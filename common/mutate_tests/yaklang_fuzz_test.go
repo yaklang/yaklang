@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -1157,7 +1158,6 @@ Cookie: a=1; b=2; c=3; d="4"; e="5"
 }
 
 func TestFuzzCookieJsonPath(t *testing.T) {
-	t.SkipNow()
 	tests := []struct {
 		name string
 		base base
@@ -1167,20 +1167,355 @@ func TestFuzzCookieJsonPath(t *testing.T) {
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
+Cookie: a={"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}; zz=abcd
+
+`,
+
+				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.boolean", false).FuzzCookieJsonPath("a", "$.string", "string").FuzzCookieJsonPath("a", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					url.QueryEscape(`"number":999`),
+					url.QueryEscape(`"boolean":false`),
+					url.QueryEscape(`"string":"string"`),
+					url.QueryEscape(`"json":{"xx":123}`),
+					`zz=abcd`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数(JSON) 默认 2",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=%7B%22number%22:%20123%2C%22boolean%22:%20true%2C%22string%22:%20%22123%22%2C%22json%22:%20%7B%22a%22:%22b%22%7D%7D
+
+`,
+
+				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.boolean", false).FuzzCookieJsonPath("a", "$.string", "string").FuzzCookieJsonPath("a", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					url.QueryEscape(`"number":999`),
+					url.QueryEscape(`"boolean":false`),
+					url.QueryEscape(`"string":"string"`),
+					url.QueryEscape(`"json":{"xx":123}`),
+				},
+				debug: true,
+			},
+		},
+
+		{
+			name: "Cookie参数(JSON) 禁止编码",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=%7B%22number%22:%20123%2C%22boolean%22:%20true%2C%22string%22:%20%22123%22%2C%22json%22:%20%7B%22a%22:%22b%22%7D%7D
+
+`,
+
+				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.boolean", false).FuzzCookieJsonPath("a", "$.string", "string").FuzzCookieJsonPath("a", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`"number":999`,
+					`"boolean":false`,
+					`"string":"string"`,
+					`"json":{"xx":123}`,
+				},
+				debug:         true,
+				disableEncode: true,
+			},
+		},
+		{
+			name: "Cookie参数(JSON) 友好显示",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
 Cookie: a={"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}
 
 `,
 
 				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.boolean", false).FuzzCookieJsonPath("a", "$.string", "string").FuzzCookieJsonPath("a", "$.json", {"xx":123})`,
 				expectKeywordInOutputPacket: []string{
-					`a={"number":999,"boolean":false,"string":"string","json":{"xx":123}}`,
+					`{{urlescape(`,
+					`"number":999`,
+					`"boolean":false`,
+					`"string":"string"`,
+					`"json":{"xx":123}`,
+					`)}}`,
 				},
-				debug: true,
+				debug:           true,
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "Cookie参数(JSON) 友好显示 && 禁止编码",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a={"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}
+
+`,
+
+				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.boolean", false).FuzzCookieJsonPath("a", "$.string", "string").FuzzCookieJsonPath("a", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`"number":999`,
+					`"boolean":false`,
+					`"string":"string"`,
+					`"json":{"xx":123}`,
+				},
+				debug:           true,
+				friendlyDisplay: true,
+				disableEncode:   true,
+			},
+		},
+		{
+			name: "Cookie参数(JSON) 追加",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a={"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}
+
+`,
+
+				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.append", 123).FuzzCookieJsonPath("a", "$.append_string", "123")`,
+				expectKeywordInOutputPacket: []string{
+					`"number":999`,
+					`"boolean":true`,
+					`"string":"123"`,
+					`"json":{"a":"b"}`,
+					`"append":123`,
+					`"append_string":"123"`,
+				},
+				debug:           true,
+				friendlyDisplay: true,
+				disableEncode:   true,
 			},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzCookieBase64JsonPath(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{ // base64 编码的 value 应当默认 disable auto encode
+			name: "Cookie参数(Base64+JSON) 默认",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=eyJudW1iZXIiOjEyM30=; b=eyJib29sZWFuIjp0cnVlfQ==; c=eyJzdHJpbmciOiIxMjMifQ==; d=eyJqc29uIjp7Inh4IjoiYiJ9fQ==
+
+`,
+				//原始测试值 a={"number":123}; b={"boolean":true}; c={"string":"123"}; d={"json":{"xx":"b"}}
+				code: `.FuzzCookieBase64JsonPath("a", "$.number", 999).FuzzCookieBase64JsonPath("b", "$.boolean", false).FuzzCookieBase64JsonPath("c", "$.string", "string").FuzzCookieBase64JsonPath("d", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`a=` + codec.EncodeBase64(`{"number":999}`),
+					`b=` + codec.EncodeBase64(`{"boolean":false}`),
+					`c=` + codec.EncodeBase64(`{"string":"string"}`),
+					`d=` + codec.EncodeBase64(`{"json":{"xx":123}}`),
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64+JSON) 追加",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=eyJudW1iZXIiOjEyM30=; b=eyJib29sZWFuIjp0cnVlfQ==; c=eyJzdHJpbmciOiIxMjMifQ==; d=eyJqc29uIjp7Inh4IjoiYiJ9fQ==
+
+`,
+				//原始测试值 a={"number":123}; b={"boolean":true}; c={"string":"123"}; d={"json":{"xx":"b"}}
+				code: `.FuzzCookieBase64JsonPath("e", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`a=` + codec.EncodeBase64(`{"number":999}`),
+					`b=` + codec.EncodeBase64(`{"boolean":false}`),
+					`c=` + codec.EncodeBase64(`{"string":"string"}`),
+					`d=` + codec.EncodeBase64(`{"json":{"xx":123}}`),
+					`e=` + codec.EncodeBase64(`{"json":{"xx":123}}`),
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64+JSON) 友好显示",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=eyJudW1iZXIiOjEyM30=; b=eyJib29sZWFuIjp0cnVlfQ==; c=eyJzdHJpbmciOiIxMjMifQ==; d=eyJqc29uIjp7Inh4IjoiYiJ9fQ==
+
+`,
+				//原始测试值 a={"number":123}; b={"boolean":true}; c={"string":"123"}; d={"json":{"xx":"b"}}
+				code: `.FuzzCookieBase64JsonPath("a", "$.number", 999).FuzzCookieBase64JsonPath("b", "$.boolean", false).FuzzCookieBase64JsonPath("c", "$.string", "string").FuzzCookieBase64JsonPath("d", "$.json", {"xx":123}).FuzzCookieBase64JsonPath("e", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`a={{base64({"number":999})}}`,
+					`b={{base64({"boolean":false})}}`,
+					`c={{base64({"string":"string"})}}`,
+					`d={{base64({"json":{"xx":123}})}}`,
+					`e={{base64({"json":{"xx":123}})}}`,
+				},
+				debug:           true,
+				friendlyDisplay: true,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzPostParams(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "POST参数 默认",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==
+`,
+				code: `.FuzzPostParams("b", "%25%25").FuzzPostParams("c", "$")`,
+				expectKeywordInOutputPacket: []string{
+					"a=MTIzNA%3D%3D%0A",
+					"b=%2525%2525",
+					"c=%24",
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "POST参数 友好显示",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==
+`,
+				code: `.FuzzPostParams("b", "%25%25").FuzzPostParams("c", "$")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==\n)}}",
+					"b={{urlescape(%25%25)}}",
+					"c={{urlescape($)}}",
+				},
+				friendlyDisplay: true,
+				debug:           true,
+			},
+		},
+		{
+			name: "POST参数 友好显示2",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==`,
+				code: `.FuzzPostParams("b", "%25%25").FuzzPostParams("c", "$")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}&b={{urlescape(%25%25)}}&c={{urlescape($)}}",
+				},
+				friendlyDisplay: true,
+				debug:           true,
+			},
+		},
+		{
+			name: "POST参数 禁止指定参数自动编码",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==`,
+				code: `.FuzzPostParams("b", "%25%25").FuzzPostParams("c", "$")`,
+				expectKeywordInOutputPacket: []string{
+					"a=MTIzNA%3D%3D",
+					"b=%25%25",
+					"c=$",
+				},
+				disableEncode: true,
+			},
+		},
+		{
+			name: "POST参数 禁止编码 & 友好显示",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==`,
+				code: `.FuzzPostParams("b", "%25%25")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}", "b=%25%25",
+				},
+				disableEncode:   true,
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "POST参数 禁止编码 & 友好显示 2",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==`,
+				code: `.FuzzPostParams("b", "%25").FuzzPostParams("c", "$")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}",
+					"b=%25",
+					"c=$",
+				},
+				disableEncode:   true,
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "POST参数 友好显示 2",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=MTIzNA==&b=2`,
+				code: `.FuzzPostParams("b", "12")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}", "b=12",
+				},
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "POST参数 Raw",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=b
+`,
+				code: `.FuzzPostRaw("ccccccccccccccc")`,
+				expectKeywordInOutputPacket: []string{
+					"\r\n\r\nccccccccccccccc",
+				},
+			},
+		},
+		{
+			name: "POST参数 Packet Num",
+			base: base{
+				inputPacket: `POST /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzPostRaw("{{int(1-3)}}")`,
+				expectKeywordInOutputPacket: []string{
+					"\r\n\r\n1",
+				},
+				expectPacketNum: 3,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+
 	}
 }
 

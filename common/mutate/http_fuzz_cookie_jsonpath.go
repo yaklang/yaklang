@@ -1,34 +1,14 @@
 package mutate
 
 import (
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonpath"
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
-	"net/url"
 )
-
-func cloneCookies(i []*http.Cookie) []*http.Cookie {
-	return funk.Map(i, func(in *http.Cookie) *http.Cookie {
-		return &http.Cookie{
-			Name:       in.Name,
-			Value:      in.Value,
-			Path:       in.Path,
-			Domain:     in.Domain,
-			Expires:    in.Expires,
-			RawExpires: in.RawExpires,
-			MaxAge:     in.MaxAge,
-			Secure:     in.Secure,
-			HttpOnly:   in.HttpOnly,
-			SameSite:   in.SameSite,
-			Raw:        in.Raw,
-			Unparsed:   in.Unparsed,
-		}
-	}).([]*http.Cookie)
-}
 
 func valueToJsonValue(i string) []any {
 	if utils.IsValidInteger(i) {
@@ -50,8 +30,7 @@ func valueToJsonValue(i string) []any {
 	return []any{i}
 }
 
-// TODO
-func (f *FuzzHTTPRequest) fuzzCookieBase64JsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any, encoded ...codec.EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -63,108 +42,66 @@ func (f *FuzzHTTPRequest) fuzzCookieBase64JsonPath(key any, jsonPath string, val
 		return nil, utils.Error("empty cookie")
 	}
 
-	var kStr = utils.InterfaceToString(key)
+	kStr, values := utils.InterfaceToString(key), InterfaceToFuzzResults(val)
 	var originJson string
 	for _, k := range cookies {
 		if k.Name != kStr {
 			continue
 		}
 		var ok bool
-		originJson, ok = isBase64JSON(k.Value)
-		if !ok {
-			continue
-		}
-	}
-	if originJson == "" {
-		return nil, utils.Error("empty json")
-	}
-
-	var reqs []*http.Request
-	err = cartesian.ProductEx([][]string{
-		{kStr}, InterfaceToFuzzResults(val),
-	}, func(result []string) error {
-		k, v := result[0], result[1]
-		_ = k
-		var replaced = valueToJsonValue(v)
-		for _, i := range replaced {
-			replacedOrigin := jsonpath.ReplaceString(originJson, jsonPath, i)
-			cloned := cloneCookies(cookies)
-			for _, cookie := range cloned {
-				if cookie.Name == kStr {
-					cookie.Value = url.QueryEscape(codec.EncodeBase64(replacedOrigin))
-					break
-				}
+		if originJson, ok = isBase64JSON(k.Value); !ok {
+			originJson, ok = utils.IsJSON(k.Value)
+			if !ok {
+				continue
 			}
-			_req := lowhttp.CopyRequest(req)
-			_req.Header.Del("Cookie")
-			_req.Header["Cookie"] = []string{lowhttp.CookiesToString(cloned)}
-			reqs = append(reqs, _req)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return reqs, nil
-}
-
-func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {
-	req, err := f.GetOriginHTTPRequest()
-	if err != nil {
-		return nil, err
-	}
-
-	var cookies []*http.Cookie
-	cookies = lowhttp.ParseCookie("cookie", req.Header.Get("Cookie"))
-	if cookies == nil {
-		return nil, utils.Error("empty cookie")
-	}
-
-	var kStr = utils.InterfaceToString(key)
-	var originJson string
-	for _, k := range cookies {
-		if k.Name != kStr {
-			continue
-		}
-		var ok bool
-		originJson, ok = utils.IsJSON(k.Value)
-		if !ok {
-			continue
 		}
 	}
+	// 如果没有找到对应的cookie key,则认为是追加
 	if originJson == "" {
-		return nil, utils.Error("empty json")
+		originJson = "{}"
 	}
 
-	var reqs []*http.Request
+	results := make([]*http.Request, 0, len(kStr)*len(values))
+	origin := httpctx.GetBareRequestBytes(req)
+
 	err = cartesian.ProductEx([][]string{
-		{kStr}, InterfaceToFuzzResults(val),
+		{kStr}, values,
 	}, func(result []string) error {
-		k, v := result[0], result[1]
-		_ = k
-		var replaced = valueToJsonValue(v)
-		for _, i := range replaced {
-			replacedOrigin := jsonpath.ReplaceString(originJson, jsonPath, i)
-			cloned := cloneCookies(cookies)
-			for _, cookie := range cloned {
-				if cookie.Name == kStr {
-					cookie.Value = replacedOrigin
-					break
-				}
-			}
-			_req := lowhttp.CopyRequest(req)
-			_req.Header.Del("Cookie")
-			_req.Header["Cookie"] = []string{lowhttp.CookiesToString(cloned)}
-			reqs = append(reqs, _req)
+		_, value := result[0], result[1]
+		modifiedParams, err := modifyJSONValue(originJson, jsonPath, value, val)
+		if err != nil {
+			return err
 		}
+		var newModifiedParams string
+
+		if f.friendlyDisplay {
+			newModifiedParams = lowhttp.CookieSafeFriendly(modifiedParams)
+		}
+		if f.NoAutoEncode() {
+			newModifiedParams = lowhttp.CookieSafeString(modifiedParams)
+		} else if !f.friendlyDisplay {
+			newModifiedParams = lowhttp.CookieSafeQuoteString(modifiedParams)
+		}
+
+		for _, e := range encoded {
+			newModifiedParams = e(newModifiedParams)
+		}
+
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(
+			lowhttp.ReplaceHTTPPacketCookie(origin, kStr, newModifiedParams),
+		)
+		if err != nil {
+			return err
+		}
+
+		results = append(results, reqIns)
 
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return reqs, nil
+	return results, nil
 }
 
 func (f *FuzzHTTPRequest) FuzzCookieJsonPath(k any, jp string, v any) FuzzHTTPRequestIf {
@@ -176,7 +113,15 @@ func (f *FuzzHTTPRequest) FuzzCookieJsonPath(k any, jp string, v any) FuzzHTTPRe
 }
 
 func (f *FuzzHTTPRequest) FuzzCookieBase64JsonPath(k any, jp string, v any) FuzzHTTPRequestIf {
-	reqs, err := f.fuzzCookieBase64JsonPath(k, jp, v)
+	encode := func(v any) string {
+		if f.friendlyDisplay {
+			return fmt.Sprintf("{{base64(%s)}}", v)
+		}
+		return codec.EncodeBase64(v)
+	}
+	// 被base64编码的json 应当不再被 url 编码
+	f.DisableAutoEncode(true)
+	reqs, err := f.fuzzCookieJsonPath(k, jp, v, encode)
 	if err != nil {
 		return f.toFuzzHTTPRequestBatch()
 	}
