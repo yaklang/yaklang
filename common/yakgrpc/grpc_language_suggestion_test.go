@@ -106,6 +106,20 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		}, []string{"a", "b", "c"})
 	})
 
+	t.Run("assign variable offset", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionContains(t,
+			`a = ssa.Parse("")~.`,
+			&ypb.Range{
+				Code:        ".",
+				StartLine:   1,
+				StartColumn: 19,
+				EndLine:     1,
+				EndColumn:   20,
+			}, []string{"Ref", "Program"})
+	})
+
 	t.Run("before with repeated symbols", func(t *testing.T) {
 		t.Parallel()
 
