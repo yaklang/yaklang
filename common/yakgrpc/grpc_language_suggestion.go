@@ -284,15 +284,17 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 }
 
 func getInstancesAndFuncDecls(v *ssaapi.Value, containPoint bool) (map[string]*yakdoc.LibInstance, map[string]*yakdoc.FuncDecl) {
-	libName := v.GetName()
-	lib, ok := doc.DefaultDocumentHelper.Libs[libName]
-	if ok {
-		return lib.Instances, lib.Functions
+	if containPoint {
+		libName := v.GetName()
+		lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+		if ok {
+			return lib.Instances, lib.Functions
+		} else {
+			return nil, nil
+		}
 	}
-	if !containPoint {
-		return nil, doc.DefaultDocumentHelper.Functions
-	}
-	return nil, nil
+
+	return nil, doc.DefaultDocumentHelper.Functions
 }
 
 func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(decl *yakdoc.FuncDecl) string) string {

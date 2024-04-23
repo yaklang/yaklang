@@ -50,33 +50,48 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		// }
 		return GetSuggestion(local, COMPLETION, "yak", t, code, r, id)
 	}
-	checkCompletionWithCallback := func(t *testing.T, code string, r *ypb.Range, callback func(suggestions []*ypb.SuggestionDescription), ids ...string) {
+	type callbackTyp func(suggestions []*ypb.SuggestionDescription)
+
+	checkCompletionWithCallbacks := func(t *testing.T, code string, r *ypb.Range, callbacks ...callbackTyp) {
 		t.Helper()
 		var id string
-		if len(ids) == 0 {
-			id = uuid.NewString()
-		} else {
-			id = ids[0]
-		}
 
 		res := getCompletion(t, code, r, id)
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("should get completion but not")
 		}
-		callback(res.SuggestionMessage)
+		for _, callback := range callbacks {
+			callback(res.SuggestionMessage)
+		}
 	}
 
-	checkCompletionContains := func(t *testing.T, code string, r *ypb.Range, want []string, ids ...string) {
-		t.Helper()
-		checkCompletionWithCallback(t, code, r, func(suggestions []*ypb.SuggestionDescription) {
+	labelsContainsCallback := func(t *testing.T, want []string) callbackTyp {
+		return func(suggestions []*ypb.SuggestionDescription) {
+			t.Helper()
 			labels := lo.Map(suggestions, func(item *ypb.SuggestionDescription, _ int) string {
 				return item.Label
 			})
-			log.Info("got: ", labels)
 			if !utils.StringSliceContainsAll(labels, want...) {
 				t.Fatalf("want %v, but got %v", want, labels)
 			}
-		})
+		}
+	}
+
+	labelsNotContainsCallback := func(t *testing.T, notWant []string) callbackTyp {
+		return func(suggestions []*ypb.SuggestionDescription) {
+			t.Helper()
+			labels := lo.Map(suggestions, func(item *ypb.SuggestionDescription, _ int) string {
+				return item.Label
+			})
+			if utils.ContainsAny(labels, notWant...) {
+				t.Fatalf("don't want %v, but got", notWant)
+			}
+		}
+	}
+
+	checkCompletionContains := func(t *testing.T, code string, r *ypb.Range, want []string) {
+		t.Helper()
+		checkCompletionWithCallbacks(t, code, r, labelsContainsCallback(t, want))
 	}
 
 	t.Run("before symbols", func(t *testing.T) {
@@ -94,7 +109,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 	t.Run("before with repeated symbols", func(t *testing.T) {
 		t.Parallel()
 
-		checkCompletionWithCallback(t,
+		checkCompletionWithCallbacks(t,
 			`a = 1; a = 2; `,
 			&ypb.Range{
 				Code:        "",
@@ -256,6 +271,22 @@ rsp.`,
 				EndLine:     2,
 				EndColumn:   5,
 			}, []string{"Contains"})
+	})
+
+	t.Run("fix unexpected lib function completion", func(t *testing.T) {
+		t.Parallel()
+		checkCompletionWithCallbacks(t,
+			`ssa`,
+			&ypb.Range{
+				Code:        "ssa",
+				StartLine:   1,
+				StartColumn: 1,
+				EndLine:     1,
+				EndColumn:   4,
+			},
+			labelsContainsCallback(t, []string{"println"}),
+			labelsNotContainsCallback(t, []string{"Parse"}),
+		)
 	})
 }
 
