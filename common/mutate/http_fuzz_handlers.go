@@ -2,7 +2,6 @@ package mutate
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/antchfx/xmlquery"
 	"github.com/tidwall/gjson"
@@ -351,13 +350,8 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 		return nil, err
 	}
 
-	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(f.originRequest)
-	if body == nil {
-		return nil, errors.New("empty body")
-	}
-
 	if f.queryParams == nil {
-		f.queryParams = lowhttp.ParseQueryParams(string(body))
+		f.queryParams = lowhttp.ParseQueryParams(f.GetPostQuery())
 	}
 
 	keyStr := utils.InterfaceToString(key)
@@ -699,7 +693,7 @@ func (f *FuzzHTTPRequest) fuzzXMLWithRaw(k, v any) ([]*http.Request, error) {
 
 	var rawBody []byte
 	if req.Body != nil {
-		rawBody = httpRequestReadBody(req)
+		rawBody = f.GetBody()
 	} else {
 		return nil, utils.Errorf("empty body")
 	}
@@ -721,6 +715,7 @@ func (f *FuzzHTTPRequest) fuzzXMLWithRaw(k, v any) ([]*http.Request, error) {
 
 	var reqs []*http.Request
 	var nodes []*xmlquery.Node
+	origin := httpctx.GetBareRequestBytes(req)
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
@@ -740,11 +735,11 @@ func (f *FuzzHTTPRequest) fuzzXMLWithRaw(k, v any) ([]*http.Request, error) {
 					Type: xmlquery.TextNode,
 				}
 				raw := rootNode.OutputXML(false)
-				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-				_req.Body = io.NopCloser(strings.NewReader(raw))
-				if _req != nil {
-					reqs = append(reqs, _req)
+				reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketBodyFast(origin, []byte(raw)))
+				if err != nil {
+					continue
 				}
+				reqs = append(reqs, reqIns)
 				node.FirstChild = oldChild
 			}
 		}
