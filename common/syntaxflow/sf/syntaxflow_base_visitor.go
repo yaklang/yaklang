@@ -19,19 +19,11 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterStatement(ctx *FilterStatementContext
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitExistedRef(ctx *ExistedRefContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowVisitor) VisitRefVariable(ctx *RefVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitRegexpLiteralFilter(ctx *RegexpLiteralFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitDirectionFilter(ctx *DirectionFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -67,11 +59,19 @@ func (v *BaseSyntaxFlowVisitor) VisitDeepNextFilter(ctx *DeepNextFilterContext) 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitNamedParam(ctx *NamedParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitEmptyParam(ctx *EmptyParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitSliceCallItem(ctx *SliceCallItemContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

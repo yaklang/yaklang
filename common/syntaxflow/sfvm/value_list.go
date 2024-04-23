@@ -3,18 +3,14 @@ package sfvm
 import (
 	"fmt"
 	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 )
 
-func AutoValue(i any) ValueOperator {
-	log.Warnf("TBD: AutoValue: %v", i)
-	return NewValue(nil)
-}
+var _ ValueOperator = &ValueList{}
 
 func MergeValues(values ...ValueOperator) ValueOperator {
-	return &ValueList{values: values}
+	return NewValues(values)
 }
 
 func NewValues(values []ValueOperator) ValueOperator {
@@ -23,6 +19,41 @@ func NewValues(values []ValueOperator) ValueOperator {
 
 type ValueList struct {
 	values []ValueOperator
+}
+
+func (v *ValueList) GetCallActualParams() (ValueOperator, error) {
+	return nil, utils.Error("list cannot be handled in ValueList.GetCallActualParams")
+}
+
+func (v *ValueList) GetSyntaxFlowTopDef() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		topDef, err := v.GetSyntaxFlowTopDef()
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, topDef)
+	}
+	return NewValues(res), nil
+}
+
+func (v *ValueList) GetSyntaxFlowBottomUse() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		bottomUse, err := v.GetSyntaxFlowBottomUse()
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, bottomUse)
+	}
+	return NewValues(res), nil
+}
+
+func (v *ValueList) ListIndex(i int) (ValueOperator, error) {
+	if i < 0 || i >= len(v.values) {
+		return nil, utils.Error("index out of range")
+	}
+	return v.values[i], nil
 }
 
 func (v *ValueList) GetName() string {
@@ -38,27 +69,57 @@ func (v *ValueList) IsList() bool {
 }
 
 func (v *ValueList) ExactMatch(s string) (bool, ValueOperator, error) {
-	return false, nil, utils.Error("ValueList does not support ExactMatch")
+	var res []ValueOperator
+	for _, value := range v.values {
+		match, next, err := value.ExactMatch(s)
+		if err != nil {
+			return false, nil, err
+		}
+		if match {
+			if next != nil {
+				res = append(res, next)
+			} else {
+				res = append(res, value)
+			}
+		}
+	}
+	return len(res) > 0, NewValues(res), nil
 }
 
 func (v *ValueList) GlobMatch(s glob.Glob) (bool, ValueOperator, error) {
-	return false, nil, utils.Error("ValueList does not support GlobMatch")
+	var res []ValueOperator
+	for _, value := range v.values {
+		match, next, err := value.GlobMatch(s)
+		if err != nil {
+			return false, nil, err
+		}
+		if match {
+			if next != nil {
+				res = append(res, next)
+			} else {
+				res = append(res, value)
+			}
+		}
+	}
+	return len(res) > 0, NewValues(res), nil
 }
 
 func (v *ValueList) RegexpMatch(regexp *regexp.Regexp) (bool, ValueOperator, error) {
-	return false, nil, utils.Error("ValueList does not support RegexpMatch")
-}
-
-func (v *ValueList) NumberEqual(i any) (bool, ValueOperator, error) {
-	return false, nil, utils.Error("ValueList does not support NumberEqual")
-}
-
-func (v *ValueList) GetFields() (ValueOperator, error) {
-	var result []ValueOperator
-	for k := range v.values {
-		result = append(result, AutoValue(k))
+	var res []ValueOperator
+	for _, value := range v.values {
+		match, next, err := value.RegexpMatch(regexp)
+		if err != nil {
+			return false, nil, err
+		}
+		if match {
+			if next != nil {
+				res = append(res, next)
+			} else {
+				res = append(res, value)
+			}
+		}
 	}
-	return NewValues(result), nil
+	return len(res) > 0, NewValues(res), nil
 }
 
 func (v *ValueList) GetMembers() (ValueOperator, error) {
@@ -68,21 +129,3 @@ func (v *ValueList) GetMembers() (ValueOperator, error) {
 	}
 	return MergeValues(result...), nil
 }
-
-func (v *ValueList) GetFunctionCallArgs() (ValueOperator, error) {
-	return nil, utils.Error("ValueList does not support GetFunctionCallArgs")
-}
-
-func (v *ValueList) GetSliceCallArgs() (ValueOperator, error) {
-	return nil, utils.Error("ValueList does not support GetSliceCallArgs")
-}
-
-func (v *ValueList) Next() (ValueOperator, error) {
-	return nil, utils.Error("ValueList does not support Next")
-}
-
-func (v ValueList) DeepNext() (ValueOperator, error) {
-	return nil, utils.Error("ValueList does not support DeepNext")
-}
-
-var _ ValueOperator = &ValueList{}

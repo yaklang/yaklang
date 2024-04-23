@@ -5,20 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func (y *SyntaxFlowVisitor) EmitMapBuildDone(refs ...string) {
-	i := len(refs)
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpMapDone, UnaryInt: i,
-		Values: refs,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitMapBuildStart() {
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpMapStart,
-	})
-}
-
 func (y *SyntaxFlowVisitor) EmitNewRef(i string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpNewRef,
@@ -36,28 +22,6 @@ func (y *SyntaxFlowVisitor) EmitUpdate(i string) {
 func (y *SyntaxFlowVisitor) EmitWithdraw() {
 	y.codes = append(y.codes, &SFI{
 		OpCode: OpWithdraw,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitRestoreMapContext() {
-	y.codes = append(y.codes, &SFI{OpCode: OpRestoreMapContext})
-}
-
-func (y *SyntaxFlowVisitor) EmitRestoreFlatContext() {
-	y.codes = append(y.codes, &SFI{OpCode: OpRestoreFlatContext})
-}
-
-func (y *SyntaxFlowVisitor) EmitFlatDone(i int) {
-	y.codes = append(y.codes, &SFI{
-		OpCode:   OpFlatDone,
-		UnaryInt: i,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitFlatStart(i int) {
-	y.codes = append(y.codes, &SFI{
-		OpCode:   OpFlatStart,
-		UnaryInt: i,
 	})
 }
 
@@ -130,39 +94,11 @@ func (v *SyntaxFlowVisitor) EmitPushLiteral(i any) {
 
 }
 
-func (v *SyntaxFlowVisitor) EmitRef(i string) {
-	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushRef,
-		UnaryStr: i,
-	})
-}
-
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {
 	case string:
 	case int:
 	}
-}
-
-func (v *SyntaxFlowVisitor) EmitField(i string) {
-	v.codes = append(v.codes, &SFI{
-		OpCode:   OpFetchField,
-		UnaryStr: i,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitFetchIndex(i int) {
-	y.codes = append(y.codes, &SFI{
-		OpCode:   OpFetchIndex,
-		UnaryInt: i,
-	})
-}
-
-func (v *SyntaxFlowVisitor) EmitTypeCast(i string) {
-	v.codes = append(v.codes, &SFI{
-		OpCode:   OpTypeCast,
-		UnaryStr: i,
-	})
 }
 
 func (v *SyntaxFlowVisitor) EmitSearchExact(i string) {
@@ -186,34 +122,14 @@ func (v *SyntaxFlowVisitor) EmitSearchRegexp(i string) {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchMember(i string) {
+func (v *SyntaxFlowVisitor) EmitGetMembers() {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushSearchMember,
-		UnaryStr: i,
+		OpCode: OpGetMembers,
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitPushCallArgs() {
-	v.codes = append(v.codes, &SFI{OpCode: OpPushCallArgs})
-}
-
-func (v *SyntaxFlowVisitor) EmitPushIndex(i int) {
-	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushIndex,
-		UnaryInt: i,
-	})
-}
-
-func (v *SyntaxFlowVisitor) EmitDirection(i string) {
-	switch i {
-	case ">>", "<<":
-		v.codes = append(v.codes, &SFI{
-			OpCode:   OpSetDirection,
-			UnaryStr: i,
-		})
-	default:
-		panic("unknown direction")
-	}
+func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetCallArgs, UnaryInt: i})
 }
 
 func (v *SyntaxFlowVisitor) Show() {
@@ -235,5 +151,21 @@ func (y *SyntaxFlowVisitor) EmitPop() {
 func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
 	y.codes = append(y.codes, &SFI{
 		OpCode: OpCheckStackTop,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitGetTopDef() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpTopDefs,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitListIndex(i int) {
+	y.codes = append(y.codes, &SFI{OpCode: OpListIndex, UnaryInt: i})
+}
+
+func (v *SyntaxFlowVisitor) EmitPass() {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpPass,
 	})
 }

@@ -15,16 +15,9 @@ func checkSyntax(i string, t *testing.T) {
 
 func TestSyntaxInOne(t *testing.T) {
 	for _, i := range []string{
-		`$(id)>> $`,
-		`$(id)<< $`,
-		`$id>> $`,
-		"$i<< $",
-		"$i<< $ =>$d",
 		"$",
 		"exec",    // Ref
-		"1",       // *NumberLiteral
 		".member", // Field
-		">> $",    // Change Direction
 		".*exec*",
 		"*exec",
 		"exe*c",
@@ -37,6 +30,7 @@ func TestSyntaxInOne(t *testing.T) {
 		"b?(!1)",
 		"b?(>1)",
 		"b?(!/abc/)",
+		"/(?i)runtime/.exec(,,,#*exec)",
 	} {
 		checkSyntax(i, t)
 	}

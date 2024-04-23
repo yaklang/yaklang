@@ -1,8 +1,8 @@
 package sfvm
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strconv"
 	"strings"
@@ -58,22 +58,11 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		return nil
 	}
 
-	if i.ExistedRef() != nil {
-		y.VisitExistedRef(i.ExistedRef())
+	err := y.VisitFilterExpr(i.FilterExpr())
+	if err != nil {
+		msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
+		panic(msg)
 	}
-
-	// 默认向右
-	if ret := i.GetDirection(); ret != nil {
-		if ret.GetText() == ">>" {
-			y.EmitDirection(">>")
-		} else {
-			y.EmitDirection("<<")
-		}
-	} else {
-		y.EmitDirection(">>")
-	}
-
-	y.VisitFilterExpr(i.FilterExpr())
 
 	if i.Filter() != nil {
 		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
@@ -81,21 +70,6 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		y.EmitUpdate(varName)
 	}
 
-	return nil
-}
-
-func (y *SyntaxFlowVisitor) VisitExistedRef(raw sf.IExistedRefContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*sf.ExistedRefContext)
-	if i == nil {
-		return nil
-	}
-
-	var varName = y.VisitRefVariable(i.RefVariable())
-	y.EmitRef(varName)
 	return nil
 }
 
@@ -110,109 +84,44 @@ func (y *SyntaxFlowVisitor) VisitRefVariable(raw sf.IRefVariableContext) string 
 	return i.Identifier().GetText()
 }
 
-func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-
-	switch ret := raw.(type) {
-	case *sf.CurrentRootFilterContext:
-		y.EmitCheckStackTop()
-		return nil
-	case *sf.PrimaryFilterContext:
-		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
-		if glob {
-			y.EmitSearchGlob(filter)
-		} else {
-			y.EmitSearchExact(filter)
-		}
-		return nil
-	case *sf.RegexpLiteralFilterContext:
-		regexpRaw := ret.RegexpLiteral().GetText()
-		if !(len(regexpRaw) > 2 && regexpRaw[0] == '/' && regexpRaw[len(regexpRaw)-1] == '/') {
-			return utils.Errorf("regexp format error: %v", regexpRaw)
-		}
-		regexpRaw = regexpRaw[1 : len(regexpRaw)-1]
-		r, err := regexp.Compile(regexpRaw)
-		if err != nil {
-			return utils.Errorf("regexp compile error: %v", err)
-		}
-		y.EmitRegexpMatch(r.String())
-		return nil
-	case *sf.NumberIndexFilterContext:
-		index := y.VisitNumberLiteral(ret.NumberLiteral()) // emit index number
-		y.EmitPushIndex(index)
-	case *sf.DirectionFilterContext:
-		if ret.GetOp().GetText() == "<<" {
-			y.EmitDirection("<<")
-		} else {
-			y.EmitDirection(">>")
-		}
-		y.VisitFilterExpr(ret.FilterExpr())
-	case *sf.FieldFilterContext:
-		y.EmitSearchMember(ret.NameFilter().GetText())
-	case *sf.FieldCallFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.EmitSearchMember(ret.NameFilter().GetText())
-	case *sf.FunctionCallFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.EmitPushCallArgs()
-	case *sf.FieldIndexFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.EmitSearchMember(ret.NameFilter().GetText())
-	case *sf.OptionalFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.VisitConditionExpression(ret.ConditionExpression())
-	case *sf.NextFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.VisitChainFilter(ret.ChainFilter())
-	case *sf.DeepNextFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.VisitChainFilter(ret.ChainFilter())
-	default:
-		//panic("BUG: in filterExpr")
-	}
-
-	return nil
-}
-
 func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	switch ret := raw.(type) {
-	case *sf.FlatContext:
-		var count int
-		l := len(ret.AllFilters())
-		y.EmitFlatStart(l)
-		for _, filter := range ret.AllFilters() {
-			count++
-			y.VisitFilters(filter)
-			y.EmitRestoreFlatContext()
-		}
-		y.EmitFlatDone(count)
-	case *sf.BuildMapContext:
-		var count int
-		y.EmitMapBuildStart()
-		l := len(ret.AllColon())
-		var vals []string = make([]string, l)
-		for i := 0; i < l; i++ {
-			key := ret.Identifier(i).GetText()
-			count++
-			y.EmitNewRef(key)
-			vals[i] = key
-			y.VisitFilters(ret.Filters(i))
-			y.EmitWithdraw()
-			y.EmitUpdate(key)
-			y.EmitRestoreMapContext()
-			// pop val, create object and set key
-		}
-		y.EmitMapBuildDone(vals...)
-	default:
-		panic("Unexpected VisitChainFilter")
-	}
-
+	//switch ret := raw.(type) {
+	//case *sf.FlatContext:
+	//	var count int
+	//	l := len(ret.AllFilters())
+	//	y.EmitFlatStart(l)
+	//	for _, filter := range ret.AllFilters() {
+	//		count++
+	//		y.VisitFilters(filter)
+	//		y.EmitRestoreFlatContext()
+	//	}
+	//	y.EmitFlatDone(count)
+	//case *sf.BuildMapContext:
+	//	var count int
+	//	y.EmitMapBuildStart()
+	//	l := len(ret.AllColon())
+	//	var vals []string = make([]string, l)
+	//	for i := 0; i < l; i++ {
+	//		key := ret.Identifier(i).GetText()
+	//		count++
+	//		y.EmitNewRef(key)
+	//		vals[i] = key
+	//		y.VisitFilters(ret.Filters(i))
+	//		y.EmitWithdraw()
+	//		y.EmitUpdate(key)
+	//		y.EmitRestoreMapContext()
+	//		// pop val, create object and set key
+	//	}
+	//	y.EmitMapBuildDone(vals...)
+	//default:
+	//	panic("Unexpected VisitChainFilter")
+	//}
+	//
+	//return nil
 	return nil
 }
 

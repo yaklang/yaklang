@@ -16,17 +16,11 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#filterStatement.
 	VisitFilterStatement(ctx *FilterStatementContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#existedRef.
-	VisitExistedRef(ctx *ExistedRefContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#refVariable.
 	VisitRefVariable(ctx *RefVariableContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#RegexpLiteralFilter.
 	VisitRegexpLiteralFilter(ctx *RegexpLiteralFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#DirectionFilter.
-	VisitDirectionFilter(ctx *DirectionFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FieldFilter.
 	VisitFieldFilter(ctx *FieldFilterContext) interface{}
@@ -52,11 +46,17 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#DeepNextFilter.
 	VisitDeepNextFilter(ctx *DeepNextFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#NumberIndexFilter.
-	VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#FieldIndexFilter.
 	VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#NamedParam.
+	VisitNamedParam(ctx *NamedParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#EmptyParam.
+	VisitEmptyParam(ctx *EmptyParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#sliceCallItem.
+	VisitSliceCallItem(ctx *SliceCallItemContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#nameFilter.
 	VisitNameFilter(ctx *NameFilterContext) interface{}
