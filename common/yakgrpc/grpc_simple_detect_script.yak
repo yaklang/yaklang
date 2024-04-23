@@ -499,12 +499,12 @@ bruteScan = func(result) {
         uL = make([]string)
         pL = make([]string)
 
-        if (replaceDefaultUsernameDict) {
+        if !replaceDefaultUsernameDict {
             uL = append(uL, defaultusers...)
         }
 
 
-        if (replaceDefaultPasswordDict) {
+        if !replaceDefaultPasswordDict {
             pL = append(pL, defaultpass...)
         }
 
