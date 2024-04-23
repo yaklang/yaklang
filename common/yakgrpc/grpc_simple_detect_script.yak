@@ -646,7 +646,7 @@ func handleTCP(target) {
             yakit.Output({"host": "TCP-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
             portRes,_ = yakit.ObjToPort(result)
             portRes.TaskName = taskName
-            yakit.SavePortFromResult(result)
+            yakit.SavePortFromResult(portRes)
             addOpenPortCount()
             handleServiceScanResult(result)
         }
