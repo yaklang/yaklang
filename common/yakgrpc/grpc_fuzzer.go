@@ -115,13 +115,15 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	if strings.HasPrefix(result, "https://") {
 		isHttps = true
 	}
+	if strings.HasPrefix(result, "http://") {
+		isHttps = false
+	}
 	_ = isHttps
 	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, isHttps)
 	resultRequest := lowhttp.UrlToGetRequestPacket(newUrl, []byte(req.GetRequest()), isHttps, lowhttp.ExtractCookieJarFromHTTPResponse([]byte(req.GetResponse()))...)
 	if resultRequest == nil {
 		return nil, utils.Errorf("cannot merge request packet. redirect url: %s", newUrl)
 	}
-
 	start := time.Now()
 	host, port, _ := utils.ParseStringToHostPort(newUrl)
 	rspIns, err := lowhttp.HTTPWithoutRedirect(
@@ -131,8 +133,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		lowhttp.WithRequest(resultRequest),
 		lowhttp.WithTimeoutFloat(req.GetPerRequestTimeoutSeconds()),
 		lowhttp.WithGmTLS(req.GetIsGmTLS()),
-		lowhttp.WithProxy(utils.PrettifyListFromStringSplited(req.GetProxy(), ",")...),
-	)
+		lowhttp.WithProxy(utils.PrettifyListFromStringSplited(req.GetProxy(), ",")...))
 	if err != nil {
 		return nil, err
 	}
