@@ -32,6 +32,13 @@ func (variable *Variable) Assign(value Value) error {
 	if utils.IsNil(value) {
 		return utils.Error("assign empty")
 	}
+
+	// set offset value for assign variable
+	prog := value.GetProgram()
+	if prog != nil {
+		prog.SetOffsetValue(value, value.GetRange())
+	}
+
 	value.AddVariable(variable)
 	if variable.IsMemberCall() {
 		// setMemberVerboseName(value)
