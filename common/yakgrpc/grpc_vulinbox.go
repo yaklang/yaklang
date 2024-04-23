@@ -3,14 +3,15 @@ package yakgrpc
 import (
 	"context"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed grpc_vulinbox_script.yak
@@ -52,13 +53,6 @@ func (s *Server) IsVulinboxReady(ctx context.Context, req *ypb.IsVulinboxReadyRe
 		}, nil
 	}
 
-	raw, err := exec.CommandContext(ctx, p, "--version").CombinedOutput()
-	if err != nil {
-		return &ypb.IsVulinboxReadyResponse{
-			Ok: false, Reason: "vulinbox cannot show version",
-		}, err
-	}
-	log.Infof("checking vulinbox version: \n%s\n", string(raw))
 	return &ypb.IsVulinboxReadyResponse{Ok: true}, nil
 }
 
