@@ -208,7 +208,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 // NOTE: the object/membercall will create vars in finished blocks
 func (f *FunctionBuilder) EmitUndefined(name string) *Undefined {
 	u := NewUndefined(name)
-	f.EmitFirst(u, f.CurrentBlock)
+	f.emit(u)
 	return u
 }
 
