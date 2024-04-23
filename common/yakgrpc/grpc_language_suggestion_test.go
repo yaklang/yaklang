@@ -110,19 +110,24 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		t.Parallel()
 
 		checkCompletionWithCallbacks(t,
-			`a = 1; a = 2; `,
+			`a = 1; a = () => 2;`,
 			&ypb.Range{
 				Code:        "",
 				StartLine:   1,
-				StartColumn: 14,
+				StartColumn: 19,
 				EndLine:     1,
-				EndColumn:   15,
+				EndColumn:   20,
 			},
 			func(suggestions []*ypb.SuggestionDescription) {
-				labels := lo.Map(suggestions, func(item *ypb.SuggestionDescription, _ int) string {
-					return item.Label
+				// check only one "a"
+				items := lo.Filter(suggestions, func(item *ypb.SuggestionDescription, _ int) bool {
+					return item.Label == "a"
 				})
-				require.Equal(t, 1, lo.Count(labels, "a"), `want only 1 "a" label but got 2`)
+				require.Len(t, items, 1, `want only 1 "a" label but got 2`)
+
+				// check the "a" is a function
+				item := items[0]
+				require.Equal(t, "Function", item.Kind)
 			})
 	})
 
