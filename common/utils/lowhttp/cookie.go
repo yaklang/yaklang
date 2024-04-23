@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
@@ -46,6 +47,27 @@ func CookieSafeQuoteString(i string) string {
 		return `"` + url.QueryEscape(i) + `"`
 	} else {
 		return i
+	}
+}
+
+func CookieSafeString(i string) string {
+	if ret, ok := utils.IsJSON(i); ok {
+		return ret
+	} else if strings.ContainsAny(i, " ,") {
+		return `"` + i + `"`
+	} else {
+		return i
+	}
+}
+
+func CookieSafeFriendly(vs string) string {
+	format := "{{urlescape(%s)}}"
+	if ret, ok := utils.IsJSON(vs); ok {
+		return fmt.Sprintf(format, ret)
+	} else if strings.ContainsAny(vs, " ,") {
+		return `"` + fmt.Sprintf(format, vs) + `"`
+	} else {
+		return vs
 	}
 }
 

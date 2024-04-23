@@ -62,7 +62,6 @@ func (item *QueryParamItem) fuzzEncode() string {
 		if item.NoAutoEncode {
 			buf.WriteString(item.Raw)
 		} else {
-			//buf.WriteString(codec.QueryEscape(item.Raw))
 			if utils.NeedsURLEncoding(item.Raw) {
 				buf.WriteString(fmt.Sprintf(format, item.Raw))
 			} else {
@@ -95,9 +94,9 @@ func (item *QueryParamItem) fuzzEncode() string {
 }
 
 type QueryParams struct {
-	NoAutoEncode bool
+	NoAutoEncode    bool
 	friendlyDisplay bool
-	Items        []*QueryParamItem
+	Items           []*QueryParamItem
 }
 
 func NewQueryParams() *QueryParams {

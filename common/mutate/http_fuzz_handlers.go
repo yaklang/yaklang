@@ -593,8 +593,7 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...codec.Enco
 		return nil, err
 	}
 	if f.queryParams == nil {
-		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
-
+		f.queryParams = lowhttp.ParseQueryParams(f.GetPostQuery())
 	}
 	keys, values := InterfaceToFuzzResults(k), InterfaceToFuzzResults(v)
 	if keys == nil || values == nil {
@@ -899,49 +898,21 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedF
 		key, value := pair[0], pair[1]
 		var rspIns *http.Request
 		var err error
-		var combinedEncoded []codec.EncodedFunc
+		var newValue string
 		if f.friendlyDisplay {
-			combinedEncoded = []codec.EncodedFunc{
-				func(value any) string {
-					format := "{{urlescape(%s)}}"
-					vs := fmt.Sprintf("%v", value)
-					if ret, ok := utils.IsJSON(vs); ok {
-						return fmt.Sprintf(format, ret)
-					} else if strings.ContainsAny(vs, " ,") {
-						return `"` + fmt.Sprintf(format, vs) + `"`
-					} else {
-						return vs
-					}
-				},
-			}
+			newValue = lowhttp.CookieSafeFriendly(value)
 		}
 		if f.NoAutoEncode() {
-			combinedEncoded = []codec.EncodedFunc{
-				func(value any) string {
-					vs := fmt.Sprintf("%v", value)
-					if ret, ok := utils.IsJSON(vs); ok {
-						return ret
-					} else if strings.ContainsAny(vs, " ,") {
-						return `"` + vs + `"`
-					} else {
-						return vs
-					}
-				},
-			}
+			newValue = lowhttp.CookieSafeString(value)
 		} else if !f.friendlyDisplay {
-			combinedEncoded = []codec.EncodedFunc{
-				func(value any) string {
-					return lowhttp.CookieSafeQuoteString(fmt.Sprintf("%v", value))
-				},
-			}
+			newValue = lowhttp.CookieSafeQuoteString(value)
 		}
 
-		combinedEncoded = append(combinedEncoded, encoded...)
-		for _, e := range combinedEncoded {
-			value = e(value)
+		for _, e := range encoded {
+			newValue = e(newValue)
 		}
 		rspIns, err = lowhttp.ParseBytesToHttpRequest(
-			lowhttp.ReplaceHTTPPacketCookie(origin, key, value),
+			lowhttp.ReplaceHTTPPacketCookie(origin, key, newValue),
 		)
 		if err != nil {
 			log.Infof("parse (in FuzzCookie) request failed: %v", err)
