@@ -220,8 +220,20 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#parameterDecl.
 	VisitParameterDecl(ctx *ParameterDeclContext) interface{}
 
-	// Visit a parse tree produced by GoParser#expression.
-	VisitExpression(ctx *ExpressionContext) interface{}
+	// Visit a parse tree produced by GoParser#ComparisonExpression.
+	VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{}
+
+	// Visit a parse tree produced by GoParser#PrimaryExpression.
+	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
+
+	// Visit a parse tree produced by GoParser#UnaryExpression.
+	VisitUnaryExpression(ctx *UnaryExpressionContext) interface{}
+
+	// Visit a parse tree produced by GoParser#ArithmeticExpression.
+	VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{}
+
+	// Visit a parse tree produced by GoParser#BitwiseExpression.
+	VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{}
 
 	// Visit a parse tree produced by GoParser#primaryExpr.
 	VisitPrimaryExpr(ctx *PrimaryExprContext) interface{}

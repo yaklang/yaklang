@@ -291,7 +291,23 @@ func (v *BaseGoParserVisitor) VisitParameterDecl(ctx *ParameterDeclContext) inte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseGoParserVisitor) VisitExpression(ctx *ExpressionContext) interface{} {
+func (v *BaseGoParserVisitor) VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
