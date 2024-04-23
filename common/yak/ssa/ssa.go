@@ -159,32 +159,6 @@ type Program struct {
 	packagePathList packagePathList
 }
 
-func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
-	return p.editorMap.Get(url)
-}
-func (p *Program) PushEditor(e *memedit.MemEditor) {
-	p.editorStack.Push(e)
-	p.editorMap.Set(e.GetUrl(), e)
-}
-
-func (p *Program) getCurrentEditor() *memedit.MemEditor {
-	if p.editorStack == nil || p.editorStack.Len() <= 0 {
-		return nil
-	}
-	_, v, ok := p.editorStack.Last()
-	if !ok {
-		return nil
-	}
-	return v
-}
-
-func (p *Program) PopEditor() {
-	if p.editorStack == nil || p.editorStack.Len() <= 0 {
-		return
-	}
-	p.editorStack.Pop()
-}
-
 type Package struct {
 	Name string
 	// point to program

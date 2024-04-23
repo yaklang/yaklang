@@ -3,9 +3,6 @@ package ssautil
 import (
 	"io"
 	"io/fs"
-	"os"
-	"path"
-	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -49,7 +46,7 @@ func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 		i(loader)
 	}
 	if loader.fs == nil {
-		loader.fs = filesys.NewLocalFs(".")
+		loader.fs = filesys.NewLocalFs()
 	}
 	return loader
 }
@@ -60,14 +57,6 @@ func (p *PackageLoader) SetCurrentPath(currentPath string) {
 
 func (p *PackageLoader) GetCurrentPath() string {
 	return p.currentPath
-}
-
-func (p *PackageLoader) join(s ...string) string {
-	if p.fs != nil {
-		return path.Join(s...)
-	} else {
-		return filepath.Join(s...)
-	}
 }
 
 func (p *PackageLoader) AddPackagePath(path []string) {
@@ -83,19 +72,31 @@ func (p *PackageLoader) AddIncludePath(s ...string) {
 }
 
 func (p *PackageLoader) FilePath(wantPath string, once bool) (string, error) {
-	return p.getPath(wantPath, once, utils.IsFile)
+	return p.getPath(wantPath, once,
+		func(fi fs.FileInfo) bool { return !fi.IsDir() },
+	)
 }
 
 func (p *PackageLoader) DirPath(wantPath string, once bool) (string, error) {
-	return p.getPath(wantPath, once, utils.IsDir)
+	return p.getPath(wantPath, once,
+		func(fi fs.FileInfo) bool { return fi.IsDir() },
+	)
 }
 
-func (p *PackageLoader) getPath(want string, once bool, f func(string) bool) (string, error) {
+func (p *PackageLoader) getPath(want string, once bool, f func(fs.FileInfo) bool) (string, error) {
+	fs := p.fs
+	if fs == nil {
+		return "", utils.Errorf("file system is nil")
+	}
 	// found path in current path
 	tmpPath := append([]string{p.currentPath}, p.includePath...)
 	for _, path := range tmpPath {
-		filePath := p.join(path, want)
-		if f(filePath) {
+		filePath := fs.Join(path, want)
+		info, err := fs.Stat(filePath)
+		if err != nil {
+			continue
+		}
+		if f(info) {
 			if once {
 				if _, ok := p.includedPath[filePath]; ok {
 					// only check included, in once = true
@@ -110,15 +111,14 @@ func (p *PackageLoader) getPath(want string, once bool, f func(string) bool) (st
 }
 
 func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, io.Reader, error) {
+	if p.fs == nil {
+		return "", nil, utils.Errorf("file system is nil")
+	}
 	path, err := p.FilePath(packageName, once)
 	if err != nil {
 		return "", nil, err
 	}
-	if p.fs != nil {
-		data, err := p.fs.Open(path)
-		return path, data, err
-	}
-	data, err := os.Open(path)
+	data, err := p.fs.Open(path)
 	return path, data, err
 }
 
