@@ -188,11 +188,17 @@ func (sr searchResults) append(v interface{}) searchResults {
 	return append(sr, v)
 }
 
+const (
+	replace = iota
+	search
+)
+
 type parser struct {
 	scanner      scanner.Scanner
 	path         string
 	actions      actions
 	replaceValue interface{}
+	mode         int
 }
 
 func (p *parser) prepareFilterFunc() FilterFunc {
@@ -209,11 +215,11 @@ func (p *parser) prepareFilterFunc() FilterFunc {
 }
 
 func newScanner(path string) *parser {
-	return &parser{path: path}
+	return &parser{path: path, mode: search}
 }
 
 func newScannerWithReplaceValue(path string, replaceValue interface{}) *parser {
-	return &parser{path: path, replaceValue: replaceValue}
+	return &parser{path: path, replaceValue: replaceValue, mode: replace}
 }
 
 func (p *parser) scan() rune {
@@ -282,16 +288,19 @@ func (p *parser) parseObjAccess() error {
 		if !ok {
 			return nil, fmt.Errorf("expected JSON object to access child '%s' at %d", ident, column)
 		}
-		// 如果指定的属性存在，则进行替换并继续执行后续操作
-		if _, exists := obj[ident]; exists {
-			obj[ident] = p.replaceValue
+
+		if p.mode == replace {
+			if len(a) == 1 {
+				obj[ident] = p.replaceValue
+			}
 			return a.next(r, obj[ident])
 		}
+		// 默认是search
+		if c, ok := obj[ident]; ok {
+			return a.next(r, c)
+		}
+		return nil, fmt.Errorf("child '%s' not found in JSON object at %d", ident, column)
 
-		// 如果指定的属性不存在，追加
-		obj[ident] = p.replaceValue
-
-		return a.next(r, obj[ident])
 	})
 	return nil
 }
