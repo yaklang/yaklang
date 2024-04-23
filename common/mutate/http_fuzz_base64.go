@@ -1,21 +1,16 @@
 package mutate
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
-
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/mixer"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net/http"
+	"net/url"
 )
 
 func isBase64JSON(raw string) (string, bool) {
@@ -126,17 +121,9 @@ func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val a
 	}
 
 	keyStr := utils.InterfaceToString(key)
-	vals, err := url.ParseQuery(string(f.GetBody()))
-	if err != nil {
-		return nil, utils.Errorf("url.ParseQuery: %s", err)
-	}
+	vals := lowhttp.ParseQueryParams(f.GetPostQuery())
 	originValue := vals.Get(keyStr)
-	if strings.Contains(originValue, "%") {
-		unescaped, err := url.QueryUnescape(originValue)
-		if err == nil {
-			originValue = unescaped
-		}
-	}
+
 	if ret, ok := isBase64JSON(originValue); !ok {
 		return nil, utils.Errorf("invalid base64 json: %s", ret)
 	} else {
@@ -144,26 +131,32 @@ func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val a
 	}
 
 	var reqs []*http.Request
+	origin := httpctx.GetBareRequestBytes(req)
+
 	err = cartesian.ProductEx([][]string{
 		{keyStr}, InterfaceToFuzzResults(val),
 	}, func(result []string) error {
 		value := result[1]
-		var replaced = valueToJsonValue(value)
-		for _, i := range replaced {
-			_req := lowhttp.CopyRequest(req)
-			originVals := make(url.Values)
-			for k, v := range vals {
-				if k == keyStr {
-					originVals.Set(
-						k,
-						codec.EncodeBase64(jsonpath.ReplaceString(originValue, jsonPath, i)))
-				} else {
-					originVals[k] = v
-				}
-			}
-			_req.Body = io.NopCloser(bytes.NewBufferString(originVals.Encode()))
-			reqs = append(reqs, _req)
+		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val)
+
+		if err != nil {
+			return err
 		}
+		if f.friendlyDisplay {
+			modifiedParams = fmt.Sprintf("{{base64(%s)}}", modifiedParams)
+		} else {
+			modifiedParams = codec.EncodeBase64(modifiedParams)
+		}
+
+		vals.DisableAutoEncode(f.NoAutoEncode())
+		vals.SetFriendlyDisplay(f.friendlyDisplay)
+		vals.Set(keyStr, modifiedParams)
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketQueryParamRaw(origin, vals.Encode()))
+		if err != nil {
+			log.Errorf("parse (in FuzzGetParams) request failed: %v", err)
+			return nil
+		}
+		reqs = append(reqs, reqIns)
 		return nil
 	})
 	if err != nil {
@@ -181,12 +174,7 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 	keyStr := utils.InterfaceToString(key)
 	vals := lowhttp.ParseQueryParams(f.GetQueryRaw())
 	originValue := vals.Get(keyStr)
-	if strings.Contains(originValue, "%") {
-		unescaped, err := url.QueryUnescape(originValue)
-		if err == nil {
-			originValue = unescaped
-		}
-	}
+
 	if ret, ok := isBase64JSON(originValue); !ok {
 		return nil, utils.Errorf("invalid base64 json: %s", ret)
 	} else {
