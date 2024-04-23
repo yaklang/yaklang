@@ -328,6 +328,20 @@ func queryPortsByTaskName(taskName string) (chan *yakit.Port, error) {
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
+func queryPortsByRuntimeId(runtimeID string) (chan *yakit.Port, error) {
+	var db = consts.GetGormProjectDatabase()
+	if db == nil {
+		return nil, utils.Errorf("cannot found database")
+	}
+	db = db.Model(&yakit.Port{})
+	db = bizhelper.ExactQueryString(db, "runtime_id", runtimeID)
+	db = bizhelper.FuzzSearchEx(db, []string{
+		"host", "service_type",
+		"fingerprint", "cpe", "html_title",
+	}, "", false)
+	return yakit.YieldPorts(db, context.Background()), nil
+}
+
 func queryHTTPFlowByID(id ...int64) chan *yakit.HTTPFlow {
 	ch := make(chan *yakit.HTTPFlow, 100)
 	go func() {

@@ -88,6 +88,7 @@ var DatabaseExports = map[string]interface{}{
 	},
 	"QueryPortsByUpdatedAt":       queryPortsByUpdatedAt,
 	"QueryPortsByTaskName":        queryPortsByTaskName,
+	"QueryPortsByRuntimeId":       queryPortsByRuntimeId,
 	"QueryHTTPFlowsByID":          queryHTTPFlowByID,
 	"QueryHostPortByNetwork":      queryHostPortByNetwork,
 	"QueryHostPortByKeyword":      queryHostAssetByNetwork,
