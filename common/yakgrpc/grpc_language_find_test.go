@@ -176,20 +176,23 @@ a = Error()`
 		)
 	})
 
-	// 	t.Run("stdlib", func(t *testing.T) {
-	// 		code := `ssa.Parse("")
-	// ssa.Parse("")`
-	// 		checkReferences(t,
-	// 			local,
-	// 			code,
-	// 			"yak",
-	// 			newRangeFromText("1:0 1:3"),
-	// 			[]memedit.RangeIf{
-	// 				newRangeFromText("1:0 1:3"),
-	// 				newRangeFromText("2:0 2:3"),
-	// 			},
-	// 		)
-	// 	})
+	t.Run("return value", func(t *testing.T) {
+		code := `func Error() {
+err = ""
+return err
+}
+`
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("2:1 2:3"),
+			[]memedit.RangeIf{
+				newRangeFromText("2:1 2:4"),
+				newRangeFromText("3:8 3:11"),
+			},
+		)
+	})
 
 	t.Run("standary library function", func(t *testing.T) {
 		code := `ssa.Parse("")

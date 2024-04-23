@@ -95,7 +95,10 @@ func (b *FunctionBuilder) Finish() {
 		b.CurrentBlock = endBlock
 	}
 
-	// set program offsetMap for not const and not variable value
+	// set program offsetMap
+	// skip const
+	// skip no variable value
+	// skip return
 	for _, block := range b.Blocks {
 		for _, inst := range block.Insts {
 			value, ok := ToValue(inst)
@@ -103,6 +106,9 @@ func (b *FunctionBuilder) Finish() {
 				continue
 			}
 			if _, ok := ToConst(value); ok {
+				continue
+			}
+			if value.GetOpcode() == SSAOpcodeReturn {
 				continue
 			}
 
