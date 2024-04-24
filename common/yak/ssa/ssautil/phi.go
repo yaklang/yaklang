@@ -20,8 +20,8 @@ func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
 
 	baseScope := ScopedVersionedTableIF[T](base)
 	ForEachCapturedVariable(scope, baseScope, func(name string, ver VersionedIF[T]) {
-		v := base.CreateVariable(name, false)
-		base.AssignVariable(v, ver.GetValue())
+		// v := base.CreateVariable(name, false)
+		base.AssignVariable(ver, ver.GetValue())
 	})
 }
 

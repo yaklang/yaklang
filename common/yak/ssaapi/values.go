@@ -338,6 +338,11 @@ func GetBareNode(v *Value) ssa.Value {
 	return v.node
 }
 
+func GetValues(v *Value) Values {
+	v.node.GetValues()
+	return lo.Map(v.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+}
+
 // IsCalled desc any of 'Users' is Call
 func (v *Value) IsCalled() bool {
 	return len(v.GetUsers().Filter(func(value *Value) bool {
