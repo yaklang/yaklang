@@ -14,6 +14,8 @@ import (
 	"go.uber.org/atomic"
 )
 
+var DB = consts.GetGormProjectDatabase()
+
 type instructionIrCode struct {
 	inst   Instruction
 	irCode *ssadb.IrCode
@@ -51,7 +53,7 @@ func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 	}
 
 	if databaseEnable {
-		cache.DB = consts.GetGormProjectDatabase() // just use the default database
+		cache.DB = DB
 		instructionCache.SetExpirationCallback(func(key int64, instIrCode instructionIrCode) {
 			cache.saveInstruction(instIrCode)
 		})
@@ -103,9 +105,10 @@ func (c *Cache) DeleteInstruction(inst Instruction) {
 func (c *Cache) GetInstruction(id int64) Instruction {
 	ret, ok := c.InstructionCache.Get(id)
 	if !ok && c.DB != nil {
-		ir := ssadb.GetIrCodeById(c.DB, id)
-		_ = ir
-		// ir to Instruction
+		// if no in cache, get from database
+		// if found in database, create a new lazy instruction
+		return c.newLazyInstruction(id)
+		// all instruction from database will be lazy instruction
 	}
 	return ret.inst
 }
@@ -117,9 +120,14 @@ func (c *Cache) GetByVariable(name string) []Instruction {
 	ret, ok := c.VariableCache.Get(name)
 	if !ok && c.DB != nil {
 		// get from database
-	}
-	if ret == nil {
-		ret = make([]Instruction, 0)
+		irVariable, err := ssadb.GetVariable(c.DB, c.ProgramName, name)
+		if err != nil {
+			return ret
+		}
+		ret = lo.Map(irVariable.InstructionID, func(id int64, _ int) Instruction {
+			return c.newLazyInstruction(id)
+		})
+		c.VariableCache.Set(name, ret)
 	}
 	return ret
 }
@@ -170,7 +178,16 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) {
 	if c.DB == nil {
 		return
 	}
-	if err := FitIRCode(instIr.irCode, instIr.inst); err != nil {
+
+	// all instruction from database will be lazy instruction
+	if lz, ok := ToLazyInstruction(instIr.inst); ok {
+		// we just check if this lazy-instruction should be saved again?
+		if !lz.ShouldSave() {
+			return
+		}
+	}
+
+	if err := Instruction2IrCode(instIr.inst, instIr.irCode); err != nil {
 		log.Errorf("FitIRCode error: %s", err)
 		return
 	}

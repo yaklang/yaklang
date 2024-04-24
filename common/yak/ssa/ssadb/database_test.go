@@ -1,6 +1,7 @@
 package ssadb_test
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -89,4 +90,48 @@ func TestBuild_Multiple_Program(t *testing.T) {
 
 	check(`a = 1`, "1")
 	check(`a = 2`, "2")
+}
+
+func TestSyncFromDatabase(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		programName := uuid.NewString()
+		// db := consts.GetGormProjectDatabase()
+		prog, err := ssaapi.Parse(`
+		a = 1 
+		print(a)
+		`,
+			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithDatabaseProgramName(programName),
+		)
+		defer ssadb.DeleteProgram(ssa.DB, programName)
+		require.NoError(t, err)
+
+		prog.Program.ShowWithSource()
+
+		cache := prog.Program.Cache
+		_ = cache
+		valuesA := prog.Ref("a")
+		require.Len(t, valuesA, 1)
+		valueA := valuesA[0]
+		// valueA.GetId()
+
+		cache.SaveToDatabase()
+		lazyInst := cache.GetInstruction(valueA.GetId())
+		require.NotNil(t, lazyInst)
+
+		lz, isLazyInstruction := ssa.ToLazyInstruction(lazyInst)
+		// spew.Dump(lazyInst)
+		require.True(t, isLazyInstruction)
+		require.Equal(t, ssa.SSAOpcodeConstInst, lz.GetOpcode())
+
+		fmt.Println("lz: ", lz.String())
+
+		users := lz.GetUsers()
+		fmt.Println("users: ", users)
+		require.Len(t, users, 1)
+		user := users[0]
+		require.NotNil(t, user)
+		require.Equal(t, ssa.SSAOpcodeCall, user.GetOpcode())
+	})
+
 }
