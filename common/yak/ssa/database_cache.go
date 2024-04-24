@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"github.com/gobwas/glob"
+	"regexp"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -120,6 +122,28 @@ func (c *Cache) GetByVariable(name string) []Instruction {
 		ret = make([]Instruction, 0)
 	}
 	return ret
+}
+
+// GetByVariableGlob means get variable name(glob).
+func (c *Cache) GetByVariableGlob(g glob.Glob) []Instruction {
+	var ins []Instruction
+	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
+		if g.Match(s) {
+			ins = append(ins, instructions...)
+		}
+	})
+	return ins
+}
+
+// GetByVariableRegexp will filter Instruction via variable regexp name
+func (c *Cache) GetByVariableRegexp(r *regexp.Regexp) []Instruction {
+	var ins []Instruction
+	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
+		if r.MatchString(s) {
+			ins = append(ins, instructions...)
+		}
+	})
+	return ins
 }
 
 // GetByVariable : get variable from cache.
