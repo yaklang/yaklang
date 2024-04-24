@@ -727,6 +727,87 @@ func (flow *CodecExecFlow) SHA2(size string) error {
 	return nil
 }
 
+// Tag = "MAC"
+// CodecName = "Hmac"
+// Desc = """HMAC（Hash-based Message Authentication Code）是一种密钥相关的哈希运算消息认证码，主要用于服务器对访问者进行鉴权认证流程中。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "hashMethod", Type = "select",DefaultValue = "SHA-512", Options = ["SHA-1", "SHA-256","SHA-512","MD5","SM3"], Required = true ,Label = "哈希方法"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// ]
+func (flow *CodecExecFlow) Hmac(key string, keyType string, hashMethod string, output outputType) error {
+	keyByte := decodeData([]byte(key), keyType)
+	var res []byte
+	switch hashMethod {
+	case "MD5":
+		res = codec.HmacMD5(keyByte, flow.Text)
+	case "SHA-1":
+		res = codec.HmacSha1(keyByte, flow.Text)
+	case "SHA-256":
+		res = codec.HmacSha256(keyByte, flow.Text)
+	case "SHA-512":
+		res = codec.HmacSha512(keyByte, flow.Text)
+	case "SM3":
+		res = codec.HmacSM3(keyByte, flow.Text)
+	default:
+		return utils.Error("Hmac: unknown hash method")
+	}
+	flow.Text = encodeData(res, output)
+	return nil
+}
+
+// Tag = "MAC"
+// CodecName = "CBC-MAC"
+// Desc = """CBC-MAC（Cipher Block Chaining Message Authentication Code）是一种基于块密码的消息认证码（MAC）构造技术。它通过在密码块链（CBC）模式下加密消息来创建一个块链，其中每个块都依赖于前一个块的正确加密。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "alg", Type = "select",DefaultValue = "AES", Options = ["SM4", "DES","AES"], Required = true ,Label = "加密算法"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// ]
+func (flow *CodecExecFlow) CbcMac(alg, key, keyType string, output outputType) error {
+	keyByte := decodeData([]byte(key), keyType)
+	var res []byte
+	var err error
+	var blockSize int
+	switch alg {
+	case "SM4":
+		res, err = codec.SM4CBCEnc(keyByte, flow.Text, codec.ZeroPadding([]byte{0}, 16))
+		blockSize = 16
+	case "DES":
+		res, err = codec.DESCBCEnc(keyByte, flow.Text, codec.ZeroPadding([]byte{0}, 8))
+		blockSize = 8
+	case "AES":
+		res, err = codec.AESCBCEncrypt(keyByte, flow.Text, codec.ZeroPadding([]byte{0}, 16))
+		blockSize = 16
+	default:
+		return utils.Error("CbcMac: unknown alg method")
+	}
+	if err != nil {
+		return err
+	}
+	res = res[len(res)-blockSize:]
+	flow.Text = encodeData(res, output)
+	return nil
+}
+
+// Tag = "MAC"
+// CodecName = "CMAC"
+// Desc = """CMAC（Cipher-based Message Authentication Code）是一种基于密码的消息认证码（MAC）算法，它使用对称加密算法来生成消息的认证码。CMAC的主要目的是确保消息的完整性和身份验证。它通过将消息与密钥一起处理，生成一个固定长度的认证码，该认证码可以被发送者和接收者用来验证消息的完整性和来源。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "alg", Type = "select",DefaultValue = "AES", Options = ["SM4", "DES","AES","3DES"], Required = true ,Label = "加密算法"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// ]
+func (flow *CodecExecFlow) Cmac(alg string, key string, keyType string, output outputType) error {
+	keyByte := decodeData([]byte(key), keyType)
+	cmacByte, err := codec.Cmac(alg, keyByte, flow.Text)
+	if err != nil {
+		return err
+	}
+	flow.Text = encodeData(cmacByte, output)
+	return nil
+}
+
 // Tag = "数据美化"
 // CodecName = "Json处理"
 // Desc = """JSON（JavaScript Object Notation）是一种轻量级数据交换格式，易于人阅读和编写，同时也易于机器解析和生成。它基于JavaScript语言标准，但独立于语言，被广泛应用于网络应用程序中数据的传输。"""

@@ -26,7 +26,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/DataDog/mmh3"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/saintfish/chardet"
 	"github.com/yaklang/yaklang/common/gmsm/sm3"
@@ -226,7 +225,6 @@ func HmacSha256(key, data interface{}) []byte {
 
 func HmacSha512(key, data interface{}) []byte {
 	kBytes, dataBytes := interfaceToBytes(key), interfaceToBytes(data)
-	spew.Dump(kBytes, dataBytes)
 	h := hmac.New(sha512.New, kBytes)
 	h.Write(dataBytes)
 	return h.Sum(nil)
