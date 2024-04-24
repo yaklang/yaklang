@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 )
 
@@ -13,17 +14,39 @@ func (v *Value) IsMap() bool {
 	return kind == ssa.MapTypeKind || kind == ssa.ObjectTypeKind
 }
 
+func (v *Value) GetNames() []string {
+	var results []string
+	if v.IsCall() {
+		results = append(results, v.GetCallee().GetNames()...)
+	}
+	if v.IsMember() {
+		results = append(results, v.GetKey().GetNames()...)
+	}
+	if v.IsConstInst() {
+		results = append(results, codec.AnyToString(v.GetConstValue()))
+	}
+	results = append(results, v.GetName())
+	return results
+}
+
 func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
 func (v *Value) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
-	return v.GetName() == s, v, nil
+	for _, name := range v.GetNames() {
+		if name == s {
+			return true, v, nil
+		}
+	}
+	return false, nil, nil
 }
 
 func (v *Value) GlobMatch(g glob.Glob) (bool, sfvm.ValueOperator, error) {
-	if g.Match(v.GetName()) {
-		return true, v, nil
+	for _, name := range v.GetNames() {
+		if g.Match(name) {
+			return true, v, nil
+		}
 	}
 	return false, nil, nil
 }
@@ -40,6 +63,13 @@ func (v *Value) GetCallActualParams() (sfvm.ValueOperator, error) {
 		return nil, utils.Error("ssa.Value is not a call instruction")
 	}
 	return v.GetCallArgs(), nil
+}
+
+func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
+	if v.IsCalled() {
+		return v.GetCalledBy(), nil
+	}
+	return nil, utils.Errorf("ssa.Value %v is not called", v.String())
 }
 
 func (v *Value) GetMembers() (sfvm.ValueOperator, error) {

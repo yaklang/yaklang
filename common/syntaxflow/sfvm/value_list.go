@@ -1,8 +1,9 @@
 package sfvm
 
 import (
-	"fmt"
+	"bytes"
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 )
@@ -19,6 +20,32 @@ func NewValues(values []ValueOperator) ValueOperator {
 
 type ValueList struct {
 	values []ValueOperator
+}
+
+func (v ValueList) GetCalled() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		called, err := v.GetCalled()
+		if err != nil {
+			continue
+		}
+		res = append(res, called)
+	}
+	return NewValues(res), nil
+}
+
+func (v ValueList) ForEach(h func(i any)) {
+	funk.ForEach(v.values, func(i any) {
+		h(i)
+	})
+}
+
+func (v *ValueList) GetNames() []string {
+	var res []string
+	for _, v := range v.values {
+		res = append(res, v.GetNames()...)
+	}
+	return res
 }
 
 func (v *ValueList) GetCallActualParams() (ValueOperator, error) {
@@ -57,7 +84,19 @@ func (v *ValueList) ListIndex(i int) (ValueOperator, error) {
 }
 
 func (v *ValueList) GetName() string {
-	return fmt.Sprintf("%v", v.values)
+	var buf = new(bytes.Buffer)
+	if len(v.values) > 0 {
+		buf.WriteByte('[')
+		defer buf.WriteByte(']')
+	}
+	for idx, value := range v.values {
+		if idx > 0 {
+			buf.WriteByte(';')
+			buf.WriteByte(' ')
+		}
+		buf.WriteString(value.GetName())
+	}
+	return buf.String()
 }
 
 func (v *ValueList) IsMap() bool {
@@ -125,7 +164,11 @@ func (v *ValueList) RegexpMatch(regexp *regexp.Regexp) (bool, ValueOperator, err
 func (v *ValueList) GetMembers() (ValueOperator, error) {
 	var result []ValueOperator
 	for _, k := range v.values {
-		result = append(result, k)
+		members, err := k.GetMembers()
+		if err != nil {
+			continue
+		}
+		result = append(result, members)
 	}
 	return MergeValues(result...), nil
 }

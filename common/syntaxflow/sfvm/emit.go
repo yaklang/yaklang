@@ -19,12 +19,6 @@ func (y *SyntaxFlowVisitor) EmitUpdate(i string) {
 	})
 }
 
-func (y *SyntaxFlowVisitor) EmitWithdraw() {
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpWithdraw,
-	})
-}
-
 func (y *SyntaxFlowVisitor) EmitOperator(i string) {
 	switch i {
 	case ">":
@@ -138,7 +132,7 @@ func (v *SyntaxFlowVisitor) Show() {
 	}
 }
 
-func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, any]) *SFFrame {
+func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, ValueOperator]) *SFFrame {
 	return NewSFFrame(vars, v.text, v.codes)
 }
 
