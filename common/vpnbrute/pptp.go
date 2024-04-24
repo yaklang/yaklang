@@ -16,8 +16,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/vpnbrute/ppp"
+	"golang.org/x/exp/rand"
 	"net"
 	"time"
+)
+
+var (
+	PPTP_START_CONTROL_CONN_REQ = uint16(1)
+	PPTP_START_CONTROL_CONN_REP = uint16(2)
+	PPTP_OUTGOING_CALL_REQ      = uint16(7)
+	PPTP_OUTGOING_CALL_REP      = uint16(8)
+	PPTP_SER_LINK_INFO          = uint16(15)
 )
 
 type PPTPConfig struct {
@@ -47,12 +56,37 @@ type PPTPConfig struct {
 	RecvAccm uint32
 }
 
+func GetDefaultPPTPConfig() *PPTPConfig {
+	return &PPTPConfig{
+		FramingCapabilities: 0x1,
+		BearerCapabilities:  0x1,
+		MaxChannels:         0,
+		FirmwareRevision:    0,
+		Hostname:            "",
+		Vendor:              "",
+		CallId:              uint16(rand.Intn(65535)),
+		PeerCallId:          0,
+		CallSerialNumber:    1,
+		MinimumBPS:          300,
+		MaximumBPS:          100000000,
+		BearerType:          0x3,
+		FramingType:         0x3,
+		RecvWindowSize:      0x0a,
+		ProcessingDelay:     0,
+		PhoneNumberLength:   0,
+		Reserved:            0,
+		PhoneNumber:         "",
+		SubAddress:          "",
+		SendAccm:            0xffffffff,
+		RecvAccm:            0xffffffff,
+	}
+}
+
 type PPTPAuth struct {
-	ppp       *ppp.PPPAuth
-	PNSCallID uint16 // c -> s gre call id
-	PASCallID uint16 // s -> c gre call id
-	Target    string
-	LocalAddr net.Addr
+	ppp *ppp.PPPAuth
+	cfg *PPTPConfig
+
+	Target string
 
 	RAddrByte []byte
 	LAddrByte []byte
@@ -60,19 +94,13 @@ type PPTPAuth struct {
 	RMac []byte
 	LMac []byte
 
-	AckNumber int
-	SNumber   int
-	ctx       context.Context
-	cancel    context.CancelFunc
+	SNumber int
 }
 
 func GetDefaultPPTPAuth() *PPTPAuth {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &PPTPAuth{
 		ppp:     ppp.GetDefaultPPPAuth(),
-		ctx:     ctx,
-		cancel:  cancel,
+		cfg:     GetDefaultPPTPConfig(),
 		SNumber: 0,
 	}
 }
@@ -89,7 +117,7 @@ func (c *PPTPConfig) GetStartControlConnReq() map[string]any {
 		"Length":             156,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
-		"ControlMessageType": 1,
+		"ControlMessageType": PPTP_START_CONTROL_CONN_REQ,
 		"Reserved":           0,
 		"Start Control Conn Req": map[string]any{
 			"ProtocolVersion":     0x0100,
@@ -109,7 +137,7 @@ func GetStartControlConnReq() map[string]any {
 		"Length":             156,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
-		"ControlMessageType": 1,
+		"ControlMessageType": PPTP_START_CONTROL_CONN_REQ,
 		"Reserved":           0,
 		"Start Control Conn Req": map[string]any{
 			"ProtocolVersion":     0x0100,
@@ -129,7 +157,7 @@ func (c *PPTPConfig) GetOutgoingCallReq() map[string]any {
 		"Length":             168,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
-		"ControlMessageType": 7,
+		"ControlMessageType": PPTP_OUTGOING_CALL_REQ,
 		"Reserved":           0,
 		"Outgoing Call Req": map[string]any{
 			"CallId":            c.CallId,
@@ -153,7 +181,7 @@ func GetOutgoingCallReq() map[string]any {
 		"Length":             168,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
-		"ControlMessageType": 7,
+		"ControlMessageType": PPTP_OUTGOING_CALL_REQ,
 		"Reserved":           0,
 		"Outgoing Call Req": map[string]any{
 			"CallId":            7568,
@@ -177,7 +205,7 @@ func (c *PPTPConfig) GetSetLinkInfo() map[string]any {
 		"Length":             24,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
-		"ControlMessageType": 15,
+		"ControlMessageType": PPTP_SER_LINK_INFO,
 		"Reserved":           0,
 		"Set Link Info": map[string]any{
 			"PeerCallId": c.PeerCallId,
@@ -193,10 +221,10 @@ func (pptp *PPTPAuth) GetSetLinkInfo() map[string]any {
 		"Length":             24,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
-		"ControlMessageType": 15,
+		"ControlMessageType": PPTP_SER_LINK_INFO,
 		"Reserved":           0,
 		"Set Link Info": map[string]any{
-			"PeerCallId": pptp.PNSCallID,
+			"PeerCallId": pptp.cfg.PeerCallId,
 			"Reserved":   0,
 			"Send Accm":  0xffffffff,
 			"Recv Accm":  0xffffffff,
@@ -204,76 +232,93 @@ func (pptp *PPTPAuth) GetSetLinkInfo() map[string]any {
 	}
 }
 
-func (pptp *PPTPAuth) Auth() (error, bool) {
-	defer pptp.cancel()
+func (pptp *PPTPAuth) PPTPNegotiate() (net.Conn, error) {
+	// connect pptp server
 	conn, err := netx.DialX(pptp.Target, netx.DialX_WithTimeout(5*time.Second))
 	if err != nil {
-		return err, false
+		return nil, err
 	}
 
-	pptp.LocalAddr = conn.LocalAddr()
-
-	startReq, err := parser.GenerateBinary(GetStartControlConnReq(), "application-layer.pptp", "PPTP")
+	startReq, err := parser.GenerateBinary(pptp.cfg.GetStartControlConnReq(), "application-layer.pptp", "PPTP")
 	if err != nil {
-		return err, false
+		return nil, err
 	}
 
 	_, err = conn.Write(binparser.NodeToBytes(startReq))
 	if err != nil {
-		return err, false
+		return nil, err
 	}
 
 	// read start control conn reply
 	for {
 		messageNode, err := parser.ParseBinary(conn, "application-layer.pptp", "PPTP")
 		if err != nil {
-			return err, false
+			return nil, err
 		}
 		if messageNode.Name != "PPTP" {
-			return utils.Error("not PPP message"), false
+			return nil, utils.Error("not PPP message")
 		}
 
 		messageMap := binparser.NodeToMap(messageNode).(map[string]any)
-		pptpType := messageMap["ControlMessageType"]
-		switch pptpType {
-		case uint16(2):
-			pptp.PASCallID = 7568
-			outgoingReq, err := parser.GenerateBinary(GetOutgoingCallReq(), "application-layer.pptp", "PPTP")
+
+		pptpType, ok := base.GetSubData(messageMap, "ControlMessageType")
+		if !ok {
+			return nil, utils.Error("ControlMessageType not found")
+		}
+
+		switch pptpType.(uint16) {
+		case PPTP_START_CONTROL_CONN_REP:
+			outgoingReq, err := parser.GenerateBinary(pptp.cfg.GetOutgoingCallReq(), "application-layer.pptp", "PPTP")
 			if err != nil {
-				return err, false
+				return nil, err
 			}
 			_, err = conn.Write(binparser.NodeToBytes(outgoingReq))
 			if err != nil {
-				return err, false
+				return nil, err
 			}
-		case uint16(8):
-			pptp.PNSCallID = messageMap["Message"].(map[string]any)["Outgoing Call Reply"].(map[string]any)["CallId"].(uint16)
-
-			go func() {
-				for {
-					select {
-					case <-pptp.ctx.Done():
-					default:
-						setInfo, err := parser.GenerateBinary(pptp.GetSetLinkInfo(), "application-layer.pptp", "PPTP")
-						if err != nil {
-							log.Error(err)
-						}
-						_, err = conn.Write(binparser.NodeToBytes(setInfo))
-						if err != nil {
-							log.Error(err)
-							return
-						}
-						time.Sleep(7 * time.Second)
-					}
-				}
-			}()
-			// gre
-			return pptp.Tunnel()
+		case PPTP_OUTGOING_CALL_REP:
+			var peerCallId uint16
+			err = base.UnmarshalSubData(messageMap, "Message.Outgoing Call Reply.CallId", &peerCallId)
+			if err != nil {
+				return nil, utils.Error("peerCallId not found")
+			}
+			pptp.cfg.PeerCallId = peerCallId
+			return conn, nil
 		}
 	}
 }
 
-func (pptp *PPTPAuth) Tunnel() (error, bool) {
+func (pptp *PPTPAuth) Auth(ctx context.Context) (error, bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	conn, err := pptp.PPTPNegotiate()
+	if err != nil {
+		return err, false
+	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+			default:
+				setInfo, err := parser.GenerateBinary(pptp.cfg.GetSetLinkInfo(), "application-layer.pptp", "PPTP")
+				if err != nil {
+					log.Error(err)
+				}
+				_, err = conn.Write(binparser.NodeToBytes(setInfo))
+				if err != nil {
+					log.Error(err)
+					cancel()
+					return
+				}
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}()
+
+	return pptp.Tunnel(ctx)
+}
+
+func (pptp *PPTPAuth) Tunnel(ctx context.Context) (error, bool) {
 	targetHost := utils.ExtractHost(pptp.Target)
 	iface, _, sIp, err := netutil.Route(5*time.Second, targetHost)
 	if err != nil {
@@ -298,7 +343,7 @@ func (pptp *PPTPAuth) Tunnel() (error, bool) {
 			pcaputil.WithDevice(iface.Name),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithBPFFilter("proto 47"),
-			pcaputil.WithContext(pptp.ctx),
+			pcaputil.WithContext(ctx),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
 				go func() {
 					for {
@@ -312,7 +357,7 @@ func (pptp *PPTPAuth) Tunnel() (error, bool) {
 								errorCh <- err
 								log.Error(err)
 							}
-						case <-pptp.ctx.Done():
+						case <-ctx.Done():
 							return
 						}
 					}
@@ -333,29 +378,13 @@ func (pptp *PPTPAuth) Tunnel() (error, bool) {
 					log.Error("GRE node is nil")
 					return
 				}
-				respMap, err := pptp.ProcessGre(GREnode)
+				err = pptp.ProcessGre(GREnode, sendPacketCh)
 				if err != nil {
 					log.Error(err)
 					errorCh <- err
 					return
 				}
 
-				if respMap == nil {
-					log.Infof("not need send resp")
-					return
-				}
-
-				sendPacket, err := pptp.getSendPacket(respMap)
-				if err != nil {
-					log.Error(err)
-					errorCh <- err
-					return
-				}
-				if sendPacket == nil {
-					log.Error("send packet is nil")
-					return
-				}
-				sendPacketCh <- sendPacket
 			}),
 		)
 		if err != nil {
@@ -363,14 +392,27 @@ func (pptp *PPTPAuth) Tunnel() (error, bool) {
 		}
 	}()
 
-	packet, err := pptp.getSendPacket(pptp.ppp.GetPPPReqParams())
+	packet, err := pptp.pppMapToPacket(pptp.ppp.GetPPPStartReqParams())
 	if err != nil {
 		return err, false
 	}
 	sendPacketCh <- packet
 
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+			case <-pptp.ppp.NegotiateOk:
+				if bytes.Equal(pptp.ppp.AuthTypeCode, ppp.PAP) {
+					packet, _ := pptp.pppMapToPacket(pptp.ppp.GetPAPReqParams())
+					sendPacketCh <- packet
+				}
+			}
+		}
+	}()
+
 	select {
-	case <-pptp.ctx.Done():
+	case <-ctx.Done():
 		return utils.Error("context done"), false
 	case <-errorCh:
 		return err, false
@@ -378,47 +420,9 @@ func (pptp *PPTPAuth) Tunnel() (error, bool) {
 		return nil, ok
 	}
 
-	//targetHost := utils.ExtractHost(pptp.Target)
-	//raddr, err := net.ResolveIPAddr("ip", targetHost)
-	//if err != nil {
-	//	return
-	//}
-	//
-	//laddr, err := net.ResolveIPAddr("ip", utils.ExtractHost(pptp.LocalAddr.String()))
-	//if err != nil {
-	//	return
-	//}
-	//
-	//ipConn, err := net.DialIP("ip:47", laddr, raddr)
-	//if err != nil {
-	//	return
-	//}
-	//defer ipConn.Close()
-	//
-	//for {
-	//	var buffer []byte
-	//	data := bytes.NewBuffer(buffer)
-	//	go func() {
-	//		time.Sleep(10 * time.Millisecond)
-	//		spew.Dump(data.Bytes())
-	//	}()
-	//	messageNode, err := parser.ParseBinary(io.TeeReader(ipConn, data), "internet_protocol")
-	//	if err != nil {
-	//		return
-	//	}
-	//
-	//	go func(processNode *base.Node) {
-	//		respMap, err := pptp.ProcessGre(base.GetNodeByPath(processNode, "@Internet Protocol.Payload.GRE"))
-	//		if err != nil {
-	//			return
-	//		}
-	//		pptp.SendPPPByGRE(respMap, ipConn)
-	//	}(messageNode)
-	//}
-
 }
 
-func (pptp *PPTPAuth) getSendPacket(pppMap map[string]any) ([]byte, error) {
+func (pptp *PPTPAuth) pppMapToPacket(pppMap map[string]any) ([]byte, error) { // encapsulate ppp to ethernet packet
 	greMap, err := pptp.encapsulateGRE(pppMap)
 	if err != nil {
 		return nil, err
@@ -446,12 +450,12 @@ func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, er
 	snumber := pptp.SNumber
 	pptp.SNumber = snumber + 2
 	return map[string]any{
-		"Flags And Version":     0x3081,
-		"Protocol Type":         0x880b,
-		"Payload Length":        len(payloadByte),
-		"Call ID":               pptp.PNSCallID,
-		"Sequence Number":       snumber,
-		"Acknowledgment Number": pptp.AckNumber,
+		"Flags And Version": 0x3001,
+		"Protocol Type":     0x880b,
+		"Payload Length":    len(payloadByte),
+		"Call ID":           pptp.cfg.PeerCallId,
+		"Sequence Number":   snumber,
+		//"Acknowledgment Number": pptp.AckNumber,
 		"Payload": map[string]any{
 			"PPP": payloadByte,
 		},
@@ -459,31 +463,38 @@ func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, er
 
 }
 
-func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node) (map[string]any, error) {
+func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node, replyChan chan []byte) error {
 	if messageNode.Name != "GRE" {
-		return nil, utils.Error("not GRE message")
+		return utils.Error("not GRE message")
 	}
 
 	messageMap := binparser.NodeToMap(messageNode).(map[string]any)
-	if messageMap["Call ID"].(uint16) != pptp.PASCallID {
-		return nil, nil
+	if messageMap["Call ID"].(uint16) != pptp.cfg.CallId {
+		return nil
 	}
 
-	snumber, ok := messageMap["Optional"].(map[string]any)["Sequence Number"]
-	if ok {
-		pptp.AckNumber = int(snumber.(uint32))
-	}
+	//snumber, ok := messageMap["Optional"].(map[string]any)["Sequence Number"]
+	//if ok {
+	//	pptp.AckNumber = int(snumber.(uint32))
+	//}
 
 	pppNode := base.GetNodeByPath(messageNode, "@GRE.Payload.PPP")
 	if pppNode == nil {
 		log.Infof("not ppp gre message")
-		return nil, nil
+		return nil
 	}
+
 	pppParamMap, err := pptp.ppp.ProcessMessage(pppNode)
 	if err != nil || pppParamMap == nil {
-		return nil, err
+		return err
 	}
-	return pppParamMap, nil
+
+	packet, err := pptp.pppMapToPacket(pppParamMap)
+	if err != nil {
+		return err
+	}
+	replyChan <- packet
+	return nil
 }
 
 func getDefaultIPV4Header() map[string]any {
