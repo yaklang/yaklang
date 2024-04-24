@@ -155,12 +155,24 @@ func (p *FuzzHTTPRequestParam) PositionVerbose() string {
 	return PositionTypeVerbose(p.position)
 }
 
-func (p *FuzzHTTPRequestParam) GetFirstValue() string {
+func (p *FuzzHTTPRequestParam) GetFirstValue() any {
 	vals := utils.InterfaceToSliceInterface(p.Value())
 	if len(vals) > 0 {
-		return utils.InterfaceToString(vals[0])
+		return vals[0]
 	}
 	return ""
+}
+
+func (p *FuzzHTTPRequestParam) GetPostJsonPath() string {
+	if p.Position() == string(posPostJson) {
+		return p.path
+	}
+	return ""
+}
+
+func (p *FuzzHTTPRequestParam) FirstValueIsNumber() bool {
+	ret := p.GetFirstValue()
+	return utils.IsInt(ret) || utils.IsFloat(ret)
 }
 
 func (p *FuzzHTTPRequestParam) OriginValue() interface{} {
