@@ -29,3 +29,13 @@ func SaveVariable(db *gorm.DB, program, variable string, instIDs []int64) error 
 	irVariable.InstructionID = instIDs
 	return db.Save(irVariable).Error
 }
+
+func GetVariable(db *gorm.DB, program, variable string) (*IrVariable, error) {
+	variableOnce.Do(func() {
+		db.AutoMigrate(&IrVariable{})
+	})
+	db = db.Model(&IrVariable{})
+	irVariable := &IrVariable{}
+	err := db.Where("program_name = ? AND variable_name = ?", program, variable).First(irVariable).Error
+	return irVariable, err
+}

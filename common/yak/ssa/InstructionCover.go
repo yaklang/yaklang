@@ -16,6 +16,8 @@ func ToFreeValue(n Node) (*Parameter, bool) {
 	return u, ok
 }
 
+func ToLazyInstruction(n any) (*LazyInstruction, bool) { u, ok := n.(*LazyInstruction); return u, ok }
+
 // value
 func ToConst(v Instruction) (*ConstInst, bool)     { c, ok := v.(*ConstInst); return c, ok }
 func IsConst(v Instruction) bool                   { _, ok := ToConst(v); return ok }

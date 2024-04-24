@@ -1,8 +1,10 @@
 package ssadb
 
 import (
+	"encoding/json"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/jinzhu/gorm"
@@ -27,8 +29,10 @@ type IrCode struct {
 	SourceCodeHash        string `json:"source_code_hash"`
 
 	// opcode
-	Opcode         int64  `json:"opcode"`
-	OpcodeName     string `json:"opcode_name"`
+	Opcode     int64  `json:"opcode"`
+	OpcodeName string `json:"opcode_name"`
+
+	// just for binary and unary operator
 	OpcodeOperator string `json:"opcode_operator"`
 
 	// basic info
@@ -36,7 +40,7 @@ type IrCode struct {
 	VerboseName      string `json:"verbose_name"`
 	ShortVerboseName string `json:"short_verbose_name"`
 
-	// any IrCode in one function
+	// any IrCode in one block inner one  function
 	CurrentBlock    int64 `json:"current_block"`
 	CurrentFunction int64 `json:"current_function"`
 
@@ -47,7 +51,6 @@ type IrCode struct {
 	ReturnCodes      Int64Slice `json:"return_codes" gorm:"type:text"`
 	SideEffects      Int64Slice `json:"side_effects" gorm:"type:text"`
 	IsExternal       bool       `json:"is_external"`
-	IsCalledBy       Int64Slice `json:"is_called_by" gorm:"type:text"`
 	CodeBlocks       Int64Slice `json:"code_blocks" gorm:"type:text"`
 	EnterBlock       int64      `json:"enter_block"`
 	ExitBlock        int64      `json:"exit_block"`
@@ -64,20 +67,26 @@ type IrCode struct {
 	// Use-Def Chains Relation
 	Defs  Int64Slice `json:"defs" gorm:"type:text"`
 	Users Int64Slice `json:"users" gorm:"type:text"`
+	// this is user is call and method is this IR self
+	CalledBy Int64Slice `json:"is_called_by" gorm:"type:text"`
 
 	// OOP Supporting
 	IsObject       bool
-	IsObjectMember bool
 	ObjectMembers  Int64Map `json:"object_members" gorm:"type:text"`
-	ObjectParent   int64    `json:"object_parent"`
+	IsObjectMember bool
+	ObjectParent   int64 `json:"object_parent"`
+	ObjectKey      int64 `json:"object_key"`
 
 	// Maskable
 	MaskedCodes Int64Slice `json:"masked_codes" gorm:"type:text"`
 	IsMasked    bool       `json:"is_masked"`
 
-	// Called
-	IsCalled   bool       `json:"is_called"`
-	ActualArgs Int64Slice `json:"actual_args" gorm:"type:text"`
+	// Call instruction
+	IsCalled       bool       `json:"is_called"`
+	Method         int64      `json:"method"`
+	ActualArgs     Int64Slice `json:"actual_args" gorm:"type:text"`
+	BingDings      Int64Map   `json:"bing_dings" gorm:"type:text"`
+	ArgumentMember Int64Map   `json:"argument_member" gorm:"type:text"`
 
 	// Variable
 	Variable StringSlice `json:"variable" gorm:"type:text"`
@@ -163,4 +172,20 @@ func (r *IrCode) GetIdInt64() int64 {
 
 func (r *IrCode) GetIdInt() int {
 	return int(r.ID)
+}
+
+func (r *IrCode) SetExtraInfo(params map[string]any) {
+	results, err := json.Marshal(params)
+	if err != nil {
+		log.Warnf("BUG: cannot fetch instruction's extra info: %v", err)
+	}
+	r.ExtraInformation = string(results)
+}
+
+func (r *IrCode) GetExtraInfo() map[string]any {
+	results := make(map[string]any)
+	if err := json.Unmarshal([]byte(r.ExtraInformation), &results); err != nil {
+		log.Warnf("BUG: cannot fetch instruction's extra info: %v", err)
+	}
+	return results
 }

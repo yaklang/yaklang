@@ -97,3 +97,112 @@ func (i *Switch) GetOpcode() Opcode       { return SSAOpcodeSwitch }
 func IsControlInstruction(i Instruction) bool {
 	return slices.Index([]Opcode{SSAOpcodeErrorHandler, SSAOpcodeJump, SSAOpcodeIf, SSAOpcodeLoop, SSAOpcodeSwitch}, i.GetOpcode()) != -1
 }
+
+func CreateInstruction(op Opcode) Instruction {
+	switch op {
+	case SSAOpcodeFunction:
+		return &Function{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeBasicBlock:
+		return &BasicBlock{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeParameterMember:
+		return &ParameterMember{
+			Parameter: &Parameter{
+				anValue: NewValue(),
+			},
+		}
+	case SSAOpcodeParameter:
+		return &Parameter{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeExternLib:
+		return &ExternLib{
+			anValue: NewValue(),
+		}
+	case SSAOpcodePhi:
+		return &Phi{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeConstInst:
+		return &ConstInst{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeUndefined:
+		return &Undefined{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeBinOp:
+		return &BinOp{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeUnOp:
+		return &UnOp{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeCall:
+		return &Call{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeSideEffect:
+		return &SideEffect{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeReturn:
+		return &Return{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeMake:
+		return &Make{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeNext:
+		return &Next{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeAssert:
+		return &Assert{
+			anInstruction: NewInstruction(),
+		}
+	case SSAOpcodeTypeCast:
+		return &TypeCast{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeTypeValue:
+		return &TypeValue{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeErrorHandler:
+		return &ErrorHandler{
+			anInstruction: NewInstruction(),
+		}
+	case SSAOpcodePanic:
+		return &Panic{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeRecover:
+		return &Recover{
+			anValue: NewValue(),
+		}
+	case SSAOpcodeJump:
+		return &Jump{
+			anInstruction: NewInstruction(),
+		}
+	case SSAOpcodeIf:
+		return &If{
+			anInstruction: NewInstruction(),
+		}
+	case SSAOpcodeLoop:
+		return &Loop{
+			anInstruction: NewInstruction(),
+		}
+	case SSAOpcodeSwitch:
+		return &Switch{
+			anInstruction: NewInstruction(),
+		}
+	default:
+		return nil
+	}
+}
