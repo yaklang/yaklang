@@ -2,6 +2,7 @@ package base
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +12,9 @@ func GetSubData(d any, key string) (any, bool) {
 	p := strings.Split(key, ".")
 	for _, ele := range p {
 		refV := reflect.ValueOf(d)
+		if !refV.IsValid() {
+			return nil, false
+		}
 		if refV.Kind() == reflect.Map {
 			v := refV.MapIndex(reflect.ValueOf(ele))
 			if !v.IsValid() {
@@ -36,6 +40,55 @@ func GetSubData(d any, key string) (any, bool) {
 	}
 	return d, true
 }
+
+func UnmarshalSubData(d any, path string, v any) error {
+	rV := reflect.ValueOf(v)
+	if rV.Kind() != reflect.Ptr {
+		return utils.Errorf("v is not pointer")
+	}
+
+	rV = rV.Elem()
+	if !rV.CanSet() || !rV.IsValid() {
+		return utils.Errorf("v is not valid")
+	}
+
+	p := strings.Split(path, ".")
+	for _, ele := range p {
+		refV := reflect.ValueOf(d)
+		if !refV.IsValid() {
+			return utils.Errorf("data is not valid")
+		}
+		if refV.Kind() == reflect.Map {
+			v := refV.MapIndex(reflect.ValueOf(ele))
+			if !v.IsValid() {
+				return utils.Errorf("data is not valid")
+			} else {
+				d = v.Interface()
+			}
+		} else if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
+			if !strings.HasPrefix(ele, "#") {
+				return utils.Errorf("path is not valid: slice or array data must start with #")
+			}
+			index, err := strconv.Atoi(ele[1:])
+			if err != nil {
+				return utils.Errorf("path is not valid: %s", err)
+			}
+			if index >= refV.Len() {
+				return utils.Errorf("index out of range")
+			}
+			d = refV.Index(index).Interface()
+		} else {
+			return utils.Errorf("data is not support")
+		}
+	}
+	rd := reflect.ValueOf(d)
+	if rd.Type() != rV.Type() {
+		return utils.Errorf("type not match")
+	}
+	rV.Set(rd)
+	return nil
+}
+
 func InterfaceToUint64(d any) (uint64, bool) {
 	switch ret := d.(type) {
 	case uint64:
