@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//go:embed grpc_creat_report.yak
+//go:embed grpc_create_report.yak
 var creat_report []byte
 
 func (s *Server) SimpleDetectCreatReport(req *ypb.CreatReportRequest, stream ypb.Yak_SimpleDetectCreatReportServer) error {
