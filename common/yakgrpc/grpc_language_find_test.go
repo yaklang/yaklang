@@ -122,6 +122,21 @@ m.a`
 			newRangeFromText("2:1 2:4"),
 		)
 	})
+
+	t.Run("free value", func(t *testing.T) {
+		code := `a = 1
+b = func() {
+return a
+}
+`
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("3:8 3:9"),
+			newRangeFromText("1:1 1:2"),
+		)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_Find_References(t *testing.T) {
@@ -225,4 +240,23 @@ println(2)`
 			},
 		)
 	})
+
+	// todo: ssa fix freeValue use def chain
+	// 	t.Run("free value", func(t *testing.T) {
+	// 		code := `a = 1
+	// b = func() {
+	// return a
+	// }
+	// `
+	// 		checkReferences(t,
+	// 			local,
+	// 			code,
+	// 			"yak",
+	// 			newRangeFromText("3:8 3:9"),
+	// 			[]memedit.RangeIf{
+	// 				newRangeFromText("1:1 1:2"),
+	// 				newRangeFromText("3:8 3:9"),
+	// 			},
+	// 		)
+	// 	})
 }
