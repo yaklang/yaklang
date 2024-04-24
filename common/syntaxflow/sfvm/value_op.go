@@ -7,6 +7,7 @@ import (
 
 type ValueOperator interface {
 	GetName() string
+	GetNames() []string
 	IsMap() bool
 	IsList() bool
 
@@ -18,6 +19,7 @@ type ValueOperator interface {
 	RegexpMatch(*regexp.Regexp) (bool, ValueOperator, error)
 
 	// GetCallActualParams for OpGetCallArgs
+	GetCalled() (ValueOperator, error)
 	GetCallActualParams() (ValueOperator, error)
 
 	// GetMembers for list or objct

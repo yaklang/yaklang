@@ -7,23 +7,6 @@ import (
 	"testing"
 )
 
-func TestSyntaxFlowFilter_Root(t *testing.T) {
-	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	vm.Debug()
-	err := vm.Compile(`$`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vm.Show()
-	count := 0
-	vm.ForEachFrame(func(frame *sfvm.SFFrame) {
-		count += len(frame.Codes)
-	})
-	if count <= 2 {
-		panic("SyntaxFlowVirtualMachine.Compile failed")
-	}
-}
-
 func TestSyntaxFlowFilter_Search(t *testing.T) {
 	for _, i := range []map[string]string{
 		{

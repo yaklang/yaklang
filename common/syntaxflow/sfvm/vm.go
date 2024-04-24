@@ -12,7 +12,7 @@ import (
 )
 
 type SyntaxFlowVirtualMachine struct {
-	vars *omap.OrderedMap[string, any]
+	vars *omap.OrderedMap[string, ValueOperator]
 
 	debug      bool
 	frameMutex *sync.Mutex
@@ -21,7 +21,7 @@ type SyntaxFlowVirtualMachine struct {
 
 func NewSyntaxFlowVirtualMachine() *SyntaxFlowVirtualMachine {
 	sfv := &SyntaxFlowVirtualMachine{
-		vars:       omap.NewEmptyOrderedMap[string, any](),
+		vars:       omap.NewEmptyOrderedMap[string, ValueOperator](),
 		frameMutex: new(sync.Mutex),
 	}
 	return sfv
@@ -77,21 +77,24 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	return nil
 }
 
-func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) *omap.OrderedMap[string, any] {
+func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) *omap.OrderedMap[string, ValueOperator] {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
-	result := omap.NewOrderedMap(map[string]any{})
+	result := omap.NewOrderedMap(map[string]ValueOperator{})
 	for index, frame := range s.frames {
 		err := frame.Debug(s.debug).exec(i)
 		if err != nil {
 			log.Errorf("exec frame[%v]: %v\n\t\tCODE: %v", err, index, frame.Text)
 		}
-		if frame.stack.Len() > 1 {
+		if frame.stack.Len() > 0 {
 			log.Infof("stack unbalanced: %v", frame.stack.Len())
 		}
+		if frame.stack.HaveLastStackValue() {
+			result.Push(frame.stack.LastStackValue())
+		}
 	}
-	s.vars.Map(func(s string, a any) (string, any, error) {
+	s.vars.Map(func(s string, a ValueOperator) (string, ValueOperator, error) {
 		result.Set(s, a)
 		return s, a, nil
 	})
