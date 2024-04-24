@@ -32,6 +32,11 @@ func (r *Range) GetEnd() memedit.PositionIf {
 	return r.end
 }
 
+func (r *Range) Len() int {
+	start, end := r.GetOffsetRange()
+	return end - start + 1
+}
+
 func NewRange(editor *memedit.MemEditor, startIf, endIf memedit.PositionIf) *Range {
 	start, ok := startIf.(*Position)
 	if !ok {
