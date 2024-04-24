@@ -81,7 +81,6 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 		return nil, errors.New("ssa parse error")
 	}
 
-	// todo: remove this
 	// prog.Program.ShowOffsetMap()
 
 	v := getFrontValueByOffset(prog, editor, ssaRange)

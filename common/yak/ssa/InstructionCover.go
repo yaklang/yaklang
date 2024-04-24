@@ -7,6 +7,13 @@ func ToUser(n any) (User, bool)   { u, ok := n.(User); return u, ok }
 
 func ToFunction(n Node) (*Function, bool)  { u, ok := n.(*Function); return u, ok }
 func ToMethod(n Node) (*ClassMethod, bool) { u, ok := n.(*ClassMethod); return u, ok }
+func ToFreeValue(n Node) (*Parameter, bool) {
+	u, ok := n.(*Parameter)
+	if ok && u.IsFreeValue {
+		return u, ok
+	}
+	return u, ok
+}
 
 // value
 func ToConst(v Instruction) (*ConstInst, bool)     { c, ok := v.(*ConstInst); return c, ok }
