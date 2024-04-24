@@ -635,11 +635,18 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
 
 	call := func(key, val gjson.Result, gPath, jPath string) {
+		var paramValue interface{}
+		if val.IsObject() || val.IsArray() {
+			paramValue = val.String()
+		} else {
+			paramValue = val.Value()
+		}
+
 		fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 			position:   posPostJson,
 			param:      key.String(),
 			raw:        string(bytes.TrimSpace(bodyRaw)),
-			paramValue: val.String(),
+			paramValue: paramValue,
 			path:       jPath,
 			gpath:      gPath,
 			origin:     f,
