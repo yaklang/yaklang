@@ -275,6 +275,9 @@ func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 	return g
 }
 
+func (g *Generator) RawResult() []*FuzzResult {
+	return g.container
+}
 func (g *Generator) Result() *FuzzResult {
 	res := NewFuzzResult()
 	data := []byte{}
