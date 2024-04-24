@@ -9,8 +9,9 @@ import (
 )
 
 type OffsetItem struct {
-	variable *Variable // maybe nil
-	value    Value
+	variable    *Variable // maybe nil
+	value       Value
+	rangeLength int
 }
 
 func (item *OffsetItem) GetVariable() *Variable {
@@ -54,12 +55,17 @@ func (prog *Program) SetOffsetVariable(v *Variable, r *Range) {
 		return
 	}
 	endOffset := r.GetEndOffset()
-	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
 
-	if _, ok := prog.OffsetMap[endOffset]; ok {
-		prog.OffsetMap[endOffset].variable = v
-	} else {
-		prog.OffsetMap[endOffset] = &OffsetItem{variable: v, value: v.GetValue()}
+	// If it already exists, then the trust range is smaller
+	if item, ok := prog.OffsetMap[endOffset]; ok && item.rangeLength <= r.Len() {
+		return
+	}
+
+	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
+	prog.OffsetMap[endOffset] = &OffsetItem{
+		variable:    v,
+		value:       v.GetValue(),
+		rangeLength: r.Len(),
 	}
 }
 
@@ -69,6 +75,16 @@ func (prog *Program) SetOffsetValue(v Value, r *Range) {
 		return
 	}
 	endOffset := r.GetEndOffset()
+
+	// If it already exists, then the trust range is smaller
+	if item, ok := prog.OffsetMap[endOffset]; ok && item.rangeLength <= r.Len() {
+		return
+	}
+
 	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
-	prog.OffsetMap[endOffset] = &OffsetItem{variable: nil, value: v}
+	prog.OffsetMap[endOffset] = &OffsetItem{
+		variable:    nil,
+		value:       v,
+		rangeLength: r.Len(),
+	}
 }

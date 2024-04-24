@@ -170,7 +170,7 @@ func (f *FunctionBuilder) EmitInstructionAfter(i, after Instruction) {
 }
 
 func (f *FunctionBuilder) emitAroundInstruction(i, other Instruction, insert func(Instruction)) {
-	recoverBuilder := f.SetCurrent(other)
+	recoverBuilder := f.SetCurrent(other, true)
 	defer recoverBuilder()
 
 	f.emitEx(i, insert)
@@ -208,7 +208,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 // NOTE: the object/membercall will create vars in finished blocks
 func (f *FunctionBuilder) EmitUndefined(name string) *Undefined {
 	u := NewUndefined(name)
-	f.emit(u)
+	f.EmitFirst(u, f.CurrentBlock)
 	return u
 }
 
