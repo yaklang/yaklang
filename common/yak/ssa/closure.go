@@ -17,7 +17,7 @@ type FunctionSideEffect struct {
 
 	forceCreate bool
 
-	*parameterMember
+	*parameterMemberInner
 }
 
 func (f *Function) AddForceSideEffect(name string, v Value) {
@@ -25,7 +25,7 @@ func (f *Function) AddForceSideEffect(name string, v Value) {
 		Name:        name,
 		Modify:      v,
 		forceCreate: true,
-		parameterMember: &parameterMember{
+		parameterMemberInner: &parameterMemberInner{
 			MemberCallKind: NoMemberCall,
 		},
 	})
@@ -35,7 +35,7 @@ func (f *Function) AddSideEffect(name *Variable, v Value) {
 		Name:     name.GetName(),
 		Modify:   v,
 		Variable: name,
-		parameterMember: &parameterMember{
+		parameterMemberInner: &parameterMemberInner{
 			MemberCallKind: NoMemberCall,
 		},
 	})
@@ -49,12 +49,12 @@ func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
 			return
 		}
 		sideEffect := &FunctionSideEffect{
-			Name:            variable.GetName(),
-			VerboseName:     getMemberVerboseName(variable.object, variable.key),
-			Modify:          v,
-			Variable:        variable,
-			forceCreate:     false,
-			parameterMember: newParameterMember(para, variable.key),
+			Name:                 variable.GetName(),
+			VerboseName:          getMemberVerboseName(variable.object, variable.key),
+			Modify:               v,
+			Variable:             variable,
+			forceCreate:          false,
+			parameterMemberInner: newParameterMember(para, variable.key),
 		}
 		f.SideEffects = append(f.SideEffects, sideEffect)
 	}

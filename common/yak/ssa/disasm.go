@@ -327,12 +327,12 @@ func (sw *Switch) String() string {
 
 // ----------- BinOp
 func (b *BinOp) String() string {
-	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), BinaryOpcodeName[b.Op], getStr(b.Y))
+	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), b.Op, getStr(b.Y))
 }
 
 // ----------- UnOp
 func (u *UnOp) String() string {
-	return fmt.Sprintf("%s = %s %s", getStr(u), UnaryOpcodeName[u.Op], getStr(u.X))
+	return fmt.Sprintf("%s = %s %s", getStr(u), u.Op, getStr(u.X))
 }
 
 // ----------- Interface

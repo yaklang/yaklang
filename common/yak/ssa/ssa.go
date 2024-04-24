@@ -40,18 +40,10 @@ type Instruction interface {
 	GetRange() *Range
 	SetRange(*Range)
 
-	// Scope
-	// SetScope(*Scope)
-	// GetScope() *Scope
-
 	// extern
 	IsExtern() bool
 	SetExtern(bool)
 
-	GetVariable(string) *Variable
-	GetLastVariable() *Variable
-	GetAllVariables() map[string]*Variable
-	AddVariable(*Variable)
 	SelfDelete()
 }
 
@@ -101,6 +93,13 @@ type MemberCall interface {
 	// ReplaceObject(Value) // replace old-object to new-object
 }
 
+type AssignAble interface {
+	GetVariable(string) *Variable
+	GetLastVariable() *Variable
+	GetAllVariables() map[string]*Variable
+	AddVariable(*Variable)
+}
+
 // basic handle item (interface)
 type Value interface {
 	Node
@@ -108,6 +107,7 @@ type Value interface {
 	MemberCall
 	Typed
 	Maskable
+	AssignAble
 	AddUser(User)
 	RemoveUser(User)
 }
@@ -325,7 +325,7 @@ const (
 	FreeValueMemberCall
 )
 
-type parameterMember struct {
+type parameterMemberInner struct {
 	ObjectName            string
 	MemberCallKind        ParameterMemberCallKind
 	MemberCallObjectIndex int    // for Parameter
@@ -333,8 +333,8 @@ type parameterMember struct {
 	MemberCallKey         Value
 }
 
-func newParameterMember(obj *Parameter, key Value) *parameterMember {
-	new := &parameterMember{
+func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
+	new := &parameterMemberInner{
 		ObjectName:    obj.GetName(),
 		MemberCallKey: key,
 	}
@@ -349,7 +349,7 @@ func newParameterMember(obj *Parameter, key Value) *parameterMember {
 	return new
 }
 
-func (p *parameterMember) Get(c *Call) (obj Value, ok bool) {
+func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 	switch p.MemberCallKind {
 	case NoMemberCall:
 		return
@@ -368,7 +368,7 @@ func (p *parameterMember) Get(c *Call) (obj Value, ok bool) {
 
 type ParameterMember struct {
 	*Parameter
-	*parameterMember
+	*parameterMemberInner
 }
 
 func (p *ParameterMember) IsMember() bool { return true }

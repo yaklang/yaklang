@@ -2,85 +2,46 @@ package ssa
 
 import "math"
 
-type BinaryOpcode int
-
 const (
-	// Binary
-	OpShl BinaryOpcode = iota // <<
-
-	OpLogicAnd // &&
-	OpLogicOr  // ||
-
-	OpShr    // >>
-	OpAnd    // &
-	OpAndNot // &^
-	OpOr     // |
-	OpXor    // ^
-	OpAdd    // +
-	OpSub    // -
-	OpDiv    // /
-	OpMod    // %
-	// mul
-	OpMul // *
-
-	// boolean opcode
-	OpGt    // >
-	OpLt    // <
-	OpGtEq  // >=
-	OpLtEq  // <=
-	OpEq    // ==
-	OpNotEq // != <>
-	OpIn    //  a in b
-
-	OpSend // <-
-	OpPow  // **
+	OpNone = ``
 )
 
-var BinaryOpcodeName = map[BinaryOpcode]string{
-	OpLogicAnd: `LogicAnd`,
-	OpLogicOr:  `LogicOr`,
-
-	OpAnd:    `and`,
-	OpAndNot: `and-not`,
-	OpOr:     `or`,
-	OpXor:    `xor`,
-	OpShl:    `shl`,
-	OpShr:    `shr`,
-	OpAdd:    `add`,
-	OpSub:    `sub`,
-	OpMod:    `mod`,
-	OpMul:    `mul`,
-	OpDiv:    `div`,
-	OpGt:     `gt`,
-	OpLt:     `lt`,
-	OpLtEq:   `ltEq`,
-	OpGtEq:   `gtEq`,
-	OpNotEq:  `neq`,
-	OpEq:     `eq`,
-	OpIn:     `in`,
-	OpSend:   `send`,
-	OpPow:    `pow`,
-}
-
-type UnaryOpcode int
+type BinaryOpcode string
 
 const (
-	OpNone       UnaryOpcode = iota
-	OpNot                    // !
-	OpPlus                   // +
-	OpNeg                    // -
-	OpChan                   // <-
-	OpBitwiseNot             // ^
+	OpLogicAnd = `LogicAnd`
+	OpLogicOr  = `LogicOr`
+	OpAnd      = `and`
+	OpAndNot   = `and-not`
+	OpOr       = `or`
+	OpXor      = `xor`
+	OpShl      = `shl`
+	OpShr      = `shr`
+	OpAdd      = `add`
+	OpSub      = `sub`
+	OpMod      = `mod`
+	OpMul      = `mul`
+	OpDiv      = `div`
+	OpGt       = `gt`
+	OpLt       = `lt`
+	OpLtEq     = `ltEq`
+	OpGtEq     = `gtEq`
+	OpNotEq    = `neq`
+	OpEq       = `eq`
+	OpIn       = `in`
+	OpSend     = `send`
+	OpPow      = `pow`
 )
 
-var UnaryOpcodeName = map[UnaryOpcode]string{
-	OpNone:       ``,
-	OpNot:        `not`,
-	OpPlus:       `plus`,
-	OpNeg:        `neg`,
-	OpChan:       `chan`,
-	OpBitwiseNot: `bitwise-not`,
-}
+type UnaryOpcode string
+
+const (
+	OpNot        = `not`
+	OpPlus       = `plus`
+	OpNeg        = `neg`
+	OpChan       = `chan`
+	OpBitwiseNot = `bitwise-not`
+)
 
 func HandlerBinOp(b *BinOp) (ret Value) {
 	defer func() {

@@ -19,12 +19,7 @@ type anInstruction struct {
 	verboseName string // verbose name for output or debug or tag
 	id          int64
 
-	isExtern  bool
-	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
-
-	// mask is a map, key is variable name, value is variable value
-	// it record the variable is masked by closure function or some scope changed
-	mask *omap.OrderedMap[string, Value]
+	isExtern bool
 }
 
 func (i *anInstruction) IsUndefined() bool {
@@ -36,10 +31,6 @@ func (i *anInstruction) SelfDelete() {
 }
 
 func (i *anInstruction) ReplaceValue(Value, Value) {
-}
-
-func (i *anInstruction) AddMask(v Value) {
-	i.mask.Add(v)
 }
 
 func (i *anInstruction) GetVerboseName() string {
@@ -63,19 +54,9 @@ func (i *anInstruction) SetVerboseName(verbose string) {
 	i.verboseName = verbose
 }
 
-func (i *anInstruction) GetMask() []Value {
-	return i.mask.Values()
-}
-
-func (i *anInstruction) Masked() bool {
-	return i.mask.Len() != 0
-}
-
 func NewInstruction() anInstruction {
 	return anInstruction{
-		variables: omap.NewOrderedMap(make(map[string]*Variable)),
-		id:        -1,
-		mask:      omap.NewEmptyOrderedMap[string, Value](),
+		id: -1,
 	}
 }
 
@@ -123,32 +104,7 @@ func (a *anInstruction) GetId() int64 {
 func (a *anInstruction) LineDisasm() string { return "" }
 
 // opcode
-func (a *anInstruction) GetOpcode() Opcode      { return SSAOpcodeUnKnow } // cover by instruction
-func (a *anInstruction) GetOperands() Values    { return nil }             // cover by instruction
-func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
-func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
-
-func (a *anInstruction) GetVariable(name string) *Variable {
-	if ret, ok := a.variables.Get(name); ok {
-		return ret
-	} else {
-		return nil
-	}
-}
-
-func (a *anInstruction) GetLastVariable() *Variable {
-	_, v, _ := a.variables.Last()
-	return v
-}
-
-func (a *anInstruction) GetAllVariables() map[string]*Variable {
-	return a.variables.GetMap()
-}
-func (a *anInstruction) AddVariable(v *Variable) {
-	name := v.GetName()
-	a.variables.Set(name, v)
-	a.variables.BringKeyToLastOne(name)
-}
+func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover by instruction
 
 var _ Instruction = (*anInstruction)(nil)
 
@@ -161,6 +117,12 @@ type anValue struct {
 	object Value
 	key    Value
 	member *omap.OrderedMap[Value, Value] // map[Value]Value
+
+	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
+
+	// mask is a map, key is variable name, value is variable value
+	// it record the variable is masked by closure function or some scope changed
+	mask *omap.OrderedMap[string, Value]
 }
 
 func NewValue() anValue {
@@ -171,6 +133,9 @@ func NewValue() anValue {
 		object:        nil,
 		key:           nil,
 		member:        omap.NewOrderedMap(map[Value]Value{}),
+
+		variables: omap.NewOrderedMap(map[string]*Variable{}),
+		mask:      omap.NewOrderedMap(map[string]Value{}),
 	}
 }
 
@@ -274,4 +239,38 @@ func (n *anValue) SetType(typ Type) {
 		log.Errorf("SetType: value is not Value but is %d", n.GetId())
 	}
 	n.typ = classBluePrint.Apply(value)
+}
+
+func (a *anValue) GetVariable(name string) *Variable {
+	if ret, ok := a.variables.Get(name); ok {
+		return ret
+	} else {
+		return nil
+	}
+}
+
+func (a *anValue) GetLastVariable() *Variable {
+	_, v, _ := a.variables.Last()
+	return v
+}
+
+func (a *anValue) GetAllVariables() map[string]*Variable {
+	return a.variables.GetMap()
+}
+func (a *anValue) AddVariable(v *Variable) {
+	name := v.GetName()
+	a.variables.Set(name, v)
+	a.variables.BringKeyToLastOne(name)
+}
+
+func (i *anValue) AddMask(v Value) {
+	i.mask.Add(v)
+}
+
+func (i *anValue) GetMask() []Value {
+	return i.mask.Values()
+}
+
+func (i *anValue) Masked() bool {
+	return i.mask.Len() != 0
 }

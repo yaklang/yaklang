@@ -290,7 +290,6 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		}
 	}
 	getBinaryOp := func() (single getSingleExpr, Op ssa.BinaryOpcode, IsBinOp bool) {
-		single, Op, IsBinOp = nil, 0, false
 		for {
 			// a := stmt
 			// fmt.Println(a.GetText())
@@ -383,7 +382,6 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	}
 
 	getUnaryOp := func() (single *JS.PreUnaryExpressionContext, Op ssa.UnaryOpcode, IsUnaryOp bool) {
-		single, Op, IsUnaryOp = nil, 0, false
 		for {
 			// + - ! ~
 			if s, ok := stmt.(*JS.PreUnaryExpressionContext); ok {

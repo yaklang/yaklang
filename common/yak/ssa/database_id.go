@@ -8,9 +8,11 @@ import (
 
 func (p *Program) DeleteInstruction(inst Instruction) {
 	p.Cache.DeleteInstruction(inst)
-	//
-	for name := range inst.GetAllVariables() {
-		p.RemoveInstructionInVariable(name, inst)
+
+	if assignable, ok := inst.(AssignAble); ok {
+		for name := range assignable.GetAllVariables() {
+			p.RemoveInstructionInVariable(name, inst)
+		}
 	}
 }
 

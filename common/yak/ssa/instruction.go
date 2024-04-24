@@ -155,8 +155,9 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 
 func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Parameter {
 	p := &Parameter{
-		anValue:     NewValue(),
-		IsFreeValue: isFreeValue,
+		anValue:      NewValue(),
+		IsFreeValue:  isFreeValue,
+		defaultValue: nil,
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
