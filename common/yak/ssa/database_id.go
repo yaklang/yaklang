@@ -1,6 +1,10 @@
 package ssa
 
-import "strings"
+import (
+	"github.com/gobwas/glob"
+	"regexp"
+	"strings"
+)
 
 func (p *Program) DeleteInstruction(inst Instruction) {
 	p.Cache.DeleteInstruction(inst)
@@ -32,4 +36,12 @@ func (p *Program) RemoveInstructionInVariable(name string, i Instruction) {
 
 func (p *Program) GetInstructionsByName(name string) []Instruction {
 	return p.Cache.GetByVariable(name)
+}
+
+func (p *Program) GetInstructionsByGlob(g glob.Glob) []Instruction {
+	return p.Cache.GetByVariableGlob(g)
+}
+
+func (p *Program) GetInstructionsByRegexp(r *regexp.Regexp) []Instruction {
+	return p.Cache.GetByVariableRegexp(r)
 }

@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"github.com/gobwas/glob"
+	"regexp"
 	"sort"
 
 	"github.com/samber/lo"
@@ -61,6 +63,50 @@ func (p *Program) GetInstructionById(id int64) ssa.Instruction {
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
 		p.Program.GetInstructionsByName(name),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, ok := i.(ssa.Value); ok {
+				return NewValue(v), true
+			} else {
+				return nil, false
+			}
+		},
+	)
+}
+
+func (g *Program) GlobRefRaw(rule string) Values {
+	r, err := glob.Compile(rule)
+	if err != nil {
+		log.Warnf("GlobRef for %v compile failed: %s", rule, err)
+		return nil
+	}
+	return g.GlobRef(r)
+}
+
+func (p *Program) GlobRef(r glob.Glob) Values {
+	return lo.FilterMap(
+		p.Program.GetInstructionsByGlob(r),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, ok := i.(ssa.Value); ok {
+				return NewValue(v), true
+			} else {
+				return nil, false
+			}
+		},
+	)
+}
+
+func (p *Program) RegexpRefRaw(rule string) Values {
+	r, err := regexp.Compile(rule)
+	if err != nil {
+		log.Warnf("RegexpRef for %v compile failed: %s", rule, err)
+		return nil
+	}
+	return p.RegexpRef(r)
+}
+
+func (p *Program) RegexpRef(r *regexp.Regexp) Values {
+	return lo.FilterMap(
+		p.Program.GetInstructionsByRegexp(r),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return NewValue(v), true
