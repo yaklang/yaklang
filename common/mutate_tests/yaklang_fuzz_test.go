@@ -1329,10 +1329,10 @@ Cookie: a=eyJudW1iZXIiOjEyM30=; b=eyJib29sZWFuIjp0cnVlfQ==; c=eyJzdHJpbmciOiIxMj
 				//原始测试值 a={"number":123}; b={"boolean":true}; c={"string":"123"}; d={"json":{"xx":"b"}}
 				code: `.FuzzCookieBase64JsonPath("e", "$.json", {"xx":123})`,
 				expectKeywordInOutputPacket: []string{
-					`a=` + codec.EncodeBase64(`{"number":999}`),
-					`b=` + codec.EncodeBase64(`{"boolean":false}`),
-					`c=` + codec.EncodeBase64(`{"string":"string"}`),
-					`d=` + codec.EncodeBase64(`{"json":{"xx":123}}`),
+					`a=` + codec.EncodeBase64(`{"number":123}`),
+					`b=` + codec.EncodeBase64(`{"boolean":true}`),
+					`c=` + codec.EncodeBase64(`{"string":"123"}`),
+					`d=` + codec.EncodeBase64(`{"json":{"xx":"b"}}`),
 					`e=` + codec.EncodeBase64(`{"json":{"xx":123}}`),
 				},
 				debug: true,
