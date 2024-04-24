@@ -23,17 +23,19 @@ func (p *Program) IsList() bool {
 func (p *Program) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
 	vals := p.Ref(s)
 	if len(vals) > 0 {
-		return true, nil, nil
+		return true, vals, nil
 	}
 	return false, nil, nil
 }
 
-func (p *Program) GlobMatch(glob glob.Glob) (bool, sfvm.ValueOperator, error) {
-	return false, nil, utils.Error("ssa.Program is not supported glob match")
+func (p *Program) GlobMatch(g glob.Glob) (bool, sfvm.ValueOperator, error) {
+	values := p.GlobRef(g)
+	return len(values) > 0, values, nil
 }
 
-func (p *Program) RegexpMatch(regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	return false, nil, utils.Error("ssa.Program is not supported regexp match")
+func (p *Program) RegexpMatch(re *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+	values := p.RegexpRef(re)
+	return len(values) > 0, values, nil
 }
 
 func (p *Program) GetMembers() (sfvm.ValueOperator, error) {
