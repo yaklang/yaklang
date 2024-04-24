@@ -3,31 +3,31 @@ loglevel("info")
 
 db.DelKey("JznQXuFDSepeNWHbiLGEwONiaBxhvj_SERVER_SCAN_MANAGER")
 
+// createAt  = cli.Int("timestamp", cli.setRequired(true))
 runtimeID = cli.String("runtime_id", cli.setRequired(true))
 hostTotal = cli.Int("host_total", cli.setRequired(true))
-pingAliveHostTotal = cli.Int("ping_alive_host_total", cli.setDefault(0))
 portTotal = cli.Int("port_total", cli.setDefault(0))
+pingAliveHostTotal = cli.Int("ping_alive_host_total", cli.setDefault(0))
 reportName = cli.String("report_name")
-plugins = cli.Int("plugins", cli.setDefault(10))
-
+plugins = cli.Int("plugins",cli.setDefault(10))
 cli.check()
+
 if reportName == "" {
     reportName = "报告"
 }
 
-
 reportInstance = report.New()
 reportInstance.From("simple-detect")
-defer func {
+defer func{
     err := recover()
     if err != nil {
         yakit.Info("扫描报告构建失败：%#v", err)
     }
-
     id = reportInstance.Save()
     yakit.Report(id)
-}
+    println(runtimeID)
 
+}
 
 severityToRisks = {}
 targetToRisks = {}
@@ -40,22 +40,23 @@ noWeakPassWordRisks = []
 // 风险漏洞分组
 // env.Get("YAK_RUNTIME_ID")
 for riskInstance = range risk.YieldRiskByRuntimeId(runtimeID) {
+    //println(riskInstance.IP)
+    // 按照级别分类 Risk
+    // printf("#%v\\n", riskInstance)
     if severityToRisks[riskInstance.Severity] == undefined {
         severityToRisks[riskInstance.Severity] = []
     }
-
     severityToRisks[riskInstance.Severity] = append(severityToRisks[riskInstance.Severity], riskInstance)
 
     // 按照 IP 来分类 Risk
     if targetToRisks[riskInstance.IP] == undefined {
         targetToRisks[riskInstance.IP] = []
     }
-
     targetToRisks[riskInstance.IP] = append(targetToRisks[riskInstance.IP], riskInstance)
 
     if parseBool(riskInstance.IsPotential) {
         potentialRisks = append(potentialRisks, riskInstance)
-    } else {
+    }else{
         noPotentialRisks = append(noPotentialRisks, riskInstance)
     }
 
@@ -64,7 +65,6 @@ for riskInstance = range risk.YieldRiskByRuntimeId(runtimeID) {
     } else {
         noWeakPassWordRisks = append(noWeakPassWordRisks, riskInstance)
     }
-
 
     riskAll = append(riskAll, riskInstance)
 }
@@ -79,21 +79,16 @@ for key, value = range severityToRisks {
     if str.Contains(key, "critical") {
         criticalLens = len(value)
     }
-
     if str.Contains(key, "high") {
         highLens = len(value)
     }
-
     if str.Contains(key, "warning") {
         warningLens = len(value)
     }
-
     if str.Contains(key, "low") {
         lowLens = len(value)
     }
-
 }
-
 
 if criticalLens > 0 {
     reportInstance.Raw({"type": "report-cover", "data": "critical"})
@@ -116,16 +111,18 @@ if criticalLens == 0 && highLens == 0 && warningLens == 0 && lowLens == 0 {
 }
 
 
+// 端口开放情况
 portsLine = []
 aliveHostCountList = []
 openPortCount = 0
 
-portChan := db.QueryPortsByTaskName(runtimeID)~
-for port := range portChan {
-    openPortCount += 1
+portChan := db.QueryPortsByRuntimeId(runtimeID)~
+for port :=range portChan{
+    openPortCount +=1
     if port.Host not in aliveHostCountList {
-        aliveHostCountList = append(aliveHostCountList, port.Host)
+        aliveHostCountList = append(aliveHostCountList,port.Host)
     }
+    // println(sprintf("%s:%d",port.Host,port.Port))
     portsLine = append(portsLine, {
         "地址": {"value": port.Host, "sort": 1},
         "端口": {"value": port.Port, "sort": 2},
@@ -138,10 +135,9 @@ for port := range portChan {
 
 aliveHostCount = len(aliveHostCountList)
 
-if pingAliveHostTotal > 0 {
+if pingAliveHostTotal > 0{
     aliveHostCount = pingAliveHostTotal
 }
-
 reportInstance.Title(reportName)
 
 reportInstance.Markdown(`# 1、项目概述
@@ -221,10 +217,8 @@ if criticalLens > 0{
      riskGradeColor = "#FFA500"
 }
 riskGradeStyleColor = sprintf(`<span style='color:%s;font-weight:bold'>%s</span>`, riskGradeColor, riskGrade)
-reportInstance.Markdown(sprintf(
-    `
+reportInstance.Markdown(sprintf(`
 本次测试的总体安全现状如下：
-
 - 风险等级：%s
 - 扫描端口数：%v个
 - 开放端口数：%v个
@@ -232,18 +226,10 @@ reportInstance.Markdown(sprintf(
 - 扫描主机数：%v个
 - 每台主机涉及端口数：%v个
 
-`,
-    riskGradeStyleColor,
-    totalTasks,
-    openPortCount,
-    aliveHostCount,
-    hostTotal,
-    portTotal,
-))
+`, riskGradeStyleColor, totalTasks,openPortCount,aliveHostCount, hostTotal, portTotal))
 // 输出漏洞图相关的内容
-total := len(riskAll)
-reportInstance.Markdown(sprintf(
-    `
+total := criticalLens + highLens + warningLens + lowLens
+reportInstance.Markdown(sprintf(`
 本次测试发现以下漏洞与合规风险：
 
 - 总数：**%v**个
@@ -254,19 +240,15 @@ reportInstance.Markdown(sprintf(
 
 附录含有漏洞详情，如有需求请及时修复。
 
-`,
-    total,
-    criticalLens,
-    highLens,
-    warningLens,
-    lowLens,
-))
+`, total, criticalLens, highLens, warningLens, lowLens))
 
+
+// reportInstance.Markdown("#### 漏洞汇总")
+// reportInstance.Raw({"type": "bar-graph", "data": [{"name": "严重漏洞", "value": criticalLens}, {"name": "高危漏洞", "value": highLens},  {"name": "中危漏洞", "value": warningLens}, {"name": "低危漏洞", "value": lowLens}], "color": ["#f70208","#f9c003","#2ab150","#5c9cd5"]})
 reportInstance.Raw({"type": "bar-graph", "title": "漏洞与合规风险汇总", "data": [{"name": "严重漏洞", "value": criticalLens}, {"name": "高危漏洞", "value": highLens}, {"name": "中危漏洞", "value": warningLens}, {"name": "低危漏洞", "value": lowLens}], "color": ["#f70208", "#f9c003", "#2ab150", "#5c9cd5"]})
 
-
 // IP 漏洞信息统计
-// ipRisksStr = ""
+
 ipRisksStr = []
 
 // 漏洞等级分类数组
@@ -289,11 +271,10 @@ warningCountScale = 0
 lowCountScale = 0
 secureCountScale = 0
 infoPotentialRisk = []
-for target, risks = range targetToRisks {
+for target,risks = range targetToRisks {
     if target == "" {
         continue
     }
-
     criticalCount = 0
     highCount = 0
     warningCount = 0
@@ -301,7 +282,7 @@ for target, risks = range targetToRisks {
     secureCount = 0
     riskLevel = "安全"
     for _, riskIns := range risks {
-        if  str.Contains(riskIns.Severity, "info") {
+        if str.Contains(riskIns.Severity, "info") {
             infoPotentialRisk = append(infoPotentialRisk, riskIns)
         }
         if str.Contains(riskIns.Severity, "critical") {
@@ -311,9 +292,7 @@ for target, risks = range targetToRisks {
             } else {
                 criticalRisks = append(criticalRisks, riskIns)
             }
-
         }
-
         if str.Contains(riskIns.Severity, "high") {
             highCount++
             if parseBool(riskIns.IsPotential) {
@@ -321,9 +300,7 @@ for target, risks = range targetToRisks {
             } else {
                 highRisks = append(highRisks, riskIns)
             }
-
         }
-
         if str.Contains(riskIns.Severity, "warning") {
             warningCount++
             if parseBool(riskIns.IsPotential) {
@@ -331,9 +308,7 @@ for target, risks = range targetToRisks {
             } else {
                 warningRisks = append(warningRisks, riskIns)
             }
-
         }
-
         if str.Contains(riskIns.Severity, "low") {
             lowCount++
             if parseBool(riskIns.IsPotential) {
@@ -341,17 +316,15 @@ for target, risks = range targetToRisks {
             } else {
                 lowRisks = append(lowRisks, riskIns)
             }
-
         }
-
-        if  str.Contains(riskIns.Severity, "info") {
+       if  str.Contains(riskIns.Severity, "info") {
            secureCount++
             if parseBool(riskIns.IsPotential) {
                 secureCountScaleRisks = append(secureCountScaleRisks, riskIns)
             } else {
                 secureRisks = append(secureRisks, riskIns)
             }
-        }
+       }
 
     }
     colorTag = ""
@@ -375,7 +348,7 @@ for target, risks = range targetToRisks {
       secureCountScale = secureCountScale + 1
     }
 
-    allCount = criticalCount + highCount + warningCount + lowCount
+    allCount = criticalCount +highCount + warningCount + lowCount
     if riskLevel != "安全" {
         ipRisksStr = append(ipRisksStr, {
             "资产": {"value": target, "jump_link": target, "sort": 1},
@@ -387,14 +360,13 @@ for target, risks = range targetToRisks {
             "总计": {"value": allCount, "sort": 7}
         })
     }
+
 }
 
-
-// reportInstance.Raw({"type": "pie-graph", "title":"存活资产统计", "data": [{"name": "超危", "value": criticalCountScale, "color": "#f2637b"}, {"name": "高危", "value": highCountScale, "color": "#fbd438"}, {"name": "中危", "value": warningCountScale, "color": "#4ecb73"}, {"name": "低危", "value": lowCountScale, "color": "#59d4d4"}, {"name": "安全", "value": secureCountScale, "color":  "#39a1ff"}, {"name": "存活资产", "value": aliveHostCount, "direction": "center", "color":  "#ffffff"} ] })
+// reportInstance.Raw({"type": "pie-graph", "title":"存活资产统计", "data": [{"name": "超危", "value": criticalCountScale}, {"name": "高危", "value": highCountScale}, {"name": "中危", "value": warningCountScale}, {"name": "低危", "value": lowCountScale}, {"name": "安全", "value": secureCountScale}, {"name": "存活资产", "value": aliveHostCount, "direction": "center"} ], "color": ["#f2637b", "#fbd438", "#4ecb73", "#59d4d4", "#39a1ff", "#ffffff"]})
 
 aliveHostList = []
 aliveHostKey = 0
-// 便携版平台
 for aliveHost = range db.QueryAliveHost(runtimeID) {
     if aliveHost.IP != "127.0.0.1" {
         aliveHostKey = aliveHostKey + 1
@@ -413,6 +385,7 @@ if len(aliveHostList) == 0 {
         }
     }
 }
+
 reportInstance.Markdown("<br/>")
 reportInstance.Raw({"type": "pie-graph", "title":"存活资产统计", "data": [{"name": "存活资产", "value": len(aliveHostList), "color": "#43ab42"}, {"name": "未知", "value": hostTotal-len(aliveHostList), "color": "#bfbfbf"}, {"name": "总资产", "value": hostTotal, "direction": "center", "color": "#ffffff"} ]})
 reportInstance.Raw({"type": "pie-graph", "title":"风险资产统计", "data": [{"name": "超危", "value": criticalCountScale, "color":"#8B0000"}, {"name": "高危", "value": highCountScale, "color":"#FF4500"}, {"name": "中危", "value": warningCountScale, "color": "#FFA500"}, {"name": "低危", "value": lowCountScale, "color": "#FDD338"}, {"name": "安全", "value": aliveHostCount-len(ipRisksStr), "color": "#43ab42"}, {"name": "存活资产统计", "value": aliveHostCount, "direction": "center", "color": "#ffffff"} ]})
@@ -436,7 +409,6 @@ if len(ipRisksStr) > 0 {
     reportInstance.Markdown("暂无资产汇总")
 }
 
-
 // 端口扫描统计展示
 reportInstance.Markdown("## 3.2 端口扫描统计")
 if len(portsLine) > 0 {
@@ -444,10 +416,6 @@ if len(portsLine) > 0 {
 } else {
     reportInstance.Markdown("暂无端口扫描")
 }
-
-// 插件扫描状态表格展示
-// reportInstance.Markdown("## 3.3 插件扫描状态统计")
-// reportInstance.Markdown(sprintf("涉及扫描插件：%v个", plugins))
 
 // 风险统计展示
 reportInstance.Markdown("## 3.3 风险统计")
@@ -518,7 +486,6 @@ if len(noPotentialRisks) == 0 {
         if info.IP != "" {
             addr = sprintf(`%v:%v`, info.IP, info.Port)
         }
-
         if !str.Contains(info.Severity, "info") {
             _line = append(_line, {
                 "序号": { "value": index + 1, "sort": 1},
@@ -532,7 +499,6 @@ if len(noPotentialRisks) == 0 {
     reportInstance.Raw(potentialRisksList)
 }
 
-
 showPotentialLine = []
 complianceRiskCriticalCount = 0
 complianceRiskHighCount = 0
@@ -541,52 +507,55 @@ complianceRiskLowCount = 0
 cpp = cve.NewStatistics("PotentialPie")
 println(len(potentialRisks))
 for i, riskIns := range potentialRisks {
+
     level = "-"
     if str.Contains(riskIns.Severity, "critical") {
         level = "严重"
         complianceRiskCriticalCount ++
     }
-
     if str.Contains(riskIns.Severity, "high") {
         level = "高危"
         complianceRiskHighCount ++
     }
-
     if str.Contains(riskIns.Severity, "warning") {
         level = "中危"
         complianceRiskWarningCount ++
-
     }
-
     if str.Contains(riskIns.Severity, "low") {
         level = "低危"
         complianceRiskLowCount ++
     }
 
     c = cve.GetCVE(riskIns.CVE)
-    cweNameZh = "-"
-    if len(c.CWE) != 0 {
+    cweNameZh="-"
+    if len(c.CWE) !=0 {
         ccwe = cwe.Get(c.CWE)
-        if ccwe != nil {
-            cweNameZh = ccwe.NameZh
+        if ccwe != nil{
+            cweNameZh =  ccwe.NameZh
         }
-
     }
-
 
     cveStr = riskIns.CVE
-    if len(cveStr) == 0 {
+    if len(cveStr) ==0 {
         cveStr = "-"
     }
-
     if len(showPotentialLine) < 10 {
-        title = str.SplitN(riskIns.Title, ": -", 2)[1]
+        title = riskIns.Title
+        try {
+          if str.Contains(riskIns.Title,": -") {
+            title = str.SplitN(riskIns.Title,": -",2)[1]
+          } else if str.Contains(riskIns.Title,":") && str.Contains(riskIns.Title,"CVE-") {
+            title = str.SplitN(riskIns.Title,":",2)[1]
+          }
+        }catch err {
+             yakit.Info("Title %v", err)
+        }
+
         showPotentialLine = append(
             showPotentialLine,
             [cveStr, title, sprintf(`%v:%v`, riskIns.IP, riskIns.Port), cweNameZh, level],
         )
     }
-
 
     cpp.Feed(c)
     yakit.SetProgress((float(i) / float(len(potentialRisks) - 1)))
@@ -596,79 +565,63 @@ for i, riskIns := range potentialRisks {
             ["更多风险请在附录中查看...", "", "", "", ""],
         )
     }
-
 }
-
 if len(potentialRisks) != 0 {
     reportInstance.Markdown(sprintf("### 3.3.3 合规检查风险统计"))
-    if(complianceRiskCriticalCount > 0 || complianceRiskHighCount > 0 || complianceRiskWarningCount > 0 || complianceRiskLowCount > 0) {
+    if(complianceRiskCriticalCount > 0 || complianceRiskHighCount > 0 || complianceRiskHighCount > 0 || complianceRiskWarningCount > 0) {
         reportInstance.Raw({"type": "bar-graph", "title": "合规漏洞严重程度统计", "data": [{"name": "严重", "value": complianceRiskCriticalCount}, {"name": "高危", "value": complianceRiskHighCount}, {"name": "中危", "value": complianceRiskWarningCount}, {"name": "低危", "value": complianceRiskLowCount}], "color": ["#f70208", "#f9c003", "#2ab150", "#5c9cd5"]})
     }
-
     reportInstance.Markdown(`合规检查是根据多年的经验， 通过扫描检查出危险系统及组件的版本。合规检查风险不是会造成实际损失的漏洞，可跟技术人员评估后，决定是否升级系统版本。`)
-    reportInstance.Table(
-        ["CVE编号", "漏洞标题", "地址", "CWE类型", "漏洞级别"],
-        showPotentialLine...,
-    )
+    reportInstance.Table(["CVE编号", "漏洞标题", "地址", "CWE类型", "漏洞级别"], showPotentialLine...)
 
     reportInstance.Markdown(sprintf("### 3.3.4 合规检查风险分析"))
-        for _, gp := range cpp.ToGraphs() {
-            aa = json.dumps(gp)
-            reportInstance.Raw(aa)
-            if gp.Name == "AttentionRing" {
-                reportInstance.Markdown(sprintf(`|  风险等级   | 等级划分依据  |
+    for _, gp := range cpp.ToGraphs(){
+        aa = json.dumps(gp)
+        reportInstance.Raw(aa)
+        if gp.Name == "AttentionRing"{
+             reportInstance.Markdown(sprintf(`|  风险等级   | 等级划分依据  |
 |  ----  | ----  |
 | <font color="#da4943">通过网络无需认证且易于攻击</font>  | 这种漏洞类型指的是攻击者可以通过互联网或者内部网络等方式，<font color="#da4943">无需进行任何身份认证</font>就能够轻易地攻击目标系统或应用程序。通常，这种漏洞会暴露在网络端口、协议、服务等方面，攻击者**很容易**利用其漏洞来实现远程控制、拒绝服务攻击、数据窃取等攻击行为。这种漏洞对于网络安全威胁性较高，需要及时采取相应的安全措施来防范和修复。 |
 | <font color="#dc9b02">攻击通过网络无需认证</font>  | 这种漏洞类型指的是攻击者可以通过互联网或者内部网络等方式，利用特定的漏洞或技术手段来<font color="#dc9b02">绕过身份验证或者访问控制机制</font>，从而获取系统或应用程序中敏感信息或者实现非法操作。这种漏洞通常涉及到系统或应用程序中存在的逻辑错误、缺陷或者安全配置问题，攻击者可以通过这些漏洞从外部或内部进入系统，发起攻击行为。这种漏洞需要综合考虑网络架构、身份认证、授权机制等多个方面来解决，确保系统或应用程序的安全和可靠性。 |
-| <font color="#43ab42">通过网络攻击</font>  | 这种漏洞类型指的是攻击者可以通过互联网或者内部网络等方式，利用<font color="#43ab42">已知或未知的漏洞</font>来实现对目标系统或应用程序的攻击。这种攻击通常涉及到系统或应用程序中的某个软件组件或者功能模块，攻击者可以通过针对这些组件或模块的漏洞发起攻击，例如代码注入、文件包含、SQL 注入等方式。这种漏洞需要及时更新系统或应用程序中的软件版本，并加强安全测试和审计等手段，确保系统或应用程序的安全性和可靠性。|
-`))
-            }
+| <font color="#43ab42">通过网络攻击</font>  | 这种漏洞类型指的是攻击者可以通过互联网或者内部网络等方式，利用<font color="#43ab42">已知或未知的漏洞</font>来实现对目标系统或应用程序的攻击。这种攻击通常涉及到系统或应用程序中的某个软件组件或者功能模块，攻击者可以通过针对这些组件或模块的漏洞发起攻击，例如代码注入、文件包含、SQL 注入等方式。这种漏洞需要及时更新系统或应用程序中的软件版本，并加强安全测试和审计等手段，确保系统或应用程序的安全性和可靠性。|`))
         }
+    }
 } else {
-  reportInstance.Markdown(sprintf("### 3.3.3 合规检查风险统计"))
-  reportInstance.Markdown("无合规检查风险统计")
+    reportInstance.Markdown(sprintf("### 3.3.3 合规检查风险统计"))
+    reportInstance.Markdown("无合规检查风险统计")
 
-  reportInstance.Markdown(sprintf("### 3.3.4 合规检查风险分析"))
-  reportInstance.Markdown("无合规检查风险分析")
+    reportInstance.Markdown(sprintf("### 3.3.4 合规检查风险分析"))
+    reportInstance.Markdown("无合规检查风险分析")
+
 }
 
 
 showWeakPassWordLine = []
 for _, riskIns := range weakPassWordRisks {
+
     level = "-"
-    if str.Contains(riskIns.Severity, "critical") {
-        level = "严重"
-    }
-
-    if str.Contains(riskIns.Severity, "high") {
-        level = "高危"
-    }
-
-    if str.Contains(riskIns.Severity, "warning") {
-        level = "中危"
-    }
-
-    if str.Contains(riskIns.Severity, "low") {
-        level = "低危"
-    }
-
+    if str.Contains(riskIns.Severity, "critical") { level = "严重" }
+    if str.Contains(riskIns.Severity, "high") { level = "高危" }
+    if str.Contains(riskIns.Severity, "warning") { level = "中危" }
+    if str.Contains(riskIns.Severity, "low") { level = "低危"}
 
     if len(showWeakPassWordLine) < 10 {
-        showWeakPassWordLine = append(
-            showWeakPassWordLine,
-            [riskIns.TitleVerbose, riskIns.IP, riskIns.RiskTypeVerbose, level],
-        )
+        showWeakPassWordLine = append(showWeakPassWordLine, [
+            riskIns.TitleVerbose,
+            riskIns.IP,
+            riskIns.RiskTypeVerbose,
+            level,
+        ])
     }
-
     if len(showWeakPassWordLine) == 10 {
-        showWeakPassWordLine = append(
-            showWeakPassWordLine,
-            ["更多风险请在附录中查看", "", "", ""],
-        )
+        showWeakPassWordLine = append(showWeakPassWordLine, [
+            "更多风险请在附录中查看",
+            "",
+            "",
+            "",
+        ])
     }
-
 }
-
 
 if len(weakPassWordRisks) != 0 {
      reportInstance.Markdown(sprintf("### 3.3.5 弱口令风险列表"))
@@ -711,8 +664,8 @@ if len(weakPassWordRisks) != 0 {
 }
 
 if len(infoPotentialRisk) > 0 {
-    reportInstance.Markdown(sprintf("### 3.3.6 信息/指纹列表"))
-    reportInstance.Markdown(sprintf(`本次扫描检测到信息/指纹共<span style="font-weight:bold">%v</span>条，请认真查看是否有风险信息需要排查。`, len(infoPotentialRisk) ))
+    reportInstance.Markdown(sprintf("### 3.3.6 风险信息列表"))
+    reportInstance.Markdown(sprintf(`本次扫描检测到风险信息共<span style="font-weight:bold">%v</span>条，请认真查看是否有风险信息需要排查。`, len(infoPotentialRisk) ))
     infoPotentialRiskList = []
     for _, infoRisk := range infoPotentialRisk {
         titleVerbose = infoRisk.TitleVerbose
@@ -745,47 +698,25 @@ if len(infoPotentialRisk) > 0 {
     reportInstance.Raw({"type": "info-risk-list", "data": infoPotentialRiskList})
 
 } else {
-    reportInstance.Markdown(sprintf("### 3.3.6 信息/指纹列表"))
-    reportInstance.Markdown("暂无信息/指纹")
+    reportInstance.Markdown(sprintf("### 3.3.6 风险信息列表"))
+    reportInstance.Markdown("暂无风险信息")
 }
 
+
+// 后续整改建议
 reportInstance.Markdown("# 4、后续整改建议")
 if criticalLens > 0 || highLens > 0 {
-    reportInstance.Markdown(sprintf(
-        `本次测试漏洞与合规风险共%v个，其中<font color='#da4943'>严重</font>漏洞有%v个，<font color='#d83931'>高危</font>漏洞有%v个，<font color='#dc9b02'>中危</font>漏洞有%v个，<font color='#43ab42'>低危</font>漏洞有%v个。存在的潜在风险较大，请尽快部署安全防护策略和安全防护技术手段，落实安全评估和日常安全扫描，做到安全漏洞及时发现及时修复，切实提升系统安全防护能力。`,
-        total,
-        criticalLens,
-        highLens,
-        warningLens,
-        lowLens,
-    ))
-} else if  warningLens > 0 {
-    reportInstance.Markdown(sprintf(
-        `本次测试漏洞与合规风险共%v个，其中<font color='#da4943'>严重</font>漏洞有%v个，<font color='#d83931'>高危</font>漏洞有%v个，<font color='#dc9b02'>中危</font>漏洞有%v个，<font color='#43ab42'>低危</font>漏洞有%v个。存在潜在风险，请尽快部署安全防护策略和安全防护技术手段，落实安全评估和日常安全扫描，做到安全漏洞及时发现及时修复，切实提升系统安全防护能力。`,
-        total,
-        criticalLens,
-        highLens,
-        warningLens,
-        lowLens,
-    ))
-} else {
-    reportInstance.Markdown(sprintf(
-        `本次测试漏洞与合规风险共%v个，其中<font color='#da4943'>严重</font>漏洞有%v个，<font color='#d83931'>高危</font>漏洞有%v个，<font color='#dc9b02'>中危</font>漏洞有%v个，<font color='#43ab42'>低危</font>漏洞有%v个。整体安全防护良好。`,
-        total,
-        criticalLens,
-        highLens,
-        warningLens,
-        lowLens,
-    ))
+    reportInstance.Markdown(sprintf(`本次测试风险漏洞共%v个，其中<font color='#da4943'>严重</font>漏洞有%v个，<font color='#d83931'>高危</font>漏洞有%v个，<font color='#dc9b02'>中危</font>漏洞有%v个，<font color='#43ab42'>低危</font>漏洞有%v个。存在的潜在风险较大，请尽快部署安全防护策略和安全防护技术手段，落实安全评估和日常安全扫描，做到安全漏洞及时发现及时修复，切实提升系统安全防护能力。`, total, criticalLens, highLens, warningLens, lowLens))
+} else if criticalLens == 0 && highLens == 0 && warningLens > 0 {
+    reportInstance.Markdown(sprintf(`本次测试风险漏洞共%v个，其中<font color='#da4943'>严重</font>漏洞有%v个，<font color='#d83931'>高危</font>漏洞有%v个，<font color='#dc9b02'>中危</font>漏洞有%v个，<font color='#43ab42'>低危</font>漏洞有%v个。存在潜在风险，请尽快部署安全防护策略和安全防护技术手段，落实安全评估和日常安全扫描，做到安全漏洞及时发现及时修复，切实提升系统安全防护能力。`, total, criticalLens, highLens, warningLens, lowLens))
+} else if criticalLens == 0 && highLens == 0 && warningLens == 0 {
+    reportInstance.Markdown(sprintf(`本次测试风险漏洞共%v个，其中<font color='#da4943'>严重</font>漏洞有%v个，<font color='#d83931'>高危</font>漏洞有%v个，<font color='#dc9b02'>中危</font>漏洞有%v个，<font color='#43ab42'>低危</font>漏洞有%v个。整体安全防护良好。`, total, criticalLens, highLens, warningLens, lowLens))
 }
-
 
 reportInstance.Markdown("# 附录：")
 
-
 // 检索漏洞详情
-
-func showReportLm(risks) {
+func showReport(risks) {
     for k, riskIns := range risks {
         payload, _ := codec.StrconvUnquote(riskIns.Payload)
         if payload == "" {
@@ -797,6 +728,7 @@ func showReportLm(risks) {
         if riskIns.Host != "" {
             addr = sprintf(`%v:%v`, riskIns.Host, riskIns.Port)
         }
+
         titleVerbose = riskIns.TitleVerbose
         if titleVerbose == "" {
             titleVerbose = riskIns.Title
@@ -842,47 +774,41 @@ func showReportLm(risks) {
                 "value": response,
                 "type": "code"
             }
+
           }
+
         })
     }
-
 }
 
 reportInstance.Markdown("## 漏洞详情与复现依据")
 
 if len(criticalRisks) > 0 {
     reportInstance.Markdown(sprintf("### 严重漏洞详情"))
-    showReportLm(criticalRisks)
+    showReport(criticalRisks)
 }
-
 if len(highRisks) > 0 {
     reportInstance.Markdown(sprintf("### 高危漏洞详情"))
-    showReportLm(highRisks)
+    showReport(highRisks)
 }
-
 if len(warningRisks) > 0 {
     reportInstance.Markdown(sprintf("### 中危漏洞详情"))
-    showReportLm(warningRisks)
+    showReport(warningRisks)
 }
-
 if len(lowRisks) > 0 {
     reportInstance.Markdown(sprintf("### 低危漏洞详情"))
-    showReportLm(lowRisks)
+    showReport(lowRisks)
 }
-
-if len(criticalRisks) == 0 && len(highRisks) == 0 && len(warningRisks) == 0 && len(lowRisks) == 0 {
+if len(criticalRisks)== 0 && len(highRisks)== 0 && len(warningRisks)== 0 && len(lowRisks)== 0 {
     reportInstance.Markdown(sprintf("暂无漏洞详情"))
 }
-
-// 合规
 
 reportInstance.Markdown("## 合规检查风险详情")
 
 // 用 map 存储每个年份的 CVE 编号
 cveTestMap := make(map[string][]var)
 
-func showCVEReportLm(risks, riskSeverity) {
-
+func showCVEReport(risks, riskSeverity) {
     for _, riskIns := range risks {
         year = riskIns.CVE[4:8]
 
@@ -929,7 +855,7 @@ func showCVEReportLm(risks, riskSeverity) {
             }
             parameter = "-"
             if customHasPrefix(cve.Parameter, "cpe") {
-            	parameter = cve.Parameter
+            parameter = cve.Parameter
             }
             titleVerbose = cve.TitleVerbose
             if titleVerbose == "" {
@@ -977,44 +903,38 @@ func showCVEReportLm(risks, riskSeverity) {
         }
 
     }
-
 }
 
 func customHasPrefix(str, prefix) {
-	if len(str) < len(prefix) {
-		return false
-	}
+    if len(str) < len(prefix) {
+        return false
+    }
 
-	for i := 0; i < len(prefix); i++ {
-		if str[i] != prefix[i] {
-			return false
-		}
-	}
-
-	return true
+    for i := 0; i < len(prefix); i++ {
+        if str[i] != prefix[i] {
+            return false
+        }
+    }
+    return true
 }
 
 if len(criticalPotentialRisks) > 0 {
     reportInstance.Markdown(sprintf("### 严重合规风险详情"))
-    showCVEReportLm(criticalPotentialRisks, "critical")
+    showCVEReport(criticalPotentialRisks, "critical")
 }
-
 if len(highPotentialRisks) > 0 {
     reportInstance.Markdown(sprintf("### 高危合规风险详情"))
-    showCVEReportLm(highPotentialRisks, "high")
+    showCVEReport(highPotentialRisks, "high")
 }
-
 if len(warningPotentialRisks) > 0 {
     reportInstance.Markdown(sprintf("### 中危合规风险详情"))
-    showCVEReportLm(warningPotentialRisks, "warning")
+    showCVEReport(warningPotentialRisks, "warning")
 }
-
 if len(lowPotentialRisks) > 0 {
     reportInstance.Markdown(sprintf("### 低危合规风险详情"))
-    showCVEReportLm(lowPotentialRisks, "low")
+    showCVEReport(lowPotentialRisks, "low")
 }
-
-if len(criticalPotentialRisks) == 0 && len(highPotentialRisks) == 0 && len(warningPotentialRisks) == 0 && len(lowPotentialRisks) == 0 {
+if len(criticalPotentialRisks)== 0 && len(highPotentialRisks)== 0 && len(warningPotentialRisks)== 0 && len(lowPotentialRisks)== 0 {
     reportInstance.Markdown(sprintf("暂无合规风险"))
 }
 
