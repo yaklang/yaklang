@@ -19,6 +19,7 @@ const YakHotPatchErr = "__YakHotPatchErr@"
 type FuzzTag struct {
 	parser.BaseTag
 }
+type stepDataGetter func() ([]byte, error)
 
 func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
 	data := string(raw.GetData())
