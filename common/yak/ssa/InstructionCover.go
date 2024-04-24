@@ -5,8 +5,9 @@ func ToNode(a any) (Node, bool)   { u, ok := a.(Node); return u, ok }
 func ToValue(n any) (Value, bool) { v, ok := n.(Value); return v, ok }
 func ToUser(n any) (User, bool)   { u, ok := n.(User); return u, ok }
 
-func ToFunction(n Node) (*Function, bool)  { u, ok := n.(*Function); return u, ok }
-func ToMethod(n Node) (*ClassMethod, bool) { u, ok := n.(*ClassMethod); return u, ok }
+func ToFunction(n any) (*Function, bool)     { u, ok := n.(*Function); return u, ok }
+func ToBasicBlock(n any) (*BasicBlock, bool) { u, ok := n.(*BasicBlock); return u, ok }
+func ToMethod(n Node) (*ClassMethod, bool)   { u, ok := n.(*ClassMethod); return u, ok }
 func ToFreeValue(n Node) (*Parameter, bool) {
 	u, ok := n.(*Parameter)
 	if ok && u.IsFreeValue {

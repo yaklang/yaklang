@@ -161,9 +161,9 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		}
 		return fmt.Sprintf("%s", v.String())
 	case *BinOp:
-		return fmt.Sprintf("%s(%s, %s)", BinaryOpcodeName[v.Op], liner.DisasmValue(v.X), liner.DisasmValue(v.Y))
+		return fmt.Sprintf("%s(%s, %s)", v.Op, liner.DisasmValue(v.X), liner.DisasmValue(v.Y))
 	case *UnOp:
-		return fmt.Sprintf("%s(%s)", UnaryOpcodeName[v.Op], liner.DisasmValue(v.X))
+		return fmt.Sprintf("%s(%s)", v.Op, liner.DisasmValue(v.X))
 	case *Call:
 		arg := ""
 		if len(v.Args) != 0 {
