@@ -89,7 +89,11 @@ func (v *Variable) AddRange(r *Range, force bool) {
 	//if force || len(*p.SourceCode) == len(v.GetName()) {
 	//	v.UseRange[p] = struct{}{}
 	//}
-	if force || r.GetText() == v.verboseName {
+	value := v.GetValue()
+	// phi not def range, so not have verboseName
+	isPhi := !utils.IsNil(value) && value.GetOpcode() == SSAOpcodePhi
+
+	if force || isPhi || r.GetText() == v.verboseName {
 		v.UseRange[r] = struct{}{}
 	}
 }

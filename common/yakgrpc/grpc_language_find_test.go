@@ -59,14 +59,16 @@ func getFindDefinition(local ypb.YakClient, pluginType string, t *testing.T, cod
 	return getFind(local, "definition", pluginType, t, code, Range, id)
 }
 
-func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange, wantRange memedit.RangeIf) {
+func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges ...memedit.RangeIf) {
 	t.Helper()
 
 	rsp := getFindDefinition(local, pluginType, t, sourceCode, RangeIfToGrpcRange(selectRange), "")
 
 	require.NotNil(t, rsp)
-	require.Len(t, rsp.Ranges, 1)
-	require.Equal(t, memedit.RangeIf(wantRange), GrpcRangeToRangeIf(rsp.Ranges[0]))
+	require.Len(t, rsp.Ranges, len(wantRanges))
+	for i, wantRange := range wantRanges {
+		require.Equal(t, wantRange, GrpcRangeToRangeIf(rsp.Ranges[i]))
+	}
 }
 
 func checkReferences(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges []memedit.RangeIf) {
@@ -150,7 +152,7 @@ a`
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:1 2:2"),
+			newRangeFromText("2:1 2:1"),
 			[]memedit.RangeIf{
 				newRangeFromText("1:5 1:6"),
 				newRangeFromText("2:1 2:2"),
@@ -209,7 +211,7 @@ return err
 		)
 	})
 
-	t.Run("standary library function", func(t *testing.T) {
+	t.Run("standard library function", func(t *testing.T) {
 		code := `ssa.Parse("")
 ssa.Parse("")`
 
@@ -225,7 +227,7 @@ ssa.Parse("")`
 		)
 	})
 
-	t.Run("standary function", func(t *testing.T) {
+	t.Run("standard function", func(t *testing.T) {
 		code := `println(1)
 println(2)`
 
@@ -259,4 +261,87 @@ println(2)`
 	// 			},
 	// 		)
 	// 	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_Find_Phi(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	code := `a = 1
+println(a)
+if c {
+a = 2
+println(a)
+}
+println(a)`
+
+	t.Run("def-1", func(t *testing.T) {
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("1:1 1:1"),
+			newRangeFromText("1:1 1:2"),
+		)
+	})
+	t.Run("def-2", func(t *testing.T) {
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("4:1 4:1"),
+			newRangeFromText("4:1 4:2"),
+		)
+	})
+	t.Run("def-phi", func(t *testing.T) {
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("7:9 7:9"),
+			newRangeFromText("1:1 1:2"),
+			newRangeFromText("4:1 4:2"),
+		)
+	})
+	t.Run("use-1", func(t *testing.T) {
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("2:9 2:9"),
+			[]memedit.RangeIf{
+				newRangeFromText("1:1 1:2"),
+				newRangeFromText("2:9 2:10"),
+				newRangeFromText("7:9 7:10"),
+			},
+		)
+	})
+	t.Run("use-2", func(t *testing.T) {
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("5:9 5:9"),
+			[]memedit.RangeIf{
+				newRangeFromText("4:1 4:2"),
+				newRangeFromText("5:9 5:10"),
+				newRangeFromText("7:9 7:10"),
+			},
+		)
+	})
+	t.Run("use-phi", func(t *testing.T) {
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("7:9 7:9"),
+			[]memedit.RangeIf{
+				newRangeFromText("1:1 1:2"),
+				newRangeFromText("2:9 2:10"),
+				newRangeFromText("4:1 4:2"),
+				newRangeFromText("5:9 5:10"),
+				newRangeFromText("7:9 7:10"),
+			},
+		)
+	})
 }

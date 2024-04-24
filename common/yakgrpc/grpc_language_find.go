@@ -5,69 +5,101 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v *ssaapi.Value) *ssa.Variable {
-	var targetVariable *ssa.Variable
+func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v *ssaapi.Value, isReference bool) []*ssa.Variable {
+	variables := make([]*ssa.Variable, 0)
 
-	if !containPoint {
-		targetVariable = v.GetVariable(word)
-	} else {
-		_, lastName, _ := strings.Cut(word, ".")
-		lastNameWithPoint := "." + lastName
-		variables := v.GetAllVariables()
-		for _, variable := range variables {
-			if !strings.HasSuffix(variable.GetName(), lastNameWithPoint) {
-				continue
+	findVariable := func(v *ssaapi.Value) {
+		if !containPoint {
+			variables = append(variables, v.GetVariable(word))
+		} else {
+			// fuzz match variable name
+			_, lastName, _ := strings.Cut(word, ".")
+			lastNameWithPoint := "." + lastName
+			for _, variable := range v.GetAllVariables() {
+				if !strings.HasSuffix(variable.GetName(), lastNameWithPoint) {
+					continue
+				}
+				variables = append(variables, variable)
+				break
 			}
-			targetVariable = variable
-			break
 		}
 	}
 
-	// if v.IsExtern() {
-	// }
+	if isReference {
+		findVariable(v)
+		// try to get users phi, add each edge variable
+		for _, user := range v.GetUsers() {
+			if !user.IsPhi() {
+				continue
+			}
 
-	return targetVariable
+			findVariable(user)
+		}
+		// try to convert value to phi, add each edge variable
+		if v.IsPhi() {
+			for _, edge := range ssaapi.GetValues(v) {
+				findVariable(edge)
+			}
+		}
+	} else {
+		findVariable(v)
+		// try to convert value to phi, add each edge variable
+		if v.IsPhi() {
+			for _, edge := range ssaapi.GetValues(v) {
+				findVariable(edge)
+			}
+		}
+	}
+
+	variables = lo.Uniq(variables)
+
+	return variables
+}
+
+func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value, isReference bool) ([]memedit.RangeIf, error) {
+	ranges := make([]memedit.RangeIf, 0)
+	variables := languageServerFind(prog, word, containPoint, v, isReference)
+	editor := ssaRange.GetEditor()
+
+	for _, variable := range variables {
+		if variable.DefRange != nil {
+			ranges = append(ranges, editor.ExpandWordTextRange(variable.DefRange))
+		}
+
+		if isReference {
+			for rng := range variable.UseRange {
+				ranges = append(ranges, editor.ExpandWordTextRange(rng))
+			}
+		}
+	}
+	// if extern variable, add extern variable range
+	if v.IsExtern() && len(ranges) == 0 {
+		ranges = append(ranges, editor.ExpandWordTextRange(v.GetRange()))
+	}
+
+	// sort by end offset
+	sort.SliceStable(ranges, func(i, j int) bool {
+		offset1 := editor.GetOffsetByPosition(ranges[i].GetEnd())
+		offset2 := editor.GetOffsetByPosition(ranges[j].GetEnd())
+		return offset1 < offset2
+	})
+
+	return ranges, nil
 }
 
 func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value) ([]memedit.RangeIf, error) {
-	ranges := make([]memedit.RangeIf, 0)
-	targetVariable := languageServerFind(prog, word, containPoint, v)
-
-	if targetVariable != nil {
-		editor := ssaRange.GetEditor()
-		ranges = append(ranges, editor.ExpandWordTextRange(targetVariable.DefRange))
-	} else if v.IsExtern() {
-		ranges = append(ranges, v.GetRange())
-	}
-	return ranges, nil
+	return onFind(prog, word, containPoint, ssaRange, v, false)
 }
 
 func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value) ([]memedit.RangeIf, error) {
-	ranges := make([]memedit.RangeIf, 0)
-	targetVariable := languageServerFind(prog, word, containPoint, v)
-
-	if targetVariable != nil {
-		editor := ssaRange.GetEditor()
-		ranges = append(ranges, editor.ExpandWordTextRange(targetVariable.DefRange))
-		for rng := range targetVariable.UseRange {
-			ranges = append(ranges, editor.ExpandWordTextRange(rng))
-		}
-
-		// sort by end offset
-		sort.SliceStable(ranges, func(i, j int) bool {
-			offset1 := editor.GetOffsetByPosition(ranges[i].GetEnd())
-			offset2 := editor.GetOffsetByPosition(ranges[j].GetEnd())
-			return offset1 < offset2
-		})
-	}
-
-	return ranges, nil
+	return onFind(prog, word, containPoint, ssaRange, v, true)
 }
 
 func RangeIfToGrpcRange(rng memedit.RangeIf) *ypb.Range {
