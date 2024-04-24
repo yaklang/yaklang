@@ -15,7 +15,6 @@ const (
 	OpPushString
 	OpPushBool
 	OpPop
-	OpWithdraw
 
 	// OpPushSearchExact can push data from origin
 	OpPushSearchExact
@@ -84,12 +83,27 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" (len:%v) %v", "push", len(s.UnaryStr), strconv.Quote(s.UnaryStr))
 	case OpPushNumber:
 		return fmt.Sprintf(verboseLen+" %v", "push", s.UnaryInt)
+
 	case OpPushSearchGlob:
 		return fmt.Sprintf(verboseLen+" %v", "push$glob", s.UnaryStr)
 	case OpPushSearchExact:
 		return fmt.Sprintf(verboseLen+" %v", "push$exact", s.UnaryStr)
 	case OpPushSearchRegexp:
 		return fmt.Sprintf(verboseLen+" %v", "push$regexp", s.UnaryStr)
+
+	case OpGetCallArgs:
+		return fmt.Sprintf(verboseLen+" %v", "getCallArgs", s.UnaryStr)
+	case OpGetMembers:
+		return fmt.Sprintf(verboseLen+" %v", "getMembers", s.UnaryStr)
+
+	case OpTopDefs:
+		return fmt.Sprintf(verboseLen+" %v", "topDefs", s.UnaryStr)
+	case OpBottomUse:
+		return fmt.Sprintf(verboseLen+" %v", "bottomUse", s.UnaryStr)
+
+	case OpListIndex:
+		return fmt.Sprintf(verboseLen+" %v", "listIndex", s.UnaryStr)
+
 	case OpNewRef:
 		return fmt.Sprintf(verboseLen+" %v", "new$ref", s.UnaryStr)
 	case OpUpdateRef:
@@ -118,8 +132,6 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
-	case OpWithdraw:
-		return fmt.Sprint("withdraw last stack value")
 	case OpCheckStackTop:
 		return fmt.Sprint("check stack top")
 	default:

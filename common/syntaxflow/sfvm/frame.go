@@ -2,7 +2,6 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -10,7 +9,7 @@ import (
 )
 
 type SFFrame struct {
-	symbolTable *omap.OrderedMap[string, any]
+	symbolTable *omap.OrderedMap[string, ValueOperator]
 	stack       *utils.Stack[ValueOperator]
 	Text        string
 	Codes       []*SFI
@@ -18,10 +17,10 @@ type SFFrame struct {
 	debug       bool
 }
 
-func NewSFFrame(vars *omap.OrderedMap[string, any], text string, codes []*SFI) *SFFrame {
+func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
 	v := vars
 	if v == nil {
-		v = omap.NewEmptyOrderedMap[string, any]()
+		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
 	}
 	return &SFFrame{
 		symbolTable: v,
@@ -38,7 +37,7 @@ func (s *SFFrame) Debug(v ...bool) *SFFrame {
 	return s
 }
 
-func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, any] {
+func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
 	return s.symbolTable
 }
 
@@ -72,30 +71,31 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Errorf("stack top is empty")
 			}
 		case OpPushSearchExact:
-			s.debugSubLog("<< pop search: %v", i.UnaryStr)
+			s.debugSubLog(">> pop match exactly: %v", i.UnaryStr)
 			value := s.stack.Pop()
 			if value == nil {
 				return utils.Errorf("search exact failed: stack top is empty")
 			}
+
 			result, next, err := value.ExactMatch(i.UnaryStr)
 			if err != nil {
 				return utils.Wrapf(err, "search exact failed")
 			}
 			if !result {
-				s.debugSubLog("result: %v, not found", i.UnaryStr)
+				s.debugSubLog("result: %v, not found, got: %s", i.UnaryStr, value.GetName())
 				return utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
-				s.debugSubLog("result: %v", next.GetName())
+				s.debugSubLog("result next: %v", next.GetName())
 				s.stack.Push(next)
-				s.debugSubLog("<< push")
+				s.debugSubLog("<< push next")
 			} else {
 				s.debugSubLog("result: %v", value.GetName())
 				s.stack.Push(value)
 				s.debugSubLog("<< push")
 			}
 		case OpPushSearchGlob:
-			s.debugSubLog("<< pop search glob: %v", i.UnaryStr)
+			s.debugSubLog(">> pop search glob: %v", i.UnaryStr)
 			value := s.stack.Pop()
 			if value == nil {
 				return utils.Errorf("search glob failed: stack top is empty")
@@ -123,7 +123,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			s.debugSubLog("<< push")
 			return nil
 		case OpPushSearchRegexp:
-			s.debugSubLog("<< pop search regexp: %v", i.UnaryStr)
+			s.debugSubLog(">> pop search regexp: %v", i.UnaryStr)
 			value := s.stack.Pop()
 			if value == nil {
 				return utils.Errorf("search regexp failed: stack top is empty")
@@ -149,6 +149,42 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			s.debugSubLog("result: %v", value.GetName())
 			s.stack.Push(value)
 			s.debugSubLog("<< push")
+		case OpGetMembers:
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			valueOperator, err := value.GetMembers()
+			if err != nil {
+				s.debugSubLog("E: %v", err)
+				return err
+			}
+			s.debugSubLog("- call GetMembers: %v", valueOperator.GetNames())
+			if !valueOperator.IsList() {
+				return utils.Error("E: GetMembers should return values list")
+			}
+			l := valuesLen(valueOperator)
+			s.debugSubLog("<< push members [%v]", l)
+			s.stack.Push(valueOperator)
+		case OpPop:
+			if s.stack.Len() == 0 {
+				s.debugSubLog(">> pop Error: empty stack")
+				return utils.Error("E: stack is empty, cannot pop")
+			}
+			i := s.stack.Pop()
+			s.debugSubLog(">> pop %v", i.GetNames())
+		case OpGetCallArgs:
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Error("get call args failed: stack top is empty")
+			}
+			results, err := value.GetCalled()
+			if err != nil {
+				return utils.Errorf("get calling instruction failed: %s", err)
+			}
+			callLen := valuesLen(results)
+			s.debugSubLog("- call Called: %v", callLen)
+			s.debugSubLog("<< push arg len: %v", callLen)
+			s.stack.Push(results)
 		//case OpPushIndex:
 		//	s.debugSubLog("peek stack top index: [%v]", i.UnaryInt)
 		//	parent := s.stack.Peek().AsMap()
@@ -405,12 +441,11 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		//	op2 := i.UnaryStr
 		//	_ = op1
 		//	_ = op2
-		//case OpPop:
-		//	s.stack.Pop()
 		//case OpWithdraw:
 		//	s.stack.Push(s.stack.LastStackValue())
 		default:
-			panic(fmt.Sprintf("unhandled default case， undefined opcode: %v", spew.Sdump(i)))
+			msg := fmt.Sprintf("unhandled default case， undefined opcode %v", i.String())
+			panic(msg)
 		}
 
 		idx++

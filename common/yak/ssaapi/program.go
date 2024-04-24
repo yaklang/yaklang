@@ -16,6 +16,10 @@ type Program struct {
 	config  *config
 }
 
+func (p *Program) GetNames() []string {
+	return []string{p.Program.GetProgramName()}
+}
+
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	return &Program{
 		Program: prog,
