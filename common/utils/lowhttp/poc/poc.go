@@ -582,11 +582,13 @@ func WithSource(i string) PocConfigOption {
 
 // connPool 是一个请求选项参数，用于指定是否使用连接池，默认不使用连接池
 // Example:
+// ```
 // rsp, req, err = poc.HTTP(x`POST /post HTTP/1.1
 // Content-Type: application/json
 // Host: pie.dev
 //
 // {"key": "asd"}`, poc.connPool(true)) // 使用连接池发送请求，这在发送多个请求时非常有用
+// ```
 func WithConnPool(b bool) PocConfigOption {
 	return func(c *PocConfig) {
 		c.ConnectionPool = b

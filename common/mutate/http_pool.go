@@ -989,6 +989,7 @@ var HttpPoolExports = map[string]interface{}{
 	"fuzz":               _httpPool_SetForceFuzz,
 	"fuzzParams":         _httpPool_SetFuzzParams,
 	"noFixContentLength": _httpPool_noFixContentLength,
+	"connPool":           _httpPool_withConnPool,
 }
 
 var (
