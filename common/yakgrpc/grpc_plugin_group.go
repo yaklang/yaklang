@@ -91,7 +91,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 			}
 		}
 	}
-
+	filterGroup.Close()
 	return &groupCount, nil
 }
 
