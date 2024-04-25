@@ -126,8 +126,10 @@ type User interface {
 
 type Build func(string, io.Reader, *FunctionBuilder) error
 
-type packagePath []string
-type packagePathList []packagePath
+type (
+	packagePath     []string
+	packagePathList []packagePath
+)
 
 // both instruction and value
 type Program struct {
@@ -157,6 +159,12 @@ type Program struct {
 
 	// cache hitter
 	packagePathList packagePathList
+
+	// extern lib
+	cacheExternInstance map[string]Value // lib and value
+	externType          map[string]Type
+	ExternInstance      map[string]any
+	ExternLib           map[string]map[string]any
 }
 
 type Package struct {
@@ -202,10 +210,6 @@ type Function struct {
 	// this block will always execute when the function exits,
 	// regardless of whether the function returns normally or exits due to a panic.
 	DeferBlock *BasicBlock
-
-	// extern lib
-	cacheExternInstance map[string]Value // lib and value
-	externType          map[string]Type
 
 	// include / require / eval-code / import packet
 	referenceFiles *omap.OrderedMap[string, string]

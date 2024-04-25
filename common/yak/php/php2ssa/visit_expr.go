@@ -84,7 +84,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			} else {
 				code = unquote
 			}
-			//应该考虑更多情况
+			// 应该考虑更多情况
 			code = `<?php ` + code + ";"
 			if err := y.GetProgram().Build("Exec-"+uuid.NewString(), strings.NewReader(code), y.FunctionBuilder); err != nil {
 				log.Errorf("execute code %v failed", code)
@@ -236,7 +236,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			for _, chain := range ret.ChainList().(*phpparser.ChainListContext).AllChain() {
 				if visitChain := y.VisitChain(chain); visitChain.IsUndefined() {
 					return y.EmitConstInstAny()
-					//return y.EmitConstInst(false)
+					// return y.EmitConstInst(false)
 				}
 			}
 			return y.EmitConstInst(true)
@@ -379,7 +379,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return result
 	case *phpparser.NullCoalescingExpressionContext:
 		if leftValue := y.VisitExpression(ret.Expression(0)); leftValue.IsUndefined() {
-			return y.VisitExpression(ret.Expression(1)) //如果是undefined就返回1
+			return y.VisitExpression(ret.Expression(1)) // 如果是undefined就返回1
 		} else {
 			return nil
 		}
@@ -415,7 +415,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return rightValue
 
 	case *phpparser.LogicalExpressionContext:
-		var id = uuid.NewString()
+		id := uuid.NewString()
 		y.AssignVariable(y.CreateVariable(id), y.EmitConstInstAny())
 		if ret.LogicalXor() != nil {
 			v1 := y.VisitExpression(ret.Expression(0))
@@ -451,7 +451,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.ReadValue(id)
 
 	case *phpparser.ShortQualifiedNameExpressionContext:
-		//因为涉及到函数，先peek 如果没有读取到说明是一个常量 （define定义的常量会出现问题）
+		// 因为涉及到函数，先peek 如果没有读取到说明是一个常量 （define定义的常量会出现问题）
 		var unquote string
 		_unquote, err := yakunquote.Unquote(ret.Identifier().GetText())
 		if err != nil {
@@ -459,15 +459,15 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else {
 			unquote = _unquote
 		}
-		//先在常量表中查询
+		// 先在常量表中查询
 		if !y.isFunction {
 			if s, ok := y.ReadConst(unquote); ok {
 				return s
 			}
 			log.Warnf("const map not found %v", unquote)
 		}
-		var _value = y.VisitIdentifier(ret.Identifier())
-		if _, exit := y.ExternInstance[strings.ToLower(y.VisitIdentifier(ret.Identifier()))]; exit {
+		_value := y.VisitIdentifier(ret.Identifier())
+		if _, exit := y.GetProgram().ExternInstance[strings.ToLower(y.VisitIdentifier(ret.Identifier()))]; exit {
 			_value = strings.ToLower(_value)
 			return y.ReadValue(_value)
 		} else if value := y.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
@@ -532,6 +532,7 @@ func (y *builder) VisitChainList(raw phpparser.IChainListContext) []ssa.Value {
 	}
 	return tmpValue
 }
+
 func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -711,7 +712,7 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	v := y.VisitFunctionCallName(i.FunctionCallName())
 	var c *ssa.Call
 	args, ellipsis := y.VisitActualArguments(i.ActualArguments())
-	if _, exit := y.ExternInstance[strings.ToLower(v.String())]; exit {
+	if _, exit := y.GetProgram().ExternInstance[strings.ToLower(v.String())]; exit {
 		c = y.NewCall(y.EmitConstInst(strings.ToLower(v.String())), args)
 	} else {
 		c = y.NewCall(v, args)
@@ -965,7 +966,7 @@ func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) ssa.
 	//	return y.EmitConstInst(i.GetText())
 	//}
 
-	//return ret
+	// return ret
 	return nil
 }
 
@@ -1021,6 +1022,7 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 		return initVal
 	}
 }
+
 func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -1032,12 +1034,13 @@ func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ss
 	if i == nil {
 		return nil
 	}
-	var value = make([]ssa.Value, 0, len(i.AllExpression()))
+	value := make([]ssa.Value, 0, len(i.AllExpression()))
 	for _, expressionContext := range i.AllExpression() {
 		value = append(value, y.VisitExpression(expressionContext))
 	}
 	return value
 }
+
 func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -1060,7 +1063,7 @@ func (y *builder) reduceAssignCalcExpression(operator string, variable *ssa.Vari
 	if operator == "=" {
 		return value
 	}
-	//y.GetReferenceFiles()
+	// y.GetReferenceFiles()
 	return y.reduceAssignCalcExpressionEx(operator, y.ReadValueByVariable(variable), value)
 }
 
@@ -1076,14 +1079,14 @@ func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.V
 		rightValue = y.EmitBinOp(ssa.OpMul, leftValues, rightValue)
 	case "**=":
 		rightValue = y.EmitBinOp(ssa.OpPow, leftValues, rightValue)
-		//rightValue = ssa.CalcConstBinary(y.c, rightValue, ssa.OpPow)
+		// rightValue = ssa.CalcConstBinary(y.c, rightValue, ssa.OpPow)
 	case "/=":
 		rightValue = y.EmitBinOp(ssa.OpDiv, leftValues, rightValue)
 	case "%=":
 		rightValue = y.EmitBinOp(ssa.OpMod, leftValues, rightValue)
 	case ".=":
 		rightValue = y.EmitConstInst(leftValues.String() + rightValue.String())
-		//rightValue = y.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
+		// rightValue = y.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
 	case "&=":
 		rightValue = y.EmitBinOp(ssa.OpAnd, leftValues, rightValue)
 	case "|=":
@@ -1176,7 +1179,6 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 		once = true
 	}
 	if value := y.VisitExpression(i.Expression()); value.IsUndefined() {
-
 	} else {
 		file := value.String()
 		if err := y.BuildFilePackage(file, once); err != nil {
