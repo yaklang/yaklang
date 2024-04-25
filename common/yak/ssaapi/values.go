@@ -283,6 +283,13 @@ func (v *Value) IsObject() bool { return v.node.IsObject() }
 
 func (v *Value) IsExtern() bool { return v.node.IsExtern() }
 
+func (v *Value) IsFreeValue() bool {
+	if f, ok := ssa.ToFreeValue(v.node); ok && f.IsFreeValue {
+		return true
+	}
+	return false
+}
+
 // GetMember get member of object by key
 func (v *Value) GetMember(value *Value) *Value {
 	key := value.node.String()
@@ -341,6 +348,13 @@ func GetBareNode(v *Value) ssa.Value {
 func GetValues(v *Value) Values {
 	v.node.GetValues()
 	return lo.Map(v.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+}
+
+func GetFreeValue(v *Value) *ssa.Parameter {
+	if f, ok := ssa.ToFreeValue(v.node); ok && f.IsFreeValue {
+		return f
+	}
+	return nil
 }
 
 // IsCalled desc any of 'Users' is Call

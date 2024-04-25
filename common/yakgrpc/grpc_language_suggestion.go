@@ -159,9 +159,6 @@ func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng 
 	offset := rng.GetEndOffset()
 	value := prog.Program.GetFrontValueByOffset(offset)
 	if !utils.IsNil(value) {
-		if freeValue, ok := ssa.ToFreeValue(value); ok {
-			return ssaapi.NewValue(freeValue.GetDefault())
-		}
 		return ssaapi.NewValue(value)
 	}
 	return nil
