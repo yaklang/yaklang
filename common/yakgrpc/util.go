@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -160,6 +161,13 @@ func NewLocalClientWithReverseServer(locals ...bool) (ypb.YakClient, error) {
 	return newLocalClientEx(true, locals...)
 }
 
+var (
+	localClient         ypb.YakClient
+	initLocalClientOnce sync.Once
+	ciClient            ypb.YakClient
+	ciClientOnce        sync.Once
+)
+
 func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
 	return newLocalClientEx(false, locals...)
 }
@@ -173,48 +181,60 @@ func newLocalClientEx(initFacadeServer bool, locals ...bool) (ypb.YakClient, err
 	if len(locals) > 0 {
 		local = locals[0]
 	}
+	dialServer := func(addr string) (ypb.YakClient, error) {
+		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(100*1024*1045),
+			grpc.MaxCallRecvMsgSize(100*1024*1045),
+		))
+		return ypb.NewYakClient(conn), err
+	}
 
 	if local || !utils.InGithubActions() {
-		consts.InitilizeDatabase("", "")
-		yakit.InitializeDefaultDatabaseSchema()
+		var finalErr error
+		initLocalClientOnce.Do(func() {
+			consts.InitilizeDatabase("", "")
+			yakit.InitializeDefaultDatabaseSchema()
 
-		port = utils.GetRandomAvailableTCPPort()
-		addr = utils.HostPort("127.0.0.1", port)
-		grpcTrans := grpc.NewServer(
-			grpc.MaxRecvMsgSize(100*1024*1024),
-			grpc.MaxSendMsgSize(100*1024*1024),
-		)
-		s, err := newServerEx(initFacadeServer, false)
-		if err != nil {
-			log.Errorf("build yakit server failed: %s", err)
-			return nil, err
-		}
-		ypb.RegisterYakServer(grpcTrans, s)
-		var lis net.Listener
-		lis, err = net.Listen("tcp", addr)
-		if err != nil {
-			return nil, err
-		}
-		go func() {
-			err = grpcTrans.Serve(lis)
+			port = utils.GetRandomAvailableTCPPort()
+			addr = utils.HostPort("127.0.0.1", port)
+			grpcTrans := grpc.NewServer(
+				grpc.MaxRecvMsgSize(100*1024*1024),
+				grpc.MaxSendMsgSize(100*1024*1024),
+			)
+			s, err := newServerEx(initFacadeServer, false)
 			if err != nil {
-				log.Error(err)
+				log.Errorf("build yakit server failed: %s", err)
+				finalErr = err
+				return
 			}
-		}()
-		time.Sleep(1 * time.Second)
+			ypb.RegisterYakServer(grpcTrans, s)
+			var lis net.Listener
+			lis, err = net.Listen("tcp", addr)
+			if err != nil {
+				finalErr = err
+				return
+			}
+			go func() {
+				err = grpcTrans.Serve(lis)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
+			time.Sleep(1 * time.Second)
+			localClient, finalErr = dialServer(addr)
+		})
+		if finalErr != nil {
+			return nil, finalErr
+		}
+		return localClient, nil
 	} else {
-		port = 8087
-		addr = utils.HostPort("127.0.0.1", port)
+		addr = utils.HostPort("127.0.0.1", 8087)
+		var finalErr error
+		ciClientOnce.Do(func() {
+			ciClient, finalErr = dialServer(addr)
+		})
+		return ciClient, finalErr
 	}
-
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-	))
-	if err != nil {
-		return nil, err
-	}
-	return ypb.NewYakClient(conn), nil
 }
 
 type YamlMapBuilder struct {
