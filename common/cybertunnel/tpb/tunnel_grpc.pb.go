@@ -30,6 +30,8 @@ type TunnelClient interface {
 	QueryExistedRandomPortTrigger(ctx context.Context, in *QueryExistedRandomPortTriggerRequest, opts ...grpc.CallOption) (*QueryExistedRandomPortTriggerResponse, error)
 	// 随机 ICMP 长度触发器
 	QuerySpecificICMPLengthTrigger(ctx context.Context, in *QuerySpecificICMPLengthTriggerParams, opts ...grpc.CallOption) (*QuerySpecificICMPLengthTriggerResponse, error)
+	RequireHTTPRequestTrigger(ctx context.Context, in *RequireHTTPRequestTriggerParams, opts ...grpc.CallOption) (*RequireHTTPRequestTriggerResponse, error)
+	QueryExistedHTTPRequestTrigger(ctx context.Context, in *QueryExistedHTTPRequestTriggerRequest, opts ...grpc.CallOption) (*QueryExistedHTTPRequestTriggerResponse, error)
 }
 
 type tunnelClient struct {
@@ -134,6 +136,24 @@ func (c *tunnelClient) QuerySpecificICMPLengthTrigger(ctx context.Context, in *Q
 	return out, nil
 }
 
+func (c *tunnelClient) RequireHTTPRequestTrigger(ctx context.Context, in *RequireHTTPRequestTriggerParams, opts ...grpc.CallOption) (*RequireHTTPRequestTriggerResponse, error) {
+	out := new(RequireHTTPRequestTriggerResponse)
+	err := c.cc.Invoke(ctx, "/tpb.Tunnel/RequireHTTPRequestTrigger", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tunnelClient) QueryExistedHTTPRequestTrigger(ctx context.Context, in *QueryExistedHTTPRequestTriggerRequest, opts ...grpc.CallOption) (*QueryExistedHTTPRequestTriggerResponse, error) {
+	out := new(QueryExistedHTTPRequestTriggerResponse)
+	err := c.cc.Invoke(ctx, "/tpb.Tunnel/QueryExistedHTTPRequestTrigger", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TunnelServer is the server API for Tunnel service.
 // All implementations must embed UnimplementedTunnelServer
 // for forward compatibility
@@ -150,6 +170,8 @@ type TunnelServer interface {
 	QueryExistedRandomPortTrigger(context.Context, *QueryExistedRandomPortTriggerRequest) (*QueryExistedRandomPortTriggerResponse, error)
 	// 随机 ICMP 长度触发器
 	QuerySpecificICMPLengthTrigger(context.Context, *QuerySpecificICMPLengthTriggerParams) (*QuerySpecificICMPLengthTriggerResponse, error)
+	RequireHTTPRequestTrigger(context.Context, *RequireHTTPRequestTriggerParams) (*RequireHTTPRequestTriggerResponse, error)
+	QueryExistedHTTPRequestTrigger(context.Context, *QueryExistedHTTPRequestTriggerRequest) (*QueryExistedHTTPRequestTriggerResponse, error)
 	mustEmbedUnimplementedTunnelServer()
 }
 
@@ -180,6 +202,12 @@ func (UnimplementedTunnelServer) QueryExistedRandomPortTrigger(context.Context, 
 }
 func (UnimplementedTunnelServer) QuerySpecificICMPLengthTrigger(context.Context, *QuerySpecificICMPLengthTriggerParams) (*QuerySpecificICMPLengthTriggerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySpecificICMPLengthTrigger not implemented")
+}
+func (UnimplementedTunnelServer) RequireHTTPRequestTrigger(context.Context, *RequireHTTPRequestTriggerParams) (*RequireHTTPRequestTriggerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequireHTTPRequestTrigger not implemented")
+}
+func (UnimplementedTunnelServer) QueryExistedHTTPRequestTrigger(context.Context, *QueryExistedHTTPRequestTriggerRequest) (*QueryExistedHTTPRequestTriggerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryExistedHTTPRequestTrigger not implemented")
 }
 func (UnimplementedTunnelServer) mustEmbedUnimplementedTunnelServer() {}
 
@@ -346,6 +374,42 @@ func _Tunnel_QuerySpecificICMPLengthTrigger_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tunnel_RequireHTTPRequestTrigger_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequireHTTPRequestTriggerParams)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TunnelServer).RequireHTTPRequestTrigger(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tpb.Tunnel/RequireHTTPRequestTrigger",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServer).RequireHTTPRequestTrigger(ctx, req.(*RequireHTTPRequestTriggerParams))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Tunnel_QueryExistedHTTPRequestTrigger_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryExistedHTTPRequestTriggerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TunnelServer).QueryExistedHTTPRequestTrigger(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/tpb.Tunnel/QueryExistedHTTPRequestTrigger",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TunnelServer).QueryExistedHTTPRequestTrigger(ctx, req.(*QueryExistedHTTPRequestTriggerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Tunnel_ServiceDesc is the grpc.ServiceDesc for Tunnel service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +444,14 @@ var Tunnel_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuerySpecificICMPLengthTrigger",
 			Handler:    _Tunnel_QuerySpecificICMPLengthTrigger_Handler,
+		},
+		{
+			MethodName: "RequireHTTPRequestTrigger",
+			Handler:    _Tunnel_RequireHTTPRequestTrigger_Handler,
+		},
+		{
+			MethodName: "QueryExistedHTTPRequestTrigger",
+			Handler:    _Tunnel_QueryExistedHTTPRequestTrigger_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

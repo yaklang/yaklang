@@ -11,6 +11,7 @@ import (
 
 var startTunnelServerOnceForRandomPort = new(sync.Once)
 var startTunnelServerOnceForICMPLength = new(sync.Once)
+var startTunnelServerOnceForHTTPTrigger = new(sync.Once)
 var randomPortTrigger *RandomPortTrigger
 var icmpTrigger *ICMPTrigger
 
@@ -73,6 +74,23 @@ func (s *TunnelServer) InitialReverseTrigger() error {
 		}
 	})
 
+	defaultHTTPTrigger, err := NewHTTPTrigger()
+	if err != nil {
+		return utils.Errorf("create http trigger failed: %s", err)
+	}
+	go startTunnelServerOnceForHTTPTrigger.Do(func() {
+		for {
+			if defaultHTTPTrigger != nil {
+				err := defaultHTTPTrigger.Serve()
+				if err != nil {
+					log.Errorf("start http trigger failed: %s", err)
+				} else {
+					log.Errorf("http trigger empty")
+				}
+				time.Sleep(time.Second * 1)
+			}
+		}
+	})
 	return nil
 }
 
