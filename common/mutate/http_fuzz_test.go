@@ -378,8 +378,7 @@ func TestFuzzHTTPRequest_GetCommonParamsWithBase64(t *testing.T) {
 GET /?a=cXdl&b=enhjdg%3D%3D HTTP/1.1
 Host: www.baidu.com
 
-a=cXdl&b=enhjdg%3D%3D
-`)
+a=cXdl&b=enhjdg%3D%3D`)
 	if err != nil {
 		test.FailNow(err.Error())
 	}
@@ -660,12 +659,12 @@ c=1&d=1
 		t.FailNow()
 		return
 	}
-	// fparam := freq.FuzzGetParams("a", "1")
+	res := freq.FuzzHTTPHeader("Header111", "dfs").FirstHTTPRequestBytes()
 	// fparam.Show()
 	// res, _ := freq.FuzzGetParams("a", "1")
 	// res.
 	//	res.RequestRaw
-	if !strings.Contains(freq.GetHeader("Header111"), "dfs") {
+	if !strings.Contains(string(res), "dfs") {
 		panic(1)
 	}
 }

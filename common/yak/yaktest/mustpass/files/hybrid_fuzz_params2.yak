@@ -13,7 +13,7 @@ resultLines = allParams.Map(i => i.String())
 paramsTable = "".Join(resultLines)
 println(string(paramsTable))
 if str.Count(paramsTable, `get-query-base64-json`) < 7 {
-    panic("et-query-base64-json 提取失败")
+    panic("get-query-base64-json 提取失败")
 }
 
 if str.Count(paramsTable, `post-query-json`) < 7 {
