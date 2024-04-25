@@ -288,7 +288,15 @@ func (pptp *PPTPAuth) PPTPNegotiate() (net.Conn, error) {
 	}
 }
 
-func (pptp *PPTPAuth) Auth(ctx context.Context) (error, bool) {
+func Auth(ctx context.Context, target, username, password string) (error, bool) {
+	pptp := GetDefaultPPTPAuth()
+	pptp.Target = target
+	pptp.ppp.Username = username
+	pptp.ppp.Password = password
+	return pptp.auth(ctx)
+}
+
+func (pptp *PPTPAuth) auth(ctx context.Context) (error, bool) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	conn, err := pptp.PPTPNegotiate()

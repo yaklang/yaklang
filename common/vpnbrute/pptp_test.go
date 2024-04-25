@@ -1,6 +1,7 @@
 package vpnbrute
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/vpnbrute/ppp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -8,13 +9,7 @@ import (
 )
 
 func TestAAABBB(t *testing.T) {
-	a := GetDefaultPPTPAuth()
-	a.Target = "192.168.212.208:1723"
-	a.ppp = ppp.GetDefaultPPPAuth()
-	a.ppp.Username = "test"
-	a.ppp.Password = "123456"
-	a.ppp.AuthTypeCode = ppp.MS_CHAP_V2
-	err, ok := a.Auth()
+	err, ok := Auth(context.Background(), "172.22.175.238:1723", "test", "123456")
 	_ = ok
 	if ok {
 		println("ok")
