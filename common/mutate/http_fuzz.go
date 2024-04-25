@@ -725,7 +725,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
 					fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
-						position:   posPostQueryJson,
+						position:   posPostQueryBase64Json,
 						param:      key,
 						param2nd:   jk.String(),
 						paramValue: jv.String(),
@@ -891,6 +891,7 @@ func (f *FuzzHTTPRequest) GetCommonParams() []*FuzzHTTPRequestParam {
 	var params []*FuzzHTTPRequestParam
 	params = append(params, f.GetGetQueryParams()...)
 	params = append(params, f.GetPostCommonParams()...)
+	params = append(params, f.GetCookieParams()...)
 	return params
 }
 
