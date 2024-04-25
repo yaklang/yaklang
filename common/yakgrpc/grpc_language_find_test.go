@@ -227,6 +227,30 @@ println(2)`
 			},
 		)
 	})
+
+	t.Run("standard function in different function", func(t *testing.T) {
+		code := `println(1)
+println(2)
+func a() {
+println(3)
+}
+func b() {
+println(4)
+}`
+
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("1:1 1:7"),
+			[]memedit.RangeIf{
+				newRangeFromText("1:1 1:8"),
+				newRangeFromText("2:1 2:8"),
+				newRangeFromText("4:1 4:8"),
+				newRangeFromText("7:1 7:8"),
+			},
+		)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_Find_Phi(t *testing.T) {

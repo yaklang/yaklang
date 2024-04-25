@@ -24,21 +24,19 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		anValue:             NewValue(),
-		Package:             p,
-		Param:               make([]*Parameter, 0),
-		hasEllipsis:         false,
-		Blocks:              make([]*BasicBlock, 0),
-		EnterBlock:          nil,
-		ExitBlock:           nil,
-		ChildFuncs:          make([]*Function, 0),
-		parent:              nil,
-		FreeValues:          make(map[string]*Parameter),
-		SideEffects:         make([]*FunctionSideEffect, 0),
-		cacheExternInstance: make(map[string]Value),
-		externType:          make(map[string]Type),
-		builder:             nil,
-		referenceFiles:      omap.NewOrderedMap(map[string]string{}),
+		anValue:        NewValue(),
+		Package:        p,
+		Param:          make([]*Parameter, 0),
+		hasEllipsis:    false,
+		Blocks:         make([]*BasicBlock, 0),
+		EnterBlock:     nil,
+		ExitBlock:      nil,
+		ChildFuncs:     make([]*Function, 0),
+		parent:         nil,
+		FreeValues:     make(map[string]*Parameter),
+		SideEffects:    make([]*FunctionSideEffect, 0),
+		builder:        nil,
+		referenceFiles: omap.NewOrderedMap(map[string]string{}),
 	}
 	f.SetName(name)
 	if parent != nil {
