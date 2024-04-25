@@ -7,7 +7,6 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/tidwall/sjson"
 )
 
 var dump = spew.Dump
@@ -661,21 +659,22 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 	}
 
 	var reqs []*http.Request
+	origin := httpctx.GetBareRequestBytes(req)
 
 	err = cartesian.ProductEx([][]string{
 		values,
 	}, func(result []string) error {
 		value := result[0]
 
-		newBody, err := sjson.SetBytes(rawBody, p.path, value)
+		modifiedBody, err := modifyJSONValue(string(rawBody), p.path, value, p.paramValue)
 		if err != nil {
 			return err
 		}
-		_req, _ := rebuildHTTPRequest(req, int64(len(newBody)))
-		_req.Body = io.NopCloser(bytes.NewBuffer(newBody))
-		if _req != nil {
-			reqs = append(reqs, _req)
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketBodyFast(origin, []byte(modifiedBody)))
+		if err != nil {
+			return err
 		}
+		reqs = append(reqs, reqIns)
 		return nil
 	})
 	if err != nil {

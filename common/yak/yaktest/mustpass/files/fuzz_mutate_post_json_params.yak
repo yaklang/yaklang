@@ -8,11 +8,12 @@ Host: ${host}:${port}
 
 ` + `{"key":"a", "b":[{"c":"ckey"}]}`)~.GetPostJsonParams() {
     body = result.Fuzz(f`${result.Value()}` + "__PLACEHOLDER").FirstFuzzHTTPRequest()~.Show().GetBody()
-    if body.Contains("[a]__PLACEHOLDER") {
+    if body.Contains("a__PLACEHOLDER") {
         checkKey = true
-    } else if body.Contains(`[map[c:ckey]]__PLACEHOLDER`) {
+        // 把 array 和 字符串拼接了
+    } else if body.Contains(`[{\"c\":\"ckey\"}]__PLACEHOLDER`) {
         checkb = true
-    } else if body.Contains(`[ckey]__PLACEHOLDER`) {
+    } else if body.Contains(`ckey__PLACEHOLDER`) {
         checkb0c = true
     }
 }
