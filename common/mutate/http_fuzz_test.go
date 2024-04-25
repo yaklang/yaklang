@@ -857,3 +857,35 @@ Host: www.example.com
 	test.Equal(numCount, 3)
 	test.Equal(otherCount, 3)
 }
+
+func TestFuzzRequestPath(t *testing.T) {
+	type TestCase struct {
+		request string
+		path    []string
+
+		testName string
+	}
+	testCase := TestCase{
+		request: `GET /a/b/c HTTP/1.1
+HOST: www.example.com`,
+		path:     []string{"/test/b/c", "/a/test/c", "/a/b/test"},
+		testName: "test",
+	}
+	request, err := NewFuzzHTTPRequest(testCase.request)
+	if err != nil {
+		panic(err)
+	}
+	param := request.GetPathBlockParams()[0]
+	results, err := param.Fuzz(testCase.testName).Results()
+	if err != nil {
+		panic(err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("request number not match,except %v", 3)
+	}
+	for i, result := range results {
+		if result.RequestURI != testCase.path[i] {
+			t.Fatalf("request uri not match,except %v", testCase.path[i])
+		}
+	}
+}
