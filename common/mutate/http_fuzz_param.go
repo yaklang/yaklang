@@ -300,7 +300,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		}
 		var templates []string
 		for i := 1; i < len(result); i++ {
-			resultCopy := result[:]
+			var resultCopy = make([]string, len(result))
+			copy(resultCopy, result)
 			resultCopy[i] = `{{params(placeholder)}}`
 			templates = append(templates, strings.Join(resultCopy, "/"))
 		}
