@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -35,7 +36,11 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 		}
 	}
 	groups, _ := yakit.GroupCount(s.GetProfileDatabase())
+	filterGroup := filter.NewFilter()
 	for _, group := range groups {
+		if filterGroup.Exist(group.Value) {
+			continue
+		}
 		if req.GetAll() {
 			if req.GetIsPocBuiltIn() != group.IsPocBuiltIn {
 				continue
@@ -50,6 +55,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 				TemporaryId:  group.TemporaryId,
 				IsPocBuiltIn: group.IsPocBuiltIn,
 			})
+			filterGroup.Insert(group.Value)
 		} else if !req.GetIsPocBuiltIn() && req.GetPageId() == "" && !req.GetAll() {
 			if req.GetIsPocBuiltIn() != group.IsPocBuiltIn {
 				continue
@@ -64,6 +70,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 				TemporaryId:  group.TemporaryId,
 				IsPocBuiltIn: group.IsPocBuiltIn,
 			})
+			filterGroup.Insert(group.Value)
 		} else {
 			// 检查记录是否满足IsPocBuiltIn为true
 			isPocBuiltInMatch := req.GetIsPocBuiltIn() && group.IsPocBuiltIn
@@ -80,6 +87,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 					TemporaryId:  group.TemporaryId,
 					IsPocBuiltIn: group.IsPocBuiltIn,
 				})
+				filterGroup.Insert(group.Value)
 			}
 		}
 	}
