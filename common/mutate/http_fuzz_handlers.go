@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/antchfx/xmlquery"
 	"github.com/tidwall/gjson"
@@ -437,9 +438,20 @@ func modifyJSONValue(rawJson, jsonPath, value string, val any) (string, error) {
 	//}
 	switch val.(type) {
 	case string:
-		newValue = value
+		jsonStr, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		newValue = gjson.ParseBytes(jsonStr).Value()
+	case nil:
+		newValue = nil
 	default:
 		newValue = gjson.Parse(value).Value()
+	}
+	// 如果原始值类型不为 nil，且新值为 nil，则说明 value 和 val 的类型可能不一致，尝试直接转换 value 为 json value
+	if val != nil && newValue == nil {
+		jsonStr, _ := json.Marshal(value)
+		newValue = gjson.ParseBytes(jsonStr).Value()
 	}
 
 	return jsonpath.ReplaceString(rawJson, jsonPath, newValue), nil
@@ -666,7 +678,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 	}, func(result []string) error {
 		value := result[0]
 
-		modifiedBody, err := modifyJSONValue(string(rawBody), p.path, value, p.paramValue)
+		modifiedBody, err := modifyJSONValue(string(rawBody), p.path, value, originValue)
 		if err != nil {
 			return err
 		}
