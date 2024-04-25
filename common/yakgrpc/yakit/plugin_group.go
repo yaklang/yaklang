@@ -41,7 +41,7 @@ var pocBuiltInGroups = map[string]string{
 	"Log4j":      "Log4j,log4j,Log4shell,log4shell,Log4Shell",
 	"远程代码执行（扫描）": "RCE,rce",
 	"XSS":        "xss,XSS",
-	"SQL注入":    "sql注入",
+	"SQL注入":      "sql注入",
 }
 
 func init() {
