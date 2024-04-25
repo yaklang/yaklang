@@ -17,7 +17,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func fetchExternalIP() (net.IP, error) {
+var DefaultExternalIP *net.IP
+
+func GetExternalIP() (net.IP, error) {
+	if DefaultExternalIP != nil {
+		return *DefaultExternalIP, nil
+	}
 	dailer := utils.NewDefaultHTTPClient()
 	for _, domain := range []string{
 		"ifconfig.me",
@@ -42,6 +47,7 @@ func fetchExternalIP() (net.IP, error) {
 		raw = bytes.TrimSpace(raw)
 		ip := net.ParseIP(utils.FixForParseIP(string(raw)))
 		if ip != nil {
+			DefaultExternalIP = &ip
 			return ip, nil
 		}
 	}
@@ -122,7 +128,7 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 func NewDNSLogServer(domain string, externalIP string) (*DNSLogGRPCServer, error) {
 	ip := externalIP
 	if externalIP == "" {
-		ipIns, err := fetchExternalIP()
+		ipIns, err := GetExternalIP()
 		if err != nil {
 			return nil, err
 		}

@@ -31,7 +31,7 @@ service Tunnel {
 message HTTPRequestTriggerNotification {
   string Url = 1;
   string RemoteAddr = 2;
-  int32 RemotePort = 3;
+  bool IsHttps = 3;
   int64 TriggerTimestamp = 4;
   int64 Timestamp = 5;
   bytes Request = 6;
@@ -53,7 +53,12 @@ message RequireHTTPRequestTriggerParams {
 }
 
 message RequireHTTPRequestTriggerResponse {
-  string Url = 1;
+  string PrimaryUrl = 1;
+  string PrimaryHost = 2;
+  repeated string Urls = 3;
+  repeated string Hosts = 4;
+
+  string Token = 5;
 }
 
 message RegisterTunnelRequest {
