@@ -9,8 +9,8 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"hash"
-	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -20,23 +20,18 @@ import (
 
 func Encrypt(raw []byte, pemBytes []byte) (string, error) {
 	b, _ := pem.Decode(pemBytes)
-	pub, err := x509.ParsePKIXPublicKey(b.Bytes)
+	pub, err := ParseRsaPublicKey(b)
 	if err != nil {
 		return "", utils.Errorf("parse public key failed: %s", err)
 	}
 
-	pubKey, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return "", utils.Errorf("parse pubkey[%s] need *rsa.PublicKey", reflect.TypeOf(pubKey))
-	}
-
 	var enc []string
-	subs, err := SplitBlock(raw, (pubKey.Size()-11)/2)
+	subs, err := SplitBlock(raw, (pub.Size()-11)/2)
 	if err != nil {
 		return "", utils.Errorf("split block failed: %s", err)
 	}
 	for _, sub := range subs {
-		rs, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, []byte(sub))
+		rs, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pub, []byte(sub))
 		if err != nil {
 			return "", utils.Errorf("enc sub[%s] failed: %s", sub, err)
 		}
@@ -142,22 +137,36 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 		return nil, errors.Wrap(errors.New("empty pem block"), "pem decode public key failed")
 	}
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	pub, err := ParseRsaPublicKey(block)
 	if err != nil {
 		return nil, errors.Wrap(err, `x509.ParsePKIXPublicKey(block.Bytes) failed`)
 	}
-
-	pubKey, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.Wrap(err, "need *rsp.PublicKey, cannot found! ")
-	}
 	_, _ = dataBytes, pub
 
-	results, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, dataBytes)
+	results, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pub, dataBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, `rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, dataBytes) error`)
 	}
 	return results, err
+}
+
+func ParseRsaPublicKey(block *pem.Block) (*rsa.PublicKey, error) {
+	derBytes := block.Bytes
+	var pub *rsa.PublicKey
+	var key any
+	var err error
+	key, err = x509.ParsePKIXPublicKey(derBytes)
+	if err != nil {
+		key, err = x509.ParsePKCS1PublicKey(derBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	pub, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("need *rsa.PublicKey, got %t", key)
+	}
+	return pub, nil
 }
 
 func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
@@ -171,18 +180,13 @@ func PemPkcsOAEPEncryptWithHash(pemBytes []byte, data interface{}, hashFunc hash
 		return nil, errors.Wrap(errors.New("empty pem block"), "pem decode public key failed")
 	}
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	pub, err := ParseRsaPublicKey(block)
 	if err != nil {
 		return nil, errors.Wrap(err, `x509.ParsePKIXPublicKey(block.Bytes) failed`)
 	}
-
-	pubKey, ok := pub.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.Wrap(err, "need *rsp.PublicKey, cannot found! ")
-	}
 	_, _ = dataBytes, pub
 
-	results, err := rsa.EncryptOAEP(hashFunc, cryptorand.Reader, pubKey, dataBytes, nil)
+	results, err := rsa.EncryptOAEP(hashFunc, cryptorand.Reader, pub, dataBytes, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, `rsa.EncryptOAEP(cryptorand.Reader, pubKey, dataBytes) error`)
 	}
