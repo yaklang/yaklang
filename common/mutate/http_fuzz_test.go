@@ -462,18 +462,17 @@ Cookie: testCookie=13;
 	}
 
 	for _, p := range params {
-		p.Name()
 		res, err := p.Fuzz("HACKEDPARAM{{i(1-20)}}").Results()
 		if err != nil {
 			test.FailNow("Fuzz failed")
 		}
-		for _, r := range res {
+		for index, r := range res {
 			raw, err := utils.DumpHTTPRequest(r, true)
 			if err != nil {
 				test.FailNow(err.Error())
 			}
 			if !bytes.Contains(raw, []byte("HACKEDPARAM")) {
-				test.FailNow(fmt.Sprintf("FUZZ PARAM FAILED: %v[%v]", string(p.position), p.Name()))
+				test.FailNow(fmt.Sprintf("FUZZ PARAM FAILED:  %d %v[%v]", index, string(p.position), p.Name()))
 			}
 			println(string(raw))
 		}

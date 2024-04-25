@@ -88,6 +88,7 @@ jobs:
               go test -timeout 20s ./common/mutate_tests ./common/fuzztag  
               go test -timeout 20s ./common/fuzztagx 
               go test -timeout 10s -run TestFuzzNucleiVar ./common/mutate
+              go test -timeout 20s -run 'Test(New)?FuzzHTTPRequest' ./common/mutate
 
           - name: Test SSA / SSARule / StaticAnalyze
             run: |
