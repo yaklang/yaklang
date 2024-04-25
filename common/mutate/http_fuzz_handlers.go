@@ -446,7 +446,14 @@ func modifyJSONValue(rawJson, jsonPath, value string, val any) (string, error) {
 	case nil:
 		newValue = nil
 	default:
-		newValue = gjson.Parse(value).Value()
+		// gjson 解析字符串时 `{"c":"b"}__abcd` 会解析为 {"c":"b"}
+		p := gjson.Parse(value)
+		if (p.IsObject() && !strings.HasSuffix(value, "}")) ||
+			(p.IsArray() && !strings.HasSuffix(value, "]")) {
+			newValue = value
+		} else {
+			newValue = p.Value()
+		}
 	}
 	// 如果原始值类型不为 nil，且新值为 nil，则说明 value 和 val 的类型可能不一致，尝试直接转换 value 为 json value
 	if val != nil && newValue == nil {
