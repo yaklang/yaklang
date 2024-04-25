@@ -216,12 +216,11 @@ func GetTunnelServerCommandCli() *cli.App {
 			grpc.MaxRecvMsgSize(100*1024*1024),
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
-		s, err := NewTunnelServer()
+		s, err := NewTunnelServer(c.String("domain"), c.String("public-ip"))
 		if err != nil {
 			log.Errorf("build tunnel server failed: %s", err)
 			return err
 		}
-		s.ExternalIP = c.String("public-ip")
 		s.SecondaryPassword = c.String("secondary-password")
 		if s.SecondaryPassword == "" {
 			err := s.InitialReverseTrigger()
