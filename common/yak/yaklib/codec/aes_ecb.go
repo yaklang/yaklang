@@ -6,6 +6,7 @@ import (
 
 func _AESECBEncryptWithPadding(key []byte, i interface{}, iv []byte, padding func(i []byte) []byte) ([]byte, error) {
 	data := interfaceToBytes(i)
+	key = AesKeyPaddingWithZero(key)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

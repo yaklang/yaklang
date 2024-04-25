@@ -37,7 +37,7 @@ func AESGCMEncryptWithNonceSize12(key []byte, data interface{}, nonceRaw []byte)
 
 func AESGCMEncryptWithNonceSize(key []byte, data interface{}, nonceRaw []byte, nonceSize int) ([]byte, error) {
 	dataRaw := interfaceToBytes(data)
-
+	key = AesKeyPaddingWithZero(key)
 	c, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, errors.Errorf("create aes cipher failed: %s", err)

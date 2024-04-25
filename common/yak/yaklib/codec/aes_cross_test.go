@@ -1,6 +1,8 @@
 package codec
 
 import (
+	"crypto/aes"
+	"encoding/base64"
 	"github.com/davecgh/go-spew/spew"
 	"testing"
 )
@@ -259,5 +261,56 @@ func TestAESGCMEncrypt2(t *testing.T) {
 	if string(raw) != string(plain) {
 		spew.Dump(string(raw))
 		panic("aes failed")
+	}
+}
+
+type AesTestCase struct {
+	key     []byte
+	data    string
+	iv      []byte
+	padding func(data []byte, size int) []byte
+
+	ECBExcept string
+	CBCExcept string
+}
+
+func TestAESECBEncrypt3(t *testing.T) {
+	var cases = []AesTestCase{
+		{
+			key:       []byte("11"),
+			data:      "123",
+			iv:        []byte("123"),
+			padding:   PKCS5Padding,
+			ECBExcept: "CCGyw6NkQiL7MqIt67mtkg==",
+			CBCExcept: "WoadkZTyrv5HQhSFDow3WA==",
+		},
+		{
+			key:       []byte("11"),
+			data:      "123",
+			iv:        []byte("123"),
+			padding:   ZeroPadding,
+			ECBExcept: "S9ldMKCSfAvKWvs0PIS9bQ==",
+			CBCExcept: "Y4KZsWZV4nxQydnWWA/lPw==",
+		},
+	}
+	for _, testCase := range cases {
+		padding, err := _AESECBEncryptWithPadding(testCase.key, testCase.data, nil, func(i []byte) []byte {
+			return testCase.padding(i, aes.BlockSize)
+		})
+		if err != nil {
+			panic(err)
+		}
+		if base64.StdEncoding.EncodeToString(padding) != testCase.ECBExcept {
+			t.Fatalf("aes ecb encode fail, except: %s", testCase.ECBExcept)
+		}
+		bytes, err := _AESCBCEncryptWithPadding(testCase.key, testCase.data, testCase.iv, func(bytes []byte) []byte {
+			return testCase.padding(bytes, aes.BlockSize)
+		})
+		if err != nil {
+			panic(err)
+		}
+		if base64.StdEncoding.EncodeToString(bytes) != testCase.CBCExcept {
+			t.Fatalf("aes ecb encode fail, except: %s,actual: %s", testCase.CBCExcept, base64.StdEncoding.EncodeToString(bytes))
+		}
 	}
 }

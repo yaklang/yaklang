@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 )
@@ -19,6 +20,7 @@ var AESCBCEncrypt = AESCBCEncryptWithPKCS7Padding
 
 func _AESCBCEncryptWithPadding(key []byte, i interface{}, iv []byte, padding func([]byte) []byte) (data []byte, _ error) {
 	origData := interfaceToBytes(i)
+	key = AesKeyPaddingWithZero(key)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -32,7 +34,9 @@ func _AESCBCEncryptWithPadding(key []byte, i interface{}, iv []byte, padding fun
 	if len(iv) > blockSize {
 		iv = iv[:blockSize]
 	}
-
+	if len(iv) < blockSize {
+		iv = append(iv, bytes.Repeat([]byte{0}, blockSize-len(iv))...)
+	}
 	origData = padding(origData)
 
 	blockMode := cipher.NewCBCEncrypter(block, iv)
