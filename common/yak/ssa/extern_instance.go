@@ -14,11 +14,11 @@ const (
 )
 
 func (b *FunctionBuilder) WithExternValue(vs map[string]any) {
-	b.ExternInstance = vs
+	b.GetProgram().ExternInstance = vs
 }
 
 func (b *FunctionBuilder) WithExternLib(lib map[string]map[string]any) {
-	b.ExternLib = lib
+	b.GetProgram().ExternLib = lib
 }
 
 func (b *FunctionBuilder) WithExternMethod(builder MethodBuilder) {
@@ -46,17 +46,6 @@ func TryGetSimilarityKey(table []string, name string) string {
 	return ret
 }
 
-func (b *FunctionBuilder) TryGetSimilarityKey(name, key string) string {
-	if b.ExternLib == nil {
-		return ""
-	}
-	var ret string
-	if table, ok := b.ExternLib[name]; ok {
-		ret = TryGetSimilarityKey(lo.Keys(table), key)
-	}
-	return ret
-}
-
 func (ex *ExternLib) BuildField(key string) Value {
 	if ret, ok := ex.MemberMap[key]; ok {
 		return ret
@@ -71,42 +60,53 @@ func (ex *ExternLib) BuildField(key string) Value {
 	return nil
 }
 
-func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
+func (prog *Program) TryGetSimilarityKey(name, key string) string {
+	if prog.ExternLib == nil {
+		return ""
+	}
+	var ret string
+	if table, ok := prog.ExternLib[name]; ok {
+		ret = TryGetSimilarityKey(lo.Keys(table), key)
+	}
+	return ret
+}
+
+func (prog *Program) TryBuildExternValue(b *FunctionBuilder, id string) Value {
 	getExternValue := func(id string) Value {
-		if v, ok := b.cacheExternInstance[id]; ok {
+		if v, ok := prog.cacheExternInstance[id]; ok {
 			return v
 		}
 
-		if b.ExternInstance == nil {
+		if prog.ExternInstance == nil {
 			return nil
 		}
-		v, ok := b.ExternInstance[id]
+		v, ok := prog.ExternInstance[id]
 		if !ok {
 			return nil
 		}
-		ret := b.BuildValueFromAny(id, v)
-		b.cacheExternInstance[id] = ret
+		ret := prog.BuildValueFromAny(b, id, v)
+		prog.cacheExternInstance[id] = ret
 		return ret
 	}
 
 	getExternLib := func(id string) *ExternLib {
-		if v, ok := b.cacheExternInstance[id]; ok {
+		if v, ok := prog.cacheExternInstance[id]; ok {
 			if ex, ok := v.(*ExternLib); ok {
 				return ex
 			}
 			return nil
 		}
 
-		if b.ExternLib == nil {
+		if prog.ExternLib == nil {
 			return nil
 		}
-		table, ok := b.ExternLib[id]
+		table, ok := prog.ExternLib[id]
 		if !ok {
 			return nil
 		}
 		ex := NewExternLib(id, b, table)
 		ex.SetExtern(true)
-		b.cacheExternInstance[id] = ex
+		prog.cacheExternInstance[id] = ex
 		return ex
 	}
 
@@ -121,7 +121,7 @@ func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
 	}
 
 	getExternField := func(lib string, key string) Value {
-		if v, ok := b.cacheExternInstance[id]; ok {
+		if v, ok := prog.cacheExternInstance[id]; ok {
 			return v
 		}
 
@@ -131,7 +131,7 @@ func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
 		}
 		ret := extern.BuildField(key)
 		if ret != nil {
-			b.cacheExternInstance[id] = ret
+			prog.cacheExternInstance[id] = ret
 		}
 		return ret
 	}
@@ -145,8 +145,7 @@ func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
 	}
 }
 
-func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
-
+func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (value Value) {
 	itype := reflect.TypeOf(v)
 	if itype == nil {
 		return nil
@@ -154,35 +153,34 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 	str := id
 	switch itype.Kind() {
 	case reflect.Func:
-		f := NewFunctionWithType(str, b.CoverReflectFunctionType(itype, 0))
+		f := NewFunctionWithType(str, prog.CoverReflectFunctionType(itype, 0))
 		f.SetRange(b.CurrentRange)
 		value = f
 	default:
 		value = NewParam(str, false, b)
-		value.SetType(b.handlerType(itype, 0))
+		value.SetType(prog.handlerType(itype, 0))
 	}
 	value.SetExtern(true)
-	b.GetProgram().SetInstructionWithName(str, value)
+	prog.SetInstructionWithName(str, value)
 	return
 }
 
-func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int) *FunctionType {
+func (prog *Program) CoverReflectFunctionType(itype reflect.Type, level int) *FunctionType {
 	params := make([]Type, 0)
 	returns := make([]Type, 0)
 	isVariadic := itype.IsVariadic()
 	// parameter
 	for i := 0; i < itype.NumIn(); i++ {
-		params = append(params, f.handlerType(itype.In(i), level))
+		params = append(params, prog.handlerType(itype.In(i), level))
 	}
 	// return
 	for i := 0; i < itype.NumOut(); i++ {
-		returns = append(returns, f.handlerType(itype.Out(i), level))
+		returns = append(returns, prog.handlerType(itype.Out(i), level))
 	}
 	return NewFunctionTypeDefine(itype.String(), params, returns, isVariadic)
 }
 
-func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
-
+func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	Name := typ.String()
 	if Name == "[]uint8" {
 		Name = "bytes"
@@ -205,7 +203,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		PkgPath = fmt.Sprintf("%s.%s", pkg, name)
 	}
 
-	if hijackType, ok := f.externType[Name]; ok {
+	if hijackType, ok := prog.externType[Name]; ok {
 		return hijackType
 	}
 
@@ -228,17 +226,17 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	// complex type
 	switch typ.Kind() {
 	case reflect.Array, reflect.Slice:
-		ret = NewSliceType(f.handlerType(typ.Elem(), level))
+		ret = NewSliceType(prog.handlerType(typ.Elem(), level))
 	case reflect.Map:
-		ret = NewMapType(f.handlerType(typ.Key(), level), f.handlerType(typ.Elem(), level))
+		ret = NewMapType(prog.handlerType(typ.Key(), level), prog.handlerType(typ.Elem(), level))
 	case reflect.Struct:
 		structType := NewStructType()
 		structType.Name = Name
 		structType.pkgPath = PkgPath
-		f.externType[Name] = structType
+		prog.externType[Name] = structType
 		for i := 0; i < typ.NumField(); i++ {
 			field := typ.Field(i)
-			fieldType := f.handlerType(field.Type, level)
+			fieldType := prog.handlerType(field.Type, level)
 			structType.AddField(NewConst(field.Name), fieldType)
 			if field.Anonymous && IsObjectType(fieldType) {
 				structType.AnonymousField = append(structType.AnonymousField, fieldType.(*ObjectType))
@@ -247,9 +245,9 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		structType.Finish()
 		ret = structType
 	case reflect.Func:
-		ret = f.CoverReflectFunctionType(typ, level)
+		ret = prog.CoverReflectFunctionType(typ, level)
 	case reflect.Pointer:
-		ret = f.handlerType(typ.Elem(), level)
+		ret = prog.handlerType(typ.Elem(), level)
 		return ret
 	case reflect.UnsafePointer:
 		obj := NewObjectType()
@@ -259,7 +257,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		isInterface = true
 		ret = NewInterfaceType(Name, PkgPath)
 	case reflect.Chan:
-		ret = NewChanType(f.handlerType(typ.Elem(), level))
+		ret = NewChanType(prog.handlerType(typ.Elem(), level))
 	default:
 		if ret == nil {
 			fmt.Println("cannot handler this type:" + typ.Kind().String())
@@ -268,7 +266,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	}
 
 	if ret != nil {
-		f.externType[Name] = ret
+		prog.externType[Name] = ret
 		if ityp, ok := ret.(*ObjectType); ok {
 			ityp.SetName(Name)
 		}
@@ -280,7 +278,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	handlerMethod := func(typ reflect.Type) {
 		for i := 0; i < typ.NumMethod(); i++ {
 			method := typ.Method(i)
-			funTyp := f.CoverReflectFunctionType(method.Type, level)
+			funTyp := prog.CoverReflectFunctionType(method.Type, level)
 			if isInterface {
 				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
 			}
@@ -293,4 +291,24 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	handlerMethod(pTyp)
 	ret.SetMethod(Methods)
 	return ret
+}
+
+func (b *FunctionBuilder) TryGetSimilarityKey(name, key string) string {
+	return b.GetProgram().TryGetSimilarityKey(name, key)
+}
+
+func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
+	return b.GetProgram().TryBuildExternValue(b, id)
+}
+
+func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
+	return b.GetProgram().BuildValueFromAny(b, id, v)
+}
+
+func (b *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int) *FunctionType {
+	return b.GetProgram().CoverReflectFunctionType(itype, level)
+}
+
+func (b *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
+	return b.GetProgram().handlerType(typ, level)
 }

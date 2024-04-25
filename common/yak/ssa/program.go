@@ -12,14 +12,18 @@ import (
 
 func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
 	prog := &Program{
-		Packages:          make(map[string]*Package),
-		errors:            make([]*SSAError, 0),
-		ClassBluePrint:    make(map[string]*ClassBluePrint),
-		Cache:             NewDBCache(dbProgramName),
-		OffsetMap:         make(map[int]*OffsetItem),
-		OffsetSortedSlice: make([]int, 0),
-		editorStack:       omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
-		editorMap:         omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		Packages:            make(map[string]*Package),
+		errors:              make([]*SSAError, 0),
+		ClassBluePrint:      make(map[string]*ClassBluePrint),
+		Cache:               NewDBCache(dbProgramName),
+		OffsetMap:           make(map[int]*OffsetItem),
+		OffsetSortedSlice:   make([]int, 0),
+		editorStack:         omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		editorMap:           omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		cacheExternInstance: make(map[string]Value),
+		externType:          make(map[string]Type),
+		ExternInstance:      make(map[string]any),
+		ExternLib:           make(map[string]map[string]any),
 	}
 	prog.Loader = ssautil.NewPackageLoader(ssautil.WithFileSystem(fs))
 	return prog
@@ -142,6 +146,7 @@ func (prog *Program) IsPackagePathInList(pkgName string) bool {
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }
+
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
 	p.editorMap.Set(e.GetUrl(), e)

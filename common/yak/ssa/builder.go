@@ -44,9 +44,7 @@ type FunctionBuilder struct {
 
 	parentScope *ParentScope
 
-	ExternInstance map[string]any
-	ExternLib      map[string]map[string]any
-	DefineFunc     map[string]any
+	DefineFunc map[string]any
 
 	MarkedFuncType  *FunctionType
 	MarkedFunctions []*Function
@@ -71,8 +69,6 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		RefParameter:  make(map[string]struct{}),
 	}
 	if parent != nil {
-		b.ExternInstance = parent.ExternInstance
-		b.ExternLib = parent.ExternLib
 		b.DefineFunc = parent.DefineFunc
 		// sub scope
 		// b.parentScope = parent.CurrentBlock.ScopeTable
