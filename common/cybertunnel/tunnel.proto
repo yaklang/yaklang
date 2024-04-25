@@ -23,6 +23,37 @@ service Tunnel {
 
   // 随机 ICMP 长度触发器
   rpc QuerySpecificICMPLengthTrigger(QuerySpecificICMPLengthTriggerParams) returns (QuerySpecificICMPLengthTriggerResponse);
+
+  rpc RequireHTTPRequestTrigger(RequireHTTPRequestTriggerParams) returns (RequireHTTPRequestTriggerResponse);
+  rpc QueryExistedHTTPRequestTrigger(QueryExistedHTTPRequestTriggerRequest) returns (QueryExistedHTTPRequestTriggerResponse);
+}
+
+message HTTPRequestTriggerNotification {
+  string Url = 1;
+  string RemoteAddr = 2;
+  int32 RemotePort = 3;
+  int64 TriggerTimestamp = 4;
+  int64 Timestamp = 5;
+  bytes Request = 6;
+  bytes Response = 7;
+}
+
+message QueryExistedHTTPRequestTriggerResponse {
+  repeated HTTPRequestTriggerNotification Notifications = 1;
+}
+
+message QueryExistedHTTPRequestTriggerRequest {
+  string Token = 1;
+}
+
+message RequireHTTPRequestTriggerParams {
+  string Token = 1;
+  int32 TTLSeconds = 2;
+  bytes ExpectedHTTPResponse = 3;
+}
+
+message RequireHTTPRequestTriggerResponse {
+  string Url = 1;
 }
 
 message RegisterTunnelRequest {

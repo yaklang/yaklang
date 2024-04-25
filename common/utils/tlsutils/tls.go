@@ -27,6 +27,7 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 }
 
 var defaultTLSServerConfig *tls.Config
+var ttlTLSServerConfig = utils.NewTTLCache[*tls.Config](time.Minute * 20)
 
 func NewDefaultTLSServer(conn net.Conn) *tls.Conn {
 	if defaultTLSServerConfig == nil {
