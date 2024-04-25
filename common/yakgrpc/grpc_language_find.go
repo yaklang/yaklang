@@ -12,73 +12,120 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v *ssaapi.Value, isReference bool) []*ssa.Variable {
+func findVariable(v *ssaapi.Value, word string, containPoint bool) []*ssa.Variable {
+	variables := make([]*ssa.Variable, 0)
+	if !containPoint {
+		variables = append(variables, v.GetVariable(word))
+	} else {
+		// fuzz match variable name
+		_, lastName, _ := strings.Cut(word, ".")
+		lastNameWithPoint := "." + lastName
+		for _, variable := range v.GetAllVariables() {
+			if !strings.HasSuffix(variable.GetName(), lastNameWithPoint) {
+				continue
+			}
+			variables = append(variables, variable)
+			break
+		}
+	}
+	return variables
+}
+
+func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v *ssaapi.Value, isReference bool) ([]*ssa.Variable, *ssa.Parameter) {
+	var parameter *ssa.Parameter
 	variables := make([]*ssa.Variable, 0)
 
-	findVariable := func(v *ssaapi.Value) {
-		if !containPoint {
-			variables = append(variables, v.GetVariable(word))
-		} else {
-			// fuzz match variable name
-			_, lastName, _ := strings.Cut(word, ".")
-			lastNameWithPoint := "." + lastName
-			for _, variable := range v.GetAllVariables() {
-				if !strings.HasSuffix(variable.GetName(), lastNameWithPoint) {
-					continue
-				}
-				variables = append(variables, variable)
-				break
+	builtinFindVariable := func(v *ssaapi.Value) {
+		variables = append(variables, findVariable(v, word, containPoint)...)
+	}
+
+	// handle free value, find value by prog.Ref and filter by same default value
+	if v.IsFreeValue() {
+		parameter = ssaapi.GetFreeValue(v)
+		defaultValue := parameter.GetDefault()
+
+		prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
+			if v.IsFreeValue() {
+				return ssaapi.GetFreeValue(v).GetDefault() == defaultValue
 			}
-		}
+			return false
+		}).ForEach(func(v *ssaapi.Value) {
+			builtinFindVariable(v)
+		})
 	}
 
 	if isReference {
-		findVariable(v)
+		builtinFindVariable(v)
 		// try to get users phi, add each edge variable
 		for _, user := range v.GetUsers() {
 			if !user.IsPhi() {
 				continue
 			}
 
-			findVariable(user)
+			builtinFindVariable(user)
 		}
 		// try to convert value to phi, add each edge variable
 		if v.IsPhi() {
 			for _, edge := range ssaapi.GetValues(v) {
-				findVariable(edge)
+				builtinFindVariable(edge)
 			}
 		}
 	} else {
-		findVariable(v)
+		builtinFindVariable(v)
 		// try to convert value to phi, add each edge variable
 		if v.IsPhi() {
 			for _, edge := range ssaapi.GetValues(v) {
-				findVariable(edge)
+				builtinFindVariable(edge)
 			}
 		}
 	}
 
 	variables = lo.Uniq(variables)
 
-	return variables
+	return variables, parameter
 }
 
 func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value, isReference bool) ([]memedit.RangeIf, error) {
 	ranges := make([]memedit.RangeIf, 0)
-	variables := languageServerFind(prog, word, containPoint, v, isReference)
+	variables, freeValue := languageServerFind(prog, word, containPoint, v, isReference)
 	editor := ssaRange.GetEditor()
 
-	for _, variable := range variables {
-		if variable.DefRange != nil {
-			ranges = append(ranges, editor.ExpandWordTextRange(variable.DefRange))
+	if freeValue != nil && freeValue.IsFreeValue {
+		// free value def is default value variable
+		defValue := freeValue.GetDefault()
+		if defValue != nil {
+			variables := findVariable(ssaapi.NewValue(defValue), word, containPoint)
+			if len(variables) > 0 && variables[0].DefRange != nil {
+				ranges = append(ranges, editor.ExpandWordTextRange(variables[0].DefRange))
+			}
 		}
 
+		// free value references
 		if isReference {
-			for rng := range variable.UseRange {
-				ranges = append(ranges, editor.ExpandWordTextRange(rng))
+			for _, variable := range variables {
+				if variable.DefRange != nil {
+					ranges = append(ranges, editor.ExpandWordTextRange(variable.DefRange))
+				}
+
+				for rng := range variable.UseRange {
+					ranges = append(ranges, editor.ExpandWordTextRange(rng))
+				}
+			}
+		}
+	} else {
+		for _, variable := range variables {
+			if variable.DefRange != nil {
+				ranges = append(ranges, editor.ExpandWordTextRange(variable.DefRange))
+			}
+
+			if isReference {
+				for rng := range variable.UseRange {
+					ranges = append(ranges, editor.ExpandWordTextRange(rng))
+				}
 			}
 		}
 	}
+
 	// if extern variable, add extern variable range
 	if v.IsExtern() && len(ranges) == 0 {
 		ranges = append(ranges, editor.ExpandWordTextRange(v.GetRange()))

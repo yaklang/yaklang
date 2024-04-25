@@ -124,21 +124,6 @@ m.a`
 			newRangeFromText("2:1 2:4"),
 		)
 	})
-
-	t.Run("free value", func(t *testing.T) {
-		code := `a = 1
-b = func() {
-return a
-}
-`
-		checkDefinition(t,
-			local,
-			code,
-			"yak",
-			newRangeFromText("3:8 3:9"),
-			newRangeFromText("1:1 1:2"),
-		)
-	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_Find_References(t *testing.T) {
@@ -242,25 +227,6 @@ println(2)`
 			},
 		)
 	})
-
-	// todo: ssa fix freeValue use def chain
-	// 	t.Run("free value", func(t *testing.T) {
-	// 		code := `a = 1
-	// b = func() {
-	// return a
-	// }
-	// `
-	// 		checkReferences(t,
-	// 			local,
-	// 			code,
-	// 			"yak",
-	// 			newRangeFromText("3:8 3:9"),
-	// 			[]memedit.RangeIf{
-	// 				newRangeFromText("1:1 1:2"),
-	// 				newRangeFromText("3:8 3:9"),
-	// 			},
-	// 		)
-	// 	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_Find_Phi(t *testing.T) {
@@ -341,6 +307,52 @@ println(a)`
 				newRangeFromText("4:1 4:2"),
 				newRangeFromText("5:9 5:10"),
 				newRangeFromText("7:9 7:10"),
+			},
+		)
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_Find_FreeValue(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	code := `a = 1
+b = func() {
+c = a + 1
+d = a + 2
+return a
+}
+e = func() {
+q = a + 1
+w = a + 2
+return a
+}
+`
+
+	t.Run("def", func(t *testing.T) {
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("5:8 5:9"),
+			newRangeFromText("1:1 1:2"),
+		)
+	})
+
+	t.Run("ref", func(t *testing.T) {
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("5:8 5:9"),
+			[]memedit.RangeIf{
+				newRangeFromText("1:1 1:2"),
+				newRangeFromText("3:5 3:6"),
+				newRangeFromText("4:5 4:6"),
+				newRangeFromText("5:8 5:9"),
+				newRangeFromText("8:5 8:6"),
+				newRangeFromText("9:5 9:6"),
+				newRangeFromText("10:8 10:9"),
 			},
 		)
 	})
