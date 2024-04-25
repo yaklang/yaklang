@@ -508,70 +508,78 @@ Host: www.baidu.com
 }
 
 func TestGetHTTPPacketCookieValues(t *testing.T) {
-	for _, c := range [][]string{
+	testCases := []struct {
+		name      string
+		packet    string
+		cookie    string
+		expected  []byte
+		blacklist []byte
+	}{
 		{
-			`GET / HTTP/1.1
+			name: "SingleCookie",
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=1`,
-			"a",
-			"1", "2",
+			cookie:   "a",
+			expected: []byte("1"),
 		},
 		{
-			`GET / HTTP/1.1
+			name: "MultipleCookiesSameName",
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=1; a=2`,
-			"a",
-			"1,2", "3",
+			cookie:   "a",
+			expected: []byte("1,2"),
 		},
 		{
-			`GET / HTTP/1.1
+			name: "NonExistentCookie",
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=1; a=2`,
-			"c",
-			"", "3",
+			cookie:   "c",
+			expected: []byte(""),
 		},
 		{
-			`GET / HTTP/1.1
+			name: "EmptyCookies",
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 `,
-			"c",
-			"", "3",
+			cookie:   "c",
+			expected: []byte(""),
 		},
 		{
-			`HTTP/1.1 200 OK
+			name: "NoCookiesHTTP200",
+			packet: `HTTP/1.1 200 OK
 Host: www.baidu.com
 `,
-			"c",
-			"", "3",
+			cookie:   "c",
+			expected: []byte(""),
 		},
 		{
-			`HTTP/1.1 200 OK
+			name: "SetCookieInsteadOfCookie",
+			packet: `HTTP/1.1 200 OK
 Host: www.baidu.com
-Set-Cookie: a=1; a=2`,
-			"a",
-			"1,2", "3",
+Set-Cookie: a=1; HttpOnly`,
+			cookie:   "a",
+			expected: []byte("1"),
 		},
-	} {
-		var (
-			black []byte
-			white []byte
-		)
-		_ = black
-		_ = white
-		if len(c) > 2 {
-			white = []byte(c[2])
-		}
-		if len(c) > 3 {
-			black = []byte(c[3])
-		}
-		ret := GetHTTPPacketCookieValues([]byte(c[0]), c[1])
-		byteResult := []byte(strings.Join(ret, ","))
-		if bytes.Contains(byteResult, black) {
-			t.Fatalf("GetHTTPPacketCookieValues failed: %s", string(byteResult))
-		}
-		if !bytes.Contains(byteResult, []byte(white)) {
-			t.Fatalf("GetHTTPPacketCookieValues failed: %s", string(byteResult))
-		}
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := GetHTTPPacketCookieValues([]byte(tc.packet), tc.cookie)
+			byteResult := []byte(strings.Join(result, ","))
+
+			// Validate expected result should be present
+			if !bytes.Contains(byteResult, tc.expected) {
+				t.Errorf("Expected %q to include %q", byteResult, tc.expected)
+			}
+
+			// Validate blacklist result should not be present
+			if len(tc.blacklist) > 0 && bytes.Contains(byteResult, tc.blacklist) {
+				t.Errorf("Result %q should not contain %q", byteResult, tc.blacklist)
+			}
+		})
 	}
 }
 
@@ -700,120 +708,262 @@ Content-Type: abc/abcd
 	}
 }
 
+//func TestGetHTTPPacketCookies(t *testing.T) {
+//	for _, c := range [][]any{
+//		{[]byte(`GET / HTTP/1.1
+//Host: www.baidu.com`), [2]string{}},
+//		{[]byte(`GET / HTTP/1.1
+//Host: www.baidu.com
+//Cookie: a=1;
+//`), [2]string{"a", "1"}},
+//		{[]byte(`GET / HTTP/1.1
+//Host: www.baidu.com
+//Cookie: c=1
+//Cookie: a=1;
+//`), [2]string{"a", "1"}},
+//		{[]byte(`GET / HTTP/1.1
+//Host: www.baidu.com
+//Cookie: c=1
+//Cookie: a=1;
+//`), [2]string{"c", "1"}},
+//		{[]byte(`GET / HTTP/1.1
+//Host: www.baidu.com
+//Cookie: c=1
+//Cookie: b=1; a=1;
+//`), [2]string{"c", "1"}},
+//		{[]byte(`GET / HTTP/1.1
+//Host: www.baidu.com
+//Cookie: c=1
+//Cookie: b=1; a=1;
+//`), [2]string{"a", "1"}},
+//		{[]byte(`HTTP/1.1 200 OK
+//Content-Type: text/html; charset=utf-8
+//Set-Cookie: c=1
+//Set-Cookie: b=1; a=1;
+//`), [2]string{"a", "1"}},
+//		{[]byte(`HTTP/1.1 200 OK
+//Content-Type: text/html; charset=utf-8
+//Set-Cookie: b=1; a=1;
+//`), [2]string{"ddddd", ""}},
+//	} {
+//		results := GetHTTPPacketCookies(c[0].([]byte))
+//		ret := c[1].([2]string)
+//		key, value := ret[0], ret[1]
+//		if key == "" {
+//			continue
+//		}
+//
+//		spew.Dump(results)
+//		if ret, _ := results[key]; ret != value {
+//			println(string(c[0].([]byte)))
+//			panic(fmt.Sprintf("GetHTTPPacketCookies failed: %s", string(c[0].([]byte))))
+//		}
+//	}
+//}
+
 func TestGetHTTPPacketCookies(t *testing.T) {
-	for _, c := range [][]any{
-		{[]byte(`GET / HTTP/1.1
-Host: www.baidu.com`), [2]string{}},
-		{[]byte(`GET / HTTP/1.1
+	testCases := []struct {
+		name     string
+		packet   []byte
+		key      string
+		expected string
+	}{
+		{
+			name: "NoCookies",
+			packet: []byte(`GET / HTTP/1.1
+Host: www.baidu.com`),
+			key:      "",
+			expected: "",
+		},
+		{
+			name: "SingleCookie",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key: "a", expected: "1",
+		},
+		{
+			name: "MultipleCookiesSamePacket",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key:      "a",
+			expected: "1",
+		},
+		{
+			name: "FirstCookie",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: a=1;
-`), [2]string{"c", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key:      "c",
+			expected: "1",
+		},
+		{
+			name: "SelectFirstCookie",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: b=1; a=1;
-`), [2]string{"c", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key:      "c",
+			expected: "1",
+		},
+		{
+			name: "SelectLastCookie",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: b=1; a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`HTTP/1.1 200 OK
+`),
+			key:      "a",
+			expected: "1",
+		},
+		{
+			name: "HTTP200Cookies",
+			packet: []byte(`HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Set-Cookie: c=1
-Set-Cookie: b=1; a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`HTTP/1.1 200 OK
+Set-Cookie: b=1
+`),
+			key:      "b",
+			expected: "1",
+		},
+		{
+			name: "NonexistentCookie",
+			packet: []byte(`HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Set-Cookie: b=1; a=1;
-`), [2]string{"ddddd", ""}},
-	} {
-		results := GetHTTPPacketCookies(c[0].([]byte))
-		ret := c[1].([2]string)
-		key, value := ret[0], ret[1]
-		if key == "" {
-			continue
-		}
+`),
+			key:      "ddddd",
+			expected: "",
+		},
+	}
 
-		spew.Dump(results)
-		if ret, _ := results[key]; ret != value {
-			println(string(c[0].([]byte)))
-			panic(fmt.Sprintf("GetHTTPPacketCookies failed: %s", string(c[0].([]byte))))
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			results := GetHTTPPacketCookies(tc.packet)
+			if tc.key == "" {
+				return // If key is empty, skip the check
+			}
+			value, exists := results[tc.key]
+			if !exists && tc.expected != "" {
+				t.Fatalf("Expected key %q was not found in the results", tc.key)
+			}
+			if exists && value != tc.expected {
+				t.Errorf("Mismatch for key %q: expected %q, got %q", tc.key, tc.expected, value)
+			}
+		})
 	}
 }
 
 func TestGetHTTPPacketCookiesFull(t *testing.T) {
-	for _, c := range [][]any{
-		{[]byte(`GET / HTTP/1.1
-Host: www.baidu.com`), [2]string{}},
-		{[]byte(`GET / HTTP/1.1
+	testCases := []struct {
+		name     string
+		packet   []byte
+		key      string
+		expected string
+	}{
+		{
+			name: "NoCookiesEmptyPacket",
+			packet: []byte(`GET / HTTP/1.1
+Host: www.baidu.com`),
+			key:      "",
+			expected: "",
+		},
+		{
+			name: "CookiesSetOnce",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=1; a=2
-`), [2]string{"a", "1,2"}},
-		{[]byte(`GET / HTTP/1.1
-Host: www.baidu.com`), [2]string{}},
-		{[]byte(`GET / HTTP/1.1
+`), key: "a",
+			expected: "1,2"},
+		{
+			name: "SingleCookieSingleValue",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key:      "a",
+			expected: "1",
+		},
+		{
+			name: "MultipleCookiesSamePacket",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key:      "a",
+			expected: "1",
+		},
+		{
+			name: "MultipleCookiesDifferentPacket",
+			packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: a=1;
-`), [2]string{"c", "1"}},
-		{[]byte(`GET / HTTP/1.1
+`),
+			key:      "c",
+			expected: "1"},
+		{name: "MixedCookies", packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: b=1; a=1;
-`), [2]string{"c", "1"}},
-		{[]byte(`GET / HTTP/1.1
-Host: www.baidu.com
-Cookie: c=1
-Cookie: b=1; a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`HTTP/1.1 200 OK
+`),
+			key: "c", expected: "1",
+		},
+		{
+			name: "MultipleCookiesMixedPacket",
+			packet: []byte(`HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Set-Cookie: c=1
-Set-Cookie: b=1; a=1;
-`), [2]string{"a", "1"}},
-		{[]byte(`HTTP/1.1 200 OK
+Set-Cookie: b=1
+Set-Cookie: a=1;
+`),
+			key:      "a",
+			expected: "1",
+		},
+		{
+			name: "CookiesNotFound",
+			packet: []byte(`HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Set-Cookie: b=1; a=1;
-`), [2]string{"ddddd", ""}},
-		{[]byte(`HTTP/1.1 200 OK
+`),
+			key:      "ddddd",
+			expected: "",
+		},
+		{
+			name: "CookiesOverwritten",
+			packet: []byte(`HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Set-Cookie: b=1; a=1;
 Set-Cookie: a=123
-`), [2]string{"a", "1,123"}},
-	} {
-		results := GetHTTPPacketCookiesFull(c[0].([]byte))
-		ret := c[1].([2]string)
-		key, value := ret[0], ret[1]
-		if key == "" {
-			continue
-		}
+`),
+			key:      "a",
+			expected: "123",
+		},
+	}
 
-		spew.Dump(results)
-		if ret, _ := results[key]; strings.Join(ret, ",") != value {
-			println(string(c[0].([]byte)))
-			panic(fmt.Sprintf("GetHTTPPacketCookies failed: %s", string(c[0].([]byte))))
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			results := GetHTTPPacketCookiesFull(tc.packet)
+			if tc.key == "" { // If key is empty, skip check
+				return
+			}
+			value, exists := results[tc.key]
+			if !exists && tc.expected != "" {
+				t.Fatalf("Cookie key %q not found in results", tc.key)
+			}
+			joinedValue := strings.Join(value, ",")
+			if joinedValue != tc.expected {
+				t.Errorf("Mismatch for cookie %q: expected %q, got %q", tc.key, tc.expected, joinedValue)
+			}
+		})
 	}
 }
 

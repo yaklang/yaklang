@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	debugName := "hybrid_fuzz_params2.yak"
+	debugName := "fuzz_mutate_post_json_params.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
