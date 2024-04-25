@@ -27,6 +27,7 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
+	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
 	"net"
 	"net/http"
@@ -197,6 +198,10 @@ func (c *Config) TLS() *tls.Config {
 		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			if clientHello.ServerName == "" {
+				if clientHello.Conn != nil && clientHello.Conn.LocalAddr() != nil {
+					host := utils.ExtractHost(clientHello.Conn.LocalAddr().String())
+					return c.cert(host)
+				}
 				return nil, errors.New("mitm: SNI not provided, failed to build certificate")
 			}
 
