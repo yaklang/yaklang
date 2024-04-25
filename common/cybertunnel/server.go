@@ -2,9 +2,11 @@ package cybertunnel
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/cybertunnel/dnslog"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,7 +20,8 @@ var icmpTrigger *ICMPTrigger
 type TunnelServer struct {
 	tpb.TunnelServer
 
-	ExternalIP string
+	ExternalIP   string
+	DNSLogDomain string
 
 	// 二级密码是用来分别
 	SecondaryPassword string
@@ -74,7 +77,7 @@ func (s *TunnelServer) InitialReverseTrigger() error {
 		}
 	})
 
-	defaultHTTPTrigger, err := NewHTTPTrigger()
+	defaultHTTPTrigger, err := NewHTTPTrigger(s.ExternalIP, s.DNSLogDomain)
 	if err != nil {
 		return utils.Errorf("create http trigger failed: %s", err)
 	}
@@ -94,7 +97,17 @@ func (s *TunnelServer) InitialReverseTrigger() error {
 	return nil
 }
 
-func NewTunnelServer() (*TunnelServer, error) {
-	s := &TunnelServer{}
+func NewTunnelServer(dnslogDomain, externalIPConfigged string) (*TunnelServer, error) {
+	s := &TunnelServer{
+		ExternalIP:   externalIPConfigged,
+		DNSLogDomain: strings.Trim(strings.TrimSpace(strings.ToLower(dnslogDomain)), "."),
+	}
+	if s.ExternalIP == "" {
+		i, err := dnslog.GetExternalIP()
+		if err != nil {
+			return nil, err
+		}
+		s.ExternalIP = i.String()
+	}
 	return s, nil
 }
