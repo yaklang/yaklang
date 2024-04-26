@@ -284,17 +284,17 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 }
 
 func getInstancesAndFuncDecls(v *ssaapi.Value, containPoint bool) (map[string]*yakdoc.LibInstance, map[string]*yakdoc.FuncDecl) {
-	if containPoint {
-		libName := v.GetName()
-		lib, ok := doc.DefaultDocumentHelper.Libs[libName]
-		if ok {
-			return lib.Instances, lib.Functions
-		} else {
-			return nil, nil
-		}
+	if !containPoint || v.IsNil() {
+		return nil, doc.DefaultDocumentHelper.Functions
 	}
 
-	return nil, doc.DefaultDocumentHelper.Functions
+	libName := v.GetName()
+	lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+	if ok {
+		return lib.Instances, lib.Functions
+	} else {
+		return nil, nil
+	}
 }
 
 func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(decl *yakdoc.FuncDecl) string) string {
@@ -369,6 +369,10 @@ func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc s
 }
 
 func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, document string) {
+	if v.IsNil() {
+		return "", ""
+	}
+
 	lastName := name
 	_, after, ok := strings.Cut(name, ".")
 	if ok {
@@ -445,6 +449,10 @@ func getExternLibDesc(name string) string {
 }
 
 func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v *ssaapi.Value) string {
+	if v.IsNil() {
+		return ""
+	}
+
 	desc := ""
 	lastName := name
 	_, after, ok := strings.Cut(name, ".")
@@ -687,7 +695,8 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 				continue
 			}
 			uniqMap[varName] = struct{}{}
-			v := ssaapi.NewValue(item.GetValue())
+			bareValue := item.GetValue()
+			v := ssaapi.NewValue(bareValue)
 
 			// 不应该再补全标准库
 			if _, ok := doc.DefaultDocumentHelper.Libs[varName]; ok {
@@ -700,7 +709,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 
 			insertText := varName
 			vKind := "Variable"
-			if v.IsFunction() {
+			if !v.IsNil() && v.IsFunction() {
 				vKind = "Function"
 				insertText = getVscodeSnippetsBySSAValue(varName, v)
 			}
@@ -742,7 +751,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		return ret
 	}
 
-	if v == nil {
+	if v.IsNil() {
 		return ret
 	}
 	bareTyp := ssaapi.GetBareType(v.GetType())
