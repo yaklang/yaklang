@@ -13,7 +13,7 @@ import (
 )
 
 func TestServer_RegisterFacadesHTTP(t *testing.T) {
-	c, err := NewLocalClient()
+	c, err := NewLocalClientWithReverseServer()
 	if err != nil {
 		panic(err)
 	}

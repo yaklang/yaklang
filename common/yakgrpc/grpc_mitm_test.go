@@ -776,13 +776,13 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 }
 
 func TestGRPCMUSTPASS_MITM_DnsAndHosts(t *testing.T) {
-	client, err := NewLocalClient() // 新建一个 yakit client
+	client, err := NewLocalClientWithReverseServer() // 新建一个 yakit client
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	port1 := utils.GetRandomAvailableTCPPort()
-
+	fmt.Println(port1)
 	// mock http server
 	go func() {
 		err = facades.Serve("127.0.0.1", port1, facades.SetHttpResource("/ok", []byte("")))
