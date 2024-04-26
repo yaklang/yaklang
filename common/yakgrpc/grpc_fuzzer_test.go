@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"net/http"
 	"sort"
 	"strings"
@@ -1184,5 +1186,65 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func TestFuzzerBigRequest(t *testing.T) {
+	uid := uuid.New().String()
+
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 0\r\n\r\n"))
+	target := utils.HostPort(host, port)
+	origin := []byte(`GET /` + uid + ` HTTP/1.1
+Host: ` + target + `
+Content-Type: multipart/form-data; boundary=X-INSOMNIA-BOUNDARY
+
+--X-INSOMNIA-BOUNDARY
+Content-Disposition: form-data; name=""
+
+` + strings.Repeat("\x99", 11000000) /* 11,000,000 B ~ 11M */ + `
+--X-INSOMNIA-BOUNDARY
+Content-Disposition: form-data; name=""; filename="small.jpg"
+Content-Type: image/jpeg
+
+11
+`)
+	client, _ := NewLocalClient()
+	stream, _ := client.MITM(context.Background())
+	var portMITM = int64(utils.GetRandomAvailableTCPPort())
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(portMITM),
+	})
+	go func() {
+		for {
+			_, err := stream.Recv()
+			if err != nil {
+				break
+			}
+		}
+	}()
+	err := utils.WaitConnect("127.0.0.1:"+fmt.Sprint(portMITM), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	_, _, _ = poc.HTTP(origin, poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(portMITM)))
+	rsp, _ := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		SourceType: "mitm",
+		SearchURL:  uid,
+	})
+	reqId := rsp.GetData()[0].Id
+	flow, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{Id: int64(reqId)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(flow.Request) < 1000 {
+		t.Fatal("request too small")
+	}
+	suffix := flow.Request[len(flow.Request)-200:]
+	spew.Dump(suffix)
+	if len(flow.Request) < 11000000 {
+		t.Fatal("request is too small, truncated some reason")
 	}
 }
