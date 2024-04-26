@@ -2,11 +2,34 @@ package yakgrpc
 
 import (
 	"bytes"
+	"context"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestServer_GenerateYakCodeByPacketFixEOFError(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	rsp, err := client.GenerateCSRFPocByPacket(context.Background(), &ypb.GenerateCSRFPocByPacketRequest{
+		Request: []byte(`POST / HTTP/1.1
+Content-Type: multipart/form-data; boundary=63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Host: www.example.com
+Content-Length: 183
+
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Content-Disposition: form-data; name="key"
+
+value
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618--`),
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(rsp.Code), `<input type="hidden" name="key" value="value"/>`)
+}
+
 func TestServer_GenerateYakCodeByPacket(t *testing.T) {
-	var result = extractPacketToGenerateParams(true, []byte(`GET /_sockets/u/13946521/ws?session=eyJ2IjoiVjMiLCJ1IjoxMzk0NjUyMSwicyI6Nzg3ODA2Mjc3LCJjIjoyNTE4NjU0OTYzLCJ0IjoxNjUxODkzNjczfQ%3D%3D--18c938b8dfe75b4563893d59c29dd7379ce53a7cdb6972f83cb7e35e4d70e77d&shared=true&p=1520115733_1651762913.437 HTTP/1.1
+	result := extractPacketToGenerateParams(true, []byte(`GET /_sockets/u/13946521/ws?session=eyJ2IjoiVjMiLCJ1IjoxMzk0NjUyMSwicyI6Nzg3ODA2Mjc3LCJjIjoyNTE4NjU0OTYzLCJ0IjoxNjUxODkzNjczfQ%3D%3D--18c938b8dfe75b4563893d59c29dd7379ce53a7cdb6972f83cb7e35e4d70e77d&shared=true&p=1520115733_1651762913.437 HTTP/1.1
 Host: baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
@@ -20,10 +43,10 @@ Sec-WebSocket-Version: 13
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.109 Safari/537.36
 
 1231231`+"`"+`123123`))
-	//spew.Dump(result)
+	// spew.Dump(result)
 
 	var buf bytes.Buffer
-	var err = OrdinaryPoCTemplate.Execute(&buf, result)
+	err := OrdinaryPoCTemplate.Execute(&buf, result)
 	if err != nil {
 		panic(err)
 	}
@@ -31,7 +54,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 }
 
 func TestServer_GenerateYakCodeByPacket_Multipart(t *testing.T) {
-	var result = extractPacketToGenerateParams(true, []byte(`POST /CuteNews/index.php HTTP/1.1
+	result := extractPacketToGenerateParams(true, []byte(`POST /CuteNews/index.php HTTP/1.1
 Host: 10.129.106.34
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
 Accept-Encoding: gzip, deflate
@@ -89,10 +112,10 @@ Content-Disposition: form-data; name="more[about]"
 ------WebKitFormBoundaryL9EjCsrvV7xykqHB--
 
 `))
-	//spew.Dump(result)
+	// spew.Dump(result)
 
 	var buf bytes.Buffer
-	var err = OrdinaryPoCTemplate.Execute(&buf, result)
+	err := OrdinaryPoCTemplate.Execute(&buf, result)
 	if err != nil {
 		panic(err)
 	}

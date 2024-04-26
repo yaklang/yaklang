@@ -1,9 +1,10 @@
 package yaklib
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCsrfPOCGet(t *testing.T) {
@@ -16,7 +17,7 @@ User-Agent: HTTPie/3.2.1
 
 `)
 	t.Log(poc)
-	spew.Dump(err)
+	require.NoError(t, err)
 }
 
 func TestCsrfPOCPost(t *testing.T) {
@@ -32,7 +33,7 @@ Content-Length: 15
 a[1]=1&a[2]=1&c=1&d=2
 `)
 	t.Log(poc)
-	spew.Dump(err)
+	require.NoError(t, err)
 }
 
 func TestCsrfPOCJSONPost(t *testing.T) {
@@ -48,11 +49,12 @@ Content-Length: 16
 {"key": "value"}
 `)
 	t.Log(poc)
-	spew.Dump(err)
+	require.NoError(t, err)
 }
 
-func TestCsrfPOCMultipartTrue(t *testing.T) {
-	poc, err := GenerateCSRFPoc(`POST /post HTTP/1.1
+func TestCsrfPOCMultipartForm(t *testing.T) {
+	t.Run("use js template", func(t *testing.T) {
+		poc, err := GenerateCSRFPoc(`POST /post HTTP/1.1
 Accept: */*
 Accept-Encoding: gzip, deflate
 Connection: keep-alive
@@ -67,28 +69,42 @@ Content-Type: image/png
 
 <?php phpinfo(); ?>
 ------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7--
-`, CsrfOptWithMultipartDefaultValue(true))
-	t.Log(poc)
-	spew.Dump(err)
-}
+		`, CsrfOptWithMultipartDefaultValue(true))
+		t.Log(poc)
+		require.NoError(t, err)
+	})
+	t.Run("fix EOF error", func(t *testing.T) {
+		poc, err := GenerateCSRFPoc(`POST / HTTP/1.1
+Content-Type: multipart/form-data; boundary=63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Host: www.example.com
+Content-Length: 183
 
-func TestCsrfPOCMultipartFalse(t *testing.T) {
-	poc, err := GenerateCSRFPoc(`POST /post HTTP/1.1
-Accept: */*
-Accept-Encoding: gzip, deflate
-Connection: keep-alive
-Host: httpbin.org
-User-Agent: HTTPie/3.2.1
-Content-Type:multipart/form-data;boundary=----------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7
-Content-Length: 199
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Content-Disposition: form-data; name="key"
 
-------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7
-Content-Disposition: form-data; name="postfile"; filename="a.php"
-Content-Type: image/png
+value
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618--`)
+		t.Log(poc)
+		require.NoError(t, err)
+	})
 
-<?php phpinfo(); ?>
-------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7--
-`)
-	t.Log(poc)
-	spew.Dump(err)
+	t.Run("same key", func(t *testing.T) {
+		poc, err := GenerateCSRFPoc(`POST / HTTP/1.1
+Content-Type: multipart/form-data; boundary=63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Host: www.example.com
+Content-Length: 183
+
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Content-Disposition: form-data; name="key"
+
+value
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618
+Content-Disposition: form-data; name="key"
+
+value
+--63dee9b440dfdc85aab452b088e80a7484ef13a44fc4a4fba0b9affe8618--`)
+		t.Log(poc)
+		require.Equal(t, strings.Count(poc, `<input type="hidden" name="key" value="value"/>`), 2)
+		require.NoError(t, err)
+	})
 }
