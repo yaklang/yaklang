@@ -698,7 +698,10 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 			bareValue := item.GetValue()
 			v := ssaapi.NewValue(bareValue)
 
-			// 不应该再补全标准库
+			// 不应该再补全标准库函数和标准库
+			if _, ok := doc.DefaultDocumentHelper.Functions[varName]; ok {
+				continue
+			}
 			if _, ok := doc.DefaultDocumentHelper.Libs[varName]; ok {
 				continue
 			}
