@@ -116,14 +116,16 @@ func TestGRE_PPP_Message(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	LCPDate, _ := codec.DecodeHex("0100000a05060a94c166")
+	LCPDate, _ := codec.DecodeHex("0101000e0304c02305060f3f117c")
 
 	mapData := map[string]any{
-		"Flags And Version": 0x3081,
-		"Protocol Type":     0x880b,
-		"Payload Length":    14,
-		"Call ID":           24,
-		"Number":            0,
+		"Flags And Version":     0x3081,
+		"Protocol Type":         0x880b,
+		"Payload Length":        18,
+		"Call ID":               1,
+		"Number":                0,
+		"Sequence Number":       1,
+		"Acknowledgment Number": 4294967295,
 		"Payload": map[string]any{
 			"PPP": map[string]any{
 				"Address":  0xff,
@@ -138,7 +140,7 @@ func TestGRE_PPP_Message(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	assert.Equal(t, "3081880b000e001800000000ff03c0210100000a05060a94c166", codec.EncodeToHex(NodeToBytes(res)))
+	assert.Equal(t, "3081880b0012000100000001ffffffffff03c0210101000e0304c02305060f3f117c", codec.EncodeToHex(NodeToBytes(res)))
 }
 
 func TestLCPMessage(t *testing.T) {
@@ -157,42 +159,44 @@ func TestLCPMessage(t *testing.T) {
 		"Code":       1,
 		"Identifier": 1,
 		"Length":     36,
-		"Options": []map[string]any{
-			{
-				"Type":   1,
-				"Length": 4,
-				"Data":   "\x05\xea",
-			}, {
-				"Type":   2,
-				"Length": 6,
-				"Data":   "\x00\x00\x00\x00",
-			}, {
-				"Type":   3,
-				"Length": 5,
-				"Data":   "\xc2\x23\x05",
-			},
-			{
-				"Type":   5,
-				"Length": 6,
-				"Data":   "\xdf\xc5\x3f\x2f",
-			},
-			{
-				"Type":   7,
-				"Length": 2,
-				"Data":   "",
-			},
-			{
-				"Type":   8,
-				"Length": 2,
-				"Data":   "",
-			}, {
-				"Type":   17,
-				"Length": 4,
-				"Data":   "\x05\xea",
-			}, {
-				"Type":   19,
-				"Length": 3,
-				"Data":   "\x00",
+		"Info": map[string]any{
+			"Options": []map[string]any{
+				{
+					"Type":   1,
+					"Length": 4,
+					"Data":   "\x05\xea",
+				}, {
+					"Type":   2,
+					"Length": 6,
+					"Data":   "\x00\x00\x00\x00",
+				}, {
+					"Type":   3,
+					"Length": 5,
+					"Data":   "\xc2\x23\x05",
+				},
+				{
+					"Type":   5,
+					"Length": 6,
+					"Data":   "\xdf\xc5\x3f\x2f",
+				},
+				{
+					"Type":   7,
+					"Length": 2,
+					"Data":   "",
+				},
+				{
+					"Type":   8,
+					"Length": 2,
+					"Data":   "",
+				}, {
+					"Type":   17,
+					"Length": 4,
+					"Data":   "\x05\xea",
+				}, {
+					"Type":   19,
+					"Length": 3,
+					"Data":   "\x00",
+				},
 			},
 		},
 	}
