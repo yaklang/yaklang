@@ -2166,23 +2166,9 @@ Content-Disposition: form-data; name="b"
 
 func TestGetParamsFromBody(t *testing.T) {
 	type Excepted struct {
-		params map[string]string
+		params map[string][]string
 		useRaw bool
 		err    error
-	}
-	mapEqual := func(m1, m2 map[string]string) bool {
-		if len(m1) != len(m2) {
-			return false
-		}
-
-		for key, aValue := range m1 {
-			bValue, exists := m2[key]
-			if !exists || aValue != bValue {
-				return false
-			}
-		}
-
-		return true
 	}
 
 	testcases := []struct {
@@ -2196,7 +2182,17 @@ func TestGetParamsFromBody(t *testing.T) {
 			contentType: "application/x-www-form-urlencoded",
 			body:        "a=1&b=2",
 			expected: &Excepted{
-				params: map[string]string{"a": "1", "b": "2"},
+				params: map[string][]string{"a": {"1"}, "b": {"2"}},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
+			name:        "form-urlencoded-with-same-key",
+			contentType: "application/x-www-form-urlencoded",
+			body:        "a=1&a=2",
+			expected: &Excepted{
+				params: map[string][]string{"a": {"1", "2"}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2214,7 +2210,7 @@ Content-Disposition: form-data; name="b"
 2
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
 			expected: &Excepted{
-				params: map[string]string{"a": "1", "b": "2"},
+				params: map[string][]string{"a": {"1"}, "b": {"2"}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2224,7 +2220,7 @@ Content-Disposition: form-data; name="b"
 			contentType: "application/json",
 			body:        `{"a":1,"b":2}`,
 			expected: &Excepted{
-				params: map[string]string{"a": "1", "b": "2"},
+				params: map[string][]string{"a": {"1"}, "b": {"2"}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2234,7 +2230,7 @@ Content-Disposition: form-data; name="b"
 			contentType: "application/json",
 			body:        `{"a":[1, 2],"b":{"c": "d","q":"w"}}`,
 			expected: &Excepted{
-				params: map[string]string{"a": "2", "b[c]": "d", "b[q]": "w"},
+				params: map[string][]string{"a": {"2"}, "b[c]": {"d"}, "b[q]": {"w"}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2244,7 +2240,7 @@ Content-Disposition: form-data; name="b"
 			contentType: "application/xml",
 			body:        `<COM><a>1</a><b>2</b></COM>`,
 			expected: &Excepted{
-				params: map[string]string{"COM[a]": "1", "COM[b]": "2"},
+				params: map[string][]string{"COM[a]": {"1"}, "COM[b]": {"2"}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2254,7 +2250,7 @@ Content-Disposition: form-data; name="b"
 			contentType: "application/x-www-form-urlencoded",
 			body:        `x=1';%0d%0aWAITFOR%0d%0aDELAY%0d%0a'0:0:5'--+-`,
 			expected: &Excepted{
-				params: map[string]string{"x": `1';%0d%0aWAITFOR%0d%0aDELAY%0d%0a'0:0:5'--+-`},
+				params: map[string][]string{"x": {`1';%0d%0aWAITFOR%0d%0aDELAY%0d%0a'0:0:5'--+-`}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2263,14 +2259,8 @@ Content-Disposition: form-data; name="b"
 	for _, testcase := range testcases {
 		actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
 
-		if !mapEqual(testcase.expected.params, actualParams) {
-			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualParams, testcase.expected.params)
-		}
-		if actualUseRaw != testcase.expected.useRaw {
-			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualUseRaw, testcase.expected.useRaw)
-		}
-		if !errors.Is(actualError, testcase.expected.err) {
-			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualError, testcase.expected.err)
-		}
+		require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody params failed:", testcase.name)
+		require.Equalf(t, testcase.expected.useRaw, actualUseRaw, "[%s] GetParamsFromBody useRaw failed:", testcase.name)
+		require.ErrorIs(t, testcase.expected.err, actualError, "[%s] GetParamsFromBody error failed:", testcase.name)
 	}
 }

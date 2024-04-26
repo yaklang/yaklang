@@ -831,6 +831,15 @@ func WithReplaceAllHttpPacketQueryParamsWithoutEscape(values map[string]string) 
 	}
 }
 
+func WithReplaceFullHttpPacketQueryParamsWithoutEscape(values map[string][]string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceFullHTTPPacketQueryParamsWithoutEscape(packet, values)
+		},
+		)
+	}
+}
+
 // replacePostParam 是一个请求选项参数，用于改变请求报文，修改 POST 请求参数，如果不存在则会增加
 // Example:
 // ```
@@ -869,6 +878,15 @@ func WithReplaceAllHttpPacketPostParamsWithoutEscape(values map[string]string) P
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceAllHTTPPacketPostParamsWithoutEscape(packet, values)
+		},
+		)
+	}
+}
+
+func WithReplaceFullHttpPacketPostParamsWithoutEscape(values map[string][]string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceFullHTTPPacketPostParamsWithoutEscape(packet, values)
 		},
 		)
 	}
@@ -1532,10 +1550,16 @@ func httpRequestToCurl(https bool, raw any) (curlCommand string) {
 func ExtractPostParams(raw []byte) (map[string]string, error) {
 	_, body := lowhttp.SplitHTTPPacketFast(raw)
 	contentType := lowhttp.GetHTTPPacketHeader(raw, "Content-Type")
-	params, useRaw, err := lowhttp.GetParamsFromBody(contentType, body)
+	totalParams, useRaw, err := lowhttp.GetParamsFromBody(contentType, body)
 	if useRaw && err == nil {
 		err = utils.Error("cannot extract post params")
 	}
+	params := lo.MapEntries(totalParams, func(key string, value []string) (string, string) {
+		if len(value) == 0 {
+			return key, ""
+		}
+		return key, value[0]
+	})
 
 	return params, err
 }

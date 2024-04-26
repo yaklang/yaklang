@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/davecgh/go-spew/spew"
 	filter2 "github.com/yaklang/yaklang/common/filter"
@@ -583,14 +584,15 @@ func TestServer_HTTPFuzzer3(t *testing.T) {
 	spew.Dump(client)
 }
 
-func TestGRPCMUSTPASS_Server_HTTPRequestMutateFormToPOST(t *testing.T) {
+func TestGRPCMUSTPASS_Server_HTTPRequestMutate(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
-		Request: []byte(`POST /ofcms-admin/admin/cms/template/save.json HTTP/1.1
+	t.Run("From to POST", func(t *testing.T) {
+		r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
+			Request: []byte(`POST /ofcms-admin/admin/cms/template/save.json HTTP/1.1
 Host: localhost:8080
 Content-Type: multipart/form-data; boundary=b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3
 
@@ -599,15 +601,27 @@ Content-Disposition: form-data; name="key"
 
 value
 --b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3--`),
-		FuzzMethods: []string{"POST"},
+			FuzzMethods: []string{"POST"},
+		})
+		require.NoError(t, err)
+		_, body := lowhttp.SplitHTTPPacketFast(r.Result)
+		require.Equal(t, "key=value", string(body))
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, body := lowhttp.SplitHTTPPacketFast(r.Result)
-	if string(body) != "key=value" {
-		t.Fatal("expect body is key=value, got " + string(body))
-	}
+
+	t.Run("same key", func(t *testing.T) {
+		r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
+			Request: []byte(`POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 11
+
+key=1&key=1`),
+			FuzzMethods: []string{"GET"},
+		})
+		require.NoError(t, err)
+		headers, _ := lowhttp.SplitHTTPPacketFast(r.Result)
+		require.Contains(t, headers, "?key=1&key=1")
+	})
 }
 
 func TestServer_HTTPRequestMutateWithoutConnection(t *testing.T) {
