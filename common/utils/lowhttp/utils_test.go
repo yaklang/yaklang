@@ -265,6 +265,14 @@ func TestParseCookie(t *testing.T) {
 			want: `a=b; c=d; e=f; g="h, z"`,
 		},
 		{
+			name: "request cookie 2",
+			args: args{
+				key: "cookie",
+				raw: `a=b; a=d; `,
+			},
+			want: `a=b; a=d`,
+		},
+		{
 			// RFC 6265
 			// cookie-value      = *cookie-octet / ( DQUOTE *cookie-octet DQUOTE )
 			// cookie-octet      = %x21 / %x23-2B / %x2D-3A / %x3C-5B / %x5D-7E
