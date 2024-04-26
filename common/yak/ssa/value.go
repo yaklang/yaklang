@@ -91,6 +91,7 @@ func (b *FunctionBuilder) readValueEx(
 		if variable == nil {
 			variable = b.CreateVariable(name)
 			ret.AddVariable(variable)
+			variable.Assign(ret)
 		} else {
 			variable.AddRange(b.CurrentRange, true)
 		}
