@@ -1234,7 +1234,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	result := rawRequest
 	method := strings.ToUpper(strings.Join(req.FuzzMethods, ""))
 	// get params
-	totalParams := lowhttp.GetAllHTTPRequestQueryParams(rawRequest)
+	totalParams := lowhttp.GetFullHTTPRequestQueryParams(rawRequest)
 	// post params
 	contentType := lowhttp.GetHTTPPacketHeader(rawRequest, "Content-Type")
 	transferEncoding := lowhttp.GetHTTPPacketHeader(rawRequest, "Transfer-Encoding")
@@ -1246,7 +1246,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	}
 	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
 	for k, v := range postParams {
-		totalParams[k] = v
+		totalParams[k] = append(totalParams[k], v...)
 	}
 
 	switch method {
@@ -1257,14 +1257,14 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 			poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
 			poc.WithDeleteHeader("Transfer-Encoding"),
 			poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
-			poc.WithReplaceAllHttpPacketPostParamsWithoutEscape(totalParams),
+			poc.WithReplaceFullHttpPacketPostParamsWithoutEscape(totalParams),
 		)
 
 	default:
 		if len(method) > 0 {
 			result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result),
 				poc.WithReplaceHttpPacketMethod(method),
-				poc.WithReplaceAllHttpPacketQueryParamsWithoutEscape(totalParams),
+				poc.WithReplaceFullHttpPacketQueryParamsWithoutEscape(totalParams),
 				poc.WithDeleteHeader("Transfer-Encoding"),
 				poc.WithDeleteHeader("Content-Type"),
 				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),

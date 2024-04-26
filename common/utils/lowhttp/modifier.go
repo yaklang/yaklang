@@ -335,6 +335,16 @@ func ReplaceAllHTTPPacketQueryParamsWithoutEscape(packet []byte, values map[stri
 	})
 }
 
+func ReplaceFullHTTPPacketQueryParamsWithoutEscape(packet []byte, values map[string][]string) []byte {
+	return handleHTTPPacketQueryParam(packet, true, func(p *QueryParams) {
+		for key, values := range values {
+			for _, value := range values {
+				p.Add(key, value)
+			}
+		}
+	})
+}
+
 // ReplaceHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，修改GET请求参数，如果不存在则会增加
 // Example:
 // ```
@@ -462,6 +472,16 @@ func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []b
 func ReplaceAllHTTPPacketPostParamsWithoutEscape(packet []byte, values map[string]string) []byte {
 	return handleHTTPPacketPostParam(packet, true, func(p *QueryParams) {
 		replaceAllParams(values, p)
+	})
+}
+
+func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[string][]string) []byte {
+	return handleHTTPPacketPostParam(packet, true, func(p *QueryParams) {
+		for key, values := range values {
+			for _, value := range values {
+				p.Add(key, value)
+			}
+		}
 	})
 }
 
@@ -1235,13 +1255,13 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 	})
 }
 
-func GetParamsFromBody(contentType string, body []byte) (params map[string]string, useRaw bool, err error) {
+func GetParamsFromBody(contentType string, body []byte) (params map[string][]string, useRaw bool, err error) {
 	var contentTypeParams map[string]string
 	_, contentTypeParams, err = mime.ParseMediaType(contentType)
 	if err != nil {
 		return
 	}
-	params = make(map[string]string)
+	params = make(map[string][]string)
 	// 这是为了处理复杂json/xml的情况
 	handleUnmarshalValues := func(v any) ([]string, []string) {
 		var keys, values []string
@@ -1269,37 +1289,22 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 		}
 		return []string{""}, []string{utils.InterfaceToString(v)}
 	}
-	handleUnmarshalResults := func(tempMap map[string]any) map[string]string {
-		params := make(map[string]string, len(tempMap))
+	handleUnmarshalResults := func(tempMap map[string]any) map[string][]string {
+		params := make(map[string][]string, len(tempMap))
 		for k, v := range tempMap {
 			extraKeys, extraValues := handleUnmarshalValues(v)
 			for i, key := range extraKeys {
 				if key == "" {
-					params[k] = extraValues[i]
+					params[k] = append(params[k], extraValues[i])
 					continue
 				}
-				params[fmt.Sprintf("%s[%s]", k, key)] = extraValues[i]
+				finalKey := fmt.Sprintf("%s[%s]", k, key)
+				params[finalKey] = append(params[finalKey], extraValues[i])
 			}
 		}
 		return params
 	}
 
-	// try json
-	var tempMap map[string]any
-	if len(params) == 0 {
-		err = json.Unmarshal(body, &tempMap)
-		if err == nil {
-			params = handleUnmarshalResults(tempMap)
-		}
-	}
-
-	// try xml
-	if len(params) == 0 {
-		tempMap = utils.XmlLoads(body)
-		if len(tempMap) > 0 {
-			params = handleUnmarshalResults(tempMap)
-		}
-	}
 	// try post form
 	if len(params) == 0 {
 		boundary, ok := contentTypeParams["boundary"]
@@ -1320,11 +1325,30 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 					if err != nil && err != io.EOF {
 						return nil, false, err
 					}
-					params[part.FormName()] = utils.UnsafeBytesToString(content)
+					key := part.FormName()
+					params[key] = append(params[key], utils.UnsafeBytesToString(content))
 				}
 			}
 		}
 	}
+
+	// try json
+	var tempMap map[string]any
+	if len(params) == 0 {
+		err = json.Unmarshal(body, &tempMap)
+		if err == nil {
+			params = handleUnmarshalResults(tempMap)
+		}
+	}
+
+	// try xml
+	if len(params) == 0 {
+		tempMap = utils.XmlLoads(body)
+		if len(tempMap) > 0 {
+			params = handleUnmarshalResults(tempMap)
+		}
+	}
+
 	// try post values
 	if len(params) == 0 {
 		queryParams := ParseQueryParams(string(body))
@@ -1334,7 +1358,7 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 					continue
 				}
 				// use raw values
-				params[item.Key] = item.ValueRaw
+				params[item.Key] = append(params[item.Key], item.ValueRaw)
 			}
 		}
 	}
@@ -1709,28 +1733,24 @@ func GetHTTPPacketJSONPath(packet []byte, key string) any {
 
 func GetHTTPRequestPostParamFull(packet []byte, key string) []string {
 	body := GetHTTPPacketBody(packet)
-	vals, err := url.ParseQuery(string(body))
-	if err != nil {
-		return nil
-	}
-	v, ok := vals[key]
-	if ok {
-		return v
-	}
-	return nil
+	vals := ParseQueryParams(string(body))
+	v := vals.GetAll(key)
+	return v
 }
 
-func GetHTTPRequestQueryParamFull(packet []byte, key string) []string {
+func GetHTTPRequestQueryParamFull(packet []byte, key string) (ret []string) {
+	ret = make([]string, 0)
 	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
 	if err != nil {
-		return nil
+		return
 	}
+
 	val := u.Query()
 	vals, ok := val[key]
 	if ok {
 		return vals
 	}
-	return []string{}
+	return
 }
 
 // GetAllHTTPPacketPostParams 是一个辅助函数，用于获取请求报文中的所有POST请求参数，其返回值为map[string]string，其中键为参数名，值为参数值
@@ -1744,14 +1764,22 @@ func GetHTTPRequestQueryParamFull(packet []byte, key string) []string {
 // a=b&c=d`) // 获取所有POST请求参数
 // ```
 func GetAllHTTPRequestPostParams(packet []byte) (params map[string]string) {
+	params = make(map[string]string)
 	body := GetHTTPPacketBody(packet)
-	vals, err := url.ParseQuery(string(body))
-	if err != nil {
-		return nil
+	vals := ParseQueryParams(string(body))
+
+	for _, item := range vals.Items {
+		params[item.Key] = item.Value
 	}
-	ret := make(map[string]string)
-	for k, v := range vals {
-		ret[k] = v[len(v)-1]
+	return
+}
+
+func GetFullHTTPRequestPostParams(packet []byte) (params map[string][]string) {
+	body := GetHTTPPacketBody(packet)
+	vals := ParseQueryParams(string(body))
+	ret := make(map[string][]string)
+	for _, item := range vals.Items {
+		ret[item.Key] = append(ret[item.Key], item.Value)
 	}
 	return ret
 }
@@ -1766,16 +1794,31 @@ func GetAllHTTPRequestPostParams(packet []byte) (params map[string]string) {
 // `) // 获取所有GET请求参数
 // ```
 func GetAllHTTPRequestQueryParams(packet []byte) (params map[string]string) {
+	params = make(map[string]string)
 	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
 	if err != nil {
-		return nil
+		return
 	}
-	vals := u.Query()
-	ret := make(map[string]string)
-	for k, v := range vals {
-		ret[k] = v[len(v)-1]
+
+	vals := ParseQueryParams(u.RawQuery)
+	for _, item := range vals.Items {
+		params[item.Key] = item.Value
 	}
-	return ret
+	return
+}
+
+func GetFullHTTPRequestQueryParams(packet []byte) (params map[string][]string) {
+	params = make(map[string][]string)
+	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
+	if err != nil {
+		return
+	}
+
+	vals := ParseQueryParams(u.RawQuery)
+	for _, item := range vals.Items {
+		params[item.Key] = append(params[item.Key], item.Value)
+	}
+	return
 }
 
 // GetStatusCodeFromResponse 是一个辅助函数，用于获取响应报文中的状态码，其返回值为int
