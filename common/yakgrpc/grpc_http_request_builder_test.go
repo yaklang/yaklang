@@ -119,8 +119,6 @@ Host: ` + target + `
 }
 
 func TestGRPCMUSTPASS_HTTP_BuildHTTPRequest_Results(t *testing.T) {
-	// TODO test case failed
-	t.SkipNow()
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
