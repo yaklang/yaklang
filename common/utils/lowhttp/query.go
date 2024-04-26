@@ -247,3 +247,7 @@ func (q *QueryParams) Encode() string {
 func (q *QueryParams) Clear() {
 	q.Items = make([]*QueryParamItem, 0)
 }
+
+func (q *QueryParams) IsEmpty() bool {
+	return len(q.Items) == 0
+}
