@@ -1,6 +1,8 @@
 package ssa
 
-import "math"
+import (
+	"math"
+)
 
 const (
 	OpNone = ``
@@ -32,6 +34,17 @@ const (
 	OpSend     = `send`
 	OpPow      = `pow`
 )
+
+var CompareOpcode = []string{OpGt, OpLt, OpLtEq, OpGtEq, OpNotEq, OpEq}
+
+func IsCompareOpcode(i BinaryOpcode) bool {
+	for _, v := range CompareOpcode {
+		if v == string(i) {
+			return true
+		}
+	}
+	return false
+}
 
 type UnaryOpcode string
 
