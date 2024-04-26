@@ -20,7 +20,7 @@ func ForceStringToUrl(i string) *url.URL {
 }
 
 func ExtractQueryFromRequestURI(i string) *QueryParams {
-	return NewQueryParams(ForceStringToUrl(i).RawQuery)
+	return ParseQueryParams(ForceStringToUrl(i).RawQuery)
 }
 
 type QueryParamItem struct {
@@ -60,8 +60,8 @@ type QueryParams struct {
 	Items        []*QueryParamItem
 }
 
-func NewQueryParams(s string) *QueryParams {
-	return ParseQueryParams(s)
+func NewQueryParams() *QueryParams {
+	return new(QueryParams)
 }
 
 func ParseQueryParams(s string) *QueryParams {

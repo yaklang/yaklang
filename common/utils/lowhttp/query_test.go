@@ -1,13 +1,14 @@
 package lowhttp
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestQueryParams1(t *testing.T) {
 	test := assert.New(t)
-	params := NewQueryParams("a=1&b=2")
+	params := ParseQueryParams("a=1&b=2")
 	params.Add("c", "3")
 	test.Equal("a=1&b=2&c=3", params.Encode())
 

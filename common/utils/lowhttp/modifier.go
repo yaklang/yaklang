@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,40 +41,29 @@ func IsChunkedHeaderLine(line string) bool {
 	return false
 }
 
-func replaceAllParams(values map[string]string, p *QueryParams) {
-	// clear all values
-	shouldRemove := make(map[string]struct{})
-	shouldReplace := make(map[string]string)
-	for _, item := range p.Items {
-		_, ok := values[item.Key]
-		if !ok {
-			shouldRemove[item.Key] = struct{}{}
-		} else {
-			shouldReplace[item.Key] = values[item.Key]
+func replaceFullParams(params map[string][]string, p *QueryParams) {
+	newParams := NewQueryParams().DisableAutoEncode(p.NoAutoEncode)
+	keys := lo.Keys(params)
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		values := params[k]
+		for _, value := range values {
+			newParams.Add(k, value)
 		}
 	}
 
-	for k := range shouldRemove {
-		p.Remove(k)
-	}
-	var extraItem []*QueryParamItem
-	for k, v := range values {
-		_, ok := shouldReplace[k]
-		if ok {
-			p.Set(k, v)
-		} else {
-			extraItem = append(extraItem, &QueryParamItem{Key: k, Value: v})
-		}
-	}
+	*p = *newParams
+}
 
-	if len(extraItem) > 0 {
-		sort.SliceStable(extraItem, func(i, j int) bool {
-			return extraItem[i].Key < extraItem[j].Key
-		})
-		lo.ForEach(extraItem, func(item *QueryParamItem, _ int) {
-			p.Set(item.Key, item.Value)
-		})
+func replaceAllParams(params map[string]string, p *QueryParams) {
+	newParams := NewQueryParams().DisableAutoEncode(p.NoAutoEncode)
+	keys := lo.Keys(params)
+	sort.Strings(keys)
+	for _, k := range keys {
+		newParams.Add(k, params[k])
 	}
+	*p = *newParams
 }
 
 func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
@@ -289,7 +277,7 @@ func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(
 			}()
 
 			urlIns := ForceStringToUrl(requestUri)
-			u := NewQueryParams(urlIns.RawQuery).DisableAutoEncode(noAutoEncode)
+			u := ParseQueryParams(urlIns.RawQuery).DisableAutoEncode(noAutoEncode)
 			callback(u)
 			urlIns.RawQuery = u.Encode()
 			requestUri = urlIns.String()
@@ -337,11 +325,7 @@ func ReplaceAllHTTPPacketQueryParamsWithoutEscape(packet []byte, values map[stri
 
 func ReplaceFullHTTPPacketQueryParamsWithoutEscape(packet []byte, values map[string][]string) []byte {
 	return handleHTTPPacketQueryParam(packet, true, func(p *QueryParams) {
-		for key, values := range values {
-			for _, value := range values {
-				p.Add(key, value)
-			}
-		}
+		replaceFullParams(values, p)
 	})
 }
 
@@ -442,7 +426,7 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode bool, callback func(*
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
 	bodyString := utils.UnsafeBytesToString(bodyRaw)
-	u := NewQueryParams(bodyString).DisableAutoEncode(noAutoEncode)
+	u := ParseQueryParams(bodyString).DisableAutoEncode(noAutoEncode)
 	callback(u)
 	newBody := u.Encode()
 
@@ -477,11 +461,7 @@ func ReplaceAllHTTPPacketPostParamsWithoutEscape(packet []byte, values map[strin
 
 func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[string][]string) []byte {
 	return handleHTTPPacketPostParam(packet, true, func(p *QueryParams) {
-		for key, values := range values {
-			for _, value := range values {
-				p.Add(key, value)
-			}
-		}
+		replaceFullParams(values, p)
 	})
 }
 

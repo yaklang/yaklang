@@ -2,13 +2,14 @@ package openapigen
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 // the 3rd return value is true if before and after is same
@@ -74,7 +75,7 @@ func extractQueryParamsFromPath(u string) []*openapi3.Parameter {
 
 func extractQueryParams(query string) []*openapi3.Parameter {
 	var params []*openapi3.Parameter
-	for _, item := range lowhttp.NewQueryParams(query).Items {
+	for _, item := range lowhttp.ParseQueryParams(query).Items {
 		typeVerbose := "string"
 		if utils.MatchAllOfRegexp(item.Key, item.Value) {
 			typeVerbose = "integer"
@@ -88,7 +89,7 @@ func extractQueryParams(query string) []*openapi3.Parameter {
 }
 
 func mergeParams(params ...[]*openapi3.Parameter) []*openapi3.Parameter {
-	var result = omap.NewOrderedMap(map[string]*openapi3.Parameter{})
+	result := omap.NewOrderedMap(map[string]*openapi3.Parameter{})
 	for _, paramList := range params {
 		for _, param := range paramList {
 			hash := codec.Sha256(fmt.Sprintln(param.In, param.Name))
