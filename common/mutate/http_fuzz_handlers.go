@@ -165,7 +165,7 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 	results := make([]*http.Request, 0, len(pathTotal))
 	origin := httpctx.GetBareRequestBytes(req)
 
-	if f.queryParams == nil {
+	if f.queryParams == nil || f.queryParams.IsEmpty() {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
 	}
 
@@ -375,7 +375,7 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 		return nil, err
 	}
 
-	if f.queryParams == nil {
+	if f.queryParams == nil || f.queryParams.IsEmpty() {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetPostQuery())
 	}
 
@@ -496,7 +496,7 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 		return nil, err
 	}
 
-	if f.queryParams == nil {
+	if f.queryParams == nil || f.queryParams.IsEmpty() {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
 	}
 	keyStr := utils.InterfaceToString(key)
@@ -544,7 +544,7 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, enco
 	if err != nil {
 		return nil, err
 	}
-	if f.queryParams == nil {
+	if f.queryParams == nil || f.queryParams.IsEmpty() {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
 	}
 
@@ -629,7 +629,7 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...codec.Enco
 	if err != nil {
 		return nil, err
 	}
-	if f.queryParams == nil {
+	if f.queryParams == nil || f.queryParams.IsEmpty() {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetPostQuery())
 	}
 	keys, values := InterfaceToFuzzResults(k), InterfaceToFuzzResults(v)
