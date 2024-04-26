@@ -155,7 +155,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 		}
 
 		// if y.GetTypeKind() == ssa.Null {
-		if bin.Op >= ssa.OpGt && bin.Op <= ssa.OpNotEq {
+		if ssa.IsCompareOpcode(bin.Op) {
 			return ssa.BasicTypes[ssa.BooleanTypeKind]
 		}
 		// }
@@ -168,7 +168,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 	}
 
 	// typ := handler
-	if bin.Op >= ssa.OpGt && bin.Op <= ssa.OpNotEq {
+	if ssa.IsCompareOpcode(bin.Op) {
 		bin.SetType(ssa.BasicTypes[ssa.BooleanTypeKind])
 		return
 	} else {
