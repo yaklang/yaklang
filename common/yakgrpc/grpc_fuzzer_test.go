@@ -1228,12 +1228,23 @@ Content-Type: image/jpeg
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second)
-	_, _, _ = poc.HTTP(origin, poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(portMITM)))
-	rsp, _ := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-		SourceType: "mitm",
-		SearchURL:  uid,
-	})
+	_, reqRaw, _ := poc.HTTP(origin, poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(portMITM)))
+	if len(reqRaw) < 11000000 {
+		t.Fatal("response raw is too small")
+	}
+	var rsp *ypb.QueryHTTPFlowResponse
+	for i := 0; i < 20; i++ {
+		rsp, _ = client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			SourceType: "mitm",
+			SearchURL:  uid,
+		})
+		if rsp == nil || len(rsp.GetData()) <= 0 {
+			time.Sleep(time.Second)
+		} else {
+			break
+		}
+	}
+
 	reqId := rsp.GetData()[0].Id
 	flow, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{Id: int64(reqId)})
 	if err != nil {
@@ -1243,8 +1254,9 @@ Content-Type: image/jpeg
 		t.Fatal("request too small")
 	}
 	suffix := flow.Request[len(flow.Request)-200:]
+
 	spew.Dump(suffix)
 	if len(flow.Request) < 11000000 {
-		t.Fatal("request is too small, truncated some reason")
+		t.Fatal("request is too small, truncated some reason got: " + utils.ByteSize(uint64(len(flow.Request))))
 	}
 }

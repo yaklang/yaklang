@@ -671,7 +671,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 		requestUri = r
 		return nil
 	})
-	if len(body) > maxBodyLength {
+
+	if false && len(body) > maxBodyLength {
+		// Truncated by saver
 		reqRaw = lowhttp.ReplaceHTTPPacketBody([]byte(header), body[:maxBodyLength], false)
 	}
 	requestRaw := strconv.Quote(string(reqRaw))
