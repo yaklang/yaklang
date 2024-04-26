@@ -10,6 +10,11 @@ on:
         options:
         - windows-latest
         - macos-latest
+        - macos-12
+        - macos-13
+        - macos-13-amd64
+        - macos-14
+        - macos-amd64
         - ubuntu-20.04
 
 jobs:
