@@ -12,7 +12,7 @@ jobs:
       matrix:
         os:
           - windows-latest
-          - macos-12
+          - macos-13
           - macos-14
           - ubuntu-20.04
     runs-on: ${{ matrix.os }}
@@ -80,13 +80,19 @@ jobs:
           path: ./yak_windows_amd64.exe
 
 
-      - name: Upload Artifacts MacOS
+      - name: Upload Artifacts MacOS(amd64)
         uses: actions/upload-artifact@v2
         if: runner.os == 'macOS'
         with:
           name: yak_darwin_amd64
           path: ./yak_darwin_amd64
 
+      - name: Upload Artifacts MacOS(arm64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_darwin_arm64
+          path: ./yak_darwin_arm64
 
       - name: Upload Artifacts Linux
         uses: actions/upload-artifact@v2
