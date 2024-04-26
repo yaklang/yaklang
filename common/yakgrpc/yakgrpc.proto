@@ -1089,6 +1089,8 @@ message GlobalNetworkConfig {
   // AI Primary Config 首选 AI 配置项
   // openai / chatglm
   string PrimaryAIType = 17;
+
+  repeated string AiApiPriority = 18;
 }
 
 message AuthInfo {
