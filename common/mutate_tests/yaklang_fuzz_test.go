@@ -812,6 +812,77 @@ Host: www.baidu.com
 				debug: true,
 			},
 		},
+		{
+			name: "URL路径 加参数",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("$/你好?b=c")`,
+				expectKeywordInOutputPacket: []string{
+					`/$/`,
+					codec.PathEscape("你好"),
+					`b=c`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "URL路径 加参数 禁止编码",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/fastjson/json-in-query?auth={\"user\":\"admin\",\"password\":\"password\"}")`,
+				expectKeywordInOutputPacket: []string{
+					`/fastjson/json-in-query`,
+					`auth={"user":"admin","password":"password"}`,
+					`a=ab`,
+				},
+				debug:         true,
+				disableEncode: true,
+			},
+		},
+		{
+			name: "URL路径 加参数 友好显示",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/fastjson/json-in-query?auth={\"user\":\"admin\",\"password\":\"password\"}")`,
+				expectKeywordInOutputPacket: []string{
+					`/fastjson/json-in-query`,
+					`auth={{urlescape({"user":"admin","password":"password"})}}`,
+					`a=ab`,
+				},
+				debug:           true,
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "URL路径 加参数 友好显示",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/fastjson/json-in-query?auth={\"user\":\"admin\",\"password\":\"password\"}")`,
+				expectKeywordInOutputPacket: []string{
+					`/fastjson/json-in-query`,
+					`auth={{urlescape({"user":"admin","password":"password"})}}`,
+					`a=ab`,
+				},
+				debug:           true,
+				friendlyDisplay: true,
+			},
+		},
 	}
 
 	for _, tc := range tests {

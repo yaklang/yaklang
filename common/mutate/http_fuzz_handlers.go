@@ -163,20 +163,46 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 	pathTotal := QuickMutateSimple(paths...)
 
 	results := make([]*http.Request, 0, len(pathTotal))
-	rawRequest := httpctx.GetBareRequestBytes(req)
+	origin := httpctx.GetBareRequestBytes(req)
 
-	for i := 0; i < len(pathTotal); i++ {
-		proto := req.Proto
-		if !strings.HasPrefix(proto, "HTTP/") {
-			proto = "HTTP/1.1"
+	if f.queryParams == nil {
+		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
+	}
+
+	for _, targetPath := range pathTotal {
+		var path, query string
+		var params *lowhttp.QueryParams
+		if strings.Contains(targetPath, "?") {
+			path, query, _ = strings.Cut(targetPath, "?")
+			if query != "" {
+				// 每个 path?query 应该都是独立的 queryParams
+				params = lowhttp.ParseQueryParams(query)
+				params.DisableAutoEncode(f.NoAutoEncode())
+				params.SetFriendlyDisplay(f.friendlyDisplay)
+				for _, v := range params.Items {
+					params.Set(v.Key, v.Value)
+				}
+				for _, v := range f.queryParams.Items {
+					params.Set(v.Key, v.Value)
+				}
+			}
+		} else {
+			path = targetPath
 		}
 		var replaced []byte
 		if f.NoAutoEncode() {
-			replaced = lowhttp.ReplaceHTTPPacketPathWithoutEncoding(rawRequest, pathTotal[i])
+			replaced = lowhttp.ReplaceHTTPPacketPathWithoutEncoding(origin, path)
 		} else {
-			replaced = lowhttp.ReplaceHTTPPacketPath(rawRequest, pathTotal[i])
+			replaced = lowhttp.ReplaceHTTPPacketPath(origin, path)
 		}
-		reqIns, err := lowhttp.ParseBytesToHttpRequest(replaced)
+		var reqIns *http.Request
+		if params != nil {
+			reqIns, err = lowhttp.ParseBytesToHttpRequest(
+				lowhttp.ReplaceHTTPPacketQueryParamRaw(replaced, params.Encode()),
+			)
+		} else {
+			reqIns, err = lowhttp.ParseBytesToHttpRequest(replaced)
+		}
 		if err != nil {
 			log.Infof("parse (in FuzzPath) request failed: %v", err)
 			continue
