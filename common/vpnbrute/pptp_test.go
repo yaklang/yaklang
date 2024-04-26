@@ -8,14 +8,13 @@ import (
 	"testing"
 )
 
-func TestAAABBB(t *testing.T) {
+func TestPPTPAuth(t *testing.T) {
 	err, ok := Auth(context.Background(), "172.22.175.238:1723", "test", "123456")
-	_ = ok
-	if ok {
-		println("ok")
-	}
 	if err != nil {
-		return
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("auth fail")
 	}
 }
 
