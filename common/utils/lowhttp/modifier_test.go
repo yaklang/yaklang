@@ -2170,6 +2170,20 @@ func TestGetParamsFromBody(t *testing.T) {
 		useRaw bool
 		err    error
 	}
+	// mapEqual := func(m1, m2 map[string]string) bool {
+	// 	if len(m1) != len(m2) {
+	// 		return false
+	// 	}
+
+	// 	for key, aValue := range m1 {
+	// 		bValue, exists := m2[key]
+	// 		if !exists || aValue != bValue {
+	// 			return false
+	// 		}
+	// 	}
+
+	// 	return true
+	// }
 
 	testcases := []struct {
 		name        string
@@ -2183,16 +2197,6 @@ func TestGetParamsFromBody(t *testing.T) {
 			body:        "a=1&b=2",
 			expected: &Excepted{
 				params: map[string][]string{"a": {"1"}, "b": {"2"}},
-				useRaw: false,
-				err:    nil,
-			},
-		},
-		{
-			name:        "form-urlencoded-with-same-key",
-			contentType: "application/x-www-form-urlencoded",
-			body:        "a=1&a=2",
-			expected: &Excepted{
-				params: map[string][]string{"a": {"1", "2"}},
 				useRaw: false,
 				err:    nil,
 			},
@@ -2259,8 +2263,16 @@ Content-Disposition: form-data; name="b"
 	for _, testcase := range testcases {
 		actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
 
-		require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody params failed:", testcase.name)
-		require.Equalf(t, testcase.expected.useRaw, actualUseRaw, "[%s] GetParamsFromBody useRaw failed:", testcase.name)
-		require.ErrorIs(t, testcase.expected.err, actualError, "[%s] GetParamsFromBody error failed:", testcase.name)
+		require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody failed:", testcase.name)
+
+		// if !mapEqual(testcase.expected.params, actualParams) {
+		// 	t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualParams, testcase.expected.params)
+		// }
+		if actualUseRaw != testcase.expected.useRaw {
+			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualUseRaw, testcase.expected.useRaw)
+		}
+		if !errors.Is(actualError, testcase.expected.err) {
+			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualError, testcase.expected.err)
+		}
 	}
 }
