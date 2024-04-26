@@ -179,7 +179,9 @@ jobs:
             yak_linux_amd64:/yak/latest/yak_linux_amd64
             yak_linux_amd64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_linux_amd64
             yak_darwin_amd64:/yak/latest/yak_darwin_amd64
+            yak_darwin_arm64:/yak/latest/yak_darwin_arm64
             yak_darwin_amd64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_amd64
+            yak_darwin_arm64:/yak/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_arm64
       #      - name: Upload Yakit to oss(MacOS m1)
       #        uses: tvrcgo/upload-to-oss@master
       #        with:
@@ -260,7 +262,7 @@ jobs:
           asset_name: yak_linux_amd64
           asset_content_type: application/octet-stream
 
-      - name: Upload Release Asset macOS
+      - name: Upload Release Asset macOS(amd64)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -268,6 +270,16 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           asset_path: ./yak_darwin_amd64
           asset_name: yak_darwin_amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset macOS(arm64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./yak_darwin_arm64
+          asset_name: yak_darwin_arm64
           asset_content_type: application/octet-stream
 
       - name: Upload Release Asset Windows
