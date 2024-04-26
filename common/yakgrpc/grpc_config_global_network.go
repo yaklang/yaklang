@@ -63,6 +63,9 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 	if err != nil {
 		return nil, err
 	}
+	if len(config.AiApiPriority) != 3 {
+		config.AiApiPriority = []string{"openai", "chatglm", "moonshot"}
+	}
 	return &config, nil
 }
 
