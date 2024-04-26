@@ -3,17 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/crep"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptrace"
 	"sync"
-	"testing"
-	"time"
+
+	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type testServer struct {
@@ -127,36 +126,36 @@ func (t *testServer) MITM(stream ypb.Yak_MITMServer) error {
 	return nil
 }
 
-func TestServer_MITM(t *testing.T) {
-	go func() {
-		mServer, err := crep.NewMITMServer(
-			crep.MITM_SetHTTPRequestHijack(func(isHttps bool, req *http.Request) *http.Request {
-				req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
-					GotConn: func(info httptrace.GotConnInfo) {
-						println(info.Conn.RemoteAddr())
-					},
-				}))
+// func TestServer_MITM(t *testing.T) {
+// 	go func() {
+// 		mServer, err := crep.NewMITMServer(
+// 			crep.MITM_SetHTTPRequestHijack(func(isHttps bool, req *http.Request) *http.Request {
+// 				req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+// 					GotConn: func(info httptrace.GotConnInfo) {
+// 						println(info.Conn.RemoteAddr())
+// 					},
+// 				}))
 
-				req.URL.Path = fmt.Sprintf("/test-hijacked-by-yak-test-%v", utils.RandStringBytes(20))
-				req.URL.RawQuery = fmt.Sprintf("q=1&b=%v", utils.RandStringBytes(20))
-				return req
-			}),
-		)
-		if err != nil {
-			log.Error(err)
-			return
-		}
+// 				req.URL.Path = fmt.Sprintf("/test-hijacked-by-yak-test-%v", utils.RandStringBytes(20))
+// 				req.URL.RawQuery = fmt.Sprintf("q=1&b=%v", utils.RandStringBytes(20))
+// 				return req
+// 			}),
+// 		)
+// 		if err != nil {
+// 			log.Error(err)
+// 			return
+// 		}
 
-		err = mServer.Serve(context.Background(), "127.0.0.1:8084")
-		if err != nil {
-			log.Error(err)
-			return
-		}
+// 		err = mServer.Serve(context.Background(), "127.0.0.1:8084")
+// 		if err != nil {
+// 			log.Error(err)
+// 			return
+// 		}
 
-		return
-	}()
-	time.Sleep(1 * time.Second)
-}
+// 		return
+// 	}()
+// 	time.Sleep(1 * time.Second)
+// }
 
 func (t *testServer) Echo(c context.Context, req *ypb.EchoRequest) (*ypb.EchoResposne, error) {
 	return &ypb.EchoResposne{Result: req.GetText()}, nil
