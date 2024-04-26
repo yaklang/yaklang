@@ -93,15 +93,13 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		method     string
 		key, value string
 		values     []string
-		vals       url.Values
 		builder    = &strings.Builder{}
 
 		config         *_csrfConfig
 		templateConfig *_csrfTemplateConfig
 
-		isMultipart bool
-		template    *template.Template = csrfFormTemplate
-		err         error
+		template *template.Template = csrfFormTemplate
+		err      error
 	)
 
 	switch raw.(type) {
@@ -120,12 +118,12 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 
 	u, err = lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.https)
 	if err != nil {
-		return "", utils.Errorf("extract url failed: %s", err)
+		return "", utils.Wrap(err, "extract url failed")
 	}
 
 	req, err = lowhttp.ParseBytesToHttpRequest(packet)
 	if err != nil {
-		return "", utils.Errorf("parse bytes to http request failed: %s", err)
+		return "", utils.Wrap(err, "parse request failed")
 	}
 
 	method = strings.ToUpper(req.Method)
@@ -141,13 +139,11 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 			continue
 		}
 		for _, value = range values {
+			templateConfig.ContentType = value
 			if strings.Contains(strings.ToLower(value), "multipart/form-data;") {
-				isMultipart = true
-				templateConfig.ContentType = value
 				templateConfig.EncType = "multipart/form-data"
 				break
 			} else if strings.Contains(strings.ToLower(value), "application/json") {
-				templateConfig.ContentType = value
 				break
 			}
 		}
@@ -157,45 +153,24 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	if method == "POST" {
 		rawBody, err = ioutil.ReadAll(req.Body)
 		if err != nil {
-			return "", utils.Errorf("parse request body failed: %s", err)
+			return "", utils.Wrap(err, "read body failed")
 		}
-
-		if config.MultipartDefaultValue || strings.Contains(strings.ToLower(value), "application/json") {
-			template = csrfJSTemplate
-			templateConfig.Body = string(rawBody)
-		} else if !isMultipart {
-			vals, err = url.ParseQuery(strings.TrimSpace(string(rawBody)))
-			if err != nil {
-				return "", err
-			}
-			for key, values = range vals {
-				for _, value = range values {
-					templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
-				}
-			}
-		} else if !config.MultipartDefaultValue {
-			err = req.ParseMultipartForm(81920)
-			if err != nil {
-				return "", err
-			}
-			for key, values = range req.MultipartForm.Value {
-				for _, value = range values {
-					templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
-				}
-			}
-			for key = range req.MultipartForm.File {
-				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"file", key, ""})
-			}
+		params, _, err := lowhttp.GetParamsFromBody(templateConfig.ContentType, rawBody)
+		if err != nil {
+			return "", utils.Wrap(err, "get params from body failed")
 		}
-
-	} else if method == "GET" {
-		for key, values := range u.Query() {
-			for _, value = range values {
+		for key, values = range params {
+			for _, value := range values {
 				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
 			}
 		}
+	} else if method == "GET" {
+		vals := lowhttp.ParseQueryParams(strings.TrimSpace(string(u.RawQuery)))
+		for _, item := range vals.Items {
+			templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", item.Key, item.Value})
+		}
 	} else {
-		return "", utils.Errorf("not support method: %s", method)
+		return "", utils.Wrap(err, "not support method")
 	}
 
 	err = template.Execute(builder, templateConfig)
