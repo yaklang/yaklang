@@ -307,6 +307,7 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					"/?ccccccccccccccc",
 				},
+				debug: true,
 			},
 		},
 		{
