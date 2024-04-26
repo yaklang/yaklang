@@ -9,10 +9,12 @@ on:
         type: choice
         options:
           - windows-latest
+          - ubuntu-20.04
           # macos 13 means x64
           # macos 14 means arm64
           - macos-13
           - macos-14
+          - ubuntu-20.04
 
 jobs:
   build:
