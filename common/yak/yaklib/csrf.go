@@ -116,6 +116,10 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		opt(config)
 	}
 
+	if config.MultipartDefaultValue {
+		template = csrfJSTemplate
+	}
+
 	u, err = lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.https)
 	if err != nil {
 		return "", utils.Wrap(err, "extract url failed")

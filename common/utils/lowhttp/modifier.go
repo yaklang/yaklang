@@ -1326,7 +1326,7 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 						return nil, false, err
 					}
 					key := part.FormName()
-					params[key] = append(params[key], utils.UnsafeBytesToString(content))
+					params[key] = append(params[key], string(content))
 				}
 			}
 		}
