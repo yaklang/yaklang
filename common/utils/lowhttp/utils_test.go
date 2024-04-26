@@ -245,3 +245,35 @@ func TestSplitHTTPPacket_BlankCharacterBody(t *testing.T) {
 		t.Fatal("split body error ")
 	}
 }
+
+func TestMultipartHandleDupHeader(t *testing.T) {
+	origin := []byte(`GET / HTTP/1.1
+Host: www.example.com
+Content-Type: multipart/form-data; boundary=X-INSOMNIA-BOUNDARY
+
+--X-INSOMNIA-BOUNDARY
+Content-Disposition: form-data; name=""
+
+` + strings.Repeat("\x99", 11111111) + `
+--X-INSOMNIA-BOUNDARY
+Content-Disposition: form-data; name=""; filename="small.jpg"
+Content-Type: image/jpeg
+
+11
+`)
+	//origin = FixHTTPRequest(origin)
+	//fmt.Println(string(origin))
+	origin = ConvertHTTPRequestToFuzzTag(origin)
+	fmt.Println(len(origin))
+	if len(origin) > 10000 {
+		results := string(origin[len(origin)-300:])
+		fmt.Println(results)
+		spew.Dump(results)
+		if strings.HasSuffix(results, "11\r\n--X-INSOMNIA-BOUNDARY--\r\n") {
+			return
+		}
+	}
+	t.Fatal("bad packet")
+	//origin = FixHTTPRequest(origin)
+	//fmt.Println(string(origin))
+}
