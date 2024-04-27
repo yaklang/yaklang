@@ -20,7 +20,7 @@ func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi
 	}
 	prog, err := ssaapi.Parse(code, opt...)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatalf("prog parse error: %v", err)
 	}
 	prog.Show()
 
@@ -121,14 +121,14 @@ func checkFunctionEx(
 ) error {
 	values := variable()
 	if len(values) != 1 {
-		return fmt.Errorf("variable[%s] not len(1): %d", variable, len(values))
+		return fmt.Errorf("variable[%s] not len(1): %d", values, len(values))
 	}
 	value := values[0]
 	vs := get(value)
 	vs = lo.UniqBy(vs, func(v *ssaapi.Value) int64 { return v.GetId() })
 	if checkLength {
 		if len(vs) != len(want) {
-			return fmt.Errorf("variable[%s] not want len(%d): %d: %v", variable, len(want), len(vs), vs)
+			return fmt.Errorf("variable[%v] not want len(%d): %d: %v", values, len(want), len(vs), vs)
 		}
 	}
 	mark := make([]bool, len(want))
