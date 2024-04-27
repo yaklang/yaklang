@@ -84,7 +84,7 @@ func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte,
 				}); ok {
 					raw, err = vIns.MarshalJSONWithKeyValueFetcher(k, vf)
 				} else {
-					raw, err = json.Marshal(v)
+					raw, err = json.Marshal(val)
 				}
 			}
 			if err != nil {
