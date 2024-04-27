@@ -78,7 +78,7 @@ func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte,
 			if vf != nil {
 				raw, err = vf(val)
 			} else {
-				var vAny any = v
+				var vAny any = val
 				if vIns, ok := vAny.(interface {
 					MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte, error), vf func(any) ([]byte, error)) ([]byte, error)
 				}); ok {
