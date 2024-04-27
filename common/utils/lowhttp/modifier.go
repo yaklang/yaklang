@@ -817,12 +817,12 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	})
 	if !added {
 		if isReq {
-			header = strings.Trim(header, CRLF) + CRLF + "Cookie: " + CookiesToString([]*http.Cookie{
+			header = strings.Trim(header, CRLF) + CRLF + "Cookie: " + CookiesToRaw([]*http.Cookie{
 				{Name: key, Value: utils.InterfaceToString(value)},
 			})
 		}
 		if isRsp {
-			header = strings.Trim(header, CRLF) + CRLF + "Set-Cookie: " + CookiesToString([]*http.Cookie{
+			header = strings.Trim(header, CRLF) + CRLF + "Set-Cookie: " + CookiesToRaw([]*http.Cookie{
 				{Name: key, Value: utils.InterfaceToString(value)},
 			})
 		}

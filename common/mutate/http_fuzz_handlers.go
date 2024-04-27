@@ -928,6 +928,7 @@ func (f *FuzzHTTPRequest) FuzzUploadFileName(k, v interface{}) FuzzHTTPRequestIf
 }
 
 func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedFunc) ([]*http.Request, error) {
+	f.DisableAutoEncode(true)
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
