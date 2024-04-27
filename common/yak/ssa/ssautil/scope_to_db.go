@@ -33,6 +33,20 @@ func (s *ScopedVersionedTable[T]) GetIncomingPhi() *omap.OrderedMap[string, Vers
 	return s.incomingPhi
 }
 
+func ssaValueMarshal(raw any) ([]byte, error) {
+	v, ok := raw.(SSAValue)
+	if ok {
+		return []byte(fmt.Sprint(v.GetId())), nil
+	}
+	hookedMarshal, ok := raw.(interface {
+		MarshalJSONWithKeyValueFetcher(func(any) ([]byte, error), func(any) ([]byte, error)) ([]byte, error)
+	})
+	if ok {
+		return hookedMarshal.MarshalJSONWithKeyValueFetcher(ssaValueMarshal, ssaValueMarshal)
+	}
+	return json.Marshal(raw)
+}
+
 func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 	if !s.ShouldSaveToDatabase() {
 		return nil
@@ -43,32 +57,29 @@ func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 	params["level"] = s.level
 
 	// ScopedVersionedTable.values
-	values, err := s.values.MarshalJSON()
-	if err != nil {
-		return utils.Wrap(err, "marshal scope.values error")
-	}
-	params["values"] = strconv.Quote(string(values))
-
-	vars, err := s.variable.MarshalJSONWithKeyValueFetcher(func(t T) ([]byte, error) {
-		var raw any = t
-		v, ok := raw.(interface{ GetId() int64 })
-		if !ok {
-			return nil, utils.Errorf("%T is not a valid interface{GetId() int64}", t)
+	if s.values.Len() > 0 {
+		values, err := s.values.MarshalJSONWithKeyValueFetcher(nil, ssaValueMarshal)
+		if err != nil {
+			return utils.Wrap(err, "marshal scope.values error")
 		}
-		return []byte(fmt.Sprint(v.GetId())), nil
-	}, nil)
+		params["values"] = strconv.Quote(string(values))
+	} else {
+		params["values"] = "[]"
+	}
+
+	vars, err := s.variable.MarshalJSONWithKeyValueFetcher(ssaValueMarshal, nil)
 	if err != nil {
 		return utils.Wrap(err, "marshal scope.variable error")
 	}
 	params["variable"] = strconv.Quote(string(vars))
 
-	captured, err := s.captured.MarshalJSON()
+	captured, err := s.captured.MarshalJSONWithKeyValueFetcher(nil, ssaValueMarshal)
 	if err != nil {
 		return utils.Wrap(err, "marshal scope.captured error")
 	}
 	params["captured"] = strconv.Quote(string(captured))
 
-	incomingPhi, err := s.incomingPhi.MarshalJSON()
+	incomingPhi, err := s.incomingPhi.MarshalJSONWithKeyValueFetcher(nil, ssaValueMarshal)
 	if err != nil {
 		return utils.Wrap(err, "marshal scope.incomingPhi error")
 	}

@@ -58,7 +58,7 @@ func (v *OrderedMap[T, V]) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(T) ([]byte, error), vf func(V) ([]byte, error)) ([]byte, error) {
+func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte, error), vf func(any) ([]byte, error)) ([]byte, error) {
 	if v.HaveLiteralValue() {
 		raw, err := json.Marshal(v.LiteralValue())
 		if err != nil {
@@ -78,7 +78,14 @@ func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(T) ([]byte, err
 			if vf != nil {
 				raw, err = vf(val)
 			} else {
-				raw, err = json.Marshal(val)
+				var vAny any = v
+				if vIns, ok := vAny.(interface {
+					MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte, error), vf func(any) ([]byte, error)) ([]byte, error)
+				}); ok {
+					raw, err = vIns.MarshalJSONWithKeyValueFetcher(k, vf)
+				} else {
+					raw, err = json.Marshal(v)
+				}
 			}
 			if err != nil {
 				buf.Write([]byte("null"))
@@ -113,7 +120,14 @@ func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(T) ([]byte, err
 		if vf != nil {
 			raw, err = vf(v)
 		} else {
-			raw, err = json.Marshal(v)
+			var vAny any = v
+			if vIns, ok := vAny.(interface {
+				MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte, error), vf func(any) ([]byte, error)) ([]byte, error)
+			}); ok {
+				raw, err = vIns.MarshalJSONWithKeyValueFetcher(k, vf)
+			} else {
+				raw, err = json.Marshal(v)
+			}
 		}
 		if err != nil {
 			buf.Write([]byte("null"))
