@@ -14,6 +14,7 @@ func Test_verify(t *testing.T) {
 		domain    string
 		useRoot   bool
 	}
+	pool := x509.NewCertPool()
 	tests := []struct {
 		name    string
 		args    args
@@ -55,6 +56,8 @@ func Test_verify(t *testing.T) {
 					ServerName: "www.example.com",
 					MinVersion: tls.VersionSSL30,
 					MaxVersion: tls.VersionTLS13,
+					// 本地安装了 yakit mitm 证书的情况下，不覆盖 root ca 会导致tls正常发送
+					RootCAs: pool,
 				},
 				useRoot: false,
 				domain:  "www.example.com",
