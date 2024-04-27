@@ -63,12 +63,12 @@ func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any, 
 
 	results := make([]*http.Request, 0, len(kStr)*len(values))
 	origin := httpctx.GetBareRequestBytes(req)
-
+	valueIndex := 0
 	err = cartesian.ProductEx([][]string{
 		{kStr}, values,
 	}, func(result []string) error {
 		_, value := result[0], result[1]
-		modifiedParams, err := modifyJSONValue(originJson, jsonPath, value, val)
+		modifiedParams, err := modifyJSONValue(originJson, jsonPath, value, val, valueIndex)
 		if err != nil {
 			return err
 		}

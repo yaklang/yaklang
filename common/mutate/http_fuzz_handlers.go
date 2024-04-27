@@ -165,7 +165,8 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 	results := make([]*http.Request, 0, len(pathTotal))
 	origin := httpctx.GetBareRequestBytes(req)
 
-	if f.queryParams == nil || f.queryParams.IsEmpty() {
+	if f.queryParams == nil || f.queryParams.IsEmpty() || f.mode == paramsFuzz {
+
 		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
 	}
 
@@ -375,7 +376,8 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 		return nil, err
 	}
 
-	if f.queryParams == nil || f.queryParams.IsEmpty() {
+	if f.queryParams == nil || f.queryParams.IsEmpty() || f.mode == paramsFuzz {
+
 		f.queryParams = lowhttp.ParseQueryParams(f.GetPostQuery())
 	}
 
@@ -394,10 +396,11 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 
 	var reqs []*http.Request
 	origin := httpctx.GetBareRequestBytes(req)
+	valueIndex := 0
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
 
-		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val)
+		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val, valueIndex)
 		if err != nil {
 			return err
 		}
@@ -420,7 +423,10 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 	return reqs, nil
 }
 
-func modifyJSONValue(rawJson, jsonPath, value string, val any) (string, error) {
+func modifyJSONValue(rawJson, jsonPath, value string, val any, index int) (string, error) {
+	defer func() {
+		index++
+	}()
 	if !strings.HasPrefix(jsonPath, "$.") {
 		jsonPath = "$." + jsonPath
 	}
@@ -462,32 +468,36 @@ func modifyJSONValue(rawJson, jsonPath, value string, val any) (string, error) {
 	// 该不该 fuzz 类型
 	// newValue = originalValue
 	//}
-	switch val.(type) {
-	case string:
-		jsonStr, err := json.Marshal(value)
-		if err != nil {
-			return "", err
-		}
-		newValue = gjson.ParseBytes(jsonStr).Value()
-	case nil:
-		newValue = nil
-	default:
-		// gjson 解析字符串时 `{"c":"b"}__abcd` 会解析为 {"c":"b"}
-		p := gjson.Parse(value)
-		if (p.IsObject() && !strings.HasSuffix(value, "}")) ||
-			(p.IsArray() && !strings.HasSuffix(value, "]")) {
-			newValue = value
-		} else {
-			newValue = p.Value()
-		}
-	}
+
+	newValue, valIndex := handleJSONVal(value, val, index)
+
 	// 如果原始值类型不为 nil，且新值为 nil，则说明 value 和 val 的类型可能不一致，尝试直接转换 value 为 json value
-	if val != nil && newValue == nil {
+	if valIndex != nil && newValue == nil {
 		jsonStr, _ := json.Marshal(value)
 		newValue = gjson.ParseBytes(jsonStr).Value()
 	}
 
 	return jsonpath.ReplaceString(rawJson, jsonPath, newValue), nil
+}
+
+func handleJSONVal(value string, val any, index int) (any, any) {
+	switch v := val.(type) {
+	case string:
+		jsonStr, _ := json.Marshal(value)
+		return gjson.ParseBytes(jsonStr).Value(), v
+	case nil:
+		return nil, nil
+	case []interface{}:
+		return handleJSONVal(value, v[index], index)
+	default:
+		// 解析字符串时先判断是否为合法 json，如果不是则返回 nil
+		// `"abcd"` 才是合法的 json 字符串，`abcd` 不是
+		// `"abcd"` -> "abcd"
+		// `123` -> 123 `true` -> true
+		// `abcd` -> nil
+		p := gjson.Parse(value).Get("@valid")
+		return p.Value(), v
+	}
 }
 
 func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val any) ([]*http.Request, error) {
@@ -496,7 +506,8 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 		return nil, err
 	}
 
-	if f.queryParams == nil || f.queryParams.IsEmpty() {
+	if f.queryParams == nil || f.queryParams.IsEmpty() || f.mode == paramsFuzz {
+
 		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
 	}
 	keyStr := utils.InterfaceToString(key)
@@ -513,13 +524,15 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 
 	var reqs []*http.Request
 	origin := httpctx.GetBareRequestBytes(req)
+	valueIndex := 0
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
-		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val)
+		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val, valueIndex)
 		if err != nil {
 			log.Errorf("modify json value failed: %s", err)
 			return nil
 		}
+
 		f.queryParams.DisableAutoEncode(f.NoAutoEncode())
 		f.queryParams.SetFriendlyDisplay(f.friendlyDisplay)
 		f.queryParams.Set(key, modifiedParams)
@@ -544,7 +557,7 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, enco
 	if err != nil {
 		return nil, err
 	}
-	if f.queryParams == nil || f.queryParams.IsEmpty() {
+	if f.queryParams == nil || f.queryParams.IsEmpty() || f.mode == paramsFuzz {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetQueryRaw())
 	}
 
@@ -629,7 +642,7 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...codec.Enco
 	if err != nil {
 		return nil, err
 	}
-	if f.queryParams == nil || f.queryParams.IsEmpty() {
+	if f.queryParams == nil || f.queryParams.IsEmpty() || f.mode == paramsFuzz {
 		f.queryParams = lowhttp.ParseQueryParams(f.GetPostQuery())
 	}
 	keys, values := InterfaceToFuzzResults(k), InterfaceToFuzzResults(v)
@@ -705,13 +718,13 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 
 	var reqs []*http.Request
 	origin := httpctx.GetBareRequestBytes(req)
-
+	valueIndex := 0
 	err = cartesian.ProductEx([][]string{
 		values,
 	}, func(result []string) error {
 		value := result[0]
 
-		modifiedBody, err := modifyJSONValue(string(rawBody), p.path, value, originValue)
+		modifiedBody, err := modifyJSONValue(string(rawBody), p.path, value, originValue, valueIndex)
 		if err != nil {
 			return err
 		}
@@ -824,11 +837,12 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 
 	origin := httpctx.GetBareRequestBytes(req)
 	var reqs []*http.Request
+	valueIndex := 0
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
 
-		modifiedBody, err := modifyJSONValue(string(originBody), key, value, v)
+		modifiedBody, err := modifyJSONValue(string(originBody), key, value, v, valueIndex)
 		if err != nil {
 			break
 		}
