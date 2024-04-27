@@ -267,6 +267,7 @@ func (p *FuzzHTTPRequestParam) FriendlyDisplay() *FuzzHTTPRequestParam {
 }
 
 func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
+	p.origin.mode = paramsFuzz
 	switch p.position {
 	case posMethod:
 		return p.origin.FuzzMethod(InterfaceToFuzzResults(i)...)

@@ -133,11 +133,12 @@ func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val a
 	var reqs []*http.Request
 	origin := httpctx.GetBareRequestBytes(req)
 
+	valueIndex := 0
 	err = cartesian.ProductEx([][]string{
 		{keyStr}, InterfaceToFuzzResults(val),
 	}, func(result []string) error {
 		value := result[1]
-		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val)
+		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex)
 
 		if err != nil {
 			return err
@@ -183,12 +184,12 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 
 	var reqs []*http.Request
 	origin := httpctx.GetBareRequestBytes(req)
-
+	valueIndex := 0
 	err = cartesian.ProductEx([][]string{{keyStr}, InterfaceToFuzzResults(val)}, func(result []string) error {
 		value := result[1]
 		//var replaced = valueToJsonValue(value)
 
-		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val)
+		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex)
 
 		if err != nil {
 			return err

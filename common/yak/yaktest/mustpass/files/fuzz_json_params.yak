@@ -1,0 +1,47 @@
+raw =`GET /expr/injection?b={"a": 1} HTTP/1.1
+Host: 127.0.0.1:8080
+
+`
+cases = [
+    123,
+    "yakit",
+    3.1415926,
+    {"yak":"yakit"},
+    true,
+    false,
+    "",
+    nil,
+    "null",
+    ["a","b","c"],
+    [1,2,3]
+]
+
+checks = [
+    ["b=123",`{"a":123}`],
+    ["b=yakit",`{"a":"yakit"}`],
+    ["b=3.1415926",`{"a":3.1415926}`],
+    [`b={"yak":"yakit"}`,`{"a":{"yak":"yakit"}}`],
+    ["b=true",`{"a":true}`],
+    ["b=false",`{"a":false}`],
+    ["b=",`{"a":""}`],
+    ["b=",`{"a":null}`],
+    ["b=null",`{"a":"null"}`],
+    [`b=["a","b","c"]`,`{"a":["a","b","c"]}`],
+    ["b=[1,2,3]",`{"a":[1,2,3]}`],
+]
+
+params = fuzz.HTTPRequest(raw, fuzz.noEncode(true))~.GetCommonParams()
+
+
+for index,c :=range cases{
+    payload = c
+    var packetMerge = ``
+    for _,p :=range params {
+        freq = p.Fuzz(payload)
+        freq.RequestMap(func(bytes) {
+            packetMerge += string(bytes) + "\r\n-------------------------------\r\n"
+        }) 
+    }
+    //println(packetMerge)
+    assert str.MatchAllOfSubString(packetMerge, checks[index]...)
+}
