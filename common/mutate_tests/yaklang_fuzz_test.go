@@ -324,6 +324,22 @@ Host: www.baidu.com
 				expectPacketNum: 3,
 			},
 		},
+		{
+			name: "GET 参数(JSON) vulinbox ssti case",
+			base: base{
+				inputPacket: `GET /expr/injection?b={%22a%22:%201} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("b", ` + `{"a":"{2018-05-25}"}` + `)`,
+				expectKeywordInOutputPacket: []string{
+					`/expr/injection`,
+					`b={"a":"{2018-05-25}"}`,
+				},
+				disableEncode: true,
+				//debug:         true,
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))

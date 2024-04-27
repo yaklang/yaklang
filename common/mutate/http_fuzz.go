@@ -23,6 +23,12 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+const (
+	packetFuzz = iota
+	// param.Fuzz(any) 的情况不应该保留上一次 fuzz 的params
+	paramsFuzz
+)
+
 type FuzzHTTPRequest struct {
 	opts                   []BuildFuzzHTTPRequestOption
 	isHttps                bool
@@ -36,6 +42,7 @@ type FuzzHTTPRequest struct {
 	chunked                bool
 	ctx                    context.Context
 	queryParams            *lowhttp.QueryParams
+	mode                   int
 }
 
 func (r *FuzzHTTPRequest) NoAutoEncode() bool {
