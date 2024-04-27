@@ -289,8 +289,7 @@ type Phi struct {
 	//	what instruction create this control-flow merge?
 	// branch *Instruction // loop or if :
 	// for build
-	create     bool  // for ReadVariable method
-	wit1, wit2 Value // witness for trivial-phi
+	create bool // for ReadVariable method
 }
 
 var (

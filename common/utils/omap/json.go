@@ -3,7 +3,6 @@ package omap
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -59,7 +58,7 @@ func (v *OrderedMap[T, V]) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {
+func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(T) ([]byte, error), vf func(V) ([]byte, error)) ([]byte, error) {
 	if v.HaveLiteralValue() {
 		raw, err := json.Marshal(v.LiteralValue())
 		if err != nil {
@@ -74,7 +73,13 @@ func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {
 			if index != 0 {
 				buf.WriteByte(',')
 			}
-			raw, err := json.Marshal(val)
+			var raw []byte
+			var err error
+			if vf != nil {
+				raw, err = vf(val)
+			} else {
+				raw, err = json.Marshal(val)
+			}
 			if err != nil {
 				buf.Write([]byte("null"))
 				continue
@@ -94,13 +99,22 @@ func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {
 		} else {
 			buf.WriteByte(',')
 		}
-		fieldName := fmt.Sprint(i)
-		_ = fieldName
-		raw, _ := json.Marshal(fieldName)
+
+		var raw []byte
+		var err error
+		if k != nil {
+			raw, err = k(i)
+		} else {
+			raw, err = json.Marshal(i)
+		}
 		buf.Write(raw)
 		buf.WriteByte(':')
 
-		raw, err := json.Marshal(v)
+		if vf != nil {
+			raw, err = vf(v)
+		} else {
+			raw, err = json.Marshal(v)
+		}
 		if err != nil {
 			buf.Write([]byte("null"))
 			return true
@@ -111,4 +125,8 @@ func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteByte('}')
 
 	return buf.Bytes(), nil
+}
+
+func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {
+	return v.MarshalJSONWithKeyValueFetcher(nil, nil)
 }

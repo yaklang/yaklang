@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -90,30 +91,24 @@ func SyncFromDatabase(s *Scope) error {
 		return utils.Wrapf(err, "unquote variable error")
 	}
 	if gres := gjson.Parse(variable); gres.IsObject() {
-		gres.ForEach(func(key, value gjson.Result) bool {
-			var v []ssautil.VersionedIF[Value]
-			if arr := gjson.Parse(value.Raw); arr.IsArray() {
+		for k, v := range gres.Map() {
+			spew.Dump(k)
+			var values []ssautil.VersionedIF[Value]
+			if arr := gjson.Parse(v.Raw); arr.IsArray() {
 				for _, result := range arr.Array() {
 					var versioned = new(ssautil.Versioned[Value])
 					err := json.Unmarshal([]byte(result.Raw), versioned)
 					if err != nil {
-						return false
+						log.Warnf("failed to unmarshal key(T): %v, data:%v", err, result.Raw)
+						continue
 					}
 					if versioned.GetScope() == nil {
 						versioned.SetScope(s)
 					}
-					v = append(v, versioned)
+					values = append(values, versioned)
 				}
 			}
-			var k = new(Value)
-			err = json.Unmarshal([]byte(key.Raw), k)
-			if err != nil {
-				log.Warnf("failed to unmarshal key(T): %v", err)
-				return false
-			}
-			s.GetVariable().Set(*k, v)
-			return true
-		})
+		}
 	}
 
 	captured, err := strconv.Unquote(quotedCaptured)
