@@ -298,10 +298,16 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 		return
 	}
 
-	variable.Assign(value)
+	err := variable.Assign(value)
+	if err != nil {
+		log.Warnf("BUG: variable.Assign error: %v", err)
+	}
 
 	variable.SetVersion(ret.Len())
-	ret.Add(variable)
+	err = ret.Add(variable)
+	if err != nil {
+		log.Warnf("BUG: add variable to scope failed: %v", err)
+	}
 
 	{
 		variables, ok := scope.variable.Get(value)
