@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -118,10 +117,6 @@ func RequireIrCode(db *gorm.DB, program string) (uint, *IrCode) {
 	ircode.ProgramName = program
 	db.Create(ircode)
 	return ircode.ID, ircode
-}
-
-func NewLazyInstruction(i any) (*LazyInstruction, error) {
-	codec.Atoi(codec.AnyToString(i))
 }
 
 func GetIrCodeById(db *gorm.DB, id int64) *IrCode {

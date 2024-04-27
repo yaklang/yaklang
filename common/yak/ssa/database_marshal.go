@@ -69,14 +69,20 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	switch ret := raw.(type) {
 	case *Assert:
 		params["assert_condition_id"] = ret.Cond.GetId()
-		params["assert_message_id"] = ret.MsgValue.GetId()
-		params["assert_message_string"] = ret.MsgValue.String()
+		if ret.MsgValue != nil {
+			params["assert_message_id"] = ret.MsgValue.GetId()
+		}
+		if ret.MsgValue != nil {
+			params["assert_message_string"] = ret.MsgValue.String()
+		}
 	case *BasicBlock:
 		params["block_id"] = ret.GetId()
 		params["block_name"] = ret.GetName()
 		params["block_preds"] = fetchIds(ret.Preds)
 		params["block_succs"] = fetchIds(ret.Succs)
-		params["block_condition"] = ret.Condition.GetId()
+		if ret.Condition != nil {
+			params["block_condition"] = ret.Condition.GetId()
+		}
 		params["block_insts"] = fetchIds(ret.Insts)
 		params["block_phis"] = fetchIds(ret.Phis)
 	case *BinOp:
@@ -84,7 +90,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["binop_x"] = ret.X.GetId()
 		params["binop_y"] = ret.Y.GetId()
 	case *Call:
-		params["call_method"] = ret.GetFunc().GetId()
+		if al := ret.GetFunc(); al != nil {
+			params["call_method"] = al.GetId()
+		}
 		params["call_args"] = marshalValues(ret.Args)
 		params["call_binding"] = fetchIds(ret.Binding)
 		params["call_async"] = ret.Async
@@ -93,39 +101,77 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["call_ellipsis"] = ret.IsEllipsis
 	case *ErrorHandler:
 		// try-catch-finally-done
-		params["errorhandler_try"] = ret.try.GetId()
-		params["errorhandler_catch"] = ret.catch.GetId()
-		params["errorhandler_finally"] = ret.final.GetId()
-		params["errorhandler_done"] = ret.done.GetId()
+		if ret.try != nil {
+			params["errorhandler_try"] = ret.try.GetId()
+		}
+		if ret.try != nil {
+			params["errorhandler_catch"] = ret.catch.GetId()
+		}
+		if ret.final != nil {
+			params["errorhandler_finally"] = ret.final.GetId()
+		}
+		if ret.done != nil {
+			params["errorhandler_done"] = ret.done.GetId()
+		}
 	case *ExternLib:
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
 	case *If:
 		params["if_cond"] = ret.Cond.GetId()
-		params["if_true"] = ret.True.GetId()
-		params["if_false"] = ret.False.GetId()
+		if ret.True != nil {
+			params["if_true"] = ret.True.GetId()
+		}
+		if ret.False != nil {
+			params["if_false"] = ret.False.GetId()
+		}
 	case *Jump:
 		params["jump_to"] = ret.To.GetId()
 	case *Loop:
 		params["loop_body"] = ret.Body.GetId()
-		params["loop_exit"] = ret.Exit.GetId()
-		params["loop_init"] = ret.Init.GetId()
-		params["loop_cond"] = ret.Cond.GetId()
-		params["loop_step"] = ret.Step.GetId()
-		params["loop_key"] = ret.Key.GetId()
+		if ret.Exit != nil {
+			params["loop_exit"] = ret.Exit.GetId()
+		}
+		if ret.Init != nil {
+			params["loop_init"] = ret.Init.GetId()
+		}
+		if ret.Cond != nil {
+			params["loop_cond"] = ret.Cond.GetId()
+		}
+		if ret.Step != nil {
+			params["loop_step"] = ret.Step.GetId()
+		}
+		if ret.Key != nil {
+			params["loop_key"] = ret.Key.GetId()
+		}
 	case *Make:
-		params["make_low"] = ret.low.GetId()
-		params["make_high"] = ret.high.GetId()
-		params["make_step"] = ret.step.GetId()
-		params["make_len"] = ret.Len.GetId()
-		params["make_cap"] = ret.Cap.GetId()
+		if ret.low != nil {
+			params["make_low"] = ret.low.GetId()
+		}
+		if ret.high != nil {
+			params["make_high"] = ret.high.GetId()
+		}
+		if ret.step != nil {
+			params["make_step"] = ret.step.GetId()
+		}
+		if ret.Len != nil {
+			params["make_len"] = ret.Len.GetId()
+		}
+		if ret.Cap != nil {
+			params["make_cap"] = ret.Cap.GetId()
+		}
 	case *Next:
-		params["next_iter"] = ret.Iter.GetId()
+		if ret.Iter != nil {
+			params["next_iter"] = ret.Iter.GetId()
+		}
 		params["next_in_next"] = ret.InNext
 	case *Panic:
-		params["panic_value"] = ret.Info.GetId()
+		if ret.Info != nil {
+			params["panic_value"] = ret.Info.GetId()
+		}
 	case *Parameter:
 		params["formalParam_is_freevalue"] = ret.IsFreeValue
-		params["formalParam_default"] = ret.defaultValue.GetId()
+		if ret.defaultValue != nil {
+			params["formalParam_default"] = ret.defaultValue.GetId()
+		}
 		params["formalParam_index"] = ret.FormalParameterIndex
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
@@ -135,24 +181,34 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *Return:
 		params["return_results"] = marshalValues(ret.Results)
 	case *SideEffect:
-		params["sideEffect_call"] = ret.CallSite.GetId()
+		if ret.CallSite != nil {
+			params["sideEffect_call"] = ret.CallSite.GetId()
+		}
 		params["sideEffect_value"] = ret.GetId()
 	case *Switch:
-		params["switch_cond"] = ret.Cond.GetId()
+		if ret.Cond != nil {
+			params["switch_cond"] = ret.Cond.GetId()
+		}
 		params["switch_label"] = fetchIds(ret.Label)
 	case *TypeCast:
-		params["typecast_value"] = ret.Value.GetId()
+		if ret.Value != nil {
+			params["typecast_value"] = ret.Value.GetId()
+		}
 	case *TypeValue:
 		// nothing to do
 	case *UnOp:
 		params["unop_op"] = ret.Op
-		params["unop_x"] = ret.X.GetId()
+		if ret.X != nil {
+			params["unop_x"] = ret.X.GetId()
+		}
 	case *Undefined:
 		params["undefined_kind"] = ret.Kind
 	case *Function:
 		// fill it later
 	case *ConstInst:
-		params["const_value"] = ret.Const.GetRawValue()
+		if ret.Const != nil {
+			params["const_value"] = ret.Const.GetRawValue()
+		}
 	}
 	return params
 }

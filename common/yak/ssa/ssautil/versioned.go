@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -90,6 +91,24 @@ func (v *Versioned[T]) SetScope(s ScopedVersionedTableIF[T]) {
 	v.scope = s
 }
 
+var (
+	lazyInstructionBuilder             func(id int64) (SSAValue, error)
+	lazyInstructionBuilderRegisterOnce = new(sync.Once)
+)
+
+func NewLazyInstruction(id int64) (SSAValue, error) {
+	if lazyInstructionBuilder == nil {
+		return nil, utils.Error("lazyInstructionBuilder is not registered")
+	}
+	return lazyInstructionBuilder(id)
+}
+
+func RegisterLazyInstructionBuilder(builder func(id int64) (SSAValue, error)) {
+	lazyInstructionBuilderRegisterOnce.Do(func() {
+		lazyInstructionBuilder = builder
+	})
+}
+
 func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
 	if v == nil {
 		return nil
@@ -102,16 +121,23 @@ func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
 	capId := v.versionIndex
 	_ = capId
 
-	v.versionIndex = utils.MapGetInt(params, "version_index")
-	v.globalIndex = utils.MapGetInt(params, "global_index")
+	v.versionIndex = utils.MapGetIntEx(params, "version_index")
+	v.globalIndex = utils.MapGetIntEx(params, "global_index")
 	v.lexicalName = utils.MapGetString(params, "lexical_name")
 	v.local = utils.MapGetBool(params, "local")
 	v.isAssigned = utils.NewAtomicBool()
 	v.isAssigned.SetTo(utils.MapGetBool(params, "is_assigned"))
 
-	valIdx := utils.MapGetInt(params, "value")
+	valIdx := utils.MapGetIntEx(params, "value")
 	// lazy value for ssa.Value
-	_ = valIdx
+	if valIdx > 0 {
+		raw, err := NewLazyInstruction(int64(valIdx))
+		if err != nil {
+			log.Warnf("TBD or BUG: lazy value for ssa.Value: %v, reason: %v", valIdx, err)
+		} else {
+			v.Value = raw.(T)
+		}
+	}
 
 	// lazy scope, scope 可能是不需要的，
 	// 因为一般在反序列化这个结果的过程中，
@@ -135,7 +161,7 @@ func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
 	params["scope"] = v.scope.GetPersistentId()
 	params["is_assigned"] = v.isAssigned.IsSet()
 	var valIdx int64 = 0
-	if isZeroValue(v.Value) {
+	if !isZeroValue(v.Value) {
 		valIdx = v.Value.GetId()
 	}
 	params["value"] = valIdx

@@ -1,8 +1,19 @@
 package ssa
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
+
+func init() {
+	ssautil.RegisterLazyInstructionBuilder(func(id int64) (ssautil.SSAValue, error) {
+		return NewLazyInstruction(id)
+	})
+}
 
 type LazyInstruction struct {
 	Instruction
@@ -21,27 +32,35 @@ var (
 )
 
 // NewLazyInstruction : create a new lazy instruction, only create in cache
-func (c *Cache) newLazyInstruction(id int64) *LazyInstruction {
-	ir := ssadb.GetIrCodeById(DB, id)
+func NewLazyInstruction(id int64) (*LazyInstruction, error) {
+	ir := ssadb.GetIrCodeById(consts.GetGormProjectDatabase(), id)
 	if ir == nil {
-		return nil
+		return nil, utils.Error("ircode [" + fmt.Sprint(id) + "]not found")
 	}
 
 	lz := &LazyInstruction{
-		Instruction: nil,
-		Value:       nil,
-		User:        nil,
-		id:          id,
-		ir:          ir,
-		cache:       c,
-		Modify:      false,
+		id: id,
+		ir: ir,
 	}
+	return lz, nil
+}
 
-	c.InstructionCache.Set(id, instructionIrCode{
-		inst:   lz,
-		irCode: ir,
+func (z *LazyInstruction) SetCache(i *Cache) {
+	z.cache = i
+	z.cache.InstructionCache.Set(z.id, instructionIrCode{
+		inst:   z,
+		irCode: z.ir,
 	})
-	return lz
+}
+
+func (c *Cache) newLazyInstruction(id int64) *LazyInstruction {
+	ins, err := NewLazyInstruction(id)
+	if err != nil {
+		log.Warnf("BUG or database error: failed to create lazy instruction: %v", err)
+		return nil
+	}
+	ins.SetCache(c)
+	return ins
 }
 
 // create real-instruction from lazy-instruction

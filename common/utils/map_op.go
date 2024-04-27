@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -268,10 +269,11 @@ func MapGetIntOr(m map[string]interface{}, key string, value int) int {
 
 	r, ok := m[key]
 	if ok {
-		v, typeOk := r.(int)
-		if typeOk {
-			return v
+		result, err := strconv.ParseInt(fmt.Sprint(r), 10, 64)
+		if err != nil {
+			return value
 		}
+		return int(result)
 	}
 	return value
 }
