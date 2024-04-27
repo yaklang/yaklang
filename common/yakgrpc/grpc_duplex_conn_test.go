@@ -14,7 +14,7 @@ import (
 )
 
 func TestDuplexConnection(t *testing.T) {
-	client, err := NewLocalClientWithReverseServer()
+	client, err := NewLocalClient(true)
 	require.Nil(t, err, "create local client error")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
