@@ -92,15 +92,15 @@ jobs:
           - name: Test SSA / SSARule / StaticAnalyze
             run: |
               # SSA
-              go test -timeout 20s ./common/yak/ssaapi 
+              go test -timeout 20s ./common/yak/ssaapi/... 
               # SSA plugin rule/option
-              go test -timeout 20s ./common/yak/static_analyzer/test 
+              go test -timeout 20s ./common/yak/static_analyzer/test/...
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
               # SSA UTIL
               go test -timeout 20s ./common/yak/ssa/ssautil/...
               # yak ssa
-              go test -timeout 20s ./common/yak/yak2ssa/test 
+              go test -timeout 20s ./common/yak/yak2ssa/test/...
 
           - name: Test (Java/PHP/JS/Go) Frontend Language
             run: |
@@ -140,7 +140,7 @@ jobs:
 
           - name: Test gRPC(LARGE)MUSTPASS
             run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc/...
-          
+
           - name: Test gRPC Other
             run: go test -timeout 5m -skip "^(TestGRPCMUSTPASS_HTTP_|TestGRPCMUSTPASS_MITM_|TestGRPCMUSTPASS_HTTPFuzzer|TestGRPCMUSTPASS_LANGUAGE|TestGRPCMUSTPASS_COMMON|TestLARGEGRPCMUSTPASS)" ./common/yakgrpc/...
 
