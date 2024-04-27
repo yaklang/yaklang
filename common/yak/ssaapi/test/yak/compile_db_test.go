@@ -95,7 +95,7 @@ c("d")
 		}
 		count++
 		if result.IsEmptySourceCodeHash() {
-			spew.Dump(result)
+			spew.Dump(result.VerboseString())
 			panic("source code hash is empty")
 		}
 		includeFile.Set(result.SourceCodeHash, struct{}{})

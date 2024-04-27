@@ -64,6 +64,10 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	if codeRange := inst.GetRange(); codeRange != nil {
 		fitRange(ir, inst.GetRange())
+	} else if codeRange = inst.GetFunc().GetRange(); codeRange != nil {
+		fitRange(ir, inst.GetRange())
+	} else {
+		log.Warnf("Range not found for %s", inst.GetName())
 	}
 	if fun := inst.GetFunc(); fun != nil {
 		ir.CurrentFunction = fun.GetId()
