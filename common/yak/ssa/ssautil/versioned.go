@@ -173,7 +173,10 @@ func (v *Versioned[T]) Replace(val, to T) {
 
 func (v *Versioned[T]) Assign(val T) error {
 	if v.isAssigned.IsSet() {
-		log.Warnf("ssa: #%v have been assigned by %v", v.globalIndex, v.Value)
+		if !isZeroValue(val) && val.GetId() == v.Value.GetId() {
+			return nil
+		}
+		log.Warnf("ssa: #%v have been assigned by %v (%v), but u are trying to re-assign to: %v(%v)", v.globalIndex, v.Value, v.Value.GetId(), val, val.GetId())
 		return utils.Error("ssautil.VersionedVar should be assigned once")
 	}
 

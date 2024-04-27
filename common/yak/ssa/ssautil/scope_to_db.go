@@ -2,6 +2,7 @@ package ssautil
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -48,7 +49,14 @@ func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 	}
 	params["values"] = strconv.Quote(string(values))
 
-	vars, err := s.variable.MarshalJSON()
+	vars, err := s.variable.MarshalJSONWithKeyValueFetcher(func(t T) ([]byte, error) {
+		var raw any = t
+		v, ok := raw.(interface{ GetId() int64 })
+		if !ok {
+			return nil, utils.Errorf("%T is not a valid interface{GetId() int64}", t)
+		}
+		return []byte(fmt.Sprint(v.GetId())), nil
+	}, nil)
 	if err != nil {
 		return utils.Wrap(err, "marshal scope.variable error")
 	}
