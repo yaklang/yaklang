@@ -130,16 +130,6 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
 		params["phi_create"] = ret.create
-		if ret.wit1 != nil {
-			params["phi_whi1"] = ret.wit1.GetId()
-		} else {
-			log.Warn("BUG: persistent error: phi wit1 is nil")
-		}
-		if ret.wit2 != nil {
-			params["phi_whi2"] = ret.wit2.GetId()
-		} else {
-			log.Warn("BUG: persistent error: phi wit2 is nil")
-		}
 	case *Recover:
 		// nothing to do
 	case *Return:

@@ -439,8 +439,6 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 		anValue: NewValue(),
 		Edge:    vs,
 		create:  false,
-		wit1:    nil,
-		wit2:    nil,
 	}
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {
