@@ -14,7 +14,7 @@ import (
 	"go.uber.org/atomic"
 )
 
-var DB = consts.GetGormProjectDatabase()
+var DB = consts.GetGormProjectDatabase() // not good here...
 
 type instructionIrCode struct {
 	inst   Instruction

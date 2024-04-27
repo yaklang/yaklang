@@ -24,14 +24,15 @@ a = 1
 if (c > 1) {
 	a = 2
 }
-d = a
+e = a
+dump(c)
 `, ssaapi.WithDatabaseProgramName(uid.String()))
 	if err != nil {
 		panic(err)
 	}
 	prog.Show()
 	funcIns := prog.Program.GetFunctionFast("main")
-	scope := funcIns.Blocks[0].ScopeTable
+	scope := funcIns.Blocks[len(funcIns.Blocks)-1].ScopeTable
 	id := scope.GetPersistentId()
 	if id <= 0 {
 		t.Fatal("scope is not a persistent scope")
@@ -40,17 +41,21 @@ d = a
 		t.Fatal("scope is not a persistent scope")
 	}
 
+	ePhi := scope.ReadValue("e")
+	t.Log(ePhi.String())
+
 	scopePersistent := ssa.GetScopeFromIrScopeId(scope.GetPersistentId())
 	if scopePersistent == nil {
 		t.Fatalf("failed to get scope from ir scope id: %d", scope.GetPersistentId())
 	}
-	variable := scopePersistent.ReadVariable("a")
-	verbose := variable.String()
+	eLazyPhi := scopePersistent.ReadValue("e")
+	verbose := eLazyPhi.String()
 	if verbose == "" {
-		t.Fatal("failed to get variable a")
+		t.Fatal("failed to get variable e(a)")
 	}
-	a := scopePersistent.GetIncomingPhi().Len()
-	spew.Dump(a)
+	if eLazyPhi.GetId() != ePhi.GetId() {
+		t.Fatal("failed to get variable e(a)")
+	}
 }
 
 func TestCompileWithDatabase_Scope_Phi2(t *testing.T) {
