@@ -16,7 +16,6 @@ func fetchIds(origin any) any {
 			ids[i] = ret[i].GetId()
 		}
 		return ids
-	case []Value:
 	case map[string]Value:
 		params := make(map[string]any)
 		for k, v := range ret {
@@ -39,6 +38,19 @@ func fetchIds(origin any) any {
 		}
 		return ids
 	default:
+		t := reflect.TypeOf(origin).Kind()
+		if t == reflect.Array || t == reflect.Slice {
+			ids := make([]int64, 0, reflect.ValueOf(origin).Len())
+			for i := 0; i < len(ids); i++ {
+				ins, ok := reflect.ValueOf(origin).Index(i).Interface().(Instruction)
+				if ok {
+					ids[i] = ins.GetId()
+				} else {
+					ids[i] = 0
+				}
+			}
+			return ids
+		}
 		log.Warnf("fetchIds: unknown type: %v", reflect.TypeOf(origin).String())
 	}
 	return ids
@@ -118,8 +130,16 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
 		params["phi_create"] = ret.create
-		params["phi_whi1"] = ret.wit1.GetId()
-		params["phi_whi2"] = ret.wit2.GetId()
+		if ret.wit1 != nil {
+			params["phi_whi1"] = ret.wit1.GetId()
+		} else {
+			log.Warn("BUG: persistent error: phi wit1 is nil")
+		}
+		if ret.wit2 != nil {
+			params["phi_whi2"] = ret.wit2.GetId()
+		} else {
+			log.Warn("BUG: persistent error: phi wit2 is nil")
+		}
 	case *Recover:
 		// nothing to do
 	case *Return:
