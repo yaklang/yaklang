@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yak"
+
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 )
@@ -428,4 +429,7 @@ func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 	params["path"] = "C:/"
 	b.processParams(params)
 	return b.sendRequestAndGetResponse(payloads.CmdGo, params)
+}
+
+func (b *Behinder) SetCustomEncFunc(func(data, key []byte) ([]byte, error)) {
 }

@@ -20,18 +20,19 @@ type YakShell struct {
 	Url           string
 	Pass          string
 	Charset       string
-	ShellScript   string            //shell类型
-	ReqCipherMode string            //加密方式
-	ResCipherMode string            //返回包解密方式
-	Proxy         string            //代理
-	Os            string            //系统
-	IsSession     bool              //是否启用session mode  todo： 后续应该增加内存马
-	Retry         int64             //重试次数
-	Timeout       int64             //超时
-	BlockSize     int64             //分块大小
-	MaxSize       int64             //上传包最大（M）
-	Posts         map[string]string //在post中添加的数据
-	Headers       map[string]string //在headers中添加的数据
+	ShellScript   string                                 //shell类型
+	ReqCipherMode string                                 //加密方式
+	ResCipherMode string                                 //返回包解密方式
+	Proxy         string                                 //代理
+	Os            string                                 //系统
+	IsSession     bool                                   //是否启用session mode todo: 如果是内存马是不是应该算成session？
+	Retry         int64                                  //重试次数
+	Timeout       int64                                  //超时
+	BlockSize     int64                                  //分块大小
+	MaxSize       int64                                  //上传包最大（M）
+	Posts         map[string]string                      //在post中添加的数据
+	Headers       map[string]string                      //在headers中添加的数据
+	EncryptFunc   func(data, key []byte) ([]byte, error) //用户自定义实现的加密方式
 
 	cache      *utils.Cache[string] //缓存cookie
 	remoteFunc map[string]struct{}  //远程方法缓存
@@ -54,7 +55,7 @@ func NewYakShell(shell *ypb.WebShell) (*YakShell, error) {
 		Posts:         make(map[string]string, 2),
 		Headers:       make(map[string]string, 2),
 		Os:            shell.Os,
-		cache:         utils.NewTTLCache[string](time.Second * 60 * 20),
+		cache:         utils.NewTTLCache[string](time.Second * 60 * time.Duration(shell.ShellOptions.GetUpdateTime())),
 		remoteFunc:    make(map[string]struct{}),
 	}
 	if shell.Headers != nil {
@@ -77,9 +78,11 @@ func (y *YakShell) setContentType() {
 
 func (y *YakShell) getOrCrateSession() string {
 	if value, exists := y.cache.Get("session"); !exists {
-		//session不存在，清空remote缓存
-		for s, _ := range y.remoteFunc {
-			delete(y.remoteFunc, s)
+		//session不存在，清空remote缓存,如果是java、.net 不需要清空
+		if y.ShellScript == ypb.ShellScript_PHP.String() {
+			for s, _ := range y.remoteFunc {
+				delete(y.remoteFunc, s)
+			}
 		}
 		tmpSession := uuid.NewString()
 		y.cache.Set("session", tmpSession)
@@ -91,7 +94,7 @@ func (y *YakShell) getOrCrateSession() string {
 
 // encryptAndSendPayload 加密并且发送请求
 func (y *YakShell) encryptAndSendPayload(payload []byte, check bool) ([]byte, error) {
-	encryption, err := yakshell.Encryption(payload, []byte(y.Pass), y.ReqCipherMode)
+	encryption, err := y.ClientRequestEncode(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +113,6 @@ func (y *YakShell) getPostConfig() []poc.PocConfigOption {
 	config = append(config, poc.WithProxy(y.Proxy))
 	config = append(config, poc.WithAppendHeaders(y.Headers))
 	config = append(config, poc.WithTimeout(float64(y.Timeout)))
-	//todo: 应该增加重试次数
 	config = append(config, poc.WithRetryTimes(int(y.Retry)))
 	config = append(config, poc.WithRetryInStatusCode(404, 403, 502, 503, 500))
 	if y.IsSession {
@@ -126,9 +128,6 @@ func (y *YakShell) post(data []byte) ([]byte, error) {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(resp.RawPacket)
-	//if len(body) == 0 {
-	//	return nil, utils.Errorf("empty response")
-	//}
 	body = bytes.TrimSuffix(body, []byte("\r\n\r\n"))
 	return body, nil
 }
@@ -203,17 +202,19 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params yakshell.Param, s
 }
 
 func (y *YakShell) ClientRequestEncode(raw []byte) ([]byte, error) {
-	//TODO implement me
-	return nil, nil
+	if y.EncryptFunc != nil {
+		return y.EncryptFunc(raw, []byte(y.Pass))
+	} else {
+		return yakshell.Encryption(raw, []byte(y.Pass), y.ReqCipherMode)
+	}
 }
 
 func (y *YakShell) ServerResponseDecode(raw []byte) ([]byte, error) {
-	//TODO implement me
-	return nil, nil
+	return yakshell.Decryption(raw, []byte(y.Pass), y.ResCipherMode)
 }
 
 func (y *YakShell) handleResponse(data []byte) ([]byte, error) {
-	decryption, err := yakshell.Decryption(data, []byte(y.Pass), y.ResCipherMode)
+	decryption, err := y.ServerResponseDecode(data)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +268,6 @@ func (y *YakShell) processParams(params map[string]string) {
 	}
 	switch y.ShellScript {
 	case ypb.ShellScript_ASPX.String():
-		// todo
 		params["customEncoderFromAssembly"] = base64.StdEncoding.EncodeToString([]byte(value))
 	case ypb.ShellScript_JSP.String(), ypb.ShellScript_JSPX.String():
 		params["customEncoderFromClass"] = base64.StdEncoding.EncodeToString([]byte(value))
@@ -332,7 +332,7 @@ func (y *YakShell) String() string {
 	panic("implement me")
 }
 
-// ExecutePlugin 执行额外的插件功能
+// ExecutePluginOrCache 执行额外的插件功能
 func (y *YakShell) ExecutePluginOrCache(param map[string]string) ([]byte, error) {
 	/*
 		如果是session，code~~返回未填充的包,参数
@@ -383,4 +383,8 @@ func (y *YakShell) ExecutePluginOrCache(param map[string]string) ([]byte, error)
 func (y *YakShell) GenWebShell() string {
 	//TODO implement me
 	panic("implement me")
+}
+
+func (y *YakShell) SetCustomEncFunc(enc func(data, key []byte) ([]byte, error)) {
+	y.EncryptFunc = enc
 }
