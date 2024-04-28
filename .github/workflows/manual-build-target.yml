@@ -19,15 +19,6 @@ jobs:
   build:
     runs-on: "${{ inputs.os }}"
     steps:
-
-      - name: Build For Linux(ARM64) 
-        run: |
-          brew install docker colima
-          colima start
-          docker run arm64v8/golang:1.20.3 /bin/bash -c "echo hellowwwwww"
-          # docker run arm64v8/golang:1.20.3 /bin/bash -c "apt-get update && apt-get install -y libpcap-dev=1.9.1-3 && cd /work && go build -ldflags '-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}' -o ./yak_linux_arm64 -v common/yak/cmd/yak.go"
-        if: runner.os == 'macOS' 
-
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
@@ -40,7 +31,6 @@ jobs:
         run: |
           brew install libpcap
         if: runner.os == 'macOS'
-
       - name: Install libpcap (Linux)
         run: |
           sudo apt-get update
@@ -55,6 +45,24 @@ jobs:
           go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
         if: runner.os == 'Linux'
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+        if: runner.os == 'Linux' 
+
+      - name: Build For Linux(ARM64) 
+        uses: addnab/docker-run-action@v3
+        with:
+          image: arm64v8/golang:1.20.3
+          options: |
+            --platform linux/arm64 
+            -v ${{ github.workspace }}:/work 
+          run: |
+            apt update
+            apt install -y libpcap-dev
+            cd /work && go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
+        if: runner.os == 'Linux' 
 
       - name: Build For MacOS
         run: |
