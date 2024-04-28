@@ -14,12 +14,20 @@ on:
           # macos 14 means arm64
           - macos-13
           - macos-14
-          - ubuntu-20.04
 
 jobs:
   build:
     runs-on: "${{ inputs.os }}"
     steps:
+
+      - name: Build For Linux(ARM64) 
+        run: |
+          brew install docker colima
+          colima start
+          docker run arm64v8/golang:1.20.3 /bin/bash -c "echo hellowwwwww"
+          # docker run arm64v8/golang:1.20.3 /bin/bash -c "apt-get update && apt-get install -y libpcap-dev=1.9.1-3 && cd /work && go build -ldflags '-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}' -o ./yak_linux_arm64 -v common/yak/cmd/yak.go"
+        if: runner.os == 'macOS' 
+
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
@@ -42,10 +50,11 @@ jobs:
       - name: Generate Document
         run: go run common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
 
-      - name: Build For Linux
+      - name: Build For Linux(AMD64)
         run: |
           go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_$(go env GOOS)_$(go env GOARCH)" -v common/yak/cmd/yak.go
         if: runner.os == 'Linux'
+
 
       - name: Build For MacOS
         run: |
@@ -64,16 +73,30 @@ jobs:
           name: yak.exe
           path: ./yak_windows_amd64.exe
 
-      - name: Upload Artifacts MacOS
+      - name: Upload Artifacts MacOS(amd64)
         uses: actions/upload-artifact@v2
         if: runner.os == 'macOS'
         with:
-          name: yak
+          name: yak_darwin_amd64
           path: ./yak_darwin_amd64
+
+      - name: Upload Artifacts MacOS(arm64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_darwin_arm64
+          path: ./yak_darwin_arm64
 
       - name: Upload Artifacts Linux
         uses: actions/upload-artifact@v2
         if: runner.os == 'Linux'
         with:
-          name: yak
+          name: yak_linux_amd64
           path: ./yak_linux_amd64
+
+      - name: Upload Artifacts Linux(arm64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Linux'
+        with:
+          name: yak_linux_arm64
+          path: ./yak_linux_arm64
