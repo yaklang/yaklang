@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -679,56 +680,86 @@ func OnSignature(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.
 	return ret
 }
 
-func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
-	if !containPoint {
-		// 库补全
-		ret = append(ret, getStandardLibrarySuggestions()...)
-		// 关键字补全
-		ret = append(ret, getLanguageKeywordSuggestions()...)
-		// 自定义变量补全
-		uniqMap := make(map[string]struct{})
-		// 需要反转，因为是按 offset 顺序排列的
-		for _, item := range lo.Reverse(prog.GetAllOffsetItemsBefore(rng.GetEndOffset())) {
-			variable := item.GetVariable()
-			varName := variable.GetName()
-			if _, ok := uniqMap[varName]; ok {
-				continue
-			}
-			uniqMap[varName] = struct{}{}
-			bareValue := item.GetValue()
-			v := ssaapi.NewValue(bareValue)
+func completionYakStandardLibrary() (ret []*ypb.SuggestionDescription) {
+	// 库补全
+	return getStandardLibrarySuggestions()
+}
 
-			// 不应该再补全标准库函数和标准库
-			if _, ok := doc.DefaultDocumentHelper.Functions[varName]; ok {
-				continue
-			}
-			if _, ok := doc.DefaultDocumentHelper.Libs[varName]; ok {
-				continue
-			}
-			// 不应该再补全包含.或#的符号
-			if strings.Contains(varName, ".") || strings.Contains(varName, "#") {
-				continue
-			}
+func completionYakLanguageKeyword() (ret []*ypb.SuggestionDescription) {
+	// 关键字补全
+	return getLanguageKeywordSuggestions()
+}
 
-			insertText := varName
-			vKind := "Variable"
-			if !v.IsNil() && v.IsFunction() {
-				vKind = "Function"
-				insertText = getVscodeSnippetsBySSAValue(varName, v)
-			}
-			ret = append(ret, &ypb.SuggestionDescription{
-				Label:       varName,
-				Description: "",
-				InsertText:  insertText,
-				Kind:        vKind,
-			})
-		}
+func completionUserDefinedVariable(prog *ssaapi.Program, rng *ssa.Range) (ret []*ypb.SuggestionDescription) {
+	if prog == nil || prog.Program == nil {
+		return
 	}
 
-	// 库函数补全
-	instances, funcDecls := getInstancesAndFuncDecls(v, containPoint)
-	if funcDecls != nil {
-		for _, decl := range funcDecls {
+	ret = make([]*ypb.SuggestionDescription, 0)
+	// 自定义变量补全
+	uniqMap := make(map[string]struct{})
+	// 需要反转，因为是按 offset 顺序排列的
+	for _, item := range lo.Reverse(prog.GetAllOffsetItemsBefore(rng.GetEndOffset())) {
+		variable := item.GetVariable()
+		varName := variable.GetName()
+		if _, ok := uniqMap[varName]; ok {
+			continue
+		}
+		uniqMap[varName] = struct{}{}
+		bareValue := item.GetValue()
+		v := ssaapi.NewValue(bareValue)
+
+		// 不应该再补全标准库函数和标准库
+		if _, ok := doc.DefaultDocumentHelper.Functions[varName]; ok {
+			continue
+		}
+		if _, ok := doc.DefaultDocumentHelper.Libs[varName]; ok {
+			continue
+		}
+		// 不应该再补全包含.或#的符号
+		if strings.Contains(varName, ".") || strings.Contains(varName, "#") {
+			continue
+		}
+
+		insertText := varName
+		vKind := "Variable"
+		if !v.IsNil() && v.IsFunction() {
+			vKind = "Function"
+			insertText = getVscodeSnippetsBySSAValue(varName, v)
+		}
+		ret = append(ret, &ypb.SuggestionDescription{
+			Label:       varName,
+			Description: "",
+			InsertText:  insertText,
+			Kind:        vKind,
+		})
+	}
+	return
+}
+
+func completionYakGlobalFunctions() (ret []*ypb.SuggestionDescription) {
+	ret = make([]*ypb.SuggestionDescription, 0, len(doc.DefaultDocumentHelper.Functions))
+	// 全局函数补全
+	for funcName, funcDecl := range doc.DefaultDocumentHelper.Functions {
+		ret = append(ret, &ypb.SuggestionDescription{
+			Label:       funcName,
+			Description: funcDecl.Document,
+			InsertText:  funcDecl.VSCodeSnippets,
+			Kind:        "Function",
+		})
+	}
+	return
+}
+
+func completionYakStandardLibraryChildren(v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+	libName := v.GetName()
+	lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+	if !ok {
+		return
+	}
+	ret = make([]*ypb.SuggestionDescription, 0, len(lib.Functions)+len(lib.Instances))
+	if len(lib.Functions) > 0 {
+		for _, decl := range lib.Functions {
 			ret = append(ret, &ypb.SuggestionDescription{
 				Label:       decl.MethodName,
 				Description: decl.Document,
@@ -737,9 +768,8 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 			})
 		}
 	}
-	// 库常量补全
-	if len(instances) > 0 {
-		for _, instance := range instances {
+	if len(lib.Instances) > 0 {
+		for _, instance := range lib.Instances {
 			ret = append(ret, &ypb.SuggestionDescription{
 				Label:       instance.InstanceName,
 				Description: "",
@@ -748,17 +778,11 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 			})
 		}
 	}
+	return
+}
 
-	// 结构体成员补全
-	if !containPoint {
-		return ret
-	}
-
-	if v.IsNil() {
-		return ret
-	}
+func completionYakTypeBUiltinMethod(rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	bareTyp := ssaapi.GetBareType(v.GetType())
-	typStr := getGolangTypeStringBySSAType(bareTyp)
 	typKind := bareTyp.GetTypeKind()
 	switch typKind {
 	case ssa.BytesTypeKind:
@@ -773,11 +797,12 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		// map 成员
 		filterMap := make(map[string]struct{})
 		v.GetUsers().Filter(func(u *ssaapi.Value) bool {
-			position2 := u.GetRange()
-			if position2 == nil {
+			rng2 := u.GetRange()
+			if rng2 == nil {
 				return false
 			}
-			return u.IsMember() && position2.GetStart().GetLine() <= rng.GetStart().GetLine()
+			endOffset := rng2.GetEndOffset()
+			return u.IsMember() && endOffset < rng.GetEndOffset()
 		}).ForEach(func(v *ssaapi.Value) {
 			key := v.GetOperand(1)
 			if _, ok := filterMap[key.String()]; ok {
@@ -795,7 +820,12 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		// string 内置方法
 		ret = append(ret, getStringBuiltinMethodSuggestions()...)
 	}
+	return
+}
 
+func completionComplexStructMethodAndInstances(v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+	bareTyp := ssaapi.GetBareType(v.GetType())
+	typStr := getGolangTypeStringBySSAType(bareTyp)
 	// 接口方法，结构体成员与方法，定义类型方法
 	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
 	if !ok {
@@ -824,7 +854,25 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 			Kind:        "Method",
 		})
 	}
+	return
+}
 
+func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Language completion error: %v", r)
+		}
+	}()
+	if !containPoint {
+		ret = append(ret, completionYakStandardLibrary()...)
+		ret = append(ret, completionYakLanguageKeyword()...)
+		ret = append(ret, completionUserDefinedVariable(prog, rng)...)
+		ret = append(ret, completionYakGlobalFunctions()...)
+	} else {
+		ret = append(ret, completionYakStandardLibraryChildren(v)...)
+		ret = append(ret, completionYakTypeBUiltinMethod(rng, v)...)
+		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
+	}
 	return ret
 }
 
