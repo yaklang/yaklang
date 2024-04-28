@@ -521,6 +521,20 @@ Host: www.baidu.com
 				//debug:         true,
 			},
 		},
+		{
+			name: "GET 参数(JSON) slqi case",
+			base: base{
+				inputPacket: `GET /user/id-json?id=%7B%22uid%22%3A1%2C%22id%22%3A%221%22%7D HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("id", "$.id", "1/**/ORDeR/**/bY/**/9-- ")`,
+				expectKeywordInOutputPacket: []string{
+					url.QueryEscape(`1/**/ORDeR/**/bY/**/9-- `),
+				},
+				debug: true,
+			},
+		},
 	}
 
 	for _, tc := range tests {
