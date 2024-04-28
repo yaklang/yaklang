@@ -953,14 +953,15 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedF
 		var rspIns *http.Request
 		var err error
 		var newValue string
-		if f.friendlyDisplay {
-			newValue = lowhttp.CookieSafeFriendly(value)
-		}
+		//if f.friendlyDisplay {
+		//	newValue = lowhttp.CookieSafeFriendly(value)
+		//}
 		if f.NoAutoEncode() {
 			newValue = lowhttp.CookieSafeString(value)
-		} else if !f.friendlyDisplay {
-			newValue = lowhttp.CookieSafeQuoteString(value)
 		}
+		//else if !f.friendlyDisplay {
+		//	newValue = lowhttp.CookieSafeQuoteString(value)
+		//}
 
 		for _, e := range encoded {
 			newValue = e(newValue)
