@@ -19,8 +19,9 @@ import (
 )
 
 type HTTPTrigger struct {
-	httpListener net.Listener
-	tlsListener  net.Listener
+	defaultHTTPPort, defaultHTTPSPort int
+	httpListener                      net.Listener
+	tlsListener                       net.Listener
 
 	dnslogDomain string
 	externalIP   string
@@ -62,21 +63,22 @@ func (t *HTTPTrigger) serveRequest(isTls bool, req []byte, conn net.Conn) error 
 			return nil
 		}
 		before = strings.TrimSpace(before)
-		before = strings.TrimSpace(".")
+		before = strings.Trim(before, ".")
 		token = before
 		idx := strings.LastIndex(before, ".")
 		if idx > 0 {
 			token = before[idx+1:]
 		}
 	}
+	log.Infof("found token: %v from: %v", token, uStr)
 	fetcher, haveToken := t.responseFetcherCache.Get(token)
 	if !haveToken {
-		log.Info(logMsg)
+		log.Infof("no token found: log" + logMsg.String())
 		return nil
 	}
 	rsp := fetcher(req)
 	if rsp == nil {
-		log.Info(logMsg)
+		log.Info(logMsg.String())
 		return nil
 	}
 	rspStatus := lowhttp.ExtractStatusCodeFromResponse(rsp)
@@ -128,14 +130,31 @@ func (t *HTTPTrigger) Register(token string, response func([]byte) []byte) ([]st
 	return nil, utils.Errorf("register %v failed, plz checking your domain or external ip", token)
 }
 
+func (t *HTTPTrigger) SetHTTPPort(i int) {
+	t.defaultHTTPPort = i
+}
+
+func (t *HTTPTrigger) SetHTTPSPort(i int) {
+	t.defaultHTTPSPort = i
+}
+
 func (t *HTTPTrigger) Serve() error {
 
 	var httpErr, tlsErr error
 
 	log.Info("start to listen in :80/:443")
 
-	t.httpListener, httpErr = net.Listen("tcp", "0.0.0.0:80")
-	t.tlsListener, tlsErr = net.Listen("tcp", "0.0.0.0:443")
+	var defaultHTTPPort = t.defaultHTTPPort
+	if defaultHTTPPort <= 0 {
+		defaultHTTPPort = 80
+	}
+	var defaultHTTPSPort = t.defaultHTTPSPort
+	if defaultHTTPSPort <= 0 {
+		defaultHTTPSPort = 443
+	}
+
+	t.httpListener, httpErr = net.Listen("tcp", "0.0.0.0:"+fmt.Sprint(defaultHTTPPort))
+	t.tlsListener, tlsErr = net.Listen("tcp", "0.0.0.0:"+fmt.Sprint(defaultHTTPSPort))
 	defer func() {
 		if t.httpListener != nil {
 			t.httpListener.Close()
