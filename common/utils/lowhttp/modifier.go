@@ -1062,7 +1062,7 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 			h := make(textproto.MIMEHeader)
 			contentDisposition := fmt.Sprintf(`form-data; name="%s"`, escapeQuotes(fieldName))
 			if fileName != "" {
-				contentDisposition += fmt.Sprintf(`;filename="%s"`, escapeQuotes(fileName))
+				contentDisposition += fmt.Sprintf(`; filename="%s"`, escapeQuotes(fileName))
 			}
 			h.Set("Content-Disposition", contentDisposition)
 
