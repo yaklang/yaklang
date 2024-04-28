@@ -99,6 +99,7 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 		parameterMemberInner: newParameterMember(obj, key),
 	}
 	f.ParameterMember = append(f.ParameterMember, new)
+	new.FormalParameterIndex = len(f.ParameterMember) - 1
 	return new
 }
 

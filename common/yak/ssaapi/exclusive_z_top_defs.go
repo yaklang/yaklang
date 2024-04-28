@@ -250,6 +250,32 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{i} // no return, use undefined
 		}
 		return vals.AppendEffectOn(i)
+	case *ssa.ParameterMember:
+		// log.Info("ParameterMember")
+		called := actx.GetCurrentCall()
+		if called == nil {
+			log.Error("parent function is not called by any other function, skip")
+			return Values{i}
+		}
+		if !called.IsCall() {
+			log.Infof("parent function is not called by any other function, skip (%T)", called)
+			return Values{i}
+		}
+		calledInstance := called.node.(*ssa.Call)
+
+		// parameter
+		if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
+			log.Infof("formal parameter member index: %d is out of range", inst.FormalParameterIndex)
+			return getMemberCall(i.node, actx)
+		}
+		actualParam := calledInstance.ArgMember[inst.FormalParameterIndex]
+		traced := NewValue(actualParam).AppendEffectOn(called)
+		if ret := traced.getTopDefs(actx); len(ret) > 0 {
+			return ret
+		} else {
+			return Values{traced}
+		}
+
 	case *ssa.Parameter:
 		// 查找被调用函数的TopDef
 		getCalledByValue := func(called *Value) Values {
