@@ -62,7 +62,7 @@ paramFilter = func (params){
             res.Append(param)
             continue
         }
-        value, err = codec.DecodeUrl(param.Value()[0])
+        value, err = codec.DecodeUrl(param.GetFirstValue())
         die(err)
         if len(re.ExtractURL(value)) > 0 ||  len(re.ExtractPath(value)) > 0{
             res.Append(param)
@@ -289,7 +289,7 @@ scriptTask = func(req,param,ishttps){
 
 open_redirect_Detect = func(url, req, rsp, param, ishttps) {
     randStr = str.RandStr(10)
-    originValue = param.Value()[0]
+    originValue = param.GetFirstValue()
     respRaw= Rawfuzz(param,originValue+randStr)
     payloadParams = []
     position = outputPosition(respRaw,originValue+randStr)

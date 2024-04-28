@@ -1071,7 +1071,7 @@ Host: www.baidu.com
 			},
 		},
 		{
-			name: "Cookie参数 默认3",
+			name: "Cookie参数 sqli",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
@@ -1080,6 +1080,22 @@ Host: www.baidu.com
 				code: `.FuzzCookie("a", "1/**/ORDeR/**/bY/**/9-- ")`,
 				expectKeywordInOutputPacket: []string{
 					`a="1/**/ORDeR/**/bY/**/9-- "`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数 xss",
+			base: base{
+				inputPacket: `GET /xss/cookie/name?skip=1 HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
+Cookie: xCname=UserAdmin
+
+`,
+				code: ".FuzzCookie(`xCname`, \"1`;</SCrIpT><Img id='jsmxNLlB' src=1 onerror='prompt(1)'><ScRiPT>`\")",
+				expectKeywordInOutputPacket: []string{
+					"xCname=\"1`;</SCrIpT><Img id='jsmxNLlB' src=1 onerror='prompt(1)'><ScRiPT>`\"",
 				},
 				debug: true,
 			},
