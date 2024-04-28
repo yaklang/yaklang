@@ -299,7 +299,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
 			traced := NewValue(actualParam).AppendEffectOn(called)
-			if ret := traced.getTopDefs(actx); len(ret) > 0 {
+			call := actx.PopCall()
+			ret := traced.getTopDefs(actx)
+			if call != nil {
+				actx.PushCall(call)
+			}
+			if len(ret) > 0 {
 				return ret
 			} else {
 				return Values{traced}
@@ -338,6 +343,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.SideEffect:
+
 		callIns := inst.CallSite
 		if callIns != nil {
 			err := actx.PushCall(NewValue(callIns).AppendEffectOn(i))
@@ -345,26 +351,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Errorf("push call error: %v", err)
 			} else {
 				defer actx.PopCall()
-				var results Values
 
-				callInsVal := NewValue(callIns).AppendEffectOn(i)
-				filter := make(map[int64]struct{})
-				results = append(results, callInsVal)
-				for _, val := range inst.GetValues() {
-					filter[val.GetId()] = struct{}{}
-					if val.GetId() == callIns.GetId() {
-						continue
-					}
-					results = append(results, NewValue(val).AppendEffectOn(callInsVal).getTopDefs(actx)...)
-				}
-				masks := inst.GetMask()
-				for _, val := range masks {
-					_, ok := filter[val.GetId()]
-					if !ok {
-						results = append(results, NewValue(val).AppendEffectOn(i).getTopDefs(actx)...)
-					}
-				}
-				return results
+				v := NewValue(inst.Value).AppendEffectOn(i)
+				return v.getTopDefs(actx)
 			}
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
