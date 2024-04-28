@@ -22,6 +22,8 @@ func GetTunnelServerExternalIP(addr string, secret string) (net.IP, error) {
 		return nil, utils.Errorf("empty addr")
 	}
 
+	addr = utils.AppendDefaultPort(addr, 64333)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -60,6 +62,7 @@ func GetTunnelServerExternalIP(addr string, secret string) (net.IP, error) {
 }
 
 func GetClient(ctx context.Context, addr, secret string) (context.Context, tpb.TunnelClient, *grpc.ClientConn, error) {
+	addr = utils.AppendDefaultPort(addr, 64333)
 	conn, err := grpc.Dial(
 		addr,
 		grpc.WithInsecure(),
@@ -118,6 +121,8 @@ func RequireDNSLogDomainByLocal(mode string) (string, string, string, error) {
 }
 
 func GetDNSLogClient(addr string) (tpb.DNSLogClient, *grpc.ClientConn, error) {
+	addr = utils.AppendDefaultPort(addr, 64333)
+
 	conn, err := grpc.Dial(
 		addr,
 		grpc.WithInsecure(),
@@ -181,7 +186,7 @@ func MirrorLocalPortToRemoteWithRegisterEx(
 	if network == "" {
 		network = "tcp"
 	}
-
+	addr = utils.AppendDefaultPort(addr, 64333)
 	conn, err := grpc.Dial(
 		addr,
 		grpc.WithInsecure(),
