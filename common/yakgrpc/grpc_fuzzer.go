@@ -1282,8 +1282,12 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		opts := make([]poc.PocConfigOption, 0)
 		opts = append(opts, poc.WithReplaceHttpPacketBody(nil, false))
 		opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
-		for k, v := range totalParams {
-			opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+		if len(totalParams) > 0 {
+			for k, v := range totalParams {
+				opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+			}
+		} else {
+			opts = append(opts, poc.WithAppendHttpPacketUploadFile("key", "", "[value]", ""))
 		}
 		result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result), opts...)
 	}

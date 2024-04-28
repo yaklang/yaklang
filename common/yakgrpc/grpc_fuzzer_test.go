@@ -31,6 +31,40 @@ func init() {
 	yakit.InitialDatabase()
 }
 
+func TestGRPCMUSTPASS_ChangeToUpload(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
+		Request: []byte(`GET / HTTP/1.1
+Host: www.example.com
+`),
+		UploadEncode: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	packet := string(resp.Result)
+	if lowhttp.GetHTTPRequestMethod([]byte(packet)) != "POST" {
+		t.Fatal("expect POST, got " + lowhttp.GetHTTPRequestMethod([]byte(packet)))
+	}
+	if !strings.Contains(packet, "Content-Type: multipart/form-data") {
+		t.Fatal("expect multipart/form-data, got " + packet)
+	}
+	body := string(lowhttp.GetHTTPPacketBody(resp.Result))
+	body = strings.TrimSpace(body)
+	if !(strings.HasPrefix(body, "--") && strings.HasSuffix(body, "--")) {
+		t.Fatal("expect body is a multipart/form-data, got " + body)
+	}
+	boundary := lowhttp.ExtractBoundaryFromBody(body)
+	if !strings.Contains(lowhttp.GetHTTPPacketHeader(resp.Result, "content-type"), boundary) {
+		t.Fatal("expect boundary in content-type, got " + lowhttp.GetHTTPPacketHeader(resp.Result, "content-type"))
+	}
+	fmt.Println(packet)
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFollowRedirect(t *testing.T) {
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.RequestURI != "/admin" {
