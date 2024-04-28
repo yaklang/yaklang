@@ -1022,13 +1022,11 @@ Host: www.baidu.com
 }
 
 func TestFuzzCookie(t *testing.T) {
-	// TODO fail test case
-	t.SkipNow()
 	tests := []struct {
 		name string
 		base base
 	}{
-		{
+		{ // cookie value 应当默认 disableEncode
 			name: "Cookie参数 默认",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
@@ -1038,7 +1036,7 @@ Host: www.baidu.com
 				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
-					`e="a%2cb"`,
+					`e="a,b"`,
 				},
 				debug: true,
 			},
@@ -1053,7 +1051,7 @@ Host: www.baidu.com
 				code: `.FuzzCookie("a", "123").FuzzCookie("a", "345").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=345`,
-					`e="a%2cb"`,
+					`e="a,b"`,
 				},
 				debug: true,
 			},
@@ -1068,6 +1066,20 @@ Host: www.baidu.com
 				code: `.FuzzCookie("a", "1/**/ORDeR/**/bY/**/9-- ")`,
 				expectKeywordInOutputPacket: []string{
 					`a="1/**/ORDeR/**/bY/**/9-- "`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数 默认4",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "%2525")`,
+				expectKeywordInOutputPacket: []string{
+					`a=%2525`,
 				},
 				debug: true,
 			},
@@ -1098,7 +1110,7 @@ Host: www.baidu.com
 				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
-					`e="{{urlescape(a,b)}}"`,
+					`e="a,b"`,
 				},
 				debug:           true,
 				friendlyDisplay: true,
