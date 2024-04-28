@@ -19,6 +19,7 @@ type BaseShellManager interface {
 	ExecutePluginOrCache(param map[string]string) ([]byte, error)
 	String() string
 	GenWebShell() string
+	SetCustomEncFunc(func(data, key []byte) ([]byte, error))
 }
 
 type FileOperation interface {

@@ -524,9 +524,10 @@ func TestInjectWebappComponent(t *testing.T) {
 
 func TestYakShellJsp(t *testing.T) {
 	//url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
+	//url := "http://localhost:8080/tomcat_war_exploded/index.jsp"
 	//url := "http://127.0.0.1:8080/tomcat_war_exploded/sessionEvil2.jsp"
-	url := "http://127.0.0.1:8093/bypassdemo/123.php"
-	//url := "http://127.0.0.1:8093/1.php"
+	//url := "http://127.0.0.1:8093/bypassdemo/123.php"
+	url := "http://127.0.0.1:8093/1.php"
 	//url := "http://10.211.55.3:8076/testsession.aspx"
 	//url := "http://10.211.55.3:8076/shell.aspx"
 	manager, err := NewYakShellManager(url,
@@ -536,8 +537,8 @@ func TestYakShellJsp(t *testing.T) {
 		SetShellScript(ypb.ShellScript_PHP.String()),
 		SetProxy("http://127.0.0.1:8083"),
 		SetTimeout(10),
-		SetSession(),
-		//SetBase64Dec(),
+		//SetSession(),
+		SetBase64Dec(),
 		//SetPosts(map[string]string{"test": "test"}),
 	)
 	if err != nil {

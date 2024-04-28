@@ -160,10 +160,10 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
-		//file, err = DecryptFunc(file)
-		//if err != nil {
-		//	panic(err)
-		//}
+		file, err = DecryptFunc(file)
+		if err != nil {
+			panic(err)
+		}
 		if _, exists := EncryptPayload[script]; !exists {
 			EncryptPayload[script] = make(map[string]string)
 		}

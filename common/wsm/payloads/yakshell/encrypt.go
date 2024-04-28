@@ -2,19 +2,59 @@ package yakshell
 
 import (
 	"encoding/base64"
-	"github.com/forgoer/openssl"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type EncryptOptions func(str, key []byte) ([]byte, error)
-
-func Base64Encode(raw []byte) ([]byte, error) {
-	return []byte(base64.StdEncoding.EncodeToString(raw)), nil
+var EncryptMap = map[string]func(raw, key []byte) ([]byte, error){
+	"": func(raw, key []byte) ([]byte, error) {
+		return raw, nil
+	},
+	ypb.EncMode_Raw.String(): func(raw, key []byte) ([]byte, error) {
+		return raw, nil
+	},
+	ypb.EncMode_XorBase64.String(): func(raw, key []byte) ([]byte, error) {
+		return XorBase64Encode(raw, key)
+	},
+	ypb.EncMode_Base64.String(): func(raw, key []byte) ([]byte, error) {
+		return []byte(codec.EncodeBase64(raw)), nil
+	},
+	//默认使用pkcs7padding
+	ypb.EncMode_AesRaw.String(): func(raw, key []byte) ([]byte, error) {
+		return codec.AESECBEncryptWithPKCS7Padding(aesKeyPaddingWithZero(key), raw, nil)
+	},
+	ypb.EncMode_AesBase64.String(): func(raw, key []byte) ([]byte, error) {
+		bytes, err := codec.AESECBEncryptWithPKCS7Padding(aesKeyPaddingWithZero(key), raw, nil)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(codec.EncodeBase64(bytes)), nil
+	},
 }
-
-func AesRawEncode(raw, key []byte) ([]byte, error) {
-	return openssl.AesECBEncrypt(raw, key, openssl.PKCS5_PADDING)
+var DecryptMap = map[string]func(raw, key []byte) ([]byte, error){
+	"": func(raw, key []byte) ([]byte, error) {
+		return raw, nil
+	},
+	ypb.EncMode_Raw.String(): func(raw, key []byte) ([]byte, error) {
+		return raw, nil
+	},
+	ypb.EncMode_XorBase64.String(): func(raw, key []byte) ([]byte, error) {
+		return XorBase64Decode(raw, key)
+	},
+	ypb.EncMode_Base64.String(): func(raw, key []byte) ([]byte, error) {
+		return codec.DecodeBase64(string(raw))
+	},
+	ypb.EncMode_AesRaw.String(): func(raw, key []byte) ([]byte, error) {
+		return codec.AESECBDecrypt(raw, aesKeyPaddingWithZero(key), nil)
+	},
+	ypb.EncMode_AesBase64.String(): func(raw, key []byte) ([]byte, error) {
+		bytes, err := codec.DecodeBase64(string(raw))
+		if err != nil {
+			return nil, err
+		}
+		return codec.AESECBDecryptWithPKCS7Padding(aesKeyPaddingWithZero(key), bytes, nil)
+	},
 }
 
 func XorBase64Encode(raw, key []byte) ([]byte, error) {
@@ -24,22 +64,6 @@ func XorBase64Encode(raw, key []byte) ([]byte, error) {
 		}
 	}
 	return []byte(base64.StdEncoding.EncodeToString(raw)), nil
-}
-
-func Base64Decode(raw []byte) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(string(raw))
-}
-
-func AesDecode(raw, key []byte) ([]byte, error) {
-	return openssl.AesECBDecrypt(raw, key, openssl.PKCS5_PADDING)
-}
-
-func Base64AesDecode(raw, key []byte) ([]byte, error) {
-	if decodeString, err := base64.StdEncoding.DecodeString(string(raw)); err != nil {
-		return nil, err
-	} else {
-		return openssl.AesECBDecrypt(decodeString, key, openssl.PKCS5_PADDING)
-	}
 }
 
 func XorBase64Decode(raw, key []byte) ([]byte, error) {
@@ -56,37 +80,31 @@ func XorBase64Decode(raw, key []byte) ([]byte, error) {
 	return result, nil
 }
 
-func Encryption(data, key []byte, encMode string) ([]byte, error) {
-	switch encMode {
-	case ypb.EncMode_Raw.String():
-		return data, nil
-	case ypb.EncMode_XorBase64.String():
-		return XorBase64Encode(data, key)
-	case ypb.EncMode_Base64.String():
-		return Base64Encode(data)
-	case ypb.EncMode_AesRaw.String():
-		return AesRawEncode(data, key)
-	case ypb.EncMode_AesBase64.String():
-		fallthrough
-	default:
-		return nil, utils.Errorf("encode mode not found")
+func aesKeyPaddingWithZero(key []byte) []byte {
+	originLen := len(key)
+	if originLen >= 32 {
+		return key[:32]
+	} else if originLen%16 == 0 {
+		return key
+	} else {
+		out := make([]byte, (originLen/16+1)*16)
+		copy(out, key)
+		return out
 	}
 }
 
-func Decryption(data, key []byte, deMode string) ([]byte, error) {
-	switch deMode {
-	case ypb.EncMode_XorBase64.String():
-		return XorBase64Decode(data, key)
-	case ypb.EncMode_Base64.String():
-		return Base64Decode(data)
-	case ypb.EncMode_AesRaw.String():
-		return AesDecode(data, key)
-	case ypb.EncMode_AesBase64.String():
-		return Base64AesDecode(data, key)
-	case ypb.EncMode_Raw.String():
-		fallthrough
-	default:
-		//log.Warn("decode mode not found")
-		return data, nil
+func Encryption(data, key []byte, encMode string) ([]byte, error) {
+	f, exit := EncryptMap[encMode]
+	if !exit {
+		return nil, utils.Error("enc func not found in encode map")
 	}
+	return f(data, key)
+}
+
+func Decryption(data, key []byte, deMode string) ([]byte, error) {
+	f, exit := DecryptMap[deMode]
+	if !exit {
+		return nil, utils.Error("denc func not found in decode map")
+	}
+	return f(data, key)
 }

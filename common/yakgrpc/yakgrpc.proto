@@ -311,7 +311,7 @@ service Yak {
   rpc YaklangLanguageFind(YaklangLanguageSuggestionRequest) returns (YaklangLanguageFindResponse);
   // 从代码中提取yaklang数据
   rpc YaklangInspectInformation(YaklangInspectInformationRequest) returns (YaklangInspectInformationResponse);
-  // 进行数据迁移使用 
+  // 进行数据迁移使用
   rpc YaklangGetCliCodeFromDatabase(YaklangGetCliCodeFromDatabaseRequest) returns (YaklangGetCliCodeFromDatabaseResponse);
 
   // 端口扫描的封装
@@ -430,6 +430,7 @@ service Yak {
   rpc QueryWebShells(QueryWebShellsRequest) returns (QueryWebShellsResponse);
   rpc Ping(WebShellRequest) returns (WebShellResponse);
   rpc GetBasicInfo(WebShellRequest) returns (WebShellResponse);
+  rpc GenerateWebShell(ShellGenerate) returns(WebShellResponse);
 
   // DNSLog / ICMP / RandomTrigger
   rpc SetYakBridgeLogServer(YakDNSLogBridgeAddr) returns (Empty);
@@ -1920,8 +1921,8 @@ message YaklangLanguageSuggestionResponse {
 }
 
 message YaklangLanguageFindResponse {
-    string URI = 1;
-    repeated Range Ranges = 2;
+  string URI = 1;
+  repeated Range Ranges = 2;
 }
 
 message YaklangInspectInformationResponse {
@@ -2563,6 +2564,7 @@ enum ShellType {
   Godzilla = 1;
   YakShell = 2;
 }
+
 enum ShellScript {
   JSP = 0;
   JSPX = 1;
@@ -2603,6 +2605,15 @@ message WebShell {
   string Os = 20;
   string ResDecMOde = 21; //解密方式
 }
+
+message ShellGenerate{
+  EncMode EncMode = 1;
+  ShellScript Script = 2;
+  string Pass = 3;
+  bool Confuse = 4;  //是否混淆
+  bool IsSession = 5;
+}
+
 message ShellOptions{
   int64 RetryCount = 1; //重新时间
   int64 Timeout = 2; //超时时间
@@ -2611,9 +2622,11 @@ message ShellOptions{
   int64 UpdateTime = 5; //更新时间，当是session-mode的时候涉及到session过期的问题
   bool IsSession = 6; //是否是session类型
 }
+
 message WebShellRequest {
   int64 Id = 1;
 }
+
 message WebShellResponse {
   bool State = 1;
   bytes Data = 2;
@@ -2640,6 +2653,12 @@ message UpdateWebShellRequest {
   string ShellType = 7;
   string ShellScript = 8;
   string Tag = 10;
+  ShellOptions ShellOptions = 11;
+  string Os = 12;
+  string ResDataMOde = 13;
+  map<string, string> Headers = 14;
+  map<string, string> Posts = 15;
+
 }
 
 message DeleteWebShellRequest {
@@ -4260,7 +4279,7 @@ message FuzzerResponse {
   string TooLargeResponseHeaderFile = 50;
   string TooLargeResponseBodyFile = 51;
   bool DisableRenderStyles = 52;
-  
+
   string RuntimeID = 53;
 }
 
