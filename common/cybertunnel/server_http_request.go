@@ -24,6 +24,7 @@ func (t *TunnelServer) RequireHTTPRequestTrigger(ctx context.Context, req *tpb.R
 		return nil, err
 	}
 	rsp := &tpb.RequireHTTPRequestTriggerResponse{}
+	rsp.Token = token
 	for _, i := range results {
 		if strings.HasPrefix(i, "https://") {
 			rsp.Urls = append(rsp.Urls, i)

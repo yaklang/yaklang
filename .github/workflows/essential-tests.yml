@@ -79,6 +79,8 @@ jobs:
               go test -timeout 20s ./common/yserx
               # totp
               go test -timeout 20s ./common/twofa/...
+              # cybertunnel http trigger
+              go test -run TestHTTPTrigger  ./common/cybertunnel/...
 
           - name: Test NetX
             run: |
