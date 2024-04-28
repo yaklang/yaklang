@@ -33,7 +33,7 @@ func (s *VulinServer) registerExprInj() {
 				err := json.Unmarshal([]byte(expr1), &mapRaw)
 				if err != nil {
 					buf.WriteString("\n\nb params is should be JSON!!!!!!!!!!!!!!!!!\n\n")
-					log.Errorf("json unmarshal failed: %v", err)
+					log.Debugf("json unmarshal failed: %v", err)
 					continue
 				}
 				expr1 = utils.MapGetString(mapRaw, "a")
