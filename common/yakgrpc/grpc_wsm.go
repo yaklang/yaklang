@@ -50,6 +50,9 @@ func (s *Server) getWebShellManager(id int64) (wsm.BaseShellManager, error) {
 	return manager, nil
 }
 
+func (s *Server) GenerateWebShell(context.Context, *ypb.ShellGenerate) (*ypb.WebShellResponse, error) {
+	panic("impl me")
+}
 func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {

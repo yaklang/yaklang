@@ -573,3 +573,6 @@ func (g *Godzilla) ExecutePluginOrCache(param map[string]string) ([]byte, error)
 func (g *Godzilla) FileManagement() {
 
 }
+
+func (g *Godzilla) SetCustomEncFunc(func(data, key []byte) ([]byte, error)) {
+}
