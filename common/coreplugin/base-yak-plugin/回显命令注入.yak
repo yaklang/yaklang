@@ -18,7 +18,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 
         originValue = ""
         try {
-            originValue = f`${param.Value()[0]}`
+            originValue = f`${param.GetFirstValue()}`
         } catch err {
             originValue = sprint(param.Value())
         }
