@@ -568,12 +568,17 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			})
 
 		}
-
+		var pv any
+		if len(values) == 1 {
+			pv = values[0]
+		} else {
+			pv = values
+		}
 		param := &FuzzHTTPRequestParam{
 			position:   posGetQuery,
 			param:      key,
 			raw:        values,
-			paramValue: values,
+			paramValue: pv,
 			origin:     f,
 		}
 		fuzzParams = append(fuzzParams, param)
@@ -753,11 +758,16 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			})
 
 		}
-
+		var pv any
+		if len(values) == 1 {
+			pv = values[0]
+		} else {
+			pv = values
+		}
 		param := &FuzzHTTPRequestParam{
 			position:   posPostQuery,
 			param:      key,
-			paramValue: values,
+			paramValue: pv,
 			raw:        string(body),
 			origin:     f,
 		}
@@ -823,7 +833,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 		fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 			position:   posCookie,
 			param:      k.Name,
-			paramValue: []string{k.Value},
+			paramValue: k.Value,
 			raw:        []string{k.Value},
 			origin:     f,
 		})
