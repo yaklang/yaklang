@@ -3,6 +3,7 @@ package java
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"gotest.tools/v3/assert"
 	"strings"
 	"testing"
 )
@@ -10,11 +11,11 @@ import (
 func Test_HTTP_SSRF(t *testing.T) {
 	tests := []struct {
 		name   string
-		target string
+		expect string
 		isSink bool
 		code   string
 	}{
-		{"aTaintCase023", "Parameter-path", true, `/**
+		{"aTaintCase023", "Parameter: Parameter-path", true, `/**
      * 字符级别
      * case应该被检出
      * @param url
@@ -33,7 +34,7 @@ func Test_HTTP_SSRF(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase023_2", "", false, ` /**
+		{"aTaintCase023_2", "Parameter: Parameter-path", false, ` /**
      * 字符级别
      * case不应被检出
      * @param path
@@ -55,39 +56,27 @@ func Test_HTTP_SSRF(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.code = createHttpUtilCode(tt.code)
-			target, err := getRequestTopDef(tt.code)
-
-			if err != nil {
-				t.Fatal("prog parse fail", err)
-			}
-			if !strings.Contains(target, tt.target) {
-				t.Fatalf("want to get input  [%v],but got [%v].", tt.target, target)
-			}
-
-			if !tt.isSink {
-				if strings.Contains(target, "Parameter-path") {
-					t.Fatalf("want to get isSink[%v],but topDef contain input param", tt.isSink)
-				}
-			}
-
+			testRequestTopDef(t, tt.code, tt.expect, tt.isSink)
 		})
 	}
 }
 
-func getRequestTopDef(code string) (string, error) {
+func testRequestTopDef(t *testing.T, code string, expect string, isSink bool) {
 	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage("java"))
-	if err != nil {
-		return "", err
-	}
 	prog.Show()
+	results, err := prog.SyntaxFlowWithError(".createDefault().execute()")
+	if err != nil {
+		t.Fatal(err)
+	}
+	topDef := results.GetTopDefs(ssaapi.WithAllowCallStack(true))
+	topDef.Show()
 
-	httpClient := prog.Ref("HttpClients").Ref("createDefault")[0].GetCalledBy()
-	execute := httpClient.Ref("execute")[0].GetCalledBy()
-	args := execute[0].GetCallArgs()
-	topDef := args.GetTopDefs(ssaapi.WithAllowCallStack(true))
-	topDef.ShowWithSource()
-	target := topDef.StringEx(0)
-	return target, nil
+	count := strings.Count(topDef.StringEx(0), expect)
+	if isSink {
+		assert.Equal(t, 1, count)
+	} else {
+		assert.Equal(t, 0, count)
+	}
 }
 
 func createHttpUtilCode(code string) string {
