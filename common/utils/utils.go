@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/gobwas/glob"
 	"io"
 	"io/ioutil"
 	"net"
@@ -21,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gobwas/glob"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -140,12 +141,12 @@ func GetMachineCode() string {
 	mid, err := GetSystemMachineCode()
 	if err != nil {
 		fileName := filepath.Join(GetHomeDirDefault("."), ".ym-id")
-		var raw, _ = ioutil.ReadFile(fileName)
+		raw, _ := ioutil.ReadFile(fileName)
 		if raw != nil {
 			mid = EscapeInvalidUTF8Byte(raw)
 		} else {
 			mid = uuid.New().String()
-			_ = ioutil.WriteFile(fileName, []byte(mid), 0666)
+			_ = ioutil.WriteFile(fileName, []byte(mid), 0o666)
 		}
 	}
 	return mid
@@ -167,7 +168,6 @@ func GetSystemMachineCode() (_ string, err error) {
 				if err != nil {
 					return "", Errorf("please create a file named product_uuid with 36 digs uuid in / path ")
 				}
-				log.Warnf("wsl detected, uuid: %v", string(raw))
 				return codec.EncodeToHex(raw), nil
 			} else {
 				return "", Errorf("fetch system machine code failed: %s", err)
@@ -241,7 +241,7 @@ func DownloadFile(client *http.Client, u string, localFile string, every1s ...fu
 	}
 
 	if rsp.Body != nil {
-		fp, err := os.OpenFile(localFile, os.O_CREATE|os.O_WRONLY, 0666)
+		fp, err := os.OpenFile(localFile, os.O_CREATE|os.O_WRONLY, 0o666)
 		if err != nil {
 			return err
 		}
@@ -352,7 +352,7 @@ func FixHTTPRequestForHTTPDoWithHttps(r *http.Request, isHttps bool) (*http.Requ
 		req.Header[key] = values
 	}
 
-	//respect proto
+	// respect proto
 	req.Proto = r.Proto
 	req.ProtoMajor = r.ProtoMajor
 	req.ProtoMinor = r.ProtoMinor
@@ -374,7 +374,7 @@ func CallWithCtx(ctx context.Context, cb func()) error {
 }
 
 func CallWithTimeout(timeout float64, cb func()) error {
-	var ctx, cancel = context.WithCancel(TimeoutContextSeconds(timeout))
+	ctx, cancel := context.WithCancel(TimeoutContextSeconds(timeout))
 	defer cancel()
 	sig := make(chan struct{})
 	go func() {
