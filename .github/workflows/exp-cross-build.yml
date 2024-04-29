@@ -12,7 +12,7 @@ on:
 #            default: true
 
 jobs:
-  build_and_release:
+  build_and_upload_to_oss:
     strategy:
         matrix:
           os:
@@ -42,10 +42,11 @@ jobs:
         # build
         - uses: actions/checkout@v2
 
-        - name: Set up Go
-          uses: actions/setup-go@v2
+        - name: Set up Go 1.x
+          uses: actions/setup-go@v4
           with:
-            go-version: 1.20.3
+            go-version-file: "./go.mod"
+          id: go
 
         - name: Get Repo tags
           run: |
@@ -53,7 +54,7 @@ jobs:
             echo "YAK_TAG=$(cat tags.txt)" >> ${{ matrix.env }} 
   
         - name: Download CrossBuild GCC(Linux x64)
-          if: matrix.os == 'linux-amd64' || matrix.os == 'macos-amd64'
+          if: matrix.os == 'linux-amd64'
           run: |
             brew tap messense/macos-cross-toolchains
             brew install x86_64-unknown-linux-gnu
@@ -111,6 +112,7 @@ jobs:
             echo "env.YAK_TAG PRODUCT_BINARY=${{ matrix.binary }}"
             echo "env.YAK_TAG YAK_TAG=${{ env.YAK_TAG }}"
             echo "env.YAK_TAG SHA256=${{ env.SHA256 }}"
+            ls -lh
             
         - name: Upload Binaries To aliyun-oss
           run: |
@@ -152,7 +154,7 @@ jobs:
             name: yak_linux_arm64
             path: ./yak_linux_arm64
 
-  download_artifacts_and_github_release:
+  check_version_and_github_release:
     runs-on: ubuntu-latest
     needs: build_and_release
     steps:
