@@ -189,6 +189,7 @@ jobs:
 
       - name: Get Repo tags
         run: |
+          pwd && ls -lh
           ./yak_linux_amd64 repos-tag -o tags.txt
           echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV
 
