@@ -206,12 +206,14 @@ jobs:
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           tag_name: ${{ env.YAK_TAG }}
           release_name: ${{ env.YAK_TAG }}
           body: |
             Release ${{ env.YAK_TAG }}
-          draft: false
+          draft: true
           prerelease: false
     
       - name: Upload Release Asset Linux(amd64)
