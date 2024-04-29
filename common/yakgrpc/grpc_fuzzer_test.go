@@ -5,13 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"net/http"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -624,6 +625,18 @@ key=1&key=1`),
 		headers, _ := lowhttp.SplitHTTPPacketFast(r.Result)
 		require.Contains(t, headers, "?key=1&key=1")
 	})
+
+	t.Run("fix invalid host cause mutate failed", func(t *testing.T) {
+		r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
+			Request: []byte(`GET /?a=1 HTTP/1.1
+Host: {{payload(test)}}`),
+			FuzzMethods: []string{"POST"},
+		})
+		require.NoError(t, err)
+		headers, body := lowhttp.SplitHTTPPacketFast(r.Result)
+		require.Contains(t, headers, "Content-Type: application/x-www-form-urlencoded")
+		require.Equal(t, "a=1", string(body))
+	})
 }
 
 func TestServer_HTTPRequestMutateWithoutConnection(t *testing.T) {
@@ -1225,7 +1238,7 @@ Content-Type: image/jpeg
 `)
 	client, _ := NewLocalClient()
 	stream, _ := client.MITM(context.Background())
-	var portMITM = int64(utils.GetRandomAvailableTCPPort())
+	portMITM := int64(utils.GetRandomAvailableTCPPort())
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
 		Port: uint32(portMITM),
