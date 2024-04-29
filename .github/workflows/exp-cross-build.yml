@@ -111,7 +111,10 @@ jobs:
             echo "env.YAK_TAG PRODUCT_BINARY=${{ matrix.binary }}"
             echo "env.YAK_TAG YAK_TAG=${{ env.YAK_TAG }}"
             echo "env.YAK_TAG SHA256=${{ env.SHA256 }}"
-            ls -lh
+
+        - name: Show Current Dir
+          run: ls
+          if: runner.os != 'Windows'
             
         - name: Upload Binaries To aliyun-oss
           run: |
