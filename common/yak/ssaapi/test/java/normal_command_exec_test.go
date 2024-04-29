@@ -2,6 +2,7 @@ package java
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"strings"
 	"testing"
@@ -10,10 +11,10 @@ import (
 func Test_Simple_Exec_Case(t *testing.T) {
 	tests := []struct {
 		name   string
-		target string
+		expect string
 		code   string
 	}{
-		{"aTaintCase011", "Parameter-cmd", `@GetMapping("case011/{cmd}")
+		{"aTaintCase011", "Parameter: Parameter-cmd", `@GetMapping("case011/{cmd}")
     public Map<String, Object> aTaintCase011(@PathVariable String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         try {
@@ -26,7 +27,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase012", "Parameter-cmd", `@GetMapping("case011/{cmd}")
+		{"aTaintCase012", "Parameter: Parameter-cmd", `@GetMapping("case011/{cmd}")
     public Map<String, Object> aTaintCase011(@PathVariable String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         try {
@@ -39,19 +40,13 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0110", "Parameter-request", ` @PostMapping("case0110")
+		{"aTaintCase0110", "Parameter: Parameter-request", ` @PostMapping("case0110")
     public Map<String, Object> aTaintCase0110(@RequestParam("cmd") String cmd, HttpServletRequest request) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
             String cmdStr = request.getParameterMap().get("cmd")[0];
             Runtime.getRuntime().exec(cmdStr);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
+       
     }`},
-		{"aTaintCase0111", "Parameter-request", ` /**
+		{"aTaintCase0111", "Parameter: Parameter-request", ` /**
      * Arrayaccess
      * @param request
      * @return
@@ -69,29 +64,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
     }`},
-		{"aTaintCase0112", "ls -la", `/**
-     * argument arrayaccess
-     * @param
-     * @return
-     */
-    @PostMapping(value = "case0112")
-    public Map<String, Object> aTaintCase0112(@RequestParam(defaultValue = "ls") String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            String strs[] = new String[1];
-            strs[0]=cmd;
-            List<String> target = Lists.newArrayList("cd /","ls","ls -la");
-            CollectionUtils.mergeArrayIntoCollection(strs,target);
-            Runtime.getRuntime().exec(target.get(3));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-
-    }`},
-		{"aTaintCase0113", "make(any)", `/**
+		{"aTaintCase0113", "Parameter: Parameter-cmd", `/**
      * classinstance + initfix
      */
     @PostMapping(value = "case0113")
@@ -105,7 +78,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0117", "Parameter-cmd", ` /**
+		{"aTaintCase0117", "Parameter: Parameter-cmd", ` /**
      * arrayaccess
      */
     @PostMapping(value = "case0117")
@@ -123,7 +96,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0118", "Parameter-cmd", `    /**
+		{"aTaintCase0118", "Parameter: Parameter-cmd", `    /**
      * WhileStatement
      * @param cmd
      * @param type
@@ -145,7 +118,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0127", "Parameter-cmd", ` /**
+		{"aTaintCase0127", "Parameter: Parameter-cmd", ` /**
      * forstatement
      * @param cmd
      * @return
@@ -166,7 +139,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0128", "Parameter-cmd", `/**
+		{"aTaintCase0128", "Parameter: Parameter-cmd", `/**
      * DoStatement
      * @param cmd
      * @return
@@ -190,7 +163,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0129", "Parameter-cmd", `   /**
+		{"aTaintCase0129", "Parameter: Parameter-cmd", `   /**
      * CastExpression
      * @param cmd
      * @return
@@ -208,7 +181,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0134", "Parameter-cmd", `/**
+		{"aTaintCase0134", "Parameter: Parameter-cmd", `/**
 		* 反射调用
 		* @param cmd
 		* @return
@@ -232,7 +205,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		   }
 		   return modelMap;
 		}`},
-		{"aTaintCase0135", "Parameter-cmd", `
+		{"aTaintCase0135", "Parameter: Parameter-cmd", `
     /**
      * PrefixExpression
      */
@@ -248,7 +221,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0136", "Parameter-cmd", ` /**
+		{"aTaintCase0136", "Parameter: Parameter-cmd", ` /**
      * PostfixExpression
      */
     @GetMapping("case0136/{cmd}")
@@ -263,7 +236,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0137", "Parameter-cmd", `/**
+		{"aTaintCase0137", "Parameter: Parameter-cmd", `/**
 * 基本类型char 作为污点源
      * 测试数据传（0～9）
      * @return
@@ -280,7 +253,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0138", "Parameter-cmd", `  /**
+		{"aTaintCase0138", "Parameter: Parameter-cmd", `  /**
      * 基本类型byte 作为污点源
      * @param cmd
      * @return
@@ -297,7 +270,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0139", "Parameter-cmd", `/**
+		{"aTaintCase0139", "Parameter: Parameter-cmd", `/**
      * 基础类型long 作为污点源
      *
      * @param cmd
@@ -315,7 +288,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0140", "Parameter-cmd", `  /**
+		{"aTaintCase0140", "Parameter: Parameter-cmd", `  /**
      * 引用类型Map 作为污点源
      *
      * @param cmd
@@ -336,7 +309,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0141", "Parameter-cmd", `
+		{"aTaintCase0141", "Parameter: Parameter-cmd", `
     /**
      * 引用类型List 作为污点源
      *
@@ -359,7 +332,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0144", "Parameter-cmd", ` /**
+		{"aTaintCase0144", "Parameter: Parameter-cmd", ` /**
      * 基本数据类型的封装类型 Byte 作为污点源
      *
      * @param cmd
@@ -380,7 +353,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0145", "Parameter-cmd", `/**
+		{"aTaintCase0145", "Parameter: Parameter-cmd", `/**
      * 基本数据类型的封装类型 Integer 作为污点源
      *
      * @param cmd
@@ -402,7 +375,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0146", "Parameter-cmd", `
+		{"aTaintCase0146", "Parameter: Parameter-cmd", `
     /**
      * 基本数据类型的封装类型 Long 作为污点源
      * @param cmd
@@ -424,7 +397,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0147", "Parameter-cmd", ` /**
+		{"aTaintCase0147", "Parameter: Parameter-cmd", ` /**
      * 基本数据类型的封装类型 Character 作为污点源
      * @param cmd 测试数据使用（0~9）
      * @return
@@ -444,7 +417,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0149", "Parameter", `/**
+		{"aTaintCase0149", "Parameter: Parameter-cmd", `/**
      * 数组 String[] 作为污点源
      *
      * @param cmd
@@ -466,7 +439,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `}, //数组 String[] 作为污点源
-		{"aTaintCase0150", "Parameter", `/**
+		{"aTaintCase0150", "Parameter: Parameter-cmd", `/**
      * 数组 char[] 作为污点源
      *
      * @param cmd [1,2]
@@ -488,7 +461,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`}, //数组 char[] 作为污点源
-		{"aTaintCase0151", "Parameter-cmd", ` /**
+		{"aTaintCase0151", "Parameter: Parameter-cmd", ` /**
      * 数组 byte[] 作为污点源
      *
      * @param cmd
@@ -510,7 +483,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0152", "Parameter-cmd", `    /**
+		{"aTaintCase0152", "Parameter: Parameter-cmd", `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -531,7 +504,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0153", "Parameter-cmd", `    /**
+		{"aTaintCase0153", "Parameter: Parameter-cmd", `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -553,7 +526,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }`},
 
-		{"aTaintCase0155", "Parameter-cmd", ` /**
+		{"aTaintCase0155", "Parameter: Parameter-cmd", ` /**
      * 类对象找不到对应的实现类
      *
      * @param
@@ -590,7 +563,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0159", "Parameter-cmd", `/**
+		{"aTaintCase0159", "Parameter: Parameter-cmd", `/**
      * 61 传播场景->运算符->位运算
      */
     @PostMapping(value = "case0159")
@@ -606,7 +579,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }`},
 		//传播场景->String操作
-		{"aTaintCase0161", "Parameter-cmd", `  /**
+		{"aTaintCase0161", "Parameter: Parameter-cmd", `  /**
      * 63 传播场景->String操作->conact
      */
     @PostMapping(value = "case0161")
@@ -621,7 +594,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0162", "Parameter-cmd", `  /**
+		{"aTaintCase0162", "Parameter: Parameter-cmd", `  /**
      * 传播场景->String操作->copyValueOf
      */
     @PostMapping(value = "case0162")
@@ -636,7 +609,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0163", "Parameter-cmd", ` /**
+		{"aTaintCase0163", "Parameter: Parameter-cmd", ` /**
 		* 65 传播场景->String操作->format
 		*/
 		@PostMapping(value = "case0163")
@@ -651,7 +624,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		   }
 		   return modelMap;
 		}`},
-		{"aTaintCase0164", "Parameter-cmd", `/**
+		{"aTaintCase0164", "Parameter: Parameter-cmd", `/**
      * 66 传播场景->String操作->getBytes
      */
 
@@ -669,7 +642,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
     }
 `},
 
-		{"aTaintCase0166", "Parameter-cmd", `/**
+		{"aTaintCase0166", "Parameter: Parameter-cmd", `/**
      * 68 传播场景->String操作->intern
      */
     @PostMapping(value = "case0166")
@@ -683,7 +656,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0167", "Parameter-cmd", `/**
+		{"aTaintCase0167", "Parameter: Parameter-cmd", `/**
 		    * 69 传播场景->String操作->join
 		    */
 		   @PostMapping(value = "case0167")
@@ -699,7 +672,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		       return modelMap;
 		   }
 		`},
-		{"aTaintCase0168", "Parameter-cmd", `
+		{"aTaintCase0168", "Parameter: Parameter-cmd", `
     /**
      * 70 传播场景->String操作->repeat
      *
@@ -716,7 +689,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0171", "Parameter-cmd", ` /**
+		{"aTaintCase0171", "Parameter: Parameter-cmd", ` /**
      * 72 传播场景->String操作->split
      */
     @PostMapping(value = "case0171")
@@ -731,7 +704,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0172", "Parameter-cmd", `/**
+		{"aTaintCase0172", "Parameter: Parameter-cmd", `/**
      * 73 传播场景->String操作->strip
      */
     @PostMapping(value = "case0172")
@@ -745,7 +718,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0175", "Parameter-cmd", ` /**
+		{"aTaintCase0175", "Parameter: Parameter-cmd", ` /**
      * 76 传播场景->String操作->toCharArray
      */
     @PostMapping(value = "case0175")
@@ -760,7 +733,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0176", "Parameter-cmd", `/**
+		{"aTaintCase0176", "Parameter: Parameter-cmd", `/**
      * 77 传播场景->String操作->toLowerCase
      */
     @PostMapping(value = "case0176")
@@ -775,7 +748,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0177", "Parameter-cmd", ` /**
+		{"aTaintCase0177", "Parameter: Parameter-cmd", ` /**
      * 78 传播场景->String操作->toString
      */
     @PostMapping(value = "case0177")
@@ -790,7 +763,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0178", "Parameter-cmd", `/**
+		{"aTaintCase0178", "Parameter: Parameter-cmd", `/**
      *传播场景->String操作->toUpperCase
      */
     @PostMapping(value = "case0178")
@@ -805,7 +778,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0179", "Parameter-cmd", `/**
+		{"aTaintCase0179", "Parameter: Parameter-cmd", `/**
      *传播场景->String操作->trim
      */
 
@@ -821,7 +794,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0180", "Parameter-cmd", ` /**
+		{"aTaintCase0180", "Parameter: Parameter-cmd", ` /**
      * 传播场景->String操作->valueOf
      */
     @PostMapping(value = "case0180")
@@ -836,23 +809,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0194", "Parameter-cmd", `/**
-     * 传播场景-char[],byte[]操作->toString
-     */
-    @PostMapping(value = "case0194")
-    public Map<String, Object> aTaintCase0194(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            char[] chars = cmd.toCharArray();
-            Runtime.getRuntime().exec(chars.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-`},
-		{"aTaintCase0195", "Parameter", ` /**
+
+		{"aTaintCase0195", "ParameterMember: ParameterMember-parameter[1].0", ` /**
      * 传播场景-数组初始化->new 方式初始化
      */
     @PostMapping(value = "case0195")
@@ -872,576 +830,580 @@ func Test_Simple_Exec_Case(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.code = createAllCode(tt.code)
-			target, err := getExecTopDef(tt.code)
-			if err != nil {
-				t.Fatal("prog parse fail", err)
-			}
-			if !strings.Contains(target, tt.target) {
-				t.Fatalf("want to get source [%v],but got [%v].", tt.target, target)
-			}
+			testExecTopDef(t, tt.code, tt.expect, true)
 		})
 	}
 }
 
-func Test_Special_Exec_Case(t *testing.T) {
+// todo：待完善java官方库的方法
+//func Test_Special_Exec_Case(t *testing.T) {
+//	tests := []struct {
+//		name   string
+//		target string
+//		code   string
+//	}{
+//		{"aTaintCase018", "Parameter: Parameter-cmd", `@PostMapping("case018/{cmd}")
+//   public Map<String, Object> aTaintCase018(@PathVariable String cmd) {
+//       Map<String, Object> modelMap = new HashMap<>();
+//       if (cmd == null) {
+//           modelMap.put("status", "error");
+//           return modelMap;
+//       }
+//       try {
+//           String[] b = {"a","b"};
+//           System.arraycopy(cmd,0,b,0,2);
+//           Runtime.getRuntime().exec(b[0]);
+//           modelMap.put("status", "success");
+//       } catch (Exception e) {
+//           modelMap.put("status", "error");
+//       }
+//       return modelMap;
+//   }
+//`}, //System.arraycopy方法
+//		{"aTaintCase019", "Parameter: Parameter-cmd", ` @PostMapping("case019")
+//    public Map<String, Object> aTaintCase019(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        char[] data = cmd.toCharArray();
+//        try {
+//            Runtime.getRuntime().exec(new String(data));
+//            modelMap.put("status", "success");
+//        } catch (IOException e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`}, // 实例化一个不存在的类
+//		{"aTaintCase0114", "Parameter: Parameter-cmd", `  /**
+//     * MI+MI
+//     * @param cmd
+//     * @return
+//     */
+//    @PostMapping(value = "case0114")
+//    public Map<String, Object> aTaintCase0114(@RequestParam(defaultValue = "ls") String cmd ) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd.toUpperCase());
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`}, //StringBuilder
+//		{"aTaintCase0115", "Parameter: Parameter-cmd", `/**
+//     * MI+arguement
+//     */
+//    @PostMapping(value = "case0115")
+//    public Map<String, Object> aTaintCase0115(@RequestParam String cmd ) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            char[] chars= new char[]{0,0};
+//            cmd.getChars(0,2,chars,0);
+//            Runtime.getRuntime().exec(String.valueOf(chars));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`}, //getChars
+//		{"aTaintCase0142", "Parameter: Parameter-cmd", `/**
+//     * 引用类型queue 作为污点源
+//     *
+//     * @param cmd
+//     * @return
+//     */
+//    @PostMapping("case0142")
+//    public Map<String, Object> aTaintCase0142(@RequestBody List<String> cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        if (cmd == null || CollectionUtils.isEmpty(cmd)) {
+//            modelMap.put("status", "error");
+//            return modelMap;
+//        }
+//        Queue<String> queue = new LinkedBlockingQueue();
+//        try {
+//            queue.add(cmd.get(0));
+//            Runtime.getRuntime().exec(queue.peek());
+//            modelMap.put("status", "success");
+//        } catch (IOException e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`}, //引用类型queue 作为污点源
+//		{"aTaintCase0143", "Parameter: Parameter-cmd", ` /**
+//     * 引用类型Set 作为污点源
+//     *
+//     * @param cmd
+//     * @return
+//     */
+//    @PostMapping("case0143")
+//    public Map<String, Object> aTaintCase0143(@RequestBody List<String> cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        if (cmd == null || CollectionUtils.isEmpty(cmd)) {
+//            modelMap.put("status", "error");
+//            return modelMap;
+//        }
+//        Set<String> stringSet = new HashSet<>(cmd);
+//        try {
+//
+//            Runtime.getRuntime().exec(stringSet.stream().iterator().next());
+//            modelMap.put("status", "success");
+//        } catch (IOException e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }
+//`}, //引用类型Set 作为污点源
+//		{"aTaintCase0154", "Parameter: Parameter-cmd", `/**
+//     * 其他对象 StringBuilder 作为污点源
+//     *
+//     * @param cmd
+//     * @return
+//     */
+//    @PostMapping("case0154")
+//    public Map<String, Object> aTaintCase0154(@RequestBody String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        if (cmd == null) {
+//            modelMap.put("status", "error");
+//            return modelMap;
+//        }
+//        StringBuilder data = new StringBuilder();
+//        data.append(cmd);
+//        try {
+//            Runtime.getRuntime().exec(data.toString());
+//            modelMap.put("status", "success");
+//        } catch (IOException e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }
+//
+//`}, // StringBuilder 作为污点源
+//		{"aTaintCase0160", "Parameter: Parameter-cmd", ` /**
+//     * 62 传播场景->String操作->构造方法
+//     */
+//    @PostMapping(value = "case0160")
+//    public Map<String, Object> aTaintCase0160(@RequestParam String cmd ) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            Runtime.getRuntime().exec(new String(cmd));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0165", "Parameter: Parameter-cmd", `/**
+//     * 67 传播场景->String操作->getChars
+//     */
+//    @PostMapping(value = "case0165")
+//    public Map<String, Object> aTaintCase0165(@RequestParam String cmd ) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            char[] chars= new char[]{0,0};
+//            cmd.getChars(0,2,chars,0);
+//            Runtime.getRuntime().exec(String.valueOf(chars));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0169", "Parameter: Parameter-cmd", `  /**
+//     * 71 传播场景->String操作->replace
+//     * ls;-la
+//     */
+//    @PostMapping(value = "case0169")
+//    public Map<String, Object> aTaintCase0169(@RequestParam String cmd ) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            cmd=cmd.replace(";"," ");
+//            Runtime.getRuntime().exec(cmd);
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }
+//`},
+//		{"aTaintCase0170", "Parameter: Parameter-cmd", `    /**
+//     *  传播场景->String操作->replace
+//     * alasa
+//     */
+//    @PostMapping(value = "case0170")
+//    public Map<String, Object> aTaintCase0170(@RequestParam String cmd ) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            cmd=cmd.replaceAll("a","");
+//            Runtime.getRuntime().exec(cmd);
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0173", "Parameter: Parameter-cmd", `/**
+//     * 74 传播场景->String操作->subSequence
+//     */
+//    @PostMapping(value = "case0173")
+//    public Map<String, Object> aTaintCase0173(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            Runtime.getRuntime().exec(String.valueOf(cmd.subSequence(0,2)));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0174", "Parameter: Parameter-cmd", ` /**
+//     * 75 传播场景->String操作->substring
+//     * lsabc
+//     */
+//    @PostMapping(value = "case0174")
+//    public Map<String, Object> aTaintCase0174(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            Runtime.getRuntime().exec(cmd.substring(0,2));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		//传播场景->StringBuilder操作
+//		{"aTaintCase0181", "Parameter: Parameter-cmd", ` /**
+//     *传播场景->StringBuilder操作->构造方法
+//     */
+//    @PostMapping(value = "case0181")
+//    public Map<String, Object> aTaintCase0181(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            Runtime.getRuntime().exec(String.valueOf(new StringBuilder(cmd)));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }
+//    `},
+//		{"aTaintCase0182", "Parameter: Parameter-cmd", ` /**
+//     *传播场景->StringBuilder操作->append
+//     */
+//    @PostMapping(value = "case0182")
+//    public Map<String, Object> aTaintCase0182(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0183", "Parameter: Parameter-cmd", `/**
+//     *传播场景->StringBuilder操作->charAt
+//     *
+//     */
+//    @PostMapping(value = "case0183")
+//    public Map<String, Object> aTaintCase0183(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            char c= builder.charAt(0);
+//            Runtime.getRuntime().exec(String.valueOf(c));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0184", "Parameter: Parameter-cmd", `  /**
+//     * 传播场景->StringBuilder操作->delete
+//     */
+//    @PostMapping(value = "case0184")
+//    public Map<String, Object> aTaintCase0184(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            builder.delete(2,cmd.length());
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0185", "Parameter: Parameter-cmd", `/**
+//     * 传播场景->StringBuilder操作->deleteCharAt
+//     */
+//    @PostMapping(value = "case0185")
+//    public Map<String, Object> aTaintCase0185(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            builder.deleteCharAt(2);
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0186", "Parameter: Parameter-cmd", `  /**
+//     * 传播场景->StringBuilder操作->getChars
+//     */
+//    @PostMapping(value = "case0186")
+//    public Map<String, Object> aTaintCase0186(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            char[] chars = {0,0};
+//            builder.getChars(0,2,chars,0);
+//            Runtime.getRuntime().exec(String.valueOf(chars));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0187", "Parameter: Parameter-cmd", `/**
+//     * 传播场景->StringBuilder操作->insert
+//     */
+//    @PostMapping(value = "case0187")
+//    public Map<String, Object> aTaintCase0187(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.insert(0,cmd);
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0188", "Parameter: Parameter-cmd", `/**
+//     * 传播场景->StringBuilder操作->replace
+//     */
+//    @PostMapping(value = "case0188")
+//    public Map<String, Object> aTaintCase0188(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder("abc");
+//            builder.replace(2,3,cmd);
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0189", "Parameter: Parameter-cmd", `/**
+//     * 传播场景->StringBuilder操作->subSequence
+//     */
+//    @PostMapping(value = "case0189")
+//    public Map<String, Object> aTaintCase0189(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            builder.subSequence(0,2);
+//            Runtime.getRuntime().exec(String.valueOf(builder.subSequence(0,2)));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0190", "Parameter: Parameter-cmd", `/**
+//     * 传播场景->StringBuilder操作->subString
+//     */
+//    @PostMapping(value = "case0190")
+//    public Map<String, Object> aTaintCase0190(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            builder.substring(0,2);
+//            Runtime.getRuntime().exec(builder.substring(0,2));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0191", "Parameter: Parameter-cmd", `/**
+//     * 传播场景->StringBuilder操作->toString
+//     */
+//    @PostMapping(value = "case0191")
+//    public Map<String, Object> aTaintCase0191(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            StringBuilder builder = new StringBuilder();
+//            builder.append(cmd);
+//            Runtime.getRuntime().exec(builder.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0192", "Parameter: Parameter-cmd", ` /**
+//     * 传播场景-char[],byte[]操作->copyOf
+//     */
+//    @PostMapping(value = "case0192")
+//    public Map<String, Object> aTaintCase0192(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            byte[] b1 = cmd.getBytes();
+//            byte[] b2 = Arrays.copyOf(b1,10);
+//            Runtime.getRuntime().exec(new String(b2));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`},
+//		{"aTaintCase0193", "Parameter: Parameter-cmd", ` /**
+//     * 传播场景-char[],byte[]操作-->copyOfRange
+//     */
+//    @PostMapping(value = "case0193")
+//    public Map<String, Object> aTaintCase0193(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            byte[] b1 = cmd.getBytes();
+//            byte[] b2 = Arrays.copyOfRange(b1,0,2);
+//            Runtime.getRuntime().exec(new String(b2));
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }`,
+//   {"aTaintCase0194", "Parameter: Parameter-cmd", `/**
+//     * 传播场景-char[],byte[]操作->toString
+//     */
+//    @PostMapping(value = "case0194")
+//    public Map<String, Object> aTaintCase0194(@RequestParam String cmd) {
+//        Map<String, Object> modelMap = new HashMap<>();
+//        try {
+//            char[] chars = cmd.toCharArray();
+//            Runtime.getRuntime().exec(chars.toString());
+//            modelMap.put("status", "success");
+//        } catch (Exception e) {
+//            modelMap.put("status", "error");
+//        }
+//        return modelMap;
+//    }
+//`},},
+//	}
+//	for _, tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//			tt.code = createAllCode(tt.code)
+//			target, err := getExecTopDef(tt.code)
+//			if err != nil {
+//				t.Fatal("prog parse fail", err)
+//			}
+//			if !strings.Contains(target, tt.target) {
+//				t.Fatalf("want to get source [%v],but got [%v].", tt.target, target)
+//			}
+//		})
+//	}
+//}
+
+func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 	tests := []struct {
 		name   string
-		target string
+		expect string
+		isSink bool
 		code   string
 	}{
-		{"aTaintCase018", "Parameter-cmd", `@PostMapping("case018/{cmd}")
-   public Map<String, Object> aTaintCase018(@PathVariable String cmd) {
+		{"aTaintCase013", "Parameter: Parameter-cmd", true, ` /**
+    * MethodInvocation
+    */
+   @GetMapping("case013/{cmd}")
+   public Map<String, Object> aTaintCase013(@PathVariable String cmd) {
        Map<String, Object> modelMap = new HashMap<>();
-       if (cmd == null) {
-           modelMap.put("status", "error");
-           return modelMap;
-       }
+		CmdUtil cmdUtil = new CmdUtil();
        try {
-           String[] b = {"a","b"};
-           System.arraycopy(cmd,0,b,0,2);
-           Runtime.getRuntime().exec(b[0]);
+           cmdUtil.run(cmd+"|grep a");
            modelMap.put("status", "success");
        } catch (Exception e) {
            modelMap.put("status", "error");
        }
        return modelMap;
-   }
-`}, //System.arraycopy方法
-		{"aTaintCase019", "Parameter-cmd", ` @PostMapping("case019")
-    public Map<String, Object> aTaintCase019(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        char[] data = cmd.toCharArray();
-        try {
-            Runtime.getRuntime().exec(new String(data));
-            modelMap.put("status", "success");
-        } catch (IOException e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, // 实例化一个不存在的类
-		{"aTaintCase0114", "Parameter-cmd", `  /**
-     * MI+MI
-     * @param cmd
-     * @return
-     */
-    @PostMapping(value = "case0114")
-    public Map<String, Object> aTaintCase0114(@RequestParam(defaultValue = "ls") String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd.toUpperCase());
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //StringBuilder
-		{"aTaintCase0115", "Parameter-cmd", `/**
-     * MI+arguement
-     */
-    @PostMapping(value = "case0115")
-    public Map<String, Object> aTaintCase0115(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            char[] chars= new char[]{0,0};
-            cmd.getChars(0,2,chars,0);
-            Runtime.getRuntime().exec(String.valueOf(chars));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //getChars
-		{"aTaintCase0142", "Parameter-cmd", `/**
-     * 引用类型queue 作为污点源
-     *
-     * @param cmd
-     * @return
-     */
-    @PostMapping("case0142")
-    public Map<String, Object> aTaintCase0142(@RequestBody List<String> cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        if (cmd == null || CollectionUtils.isEmpty(cmd)) {
-            modelMap.put("status", "error");
-            return modelMap;
-        }
-        Queue<String> queue = new LinkedBlockingQueue();
-        try {
-            queue.add(cmd.get(0));
-            Runtime.getRuntime().exec(queue.peek());
-            modelMap.put("status", "success");
-        } catch (IOException e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //引用类型queue 作为污点源
-		{"aTaintCase0143", "Parameter-cmd", ` /**
-     * 引用类型Set 作为污点源
-     *
-     * @param cmd
-     * @return
-     */
-    @PostMapping("case0143")
-    public Map<String, Object> aTaintCase0143(@RequestBody List<String> cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        if (cmd == null || CollectionUtils.isEmpty(cmd)) {
-            modelMap.put("status", "error");
-            return modelMap;
-        }
-        Set<String> stringSet = new HashSet<>(cmd);
-        try {
-
-            Runtime.getRuntime().exec(stringSet.stream().iterator().next());
-            modelMap.put("status", "success");
-        } catch (IOException e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-`}, //引用类型Set 作为污点源
-		{"aTaintCase0154", "Parameter-cmd", `/**
-     * 其他对象 StringBuilder 作为污点源
-     *
-     * @param cmd
-     * @return
-     */
-    @PostMapping("case0154")
-    public Map<String, Object> aTaintCase0154(@RequestBody String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        if (cmd == null) {
-            modelMap.put("status", "error");
-            return modelMap;
-        }
-        StringBuilder data = new StringBuilder();
-        data.append(cmd);
-        try {
-            Runtime.getRuntime().exec(data.toString());
-            modelMap.put("status", "success");
-        } catch (IOException e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-
-`}, // StringBuilder 作为污点源
-		{"aTaintCase0160", "Parameter-cmd", ` /**
-     * 62 传播场景->String操作->构造方法
-     */
-    @PostMapping(value = "case0160")
-    public Map<String, Object> aTaintCase0160(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            Runtime.getRuntime().exec(new String(cmd));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0165", "Parameter-cmd", `/**
-     * 67 传播场景->String操作->getChars
-     */
-    @PostMapping(value = "case0165")
-    public Map<String, Object> aTaintCase0165(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            char[] chars= new char[]{0,0};
-            cmd.getChars(0,2,chars,0);
-            Runtime.getRuntime().exec(String.valueOf(chars));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0169", "Parameter-cmd", `  /**
-     * 71 传播场景->String操作->replace
-     * ls;-la
-     */
-    @PostMapping(value = "case0169")
-    public Map<String, Object> aTaintCase0169(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=cmd.replace(";"," ");
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-`},
-		{"aTaintCase0170", "Parameter-cmd", `    /**
-     *  传播场景->String操作->replace
-     * alasa
-     */
-    @PostMapping(value = "case0170")
-    public Map<String, Object> aTaintCase0170(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=cmd.replaceAll("a","");
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0173", "Parameter-cmd", `/**
-     * 74 传播场景->String操作->subSequence
-     */
-    @PostMapping(value = "case0173")
-    public Map<String, Object> aTaintCase0173(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            Runtime.getRuntime().exec(String.valueOf(cmd.subSequence(0,2)));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0174", "Parameter-cmd", ` /**
-     * 75 传播场景->String操作->substring
-     * lsabc
-     */
-    @PostMapping(value = "case0174")
-    public Map<String, Object> aTaintCase0174(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            Runtime.getRuntime().exec(cmd.substring(0,2));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		//传播场景->StringBuilder操作
-		{"aTaintCase0181", "Parameter-cmd", ` /**
-     *传播场景->StringBuilder操作->构造方法
-     */
-    @PostMapping(value = "case0181")
-    public Map<String, Object> aTaintCase0181(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            Runtime.getRuntime().exec(String.valueOf(new StringBuilder(cmd)));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-    `},
-		{"aTaintCase0182", "Parameter-cmd", ` /**
-     *传播场景->StringBuilder操作->append
-     */
-    @PostMapping(value = "case0182")
-    public Map<String, Object> aTaintCase0182(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0183", "Parameter-cmd", `/**
-     *传播场景->StringBuilder操作->charAt
-     *
-     */
-    @PostMapping(value = "case0183")
-    public Map<String, Object> aTaintCase0183(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            char c= builder.charAt(0);
-            Runtime.getRuntime().exec(String.valueOf(c));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0184", "Parameter-cmd", `  /**
-     * 传播场景->StringBuilder操作->delete
-     */
-    @PostMapping(value = "case0184")
-    public Map<String, Object> aTaintCase0184(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            builder.delete(2,cmd.length());
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0185", "Parameter-cmd", `/**
-     * 传播场景->StringBuilder操作->deleteCharAt
-     */
-    @PostMapping(value = "case0185")
-    public Map<String, Object> aTaintCase0185(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            builder.deleteCharAt(2);
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0186", "Parameter-cmd", `  /**
-     * 传播场景->StringBuilder操作->getChars
-     */
-    @PostMapping(value = "case0186")
-    public Map<String, Object> aTaintCase0186(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            char[] chars = {0,0};
-            builder.getChars(0,2,chars,0);
-            Runtime.getRuntime().exec(String.valueOf(chars));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0187", "Parameter-cmd", `/**
-     * 传播场景->StringBuilder操作->insert
-     */
-    @PostMapping(value = "case0187")
-    public Map<String, Object> aTaintCase0187(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.insert(0,cmd);
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0188", "Parameter-cmd", `/**
-     * 传播场景->StringBuilder操作->replace
-     */
-    @PostMapping(value = "case0188")
-    public Map<String, Object> aTaintCase0188(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder("abc");
-            builder.replace(2,3,cmd);
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0189", "Parameter-cmd", `/**
-     * 传播场景->StringBuilder操作->subSequence
-     */
-    @PostMapping(value = "case0189")
-    public Map<String, Object> aTaintCase0189(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            builder.subSequence(0,2);
-            Runtime.getRuntime().exec(String.valueOf(builder.subSequence(0,2)));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0190", "Parameter-cmd", `/**
-     * 传播场景->StringBuilder操作->subString
-     */
-    @PostMapping(value = "case0190")
-    public Map<String, Object> aTaintCase0190(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            builder.substring(0,2);
-            Runtime.getRuntime().exec(builder.substring(0,2));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0191", "Parameter-cmd", `/**
-     * 传播场景->StringBuilder操作->toString
-     */
-    @PostMapping(value = "case0191")
-    public Map<String, Object> aTaintCase0191(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            StringBuilder builder = new StringBuilder();
-            builder.append(cmd);
-            Runtime.getRuntime().exec(builder.toString());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0192", "Parameter-cmd", ` /**
-     * 传播场景-char[],byte[]操作->copyOf
-     */
-    @PostMapping(value = "case0192")
-    public Map<String, Object> aTaintCase0192(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            byte[] b1 = cmd.getBytes();
-            byte[] b2 = Arrays.copyOf(b1,10);
-            Runtime.getRuntime().exec(new String(b2));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0193", "Parameter-cmd", ` /**
-     * 传播场景-char[],byte[]操作-->copyOfRange
-     */
-    @PostMapping(value = "case0193")
-    public Map<String, Object> aTaintCase0193(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            byte[] b1 = cmd.getBytes();
-            byte[] b2 = Arrays.copyOfRange(b1,0,2);
-            Runtime.getRuntime().exec(new String(b2));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.code = createAllCode(tt.code)
-			target, err := getExecTopDef(tt.code)
-			if err != nil {
-				t.Fatal("prog parse fail", err)
-			}
-			if !strings.Contains(target, tt.target) {
-				t.Fatalf("want to get source [%v],but got [%v].", tt.target, target)
-			}
-		})
-	}
-}
-
-func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
-	tests := []struct {
-		name   string
-		target string
-		isSink bool
-		code   string
-	}{
-		{"aTaintCase013", "Parameter-cmd", true, ` /**
-     * MethodInvocation
-     */
-    @GetMapping("case013/{cmd}")
-    public Map<String, Object> aTaintCase013(@PathVariable String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
+   }`}, //方法调用
+		{"aTaintCase014", "Parameter: Parameter-cmd", true, ` /**
+    * MethodInvocation+InfixExpression
+    */
+   @GetMapping("case014/{cmd}")
+   public Map<String, Object> aTaintCase014(@PathVariable String cmd) {
+       Map<String, Object> modelMap = new HashMap<>();
 		CmdUtil cmdUtil = new CmdUtil();
-        try {
-            cmdUtil.run(cmd+"|grep a");
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //方法调用
-		{"aTaintCase014", "Parameter-cmd", true, ` /**
-     * MethodInvocation+InfixExpression
-     */
-    @GetMapping("case014/{cmd}")
-    public Map<String, Object> aTaintCase014(@PathVariable String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
+       try {
+           cmdUtil.run(cmd+ HttpUtil.doGet("www.test.com"));
+           modelMap.put("status", "success");
+       } catch (Exception e) {
+           modelMap.put("status", "error");
+       }
+       return modelMap;
+   }`}, //方法调用+中缀表达式
+		{"aTaintCase015", "Parameter: Parameter-cmd", true, ` /**
+    * ifStatement
+    */
+   @GetMapping("case015/{cmd}")
+   public Map<String, Object> aTaintCase015(@PathVariable String cmd) {
+       Map<String, Object> modelMap = new HashMap<>();
 		CmdUtil cmdUtil = new CmdUtil();
-        try {
-            cmdUtil.run(cmd+ HttpUtil.doGet("www.test.com"));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //方法调用+中缀表达式
-		{"aTaintCase015", "Parameter-cmd", true, ` /**
-     * ifStatement
-     */
-    @GetMapping("case015/{cmd}")
-    public Map<String, Object> aTaintCase015(@PathVariable String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
+       try {
+           if(true == false){
+               cmdUtil.run(cmd);
+           }else{
+               String cmdString = HttpUtil.doGet("www.test.com");
+               cmdUtil.run(cmd+cmdString);
+           }
+           modelMap.put("status", "success");
+       } catch (Exception e) {
+           modelMap.put("status", "error");
+       }
+       return modelMap;
+   }`}, //if语句
+		{"aTaintCase016", "Parameter: Parameter-cmd", true, ` /**
+    * Switch
+    */
+   @GetMapping("case016/{type}/{cmd}")
+   public Map<String, Object> aTaintCase016(@PathVariable String cmd,@PathVariable String type) {
+       Map<String, Object> modelMap = new HashMap<>();
 		CmdUtil cmdUtil = new CmdUtil();
-        try {
-            if(true == false){
-                cmdUtil.run(cmd);
-            }else{
-                String cmdString = HttpUtil.doGet("www.test.com");
-                cmdUtil.run(cmd+cmdString);
-            }
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //if语句
-		{"aTaintCase016", "Parameter-cmd", true, ` /**
-     * Switch
-     */
-    @GetMapping("case016/{type}/{cmd}")
-    public Map<String, Object> aTaintCase016(@PathVariable String cmd,@PathVariable String type) {
-        Map<String, Object> modelMap = new HashMap<>();
-		CmdUtil cmdUtil = new CmdUtil();
-        try {
-            switch (type){
+       try {
+           switch (type){
 
-                case "mkdir":
-                    cmdUtil.run("mkdir"+" "+cmd);
-                    modelMap.put("status", "success");
-                default:
-                    modelMap.put("status", "success");
-                    return null;
-            }
+               case "mkdir":
+                   cmdUtil.run("mkdir"+" "+cmd);
+                   modelMap.put("status", "success");
+               default:
+                   modelMap.put("status", "success");
+                   return null;
+           }
 
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`}, //switch语句
+       } catch (Exception e) {
+           modelMap.put("status", "error");
+       }
+       return modelMap;
+   }`}, //switch语句
 
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.code = createCmdUtilCode(tt.code)
-			target, err := getExecTopDef(tt.code)
-			if err != nil {
-				t.Fatal("prog parse fail", err)
-			}
-			if !strings.Contains(target, tt.target) {
-				t.Fatalf("want to get source [%v],but got [%v].", tt.target, target)
-			}
-
+			testExecTopDef(t, tt.code, tt.expect, tt.isSink)
 		})
 	}
 
@@ -1450,75 +1412,76 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
 	tests := []struct {
 		name   string
-		target string
+		expect string
 		isSink bool
 		code   string
 	}{
-		{"aTaintCase022", "Function-CmdObject_setCmd(make(CmdObject),Parameter-cmd)", true, `/**
-     * 字段/元素级别->对象字段->对象元素
-     * case应该被检出
-     */
-    @PostMapping(value = "case022")
-    public Map<String, Object> aTaintCase022(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            CmdObject simpleBean = new CmdObject();
-            simpleBean.setCmd(cmd);
-            simpleBean.setCmd2("cd /");
-            Runtime.getRuntime().exec(simpleBean.getCmd());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase022_2", "cd /", false, ` /**
-     * 字段/元素级别->对象字段->对象元素
-     * case不应被检出
-     */
-    @PostMapping(value = "case022-2")
-    public Map<String, Object> aTaintCase022_2(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            CmdObject simpleBean = new CmdObject();
-            simpleBean.setCmd(cmd);
-            simpleBean.setCmd2("cd /");
-            Runtime.getRuntime().exec(simpleBean.getCmd2());
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-`}, //todo topdef得到结果过多
+		{"aTaintCase022", "Parameter: Parameter-cmd", true, `/**
+   * 字段/元素级别->对象字段->对象元素
+   * case应该被检出
+   */
+  @PostMapping(value = "case022")
+  public Map<String, Object> aTaintCase022(@RequestParam String cmd) {
+      Map<String, Object> modelMap = new HashMap<>();
+      try {
+          CmdObject simpleBean = new CmdObject();
+          simpleBean.setCmd(cmd);
+          simpleBean.setCmd2("cd /");
+          Runtime.getRuntime().exec(simpleBean.getCmd());
+          modelMap.put("status", "success");
+      } catch (Exception e) {
+          modelMap.put("status", "error");
+      }
+      return modelMap;
+  }`},
+		{"aTaintCase022_2", "Parameter: Parameter-cmd", false, ` /**
+   * 字段/元素级别->对象字段->对象元素
+   * case不应被检出
+   */
+  @PostMapping(value = "case022-2")
+  public Map<String, Object> aTaintCase022_2(@RequestParam String cmd) {
+      Map<String, Object> modelMap = new HashMap<>();
+      try {
+          CmdObject simpleBean = new CmdObject();
+          simpleBean.setCmd(cmd);
+          simpleBean.setCmd2("cd /");
+          Runtime.getRuntime().exec(simpleBean.getCmd2());
+          modelMap.put("status", "success");
+      } catch (Exception e) {
+          modelMap.put("status", "error");
+      }
+      return modelMap;
+  }
+`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.code = createCmdObject(tt.code)
-			target, err := getExecTopDef(tt.code)
-			if err != nil {
-				t.Fatal("prog parse fail", err)
-			}
-			if !strings.Contains(target, tt.target) {
-				t.Fatalf("want to get source [%v],but got [%v].", tt.target, target)
-			}
+			testExecTopDef(t, tt.code, tt.expect, tt.isSink)
 		})
 	}
 }
 
-func getExecTopDef(code string) (string, error) {
+func testExecTopDef(t *testing.T, code string, expect string, isSink bool) {
 	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage("java"))
 	if err != nil {
-		return "", err
+		t.Fatal(err)
 	}
 	prog.Show()
-	runtime := prog.Ref("Runtime").Ref("getRuntime")[0].GetCalledBy()
-	exec := runtime.Ref("exec")[0].GetCalledBy()
-	args := exec[0].GetCallArgs()
-	topDef := args.GetTopDefs(ssaapi.WithDepthLimit(100), ssaapi.WithAllowCallStack(true))
+	results, err := prog.SyntaxFlowWithError("Runtime.getRuntime().exec()")
+	if err != nil {
+		t.Fatal(err)
+	}
+	topDef := results.GetTopDefs(ssaapi.WithAllowCallStack(true))
 	topDef.ShowWithSource()
-	target := topDef.StringEx(0)
-	return target, nil
+
+	count := strings.Count(topDef.StringEx(0), expect)
+	if isSink {
+		assert.Equal(t, 1, count)
+	} else {
+		assert.Equal(t, 0, count)
+	}
+
 }
 
 func createAllCode(code string) string {
