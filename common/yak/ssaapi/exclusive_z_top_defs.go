@@ -152,13 +152,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{i} // return self
 		}
 
-		err := actx.PushCall(i)
-		if err != nil {
-			log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-			return Values{i}
-		}
-		defer actx.PopCall()
-
 		// TODO: trace the specific return-values
 		callerValue := NewValue(caller)
 		callerFunc, isFunc := ssa.ToFunction(caller)
@@ -188,7 +181,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 		callerValue.AppendEffectOn(i)
-
+		err := actx.PushCall(i)
+		if err != nil {
+			log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
+			return Values{i}
+		}
+		defer actx.PopCall()
 		// inherit return index
 		val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
 		if ok {
@@ -318,6 +316,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			traced := NewValue(actualParam).AppendEffectOn(called)
 			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
 			call := actx.PopCall()
+			//todo 函数内拿到外面东西 调用栈
 			ret := traced.getTopDefs(actx)
 			if call != nil {
 				actx.PushCall(call)
