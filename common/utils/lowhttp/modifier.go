@@ -1420,7 +1420,7 @@ func AppendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerVal
 func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string) {
 	var val []string
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
-		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
+		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "cookie" {
 			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				if e.Name == key {

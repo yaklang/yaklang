@@ -305,6 +305,29 @@ func SplitKV(i string) (string, string) {
 	}
 }
 
+// ValidCookieValue 判断是否存在不允许的字符,
+func ValidCookieValue(value string) bool {
+	for i := 0; i < len(value); i++ {
+		if !validCookieValueByte(value[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func validCookieValueByte(b byte) bool {
+	return 0x20 <= b && b < 0x7f && b != '"' && b != ';' && b != '\\'
+}
+
+func parseCookieValue(raw string, allowDoubleQuote bool) (string, bool) {
+	// Strip the quotes, if present.
+	if allowDoubleQuote && len(raw) > 1 && raw[0] == '"' && raw[len(raw)-1] == '"' {
+		raw = raw[1 : len(raw)-1]
+	}
+
+	return raw, true
+}
+
 // readCookies parses all "Cookie" values from the header h and
 // returns the successfully parsed Cookies.
 //
@@ -342,6 +365,10 @@ func readCookies(h http.Header, filter string) []*http.Cookie {
 				name = strings.TrimSuffix(name, ")}}")
 				val = strings.TrimPrefix(val, "{{urlescape(")
 				val = strings.TrimSuffix(val, ")}}")
+			}
+			if !strings.ContainsAny(val, " ,") {
+				// 只去双引号，不判断是否合法
+				val, _ = parseCookieValue(val, true)
 			}
 
 			if strings.Contains(val, "%") {
