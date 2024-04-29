@@ -21,7 +21,7 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 
 // ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
-	return b.readValueEx(name, true, false || b.SupportClosure)
+	return b.readValueEx(name, true, false || b.UnSupportClosure)
 }
 
 func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
@@ -45,7 +45,7 @@ func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
 }
 
 func (b *FunctionBuilder) PeekValue(name string) Value {
-	return b.readValueEx(name, false, false || b.SupportClosure)
+	return b.readValueEx(name, false, false || b.UnSupportClosure)
 }
 
 func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
