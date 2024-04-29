@@ -1235,7 +1235,6 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	method := strings.ToUpper(strings.Join(req.FuzzMethods, ""))
 	// get params
 	totalParams := lowhttp.GetFullHTTPRequestQueryParams(rawRequest)
-	// post params
 	contentType := lowhttp.GetHTTPPacketHeader(rawRequest, "Content-Type")
 	transferEncoding := lowhttp.GetHTTPPacketHeader(rawRequest, "Transfer-Encoding")
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
@@ -1244,14 +1243,18 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		result = lowhttp.ReplaceHTTPPacketBody(result, body, false)
 		_, body = lowhttp.SplitHTTPHeadersAndBodyFromPacket(result)
 	}
+	// post params
 	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
+	if totalParams == nil {
+		totalParams = make(map[string][]string, len(postParams))
+	}
 	for k, v := range postParams {
 		totalParams[k] = append(totalParams[k], v...)
 	}
 
 	switch method {
 	case "POST":
-		result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result),
+		result = poc.FixPacketByPocOptions(lowhttp.TrimLeftHTTPPacket(result),
 			poc.WithReplaceHttpPacketMethod("POST"),
 			poc.WithReplaceHttpPacketQueryParamRaw(""),
 			poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
@@ -1262,7 +1265,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 
 	default:
 		if len(method) > 0 {
-			result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result),
+			result = poc.FixPacketByPocOptions(lowhttp.TrimLeftHTTPPacket(result),
 				poc.WithReplaceHttpPacketMethod(method),
 				poc.WithReplaceFullHttpPacketQueryParamsWithoutEscape(totalParams),
 				poc.WithDeleteHeader("Transfer-Encoding"),
@@ -1285,7 +1288,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		for k, v := range totalParams {
 			opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
 		}
-		result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result), opts...)
+		result = poc.FixPacketByPocOptions(lowhttp.TrimLeftHTTPPacket(result), opts...)
 	}
 
 	return &ypb.MutateResult{
