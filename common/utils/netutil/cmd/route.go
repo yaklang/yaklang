@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/google/gopacket/pcap"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"

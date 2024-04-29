@@ -70,12 +70,12 @@ jobs:
 
       - name: Build For Linux(linux, amd64)
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=/tmp/crossbuild/x86_64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_amd64" -v common/yak/cmd/yak.go && ls
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=/tmp/crossbuild/x86_64-linux-gnu-gcc go build -x -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_amd64" -v common/yak/cmd/yak.go && ls
         if: runner.os == 'macOS'
 
       - name: Build For Linux(linux, arm64)
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=/tmp/crossbuild/aarch64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_arm64" -v common/yak/cmd/yak.go && ls
+          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=/tmp/crossbuild/aarch64-linux-gnu-gcc go build -x -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_arm64" -v common/yak/cmd/yak.go && ls
         if: runner.os == 'macOS'
 
       - name: Build For MacOS(arm64)
