@@ -73,9 +73,8 @@ jobs:
         - name: Codec Methods Document
           run: go run common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
   
-        # - name: Initialize License Machine
-        #   if: inputs.ee
-        #   run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
+        - name: Initialize License Machine
+          run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
   
         - name: Build For Linux(linux, amd64)
           run: |
@@ -116,7 +115,7 @@ jobs:
             
         - name: Upload Binaries To aliyun-oss
           run: |
-            go run common/yak/cmd/yak.go upload-oss -f ${{ matrix.binary }}:/yak/_/${{ env.YAK_TAG }}/${{ matrix.binary }};${{ env.SHA256 }}:/yak/_/${{ env.YAK_TAG }}/${{ env.SHA256 }} -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
+            go run common/yak/cmd/yak.go upload-oss -f ${{ matrix.binary }}:/yak/_/${{ env.YAK_TAG }}/${{ matrix.binary }};${{ env.SHA256 }}:/yak/_/${{ env.YAK_TAG }}/${{ env.SHA256 }} --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5
     
         # upload assets
         - name: Upload Artifacts Windows
