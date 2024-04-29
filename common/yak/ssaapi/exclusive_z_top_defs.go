@@ -177,7 +177,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			var results Values
 			for _, subNode := range nodes {
-				vals := subNode.getTopDefs(actx, opt...).AppendEffectOn(subNode)
+				//getTopDefs(nil,opt...)第一个参数指定为nil
+				//提供一个新的上下文，避免指向新的actx.self导致多余的结果
+				vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
 				results = append(results, vals...)
 			}
 			return results
@@ -255,7 +257,22 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		called := actx.GetCurrentCall()
 		if called == nil {
 			log.Error("parent function is not called by any other function, skip")
-			return Values{i}
+			var vals Values
+			vals = append(vals, i)
+			// 获取ParameterMember的形参定义
+			obj := inst.Parameter.GetObject()
+			if obj != nil {
+				if inst.MemberCallKind == ssa.ParameterMemberCall {
+					objValue := NewValue(obj)
+					val := objValue.GetFunction().GetParameter(inst.MemberCallObjectIndex)
+					vals = append(vals, val)
+				} else if inst.MemberCallKind == ssa.FreeValueMemberCall {
+					param := inst.GetFunc().FreeValues[obj.GetName()]
+					val := NewValue(param)
+					vals = append(vals, val)
+				}
+			}
+			return vals
 		}
 		if !called.IsCall() {
 			log.Infof("parent function is not called by any other function, skip (%T)", called)
@@ -299,6 +316,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
 			traced := NewValue(actualParam).AppendEffectOn(called)
+			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
 			call := actx.PopCall()
 			ret := traced.getTopDefs(actx)
 			if call != nil {
@@ -320,12 +338,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			// 允许跨类进行TopDef的查找
 			if actx.config.AllowCallStack {
 				fun := i.GetFunction()
-				call2fun := fun.GetCalledBy()
-				call2fun.ForEach(func(call *Value) {
-					val := getCalledByValue(call)
-					vals = append(vals, val...)
-				})
-				return append(vals, i)
+				if fun != nil {
+					call2fun := fun.GetCalledBy()
+					call2fun.ForEach(func(call *Value) {
+						val := getCalledByValue(call)
+						vals = append(vals, val...)
+					})
+					return append(vals, i)
+				}
 			}
 			log.Error("parent function is not called by any other function, skip")
 			return Values{i}
@@ -337,6 +357,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		calledByValue := getCalledByValue(called)
 		vals = append(vals, calledByValue...)
+		if actx.config.AllowCallStack {
+			fun := i.GetFunction()
+			if fun != nil {
+				call2fun := fun.GetCalledBy()
+				call2fun.ForEach(func(call *Value) {
+					val := getCalledByValue(call)
+					vals = append(vals, val...)
+				})
+			}
+		}
 
 		if len(vals) == 0 {
 			return Values{NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
@@ -378,11 +408,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		values = append(values, i)
 		for _, member := range inst.GetAllMember() {
 			value := NewValue(member)
-			// 沿着make类型的参数继续寻找topdef
-			paramVals := getMakeParamTopDef()
-			values = append(values, paramVals...)
 			values = append(values, value.getTopDefs(actx, opt...)...)
-
 		}
 		paramVals := getMakeParamTopDef()
 		values = append(values, paramVals...)
