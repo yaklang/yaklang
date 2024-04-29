@@ -305,6 +305,47 @@ var UtilsCommands = []*cli.Command{
 			return fallback()
 		},
 	},
+	// upload to oss
+	{
+		Name:  "upload-oss",
+		Usage: "(Inner command) Upload File To Aliyun OSS",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "file,f", Usage: "local_file_path:remote_file_path, splited by ;"},
+			cli.StringFlag{Name: "ak", Usage: "Aliyun Access Key"},
+			cli.StringFlag{Name: "sk", Usage: "Aliyun Secret Key"},
+			cli.StringFlag{Name: "endpoint", Usage: "Aliyun OSS Endpoint", Value: `oss-accelerate.aliyuncs.com`},
+			cli.StringFlag{Name: "bucket, b", Usage: "Aliyun OSS Bucket", Value: "yaklang"},
+			cli.IntFlag{Name: "times,t", Usage: "retry times", Value: 5},
+		},
+		Action: func(c *cli.Context) error {
+			client, err := oss.New(c.String("endpoint"), c.String("ak"), c.String("sk"))
+			if err != nil {
+				return err
+			}
+
+			bucket, err := client.Bucket(c.String("bucket"))
+			if err != nil {
+				return err
+			}
+			for _, i := range strings.Split(c.String("file"), ";") {
+				localFilePath, remoteFilePath, ok := strings.Cut(i, ":")
+				if !ok {
+					return utils.Errorf("invalid file path: %v", i)
+				}
+				localFilePath = strings.TrimSpace(localFilePath)
+				remoteFilePath = strings.TrimSpace(strings.TrimLeft(remoteFilePath, "/"))
+
+				_, _, err = lo.AttemptWithDelay(c.Int("times"), time.Second, func(index int, _ time.Duration) error {
+					return bucket.PutObjectFromFile(remoteFilePath, localFilePath)
+				})
+				if err != nil {
+					return utils.Wrap(err, "upload file to oss failed")
+				}
+			}
+
+			return nil
+		},
+	},
 	// file tree size
 	{
 		Name:  "weight",
