@@ -9,46 +9,125 @@ on:
       - "v*"
 
 jobs:
-  build:
+  build_and_release:
     strategy:
-      matrix:
-        os:
-          - windows
-          - macos-amd64 
-          - macos-arm64
-          - linux-amd64
-          - linux-arm64
-    uses: ./.github/workflows/reuse-build.yml
-    with:
-      os: ${{ matrix.os }}
-      ee: true
-    secrets: inherit
-  release:
-    needs: build
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: ubuntu-20.04
+        matrix:
+          os:
+            - windows
+            - macos-amd64 
+            - macos-arm64
+            - linux-amd64
+            - linux-arm64
+          include:
+            - os: windows
+              binary: yak_windows_amd64.exe
+              sha256txt: yak_windows_amd64.exe.sha256.txt
+            - os: macos-amd64
+              binary: yak_darwin_amd64
+              sha256txt: yak_darwin_amd64.sha256.txt
+            - os: macos-arm64
+              binary: yak_darwin_arm64
+              sha256txt: yak_darwin_arm64.sha256.txt
+            - os: linux-amd64
+              binary: yak_linux_amd64
+              sha256txt: yak_linux_amd64.sha256.txt
+            - os: linux-arm64
+              binary: yak_linux_arm64
+              sha256txt: yak_linux_arm64.sha256.txt
+    runs-on: ${{ contains(matrix.os, 'windows') && 'windows-latest' || 'macos-14' }}
     steps:
-      - name: Upload To aliyun-oss(MacOS)
-        uses: tvrcgo/upload-to-oss@master
-        if: runner.os == 'macOS'
-        with:
-          key-id: ${{ secrets.OSS_KEY_ID }}
-          key-secret: ${{ secrets.OSS_KEY_SECRET }}
-          region: oss-accelerate
-          bucket: yaklang
-          assets: |
-            yak_darwin_amd64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_amd64
-            yak_darwin_arm64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_arm64
-            yak_linux_arm64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_linux_arm64
-            yak_linux_amd64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_linux_amd64
-
-      - name: Upload To aliyun-oss(Windows)
-        uses: tvrcgo/upload-to-oss@master
-        if: runner.os == 'Windows'
-        with:
-          key-id: ${{ secrets.OSS_KEY_ID }}
-          key-secret: ${{ secrets.OSS_KEY_SECRET }}
-          region: oss-accelerate
-          bucket: yaklang
-          assets: |
-            yak_windows_amd64.exe:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_windows_amd64.exe
+        # build
+        - uses: actions/checkout@v2
+        - name: Set Yak Version by Tag
+          uses: mad9000/actions-find-and-replace-string@1
+          id: fetchtag
+          with:
+            source: ${{ github.ref }}
+            find: 'refs/tags/'
+            replace: ''
+        - name: Print RELEASE_VERSION
+          run: |
+            echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
+        - name: Set up Go
+          uses: actions/setup-go@v2
+          with:
+            go-version: 1.20.3
+  
+        - name: Check MacOS Arch Version
+          run: |
+            echo "DARWIN_X_ARCH=$(uname -m)" >> $GITHUB_ENV
+          if: runner.os == 'macOS'
+  
+        - name: Print Architecture(MACOS)
+          if: runner.os == 'macOS'
+          run: echo "Running on ${{ env.DARWIN_X_ARCH }} architecture"
+  
+        - name: Download CrossBuild GCC(MACOS x64)
+          if: matrix.os == 'linux-amd64' 
+          run: |
+            brew tap messense/macos-cross-toolchains
+            brew install x86_64-unknown-linux-gnu
+            x86_64-linux-gnu-gcc -v
+  
+        - name: Download CrossBuild GCC(MACOS x64)
+          if: matrix.os == 'linux-arm64' 
+          run: |
+            brew tap messense/macos-cross-toolchains
+            brew install aarch64-unknown-linux-gnu
+            aarch64-linux-gnu-gcc -v
+  
+        - name: Generate Document
+          run: go run common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
+  
+        - name: Codec Methods Document
+          run: go run common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
+  
+        # - name: Initialize License Machine
+        #   if: inputs.ee
+        #   run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
+  
+        - name: Build For Linux(linux, amd64)
+          run: |
+            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=x86_64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_amd64" -v common/yak/cmd/yak.go && ls
+          if: matrix.os == 'linux-amd64'
+  
+        - name: Build For Linux(linux, arm64)
+          run: |
+            CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_arm64" -v common/yak/cmd/yak.go && ls
+          if: matrix.os == 'linux-arm64'
+  
+        - name: Build For MacOS(arm64)
+          run: |
+            CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_darwin_arm64" -v common/yak/cmd/yak.go && ls
+          if: matrix.os == 'macos-arm64'
+  
+        - name: Build For MacOS(amd64)
+          run: |
+            CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_darwin_amd64" -v common/yak/cmd/yak.go && ls
+          if: matrix.os == 'macos-amd64' || runner.os == 'macOS'
+  
+        - name: Build For Windows
+          run: |
+            go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_amd64.exe -v common/yak/cmd/yak.go
+          if: runner.os == 'Windows'  
+        # release
+        - name: prepare binary env
+          run: |
+            echo "YAK_BINARY=${{ runner.os == 'Windows' && './yak_windows_amd64.exe' || './yak_darwin_amd64' }}" >> $GITHUB_ENV
+        - name: Generate Checksums
+          run: |
+            echo ${{ env.YAK_BINARY }} sha256 -f ${{ matrix.binary }}
+            echo "SHA256=${{ matrix.binary }}.sha256.txt" >> $GITHUB_ENV
+        - name: Get Repo tags
+          run: |
+            echo "YAK_TAG=$(${{ env.YAK_BINARY }} repos-tag)" >> $GITHUB_ENV  
+        - name: debug info
+          run: |
+              echo "::notice YAK_BINARY=${{ env.YAK_BINARY }}"
+              echo "::notice PRODUCT_BINARY=${{ matrix.binary }}"
+              echo "::notice YAK_TAG=${{ env.YAK_TAG }}"
+              echo "::notice SHA256=${{ env.SHA256 }}"
+        - name: Upload To aliyun-oss
+          if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          run: |
+            ${{ env.YAK_BINARY }} upload-oss -f ${{ matrix.binary }}:/yak/_/${{ env.YAK_TAG }}/${{ matrix.binary }};${{ env.SHA256 }}:/yak/_/${{ env.YAK_TAG }}/${{ env.SHA256 }} -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
