@@ -1,0 +1,130 @@
+name: Cross-Build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/exp-cross-build.yml'
+
+jobs:
+  build_and_release:
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - macos-14
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set Yak Version by Tag
+        uses: mad9000/actions-find-and-replace-string@1
+        id: fetchtag
+        with:
+          source: ${{ github.ref }}
+          find: 'refs/tags/'
+          replace: ''
+      - name: Print RELEASE_VERSION
+        run: |
+          echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.20.3
+
+      - name: Check MacOS Arch Version
+        run: |
+          echo "DARWIN_X_ARCH=$(uname -m)" >> $GITHUB_ENV
+        if: runner.os == 'macOS'
+
+      - name: Print Architecture(MACOS)
+        if: runner.os == 'macOS'
+        run: echo "Running on ${{ env.DARWIN_X_ARCH }} architecture"
+
+      - name: Download CrossBuild GCC(MACOS arm64)
+        if: env.DARWIN_X_ARCH == 'arm64'
+        run: |
+          mkdir -p /tmp/crossbuild/
+          curl -L -o /tmp/crossbuild/aarch64-linux-gnu-gcc https://aliyun-oss.yaklang.com/cross-build/darwin/arm64/aarch64-linux-gnu-gcc
+          chmod +x /tmp/crossbuild/aarch64-linux-gnu-gcc
+          curl -L -o /tmp/crossbuild/x86_64-linux-gnu-gcc https://aliyun-oss.yaklang.com/cross-build/darwin/arm64/x86_64-linux-gnu-gcc
+          chmod +x /tmp/crossbuild/x86_64-linux-gnu-gcc
+          ls -l /tmp/crossbuild/
+
+      - name: Download CrossBuild GCC(MACOS amd64(x86_64))
+        if: env.DARWIN_X_ARCH == 'x86_64'
+        run: |
+          mkdir -p /tmp/crossbuild/
+          curl -L -o /tmp/crossbuild/aarch64-linux-gnu-gcc https://aliyun-oss.yaklang.com/cross-build/darwin/amd64/aarch64-linux-gnu-gcc
+          chmod +x /tmp/crossbuild/aarch64-linux-gnu-gcc
+          curl -L -o /tmp/crossbuild/x86_64-linux-gnu-gcc https://aliyun-oss.yaklang.com/cross-build/darwin/amd64/x86_64-linux-gnu-gcc
+          chmod +x /tmp/crossbuild/x86_64-linux-gnu-gcc
+          ls -l /tmp/crossbuild/
+
+      - name: Generate Document
+        run: go run common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
+
+      - name: Codec Methods Document
+        run: go run common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
+
+      - name: Initialize License Machine
+        run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
+
+      - name: Build For Linux(linux, amd64)
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=/tmp/crossbuild/x86_64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_amd64" -v common/yak/cmd/yak.go && ls
+        if: runner.os == 'macOS'
+
+      - name: Build For Linux(linux, arm64)
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC=/tmp/crossbuild/aarch64-linux-gnu-gcc go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_linux_arm64" -v common/yak/cmd/yak.go && ls
+        if: runner.os == 'macOS'
+
+      - name: Build For MacOS(arm64)
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_darwin_arm64" -v common/yak/cmd/yak.go && ls
+        if: runner.os == 'macOS'
+
+      - name: Build For MacOS(amd64)
+        run: |
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./yak_darwin_amd64" -v common/yak/cmd/yak.go && ls
+        if: runner.os == 'macOS'
+
+      - name: Build For Windows
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./yak_windows_amd64.exe -v common/yak/cmd/yak.go
+        if: runner.os == 'Windows'
+
+      - name: Upload Artifacts Windows
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'Windows'
+        with:
+          name: yak_windows_amd64.exe
+          path: ./yak_windows_amd64.exe
+
+
+      - name: Upload Artifacts MacOS(amd64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_darwin_amd64
+          path: ./yak_darwin_amd64
+
+      - name: Upload Artifacts MacOS(arm64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_darwin_arm64
+          path: ./yak_darwin_arm64
+
+      - name: Upload Artifacts CrossBuild Linux(arm64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_linux_arm64
+          path: ./yak_linux_arm64
+
+      - name: Upload Artifacts CrossBuild Linux(amd64)
+        uses: actions/upload-artifact@v2
+        if: runner.os == 'macOS'
+        with:
+          name: yak_linux_amd64
+          path: ./yak_linux_amd64
