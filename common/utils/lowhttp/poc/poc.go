@@ -1146,6 +1146,14 @@ func WithDeleteForm(key string) PocConfigOption {
 	}
 }
 
+func FixPacketByPocOptions(packet []byte, opts ...PocConfigOption) []byte {
+	config := NewDefaultPoCConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	return fixPacketByConfig(packet, config)
+}
+
 func fixPacketByConfig(packet []byte, config *PocConfig) []byte {
 	for _, fixFunc := range config.PacketHandler {
 		packet = fixFunc(packet)
