@@ -267,9 +267,22 @@ var UtilsCommands = []*cli.Command{
 	{
 		Name:  "repos-tag",
 		Usage: "(Inner command) Get Current Git Repository Tag, if not found, generate a fallback tag with dev/{datetime}",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "output,o", Usage: "output file", Value: "tags.txt"},
+		},
 		Action: func(c *cli.Context) error {
+			var (
+				file *os.File
+				err  error
+			)
+			file, err = os.OpenFile(c.String("output"), os.O_CREATE|os.O_RDWR, 0o644)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
 			fallback := func() error {
-				fmt.Print("dev/" + utils.DatetimePretty2())
+				fmt.Fprint(file, "dev/"+utils.DatetimePretty2())
 				return nil
 			}
 			rp, err := git.PlainOpen(".")
@@ -299,7 +312,7 @@ var UtilsCommands = []*cli.Command{
 			}
 
 			if len(foundTags) > 0 {
-				fmt.Print(foundTags[0])
+				fmt.Fprint(file, foundTags[0])
 				return nil
 			}
 			return fallback()

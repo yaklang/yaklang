@@ -120,7 +120,8 @@ jobs:
             echo "SHA256=${{ matrix.binary }}.sha256.txt" >> $GITHUB_ENV
         - name: Get Repo tags
           run: |
-            echo "YAK_TAG=$(${{ env.YAK_BINARY }} repos-tag)" >> $GITHUB_ENV  
+            ${{ env.YAK_BINARY }} repos-tag -o tags.txt
+            echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV  
         - name: debug info
           run: |
               echo "::notice YAK_BINARY=${{ env.YAK_BINARY }}"
