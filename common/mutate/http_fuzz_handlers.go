@@ -928,7 +928,6 @@ func (f *FuzzHTTPRequest) FuzzUploadFileName(k, v interface{}) FuzzHTTPRequestIf
 }
 
 func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedFunc) ([]*http.Request, error) {
-	f.DisableAutoEncode(true)
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -953,15 +952,18 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedF
 		var rspIns *http.Request
 		var err error
 		var newValue string
-		//if f.friendlyDisplay {
-		//	newValue = lowhttp.CookieSafeFriendly(value)
-		//}
-		if f.NoAutoEncode() {
-			newValue = lowhttp.CookieSafeString(value)
+		if encoded == nil {
+			if f.friendlyDisplay {
+				newValue = lowhttp.CookieSafeFriendly(value)
+			}
+			if f.NoAutoEncode() {
+				newValue = lowhttp.CookieSafeString(value)
+			} else if !f.friendlyDisplay {
+				newValue = lowhttp.CookieSafeQuoteString(value)
+			}
+		} else {
+			newValue = value
 		}
-		//else if !f.friendlyDisplay {
-		//	newValue = lowhttp.CookieSafeQuoteString(value)
-		//}
 
 		for _, e := range encoded {
 			newValue = e(newValue)

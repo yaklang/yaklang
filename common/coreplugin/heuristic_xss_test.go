@@ -29,9 +29,8 @@ func TestGRPCMUSTPASS_XSS(t *testing.T) {
 			`/xss/attr/alt/b64/json?b64json=eyJ2YWx1ZSI6InZhbHVlPXZpc2l0b3ItbmFtZSJ9`,
 			`/xss/attr/src?src=/static/logo.png`,
 			`/xss/attr/href?href=/static/logo.png`,
-			// TODO
-			//`/xss/cookie/name`,
-			//`/xss/cookie/b64/json/name`,
+			`/xss/cookie/name`,
+			`/xss/cookie/b64/json/name`,
 		},
 		ExpectedResult: map[string]int{
 			fmt.Sprintf("XSS for: %s/xss/echo?name=admin", vulAddr):           1,
@@ -45,8 +44,8 @@ func TestGRPCMUSTPASS_XSS(t *testing.T) {
 			fmt.Sprintf(`XSS for: %s/xss/attr/alt/b64/json`, vulAddr):         1,
 			fmt.Sprintf(`XSS for: %s/xss/attr/src`, vulAddr):                  1,
 			fmt.Sprintf(`XSS for: %s/xss/attr/href`, vulAddr):                 1,
-			//fmt.Sprintf(`XSS for: %s/xss/cookie/name`, vulAddr):               1,
-			//fmt.Sprintf(`XSS for: %s/xss/cookie/b64/json/name`, vulAddr):      1,
+			fmt.Sprintf(`XSS for: %s/xss/cookie/name`, vulAddr):               1,
+			fmt.Sprintf(`XSS for: %s/xss/cookie/b64/json/name`, vulAddr):      1,
 		},
 		StrictMode: false,
 	}

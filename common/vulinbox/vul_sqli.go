@@ -4,6 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
@@ -202,8 +204,9 @@ func (s *VulinServer) registerSQLinj() {
 				},
 			},
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				a, err := request.Cookie("ID")
-				if err != nil {
+				raw, _ := utils.HttpDumpWithBody(request, true)
+				id := lowhttp.GetHTTPPacketCookieFirst(raw, "ID")
+				if id == "" && lowhttp.GetHTTPRequestQueryParam(raw, "skip") != "1" {
 					cookie := http.Cookie{
 						Name:     "ID",
 						Value:    "1",                                // 设置 cookie 的值
@@ -220,7 +223,7 @@ func (s *VulinServer) registerSQLinj() {
 					}
 					return
 				}
-				u, err := s.database.GetUserByIdUnsafe(a.Value)
+				u, err := s.database.GetUserByIdUnsafe(id)
 				if err != nil {
 					writer.Write([]byte(err.Error()))
 					writer.WriteHeader(500)
