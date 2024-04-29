@@ -116,3 +116,37 @@ jobs:
         with:
           name: yak_linux_amd64
           path: ./yak_linux_amd64
+
+      - name: Set Yak Version by Tag
+        uses: mad9000/actions-find-and-replace-string@1
+        id: fetchtag
+        with:
+          source: ${{ github.ref }}
+          find: 'refs/tags/'
+          replace: ''
+          
+      - name: Upload To aliyun-oss(MacOS)
+        uses: tvrcgo/upload-to-oss@master
+        if: runner.os == 'macOS'
+        with:
+          key-id: ${{ secrets.OSS_KEY_ID }}
+          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+          region: oss-accelerate
+          bucket: yaklang
+          assets: |
+            yak_windows_amd64.exe:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_windows_amd64.exe
+            yak_darwin_amd64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_amd64
+            yak_darwin_arm64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_darwin_arm64
+            yak_linux_arm64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_linux_arm64
+            yak_linux_amd64:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_linux_amd64
+
+      - name: Upload To aliyun-oss(Windows)
+        uses: tvrcgo/upload-to-oss@master
+        if: runner.os == 'Windows'
+        with:
+          key-id: ${{ secrets.OSS_KEY_ID }}
+          key-secret: ${{ secrets.OSS_KEY_SECRET }}
+          region: oss-accelerate
+          bucket: yaklang
+          assets: |
+            yak_windows_amd64.exe:/yak/_/${{ steps.fetchtag_release.outputs.value }}/yak_windows_amd64.exe
