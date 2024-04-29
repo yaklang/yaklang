@@ -1719,15 +1719,11 @@ func GetHTTPRequestPostParamFull(packet []byte, key string) []string {
 }
 
 func GetHTTPRequestQueryParamFull(packet []byte, key string) (ret []string) {
-	ret = make([]string, 0)
-	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
-	if err != nil {
-		return
+	params := GetFullHTTPRequestQueryParams(packet)
+	if len(params) == 0 {
+		return nil
 	}
-
-	val := u.Query()
-	vals, ok := val[key]
-	if ok {
+	if vals, ok := params[key]; ok {
 		return vals
 	}
 	return
@@ -1774,27 +1770,26 @@ func GetFullHTTPRequestPostParams(packet []byte) (params map[string][]string) {
 // `) // 获取所有GET请求参数
 // ```
 func GetAllHTTPRequestQueryParams(packet []byte) (params map[string]string) {
-	params = make(map[string]string)
-	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
-	if err != nil {
-		return
+	fullParams := GetFullHTTPRequestQueryParams(packet)
+	if len(fullParams) == 0 {
+		return nil
 	}
-
-	vals := ParseQueryParams(u.RawQuery)
-	for _, item := range vals.Items {
-		params[item.Key] = item.Value
-	}
-	return
+	return lo.MapEntries(fullParams, func(key string, value []string) (string, string) {
+		if len(value) == 0 {
+			return key, ""
+		}
+		return key, value[len(value)-1]
+	})
 }
 
 func GetFullHTTPRequestQueryParams(packet []byte) (params map[string][]string) {
-	params = make(map[string][]string)
-	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
-	if err != nil {
+	_, uriPath, _ := GetHTTPPacketFirstLine(packet)
+	_, rawQuery, ok := strings.Cut(uriPath, "?")
+	if !ok {
 		return
 	}
-
-	vals := ParseQueryParams(u.RawQuery)
+	vals := ParseQueryParams(rawQuery)
+	params = make(map[string][]string, len(vals.Items))
 	for _, item := range vals.Items {
 		params[item.Key] = append(params[item.Key], item.Value)
 	}
