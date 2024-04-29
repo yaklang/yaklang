@@ -1036,11 +1036,29 @@ Host: www.baidu.com
 }
 
 func TestFuzzCookie(t *testing.T) {
+	// 对于合法的值，不会进行编码，对于 " ", "," 等特殊字符会进行编码
+	// 对于不合法的值，会强制进行编码
 	tests := []struct {
 		name string
 		base base
 	}{
-		{ // cookie value 应当默认 disableEncode
+		{
+			name: "Cookie参数 默认",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				expectKeywordInOutputPacket: []string{
+					`a=123`,
+					`e="`,
+					url.QueryEscape("a,b"),
+				},
+				debug: true,
+			},
+		},
+		{
 			name: "Cookie参数 默认",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
@@ -1052,7 +1070,8 @@ Host: www.baidu.com
 					`a=123`,
 					`e="a,b"`,
 				},
-				debug: true,
+				debug:         true,
+				disableEncode: true,
 			},
 		},
 		{
@@ -1065,7 +1084,8 @@ Host: www.baidu.com
 				code: `.FuzzCookie("a", "123").FuzzCookie("a", "345").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=345`,
-					`e="a,b"`,
+					`e="`,
+					url.QueryEscape("a,b"),
 				},
 				debug: true,
 			},
@@ -1079,9 +1099,25 @@ Host: www.baidu.com
 `,
 				code: `.FuzzCookie("a", "1/**/ORDeR/**/bY/**/9-- ")`,
 				expectKeywordInOutputPacket: []string{
-					`a="1/**/ORDeR/**/bY/**/9-- "`,
+					`a="`,
+					url.QueryEscape(`1/**/ORDeR/**/bY/**/9-- `),
 				},
 				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数 sqli 2",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "1/**/UniOn/**/Select/**/md5('VLpqc'),md5('VLpqc'),md5('VLpqc'),SLeep(3)-- ")`,
+				expectKeywordInOutputPacket: []string{
+					`a="1/**/UniOn/**/Select/**/md5('VLpqc'),md5('VLpqc'),md5('VLpqc'),SLeep(3)-- "`,
+				},
+				debug:         true,
+				disableEncode: true,
 			},
 		},
 		{
@@ -1095,7 +1131,7 @@ Cookie: xCname=UserAdmin
 `,
 				code: ".FuzzCookie(`xCname`, \"1`;</SCrIpT><Img id='jsmxNLlB' src=1 onerror='prompt(1)'><ScRiPT>`\")",
 				expectKeywordInOutputPacket: []string{
-					"xCname=\"1`;</SCrIpT><Img id='jsmxNLlB' src=1 onerror='prompt(1)'><ScRiPT>`\"",
+					url.QueryEscape("1`;</SCrIpT><Img id='jsmxNLlB' src=1 onerror='prompt(1)'><ScRiPT>`"),
 				},
 				debug: true,
 			},
@@ -1137,26 +1173,28 @@ Host: www.baidu.com
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b").FuzzCookie("f", "a;b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
 					`e="a,b"`,
+					`f={{urlescape(a;b)}}`,
 				},
 				debug:           true,
 				friendlyDisplay: true,
 			},
 		},
 		{
-			name: "Cookie参数 禁止编码 && 友好显示",
+			name: "Cookie参数 禁止编码 && 友好显示 无法限制不合法的字符",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b").FuzzCookie("f", "a;b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
 					`e="a,b"`,
+					`f=` + url.QueryEscape(`a;b`),
 				},
 				debug:           true,
 				disableEncode:   true,
@@ -1171,6 +1209,8 @@ Host: www.baidu.com
 }
 
 func TestFuzzCookieBase64(t *testing.T) {
+	// 如果一个 Cookie Value 的值是 base64 编码的，应该对原值不进行任何的处理
+	// 比如 "a,b" 不应该添加双引号后再进行 base64 编码
 	tests := []struct {
 		name string
 		base base
@@ -1204,9 +1244,9 @@ Host: www.baidu.com
 					`a=` + codec.EncodeBase64("123"),
 					`b=` + codec.EncodeBase64("123"),
 					`c=` + codec.EncodeBase64("true"),
-					`d=` + codec.EncodeBase64("\"123\""),
-					`e=` + codec.EncodeBase64("\"a b\""),
-					`f=` + codec.EncodeBase64("\"c,d\""),
+					`d=` + codec.EncodeBase64(`"123"`),
+					`e=` + codec.EncodeBase64(`a b`),
+					`f=` + codec.EncodeBase64(`c,d`),
 				},
 				debug: true,
 			},
@@ -1225,8 +1265,8 @@ Host: www.baidu.com
 					`b={{base64(123)}}`,
 					`c={{base64(true)}}`,
 					`d={{base64("123")}}`,
-					`e={{base64("a b")}}`,
-					`f={{base64("a,b")}}`,
+					`e={{base64(a b)}}`, // 不应该添加双引号
+					`f={{base64(a,b)}}`, // 不应该添加双引号
 				},
 				friendlyDisplay: true,
 				debug:           true,
@@ -1245,8 +1285,8 @@ Host: www.baidu.com
 					`a=` + codec.EncodeBase64("123"),
 					`b=` + codec.EncodeBase64("123"),
 					`c=` + codec.EncodeBase64("true"),
-					`d=` + codec.EncodeBase64("\"123\""),
-					`e=` + codec.EncodeBase64("\"a b\""),
+					`d=` + codec.EncodeBase64(`"123"`),
+					`e=` + codec.EncodeBase64(`a b`), // 不应该添加双引号
 				},
 				disableEncode: true,
 				debug:         true,
@@ -1266,7 +1306,7 @@ Host: www.baidu.com
 					`b={{base64(123)}}`,
 					`c={{base64(true)}}`,
 					`d={{base64("123")}}`,
-					`e={{base64("a b")}}`,
+					`e={{base64(a b)}}`, // 不应该添加双引号
 				},
 				friendlyDisplay: true,
 				disableEncode:   true,
@@ -1288,7 +1328,7 @@ Cookie: a=1; b=2; c=3; d="4"; e="5"
 					`b={{base64(123)}}`,
 					`c={{base64(true)}}`,
 					`d={{base64("123")}}`,
-					`e={{base64("a b")}}`,
+					`e={{base64(a b)}}`,
 				},
 				friendlyDisplay: true,
 				disableEncode:   true,

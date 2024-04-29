@@ -43,6 +43,8 @@ func ExtractCookieJarFromHTTPResponse(rawResponse []byte) []*http.Cookie {
 func CookieSafeQuoteString(i string) string {
 	if ret, ok := utils.IsJSON(i); ok {
 		return url.QueryEscape(ret)
+	} else if ValidCookieValue(i) {
+		return url.QueryEscape(i)
 	} else if strings.ContainsAny(i, " ,") {
 		return `"` + url.QueryEscape(i) + `"`
 	} else {
@@ -50,9 +52,13 @@ func CookieSafeQuoteString(i string) string {
 	}
 }
 
+// CookieSafeString disableAutoEncode 的模式下，不会对 cookie 进行自动编码
+// 但是对于不允许的字符，会编码
 func CookieSafeString(i string) string {
 	if ret, ok := utils.IsJSON(i); ok {
 		return ret
+	} else if ValidCookieValue(i) {
+		return url.QueryEscape(i)
 	} else if strings.ContainsAny(i, " ,") {
 		return `"` + i + `"`
 	} else {
@@ -60,12 +66,15 @@ func CookieSafeString(i string) string {
 	}
 }
 
+// CookieSafeFriendly 友好显示
 func CookieSafeFriendly(vs string) string {
 	format := "{{urlescape(%s)}}"
 	if ret, ok := utils.IsJSON(vs); ok {
 		return fmt.Sprintf(format, ret)
+	} else if ValidCookieValue(vs) {
+		return fmt.Sprintf(format, vs)
 	} else if strings.ContainsAny(vs, " ,") {
-		return `"` + fmt.Sprintf(format, vs) + `"`
+		return `"` + vs + `"`
 	} else {
 		return vs
 	}
