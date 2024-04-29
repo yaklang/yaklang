@@ -96,11 +96,12 @@ jobs:
 
   test:
     name: ${{ matrix.name }}
-    needs: setup
+    needs: setup-iis
     runs-on: windows-latest
-    strategy:
-      matrix:
-        include:
-          - name: Test ASPX
-            run: |
-              go test -timeout 20s -run TestNewWebASPXShell ./common/wsm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run Tests
+        run: |
+          go test -timeout 20s -run TestNewWebASPXShell ./common/wsm
