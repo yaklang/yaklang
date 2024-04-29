@@ -1,9 +1,12 @@
 name: Essential Tests
 
 on:
-  push:
-    tags:
-      - '*'
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "common/**"
+      - ".github/workflows/essential-tests.yml"
 
 jobs:
   setup:
