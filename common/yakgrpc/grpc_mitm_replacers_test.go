@@ -2,11 +2,13 @@ package yakgrpc
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -56,7 +58,6 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	if len(extractedData) == 0 {
 		t.Fatal("no data extracted")
 	}
-
 }
 
 func TestGRPCMUSTPASS_HookColorWithResponse(t *testing.T) {
@@ -275,7 +276,7 @@ testBody`
 // TestReplaceWithScope verify the replacer can replace the matched content in the right scope
 // Since matching and replacement are two implementation methods, the scope of replacement needs to be tested.
 func TestGRPCMUSTPASS_ReplaceWithScope(t *testing.T) {
-	var replaceOkFlag = fmt.Sprintf("===%s===", utils.RandStringBytes(8))
+	replaceOkFlag := fmt.Sprintf("===%s===", utils.RandStringBytes(8))
 
 	responseBytes := []byte(`HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
@@ -588,10 +589,44 @@ body
 		t.Fatal("replace failed")
 	}
 }
+
 func ConfigRuleByFlags(rule *ypb.MITMContentReplacer, ruleFlag int) {
 	rule.EnableForRequest = ruleFlag&request != 0
 	rule.EnableForResponse = ruleFlag&response != 0
 	rule.EnableForHeader = ruleFlag&header != 0
 	rule.EnableForBody = ruleFlag&body != 0
 	rule.EnableForURI = ruleFlag&uri != 0
+}
+
+func TestGRPCMUSTPASS_HookColorWithRequestAndResponse(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `test`,
+		NoReplace:         true,
+		Result:            ``,
+		Color:             "",
+		EnableForRequest:  true,
+		EnableForResponse: true,
+		EnableForHeader:   true,
+		EnableForBody:     true,
+		Index:             0,
+		ExtraTag:          nil,
+		Disabled:          false,
+		VerboseName:       "",
+	})
+	responseBytes := []byte(`HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Tue, 10 Oct 2023 07:28:15 GMT
+Content-Length: 4
+
+test`)
+	req, err := http.NewRequest("GET", "https://www.baidu.com?a=test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqRaw, err := utils.DumpHTTPRequest(req, true)
+	require.NoError(t, err)
+
+	extractedData := replacer.hookColor(reqRaw, responseBytes, req, &yakit.HTTPFlow{})
+	require.Len(t, extractedData, 2)
 }
