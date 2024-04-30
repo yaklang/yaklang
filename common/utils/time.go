@@ -29,6 +29,10 @@ func DatetimePretty2() string {
 	return time.Now().Format(DefaultTimeFormat2)
 }
 
+func DatePretty() string {
+	return time.Now().Format(DefaultDateFormat)
+}
+
 func weekdayToOffsetWithMondayFirst(w time.Weekday) int {
 	switch w {
 	case time.Monday:

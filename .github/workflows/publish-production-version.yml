@@ -1,0 +1,81 @@
+name: Publish Production Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish"
+        required: true
+        type: string
+
+jobs:
+  check_version_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if version starts with 'v'
+        run: |
+          VERSION_INPUT="${{ github.event.inputs.version }}"
+          if [[ $VERSION_INPUT != v* ]]; then
+            echo "Error: Version must start with 'v'."
+            exit 1
+          else
+            echo "Version starts with 'v': $VERSION_INPUT"
+            # Remove the 'v' prefix and store in YAK_VERSION
+            YAK_VERSION="${VERSION_INPUT:1}"
+            echo "YAK_VERSION=$YAK_VERSION" >> $GITHUB_ENV
+          fi
+      - name: Check Version
+        run: echo ${{ env.YAK_VERSION }}
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Switch to version branch
+        run: |
+          git fetch --all
+          git checkout ${{ github.event.inputs.version }}
+          if [ $? -ne 0 ]; then
+            echo "Branch checkout failed."
+            exit 1
+          fi
+
+      - name: Download Last Published Version
+        run: wget -O previous_version.txt https://aliyun-oss.yaklang.com/yak/latest/version.txt
+
+      - name: Download CI Needed Yak Linux(amd64) Version to operator
+        run: wget -O './yak' https://aliyun-oss.yaklang.com/yak/ci/yak_linux_amd64 && chmod +x ./yak
+
+      - name: Download From OSS(Darwin AMD64)
+        run: wget -O './yak_darwin_amd64' https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}/yak_darwin_amd64
+      - name: Download From OSS(Darwin Arm64)
+        run: wget -O './yak_darwin_arm64' https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}/yak_darwin_arm64
+      - name: Download From OSS(Linux AMD64)
+        run: wget -O './yak_linux_amd64' https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}/yak_linux_amd64
+      - name: Download From OSS(Linux ARM64)
+        run: wget -O './yak_linux_arm64' https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}/yak_linux_arm64
+      - name: Download From OSS(Windows AMD64)
+        run: wget -O './yak_windows_amd64.exe' https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}/yak_windows_amd64.exe
+
+      - name: Check files
+        run: ls -lh
+
+      - name: Start to Upload Version.txt
+        run: |
+          echo '${{ env.YAK_VERSION }}' > version.txt
+          echo "Uploading version.txt to oss"
+          echo "Version $(cat version.txt)"
+          echo "Previous Version $(cat previous_version.txt)"
+          bucket="cve-db"
+          ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'version.txt:/yak/latest/version.txt'
+          ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'previous_version.txt:/yak/previous/previous_version.txt'
+
+      - name: Upload Yak Binary Version
+        run: |
+          bucket="cve-db"
+          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe; do
+            if [[ $arch == "windows_amd64.exe" ]]; then
+              file_path='yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe'
+            else
+              file_path='yak_${arch}:/yak/latest/yak_${arch}'
+            fi
+            echo "Start to upload $file_path"
+            ./yak upload-oss -b $bucket --ak $OSS_KEY_ID --sk $OSS_KEY_SECRET -t 5 -f $file_path
+          done
