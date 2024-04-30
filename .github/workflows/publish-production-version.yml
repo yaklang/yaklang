@@ -94,7 +94,7 @@ jobs:
             if [[ $arch == "windows_amd64.exe" ]]; then
               file_path='yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe'
             else
-              file_path='yak_${arch}:/yak/latest/yak_${arch}'
+              file_path="yak_${arch}:/yak/latest/yak_${arch}"
             fi
             echo "Start to upload $file_path"
             ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_path
@@ -102,7 +102,7 @@ jobs:
             if [[ $arch == "windows_amd64.exe" ]]; then
               file_hash_path='yak_windows_amd64.exe.sha256.txt:/yak/latest/yak_windows_amd64.exe.sha256.txt'
             else
-              file_hash_path='yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt'
+              file_hash_path="yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt"
             fi
           
             # Check if SHA256 file exists before uploading
