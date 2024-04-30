@@ -52,6 +52,7 @@ var (
 		{Types: []string{"insecure-default"}, Verbose: "默认配置漏洞"},
 		{Types: []string{"weak-pass", "weak-password", "weak-credential", "弱口令"}, Verbose: "弱口令"},
 		{Types: []string{"compliance-test"}, Verbose: "合规检测"},
+		{Types: []string{"cve-baseline"}, Verbose: "CVE基线检查"},
 		{Types: []string{"ssti"}, Verbose: "SSTI"},
 		{Types: []string{"ssrf"}, Verbose: "SSRF"},
 		{Types: []string{"csrf"}, Verbose: "CSRF"},
@@ -131,7 +132,7 @@ func WithRiskParam_RiskType(i string) RiskParamsOpt {
 
 func WithRiskParam_RiskVerbose(i string) RiskParamsOpt {
 	return func(r *Risk) {
-		r.RiskTypeVerbose = RiskTypeToVerbose(i)
+		r.RiskTypeVerbose = i
 	}
 }
 
@@ -351,7 +352,8 @@ func _createRisk(u string, opts ...RiskParamsOpt) *Risk {
 	for _, opt := range opts {
 		opt(r)
 	}
-
+	verbose := RiskTypeToVerbose(r.RiskType)
+	r.RiskTypeVerbose = verbose
 	if r.Title == "" {
 		r.Title = fmt.Sprintf("no title risk for target: %v", u)
 	}
