@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
@@ -629,4 +630,68 @@ test`)
 
 	extractedData := replacer.hookColor(reqRaw, responseBytes, req, &yakit.HTTPFlow{})
 	require.Len(t, extractedData, 2)
+}
+
+func TestGRPCMUSTPASS_HookColorOffset(t *testing.T) {
+	headerBytes, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Tue, 10 Oct 2023 07:28:15 GMT
+Content-Length: 4`))
+	bodyBytes := []byte(`test`)
+	responseBytes := []byte(fmt.Sprintf("%s\r\n\r\n%s", headerBytes, bodyBytes))
+	req, err := http.NewRequest("POST", "https://www.baidu.com?a=test", bytes.NewBuffer([]byte("test")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqRaw, err := utils.DumpHTTPRequest(req, true)
+	require.NoError(t, err)
+	reqHeaderRaw, _ := lowhttp.SplitHTTPPacketFast(reqRaw)
+
+	testOffset := func(t *testing.T, name string, rule *ypb.MITMContentReplacer, wantLen, wantOffset int) {
+		replacer := NewMITMReplacer()
+		replacer.SetRules(rule)
+		extractedData := replacer.hookColor(reqRaw, responseBytes, req, &yakit.HTTPFlow{})
+		require.Lenf(t, extractedData, wantLen, "testcase name: %s", name)
+		require.Equalf(t, wantOffset, extractedData[0].DataIndex, "testcase name: %s", name)
+	}
+	testOffset(t,
+		"URI",
+		&ypb.MITMContentReplacer{
+			Rule:             `\/\?a=test`,
+			NoReplace:        true,
+			Result:           ``,
+			Color:            "",
+			EnableForRequest: true,
+			EnableForURI:     true,
+			Index:            0,
+			ExtraTag:         nil,
+			Disabled:         false,
+			VerboseName:      "",
+		}, 1, len("POST")+1)
+
+	testOffset(t,
+		"Response Body", &ypb.MITMContentReplacer{
+			Rule:              `test`,
+			NoReplace:         true,
+			Result:            ``,
+			Color:             "",
+			EnableForResponse: true,
+			EnableForBody:     true,
+			Index:             0,
+			ExtraTag:          nil,
+			Disabled:          false,
+			VerboseName:       "",
+		}, 1, len(headerBytes)+4)
+	testOffset(t, "Request Body", &ypb.MITMContentReplacer{
+		Rule:             `test`,
+		NoReplace:        true,
+		Result:           ``,
+		Color:            "",
+		EnableForRequest: true,
+		EnableForBody:    true,
+		Index:            0,
+		ExtraTag:         nil,
+		Disabled:         false,
+		VerboseName:      "",
+	}, 1, len(reqHeaderRaw))
 }

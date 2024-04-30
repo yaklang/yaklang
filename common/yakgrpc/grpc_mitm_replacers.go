@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dlclark/regexp2"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -63,23 +62,6 @@ type MITMReplaceRule struct {
 	*ypb.MITMContentReplacer
 	cache *regexp2.Regexp
 }
-type PacketInfo struct {
-	IsRequest     bool
-	GzipHeader    string
-	ChunkedHeader string
-	Method        string
-	RequestURI    string
-	Proto         string
-	Headers       [][2]string
-	Cookies       []*http.Cookie
-	HeaderRaw     string
-	BodyRaw       []byte
-}
-
-type MatchResult struct {
-	*regexp2.Match
-	IsMatchRequest bool
-}
 
 func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
 	if r.cache != nil {
@@ -129,7 +111,7 @@ func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
 	return re, nil
 }
 
-func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match, error) {
+func (m *MITMReplaceRule) matchByPacketInfo(info *yakit.PacketInfo) ([]*yakit.MatchResult, error) {
 	r, err := m.compile()
 	if err != nil {
 		return nil, err
@@ -140,7 +122,7 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match,
 	if !info.IsRequest && !m.EnableForResponse {
 		return nil, nil // match nothing
 	}
-	var items [][]byte
+	var items []*yakit.MatchInfo
 	var enableURI, enableHeader, enableBody, enableEntire bool
 	enableURI = m.EnableForURI
 	enableHeader = m.EnableForHeader
@@ -158,20 +140,24 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match,
 		enableBody = false
 	}
 	if enableURI {
-		items = append(items, []byte(info.RequestURI))
+		items = append(items, &yakit.MatchInfo{
+			[]byte(info.RequestURI), len(info.Method) + 1,
+		})
 	}
 	if enableHeader {
-		items = append(items, []byte(info.HeaderRaw))
+		items = append(items, &yakit.MatchInfo{
+			[]byte(info.HeaderRaw), 0,
+		})
 	}
 	if enableBody {
-		items = append(items, info.BodyRaw)
+		items = append(items, &yakit.MatchInfo{info.BodyRaw, len(info.HeaderRaw)})
 	}
 	if enableEntire {
-		items = append(items, lowhttp.ReplaceHTTPPacketBody([]byte(info.HeaderRaw), info.BodyRaw, false))
+		items = append(items, &yakit.MatchInfo{info.Raw, 0})
 	}
-	var res []*regexp2.Match
-	for _, data := range items {
-		match, err := r.FindStringMatch(utils.UnsafeBytesToString(data))
+	var res []*yakit.MatchResult
+	for _, item := range items {
+		match, err := r.FindStringMatch(string(item.Raw))
 		if err != nil {
 			return nil, err
 		}
@@ -191,14 +177,18 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match,
 			if ret == "" {
 				continue
 			}
-			res = append(res, match)
+			res = append(res, &yakit.MatchResult{
+				Match:          match,
+				IsMatchRequest: info.IsRequest,
+				MatchInfo:      item,
+			})
 		}
 	}
 	return res, nil
 }
 
-func (m *MITMReplaceRule) splitPacket(packet []byte) (*PacketInfo, error) {
-	info := &PacketInfo{}
+func (m *MITMReplaceRule) splitPacket(packet []byte) (*yakit.PacketInfo, error) {
+	info := &yakit.PacketInfo{Raw: packet}
 	headerRaw, bodyRaw := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx(
 		packet, func(method string, requestUri string, proto string) error {
 			info.RequestURI = requestUri
@@ -243,26 +233,27 @@ func (m *MITMReplaceRule) splitPacket(packet []byte) (*PacketInfo, error) {
 	return info, nil
 }
 
-func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) ([]*regexp2.Match, error) {
+func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) (*yakit.PacketInfo, []*yakit.MatchResult, error) {
 	originPacket := packet // backup origin packet
 	if !isReq {
 		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
 		if err != nil {
-			return nil, fmt.Errorf("fix http response failed: %v", err)
+			return nil, nil, fmt.Errorf("fix http response failed: %v", err)
 		}
 		packet = originDecoded
 	}
 	// parse http packet
 	packetInfo, err := m.splitPacket(packet)
 	if err != nil {
-		return nil, err
+		return packetInfo, nil, err
 	}
 	packetInfo.IsRequest = isReq
-	return m.matchByPacketInfo(packetInfo)
+	matched, err := m.matchByPacketInfo(packetInfo)
+	return packetInfo, matched, err
 }
 
 // MatchAndReplacePacket match and replace package, return matched result and replaced package
-func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*regexp2.Match, []byte, error) {
+func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*yakit.MatchResult, []byte, error) {
 	originPacket := packet // backup origin packet
 	if !isReq {
 		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
@@ -610,7 +601,13 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
 		}
 	}()
-	var extracted []*yakit.ExtractedData
+	var (
+		// packetInfo      *yakit.PacketInfo
+		extracted       []*yakit.ExtractedData
+		matchResults    []*yakit.MatchResult
+		newMatchResults []*yakit.MatchResult
+		err             error
+	)
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastElement := ret[len(ret)-1]
@@ -625,33 +622,21 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		if !rule.EnableForRequest && !rule.EnableForResponse {
 			continue
 		}
-		var matchResults []*MatchResult
+
 		if rule.EnableForRequest {
-			res, err := rule.MatchPacket(request, true)
+			_, newMatchResults, err = rule.MatchPacket(request, true)
 			if err != nil && !isMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
-			newMatchResults := lo.Map(res, func(item *regexp2.Match, _ int) *MatchResult {
-				return &MatchResult{
-					Match:          item,
-					IsMatchRequest: true,
-				}
-			})
 			matchResults = append(matchResults, newMatchResults...)
 		}
 		if rule.EnableForResponse {
-			res, err := rule.MatchPacket(response, false)
+			_, newMatchResults, err = rule.MatchPacket(response, false)
 			if err != nil && !isMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
-			newMatchResults := lo.Map(res, func(item *regexp2.Match, _ int) *MatchResult {
-				return &MatchResult{
-					Match:          item,
-					IsMatchRequest: false,
-				}
-			})
 			matchResults = append(matchResults, newMatchResults...)
 		}
 		for _, match := range matchResults {
@@ -669,13 +654,13 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			if ret == "" {
 				continue
 			}
+
 			stringForSettingColor(rule.Color, rule.ExtraTag, flow)
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
 				flow.CalcHash(),
 				rule.VerboseName,
-				match.Match,
+				match,
 				ret,
-				match.IsMatchRequest,
 				rule.String(),
 			))
 		}
