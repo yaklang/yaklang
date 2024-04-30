@@ -121,70 +121,31 @@ jobs:
           go run common/yak/cmd/yak.go upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f '${{ matrix.binary }}:/yak/${{ env.YAK_TAG }}/${{ matrix.binary }};${{ env.SHA256 }}:/yak/${{ env.YAK_TAG }}/${{ env.SHA256 }}'
 
       # upload assets
-      - name: Upload Artifacts Windows
-        uses: actions/upload-artifact@v2
-        if: runner.os == 'Windows'
+      - name: Upload binary artifacts 
+        uses: actions/upload-artifact@v4
         with:
-          name: yak_windows_amd64.exe
-          path: ./yak_windows_amd64.exe
+          name: ${{ matrix.binary }}
+          path: ./${{ matrix.binary }}
 
-      - name: Upload Artifacts MacOS(amd64)
-        uses: actions/upload-artifact@v2
-        if: matrix.os == 'macos-amd64'
+      - name: Upload sha256 checksums artifacts 
+        uses: actions/upload-artifact@v4
         with:
-          name: yak_darwin_amd64
-          path: ./yak_darwin_amd64
+          name: ${{ env.SHA256 }}
+          path: ./${{ env.SHA256 }}
 
-      - name: Upload Artifacts MacOS(arm64)
-        uses: actions/upload-artifact@v2
-        if: matrix.os == 'macos-arm64'
-        with:
-          name: yak_darwin_arm64
-          path: ./yak_darwin_arm64
-
-      - name: Upload Artifacts CrossBuild Linux(amd64)
-        uses: actions/upload-artifact@v2
-        if: matrix.os == 'linux-amd64'
-        with:
-          name: yak_linux_amd64
-          path: ./yak_linux_amd64
-
-      - name: Upload Artifacts CrossBuild Linux(arm64)
-        uses: actions/upload-artifact@v2
-        if: matrix.os == 'linux-arm64'
-        with:
-          name: yak_linux_arm64
-          path: ./yak_linux_arm64
 
   check_version_and_github_release:
     runs-on: ubuntu-latest
     needs: build_and_upload_to_oss
     steps:
       - uses: actions/checkout@v2
-      - name: Download Windows binary
-        uses: actions/download-artifact@v2
-        with:
-          name: yak_windows_amd64.exe
 
-      - name: Download macOS x64 binary
-        uses: actions/download-artifact@v2
+      # download assets
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: yak_darwin_amd64
-
-      - name: Download macOS arm64 binary
-        uses: actions/download-artifact@v2
-        with:
-          name: yak_darwin_arm64
-
-      - name: Download Linux x64 binary
-        uses: actions/download-artifact@v2
-        with:
-          name: yak_linux_amd64
-
-      - name: Download Linux arm64 binary
-        uses: actions/download-artifact@v2
-        with:
-          name: yak_linux_arm64
+          merge-multiple: true
+          path: ${{ github.workspace }}
 
       - name: Get Repo tags
         run: |
@@ -203,68 +164,28 @@ jobs:
       #        run: |
       #          ./yak_linux_amd64 upload-oss -f tags.txt:/yak/latest/version.txt;previous_version.txt:/yak/previous/previous_version.txt -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
+          name: ${{ env.YAK_TAG }}
           tag_name: ${{ env.YAK_TAG }}
-          release_name: ${{ env.YAK_TAG }}
           body: |
             Release ${{ env.YAK_TAG }}
           draft: true
           prerelease: false
-
-      - name: Upload Release Asset Linux(amd64)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./yak_linux_amd64
-          asset_name: yak_linux_amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset Linux(arm64)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./yak_linux_arm64
-          asset_name: yak_linux_arm64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset macOS(amd64)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./yak_darwin_amd64
-          asset_name: yak_darwin_amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset macOS(arm64)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./yak_darwin_arm64
-          asset_name: yak_darwin_arm64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset Windows
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./yak_windows_amd64.exe
-          asset_name: yak_windows_amd64.exe
-          asset_content_type: application/octet-stream
+          files: |
+            yak_windows_amd64.exe
+            yak_linux_amd64
+            yak_linux_arm64
+            yak_darwin_amd64
+            yak_darwin_arm64
+            yak_windows_amd64.exe.sha256.txt
+            yak_linux_amd64.sha256.txt
+            yak_linux_arm64.sha256.txt
+            yak_darwin_amd64.sha256.txt
+            yak_darwin_arm64.sha256.txt
     
     
     
