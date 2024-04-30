@@ -201,7 +201,7 @@ func newLocalClientEx(initFacadeServer bool, locals ...bool) (ypb.YakClient, err
 				grpc.MaxRecvMsgSize(100*1024*1024),
 				grpc.MaxSendMsgSize(100*1024*1024),
 			)
-			s, err := newServerEx(initFacadeServer, false)
+			s, err := newServerEx(WithInitFacadeServer(initFacadeServer))
 			if err != nil {
 				log.Errorf("build yakit server failed: %s", err)
 				finalErr = err
