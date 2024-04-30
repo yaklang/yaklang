@@ -35,6 +35,9 @@ type ExtractedData struct {
 
 	// Length 表示数据的长度
 	Length int
+
+	// IsMatchRequest 表示是否是匹配请求
+	IsMatchRequest bool
 }
 
 func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error {
@@ -87,19 +90,20 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	return paging, ret, nil
 }
 
-func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matched *regexp2.Match, data string, regexpStr ...string) *ExtractedData {
+func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matched *regexp2.Match, data string, isMatchRequest bool, regexpStr ...string) *ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
 	}
 	extractData := &ExtractedData{
-		SourceType:  "httpflow",
-		TraceId:     flowHash,
-		Regexp:      r,
-		RuleVerbose: ruleName,
-		Data:        data,
-		DataIndex:   matched.Index,
-		Length:      matched.Length,
+		SourceType:     "httpflow",
+		TraceId:        flowHash,
+		Regexp:         r,
+		RuleVerbose:    ruleName,
+		Data:           data,
+		DataIndex:      matched.Index,
+		Length:         matched.Length,
+		IsMatchRequest: isMatchRequest,
 	}
 	return extractData
 }

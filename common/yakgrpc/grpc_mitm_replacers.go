@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dlclark/regexp2"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -73,6 +74,11 @@ type PacketInfo struct {
 	Cookies       []*http.Cookie
 	HeaderRaw     string
 	BodyRaw       []byte
+}
+
+type MatchResult struct {
+	*regexp2.Match
+	IsMatchRequest bool
 }
 
 func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
@@ -598,38 +604,6 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 	return
 }
 
-func (m *mitmReplacer) matchAndRenderColor(flow *yakit.HTTPFlow, r *regexp2.Regexp, rule *ypb.MITMContentReplacer, origin []byte) *yakit.ExtractedData {
-	match, err := r.FindStringMatch(utils.UnsafeBytesToString(origin))
-	if err != nil || match == nil {
-		return nil
-	}
-
-	var ret string
-	for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
-		if match.GroupCount() > 1 {
-			extractGroup := match.GroupByNumber(1)
-			if extractGroup != nil {
-				ret = extractGroup.String()
-			}
-		} else {
-			ret = match.String()
-		}
-
-		if ret == "" {
-			continue
-		}
-		stringForSettingColor(rule.Color, rule.ExtraTag, flow)
-		return yakit.ExtractedDataFromHTTPFlow(
-			flow.CalcHash(), rule.VerboseName,
-			match,
-			ret,
-			r.String(),
-		)
-	}
-
-	return nil
-}
-
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) []*yakit.ExtractedData {
 	defer func() {
 		if err := recover(); err != nil {
@@ -651,14 +625,20 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		if !rule.EnableForRequest && !rule.EnableForResponse {
 			continue
 		}
-		var matchRes []*regexp2.Match
+		var matchResults []*MatchResult
 		if rule.EnableForRequest {
 			res, err := rule.MatchPacket(request, true)
 			if err != nil && !isMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
-			matchRes = append(matchRes, res...)
+			newMatchResults := lo.Map(res, func(item *regexp2.Match, _ int) *MatchResult {
+				return &MatchResult{
+					Match:          item,
+					IsMatchRequest: true,
+				}
+			})
+			matchResults = append(matchResults, newMatchResults...)
 		}
 		if rule.EnableForResponse {
 			res, err := rule.MatchPacket(response, false)
@@ -666,9 +646,15 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
-			matchRes = append(matchRes, res...)
+			newMatchResults := lo.Map(res, func(item *regexp2.Match, _ int) *MatchResult {
+				return &MatchResult{
+					Match:          item,
+					IsMatchRequest: false,
+				}
+			})
+			matchResults = append(matchResults, newMatchResults...)
 		}
-		for _, match := range matchRes {
+		for _, match := range matchResults {
 			ret := ""
 
 			if match.GroupCount() > 1 {
@@ -685,9 +671,11 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			}
 			stringForSettingColor(rule.Color, rule.ExtraTag, flow)
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
-				flow.CalcHash(), rule.VerboseName,
-				match,
+				flow.CalcHash(),
+				rule.VerboseName,
+				match.Match,
 				ret,
+				match.IsMatchRequest,
 				rule.String(),
 			))
 		}

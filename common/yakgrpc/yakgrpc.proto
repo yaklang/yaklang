@@ -1530,6 +1530,7 @@ message MITMRuleExtractedData {
   string Data = 7;
   int64 Index = 8;
   int64 Length = 9;
+  bool IsMatchRequest = 10;
 }
 
 message QueryMITMRuleExtractedDataResponse {
