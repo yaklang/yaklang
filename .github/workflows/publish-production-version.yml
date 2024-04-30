@@ -83,13 +83,13 @@ jobs:
           echo "Uploading version.txt to oss"
           echo "Version $(cat version.txt)"
           echo "Previous Version $(cat previous_version.txt)"
-          bucket="cve-db"
+          bucket="yaklang"
           ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'version.txt:/yak/latest/version.txt'
           ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'previous_version.txt:/yak/previous/previous_version.txt'
 
       - name: Upload Yak Binary Version
         run: |
-          bucket="cve-db"
+          bucket="yaklang"
           for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe; do
             if [[ $arch == "windows_amd64.exe" ]]; then
               file_path='yak_windows_amd64.exe:/yak/latest/yak_windows_amd64.exe'
