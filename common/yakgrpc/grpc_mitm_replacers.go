@@ -659,7 +659,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 				continue
 			}
 			matchRes = append(matchRes, res...)
-		} else {
+		}
+		if rule.EnableForResponse {
 			res, err := rule.MatchPacket(response, false)
 			if err != nil && !isMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
