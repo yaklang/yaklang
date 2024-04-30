@@ -8,6 +8,8 @@ on:
     inputs:
       publish_version:
         description: "Version to publish (e.g. v1.3.0)"
+        type: string
+        required: true
 
 jobs:
   check_version_and_publish:
