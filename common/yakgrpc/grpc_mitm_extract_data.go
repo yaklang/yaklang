@@ -25,15 +25,16 @@ func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryM
 	return &ypb.QueryMITMRuleExtractedDataResponse{
 		Data: funk.Map(data, func(i *yakit.ExtractedData) *ypb.MITMRuleExtractedData {
 			return &ypb.MITMRuleExtractedData{
-				Id:         int64(i.ID),
-				CreatedAt:  i.CreatedAt.Unix(),
-				SourceType: i.SourceType,
-				TraceId:    i.TraceId,
-				Regexp:     utils.EscapeInvalidUTF8Byte([]byte(i.Regexp)),
-				RuleName:   utils.EscapeInvalidUTF8Byte([]byte(i.RuleVerbose)),
-				Data:       utils.EscapeInvalidUTF8Byte([]byte(i.Data)),
-				Index:      int64(i.DataIndex),
-				Length:     int64(i.Length),
+				Id:             int64(i.ID),
+				CreatedAt:      i.CreatedAt.Unix(),
+				SourceType:     i.SourceType,
+				TraceId:        i.TraceId,
+				Regexp:         utils.EscapeInvalidUTF8Byte([]byte(i.Regexp)),
+				RuleName:       utils.EscapeInvalidUTF8Byte([]byte(i.RuleVerbose)),
+				Data:           utils.EscapeInvalidUTF8Byte([]byte(i.Data)),
+				Index:          int64(i.DataIndex),
+				Length:         int64(i.Length),
+				IsMatchRequest: i.IsMatchRequest,
 			}
 		}).([]*ypb.MITMRuleExtractedData),
 		Total:      int64(p.TotalRecord),
