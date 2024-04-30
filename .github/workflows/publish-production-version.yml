@@ -3,10 +3,10 @@ name: Publish Production Version
 on:
   pull_request:
     paths:
-      - '.github/workflows/exp-cross-build.yml'
+      - '.github/workflows/publish-production-version.yml'
   workflow_dispatch:
     inputs:
-      version:
+      publish_version:
         description: "Version to publish (e.g. v1.3.0)"
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Check if version starts with 'v'
         run: |
-          VERSION_INPUT="${{ github.event.inputs.version }}"
+          VERSION_INPUT="${{ github.event.inputs.publish_version }}"
           if [[ $VERSION_INPUT != v* ]]; then
             echo "Error: Version must start with 'v'."
             exit 1
@@ -32,7 +32,7 @@ jobs:
       - name: Switch to version branch
         run: |
           git fetch --all
-          git checkout ${{ github.event.inputs.version }}
+          git checkout ${{ github.event.inputs.publish_version }}
           if [ $? -ne 0 ]; then
             echo "Branch checkout failed."
             exit 1
