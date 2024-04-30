@@ -1,4 +1,4 @@
-name: Publish Production Version
+name: Publish-Production-Version
 
 on:
   pull_request:
