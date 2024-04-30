@@ -1,6 +1,9 @@
 name: Publish Production Version
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/exp-cross-build.yml'
   workflow_dispatch:
     inputs:
       version:
