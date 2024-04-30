@@ -3,6 +3,9 @@ package codegrpc
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/des"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -10,6 +13,7 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"hash"
 	"regexp"
 	"strings"
@@ -142,6 +146,28 @@ func decodeData(text []byte, input outputType) []byte {
 	return data
 }
 
+func padding(paddingType string, data []byte, size int) ([]byte, error) {
+	switch paddingType {
+	case "pkcs":
+		return codec.PKCS5Padding(data, size), nil
+	case "zeroPadding":
+		return codec.ZeroPadding(data, size), nil
+	default:
+		return nil, utils.Error("unknown paddingType")
+	}
+}
+
+func unPadding(paddingType string, data []byte) ([]byte, error) {
+	switch paddingType {
+	case "pkcs":
+		return codec.PKCS5UnPadding(data), nil
+	case "zeroPadding":
+		return codec.ZeroUnPadding(data), nil
+	default:
+		return nil, utils.Error("unknown unPaddingType")
+	}
+}
+
 // Tag = "加密"
 // CodecName = "AES对称加密"
 // Desc ="""高级加密标准（AES）是美国联邦信息处理标准（FIPS）。它是在一个历时5年的过程中，从15个竞争设计中选出的。
@@ -153,25 +179,21 @@ func decodeData(text []byte, input outputType) []byte {
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
-	var data []byte
-	var err error
-
+func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
+	inData, err := padding(paddingType, flow.Text, 16)
+	if err != nil {
+		return err
+	}
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeIV := decodeData([]byte(IV), ivType)
-	switch mode {
-	case "CBC":
-		data, err = codec.AESCBCEncrypt(decodeKey, flow.Text, decodeIV)
-	case "ECB":
-		data, err = codec.AESECBEncrypt(decodeKey, flow.Text, decodeIV)
-	case "GCM":
-		data, err = codec.AESGCMEncrypt(decodeKey, flow.Text, decodeIV)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	if funk.IsEmpty(decodeIV) {
+		decodeIV = decodeKey // if IV is empty, use key as IV
 	}
+	data, err := codec.AESEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
 	}
@@ -188,29 +210,25 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"}
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
-	var data []byte
+func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	var err error
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	inputText := decodeData(flow.Text, input)
-	switch mode {
-	case "CBC":
-		data, err = codec.AESCBCDecrypt(decodeKey, inputText, decodeIV)
-	case "ECB":
-		data, err = codec.AESECBDecrypt(decodeKey, inputText, decodeIV)
-	case "GCM":
-		data, err = codec.AESGCMDecrypt(decodeKey, inputText, decodeIV)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	dec, err := codec.AESDec(decodeKey, inputText, decodeIV, mode)
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		flow.Text = data
+	dec, err = unPadding(paddingType, dec)
+	if err != nil {
+		return err
 	}
-	return err
+	flow.Text = dec
+	return nil
 }
 
 // Tag = "加密"
@@ -219,28 +237,21 @@ func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"}
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
-	var data []byte
-	var err error
+func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
+	inData, err := padding(paddingType, flow.Text, 16)
+	if err != nil {
+		return err
+	}
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeIV := decodeData([]byte(IV), ivType)
-	switch mode {
-	case "CBC":
-		data, err = codec.SM4CBCEnc(decodeKey, flow.Text, decodeIV)
-	case "ECB":
-		data, err = codec.SM4ECBEnc(decodeKey, flow.Text, decodeIV)
-	case "GCM":
-		data, err = codec.SM4GCMEnc(decodeKey, flow.Text, decodeIV)
-	case "CFB":
-		data, err = codec.SM4CFBEnc(decodeKey, flow.Text, decodeIV)
-	case "OFB":
-		data, err = codec.SM4OFBEnc(decodeKey, flow.Text, decodeIV)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	if funk.IsEmpty(decodeIV) {
+		decodeIV = decodeKey // if IV is empty, use key as IV
 	}
+	data, err := codec.SM4Enc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
 	}
@@ -253,33 +264,25 @@ func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
-	var data []byte
+func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	var err error
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	inputText := decodeData(flow.Text, input)
-	switch mode {
-	case "CBC":
-		data, err = codec.SM4CBCDec(decodeKey, inputText, decodeIV)
-	case "ECB":
-		data, err = codec.SM4ECBDec(decodeKey, inputText, decodeIV)
-	case "GCM":
-		data, err = codec.SM4GCMDec(decodeKey, inputText, decodeIV)
-	case "CFB":
-		data, err = codec.SM4CFBDec(decodeKey, inputText, decodeIV)
-	case "OFB":
-		data, err = codec.SM4OFBDec(decodeKey, inputText, decodeIV)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	dec, err := codec.SM4Dec(decodeKey, inputText, decodeIV, mode)
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		flow.Text = data
+	dec, err = unPadding(paddingType, dec)
+	if err != nil {
+		return err
 	}
-	return err
+	flow.Text = dec
+	return nil
 }
 
 // Tag = "加密"
@@ -289,21 +292,20 @@ func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivT
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"}
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
-	var data []byte
-	var err error
+func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
+	inData, err := padding(paddingType, flow.Text, 8)
+	if err != nil {
+		return err
+	}
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeIV := decodeData([]byte(IV), ivType)
-	switch mode {
-	case "CBC":
-		data, err = codec.DESCBCEnc(decodeKey, flow.Text, decodeIV)
-	case "ECB":
-		data, err = codec.DESECBEnc(decodeKey, flow.Text)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	if funk.IsEmpty(decodeIV) {
+		decodeIV = decodeKey // if IV is empty, use key as IV
 	}
+	data, err := codec.DESEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
 	}
@@ -317,26 +319,23 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
-	var data []byte
-	var err error
+func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	inputText := decodeData(flow.Text, input)
-	switch mode {
-	case "CBC":
-		data, err = codec.DESCBCDec(decodeKey, inputText, decodeIV)
-	case "ECB":
-		data, err = codec.DESECBDec(decodeKey, inputText)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	dec, err := codec.DESDec(decodeKey, inputText, decodeIV, mode)
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		flow.Text = data
+	dec, err = unPadding(paddingType, dec)
+	if err != nil {
+		return err
 	}
-	return err
+	flow.Text = dec
+	return nil
 }
 
 // Tag = "加密"
@@ -346,21 +345,20 @@ func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivT
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true ,Label = "输出格式"}
+// { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true ,Label = "输出格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
-	var data []byte
-	var err error
+func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
+	inData, err := padding(paddingType, flow.Text, 8)
+	if err != nil {
+		return err
+	}
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeIV := decodeData([]byte(IV), ivType)
-	switch mode {
-	case "CBC":
-		data, err = codec.TripleDES_CBCEnc(decodeKey, flow.Text, decodeIV)
-	case "ECB":
-		data, err = codec.TripleDES_ECBEnc(decodeKey, flow.Text)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	if funk.IsEmpty(decodeIV) && len(decodeKey) == 24 {
+		decodeIV = decodeKey[:8] // if IV is empty, use key as IV
 	}
+	data, err := codec.TripleDesEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
 	}
@@ -374,26 +372,23 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
+// { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
-	var data []byte
-	var err error
+func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	inputText := decodeData(flow.Text, input)
-	switch mode {
-	case "CBC":
-		data, err = codec.TripleDES_CBCDec(decodeKey, inputText, decodeIV)
-	case "ECB":
-		data, err = codec.TripleDES_ECBDec(decodeKey, inputText)
-	default:
-		return utils.Error("AESEncryptEx: unknown mode")
+	dec, err := codec.TripleDesDec(decodeKey, inputText, decodeIV, mode)
+	if err != nil {
+		return err
 	}
-	if err == nil {
-		flow.Text = data
+	dec, err = unPadding(paddingType, dec)
+	if err != nil {
+		return err
 	}
-	return err
+	flow.Text = dec
+	return nil
 }
 
 // Tag = "加密"
@@ -762,30 +757,42 @@ func (flow *CodecExecFlow) Hmac(key string, keyType string, hashMethod string, o
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "alg", Type = "select",DefaultValue = "AES", Options = ["SM4", "DES","AES"], Required = true ,Label = "加密算法"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
-func (flow *CodecExecFlow) CbcMac(alg, key, keyType string, output outputType) error {
+func (flow *CodecExecFlow) CbcMac(alg, key, keyType string, output outputType, paddingType string) error {
 	keyByte := decodeData([]byte(key), keyType)
-	var res []byte
 	var err error
-	var blockSize int
+	var c cipher.Block
+
 	switch alg {
 	case "SM4":
-		res, err = codec.SM4CBCEnc(keyByte, flow.Text, codec.ZeroPadding([]byte{0}, 16))
-		blockSize = 16
+		c, err = sm4.NewCipher(keyByte)
+		if err != nil {
+			return err
+		}
 	case "DES":
-		res, err = codec.DESCBCEnc(keyByte, flow.Text, codec.ZeroPadding([]byte{0}, 8))
-		blockSize = 8
+		c, err = des.NewCipher(keyByte)
+		if err != nil {
+			return err
+		}
 	case "AES":
-		res, err = codec.AESCBCEncrypt(keyByte, flow.Text, codec.ZeroPadding([]byte{0}, 16))
-		blockSize = 16
+		c, err = aes.NewCipher(keyByte)
+		if err != nil {
+			return err
+		}
 	default:
 		return utils.Error("CbcMac: unknown alg method")
 	}
+	data, err := padding(paddingType, flow.Text, c.BlockSize())
 	if err != nil {
 		return err
 	}
-	res = res[len(res)-blockSize:]
+	res, err := codec.CBCEncode(c, make([]byte, c.BlockSize()), data)
+	if err != nil {
+		return err
+	}
+	res = res[len(res)-c.BlockSize():]
 	flow.Text = encodeData(res, output)
 	return nil
 }
