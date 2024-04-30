@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
+	"github.com/yaklang/pcap"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
