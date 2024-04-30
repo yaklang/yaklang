@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"net/http"
 	"strings"
 
 	"github.com/dlclark/regexp2"
@@ -40,6 +41,29 @@ type ExtractedData struct {
 	IsMatchRequest bool
 }
 
+type PacketInfo struct {
+	IsRequest     bool
+	GzipHeader    string
+	ChunkedHeader string
+	Method        string
+	RequestURI    string
+	Proto         string
+	Headers       [][2]string
+	Cookies       []*http.Cookie
+	HeaderRaw     string
+	BodyRaw       []byte
+	Raw           []byte
+}
+type MatchInfo struct {
+	Raw    []byte
+	Offset int
+}
+type MatchResult struct {
+	*regexp2.Match
+	IsMatchRequest bool
+	MatchInfo      *MatchInfo
+}
+
 func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error {
 	if mainId <= 0 {
 		if db := db.Model(&ExtractedData{}).Save(i); db.Error != nil {
@@ -75,7 +99,7 @@ func DeleteExtractedDataByID(db *gorm.DB, id int64) error {
 }
 
 func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*ExtractedData, error) {
-	db = db.Model(&ExtractedData{})
+	db = db.Debug().Model(&ExtractedData{})
 
 	params := req.GetPagination()
 
@@ -90,20 +114,21 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	return paging, ret, nil
 }
 
-func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matched *regexp2.Match, data string, isMatchRequest bool, regexpStr ...string) *ExtractedData {
+func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
 	}
+
 	extractData := &ExtractedData{
 		SourceType:     "httpflow",
 		TraceId:        flowHash,
 		Regexp:         r,
 		RuleVerbose:    ruleName,
 		Data:           data,
-		DataIndex:      matched.Index,
-		Length:         matched.Length,
-		IsMatchRequest: isMatchRequest,
+		DataIndex:      matchResult.Index + matchResult.MatchInfo.Offset,
+		Length:         matchResult.Length,
+		IsMatchRequest: matchResult.IsMatchRequest,
 	}
 	return extractData
 }
