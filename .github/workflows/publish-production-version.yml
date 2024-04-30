@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Switch to version branch
         run: |
-          git fetch --all
+          git fetch origin ${{ github.event.inputs.publish_version }} 
           git checkout ${{ github.event.inputs.publish_version }}
           if [ $? -ne 0 ]; then
             echo "Branch checkout failed."
