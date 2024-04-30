@@ -610,6 +610,20 @@ func httpRequestReadBody(r *http.Request) []byte {
 	return buf.Bytes()
 }
 
+// hasSpecialJSONPathChars 检查 JSONPath 字符串是否包含特殊意义的符号。
+func hasSpecialJSONPathChars(jsonPath string) bool {
+	// 定义一个包含 JSONPath 特殊字符的列表。
+	specialChars := []string{"$", "@", ".", "..", "*", "[", "]", "?", "(", ":", ")"}
+
+	// 遍历特殊字符列表，检查它们是否在 JSONPath 字符串中。
+	for _, char := range specialChars {
+		if strings.Contains(jsonPath, char) {
+			return true // 发现特殊字符，返回 true。
+		}
+	}
+	return false
+}
+
 func walk(raw []byte, value gjson.Result, gPrefix string, jPrefix string, call func(key, val gjson.Result, gPath, jPath string)) {
 	// 遍历当前层级的所有键
 	value.ForEach(func(key, val gjson.Result) bool {
@@ -620,10 +634,17 @@ func walk(raw []byte, value gjson.Result, gPrefix string, jPrefix string, call f
 		} else {
 			jPath = fmt.Sprintf("%s.%s", jPrefix, key.String())
 		}
+		if key.Type == gjson.String && hasSpecialJSONPathChars(key.String()) {
+			jPath = fmt.Sprintf(`%s["%s"]`, jPrefix, key.String())
+		}
 		// gjson path syntax
 		gPath := key.String()
 		if gPrefix != "" {
-			gPath = gPrefix + "." + key.String()
+			curr := key.String()
+			if hasSpecialJSONPathChars(key.String()) {
+				curr = "\\" + key.String()
+			}
+			gPath = gPrefix + "." + curr
 		}
 
 		call(key, val, gPath, jPath)
