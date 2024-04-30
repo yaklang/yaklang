@@ -783,6 +783,7 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 		plainResponse []byte
 		err           error
 	)
+	// 为了此处的请求与mitm的请求保持一致，需要重新从httpctx中获取
 	if httpctx.GetRequestIsModified(req) {
 		plainRequest = httpctx.GetHijackedRequestBytes(req)
 	} else {
@@ -790,17 +791,18 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 		if len(plainRequest) <= 0 {
 			plainRequest = lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
 		}
-		if len(plainRequest) <= 0 {
-			plainRequest, err = utils.HttpDumpWithBody(req, true)
+	}
+	if len(plainRequest) <= 0 {
+		plainRequest, err = utils.HttpDumpWithBody(req, true)
+		if err != nil {
+			plainRequest, err = utils.HttpDumpWithBody(req, false)
 			if err != nil {
-				plainRequest, err = utils.HttpDumpWithBody(req, false)
-				if err != nil {
-					log.Errorf("dump request failed: %s", err)
-				}
+				log.Errorf("dump request failed: %s", err)
 			}
 		}
 	}
 
+	// 为了此处的响应与mitm的响应保持一致，需要重新从httpctx中获取
 	if rsp != nil {
 		if httpctx.GetResponseIsModified(req) {
 			plainResponse = httpctx.GetHijackedResponseBytes(req)
@@ -809,11 +811,11 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 			if len(plainResponse) <= 0 {
 				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
 			}
-			if len(plainResponse) <= 0 {
-				plainResponse, err = utils.HttpDumpWithBody(rsp, true)
-				if err != nil {
-					log.Errorf("dump response failed: %s", err)
-				}
+		}
+		if len(plainResponse) <= 0 {
+			plainResponse, err = utils.HttpDumpWithBody(rsp, true)
+			if err != nil {
+				log.Errorf("dump response failed: %s", err)
 			}
 		}
 	} else {
