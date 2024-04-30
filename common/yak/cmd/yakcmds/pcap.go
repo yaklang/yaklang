@@ -3,8 +3,8 @@ package yakcmds
 import (
 	"fmt"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
 	"github.com/urfave/cli"
+	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
