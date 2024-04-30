@@ -943,6 +943,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			response := reqInstance.GetResponse()
 			if handleResponseModified(response) {
 				httpctx.SetResponseModified(req, "manual")
+				httpctx.SetHijackedResponseBytes(req, response)
 			}
 
 			rspModified, _, err := lowhttp.FixHTTPResponse(response)
