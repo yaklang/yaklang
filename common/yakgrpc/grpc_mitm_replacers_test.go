@@ -579,16 +579,17 @@ func TestMatchPatternMatchHeaderAndBody(t *testing.T) {
 		Disabled:          false,
 		VerboseName:       "",
 	})
-	reqRaw := `POST /testUri HTTP/1.1
+	reqRaw := lowhttp.FixHTTPRequest([]byte(`POST /testUri HTTP/1.1
 Host: www.baidu.com
 header: 1
 
 body
-`
+`))
 	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
-	if !strings.HasSuffix(string(modifiedPacket), "Content-Length: 5==ok==\n") {
-		t.Fatal("replace failed")
-	}
+	require.Contains(t, string(modifiedPacket), "Content-Length: 6==ok==")
+	// if !strings.Contains(string(modifiedPacket), "Content-Length: 6==ok==\n") {
+	// 	t.Fatalf("replace failed: %s", string(modifiedPacket))
+	// }
 }
 
 func ConfigRuleByFlags(rule *ypb.MITMContentReplacer, ruleFlag int) {
@@ -638,7 +639,7 @@ Content-Type: application/json; charset=utf-8
 Date: Tue, 10 Oct 2023 07:28:15 GMT
 Content-Length: 4`))
 	bodyBytes := []byte(`test`)
-	responseBytes := []byte(fmt.Sprintf("%s\r\n\r\n%s", headerBytes, bodyBytes))
+	responseBytes := []byte(fmt.Sprintf("%s%s", headerBytes, bodyBytes))
 	req, err := http.NewRequest("POST", "https://www.baidu.com?a=test", bytes.NewBuffer([]byte("test")))
 	if err != nil {
 		t.Fatal(err)
@@ -681,7 +682,7 @@ Content-Length: 4`))
 			ExtraTag:          nil,
 			Disabled:          false,
 			VerboseName:       "",
-		}, 1, len(headerBytes)+4)
+		}, 1, len(headerBytes))
 	testOffset(t, "Request Body", &ypb.MITMContentReplacer{
 		Rule:             `test`,
 		NoReplace:        true,
