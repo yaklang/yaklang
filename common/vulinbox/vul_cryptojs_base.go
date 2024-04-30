@@ -415,7 +415,7 @@ setTimeout(function(){
 					encrypted := utils.MapGetString(params, "data")
 					encryptedBase64Decoded, _ := codec.DecodeBase64(encrypted)
 
-					var origin, decErr = codec.AESECBDecryptWithPKCS7Padding([]byte(key), []byte(encryptedBase64Decoded), []byte(iv))
+					var origin, decErr = codec.AESDecryptECBWithPKCSPadding([]byte(key), []byte(encryptedBase64Decoded), []byte(iv))
 					spew.Dump(origin, decErr)
 					var handled string
 					var raw, _ = json.MarshalIndent(map[string]any{

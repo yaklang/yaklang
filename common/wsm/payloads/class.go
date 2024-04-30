@@ -459,10 +459,10 @@ func DecryptForCSharp(code []byte, key []byte) ([]byte, error) {
 }
 
 func EncryptForJava(code []byte, key []byte) ([]byte, error) {
-	return codec.AESECBEncrypt(key, code, nil)
+	return codec.AESEncryptECBWithPKCSPadding(key, code, nil)
 }
 
 // DecryptForJava TODO 解密前判断下长度，不然可能会 panic
 func DecryptForJava(code []byte, key []byte) ([]byte, error) {
-	return codec.AESECBDecrypt(key, code, nil)
+	return codec.AESDecryptECBWithPKCSPadding(key, code, nil)
 }
