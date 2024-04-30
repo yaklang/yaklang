@@ -7,9 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish"
-        required: true
-        type: string
+        description: "Version to publish (e.g. v1.3.0)"
 
 jobs:
   check_version_and_publish:
