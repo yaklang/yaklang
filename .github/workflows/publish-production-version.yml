@@ -38,10 +38,10 @@ jobs:
           fi
 
       - name: Download Last Published Version
-        run: wget -O previous_version.txt https://aliyun-oss.yaklang.com/yak/latest/version.txt
+        run: wget -O -q previous_version.txt https://aliyun-oss.yaklang.com/yak/latest/version.txt
 
       - name: Download CI Needed Yak Linux(amd64) Version to operator
-        run: wget -O './yak' https://aliyun-oss.yaklang.com/yak/ci/yak_linux_amd64 && chmod +x ./yak
+        run: wget -O -q './yak' https://aliyun-oss.yaklang.com/yak/ci/yak_linux_amd64 && chmod +x ./yak
 
       - name: Download Binaries
         run: |
@@ -61,13 +61,13 @@ jobs:
           for arch in "${!os_archs[@]}"; do
             file_name="${os_archs[$arch]}"
 
-            wget -O "./$file_name" "$base_url/$file_name"
+            wget -O -q "./$file_name" "$base_url/$file_name"
           
             # Use wget to check if the SHA256 file is accessible and returns HTTP 200
             if wget --spider --server-response "$base_url/$file_name.sha256.txt" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
               # If HTTP response 200, download both the file and its SHA256
               echo "Downloading $file_name and its SHA256..."
-              wget -O "./$file_name.sha256.txt" "$base_url/$file_name.sha256.txt"
+              wget -O -q "./$file_name.sha256.txt" "$base_url/$file_name.sha256.txt"
             else
               echo "SHA256 file not found or server did not return HTTP 200 for $file_name.sha256.txt, skipping download."
             fi
