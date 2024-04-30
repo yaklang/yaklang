@@ -18,7 +18,7 @@ func TestAESECBEncrypt(t *testing.T) {
 	key = []byte("asdfasdfasdfasdf")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`4m7Z+sPRfCM0F77gJg9v6RAmt8hy9AqfAkhLtQiwZGw=`)
-	encryptedRaw, err = AESECBEncryptWithPKCS7Padding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptECBWithPKCSPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -26,7 +26,7 @@ func TestAESECBEncrypt(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("aes ecb encrypt error")
 	}
-	raw, err := AESECBDecryptWithPKCS7Padding(key, encryptedRaw, iv)
+	raw, err := AESDecryptECBWithPKCSPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func TestAESECBEncrypt(t *testing.T) {
 	key = []byte("asdfasdfasdfasdf")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`4m7Z+sPRfCM0F77gJg9v6aUrf1IbU9gZ8eemQZB8cCI=`)
-	encryptedRaw, err = AESECBEncryptWithZeroPadding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptECBWithZeroPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +47,7 @@ func TestAESECBEncrypt(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("aes ecb encrypt error")
 	}
-	raw, err = AESECBDecryptWithZeroPadding(key, encryptedRaw, iv)
+	raw, err = AESDecryptECBWithZeroPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +69,7 @@ func TestAESECBEncrypt2(t *testing.T) {
 	key = []byte("asdfasdfasdfasdfaaaaaaaa")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`AT3zVDh1IuRnk3DfYboPHHPWnLjz5GSvZmx9gKUII0I=`)
-	encryptedRaw, err = AESECBEncryptWithPKCS7Padding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptECBWithPKCSPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +77,7 @@ func TestAESECBEncrypt2(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("aes ecb encrypt error")
 	}
-	raw, err := AESECBDecryptWithPKCS7Padding(key, encryptedRaw, iv)
+	raw, err := AESDecryptECBWithPKCSPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func TestAESECBEncrypt2(t *testing.T) {
 	key = []byte("asdfasdfasdfasdfaaaaaaaa")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`AT3zVDh1IuRnk3DfYboPHGFQBhsctmch1PYxcnV7yM0=`)
-	encryptedRaw, err = AESECBEncryptWithZeroPadding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptECBWithZeroPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -98,7 +98,7 @@ func TestAESECBEncrypt2(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("eas ecb encrypt error")
 	}
-	raw, err = AESECBDecryptWithZeroPadding(key, encryptedRaw, iv)
+	raw, err = AESDecryptECBWithZeroPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -120,7 +120,7 @@ func TestAESCBCEncrypt(t *testing.T) {
 	key = []byte("asdfasdfasdfasdf")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`4y+v7uadZUopc2N8rF2Yhsm3JgofMr4mCZEXH7xKdFM=`)
-	encryptedRaw, err = AESCBCEncryptWithPKCS7Padding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptCBCWithPKCSPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -128,7 +128,7 @@ func TestAESCBCEncrypt(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic(1)
 	}
-	raw, err := AESCBCDecryptWithPKCS7Padding(key, encryptedRaw, iv)
+	raw, err := AESDecryptCBCWithPKCSPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -141,7 +141,7 @@ func TestAESCBCEncrypt(t *testing.T) {
 	key = []byte("asdfasdfasdfasdf")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`4y+v7uadZUopc2N8rF2YhgmcAjyv28GlvoZaecovJtc=`)
-	encryptedRaw, err = AESCBCEncryptWithZeroPadding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptCBCWithZeroPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(1)
 	}
@@ -149,7 +149,7 @@ func TestAESCBCEncrypt(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("eas ecb encrypt error")
 	}
-	raw, err = AESCBCDecryptWithZeroPadding(key, encryptedRaw, iv)
+	raw, err = AESDecryptCBCWithZeroPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -171,7 +171,7 @@ func TestAESCBCEncrypt2(t *testing.T) {
 	key = []byte("asdfasdfasdfasdfaaaaaaaa")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`YvcnVzLeqrpiRZv8WO1poGdIhHv1bq/Yd2SwRbTnWhU=`)
-	encryptedRaw, err = AESCBCEncryptWithPKCS7Padding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptCBCWithPKCSPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -179,7 +179,7 @@ func TestAESCBCEncrypt2(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("enc failed")
 	}
-	raw, err := AESCBCDecryptWithPKCS7Padding(key, encryptedRaw, iv)
+	raw, err := AESDecryptCBCWithPKCSPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -192,7 +192,7 @@ func TestAESCBCEncrypt2(t *testing.T) {
 	key = []byte("asdfasdfasdfasdfaaaaaaaa")
 	plain = []byte(`abcHelloWorld` + "`" + `1123sdfasdasdf`)
 	data = []byte(`YvcnVzLeqrpiRZv8WO1poDzAXEjuW+j4trTjpnoZoJg=`)
-	encryptedRaw, err = AESCBCEncryptWithZeroPadding([]byte(key), plain, iv)
+	encryptedRaw, err = AESEncryptCBCWithZeroPadding([]byte(key), plain, iv)
 	if err != nil {
 		panic(err)
 	}
@@ -200,7 +200,7 @@ func TestAESCBCEncrypt2(t *testing.T) {
 	if EncodeBase64(encryptedRaw) != string(data) {
 		panic("aes encrypt error")
 	}
-	raw, err = AESCBCDecryptWithZeroPadding(key, encryptedRaw, iv)
+	raw, err = AESDecryptCBCWithZeroPadding(key, encryptedRaw, iv)
 	if err != nil {
 		panic(err)
 	}
