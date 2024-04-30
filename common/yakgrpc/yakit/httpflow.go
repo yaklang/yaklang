@@ -760,7 +760,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 	return flow, nil
 }
 
-func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
@@ -778,60 +778,57 @@ func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, sourc
 		}
 	}
 
-	reqRaw := httpctx.GetRequestBytes(req)
-	if reqRaw == nil {
-		var err error
-		reqRaw, err = utils.HttpDumpWithBody(req, true)
-		if err != nil {
-			reqRaw, err = utils.HttpDumpWithBody(req, false)
+	var (
+		plainRequest  []byte
+		plainResponse []byte
+		err           error
+	)
+	if httpctx.GetRequestIsModified(req) {
+		plainRequest = httpctx.GetHijackedRequestBytes(req)
+	} else {
+		plainRequest = httpctx.GetPlainRequestBytes(req)
+		if len(plainRequest) <= 0 {
+			plainRequest = lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
+		}
+		if len(plainRequest) <= 0 {
+			plainRequest, err = utils.HttpDumpWithBody(req, true)
 			if err != nil {
-				log.Errorf("dump request failed: %s", err)
+				plainRequest, err = utils.HttpDumpWithBody(req, false)
+				if err != nil {
+					log.Errorf("dump request failed: %s", err)
+				}
 			}
 		}
 	}
 
-	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, make([]byte, 0), source, urlRaw, remoteAddr)
-	if err != nil {
-		return nil, err
+	if rsp != nil {
+		if httpctx.GetResponseIsModified(req) {
+			plainResponse = httpctx.GetHijackedResponseBytes(req)
+		} else {
+			plainResponse = httpctx.GetPlainResponseBytes(req)
+			if len(plainResponse) <= 0 {
+				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+			}
+			if len(plainResponse) <= 0 {
+				plainResponse, err = utils.HttpDumpWithBody(rsp, true)
+				if err != nil {
+					log.Errorf("dump response failed: %s", err)
+				}
+			}
+		}
+	} else {
+		plainResponse = make([]byte, 0)
 	}
-	return flow, nil
+
+	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, plainRequest, plainResponse, source, urlRaw, remoteAddr, opts...)
+}
+
+func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+	return createHTTPFlowFromHTTP(isHttps, req, nil, source, url, remoteAddr, opts...)
 }
 
 func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
-	urlRaw := url
-	if urlRaw == "" {
-		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
-		if err != nil {
-			log.Warnf("extract url from request failed: %s", err)
-		}
-		if u != nil {
-			urlRaw = u.String()
-		} else {
-			if isHttps {
-				urlRaw = "https://" + remoteAddr
-			} else {
-				urlRaw = "http://" + remoteAddr
-			}
-		}
-	}
-
-	reqRaw := httpctx.GetRequestBytes(req)
-	if reqRaw == nil {
-		var err error
-		reqRaw, err = utils.HttpDumpWithBody(req, true)
-		if err != nil {
-			reqRaw, err = utils.HttpDumpWithBody(req, false)
-			if err != nil {
-				log.Errorf("dump request failed: %s", err)
-			}
-		}
-	}
-
-	rspRaw, err := utils.HttpDumpWithBody(rsp, true)
-	if err != nil {
-		log.Errorf("dump response failed: %s", err)
-	}
-	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, opts...)
+	return createHTTPFlowFromHTTP(isHttps, req, rsp, source, url, remoteAddr, opts...)
 }
 
 func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {
