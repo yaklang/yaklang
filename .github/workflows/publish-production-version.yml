@@ -55,13 +55,22 @@ jobs:
           )
           
           # Base URL for downloads
-          base_url="https://aliyun-oss.yaklang.com/yak/${YAK_VERSION}"
-
+          base_url="https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}"
+          
           # Loop over the os_archs dictionary to download each file
           for arch in "${!os_archs[@]}"; do
             file_name="${os_archs[$arch]}"
+
             wget -O "./$file_name" "$base_url/$file_name"
-            wget -O "./$file_name.sha256.txt" "$base_url/$file_name.sha256.txt"
+          
+            # Use wget to check if the SHA256 file is accessible and returns HTTP 200
+            if wget --spider --server-response "$base_url/$file_name.sha256.txt" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
+              # If HTTP response 200, download both the file and its SHA256
+              echo "Downloading $file_name and its SHA256..."
+              wget -O "./$file_name.sha256.txt" "$base_url/$file_name.sha256.txt"
+            else
+              echo "SHA256 file not found or server did not return HTTP 200 for $file_name.sha256.txt, skipping download."
+            fi
           done
 
       - name: Check files
@@ -94,6 +103,12 @@ jobs:
             else
               file_hash_path='yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt'
             fi
-            echo "Start to upload $file_hash_path"
-            ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_hash_path
+          
+            # Check if SHA256 file exists before uploading
+            if [[ -f "${file_hash_path%%:*}" ]]; then
+              echo "Start to upload $file_hash_path"
+              ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_hash_path
+            else
+              echo "SHA256 file ${file_hash_path%%:*} not found, skipping upload."
+            fi
           done
