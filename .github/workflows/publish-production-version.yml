@@ -1,9 +1,6 @@
 name: Publish-Production-Version
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/publish-production-version.yml'
   workflow_dispatch:
     inputs:
       publish_version:
