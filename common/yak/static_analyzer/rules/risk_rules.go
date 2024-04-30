@@ -1,13 +1,13 @@
 package rules
 
 import (
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var RiskTypeFuncs = []string{"risk.type", "risk.typeVerbose"}
@@ -96,9 +96,10 @@ func RuleRiskTypeVerbose(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 			if err == nil {
 				constValue = unquoted
 			}
-
-			if !lo.Contains(yakit.RiskTypes, constValue) {
-				ret.NewWarn(WarnInvalidRiskTypeVerbose(), v)
+			if funcName == "risk.type" {
+				if !lo.Contains(yakit.RiskTypes, constValue) {
+					ret.NewWarn(WarnInvalidRiskTypeVerbose(), v)
+				}
 			}
 		})
 	}
