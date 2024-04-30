@@ -376,7 +376,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 			break
 		}
 	case "aes-cbc-encrypt":
-		raw, err = codec.AESCBCEncrypt([]byte(getParams("key", true)), text, iv)
+		raw, err = codec.AESEncryptCBCWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 		if err != nil {
 			return nil, utils.Errorf("aes cbc enc failed: %s", err)
 		}
@@ -390,7 +390,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		if err != nil {
 			return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 		}
-		raw, err = codec.AESCBCDecrypt([]byte(getParams("key", true)), decoded, iv)
+		raw, err = codec.AESDecryptCBCWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 		if err != nil {
 			return nil, utils.Errorf("aes cbc dec failed: %s", err)
 		}
@@ -420,7 +420,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		result = codec.EncodeToHex(raw)
 		raw = []byte(result)
 	case "sm4-cbc-encrypt":
-		raw, err = codec.AESCBCEncrypt([]byte(getParams("key", true)), text, iv)
+		raw, err = codec.AESEncryptCBCWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
@@ -434,13 +434,13 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		if err != nil {
 			return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 		}
-		raw, err = codec.AESCBCDecrypt([]byte(getParams("key", true)), decoded, iv)
+		raw, err = codec.AESDecryptCBCWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
 		result = string(raw)
 	case "sm4-cfb-encrypt":
-		raw, err = codec.SM4CFBEnc([]byte(getParams("key", true)), text, iv)
+		raw, err = codec.SM4EncryptCFBWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
@@ -454,13 +454,13 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		if err != nil {
 			return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 		}
-		raw, err = codec.SM4CFBDec([]byte(getParams("key", true)), decoded, iv)
+		raw, err = codec.SM4DecryptCFBWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
 		result = string(raw)
 	case "sm4-ebc-encrypt":
-		raw, err = codec.SM4ECBEnc([]byte(getParams("key", true)), text, iv)
+		raw, err = codec.SM4EncryptECBWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
@@ -474,13 +474,13 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		if err != nil {
 			return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 		}
-		raw, err = codec.SM4ECBDec([]byte(getParams("key", true)), decoded, iv)
+		raw, err = codec.SM4DecryptECBWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
 		result = string(raw)
 	case "sm4-ofb-encrypt":
-		raw, err = codec.SM4OFBEnc([]byte(getParams("key", true)), text, iv)
+		raw, err = codec.SM4EncryptOFBWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
@@ -494,7 +494,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		if err != nil {
 			return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 		}
-		raw, err = codec.SM4OFBDec([]byte(getParams("key", true)), decoded, iv)
+		raw, err = codec.SM4DecryptOFBWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 		if err != nil {
 			return nil, utils.Errorf("%v failed: %s", req.GetType(), err)
 		}
@@ -826,7 +826,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 //				break
 //			}
 //		case "aes-cbc-encrypt":
-//			raw, err = codec.AESCBCEncrypt([]byte(getParams("key", true)), text, iv)
+//			raw, err = codec.AESEncryptCBCWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 //			if err != nil {
 //				return nil, utils.Errorf("aes cbc enc failed: %s", err)
 //			}
@@ -840,7 +840,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 //			if err != nil {
 //				return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 //			}
-//			raw, err = codec.AESCBCDecrypt([]byte(getParams("key", true)), decoded, iv)
+//			raw, err = codec.AESDecryptCBCWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 //			if err != nil {
 //				return nil, utils.Errorf("aes cbc dec failed: %s", err)
 //			}
@@ -870,7 +870,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 //			result = codec.EncodeToHex(raw)
 //			raw = []byte(result)
 //		case "sm4-cbc-encrypt":
-//			raw, err = codec.AESCBCEncrypt([]byte(getParams("key", true)), text, iv)
+//			raw, err = codec.AESEncryptCBCWithPKCSPadding([]byte(getParams("key", true)), text, iv)
 //			if err != nil {
 //				return nil, utils.Errorf("%v failed: %s", codecType, err)
 //			}
@@ -884,7 +884,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 //			if err != nil {
 //				return nil, utils.Errorf("decode hex/base64 failed: %s", err)
 //			}
-//			raw, err = codec.AESCBCDecrypt([]byte(getParams("key", true)), decoded, iv)
+//			raw, err = codec.AESDecryptCBCWithPKCSPadding([]byte(getParams("key", true)), decoded, iv)
 //			if err != nil {
 //				return nil, utils.Errorf("%v failed: %s", codecType, err)
 //			}
