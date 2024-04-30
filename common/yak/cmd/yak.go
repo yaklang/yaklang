@@ -364,6 +364,15 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "disable-output",
 			Usage: "禁止插件的一些输出",
 		},
+		cli.IntFlag{
+			Name:  "reverse-port",
+			Usage: "反连本地监听端口",
+			Value: 0,
+		},
+		cli.BoolFlag{
+			Name:  "disable-reverse-server",
+			Usage: "关闭反连服务器",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
@@ -457,7 +466,13 @@ var startGRPCServerCommand = cli.Command{
 			grpc.MaxRecvMsgSize(100*1024*1024),
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
-		s, err := yakgrpc.NewServer()
+		reverse_port := c.Int("reverse-port")
+		init_reverse := c.Bool("disable-reverse-server")
+		s, err := yakgrpc.NewServer(
+			yakgrpc.WithReverseServerPort(reverse_port),
+			yakgrpc.WithInitFacadeServer(!init_reverse),
+			yakgrpc.WithStartCacheLog(),
+		)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
 			return err
