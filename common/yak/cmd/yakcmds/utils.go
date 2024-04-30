@@ -271,13 +271,10 @@ var UtilsCommands = []*cli.Command{
 			cli.StringFlag{Name: "output,o", Usage: "output file", Value: "tags.txt"},
 		},
 		Action: func(c *cli.Context) error {
-			var (
-				file *os.File
-				err  error
-			)
+			var err error
 			fallback := func() error {
-				fmt.Fprint(file, "dev/"+utils.DatePretty())
-				return nil
+				results := "dev/" + utils.DatePretty()
+				return os.WriteFile(c.String("output"), []byte(results), 0o644)
 			}
 			rp, err := git.PlainOpen(".")
 			if err != nil {
