@@ -98,22 +98,23 @@ require (
 	github.com/sijms/go-ora/v2 v2.7.19
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/steambap/captcha v1.4.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
 	github.com/twmb/murmur3 v1.1.6
-	github.com/urfave/cli v1.22.12
+	github.com/urfave/cli v1.22.15
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
 	github.com/xdg-go/scram v1.1.2
+	github.com/yaklang/pcap v0.0.0-20240429012614-594b487c39ce
 	github.com/ysmood/gson v0.7.3
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/net v0.19.0
-	golang.org/x/sys v0.16.0
+	golang.org/x/sys v0.19.0
 	golang.org/x/text v0.14.0
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
@@ -136,7 +137,7 @@ require (
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect

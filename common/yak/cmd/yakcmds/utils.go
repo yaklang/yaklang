@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/fs"
@@ -10,7 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/samber/lo"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
@@ -81,7 +88,8 @@ var UtilsCommands = []*cli.Command{
 			gzipWriter.Flush()
 			gzipWriter.Close()
 			return nil
-		}},
+		},
+	},
 	{
 		Name: "hex",
 		Flags: []cli.Flag{
@@ -108,7 +116,8 @@ var UtilsCommands = []*cli.Command{
 			if c.String("data") != "" {
 				println(codec.EncodeToHex(c.String("data")))
 			}
-		}},
+		},
+	},
 	{
 		Name:  "tag-stats",
 		Usage: "Generate Tag Status(for Yakit)",
@@ -220,7 +229,126 @@ var UtilsCommands = []*cli.Command{
 			}
 		},
 	},
+	// sha256
+	{
+		Name:  "sha256",
+		Usage: "(Inner command) sha256 checksums for file and generate [filename].sha256.txt",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "file,f", Usage: "file to checksum"},
+		},
+		Action: func(c *cli.Context) error {
+			filename := c.String("file")
+			if filename == "" {
+				return utils.Errorf("empty filename")
+			}
+			file, err := os.Open(filename)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				file.Close()
+			}()
+			hasher := sha256.New()
+			if _, err := io.Copy(hasher, file); err != nil && err != io.EOF {
+				return err
+			}
+			sum := hasher.Sum(nil)
+			result := codec.EncodeToHex(sum)
 
+			targetFile := filename + ".sha256.txt"
+			err = os.WriteFile(targetFile, []byte(result), 0o644)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("file[%s] Sha256 checksum: %s\nGenerate to %s", filename, result, targetFile)
+			return nil
+		},
+	},
+	{
+		Name:  "repos-tag",
+		Usage: "(Inner command) Get Current Git Repository Tag, if not found, generate a fallback tag with dev/{date}",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "output,o", Usage: "output file", Value: "tags.txt"},
+		},
+		Action: func(c *cli.Context) error {
+			var err error
+			fallback := func() error {
+				results := "dev/" + utils.DatePretty()
+				return os.WriteFile(c.String("output"), []byte(results), 0o644)
+			}
+			rp, err := git.PlainOpen(".")
+			if err != nil {
+				return fallback()
+			}
+			ref, err := rp.Head()
+			if err != nil {
+				return fallback()
+			}
+			// 尝试获取当前 HEAD 关联的所有标签
+			tags, err := rp.Tags()
+			if err != nil {
+				return fallback()
+			}
+
+			// 查找与当前 HEAD 提交相关联的标签
+			var foundTags []string
+			err = tags.ForEach(func(t *plumbing.Reference) error {
+				if t.Hash() == ref.Hash() {
+					foundTags = append(foundTags, t.Name().Short())
+				}
+				return nil
+			})
+			if err != nil {
+				return fallback()
+			}
+
+			if len(foundTags) > 0 {
+				return os.WriteFile(c.String("output"), []byte(strings.TrimLeft(foundTags[0], "v")), 0o644)
+			}
+			return fallback()
+		},
+	},
+	// upload to oss
+	{
+		Name:  "upload-oss",
+		Usage: "(Inner command) Upload File To Aliyun OSS",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "file,f", Usage: "local_file_path:remote_file_path, splited by ;"},
+			cli.StringFlag{Name: "ak", Usage: "Aliyun Access Key"},
+			cli.StringFlag{Name: "sk", Usage: "Aliyun Secret Key"},
+			cli.StringFlag{Name: "endpoint", Usage: "Aliyun OSS Endpoint", Value: `oss-accelerate.aliyuncs.com`},
+			cli.StringFlag{Name: "bucket, b", Usage: "Aliyun OSS Bucket", Value: "yaklang"},
+			cli.IntFlag{Name: "times,t", Usage: "retry times", Value: 5},
+		},
+		Action: func(c *cli.Context) error {
+			client, err := oss.New(c.String("endpoint"), c.String("ak"), c.String("sk"))
+			if err != nil {
+				return err
+			}
+
+			bucket, err := client.Bucket(c.String("bucket"))
+			if err != nil {
+				return err
+			}
+			for _, i := range strings.Split(c.String("file"), ";") {
+				localFilePath, remoteFilePath, ok := strings.Cut(i, ":")
+				if !ok {
+					return utils.Errorf("invalid file path: %v", i)
+				}
+				localFilePath = strings.TrimSpace(localFilePath)
+				remoteFilePath = strings.TrimSpace(strings.TrimLeft(remoteFilePath, "/"))
+
+				_, _, err = lo.AttemptWithDelay(c.Int("times"), time.Second, func(index int, _ time.Duration) error {
+					return bucket.PutObjectFromFile(remoteFilePath, localFilePath)
+				})
+				if err != nil {
+					return utils.Wrap(err, "upload file to oss failed")
+				}
+			}
+
+			return nil
+		},
+	},
 	// file tree size
 	{
 		Name:  "weight",

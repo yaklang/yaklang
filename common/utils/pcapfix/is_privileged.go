@@ -1,7 +1,7 @@
 package pcapfix
 
 import (
-	"github.com/google/gopacket/pcap"
+	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/permutil"

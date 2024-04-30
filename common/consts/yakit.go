@@ -508,10 +508,14 @@ func InitializeCVEDatabase() (*gorm.DB, error) {
 }
 
 func doDBPatch() {
-	err := gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_source"
+	var err error
+	if !gormDatabase.HasTable("http_flows") {
+		return
+	}
+	err = gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_source"
 ON "http_flows" (
   "source_type" ASC
-);`).Error
+);`).Unscoped().Error
 	if err != nil {
 		log.Warnf("failed to add index on http_flows.source_type: %v", err)
 	}
@@ -526,6 +530,9 @@ ON "http_flows" (
 }
 
 func doDBRiskPatch() {
+	if !gormDatabase.HasTable("risks") {
+		return
+	}
 	err := gormDatabase.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_id ON risks(id);`).Error
 	if err != nil {
 		log.Warnf("failed to add index on risks.id: %v", err)

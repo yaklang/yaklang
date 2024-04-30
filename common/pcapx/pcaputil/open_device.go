@@ -2,8 +2,8 @@ package pcaputil
 
 import (
 	"fmt"
-	"github.com/google/gopacket/pcap"
 	"github.com/samber/lo"
+	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
