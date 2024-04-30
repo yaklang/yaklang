@@ -68,8 +68,8 @@ var CodecExports = map[string]interface{}{
 	// aes
 	"AESEncrypt":                    codec.AESEncryptCBCWithPKCSPadding,
 	"AESDecrypt":                    codec.AESDecryptCBCWithPKCSPadding,
-	"AESEncryptCBCWithPKCSPadding":  codec.AESEncryptCBCWithPKCSPadding,
-	"AESDecryptCBCWithPKCSPadding":  codec.AESDecryptCBCWithPKCSPadding,
+	"AESCBCEncrypt":                 codec.AESEncryptCBCWithPKCSPadding,
+	"AESCBCDecrypt":                 codec.AESDecryptCBCWithPKCSPadding,
 	"AESCBCEncryptWithZeroPadding":  codec.AESEncryptCBCWithZeroPadding,
 	"AESCBCDecryptWithZeroPadding":  codec.AESDecryptCBCWithZeroPadding,
 	"AESCBCEncryptWithPKCS7Padding": codec.AESEncryptCBCWithPKCSPadding,
