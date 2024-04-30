@@ -26,6 +26,7 @@ type WebsocketFlow struct {
 }
 
 type WebsocketFlowShare struct {
+	gorm.Model
 	// HTTPFlow 过来的应该有 WebsocketHash
 	WebsocketRequestHash string
 
