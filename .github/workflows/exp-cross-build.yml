@@ -1,6 +1,10 @@
 name: Cross-Build
 
 on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
   pull_request:
     paths:
       - '.github/workflows/exp-cross-build.yml'
