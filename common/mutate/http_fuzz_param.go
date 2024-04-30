@@ -283,8 +283,6 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzHTTPHeader(p.param, i)
 	case posPath:
 		return p.origin.FuzzPath(InterfaceToFuzzResults(i)...)
-	case posPostJson:
-		return p.origin.FuzzPostJsonParams(p, i)
 	case posCookie:
 		return p.origin.FuzzCookie(p.param, InterfaceToFuzzResults(i))
 	case posCookieBase64:
@@ -293,6 +291,8 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		return p.origin.FuzzCookieJsonPath(p.param, p.path, i)
 	case posCookieBase64Json:
 		return p.origin.FuzzCookieBase64JsonPath(p.param, p.path, i)
+	case posPostJson:
+		return p.origin.FuzzPostJsonParams(p, i)
 	case posPostQuery:
 		return p.origin.FuzzPostParams(p.param, i)
 	case posPostXML:
