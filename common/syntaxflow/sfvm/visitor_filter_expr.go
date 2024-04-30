@@ -93,17 +93,23 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		}
 		y.VisitConditionExpression(ret.ConditionExpression())
 	case *sf.NextFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
 			return err
 		}
-		y.VisitChainFilter(ret.ChainFilter())
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
 	case *sf.DeepNextFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
 			return err
 		}
-		y.VisitChainFilter(ret.ChainFilter())
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
 	default:
 		panic("BUG: in filterExpr")
 	}
