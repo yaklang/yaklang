@@ -353,7 +353,7 @@ func TestNewGodzillaBase64Jsp_Plugin(t *testing.T) {
 
 func TestNewGodzillaBase64Aspx(t *testing.T) {
 	//url := "http://47.120.44.219:8087/bs64.aspx"
-	url := "http://localhost:8086/gbs64.aspx"
+	url := "http://127.0.0.1:8087/gbs64.aspx"
 
 	gs, err := NewGodzillaManager(
 		url,
@@ -361,10 +361,10 @@ func TestNewGodzillaBase64Aspx(t *testing.T) {
 		SetPass("pass"),
 		SetShellScript("aspx"),
 		SetBase64Aes(),
-		SetProxy("http://127.0.0.1:9999"),
+		//SetProxy("http://127.0.0.1:9999"),
 	)
 	if err != nil {
-		panic(err)
+		t.FailNow()
 	}
 
 	gs.ClientRequestEncodeFormGo(func(reqBody []byte) ([]byte, error) {
@@ -384,15 +384,9 @@ func TestNewGodzillaBase64Aspx(t *testing.T) {
 
 	ping, err := gs.Ping()
 	if err != nil {
-		log.Error(err)
+		t.FailNow()
 	}
-	fmt.Println(ping)
-
-	//info, err := gs.BasicInfo()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println(string(info))
+	assert.True(t, ping)
 }
 
 func TestNewGodzillaRawJsp(t *testing.T) {
