@@ -304,7 +304,9 @@ func (g *Godzilla) post(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
-
+	fmt.Println(string(resp.RawRequest))
+	fmt.Println("=====================================")
+	fmt.Println(string(resp.RawPacket))
 	_, raw := lowhttp.SplitHTTPHeadersAndBodyFromPacket(resp.RawPacket)
 
 	if len(raw) == 0 && g.req != nil {
