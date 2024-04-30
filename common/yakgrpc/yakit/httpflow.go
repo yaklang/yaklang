@@ -1218,8 +1218,6 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	// todo: remove this
-	db = db.Debug()
 	queryDB := BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params)
 
 	return SelectHTTPFlowFromDB(queryDB, params)
