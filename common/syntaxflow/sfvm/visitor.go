@@ -64,7 +64,7 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		panic(msg)
 	}
 
-	if i.Filter() != nil {
+	if i.FilterExpr() != nil {
 		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
 		y.EmitNewRef(varName)
 		y.EmitUpdate(varName)

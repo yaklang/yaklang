@@ -14,7 +14,7 @@ flow: filters EOF;
 filters: filterStatement+;
 
 filterStatement
-    : filterExpr ('=>' refVariable)?
+    : filterExpr (As refVariable)?
     ;
 
 refVariable
@@ -28,9 +28,9 @@ filterExpr
     | filterExpr '.' filterExpr                   # FieldCallFilter
     | filterExpr '(' acutalParamFilter* ')'       # FunctionCallFilter
     | filterExpr '[' sliceCallItem ']'            # FieldIndexFilter
-    | filterExpr '?' '('conditionExpression ')'   # OptionalFilter
-    | filterExpr '=>' chainFilter                 # NextFilter
-    | filterExpr '==>' chainFilter                # DeepNextFilter
+    | filterExpr '?' '{' conditionExpression '}'   # OptionalFilter
+    | filterExpr '->' filterExpr                 # NextFilter
+    | filterExpr '-->' filterExpr                # DeepNextFilter
     ;
 
 acutalParamFilter
@@ -68,7 +68,7 @@ conditionExpression
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier;
 regexpLiteral: RegexpLiteral;
-identifier: Identifier | types;
+identifier: Identifier | types | As;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -108,6 +108,7 @@ Search: '%';
 Bang: '!';
 Star: '*';
 Minus: '-';
+As: 'as';
 
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
