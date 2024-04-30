@@ -737,8 +737,12 @@ func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOn
 	db = db.Where("upload_online <> '1' or upload_online IS NULL")
 	data := yakit.YieldRisks(db, context.Background())
 	for k := range data {
+		content, err := json.Marshal(k)
+		if err != nil {
+			continue
+		}
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		err := client.UploadRiskToOnlineWithToken(ctx, req.Token, k)
+		err = client.UploadRiskToOnlineWithToken(ctx, req, content)
 		if err != nil {
 			log.Errorf("uploadRiskToOnline failed: %s", err)
 			return &ypb.Empty{}, nil

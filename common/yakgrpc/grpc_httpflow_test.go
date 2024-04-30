@@ -554,3 +554,18 @@ Host: %s
 		[][]string{{"1"}, {"2"}},
 	)
 }
+
+func TestHTTPFlowsToOnline(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.HTTPFlowsToOnline(context.Background(), &ypb.HTTPFlowsToOnlineRequest{
+		Token:       "",
+		ProjectName: "defult",
+	})
+	if err != nil {
+		t.Fatalf("export httpFlows error: %v", err)
+	}
+	_ = response
+}

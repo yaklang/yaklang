@@ -124,6 +124,8 @@ type HTTPFlow struct {
 	IsTooLargeResponse         bool
 	TooLargeResponseHeaderFile string
 	TooLargeResponseBodyFile   string
+	// 同步到企业端
+	UploadOnline bool `json:"upload_online"`
 }
 
 type TagAndStatusCode struct {
@@ -1438,4 +1440,14 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 
 	queryDB := BuildHTTPFlowQuery(db, queryParams).Select(params.FieldName)
 	return SelectHTTPFlowFromDB(queryDB, queryParams)
+}
+
+func HTTPFlowToOnline(db *gorm.DB, hash []string) error {
+	db = db.Model(&HTTPFlow{})
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", hash)
+	db = db.Update(map[string]interface{}{"upload_online": true})
+	if db.Error != nil {
+		return utils.Errorf("HTTPFlowToOnline failed %s", db.Error)
+	}
+	return nil
 }
