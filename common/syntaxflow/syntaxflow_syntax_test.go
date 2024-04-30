@@ -27,10 +27,16 @@ func TestSyntaxInOne(t *testing.T) {
 		"a.b",
 		"c.d",
 		"a[1]",
-		"b?(!1)",
-		"b?(>1)",
-		"b?(!/abc/)",
+		"b?{!1}",
+		"b?{>1}",
+		"b?{!/abc/}",
 		"/(?i)runtime/.exec(,,,#*exec)",
+		"exec as $rough",
+		"/(?i)runtime/.exec(,,,#*exec) as $a",
+		"a->b",
+		"a-->b",
+		"a->b->c",
+		"a-->b.exec()-->c",
 	} {
 		checkSyntax(i, t)
 	}
