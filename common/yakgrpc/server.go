@@ -25,6 +25,29 @@ type Server struct {
 	reverseServer      *facades.FacadeServer
 }
 
+type ServerOpts func(config *ServerConfig)
+
+type ServerConfig struct {
+	reverseServerPort int
+	initFacadeServer  bool
+	startCacheLog     bool
+}
+
+func WithReverseServerPort(port int) ServerOpts {
+	return func(config *ServerConfig) {
+		config.reverseServerPort = port
+	}
+}
+func WithInitFacadeServer(init bool) ServerOpts {
+	return func(config *ServerConfig) {
+		config.initFacadeServer = init
+	}
+}
+func WithStartCacheLog() ServerOpts {
+	return func(config *ServerConfig) {
+		config.startCacheLog = true
+	}
+}
 func (*Server) GetProfileDatabase() *gorm.DB {
 	return consts.GetGormProfileDatabase()
 }
@@ -33,37 +56,61 @@ func (*Server) GetProjectDatabase() *gorm.DB {
 	return consts.GetGormProjectDatabase()
 }
 
-func NewServer() (*Server, error) {
-	return NewServerWithLogCache(true)
+func NewServer(opts ...ServerOpts) (*Server, error) {
+	return NewServerWithLogCache(opts...)
 }
 
-func NewTestServer(startCacheLog bool) (*Server, error) {
-	return newServerEx(false, startCacheLog)
+func NewTestServer() (*Server, error) {
+	//return newServerEx(false, startCacheLog)
+	return newServerEx(
+		WithStartCacheLog(),
+		WithInitFacadeServer(false),
+	)
 }
 
-func NewServerWithLogCache(startCacheLog bool) (*Server, error) {
-	return newServerEx(true, startCacheLog)
+func NewServerWithLogCache(opts ...ServerOpts) (*Server, error) {
+	//return newServerEx(true, startCacheLog)
+	return newServerEx(opts...)
 }
 
-func newServerEx(initFacadeServer, startCacheLog bool) (*Server, error) {
+func newServerEx(opts ...ServerOpts) (*Server, error) {
+	serverConfig := &ServerConfig{
+		initFacadeServer: true,
+	}
+	for _, opt := range opts {
+		opt(serverConfig)
+	}
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0o777)
-	port, err := utils.GetRangeAvailableTCPPort(50000, 65535, 3)
-	if err != nil {
-		return nil, err
-	}
 	s := &Server{
 		cacheDir: yakitBase,
 	}
-	if initFacadeServer {
+
+	if serverConfig.initFacadeServer {
+		var (
+			port int
+			err  error
+		)
+		if serverConfig.reverseServerPort == 0 {
+			port, err = utils.GetRangeAvailableTCPPort(50000, 65535, 3)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			if utils.IsTCPPortAvailable(serverConfig.reverseServerPort) && !utils.IsTCPPortOpen("127.0.0.1", serverConfig.reverseServerPort) {
+				port = serverConfig.reverseServerPort
+			} else {
+				return nil, utils.Errorf("this port has used: %v", port)
+			}
+		}
 		s.reverseServer = facades.NewFacadeServer("0.0.0.0", port)
 	}
 
-	err = s.initDatabase()
+	err := s.initDatabase()
 	if err != nil {
 		return nil, err
 	}
-	if startCacheLog {
+	if serverConfig.startCacheLog {
 		utils.StartCacheLog(context.Background(), 200)
 	}
 	return s, nil
