@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-type encType func(key []byte, i interface{}, iv []byte) ([]byte, error)
-
 func TestSM4(t *testing.T) {
 	var count = 0
 	for {
@@ -18,14 +16,14 @@ func TestSM4(t *testing.T) {
 
 		key := []byte("2345223412341234")
 		target := "asdfasdfjojoq234tjoq3reaasdfasdfasdfasdfasdfjtopqd"
-		for method, item := range map[string][]encType{
-			"sm4_cbc": {SM4CBCEnc, SM4CBCDec},
-			"sm4_cfb": {SM4CFBEnc, SM4CFBDec},
-			"sm4_ecb": {SM4ECBEnc, SM4ECBDec},
-			"sm4_ofb": {SM4OFBEnc, SM4OFBDec},
+		for method, item := range map[string][]SymmetricCryptFunc{
+			"sm4_cbc": {SM4EncryptCBCWithPKCSPadding, SM4DecryptCBCWithPKCSPadding},
+			"sm4_cfb": {SM4EncryptCFBWithPKCSPadding, SM4DecryptCFBWithPKCSPadding},
+			"sm4_ecb": {SM4EncryptECBWithPKCSPadding, SM4DecryptECBWithPKCSPadding},
+			"sm4_ofb": {SM4EncryptOFBWithPKCSPadding, SM4DecryptOFBWithPKCSPadding},
 			"sm4_gcm": {SM4GCMEnc, SM4GCMDec},
 			"aes_gcm": {AESGCMEncrypt, AESGCMDecrypt},
-			"aes_cbc": {AESCBCEncrypt, AESCBCDecrypt},
+			"aes_cbc": {AESEncryptCBCWithPKCSPadding, AESDecryptCBCWithPKCSPadding},
 		} {
 			log.Infof("start to test: %v", method)
 			enc := item[0]
@@ -44,7 +42,7 @@ func TestSM4(t *testing.T) {
 			log.Infof("dec %v finished: %v", method, StrConvQuote(string(origin)))
 
 			if target != string(origin) {
-				log.Errorf("failed for %#v", enc)
+				log.Errorf("failed for %#v", method)
 				t.FailNow()
 			}
 		}
@@ -54,7 +52,7 @@ func TestSM4(t *testing.T) {
 func TestECB(t *testing.T) {
 	// reM7Nv3xlWHFPhh6iomFgcrFqPg5VGegvbiyD3rKCQvuXy+kUP4satgd1c/4t1pZ23v8wXIEY14eMXPc9sXivT+jfR7iNOknzTHjZCEVBvkm0EKa2WVrIb9665ze8yRm
 	data, _ := DecodeBase64("reM7Nv3xlWHFPhh6iomFgcrFqPg5VGegvbiyD3rKCQvuXy+kUP4satgd1c/4t1pZ23v8wXIEY14eMXPc9sXivT+jfR7iNOknzTHjZCEVBvkm0EKa2WVrIb9665ze8yRm")
-	var result, err = SM4ECBDec([]byte("11HDESaAhiHHugDz"), data, []byte(`UISwD9fW6cFh9SNS`))
+	var result, err = SM4DecryptECBWithPKCSPadding([]byte("11HDESaAhiHHugDz"), data, []byte(`UISwD9fW6cFh9SNS`))
 	if err != nil {
 		panic(err)
 	}
@@ -66,7 +64,7 @@ func TestECB(t *testing.T) {
 
 func TestSM4ECBDec(t *testing.T) {
 	var raw, _ = DecodeBase64(`Kh1Ou151chL8Ondn6l5hgA==`)
-	results, err := SM4ECBDec([]byte(`1234123412341234`), raw, nil)
+	results, err := SM4DecryptECBWithPKCSPadding([]byte(`1234123412341234`), raw, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +73,7 @@ func TestSM4ECBDec(t *testing.T) {
 	}
 
 	raw, _ = DecodeBase64(`jw/eNRHMJAZZUsEV/Ue1rAQ/H/rvsFIXLDpbnGM9kYI=`)
-	results, err = SM4ECBDec([]byte(`1234123412341234`), raw, nil)
+	results, err = SM4DecryptECBWithPKCSPadding([]byte(`1234123412341234`), raw, nil)
 	if err != nil {
 		panic(err)
 	}

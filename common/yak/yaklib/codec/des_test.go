@@ -7,13 +7,13 @@ import (
 )
 
 func TestDESCBCDec(t *testing.T) {
-	origin, err := DESCBCEnc([]byte("test"), ZeroPadding([]byte("asdfasdfasdfsdfasdf"), 8), nil)
+	origin, err := DESEncryptCBCWithZeroPadding(ZeroPadding([]byte("test"), 8), []byte("asdfasdfasdfsdfasdf"), nil)
 	if err != nil {
 		panic(err)
 	}
 	println(StrConvQuote(string(origin)))
 
-	data, err := DESCBCDec([]byte("test"), origin, nil)
+	data, err := DESDecryptCBCWithZeroPadding(ZeroPadding([]byte("test"), 8), origin, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -21,13 +21,13 @@ func TestDESCBCDec(t *testing.T) {
 }
 
 func TestDesECB(t *testing.T) {
-	bytes, err := DESECBEnc([]byte(`abc`), []byte(`abc`))
+	bytes, err := DESECBEnc(ZeroPadding([]byte(`abc`), 8), []byte(`abc`))
 	if err != nil {
 		panic(err)
 	}
 	spew.Dump(EncodeBase64(bytes))
 
-	origin, err := DESECBDec([]byte(`abc`), bytes)
+	origin, err := DESECBDec(ZeroPadding([]byte(`abc`), 8), bytes)
 	if err != nil {
 		panic(err)
 	}
@@ -42,13 +42,13 @@ func TestTripleDES_CBC(t *testing.T) {
 
 	plainText := "abc"
 
-	bytes, err := TripleDES_CBCEnc(tripleDESKey, []byte(plainText), nil)
+	bytes, err := TripleDESEncryptCBCWithZeroPadding(tripleDESKey, []byte(plainText), nil)
 	if err != nil {
 		panic(err)
 	}
 	spew.Dump(EncodeBase64(bytes))
 
-	origin, err := TripleDES_CBCDec(tripleDESKey, bytes, nil)
+	origin, err := TripleDESDecryptCBCWithZeroPadding(tripleDESKey, bytes, nil)
 	if err != nil {
 		panic(err)
 	}
