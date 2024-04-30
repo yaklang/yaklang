@@ -54,7 +54,7 @@ func (s *VulinServer) registerCryptoSM() {
 
 			spew.Dump(key, encryptedBase64Decoded)
 			println("-----------------------")
-			var origin, decErr = codec.SM4ECBDec([]byte(key), []byte(encryptedBase64Decoded), []byte(""))
+			var origin, decErr = codec.SM4EncryptECBWithPKCSPadding([]byte(key), []byte(encryptedBase64Decoded), []byte(""))
 			spew.Dump(origin, decErr)
 
 			var handled string
