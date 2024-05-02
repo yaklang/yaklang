@@ -160,7 +160,7 @@ jobs:
           if [ -f new_history_versions.txt ]; then rm new_history_versions.txt; fi
           
           echo "${{ env.YAK_TAG }}" > current_version.txt
-          // check if history_versions.txt url 404 existed
+          # check if history_versions.txt url 404 existed
           HISTORY_URL="https://aliyun-oss.yaklang.com/yak/versino-info/history_versions.txt"
           if wget --spider --server-response "$HISTORY_URL" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
             echo "Downloading history_versions.txt..."
