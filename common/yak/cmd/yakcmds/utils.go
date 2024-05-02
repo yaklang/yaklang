@@ -272,22 +272,31 @@ var UtilsCommands = []*cli.Command{
 		},
 		Action: func(c *cli.Context) error {
 			var err error
-			fallback := func() error {
-				results := "dev/" + utils.DatePretty()
+			fallback := func(suffix string) error {
+				results := "dev/" + utils.DatePretty() + suffix
 				return os.WriteFile(c.String("output"), []byte(results), 0o644)
 			}
 			rp, err := git.PlainOpen(".")
 			if err != nil {
-				return fallback()
+				return fallback("")
 			}
 			ref, err := rp.Head()
 			if err != nil {
-				return fallback()
+				return fallback("")
+			}
+			var suffix string
+			if ref != nil && !ref.Hash().IsZero() {
+				h := ref.Hash().String()
+				if len(h) > 8 {
+					suffix = "-" + h[:8]
+				} else {
+					suffix = "-" + h
+				}
 			}
 			// 尝试获取当前 HEAD 关联的所有标签
 			tags, err := rp.Tags()
 			if err != nil {
-				return fallback()
+				return fallback(suffix)
 			}
 
 			// 查找与当前 HEAD 提交相关联的标签
@@ -299,13 +308,13 @@ var UtilsCommands = []*cli.Command{
 				return nil
 			})
 			if err != nil {
-				return fallback()
+				return fallback(suffix)
 			}
 
 			if len(foundTags) > 0 {
 				return os.WriteFile(c.String("output"), []byte(strings.TrimLeft(foundTags[0], "v")), 0o644)
 			}
-			return fallback()
+			return fallback(suffix)
 		},
 	},
 	// upload to oss
