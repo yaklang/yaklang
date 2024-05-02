@@ -161,7 +161,7 @@ jobs:
           
           echo "${{ env.YAK_TAG }}" > current_version.txt
           # check if history_versions.txt url 404 existed
-          HISTORY_URL="https://aliyun-oss.yaklang.com/yak/versino-info/history_versions.txt"
+          HISTORY_URL="https://aliyun-oss.yaklang.com/yak/version-info/history_versions.txt"
           if wget --spider --server-response "$HISTORY_URL" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
             echo "Downloading history_versions.txt..."
             wget -O history_versions.txt -q $HISTORY_URL
