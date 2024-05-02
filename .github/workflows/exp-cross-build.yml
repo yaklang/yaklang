@@ -172,8 +172,8 @@ jobs:
           fi
           
           echo "Uploading version.txt to oss"
-          cat new_history_versions.txt | head n 100
-          cat new_history_versions.txt | head n 100 > active_versions.txt
+          cat new_history_versions.txt | head -n 100
+          cat new_history_versions.txt | head -n 100 > active_versions.txt
           ./yak_linux_amd64 upload-oss -f 'new_history_versions.txt:/yak/version-info/history_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
           ./yak_linux_amd64 upload-oss -f 'active_versions.txt:/yak/version-info/active_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
 
