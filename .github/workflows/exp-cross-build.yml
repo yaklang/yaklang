@@ -214,6 +214,9 @@ jobs:
           echo "start to check buildx env and create builder"
           docker buildx ls && docker buildx create --name yaklang-builder --use
           
+          echo "start to login docker"
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          
           echo "start to build docker image..."
-          docker buildx build --platform linux/amd64 -t v1ll4n/yaklang:$formatted_tag --build-arg ARCH=amd64 ./common/yak/cmd/docker/
-          docker buildx build --platform linux/arm64 -t v1ll4n/yaklang:$formatted_tag --build-arg ARCH=arm64 ./common/yak/cmd/docker/
+          docker buildx build --platform linux/amd64 -t v1ll4n/yaklang:$formatted_tag --build-arg ARCH=amd64 ./common/yak/cmd/docker/ --push
+          docker buildx build --platform linux/arm64 -t v1ll4n/yaklang:$formatted_tag --build-arg ARCH=arm64 ./common/yak/cmd/docker/ --push
