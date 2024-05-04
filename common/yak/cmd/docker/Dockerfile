@@ -8,7 +8,7 @@ WORKDIR /app
 ARG VERSION=latest
 # Install Wget and download from https://aliyun-oss.yaklang.com/yak/${VERSION}/yak_linux_${ARCH}
 RUN apt-get update -y && apt-get install -y wget curl iputils-ping libpcap0.8=1.9.1-3 && \
-    wget -O /app/yak https://aliyun-oss.yaklang.com/yak/${VERSION}/yak_linux_$(if [ "$(uname -m)" = "aarch64" ]; then echo "arm64"; else echo "amd64"; fi) && \
+    wget -q -O /app/yak https://aliyun-oss.yaklang.com/yak/${VERSION}/yak_linux_$(if [ "$(uname -m)" = "aarch64" ]; then echo "arm64"; else echo "amd64"; fi) && \
     mkdir -p /app/ && chmod +x /app/yak && \
     cd /app/ && ./yak -v
 
