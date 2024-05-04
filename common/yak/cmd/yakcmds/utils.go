@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/yaklang/yaklang/common/twofa"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -429,6 +430,48 @@ var UtilsCommands = []*cli.Command{
 				fmt.Printf("[%6s]: %v\n", utils.ByteSize(i.Size), i.Name)
 			}
 			return nil
+		},
+	},
+
+	// totp forward
+	{
+		Name: "totp-forward",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "secret",
+				Usage: "totp secret",
+			},
+			cli.StringFlag{
+				Name:  "proxy-for",
+				Usage: "which port for forwarding to",
+			},
+			cli.IntFlag{
+				Name: "listen,l", Usage: "which port for listening", Value: 8084,
+			},
+		},
+		Action: func(c *cli.Context) {
+			var secret string = c.String("secret")
+			var lisPort = c.Int("listen")
+			if lisPort <= 0 {
+				lisPort = 8084
+			}
+			if secret == "" {
+
+			}
+
+			if secret == "" {
+				log.Warn("empty secret")
+				return
+			}
+
+			for {
+				err := twofa.NewOTPServer(secret, lisPort, c.String("proxy-for")).Serve()
+				if err != nil {
+					log.Errorf("failed to serve: %v", err)
+					time.Sleep(time.Second)
+					continue
+				}
+			}
 		},
 	},
 }
