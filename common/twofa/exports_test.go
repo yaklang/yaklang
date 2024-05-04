@@ -43,6 +43,10 @@ Content-Length: ` + fmt.Sprint(len(responseId)) + `
 		NewOTPServer(secret, pPort, target).ServeContext(ctx)
 	}()
 
+	err := utils.WaitConnect("127.0.0.1:"+fmt.Sprint(pPort), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
 	code := NewTOTPConfig(secret).GetToptUTCCode()
 	rsp, req, err := poc.HTTP(`GET / HTTP/1.1
 Host: 127.0.0.1:`+fmt.Sprint(pPort)+`
