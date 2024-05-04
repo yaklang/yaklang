@@ -203,6 +203,10 @@ jobs:
 
       - name: Build Docker Image
         run: |
+          echo "start to format tag name"
+          FORMATTEDTAG="${{ env.YAK_TAG }}"
+          formatted_tag="${FORMATTEDTAG//\//-}"
+          
           echo "start to build docker image..."
           cp ./yak_linux_amd64 ./common/yak/cmd/docker/ && cp ./yak_linux_arm64 ./common/yak/cmd/docker/
           echo "copy yak_linux_amd64 and yak_linux_arm64 to docker folder..."
@@ -211,5 +215,5 @@ jobs:
           docker buildx ls && docker buildx create --name yaklang-builder --use
           
           echo "start to build docker image..."
-          docker buildx build --platform linux/amd64 -t v1ll4n/yaklang:${{ env.YAK_TAG }} --build-arg ARCH=amd64 ./common/yak/cmd/docker/
-          docker buildx build --platform linux/arm64 -t v1ll4n/yaklang:${{ env.YAK_TAG }} --build-arg ARCH=arm64 ./common/yak/cmd/docker/
+          docker buildx build --platform linux/amd64 -t v1ll4n/yaklang:$formatted_tag --build-arg ARCH=amd64 ./common/yak/cmd/docker/
+          docker buildx build --platform linux/arm64 -t v1ll4n/yaklang:$formatted_tag --build-arg ARCH=arm64 ./common/yak/cmd/docker/
