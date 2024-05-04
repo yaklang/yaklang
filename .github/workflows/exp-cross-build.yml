@@ -202,7 +202,7 @@ jobs:
 
       - name: Build Docker Image(Tag)
         run: |
-          echo "start to format tag name"
+          echo "start to format tag name: ${{ env.YAK_TAG }}"
           FORMATTEDTAG="${{ env.YAK_TAG }}"
           formatted_tag="${FORMATTEDTAG//\//-}"
           
