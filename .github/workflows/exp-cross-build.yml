@@ -200,8 +200,7 @@ jobs:
             yak_darwin_amd64.sha256.txt
             yak_darwin_arm64.sha256.txt
 
-
-      - name: Build Docker Image
+      - name: Build Docker Image(Tag)
         run: |
           echo "start to format tag name"
           FORMATTEDTAG="${{ env.YAK_TAG }}"
@@ -219,3 +218,9 @@ jobs:
           
           echo "start to build docker image..."
           docker buildx build --platform linux/amd64,linux/arm64 -t v1ll4n/yaklang:$formatted_tag --build-arg VERSION=${{ env.YAK_TAG }} ./common/yak/cmd/docker/ --push
+          
+          echo "Check if the latest label should be updated(formatted_tag is not start with dev)"
+          if [[ ! $formatted_tag == dev* ]]; then
+            echo "start to update latest tag"
+            docker buildx build --platform linux/amd64,linux/arm64 -t v1ll4n/yaklang:latest --build-arg VERSION=${{ env.YAK_TAG }} ./common/yak/cmd/docker/ --push
+          fi
