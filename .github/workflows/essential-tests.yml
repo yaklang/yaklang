@@ -77,6 +77,8 @@ jobs:
               # yso
               go test -timeout 20s ./common/yso/...
               go test -timeout 20s ./common/yserx
+              # totp
+              go test -timeout 20s ./common/twofa/...
 
           - name: Test NetX
             run: |
