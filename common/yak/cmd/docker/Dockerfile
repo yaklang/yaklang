@@ -4,17 +4,13 @@ FROM ubuntu:20.04
 # 设置工作目录
 WORKDIR /app
 
-# 定义构建时的架构参数
-ARG ARCH
 
-# 根据架构参数复制对应的二进制文件到容器中
-COPY yak_linux_${ARCH} /app/yak
-
-# 赋予执行权限
-RUN chmod +x /app/yak
-
-# 运行程序来验证其正常工作
-RUN /app/yak -v
+ARG VERSION=latest
+# Install Wget and download from https://aliyun-oss.yaklang.com/yak/${VERSION}/yak_linux_${ARCH}
+RUN apt-get update -y && apt-get install -y wget curl iputils-ping libpcap=1.9.1-3 && \
+    wget -O /app/yak https://aliyun-oss.yaklang.com/yak/${VERSION}/yak_linux_$(if [ "$(uname -m)" = "aarch64" ]; then echo "arm64"; else echo "amd64"; fi) && \
+    mkdir -p /app/ && chmod +x /app/yak && \
+    ./yak -v
 
 # 设置容器启动时默认执行的命令
 CMD ["/app/yak", "-v"]
