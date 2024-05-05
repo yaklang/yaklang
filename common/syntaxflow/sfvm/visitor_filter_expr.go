@@ -71,6 +71,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 				}
 			}
 		}
+		y.EmitPop()
 	case *sf.FieldIndexFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {
