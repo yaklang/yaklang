@@ -19,6 +19,7 @@ a.exec("bash attack")
 		t.Fatal(err)
 	}
 	assert.Equal(t, 1, len(results))
+	results.Show()
 }
 
 func TestProgramSyntaxFlow_Match_MemberCallMember(t *testing.T) {
