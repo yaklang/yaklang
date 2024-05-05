@@ -444,7 +444,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		//case OpWithdraw:
 		//	s.stack.Push(s.stack.LastStackValue())
 		default:
-			msg := fmt.Sprintf("unhandled default case， undefined opcode %v", i.String())
+			msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 			panic(msg)
 		}
 
