@@ -5,7 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/python/pipenv"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/pipenv"
 )
 
 const (

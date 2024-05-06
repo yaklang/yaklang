@@ -5,7 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/java/pom"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/pom"
 )
 
 const (

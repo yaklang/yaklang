@@ -5,7 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/gradle/lockfile"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/gradle"
 )
 
 const (
@@ -30,7 +30,7 @@ func (a gradleAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error)
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusGradle:
-		p := lockfile.NewParser()
+		p := gradle.NewParser()
 		pkgs, err := ParseLanguageConfiguration(fi, p)
 		if err != nil {
 			return nil, err

@@ -14,9 +14,8 @@ import (
 	"regexp"
 	"strings"
 
-	dio "github.com/aquasecurity/go-dep-parser/pkg/io"
-	"github.com/aquasecurity/go-dep-parser/pkg/types"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -60,7 +59,7 @@ func NewJarParser(path string, size int64) types.Parser {
 	}
 }
 
-func (p *JarParser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *JarParser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	libs, deps, err := p.parseArtifact(p.rootFilePath, p.size, r)
 	if err != nil {
 		return nil, nil, utils.Errorf("unable to parse %s: %v", p.rootFilePath, err)
@@ -68,7 +67,7 @@ func (p *JarParser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependen
 	return removeLibraryDuplicates(libs), deps, nil
 }
 
-func (p *JarParser) parseArtifact(filePath string, size int64, r dio.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *JarParser) parseArtifact(filePath string, size int64, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 
 	zr, err := zip.NewReader(r, size)
 	if err != nil {
