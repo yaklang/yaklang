@@ -5,9 +5,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/golang/mod"
-	"github.com/aquasecurity/go-dep-parser/pkg/golang/sum"
-	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/mod"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/sum"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 )
 
 const (
@@ -20,12 +20,10 @@ const (
 	statusGoSum int = 2
 )
 
-var (
-	goModRequiredFiles = []string{
-		"go.mod",
-		"go.sum",
-	}
-)
+var goModRequiredFiles = []string{
+	"go.mod",
+	"go.sum",
+}
 
 func init() {
 	RegisterAnalyzer(TypGoMod, NewGoModAnalyzer())
@@ -70,7 +68,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 				if err != nil {
 					return nil, err
 				}
-				var originalPkg = make(map[string]*dxtypes.Package, len(pkgs))
+				originalPkg := make(map[string]*dxtypes.Package, len(pkgs))
 				for _, pkg := range pkgs {
 					originalPkg[pkg.Identifier()] = pkg
 				}
@@ -90,7 +88,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 	return nil, nil
 }
 
-func lessThanGo117(pkgs []godeptypes.Library) bool {
+func lessThanGo117(pkgs []types.Library) bool {
 	for _, pkg := range pkgs {
 		// The indirect field is populated only in Go 1.17+
 		if pkg.Indirect {

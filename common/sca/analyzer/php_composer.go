@@ -6,7 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/php/composer"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/php/composer"
 	"golang.org/x/exp/slices"
 )
 

@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"github.com/aquasecurity/go-dep-parser/pkg/rust/cargo"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/rust/cargo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 

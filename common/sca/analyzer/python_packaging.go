@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/python/packaging"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/packaging"
 	"github.com/yaklang/yaklang/common/utils"
 )
 

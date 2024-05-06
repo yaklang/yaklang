@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"github.com/aquasecurity/go-dep-parser/pkg/ruby/bundler"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/ruby/bundler"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 

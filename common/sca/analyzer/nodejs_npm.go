@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	dio "github.com/aquasecurity/go-dep-parser/pkg/io"
-	"github.com/aquasecurity/go-dep-parser/pkg/nodejs/npm"
-	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
+	godeptypes "github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
@@ -92,9 +92,9 @@ func newNpmParse() *parser {
 	return &parser{}
 }
 
-func (*parser) Parse(r dio.ReadSeekerAt) ([]godeptypes.Library, []godeptypes.Dependency, error) {
+func (*parser) Parse(r types.ReadSeekerAt) ([]godeptypes.Library, []godeptypes.Dependency, error) {
 	var pkgJSON packageJSON
-	//todo: use json field select
+	// todo: use json field select
 	if err := json.NewDecoder(r).Decode(&pkgJSON); err != nil {
 		return nil, nil, nil
 	}

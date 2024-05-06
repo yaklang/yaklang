@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
 
-	godeptypes "github.com/aquasecurity/go-dep-parser/pkg/types"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,12 +31,14 @@ var (
 	analyzerTyp = make(map[Analyzer]TypAnalyzer, 0)
 )
 
-type TypAnalyzer string
-type ScanMode int
-type Analyzer interface {
-	Analyze(AnalyzeFileInfo) ([]*dxtypes.Package, error)
-	Match(MatchInfo) int
-}
+type (
+	TypAnalyzer string
+	ScanMode    int
+	Analyzer    interface {
+		Analyze(AnalyzeFileInfo) ([]*dxtypes.Package, error)
+		Match(MatchInfo) int
+	}
+)
 
 type FileInfo struct {
 	Path        string
@@ -220,7 +222,7 @@ func (ag *AnalyzerGroup) Analyze() error {
 	return nil
 }
 
-func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]*dxtypes.Package, error) {
+func ParseLanguageConfiguration(fi FileInfo, parser types.Parser) ([]*dxtypes.Package, error) {
 	parsedLibs, parsedDeps, err := parser.Parse(fi.LazyFile)
 	if err != nil {
 		return nil, err
@@ -228,7 +230,7 @@ func ParseLanguageConfiguration(fi FileInfo, parser godeptypes.Parser) ([]*dxtyp
 	return handlerParsed(parsedLibs, parsedDeps)
 }
 
-func handlerParsed(parsedLibs godeptypes.Libraries, parsedDeps godeptypes.Dependencies) ([]*dxtypes.Package, error) {
+func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([]*dxtypes.Package, error) {
 	pkgIDMap := make(map[string]*dxtypes.Package, len(parsedLibs))
 
 	for _, lib := range parsedLibs {
