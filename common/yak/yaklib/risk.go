@@ -81,6 +81,7 @@ var (
 		"NewDNSLogDomain":           yakit.NewDNSLogDomain,
 		"NewHTTPLog":                yakit.NewHTTPLog,
 		"CheckDNSLogByToken":        yakit.CheckDNSLogByToken,
+		"CheckHTTPLogByToken":       yakit.CheckHTTPLogByToken,
 		"CheckRandomTriggerByToken": yakit.CheckRandomTriggerByToken,
 		"CheckICMPTriggerByLength":  yakit.CheckICMPTriggerByLength,
 		"ExtractTokenFromUrl":       yakit.ExtractTokenFromUrl,
