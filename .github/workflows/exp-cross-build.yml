@@ -178,7 +178,7 @@ jobs:
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
-        if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags') }}
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags') && !contains(env.YAK_TAG, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
