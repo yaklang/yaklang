@@ -22,10 +22,11 @@ var EncryptMap = map[string]func(raw, key []byte) ([]byte, error){
 	},
 	//默认使用pkcs7padding
 	ypb.EncMode_AesRaw.String(): func(raw, key []byte) ([]byte, error) {
-		return codec.AESECBEncryptWithPKCS7Padding(aesKeyPaddingWithZero(key), raw, nil)
+		return codec.AESECBEncrypt(aesKeyPaddingWithZero(key), raw, nil)
+		//return codec.AESECBEncryptWithPKCS7Padding(aesKeyPaddingWithZero(key), raw, nil)
 	},
 	ypb.EncMode_AesBase64.String(): func(raw, key []byte) ([]byte, error) {
-		bytes, err := codec.AESECBEncryptWithPKCS7Padding(aesKeyPaddingWithZero(key), raw, nil)
+		bytes, err := codec.AESECBEncrypt(aesKeyPaddingWithZero(key), raw, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +54,7 @@ var DecryptMap = map[string]func(raw, key []byte) ([]byte, error){
 		if err != nil {
 			return nil, err
 		}
-		return codec.AESECBDecryptWithPKCS7Padding(aesKeyPaddingWithZero(key), bytes, nil)
+		return codec.AESECBDecrypt(aesKeyPaddingWithZero(key), bytes, nil)
 	},
 }
 
