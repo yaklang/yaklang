@@ -568,11 +568,11 @@ func NewDNSLogDomain() (domain string, token string, _ error) {
 	}
 }
 
-func NewHTTPLog() (domain string, token string, _ error) {
+func NewHTTPLog(i ...any) (domain string, token string, _ error) {
 	counter := 0
 	for {
 		counter++
-		domain, token, _, err := cybertunnel.RequireHTTPLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
+		domain, token, _, err := cybertunnel.RequireHTTPLogDomainByRemote(consts.GetDefaultPublicReverseServer(), i...)
 		if err != nil {
 			if counter > 10 {
 				return "", "", err
