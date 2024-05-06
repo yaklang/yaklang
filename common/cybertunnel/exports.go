@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"google.golang.org/grpc"
 	grpcMetadata "google.golang.org/grpc/metadata"
 	"net"
@@ -255,6 +256,42 @@ func RequirePortByToken(
 		Token:      token,
 		TTLSeconds: 60,
 	})
+}
+
+func RequireHTTPLogDomainByRemote(addr string, i ...any) (string, string, string, error) {
+	if addr == "" {
+		addr = consts.GetDefaultPublicReverseServer()
+	}
+	ctx := context.Background()
+	ctx, client, conn, err := GetClient(ctx, addr, "")
+	if err != nil {
+		return "", "", "", err
+	}
+	defer conn.Close()
+
+	var rspRaw []byte
+	if len(i) > 0 {
+		rspRaw = codec.AnyToBytes(i[0])
+	}
+
+	var count = 0
+	for {
+		count++
+		rsp, err := client.RequireHTTPRequestTrigger(utils.TimeoutContextSeconds(10), &tpb.RequireHTTPRequestTriggerParams{
+			ExpectedHTTPResponse: rspRaw,
+		})
+		if err != nil {
+			if count > 3 {
+				return "", "", "", utils.Errorf("require http domain failed: %s", err)
+			}
+
+			if strings.Contains(strings.ToLower(err.Error()), "context deadline exceeded") {
+				continue
+			}
+			return "", "", "", err
+		}
+		return rsp.GetPrimaryUrl(), rsp.GetToken(), rsp.GetPrimaryHost(), nil
+	}
 }
 
 func RequireDNSLogDomainByRemote(addr, mode string) (string, string, string, error) {

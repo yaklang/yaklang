@@ -568,6 +568,22 @@ func NewDNSLogDomain() (domain string, token string, _ error) {
 	}
 }
 
+func NewHTTPLog() (domain string, token string, _ error) {
+	counter := 0
+	for {
+		counter++
+		domain, token, _, err := cybertunnel.RequireHTTPLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
+		if err != nil {
+			if counter > 10 {
+				return "", "", err
+			}
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		return domain, token, nil
+	}
+}
+
 func CheckDNSLogByToken(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	var f float64
 	if len(timeout) > 0 {
