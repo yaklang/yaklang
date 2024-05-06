@@ -69,7 +69,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
 		variable := y.CreateVariable(id)
-		y.AssignVariable(variable, y.EmitConstInstAny())
+		y.AssignVariable(variable, y.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := y.CreateIfBuilder()
 		ifb.AppendItem(
@@ -1002,7 +1002,7 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	} else {
 		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(name)
-		value := y.EmitConstInstAny()
+		value := y.EmitValueOnlyDeclare(name)
 		return name, value
 	}
 

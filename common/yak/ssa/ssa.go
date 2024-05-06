@@ -432,8 +432,10 @@ var (
 type UndefinedKind int
 
 const (
-	// UndefinedValue normal undefined value
-	UndefinedValue UndefinedKind = iota
+	// UndefinedValueInValid normal undefined value
+	UndefinedValueInValid UndefinedKind = iota
+	// UndefinedValueValid is variable only declare
+	UndefinedValueValid
 	// UndefinedMemberInValid member call but not this key
 	UndefinedMemberInValid
 	// UndefinedMemberValid member call, has this key, but not this value, this shouldn't mark error

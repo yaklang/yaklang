@@ -234,9 +234,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else if i := ret.List(); i != nil {
 		} else if i := ret.IsSet(); i != nil {
 			for _, chain := range ret.ChainList().(*phpparser.ChainListContext).AllChain() {
-				if visitChain := y.VisitChain(chain); visitChain.IsUndefined() {
-					return y.EmitConstInstAny()
-					// return y.EmitConstInst(false)
+				visitChain := y.VisitChain(chain)
+				undefine, ok := ssa.ToUndefined(visitChain)
+				if visitChain == nil || (ok && undefine.Kind == ssa.UndefinedValueInValid) {
+					return y.EmitConstInst(false)
 				}
 			}
 			return y.EmitConstInst(true)
@@ -284,7 +285,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			o = ssa.OpAdd
 		default:
 			log.Errorf("unexpected op: %v", opStr)
-			return y.EmitConstInstAny()
+			return nil
 		}
 		return y.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
@@ -319,9 +320,9 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.BitwiseExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "&&":
-			var id string
+			id := uuid.NewString()
 			v1 := y.VisitExpression(ret.Expression(0))
-			y.AssignVariable(y.CreateVariable(id), y.EmitConstInstAny())
+			y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 			y.CreateIfBuilder().SetCondition(func() ssa.Value {
 				return y.EmitBinOp(ssa.OpEq, v1, y.EmitConstInst(true))
 			}, func() {
@@ -332,9 +333,9 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			}).Build()
 			return y.ReadValue(id)
 		case "||":
-			var id string
+			id := uuid.NewString()
 			v1 := y.VisitExpression(ret.Expression(0))
-			y.AssignVariable(y.CreateVariable(id), y.EmitConstInstAny())
+			y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 			y.CreateIfBuilder().SetCondition(func() ssa.Value {
 				return y.EmitBinOp(ssa.OpEq, v1, y.EmitConstInst(true))
 			}, func() {
@@ -416,7 +417,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	case *phpparser.LogicalExpressionContext:
 		id := uuid.NewString()
-		y.AssignVariable(y.CreateVariable(id), y.EmitConstInstAny())
+		y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 		if ret.LogicalXor() != nil {
 			v1 := y.VisitExpression(ret.Expression(0))
 			v2 := y.VisitExpression(ret.Expression(1))
@@ -490,7 +491,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	raw.GetText()
 	log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
-	return y.EmitConstInstAny()
+	return nil
 }
 
 func (y *builder) VisitAssignable(raw phpparser.IAssignableContext) ssa.Value {

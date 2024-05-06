@@ -334,8 +334,10 @@ func (f *FunctionBuilder) EmitMakeSlice(i Value, low, high, max Value) *Make {
 	return f.emitMake(i, i.GetType(), low, high, max, nil, nil)
 }
 
-func (f *FunctionBuilder) EmitConstInstAny() *ConstInst {
-	return f.EmitConstInst(struct{}{})
+func (f *FunctionBuilder) EmitValueOnlyDeclare(name string) *Undefined {
+	un := f.EmitUndefined(name)
+	un.Kind = UndefinedValueValid
+	return un
 }
 
 func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
@@ -438,7 +440,6 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 	p := &Phi{
 		anValue: NewValue(),
 		Edge:    vs,
-		create:  false,
 	}
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {

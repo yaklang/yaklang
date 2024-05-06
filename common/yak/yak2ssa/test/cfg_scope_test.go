@@ -70,7 +70,7 @@ func TestYaklangBasic_Variable_InBlock(t *testing.T) {
 		println(a) // 1
 		`, []string{
 			"1",
-			"any",
+			"Undefined-a",
 			"1",
 		}, t)
 	})
