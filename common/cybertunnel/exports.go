@@ -327,6 +327,40 @@ func QueryExistedDNSLogEvents(addr, token, mode string) ([]*tpb.DNSLogEvent, err
 	return QueryExistedDNSLogEventsEx(addr, token, mode, 10)
 }
 
+func QueryExistedHTTPLog(addr string, token string, timeout ...float64) (*tpb.QueryExistedHTTPRequestTriggerResponse, error) {
+	var f = 5.0
+	if len(timeout) > 0 {
+		f = timeout[0]
+	}
+	if f <= 0 {
+		f = 5
+	}
+
+	if addr == "" {
+		addr = consts.GetDefaultPublicReverseServer()
+	}
+	ctx := utils.TimeoutContextSeconds(f)
+	ctx, client, conn, err := GetClient(ctx, addr, "")
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	for i := 0; i < 3; i++ {
+		rsp, err := client.QueryExistedHTTPRequestTrigger(utils.TimeoutContextSeconds(f), &tpb.QueryExistedHTTPRequestTriggerRequest{
+			Token: token,
+		})
+		if err != nil {
+			if utils.IsErrorNetOpTimeout(err) {
+				continue
+			}
+			return nil, err
+		}
+		return rsp, nil
+	}
+	return nil, utils.Error("fetch querying existed httplog failed")
+}
+
 func QueryExistedDNSLogEventsEx(addr, token, mode string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	var f = 5.0
 	if len(timeout) > 0 {

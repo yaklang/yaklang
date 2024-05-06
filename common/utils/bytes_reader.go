@@ -63,8 +63,24 @@ func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback fun
 }
 
 func IsErrorNetOpTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	var netOpError interface{ Timeout() bool }
-	return errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout()
+	result := errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout()
+	if !result {
+		// check context exceeded
+		if errors.As(err, &context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+			return true
+		}
+	}
+	ret := err.Error()
+	if strings.Contains(ret, "i/o timeout") || strings.Contains(ret, "context deadline exceeded") {
+		return true
+	}
+
+	return false
 }
 
 func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, error) {
