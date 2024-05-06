@@ -155,6 +155,10 @@ jobs:
 
       - name: Push Version Info to OSS
         run: |
+          ./scripts/generate-commit.sh > /tmp/raw_commit_message.txt
+          ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPEN_API_KEY }} --filename /tmp/raw_commit_message.txt
+          ls | grep release
+          
           if [ -f current_version.txt ]; then rm current_version.txt; fi
           if [ -f new_history_versions.txt ]; then rm new_history_versions.txt; fi
           
@@ -173,6 +177,8 @@ jobs:
           echo "Uploading version.txt to oss"
           cat new_history_versions.txt | head -n 100
           cat new_history_versions.txt | head -n 100 > active_versions.txt
+          ./yak_linux_amd64 upload-oss -f 'release_note.en.txt:/yak/${{ env.YAK_TAG }}/release_note.en.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
+          ./yak_linux_amd64 upload-oss -f 'release_note.txt:/yak/${{ env.YAK_TAG }}/release_note.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
           ./yak_linux_amd64 upload-oss -f 'new_history_versions.txt:/yak/version-info/history_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
           ./yak_linux_amd64 upload-oss -f 'active_versions.txt:/yak/version-info/active_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
 
