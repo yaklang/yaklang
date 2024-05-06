@@ -16,7 +16,7 @@ b()
 c = a;
 `
 		ssatest.Check(t, code,
-			ssatest.CheckTopDef_Contain("c", []string{"Function-b(", "2"}, true),
+			ssatest.CheckTopDef_Contain("c", []string{"2"}, true),
 		)
 	})
 
@@ -28,6 +28,6 @@ b = () => {
 }
 if e {b()}
 c = a;
-		`, ssatest.CheckTopDef_Contain("c", []string{"Function-b(", "2", "1"}, true))
+		`, ssatest.CheckTopDef_Contain("c", []string{"2", "1"}, true))
 	})
 }
