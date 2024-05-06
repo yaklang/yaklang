@@ -466,7 +466,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		// 逻辑运算聚合产生phi指令
 		id := uuid.NewString()
 		variable := b.CreateVariable(id)
-		b.AssignVariable(variable, b.EmitConstInstAny())
+		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		ifb := b.CreateIfBuilder()
 		ifb.AppendItem(
 			func() ssa.Value {

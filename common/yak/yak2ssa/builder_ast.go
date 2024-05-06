@@ -809,9 +809,8 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 	for _, idstmt := range stmt.AllIdentifier() {
 		recoverRange := b.SetRangeFromTerminalNode(idstmt)
 		id := idstmt.GetText()
-		// b.WriteVariable(id, b.EmitConstInstAny())
 		v := b.CreateLocalVariable(id)
-		b.AssignVariable(v, b.EmitConstInstAny())
+		b.AssignVariable(v, b.EmitValueOnlyDeclare(id))
 		recoverRange()
 	}
 }
@@ -1152,7 +1151,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
 		variable := b.CreateVariable(id)
-		b.AssignVariable(variable, b.EmitConstInstAny())
+		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := b.CreateIfBuilder()
 		ifb.AppendItem(
