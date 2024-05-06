@@ -223,4 +223,4 @@ jobs:
       #   shell: pwsh
       - name: Run JSP Shell Tests
         run: |
-          go test -timeout 30s -run TestNewGodzillaBase64Jsp ./common/wsm
+          go test -timeout 30s -run ^TestNewGodzillaBase64Jsp$ ./common/wsm
