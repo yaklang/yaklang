@@ -617,11 +617,11 @@ func CheckHTTPLogByToken(token string, timeout ...float64) ([]*tpb.HTTPRequestTr
 			}
 			var details = make(map[string]any)
 			json.Unmarshal(req, &details)
-			if _, ok := details["request"]; ok {
-				details["request"] = utils.EscapeInvalidUTF8Byte(i.GetRequest())
+			if _, ok := details["Request"]; ok {
+				details["Request"] = utils.EscapeInvalidUTF8Byte(i.GetRequest())
 			}
-			if _, ok := details["response"]; ok {
-				details["response"] = utils.EscapeInvalidUTF8Byte(i.GetResponse())
+			if _, ok := details["Response"]; ok {
+				details["Response"] = utils.EscapeInvalidUTF8Byte(i.GetResponse())
 			}
 
 			NewRisk(
