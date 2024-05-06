@@ -79,6 +79,7 @@ var (
 		"HaveReverseRisk":           yakit.HaveReverseRisk,
 		"NewRandomPortTrigger":      yakit.NewRandomPortTrigger,
 		"NewDNSLogDomain":           yakit.NewDNSLogDomain,
+		"NewHTTPLog":                yakit.NewHTTPLog,
 		"CheckDNSLogByToken":        yakit.CheckDNSLogByToken,
 		"CheckRandomTriggerByToken": yakit.CheckRandomTriggerByToken,
 		"CheckICMPTriggerByLength":  yakit.CheckICMPTriggerByLength,
