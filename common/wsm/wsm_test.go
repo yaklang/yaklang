@@ -147,7 +147,7 @@ func TestMUSTPASS_Behinder_PHP(t *testing.T) {
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
 		SetShellScript("php"),
-		SetProxy("http://127.0.0.1:9999"),
+		//SetProxy("http://127.0.0.1:9999"),
 	)
 	bx.ClientRequestEncodeFormGo(func(reqBody []byte) ([]byte, error) {
 		jsonStr := `{"go0p":"1",asdfakhj,"body":{"user":"lucky"}}`
