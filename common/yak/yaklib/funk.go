@@ -54,6 +54,7 @@ type (
 )
 
 var FunkExports = map[string]interface{}{
+	"Retry":       utils.Retry2,
 	"WaitConnect": WaitConnect,
 	//"WaitConnect": WaitConnect,
 	"Map": func(i interface{}, fc funkGeneralFuncType) interface{} {
