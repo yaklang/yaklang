@@ -283,7 +283,7 @@ func TestMUSTPASS_Godzilla_JSP_Base64(t *testing.T) {
 		SetSecretKey("key"),
 		SetPass("pass"),
 		SetShellScript("jsp"),
-		SetBase64Aes(),
+		SetBase64(),
 		//SetProxy("http://127.0.0.1:9999"),
 	)
 	if err != nil {
@@ -359,7 +359,7 @@ func TestNewGodzillaBase64Jsp_Plugin(t *testing.T) {
 }
 
 func TestMUSTPASS_Godzilla_ASPX_Base64(t *testing.T) {
-	url := "http://47.120.44.219:8087/bs64.aspx"
+	url := "http://47.120.44.219:8087/123.aspx"
 	if utils.InGithubActions() {
 		url = "http://127.0.0.1:8087/gbs64.aspx"
 	}
@@ -369,8 +369,8 @@ func TestMUSTPASS_Godzilla_ASPX_Base64(t *testing.T) {
 		SetSecretKey("key"),
 		SetPass("pass"),
 		SetShellScript("aspx"),
-		SetBase64Aes(),
-		//SetProxy("http://127.0.0.1:9999"),
+		SetBase64(),
+		//SetProxy("http://127.0.0.1:8083"),
 	)
 	if err != nil {
 		t.FailNow()
@@ -407,7 +407,7 @@ func TestNewGodzillaRawJsp(t *testing.T) {
 		SetPass("pass"),
 		SetShellScript("jsp"),
 		SetRawAes(),
-		SetProxy("http://127.0.0.1:9999"),
+		//SetProxy("http://127.0.0.1:9999"),
 	)
 	if err != nil {
 		panic(err)
@@ -427,7 +427,7 @@ func TestInjectSuo5Servlet(t *testing.T) {
 		SetGodzillaTool(),
 		SetPass("pass"), SetSecretKey("key"),
 		SetShellScript("jsp"),
-		SetBase64Aes(),
+		SetBase64(),
 		SetProxy("http://127.0.0.1:9999"),
 	)
 	g := godzillaShell.(*Godzilla)
