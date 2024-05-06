@@ -11,9 +11,9 @@ results = ai.FunctionCall(f`我正在发布一个新版本，后面我会放入 
 
 ${string(file.ReadFile(raw)~)}
 
-输出的内容使用列表展示(按行分割)，尽量精炼，控制在10条左右，注意同类合并`, {
+输出的内容使用列表展示(按行分割)，尽量精炼，控制在10条左右，注意同类合并，输出的时候，中文英文版本都要输出，英文放在 release_note_en 字段中`, {
     "release_note": "总结 release note 信息为中文，以序号开头，每条以 \n 换行",
-    "release_note_en": "总结 release note 信息为英文，以序号开头，每条以 \n 换行" 
+    "release_note_en": "总结 release note 信息为英文，以序号开头，每条以 \n 换行"
 }, ai.type(aiType), ai.apiKey(apiKey), ai.debugStream(true))~
 
 
