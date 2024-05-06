@@ -269,11 +269,13 @@ func (b *Behinder) sendHttpRequest(data []byte) ([]byte, error) {
 		poc.WithSession(b.Url),
 	)
 
-	//resp, err := b.Client.Do(request)
-
 	if err != nil {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
+
+	fmt.Println(string(resp.RawRequest))
+	fmt.Println("=====================================")
+	fmt.Println(string(resp.RawPacket))
 
 	_, raw, err := lowhttp.FixHTTPResponse(resp.RawPacket)
 

