@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/aquasecurity/go-dep-parser/pkg/ruby/gemspec"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/ruby/gemspec"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
@@ -13,9 +13,7 @@ const (
 	statusGemSpec  int         = 1
 )
 
-var (
-	gemspecRegex = regexp.MustCompile(`.*/specifications/.+\.gemspec`)
-)
+var gemspecRegex = regexp.MustCompile(`.*/specifications/.+\.gemspec`)
 
 func init() {
 	RegisterAnalyzer(TypRubyGemSpec, NewRubyGemSpecAnalyzer())

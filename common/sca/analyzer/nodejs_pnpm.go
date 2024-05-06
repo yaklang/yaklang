@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"github.com/aquasecurity/go-dep-parser/pkg/nodejs/pnpm"
+	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/pnpm"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
