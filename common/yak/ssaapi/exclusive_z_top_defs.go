@@ -316,7 +316,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			traced := NewValue(actualParam).AppendEffectOn(called)
 			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
 			call := actx.PopCall()
-			//todo 函数内拿到外面东西 调用栈
+
 			ret := traced.getTopDefs(actx)
 			if call != nil {
 				actx.PushCall(call)
