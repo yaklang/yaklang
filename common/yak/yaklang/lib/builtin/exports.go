@@ -1,12 +1,14 @@
 package builtin
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
 )
 
 // -----------------------------------------------------------------------------
 
 var YaklangBaseLib = map[string]interface{}{
+	"retry":     utils.Retry2,
 	"append":    Append,
 	"copy":      Copy,
 	"delete":    Delete,
