@@ -584,6 +584,53 @@ func NewHTTPLog() (domain string, token string, _ error) {
 	}
 }
 
+func CheckHTTPLogByToken(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
+	var f float64
+	if len(timeout) > 0 {
+		f = timeout[0]
+	}
+	if f <= 0 {
+		f = 5.0
+	}
+	counter := 0
+	for {
+		counter++
+		if counter > 3 {
+			return nil, utils.Errorf("cannot found result for httplog[%v]", token)
+		}
+
+		rsp, err := cybertunnel.QueryExistedHTTPLog(consts.GetDefaultPublicReverseServer(), token, f)
+		if err != nil {
+			if utils.IsErrorNetOpTimeout(err) {
+				continue
+			}
+			return nil, err
+		}
+		if len(rsp.Notifications) <= 0 {
+			time.Sleep(time.Second)
+			continue
+		}
+		for _, i := range rsp.GetNotifications() {
+			req, err := json.Marshal(i)
+			if err != nil {
+				continue
+			}
+			var details = make(map[string]any)
+			json.Unmarshal(req, &details)
+			NewRisk(
+				i.RemoteAddr,
+				WithRiskParam_Title(fmt.Sprintf("HTTPLOG - %v", i.Url)),
+				WithRiskParam_TitleVerbose(fmt.Sprintf("HTTPLOG 触发 - %v", i.Url)),
+				WithRiskParam_Details(i),
+				WithRiskParam_RiskType("httplog"),
+				WithRiskParam_Token(token),
+				WithRiskParam_Details(details),
+			)
+		}
+		return rsp.GetNotifications(), nil
+	}
+}
+
 func CheckDNSLogByToken(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	var f float64
 	if len(timeout) > 0 {
