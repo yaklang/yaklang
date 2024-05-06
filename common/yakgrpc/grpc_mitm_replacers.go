@@ -603,10 +603,9 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	}()
 	var (
 		// packetInfo      *yakit.PacketInfo
-		extracted       []*yakit.ExtractedData
-		matchResults    []*yakit.MatchResult
-		newMatchResults []*yakit.MatchResult
-		err             error
+		extracted []*yakit.ExtractedData
+
+		err error
 	)
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
@@ -619,6 +618,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	}
 
 	for _, rule := range m._mirrorRules {
+		matchResults := make([]*yakit.MatchResult, 0)
+		newMatchResults := make([]*yakit.MatchResult, 0)
 		if !rule.EnableForRequest && !rule.EnableForResponse {
 			continue
 		}
@@ -639,6 +640,11 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			}
 			matchResults = append(matchResults, newMatchResults...)
 		}
+
+		if len(matchResults) <= 0 {
+			continue
+		}
+
 		for _, match := range matchResults {
 			ret := ""
 
