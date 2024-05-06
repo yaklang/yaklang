@@ -99,7 +99,7 @@ func DeleteExtractedDataByID(db *gorm.DB, id int64) error {
 }
 
 func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*ExtractedData, error) {
-	db = db.Debug().Model(&ExtractedData{})
+	db = db.Model(&ExtractedData{})
 
 	params := req.GetPagination()
 
