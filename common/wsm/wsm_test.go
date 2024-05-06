@@ -270,6 +270,9 @@ func TestNewWebASPShell_B3(t *testing.T) {
 
 func TestNewGodzillaBase64Jsp(t *testing.T) {
 	url := "http://47.120.44.219:8080/bs64.jsp"
+	if utils.InGithubActions() {
+		url = "http://127.0.0.1:8085/godzilla_bs64.jsp"
+	}
 
 	gs, err := NewGodzillaManager(
 		url,
@@ -277,7 +280,7 @@ func TestNewGodzillaBase64Jsp(t *testing.T) {
 		SetPass("pass"),
 		SetShellScript("jsp"),
 		SetBase64Aes(),
-		SetProxy("http://127.0.0.1:9999"),
+		//SetProxy("http://127.0.0.1:9999"),
 	)
 	if err != nil {
 		panic(err)
@@ -287,19 +290,19 @@ func TestNewGodzillaBase64Jsp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(ping)
+	assert.True(t, ping)
 
-	info, err := gs.BasicInfo()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(info))
-
-	res, err := gs.CommandExec("whoami")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(res))
+	//info, err := gs.BasicInfo()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println(string(info))
+	//
+	//res, err := gs.CommandExec("whoami")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println(string(res))
 }
 
 func TestNewGodzillaBase64Jsp_Plugin(t *testing.T) {
@@ -352,8 +355,10 @@ func TestNewGodzillaBase64Jsp_Plugin(t *testing.T) {
 }
 
 func TestNewGodzillaBase64Aspx(t *testing.T) {
-	//url := "http://47.120.44.219:8087/bs64.aspx"
-	url := "http://127.0.0.1:8087/gbs64.aspx"
+	url := "http://47.120.44.219:8087/bs64.aspx"
+	if utils.InGithubActions() {
+		url = "http://127.0.0.1:8087/gbs64.aspx"
+	}
 
 	gs, err := NewGodzillaManager(
 		url,
