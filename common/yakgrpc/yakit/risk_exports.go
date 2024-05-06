@@ -624,7 +624,7 @@ func CheckHTTPLogByToken(token string, timeout ...float64) ([]*tpb.HTTPRequestTr
 			if _, ok := details["response"]; ok {
 				details["response"] = codec.AnyToBytes(i.GetResponse())
 			}
-			
+
 			NewRisk(
 				i.RemoteAddr,
 				WithRiskParam_Title(fmt.Sprintf("HTTPLOG - %v", i.Url)),
