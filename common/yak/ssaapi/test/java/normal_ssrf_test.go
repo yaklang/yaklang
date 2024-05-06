@@ -2,8 +2,8 @@ package java
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"gotest.tools/v3/assert"
 	"strings"
 	"testing"
 )
