@@ -288,7 +288,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		mitmPluginCaller.SetProxy(downstreamProxy)
 	}
 
-	//int beforeRequest afterRequest
+	// int beforeRequest afterRequest
 	var beforeRequest func(https bool, originReq []byte, req []byte) []byte = nil
 	var afterRequest func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 
