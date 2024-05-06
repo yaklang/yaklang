@@ -514,7 +514,7 @@ func (g *Godzilla) GenWebShell() string {
 func (g *Godzilla) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
 	err := g.InjectPayloadIfNoCookie()
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	parameter := newParameter()
 	result, err := g.EvalFunc("", "test", parameter)
