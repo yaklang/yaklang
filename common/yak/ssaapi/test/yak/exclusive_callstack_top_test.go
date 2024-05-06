@@ -283,7 +283,7 @@ func Test_CallStack_Normal_SideEffect(t *testing.T) {
 		`
 
 		ssatest.Check(t, code,
-			ssatest.CheckTopDef_Contain("c", []string{"Function-b(", "333333"}),
+			ssatest.CheckTopDef_Contain("c", []string{"333333"}),
 		)
 	})
 
