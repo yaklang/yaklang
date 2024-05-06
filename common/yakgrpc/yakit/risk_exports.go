@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/url"
 	"os"
 	"strconv"
@@ -617,6 +618,13 @@ func CheckHTTPLogByToken(token string, timeout ...float64) ([]*tpb.HTTPRequestTr
 			}
 			var details = make(map[string]any)
 			json.Unmarshal(req, &details)
+			if _, ok := details["request"]; ok {
+				details["request"] = codec.AnyToBytes(i.GetRequest())
+			}
+			if _, ok := details["response"]; ok {
+				details["response"] = codec.AnyToBytes(i.GetResponse())
+			}
+			
 			NewRisk(
 				i.RemoteAddr,
 				WithRiskParam_Title(fmt.Sprintf("HTTPLOG - %v", i.Url)),
@@ -793,30 +801,30 @@ func CheckRandomTriggerByToken(t string) (*tpb.RandomPortTriggerEvent, error) {
 
 func SolutionAndDescriptionByCWE(FromYakScript, RiskTypeVerbose, TitleVerbose string) (description, solution string) {
 	riskTypeList := map[string]int{
-		"SQL":    89,
-		"XSS":    79,
-		"命令执行":   77,
-		"命令注入":   77,
-		"代码执行":   94,
-		"代码注入":   94,
-		"CSRF":   352,
-		"文件包含":   41,
-		"文件读取":   41,
-		"文件下载":   41,
-		"文件写入":   434,
-		"文件上传":   434,
-		"XXE":    91,
-		"XML":    91,
-		"反序列化":   502,
-		"未授权访问":  552,
-		"路径遍历":   22,
+		"SQL":          89,
+		"XSS":          79,
+		"命令执行":     77,
+		"命令注入":     77,
+		"代码执行":     94,
+		"代码注入":     94,
+		"CSRF":         352,
+		"文件包含":     41,
+		"文件读取":     41,
+		"文件下载":     41,
+		"文件写入":     434,
+		"文件上传":     434,
+		"XXE":          91,
+		"XML":          91,
+		"反序列化":     502,
+		"未授权访问":   552,
+		"路径遍历":     22,
 		"敏感信息泄漏": 200,
 		"身份验证错误": 305,
-		"权限提升":   271,
+		"权限提升":     271,
 		"业务逻辑漏洞": 840,
 		"默认配置漏洞": 1188,
-		"弱口令":    1391,
-		"SSRF":   918,
+		"弱口令":       1391,
+		"SSRF":         918,
 	}
 	for k, v := range riskTypeList {
 		if strings.Contains(FromYakScript, k) || strings.Contains(RiskTypeVerbose, k) || strings.Contains(TitleVerbose, k) {
