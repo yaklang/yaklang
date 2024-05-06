@@ -58,6 +58,21 @@ func (a Rules) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排�
 	return a[i].Index < a[j].Index
 }
 
+func FixPacket(packet []byte, isReq bool) (fixed []byte, use bool) {
+	if !isReq {
+		fixed, _, err := lowhttp.FixHTTPResponse(packet)
+		if err != nil {
+			return nil, false
+		}
+		packet = fixed
+	}
+	// 修复混杂的换行符，统一为\r\n
+	packet = bytes.Replace(packet, []byte("\n"), []byte("\r\n"), -1)
+	packet = bytes.Replace(packet, []byte("\r\r\n"), []byte("\r\n"), -1)
+
+	return packet, true
+}
+
 type MITMReplaceRule struct {
 	*ypb.MITMContentReplacer
 	cache *regexp2.Regexp
@@ -225,6 +240,7 @@ func (m *MITMReplaceRule) splitPacket(packet []byte) (*yakit.PacketInfo, error) 
 			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), info.ChunkedHeader))
 		}
 	}
+
 	info.HeaderRaw = headerRaw
 	info.BodyRaw = bodyRaw
 	if strings.HasPrefix(info.Proto, "HTTP") {
@@ -234,13 +250,9 @@ func (m *MITMReplaceRule) splitPacket(packet []byte) (*yakit.PacketInfo, error) 
 }
 
 func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) (*yakit.PacketInfo, []*yakit.MatchResult, error) {
-	originPacket := packet // backup origin packet
-	if !isReq {
-		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fix http response failed: %v", err)
-		}
-		packet = originDecoded
+	fixed, ok := FixPacket(packet, isReq)
+	if ok {
+		packet = fixed
 	}
 	// parse http packet
 	packetInfo, err := m.splitPacket(packet)
@@ -255,13 +267,11 @@ func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) (*yakit.PacketI
 // MatchAndReplacePacket match and replace package, return matched result and replaced package
 func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*yakit.MatchResult, []byte, error) {
 	originPacket := packet // backup origin packet
-	if !isReq {
-		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fix http response failed: %v", err)
-		}
-		packet = originDecoded
+	fixed, ok := FixPacket(packet, isReq)
+	if ok {
+		packet = fixed
 	}
+
 	// parse http packet
 	packetInfo, err := m.splitPacket(packet)
 	if err != nil {
