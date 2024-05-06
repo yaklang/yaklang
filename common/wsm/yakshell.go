@@ -177,9 +177,12 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params yakshell.Param, s
 	}
 	if y.IsSession && !forceHandle {
 		//如果是session就每次都获取到AllPayload去做解析
-		hexCode = payloads.YakShellPayload[y.ShellScript][payloads.AllPayload]
+		hexCode, err = payloads.GetHexYakPayload(payloads.AllPayload.String() + "." + y.ShellScript)
 	} else {
-		hexCode = payloads.YakShellPayload[y.ShellScript][binCode]
+		hexCode, err = payloads.GetHexYakPayload(binCode.String() + "." + y.ShellScript)
+	}
+	if err != nil {
+		return nil, err
 	}
 	//如果不是forceHandle就进行处理参数
 	if !forceHandle {

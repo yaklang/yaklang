@@ -43,7 +43,6 @@ func Encryption(payload, key []byte, pass, encMode, script string, gzip bool) ([
 		up := url.QueryEscape(base64.StdEncoding.EncodeToString(enPayload))
 		enPayload = []byte(pass + "=" + up)
 	case ypb.EncMode_Raw.String():
-
 	}
 	return enPayload, nil
 }

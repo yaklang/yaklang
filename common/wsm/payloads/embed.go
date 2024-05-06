@@ -56,10 +56,49 @@ var (
 
 var payloads sync.Once
 var HexPayload = map[string]map[Payload]string{}
-var YakShellPayload = map[string]map[Payload]string{}
 
 // EncryptPayload 加密payload
 var EncryptPayload = map[string]map[string]string{}
+
+func GetHexYakPayload(filename string) (string, error) {
+	handleFile := func(filename string) string {
+		fileinfo := strings.Split(filename, ".")
+		if len(fileinfo) != 2 {
+			panic("filename analyze fails, filename cannot split filename and ext")
+		}
+		filename = fileinfo[0]
+		switch fileinfo[1] {
+		case ypb.ShellScript_PHP.String(), strings.ToLower(ypb.ShellScript_PHP.String()):
+			return filename + ".php"
+		case ypb.ShellScript_JSP.String(), strings.ToLower(ypb.ShellScript_JSP.String()):
+			return filename + ".class"
+		case ypb.ShellScript_ASPX.String(), strings.ToLower(ypb.ShellScript_ASPX.String()):
+			return filename + ".dll"
+		default:
+			panic("file ext not match")
+		}
+	}
+
+	file, err := YakPayloads.ReadFile(fmt.Sprintf("yakshell/static/%s.txt", handleFile(filename)))
+	if err != nil {
+		return "", err
+	}
+	DecryptFunc := func(raw []byte) ([]byte, error) {
+		compress, err := utils.GzipDeCompress(raw)
+		if err != nil {
+			return nil, err
+		}
+		for i, b := range compress {
+			compress[i] = b ^ byte(i)
+		}
+		return compress, nil
+	}
+	bytes, err := DecryptFunc(file)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
 
 func init() {
 	dirs, err := Payloads.ReadDir("behinder/static")
@@ -102,40 +141,6 @@ func init() {
 			compress[i] = b ^ byte(i)
 		}
 		return compress, nil
-	}
-	_ = DecryptFunc
-	//将Yakit_payload
-	dirs, err = YakPayloads.ReadDir("yakshell/static")
-	if err != nil {
-		panic(err)
-	}
-	for _, i := range dirs {
-		script := ""
-		fileName := i.Name()
-		if strings.Contains(strings.ToLower(fileName), ".class") {
-			script = ypb.ShellScript_JSP.String()
-		} else if strings.Contains(strings.ToLower(fileName), ".php") {
-			script = ypb.ShellScript_PHP.String()
-		} else if strings.Contains(strings.ToLower(fileName), ".asp") {
-			script = ypb.ShellScript_ASP.String()
-		} else if strings.Contains(strings.ToLower(fileName), ".dll") {
-			script = ypb.ShellScript_ASPX.String()
-		}
-		payloadType := Payload(strings.Split(fileName, ".")[0])
-		// https://github.com/golang/go/issues/45230
-		raw, err := YakPayloads.ReadFile(fmt.Sprintf("yakshell/static/%s", i.Name()))
-		if err != nil {
-			panic(err)
-		}
-		raw, err = DecryptFunc(raw)
-		if err != nil {
-			panic(err)
-		}
-		if _, exists := YakShellPayload[script]; !exists {
-			YakShellPayload[script] = make(map[Payload]string)
-		}
-		// 添加到 HexPayload
-		YakShellPayload[script][payloadType] = hex.EncodeToString(raw)
 	}
 
 	//将加密方式加入

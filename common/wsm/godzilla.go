@@ -307,7 +307,7 @@ func (g *Godzilla) post(data []byte) ([]byte, error) {
 	fmt.Println(string(resp.RawRequest))
 	fmt.Println("=====================================")
 	fmt.Println(string(resp.RawPacket))
-	_, raw := lowhttp.SplitHTTPHeadersAndBodyFromPacket(resp.RawPacket)
+	_, raw := lowhttp.SplitHTTPHeadersAndBodyFromPacket(resp.BareResponse)
 
 	if len(raw) == 0 && g.req != nil {
 		return nil, utils.Errorf("empty response")
