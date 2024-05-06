@@ -15,6 +15,24 @@ func Retry(times int, f func() error) error {
 	return err
 }
 
+func Retry2(i int, handler func() bool) {
+	wrapperHandler := func() (ret bool) {
+		if err := recover(); err != nil {
+			log.Warnf("retry handler failed: %v", err)
+			ret = false
+		}
+		ret = handler()
+		return
+	}
+	// retry until handler's result is true
+	for i > 0 {
+		if wrapperHandler() {
+			return
+		}
+		i--
+	}
+}
+
 func RetryWithExpBackOff(f func() error) error {
 	return RetryWithExpBackOffEx(5, 300, f)
 }
