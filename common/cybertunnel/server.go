@@ -77,7 +77,7 @@ func (s *TunnelServer) InitialReverseTrigger() error {
 		}
 	})
 
-	defaultHTTPTrigger, err := NewHTTPTrigger(s.ExternalIP, s.DNSLogDomain)
+	defaultHTTPTrigger, err = NewHTTPTrigger(s.ExternalIP, s.DNSLogDomain)
 	if err != nil {
 		return utils.Errorf("create http trigger failed: %s", err)
 	}
