@@ -376,7 +376,7 @@ die(include("syntax/for.php"));
 		code := `<?php
 $b =isset($a);
 println($b);`
-		ssatest.CheckPrintlnValue(code, []string{"any"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"false"}, t)
 	})
 	t.Run("isset-2", func(t *testing.T) {
 		code := `<?php

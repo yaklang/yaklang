@@ -110,7 +110,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 		}
 	}
 
-	if inst.Kind == ssa.UndefinedValue {
+	if inst.Kind == ssa.UndefinedValueInValid {
 		markUndefinedValue(inst)
 	}
 

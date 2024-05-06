@@ -409,7 +409,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 	name := i.Identifier().GetText()
 	variable := y.CreateVariable(name)
 	_ = variable
-	setMember(name, y.EmitConstInstAny())
+	setMember(name, y.EmitValueOnlyDeclare(name))
 	return
 }
 

@@ -43,12 +43,6 @@ func init() {
 		typ:   BasicTypes[NullTypeKind],
 		str:   "nil",
 	}
-
-	ConstMap[struct{}{}] = &Const{
-		value: struct{}{},
-		typ:   BasicTypes[AnyTypeKind],
-		str:   "any",
-	}
 }
 
 func NewNil() *ConstInst {
