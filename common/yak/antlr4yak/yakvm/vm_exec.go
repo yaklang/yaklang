@@ -46,6 +46,7 @@ func (v *Frame) Exec(codes []*Code) {
 	v.codes = codes
 	v.execEx()
 }
+
 func (v *Frame) DebugExec(codes []*Code) {
 	v.debug = true
 	v.codes = codes
@@ -57,12 +58,15 @@ func (v *Frame) NormalExec(codes []*Code) {
 	v.codes = codes
 	v.execEx()
 }
+
 func (v *Frame) continueExec() {
 	v.execExWithContinueOption(true)
 }
+
 func (v *Frame) execEx() {
 	v.execExWithContinueOption(false)
 }
+
 func (v *Frame) CheckExit() error {
 	if v.parent != nil {
 		return nil
@@ -100,7 +104,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 	// 设置线程ID
 	v.ThreadID = int(v.vm.ThreadIDCount)
 
-	//退出代码 // -1代表异常，0代表代码执行到最后，1代表通过panic、return等方式退出
+	// 退出代码 // -1代表异常，0代表代码执行到最后，1代表通过panic、return等方式退出
 	v.exitCode = ErrorExit
 	deferStack := vmstack.New()
 
@@ -115,7 +119,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 			}
 		}
 
-		//defer 中捕获 panic 并抛出
+		// defer 中捕获 panic 并抛出
 		var (
 			ierr    interface{}
 			vmPanic *VMPanic
@@ -135,7 +139,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 
 		scopeBack := v.scope
 		returnVal := v.lastStackValue
-		//执行defer中的代码
+		// 执行defer中的代码
 		for {
 			if deferStack.Len() <= 0 {
 				break
@@ -183,7 +187,7 @@ func (v *Frame) execExWithContinueOption(isContinue bool) {
 			v.exitCode = NormallyExit
 			return
 		}
-		var code = v.codes[v.codePointer]
+		code := v.codes[v.codePointer]
 		if v.debug {
 			fmt.Printf("%-16s %4d:%v\n", code.RangeVerbose(), v.codePointer, code.String())
 		}
@@ -292,13 +296,14 @@ func NewUndefined(id int) *Value {
 func (v *Frame) execCode(c *Code, debug bool) {
 	select {
 	case <-v.ctx.Done():
-		//log.Warn("YakVM Frame Exec Code Terminated by Context Control")
+		// log.Warn("YakVM Frame Exec Code Terminated by Context Control")
 		v.codePointer = len(v.codes)
 		return
 	default:
 		v._execCode(c, debug)
 	}
 }
+
 func (v *Frame) _execCode(c *Code, debug bool) {
 	isNasl := v.vm.GetConfig().vmMode == NASL
 
@@ -392,7 +397,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 							}
 						}
 					}
-
 				}
 				if !assignOk {
 					panic("assign error")
@@ -460,7 +464,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					}
 				}
 			}
-			//if leftVal
+			// if leftVal
 			v.assign(leftValues, rightValues)
 			return
 		}
@@ -505,7 +509,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 
-		var values = make([]*Value, c.Unary)
+		values := make([]*Value, c.Unary)
 		for i := 0; i < c.Unary; i++ {
 			values[i] = GetUndefined()
 		}
@@ -550,7 +554,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 
-		var values = make([]*Value, c.Unary)
+		values := make([]*Value, c.Unary)
 		for i := 0; i < c.Unary; i++ {
 			values[i] = GetUndefined()
 		}
@@ -640,13 +644,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			case 'b':
 				v.push(NewAutoValue([]byte(strValue)))
 			case 'x':
-				//使用了f前缀生成的是 string slice
+				// 使用了f前缀生成的是 string slice
 				value, err := mutate.FuzzTagExec(strValue)
 				if err != nil {
 					v.push(NewStringSliceValue([]string{}))
 					log.Error(err)
-					//解析fuzztag出错时不panic，防止fuzztag解析失败导致语言引擎异常
-					//panic(fmt.Sprintf("mutate.FuzzTagExec failed: %s", err))
+					// 解析fuzztag出错时不panic，防止fuzztag解析失败导致语言引擎异常
+					// panic(fmt.Sprintf("mutate.FuzzTagExec failed: %s", err))
 				}
 				v.push(NewStringSliceValue(value))
 			default:
@@ -657,8 +661,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		if c.Op1.IsYakFunction() {
 			fun := c.Op1.Value.(*Function)
 			fun.defineFrame = v
+
 			if c.Unary == 1 {
-				c.Op1.Value = fun.Copy(v.scope)
+				c.Op1 = NewAutoValue(fun.Copy(v.scope))
 			} else if c.Unary == 0 {
 				// check(v.scope)
 				fun.scope = v.scope
@@ -687,7 +692,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					return
 				}
 			}
-			//尝试在作用域获取值
+			// 尝试在作用域获取值
 			val, ok := v.CurrentScope().GetValueByID(id)
 			if id == 118 && strings.Contains(val.String(), "html") && c.StartLineNumber == 629 {
 				println()
@@ -695,7 +700,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if !ok {
 				name, ok1 := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
 				if ok1 {
-					//使用名字在全局变量中查找
+					// 使用名字在全局变量中查找
 					if v1, ok1 := v.GlobalVariables[name]; ok1 {
 						val = NewValue("function", v1, name)
 						ok = true
@@ -709,7 +714,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 							ok = true
 						}
 
-						//panic("BUG: cannot found value by name:[" + name + "]")
+						// panic("BUG: cannot found value by name:[" + name + "]")
 					}
 				}
 				if !ok {
@@ -823,7 +828,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 
-		//基本类型互转
+		// 基本类型互转
 		switch typ.Type() {
 		case literalReflectType_Int:
 			if val.IsInt() {
@@ -932,7 +937,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(resVal)
 			return
 		}
-		//如果未成功解析基本类型，则继续尝试解析复合类型
+		// 如果未成功解析基本类型，则继续尝试解析复合类型
 		switch typ.Type().String() {
 		case "[]uint8":
 			if val.IsStringOrBytes() {
@@ -943,7 +948,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(resVal)
 			return
 		}
-		//还不成功就只能试试自动转换了，转换失败就panic
+		// 还不成功就只能试试自动转换了，转换失败就panic
 		refV := reflect.ValueOf(val.Value)
 		err = v.AutoConvertReflectValueByType(&refV, typ.Type())
 		if err != nil {
@@ -1237,7 +1242,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			} else {
 				idValue = Val
 			}
-			//内置函数直接调用
+			// 内置函数直接调用
 			if idValue.Literal == "__method_proxy__" {
 				params := [][]interface{}{}
 				params = append(params, []interface{}{args[0].Value})
@@ -1308,9 +1313,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					Value:       val,
 				})
 			}
-			//外置函数手动调用
-			//symbolTable := v.CurrentScope().GetSymTable()
-			//funName, ok := symbolTable.GetNameByVariableId(idValue.Int())
+			// 外置函数手动调用
+			// symbolTable := v.CurrentScope().GetSymTable()
+			// funName, ok := symbolTable.GetNameByVariableId(idValue.Int())
 			return
 		case LUA:
 			args := v.popArgN(c.Unary)
@@ -1472,7 +1477,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				if iterableValueType.Kind() == reflect.String {
 					switch v.vm.GetConfig().vmMode {
 					case NASL:
-						var subStr = string([]rune{sliceRes.Interface().(rune)})
+						subStr := string([]rune{sliceRes.Interface().(rune)})
 						v.push(NewValue("string", subStr, subStr))
 					default:
 						v.push(NewValue("char", sliceRes.Interface().(rune), fmt.Sprintf("%c", sliceRes.Interface())))
@@ -1531,13 +1536,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			fieldName := args[0].Value.(string)
 			memberValue := iterableValueRF.FieldByName(fieldName)
 			if !memberValue.IsValid() {
-				//panic(fmt.Sprintf("member %s not found in %s", memberNameV.String(), structV.TypeVerbose))
+				// panic(fmt.Sprintf("member %s not found in %s", memberNameV.String(), structV.TypeVerbose))
 				v.push(undefined)
 				return
 			} else if !memberValue.CanInterface() {
 				v.push(undefined)
 				return
-				//panic(fmt.Sprintf("member %s is not exported", memberNameV.String()))
+				// panic(fmt.Sprintf("member %s is not exported", memberNameV.String()))
 			} else {
 				//if memberName.Kind() != reflect.Func {
 				//	panic(fmt.Sprintf("member %s is not a function", memberNameV.String()))
@@ -1634,8 +1639,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(NewGenericMap(""))
 					return
 				}
-				var keys = make([]*Value, c.Unary)
-				var values = make([]*Value, c.Unary)
+				keys := make([]*Value, c.Unary)
+				values := make([]*Value, c.Unary)
 				for i := 0; i < c.Unary; i++ {
 					kI := i * 2
 					vI := i*2 + 1
@@ -1684,8 +1689,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				v.push(NewEmptyMap(""))
 				return
 			}
-			var keys = make([]*Value, c.Unary)
-			var values = make([]*Value, c.Unary)
+			keys := make([]*Value, c.Unary)
+			values := make([]*Value, c.Unary)
 			for i := 0; i < c.Unary; i++ {
 				kI := i * 2
 				vI := i*2 + 1
@@ -1721,8 +1726,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(NewEmptyMap(""))
 			return
 		}
-		var keys = make([]*Value, c.Unary)
-		var values = make([]*Value, c.Unary)
+		keys := make([]*Value, c.Unary)
+		values := make([]*Value, c.Unary)
 		for i := 0; i < c.Unary; i++ {
 			kI := i * 2
 			vI := i*2 + 1
@@ -1840,7 +1845,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			//}
 			memberName := memberNameV.String()
 			caller := v.pop()
-			//处理map类型
+			// 处理map类型
 			callerReflectValue = reflect.ValueOf(caller.Value)
 			callerTypeKind := callerReflectValue.Kind()
 			callerTypeName := callerTypeKind.String()
@@ -1877,7 +1882,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 			}
 			panic(fmt.Sprintf("cannot find built-in method %s of %s type", memberName, callerTypeName))
-			//v.push(undefined)
+			// v.push(undefined)
 			return
 		case YAK:
 			fallthrough
@@ -1891,7 +1896,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			//}
 			memberName := memberNameV.String()
 			caller := v.pop()
-			//处理map类型
+			// 处理map类型
 			callerReflectValue = reflect.ValueOf(caller.Value)
 			callerTypeKind := callerReflectValue.Kind()
 			callerTypeName := callerTypeKind.String()
@@ -1929,7 +1934,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				getMember := func() (v reflect.Value) {
 					defer func() {
 						if e := recover(); e != nil {
-
 						}
 					}()
 					return callerReflectValue.MapIndex(reflect.ValueOf(memberNameV.Value))
@@ -1977,7 +1981,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					memberName = strings.ToUpper(string(firstChar)) + memberName[1:]
 				}
 
-				//获取结构体字段
+				// 获取结构体字段
 				member := callerReflectValue.FieldByName(memberName)
 				if !member.IsValid() {
 					panicByNoSuchKey(memberName, caller.Value)
@@ -2022,7 +2026,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					return
 				}
 
-				//memberName = _title(memberName)
+				// memberName = _title(memberName)
 				method, ok := stringBuildinMethod[memberName]
 
 				if ok {
@@ -2033,11 +2037,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			default:
 			}
 			panic(fmt.Sprintf("cannot find built-in method %s of %s type", memberName, callerTypeName))
-			//v.push(undefined)
+			// v.push(undefined)
 			return
 		}
 	case OpEllipsis:
-		//AutoConvertReflectValueByType()
+		// AutoConvertReflectValueByType()
 		arrayRaw := v.pop()
 		code := v.peekNextCode()
 
