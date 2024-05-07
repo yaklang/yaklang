@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/filter"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -716,8 +717,12 @@ func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*
 		}
 	}
 
-	group, _ := yakit.GroupCount(s.GetProfileDatabase())
+	group, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), []string{"yak", "codec"})
+	filterGroup := filter.NewFilter()
 	for _, v := range group {
+		if filterGroup.Exist(v.Value) {
+			continue
+		}
 		if v.IsPocBuiltIn {
 			continue
 		}
@@ -728,6 +733,7 @@ func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*
 			Value: v.Value,
 			Total: int32(v.Count),
 		})
+		filterGroup.Insert(v.Value)
 	}
 
 	return &tagsAndType, nil
