@@ -1700,6 +1700,18 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 		if value := y.PeekValueByVariable(variable); value != nil {
 			return value
 		}
+		// 读取自身类的静态成员、成员变量的时候，functionBuilder上下文会变化，导致无法读取
+		// 可以直接读取classBluePrint里面的静态成员、成员变量
+		value, ok := class.StaticMember[name]
+		if ok {
+			return value
+		}
+		member, ok := class.NormalMember[name]
+		if ok {
+			if member.Value != nil {
+				return member.Value
+			}
+		}
 	}
 	if value, ok := y.ReadConst(name); ok {
 		return value
