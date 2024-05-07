@@ -18,7 +18,7 @@ jobs:
         run: |
           git fetch --all
           echo "generate commit messages ... "
-          ./scripts/generate-commit.sh > /tmp/raw_commit_message.txt
+          ./scripts/generate-commit.sh
           cat /tmp/raw_commit_message.txt
           echo "-------------"
           # 检查 /tmp/raw_commit_message.txt 文件是否存在
