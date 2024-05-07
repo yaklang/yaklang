@@ -8,17 +8,40 @@ cli.check()
 log.Info("start to fetch file: %v gpt model: %v", raw, model)
 
 log.Info("start to call FunctionCall in openai")
-results = ai.FunctionCall(f`我正在发布一个新版本，后面我会放入 commit message 的信息，请你帮我总结成 Release Node，帮我编写一下我想要发布的信息，commit 信息为：
+for range 5 {
+    try {
+        results = ai.FunctionCall(f`我正在发布一个新版本，后面我会放入 commit message 的信息，请你帮我总结成 Release Node，帮我编写一下我想要发布的信息，commit 信息为：
 
 ${string(file.ReadFile(raw)~)}
 
 输出的内容使用列表展示(按行分割)，尽量精炼，控制在10条左右，注意同类合并，输出的时候，中文英文版本都要输出，英文放在 release_note_en 字段中`, {
-    "release_note": "总结 release note 信息为中文，以序号开头，每条以 \n 换行",
-    "release_note_en": "总结 release note 信息为英文，以序号开头，每条以 \n 换行"
-}, ai.type(aiType), ai.apiKey(apiKey), ai.debugStream(true), ai.model(model))~
+            "release_note": "总结 release note 信息为中文，以序号开头，每条结束后回车换行",
+            "release_note_en": "总结 release note 信息为英文，以序号开头，每条以回车换行"
+        }, ai.type(aiType), ai.apiKey(apiKey), ai.debugStream(true), ai.model(model))~
 
+        lines := str.Split(results.release_note, "\n")
+        if lines.Len() > 0 {
+            if lines.Len() <= 2 {
+                continue
+            }
+            retry := false
+            for line in lines {
+                if len(line) <= 4 {
+                    retry = true
+                    break
+                }
+            }
+            if retry { continue }
+        }
 
-println(string(results.release_note))
-println(string(results.release_note_en))
-file.Save("release_note.txt", results.release_note)
-file.Save("release_note.en.txt", results.release_note_en)
+        println(string(results.release_note))
+        println(string(results.release_note_en))
+        file.Save("release_note.txt", results.release_note)
+        file.Save("release_note.en.txt", results.release_note_en)
+        return
+    } catch e {
+        log.Error("error: %v", e)
+        continue
+    }
+
+}
