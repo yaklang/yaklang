@@ -26,7 +26,7 @@ func NewWebsocketController(token string, port int) *WebsocketController {
 }
 
 func (w *WebsocketController) Run() error {
-	log.Infof("start to listen on :%v localport", w.Port)
+	log.Infof("start to listen websocket controller on : 0.0.0.0:%v", w.Port)
 	lis, err := net.Listen("tcp", utils.HostPort("0.0.0.0", w.Port))
 	if err != nil {
 		log.Errorf("Listen ws controller failed: %v", err)
