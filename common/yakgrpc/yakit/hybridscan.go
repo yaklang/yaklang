@@ -52,20 +52,26 @@ func SaveHybridScanTask(db *gorm.DB, task *HybridScanTask) error {
 
 func QueryHybridScan(db *gorm.DB, query *ypb.QueryHybridScanTaskRequest) (*bizhelper.Paginator, []*HybridScanTask, error) {
 	db = db.Model(&HybridScanTask{})
-
-	db = bizhelper.ExactQueryString(db, "status", query.GetStatus())
-
-	if query.GetFromId() > 0 {
-		db = db.Where("id > ?", query.GetFromId())
-	}
-	if query.GetUntilId() > 0 {
-		db = db.Where("id <= ?", query.GetUntilId())
-	}
-
+	db = FilterHybridScan(db, query.GetFilter())
 	var data []*HybridScanTask
-	p, db := bizhelper.PagingByPagination(db, query.GetPagination(), &data)
+	paging := query.GetPagination()
+	db = bizhelper.QueryOrder(db, paging.GetOrderBy(), paging.GetOrder())
+	p, db := bizhelper.Paging(db, int(paging.GetPage()), int(paging.GetLimit()), &data)
 	if db.Error != nil {
 		return nil, nil, db.Error
 	}
 	return p, data, nil
+}
+
+func FilterHybridScan(db *gorm.DB, filter *ypb.HybridScanTaskFilter) *gorm.DB {
+	db = bizhelper.ExactQueryString(db, "status", filter.GetStatus())
+	db = bizhelper.FuzzQuery(db, "target", filter.GetTarget())
+	db = bizhelper.ExactQueryStringArrayOr(db, "task_id", filter.GetTaskId())
+	if filter.GetFromId() > 0 {
+		db = db.Where("id > ?", filter.GetFromId())
+	}
+	if filter.GetUntilId() > 0 {
+		db = db.Where("id <= ?", filter.GetUntilId())
+	}
+	return db
 }

@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 type HybridScanRequestStream interface {
@@ -77,7 +76,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		go func() {
 			select {
 			case <-streamCtx.Done():
-				time.Sleep(3 * time.Second)
+				//time.Sleep(3 * time.Second)
 				taskCancel()
 			}
 		}()
@@ -214,6 +213,8 @@ func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybr
 			TotalTasks:      item.TotalTasks,
 			FinishedTasks:   item.FinishedTasks,
 			FinishedTargets: item.FinishedTargets,
+			FirstTarget:     item.Targets,
+			Reason:          item.Reason,
 		}
 	})
 	return &ypb.QueryHybridScanTaskResponse{
@@ -224,18 +225,17 @@ func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybr
 }
 
 func (s *Server) DeleteHybridScanTask(ctx context.Context, request *ypb.DeleteHybridScanTaskRequest) (*ypb.Empty, error) {
+	db := s.GetProjectDatabase().Unscoped()
 	if request.GetDeleteAll() {
-		if err := s.GetProjectDatabase().Unscoped().Where("true").Delete(&yakit.HybridScanTask{}).Error; err != nil {
+		if err := db.Where("true").Delete(&yakit.HybridScanTask{}).Error; err != nil {
 			return nil, err
 		}
 		return &ypb.Empty{}, nil
 	}
 
-	if t := request.GetTaskId(); t != "" {
-		if err := s.GetProjectDatabase().Unscoped().Where("task_id = ?", t).Delete(&yakit.HybridScanTask{}).Error; err != nil {
-			return nil, err
-		}
-		return &ypb.Empty{}, nil
+	db = yakit.FilterHybridScan(db, request.GetFilter())
+	if err := db.Delete(&yakit.HybridScanTask{}).Error; err != nil {
+		return nil, err
 	}
 	return &ypb.Empty{}, nil
 }
