@@ -29,14 +29,13 @@ jobs:
           git checkout $REF
           echo "generate commit messages ... "
           ./scripts/generate-commit.sh
-          cat /tmp/raw_commit_message.txt
           echo "-------------"
           # 检查 /tmp/raw_commit_message.txt 文件是否存在
           if [ ! -f /tmp/raw_commit_message.txt ]; then
             echo "Error: /tmp/raw_commit_message.txt does not exist."
             exit 1
           fi
-            - name: Upload sha256 checksums artifacts
+          echo "/tmp/raw_commit_message.txt is existed continue..."
       - uses: actions/upload-artifact@v4
         with:
           name: raw_commit_message.txt
@@ -188,14 +187,8 @@ jobs:
 
       - name: Push Version Info to OSS
         run: |
-          git fetch --tags
-          echo "generate commit messages ... "
-          ./scripts/generate-commit.sh > /tmp/raw_commit_message.txt
-          cat /tmp/raw_commit_message.txt
-          echo "-------------"
-          cat /tmp/msg.txt
-          
-          ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename /tmp/raw_commit_message.txt --ai-model gpt-4-0613
+          ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename ./raw_commit_message.txt --ai-model gpt-4-0613
+          ls | grep release
           
           echo "start to handle versions"
           if [ -f current_version.txt ]; then rm current_version.txt; fi

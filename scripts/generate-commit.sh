@@ -28,6 +28,7 @@ fi
 git log $previous_tag..$current_commit --format="%s" > /tmp/raw_commit_message.txt
 
 echo "Start to check commit message"
+echo "---------------------------"
 # 检查/tmp/raw_commit_message.txt的行数
 line_count=$(wc -l < /tmp/raw_commit_message.txt)
 
