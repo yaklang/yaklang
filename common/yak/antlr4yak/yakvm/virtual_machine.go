@@ -229,9 +229,7 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		if frame.lastStackValue != nil {
 			value = frame.lastStackValue.Value
 		}
-		// if v.config.GetClosureSupport() {
 		frame.ExitScope()
-		//}
 	}, finalFlags...)
 	if err != nil {
 		return nil, err

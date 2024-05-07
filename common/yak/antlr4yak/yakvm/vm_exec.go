@@ -1818,7 +1818,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		val := v.pop()
 		panic(NewVMPanic(val.Value))
 	case OpRecover:
-		v.push(NewAutoValue(v.recover().GetData()))
+		recovered := v.recover().GetData()
+		if recovered != nil && c.Op1 != nil && c.Op1.IsBool() && c.Op1.Bool() {
+			// case for `defer recover()`
+			log.Warnf("defer recover() catch: %v", spew.Sdump(recovered))
+		}
+		v.push(NewAutoValue(recovered))
 	case OpDefer:
 		// op defer 应该在整体执行的时候，调用 defer 执行
 		_, ok := c.Op1.Value.([]*Code)

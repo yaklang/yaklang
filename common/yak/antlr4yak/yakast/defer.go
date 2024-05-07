@@ -20,6 +20,12 @@ func (y *YakCompiler) VisitDeferStmt(raw yak.IDeferStmtContext) interface{} {
 
 	finished := y.SwitchCodes()
 	y.VisitExpression(i.Expression())
+
+	// defer recover only
+	if len(y.codes) == 1 && y.codes[0].Opcode == yakvm.OpRecover {
+		y.codes[0].Op1 = yakvm.NewValue("bool", true, `true`)
+	}
+
 	// 保证平栈
 	y.pushOpPop()
 	funcCode := make([]*yakvm.Code, len(y.codes))
