@@ -2,6 +2,7 @@ package ssareducer
 
 import (
 	"io/fs"
+	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
@@ -22,10 +23,26 @@ func ReducerCompile(base string, opts ...Option) error {
 	var visited = filter.NewFilter()
 	defer visited.Close()
 
+	if len(c.entryFiles) <= 0 {
+		return utils.Error("entry-files is not set for base, try to auto select (TBD)")
+	}
+
 	for _, entryFile := range c.entryFiles {
+		info, err := c.fs.Stat(entryFile)
+		if err != nil {
+			var d string
+			d, entryFile = filepath.Split(entryFile)
+			log.Warnf("directory is repeated... split dir [%v] and filename, and use %v", d, entryFile)
+		} else {
+			if info.IsDir() {
+				log.Warnf("entry [%v] cannot be as directory...", entryFile)
+				continue
+			}
+		}
+
 		fd, err := c.fs.Open(entryFile)
 		if err != nil {
-			return err
+			return utils.Wrapf(err, "find entryfile failed: %v", entryFile)
 		}
 		results, err := c.compileMethod(entryFile, fd)
 		if err != nil {

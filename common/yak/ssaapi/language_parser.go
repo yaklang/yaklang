@@ -45,6 +45,7 @@ func (c *config) parseProject() ([]*Program, error) {
 		return nil, utils.Errorf("not support language %s", c.language)
 	}
 	ret := make([]*Program, 0)
+
 	// parse project
 	err := ssareducer.ReducerCompile(
 		".", // base
@@ -52,12 +53,18 @@ func (c *config) parseProject() ([]*Program, error) {
 		ssareducer.WithFileFilter(c.Builder.FilterFile),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
+			log.Infof("start to compile from: %v", path)
 			prog, err := c.parseSimple(path, f)
 			if err != nil {
+				log.Warnf("parse %#v failed: %v", path, err)
 				return nil, utils.Errorf("parse file %s error : %v", path, err)
 			}
 			ret = append(ret, NewProgram(prog, c))
-			return prog.GetIncludeFiles(), nil
+			exclude := prog.GetIncludeFiles()
+			if len(exclude) > 0 {
+				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
+			}
+			return exclude, nil
 		}),
 	)
 	if err != nil {
