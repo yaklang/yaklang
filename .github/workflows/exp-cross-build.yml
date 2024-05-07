@@ -17,6 +17,7 @@ jobs:
       - name: Check Commit Message
         run: |
           git fetch --all
+          git checkout ${{ github.ref }}
           echo "generate commit messages ... "
           ./scripts/generate-commit.sh
           cat /tmp/raw_commit_message.txt
