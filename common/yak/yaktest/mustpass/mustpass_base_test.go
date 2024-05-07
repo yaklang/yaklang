@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	debugName := "fuzz_json_params.yak"
+	debugName := "retry.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
