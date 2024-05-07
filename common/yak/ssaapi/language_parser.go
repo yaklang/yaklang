@@ -46,14 +46,13 @@ func (c *config) parseProject() ([]*Program, error) {
 	}
 	ret := make([]*Program, 0)
 	// parse project
-	ssareducer.ReducerCompile(
+	err := ssareducer.ReducerCompile(
 		".", // base
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithFileFilter(c.Builder.FilterFile),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
 			prog, err := c.parseSimple(path, f)
-			_ = prog
 			if err != nil {
 				return nil, utils.Errorf("parse file %s error : %v", path, err)
 			}
@@ -61,6 +60,9 @@ func (c *config) parseProject() ([]*Program, error) {
 			return prog.GetIncludeFiles(), nil
 		}),
 	)
+	if err != nil {
+		return nil, utils.Wrap(err, "parse project error")
+	}
 	return ret, nil
 }
 
