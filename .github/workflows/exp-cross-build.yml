@@ -156,10 +156,16 @@ jobs:
       - name: Push Version Info to OSS
         run: |
           git fetch --tags
+          echo "generate commit messages ... "
           ./scripts/generate-commit.sh > /tmp/raw_commit_message.txt
+          cat /tmp/raw_commit_message.txt
+          
           ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename /tmp/raw_commit_message.txt --ai-model gpt-4-0613
+          
+          echo "start to check release txt"
           ls | grep release
           
+          echo "start to handle versions"
           if [ -f current_version.txt ]; then rm current_version.txt; fi
           if [ -f new_history_versions.txt ]; then rm new_history_versions.txt; fi
           
