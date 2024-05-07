@@ -110,7 +110,7 @@ func _diewith(err interface{}) {
 	if err == nil {
 		return
 	}
-	yakitOutputHelper(fmt.Sprintf("YakVM Code DIE With Err: %v", spew.Sdump(err)))
+	yakitOutputHelper(fmt.Sprintf("YakVM Code DIE With Data: %v", spew.Sdump(err)))
 	_failed(err)
 }
 

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"time"
 )
 
@@ -15,6 +16,54 @@ func Retry(times int, f func() error) error {
 	return err
 }
 
+// retry 对第二个参数作为函数的情况，重试N次，如果第二个参数返回值是 true，则重试，否则就结束，如果遇到错误，停止重试
+// Example:
+// ```
+// count = 0
+//
+//	retry(100, () => {
+//	   defer recover()
+//
+//	   count++
+//	   if count > 3 {
+//	       die(111)
+//	   }
+//	   return true
+//	})
+//
+// assert count == 4, f`${count}`
+//
+// count = 0
+//
+//	retry(100, () => {
+//	   defer recover()
+//
+//	   count++
+//	   if count > 3 {
+//	       return false
+//	   }
+//	   return true
+//	})
+//
+// assert count == 4, f`${count}`
+//
+// count = 0
+//
+//	retry(100, () => {
+//	   count++
+//	})
+//
+// assert count == 1, f`${count}`
+//
+// count = 0
+//
+//	retry(100, () => {
+//	   count++
+//	   return true
+//	})
+//
+// assert count == 100, f`${count}`
+// ```
 func Retry2(i int, handler func() bool) {
 	wrapperHandler := func() (ret bool) {
 		if err := recover(); err != nil {
@@ -26,7 +75,7 @@ func Retry2(i int, handler func() bool) {
 	}
 	// retry until handler's result is true
 	for i > 0 {
-		if wrapperHandler() {
+		if !wrapperHandler() {
 			return
 		}
 		i--
