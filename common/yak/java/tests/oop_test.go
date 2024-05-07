@@ -306,11 +306,10 @@ public class Main{
 }
 
 func TestJava_OOP_Static_Member(t *testing.T) {
-	t.Run("test static member 1", func(t *testing.T) {
+	t.Run("test simple static member", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 class A {
 		static int a = 0;
-
 }
 class Main{
 		public static void main(String[] args) {
@@ -321,18 +320,60 @@ class Main{
 		`, []string{"Undefined-a.a(valid)"}, t)
 	})
 
-	//TODO: static member need more code
-	// 	t.Run("test static member 2", func(t *testing.T) {
-	// 		ssatest.CheckPrintlnValue(`
+	t.Run("test static variable and static method within a class", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Main {
+    static int a = 1 ;
+    public static void main(String[] args) {
+            println(a);
+        }
+ }
+			`, []string{"1"}, t)
+	})
 
-	// class Main{
-	// 		static int a = 0;
-	// 		public static void main(String[] args) {
-	// 			println(a);
-	// 		}
-	// }
-	// 		`, []string{"0"}, t)
-	// 	})
+	t.Run("test static variable and method within a class (arg is a)", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Main {
+    static int a = 1 ;
+    public void main(String[] args) {
+           println(a);
+        }
+ }
+			`, []string{"1"}, t)
+	})
+
+	t.Run("test static variable and  method within a class (arg is this.a)", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Main {
+    static int a = 1 ;
+    public void main(String[] args) {
+            println(this.a);
+        }
+ }
+			`, []string{"ParameterMember-parameter[0].a"}, t)
+	})
+
+	t.Run("test member variable and  method within a class ", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Main {
+    int a = 1 ;
+    public void main(String[] args) {
+            println(this.a);
+        }
+ }
+			`, []string{"ParameterMember-parameter[0].a"}, t)
+	})
+
+	t.Run("test member variable and  method within a class ", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Main {
+    int a = 1 ;
+    public void main(String[] args) {
+            println(a);
+        }
+ }
+			`, []string{"1"}, t)
+	})
 
 	t.Run("test static method  1", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
@@ -351,7 +392,7 @@ class Main{
 		`, []string{"Undefined-a.Hello(valid)()"}, t)
 	})
 
-	t.Run("test static method  2", func(t *testing.T) {
+	t.Run("test call self's static method", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 class Main{
 		public static void Hello(){
