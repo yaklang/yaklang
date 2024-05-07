@@ -81,8 +81,8 @@ block: L_CURLY statementList? R_CURLY;
 
 statementList: (statement eos)+;
 
-statement:
-	declaration
+statement
+    : declaration
 	| labeledStmt
 	| simpleStmt
 	| goStmt
@@ -259,8 +259,8 @@ expression
 		| RSHIFT
 		| AMPERSAND
 		| BIT_CLEAR
-	) expression # ArithmeticExpression
-	| expression add_op = (PLUS | MINUS | OR | CARET) expression # ArithmeticExpression
+	) expression # ComparisonExpression
+	| expression add_op = (PLUS | MINUS | OR | CARET) expression # ComparisonExpression
 	| expression rel_op = (
 		EQUALS
 		| NOT_EQUALS
@@ -269,8 +269,9 @@ expression
 		| GREATER
 		| GREATER_OR_EQUALS
 	) expression                        # ComparisonExpression
-	| expression LOGICAL_AND expression # BitwiseExpression
-	| expression LOGICAL_OR expression  # BitwiseExpression
+	| expression LOGICAL_AND expression # ComparisonExpression
+	| expression LOGICAL_OR expression  # ComparisonExpression
+	| IDENTIFIER L_PAREN arguments R_PAREN #FunctionCallExpression
 	;
 
 primaryExpr:

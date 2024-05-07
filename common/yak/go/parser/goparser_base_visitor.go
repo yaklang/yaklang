@@ -303,14 +303,6 @@ func (v *BaseGoParserVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseGoParserVisitor) VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseGoParserVisitor) VisitPrimaryExpr(ctx *PrimaryExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }

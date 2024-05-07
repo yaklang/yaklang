@@ -1,13 +1,16 @@
 package tests
 
 import (
-	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
 )
 
-func TestName(t *testing.T) {
-}
+func TestVariableDeclare(t *testing.T) {
+	code := `package main
 
-func printSlice(s []int) {
-	fmt.Printf("len=%d cap=%d %v\n", len(s), cap(s), s)
+func main(){
+var a = 1
+println(a)
+}`
+	ssatest.MockSSA(t, code)
 }

@@ -229,12 +229,6 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#UnaryExpression.
 	VisitUnaryExpression(ctx *UnaryExpressionContext) interface{}
 
-	// Visit a parse tree produced by GoParser#ArithmeticExpression.
-	VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{}
-
-	// Visit a parse tree produced by GoParser#BitwiseExpression.
-	VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{}
-
 	// Visit a parse tree produced by GoParser#primaryExpr.
 	VisitPrimaryExpr(ctx *PrimaryExprContext) interface{}
 

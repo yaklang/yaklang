@@ -13,8 +13,8 @@ type builder struct {
 	constMap map[string]ssa.Value
 }
 
-func (a *builder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := a.FrondEnd(src, force)
+func Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func (a *builder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	build.VisitSourceFile(ast)
 	return nil
 }
-func (a *builder) FrondEnd(src string, force bool) (goparser.ISourceFileContext, error) {
+func FrondEnd(src string, force bool) (goparser.ISourceFileContext, error) {
 	listener := antlr4util.NewErrorListener()
 	lexer := goparser.NewGoLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()

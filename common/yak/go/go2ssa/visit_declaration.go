@@ -1,6 +1,9 @@
 package go2ssa
 
-import goparser "github.com/yaklang/yaklang/common/yak/go/parser"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	goparser "github.com/yaklang/yaklang/common/yak/go/parser"
+)
 
 func (y *builder) VisitDeclaration(raw goparser.IDeclarationContext) interface{} {
 	if y == nil || raw == nil {
@@ -40,9 +43,31 @@ func (y *builder) VisitVarDecl(raw goparser.IVarDeclContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-	declar, _ := raw.(*goparser.VarDeclContext)
-	if declar == nil {
+	i, _ := raw.(*goparser.VarDeclContext)
+	if i == nil {
 		return nil
+	}
+	for _, spec := range i.AllVarSpec() {
+		y.VisitVarSpec(spec)
+	}
+	return nil
+}
+func (y *builder) VisitVarSpec(raw goparser.IVarSpecContext) interface{} {
+	if y == nil && raw == nil {
+		return nil
+	}
+	i, _ := raw.(*goparser.VarSpecContext)
+	if i == nil {
+		return nil
+	}
+	list := y.VisitIdentifierList(i.IdentifierList())
+	explist := i.ExpressionList().(*goparser.ExpressionListContext)
+	if len(list) != len(explist.AllExpression()) {
+		log.Warn("var declare fail: variable number and expression number not match")
+		return nil
+	}
+	for i, expr := range explist.AllExpression() {
+		y.ir.AssignVariable(y.ir.CreateVariable(list[i]), y.VisitExpression(expr))
 	}
 	return nil
 }

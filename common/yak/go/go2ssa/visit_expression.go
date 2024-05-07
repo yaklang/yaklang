@@ -17,9 +17,51 @@ func (y *builder) VisitExpression(raw goparser.IExpressionContext) ssa.Value {
 		return y.VisitPrimaryExpression(ret.PrimaryExpr())
 	case *goparser.UnaryExpressionContext:
 		return y.VisitUnaryExpression(ret.UnaryExpr())
-	case *goparser.ArithmeticExpressionContext:
 	case *goparser.ComparisonExpressionContext:
-	case *goparser.BitwiseExpressionContext:
+		val1 := y.VisitExpression(ret.Expression(0))
+		val2 := y.VisitExpression(ret.Expression(1))
+		switch {
+		case ret.EQUALS() != nil:
+			return y.ir.EmitBinOp(ssa.OpEq, val1, val2)
+		case ret.NOT_EQUALS() != nil:
+			return y.ir.EmitBinOp(ssa.OpNotEq, val1, val2)
+		case ret.LESS() != nil:
+			return y.ir.EmitBinOp(ssa.OpLt, val1, val2)
+		case ret.LESS_OR_EQUALS() != nil:
+			return y.ir.EmitBinOp(ssa.OpLtEq, val1, val2)
+		case ret.GREATER() != nil:
+			return y.ir.EmitBinOp(ssa.OpGt, val1, val2)
+		case ret.GetRel_op() != nil:
+			return y.ir.EmitBinOp(ssa.OpGtEq, val1, val2)
+		case ret.LOGICAL_OR() != nil:
+			return y.ir.EmitBinOp(ssa.OpLogicOr, val1, val2)
+		case ret.LOGICAL_AND() != nil:
+			return y.ir.EmitBinOp(ssa.OpLogicAnd, val1, val2)
+		case ret.PLUS() != nil:
+			return y.ir.EmitBinOp(ssa.OpAdd, val1, val2)
+		case ret.MINUS() != nil:
+			return y.ir.EmitBinOp(ssa.OpSub, val1, val2)
+		case ret.OR() != nil:
+			return y.ir.EmitBinOp(ssa.OpOr, val1, val2)
+		case ret.CARET() != nil:
+			return y.ir.EmitBinOp(ssa.OpXor, val1, val2)
+		case ret.STAR() != nil:
+			return y.ir.EmitBinOp(ssa.OpMul, val1, val2)
+		case ret.DIV() != nil:
+			return y.ir.EmitBinOp(ssa.OpDiv, val1, val2)
+		case ret.MOD() != nil:
+			return y.ir.EmitBinOp(ssa.OpMod, val1, val2)
+		case ret.LSHIFT() != nil:
+			return y.ir.EmitBinOp(ssa.OpShl, val1, val2)
+		case ret.RSHIFT() != nil:
+			return y.ir.EmitBinOp(ssa.OpShr, val1, val2)
+		case ret.AMPERSAND() != nil:
+			return y.ir.EmitBinOp(ssa.OpAnd, val1, val2)
+		case ret.BIT_CLEAR() != nil:
+			return y.ir.EmitBinOp(ssa.OpAndNot, val1, val2)
+		default:
+			return nil
+		}
 	}
 	return nil
 }
@@ -31,6 +73,12 @@ func (y *builder) VisitPrimaryExpression(raw goparser.IPrimaryExprContext) ssa.V
 	primaryExpr := raw.(*goparser.PrimaryExprContext)
 	if primaryExpr == nil {
 		return nil
+	}
+	switch {
+	case primaryExpr.Operand() != nil:
+		return y.VisitOperand(primaryExpr.Operand())
+	case primaryExpr.Conversion() != nil:
+	case primaryExpr.MethodExpr() != nil:
 	}
 	return nil
 }
@@ -54,13 +102,14 @@ func (y *builder) VisitUnaryExpression(raw goparser.IUnaryExprContext) ssa.Value
 	case i.CARET() != nil:
 		return y.ir.EmitUnOp(ssa.OpBitwiseNot, value)
 	case i.STAR() != nil:
+		return nil
 	case i.AMPERSAND() != nil:
+		return nil
 	case i.RECEIVE() != nil:
 		return y.ir.EmitUnOp(ssa.OpChan, value)
 	default:
 		return nil
 	}
-	return nil
 }
 
 func (y *builder) VisitOperandName(raw goparser.IOperandNameContext) ssa.Value {
@@ -206,7 +255,7 @@ func (y *builder) VisitParameters(raw goparser.IParametersContext) (params []str
 	if i == nil {
 		return nil, nil
 	}
-
+	//这注意参数和类型对齐
 	return nil, nil
 }
 func (y *builder) VisitParameterDecl(raw goparser.IParameterDeclContext) ([]string, bool, []ssa.Type) {

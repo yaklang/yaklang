@@ -12239,6 +12239,8 @@ func (s *ExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 type ComparisonExpressionContext struct {
 	*ExpressionContext
+	mul_op antlr.Token
+	add_op antlr.Token
 	rel_op antlr.Token
 }
 
@@ -12252,7 +12254,15 @@ func NewComparisonExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleCon
 	return p
 }
 
+func (s *ComparisonExpressionContext) GetMul_op() antlr.Token { return s.mul_op }
+
+func (s *ComparisonExpressionContext) GetAdd_op() antlr.Token { return s.add_op }
+
 func (s *ComparisonExpressionContext) GetRel_op() antlr.Token { return s.rel_op }
+
+func (s *ComparisonExpressionContext) SetMul_op(v antlr.Token) { s.mul_op = v }
+
+func (s *ComparisonExpressionContext) SetAdd_op(v antlr.Token) { s.add_op = v }
 
 func (s *ComparisonExpressionContext) SetRel_op(v antlr.Token) { s.rel_op = v }
 
@@ -12301,6 +12311,50 @@ func (s *ComparisonExpressionContext) Expression(i int) IExpressionContext {
 	return t.(IExpressionContext)
 }
 
+func (s *ComparisonExpressionContext) STAR() antlr.TerminalNode {
+	return s.GetToken(GoParserSTAR, 0)
+}
+
+func (s *ComparisonExpressionContext) DIV() antlr.TerminalNode {
+	return s.GetToken(GoParserDIV, 0)
+}
+
+func (s *ComparisonExpressionContext) MOD() antlr.TerminalNode {
+	return s.GetToken(GoParserMOD, 0)
+}
+
+func (s *ComparisonExpressionContext) LSHIFT() antlr.TerminalNode {
+	return s.GetToken(GoParserLSHIFT, 0)
+}
+
+func (s *ComparisonExpressionContext) RSHIFT() antlr.TerminalNode {
+	return s.GetToken(GoParserRSHIFT, 0)
+}
+
+func (s *ComparisonExpressionContext) AMPERSAND() antlr.TerminalNode {
+	return s.GetToken(GoParserAMPERSAND, 0)
+}
+
+func (s *ComparisonExpressionContext) BIT_CLEAR() antlr.TerminalNode {
+	return s.GetToken(GoParserBIT_CLEAR, 0)
+}
+
+func (s *ComparisonExpressionContext) PLUS() antlr.TerminalNode {
+	return s.GetToken(GoParserPLUS, 0)
+}
+
+func (s *ComparisonExpressionContext) MINUS() antlr.TerminalNode {
+	return s.GetToken(GoParserMINUS, 0)
+}
+
+func (s *ComparisonExpressionContext) OR() antlr.TerminalNode {
+	return s.GetToken(GoParserOR, 0)
+}
+
+func (s *ComparisonExpressionContext) CARET() antlr.TerminalNode {
+	return s.GetToken(GoParserCARET, 0)
+}
+
 func (s *ComparisonExpressionContext) EQUALS() antlr.TerminalNode {
 	return s.GetToken(GoParserEQUALS, 0)
 }
@@ -12323,6 +12377,14 @@ func (s *ComparisonExpressionContext) GREATER() antlr.TerminalNode {
 
 func (s *ComparisonExpressionContext) GREATER_OR_EQUALS() antlr.TerminalNode {
 	return s.GetToken(GoParserGREATER_OR_EQUALS, 0)
+}
+
+func (s *ComparisonExpressionContext) LOGICAL_AND() antlr.TerminalNode {
+	return s.GetToken(GoParserLOGICAL_AND, 0)
+}
+
+func (s *ComparisonExpressionContext) LOGICAL_OR() antlr.TerminalNode {
+	return s.GetToken(GoParserLOGICAL_OR, 0)
 }
 
 func (s *ComparisonExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
@@ -12423,206 +12485,6 @@ func (s *UnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-type ArithmeticExpressionContext struct {
-	*ExpressionContext
-	mul_op antlr.Token
-	add_op antlr.Token
-}
-
-func NewArithmeticExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArithmeticExpressionContext {
-	var p = new(ArithmeticExpressionContext)
-
-	p.ExpressionContext = NewEmptyExpressionContext()
-	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
-
-	return p
-}
-
-func (s *ArithmeticExpressionContext) GetMul_op() antlr.Token { return s.mul_op }
-
-func (s *ArithmeticExpressionContext) GetAdd_op() antlr.Token { return s.add_op }
-
-func (s *ArithmeticExpressionContext) SetMul_op(v antlr.Token) { s.mul_op = v }
-
-func (s *ArithmeticExpressionContext) SetAdd_op(v antlr.Token) { s.add_op = v }
-
-func (s *ArithmeticExpressionContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *ArithmeticExpressionContext) AllExpression() []IExpressionContext {
-	children := s.GetChildren()
-	len := 0
-	for _, ctx := range children {
-		if _, ok := ctx.(IExpressionContext); ok {
-			len++
-		}
-	}
-
-	tst := make([]IExpressionContext, len)
-	i := 0
-	for _, ctx := range children {
-		if t, ok := ctx.(IExpressionContext); ok {
-			tst[i] = t.(IExpressionContext)
-			i++
-		}
-	}
-
-	return tst
-}
-
-func (s *ArithmeticExpressionContext) Expression(i int) IExpressionContext {
-	var t antlr.RuleContext
-	j := 0
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionContext); ok {
-			if j == i {
-				t = ctx.(antlr.RuleContext)
-				break
-			}
-			j++
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IExpressionContext)
-}
-
-func (s *ArithmeticExpressionContext) STAR() antlr.TerminalNode {
-	return s.GetToken(GoParserSTAR, 0)
-}
-
-func (s *ArithmeticExpressionContext) DIV() antlr.TerminalNode {
-	return s.GetToken(GoParserDIV, 0)
-}
-
-func (s *ArithmeticExpressionContext) MOD() antlr.TerminalNode {
-	return s.GetToken(GoParserMOD, 0)
-}
-
-func (s *ArithmeticExpressionContext) LSHIFT() antlr.TerminalNode {
-	return s.GetToken(GoParserLSHIFT, 0)
-}
-
-func (s *ArithmeticExpressionContext) RSHIFT() antlr.TerminalNode {
-	return s.GetToken(GoParserRSHIFT, 0)
-}
-
-func (s *ArithmeticExpressionContext) AMPERSAND() antlr.TerminalNode {
-	return s.GetToken(GoParserAMPERSAND, 0)
-}
-
-func (s *ArithmeticExpressionContext) BIT_CLEAR() antlr.TerminalNode {
-	return s.GetToken(GoParserBIT_CLEAR, 0)
-}
-
-func (s *ArithmeticExpressionContext) PLUS() antlr.TerminalNode {
-	return s.GetToken(GoParserPLUS, 0)
-}
-
-func (s *ArithmeticExpressionContext) MINUS() antlr.TerminalNode {
-	return s.GetToken(GoParserMINUS, 0)
-}
-
-func (s *ArithmeticExpressionContext) OR() antlr.TerminalNode {
-	return s.GetToken(GoParserOR, 0)
-}
-
-func (s *ArithmeticExpressionContext) CARET() antlr.TerminalNode {
-	return s.GetToken(GoParserCARET, 0)
-}
-
-func (s *ArithmeticExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case GoParserVisitor:
-		return t.VisitArithmeticExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-type BitwiseExpressionContext struct {
-	*ExpressionContext
-}
-
-func NewBitwiseExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BitwiseExpressionContext {
-	var p = new(BitwiseExpressionContext)
-
-	p.ExpressionContext = NewEmptyExpressionContext()
-	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
-
-	return p
-}
-
-func (s *BitwiseExpressionContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *BitwiseExpressionContext) AllExpression() []IExpressionContext {
-	children := s.GetChildren()
-	len := 0
-	for _, ctx := range children {
-		if _, ok := ctx.(IExpressionContext); ok {
-			len++
-		}
-	}
-
-	tst := make([]IExpressionContext, len)
-	i := 0
-	for _, ctx := range children {
-		if t, ok := ctx.(IExpressionContext); ok {
-			tst[i] = t.(IExpressionContext)
-			i++
-		}
-	}
-
-	return tst
-}
-
-func (s *BitwiseExpressionContext) Expression(i int) IExpressionContext {
-	var t antlr.RuleContext
-	j := 0
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionContext); ok {
-			if j == i {
-				t = ctx.(antlr.RuleContext)
-				break
-			}
-			j++
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IExpressionContext)
-}
-
-func (s *BitwiseExpressionContext) LOGICAL_AND() antlr.TerminalNode {
-	return s.GetToken(GoParserLOGICAL_AND, 0)
-}
-
-func (s *BitwiseExpressionContext) LOGICAL_OR() antlr.TerminalNode {
-	return s.GetToken(GoParserLOGICAL_OR, 0)
-}
-
-func (s *BitwiseExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case GoParserVisitor:
-		return t.VisitBitwiseExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *GoParser) Expression() (localctx IExpressionContext) {
 	return p.expression(0)
 }
@@ -12697,7 +12559,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 			p.GetErrorHandler().Sync(p)
 			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 73, p.GetParserRuleContext()) {
 			case 1:
-				localctx = NewArithmeticExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
+				localctx = NewComparisonExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(729)
 
@@ -12709,14 +12571,14 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 
 					var _lt = p.GetTokenStream().LT(1)
 
-					localctx.(*ArithmeticExpressionContext).mul_op = _lt
+					localctx.(*ComparisonExpressionContext).mul_op = _lt
 
 					_la = p.GetTokenStream().LA(1)
 
 					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&7057140616089567232) != 0) {
 						var _ri = p.GetErrorHandler().RecoverInline(p)
 
-						localctx.(*ArithmeticExpressionContext).mul_op = _ri
+						localctx.(*ComparisonExpressionContext).mul_op = _ri
 					} else {
 						p.GetErrorHandler().ReportMatch(p)
 						p.Consume()
@@ -12728,7 +12590,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 
 			case 2:
-				localctx = NewArithmeticExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
+				localctx = NewComparisonExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(732)
 
@@ -12740,14 +12602,14 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 
 					var _lt = p.GetTokenStream().LT(1)
 
-					localctx.(*ArithmeticExpressionContext).add_op = _lt
+					localctx.(*ComparisonExpressionContext).add_op = _lt
 
 					_la = p.GetTokenStream().LA(1)
 
 					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2019864432875667456) != 0) {
 						var _ri = p.GetErrorHandler().RecoverInline(p)
 
-						localctx.(*ArithmeticExpressionContext).add_op = _ri
+						localctx.(*ComparisonExpressionContext).add_op = _ri
 					} else {
 						p.GetErrorHandler().ReportMatch(p)
 						p.Consume()
@@ -12790,7 +12652,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 
 			case 4:
-				localctx = NewBitwiseExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
+				localctx = NewComparisonExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(738)
 
@@ -12807,7 +12669,7 @@ func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
 				}
 
 			case 5:
-				localctx = NewBitwiseExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
+				localctx = NewComparisonExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, GoParserRULE_expression)
 				p.SetState(741)
 
