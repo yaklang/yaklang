@@ -116,7 +116,7 @@ terminatedSimpleStmt:
 
 expressionStmt: expression;
 
-sendStmt: channel = expression RECEIVE expression;
+sendStmt: chanenl = expression RECEIVE expression;
 
 incDecStmt: expression (PLUS_PLUS | MINUS_MINUS);
 
@@ -284,7 +284,8 @@ primaryExpr:
 		| slice
 		| typeAssertion
 		| arguments
-	);
+	)
+	;
 
 unaryExpr:
 	primaryExpr

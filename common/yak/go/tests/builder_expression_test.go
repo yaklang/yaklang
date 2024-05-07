@@ -7,10 +7,10 @@ import (
 
 func TestVariableDeclare(t *testing.T) {
 	code := `package main
-
-func main(){
 var a = 1
-println(a)
+func main(){
+var b = a
+println(b)
 }`
-	ssatest.MockSSA(t, code)
+	ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 }

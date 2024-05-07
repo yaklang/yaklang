@@ -13,9 +13,14 @@ func (y *builder) VisitDeclaration(raw goparser.IDeclarationContext) interface{}
 	if declar == nil {
 		return nil
 	}
-	y.VisitConstDecl(declar.ConstDecl())
-	y.VisitTypDecl(declar.TypeDecl())
-	y.VisitVarDecl(declar.VarDecl())
+	switch {
+	case declar.VarDecl() != nil:
+		y.VisitVarDecl(declar.VarDecl())
+	case declar.ConstDecl() != nil:
+		y.VisitConstDecl(declar.ConstDecl())
+	case declar.TypeDecl() != nil:
+		y.VisitTypDecl(declar.TypeDecl())
+	}
 	return nil
 }
 func (y *builder) VisitConstDecl(raw goparser.IConstDeclContext) interface{} {
@@ -66,8 +71,10 @@ func (y *builder) VisitVarSpec(raw goparser.IVarSpecContext) interface{} {
 		log.Warn("var declare fail: variable number and expression number not match")
 		return nil
 	}
-	for i, expr := range explist.AllExpression() {
-		y.ir.AssignVariable(y.ir.CreateVariable(list[i]), y.VisitExpression(expr))
+	for j, expr := range explist.AllExpression() {
+		variable := y.ir.CreateVariable(list[j])
+		value := y.VisitExpression(expr)
+		y.ir.AssignVariable(variable, value)
 	}
 	return nil
 }

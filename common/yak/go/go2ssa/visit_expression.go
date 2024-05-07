@@ -3,7 +3,14 @@ package go2ssa
 import (
 	goparser "github.com/yaklang/yaklang/common/yak/go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strconv"
 )
+
+type paramInfo struct {
+	param    string
+	_type    ssa.Type
+	ellipsis bool
+}
 
 func (y *builder) VisitExpression(raw goparser.IExpressionContext) ssa.Value {
 	if raw == nil || y == nil {
@@ -78,11 +85,66 @@ func (y *builder) VisitPrimaryExpression(raw goparser.IPrimaryExprContext) ssa.V
 	case primaryExpr.Operand() != nil:
 		return y.VisitOperand(primaryExpr.Operand())
 	case primaryExpr.Conversion() != nil:
+		return y.VisitConversion(primaryExpr.Conversion())
 	case primaryExpr.MethodExpr() != nil:
+	case primaryExpr.PrimaryExpr() != nil:
+		value := y.VisitPrimaryExpression(primaryExpr.PrimaryExpr())
+		_ = value
+		switch {
+		case primaryExpr.Index() != nil:
+		case primaryExpr.Slice() != nil:
+		case primaryExpr.TypeAssertion() != nil:
+			//按照函数调用来做解析
+		case primaryExpr.Arguments() != nil:
+			arguments := y.VisitArguments(primaryExpr.Arguments())
+			call := y.ir.NewCall(value, arguments)
+			return y.ir.EmitCall(call)
+		}
 	}
 	return nil
 }
 
+func (y *builder) VisitArguments(raw goparser.IArgumentsContext) []ssa.Value {
+	if raw == nil || y == nil {
+		return nil
+	}
+	i := raw.(*goparser.ArgumentsContext)
+	if i == nil {
+		return nil
+	}
+	if i.Type_() != nil {
+		//do somethings
+	}
+	if i.ExpressionList() != nil {
+		return y.VisitExpressionList(i.ExpressionList())
+	}
+	return nil
+}
+
+func (y *builder) VisitExpressionList(raw goparser.IExpressionListContext) []ssa.Value {
+	if raw == nil || y == nil {
+		return nil
+	}
+	i := raw.(*goparser.ExpressionListContext)
+	if i == nil {
+		return nil
+	}
+	var value []ssa.Value
+	for _, expr := range i.AllExpression() {
+		value = append(value, y.VisitExpression(expr))
+	}
+	return value
+}
+func (y *builder) VisitIndex(raw goparser.IIndexContext) ssa.Value {
+	if raw == nil || y == nil {
+		return nil
+	}
+	i := raw.(*goparser.IndexContext)
+	if i == nil {
+		return nil
+	}
+	return y.VisitExpression(i.Expression())
+}
 func (y *builder) VisitUnaryExpression(raw goparser.IUnaryExprContext) ssa.Value {
 	if raw == nil || y == nil {
 		return nil
@@ -120,6 +182,13 @@ func (y *builder) VisitOperandName(raw goparser.IOperandNameContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
+	if i.DOT() == nil {
+		_var, err := strconv.Unquote(i.IDENTIFIER(0).GetText())
+		if err != nil {
+			_var = i.IDENTIFIER(0).GetText()
+		}
+		return y.ir.ReadOrCreateVariable(_var)
+	}
 	// syntax a.b
 	return nil
 }
@@ -137,7 +206,7 @@ func (y *builder) VisitOperand(raw goparser.IOperandContext) ssa.Value {
 	}
 	switch {
 	case i.Literal() != nil:
-		y.VisitLiteral(i.Literal())
+		return y.VisitLiteral(i.Literal())
 	case i.OperandName() != nil:
 		return y.VisitOperandName(i.OperandName())
 	case i.Expression() != nil:
@@ -227,7 +296,7 @@ func (y *builder) VisitArrayType(raw goparser.IArrayTypeContext) ssa.Type {
 	return ssa.NewSliceType(elementType)
 }
 
-func (y *builder) VisitFunctionType(raw goparser.IFunctionTypeContext) (params []ssa.Type, results []ssa.Type) {
+func (y *builder) VisitFunctionType(raw goparser.IFunctionTypeContext) (paramInfo []*paramInfo, results []*paramInfo) {
 	if y == nil || raw == nil {
 		return nil, nil
 	}
@@ -237,7 +306,7 @@ func (y *builder) VisitFunctionType(raw goparser.IFunctionTypeContext) (params [
 	}
 	return nil, nil
 }
-func (y *builder) VisitResult(raw goparser.IResultContext) []ssa.Type {
+func (y *builder) VisitResult(raw goparser.IResultContext) []*paramInfo {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -245,29 +314,46 @@ func (y *builder) VisitResult(raw goparser.IResultContext) []ssa.Type {
 	if i == nil {
 		return nil
 	}
+	//如果返回值是 a int 也得把a填充到param中
 	return nil
 }
-func (y *builder) VisitParameters(raw goparser.IParametersContext) (params []string, types []ssa.Type) {
+
+func (y *builder) VisitParameters(raw goparser.IParametersContext) []*paramInfo {
 	if y == nil || raw == nil {
-		return nil, nil
+		return nil
 	}
 	i := raw.(*goparser.ParametersContext)
 	if i == nil {
-		return nil, nil
+		return nil
 	}
+	var param []*paramInfo
 	//这注意参数和类型对齐
-	return nil, nil
+	for _, parameterDecl := range i.AllParameterDecl() {
+		param = append(param, y.VisitParameterDecl(parameterDecl)...)
+	}
+	return param
 }
-func (y *builder) VisitParameterDecl(raw goparser.IParameterDeclContext) ([]string, bool, []ssa.Type) {
+func (y *builder) VisitParameterDecl(raw goparser.IParameterDeclContext) []*paramInfo {
 	if y == nil || raw == nil {
-		return nil, false, nil
+		return nil
 	}
 	i := raw.(*goparser.ParameterDeclContext)
 	if i == nil {
-		return nil, false, nil
+		return nil
 	}
-	return nil, false, nil
+	var param []*paramInfo
+	type_ := y.VisitType_(i.Type_())
+	params := y.VisitIdentifierList(i.IdentifierList())
+	for _, p := range params {
+		param = append(param, &paramInfo{
+			param:    p,
+			_type:    type_,
+			ellipsis: i.ELLIPSIS() != nil,
+		})
+	}
+	return param
 }
+
 func (y *builder) VisitElementType(raw goparser.IElementTypeContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil

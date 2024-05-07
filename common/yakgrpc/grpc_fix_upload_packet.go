@@ -16,7 +16,7 @@ func (s *Server) FixUploadPacket(ctx context.Context, req *ypb.FixUploadPacketRe
 }
 
 func (s *Server) IsMultipartFormDataRequest(ctx context.Context, req *ypb.FixUploadPacketRequest) (*ypb.IsMultipartFormDataRequestResult, error) {
-	var request []byte = req.GetRequest()
+	var request = req.GetRequest()
 
 	request = lowhttp.FixHTTPRequest(request)
 	reqIns, err := lowhttp.ParseBytesToHttpRequest(request)

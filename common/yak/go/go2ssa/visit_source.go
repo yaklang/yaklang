@@ -1,6 +1,7 @@
 package go2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	goparser "github.com/yaklang/yaklang/common/yak/go/parser"
 )
 
@@ -8,8 +9,8 @@ func (y *builder) VisitSourceFile(raw goparser.ISourceFileContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-	//recoverRange := y.SetRange(raw)
-	//defer recoverRange()
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*goparser.SourceFileContext)
 	if i == nil {
@@ -21,12 +22,11 @@ func (y *builder) VisitSourceFile(raw goparser.ISourceFileContext) interface{} {
 	for _, importDecl := range i.AllImportDecl() {
 		y.VisitImportDecl(importDecl)
 	}
-	for _, functionDecl := range i.AllFunctionDecl() {
-		//
-		_ = functionDecl
-	}
 	for _, declaration := range i.AllDeclaration() {
 		y.VisitDeclaration(declaration)
+	}
+	for _, functionDecl := range i.AllFunctionDecl() {
+		y.VisitFunctionDecl(functionDecl)
 	}
 	for _, methodDecl := range i.AllMethodDecl() {
 		_ = methodDecl
@@ -99,13 +99,32 @@ func (y *builder) VisitFunctionDecl(raw goparser.IFunctionDeclContext) interface
 	y.ir.AssignVariable(variable, function)
 	return nil
 }
+
 func (y *builder) VisitSignature(raw goparser.ISignatureContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 	i := raw.(*goparser.SignatureContext)
-	_ = i
-	//params, types := y.VisitParameters(i.Parameters())
+	if parameters := y.VisitParameters(i.Parameters()); parameters != nil {
+		for _, parameter := range parameters {
+			if parameter.param == "" {
+				log.Errorf("function param name is null")
+				return nil
+			}
+			param := y.ir.NewParam(parameter.param)
+			param.SetType(parameter._type)
+		}
+	}
+	if result := y.VisitResult(i.Result()); result != nil {
+		for _, info := range result {
+			if info.param != "" {
+				y.ir.CreateVariable(info.param)
+				y.ir.CreateVariable(info.param)
+			} else {
+				//应该设置返回值
+			}
+		}
+	}
 	return nil
 }
 func (y *builder) VisitBlock(raw goparser.IBlockContext) interface{} {
