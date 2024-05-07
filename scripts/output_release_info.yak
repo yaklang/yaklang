@@ -7,12 +7,16 @@ cli.check()
 
 log.Info("start to fetch file: %v gpt model: %v", raw, model)
 
+log.Info("start to check raw commit messages\n\n")
 rawCommitMsg = string(file.ReadFile(raw)~)
 rawCommitMsg = str.TrimSpace(rawCommitMsg)
 println(rawCommitMsg)
 if str.TrimSpace(rawCommitMsg) {
-    return
+    log.Info("empty commit msg...")
+    os.Exit(0)
+    return 0
 }
+log.Info("\n\n")
 
 log.Info("start to call FunctionCall in openai")
 for range 5 {
