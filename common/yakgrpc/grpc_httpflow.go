@@ -572,6 +572,7 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 		successHash []string
 		wg          sync.WaitGroup
 		count       = 0
+		mu          sync.Mutex
 	)
 
 	db := s.GetProjectDatabase()
@@ -608,6 +609,8 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 				}
 				log.Errorf("httpflow to online failed: %s", err.Error())
 			} else {
+				mu.Lock()
+				defer mu.Unlock()
 				successHash = append(successHash, httpFlow.Hash)
 			}
 
