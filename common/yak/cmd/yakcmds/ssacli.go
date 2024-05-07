@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+type languageCtx struct {
+	hit     int64
+	matched []string
+}
+
 var SSACompilerCommands = []*cli.Command{
 	{
 		Name:    "ssa-compile",
@@ -29,6 +34,10 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "program-name,p",
 				Usage: `program name to save in database`,
 			},
+			cli.StringFlag{
+				Name:  "entry",
+				Usage: "Program Entry",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			file := utils.GetFirstExistedPath(c.String("target"))
@@ -42,7 +51,7 @@ var SSACompilerCommands = []*cli.Command{
 				name = "default-" + ksuid.New().String()
 			}
 
-			var language = make(map[ssaapi.Language]int)
+			var language = make(map[ssaapi.Language]*languageCtx)
 			var autoDetected = 0
 			log.Infof("start to detect language in %v", file)
 			err := filesys.Recursive(
@@ -51,29 +60,37 @@ var SSACompilerCommands = []*cli.Command{
 					log.Infof("checking: %v", pathname)
 					ext := strings.TrimLeft(filepath.Ext(pathname), ".")
 					autoDetected++
+					var current *languageCtx
+					var ok bool
 					switch strings.ToLower(ext) {
 					case "yak", "yaklang":
-						if _, ok := language[ssaapi.Yak]; !ok {
-							language[ssaapi.Yak] = 0
+						if current, ok = language[ssaapi.Yak]; !ok {
+							current = &languageCtx{}
+							language[ssaapi.Yak] = current
 						}
-						language[ssaapi.Yak]++
 					case "java":
-						if _, ok := language[ssaapi.JAVA]; !ok {
-							language[ssaapi.JAVA] = 0
+						if current, ok = language[ssaapi.JAVA]; !ok {
+							current = &languageCtx{}
+							language[ssaapi.JAVA] = current
 						}
-						language[ssaapi.JAVA]++
+
 					case "php":
 						if _, ok := language[ssaapi.PHP]; !ok {
-							language[ssaapi.PHP] = 0
+							current = &languageCtx{}
+							language[ssaapi.PHP] = current
 						}
-						language[ssaapi.PHP]++
 					case "js":
 						if _, ok := language[ssaapi.JS]; !ok {
-							language[ssaapi.JS] = 0
+							current = &languageCtx{}
+							language[ssaapi.JS] = current
 						}
-						language[ssaapi.JS]++
 					default:
 						autoDetected--
+					}
+
+					if current != nil {
+						current.hit++
+						current.matched = append(current.matched, pathname)
 					}
 
 					if autoDetected > 100 {
@@ -91,19 +108,30 @@ var SSACompilerCommands = []*cli.Command{
 				return utils.Errorf("no language detected in %v", file)
 			}
 
+			entry := c.String("entry")
 			var selectedLanguage ssaapi.Language
-			var hit int
-			for l, count := range language {
-				if count > hit {
-					hit = count
+			var hit int64
+			for l, lctx := range language {
+				if lctx.hit > hit {
+					hit = lctx.hit
 					selectedLanguage = l
+					if entry == "" {
+						entry = lctx.matched[0]
+					}
 				}
 			}
 
-			log.Infof("start to compile file: %v with db: %v", file, name)
+			log.Infof("start to compile file: %v with db: %v language: %v", file, name, selectedLanguage)
+
+			if entry != "" {
+				log.Infof("start to use entry: %v", entry)
+			}
+
 			proj, err := ssaapi.ParseProjectFromPath(
 				file,
-				ssaapi.WithDatabaseProgramName(name), ssaapi.WithLanguage(selectedLanguage),
+				ssaapi.WithDatabaseProgramName(name),
+				ssaapi.WithLanguage(selectedLanguage),
+				ssaapi.WithFileSystemEntry(entry),
 			)
 			if err != nil {
 				return utils.Wrapf(err, "parse project [%v] failed", file)
