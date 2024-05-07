@@ -18,8 +18,11 @@ jobs:
         run: |
           git fetch --all
           
-          # Strip the 'refs/heads/' or 'refs/tags/' prefix and checkout
-          REF=${GITHUB_REF#refs/*/}
+          if [[ -n "$GITHUB_HEAD_REF" ]]; then
+            REF=$GITHUB_HEAD_REF
+          else
+            REF=${GITHUB_REF#refs/*/}
+          fi
           git checkout $REF
           echo "Switched to $REF"
 
