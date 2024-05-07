@@ -17,7 +17,13 @@ jobs:
       - name: Check Commit Message
         run: |
           git fetch --all
-          git checkout ${{ github.ref }}
+          
+          # Strip the 'refs/heads/' or 'refs/tags/' prefix and checkout
+          REF=${GITHUB_REF#refs/*/}
+          git checkout $REF
+          echo "Switched to $REF"
+
+          git checkout $REF
           echo "generate commit messages ... "
           ./scripts/generate-commit.sh
           cat /tmp/raw_commit_message.txt
