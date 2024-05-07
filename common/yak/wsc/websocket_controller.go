@@ -126,6 +126,7 @@ func (w *WebsocketController) handle(br *bufio.Reader, bw *bufio.Writer) error {
 }
 
 func (w *WebsocketController) frameHandler(fr *lowhttp.FrameReader, fw *lowhttp.FrameWriter) error {
+	count := 0
 	for {
 		frame, err := fr.ReadFrame()
 		if err != nil {
@@ -141,6 +142,12 @@ func (w *WebsocketController) frameHandler(fr *lowhttp.FrameReader, fw *lowhttp.
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			w.onMessage(frame.GetData())
 		}
+		err = fw.WriteText([]byte(fmt.Sprintf(`test %d`, count)), false)
+		if err := fw.Flush(); err != nil {
+			log.Errorf("ws controller flush failed: %v", err)
+			return err
+		}
+		count++
 	}
 }
 
