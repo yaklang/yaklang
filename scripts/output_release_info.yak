@@ -11,7 +11,7 @@ log.Info("start to check raw commit messages\n\n")
 rawCommitMsg = string(file.ReadFile(raw)~)
 rawCommitMsg = str.TrimSpace(rawCommitMsg)
 println(rawCommitMsg)
-if str.TrimSpace(rawCommitMsg) {
+if str.TrimSpace(rawCommitMsg) == "" {
     log.Info("empty commit msg...")
     os.Exit(0)
     return 0
