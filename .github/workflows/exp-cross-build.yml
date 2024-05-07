@@ -155,7 +155,7 @@ jobs:
 
       - name: Push Version Info to OSS
         run: |
-          git fetch --all
+          git fetch --tags
           ./scripts/generate-commit.sh > /tmp/raw_commit_message.txt
           ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename /tmp/raw_commit_message.txt --ai-model gpt-4-0613
           ls | grep release
