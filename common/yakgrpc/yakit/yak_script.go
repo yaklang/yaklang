@@ -736,10 +736,10 @@ func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) 
 	return db
 }
 
-func CountYakScriptByWhere(db *gorm.DB, isGroup bool) (total int64, err error) {
+func CountYakScriptByWhere(db *gorm.DB, isGroup bool, req *ypb.QueryYakScriptGroupRequest) (total int64, err error) {
 	db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&YakScript{})
-	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", []string{"yak", "codec"})
+	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", req.ExcludeType)
 	if isGroup {
 		db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
 	}

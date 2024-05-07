@@ -18,7 +18,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 	var groupCount ypb.QueryYakScriptGroupResponse
 
 	if req.GetAll() {
-		countAll, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), false)
+		countAll, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), false, req)
 		if err == nil {
 			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
 				Value:   "全部",
@@ -26,7 +26,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 				Default: true,
 			})
 		}
-		countGroup, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), true)
+		countGroup, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), true, req)
 		if err == nil {
 			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
 				Value:   "未分组",
@@ -35,7 +35,7 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 			})
 		}
 	}
-	groups, _ := yakit.GroupCount(s.GetProfileDatabase())
+	groups, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), req.ExcludeType)
 	filterGroup := filter.NewFilter()
 	for _, group := range groups {
 		if filterGroup.Exist(group.Value) {
