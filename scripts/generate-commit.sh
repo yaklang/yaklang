@@ -1,6 +1,8 @@
 #!/bin/sh
 echo "Start to generate commit message"
 
+set -e
+
 # 获取当前 commit 的哈希
 current_commit=$(git rev-parse HEAD)
 echo "Current Commit: $current_commit"
@@ -21,6 +23,9 @@ if [ -z "$previous_tag" ]; then
     echo "No valid previous tag found that is not the current commit."
     exit 1
 fi
+
+# Start to generate commit message
+git log $previous_tag..$current_commit --format="%s" > /tmp/raw_commit_message.txt
 
 echo "Start to check commit message"
 # 检查/tmp/raw_commit_message.txt的行数
