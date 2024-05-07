@@ -690,6 +690,7 @@ message FetchPortAssetFromSpaceEngineRequest {
 message DeleteHybridScanTaskRequest {
   string TaskId = 1;
   bool DeleteAll = 2;
+  HybridScanTaskFilter Filter = 3;
 }
 
 message HybridScanTask {
@@ -704,6 +705,8 @@ message HybridScanTask {
   int64 TotalTasks = 8;
   int64 FinishedTasks = 9;
   int64 FinishedTargets = 10;
+  string FirstTarget = 11;
+  string Reason = 12;
 }
 
 message QueryHybridScanTaskResponse {
@@ -717,6 +720,15 @@ message QueryHybridScanTaskRequest {
   int64 FromId = 2;
   int64 UntilId = 3;
   string Status = 4;
+  HybridScanTaskFilter Filter = 5;
+}
+
+message HybridScanTaskFilter {
+  repeated string TaskId = 1;
+  string Status = 2;
+  string Target = 3;
+  int64 FromId = 4;
+  int64  UntilId = 5;
 }
 
 message HybridScanResponse {
