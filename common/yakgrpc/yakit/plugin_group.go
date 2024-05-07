@@ -201,3 +201,16 @@ func DeletePluginGroupByScriptName(db *gorm.DB, scriptName []string) error {
 	}
 	return nil
 }
+
+func QueryGroupCount(db *gorm.DB, excludeType []string) (req []*TagAndTypeValue, err error) {
+	db = db.Model(&PluginGroup{}).Select(" `group` as value, count(*) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
+	db = db.Joins("INNER JOIN yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
+	//db = db.Where("yak_script_name IN (SELECT DISTINCT(script_name) FROM yak_scripts)")
+	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "Y.type", excludeType)
+	db = db.Group(" `group`,`temporary_id`,`is_poc_built_in` ").Order(`count desc`).Scan(&req)
+	if db.Error != nil {
+		return nil, utils.Wrap(db.Error, "GroupCount failed")
+	}
+
+	return req, nil
+}
