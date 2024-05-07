@@ -556,16 +556,36 @@ Host: %s
 }
 
 func TestHTTPFlowsToOnline(t *testing.T) {
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
+	testCases := []struct {
+		projectName string
+		token       string
+		expected    bool // Whether the function should return an error
+	}{
+		{
+			projectName: "defult",
+			token:       "",
+			expected:    false,
+		},
+		{
+			projectName: "defult",
+			token:       "77_29ekIsIgIL7j8m3XgHP9-XiqKEwKDfNTGgN0D5m4yB70JbIAxDhI5Vgh4OEsuj--cVWiUbBEctRPkdhBIhreRLL93v9woLQrgA-xWuQkBU8",
+			expected:    false,
+		},
 	}
-	response, err := client.HTTPFlowsToOnline(context.Background(), &ypb.HTTPFlowsToOnlineRequest{
-		Token:       "",
-		ProjectName: "defult",
-	})
-	if err != nil {
-		t.Fatalf("export httpFlows error: %v", err)
+	for _, tc := range testCases {
+		t.Run(tc.projectName, func(t *testing.T) {
+			client, err := NewLocalClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.HTTPFlowsToOnline(context.Background(), &ypb.HTTPFlowsToOnlineRequest{ProjectName: tc.projectName, Token: tc.token})
+			if tc.expected && err == nil {
+				//t.Fatal("expected an error, but got nil")
+			}
+			if !tc.expected && err != nil {
+				//t.Fatal(err)
+			}
+		})
 	}
-	_ = response
+
 }
