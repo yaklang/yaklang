@@ -113,17 +113,12 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				task.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			}
-			if rsp.HybridScanMode == "stop" {
-				manager.Stop()
-				statusManager.GetStatus(task)
-				quickSave()
-			}
 		}
 	}()
 
 	// dispatch
 	for _, __currentTarget := range targets {
-		if manager.IsPaused() { // 如果暂停立刻停止
+		if manager.IsStop() || manager.IsPaused() { // if cancel, return immediately
 			break
 		}
 		statusManager.DoActiveTarget()
@@ -171,13 +166,13 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 			}
 			targetWg.Add(1)
 
-			manager.Checkpoint(func() {
-				task.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
-				feedbackStatus()
-				task.Status = yakit.HYBRIDSCAN_PAUSED
-				quickSave()
-			})
-
+			//manager.Checkpoint(func() {
+			//	task.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
+			//	feedbackStatus()
+			//	task.Status = yakit.HYBRIDSCAN_PAUSED
+			//	quickSave()
+			//})
+			//
 			for !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
 				portScanCond.Wait()
@@ -201,11 +196,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				}()
 
 				// shrink context
-				select {
-				case <-manager.Context().Done():
+				if manager.IsStop() {
 					log.Infof("skip task %d via canceled", taskIndex)
 					return
-				default:
 				}
 
 				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
@@ -225,10 +218,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 
 				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 					// shrink context
-					select {
-					case <-manager.Context().Done():
+					if manager.IsStop() {
 						return nil
-					default:
 					}
 
 					result.RuntimeID = task.TaskId
@@ -248,20 +239,15 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 
 		}
 		// shrink context
-		select {
-		case <-manager.Context().Done():
-			return utils.Error("task manager canceled")
-		default:
+		if manager.IsStop() {
+			return utils.Error("task manager stopped")
 		}
 
 		go func() {
 			// shrink context
-			select {
-			case <-manager.Context().Done():
+			if manager.IsStop() {
 				return
-			default:
 			}
-
 			targetWg.Wait()
 			if manager.IsStop() { //停止之后不再 更新进度
 				statusManager.DoneTarget()
