@@ -80,7 +80,7 @@ func (h *HybridScanTaskManager) Context() context.Context {
 	return h.ctx
 }
 
-func (h *HybridScanTaskManager) Resume() {
+func (h *HybridScanTaskManager) Resume() { // close pause task
 	h.isPaused.UnSet()
 	h.resumeLock.Lock()
 	go func() {

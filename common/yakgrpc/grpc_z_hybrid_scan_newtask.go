@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jinzhu/gorm"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
@@ -135,7 +134,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	// 即，100w 个目标，每个目标占用大小为 100 字节，那么都在内存中，开销大约为 100M
 	// 这个开销在内存中处理绰绰有余，但是在网络传输中，这个开销就很大了
 	var targetCached []*HybridScanTarget
+	var setHybridScanTarget sync.Once
 	for targetInput := range targetChan {
+		setHybridScanTarget.Do(func() {
+			taskRecorder.Targets = utils.ExtractHost(targetInput.Url)
+			quickSave()
+		})
 		targetCached = append(targetCached, targetInput)
 	}
 
@@ -174,15 +178,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				taskRecorder.Reason = err.Error()
 				return
 			}
-			if rsp.HybridScanMode == "pause" {
+			if rsp.GetHybridScanMode() == "pause" {
 				manager.Pause()
 				statusManager.GetStatus(taskRecorder)
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
-				quickSave()
-			}
-			if rsp.HybridScanMode == "stop" {
-				manager.Stop()
-				statusManager.GetStatus(taskRecorder)
 				quickSave()
 			}
 		}
@@ -190,7 +189,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
-		if manager.IsStop() { // 如果暂停立刻停止
+		if manager.IsStop() || manager.IsPaused() {
 			break
 		}
 		// load targets
@@ -238,17 +237,17 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 			targetWg.Add(1)
 
-			manager.Checkpoint(func() {
-				// 如果出现了暂停，立即保存进度
-				taskRecorder.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
-				names, _ := json.Marshal(pluginNames)
-				taskRecorder.Plugins = string(names)
-				targetBytes, _ := json.Marshal(targetCached)
-				taskRecorder.Targets = string(targetBytes)
-				feedbackStatus()
-				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
-				quickSave()
-			})
+			//manager.Checkpoint(func() {
+			//	// 如果出现了暂停，立即保存进度
+			//	taskRecorder.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
+			//	names, _ := json.Marshal(pluginNames)
+			//	taskRecorder.Plugins = string(names)
+			//	targetBytes, _ := json.Marshal(targetCached)
+			//	taskRecorder.Targets = string(targetBytes)
+			//	feedbackStatus()
+			//	taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
+			//	quickSave()
+			//})
 
 			for __pluginInstance.Type == "port-scan" && !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
@@ -269,19 +268,15 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				}()
 				// shrink context
-				select {
-				case <-manager.Context().Done():
+				if manager.IsStop() {
 					log.Infof("skip task %d via canceled", taskIndex)
 					return
-				default:
 				}
 				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 
 				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
-					select {
-					case <-manager.Context().Done():
+					if manager.IsStop() || manager.IsPaused() {
 						return nil
-					default:
 					}
 					result.RuntimeID = taskId
 					currentStatus := getStatus()
@@ -300,20 +295,14 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 		}
 		// shrink context
-		select {
-		case <-manager.Context().Done():
-			return utils.Error("task manager cancled")
-		default:
+		if manager.IsStop() {
+			return utils.Error("task manager stopped")
 		}
-
 		go func() {
 			// shrink context
-			select {
-			case <-manager.Context().Done():
+			if manager.IsStop() {
 				return
-			default:
 			}
-
 			targetWg.Wait()
 			if !manager.IsStop() { // 停止之后不再更新进度
 				statusManager.DoneTarget()
