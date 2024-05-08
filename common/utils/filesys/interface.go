@@ -16,4 +16,6 @@ type FileSystem interface {
 	Join(elem ...string) string
 
 	GetSeparators() rune
+
+	GetLocalFSPath() string
 }

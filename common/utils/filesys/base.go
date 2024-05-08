@@ -25,6 +25,9 @@ func (e *embedFs) Stat(name string) (fs.FileInfo, error) {
 }
 
 func (e *embedFs) GetSeparators() rune { return '/' }
+
+func (e *embedFs) GetLocalFSPath() string { return "" }
+
 func (f *embedFs) Join(name ...string) string {
 	return path.Join(name...)
 }
@@ -46,6 +49,7 @@ func NewLocalFsWithPath(path string) LocalFs {
 
 var _ FileSystem = (LocalFs)("")
 
+func (f LocalFs) GetLocalFSPath() string                        { return string(f) }
 func (f LocalFs) Open(name string) (fs.File, error)             { return os.Open(f.Join(name)) }
 func (f LocalFs) Stat(name string) (fs.FileInfo, error)         { return os.Stat(f.Join(name)) }
 func (f LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return os.ReadDir(f.Join(dirname)) }
