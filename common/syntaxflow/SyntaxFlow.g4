@@ -21,23 +21,27 @@ refVariable
     :  '$' (identifier | ('(' identifier ')'));
 
 filterExpr
-    : '$'    identifier?                          # CurrentRootFilter
-    | identifier                                  # PrimaryFilter
-    | regexpLiteral                               # RegexpLiteralFilter
-    | '.' filterExpr                              # FieldFilter
-    | filterExpr '.' filterExpr                   # FieldCallFilter
-    | filterExpr '(' acutalParamFilter* ')'       # FunctionCallFilter
-    | filterExpr '[' sliceCallItem ']'            # FieldIndexFilter
-    | filterExpr '?' '{' conditionExpression '}'   # OptionalFilter
-    | filterExpr '->' filterExpr                 # NextFilter
-    | filterExpr '-->' filterExpr                # DeepNextFilter
+    : '$'    identifier?                                    # CurrentRootFilter
+    | '*'                                                   # WildcardFilter
+    | identifier                                            # PrimaryFilter
+    | regexpLiteral                                         # RegexpLiteralFilter
+    | '.' filterExpr                                        # FieldFilter
+    | filterExpr '.' filterExpr                             # FieldCallFilter
+    | filterExpr '(' acutalParamFilter* ')'                 # FunctionCallFilter
+    | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
+    | filterExpr '?{' conditionExpression '}'               # OptionalFilter
+    | filterExpr '->' filterExpr                            # NextFilter
+    | filterExpr '-->' filterExpr                           # DeepNextFilter
+    | filterExpr '-{' (recursiveConfig)? '}->' filterExpr     # ConfiggedDeepNextFilter
     ;
 
 acutalParamFilter
-    : '#'? /* # 获取的是顶级定义，应该自动跨越过程 */ (nameFilter | '-') ','? # NamedParam
-    | ','                                                               # EmptyParam
+    : ('#' | '#{' (recursiveConfig)? '}' )? filterExpr ','?   # NamedParam
+    | ','                                                   # EmptyParam
     ;
 
+recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','?;
+recursiveConfigItem: identifier ':' (identifier | numberLiteral);
 
 sliceCallItem: nameFilter | numberLiteral;
 
@@ -66,7 +70,7 @@ conditionExpression
     ;
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
-stringLiteral: identifier;
+stringLiteral: identifier | '*';
 regexpLiteral: RegexpLiteral;
 identifier: Identifier | types | As;
 
@@ -88,7 +92,10 @@ NotRegexpMatch: '!~';
 And: '&&';
 Or: '||';
 NotEq: '!=';
-
+ConditionStart: '?{';
+DeepNextStart: '-{';
+DeepNextEnd: '}->';
+TopDefStart: '#{';
 Gt: '>';
 Dot: '.';
 Lt: '<';
