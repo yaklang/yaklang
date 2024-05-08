@@ -134,6 +134,7 @@ type (
 // both instruction and value
 type Program struct {
 	// package list
+	Name     string
 	Packages map[string]*Package
 
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]

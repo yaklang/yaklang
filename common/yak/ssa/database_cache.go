@@ -1,18 +1,31 @@
 package ssa
 
 import (
-	"github.com/gobwas/glob"
 	"regexp"
 	"time"
+
+	"github.com/gobwas/glob"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"go.uber.org/atomic"
 )
+
+var CachePool = omap.NewEmptyOrderedMap[string, *Cache]()
+
+func GetCacheFromPool(programName string) *Cache {
+	if cache, ok := CachePool.Get(programName); ok {
+		return cache
+	}
+	cache := NewDBCache(programName)
+	CachePool.Set(programName, cache)
+	return cache
+}
 
 var DB = consts.GetGormProjectDatabase() // not good here...
 
@@ -54,11 +67,11 @@ func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 
 	if databaseEnable {
 		cache.DB = DB
-		instructionCache.SetExpirationCallback(func(key int64, instIrCode instructionIrCode) {
-			cache.saveInstruction(instIrCode)
+		instructionCache.SetCheckExpirationCallback(func(key int64, inst instructionIrCode) bool {
+			return cache.saveInstruction(inst)
 		})
-		variableCache.SetExpirationCallback(func(key string, insts []Instruction) {
-			cache.saveVariable(key, insts)
+		variableCache.SetCheckExpirationCallback(func(key string, value []Instruction) bool {
+			return cache.saveVariable(key, value)
 		})
 	} else {
 		cache.id = atomic.NewInt64(0)
@@ -115,7 +128,6 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 
 // =============================================== Variable =======================================================
 
-// SetVariable : set variable to cache.
 func (c *Cache) GetByVariable(name string) []Instruction {
 	ret, ok := c.VariableCache.Get(name)
 	if !ok && c.DB != nil {
@@ -154,7 +166,6 @@ func (c *Cache) GetByVariableRegexp(r *regexp.Regexp) []Instruction {
 	return ins
 }
 
-// GetByVariable : get variable from cache.
 func (c *Cache) SetVariable(name string, instructions []Instruction) {
 	c.VariableCache.Set(name, instructions)
 }
@@ -174,38 +185,43 @@ func (c *Cache) ForEachVariable(handle func(string, []Instruction)) {
 }
 
 // =============================================== Database =======================================================
-func (c *Cache) saveInstruction(instIr instructionIrCode) {
+// only LazyInstruction and false marshal will not be saved to database
+func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	if c.DB == nil {
-		return
+		log.Errorf("BUG: saveInstruction called when DB is nil")
+		return false
 	}
 
 	// all instruction from database will be lazy instruction
 	if lz, ok := ToLazyInstruction(instIr.inst); ok {
 		// we just check if this lazy-instruction should be saved again?
 		if !lz.ShouldSave() {
-			return
+			return false
 		}
 	}
 
 	if err := Instruction2IrCode(instIr.inst, instIr.irCode); err != nil {
 		log.Errorf("FitIRCode error: %s", err)
-		return
+		return false
 	}
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}
+	return true
 }
 
-func (c *Cache) saveVariable(variable string, insts []Instruction) {
+func (c *Cache) saveVariable(variable string, insts []Instruction) bool {
 	if c.DB == nil {
-		return
+		log.Errorf("BUG: saveVariable called when DB is nil")
+		return false
 	}
 	if err := ssadb.SaveVariable(c.DB, c.ProgramName, variable,
 		lo.Map(insts, func(inst Instruction, _ int) int64 { return inst.GetId() }),
 	); err != nil {
 		log.Errorf("SaveVariable error: %v", err)
-		return
+		return false
 	}
+	return true
 }
 func (c *Cache) SaveToDatabase() {
 	if c.DB == nil {
