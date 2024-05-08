@@ -15,6 +15,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	}
 
 	switch ret := raw.(type) {
+	case *sf.WildcardFilterContext:
+		y.EmitSearchGlob("*")
+		return nil
 	case *sf.CurrentRootFilterContext:
 		y.EmitCheckStackTop()
 		log.Warnf("TBD for CurrentRootFilter")
@@ -61,9 +64,6 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			case *sf.EmptyParamContext:
 				continue
 			case *sf.NamedParamContext:
-				if ret.Minus() != nil {
-					continue
-				}
 				y.EmitListIndex(idx)
 				t := ret.GetText()
 				if strings.HasPrefix(t, "#") {
@@ -111,6 +111,12 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.ConfiggedDeepNextFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
+		if err != nil {
+			return err
+		}
+		log.Warn("TBD for ConfiggedDeepNextFilterContext")
 	default:
 		panic("BUG: in filterExpr")
 	}
