@@ -33,8 +33,17 @@ echo "---------------------------"
 line_count=$(wc -l < /tmp/raw_commit_message.txt)
 
 if [ "$line_count" -le 3 ]; then
-    echo "Fewer than 4 commit messages found. Fetching the last 30 commits:"
+    echo "Fewer than 3 commit messages found. Fetching the last 30 commits:"
     git log -n 30 --format="%s" > /tmp/raw_commit_message.txt
+fi
+
+# 检查/tmp/raw_commit_message.txt的行数
+line_count=$(wc -l < /tmp/raw_commit_message.txt)
+
+if [ "$line_count" -le 3 ]; then
+    echo "Fewer than 3 commit messages found. Fetching the last 30 commits:"
+    git fetch origin main && git checkout main && git pull origin main
+    git log -n 30 > /tmp/raw_commit_message.txt
 fi
 
 cat /tmp/raw_commit_message.txt
