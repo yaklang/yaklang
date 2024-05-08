@@ -59,6 +59,14 @@ func (v *BaseSyntaxFlowVisitor) VisitDeepNextFilter(ctx *DeepNextFilterContext) 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitWildcardFilter(ctx *WildcardFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -68,6 +76,14 @@ func (v *BaseSyntaxFlowVisitor) VisitNamedParam(ctx *NamedParamContext) interfac
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitEmptyParam(ctx *EmptyParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitRecursiveConfig(ctx *RecursiveConfigContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitRecursiveConfigItem(ctx *RecursiveConfigItemContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -46,6 +46,12 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#DeepNextFilter.
 	VisitDeepNextFilter(ctx *DeepNextFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedDeepNextFilter.
+	VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#WildcardFilter.
+	VisitWildcardFilter(ctx *WildcardFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#FieldIndexFilter.
 	VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{}
 
@@ -54,6 +60,12 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#EmptyParam.
 	VisitEmptyParam(ctx *EmptyParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#recursiveConfig.
+	VisitRecursiveConfig(ctx *RecursiveConfigContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#recursiveConfigItem.
+	VisitRecursiveConfigItem(ctx *RecursiveConfigItemContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#sliceCallItem.
 	VisitSliceCallItem(ctx *SliceCallItemContext) interface{}
