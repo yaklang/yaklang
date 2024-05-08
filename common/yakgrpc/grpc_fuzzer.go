@@ -185,7 +185,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 
 		matcherParams := utils.CopyMapInterface(mergedParams)
-		httpTPLmatchersResult, err = ins.Execute(&lowhttp.LowhttpResponse{RawPacket: rspRaw}, matcherParams)
+		httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{RawPacket: rspRaw}, matcherParams)
 		if err != nil {
 			log.Errorf("httptpl.YakMatcher execute failed: %s", err)
 		}
@@ -450,7 +450,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode())
 				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
-					respModel, _ := resp.ToGRPCModel()
+					respModel, err := resp.ToGRPCModel()
+					if err != nil || respModel == nil {
+						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+						continue
+					}
 
 					if haveHTTPTplExtractor { // 提取器提取参数
 						params := make(map[string]any)
@@ -485,11 +489,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
 						httpTPLmatchersResult, err := ins.Execute(
-							&lowhttp.LowhttpResponse{
+							&httptpl.RespForMatch{
 								RawPacket: respModel.ResponseRaw,
-								TraceInfo: &lowhttp.LowhttpTraceInfo{
-									ServerTime: time.Duration(respModel.DurationMs),
-								},
+								Duration:  float64(respModel.DurationMs),
 							},
 							matcherParams)
 						if err != nil {
@@ -870,7 +872,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				for _, kv := range extractorResultsOrigin {
 					matcherParams[kv.GetKey()] = kv.GetValue()
 				}
-				httpTPLmatchersResult, err = ins.Execute(result.LowhttpResponse, matcherParams)
+				httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
+					RawPacket: result.ResponseRaw,
+					Duration:  result.LowhttpResponse.GetDurationFloat(),
+				}, matcherParams)
 				if finalError != nil {
 					log.Errorf("httptpl.YakMatcher execute failed: %s", err)
 				}

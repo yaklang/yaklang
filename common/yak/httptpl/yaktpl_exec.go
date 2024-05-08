@@ -297,7 +297,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		var tempMatchersResult []any
 		for matcherIndex, matcher := range matchers {
 			if matcher.Id == 0 {
-				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
+				matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{RawPacket: rsp.RawPacket, Duration: rsp.GetDurationFloat()}, runtimeVars)
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
@@ -312,7 +312,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 						if targetIndex >= len(responses) {
 							tempMatchersResult = append(tempMatchersResult, false)
 						} else {
-							matchResult, err := matcher.ExecuteWithConfig(config, responses[targetIndex], runtimeVars)
+							matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{RawPacket: responses[targetIndex].RawPacket, Duration: responses[targetIndex].GetDurationFloat()}, runtimeVars)
 							if err != nil {
 								log.Error("matcher execute failed: ", err)
 							}
@@ -322,7 +322,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 					}
 					continue
 				}
-				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
+				matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{RawPacket: rsp.RawPacket, Duration: rsp.GetDurationFloat()}, runtimeVars)
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
