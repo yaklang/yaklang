@@ -30,9 +30,11 @@ func ReducerCompile(base string, opts ...Option) error {
 	for _, entryFile := range c.entryFiles {
 		info, err := c.fs.Stat(entryFile)
 		if err != nil {
-			var d string
-			d, entryFile = filepath.Split(entryFile)
-			log.Warnf("directory is repeated... split dir [%v] and filename, and use %v", d, entryFile)
+			relPath, err := filepath.Rel(base, entryFile)
+			if err != nil {
+				return utils.Wrapf(err, "entry: %v (rel: %v) is not a sub-dir or sub-file for %v", entryFile, relPath, base)
+			}
+			entryFile = relPath
 		} else {
 			if info.IsDir() {
 				log.Warnf("entry [%v] cannot be as directory...", entryFile)
