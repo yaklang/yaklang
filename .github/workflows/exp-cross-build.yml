@@ -185,7 +185,8 @@ jobs:
       - name: Checkout Tags Version
         run: echo ${{ env.YAK_TAG }}
 
-      - name: Push Version Info to OSS
+      - name: Publish Release INFO
+        continue-on-error: true
         run: |
           # 定义文件路径
           raw_commit_file="./raw_commit_message.txt"
@@ -199,6 +200,19 @@ jobs:
             ls | grep release
           fi
           
+          if [[ -f release_note.en.txt ]]; then
+            echo "Uploading release_note.en.txt to oss"
+            cat release_note.en.txt | head -n 100
+            ./yak_linux_amd64 upload-oss -f 'release_note.en.txt:/yak/${{ env.YAK_TAG }}/release_note.en.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
+          fi
+
+          if [[ -f release_note.txt ]]; then
+            echo "Uploading release_note.txt to oss"
+            cat release_note.txt | head -n 100
+            ./yak_linux_amd64 upload-oss -f 'release_note.txt:/yak/${{ env.YAK_TAG }}/release_note.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
+          fi
+      - name: Push Version Info to OSS
+        run: |
           echo "start to handle versions"
           if [ -f current_version.txt ]; then rm current_version.txt; fi
           if [ -f new_history_versions.txt ]; then rm new_history_versions.txt; fi
@@ -218,19 +232,7 @@ jobs:
           echo "Uploading version.txt to oss"
           cat new_history_versions.txt | head -n 100
           cat new_history_versions.txt | head -n 100 > active_versions.txt
-          
-          if [[ -f release_note.en.txt ]]; then
-            echo "Uploading release_note.en.txt to oss"
-            cat release_note.en.txt | head -n 100
-            ./yak_linux_amd64 upload-oss -f 'release_note.en.txt:/yak/${{ env.YAK_TAG }}/release_note.en.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
-          fi
-          
-          if [[ -f release_note.txt ]]; then
-            echo "Uploading release_note.txt to oss"
-            cat release_note.txt | head -n 100
-            ./yak_linux_amd64 upload-oss -f 'release_note.txt:/yak/${{ env.YAK_TAG }}/release_note.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
-          fi
-          
+                  
           ./yak_linux_amd64 upload-oss -f 'new_history_versions.txt:/yak/version-info/history_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
           ./yak_linux_amd64 upload-oss -f 'active_versions.txt:/yak/version-info/active_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
 
