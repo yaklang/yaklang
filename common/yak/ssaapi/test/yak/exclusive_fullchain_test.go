@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -38,6 +39,8 @@ func TestChain_Basic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ds := prog.Ref("d")
+	require.Lenf(t, ds, 1, "d should be 1, but got %d", len(ds))
 	d := prog.Ref("d")[0]
 	d.GetTopDefs()
 
