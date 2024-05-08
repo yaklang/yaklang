@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
@@ -1392,9 +1393,29 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		args := v.popArgN(c.Unary)
 		iterableValue := v.pop()
 		argsLength := len(args)
-
 		iterableValueType := reflect.TypeOf(iterableValue.Value)
 		var iterableValueRF reflect.Value
+
+		// orderedMap
+		// isOrderedMap := false
+		if m, ok := iterableValue.Value.(*orderedmap.OrderedMap); ok {
+			// isOrderedMap = true
+			if argsLength != 1 {
+				panic("orderedMap call args must be 1")
+			}
+			arg := args[0]
+			if !arg.IsString() {
+				panic("orderedMap call args must be string")
+			}
+			memberName := args[0].AsString()
+			value, ok := m.Get(memberName)
+			if ok {
+				literal := fmt.Sprintf("%s.%s", iterableValue.Literal, memberName)
+				v.push(NewValue(fmt.Sprintf("%T", value), value, literal))
+				return
+			}
+		}
+
 		if iterableValueType.Kind() == reflect.String {
 			if v, ok := iterableValue.Value.(string); ok {
 				iterableValueRF = reflect.ValueOf([]rune(v))
@@ -1928,6 +1949,18 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				return false
 			}
 
+			// orderedMap
+			isOrderedMap := false
+			if m, ok := caller.Value.(*orderedmap.OrderedMap); ok {
+				isOrderedMap = true
+				value, ok := m.Get(memberName)
+				if ok {
+					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					v.push(NewValue(fmt.Sprintf("%T", value), value, literal))
+					return
+				}
+			}
+
 			switch callerTypeKind {
 			case reflect.Map:
 				// go内置成员方法
@@ -1989,6 +2022,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				// 获取结构体字段
 				member := callerReflectValue.FieldByName(memberName)
 				if !member.IsValid() {
+					if isOrderedMap {
+						// orderMap 特殊护理，返回nil
+						v.push(undefined)
+						return
+					}
 					panicByNoSuchKey(memberName, caller.Value)
 					return
 				}
