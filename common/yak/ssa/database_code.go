@@ -130,10 +130,11 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	// Object
 	ir.IsObject = value.IsObject()
 	if ir.IsObject {
-		ir.ObjectMembers = make(map[int64]int64)
-		for key, member := range value.GetAllMember() {
-			ir.ObjectMembers[key.GetId()] = member.GetId()
-		}
+		ir.ObjectMembers = make(ssadb.Int64Map, 0)
+		value.ForEachMember(func(k, v Value) bool {
+			ir.ObjectMembers.Append(k.GetId(), v.GetId())
+			return true
+		})
 	}
 
 	// member
@@ -181,9 +182,9 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// object
 	if ir.IsObject {
-		for key, member := range ir.ObjectMembers {
-			value.AddMember(getValue(key), getValue(member))
-		}
+		ir.ObjectMembers.ForEach(func(k, v int64) {
+			value.AddMember(getValue(k), getValue(v))
+		})
 	}
 
 	// object member
