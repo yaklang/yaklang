@@ -78,7 +78,7 @@ func cacheHash(rsp []byte, location string) string {
 }
 
 func (y *YakMatcher) ExecuteRawResponse(rsp []byte, vars map[string]interface{}, suf ...string) (bool, error) {
-	return y.Execute(&lowhttp.LowhttpResponse{RawPacket: rsp}, vars, suf...)
+	return y.Execute(&RespForMatch{RawPacket: rsp}, vars, suf...)
 }
 
 func (y *YakMatcher) ExecuteRaw(rsp []byte, vars map[string]interface{}, suf ...string) (bool, error) {
@@ -114,11 +114,16 @@ func (y *YakMatcher) ExecuteRawWithConfig(config *Config, rsp []byte, vars map[s
 	return y.executeRaw(y.TemplateName, config, rsp, 0, vars, suf...)
 }
 
-func (y *YakMatcher) Execute(rsp *lowhttp.LowhttpResponse, vars map[string]interface{}, suf ...string) (bool, error) {
+type RespForMatch struct {
+	RawPacket []byte
+	Duration  float64
+}
+
+func (y *YakMatcher) Execute(rsp *RespForMatch, vars map[string]interface{}, suf ...string) (bool, error) {
 	return y.ExecuteWithConfig(nil, rsp, vars, suf...)
 }
 
-func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *lowhttp.LowhttpResponse, vars map[string]interface{}, suf ...string) (bool, error) {
+func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars map[string]interface{}, suf ...string) (bool, error) {
 	if len(y.SubMatchers) > 0 {
 		if strings.TrimSpace(strings.ToLower(y.SubMatcherCondition)) == "or" {
 			for _, matcher := range y.SubMatchers {
@@ -362,8 +367,8 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 	}
 }
 
-func (y *YakMatcher) execute(config *Config, rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
+func (y *YakMatcher) execute(config *Config, rspIns *RespForMatch, vars map[string]interface{}, sufs ...string) (bool, error) {
 	rsp := utils.CopyBytes(rspIns.RawPacket)
-	duration := rspIns.GetDurationFloat()
+	duration := rspIns.Duration
 	return y.executeRaw(y.TemplateName, config, rsp, duration, vars, sufs...)
 }
