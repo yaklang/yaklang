@@ -1,13 +1,25 @@
 package ssa
 
 // for DataFlowNode cover
-func ToNode(a any) (Node, bool)   { u, ok := a.(Node); return u, ok }
-func ToValue(n any) (Value, bool) { v, ok := n.(Value); return v, ok }
-func ToUser(n any) (User, bool)   { u, ok := n.(User); return u, ok }
+func ToNode(a any) (Node, bool)         { u, ok := a.(Node); return u, ok }
+func ToValue(n any) (Value, bool)       { v, ok := n.(Value); return v, ok }
+func ToUser(n Instruction) (User, bool) { u, ok := n.(User); return u, ok }
 
-func ToFunction(n any) (*Function, bool)     { u, ok := n.(*Function); return u, ok }
-func ToBasicBlock(n any) (*BasicBlock, bool) { u, ok := n.(*BasicBlock); return u, ok }
-func ToMethod(n Node) (*ClassMethod, bool)   { u, ok := n.(*ClassMethod); return u, ok }
+func ToFunction(n Instruction) (*Function, bool) {
+	if lz, isLZ := ToLazyInstruction(n); isLZ {
+		return ToFunction(lz.Self())
+	}
+	u, ok := n.(*Function)
+	return u, ok
+}
+func ToBasicBlock(n Instruction) (*BasicBlock, bool) {
+	if lz, isLZ := ToLazyInstruction(n); isLZ {
+		return ToBasicBlock(lz.Self())
+	}
+	u, ok := n.(*BasicBlock)
+	return u, ok
+}
+func ToMethod(n Node) (*ClassMethod, bool) { u, ok := n.(*ClassMethod); return u, ok }
 func ToFreeValue(n Node) (*Parameter, bool) {
 	u, ok := n.(*Parameter)
 	if ok && u.IsFreeValue {
@@ -19,21 +31,85 @@ func ToFreeValue(n Node) (*Parameter, bool) {
 func ToLazyInstruction(n any) (*LazyInstruction, bool) { u, ok := n.(*LazyInstruction); return u, ok }
 
 // value
-func ToConst(v Instruction) (*ConstInst, bool)     { c, ok := v.(*ConstInst); return c, ok }
-func IsConst(v Instruction) bool                   { _, ok := ToConst(v); return ok }
-func ToPhi(v Instruction) (*Phi, bool)             { p, ok := v.(*Phi); return p, ok }
-func ToExternLib(v Instruction) (*ExternLib, bool) { p, ok := v.(*ExternLib); return p, ok }
-func ToParameter(v Instruction) (*Parameter, bool) { p, ok := v.(*Parameter); return p, ok }
-func ToUndefined(v Instruction) (*Undefined, bool) { p, ok := v.(*Undefined); return p, ok }
+func IsConst(v Instruction) bool { _, ok := ToConst(v); return ok }
+func ToConst(v Instruction) (*ConstInst, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToConst(lz.Self())
+	}
+	c, ok := v.(*ConstInst)
+	return c, ok
+}
 
-func ToBinOp(v Instruction) (*BinOp, bool) { c, ok := v.(*BinOp); return c, ok }
-func ToUnOp(v Instruction) (*UnOp, bool)   { c, ok := v.(*UnOp); return c, ok }
+func ToPhi(v Instruction) (*Phi, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToPhi(lz.Self())
+	}
+	p, ok := v.(*Phi)
+	return p, ok
+}
 
-func ToCall(v Instruction) (*Call, bool) { p, ok := v.(*Call); return p, ok }
-func ToMake(v Instruction) (*Make, bool) { p, ok := v.(*Make); return p, ok }
+func ToExternLib(v Instruction) (*ExternLib, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToExternLib(lz.Self())
+	}
+	p, ok := v.(*ExternLib)
+	return p, ok
+}
 
-// memory
-func ToObject(v Instruction) (*Make, bool) { o, ok := v.(*Make); return o, ok }
+func ToParameter(v Instruction) (*Parameter, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToParameter(lz.Self())
+	}
+	p, ok := v.(*Parameter)
+	return p, ok
+}
+func ToReturn(v Instruction) (*Return, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToReturn(lz.Self())
+	}
+	ret, ok := v.(*Return)
+	return ret, ok
+}
+
+func ToUndefined(v Instruction) (*Undefined, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToUndefined(lz.Self())
+	}
+	p, ok := v.(*Undefined)
+	return p, ok
+}
+
+func ToBinOp(v Instruction) (*BinOp, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToBinOp(lz.Self())
+	}
+	c, ok := v.(*BinOp)
+	return c, ok
+}
+
+func ToUnOp(v Instruction) (*UnOp, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToUnOp(lz.Self())
+	}
+	c, ok := v.(*UnOp)
+	return c, ok
+}
+
+func ToCall(v Instruction) (*Call, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToCall(lz.Self())
+	}
+	p, ok := v.(*Call)
+	return p, ok
+}
+
+func ToMake(v Instruction) (*Make, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToMake(lz.Self())
+	}
+	p, ok := v.(*Make)
+	return p, ok
+}
 
 // type cover
 

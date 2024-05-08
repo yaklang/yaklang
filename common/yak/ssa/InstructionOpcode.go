@@ -35,6 +35,7 @@ const (
 )
 
 var SSAOpcode2Name = map[Opcode]string{
+	SSAOpcodeUnKnow:          "UnKnow",
 	SSAOpcodeAssert:          "Assert",
 	SSAOpcodeBasicBlock:      "BasicBlock",
 	SSAOpcodeBinOp:           "BinOp",
@@ -114,9 +115,15 @@ func CreateInstruction(op Opcode) Instruction {
 				anValue: NewValue(),
 			},
 		}
+	case SSAOpcodeFreeValue:
+		return &Parameter{
+			anValue:     NewValue(),
+			IsFreeValue: true,
+		}
 	case SSAOpcodeParameter:
 		return &Parameter{
-			anValue: NewValue(),
+			anValue:     NewValue(),
+			IsFreeValue: false,
 		}
 	case SSAOpcodeExternLib:
 		return &ExternLib{

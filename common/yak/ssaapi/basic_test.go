@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func TestYaklangBasic_Const(t *testing.T) {
@@ -129,9 +128,9 @@ println(a)
 	}
 	var traceToCall_via_if bool
 	prog.Ref("a").ForEach(func(value *Value) {
-		if _, ok := value.node.(*ssa.Phi); ok {
+		if value.IsPhi() {
 			value.GetUsers().ForEach(func(value *Value) {
-				if _, ok := value.node.(*ssa.Call); ok {
+				if value.IsCall() {
 					traceToCall_via_if = true
 					log.Infof("a's deep uses include: %v", value.String())
 				}

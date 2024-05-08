@@ -80,6 +80,7 @@ type MemberCall interface {
 	GetStringMember(string) (Value, bool)
 	DeleteMember( /*key*/ Value)   // delete by key
 	GetAllMember() map[Value]Value // map[key]value
+	ForEachMember(func(k Value, v Value) bool)
 
 	// ReplaceMember( /* key */ Value /* value */, Value) // replace old-value with new-value
 
@@ -289,8 +290,6 @@ type Phi struct {
 	Edge []Value // edge[i] from phi.Block.Preds[i]
 	//	what instruction create this control-flow merge?
 	// branch *Instruction // loop or if :
-	// for build
-	create bool // for ReadVariable method
 }
 
 var (
@@ -519,7 +518,7 @@ var (
 // ----------- SideEffect
 type SideEffect struct {
 	anValue
-	CallSite *Call // call instruction
+	CallSite Value // call instruction
 	Value    Value // modify to this value
 }
 
