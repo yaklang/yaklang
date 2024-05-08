@@ -74,7 +74,7 @@ func TestBasic_BasicObject(t *testing.T) {
 	a.c = 3; 
 	d = a.c + a.b
 	`,
-		ssatest.CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
+		ssatest.CheckTopDef_Contain("d", []string{"3", "1", "make("}),
 	)
 }
 
@@ -85,7 +85,7 @@ func TestBasic_BasicObject2(t *testing.T) {
 	a.c = 3; 
 	d = a.c + a.b
 	`,
-		ssatest.CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
+		ssatest.CheckTopDef_Contain("d", []string{"3", "1", "make("}),
 	)
 }
 

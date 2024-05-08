@@ -1,10 +1,10 @@
 package ssaapi
 
 import (
-	"github.com/gobwas/glob"
 	"regexp"
 	"sort"
 
+	"github.com/gobwas/glob"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,6 +13,7 @@ import (
 
 type Program struct {
 	Program *ssa.Program
+	DBCache *ssa.Cache
 	config  *config
 }
 
@@ -21,10 +22,17 @@ func (p *Program) GetNames() []string {
 }
 
 func NewProgram(prog *ssa.Program, config *config) *Program {
-	return &Program{
+	p := &Program{
 		Program: prog,
 		config:  config,
 	}
+
+	if config.DatabaseProgramName == "" {
+		p.DBCache = prog.Cache
+	} else {
+		p.DBCache = ssa.GetCacheFromPool(config.DatabaseProgramName)
+	}
+	return p
 }
 
 func (p *Program) Show() *Program {
@@ -66,7 +74,7 @@ func (p *Program) GetInstructionById(id int64) ssa.Instruction {
 
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
-		p.Program.GetInstructionsByName(name),
+		p.DBCache.GetByVariable(name),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return NewValue(v), true
@@ -88,7 +96,7 @@ func (g *Program) GlobRefRaw(rule string) Values {
 
 func (p *Program) GlobRef(r glob.Glob) Values {
 	return lo.FilterMap(
-		p.Program.GetInstructionsByGlob(r),
+		p.DBCache.GetByVariableGlob(r),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return NewValue(v), true
@@ -110,7 +118,7 @@ func (p *Program) RegexpRefRaw(rule string) Values {
 
 func (p *Program) RegexpRef(r *regexp.Regexp) Values {
 	return lo.FilterMap(
-		p.Program.GetInstructionsByRegexp(r),
+		p.DBCache.GetByVariableRegexp(r),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return NewValue(v), true
