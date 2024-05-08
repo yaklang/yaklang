@@ -36,8 +36,8 @@ type config struct {
 
 func defaultConfig() *config {
 	return &config{
-		language:                   Yak,
-		Builder:                    LanguageBuilders[Yak],
+		language:                   "",
+		Builder:                    nil,
 		code:                       nil,
 		fs:                         filesys.NewLocalFs(),
 		entryFile:                  make([]string, 0),
@@ -154,8 +154,8 @@ func ParseProject(fs filesys.FileSystem, opts ...Option) ([]*Program, error) {
 		opt(config)
 	}
 	config.fs = fs
-	if config.Builder == nil {
-		return nil, utils.Errorf("not support language %s", config.language)
+	if config.fs == nil {
+		return nil, utils.Errorf("need set filesystem")
 	}
 	ret, err := config.parseProject()
 	return ret, err
@@ -178,9 +178,6 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)
-	}
-	if config.Builder == nil {
-		return nil, utils.Errorf("not support language %s", config.language)
 	}
 	config.code = input
 
@@ -209,9 +206,6 @@ func FromDatabase(programName string, opts ...Option) (*Program, error) {
 		opt(config)
 	}
 	config.DatabaseProgramName = programName
-	if config.Builder == nil {
-		return nil, utils.Errorf("not support language %s", config.language)
-	}
 	return config.fromDatabase()
 }
 
