@@ -3,6 +3,7 @@ package filesys
 import (
 	"embed"
 	"io/fs"
+	"os"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -76,4 +77,59 @@ func TestFS_Chains(t *testing.T) {
 	if count != 4 {
 		t.Fatalf("count[%d] != 4", count)
 	}
+}
+
+func TestFS_LocalFS(t *testing.T) {
+	check := func(want int, opts ...Option) {
+		count := 0
+		opts = append(opts, WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			count++
+			log.Infof("match: %v", s)
+			return nil
+		}))
+		err := Recursive(
+			"testdata",
+			opts...,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Fatalf("count[%d] != %d", count, want)
+		}
+	}
+
+	t.Run("empty local fs", func(t *testing.T) {
+		check(7,
+			WithFileSystem(NewLocalFs()),
+		)
+	})
+
+	t.Run("local fs with current dir .", func(t *testing.T) {
+		check(7,
+			WithFileSystem(NewLocalFsWithPath(".")),
+		)
+	})
+
+	t.Run("local fs with absolute path", func(t *testing.T) {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(7,
+			WithFileSystem(NewLocalFsWithPath(currentDir)),
+		)
+	})
+
+	t.Run("use state skip all directory ", func(t *testing.T) {
+		check(1,
+			WithFileSystem(NewLocalFs()),
+			WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+				if isDir {
+					return SkipDir
+				}
+				return nil
+			}),
+		)
+	})
 }
