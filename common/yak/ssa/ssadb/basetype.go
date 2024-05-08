@@ -10,15 +10,31 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-type Int64Map map[int64]int64
+// type Int64Map map[int64]int64
+type item struct {
+	key, value int64
+}
+
+type Int64Map []item
+
+func (m *Int64Map) Append(key, value int64) {
+	*m = append(*m, item{key, value})
+}
+
+func (m Int64Map) ForEach(fn func(key, value int64)) {
+	for _, item := range m {
+		fn(item.key, item.value)
+	}
+}
 
 func (m *Int64Map) Scan(value any) error {
 	if m == nil {
 		return nil
 	}
 	val := codec.AnyToString(value)
-	nm := make(map[int64]int64)
-	for _, sub := range strings.Split(val, ",") {
+	subVal := strings.Split(val, ",")
+	nm := make([]item, 0, len(subVal))
+	for _, sub := range subVal {
 		subVals := strings.Split(sub, ":")
 		if len(subVals) != 2 {
 			continue
@@ -31,7 +47,7 @@ func (m *Int64Map) Scan(value any) error {
 		if err != nil {
 			continue
 		}
-		nm[nmKey] = nmVal
+		nm = append(nm, item{nmKey, nmVal})
 	}
 	*m = nm
 	return nil
@@ -39,9 +55,9 @@ func (m *Int64Map) Scan(value any) error {
 
 func (m Int64Map) Value() (driver.Value, error) {
 	var parts []string
-	for k, v := range m {
-		parts = append(parts, strconv.FormatInt(k, 10)+":"+strconv.FormatInt(v, 10))
-	}
+	m.ForEach(func(key, value int64) {
+		parts = append(parts, strconv.FormatInt(key, 10)+":"+strconv.FormatInt(value, 10))
+	})
 	return strings.Join(parts, ","), nil
 }
 
