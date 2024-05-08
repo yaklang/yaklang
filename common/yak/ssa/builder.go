@@ -28,7 +28,7 @@ type FunctionBuilder struct {
 	_editor *memedit.MemEditor
 
 	// disable free-value
-	UnSupportClosure bool
+	SupportClosure bool
 
 	RefParameter map[string]struct{}
 
@@ -73,7 +73,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		// sub scope
 		// b.parentScope = parent.CurrentBlock.ScopeTable
 		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
-		b.UnSupportClosure = parent.UnSupportClosure
+		b.SupportClosure = parent.SupportClosure
 		b.MarkedThisObject = parent.MarkedThisObject
 	}
 
@@ -100,7 +100,7 @@ func (b *FunctionBuilder) IsBlockFinish() bool {
 // new function
 func (b *FunctionBuilder) NewFunc(name string) *Function {
 	var f *Function
-	if b.UnSupportClosure {
+	if b.SupportClosure {
 		f = b.Package.NewFunctionWithParent(name, b.Function)
 	} else {
 		f = b.Package.NewFunctionWithParent(name, nil)

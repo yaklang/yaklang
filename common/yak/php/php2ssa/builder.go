@@ -22,7 +22,6 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
-	b.UnSupportClosure = true
 	build := builder{
 		constMap:        make(map[string]ssa.Value),
 		FunctionBuilder: b,

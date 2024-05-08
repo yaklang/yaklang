@@ -20,6 +20,7 @@ func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) err
 	if err != nil {
 		return err
 	}
+	builder.SupportClosure = true
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 		lmap:            make(map[string]struct{}),
