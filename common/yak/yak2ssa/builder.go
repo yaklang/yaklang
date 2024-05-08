@@ -19,6 +19,7 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
+	b.SupportClosure = true
 	astBuilder := &astbuilder{
 		FunctionBuilder: b,
 	}
