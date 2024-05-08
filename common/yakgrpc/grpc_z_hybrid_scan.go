@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -202,6 +203,14 @@ func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybr
 	}
 	var data []*ypb.HybridScanTask
 	data = lo.Map(tasks, func(item *yakit.HybridScanTask, index int) *ypb.HybridScanTask {
+
+		var firstTarget = "未知目标"
+		var targets []*HybridScanTarget
+		err = json.Unmarshal([]byte(item.Targets), &targets)
+		if err == nil && len(targets) > 0 {
+			firstTarget = utils.ExtractHost(targets[0].Url)
+		}
+
 		return &ypb.HybridScanTask{
 			Id:              int64(item.ID),
 			CreatedAt:       item.CreatedAt.Unix(),
@@ -213,7 +222,7 @@ func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybr
 			TotalTasks:      item.TotalTasks,
 			FinishedTasks:   item.FinishedTasks,
 			FinishedTargets: item.FinishedTargets,
-			FirstTarget:     item.Targets,
+			FirstTarget:     firstTarget,
 			Reason:          item.Reason,
 		}
 	})

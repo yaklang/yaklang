@@ -129,19 +129,24 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		taskRecorder.Reason = "no plugin loaded"
 		return utils.Error("no plugin loaded")
 	}
+	pluginBytes, err := json.Marshal(pluginNames)
+	if err != nil {
+		return utils.Errorf("marshal plugin failed: %s", err)
+	}
+	taskRecorder.Plugins = string(pluginBytes)
 
 	// targetChan 的大小如何估算？目标数量（百万为单位） * 目标大小字节数为 M 数
 	// 即，100w 个目标，每个目标占用大小为 100 字节，那么都在内存中，开销大约为 100M
 	// 这个开销在内存中处理绰绰有余，但是在网络传输中，这个开销就很大了
 	var targetCached []*HybridScanTarget
-	var setHybridScanTarget sync.Once
 	for targetInput := range targetChan {
-		setHybridScanTarget.Do(func() {
-			taskRecorder.Targets = utils.ExtractHost(targetInput.Url)
-			quickSave()
-		})
 		targetCached = append(targetCached, targetInput)
 	}
+	targetsBytes, err := json.Marshal(targetCached)
+	if err != nil {
+		return utils.Errorf("marshal targets failed: %s", err)
+	}
+	taskRecorder.Targets = string(targetsBytes)
 
 	statusManager := newHybridScanStatusManager(taskId, len(targetCached), len(pluginNames))
 
