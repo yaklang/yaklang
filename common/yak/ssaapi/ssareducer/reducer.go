@@ -3,6 +3,7 @@ package ssareducer
 import (
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
@@ -30,18 +31,27 @@ func ReducerCompile(base string, opts ...Option) error {
 	for _, entryFile := range c.entryFiles {
 		info, err := c.fs.Stat(entryFile)
 		if err != nil {
-			relPath, err := filepath.Rel(base, entryFile)
-			if err != nil {
-				return utils.Wrapf(err, "entry: %v (rel: %v) is not a sub-dir or sub-file for %v", entryFile, relPath, base)
+			if strings.HasPrefix(entryFile, base) {
+				entryFile = strings.TrimPrefix(entryFile, base)
+			} else if _, ok := c.fs.(filesys.LocalFs); ok {
+				relPath, err := filepath.Rel(base, entryFile)
+				if err != nil {
+					return utils.Wrapf(err, "entry: %v (rel: %v) is not a sub-dir or sub-file for %v", entryFile, relPath, base)
+				}
+				log.Infof("convert %v to %v (base: %#v)", entryFile, relPath, base)
+				entryFile = relPath
+			} else {
+				return utils.Wrapf(err, "entry: %v is not a sub-dir or sub-file for %v: FS: %T", entryFile, base, c.fs)
 			}
-			entryFile = relPath
 		} else {
+			log.Infof("c.fs.Stat: %v is existed...", entryFile)
 			if info.IsDir() {
 				log.Warnf("entry [%v] cannot be as directory...", entryFile)
 				continue
 			}
 		}
 
+		log.Infof("start to open entry file: %v", entryFile)
 		fd, err := c.fs.Open(entryFile)
 		if err != nil {
 			return utils.Wrapf(err, "find entryfile failed: %v", entryFile)

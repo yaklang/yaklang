@@ -46,9 +46,16 @@ func (c *config) parseProject() ([]*Program, error) {
 	}
 	ret := make([]*Program, 0)
 
+	localpath := c.fs.GetLocalFSPath()
+	if localpath == "" {
+		localpath = "."
+	}
+
+	log.Infof("parse project in fs: %T, localpath: %v", c.fs, localpath)
+
 	// parse project
 	err := ssareducer.ReducerCompile(
-		".", // base
+		localpath, // base
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithFileFilter(c.Builder.FilterFile),
 		ssareducer.WithEntryFiles(c.entryFile...),
