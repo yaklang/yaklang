@@ -1610,7 +1610,7 @@ func checkType3(param, originValue, originResponse, IsNumeric) {
         string(nBody),
     ))
 
-    yakit_output(http.dump(n1rsp.ResponseRaw))
+    yakit_output(http.dump(n1rsp.ResponseRaw)~)
     risk.NewRisk(
         res.Url,
         risk.title(sprintf(
