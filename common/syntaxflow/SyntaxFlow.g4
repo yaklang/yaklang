@@ -31,12 +31,15 @@ filterExpr
     | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
     | filterExpr '?{' conditionExpression '}'               # OptionalFilter
     | filterExpr '->' filterExpr                            # NextFilter
+    | filterExpr '#>' filterExpr                            # DefFilter
     | filterExpr '-->' filterExpr                           # DeepNextFilter
+    | filterExpr '#->' filterExpr                           # TopDefFilter
     | filterExpr '-{' (recursiveConfig)? '}->' filterExpr     # ConfiggedDeepNextFilter
+    | filterExpr '#{' (recursiveConfig)? '}->' filterExpr     # ConfiggedTopDefFilter
     ;
 
 acutalParamFilter
-    : ('#' | '#{' (recursiveConfig)? '}' )? filterExpr ','?   # NamedParam
+    : ('#>' | '#{' (recursiveConfig)? '}' )? filterExpr ','?   # NamedParam
     | ','                                                   # EmptyParam
     ;
 
@@ -96,6 +99,8 @@ ConditionStart: '?{';
 DeepNextStart: '-{';
 DeepNextEnd: '}->';
 TopDefStart: '#{';
+DefStart: '#>';
+TopDef: '#->';
 Gt: '>';
 Dot: '.';
 Lt: '<';

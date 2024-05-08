@@ -36,10 +36,15 @@ func TestSyntaxInOne(t *testing.T) {
 		"/(?i)runtime/.exec(,,,#*exec,,) as $a",
 		"/(?i)runtime/.exec(,,,#*exec,,,) as $a",
 		"a->b",
+		"a#>b",
 		"a-->b",
+		"a#->b",
 		"a->b->c",
+		"a#>b#>c",
 		"a-->b.exec()-->c",
+		"a#->b.exec()#->c",
 		"a-{}->b",
+		"a#{}->b",
 		"system(#get)",
 		"system(#*)",
 		"system(#a*get)",
@@ -49,8 +54,11 @@ func TestSyntaxInOne(t *testing.T) {
 		"system(#{}*a)",
 		"system(#{}*)",
 		"a-{depth:1}->b",
+		"a#{depth:1}->b",
 		"a-{depth:1, " + "\nkey:value}->b",
+		"a#{depth:1, " + "\nkey:value}->b",
 		"a-{depth:1, " + "\nkey:value,}->b",
+		"a#{depth:1, " + "\nkey:value,}->b",
 	} {
 		checkSyntax(i, t)
 	}
