@@ -6,11 +6,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
+func NewPhi(block *BasicBlock, variable string) *Phi {
 	p := &Phi{
 		anValue: NewValue(),
 		Edge:    make([]Value, 0, len(block.Preds)),
-		create:  create,
 	}
 	p.SetName(variable)
 	p.SetBlock(block)

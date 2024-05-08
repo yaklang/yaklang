@@ -39,6 +39,7 @@ type IrCode struct {
 	Name             string `json:"name"`
 	VerboseName      string `json:"verbose_name"`
 	ShortVerboseName string `json:"short_verbose_name"`
+	String           string `json:"string"`
 
 	// any IrCode in one block inner one  function
 	CurrentBlock    int64 `json:"current_block"`
@@ -47,9 +48,11 @@ type IrCode struct {
 	// FunctionDefs
 	IsFunction       bool       `json:"is_function"`
 	FormalArgs       Int64Slice `json:"formal_args" gorm:"type:text"`
+	FreeValues       Int64Slice `json:"free_values" gorm:"type:text"`
+	MemberCallArgs   Int64Slice `json:"formal_member_call_args" gorm:"type:text"`
+	SideEffects      Int64Slice `json:"side_effects" gorm:"type:text"`
 	IsVariadic       bool       `json:"is_variadic"`
 	ReturnCodes      Int64Slice `json:"return_codes" gorm:"type:text"`
-	SideEffects      Int64Slice `json:"side_effects" gorm:"type:text"`
 	IsExternal       bool       `json:"is_external"`
 	CodeBlocks       Int64Slice `json:"code_blocks" gorm:"type:text"`
 	EnterBlock       int64      `json:"enter_block"`
@@ -81,18 +84,8 @@ type IrCode struct {
 	MaskedCodes Int64Slice `json:"masked_codes" gorm:"type:text"`
 	IsMasked    bool       `json:"is_masked"`
 
-	// Call instruction
-	IsCalled       bool       `json:"is_called"`
-	Method         int64      `json:"method"`
-	ActualArgs     Int64Slice `json:"actual_args" gorm:"type:text"`
-	BingDings      Int64Map   `json:"bing_dings" gorm:"type:text"`
-	ArgumentMember Int64Map   `json:"argument_member" gorm:"type:text"`
-
 	// Variable
 	Variable StringSlice `json:"variable" gorm:"type:text"`
-
-	// Constant
-	ConstantValue string `json:"constant_value" gorm:"type:text"`
 
 	// compile hash means: hash[ (file-content)+(program-name)+(package-name)+(program-index) ]
 	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
@@ -112,6 +105,7 @@ func RequireIrCode(db *gorm.DB, program string) (uint, *IrCode) {
 		db.AutoMigrate(&IrCode{})
 	})
 	db = db.Model(&IrCode{})
+	// log.Infof("RequireIrCode: %v", program)
 	// save new ircode
 	ircode := emptyIrCode()
 	ircode.ProgramName = program
@@ -145,6 +139,8 @@ func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
 
 func DeleteProgram(db *gorm.DB, program string) {
 	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
+	db.Model(&IrVariable{}).Where("program_name = ?", program).Unscoped().Delete(&IrVariable{})
+	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrScopeNode{})
 }
 
 func (r *IrCode) IsEmptySourceCodeHash() bool {

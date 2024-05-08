@@ -67,6 +67,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	}
 
 	switch ins := v.node.(type) {
+	case *ssa.LazyInstruction:
+		v.node = ins.Self()
+		return v.getBottomUses(actx, opt...)
 	case *ssa.Phi:
 		// enter function via phi
 		if !actx.ThePhiShouldBeVisited(v) {
@@ -195,8 +198,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if currentCallValue == nil {
 				return fallback()
 			}
-			call := currentCallValue.node.(*ssa.Call)
-			fun, ok := call.Method.(*ssa.Function)
+			call, ok := ssa.ToCall(currentCallValue.node)
+			fun, ok := ssa.ToFunction(call.Method)
 			if !ok {
 				log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
 				return fallback()

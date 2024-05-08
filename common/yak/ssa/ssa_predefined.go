@@ -201,6 +201,10 @@ func (n *anValue) GetAllMember() map[Value]Value {
 	return n.member.GetMap()
 }
 
+func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
+	n.member.ForEach(fn)
+}
+
 func (n *anValue) String() string { return "" }
 
 // has/get user and value

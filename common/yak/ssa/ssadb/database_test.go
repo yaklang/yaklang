@@ -52,7 +52,6 @@ func TestBuild(t *testing.T) {
 
 	spew.Dump(irCode)
 	require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], irCode.OpcodeName)
-	require.Equal(t, "1", irCode.ConstantValue)
 
 	v := irCode.Variable
 	sort.Strings(v)
@@ -85,7 +84,6 @@ func TestBuild_Multiple_Program(t *testing.T) {
 
 		spew.Dump(irCode)
 		require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], irCode.OpcodeName)
-		require.Equal(t, want, irCode.ConstantValue)
 	}
 
 	check(`a = 1`, "1")

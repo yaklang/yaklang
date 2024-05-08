@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,6 +32,20 @@ var (
 	_ Value       = (*LazyInstruction)(nil)
 	_ User        = (*LazyInstruction)(nil)
 )
+
+func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
+	var zero T
+	lz, err := NewLazyInstruction(id)
+	if err != nil {
+		return zero, err
+	}
+
+	inst, ok := Cover(lz)
+	if !ok {
+		return zero, utils.Errorf("BUG: lazyInstruction cover failed")
+	}
+	return inst, nil
+}
 
 // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(id int64) (Value, error) {
@@ -83,16 +98,25 @@ func (lz *LazyInstruction) Self() Value {
 
 // create real-instruction from lazy-instruction
 func (lz *LazyInstruction) check() {
-	if lz.Instruction != nil {
-		return
+	if lz.Instruction == nil {
+		inst := CreateInstruction(Opcode(lz.GetOpcode()))
+		if inst == nil {
+			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
+			return
+		}
+		lz.Instruction = inst
 	}
-	lz.Instruction = lz.cache.IrCodeToInstruction(lz.ir)
-	if value, ok := ToValue(lz.Instruction); ok {
-		lz.Value = value
+	if lz.Value == nil {
+		if value, ok := ToValue(lz.Instruction); ok {
+			lz.Value = value
+		}
 	}
-	if user, ok := ToUser(lz.Instruction); ok {
-		lz.User = user
+	if lz.User == nil {
+		if user, ok := ToUser(lz.Instruction); ok {
+			lz.User = user
+		}
 	}
+	lz.cache.IrCodeToInstruction(lz.Instruction, lz.ir)
 }
 
 func (lz *LazyInstruction) ShouldSave() bool {
@@ -107,76 +131,369 @@ func (lz *LazyInstruction) ShouldSave() bool {
 func (lz *LazyInstruction) GetId() int64 { return lz.id }
 
 // just use IrCode
-func (lz *LazyInstruction) GetName() string             { return lz.ir.Name }
-func (lz *LazyInstruction) GetVerboseName() string      { return lz.ir.VerboseName }
-func (lz *LazyInstruction) GetShortVerboseName() string { return lz.ir.ShortVerboseName }
-func (lz *LazyInstruction) IsExtern() bool              { return lz.ir.IsExternal }
-func (lz *LazyInstruction) GetOpcode() Opcode           { return Opcode(lz.ir.Opcode) }
+func (lz *LazyInstruction) GetName() string {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return ""
+	}
+	return lz.ir.Name
+}
+func (lz *LazyInstruction) GetVerboseName() string {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return ""
+	}
+	return lz.ir.VerboseName
+}
+func (lz *LazyInstruction) GetShortVerboseName() string {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return ""
+	}
+	return lz.ir.ShortVerboseName
+}
+func (lz *LazyInstruction) IsExtern() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return lz.ir.IsExternal
+}
+func (lz *LazyInstruction) GetOpcode() Opcode {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return SSAOpcodeUnKnow
+	}
+	return Opcode(lz.ir.Opcode)
+}
+func (lz *LazyInstruction) String() string {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return ""
+	}
+	return lz.ir.String
+}
 
-func (lz *LazyInstruction) GetFunc() *Function     { lz.check(); return lz.Instruction.GetFunc() }
-func (lz *LazyInstruction) SetFunc(f *Function)    { lz.check(); lz.Instruction.SetFunc(f) }
-func (lz *LazyInstruction) GetBlock() *BasicBlock  { lz.check(); return lz.Instruction.GetBlock() }
-func (lz *LazyInstruction) SetBlock(b *BasicBlock) { lz.check(); lz.Instruction.SetBlock(b) }
-func (lz *LazyInstruction) GetProgram() *Program   { lz.check(); return lz.Instruction.GetProgram() }
-func (lz *LazyInstruction) SetName(name string)    { lz.check(); lz.Instruction.SetName(name) }
+func (lz *LazyInstruction) HasUsers() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return len(lz.ir.Users) == 0
+}
+func (lz *LazyInstruction) HasValues() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return len(lz.ir.Defs) == 0
+}
+func (lz *LazyInstruction) IsMember() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return lz.ir.IsObjectMember
+}
+func (lz *LazyInstruction) IsObject() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return lz.ir.IsObject
+}
+func (lz *LazyInstruction) IsUndefined() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return lz.ir.Opcode == int64(SSAOpcodeUndefined)
+}
+
+func (lz *LazyInstruction) GetFunc() *Function {
+	lz.check()
+	if lz.Instruction == nil {
+		return nil
+	}
+	return lz.Instruction.GetFunc()
+}
+
+func (lz *LazyInstruction) SetFunc(f *Function) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetFunc(f)
+}
+
+func (lz *LazyInstruction) GetBlock() *BasicBlock {
+	lz.check()
+	if lz.Instruction == nil {
+		return nil
+	}
+	return lz.Instruction.GetBlock()
+}
+
+func (lz *LazyInstruction) SetBlock(b *BasicBlock) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetBlock(b)
+}
+
+func (lz *LazyInstruction) GetProgram() *Program {
+	lz.check()
+	if lz.Instruction == nil {
+		return nil
+	}
+	return lz.Instruction.GetProgram()
+}
+
+func (lz *LazyInstruction) SetName(name string) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetName(name)
+}
+
 func (lz *LazyInstruction) SetVerboseName(name string) {
 	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
 	lz.Instruction.SetVerboseName(name)
 }
 
-func (lz *LazyInstruction) SetId(id int64) { lz.check(); lz.Instruction.SetId(id) }
+func (lz *LazyInstruction) SetId(id int64) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetId(id)
+}
 
-func (lz *LazyInstruction) GetRange() *Range { lz.check(); return lz.Instruction.GetRange() }
+func (lz *LazyInstruction) GetRange() *Range {
+	lz.check()
+	if lz.Instruction == nil {
+		return nil
+	}
+	return lz.Instruction.GetRange()
+}
 
-func (lz *LazyInstruction) SetRange(r *Range) { lz.check(); lz.Instruction.SetRange(r) }
+func (lz *LazyInstruction) SetRange(r *Range) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetRange(r)
+}
 
-func (lz *LazyInstruction) SetExtern(extern bool) { lz.check(); lz.Instruction.SetExtern(extern) }
+func (lz *LazyInstruction) SetExtern(extern bool) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetExtern(extern)
+}
 
-func (lz *LazyInstruction) SelfDelete() { lz.check(); lz.Instruction.SelfDelete() }
+func (lz *LazyInstruction) SelfDelete() {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SelfDelete()
+}
 
-func (lz *LazyInstruction) AddMask(v Value)               { lz.check(); lz.Value.AddMask(v) }
-func (lz *LazyInstruction) AddMember(v1 Value, v2 Value)  { lz.check(); lz.Value.AddMember(v1, v2) }
-func (lz *LazyInstruction) AddVariable(v *Variable)       { lz.check(); lz.Value.AddVariable(v) }
-func (lz *LazyInstruction) DeleteMember(v Value)          { lz.check(); lz.Value.DeleteMember(v) }
-func (lz *LazyInstruction) GetAllMember() map[Value]Value { lz.check(); return lz.Value.GetAllMember() }
+func (lz *LazyInstruction) AddMask(v Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.AddMask(v)
+}
+
+func (lz *LazyInstruction) AddMember(v1 Value, v2 Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.AddMember(v1, v2)
+}
+
+func (lz *LazyInstruction) AddVariable(v *Variable) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.AddVariable(v)
+}
+
+func (lz *LazyInstruction) DeleteMember(v Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.DeleteMember(v)
+}
+
+func (lz *LazyInstruction) ForEachMember(fn func(Value, Value) bool) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.ForEachMember(fn)
+}
+
+func (lz *LazyInstruction) GetAllMember() map[Value]Value {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetAllMember()
+}
+
 func (lz *LazyInstruction) GetAllVariables() map[string]*Variable {
 	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
 	return lz.Value.GetAllVariables()
 }
+
 func (lz *LazyInstruction) GetIndexMember(i int) (Value, bool) {
 	lz.check()
+	if lz.Value == nil {
+		return nil, false
+	}
 	return lz.Value.GetIndexMember(i)
 }
-func (lz *LazyInstruction) GetKey() Value                   { lz.check(); return lz.Value.GetKey() }
-func (lz *LazyInstruction) GetLastVariable() *Variable      { lz.check(); return lz.Value.GetLastVariable() }
-func (lz *LazyInstruction) GetMask() []Value                { lz.check(); return lz.Value.GetMask() }
-func (lz *LazyInstruction) GetMember(v Value) (Value, bool) { lz.check(); return lz.Value.GetMember(v) }
-func (lz *LazyInstruction) GetObject() Value                { lz.check(); return lz.Value.GetObject() }
+
+func (lz *LazyInstruction) GetKey() Value {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetKey()
+}
+
+func (lz *LazyInstruction) GetLastVariable() *Variable {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetLastVariable()
+}
+
+func (lz *LazyInstruction) GetMask() []Value {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetMask()
+}
+
+func (lz *LazyInstruction) GetMember(v Value) (Value, bool) {
+	lz.check()
+	if lz.Value == nil {
+		return nil, false
+	}
+	return lz.Value.GetMember(v)
+}
+
+func (lz *LazyInstruction) GetObject() Value {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetObject()
+}
+
 func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
 	lz.check()
+	if lz.Value == nil {
+		return nil, false
+	}
 	return lz.Value.GetStringMember(n)
 }
-func (lz *LazyInstruction) GetType() Type     { lz.check(); return lz.Value.GetType() }
-func (lz *LazyInstruction) GetUsers() Users   { lz.check(); return lz.Value.GetUsers() }
-func (lz *LazyInstruction) GetValues() Values { lz.check(); return lz.Value.GetValues() }
+
+func (lz *LazyInstruction) GetType() Type {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetType()
+}
+
+func (lz *LazyInstruction) GetUsers() Users {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetUsers()
+}
+
+func (lz *LazyInstruction) GetValues() Values {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetValues()
+}
+
 func (lz *LazyInstruction) GetVariable(n string) *Variable {
 	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
 	return lz.Value.GetVariable(n)
 }
-func (lz *LazyInstruction) HasUsers() bool    { lz.check(); return lz.Value.HasUsers() }
-func (lz *LazyInstruction) HasValues() bool   { lz.check(); return lz.Value.HasValues() }
-func (lz *LazyInstruction) IsMember() bool    { lz.check(); return lz.Value.IsMember() }
-func (lz *LazyInstruction) IsObject() bool    { lz.check(); return lz.Value.IsObject() }
-func (lz *LazyInstruction) IsUndefined() bool { lz.check(); return lz.Value.IsUndefined() }
-func (lz *LazyInstruction) Masked() bool      { lz.check(); return lz.Value.Masked() }
+
+func (lz *LazyInstruction) Masked() bool {
+	lz.check()
+	if lz.Value == nil {
+		return false
+	}
+	return lz.Value.Masked()
+}
+
 func (lz *LazyInstruction) NewError(e ErrorKind, t ErrorTag, msg string) {
 	lz.check()
+	if lz.Value == nil {
+		return
+	}
 	lz.Value.NewError(e, t, msg)
 }
-func (lz *LazyInstruction) SetKey(v Value)    { lz.check(); lz.Value.SetKey(v) }
-func (lz *LazyInstruction) SetObject(v Value) { lz.check(); lz.Value.SetObject(v) }
-func (lz *LazyInstruction) SetType(t Type)    { lz.check(); lz.Value.SetType(t) }
 
-// func (lz *LazyInstruction) String() string            { lz.check(); return "lazy:" + lz.Value.String() }
-func (lz *LazyInstruction) String() string            { lz.check(); return lz.Value.String() }
-func (lz *LazyInstruction) ReplaceValue(v1, v2 Value) { lz.check(); lz.User.ReplaceValue(v1, v2) }
+func (lz *LazyInstruction) SetKey(v Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.SetKey(v)
+}
+
+func (lz *LazyInstruction) SetObject(v Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.SetObject(v)
+}
+
+func (lz *LazyInstruction) SetType(t Type) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.SetType(t)
+}
+
+func (lz *LazyInstruction) ReplaceValue(v1, v2 Value) {
+	lz.check()
+	if lz.User == nil {
+		return
+	}
+	lz.User.ReplaceValue(v1, v2)
+}
