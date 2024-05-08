@@ -4,42 +4,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 )
 
-type QueryUploadRiskOnlineRequest struct {
+type QueryHTTPFlowOnlineRequest struct {
 	ProjectName string `json:"projectName"`
 	Content     []byte `json:"content"`
 }
 
-func (s *OnlineClient) UploadRiskToOnlineWithToken(ctx context.Context, req *ypb.UploadRiskToOnlineRequest, risk []byte) error {
-	err := s.UploadRiskToOnline(ctx,
-		req.Token,
-		req.ProjectName,
-		risk,
-	)
-	if err != nil {
-		log.Errorf("upload risk to online failed: %s", err.Error())
-		return utils.Errorf("upload risk to online failed: %s", err.Error())
-	}
-
-	return nil
-}
-
-func (s *OnlineClient) UploadRiskToOnline(ctx context.Context,
-	token string, projectName string, content []byte) error {
-	urlIns, err := url.Parse(s.genUrl("/api/risk/upload"))
+func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, token, projectName string, content []byte) error {
+	urlIns, err := url.Parse(s.genUrl("/api/httpflow/upload"))
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)
 	}
-	raw, err := json.Marshal(QueryUploadRiskOnlineRequest{
-		projectName,
-		content,
+	raw, err := json.Marshal(QueryHTTPFlowOnlineRequest{
+		Content:     content,
+		ProjectName: projectName,
 	})
 	if err != nil {
 		return utils.Errorf("marshal params failed: %s", err)
@@ -53,8 +36,9 @@ func (s *OnlineClient) UploadRiskToOnline(ctx context.Context,
 	req.Header.Set("Authorization", token)
 	rsp, err := s.client.Do(req)
 	if err != nil {
-		return utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
+		return utils.Errorf("HTTP Post %v failed: %v ", urlIns.String(), err)
 	}
+
 	rawResponse, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
 		return utils.Errorf("read body failed: %s", err)
@@ -62,7 +46,7 @@ func (s *OnlineClient) UploadRiskToOnline(ctx context.Context,
 	var responseData map[string]interface{}
 	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
-		return utils.Errorf("unmarshal upload risk to online response failed: %s", err)
+		return utils.Errorf("unmarshal httpflow to online response failed: %s", err)
 	}
 	if utils.MapGetString(responseData, "message") != "" || utils.MapGetString(responseData, "reason") != "" {
 		return utils.Errorf("%s %s", utils.MapGetString(responseData, "reason"), utils.MapGetString(responseData, "message"))
