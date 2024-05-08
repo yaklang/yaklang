@@ -187,8 +187,17 @@ jobs:
 
       - name: Push Version Info to OSS
         run: |
-          ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename ./raw_commit_message.txt --ai-model gpt-4-0613
-          ls | grep release
+          # 定义文件路径
+          raw_commit_file="./raw_commit_message.txt"
+          
+          # 检查文件行数
+          line_count=$(wc -l < "$raw_commit_file")
+          
+          # 如果行数超过3行，输出111
+          if [ "$line_count" -gt 3 ]; then
+            ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type openai --apikey ${{ secrets.OPENAI_APIKEY }} --filename ./raw_commit_message.txt --ai-model gpt-4-0613
+            ls | grep release
+          fi
           
           echo "start to handle versions"
           if [ -f current_version.txt ]; then rm current_version.txt; fi
