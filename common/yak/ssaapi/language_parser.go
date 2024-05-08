@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"fmt"
 	"io"
-	"runtime/debug"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -41,9 +40,6 @@ var (
 )
 
 func (c *config) parseProject() ([]*Program, error) {
-	if c.Builder == nil {
-		return nil, utils.Errorf("not support language %s", c.language)
-	}
 	ret := make([]*Program, 0)
 
 	localpath := c.fs.GetLocalFSPath()
@@ -57,7 +53,6 @@ func (c *config) parseProject() ([]*Program, error) {
 	err := ssareducer.ReducerCompile(
 		localpath, // base
 		ssareducer.WithFileSystem(c.fs),
-		ssareducer.WithFileFilter(c.Builder.FilterFile),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
 			log.Infof("start to compile from: %v", path)
@@ -81,9 +76,6 @@ func (c *config) parseProject() ([]*Program, error) {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	if c.Builder == nil {
-		return nil, utils.Errorf("not support language %s", c.language)
-	}
 	prog, err := c.parseSimple("", c.code)
 	if err != nil {
 		return nil, err
@@ -106,12 +98,14 @@ func (c *config) parseSimple(path string, r io.Reader) (ret *ssa.Program, err er
 		if r := recover(); r != nil {
 			ret = nil
 			err = utils.Errorf("parse error with panic : %v", r)
-			debug.PrintStack()
+			log.Errorf("parse error with panic : %v", err)
 		}
 	}()
 
-	prog := ssa.NewProgram(c.DatabaseProgramName, c.fs)
-	builder := c.init(prog)
+	prog, builder, err := c.init(path)
+	if err != nil {
+		return nil, err
+	}
 	// parse code
 	if err := prog.Build(path, r, builder); err != nil {
 		return nil, err
@@ -122,10 +116,46 @@ func (c *config) parseSimple(path string, r io.Reader) (ret *ssa.Program, err er
 	return prog, nil
 }
 
-func (c *config) init(prog *ssa.Program) *ssa.FunctionBuilder {
+func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
+	LanguageBuilder := c.Builder
+	language := c.language
+	programName := c.DatabaseProgramName
+
+	if path != "" {
+		// TODO: whether to use the same programName for all program ?? when call ParseProject
+		// programName += "-" + path
+
+		// auto select language by path filter, if not set language
+		if LanguageBuilder != nil {
+			if !LanguageBuilder.FilterFile(path) {
+				return nil, nil, utils.Errorf("file[%s] is filtered by language [%s], skip this file", path, language)
+			}
+		} else {
+			for lang, languageBuilder := range LanguageBuilders {
+				if languageBuilder.FilterFile(path) {
+					language = lang
+					LanguageBuilder = languageBuilder
+					break
+				}
+			}
+			if LanguageBuilder == nil {
+				return nil, nil, utils.Errorf("file[%s] is not supported by any language builder, skip this file", path)
+			}
+			log.Infof("file[%s] is supported by language [%s], use this language", path, language)
+		}
+	} else {
+		// path is empty, use language or YakLang as default
+		if LanguageBuilder == nil {
+			LanguageBuilder = LanguageBuilders[Yak]
+			log.Infof("use default language [%s] for empty path", Yak)
+		}
+	}
+
+	prog := ssa.NewProgram(programName, c.fs)
+
 	prog.Build = func(filePath string, src io.Reader, fb *ssa.FunctionBuilder) error {
 		// check builder
-		if c.Builder == nil {
+		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)
 		}
 
@@ -169,7 +199,7 @@ func (c *config) init(prog *ssa.Program) *ssa.FunctionBuilder {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
 
-		return c.Builder.Build(code, c.ignoreSyntaxErr, fb)
+		return LanguageBuilder.Build(code, c.ignoreSyntaxErr, fb)
 	}
 
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
@@ -178,5 +208,5 @@ func (c *config) init(prog *ssa.Program) *ssa.FunctionBuilder {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithDefineFunction(c.defineFunc)
-	return builder
+	return prog, builder, nil
 }
