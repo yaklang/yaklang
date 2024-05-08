@@ -89,7 +89,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleSwitchEdge := func(sw *ssa.Switch) {
 		from := sw.GetBlock()
-		if cond := sw.Cond; cond.GetOpcode() == ssa.SSAOpcodeConstInst {
+		if cond := sw.Cond; cond != nil && cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("switch"))
 		}
 		var defaultCond ssa.Value

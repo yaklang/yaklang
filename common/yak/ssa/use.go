@@ -52,7 +52,7 @@ func (b *BasicBlock) GetValues() Values { return nil }
 
 // ----------- Phi
 func (p *Phi) HasValues() bool   { return true }
-func (p *Phi) GetValues() Values { return p.Edge }
+func (p *Phi) GetValues() Values { return lo.Filter(p.Edge, filterNilValue) }
 
 func (p *Phi) ReplaceValue(v Value, to Value) {
 	// p.Edge = slices.Replace(p.Edge, 0, len(p.Edge), v, to)
@@ -65,7 +65,7 @@ func (p *Phi) ReplaceValue(v Value, to Value) {
 
 // / ---- extern lib
 func (e *ExternLib) HasValues() bool   { return true }
-func (e *ExternLib) GetValues() Values { return e.Member }
+func (e *ExternLib) GetValues() Values { return lo.Filter(e.Member, filterNilValue) }
 func (e *ExternLib) ReplaceValue(v Value, to Value) {
 	if index := slices.Index(e.Member, v); index != -1 {
 		e.Member[index] = to
@@ -139,7 +139,7 @@ func (c *Call) GetValues() Values {
 	for _, v := range c.Binding {
 		ret = append(ret, v)
 	}
-	return ret
+	return lo.Filter(ret, filterNilValue)
 }
 func (c *Call) ReplaceValue(v Value, to Value) {
 	if c.Method == v {
@@ -224,8 +224,11 @@ func (n *Next) ReplaceValue(v, to Value) {
 }
 
 // ----------- Assert
-func (a *Assert) HasValues() bool   { return true }
-func (a *Assert) GetValues() Values { return []Value{a.Cond, a.MsgValue} }
+func (a *Assert) HasValues() bool { return true }
+func (a *Assert) GetValues() Values {
+	ret := []Value{a.Cond, a.MsgValue}
+	return lo.Filter(ret, filterNilValue)
+}
 
 func (a *Assert) ReplaceValue(v, to Value) {
 	if a.Cond == v {
@@ -306,12 +309,18 @@ func (r *Loop) GetUsers() Users { return nil }
 // ----------- Switch
 func (sw *Switch) HasValues() bool { return true }
 func (sw *Switch) GetValues() Values {
-	return append(
-		lo.Map(sw.Label,
-			func(label SwitchLabel, _ int) Value { return label.Value },
-		),
-		sw.Cond,
+	ret := make(Values, 0, len(sw.Label)+1)
+	lo.ForEach(sw.Label,
+		func(label SwitchLabel, _ int) {
+			if v := label.Value; v != nil {
+				ret = append(ret, v)
+			}
+		},
 	)
+	if sw.Cond != nil {
+		ret = append(ret, sw.Cond)
+	}
+	return ret
 }
 func (sw *Switch) ReplaceValue(v Value, to Value) {
 	if sw.Cond == v {
