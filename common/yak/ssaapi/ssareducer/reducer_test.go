@@ -42,11 +42,10 @@ func TestReducerCompiling_NORMAL(t *testing.T) {
 	err = ReducerCompile(
 		"testlib",
 		WithEmbedFS(lib),
-		// WithFileExt(".yak"),
-		WithFileFilter(func(s string) bool {
-			return strings.HasSuffix(s, ".yak")
-		}),
 		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+			if !strings.HasSuffix(s, ".yak") {
+				return []string{s}, nil
+			}
 			count++
 
 			var visited []string

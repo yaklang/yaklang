@@ -9,9 +9,6 @@ import (
 
 type compileMethod func(string, io.Reader) ([]string, error)
 type Config struct {
-	// suffix
-	filter func(string) bool
-
 	entryFiles []string
 
 	fs filesys.FileSystem
@@ -22,9 +19,6 @@ type Config struct {
 
 func NewConfig(opt ...Option) *Config {
 	c := &Config{
-		filter: func(string) bool {
-			return true
-		},
 		entryFiles:         make([]string, 0),
 		fs:                 nil,
 		stopAtCompileError: false,
@@ -36,12 +30,6 @@ func NewConfig(opt ...Option) *Config {
 }
 
 type Option func(config *Config)
-
-func WithFileFilter(h func(string) bool) Option {
-	return func(config *Config) {
-		config.filter = h
-	}
-}
 
 func WithFileSystem(fs filesys.FileSystem) Option {
 	return func(config *Config) {
