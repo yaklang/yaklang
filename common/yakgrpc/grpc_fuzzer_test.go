@@ -31,6 +31,59 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
+
+func TestGRPCMUSTPASS_FuzzerMatch(t *testing.T) {
+	data := uuid.New().String()
+	body, _ := utils.GzipCompress(data)
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Encoding: gzip\r\n" +
+		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
+		"\r\n" +
+		string(body)))
+	err := utils.WaitConnect(utils.HostPort(host, port), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+
+`,
+		Filter: &ypb.FuzzerResponseFilter{
+			Keywords: []string{data},
+		},
+		Matchers: []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "word",
+				Condition:   "and",
+				Group:       []string{data},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matched := false
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		fmt.Println(string(rsp.ResponseRaw))
+		if rsp.MatchedByMatcher {
+			matched = true
+		}
+	}
+	if !matched {
+		t.Fatal("expect matched, got not matched")
+	}
+}
 func TestSaveToDB(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
