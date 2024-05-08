@@ -53,6 +53,7 @@ func fitStatusToHybridScanTaskRecord(status *ypb.HybridScanResponse, task *yakit
 	task.TotalTasks = status.TotalTasks
 	task.FinishedTargets = status.FinishedTargets
 	task.FinishedTasks = status.FinishedTasks
+	task.Status = status.Status
 }
 
 func (h *HybridScanStatusManager) GetStatus(r ...*yakit.HybridScanTask) *ypb.HybridScanResponse {
