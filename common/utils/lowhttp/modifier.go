@@ -804,8 +804,8 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 
 		k, cookieRaw := SplitHTTPHeader(line)
 		if (strings.ToLower(k) == "cookie" && isReq) || (strings.ToLower(k) == "set-cookie" && isRsp) {
-			//existed := ParseCookie(k, cookieRaw)
-			//existed = append(existed, &http.Cookie{Name: key, Value: utils.InterfaceToString(value)})
+			// existed := ParseCookie(k, cookieRaw)
+			// existed = append(existed, &http.Cookie{Name: key, Value: utils.InterfaceToString(value)})
 			adds := []*http.Cookie{
 				{Name: key, Value: utils.InterfaceToString(value)},
 			}
@@ -1248,6 +1248,57 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 		}
 		return false
 	})
+}
+
+// ParseMultiPartFormWithCallback 是一个辅助函数，用于尝试解析请求报文体中的表单并进行回调
+// Example:
+// ```
+// poc.ParseMultiPartFormWithCallback(`POST /post HTTP/1.1
+// Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+// Host: pie.dev
+//
+// ------WebKitFormBoundary7MA4YWxkTrZu0gW
+// Content-Disposition: form-data; name="a"
+
+// 1
+// ------WebKitFormBoundary7MA4YWxkTrZu0gW
+// Content-Disposition: form-data; name="b"
+
+// 2
+// ------WebKitFormBoundary7MA4YWxkTrZu0gW--`, func(part) {
+// content = string(io.ReadAll(part)~)
+// println(part.FileName(), part.FormName(), content)
+// })
+// ```
+func ParseMultiPartFormWithCallback(req []byte, callback func(part *multipart.Part)) (err error) {
+	// get contentType
+	contentType := GetHTTPPacketContentType(req)
+
+	var contentTypeParams map[string]string
+	_, contentTypeParams, err = mime.ParseMediaType(contentType)
+	if err != nil {
+		return
+	}
+	_, body := SplitHTTPPacketFast(req)
+
+	boundary, ok := contentTypeParams["boundary"]
+	if ok {
+		mr := multipart.NewReader(bytes.NewReader(body), boundary)
+		for {
+			part, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			// 检查part是否为表单字段
+			if formName := part.FormName(); formName != "" {
+				callback(part)
+			}
+		}
+	}
+	return nil
 }
 
 func GetParamsFromBody(contentType string, body []byte) (params map[string][]string, useRaw bool, err error) {
