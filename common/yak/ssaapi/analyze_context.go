@@ -4,7 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type objectItem struct {
@@ -45,8 +44,7 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 // ========================================== CALL STACK ==========================================
 
 func (a *AnalyzeContext) PushCall(i *Value) error {
-	_, ok := i.node.(*ssa.Call)
-	if !ok {
+	if !i.IsCall() {
 		return utils.Errorf("BUG: (callStack is not clean!) CallStack cannot recv %T", i.node)
 	}
 	if a._callTable.Have(i.GetId()) {

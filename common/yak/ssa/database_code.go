@@ -23,13 +23,7 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 }
 
 // IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
-func (c *Cache) IrCodeToInstruction(ir *ssadb.IrCode) Instruction {
-	inst := CreateInstruction(Opcode(ir.Opcode))
-	if inst == nil {
-		log.Infof("unknown opcode: %s", ir.OpcodeName)
-		return nil
-	}
-
+func (c *Cache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode) Instruction {
 	instructionFromIrCode(inst, ir)
 	c.valueFromIrCode(inst, ir)
 	functionFromIrCode(inst, ir)
@@ -95,13 +89,24 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	// TODO: range
 	// inst.SetRange(NewRange(ir.SourceCodeStartOffset, ir.SourceCodeEndOffset))
 
-	// TODO: function :
+	// not function
+	if !ir.IsFunction {
+		if fun, err := NewInstructionFromLazy(ir.CurrentFunction, ToFunction); err == nil {
+			inst.SetFunc(fun)
+		} else {
+			log.Errorf("BUG: set CurrentFunction[%d]: %v", ir.CurrentFunction, err)
+		}
 
-	// TODO: block :
-	// inst.SetBlock()
+		if !ir.IsBlock {
+			if block, err := NewInstructionFromLazy(ir.CurrentBlock, ToBasicBlock); err == nil {
+				inst.SetBlock(block)
+			} else {
+				log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
+			}
+		}
+	}
 
 	inst.SetExtern(ir.IsExternal)
-
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -153,6 +158,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	for _, m := range value.GetMask() {
 		ir.MaskedCodes = append(ir.MaskedCodes, m.GetId())
 	}
+	ir.String = value.String()
 }
 
 func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -220,6 +226,14 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 		ir.FormalArgs = append(ir.FormalArgs, int64(formArg.GetId()))
 	}
+
+	for _, fv := range f.FreeValues {
+		if fv == nil {
+			continue
+		}
+		ir.FreeValues = append(ir.FreeValues, int64(fv.GetId()))
+	}
+
 	for _, returnIns := range f.Return {
 		if returnIns == nil {
 			continue
@@ -256,6 +270,50 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func functionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+	fun, ok := ToFunction(inst)
+	if !ir.IsFunction || !ok {
+		return
+	}
+
+	fun.hasEllipsis = ir.IsVariadic
+	for _, arg := range ir.FormalArgs {
+		para, err := NewInstructionFromLazy(arg, ToParameter)
+		if err != nil {
+			log.Errorf("BUG: function formal arg : %v", err)
+			continue
+		}
+		fun.Param = append(fun.Param, para)
+	}
+
+	fun.FreeValues = make(map[string]*Parameter)
+	for _, fv := range ir.FreeValues {
+		para, err := NewInstructionFromLazy(fv, ToParameter)
+		if err != nil {
+			log.Errorf("BUG: function free value : %v", err)
+			continue
+		}
+		fun.FreeValues[para.GetName()] = para
+	}
+	// TODO: member call args
+	// fun.ParameterMember
+
+	for _, sideEffect := range ir.SideEffects {
+		log.Warnf("SideEffect is not supported yet: %v", sideEffect)
+	}
+
+	for _, ret := range ir.ReturnCodes {
+		ret, err := NewInstructionFromLazy(ret, ToReturn)
+		if err != nil {
+			log.Errorf("BUG: function return : %v", err)
+			continue
+		}
+		fun.Return = append(fun.Return, ret)
+	}
+
+	// block
+
+	// sub-function
+
 }
 
 func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {

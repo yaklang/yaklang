@@ -153,7 +153,7 @@ func (lb *LoopBuilder) Finish() {
 	latch := SSABuild.NewBasicBlockNotAddBlocks(LoopLatch)
 
 	LoopBuilder := ssautil.NewLoopStmt(ssautil.ScopedVersionedTableIF[Value](scope), func(name string) Value {
-		phi := NewPhi(condition, name, false)
+		phi := NewPhi(condition, name)
 		condition.Phis = append(condition.Phis, phi)
 		return phi
 	})

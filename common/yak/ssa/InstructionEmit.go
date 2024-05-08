@@ -6,7 +6,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func fixupUseChain(node Node) {
+func fixupUseChain(node Instruction) {
 	if u, ok := ToUser(node); ok {
 		for _, v := range u.GetValues() {
 			v.AddUser(u)
@@ -192,9 +192,7 @@ func (f *FunctionBuilder) EmitOnly(i Instruction) {
 }
 
 func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
-	if n, ok := ToNode(i); ok {
-		fixupUseChain(n)
-	}
+	fixupUseChain(i)
 	// i.SetScope(f.CurrentScope)
 	i.SetRange(f.CurrentRange)
 	i.SetBlock(f.CurrentBlock)

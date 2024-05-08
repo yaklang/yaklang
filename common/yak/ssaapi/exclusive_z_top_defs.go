@@ -136,6 +136,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	switch inst := i.node.(type) {
+	case *ssa.LazyInstruction:
+		i.node = inst.Self()
+		return i.getTopDefs(actx, opt...)
 	case *ssa.Undefined:
 		// ret[n]
 		return getMemberCall(inst, actx)
@@ -272,11 +275,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return vals
 		}
-		if !called.IsCall() {
+		calledInstance, ok := ssa.ToCall(called.node)
+		if !ok {
 			log.Infof("parent function is not called by any other function, skip (%T)", called)
 			return Values{i}
 		}
-		calledInstance := called.node.(*ssa.Call)
 
 		// parameter
 		if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
@@ -294,7 +297,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.Parameter:
 		// 查找被调用函数的TopDef
 		getCalledByValue := func(called *Value) Values {
-			calledInstance := called.node.(*ssa.Call)
+			calledInstance, ok := ssa.ToCall(called.node)
+			if !ok {
+				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", ssa.SSAOpcode2Name[called.GetOpcode()])
+				return Values{}
+			}
 
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
@@ -372,7 +379,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.SideEffect:
-
 		callIns := inst.CallSite
 		if callIns != nil {
 			err := actx.PushCall(NewValue(callIns).AppendEffectOn(i))

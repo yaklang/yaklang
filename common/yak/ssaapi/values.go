@@ -29,7 +29,7 @@ func ValueCompare(v1, v2 *Value) bool {
 	} else if v1IsNil || v2IsNil {
 		return false
 	}
-	return v1.node == v2.node
+	return v1.GetId() == v2.GetId()
 }
 
 func NewValue(n ssa.Value) *Value {
@@ -308,8 +308,8 @@ func (v *Value) GetConstValue() any {
 	if v == nil || v.node == nil {
 		return nil
 	}
-	if v.IsConstInst() {
-		return v.node.(*ssa.ConstInst).GetRawValue()
+	if cInst, ok := ssa.ToConst(v.node); ok {
+		return cInst.GetRawValue()
 	} else {
 		return nil
 	}
@@ -320,8 +320,8 @@ func (v *Value) GetConst() *ssa.Const {
 		return nil
 	}
 
-	if v.IsConstInst() {
-		return v.node.(*ssa.ConstInst).Const
+	if cInst, ok := ssa.ToConst(v.node); ok {
+		return cInst.Const
 	} else {
 		return nil
 	}
