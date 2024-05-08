@@ -110,8 +110,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 			if rsp.HybridScanMode == "pause" {
 				manager.Pause()
 				manager.Stop()
-				statusManager.GetStatus(task)
 				task.Status = yakit.HYBRIDSCAN_PAUSED
+				stream.Send(statusManager.GetStatus(task))
 				quickSave()
 			}
 		}
