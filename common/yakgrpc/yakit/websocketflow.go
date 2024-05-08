@@ -25,17 +25,6 @@ type WebsocketFlow struct {
 	Hash string `json:"hash"`
 }
 
-type WebsocketFlowShare struct {
-	// HTTPFlow 过来的应该有 WebsocketHash
-	WebsocketRequestHash string
-
-	FrameIndex  int
-	FromServer  bool
-	QuotedData  []byte
-	MessageType string
-	Hash        string
-}
-
 func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
 	raw, _ := strconv.Unquote(i.QuotedData)
 	if len(raw) <= 0 {

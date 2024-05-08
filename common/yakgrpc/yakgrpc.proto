@@ -206,6 +206,7 @@ service Yak {
   rpc HTTPFlowsExtract(HTTPFlowsExtractRequest) returns (Empty);
   rpc GetHTTPFlowBare(HTTPFlowBareRequest) returns (HTTPFlowBareResponse);
   rpc ExportHTTPFlows(ExportHTTPFlowsRequest) returns(QueryHTTPFlowResponse);
+  rpc HTTPFlowsToOnline(HTTPFlowsToOnlineRequest) returns (Empty);
 
   // 从一个 FuzzerRequest 中提取 Url
   rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
@@ -2804,6 +2805,7 @@ message NewRiskReadRequest {
 
 message UploadRiskToOnlineRequest {
   string Token = 1;
+  string ProjectName = 2;
 }
 
 message VerifyTunnelServerDomainParams {
@@ -4330,6 +4332,11 @@ message QueryHTTPFlowRequest {
   repeated string RuntimeIDs = 40;
 
   repeated string IncludeHash = 41;
+}
+
+message HTTPFlowsToOnlineRequest {
+  string Token = 1;
+  string ProjectName = 2;
 }
 
 message ExportHTTPFlowsRequest {

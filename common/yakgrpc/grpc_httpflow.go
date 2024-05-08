@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -265,22 +266,19 @@ func (s *Server) GetResponseBodyByHTTPFlowID(ctx context.Context, req *ypb.Downl
 	return &ypb.Bytes{Raw: body}, nil
 }
 
+type HTTPFlowShare struct {
+	*yakit.HTTPFlow
+	ExtractedList         []*yakit.ExtractedData
+	WebsocketFlowsList    []*yakit.WebsocketFlow
+	ProjectGeneralStorage []*yakit.ProjectGeneralStorage
+}
+
 func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequest) (*ypb.HTTPFlowsShareResponse, error) {
 	if req.GetIds() == nil || req.Module == "" || req.ExpiredTime == 0 {
 		return nil, utils.Error("params empty")
 	}
-
-	type HTTPFlowShare struct {
-		*yakit.HTTPFlow
-		ExtractedList         []*yakit.ExtractedData
-		WebsocketFlowsList    []*yakit.WebsocketFlowShare
-		ProjectGeneralStorage []*yakit.ProjectGeneralStorage
-	}
 	var (
-		data                  []HTTPFlowShare
-		extractedData         []*yakit.ExtractedData
-		websocketFlowsData    []*yakit.WebsocketFlowShare
-		projectGeneralStorage []*yakit.ProjectGeneralStorage
+		data []HTTPFlowShare
 	)
 
 	if len(req.GetIds()) > 50 {
@@ -290,78 +288,9 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 	ret := yakit.YieldHTTPFlows(bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds()), ctx)
 
 	for httpFlow := range ret {
-		if httpFlow.Hash != "" {
-			db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.Hash)
-			extracted := yakit.BatchExtractedData(db1, ctx)
-			for v := range extracted {
-				extractedData = append(extractedData, &yakit.ExtractedData{
-					SourceType:  v.SourceType,
-					TraceId:     v.TraceId,
-					Regexp:      utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
-					RuleVerbose: utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
-					Data:        utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
-				})
-			}
-		}
-		if httpFlow.WebsocketHash != "" {
-			db2 := bizhelper.ExactQueryString(s.GetProjectDatabase(), "websocket_request_hash", httpFlow.WebsocketHash)
-			websocketFlows := yakit.BatchWebsocketFlows(db2, ctx)
-			for v := range websocketFlows {
-				raw, _ := strconv.Unquote(v.QuotedData)
-				if len(raw) <= 0 {
-					raw = v.QuotedData
-				}
-				websocketFlowsData = append(websocketFlowsData, &yakit.WebsocketFlowShare{
-					WebsocketRequestHash: v.WebsocketRequestHash,
-					FrameIndex:           v.FrameIndex,
-					FromServer:           v.FromServer,
-					QuotedData:           []byte(raw),
-					MessageType:          v.MessageType,
-					Hash:                 v.Hash,
-				})
-			}
-		}
-
-		httpFlowShare := &yakit.HTTPFlow{
-			HiddenIndex:        httpFlow.HiddenIndex,
-			NoFixContentLength: httpFlow.NoFixContentLength,
-			Hash:               httpFlow.Hash,
-			IsHTTPS:            httpFlow.IsHTTPS,
-			Url:                httpFlow.Url,
-			Path:               httpFlow.Path,
-			Method:             httpFlow.Method,
-			BodyLength:         httpFlow.BodyLength,
-			ContentType:        httpFlow.ContentType,
-			StatusCode:         httpFlow.StatusCode,
-			SourceType:         httpFlow.SourceType,
-			// Request:            request,
-			// Response:           response,
-			Request:           httpFlow.Request,
-			Response:          httpFlow.Response,
-			GetParamsTotal:    httpFlow.GetParamsTotal,
-			PostParamsTotal:   httpFlow.PostParamsTotal,
-			CookieParamsTotal: httpFlow.CookieParamsTotal,
-			IPAddress:         httpFlow.IPAddress,
-			RemoteAddr:        httpFlow.RemoteAddr,
-			IPInteger:         httpFlow.IPInteger,
-			Tags:              httpFlow.Tags,
-			IsWebsocket:       httpFlow.IsWebsocket,
-			WebsocketHash:     httpFlow.WebsocketHash,
-		}
-		projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
-		projectStorages, _ := yakit.GetProjectKeyByWhere(db, projectStoragesWhere)
-		for _, v := range projectStorages {
-			projectGeneralStorage = append(projectGeneralStorage, &yakit.ProjectGeneralStorage{
-				Key:        v.Key,
-				Value:      v.Value,
-				Group:      v.Group,
-				Verbose:    v.Verbose,
-				ExpiredAt:  v.ExpiredAt,
-				ProcessEnv: v.ProcessEnv,
-			})
-		}
+		httpFlowShareData, extractedData, websocketFlowsData, projectGeneralStorage := s.HTTPFlowsData(ctx, httpFlow)
 		data = append(data, HTTPFlowShare{
-			HTTPFlow:              httpFlowShare,
+			HTTPFlow:              httpFlowShareData,
 			ExtractedList:         extractedData,
 			WebsocketFlowsList:    websocketFlowsData,
 			ProjectGeneralStorage: projectGeneralStorage,
@@ -386,12 +315,6 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtractRequest) (*ypb.Empty, error) {
 	if req.ShareExtractContent == "" {
 		return nil, utils.Error("params empty")
-	}
-	type HTTPFlowShare struct {
-		*yakit.HTTPFlow
-		ExtractedList         []*yakit.ExtractedData
-		WebsocketFlowsList    []*yakit.WebsocketFlowShare
-		ProjectGeneralStorage []*yakit.ProjectGeneralStorage
 	}
 	var shareData []*HTTPFlowShare
 	err := json.Unmarshal([]byte(req.ShareExtractContent), &shareData)
@@ -423,6 +346,13 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 			Tags:               data.Tags,
 			IsWebsocket:        data.IsWebsocket,
 			WebsocketHash:      data.WebsocketHash,
+			RuntimeId:          data.RuntimeId,
+			FromPlugin:         data.FromPlugin,
+			//IsRequestOversize:          data.IsRequestOversize,
+			//IsResponseOversize:         data.IsResponseOversize,
+			IsTooLargeResponse:         data.IsTooLargeResponse,
+			TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
+			TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
 		}
 		var httpFlowId int64
 		if shareHttpFlow != nil {
@@ -540,4 +470,166 @@ func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRe
 		Total: int64(paging.TotalRecord),
 		Data:  res,
 	}, nil
+}
+
+func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *yakit.HTTPFlow) (*yakit.HTTPFlow, []*yakit.ExtractedData, []*yakit.WebsocketFlow, []*yakit.ProjectGeneralStorage) {
+	var (
+		httpFlowShare         *yakit.HTTPFlow
+		extractedData         []*yakit.ExtractedData
+		websocketFlowsData    []*yakit.WebsocketFlow
+		projectGeneralStorage []*yakit.ProjectGeneralStorage
+	)
+	if httpFlow.Hash != "" {
+		db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.Hash)
+		extracted := yakit.BatchExtractedData(db1, ctx)
+		for v := range extracted {
+			extractedData = append(extractedData, &yakit.ExtractedData{
+				SourceType:  v.SourceType,
+				TraceId:     v.TraceId,
+				Regexp:      utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
+				RuleVerbose: utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
+				Data:        utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
+			})
+		}
+	}
+	if httpFlow.WebsocketHash != "" {
+		db2 := bizhelper.ExactQueryString(s.GetProjectDatabase(), "websocket_request_hash", httpFlow.WebsocketHash)
+		websocketFlows := yakit.BatchWebsocketFlows(db2.Debug(), ctx)
+		for v := range websocketFlows {
+			raw, _ := strconv.Unquote(string(v.QuotedData))
+			if len(raw) <= 0 {
+				raw = string(v.QuotedData)
+			}
+			websocketFlowsData = append(websocketFlowsData, &yakit.WebsocketFlow{
+				WebsocketRequestHash: v.WebsocketRequestHash,
+				FrameIndex:           v.FrameIndex,
+				FromServer:           v.FromServer,
+				QuotedData:           raw,
+				MessageType:          v.MessageType,
+				Hash:                 v.Hash,
+			})
+		}
+	}
+
+	httpFlowShare = &yakit.HTTPFlow{
+		Model: gorm.Model{
+			CreatedAt: httpFlow.CreatedAt,
+			UpdatedAt: httpFlow.UpdatedAt,
+		},
+		HiddenIndex:        httpFlow.HiddenIndex,
+		NoFixContentLength: httpFlow.NoFixContentLength,
+		Hash:               httpFlow.Hash,
+		IsHTTPS:            httpFlow.IsHTTPS,
+		Url:                httpFlow.Url,
+		Path:               httpFlow.Path,
+		Method:             httpFlow.Method,
+		BodyLength:         httpFlow.BodyLength,
+		ContentType:        httpFlow.ContentType,
+		StatusCode:         httpFlow.StatusCode,
+		SourceType:         httpFlow.SourceType,
+		Request:            httpFlow.Request,
+		Response:           httpFlow.Response,
+		GetParamsTotal:     httpFlow.GetParamsTotal,
+		PostParamsTotal:    httpFlow.PostParamsTotal,
+		CookieParamsTotal:  httpFlow.CookieParamsTotal,
+		IPAddress:          httpFlow.IPAddress,
+		RemoteAddr:         httpFlow.RemoteAddr,
+		IPInteger:          httpFlow.IPInteger,
+		Tags:               httpFlow.Tags,
+		IsWebsocket:        httpFlow.IsWebsocket,
+		WebsocketHash:      httpFlow.WebsocketHash,
+		// 新加字段
+		RuntimeId:  httpFlow.RuntimeId,
+		FromPlugin: httpFlow.FromPlugin,
+		//IsRequestOversize:          httpFlow.IsRequestOversize,
+		//IsResponseOversize:         httpFlow.IsResponseOversize,
+		IsTooLargeResponse:         httpFlow.IsTooLargeResponse,
+		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
+		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
+	}
+	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
+	projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
+	for _, v := range projectStorages {
+		projectGeneralStorage = append(projectGeneralStorage, &yakit.ProjectGeneralStorage{
+			Key:        v.Key,
+			Value:      v.Value,
+			Group:      v.Group,
+			Verbose:    v.Verbose,
+			ExpiredAt:  v.ExpiredAt,
+			ProcessEnv: v.ProcessEnv,
+		})
+	}
+
+	return httpFlowShare, extractedData, websocketFlowsData, projectGeneralStorage
+}
+
+func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest) (*ypb.Empty, error) {
+	if req.Token == "" || req.ProjectName == "" {
+		return nil, utils.Errorf("params empty")
+	}
+	limit := make(chan struct{}, 20)
+	var (
+		successHash []string
+		wg          sync.WaitGroup
+		count       = 0
+		mu          sync.Mutex
+	)
+
+	db := s.GetProjectDatabase()
+	db = db.Where("upload_online <> '1' ")
+	ret := yakit.YieldHTTPFlows(db, context.Background())
+	for httpFlow := range ret {
+		wg.Add(1)
+
+		limit <- struct{}{}
+
+		go func(httpFlow *yakit.HTTPFlow) {
+			defer func() {
+				<-limit
+			}()
+			defer wg.Done()
+			httpFlowShareData, extractedData, websocketFlowsData, projectGeneralStorage := s.HTTPFlowsData(ctx, httpFlow)
+			content := HTTPFlowShare{
+				HTTPFlow:              httpFlowShareData,
+				ExtractedList:         extractedData,
+				WebsocketFlowsList:    websocketFlowsData,
+				ProjectGeneralStorage: projectGeneralStorage,
+			}
+			data, err := json.Marshal(content)
+			if err != nil {
+				log.Errorf("JSON marshal error: %s", err)
+				return
+			}
+			client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+			err = client.UploadHTTPFlowToOnline(ctx, req.Token, req.ProjectName, data)
+			if err != nil {
+				if strings.Contains(err.Error(), "token过期") {
+					log.Errorf("httpflow to online failed: %s", err.Error())
+					return
+				}
+				log.Errorf("httpflow to online failed: %s", err.Error())
+			} else {
+				mu.Lock()
+				defer mu.Unlock()
+				successHash = append(successHash, httpFlow.Hash)
+			}
+
+		}(httpFlow)
+
+		count++
+		if count == 20 {
+			time.Sleep(1 * time.Second)
+			count = 0
+		}
+	}
+	// 等待所有协程执行完毕
+	wg.Wait()
+	for _, v := range funk.ChunkStrings(successHash, 100) {
+		err := yakit.HTTPFlowToOnline(s.GetProjectDatabase(), v)
+		if err != nil {
+			log.Errorf("HTTPFlowsToOnline failed: %s", err)
+		}
+	}
+
+	return &ypb.Empty{}, nil
 }
