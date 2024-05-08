@@ -49,7 +49,7 @@ Hello World
 			false,
 		},
 	} {
-		if ret, err := i[0].(*YakMatcher).Execute(&lowhttp.LowhttpResponse{
+		if ret, err := i[0].(*YakMatcher).Execute(&RespForMatch{
 			RawPacket: rsp,
 		}, nil); err != nil {
 			panic(err)
