@@ -1,6 +1,7 @@
 package filesys
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -25,6 +26,9 @@ func Recursive(raw string, opts ...Option) error {
 	c := NewConfig()
 	return recursive(raw, *c, opts...)
 }
+
+var SkipDir = errors.New("skip dir")
+var SkipAll = errors.New("skip all")
 
 func recursive(raw string, c Config, opts ...Option) (retErr error) {
 	c.dirMatch = nil
@@ -54,6 +58,15 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			return utils.Errorf("total count limit exceeded: %d", c.totalLimit)
 		}
 
+		if c.onStat != nil {
+			if err := c.onStat(info.IsDir(), path, info); err != nil {
+				if err == SkipDir || err == SkipAll {
+					return nil
+				}
+				return err
+			}
+		}
+
 		if info.IsDir() {
 			// dir
 			// dir count
@@ -65,6 +78,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			// file stat
 			if c.onDirStat != nil {
 				if err := c.onDirStat(path, info); err != nil {
+					if err == SkipDir || err == SkipAll {
+						return nil
+					}
 					return err
 				}
 			}
@@ -114,7 +130,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 		}
 		for _, d := range dirs {
 			targetFile := c.fileSystem.Join(path, d.Name())
-			walkSingleFile(targetFile)
+			if err := walkSingleFile(targetFile); err != nil {
+				log.Errorf("walk file %s failed: %v", targetFile, err)
+			}
 		}
 		return nil
 	}
