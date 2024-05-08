@@ -8,7 +8,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -18,7 +21,7 @@ import (
 )
 
 func TestCompileWithDatabase_Scope_Phi(t *testing.T) {
-	uid := uuid.New()
+	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(`
 a = 1
 if (c > 1) {
@@ -26,7 +29,8 @@ if (c > 1) {
 }
 e = a
 dump(c)
-`, ssaapi.WithDatabaseProgramName(uid.String()))
+`, ssaapi.WithDatabaseProgramName(progName))
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
 	if err != nil {
 		panic(err)
 	}
@@ -37,7 +41,7 @@ dump(c)
 	if id <= 0 {
 		t.Fatal("scope is not a persistent scope")
 	}
-	if scope.GetPersistentProgramName() != uid.String() {
+	if scope.GetPersistentProgramName() != progName {
 		t.Fatal("scope is not a persistent scope")
 	}
 
@@ -51,11 +55,13 @@ dump(c)
 	eLazyPhi := scopePersistent.ReadValue("e")
 	verbose := eLazyPhi.String()
 	if verbose == "" {
-		t.Fatal("failed to get variable e(a)")
+		t.Fatal("failed to get variable e(a) verbos is nil ")
 	}
 	if eLazyPhi.GetId() != ePhi.GetId() {
-		t.Fatal("failed to get variable e(a)")
+		t.Fatalf("failed to get variable e(a) instruction errror: %d vs got(%d)", eLazyPhi.GetId(), ePhi.GetId())
 	}
+	log.Infof("eLazyPhi: %s", eLazyPhi.String())
+	log.Infof("ePhi: %s", ePhi.String())
 }
 
 func TestCompileWithDatabase_Scope_Phi2(t *testing.T) {
@@ -66,6 +72,7 @@ if (c > 1) {
 }
 d = a
 `, ssaapi.WithDatabaseProgramName("a"))
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), "a")
 	if err != nil {
 		panic(err)
 	}
@@ -82,6 +89,7 @@ include `+strconv.Quote(filename)+`
 
 c("d")
 `, ssaapi.WithDatabaseProgramName(progName))
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
 	if err != nil {
 		panic(err)
 	}
@@ -120,6 +128,7 @@ include `+strconv.Quote(filename)+`
 
 c("d")
 `, ssaapi.WithDatabaseProgramName(progName))
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
 	if err != nil {
 		panic(err)
 	}
@@ -154,6 +163,7 @@ dump("HJello")
 a = i => i + 1
 dump(a(3))
 `, ssaapi.WithDatabaseProgramName(progName))
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +180,7 @@ dump(a(3))
 			spew.Dump(result)
 			t.Fatal("source code hash is empty")
 		} else {
-			t.Log("source code hash", result.SourceCodeHash)
+			// t.Log("source code hash", result.SourceCodeHash)
 		}
 		m.Set(result.SourceCodeHash, struct{}{})
 	}
@@ -199,6 +209,7 @@ a()
 			matchAtFirst = true
 		}),
 	)
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,4 +233,48 @@ a()
 	if !matchAtCached {
 		t.Fatal("not match at cached")
 	}
+}
+
+func TestCompile_FromDatabase(t *testing.T) {
+	programID := uuid.NewString()
+	code := `
+	a = (i) => {
+		return i + 1
+	}
+	target = a(12)
+	`
+
+	check := func(prog *ssaapi.Program, msg string) {
+		result, err := prog.SyntaxFlowWithError(`target`)
+
+		require.Nilf(t, err, "syntax flow error %s", err)
+		log.Infof("syntax flow: %v", result)
+		tops := result.GetTopDefs()
+		log.Infof("tops: %v", tops)
+		require.Equal(t, 2, len(tops), msg+": tops length should 2")
+		tops_string := lo.Map(tops, func(v *ssaapi.Value, _ int) string {
+			return v.String()
+		})
+		require.Equal(t, []string{
+			"12", "1",
+		}, tops_string, msg+": tops should be [Function-a, 12]")
+	}
+
+	prog, err := ssaapi.Parse(
+		code,
+		ssaapi.WithDatabaseProgramName(programID),
+	)
+	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), programID)
+	require.Nilf(t, err, "parse code error %s", err)
+
+	prog.Show()
+
+	check(prog, "parse from source")
+
+	progFromDB, err := ssaapi.FromDatabase(
+		programID,
+	)
+	require.Nilf(t, err, "parse from database error %s", err)
+
+	check(progFromDB, "get from database")
 }

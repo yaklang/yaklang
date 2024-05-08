@@ -203,6 +203,18 @@ func (p *Program) Feed(code io.Reader) error {
 	return p.config.feed(p.Program, code)
 }
 
+func FromDatabase(programName string, opts ...Option) (*Program, error) {
+	config := defaultConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	config.DatabaseProgramName = programName
+	if config.Builder == nil {
+		return nil, utils.Errorf("not support language %s", config.language)
+	}
+	return config.fromDatabase()
+}
+
 var Exports = map[string]any{
 	"Parse": Parse,
 

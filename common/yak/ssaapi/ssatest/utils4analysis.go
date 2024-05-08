@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/samber/lo"
@@ -14,18 +17,52 @@ import (
 type checkFunction func(*ssaapi.Program) error
 
 func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi.Language) {
-	opt := make([]ssaapi.Option, 0)
-	if len(languages) > 0 {
-		opt = append(opt, ssaapi.WithLanguage(languages[0]))
-	}
-	prog, err := ssaapi.Parse(code, opt...)
-	if err != nil {
-		t.Fatalf("prog parse error: %v", err)
-	}
-	prog.Show()
+	// only in memory
+	if false {
+		opt := make([]ssaapi.Option, 0)
+		if len(languages) > 0 {
+			opt = append(opt, ssaapi.WithLanguage(languages[0]))
+		}
+		progInMemory, err := ssaapi.Parse(code, opt...)
+		if err != nil {
+			t.Fatalf("prog parse error: %v", err)
+		}
+		progInMemory.Show()
 
-	if err := handler(prog); err != nil {
-		t.Fatal("check failed: ", err)
+		if err := handler(progInMemory); err != nil {
+			t.Fatal("parse check failed in memory: ", err)
+		}
+	}
+
+	programID := uuid.NewString()
+	// parse with database
+	{
+		opt := make([]ssaapi.Option, 0)
+		if len(languages) > 0 {
+			opt = append(opt, ssaapi.WithLanguage(languages[0]))
+		}
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		prog, err := ssaapi.Parse(code, opt...)
+		defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), programID)
+		if err != nil {
+			t.Fatalf("prog parse error: %v", err)
+		}
+		prog.Show()
+
+		if err := handler(prog); err != nil {
+			t.Fatal("parse check failed with database: ", err)
+		}
+	}
+
+	// just use database
+	{
+		progFromDB, err := ssaapi.FromDatabase(programID)
+		if err != nil {
+			t.Fatalf("prog parse from database error: %v", err)
+		}
+		if err := handler(progFromDB); err != nil {
+			t.Fatal("parse check failed in database: ", err)
+		}
 	}
 }
 
