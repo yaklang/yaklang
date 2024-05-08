@@ -244,6 +244,11 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 							ErrorUnhandledWithType(c.GetType().String()),
 						)
 					}
+					if c.HasUsers() {
+						c.NewError(ssa.Error, TypeCheckTAG,
+							ErrorUnhandledWithType(c.GetType().String()),
+						)
+					}
 				}
 			}
 			// 如果未拆包 不需要后续检查

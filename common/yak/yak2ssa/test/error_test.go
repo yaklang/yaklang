@@ -1322,6 +1322,27 @@ func TestErrorHandler(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("a function with errors was called", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			codec.EncodeToHex(codec.AESCBCDecrypt('', '', ''))
+			`,
+			Want: []string{
+				ssa4analyze.ErrorUnhandledWithType(`bytes, error`),
+			},
+		})
+	})
+
+	t.Run("the function that handled the error was called", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			codec.EncodeToHex(codec.AESCBCDecrypt('', '', '')~)
+			`,
+			Want: []string{},
+		})
+	})
+
 }
 
 func TestTryCatch(t *testing.T) {
