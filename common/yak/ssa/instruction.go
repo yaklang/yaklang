@@ -28,7 +28,7 @@ func NewUndefined(name string) *Undefined {
 	return u
 }
 
-func NewBinOpOnly(op BinaryOpcode, x, y Value) *BinOp {
+func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 	b := &BinOp{
 		anValue: NewValue(),
 		Op:      op,
@@ -41,23 +41,13 @@ func NewBinOpOnly(op BinaryOpcode, x, y Value) *BinOp {
 	return b
 }
 
-func NewBinOp(op BinaryOpcode, x, y Value) Value {
-	v := HandlerBinOp(NewBinOpOnly(op, x, y))
-	return v
-}
-
-func NewUnOpOnly(op UnaryOpcode, x Value) *UnOp {
+func NewUnOp(op UnaryOpcode, x Value) *UnOp {
 	u := &UnOp{
 		anValue: NewValue(),
 		Op:      op,
 		X:       x,
 	}
 	return u
-}
-
-func NewUnOp(op UnaryOpcode, x Value) Value {
-	b := HandlerUnOp(NewUnOpOnly(op, x))
-	return b
 }
 
 func NewIf() *If {

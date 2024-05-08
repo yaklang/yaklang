@@ -169,17 +169,6 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 				// TODO: config can set function return is a const
 				// !! medium: need a good interface for user config this
 
-			case *ssa.BinOp:
-				if v := ssa.HandlerBinOp(inst); v != inst {
-					ssa.ReplaceAllValue(inst, v)
-					deleteInst = append(deleteInst, inst)
-				}
-			case *ssa.UnOp:
-				if v := ssa.HandlerUnOp(inst); v != inst {
-					ssa.ReplaceAllValue(inst, v)
-					deleteInst = append(deleteInst, inst)
-				}
-
 			// collect control flow
 			case *ssa.If:
 				handleIfEdge(inst)

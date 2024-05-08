@@ -1434,7 +1434,7 @@ func TestSwitch(t *testing.T) {
 				ssa.ValueUndefined("a"),
 				ssa.ValueUndefined("a"),
 				ssa4analyze.ConditionIsConst("switch"),
-				ssa4analyze.BlockUnreachable(),
+				// ssa4analyze.BlockUnreachable(),
 			},
 		})
 	})
