@@ -55,6 +55,7 @@ func (f LocalFs) Stat(name string) (fs.FileInfo, error)         { return os.Stat
 func (f LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return os.ReadDir(f.Join(dirname)) }
 func (f LocalFs) GetSeparators() rune                           { return filepath.Separator }
 func (f LocalFs) Join(name ...string) string {
-	p := append([]string{string(f)}, name...)
+	// p := append([]string{string(f)}, name...)
+	p := name
 	return filepath.Join(p...)
 }
