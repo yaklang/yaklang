@@ -2,6 +2,7 @@ package antlr4yak
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	utils2 "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -36,6 +38,10 @@ func init() {
 		"Remove": func() bool {
 			return true
 		},
+	})
+	Import("NewOrderedMap", orderedmap.New)
+	Import("jsonMarshal", func(v any) ([]byte, error) {
+		return json.Marshal(v)
 	})
 	Import("timeNow", time.Now) // timeNow.Unix()
 	Import("testIns", &testStructed{A: []int{1, 2, 3}})
@@ -774,7 +780,7 @@ func _viewLexerTokens(i string) {
 	}
 }
 
-func _marshallerTestWithCtx(i string, ctx context.Context) {
+func _marshallerTestWithCtx(i string, ctx context.Context, debug bool) {
 	m := yakvm.NewCodesMarshaller()
 	cl := compiler(i)
 	oldSymbolTable, oldCodes := cl.GetRootSymbolTable(), cl.GetOpcodes()
@@ -878,19 +884,25 @@ func _marshallerTestWithCtx(i string, ctx context.Context) {
 
 	vm := yakvm.NewWithSymbolTable(symbolTable)
 	vm.ImportLibs(buildinLib)
+	var checkErr error
 	err = vm.Exec(ctx, func(frame *yakvm.Frame) {
 		frame.NormalExec(codes)
-		if err := frame.CheckExit(); err != nil {
-			panic(err)
-		}
+		checkErr = frame.CheckExit()
 	})
 	if err != nil {
 		panic(err)
 	}
+	if checkErr != nil {
+		panic(checkErr)
+	}
 }
 
-func _marshallerTest(i string) {
-	_marshallerTestWithCtx(i, context.Background())
+func _marshallerTest(i string, debugs ...bool) {
+	debug := false
+	if len(debugs) > 0 {
+		debug = debugs[0]
+	}
+	_marshallerTestWithCtx(i, context.Background(), debug)
 }
 
 func _formattest(i string) []*yakvm.Code {
@@ -4020,8 +4032,50 @@ wg.Wait()
 	defer cancel()
 
 	go func() {
-		_marshallerTestWithCtx(code, ctx)
+		_marshallerTestWithCtx(code, ctx, false)
 	}()
 
 	time.Sleep(5 * time.Second)
+}
+
+func TestOrderedMap(t *testing.T) {
+	code := `
+om = NewOrderedMap({"c":3, 4: 5})
+om["a"] = 1
+om.b = 2
+assert om.a == 1
+assert om.b == 2
+assert om.c == 3
+assert om["4"] == 5
+om.Delete("a")
+om.Delete("b")
+om.Delete("c")
+om.Delete("4")
+assert om.a == nil
+assert om["b"] == nil
+
+for i in 100 {
+	om[i] = i
+}
+
+for i in 100 {
+	count = 0
+	for k, v in om {
+		assert k == string(count)
+		assert v == count
+		count++
+	}
+}
+
+om2 = NewOrderedMap()
+om2["a"] = 1
+om2["b"] = 2
+om2["c"] = 3
+want = '{"a":1,"b":2,"c":3}'
+for i in 100 {
+	b = string(jsonMarshal(om2)~)
+	assert b == want, b
+}
+`
+	_marshallerTest(code)
 }
