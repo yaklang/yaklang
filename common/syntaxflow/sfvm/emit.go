@@ -122,6 +122,22 @@ func (v *SyntaxFlowVisitor) EmitGetMembers() {
 	})
 }
 
+func (v *SyntaxFlowVisitor) EmitGetUsers() {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetUsers})
+}
+
+func (v *SyntaxFlowVisitor) EmitGetDefs() {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetDefs})
+}
+
+func (v *SyntaxFlowVisitor) EmitGetBottomUsers() {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetBottomUsers})
+}
+
+func (v *SyntaxFlowVisitor) EmitGetTopDefs() {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs})
+}
+
 func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetCallArgs, UnaryInt: i})
 }
