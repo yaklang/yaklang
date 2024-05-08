@@ -601,7 +601,7 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 				return
 			}
 			client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-			err = client.HTTPFlowToOnline(ctx, req, data)
+			err = client.UploadHTTPFlowToOnline(ctx, req.Token, req.ProjectName, data)
 			if err != nil {
 				if strings.Contains(err.Error(), "token过期") {
 					log.Errorf("httpflow to online failed: %s", err.Error())
