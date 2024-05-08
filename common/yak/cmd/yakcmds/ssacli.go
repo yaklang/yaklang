@@ -38,6 +38,9 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "entry",
 				Usage: "Program Entry",
 			},
+			cli.BoolFlag{
+				Name: "memory",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			file := utils.GetFirstExistedPath(c.String("target"))
@@ -125,6 +128,11 @@ var SSACompilerCommands = []*cli.Command{
 
 			if entry != "" {
 				log.Infof("start to use entry: %v", entry)
+			}
+
+			if c.Bool("memory") {
+				name = ""
+				log.Infof("compile in memory mode, program-name will be ignored")
 			}
 
 			proj, err := ssaapi.ParseProjectFromPath(

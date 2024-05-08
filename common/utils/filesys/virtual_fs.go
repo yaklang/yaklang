@@ -28,6 +28,10 @@ func NewVirtualFs() *VirtualFS {
 	return vs
 }
 
+func (vs *VirtualFS) GetLocalFSPath() string {
+	return ""
+}
+
 func (vs *VirtualFS) Open(name string) (fs.File, error) {
 	vf, fileName, err := vs.get(false, vs.splite(name)...)
 	if err != nil {
