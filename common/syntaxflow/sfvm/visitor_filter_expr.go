@@ -98,6 +98,17 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+		y.EmitGetUsers()
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
+	case *sf.DefFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
+		if err != nil {
+			return err
+		}
+		y.EmitGetDefs()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
 		if err != nil {
 			return err
@@ -107,6 +118,17 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+		y.EmitGetBottomUsers()
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
+	case *sf.TopDefFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
+		if err != nil {
+			return err
+		}
+		y.EmitGetTopDefs()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
 		if err != nil {
 			return err
@@ -116,7 +138,13 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
-		log.Warn("TBD for ConfiggedDeepNextFilterContext")
+		log.Warn(`TBD: *sf.ConfiggedDeepNextFilterContext`)
+	case *sf.ConfiggedTopDefFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
+		if err != nil {
+			return err
+		}
+		log.Warn(`TBD: *sf.ConfiggedTopDefFilterContext`)
 	default:
 		panic("BUG: in filterExpr")
 	}

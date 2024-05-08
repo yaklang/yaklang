@@ -24,9 +24,10 @@ const (
 	// handle function call
 	OpGetCallArgs
 	OpGetMembers
-
-	OpTopDefs
-	OpBottomUse
+	OpGetUsers
+	OpGetBottomUsers
+	OpGetDefs
+	OpGetTopDefs
 
 	// ListOperation
 	OpListIndex
@@ -95,15 +96,16 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "getCallArgs", s.UnaryStr)
 	case OpGetMembers:
 		return fmt.Sprintf(verboseLen+" %v", "getMembers", s.UnaryStr)
-
-	case OpTopDefs:
+	case OpGetUsers:
+		return fmt.Sprintf(verboseLen+" %v", "users", s.UnaryStr)
+	case OpGetDefs:
+		return fmt.Sprintf(verboseLen+" %v", "defs", s.UnaryStr)
+	case OpGetTopDefs:
 		return fmt.Sprintf(verboseLen+" %v", "topDefs", s.UnaryStr)
-	case OpBottomUse:
+	case OpGetBottomUsers:
 		return fmt.Sprintf(verboseLen+" %v", "bottomUse", s.UnaryStr)
-
 	case OpListIndex:
 		return fmt.Sprintf(verboseLen+" %v", "listIndex", s.UnaryStr)
-
 	case OpNewRef:
 		return fmt.Sprintf(verboseLen+" %v", "new$ref", s.UnaryStr)
 	case OpUpdateRef:
