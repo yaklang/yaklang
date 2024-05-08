@@ -21,7 +21,7 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 
 // ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
-	return b.readValueEx(name, true, false || b.UnSupportClosure)
+	return b.readValueEx(name, true, true && b.SupportClosure)
 }
 
 func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
@@ -33,7 +33,7 @@ func (b *FunctionBuilder) ReadOrCreateMemberCallVariable(caller, callee Value) V
 }
 
 func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
-	return b.readValueEx(name, true, true)
+	return b.readValueEx(name, true, false)
 }
 
 func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
@@ -45,17 +45,17 @@ func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
 }
 
 func (b *FunctionBuilder) PeekValue(name string) Value {
-	return b.readValueEx(name, false, false || b.UnSupportClosure)
+	return b.readValueEx(name, false, true && b.SupportClosure)
 }
 
 func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
-	return b.readValueEx(name, false, true)
+	return b.readValueEx(name, false, false)
 }
 
 func (b *FunctionBuilder) readValueEx(
 	name string,
 	create bool, // disable create undefine
-	onlyThisFunction bool, // disable free-value
+	enableClosureFreeValue bool, // disable free-value
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
@@ -74,7 +74,7 @@ func (b *FunctionBuilder) readValueEx(
 		}
 	}
 
-	if !onlyThisFunction {
+	if enableClosureFreeValue {
 		if parentValue, ok := b.getParentFunctionVariable(name); ok {
 			// the ret variable should be FreeValue
 			para := b.BuildFreeValue(name)
@@ -102,7 +102,7 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if !onlyThisFunction {
+	if enableClosureFreeValue {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}

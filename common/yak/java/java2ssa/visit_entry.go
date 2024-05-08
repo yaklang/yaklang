@@ -22,7 +22,6 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		pkgPath := y.VisitPackageDeclaration(ret)
 		builder := y.AddCurrentPackagePath(pkgPath)
 		if builder != nil {
-			builder.UnSupportClosure = true
 			y.FunctionBuilder = builder
 		}
 	}

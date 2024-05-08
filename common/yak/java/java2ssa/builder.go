@@ -28,7 +28,6 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		ast:             ast,
 		constMap:        make(map[string]ssa.Value),
 	}
-	b.UnSupportClosure = true
 	build.VisitCompilationUnit(ast)
 	return nil
 }
