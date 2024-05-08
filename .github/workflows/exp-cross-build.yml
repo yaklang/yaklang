@@ -13,9 +13,9 @@ jobs:
   check_commit_msg:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
       - name: Check Commit Message
         run: |
+          git clone https://github.com/yaklang/yaklang && cd yaklang
           git fetch --all
           
           if [[ -n "$GITHUB_HEAD_REF" ]]; then
