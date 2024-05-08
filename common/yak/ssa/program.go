@@ -12,6 +12,7 @@ import (
 
 func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
 	prog := &Program{
+		Name:                dbProgramName,
 		Packages:            make(map[string]*Package),
 		errors:              make([]*SSAError, 0),
 		ClassBluePrint:      make(map[string]*ClassBluePrint),
@@ -30,7 +31,7 @@ func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
 }
 
 func (prog *Program) GetProgramName() string {
-	return prog.Cache.ProgramName
+	return prog.Name
 }
 
 func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Function {
