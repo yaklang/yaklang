@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -14,20 +13,6 @@ import (
 type QueryHTTPFlowOnlineRequest struct {
 	ProjectName string `json:"projectName"`
 	Content     []byte `json:"content"`
-}
-
-func (s *OnlineClient) HTTPFlowToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest, content []byte) error {
-	err := s.UploadHTTPFlowToOnline(
-		ctx,
-		req.Token,
-		req.ProjectName,
-		content,
-	)
-	if err != nil {
-		return utils.Errorf("%s", err.Error())
-	}
-
-	return nil
 }
 
 func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, token, projectName string, content []byte) error {
