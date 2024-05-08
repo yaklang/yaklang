@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
 
 type Value struct {
@@ -46,6 +47,7 @@ func (v *Value) GetExtraInfo(key string) interface{} {
 	}
 	return nil
 }
+
 func ChannelValueListToValue(op *Value) *Value {
 	if !op.IsChannelValueList() {
 		return op
@@ -594,6 +596,7 @@ func (v *Value) Bool() bool {
 	}
 	return false
 }
+
 func (v *Value) IntBool() bool {
 	switch b := v.Value.(type) {
 	case int:
@@ -601,6 +604,7 @@ func (v *Value) IntBool() bool {
 	}
 	return false
 }
+
 func (v *Value) IsCodes() bool {
 	_, ok := v.Value.([]*Code)
 	return ok
@@ -624,7 +628,7 @@ func (v *Value) ValueListToInterface() interface{} {
 	case 0:
 		return nil
 	default:
-		var ret = make([]interface{}, listLen)
+		ret := make([]interface{}, listLen)
 		for i := 0; i < listLen; i++ {
 			ret[i] = list[i].Value
 		}
@@ -920,7 +924,12 @@ func (v *Value) IsLeftSliceCall() bool {
 		return false
 	}
 
-	// x[...] 的调用仅限于 slice / map / string
+	// x[...] 的调用仅限于 slice / map / string / orderedMap
+
+	// orderedMap
+	if _, ok := raw[0].Value.(*orderedmap.OrderedMap); ok {
+		return true
+	}
 
 	switch reflect.TypeOf(raw[0].Value).Kind() {
 	case reflect.Slice, reflect.String, reflect.Map:
@@ -930,9 +939,7 @@ func (v *Value) IsLeftSliceCall() bool {
 	}
 }
 
-var (
-	leftSliceAssignLock = new(sync.Mutex)
-)
+var leftSliceAssignLock = new(sync.Mutex)
 
 func (v *Value) LeftSliceAssignTo(vir *Frame, val *Value) {
 	if !v.IsLeftSliceCall() {
@@ -941,6 +948,13 @@ func (v *Value) LeftSliceAssignTo(vir *Frame, val *Value) {
 	caller, key := v.GetLeftCallerNIndex()
 	leftSliceAssignLock.Lock()
 	defer leftSliceAssignLock.Unlock()
+
+	// orderedMap
+	if m, ok := caller.Value.(*orderedmap.OrderedMap); ok {
+		m.Set(key.String(), val.Value)
+		return
+	}
+
 	switch reflect.TypeOf(caller.Value).Kind() {
 	case reflect.Slice:
 		reflect.ValueOf(caller.Value).Index(key.Int()).Set(reflect.ValueOf(val.Value).Convert(reflect.ValueOf(caller.Value).Index(key.Int()).Type()))
@@ -1027,13 +1041,19 @@ func (v *Value) LeftMemberAssignTo(vir *Frame, val *Value) {
 	}
 	caller, key := v.GetLeftCallerNIndex()
 	callerValue := caller.Value
-	switch reflect.TypeOf(caller.Value).Kind() {
+	// orderedMap
+	if m, ok := callerValue.(*orderedmap.OrderedMap); ok {
+		m.Set(key.String(), val.Value)
+		return
+	}
+
+	switch reflect.TypeOf(callerValue).Kind() {
 	case reflect.Map:
 		refV, err := vir.AutoConvertYakValueToNativeValue(val)
 		if err != nil {
 			panic(fmt.Sprintf("runtime error: cannot assign %v to map[index]", val))
 		}
-		callerRefV := reflect.ValueOf(caller.Value)
+		callerRefV := reflect.ValueOf(callerValue)
 		keyRefV := reflect.ValueOf(key.Value)
 		if callerRefV.MapIndex(keyRefV).IsValid() {
 			refV = refV.Convert(callerRefV.MapIndex(keyRefV).Type())

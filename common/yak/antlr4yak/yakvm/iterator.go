@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
 
 type IteratorType int
@@ -133,6 +134,47 @@ func (i *MapIterator) Next() (data []interface{}, hadEnd bool) {
 	return
 }
 
+type OrderedMapIterator struct {
+	BaseIterator
+
+	orderedMap *orderedmap.OrderedMap
+	mapKeys    []string
+}
+
+func newOrderedMapIterator(i *orderedmap.OrderedMap) *OrderedMapIterator {
+	mapLen := i.Len()
+	if mapLen == 0 {
+		return nil
+	}
+
+	return &OrderedMapIterator{
+		BaseIterator: BaseIterator{
+			Current: 0,
+			N:       mapLen,
+			typ:     MapIteratorType,
+		},
+		orderedMap: i,
+		mapKeys:    i.Keys(),
+	}
+}
+
+func (i *OrderedMapIterator) Next() (data []interface{}, hadEnd bool) {
+	var current int
+	current, hadEnd = i.nextStep()
+	if hadEnd {
+		data = []interface{}{nil, nil}
+	} else {
+		key := i.mapKeys[current]
+		value, ok := i.orderedMap.Get(key)
+		if !ok {
+			data = []interface{}{nil, nil}
+		} else {
+			data = []interface{}{key, value}
+		}
+	}
+	return
+}
+
 type ChannelIterator struct {
 	BaseIterator
 
@@ -212,6 +254,11 @@ func (i *RepeatIterator) Next() (data []interface{}, hadEnd bool) {
 func NewIterator(i interface{}, v *Frame) (IteratorInterface, error) {
 	if i == nil {
 		return nil, nil
+	}
+
+	// OrderedMap iterator
+	if orderedMap, ok := i.(*orderedmap.OrderedMap); ok {
+		return newOrderedMapIterator(orderedMap), nil
 	}
 
 	kind := reflect.TypeOf(i).Kind()

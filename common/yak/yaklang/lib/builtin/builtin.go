@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
 	"github.com/yaklang/yaklang/common/yak/yaklang/spec/types"
@@ -163,6 +164,11 @@ func Delete(m interface{}, key interface{}) {
 			return
 		}
 	}()
+	if m, ok := m.(*orderedmap.OrderedMap); ok {
+		m.Delete(key.(string))
+		return
+	}
+
 	reflect.ValueOf(m).SetMapIndex(reflect.ValueOf(key), zeroVal)
 }
 
