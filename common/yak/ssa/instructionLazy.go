@@ -19,10 +19,11 @@ type LazyInstruction struct {
 	Instruction
 	Value
 	User
-	id     int64
-	ir     *ssadb.IrCode
-	cache  *Cache
-	Modify bool
+	id          int64
+	ir          *ssadb.IrCode
+	programName string
+	cache       *Cache
+	Modify      bool
 }
 
 var (
@@ -32,35 +33,52 @@ var (
 )
 
 // NewLazyInstruction : create a new lazy instruction, only create in cache
-func NewLazyInstruction(id int64) (*LazyInstruction, error) {
+func NewLazyInstruction(id int64) (Value, error) {
 	ir := ssadb.GetIrCodeById(consts.GetGormProjectDatabase(), id)
 	if ir == nil {
 		return nil, utils.Error("ircode [" + fmt.Sprint(id) + "]not found")
 	}
-
-	lz := &LazyInstruction{
-		id: id,
-		ir: ir,
+	cache := GetCacheFromPool(ir.ProgramName)
+	if ret := cache.GetInstruction(id); ret != nil {
+		value, ok := ToValue(ret)
+		if !ok {
+			log.Warnf("BUG: cache return not a value")
+			return nil, utils.Errorf("BUG: LazyInstruction cache return not a value")
+		}
+		return value, nil
 	}
-	return lz, nil
-}
-
-func (z *LazyInstruction) SetCache(i *Cache) {
-	z.cache = i
-	z.cache.InstructionCache.Set(z.id, instructionIrCode{
-		inst:   z,
-		irCode: z.ir,
-	})
+	return newLazyInstruction(id, ir, cache), nil
 }
 
 func (c *Cache) newLazyInstruction(id int64) *LazyInstruction {
-	ins, err := NewLazyInstruction(id)
-	if err != nil {
-		log.Warnf("BUG or database error: failed to create lazy instruction: %v", err)
-		return nil
+	return newLazyInstruction(id, nil, c)
+}
+func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) *LazyInstruction {
+	if ir == nil {
+		ir = ssadb.GetIrCodeById(consts.GetGormProjectDatabase(), id)
+		if ir == nil {
+			log.Error("ircode [" + fmt.Sprint(id) + "]not found")
+			return nil
+		}
 	}
-	ins.SetCache(c)
-	return ins
+	lz := &LazyInstruction{
+		id:          id,
+		ir:          ir,
+		programName: ir.ProgramName,
+	}
+	lz.cache = cache
+	lz.cache.InstructionCache.Set(lz.id, instructionIrCode{
+		inst:   lz,
+		irCode: lz.ir,
+	})
+	return lz
+}
+
+func (lz *LazyInstruction) Self() Value {
+	if lz.Value == nil {
+		lz.check()
+	}
+	return lz.Value
 }
 
 // create real-instruction from lazy-instruction
