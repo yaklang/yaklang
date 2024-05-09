@@ -166,7 +166,7 @@ func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
 
 func (y *SyntaxFlowVisitor) EmitGetTopDef() {
 	y.codes = append(y.codes, &SFI{
-		OpCode: OpTopDefs,
+		OpCode: OpGetTopDefs,
 	})
 }
 

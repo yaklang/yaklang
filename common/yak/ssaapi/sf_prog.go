@@ -64,7 +64,20 @@ func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
 }
 
-func (p *Program) SyntaxFlowWithError(i string) (Values, error) {
+func (p *Program) SyntaxFlow(i string, opts ...any) Values {
+	vals, err := p.SyntaxFlowWithError(i)
+	if err != nil {
+		log.Warnf("exec syntaxflow: %#v failed: %v", i, err)
+		return nil
+	}
+	return vals
+}
+
+func (p *Program) SF(i string, opts ...any) Values {
+	return p.SyntaxFlow(i, opts...)
+}
+
+func (p *Program) SyntaxFlowWithError(i string, opts ...any) (Values, error) {
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
 	vm.Debug()
 	err := vm.Compile(i)
