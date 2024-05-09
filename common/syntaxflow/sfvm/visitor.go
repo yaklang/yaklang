@@ -2,10 +2,11 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
 
 type SyntaxFlowVisitor struct {
@@ -65,7 +66,7 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 	}
 	y.EmitPop()
 
-	if i.FilterExpr() != nil {
+	if i.FilterExpr() != nil && i.RefVariable() != nil {
 		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
 		y.EmitNewRef(varName)
 		y.EmitUpdate(varName)
