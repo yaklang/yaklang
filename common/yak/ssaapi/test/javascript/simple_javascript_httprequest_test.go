@@ -3,6 +3,7 @@ package javascript
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 )
@@ -12,38 +13,55 @@ func Test_JS_XMLHttpRequest(t *testing.T) {
 		code := `
 	let xhr1 =new XMLHttpRequest()
 
-	xhr1.open('GET', 'http://*****')
+	xhr1.open('GET', 'http://example.com')
 	xhr1.send()
     xhr1.send("123")
     xhr1.addEventListener('load', function () {
       console.log(this.response)
     })
-
    `
 		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
 		if err != nil {
 			t.Fatal("prog parse error", err)
 		}
 		prog.Show()
-		// todo syntax分析应该只能得到XMLHttpRequest.open(),得到多个无关值
 		results, err := prog.SyntaxFlowWithError("XMLHttpRequest().open")
 		for _, result := range results {
 			// 获取所有call被调用的地方
 			for _, called := range result.GetCalledBy() {
 				//获取参数
-				called.GetCallArgs().Show()
+				method := called.GetCallArgs()[0]
+				fmt.Printf("method: %v\n", method.String())
+				require.Equal(t, method.String(), "\"GET\"")
+				path := called.GetCallArgs()[1]
+				fmt.Printf("path: %v\n", path.String())
+				require.Equal(t, path.String(), "\"http://example.com\"")
 			}
 		}
 	})
 
 	t.Run("simple post request", func(t *testing.T) {
 		code := `
-	const data = {
+	const data1 = {
+       name: 'job',
+       age: '12',
+    }
+    let xhr1 = new XMLHttpRequest()
+    xhr1.open('POST', 'http://example1.com')
+    const usp = new URLSearchParams(data)
+    const query = usp.toString()
+    xhr1.setRequestHeader('Content-type', 'application/x-www-form-urlencoded')
+    xhr1.send(query)
+    xhr1.addEventListener('load', function () {
+        console.log(this.response)
+    })
+
+const data2 = {
        name: 'job',
        age: '12',
     }
     let xhr2 = new XMLHttpRequest()
-    xhr2.open('POST', 'http://XXXX')
+    xhr2.open('POST', 'http://example2.com')
     const usp = new URLSearchParams(data)
     const query = usp.toString()
     xhr2.setRequestHeader('Content-type', 'application/x-www-form-urlencoded')
@@ -58,14 +76,22 @@ func Test_JS_XMLHttpRequest(t *testing.T) {
 			t.Fatal("prog parse error", err)
 		}
 		prog.Show()
-		// todo syntax分析应该只能得到XMLHttpRequest.open(),得到多个无关值
-		// 获取XMLHttpRequest.open()的参数
-		open, err := prog.SyntaxFlowWithError("XMLHttpRequest().open")
-		for _, result := range open {
-			// 获取所有call被调用的地方
-			for _, called := range result.GetCalledBy() {
-				//获取参数
-				called.GetCallArgs().Show()
+		xmlRequest, err := prog.SyntaxFlowWithError("XMLHttpRequest()")
+		open := xmlRequest.Ref("open")
+		if len(open) != 0 {
+			for _, result := range open {
+				// 获取所有call被调用的地方
+				for _, called := range result.GetCalledBy() {
+					//获取参数
+					fmt.Println("=====================================================")
+					method := called.GetCallArgs()[0]
+					fmt.Printf("method: %v\n", method.String())
+					require.Equal(t, method.String(), "\"POST\"")
+					path := called.GetCallArgs()[1]
+					fmt.Printf("path: %v\n", path.String())
+					require.Contains(t, path.String(), "http://example")
+				}
+				// 获取post的data
 			}
 		}
 
