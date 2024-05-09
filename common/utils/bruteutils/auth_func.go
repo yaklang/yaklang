@@ -66,6 +66,7 @@ var AuthFunctionMap = []struct {
 	{Name: "socks_proxy/v5", Data: "socks5_proxy"},
 	{Name: "socks_proxy/v4", Data: "socks4_proxy"},
 	{Name: "socks_proxy/v4a", Data: "socks4a_proxy"},
+	{Name: "pptp", Data: "pptp"},
 }
 
 // rdp https://palm/common/utils/bruteutils/grdp
@@ -99,6 +100,7 @@ var authFunc = map[string]*DefaultServiceAuthInfo{
 	"socks5_proxy":   SocksProxyBruteAuthFactory("socks5"),
 	"socks4_proxy":   SocksProxyBruteAuthFactory("socks4"),
 	"socks4a_proxy":  SocksProxyBruteAuthFactory("socks4a"),
+	"pptp":           pptp_Auth,
 }
 
 func GetUsernameListFromBruteType(t string) []string {
