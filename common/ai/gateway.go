@@ -3,7 +3,9 @@ package ai
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 import (
@@ -13,11 +15,33 @@ import (
 )
 
 func createAIGateway(t string) aispec.AIGateway {
-	gw, ok := aispec.Lookup(t)
-	if !ok {
+	createAIGatewayByType := func(typ string) aispec.AIGateway {
+		gw, ok := aispec.Lookup(t)
+		if !ok {
+			return nil
+		}
+		return gw
+	}
+	if utils.StringArrayContains([]string{"openai", "chatglm", "moonshot"}, t) {
+		return createAIGatewayByType(t)
+	} else {
+		if t != "" {
+			log.Errorf("unsupported ai type: %s, use default config ai type", t)
+		}
+		cfg := yakit.GetNetworkConfig()
+		if cfg == nil {
+			return nil
+		}
+		for _, typ := range cfg.AiApiPriority {
+			agent := createAIGatewayByType(typ)
+			if agent != nil {
+				return agent
+			} else {
+				log.Errorf("create ai agent by type %s failed", typ)
+			}
+		}
 		return nil
 	}
-	return gw
 }
 
 /*
