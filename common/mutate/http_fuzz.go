@@ -663,9 +663,14 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	if err != nil {
 		return nil
 	}
-	bodyRaw := httpRequestReadBody(req)
 
 	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
+
+	bodyRaw := httpRequestReadBody(req)
+
+	if bodyRaw == nil || len(bodyRaw) == 0 {
+		return fuzzParams
+	}
 
 	call := func(key, val gjson.Result, gPath, jPath string) {
 		var paramValue interface{}
