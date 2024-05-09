@@ -351,7 +351,8 @@ questionDot: '?' '.';
 
 keywordSingleExpression
     : Import '(' singleExpression ')'                                       # ImportExpression
-    | New singleExpression arguments?                                       # NewExpression
+    | New singleExpression arguments                                        # NewExpression
+    | New singleExpression                                                  # NewExpressionWithoutArgumentsExpression
     | New '.' identifier                                                    # MetaExpression // new.target
     | Await singleExpression                                                # AwaitExpression
     ;
