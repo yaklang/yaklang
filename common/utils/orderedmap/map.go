@@ -35,7 +35,7 @@ func SetWithMaybeSameKey(o *OrderedMap, key string, value any) {
 // New 从零创建一个有序映射或从一个普通映射中创建一个有序映射，其的基本用法与普通映射相同，但内置方法可能不同
 // Example:
 // ```
-// om = omap.New()
+// om = orderedmap.New()
 // om["a"] = 1
 // om.b = 2
 // println(om.a) // 1
@@ -49,16 +49,22 @@ func SetWithMaybeSameKey(o *OrderedMap, key string, value any) {
 // }
 // ```
 func New(maps ...any) *OrderedMap {
-	m := make(map[string]any)
+	var m map[string]any
 	if len(maps) > 0 {
+		if om, ok := maps[0].(*OrderedMap); ok {
+			return om
+		}
+
 		m = utils.InterfaceToMapInterface(maps[0])
+	} else {
+		m = make(map[string]any)
 	}
 
-	o := OrderedMap{}
-	o.keys = lo.Keys(m)
-	o.values = m
-	o.escapeHTML = true
-	return &o
+	o := &OrderedMap{
+		keys:   lo.Keys(m),
+		values: m,
+	}
+	return o
 }
 
 func (o *OrderedMap) SetEscapeHTML(on bool) {
