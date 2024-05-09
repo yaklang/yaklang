@@ -1,17 +1,26 @@
 host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 var checkKey = false
+var checkDollarKey = false
 var checkb0c = false
 var checkb = false
 
 for result in fuzz.HTTPRequest(f`GET / HTTP/1.1
 Host: ${host}:${port}
 
-` + `{"key":"a", "b":[{"c":"ckey"}]}`)~.GetPostJsonParams() {
-    body = result.Fuzz(f`${result.Value()}` + "__PLACEHOLDER").FirstFuzzHTTPRequest()~.Show().GetBody()
+` + `{"key":"a","$key":"$", "b":[{"c":"ckey"}]}`)~.GetPostJsonParams() {
+
+
+
+    body = result.Fuzz(f`${result.Value()}` + "__PLACEHOLDER").FirstFuzzHTTPRequest().Show().GetBody()
     if body.Contains("a__PLACEHOLDER") {
         checkKey = true
-        // 把 array 和 字符串拼接了
-    } else if body.Contains(`[{\"c\":\"ckey\"}]__PLACEHOLDER`) {
+    } else if  body.Contains(`$__PLACEHOLDER`){
+            dump(result.Name())
+            dump(result.GetPostJsonPath())
+        if result.Name() == "$key" && result.GetPostJsonPath() == `$["$key"]` {
+            checkDollarKey = true
+        }
+    } else if body.Contains(`[{\"c\":\"ckey\"}]__PLACEHOLDER`) { // 把 array 和 字符串拼接了
         checkb = true
     } else if body.Contains(`ckey__PLACEHOLDER`) {
         checkb0c = true
@@ -21,6 +30,11 @@ Host: ${host}:${port}
 if !checkKey {
     die("BASIC $.key failed")
 }
+
+if !checkDollarKey {
+    die(`BASIC $["$key"] failed`)
+}
+
 
 if !checkb {
     die(`BASIC $.b failed`)

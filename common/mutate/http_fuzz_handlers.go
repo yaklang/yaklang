@@ -427,7 +427,7 @@ func modifyJSONValue(rawJson, jsonPath, value string, val any, index int) (strin
 	defer func() {
 		index++
 	}()
-	if !strings.HasPrefix(jsonPath, "$.") {
+	if !strings.HasPrefix(jsonPath, "$.") && !strings.HasPrefix(jsonPath, "$[") {
 		jsonPath = "$." + jsonPath
 	}
 	var newValue interface{} = value
