@@ -361,6 +361,9 @@ func Len(a interface{}) int {
 	if ch, ok := a.(*yaklangspec.Chan); ok {
 		return ch.Data.Len()
 	}
+	if m, ok := a.(*orderedmap.OrderedMap); ok {
+		return m.Len()
+	}
 	return reflect.ValueOf(a).Len()
 }
 
@@ -377,6 +380,7 @@ func Cap(a interface{}) int {
 	if ch, ok := a.(*yaklangspec.Chan); ok {
 		return ch.Data.Cap()
 	}
+
 	return reflect.ValueOf(a).Cap()
 }
 
