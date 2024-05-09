@@ -40,6 +40,17 @@ func init() {
 		},
 	})
 	Import("NewOrderedMap", orderedmap.New)
+	Import("testOrderedMap", map[string]any{
+		"StringMap": func(v map[string]any) map[string]any {
+			return v
+		},
+		"AnyMap": func(v map[any]any) map[any]any {
+			return v
+		},
+		"ToOrderedMap": func(v *orderedmap.OrderedMap) *orderedmap.OrderedMap {
+			return v
+		},
+	})
 	Import("jsonMarshal", func(v any) ([]byte, error) {
 		return json.Marshal(v)
 	})
@@ -76,6 +87,10 @@ func init() {
 		return fmt.Sprint(i)
 	})
 	Import("len", func(i interface{}) int {
+		// Reference: common\yak\yaklang\lib\builtin\builtin.go Len
+		if m, ok := i.(*orderedmap.OrderedMap); ok {
+			return m.Len()
+		}
 		return reflect.ValueOf(i).Len()
 	})
 	Import("typeof", func(i interface{}) reflect.Type {
@@ -4066,6 +4081,7 @@ for i in 100 {
 		count++
 	}
 }
+assert len(om) == 100
 
 om2 = NewOrderedMap()
 om2["a"] = 1
@@ -4076,6 +4092,15 @@ for i in 100 {
 	b = string(jsonMarshal(om2)~)
 	assert b == want, b
 }
+
+assert len(testOrderedMap.StringMap(om2)) == 3
+assert len(testOrderedMap.AnyMap(om2)) == 3
+m = make(map[string]var)
+m["a"] = 1
+m2 = make(map[var]var)
+m2[0] = 1
+assert len(testOrderedMap.ToOrderedMap(m)) == 1
+assert len(testOrderedMap.ToOrderedMap(m2)) == 1
 `
 	_marshallerTest(code)
 }
