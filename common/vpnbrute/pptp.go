@@ -82,7 +82,7 @@ func GetDefaultPPTPConfig() *PPTPConfig {
 	}
 }
 
-type PPTPAuth struct {
+type PPTPAuthItem struct {
 	ppp *ppp.PPPAuth
 	cfg *PPTPConfig
 
@@ -97,8 +97,8 @@ type PPTPAuth struct {
 	SNumber int
 }
 
-func GetDefaultPPTPAuth() *PPTPAuth {
-	return &PPTPAuth{
+func GetDefaultPPTPAuth() *PPTPAuthItem {
+	return &PPTPAuthItem{
 		ppp:     ppp.GetDefaultPPPAuth(),
 		cfg:     GetDefaultPPTPConfig(),
 		SNumber: 0,
@@ -216,7 +216,7 @@ func (c *PPTPConfig) GetSetLinkInfo() map[string]any {
 	}
 }
 
-func (pptp *PPTPAuth) GetSetLinkInfo() map[string]any {
+func (pptp *PPTPAuthItem) GetSetLinkInfo() map[string]any {
 	return map[string]any{
 		"Length":             24,
 		"MessageType":        1,
@@ -232,7 +232,7 @@ func (pptp *PPTPAuth) GetSetLinkInfo() map[string]any {
 	}
 }
 
-func (pptp *PPTPAuth) PPTPNegotiate() (net.Conn, error) {
+func (pptp *PPTPAuthItem) PPTPNegotiate() (net.Conn, error) {
 	// connect pptp server
 	conn, err := netx.DialX(pptp.Target, netx.DialX_WithTimeout(5*time.Second))
 	if err != nil {
@@ -288,7 +288,7 @@ func (pptp *PPTPAuth) PPTPNegotiate() (net.Conn, error) {
 	}
 }
 
-func Auth(ctx context.Context, target, username, password string) (error, bool) {
+func PPTPAuth(ctx context.Context, target, username, password string) (error, bool) {
 	pptp := GetDefaultPPTPAuth()
 	pptp.Target = target
 	pptp.ppp.Username = username
@@ -296,7 +296,7 @@ func Auth(ctx context.Context, target, username, password string) (error, bool) 
 	return pptp.auth(ctx)
 }
 
-func (pptp *PPTPAuth) auth(ctx context.Context) (error, bool) {
+func (pptp *PPTPAuthItem) auth(ctx context.Context) (error, bool) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	conn, err := pptp.PPTPNegotiate()
@@ -326,7 +326,7 @@ func (pptp *PPTPAuth) auth(ctx context.Context) (error, bool) {
 	return pptp.Tunnel(ctx)
 }
 
-func (pptp *PPTPAuth) Tunnel(ctx context.Context) (error, bool) {
+func (pptp *PPTPAuthItem) Tunnel(ctx context.Context) (error, bool) {
 	targetHost := utils.ExtractHost(pptp.Target)
 	iface, _, sIp, err := netutil.Route(5*time.Second, targetHost)
 	if err != nil {
@@ -430,7 +430,7 @@ func (pptp *PPTPAuth) Tunnel(ctx context.Context) (error, bool) {
 
 }
 
-func (pptp *PPTPAuth) pppMapToPacket(pppMap map[string]any) ([]byte, error) { // encapsulate ppp to ethernet packet
+func (pptp *PPTPAuthItem) pppMapToPacket(pppMap map[string]any) ([]byte, error) { // encapsulate ppp to ethernet packet
 	greMap, err := pptp.encapsulateGRE(pppMap)
 	if err != nil {
 		return nil, err
@@ -449,7 +449,7 @@ func (pptp *PPTPAuth) pppMapToPacket(pppMap map[string]any) ([]byte, error) { //
 	return binparser.NodeToBytes(ethNode), nil
 }
 
-func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, error) {
+func (pptp *PPTPAuthItem) encapsulateGRE(payload map[string]any) (map[string]any, error) {
 	res, err := parser.GenerateBinary(payload, "ppp", "PPP")
 	if err != nil {
 		return nil, err
@@ -471,7 +471,7 @@ func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, er
 
 }
 
-func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node, replyChan chan []byte) error {
+func (pptp *PPTPAuthItem) ProcessGre(messageNode *base.Node, replyChan chan []byte) error {
 	if messageNode.Name != "GRE" {
 		return utils.Error("not GRE message")
 	}
@@ -539,7 +539,7 @@ func ipChecksum(totalLength uint16, protocol uint8, src, dst []byte) uint16 {
 	return result
 }
 
-func (pptp *PPTPAuth) encapsulateIPEthernet(payload map[string]any) (map[string]any, error) {
+func (pptp *PPTPAuthItem) encapsulateIPEthernet(payload map[string]any) (map[string]any, error) {
 	res, err := parser.GenerateBinary(payload, "generic_routing_encapsulation", "GRE")
 	if err != nil {
 		return nil, err
