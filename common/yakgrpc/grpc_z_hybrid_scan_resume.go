@@ -23,17 +23,21 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	if err != nil {
 		return utils.Wrapf(err, "Resume HybridScanByID: %v", manager.TaskId())
 	}
+	quickSave := func() {
+		if consts.GetGormProjectDatabase().Save(task).Error != nil {
+			log.Error(err)
+		}
+	}
+
+	task.Status = yakit.HYBRIDSCAN_EXECUTING
+	quickSave()
+
 	var scanConfig ypb.HybridScanRequest
 	err = json.Unmarshal(task.ScanConfig, &scanConfig)
 	if err != nil {
 		return utils.Wrapf(err, "Resume HybridScanByID: %v", manager.TaskId())
 	}
 
-	quickSave := func() {
-		if consts.GetGormProjectDatabase().Save(task).Error != nil {
-			log.Error(err)
-		}
-	}
 	defer func() {
 		if err := recover(); err != nil {
 			task.Reason = utils.Wrapf(utils.Error(err), "PANIC from resume").Error()
@@ -80,7 +84,11 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		return utils.Wrapf(err, "Unmarshal HybridScan Plugins: %v", task.Plugins)
 	}
 
-	statusManager := newHybridScanStatusManager(task.TaskId, len(targets), len(pluginName))
+	statusManager := newHybridScanStatusManager(task.TaskId, len(targets), len(pluginName), task.Status)
+	setTaskStatus := func(status string) {
+		task.Status = status
+		statusManager.Status = status
+	}
 	statusManager.SetCurrentTaskIndex(minIndex)
 
 	pluginCacheList := list.New()
@@ -108,10 +116,10 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				return
 			}
 			if rsp.HybridScanMode == "pause" {
+				setTaskStatus(yakit.HYBRIDSCAN_PAUSED)
+				feedbackStatus()
 				manager.Pause()
 				manager.Stop()
-				task.Status = yakit.HYBRIDSCAN_PAUSED
-				stream.Send(statusManager.GetStatus(task))
 				quickSave()
 			}
 		}
@@ -257,11 +265,11 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		}()
 	}
 	swg.Wait()
-	feedbackStatus()
 	statusManager.GetStatus(task)
 	if !manager.IsPaused() {
-		task.Status = yakit.HYBRIDSCAN_DONE
+		setTaskStatus(yakit.HYBRIDSCAN_DONE)
 	}
+	feedbackStatus()
 	quickSave()
 	if hasUnavailableTarget {
 		return utils.Errorf("Has unreachable target")

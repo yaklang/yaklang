@@ -32,18 +32,22 @@ type HybridScanStatusManager struct {
 
 	// 恢复任务的时候使用
 	minTaskCount int64
+
+	// 任务状态
+	Status string
 }
 
 func (h *HybridScanStatusManager) SetCurrentTaskIndex(i int64) {
 	h.minTaskCount = i
 }
 
-func newHybridScanStatusManager(id string, targets int, plugins int) *HybridScanStatusManager {
+func newHybridScanStatusManager(id string, targets int, plugins int, status string) *HybridScanStatusManager {
 	return &HybridScanStatusManager{
 		TargetTotal:   int64(targets),
 		PluginTotal:   int64(plugins),
 		TaskId:        id,
 		ActiveTaskMap: new(sync.Map),
+		Status:        status,
 	}
 }
 
@@ -66,6 +70,7 @@ func (h *HybridScanStatusManager) GetStatus(r ...*yakit.HybridScanTask) *ypb.Hyb
 		ActiveTasks:      h.ActiveTask,
 		ActiveTargets:    h.ActiveTarget,
 		HybridScanTaskId: h.TaskId,
+		Status:           h.Status,
 	}
 	if h.minTaskCount > 0 {
 		if status.FinishedTasks < h.minTaskCount {

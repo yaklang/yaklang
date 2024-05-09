@@ -15,7 +15,7 @@ type HybridScanTaskManager struct {
 	cancel       context.CancelFunc
 	resumeSignal *sync.Cond
 	waitCount    int64
-	resumeLock   *sync.Mutex
+	//resumeLock   *sync.Mutex
 }
 
 func (h *HybridScanTaskManager) IsPaused() bool {
@@ -82,25 +82,26 @@ func (h *HybridScanTaskManager) Context() context.Context {
 
 func (h *HybridScanTaskManager) Resume() { // close pause task
 	h.isPaused.UnSet()
-	h.resumeLock.Lock()
-	go func() {
-		defer h.resumeLock.Unlock()
-
-		count := 0
-		for {
-			if count > 5 {
-				return
-			}
-
-			if h.waitCount > 0 {
-				count = 0
-				h.resumeSignal.Broadcast()
-				time.Sleep(200 * time.Millisecond)
-			} else {
-				count++
-			}
-		}
-	}()
+	//h.isPaused.UnSet()
+	//h.resumeLock.Lock()
+	//go func() {
+	//	defer h.resumeLock.Unlock()
+	//
+	//	count := 0
+	//	for {
+	//		if count > 5 {
+	//			return
+	//		}
+	//
+	//		if h.waitCount > 0 {
+	//			count = 0
+	//			h.resumeSignal.Broadcast()
+	//			time.Sleep(200 * time.Millisecond)
+	//		} else {
+	//			count++
+	//		}
+	//	}
+	//}()
 }
 
 var hybrisScanManager = new(sync.Map)
@@ -119,8 +120,8 @@ func CreateHybridTask(id string, ctx context.Context) (*HybridScanTaskManager, e
 		ctx:          rootctx,
 		cancel:       cancel,
 		resumeSignal: sync.NewCond(&sync.Mutex{}),
-		resumeLock:   new(sync.Mutex),
-		taskId:       id,
+		//resumeLock:   new(sync.Mutex),
+		taskId: id,
 	}
 	hybrisScanManager.Store(id, m)
 	return m, nil
