@@ -306,7 +306,7 @@ func initYaklangLib() {
 	yaklang.Import("pprof", pprofutils.Exports)
 
 	// orderedMap
-	yaklang.Import("omap", yaklib.OrderedMapExports)
+	yaklang.Import("orderedmap", yaklib.OrderedMapExports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
