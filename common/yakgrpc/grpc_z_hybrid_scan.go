@@ -117,6 +117,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			FinishedTargets:  t.FinishedTargets,
 			HybridScanTaskId: t.TaskId,
 			ScanConfig:       string(t.ScanConfig),
+			Status:           t.Status,
 		})
 
 		client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
@@ -129,6 +130,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 				FinishedTargets:  t.FinishedTargets,
 				HybridScanTaskId: t.TaskId,
 				ExecResult:       result,
+				Status:           t.Status,
 			})
 		})
 
