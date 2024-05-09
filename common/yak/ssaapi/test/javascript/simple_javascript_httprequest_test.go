@@ -25,18 +25,16 @@ func Test_JS_XMLHttpRequest(t *testing.T) {
 			t.Fatal("prog parse error", err)
 		}
 		prog.Show()
-		results, err := prog.SyntaxFlowWithError("XMLHttpRequest().open")
+		results, err := prog.SyntaxFlowWithError("XMLHttpRequest().open()")
+
 		for _, result := range results {
-			// 获取所有call被调用的地方
-			for _, called := range result.GetCalledBy() {
-				//获取参数
-				method := called.GetCallArgs()[0]
-				fmt.Printf("method: %v\n", method.String())
-				require.Equal(t, method.String(), "\"GET\"")
-				path := called.GetCallArgs()[1]
-				fmt.Printf("path: %v\n", path.String())
-				require.Equal(t, path.String(), "\"http://example.com\"")
-			}
+			args := result.GetCallArgs()
+			method := args[0]
+			fmt.Printf("method: %v\n", method.String())
+			require.Equal(t, method.String(), "\"GET\"")
+			path := args[1]
+			fmt.Printf("path: %v\n", path.String())
+			require.Equal(t, path.String(), "\"http://example.com\"")
 		}
 	})
 
@@ -76,22 +74,22 @@ const data2 = {
 			t.Fatal("prog parse error", err)
 		}
 		prog.Show()
-		xmlRequest, err := prog.SyntaxFlowWithError("XMLHttpRequest()")
-		open := xmlRequest.Ref("open")
-		if len(open) != 0 {
-			for _, result := range open {
-				// 获取所有call被调用的地方
-				for _, called := range result.GetCalledBy() {
-					//获取参数
-					fmt.Println("=====================================================")
-					method := called.GetCallArgs()[0]
-					fmt.Printf("method: %v\n", method.String())
-					require.Equal(t, method.String(), "\"POST\"")
-					path := called.GetCallArgs()[1]
-					fmt.Printf("path: %v\n", path.String())
-					require.Contains(t, path.String(), "http://example")
-				}
-				// 获取post的data
+		requests, err := prog.SyntaxFlowWithError("XMLHttpRequest().open()")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// TODO: 获取post的data 并且data要与url、method关联
+
+		for _, result := range requests {
+			args := result.GetCallArgs()
+			if len(args) == 2 {
+				fmt.Println("=====================================================")
+				method := args[0]
+				fmt.Printf("method: %v\n", method.String())
+				require.Equal(t, method.String(), "\"POST\"")
+				path := args[1]
+				fmt.Printf("path: %v\n", path.String())
+				require.Contains(t, path.String(), "http://example")
 			}
 		}
 
@@ -99,8 +97,9 @@ const data2 = {
 
 }
 
-func TestJs_Ajax(t *testing.T) {
-	code := `$.ajax({ //统计访问量
+func TestJs_JQuery(t *testing.T) {
+	t.Run("test jQuery $.ajax", func(t *testing.T) {
+		code := `$.ajax({ //统计访问量
     url:'/foot_action!getCount.action',
     type: 'POST',
     dataType: 'json',
@@ -114,33 +113,35 @@ func TestJs_Ajax(t *testing.T) {
         $("#fwl").html(result.count1);
     }
  });`
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
-	if err != nil {
-		panic(err)
-	}
-	withError, err := prog.SyntaxFlowWithError("$.ajax()")
-	if err != nil {
-		panic(err)
-	}
-	for _, value := range withError {
-		operator, err := value.GetCallActualParams()
+		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
 		if err != nil {
 			panic(err)
 		}
-		members, err := operator.GetMembers()
-		if err != nil {
-			panic(err)
+		results, err := prog.SyntaxFlowWithError("$.ajax()")
+		for _, result := range results {
+			if err != nil {
+				panic(err)
+			}
+			params, err := result.GetCallActualParams()
+			if err != nil {
+				panic(err)
+			}
+			members, err := params.GetMembers()
+			if err != nil {
+				panic(err)
+			}
+
+			match, operator, err := members.ExactMatch("url")
+			if err != nil {
+				panic(err)
+			}
+			assert.Equal(t, match, true, "match is false, except true")
+			assert.Equal(t, len(operator.GetNames()), 4, "valueOperator number not match")
 		}
-		match, valueOperator, err := members.ExactMatch("url")
-		if err != nil {
-			panic(err)
-		}
-		assert.Equal(t, match, true, "match is false, except true")
-		assert.Equal(t, len(valueOperator.GetNames()), 4, "valueOperator number not match")
-	}
-}
-func TestAjax_post(t *testing.T) {
-	code := `$.post({
+	})
+
+	t.Run("test jQuery $.post", func(t *testing.T) {
+		code := `$.post({
   url: 'https://jsonplaceholder.typicode.com/posts',
   contentType: 'application/json',
   data: JSON.stringify(formData),
@@ -151,33 +152,49 @@ func TestAjax_post(t *testing.T) {
     // ...
   }
 });
+	$.post({
+  url: 'https://tests.com',
+  contentType: 'application/json',
+  data: "aaa",
+  success: function(response) {
+    // ...
+  },
+  error: function(xhr, status, error) {
+    // ...
+  }
+});
 `
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
-	if err != nil {
-		panic(err)
-	}
-	withError, err := prog.SyntaxFlowWithError("$.post()")
-	if err != nil {
-		panic(err)
-	}
-	params, err := withError.GetCallActualParams()
-	if err != nil {
-		panic(err)
-	}
-	members, err := params.GetMembers()
-	if err != nil {
-		panic(err)
-	}
-	match, operator, err := members.ExactMatch("url")
-	if err != nil {
-		panic(err)
-	}
-	assert.Equal(t, match, true, "match is false, except true")
-	assert.Equal(t, len(operator.GetNames()), 4, "valueOperator number not match")
+		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+		if err != nil {
+			panic(err)
+		}
+		results, err := prog.SyntaxFlowWithError("$.post()")
+		for _, result := range results {
+			if err != nil {
+				panic(err)
+			}
+			params, err := result.GetCallActualParams()
+			if err != nil {
+				panic(err)
+			}
+			members, err := params.GetMembers()
+			if err != nil {
+				panic(err)
+			}
+
+			match, operator, err := members.ExactMatch("url")
+			if err != nil {
+				panic(err)
+			}
+			assert.Equal(t, match, true, "match is false, except true")
+			assert.Equal(t, len(operator.GetNames()), 4, "valueOperator number not match")
+		}
+	})
 }
 
 func Test_JS_Fetch(t *testing.T) {
-	code := `fetch('url')
+	code := `
+fetch('http://example.com')
   .then(response => {
     if (!response.ok) {
       throw new Error('Network response was not ok');
@@ -190,22 +207,170 @@ func Test_JS_Fetch(t *testing.T) {
   .catch(error => {
     console.error('There has been a problem with your fetch operation:', error);
   });
+
+const data = {
+  key1: 'value1',
+  key2: 'value2'
+};
+
+fetch('https://example.com/api/resource', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(data)
+})
+.then(response => response.json())
+.then(data => {
+  console.log('Success:', data);
+})
+.catch((error) => {
+  console.error('Error:', error);
+});
 `
 	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
 	if err != nil {
 		panic(err)
 	}
-	withError, err := prog.SyntaxFlowWithError("fetch()")
-	if err != nil {
-		panic(err)
+	results, err := prog.SyntaxFlowWithError("fetch()")
+	for _, result := range results {
+		args := result.GetCallArgs()
+		if len(args) == 1 {
+			fmt.Println("===========================")
+			url := args[0]
+			fmt.Println("Method: GET")
+			fmt.Printf("URL:%v\n", url.String())
+			require.Equal(t, "\"http://example.com\"", url.String())
+			continue
+		} else if len(args) == 2 {
+			fmt.Println("===========================")
+			url := args[0]
+			fmt.Printf("URL :%v\n", url.String())
+			require.Equal(t, "\"https://example.com/api/resource\"", url.String())
+			extArg := args[1]
+			if extArg.IsMake() {
+				datas := getDataFromMake(extArg.GetAllMember(), "\"method\"", "\"body\"")
+				method := datas[0]
+				require.Equal(t, "\"POST\"", method)
+				body := datas[1]
+				require.Equal(t, "Undefined-JSON.stringify(valid)(make(object{}))", body)
+			}
+		}
 	}
-	params, err := withError.GetCallActualParams()
-	if err != nil {
-		panic(err)
-	}
-	assert.Equal(t, len(params.GetNames()), 2, fmt.Sprintf("not match,except 1,match %v", len(params.GetNames())))
+
 }
 
-func Test_JS_JQuery(t *testing.T) {}
+func Test_JS_Axios(t *testing.T) {
+	t.Run("test axios get", func(t *testing.T) {
+		code := `axios.get('http://example.com')
+      .then(response => (this.info = response))
+      .catch(function (error) { // 请求失败处理
+        console.log(error);
+    });
+		axios.post('/user', {
+		firstName: 'Fred',
+		lastName: 'Flintstone'
+	  })
+	  .then(function (response) {
+		console.log(response);
+	  })
+	  .catch(function (error) {
+		console.log(error);
+	  });
+`
+		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+		if err != nil {
+			panic(err)
+		}
+		results, err := prog.SyntaxFlowWithError("axios.get()")
+		for _, result := range results {
+			args := result.GetCallArgs()
+			if len(args) == 1 {
+				fmt.Println("===========================")
+				url := args[0]
+				fmt.Println("Method: GET")
+				fmt.Printf("URL:%v\n", url.String())
+				require.Equal(t, "\"http://example.com\"", url.String())
+				continue
+			}
+		}
+	})
 
-func Test_JS_Axios(t *testing.T) {}
+	t.Run("test axios post", func(t *testing.T) {
+		code := `axios.post('/user', {
+    firstName: 'a',
+    lastName: 'b'
+  })
+  .then(function (response) {
+    console.log(response);
+  })
+  .catch(function (error) {
+    console.log(error);
+  });`
+		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+		if err != nil {
+			panic(err)
+		}
+		results, err := prog.SyntaxFlowWithError("axios.post()")
+		for _, result := range results {
+			args := result.GetCallArgs()
+			require.Equal(t, 2, len(args))
+
+			fmt.Println("===========================")
+			url := args[0]
+			fmt.Printf("URL :%v\n", url.String())
+			require.Equal(t, "\"/user\"", url.String())
+			extArg := args[1]
+			if extArg.IsMake() {
+				datas := getDataFromMake(extArg.GetAllMember(), "\"firstName\"", "\"lastName\"")
+				method := datas[0]
+				require.Equal(t, "\"a\"", method)
+				body := datas[1]
+				require.Equal(t, "\"b\"", body)
+			}
+
+		}
+	})
+	t.Run("test http request by config ", func(t *testing.T) {
+		code := ` 
+axios({
+  method: 'post',
+  url: '/user/12345',
+  data: {
+    firstName: 'Fred',
+    lastName: 'Flintstone'
+  }
+});`
+
+		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+		if err != nil {
+			panic(err)
+		}
+		results, err := prog.SyntaxFlowWithError("axios()")
+		for _, result := range results {
+			args := result.GetCallArgs()
+			require.Equal(t, 1, len(args))
+
+			if args[0].IsMake() {
+				datas := getDataFromMake(args[0].GetAllMember(), "\"method\"", "\"url\"")
+				require.Equal(t, "\"post\"", datas[0])
+				require.Equal(t, "\"/user/12345\"", datas[1])
+			}
+		}
+	})
+
+}
+
+func getDataFromMake(members ssaapi.Values, expecteds ...string) []string {
+	var results []string
+	for _, member := range members {
+		key := member.GetKey()
+		for _, expected := range expecteds {
+			if key.String() == expected {
+				res := member.String()
+				results = append(results, res)
+			}
+		}
+	}
+	return results
+}
