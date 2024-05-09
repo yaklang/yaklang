@@ -5,6 +5,28 @@ import (
 	"testing"
 )
 
+func mustParse(code string) *Program {
+	prog, err := Parse(code)
+	if err != nil {
+		panic(err)
+	}
+	return prog
+}
+
+func TestSF_GetBottomUses(t *testing.T) {
+	var results = mustParse(`a = Runtime.getRuntime()
+result = a.exec("bash attack")
+b = file.Write("abc", result)
+dump(b)`).SF("a.exec()-->dump")
+	if len(results) <= 0 {
+		t.Fatal("failed to syntax flow deep next")
+	}
+	results.Show()
+	if results.Len() != 1 {
+		t.Fatal("failed to syntax flow deep next")
+	}
+}
+
 func TestProgramSyntaxFlow_Match(t *testing.T) {
 	t.Run("Test Match", func(t *testing.T) {
 		prog, err := Parse(`

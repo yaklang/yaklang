@@ -1,10 +1,11 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var _ sfvm.ValueOperator = new(Values)
@@ -42,6 +43,10 @@ func (value Values) IsList() bool {
 	return true
 }
 
+func (value Values) Len() int {
+	return len(value)
+}
+
 func (value Values) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
 	var newValue Values
 	for _, i := range value {
@@ -55,8 +60,15 @@ func (value Values) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
 }
 
 func (value Values) GlobMatch(glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
-	//TODO implement me
-	panic("implement me")
+	var newValue Values
+	for _, i := range value {
+		for _, name := range i.GetNames() {
+			if glob.Match(name) {
+				newValue = append(newValue, i)
+			}
+		}
+	}
+	return len(newValue) > 0, newValue, nil
 }
 
 func (value Values) RegexpMatch(regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
