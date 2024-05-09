@@ -154,6 +154,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			return utils.Error("resume task id is empty")
 		}
 		taskManager, err = CreateHybridTask(taskId, taskCtx)
+		taskManager.Resume()
 		if err != nil {
 			return err
 		}
@@ -190,9 +191,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		}
 		return nil
 	case <-streamCtx.Done():
-		taskManager.PauseEffect()
 		taskManager.Stop()
-		taskManager.Resume()
 		RemoveHybridTask(taskId)
 		return utils.Error("client canceled")
 	}

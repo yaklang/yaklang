@@ -148,7 +148,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 	taskRecorder.Targets = string(targetsBytes)
 
-	statusManager := newHybridScanStatusManager(taskId, len(targetCached), len(pluginNames))
+	statusManager := newHybridScanStatusManager(taskId, len(targetCached), len(pluginNames), taskRecorder.Status)
+
+	setTaskStatus := func(status string) {
+		taskRecorder.Status = status
+		statusManager.Status = status
+	}
 
 	statusMutex := new(sync.Mutex)
 	getStatus := func() *ypb.HybridScanResponse {
@@ -184,10 +189,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				return
 			}
 			if rsp.GetHybridScanMode() == "pause" {
+				setTaskStatus(yakit.HYBRIDSCAN_PAUSED)
+				feedbackStatus()
 				manager.Pause()
 				manager.Stop()
-				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
-				stream.Send(statusManager.GetStatus(taskRecorder))
 				quickSave()
 			}
 		}
@@ -318,11 +323,11 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 
 	swg.Wait()
-	feedbackStatus()
 	statusManager.GetStatus(taskRecorder)
 	if !manager.IsPaused() {
-		taskRecorder.Status = yakit.HYBRIDSCAN_DONE
+		setTaskStatus(yakit.HYBRIDSCAN_DONE)
 	}
+	feedbackStatus()
 	quickSave()
 	if hasUnavailableTarget {
 		return utils.Errorf("Has unreachable target")
