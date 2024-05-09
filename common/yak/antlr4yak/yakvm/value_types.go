@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
 
 var (
@@ -29,6 +30,7 @@ var (
 	literalReflectType_YakFunction       = reflect.TypeOf(&Function{})
 	literalReflectType_NativeFunction    = reflect.TypeOf(func() {})
 	literalReflectType_NativeWarpFuntion = reflect.FuncOf([]reflect.Type{reflect.SliceOf(literalReflectType_Interface)}, []reflect.Type{literalReflectType_Interface}, true)
+	literalReflectType_OrderedMap        = reflect.TypeOf((*orderedmap.OrderedMap)(nil))
 )
 
 /*
@@ -237,21 +239,21 @@ func (v *Frame) AutoConvertYakValueToNativeValue(val *Value) (reflect.Value, err
 
 func (v *Frame) AutoConvertReflectValueByType(
 	reflectValue *reflect.Value,
-	reflectType /*, targetReflectType*/ reflect.Type,
+	targetType /*, targetReflectType*/ reflect.Type,
 ) error {
 	srcKind := reflectValue.Kind()
 
 	if srcKind == reflect.Invalid {
-		*reflectValue = reflect.Zero(reflectType) // work around `reflect: Call using zero Value argument`
+		*reflectValue = reflect.Zero(targetType) // work around `reflect: Call using zero Value argument`
 		return nil
 	}
 
 	// 类型相同，不需要转换
-	if reflectType == reflectValue.Type() {
+	if targetType == reflectValue.Type() {
 		return nil
 	}
 
-	targetKind := reflectType.Kind()
+	targetKind := targetType.Kind()
 	if targetKind == reflect.Interface {
 		// 证明是别名，例如time.Duration 是 int64 类型别名，但是有自己实现的方法，所以不应该转换
 		pkgPath := reflectValue.Type().PkgPath()
@@ -273,30 +275,30 @@ func (v *Frame) AutoConvertReflectValueByType(
 		return nil
 	}
 
-	tin := reflectValue.Type()
-	if tin == reflectType {
+	srcType := reflectValue.Type()
+	if srcType == targetType {
 		return nil
 	}
 
 	switch targetKind {
 	case reflect.Struct:
 		if srcKind == reflect.Ptr {
-			tin = tin.Elem()
-			if tin == reflectType {
+			elemSrcType := srcType.Elem()
+			if elemSrcType == targetType {
 				*reflectValue = reflectValue.Elem()
 				return nil
 			}
 		}
 	case reflect.Func:
-		if tin == literalReflectType_YakFunction && reflectValue.Interface() != nil {
+		if srcType == literalReflectType_YakFunction && reflectValue.Interface() != nil {
 			if v == nil {
 				return utils.Errorf("cannot bind Yaklang.Function Calling for VirtualMachine!")
 			}
 			f := reflectValue.Interface().(*Function)
-			*reflectValue = reflect.MakeFunc(reflectType, func(args []reflect.Value) []reflect.Value {
+			*reflectValue = reflect.MakeFunc(targetType, func(args []reflect.Value) []reflect.Value {
 				var vmArgs []*Value
 				// fix: unpack variadic args
-				if reflectType == literalReflectType_NativeWarpFuntion {
+				if targetType == literalReflectType_NativeWarpFuntion {
 					newArgs, ok := args[0].Interface().([]interface{})
 					if ok {
 						vmArgs = make([]*Value, len(newArgs))
@@ -314,14 +316,14 @@ func (v *Frame) AutoConvertReflectValueByType(
 				}
 
 				result := v.CallYakFunction(false, f, vmArgs)
-				outCount := reflectType.NumOut()
+				outCount := targetType.NumOut()
 				if outCount <= 0 {
 					return nil
 				}
 				reflectReturn := reflect.ValueOf(result)
 
 				if outCount == 1 {
-					expected := reflectType.Out(0)
+					expected := targetType.Out(0)
 					err := v.AutoConvertReflectValueByType(&reflectReturn, expected)
 					if err != nil {
 						panic(fmt.Sprintf("runtime error: cannot convert `%v` to `%v`", reflectReturn.Type().String(), expected.String()))
@@ -335,7 +337,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 				}
 				for i := 0; i < outCount; i++ {
 					val := reflectReturn.Index(i)
-					expectedType := reflectType.Out(i)
+					expectedType := targetType.Out(i)
 					err := v.AutoConvertReflectValueByType(&val, expectedType)
 					if err != nil {
 						panic(fmt.Sprintf("runtime error: cannot convert `%v` to `%v`", val.Type().String(), expectedType.String()))
@@ -350,11 +352,11 @@ func (v *Frame) AutoConvertReflectValueByType(
 		}
 	case reflect.Slice, reflect.Array: // 数组类型转换
 		if srcKind == reflect.Slice || srcKind == reflect.Array {
-			resValRef := reflect.MakeSlice(reflectType, reflectValue.Len(), reflectValue.Len())
+			resValRef := reflect.MakeSlice(targetType, reflectValue.Len(), reflectValue.Len())
 			reflectValueRef := reflect.ValueOf(reflectValue.Interface())
 			for i := 0; i < reflectValueRef.Len(); i++ {
 				val := reflectValueRef.Index(i)
-				err := v.AutoConvertReflectValueByType(&val, reflectType)
+				err := v.AutoConvertReflectValueByType(&val, targetType)
 				if err != nil {
 					return err
 				}
@@ -365,7 +367,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 		}
 	default:
 		if targetKind == srcKind || convertible(srcKind, targetKind) {
-			*reflectValue = reflectValue.Convert(reflectType)
+			*reflectValue = reflectValue.Convert(targetType)
 			return nil
 		}
 	}
@@ -373,7 +375,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 	//    1. 如果要求 []byte/[]uint8, 输入为 string 可以自动转换
 	//    2. 如果要求为 string, 输入为 []byte / []uint8 也可以转
 	if srcKind == reflect.String &&
-		targetKind == reflect.Slice && reflectType.Elem().Kind() == reflect.Uint8 {
+		targetKind == reflect.Slice && targetType.Elem().Kind() == reflect.Uint8 {
 		strValue, ok := reflectValue.Interface().(string)
 		if ok {
 			*reflectValue = reflect.ValueOf([]byte(strValue))
@@ -389,8 +391,29 @@ func (v *Frame) AutoConvertReflectValueByType(
 		}
 	}
 
-	err := fmt.Errorf("invalid argument type: require `%v`, but we got `%v`", reflectType, tin)
-	if strings.HasSuffix(fmt.Sprint(tin), "spec.undefinedType") {
+	// 2024.5.9 OrderedMap 与 map 相互转换
+	// map -> orderedMap
+	if srcKind == reflect.Map && targetType == literalReflectType_OrderedMap {
+		*reflectValue = reflect.ValueOf(orderedmap.New(reflectValue.Interface()))
+		return nil
+	}
+	// orderedMap -> map
+	if srcType == literalReflectType_OrderedMap && targetKind == reflect.Map {
+		v, ok := reflectValue.Interface().(*orderedmap.OrderedMap)
+		targetMapKeyKind, targetMapValueKind := targetType.Key().Kind(), targetType.Elem().Kind()
+		if ok && targetMapValueKind == reflect.Interface {
+			if targetMapKeyKind == reflect.String {
+				*reflectValue = reflect.ValueOf(v.ToStringMap())
+				return nil
+			} else if targetMapKeyKind == reflect.Interface {
+				*reflectValue = reflect.ValueOf(v.ToAnyMap())
+				return nil
+			}
+		}
+	}
+
+	err := fmt.Errorf("invalid argument type: require `%v`, but we got `%v`", targetType, srcType)
+	if strings.HasSuffix(fmt.Sprint(srcType), "spec.undefinedType") {
 		err = fmt.Errorf("%v\n  Maybe u forgot to define variable?", err)
 	}
 	return err

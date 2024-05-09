@@ -131,6 +131,12 @@ func (o *OrderedMap) ToStringMap() map[string]any {
 	return o.values
 }
 
+func (o *OrderedMap) ToAnyMap() map[any]any {
+	return lo.MapEntries(o.values, func(key string, value any) (any, any) {
+		return key, value
+	})
+}
+
 func (o *OrderedMap) Len() int {
 	return len(o.keys)
 }
