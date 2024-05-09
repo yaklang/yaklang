@@ -99,7 +99,7 @@ func javascriptparserParserInit() {
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 132, 1066, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
+		4, 1, 132, 1067, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
 		7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10,
 		7, 10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7,
 		15, 2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20,
@@ -186,32 +186,32 @@ func javascriptparserParserInit() {
 		62, 3, 62, 799, 8, 62, 1, 62, 1, 62, 1, 63, 3, 63, 804, 8, 63, 1, 63, 1,
 		63, 3, 63, 808, 8, 63, 1, 64, 1, 64, 1, 64, 5, 64, 813, 8, 64, 10, 64,
 		12, 64, 816, 9, 64, 1, 65, 1, 65, 1, 65, 3, 65, 821, 8, 65, 1, 66, 1, 66,
-		1, 66, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 3, 67, 834,
-		8, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 3, 67, 841, 8, 67, 1, 68, 1,
-		68, 1, 68, 1, 68, 1, 68, 3, 68, 848, 8, 68, 1, 68, 1, 68, 1, 68, 1, 68,
-		1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1,
-		68, 3, 68, 865, 8, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68,
-		1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1,
+		1, 66, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1,
+		67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 1, 67, 3, 67, 842, 8, 67, 1, 68,
+		1, 68, 1, 68, 1, 68, 1, 68, 3, 68, 849, 8, 68, 1, 68, 1, 68, 1, 68, 1,
+		68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68,
+		1, 68, 3, 68, 866, 8, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1,
 		68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68,
 		1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1,
 		68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68,
-		3, 68, 916, 8, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1,
-		68, 1, 68, 1, 68, 5, 68, 928, 8, 68, 10, 68, 12, 68, 931, 9, 68, 1, 69,
-		1, 69, 1, 69, 1, 69, 1, 69, 3, 69, 938, 8, 69, 1, 70, 1, 70, 1, 70, 1,
-		71, 1, 71, 1, 71, 3, 71, 946, 8, 71, 1, 72, 1, 72, 1, 72, 1, 72, 5, 72,
-		952, 8, 72, 10, 72, 12, 72, 955, 9, 72, 1, 72, 3, 72, 958, 8, 72, 3, 72,
-		960, 8, 72, 1, 72, 3, 72, 963, 8, 72, 1, 72, 1, 72, 1, 73, 3, 73, 968,
-		8, 73, 1, 73, 1, 73, 3, 73, 972, 8, 73, 1, 73, 3, 73, 975, 8, 73, 1, 73,
-		1, 73, 3, 73, 979, 8, 73, 1, 73, 1, 73, 1, 73, 3, 73, 984, 8, 73, 1, 73,
-		1, 73, 1, 73, 1, 73, 3, 73, 990, 8, 73, 1, 74, 1, 74, 1, 74, 3, 74, 995,
-		8, 74, 1, 74, 3, 74, 998, 8, 74, 1, 75, 1, 75, 3, 75, 1002, 8, 75, 1, 76,
-		1, 76, 1, 77, 1, 77, 1, 77, 1, 77, 1, 77, 1, 77, 1, 77, 3, 77, 1013, 8,
-		77, 1, 78, 1, 78, 5, 78, 1017, 8, 78, 10, 78, 12, 78, 1020, 9, 78, 1, 78,
-		1, 78, 1, 79, 1, 79, 1, 79, 1, 79, 1, 79, 3, 79, 1029, 8, 79, 1, 80, 1,
+		1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1,
+		68, 3, 68, 917, 8, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68, 1, 68,
+		1, 68, 1, 68, 1, 68, 5, 68, 929, 8, 68, 10, 68, 12, 68, 932, 9, 68, 1,
+		69, 1, 69, 1, 69, 1, 69, 1, 69, 3, 69, 939, 8, 69, 1, 70, 1, 70, 1, 70,
+		1, 71, 1, 71, 1, 71, 3, 71, 947, 8, 71, 1, 72, 1, 72, 1, 72, 1, 72, 5,
+		72, 953, 8, 72, 10, 72, 12, 72, 956, 9, 72, 1, 72, 3, 72, 959, 8, 72, 3,
+		72, 961, 8, 72, 1, 72, 3, 72, 964, 8, 72, 1, 72, 1, 72, 1, 73, 3, 73, 969,
+		8, 73, 1, 73, 1, 73, 3, 73, 973, 8, 73, 1, 73, 3, 73, 976, 8, 73, 1, 73,
+		1, 73, 3, 73, 980, 8, 73, 1, 73, 1, 73, 1, 73, 3, 73, 985, 8, 73, 1, 73,
+		1, 73, 1, 73, 1, 73, 3, 73, 991, 8, 73, 1, 74, 1, 74, 1, 74, 3, 74, 996,
+		8, 74, 1, 74, 3, 74, 999, 8, 74, 1, 75, 1, 75, 3, 75, 1003, 8, 75, 1, 76,
+		1, 76, 1, 77, 1, 77, 1, 77, 1, 77, 1, 77, 1, 77, 1, 77, 3, 77, 1014, 8,
+		77, 1, 78, 1, 78, 5, 78, 1018, 8, 78, 10, 78, 12, 78, 1021, 9, 78, 1, 78,
+		1, 78, 1, 79, 1, 79, 1, 79, 1, 79, 1, 79, 3, 79, 1030, 8, 79, 1, 80, 1,
 		80, 1, 81, 1, 81, 1, 82, 1, 82, 1, 82, 1, 83, 1, 83, 1, 83, 1, 84, 1, 84,
-		1, 84, 1, 84, 3, 84, 1045, 8, 84, 1, 85, 1, 85, 1, 86, 1, 86, 1, 87, 3,
-		87, 1052, 8, 87, 1, 87, 1, 87, 1, 87, 1, 87, 1, 87, 3, 87, 1059, 8, 87,
-		1, 88, 1, 88, 1, 88, 3, 88, 1064, 8, 88, 1, 88, 0, 1, 136, 89, 0, 2, 4,
+		1, 84, 1, 84, 3, 84, 1046, 8, 84, 1, 85, 1, 85, 1, 86, 1, 86, 1, 87, 3,
+		87, 1053, 8, 87, 1, 87, 1, 87, 1, 87, 1, 87, 1, 87, 3, 87, 1060, 8, 87,
+		1, 88, 1, 88, 1, 88, 3, 88, 1065, 8, 88, 1, 88, 0, 1, 136, 89, 0, 2, 4,
 		6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42,
 		44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78,
 		80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112,
@@ -221,7 +221,7 @@ func javascriptparserParserInit() {
 		114, 1, 0, 26, 28, 1, 0, 22, 23, 1, 0, 32, 34, 3, 0, 35, 38, 74, 74, 96,
 		96, 1, 0, 39, 42, 1, 0, 43, 45, 1, 0, 20, 21, 1, 0, 22, 25, 2, 0, 15, 15,
 		48, 59, 1, 0, 63, 67, 1, 0, 68, 71, 2, 0, 72, 99, 102, 120, 4, 0, 98, 101,
-		109, 109, 114, 114, 120, 121, 1176, 0, 179, 1, 0, 0, 0, 2, 187, 1, 0, 0,
+		109, 109, 114, 114, 120, 121, 1177, 0, 179, 1, 0, 0, 0, 2, 187, 1, 0, 0,
 		0, 4, 213, 1, 0, 0, 0, 6, 215, 1, 0, 0, 0, 8, 221, 1, 0, 0, 0, 10, 236,
 		1, 0, 0, 0, 12, 238, 1, 0, 0, 0, 14, 255, 1, 0, 0, 0, 16, 262, 1, 0, 0,
 		0, 18, 264, 1, 0, 0, 0, 20, 266, 1, 0, 0, 0, 22, 271, 1, 0, 0, 0, 24, 277,
@@ -241,13 +241,13 @@ func javascriptparserParserInit() {
 		1, 0, 0, 0, 116, 708, 1, 0, 0, 0, 118, 732, 1, 0, 0, 0, 120, 775, 1, 0,
 		0, 0, 122, 784, 1, 0, 0, 0, 124, 786, 1, 0, 0, 0, 126, 803, 1, 0, 0, 0,
 		128, 809, 1, 0, 0, 0, 130, 820, 1, 0, 0, 0, 132, 822, 1, 0, 0, 0, 134,
-		840, 1, 0, 0, 0, 136, 864, 1, 0, 0, 0, 138, 937, 1, 0, 0, 0, 140, 939,
-		1, 0, 0, 0, 142, 945, 1, 0, 0, 0, 144, 947, 1, 0, 0, 0, 146, 989, 1, 0,
-		0, 0, 148, 997, 1, 0, 0, 0, 150, 1001, 1, 0, 0, 0, 152, 1003, 1, 0, 0,
-		0, 154, 1012, 1, 0, 0, 0, 156, 1014, 1, 0, 0, 0, 158, 1028, 1, 0, 0, 0,
-		160, 1030, 1, 0, 0, 0, 162, 1032, 1, 0, 0, 0, 164, 1034, 1, 0, 0, 0, 166,
-		1037, 1, 0, 0, 0, 168, 1044, 1, 0, 0, 0, 170, 1046, 1, 0, 0, 0, 172, 1048,
-		1, 0, 0, 0, 174, 1058, 1, 0, 0, 0, 176, 1063, 1, 0, 0, 0, 178, 180, 5,
+		841, 1, 0, 0, 0, 136, 865, 1, 0, 0, 0, 138, 938, 1, 0, 0, 0, 140, 940,
+		1, 0, 0, 0, 142, 946, 1, 0, 0, 0, 144, 948, 1, 0, 0, 0, 146, 990, 1, 0,
+		0, 0, 148, 998, 1, 0, 0, 0, 150, 1002, 1, 0, 0, 0, 152, 1004, 1, 0, 0,
+		0, 154, 1013, 1, 0, 0, 0, 156, 1015, 1, 0, 0, 0, 158, 1029, 1, 0, 0, 0,
+		160, 1031, 1, 0, 0, 0, 162, 1033, 1, 0, 0, 0, 164, 1035, 1, 0, 0, 0, 166,
+		1038, 1, 0, 0, 0, 168, 1045, 1, 0, 0, 0, 170, 1047, 1, 0, 0, 0, 172, 1049,
+		1, 0, 0, 0, 174, 1059, 1, 0, 0, 0, 176, 1064, 1, 0, 0, 0, 178, 180, 5,
 		1, 0, 0, 179, 178, 1, 0, 0, 0, 179, 180, 1, 0, 0, 0, 180, 182, 1, 0, 0,
 		0, 181, 183, 3, 2, 1, 0, 182, 181, 1, 0, 0, 0, 182, 183, 1, 0, 0, 0, 183,
 		184, 1, 0, 0, 0, 184, 185, 5, 0, 0, 1, 185, 1, 1, 0, 0, 0, 186, 188, 3,
@@ -492,114 +492,115 @@ func javascriptparserParserInit() {
 		0, 0, 820, 818, 1, 0, 0, 0, 820, 819, 1, 0, 0, 0, 821, 131, 1, 0, 0, 0,
 		822, 823, 5, 16, 0, 0, 823, 824, 5, 19, 0, 0, 824, 133, 1, 0, 0, 0, 825,
 		826, 5, 108, 0, 0, 826, 827, 5, 8, 0, 0, 827, 828, 3, 136, 68, 0, 828,
-		829, 5, 9, 0, 0, 829, 841, 1, 0, 0, 0, 830, 831, 5, 78, 0, 0, 831, 833,
-		3, 136, 68, 0, 832, 834, 3, 124, 62, 0, 833, 832, 1, 0, 0, 0, 833, 834,
-		1, 0, 0, 0, 834, 841, 1, 0, 0, 0, 835, 836, 5, 78, 0, 0, 836, 837, 5, 19,
-		0, 0, 837, 841, 3, 172, 86, 0, 838, 839, 5, 110, 0, 0, 839, 841, 3, 136,
-		68, 0, 840, 825, 1, 0, 0, 0, 840, 830, 1, 0, 0, 0, 840, 835, 1, 0, 0, 0,
-		840, 838, 1, 0, 0, 0, 841, 135, 1, 0, 0, 0, 842, 843, 6, 68, -1, 0, 843,
-		865, 3, 134, 67, 0, 844, 865, 3, 154, 77, 0, 845, 847, 5, 102, 0, 0, 846,
-		848, 3, 172, 86, 0, 847, 846, 1, 0, 0, 0, 847, 848, 1, 0, 0, 0, 848, 849,
-		1, 0, 0, 0, 849, 865, 3, 94, 47, 0, 850, 865, 3, 146, 73, 0, 851, 865,
-		3, 64, 32, 0, 852, 865, 5, 90, 0, 0, 853, 865, 3, 172, 86, 0, 854, 865,
-		5, 105, 0, 0, 855, 865, 3, 114, 57, 0, 856, 865, 3, 144, 72, 0, 857, 858,
-		5, 8, 0, 0, 858, 859, 3, 128, 64, 0, 859, 860, 5, 9, 0, 0, 860, 865, 1,
-		0, 0, 0, 861, 862, 3, 138, 69, 0, 862, 863, 3, 136, 68, 13, 863, 865, 1,
-		0, 0, 0, 864, 842, 1, 0, 0, 0, 864, 844, 1, 0, 0, 0, 864, 845, 1, 0, 0,
-		0, 864, 850, 1, 0, 0, 0, 864, 851, 1, 0, 0, 0, 864, 852, 1, 0, 0, 0, 864,
-		853, 1, 0, 0, 0, 864, 854, 1, 0, 0, 0, 864, 855, 1, 0, 0, 0, 864, 856,
-		1, 0, 0, 0, 864, 857, 1, 0, 0, 0, 864, 861, 1, 0, 0, 0, 865, 929, 1, 0,
-		0, 0, 866, 867, 10, 12, 0, 0, 867, 868, 5, 29, 0, 0, 868, 928, 3, 136,
-		68, 12, 869, 870, 10, 11, 0, 0, 870, 871, 7, 2, 0, 0, 871, 928, 3, 136,
-		68, 12, 872, 873, 10, 10, 0, 0, 873, 874, 7, 3, 0, 0, 874, 928, 3, 136,
-		68, 11, 875, 876, 10, 9, 0, 0, 876, 877, 7, 4, 0, 0, 877, 928, 3, 136,
-		68, 10, 878, 879, 10, 8, 0, 0, 879, 880, 7, 5, 0, 0, 880, 928, 3, 136,
-		68, 9, 881, 882, 10, 7, 0, 0, 882, 883, 7, 6, 0, 0, 883, 928, 3, 136, 68,
-		8, 884, 885, 10, 6, 0, 0, 885, 886, 7, 7, 0, 0, 886, 928, 3, 136, 68, 7,
-		887, 888, 10, 5, 0, 0, 888, 889, 5, 46, 0, 0, 889, 928, 3, 136, 68, 6,
-		890, 891, 10, 4, 0, 0, 891, 892, 5, 47, 0, 0, 892, 928, 3, 136, 68, 5,
-		893, 894, 10, 3, 0, 0, 894, 895, 5, 30, 0, 0, 895, 928, 3, 136, 68, 4,
-		896, 897, 10, 2, 0, 0, 897, 898, 5, 16, 0, 0, 898, 899, 3, 136, 68, 0,
-		899, 900, 5, 17, 0, 0, 900, 901, 3, 136, 68, 3, 901, 928, 1, 0, 0, 0, 902,
-		903, 10, 1, 0, 0, 903, 904, 3, 152, 76, 0, 904, 905, 3, 136, 68, 1, 905,
-		928, 1, 0, 0, 0, 906, 907, 10, 26, 0, 0, 907, 928, 3, 156, 78, 0, 908,
-		909, 10, 18, 0, 0, 909, 910, 3, 132, 66, 0, 910, 911, 3, 174, 87, 0, 911,
-		928, 1, 0, 0, 0, 912, 913, 10, 17, 0, 0, 913, 915, 5, 19, 0, 0, 914, 916,
-		5, 31, 0, 0, 915, 914, 1, 0, 0, 0, 915, 916, 1, 0, 0, 0, 916, 917, 1, 0,
-		0, 0, 917, 928, 3, 168, 84, 0, 918, 919, 10, 16, 0, 0, 919, 920, 5, 6,
-		0, 0, 920, 921, 3, 136, 68, 0, 921, 922, 5, 7, 0, 0, 922, 928, 1, 0, 0,
-		0, 923, 924, 10, 15, 0, 0, 924, 928, 3, 124, 62, 0, 925, 926, 10, 14, 0,
-		0, 926, 928, 7, 8, 0, 0, 927, 866, 1, 0, 0, 0, 927, 869, 1, 0, 0, 0, 927,
-		872, 1, 0, 0, 0, 927, 875, 1, 0, 0, 0, 927, 878, 1, 0, 0, 0, 927, 881,
-		1, 0, 0, 0, 927, 884, 1, 0, 0, 0, 927, 887, 1, 0, 0, 0, 927, 890, 1, 0,
-		0, 0, 927, 893, 1, 0, 0, 0, 927, 896, 1, 0, 0, 0, 927, 902, 1, 0, 0, 0,
-		927, 906, 1, 0, 0, 0, 927, 908, 1, 0, 0, 0, 927, 912, 1, 0, 0, 0, 927,
-		918, 1, 0, 0, 0, 927, 923, 1, 0, 0, 0, 927, 925, 1, 0, 0, 0, 928, 931,
-		1, 0, 0, 0, 929, 927, 1, 0, 0, 0, 929, 930, 1, 0, 0, 0, 930, 137, 1, 0,
-		0, 0, 931, 929, 1, 0, 0, 0, 932, 938, 7, 8, 0, 0, 933, 938, 7, 9, 0, 0,
-		934, 938, 5, 75, 0, 0, 935, 938, 5, 83, 0, 0, 936, 938, 5, 95, 0, 0, 937,
-		932, 1, 0, 0, 0, 937, 933, 1, 0, 0, 0, 937, 934, 1, 0, 0, 0, 937, 935,
-		1, 0, 0, 0, 937, 936, 1, 0, 0, 0, 938, 139, 1, 0, 0, 0, 939, 940, 5, 15,
-		0, 0, 940, 941, 3, 136, 68, 0, 941, 141, 1, 0, 0, 0, 942, 946, 3, 172,
-		86, 0, 943, 946, 3, 114, 57, 0, 944, 946, 3, 144, 72, 0, 945, 942, 1, 0,
-		0, 0, 945, 943, 1, 0, 0, 0, 945, 944, 1, 0, 0, 0, 946, 143, 1, 0, 0, 0,
-		947, 959, 5, 10, 0, 0, 948, 953, 3, 120, 60, 0, 949, 950, 5, 14, 0, 0,
-		950, 952, 3, 120, 60, 0, 951, 949, 1, 0, 0, 0, 952, 955, 1, 0, 0, 0, 953,
-		951, 1, 0, 0, 0, 953, 954, 1, 0, 0, 0, 954, 957, 1, 0, 0, 0, 955, 953,
-		1, 0, 0, 0, 956, 958, 5, 14, 0, 0, 957, 956, 1, 0, 0, 0, 957, 958, 1, 0,
-		0, 0, 958, 960, 1, 0, 0, 0, 959, 948, 1, 0, 0, 0, 959, 960, 1, 0, 0, 0,
-		960, 962, 1, 0, 0, 0, 961, 963, 5, 13, 0, 0, 962, 961, 1, 0, 0, 0, 962,
-		963, 1, 0, 0, 0, 963, 964, 1, 0, 0, 0, 964, 965, 5, 12, 0, 0, 965, 145,
-		1, 0, 0, 0, 966, 968, 5, 109, 0, 0, 967, 966, 1, 0, 0, 0, 967, 968, 1,
-		0, 0, 0, 968, 969, 1, 0, 0, 0, 969, 971, 5, 89, 0, 0, 970, 972, 5, 26,
-		0, 0, 971, 970, 1, 0, 0, 0, 971, 972, 1, 0, 0, 0, 972, 974, 1, 0, 0, 0,
-		973, 975, 3, 172, 86, 0, 974, 973, 1, 0, 0, 0, 974, 975, 1, 0, 0, 0, 975,
-		976, 1, 0, 0, 0, 976, 978, 5, 8, 0, 0, 977, 979, 3, 106, 53, 0, 978, 977,
-		1, 0, 0, 0, 978, 979, 1, 0, 0, 0, 979, 980, 1, 0, 0, 0, 980, 981, 5, 9,
-		0, 0, 981, 990, 3, 112, 56, 0, 982, 984, 5, 109, 0, 0, 983, 982, 1, 0,
-		0, 0, 983, 984, 1, 0, 0, 0, 984, 985, 1, 0, 0, 0, 985, 986, 3, 148, 74,
-		0, 986, 987, 5, 60, 0, 0, 987, 988, 3, 150, 75, 0, 988, 990, 1, 0, 0, 0,
-		989, 967, 1, 0, 0, 0, 989, 983, 1, 0, 0, 0, 990, 147, 1, 0, 0, 0, 991,
-		998, 3, 172, 86, 0, 992, 994, 5, 8, 0, 0, 993, 995, 3, 106, 53, 0, 994,
-		993, 1, 0, 0, 0, 994, 995, 1, 0, 0, 0, 995, 996, 1, 0, 0, 0, 996, 998,
-		5, 9, 0, 0, 997, 991, 1, 0, 0, 0, 997, 992, 1, 0, 0, 0, 998, 149, 1, 0,
-		0, 0, 999, 1002, 3, 112, 56, 0, 1000, 1002, 3, 136, 68, 0, 1001, 999, 1,
-		0, 0, 0, 1001, 1000, 1, 0, 0, 0, 1002, 151, 1, 0, 0, 0, 1003, 1004, 7,
-		10, 0, 0, 1004, 153, 1, 0, 0, 0, 1005, 1013, 5, 61, 0, 0, 1006, 1013, 5,
-		62, 0, 0, 1007, 1013, 5, 122, 0, 0, 1008, 1013, 3, 156, 78, 0, 1009, 1013,
-		5, 5, 0, 0, 1010, 1013, 3, 160, 80, 0, 1011, 1013, 3, 162, 81, 0, 1012,
-		1005, 1, 0, 0, 0, 1012, 1006, 1, 0, 0, 0, 1012, 1007, 1, 0, 0, 0, 1012,
-		1008, 1, 0, 0, 0, 1012, 1009, 1, 0, 0, 0, 1012, 1010, 1, 0, 0, 0, 1012,
-		1011, 1, 0, 0, 0, 1013, 155, 1, 0, 0, 0, 1014, 1018, 5, 123, 0, 0, 1015,
-		1017, 3, 158, 79, 0, 1016, 1015, 1, 0, 0, 0, 1017, 1020, 1, 0, 0, 0, 1018,
-		1016, 1, 0, 0, 0, 1018, 1019, 1, 0, 0, 0, 1019, 1021, 1, 0, 0, 0, 1020,
-		1018, 1, 0, 0, 0, 1021, 1022, 5, 123, 0, 0, 1022, 157, 1, 0, 0, 0, 1023,
-		1029, 5, 132, 0, 0, 1024, 1025, 5, 131, 0, 0, 1025, 1026, 3, 136, 68, 0,
-		1026, 1027, 5, 11, 0, 0, 1027, 1029, 1, 0, 0, 0, 1028, 1023, 1, 0, 0, 0,
-		1028, 1024, 1, 0, 0, 0, 1029, 159, 1, 0, 0, 0, 1030, 1031, 7, 11, 0, 0,
-		1031, 161, 1, 0, 0, 0, 1032, 1033, 7, 12, 0, 0, 1033, 163, 1, 0, 0, 0,
-		1034, 1035, 5, 100, 0, 0, 1035, 1036, 3, 102, 51, 0, 1036, 165, 1, 0, 0,
-		0, 1037, 1038, 5, 101, 0, 0, 1038, 1039, 3, 102, 51, 0, 1039, 167, 1, 0,
-		0, 0, 1040, 1045, 3, 172, 86, 0, 1041, 1045, 5, 61, 0, 0, 1042, 1045, 5,
-		62, 0, 0, 1043, 1045, 3, 170, 85, 0, 1044, 1040, 1, 0, 0, 0, 1044, 1041,
-		1, 0, 0, 0, 1044, 1042, 1, 0, 0, 0, 1044, 1043, 1, 0, 0, 0, 1045, 169,
-		1, 0, 0, 0, 1046, 1047, 7, 13, 0, 0, 1047, 171, 1, 0, 0, 0, 1048, 1049,
-		7, 14, 0, 0, 1049, 173, 1, 0, 0, 0, 1050, 1052, 5, 31, 0, 0, 1051, 1050,
-		1, 0, 0, 0, 1051, 1052, 1, 0, 0, 0, 1052, 1053, 1, 0, 0, 0, 1053, 1059,
-		3, 168, 84, 0, 1054, 1055, 5, 6, 0, 0, 1055, 1056, 3, 136, 68, 0, 1056,
-		1057, 5, 7, 0, 0, 1057, 1059, 1, 0, 0, 0, 1058, 1051, 1, 0, 0, 0, 1058,
-		1054, 1, 0, 0, 0, 1059, 175, 1, 0, 0, 0, 1060, 1064, 5, 13, 0, 0, 1061,
-		1064, 4, 88, 19, 0, 1062, 1064, 5, 0, 0, 1, 1063, 1060, 1, 0, 0, 0, 1063,
-		1061, 1, 0, 0, 0, 1063, 1062, 1, 0, 0, 0, 1064, 177, 1, 0, 0, 0, 128, 179,
-		182, 189, 213, 217, 225, 229, 236, 244, 249, 251, 258, 262, 271, 275, 283,
-		287, 291, 300, 308, 312, 320, 325, 327, 334, 339, 350, 356, 374, 378, 385,
-		408, 412, 416, 424, 433, 438, 446, 450, 455, 462, 467, 474, 479, 486, 491,
-		510, 514, 516, 523, 529, 534, 544, 554, 557, 562, 565, 576, 580, 585, 596,
-		602, 608, 612, 618, 621, 626, 630, 635, 641, 649, 654, 659, 663, 667, 677,
-		682, 685, 690, 697, 708, 712, 717, 722, 728, 732, 747, 750, 755, 772, 775,
-		784, 792, 796, 798, 803, 807, 814, 820, 833, 840, 847, 864, 915, 927, 929,
-		937, 945, 953, 957, 959, 962, 967, 971, 974, 978, 983, 989, 994, 997, 1001,
-		1012, 1018, 1028, 1044, 1051, 1058, 1063,
+		829, 5, 9, 0, 0, 829, 842, 1, 0, 0, 0, 830, 831, 5, 78, 0, 0, 831, 832,
+		3, 136, 68, 0, 832, 833, 3, 124, 62, 0, 833, 842, 1, 0, 0, 0, 834, 835,
+		5, 78, 0, 0, 835, 842, 3, 136, 68, 0, 836, 837, 5, 78, 0, 0, 837, 838,
+		5, 19, 0, 0, 838, 842, 3, 172, 86, 0, 839, 840, 5, 110, 0, 0, 840, 842,
+		3, 136, 68, 0, 841, 825, 1, 0, 0, 0, 841, 830, 1, 0, 0, 0, 841, 834, 1,
+		0, 0, 0, 841, 836, 1, 0, 0, 0, 841, 839, 1, 0, 0, 0, 842, 135, 1, 0, 0,
+		0, 843, 844, 6, 68, -1, 0, 844, 866, 3, 134, 67, 0, 845, 866, 3, 154, 77,
+		0, 846, 848, 5, 102, 0, 0, 847, 849, 3, 172, 86, 0, 848, 847, 1, 0, 0,
+		0, 848, 849, 1, 0, 0, 0, 849, 850, 1, 0, 0, 0, 850, 866, 3, 94, 47, 0,
+		851, 866, 3, 146, 73, 0, 852, 866, 3, 64, 32, 0, 853, 866, 5, 90, 0, 0,
+		854, 866, 3, 172, 86, 0, 855, 866, 5, 105, 0, 0, 856, 866, 3, 114, 57,
+		0, 857, 866, 3, 144, 72, 0, 858, 859, 5, 8, 0, 0, 859, 860, 3, 128, 64,
+		0, 860, 861, 5, 9, 0, 0, 861, 866, 1, 0, 0, 0, 862, 863, 3, 138, 69, 0,
+		863, 864, 3, 136, 68, 13, 864, 866, 1, 0, 0, 0, 865, 843, 1, 0, 0, 0, 865,
+		845, 1, 0, 0, 0, 865, 846, 1, 0, 0, 0, 865, 851, 1, 0, 0, 0, 865, 852,
+		1, 0, 0, 0, 865, 853, 1, 0, 0, 0, 865, 854, 1, 0, 0, 0, 865, 855, 1, 0,
+		0, 0, 865, 856, 1, 0, 0, 0, 865, 857, 1, 0, 0, 0, 865, 858, 1, 0, 0, 0,
+		865, 862, 1, 0, 0, 0, 866, 930, 1, 0, 0, 0, 867, 868, 10, 12, 0, 0, 868,
+		869, 5, 29, 0, 0, 869, 929, 3, 136, 68, 12, 870, 871, 10, 11, 0, 0, 871,
+		872, 7, 2, 0, 0, 872, 929, 3, 136, 68, 12, 873, 874, 10, 10, 0, 0, 874,
+		875, 7, 3, 0, 0, 875, 929, 3, 136, 68, 11, 876, 877, 10, 9, 0, 0, 877,
+		878, 7, 4, 0, 0, 878, 929, 3, 136, 68, 10, 879, 880, 10, 8, 0, 0, 880,
+		881, 7, 5, 0, 0, 881, 929, 3, 136, 68, 9, 882, 883, 10, 7, 0, 0, 883, 884,
+		7, 6, 0, 0, 884, 929, 3, 136, 68, 8, 885, 886, 10, 6, 0, 0, 886, 887, 7,
+		7, 0, 0, 887, 929, 3, 136, 68, 7, 888, 889, 10, 5, 0, 0, 889, 890, 5, 46,
+		0, 0, 890, 929, 3, 136, 68, 6, 891, 892, 10, 4, 0, 0, 892, 893, 5, 47,
+		0, 0, 893, 929, 3, 136, 68, 5, 894, 895, 10, 3, 0, 0, 895, 896, 5, 30,
+		0, 0, 896, 929, 3, 136, 68, 4, 897, 898, 10, 2, 0, 0, 898, 899, 5, 16,
+		0, 0, 899, 900, 3, 136, 68, 0, 900, 901, 5, 17, 0, 0, 901, 902, 3, 136,
+		68, 3, 902, 929, 1, 0, 0, 0, 903, 904, 10, 1, 0, 0, 904, 905, 3, 152, 76,
+		0, 905, 906, 3, 136, 68, 1, 906, 929, 1, 0, 0, 0, 907, 908, 10, 26, 0,
+		0, 908, 929, 3, 156, 78, 0, 909, 910, 10, 18, 0, 0, 910, 911, 3, 132, 66,
+		0, 911, 912, 3, 174, 87, 0, 912, 929, 1, 0, 0, 0, 913, 914, 10, 17, 0,
+		0, 914, 916, 5, 19, 0, 0, 915, 917, 5, 31, 0, 0, 916, 915, 1, 0, 0, 0,
+		916, 917, 1, 0, 0, 0, 917, 918, 1, 0, 0, 0, 918, 929, 3, 168, 84, 0, 919,
+		920, 10, 16, 0, 0, 920, 921, 5, 6, 0, 0, 921, 922, 3, 136, 68, 0, 922,
+		923, 5, 7, 0, 0, 923, 929, 1, 0, 0, 0, 924, 925, 10, 15, 0, 0, 925, 929,
+		3, 124, 62, 0, 926, 927, 10, 14, 0, 0, 927, 929, 7, 8, 0, 0, 928, 867,
+		1, 0, 0, 0, 928, 870, 1, 0, 0, 0, 928, 873, 1, 0, 0, 0, 928, 876, 1, 0,
+		0, 0, 928, 879, 1, 0, 0, 0, 928, 882, 1, 0, 0, 0, 928, 885, 1, 0, 0, 0,
+		928, 888, 1, 0, 0, 0, 928, 891, 1, 0, 0, 0, 928, 894, 1, 0, 0, 0, 928,
+		897, 1, 0, 0, 0, 928, 903, 1, 0, 0, 0, 928, 907, 1, 0, 0, 0, 928, 909,
+		1, 0, 0, 0, 928, 913, 1, 0, 0, 0, 928, 919, 1, 0, 0, 0, 928, 924, 1, 0,
+		0, 0, 928, 926, 1, 0, 0, 0, 929, 932, 1, 0, 0, 0, 930, 928, 1, 0, 0, 0,
+		930, 931, 1, 0, 0, 0, 931, 137, 1, 0, 0, 0, 932, 930, 1, 0, 0, 0, 933,
+		939, 7, 8, 0, 0, 934, 939, 7, 9, 0, 0, 935, 939, 5, 75, 0, 0, 936, 939,
+		5, 83, 0, 0, 937, 939, 5, 95, 0, 0, 938, 933, 1, 0, 0, 0, 938, 934, 1,
+		0, 0, 0, 938, 935, 1, 0, 0, 0, 938, 936, 1, 0, 0, 0, 938, 937, 1, 0, 0,
+		0, 939, 139, 1, 0, 0, 0, 940, 941, 5, 15, 0, 0, 941, 942, 3, 136, 68, 0,
+		942, 141, 1, 0, 0, 0, 943, 947, 3, 172, 86, 0, 944, 947, 3, 114, 57, 0,
+		945, 947, 3, 144, 72, 0, 946, 943, 1, 0, 0, 0, 946, 944, 1, 0, 0, 0, 946,
+		945, 1, 0, 0, 0, 947, 143, 1, 0, 0, 0, 948, 960, 5, 10, 0, 0, 949, 954,
+		3, 120, 60, 0, 950, 951, 5, 14, 0, 0, 951, 953, 3, 120, 60, 0, 952, 950,
+		1, 0, 0, 0, 953, 956, 1, 0, 0, 0, 954, 952, 1, 0, 0, 0, 954, 955, 1, 0,
+		0, 0, 955, 958, 1, 0, 0, 0, 956, 954, 1, 0, 0, 0, 957, 959, 5, 14, 0, 0,
+		958, 957, 1, 0, 0, 0, 958, 959, 1, 0, 0, 0, 959, 961, 1, 0, 0, 0, 960,
+		949, 1, 0, 0, 0, 960, 961, 1, 0, 0, 0, 961, 963, 1, 0, 0, 0, 962, 964,
+		5, 13, 0, 0, 963, 962, 1, 0, 0, 0, 963, 964, 1, 0, 0, 0, 964, 965, 1, 0,
+		0, 0, 965, 966, 5, 12, 0, 0, 966, 145, 1, 0, 0, 0, 967, 969, 5, 109, 0,
+		0, 968, 967, 1, 0, 0, 0, 968, 969, 1, 0, 0, 0, 969, 970, 1, 0, 0, 0, 970,
+		972, 5, 89, 0, 0, 971, 973, 5, 26, 0, 0, 972, 971, 1, 0, 0, 0, 972, 973,
+		1, 0, 0, 0, 973, 975, 1, 0, 0, 0, 974, 976, 3, 172, 86, 0, 975, 974, 1,
+		0, 0, 0, 975, 976, 1, 0, 0, 0, 976, 977, 1, 0, 0, 0, 977, 979, 5, 8, 0,
+		0, 978, 980, 3, 106, 53, 0, 979, 978, 1, 0, 0, 0, 979, 980, 1, 0, 0, 0,
+		980, 981, 1, 0, 0, 0, 981, 982, 5, 9, 0, 0, 982, 991, 3, 112, 56, 0, 983,
+		985, 5, 109, 0, 0, 984, 983, 1, 0, 0, 0, 984, 985, 1, 0, 0, 0, 985, 986,
+		1, 0, 0, 0, 986, 987, 3, 148, 74, 0, 987, 988, 5, 60, 0, 0, 988, 989, 3,
+		150, 75, 0, 989, 991, 1, 0, 0, 0, 990, 968, 1, 0, 0, 0, 990, 984, 1, 0,
+		0, 0, 991, 147, 1, 0, 0, 0, 992, 999, 3, 172, 86, 0, 993, 995, 5, 8, 0,
+		0, 994, 996, 3, 106, 53, 0, 995, 994, 1, 0, 0, 0, 995, 996, 1, 0, 0, 0,
+		996, 997, 1, 0, 0, 0, 997, 999, 5, 9, 0, 0, 998, 992, 1, 0, 0, 0, 998,
+		993, 1, 0, 0, 0, 999, 149, 1, 0, 0, 0, 1000, 1003, 3, 112, 56, 0, 1001,
+		1003, 3, 136, 68, 0, 1002, 1000, 1, 0, 0, 0, 1002, 1001, 1, 0, 0, 0, 1003,
+		151, 1, 0, 0, 0, 1004, 1005, 7, 10, 0, 0, 1005, 153, 1, 0, 0, 0, 1006,
+		1014, 5, 61, 0, 0, 1007, 1014, 5, 62, 0, 0, 1008, 1014, 5, 122, 0, 0, 1009,
+		1014, 3, 156, 78, 0, 1010, 1014, 5, 5, 0, 0, 1011, 1014, 3, 160, 80, 0,
+		1012, 1014, 3, 162, 81, 0, 1013, 1006, 1, 0, 0, 0, 1013, 1007, 1, 0, 0,
+		0, 1013, 1008, 1, 0, 0, 0, 1013, 1009, 1, 0, 0, 0, 1013, 1010, 1, 0, 0,
+		0, 1013, 1011, 1, 0, 0, 0, 1013, 1012, 1, 0, 0, 0, 1014, 155, 1, 0, 0,
+		0, 1015, 1019, 5, 123, 0, 0, 1016, 1018, 3, 158, 79, 0, 1017, 1016, 1,
+		0, 0, 0, 1018, 1021, 1, 0, 0, 0, 1019, 1017, 1, 0, 0, 0, 1019, 1020, 1,
+		0, 0, 0, 1020, 1022, 1, 0, 0, 0, 1021, 1019, 1, 0, 0, 0, 1022, 1023, 5,
+		123, 0, 0, 1023, 157, 1, 0, 0, 0, 1024, 1030, 5, 132, 0, 0, 1025, 1026,
+		5, 131, 0, 0, 1026, 1027, 3, 136, 68, 0, 1027, 1028, 5, 11, 0, 0, 1028,
+		1030, 1, 0, 0, 0, 1029, 1024, 1, 0, 0, 0, 1029, 1025, 1, 0, 0, 0, 1030,
+		159, 1, 0, 0, 0, 1031, 1032, 7, 11, 0, 0, 1032, 161, 1, 0, 0, 0, 1033,
+		1034, 7, 12, 0, 0, 1034, 163, 1, 0, 0, 0, 1035, 1036, 5, 100, 0, 0, 1036,
+		1037, 3, 102, 51, 0, 1037, 165, 1, 0, 0, 0, 1038, 1039, 5, 101, 0, 0, 1039,
+		1040, 3, 102, 51, 0, 1040, 167, 1, 0, 0, 0, 1041, 1046, 3, 172, 86, 0,
+		1042, 1046, 5, 61, 0, 0, 1043, 1046, 5, 62, 0, 0, 1044, 1046, 3, 170, 85,
+		0, 1045, 1041, 1, 0, 0, 0, 1045, 1042, 1, 0, 0, 0, 1045, 1043, 1, 0, 0,
+		0, 1045, 1044, 1, 0, 0, 0, 1046, 169, 1, 0, 0, 0, 1047, 1048, 7, 13, 0,
+		0, 1048, 171, 1, 0, 0, 0, 1049, 1050, 7, 14, 0, 0, 1050, 173, 1, 0, 0,
+		0, 1051, 1053, 5, 31, 0, 0, 1052, 1051, 1, 0, 0, 0, 1052, 1053, 1, 0, 0,
+		0, 1053, 1054, 1, 0, 0, 0, 1054, 1060, 3, 168, 84, 0, 1055, 1056, 5, 6,
+		0, 0, 1056, 1057, 3, 136, 68, 0, 1057, 1058, 5, 7, 0, 0, 1058, 1060, 1,
+		0, 0, 0, 1059, 1052, 1, 0, 0, 0, 1059, 1055, 1, 0, 0, 0, 1060, 175, 1,
+		0, 0, 0, 1061, 1065, 5, 13, 0, 0, 1062, 1065, 4, 88, 19, 0, 1063, 1065,
+		5, 0, 0, 1, 1064, 1061, 1, 0, 0, 0, 1064, 1062, 1, 0, 0, 0, 1064, 1063,
+		1, 0, 0, 0, 1065, 177, 1, 0, 0, 0, 127, 179, 182, 189, 213, 217, 225, 229,
+		236, 244, 249, 251, 258, 262, 271, 275, 283, 287, 291, 300, 308, 312, 320,
+		325, 327, 334, 339, 350, 356, 374, 378, 385, 408, 412, 416, 424, 433, 438,
+		446, 450, 455, 462, 467, 474, 479, 486, 491, 510, 514, 516, 523, 529, 534,
+		544, 554, 557, 562, 565, 576, 580, 585, 596, 602, 608, 612, 618, 621, 626,
+		630, 635, 641, 649, 654, 659, 663, 667, 677, 682, 685, 690, 697, 708, 712,
+		717, 722, 728, 732, 747, 750, 755, 772, 775, 784, 792, 796, 798, 803, 807,
+		814, 820, 841, 848, 865, 916, 928, 930, 938, 946, 954, 958, 960, 963, 968,
+		972, 975, 979, 984, 990, 995, 998, 1002, 1013, 1019, 1029, 1045, 1052,
+		1059, 1064,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -13051,6 +13052,54 @@ func (s *MetaExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
+type NewExpressionWithoutArgumentsExpressionContext struct {
+	*KeywordSingleExpressionContext
+}
+
+func NewNewExpressionWithoutArgumentsExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NewExpressionWithoutArgumentsExpressionContext {
+	var p = new(NewExpressionWithoutArgumentsExpressionContext)
+
+	p.KeywordSingleExpressionContext = NewEmptyKeywordSingleExpressionContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*KeywordSingleExpressionContext))
+
+	return p
+}
+
+func (s *NewExpressionWithoutArgumentsExpressionContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *NewExpressionWithoutArgumentsExpressionContext) New() antlr.TerminalNode {
+	return s.GetToken(JavaScriptParserNew, 0)
+}
+
+func (s *NewExpressionWithoutArgumentsExpressionContext) SingleExpression() ISingleExpressionContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ISingleExpressionContext)
+}
+
+func (s *NewExpressionWithoutArgumentsExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JavaScriptParserVisitor:
+		return t.VisitNewExpressionWithoutArgumentsExpression(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 type ImportExpressionContext struct {
 	*KeywordSingleExpressionContext
 }
@@ -13130,9 +13179,9 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 		}
 	}()
 
-	p.SetState(840)
+	p.SetState(841)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 100, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 99, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewImportExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
@@ -13164,42 +13213,48 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 			p.SetState(831)
 			p.singleExpression(0)
 		}
-		p.SetState(833)
-		p.GetErrorHandler().Sync(p)
-
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 99, p.GetParserRuleContext()) == 1 {
-			{
-				p.SetState(832)
-				p.Arguments()
-			}
-
+		{
+			p.SetState(832)
+			p.Arguments()
 		}
 
 	case 3:
-		localctx = NewMetaExpressionContext(p, localctx)
+		localctx = NewNewExpressionWithoutArgumentsExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(835)
+			p.SetState(834)
 			p.Match(JavaScriptParserNew)
 		}
 		{
-			p.SetState(836)
-			p.Match(JavaScriptParserDot)
-		}
-		{
-			p.SetState(837)
-			p.Identifier()
+			p.SetState(835)
+			p.singleExpression(0)
 		}
 
 	case 4:
-		localctx = NewAwaitExpressionContext(p, localctx)
+		localctx = NewMetaExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 4)
 		{
+			p.SetState(836)
+			p.Match(JavaScriptParserNew)
+		}
+		{
+			p.SetState(837)
+			p.Match(JavaScriptParserDot)
+		}
+		{
 			p.SetState(838)
+			p.Identifier()
+		}
+
+	case 5:
+		localctx = NewAwaitExpressionContext(p, localctx)
+		p.EnterOuterAlt(localctx, 5)
+		{
+			p.SetState(839)
 			p.Match(JavaScriptParserAwait)
 		}
 		{
-			p.SetState(839)
+			p.SetState(840)
 			p.singleExpression(0)
 		}
 
@@ -15217,16 +15272,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(864)
+	p.SetState(865)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 102, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 101, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewKeywordExpressionContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 
 		{
-			p.SetState(843)
+			p.SetState(844)
 			p.KeywordSingleExpression()
 		}
 
@@ -15235,7 +15290,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(844)
+			p.SetState(845)
 			p.Literal()
 		}
 
@@ -15244,22 +15299,22 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(845)
+			p.SetState(846)
 			p.Match(JavaScriptParserClass)
 		}
-		p.SetState(847)
+		p.SetState(848)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
 			{
-				p.SetState(846)
+				p.SetState(847)
 				p.Identifier()
 			}
 
 		}
 		{
-			p.SetState(849)
+			p.SetState(850)
 			p.ClassTail()
 		}
 
@@ -15268,7 +15323,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(850)
+			p.SetState(851)
 			p.AnonymousFunction()
 		}
 
@@ -15277,7 +15332,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(851)
+			p.SetState(852)
 			p.YieldStatement()
 		}
 
@@ -15286,7 +15341,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(852)
+			p.SetState(853)
 			p.Match(JavaScriptParserThis)
 		}
 
@@ -15295,7 +15350,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(853)
+			p.SetState(854)
 			p.Identifier()
 		}
 
@@ -15304,7 +15359,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(854)
+			p.SetState(855)
 			p.Match(JavaScriptParserSuper)
 		}
 
@@ -15313,7 +15368,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(855)
+			p.SetState(856)
 			p.ArrayLiteral()
 		}
 
@@ -15322,7 +15377,7 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(856)
+			p.SetState(857)
 			p.ObjectLiteral()
 		}
 
@@ -15331,15 +15386,15 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(857)
+			p.SetState(858)
 			p.Match(JavaScriptParserOpenParen)
 		}
 		{
-			p.SetState(858)
+			p.SetState(859)
 			p.ExpressionSequence()
 		}
 		{
-			p.SetState(859)
+			p.SetState(860)
 			p.Match(JavaScriptParserCloseParen)
 		}
 
@@ -15348,19 +15403,19 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(861)
+			p.SetState(862)
 			p.PreUnaryOperator()
 		}
 		{
-			p.SetState(862)
+			p.SetState(863)
 			p.singleExpression(13)
 		}
 
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(929)
+	p.SetState(930)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 105, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 104, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
@@ -15368,36 +15423,36 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.TriggerExitRuleEvent()
 			}
 			_prevctx = localctx
-			p.SetState(927)
+			p.SetState(928)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 104, p.GetParserRuleContext()) {
+			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 103, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewPowerExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(866)
+				p.SetState(867)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
 				}
 				{
-					p.SetState(867)
+					p.SetState(868)
 					p.Match(JavaScriptParserPower)
 				}
 				{
-					p.SetState(868)
+					p.SetState(869)
 					p.singleExpression(12)
 				}
 
 			case 2:
 				localctx = NewMultiplicativeExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(869)
+				p.SetState(870)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
 				}
 				{
-					p.SetState(870)
+					p.SetState(871)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -15415,20 +15470,20 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 				{
-					p.SetState(871)
+					p.SetState(872)
 					p.singleExpression(12)
 				}
 
 			case 3:
 				localctx = NewAdditiveExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(872)
+				p.SetState(873)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
 				}
 				{
-					p.SetState(873)
+					p.SetState(874)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -15446,20 +15501,20 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 				{
-					p.SetState(874)
+					p.SetState(875)
 					p.singleExpression(11)
 				}
 
 			case 4:
 				localctx = NewBitShiftExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(875)
+				p.SetState(876)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
 				}
 				{
-					p.SetState(876)
+					p.SetState(877)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -15477,20 +15532,20 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 				{
-					p.SetState(877)
+					p.SetState(878)
 					p.singleExpression(10)
 				}
 
 			case 5:
 				localctx = NewRelationalExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(878)
+				p.SetState(879)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
 				}
 				{
-					p.SetState(879)
+					p.SetState(880)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -15508,20 +15563,20 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 				{
-					p.SetState(880)
+					p.SetState(881)
 					p.singleExpression(9)
 				}
 
 			case 6:
 				localctx = NewEqExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(881)
+				p.SetState(882)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
 				}
 				{
-					p.SetState(882)
+					p.SetState(883)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -15539,20 +15594,20 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 				{
-					p.SetState(883)
+					p.SetState(884)
 					p.singleExpression(8)
 				}
 
 			case 7:
 				localctx = NewBitExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(884)
+				p.SetState(885)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
 				}
 				{
-					p.SetState(885)
+					p.SetState(886)
 					_la = p.GetTokenStream().LA(1)
 
 					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&61572651155456) != 0) {
@@ -15563,205 +15618,205 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 				{
-					p.SetState(886)
+					p.SetState(887)
 					p.singleExpression(7)
 				}
 
 			case 8:
 				localctx = NewLogicalAndExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(887)
+				p.SetState(888)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
 				}
 				{
-					p.SetState(888)
+					p.SetState(889)
 					p.Match(JavaScriptParserAnd)
 				}
 				{
-					p.SetState(889)
+					p.SetState(890)
 					p.singleExpression(6)
 				}
 
 			case 9:
 				localctx = NewLogicalOrExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(890)
+				p.SetState(891)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
 				}
 				{
-					p.SetState(891)
+					p.SetState(892)
 					p.Match(JavaScriptParserOr)
 				}
 				{
-					p.SetState(892)
+					p.SetState(893)
 					p.singleExpression(5)
 				}
 
 			case 10:
 				localctx = NewCoalesceExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(893)
+				p.SetState(894)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
 				}
 				{
-					p.SetState(894)
+					p.SetState(895)
 					p.Match(JavaScriptParserNullCoalesce)
 				}
 				{
-					p.SetState(895)
+					p.SetState(896)
 					p.singleExpression(4)
 				}
 
 			case 11:
 				localctx = NewTernaryExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(896)
+				p.SetState(897)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
 				}
 				{
-					p.SetState(897)
+					p.SetState(898)
 					p.Match(JavaScriptParserQuestionMark)
 				}
 				{
-					p.SetState(898)
+					p.SetState(899)
 					p.singleExpression(0)
 				}
 				{
-					p.SetState(899)
+					p.SetState(900)
 					p.Match(JavaScriptParserColon)
 				}
 				{
-					p.SetState(900)
+					p.SetState(901)
 					p.singleExpression(3)
 				}
 
 			case 12:
 				localctx = NewAssignmentOperatorExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(902)
+				p.SetState(903)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
 				}
 				{
-					p.SetState(903)
+					p.SetState(904)
 					p.AssignmentOperator()
 				}
 				{
-					p.SetState(904)
+					p.SetState(905)
 					p.singleExpression(1)
 				}
 
 			case 13:
 				localctx = NewTemplateStringExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(906)
+				p.SetState(907)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 26)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 26)", ""))
 				}
 				{
-					p.SetState(907)
+					p.SetState(908)
 					p.TemplateStringLiteral()
 				}
 
 			case 14:
 				localctx = NewOptionalChainExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(908)
+				p.SetState(909)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 18)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 18)", ""))
 				}
 				{
-					p.SetState(909)
+					p.SetState(910)
 					p.QuestionDot()
 				}
 				{
-					p.SetState(910)
+					p.SetState(911)
 					p.OptionalChainMember()
 				}
 
 			case 15:
 				localctx = NewChainExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(912)
+				p.SetState(913)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 17)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
 				}
 				{
-					p.SetState(913)
+					p.SetState(914)
 					p.Match(JavaScriptParserDot)
 				}
-				p.SetState(915)
+				p.SetState(916)
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
 				if _la == JavaScriptParserHashtag {
 					{
-						p.SetState(914)
+						p.SetState(915)
 						p.Match(JavaScriptParserHashtag)
 					}
 
 				}
 				{
-					p.SetState(917)
+					p.SetState(918)
 					p.IdentifierName()
 				}
 
 			case 16:
 				localctx = NewMemberIndexExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(918)
+				p.SetState(919)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
 				}
 				{
-					p.SetState(919)
+					p.SetState(920)
 					p.Match(JavaScriptParserOpenBracket)
 				}
 				{
-					p.SetState(920)
+					p.SetState(921)
 					p.singleExpression(0)
 				}
 				{
-					p.SetState(921)
+					p.SetState(922)
 					p.Match(JavaScriptParserCloseBracket)
 				}
 
 			case 17:
 				localctx = NewArgumentsExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(923)
+				p.SetState(924)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
 				}
 				{
-					p.SetState(924)
+					p.SetState(925)
 					p.Arguments()
 				}
 
 			case 18:
 				localctx = NewPostUnaryExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
-				p.SetState(925)
+				p.SetState(926)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
 					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
 				}
 				{
-					p.SetState(926)
+					p.SetState(927)
 
 					var _lt = p.GetTokenStream().LT(1)
 
@@ -15782,9 +15837,9 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 			}
 
 		}
-		p.SetState(931)
+		p.SetState(932)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 105, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 104, p.GetParserRuleContext())
 	}
 
 	return localctx
@@ -15906,14 +15961,14 @@ func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext
 		}
 	}()
 
-	p.SetState(937)
+	p.SetState(938)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserPlusPlus, JavaScriptParserMinusMinus:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(932)
+			p.SetState(933)
 			_la = p.GetTokenStream().LA(1)
 
 			if !(_la == JavaScriptParserPlusPlus || _la == JavaScriptParserMinusMinus) {
@@ -15927,7 +15982,7 @@ func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext
 	case JavaScriptParserPlus, JavaScriptParserMinus, JavaScriptParserBitNot, JavaScriptParserNot:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(933)
+			p.SetState(934)
 			_la = p.GetTokenStream().LA(1)
 
 			if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&62914560) != 0) {
@@ -15941,21 +15996,21 @@ func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext
 	case JavaScriptParserTypeof:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(934)
+			p.SetState(935)
 			p.Match(JavaScriptParserTypeof)
 		}
 
 	case JavaScriptParserVoid:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(935)
+			p.SetState(936)
 			p.Match(JavaScriptParserVoid)
 		}
 
 	case JavaScriptParserDelete:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(936)
+			p.SetState(937)
 			p.Match(JavaScriptParserDelete)
 		}
 
@@ -16067,11 +16122,11 @@ func (p *JavaScriptParser) Initializer() (localctx IInitializerContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(939)
+		p.SetState(940)
 		p.Match(JavaScriptParserAssign)
 	}
 	{
-		p.SetState(940)
+		p.SetState(941)
 		p.singleExpression(0)
 	}
 
@@ -16205,28 +16260,28 @@ func (p *JavaScriptParser) Assignable() (localctx IAssignableContext) {
 		}
 	}()
 
-	p.SetState(945)
+	p.SetState(946)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserAsync, JavaScriptParserNonStrictLet, JavaScriptParserStatic, JavaScriptParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(942)
+			p.SetState(943)
 			p.Identifier()
 		}
 
 	case JavaScriptParserOpenBracket:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(943)
+			p.SetState(944)
 			p.ArrayLiteral()
 		}
 
 	case JavaScriptParserOpenBrace:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(944)
+			p.SetState(945)
 			p.ObjectLiteral()
 		}
 
@@ -16382,64 +16437,64 @@ func (p *JavaScriptParser) ObjectLiteral() (localctx IObjectLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(947)
+		p.SetState(948)
 		p.Match(JavaScriptParserOpenBrace)
 	}
-	p.SetState(959)
+	p.SetState(960)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009080261280) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1152921504606846975) != 0 {
 		{
-			p.SetState(948)
+			p.SetState(949)
 			p.PropertyAssignment()
 		}
-		p.SetState(953)
+		p.SetState(954)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 108, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 107, p.GetParserRuleContext())
 
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
-					p.SetState(949)
+					p.SetState(950)
 					p.Match(JavaScriptParserComma)
 				}
 				{
-					p.SetState(950)
+					p.SetState(951)
 					p.PropertyAssignment()
 				}
 
 			}
-			p.SetState(955)
+			p.SetState(956)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 108, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 107, p.GetParserRuleContext())
 		}
-		p.SetState(957)
+		p.SetState(958)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserComma {
 			{
-				p.SetState(956)
+				p.SetState(957)
 				p.Match(JavaScriptParserComma)
 			}
 
 		}
 
 	}
-	p.SetState(962)
+	p.SetState(963)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserSemiColon {
 		{
-			p.SetState(961)
+			p.SetState(962)
 			p.Match(JavaScriptParserSemiColon)
 		}
 
 	}
 	{
-		p.SetState(964)
+		p.SetState(965)
 		p.Match(JavaScriptParserCloseBrace)
 	}
 
@@ -16684,96 +16739,96 @@ func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionConte
 		}
 	}()
 
-	p.SetState(989)
+	p.SetState(990)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 117, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 116, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewAnonymousFunctionDeclContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
-		p.SetState(967)
+		p.SetState(968)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserAsync {
 			{
-				p.SetState(966)
+				p.SetState(967)
 				p.Match(JavaScriptParserAsync)
 			}
 
 		}
 		{
-			p.SetState(969)
+			p.SetState(970)
 			p.Match(JavaScriptParserFunction_)
 		}
-		p.SetState(971)
+		p.SetState(972)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserMultiply {
 			{
-				p.SetState(970)
+				p.SetState(971)
 				p.Match(JavaScriptParserMultiply)
 			}
 
 		}
-		p.SetState(974)
+		p.SetState(975)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
 			{
-				p.SetState(973)
+				p.SetState(974)
 				p.Identifier()
 			}
 
 		}
 		{
-			p.SetState(976)
+			p.SetState(977)
 			p.Match(JavaScriptParserOpenParen)
 		}
-		p.SetState(978)
+		p.SetState(979)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
 			{
-				p.SetState(977)
+				p.SetState(978)
 				p.FormalParameterList()
 			}
 
 		}
 		{
-			p.SetState(980)
+			p.SetState(981)
 			p.Match(JavaScriptParserCloseParen)
 		}
 		{
-			p.SetState(981)
+			p.SetState(982)
 			p.FunctionBody()
 		}
 
 	case 2:
 		localctx = NewArrowFunctionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
-		p.SetState(983)
+		p.SetState(984)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 116, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 115, p.GetParserRuleContext()) == 1 {
 			{
-				p.SetState(982)
+				p.SetState(983)
 				p.Match(JavaScriptParserAsync)
 			}
 
 		}
 		{
-			p.SetState(985)
+			p.SetState(986)
 			p.ArrowFunctionParameters()
 		}
 		{
-			p.SetState(986)
+			p.SetState(987)
 			p.Match(JavaScriptParserARROW)
 		}
 		{
-			p.SetState(987)
+			p.SetState(988)
 			p.ArrowFunctionBody()
 		}
 
@@ -16902,36 +16957,36 @@ func (p *JavaScriptParser) ArrowFunctionParameters() (localctx IArrowFunctionPar
 		}
 	}()
 
-	p.SetState(997)
+	p.SetState(998)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserAsync, JavaScriptParserNonStrictLet, JavaScriptParserStatic, JavaScriptParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(991)
+			p.SetState(992)
 			p.Identifier()
 		}
 
 	case JavaScriptParserOpenParen:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(992)
+			p.SetState(993)
 			p.Match(JavaScriptParserOpenParen)
 		}
-		p.SetState(994)
+		p.SetState(995)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
 			{
-				p.SetState(993)
+				p.SetState(994)
 				p.FormalParameterList()
 			}
 
 		}
 		{
-			p.SetState(996)
+			p.SetState(997)
 			p.Match(JavaScriptParserCloseParen)
 		}
 
@@ -17053,20 +17108,20 @@ func (p *JavaScriptParser) ArrowFunctionBody() (localctx IArrowFunctionBodyConte
 		}
 	}()
 
-	p.SetState(1001)
+	p.SetState(1002)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 120, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 119, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(999)
+			p.SetState(1000)
 			p.FunctionBody()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1000)
+			p.SetState(1001)
 			p.singleExpression(0)
 		}
 
@@ -17209,7 +17264,7 @@ func (p *JavaScriptParser) AssignmentOperator() (localctx IAssignmentOperatorCon
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1003)
+		p.SetState(1004)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&1152640029630169088) != 0) {
@@ -17366,56 +17421,56 @@ func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
 		}
 	}()
 
-	p.SetState(1012)
+	p.SetState(1013)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserNullLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1005)
+			p.SetState(1006)
 			p.Match(JavaScriptParserNullLiteral)
 		}
 
 	case JavaScriptParserBooleanLiteral:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1006)
+			p.SetState(1007)
 			p.Match(JavaScriptParserBooleanLiteral)
 		}
 
 	case JavaScriptParserStringLiteral:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(1007)
+			p.SetState(1008)
 			p.Match(JavaScriptParserStringLiteral)
 		}
 
 	case JavaScriptParserBackTick:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(1008)
+			p.SetState(1009)
 			p.TemplateStringLiteral()
 		}
 
 	case JavaScriptParserRegularExpressionLiteral:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(1009)
+			p.SetState(1010)
 			p.Match(JavaScriptParserRegularExpressionLiteral)
 		}
 
 	case JavaScriptParserDecimalLiteral, JavaScriptParserHexIntegerLiteral, JavaScriptParserOctalIntegerLiteral, JavaScriptParserOctalIntegerLiteral2, JavaScriptParserBinaryIntegerLiteral:
 		p.EnterOuterAlt(localctx, 6)
 		{
-			p.SetState(1010)
+			p.SetState(1011)
 			p.NumericLiteral()
 		}
 
 	case JavaScriptParserBigHexIntegerLiteral, JavaScriptParserBigOctalIntegerLiteral, JavaScriptParserBigBinaryIntegerLiteral, JavaScriptParserBigDecimalIntegerLiteral:
 		p.EnterOuterAlt(localctx, 7)
 		{
-			p.SetState(1011)
+			p.SetState(1012)
 			p.BigintLiteral()
 		}
 
@@ -17557,25 +17612,25 @@ func (p *JavaScriptParser) TemplateStringLiteral() (localctx ITemplateStringLite
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1014)
+		p.SetState(1015)
 		p.Match(JavaScriptParserBackTick)
 	}
-	p.SetState(1018)
+	p.SetState(1019)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JavaScriptParserTemplateStringStartExpression || _la == JavaScriptParserTemplateStringAtom {
 		{
-			p.SetState(1015)
+			p.SetState(1016)
 			p.TemplateStringAtom()
 		}
 
-		p.SetState(1020)
+		p.SetState(1021)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(1021)
+		p.SetState(1022)
 		p.Match(JavaScriptParserBackTick)
 	}
 
@@ -17689,29 +17744,29 @@ func (p *JavaScriptParser) TemplateStringAtom() (localctx ITemplateStringAtomCon
 		}
 	}()
 
-	p.SetState(1028)
+	p.SetState(1029)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserTemplateStringAtom:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1023)
+			p.SetState(1024)
 			p.Match(JavaScriptParserTemplateStringAtom)
 		}
 
 	case JavaScriptParserTemplateStringStartExpression:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1024)
+			p.SetState(1025)
 			p.Match(JavaScriptParserTemplateStringStartExpression)
 		}
 		{
-			p.SetState(1025)
+			p.SetState(1026)
 			p.singleExpression(0)
 		}
 		{
-			p.SetState(1026)
+			p.SetState(1027)
 			p.Match(JavaScriptParserTemplateCloseBrace)
 		}
 
@@ -17824,7 +17879,7 @@ func (p *JavaScriptParser) NumericLiteral() (localctx INumericLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1030)
+		p.SetState(1031)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-63)) & ^0x3f) == 0 && ((int64(1)<<(_la-63))&31) != 0) {
@@ -17936,7 +17991,7 @@ func (p *JavaScriptParser) BigintLiteral() (localctx IBigintLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1032)
+		p.SetState(1033)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-68)) & ^0x3f) == 0 && ((int64(1)<<(_la-68))&15) != 0) {
@@ -18051,11 +18106,11 @@ func (p *JavaScriptParser) Getter() (localctx IGetterContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1034)
+		p.SetState(1035)
 		p.Match(JavaScriptParserGet)
 	}
 	{
-		p.SetState(1035)
+		p.SetState(1036)
 		p.ClassElementName()
 	}
 
@@ -18163,11 +18218,11 @@ func (p *JavaScriptParser) Setter() (localctx ISetterContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1037)
+		p.SetState(1038)
 		p.Match(JavaScriptParserSet)
 	}
 	{
-		p.SetState(1038)
+		p.SetState(1039)
 		p.ClassElementName()
 	}
 
@@ -18293,34 +18348,34 @@ func (p *JavaScriptParser) IdentifierName() (localctx IIdentifierNameContext) {
 		}
 	}()
 
-	p.SetState(1044)
+	p.SetState(1045)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 124, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 123, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1040)
+			p.SetState(1041)
 			p.Identifier()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1041)
+			p.SetState(1042)
 			p.Match(JavaScriptParserNullLiteral)
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(1042)
+			p.SetState(1043)
 			p.Match(JavaScriptParserBooleanLiteral)
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(1043)
+			p.SetState(1044)
 			p.Word()
 		}
 
@@ -18599,7 +18654,7 @@ func (p *JavaScriptParser) Word() (localctx IWordContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1046)
+		p.SetState(1047)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-72)) & ^0x3f) == 0 && ((int64(1)<<(_la-72))&562949148114943) != 0) {
@@ -18727,7 +18782,7 @@ func (p *JavaScriptParser) Identifier() (localctx IIdentifierContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1048)
+		p.SetState(1049)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
@@ -18865,40 +18920,40 @@ func (p *JavaScriptParser) OptionalChainMember() (localctx IOptionalChainMemberC
 		}
 	}()
 
-	p.SetState(1058)
+	p.SetState(1059)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserHashtag, JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
-		p.SetState(1051)
+		p.SetState(1052)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserHashtag {
 			{
-				p.SetState(1050)
+				p.SetState(1051)
 				p.Match(JavaScriptParserHashtag)
 			}
 
 		}
 		{
-			p.SetState(1053)
+			p.SetState(1054)
 			p.IdentifierName()
 		}
 
 	case JavaScriptParserOpenBracket:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1054)
+			p.SetState(1055)
 			p.Match(JavaScriptParserOpenBracket)
 		}
 		{
-			p.SetState(1055)
+			p.SetState(1056)
 			p.singleExpression(0)
 		}
 		{
-			p.SetState(1056)
+			p.SetState(1057)
 			p.Match(JavaScriptParserCloseBracket)
 		}
 
@@ -18996,19 +19051,19 @@ func (p *JavaScriptParser) Eos() (localctx IEosContext) {
 		}
 	}()
 
-	p.SetState(1063)
+	p.SetState(1064)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 127, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 126, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1060)
+			p.SetState(1061)
 			p.Match(JavaScriptParserSemiColon)
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
-		p.SetState(1061)
+		p.SetState(1062)
 
 		if !(p.isEOS()) {
 			panic(antlr.NewFailedPredicateException(p, "p.isEOS()", ""))
@@ -19017,7 +19072,7 @@ func (p *JavaScriptParser) Eos() (localctx IEosContext) {
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(1062)
+			p.SetState(1063)
 			p.Match(JavaScriptParserEOF)
 		}
 

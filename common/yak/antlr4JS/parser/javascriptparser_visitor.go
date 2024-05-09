@@ -244,6 +244,9 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#NewExpression.
 	VisitNewExpression(ctx *NewExpressionContext) interface{}
 
+	// Visit a parse tree produced by JavaScriptParser#NewExpressionWithoutArgumentsExpression.
+	VisitNewExpressionWithoutArgumentsExpression(ctx *NewExpressionWithoutArgumentsExpressionContext) interface{}
+
 	// Visit a parse tree produced by JavaScriptParser#MetaExpression.
 	VisitMetaExpression(ctx *MetaExpressionContext) interface{}
 

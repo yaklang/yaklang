@@ -323,6 +323,10 @@ func (v *BaseJavaScriptParserVisitor) VisitNewExpression(ctx *NewExpressionConte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaScriptParserVisitor) VisitNewExpressionWithoutArgumentsExpression(ctx *NewExpressionWithoutArgumentsExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaScriptParserVisitor) VisitMetaExpression(ctx *MetaExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
