@@ -711,6 +711,12 @@ func (b *astbuilder) buildKeywordSingleExpression(stmt JS.IKeywordSingleExpressi
 		return b.EmitCall(b.buildArgumentsExpression(s))
 	}
 
+	if s, ok := stmt.(*JS.NewExpressionWithoutArgumentsExpressionContext); ok {
+		args := make([]ssa.Value, 0)
+		rv, _ := b.buildSingleExpression(s.SingleExpression(), false)
+		return b.EmitCall(b.NewCall(rv, args))
+	}
+
 	if s, ok := stmt.(*JS.ImportExpressionContext); ok {
 		rv, _ := b.buildSingleExpression(s.SingleExpression(), false)
 		return rv
