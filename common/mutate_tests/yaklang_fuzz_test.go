@@ -1360,6 +1360,24 @@ Cookie: a={"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}
 				disableEncode:   true,
 			},
 		},
+		{
+			name: "Cookie参数(JSON) $[ bug",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=%7B%22distinct_id%22%3A%229b919660-ecfb-4cc1-b9b2-8986d8ae9251%22%2C%22first_id%22%3A%2218f57c14e841220-01c9a3b6ad31ef9-26001d51-1638720-18f57c14e851127%22%2C%22props%22%3A%7B%7D%2C%22%24device_id%22%3A%2218f57c14e841220-01c9a3b6ad31ef9-26001d51-1638720-18f57c14e851127%22%7D
+
+`,
+				// {"distinct_id":"9b919660-ecfb-4cc1-b9b2-8986d8ae9251","first_id":"18f57c14e841220-01c9a3b6ad31ef9-26001d51-1638720-18f57c14e851127","props":{},"$device_id":"18f57c14e841220-01c9a3b6ad31ef9-26001d51-1638720-18f57c14e851127"}
+				code: `.FuzzCookieJsonPath("a", "$[\"$device_id\"]", 999)`,
+				expectKeywordInOutputPacket: []string{
+					`"$device_id":999`,
+				},
+				debug:           true,
+				friendlyDisplay: true,
+				disableEncode:   true,
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
