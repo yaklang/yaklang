@@ -18,3 +18,11 @@ func Lookup(name string) (AIGateway, bool) {
 	}
 	return creator(), true
 }
+
+func RegisteredAIGateways() []string {
+	var ret []string
+	for _, name := range list.Keys() {
+		ret = append(ret, name)
+	}
+	return ret
+}

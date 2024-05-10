@@ -16,13 +16,13 @@ import (
 
 func createAIGateway(t string) aispec.AIGateway {
 	createAIGatewayByType := func(typ string) aispec.AIGateway {
-		gw, ok := aispec.Lookup(t)
+		gw, ok := aispec.Lookup(typ)
 		if !ok {
 			return nil
 		}
 		return gw
 	}
-	if utils.StringArrayContains([]string{"openai", "chatglm", "moonshot"}, t) {
+	if utils.StringArrayContains(aispec.RegisteredAIGateways(), t) {
 		return createAIGatewayByType(t)
 	} else {
 		if t != "" {
@@ -113,16 +113,9 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		p(config)
 	}
 
-	var agent aispec.AIGateway
-	if config.Type != "" {
-		agent = createAIGateway(config.Type)
-	}
+	agent := createAIGateway(config.Type)
 	if agent == nil {
-		agent = GetPrimaryAgent()
-	}
-
-	if agent == nil {
-		return "", utils.Error("no primary and configured ai agent found")
+		return "", utils.Error("not found valid ai agent config")
 	}
 	agent.LoadOption(opts...)
 	return agent.Chat(msg)
@@ -133,16 +126,9 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	for _, p := range opts {
 		p(config)
 	}
-	var agent aispec.AIGateway
-	if config.Type != "" {
-		agent = createAIGateway(config.Type)
-	}
+	agent := createAIGateway(config.Type)
 	if agent == nil {
-		agent = GetPrimaryAgent()
-	}
-
-	if agent == nil {
-		return nil, utils.Error("no primary and configged ai agent found")
+		return nil, utils.Error("not found valid ai agent config")
 	}
 	agent.LoadOption(opts...)
 	return agent.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
