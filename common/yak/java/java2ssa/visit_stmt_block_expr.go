@@ -861,7 +861,10 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 				return cond
 			})
 		} else {
+			// expression is nil
+			recoverRange := y.SetRangeFromTerminalNode(ret.SWITCH())
 			y.NewError(ssa.Warn, "javaast", "switch expression is nil")
+			recoverRange()
 		}
 		// 设置case数目
 		allcase := ret.AllCASE()
@@ -1282,7 +1285,9 @@ func (y *builder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext,
 			return y.VisitExpression(expr)
 		})
 	} else {
-		y.NewError(ssa.Error, "javaast", "switch expression is nil")
+		recoverRange := y.SetRangeFromTerminalNode(i.SWITCH())
+		y.NewError(ssa.Warn, "javaast", "switch expression is nil")
+		recoverRange()
 	}
 
 	switchLabels := i.AllSwitchLabeledRule()
