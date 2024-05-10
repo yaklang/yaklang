@@ -99,6 +99,10 @@ func (v *BaseSyntaxFlowVisitor) VisitRecursiveConfigItem(ctx *RecursiveConfigIte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitRecursiveConfigItemValue(ctx *RecursiveConfigItemValueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitSliceCallItem(ctx *SliceCallItemContext) interface{} {
 	return v.VisitChildren(ctx)
 }

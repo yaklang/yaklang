@@ -76,6 +76,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#recursiveConfigItem.
 	VisitRecursiveConfigItem(ctx *RecursiveConfigItemContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#recursiveConfigItemValue.
+	VisitRecursiveConfigItemValue(ctx *RecursiveConfigItemValueContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#sliceCallItem.
 	VisitSliceCallItem(ctx *SliceCallItemContext) interface{}
 

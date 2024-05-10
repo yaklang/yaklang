@@ -39,12 +39,16 @@ filterExpr
     ;
 
 acutalParamFilter
-    : ('#>' | '#{' (recursiveConfig)? '}' )? filterExpr ','?   # NamedParam
-    | ','                                                   # EmptyParam
+    : ('#>' | '#{' (recursiveConfig)? '}' )? filterStatement ','?   # NamedParam
+    | ','                                                           # EmptyParam
     ;
 
 recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','?;
-recursiveConfigItem: identifier ':' (identifier | numberLiteral);
+recursiveConfigItem: identifier ':' recursiveConfigItemValue;
+recursiveConfigItemValue
+    : (identifier | numberLiteral)
+    | '%' filterStatement
+    ;
 
 sliceCallItem: nameFilter | numberLiteral;
 

@@ -61,11 +61,12 @@ const (
 )
 
 type SFI struct {
-	OpCode   SFVMOpCode
-	UnaryInt int
-	UnaryStr string
-	Desc     string
-	Values   []string
+	OpCode           SFVMOpCode
+	UnaryInt         int
+	UnaryStr         string
+	Desc             string
+	Values           []string
+	SyntaxFlowConfig []*ConfigItem
 }
 
 const verboseLen = "%-12s"
