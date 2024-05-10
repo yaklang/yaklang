@@ -63,8 +63,8 @@ const (
 	state_BacktickString    = "b-quote"
 	state_jsonObj           = "json-object"
 	state_data              = "data"
-	state_esExpr            = "es-expr"
-	state_reset             = "reset"
+	//state_esExpr            = "es-expr"
+	state_reset = "reset"
 )
 
 func ExtractObjectIndexes(c string) [][2]int {
@@ -140,9 +140,9 @@ func ExtractObjectIndexes(c string) [][2]int {
 			case '\'':
 				pushState(state_SingleQuoteString)
 				continue
-			case '`':
-				pushState(state_esExpr)
-				continue
+				//case '`':
+				//	pushState(state_esExpr)
+				//	continue
 			}
 		case state_jsonObj:
 			switch ch {
@@ -155,19 +155,19 @@ func ExtractObjectIndexes(c string) [][2]int {
 			case '\'':
 				pushState(state_SingleQuoteString)
 				continue
-			case '`':
-				pushState(state_esExpr)
-				continue
+			//case '`':
+			//	pushState(state_esExpr)
+			//	continue
 			case '}':
 				popState()
 				continue
 			}
-		case state_esExpr:
-			switch ch {
-			case '}':
-				popState()
-				continue
-			}
+		//case state_esExpr:
+		//	switch ch {
+		//	case '}':
+		//		popState()
+		//		continue
+		//	}
 		case state_DoubleQuoteString:
 			switch ch {
 			case '"':
@@ -184,25 +184,25 @@ func ExtractObjectIndexes(c string) [][2]int {
 					continue
 				}
 			}
-		case state_BacktickString:
-			/*
-				这个很特殊，有几种情况需要处理
-				`abc`
-				`abc${"123" + `abc`}`
-			*/
-			switch ch {
-			case '{':
-				if last == '$' {
-					// ${ 开头的，认为这是 expr
-					pushState(state_esExpr)
-					continue
-				}
-			case '`':
-				if last != '\\' {
-					popState()
-					continue
-				}
-			}
+		//case state_BacktickString:
+		//	/*
+		//		这个很特殊，有几种情况需要处理
+		//		`abc`
+		//		`abc${"123" + `abc`}`
+		//	*/
+		//	switch ch {
+		//	case '{':
+		//		if last == '$' {
+		//			// ${ 开头的，认为这是 expr
+		//			pushState(state_esExpr)
+		//			continue
+		//		}
+		//	case '`':
+		//		if last != '\\' {
+		//			popState()
+		//			continue
+		//		}
+		//	}
 		case state_reset:
 			// 空状态回溯，多半是有问题的
 			//currentPair[0] = -1
