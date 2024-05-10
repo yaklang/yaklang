@@ -1778,7 +1778,9 @@ func (b *astbuilder) buildSwitchStatement(stmt *JS.SwitchStatementContext) {
 			return rv
 		})
 	} else {
+		recoverRange := b.SetRangeFromTerminalNode(stmt.Switch())
 		b.NewError(ssa.Warn, TAG, "switch expression is nil")
+		recoverRange()
 	}
 
 	if s, ok := stmt.CaseBlock().(*JS.CaseBlockContext); ok {
