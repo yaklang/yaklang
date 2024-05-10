@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -15,7 +16,11 @@ import (
 func findVariable(v *ssaapi.Value, word string, containPoint bool) []*ssa.Variable {
 	variables := make([]*ssa.Variable, 0)
 	if !containPoint {
-		variables = append(variables, v.GetVariable(word))
+		if variable := v.GetVariable(word); variable != nil {
+			variables = append(variables, variable)
+		} else {
+			log.Errorf("BUG: Value[%s] don't has variable[%s]", v, word)
+		}
 	} else {
 		// fuzz match variable name
 		_, lastName, _ := strings.Cut(word, ".")
@@ -30,6 +35,10 @@ func findVariable(v *ssaapi.Value, word string, containPoint bool) []*ssa.Variab
 	}
 	return variables
 }
+
+const (
+	MAX_PHI_LEVEL = 5
+)
 
 func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v *ssaapi.Value, isReference bool) ([]*ssa.Variable, *ssa.Parameter) {
 	var parameter *ssa.Parameter
@@ -55,30 +64,39 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 	}
 
 	if isReference {
-		builtinFindVariable(v)
-		// try to get users phi, add each edge variable
-		for _, user := range v.GetUsers() {
-			if !user.IsPhi() {
-				continue
+		// use
+		var handler func(*ssaapi.Value, int)
+		handler = func(value *ssaapi.Value, level int) {
+			builtinFindVariable(value)
+			if level == MAX_PHI_LEVEL {
+				return
 			}
-
-			builtinFindVariable(user)
-		}
-		// try to convert value to phi, add each edge variable
-		if v.IsPhi() {
-			for _, edge := range ssaapi.GetValues(v) {
-				builtinFindVariable(edge)
+			level++
+			// try to convert value to phi, add each edge variable
+			for _, user := range value.GetUsers() {
+				if user.IsPhi() {
+					handler(user, level)
+				}
 			}
 		}
-	} else {
-		builtinFindVariable(v)
+		handler(v, 0)
+	}
+	// def
+	var handler func(*ssaapi.Value, int)
+	handler = func(value *ssaapi.Value, level int) {
+		builtinFindVariable(value)
+		if level == MAX_PHI_LEVEL {
+			return
+		}
+		level++
 		// try to convert value to phi, add each edge variable
-		if v.IsPhi() {
-			for _, edge := range ssaapi.GetValues(v) {
-				builtinFindVariable(edge)
+		if value.IsPhi() {
+			for _, edge := range ssaapi.GetValues(value) {
+				handler(edge, level)
 			}
 		}
 	}
+	handler(v, 0)
 
 	variables = lo.Uniq(variables)
 
