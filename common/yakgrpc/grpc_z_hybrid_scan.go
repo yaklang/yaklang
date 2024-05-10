@@ -85,9 +85,9 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 
 	var taskStream = newWrapperHybridScanStream(taskCtx, stream)
 	taskStream.RequestHandler = func(request *ypb.HybridScanRequest) bool {
-		if request.Control {
-			return false
-		}
+		//if request.Control {
+		//	return false
+		//}
 		return true
 	}
 
@@ -95,7 +95,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 	var taskId string
 	var taskManager *HybridScanTaskManager
 
-	sendHybridScanStatus := func() error {
+	recoverHybridScanStatus := func() error {
 		taskId = firstRequest.GetResumeTaskId()
 		if taskId == "" {
 			return utils.Error("resume task id is empty")
@@ -152,9 +152,9 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 
 	switch strings.ToLower(firstRequest.HybridScanMode) {
 	case "status": // 查询任务状态
-		return sendHybridScanStatus()
+		return recoverHybridScanStatus()
 	case "resume":
-		if err := sendHybridScanStatus(); err != nil {
+		if err := recoverHybridScanStatus(); err != nil {
 			return err
 		}
 		taskId = firstRequest.GetResumeTaskId()
