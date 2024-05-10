@@ -365,6 +365,19 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 }
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
+	if b.SupportGetStaticMember {
+		if object.IsUndefined() {
+			program := b.GetProgram()
+			objectName := object.GetName()
+			keyName := key.String()
+			if bluePrint := program.ClassBluePrint[objectName]; bluePrint != nil {
+				if value, ok := bluePrint.StaticMember[keyName]; ok {
+					object.SelfDelete()
+					return value
+				}
+			}
+		}
+	}
 	name, typ := checkCanMemberCall(object, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret

@@ -375,7 +375,34 @@ public class Main {
 			`, []string{"1"}, t)
 	})
 
-	t.Run("test static method  1", func(t *testing.T) {
+	t.Run("test member variable and static method within a class", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Main {
+    int a = 1 ;
+    public void main(String[] args) {
+            println(a);
+        }
+ }
+			`, []string{"1"}, t)
+	})
+
+	t.Run("test cross class static variable calls ", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+package org.example;
+public class Test {
+		static int a = 1;
+	}
+
+public class Main {
+    public void main(String[] args) {
+           println(Test.a);
+        }
+ }
+	
+			`, []string{"1"}, t)
+	})
+
+	t.Run("test static method", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 class A {
 		int a = 0;
