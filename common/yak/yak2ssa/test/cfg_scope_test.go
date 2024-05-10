@@ -200,6 +200,22 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 		}, t)
 	})
 
+	t.Run("test multiple if ", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+	a = 1
+	if 1 {
+		if 2 {
+			a = 2
+		}
+	}
+	println(a)
+	`,
+			[]string{
+				"phi(a)[phi(a)[2,1],1]",
+			},
+			t)
+	})
+
 	t.Run("test simple if else", func(t *testing.T) {
 		test.CheckPrintlnValue(`
 		a = 1

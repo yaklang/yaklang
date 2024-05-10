@@ -58,11 +58,20 @@ func getFindReferences(local ypb.YakClient, pluginType string, t *testing.T, cod
 func getFindDefinition(local ypb.YakClient, pluginType string, t *testing.T, code string, Range *ypb.Range, id string) *ypb.YaklangLanguageFindResponse {
 	return getFind(local, "definition", pluginType, t, code, Range, id)
 }
+func RangeIfToGrpcRangeRaw(rng memedit.RangeIf) *ypb.Range {
+	start, end := rng.GetStart(), rng.GetEnd()
+	return &ypb.Range{
+		StartLine:   int64(start.GetLine()),
+		StartColumn: int64(start.GetColumn()),
+		EndLine:     int64(end.GetLine()),
+		EndColumn:   int64(end.GetColumn()),
+	}
+}
 
 func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges ...memedit.RangeIf) {
 	t.Helper()
 
-	rsp := getFindDefinition(local, pluginType, t, sourceCode, RangeIfToGrpcRange(selectRange), "")
+	rsp := getFindDefinition(local, pluginType, t, sourceCode, RangeIfToGrpcRangeRaw(selectRange), "")
 
 	require.NotNil(t, rsp)
 	require.Len(t, rsp.Ranges, len(wantRanges))
@@ -74,7 +83,7 @@ func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType s
 func checkReferences(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges []memedit.RangeIf) {
 	t.Helper()
 
-	rsp := getFindReferences(local, pluginType, t, sourceCode, RangeIfToGrpcRange(selectRange), "")
+	rsp := getFindReferences(local, pluginType, t, sourceCode, RangeIfToGrpcRangeRaw(selectRange), "")
 
 	require.NotNil(t, rsp)
 	require.Len(t, rsp.Ranges, len(wantRanges))
@@ -137,7 +146,7 @@ a`
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:1 2:1"),
+			newRangeFromText("2:1 2:2"),
 			[]memedit.RangeIf{
 				newRangeFromText("1:5 1:6"),
 				newRangeFromText("2:1 2:2"),
@@ -153,7 +162,7 @@ println(m.a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("3:9 3:11"),
+			newRangeFromText("3:9 3:12"),
 			[]memedit.RangeIf{
 				newRangeFromText("2:1 2:4"),
 				newRangeFromText("3:9 3:12"),
@@ -170,7 +179,7 @@ a = Error()`
 			local,
 			code,
 			"yak",
-			newRangeFromText("4:5 4:9"),
+			newRangeFromText("4:5 4:10"),
 			[]memedit.RangeIf{
 				newRangeFromText("1:6 1:11"),
 				newRangeFromText("4:5 4:10"),
@@ -188,7 +197,7 @@ return err
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:1 2:3"),
+			newRangeFromText("2:1 2:4"),
 			[]memedit.RangeIf{
 				newRangeFromText("2:1 2:4"),
 				newRangeFromText("3:8 3:11"),
@@ -204,7 +213,7 @@ ssa.Parse("")`
 			local,
 			code,
 			"yak",
-			newRangeFromText("1:1 1:9"),
+			newRangeFromText("1:1 1:10"),
 			[]memedit.RangeIf{
 				newRangeFromText("1:1 1:10"),
 				newRangeFromText("2:1 2:10"),
@@ -220,7 +229,7 @@ println(2)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("1:1 1:7"),
+			newRangeFromText("1:1 1:8"),
 			[]memedit.RangeIf{
 				newRangeFromText("1:1 1:8"),
 				newRangeFromText("2:1 2:8"),
@@ -242,7 +251,7 @@ println(4)
 			local,
 			code,
 			"yak",
-			newRangeFromText("1:1 1:7"),
+			newRangeFromText("1:1 1:8"),
 			[]memedit.RangeIf{
 				newRangeFromText("1:1 1:8"),
 				newRangeFromText("2:1 2:8"),
@@ -258,20 +267,28 @@ func TestGRPCMUSTPASS_LANGUAGE_Find_Phi(t *testing.T) {
 	require.NoError(t, err)
 
 	code := `a = 1
-println(a)
+println(a) // 1
 if c {
 a = 2
-println(a)
+println(a) // 2
 }
-println(a)`
+println(a) // 3
+`
+
+	a1 := newRangeFromText("1:1 1:2")
+	a2 := newRangeFromText("4:1 4:2")
+
+	print1 := newRangeFromText("2:9 2:10")
+	print2 := newRangeFromText("5:9 5:10")
+	print3 := newRangeFromText("7:9 7:10")
 
 	t.Run("def-1", func(t *testing.T) {
 		checkDefinition(t,
 			local,
 			code,
 			"yak",
-			newRangeFromText("1:1 1:1"),
-			newRangeFromText("1:1 1:2"),
+			print1,
+			a1,
 		)
 	})
 	t.Run("def-2", func(t *testing.T) {
@@ -279,8 +296,8 @@ println(a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("4:1 4:1"),
-			newRangeFromText("4:1 4:2"),
+			print2,
+			a2,
 		)
 	})
 	t.Run("def-phi", func(t *testing.T) {
@@ -288,9 +305,8 @@ println(a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("7:9 7:9"),
-			newRangeFromText("1:1 1:2"),
-			newRangeFromText("4:1 4:2"),
+			print3,
+			a1, a2,
 		)
 	})
 	t.Run("use-1", func(t *testing.T) {
@@ -298,11 +314,9 @@ println(a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:9 2:9"),
+			print1,
 			[]memedit.RangeIf{
-				newRangeFromText("1:1 1:2"),
-				newRangeFromText("2:9 2:10"),
-				newRangeFromText("7:9 7:10"),
+				a1, print1, print3,
 			},
 		)
 	})
@@ -311,11 +325,9 @@ println(a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("5:9 5:9"),
+			print2,
 			[]memedit.RangeIf{
-				newRangeFromText("4:1 4:2"),
-				newRangeFromText("5:9 5:10"),
-				newRangeFromText("7:9 7:10"),
+				a2, print2, print3,
 			},
 		)
 	})
@@ -324,18 +336,61 @@ println(a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("7:9 7:9"),
+			print3,
 			[]memedit.RangeIf{
-				newRangeFromText("1:1 1:2"),
-				newRangeFromText("2:9 2:10"),
-				newRangeFromText("4:1 4:2"),
-				newRangeFromText("5:9 5:10"),
-				newRangeFromText("7:9 7:10"),
+				a1, print1, a2, print2, print3,
 			},
 		)
 	})
 }
 
+func TestGRPCMUSTPASS_LANGUAGE_Find_Multiple_Phi(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	code := `
+a = 1
+if 1 {
+	if 1 {
+		a = 2
+	}
+	// phi[1, 2]
+}
+// phi[1, phi[1,2]]
+println(a)
+`
+	println := newRangeFromText("10:9 10:10")
+	a1 := newRangeFromText("2:1 2:2")
+	a2 := newRangeFromText("5:3 5:4")
+
+	t.Run("def-1", func(t *testing.T) {
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			println,
+			a1, a2,
+		)
+	})
+
+	t.Run("use  1", func(t *testing.T) {
+		checkReferences(t, local, code, "yak",
+			a1,
+			[]memedit.RangeIf{
+				a1, println,
+			},
+		)
+	})
+
+	t.Run("use  2", func(t *testing.T) {
+		checkReferences(t, local, code, "yak",
+			a2,
+			[]memedit.RangeIf{
+				a2, println,
+			},
+		)
+	})
+}
 func TestGRPCMUSTPASS_LANGUAGE_Find_FreeValue(t *testing.T) {
 	local, err := NewLocalClient()
 	require.NoError(t, err)
