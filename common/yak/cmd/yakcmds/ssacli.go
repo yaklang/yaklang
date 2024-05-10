@@ -27,7 +27,7 @@ var SSACompilerCommands = []*cli.Command{
 				Usage: `target file or directory`,
 			},
 			cli.StringFlag{
-				Name:  "program-name,p",
+				Name:  "program,p",
 				Usage: `program name to save in database`,
 			},
 			cli.StringFlag{
@@ -37,18 +37,46 @@ var SSACompilerCommands = []*cli.Command{
 			cli.BoolFlag{
 				Name: "memory",
 			},
+			cli.StringFlag{
+				Name:  "syntaxflow,sf",
+				Usage: "syntax flow query language",
+			},
 		},
 		Action: func(c *cli.Context) error {
-			file := utils.GetFirstExistedPath(c.String("target"))
+			programName := c.String("program")
+			entry := c.String("entry")
+			language := c.String("language")
+			inMemory := c.Bool("memory")
+			rawFile := c.String("target")
+			file := utils.GetFirstExistedPath(rawFile)
+
+			// syntax flow query
+			if sf := c.String("syntaxflow"); sf != "" {
+				if programName == "" {
+					log.Errorf("program name is required when using syntax flow query language")
+					return nil
+				}
+				// program from database
+				prog, err := ssaapi.FromDatabase(programName)
+				if err != nil {
+					log.Errorf("load program [%v] from database failed: %v", programName, err)
+					return nil
+				}
+				result, err := prog.SyntaxFlowWithError(sf)
+				if err != nil {
+					log.Errorf("syntax flow [%s] query failed: %v", sf, err)
+					return nil
+				}
+				log.Infof("syntax flow query result:")
+				result.Show()
+				return nil
+			}
+
+			// parse project
 			if file == "" {
 				log.Warnf("file or dir not found: %v", c.String("target"))
 				return nil
 			}
-
-			name := c.String("program")
-			entry := c.String("entry")
-			language := c.String("language")
-			inMemory := c.Bool("memory")
 
 			opt := make([]ssaapi.Option, 0, 3)
 			log.Infof("start to compile file: %v ", file)
@@ -64,11 +92,11 @@ var SSACompilerCommands = []*cli.Command{
 			if inMemory {
 				log.Infof("compile in memory mode, program-name will be ignored")
 			} else {
-				if name == "" {
-					name = "default-" + ksuid.New().String()
+				if programName == "" {
+					programName = "default-" + ksuid.New().String()
 				}
-				log.Infof("compile save to database with program name: %v", name)
-				opt = append(opt, ssaapi.WithDatabaseProgramName(name))
+				log.Infof("compile save to database with program name: %v", programName)
+				opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
 			}
 
 			proj, err := ssaapi.ParseProjectFromPath(file, opt...)
