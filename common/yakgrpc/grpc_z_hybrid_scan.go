@@ -59,6 +59,12 @@ func (w *wrapperHybridScanStream) Context() context.Context {
 }
 
 func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error(err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	firstRequest, err := stream.Recv()
 	if err != nil {
 		return err
@@ -171,6 +177,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			if err != nil {
 				utils.TryWriteChannel(errC, err)
 			}
+			close(errC)
 		}()
 	case "new":
 		taskId = uuid.New().String()
