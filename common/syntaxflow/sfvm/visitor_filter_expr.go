@@ -138,13 +138,29 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
-		log.Warn(`TBD: *sf.ConfiggedDeepNextFilterContext`)
+		if i := ret.RecursiveConfig(); i != nil {
+			y.EmitGetBottomUsersWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
+		} else {
+			y.EmitGetBottomUsers()
+		}
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
 	case *sf.ConfiggedTopDefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
 			return err
 		}
-		log.Warn(`TBD: *sf.ConfiggedTopDefFilterContext`)
+		if i := ret.RecursiveConfig(); i != nil {
+			y.EmitGetTopDefsWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
+		} else {
+			y.EmitGetBottomUsers()
+		}
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
 	default:
 		panic("BUG: in filterExpr")
 	}

@@ -211,7 +211,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Error("BUG: get bottom uses failed, empty stack")
 			}
 			s.debugSubLog("- call BottomUses")
-			vals, err := value.GetSyntaxFlowBottomUse()
+			vals, err := value.GetSyntaxFlowBottomUse(i.SyntaxFlowConfig...)
 			if err != nil {
 				return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 			}
@@ -224,7 +224,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Error("BUG: get top defs failed, empty stack")
 			}
 			s.debugSubLog("- call TopDefs")
-			vals, err := value.GetSyntaxFlowTopDef()
+			vals, err := value.GetSyntaxFlowTopDef(i.SyntaxFlowConfig...)
 			if err != nil {
 				return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 			}
