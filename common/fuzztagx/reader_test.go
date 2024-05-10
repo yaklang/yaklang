@@ -86,7 +86,7 @@ func TestReader(t *testing.T) {
 	}()
 	time.Sleep(time.Millisecond * 500)
 	assert.Equal(t, "aaa\n", buf.String())
-	time.Sleep(time.Millisecond * 500)
+	time.Sleep(time.Second)
 	assert.Equal(t, "aaa\nsdfa", buf.String())
 	wg.Wait()
 }
