@@ -249,7 +249,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		}
 		// shrink context
 		if manager.IsStop() {
-			return utils.Error("task manager stopped")
+			break
 		}
 
 		go func() {
