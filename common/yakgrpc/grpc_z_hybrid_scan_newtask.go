@@ -37,7 +37,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 
 	quickSave := func() {
-		yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
+		err := yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
+		if err != nil {
+			log.Error(err)
+		}
 	}
 
 	defer func() {
