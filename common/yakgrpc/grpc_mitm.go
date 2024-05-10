@@ -755,7 +755,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		originRspRaw := rsp[:]
 		plainResponse := httpctx.GetPlainResponseBytes(req)
 		if len(plainResponse) <= 0 {
-			plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+			plainResponse, _, _ = lowhttp.FixHTTPResponse(httpctx.GetBareResponseBytes(req))
 			httpctx.SetPlainResponseBytes(req, plainResponse)
 		}
 		rsp = plainResponse
