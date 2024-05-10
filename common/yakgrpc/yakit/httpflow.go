@@ -1391,10 +1391,12 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	}
 	tags := make([]*TagAndStatusCode, 0)
 	for k, v := range tagCounts {
-		tags = append(tags, &TagAndStatusCode{
-			Value: k,
-			Count: v,
-		})
+		if !strings.HasPrefix(k, COLORPREFIX) {
+			tags = append(tags, &TagAndStatusCode{
+				Value: k,
+				Count: v,
+			})
+		}
 	}
 	return tags, nil
 }
