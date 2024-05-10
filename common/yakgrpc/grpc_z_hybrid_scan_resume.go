@@ -24,7 +24,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		return utils.Wrapf(err, "Resume HybridScanByID: %v", manager.TaskId())
 	}
 	quickSave := func() {
-		if consts.GetGormProjectDatabase().Save(task).Error != nil {
+		err := yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), task)
+		if err != nil {
 			log.Error(err)
 		}
 	}
