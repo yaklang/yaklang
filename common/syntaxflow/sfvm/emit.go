@@ -134,8 +134,16 @@ func (v *SyntaxFlowVisitor) EmitGetBottomUsers() {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetBottomUsers})
 }
 
+func (v *SyntaxFlowVisitor) EmitGetBottomUsersWithConfig(config []*ConfigItem) {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetBottomUsers, SyntaxFlowConfig: config})
+}
+
 func (v *SyntaxFlowVisitor) EmitGetTopDefs() {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs})
+}
+
+func (v *SyntaxFlowVisitor) EmitGetTopDefsWithConfig(config []*ConfigItem) {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs, SyntaxFlowConfig: config})
 }
 
 func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {

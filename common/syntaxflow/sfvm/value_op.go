@@ -7,7 +7,7 @@ import (
 type ConfigItem struct {
 	Key            string
 	Value          string
-	SyntaxFlowRule string
+	SyntaxFlowRule bool
 }
 
 type ValueOperator interface {
