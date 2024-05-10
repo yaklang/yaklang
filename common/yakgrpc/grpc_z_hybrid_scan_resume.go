@@ -32,6 +32,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	task.Status = yakit.HYBRIDSCAN_EXECUTING
 	quickSave()
 
+	// recover scanConfig
 	var scanConfig ypb.HybridScanRequest
 	err = json.Unmarshal(task.ScanConfig, &scanConfig)
 	if err != nil {
@@ -145,8 +146,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		// fingerprint match just once
 		var portScanCond = &sync.Cond{L: &sync.Mutex{}}
 		var fingerprintMatchOK = false
-		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
 		go func() {
+			host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
 			_, err = matcher.Match(host, port)
 			if err != nil {
 				log.Errorf("match fingerprint failed: %s", err)
@@ -175,33 +176,24 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 			}
 			targetWg.Add(1)
 
-			//manager.Checkpoint(func() {
-			//	task.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
-			//	feedbackStatus()
-			//	task.Status = yakit.HYBRIDSCAN_PAUSED
-			//	quickSave()
-			//})
-			//
+			taskIndex := statusManager.DoActiveTask(task)
+			feedbackStatus()
+
 			for !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
 				portScanCond.Wait()
 				portScanCond.L.Unlock()
 			}
 
-			taskIndex := statusManager.DoActiveTask()
-
-			feedbackStatus()
-
 			go func() {
 				defer swg.Done()
-
 				defer targetWg.Done()
 				defer func() {
 					if !manager.IsStop() { // 暂停之后不再更新进度
-						statusManager.DoneTask(taskIndex)
+						statusManager.DoneTask(taskIndex, task)
 					}
-					feedbackStatus()
 					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
+					feedbackStatus()
 				}()
 
 				// shrink context
@@ -225,6 +217,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					}
 				}
 
+				callerFilter := resumeFilterManager.DequeueFilter()
+				defer resumeFilterManager.EnqueueFilter(callerFilter)
+
 				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 					// shrink context
 					if manager.IsStop() {
@@ -237,12 +232,12 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					currentStatus.ExecResult = result
 					return stream.Send(currentStatus)
 				}, &riskCount)
-				callerFilter := resumeFilterManager.DequeueFilter()
-				defer resumeFilterManager.EnqueueFilter(callerFilter)
+
 				err := ScanHybridTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, scanConfig.Proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
+
 				time.Sleep(time.Duration(300+rand.Int63n(700)) * time.Millisecond)
 			}()
 

@@ -25,9 +25,8 @@ import (
 )
 
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
-	taskId := manager.TaskId()
 	defer manager.Stop()
-
+	taskId := manager.TaskId()
 	taskRecorder := &yakit.HybridScanTask{
 		TaskId: taskId,
 		Status: yakit.HYBRIDSCAN_EXECUTING,
@@ -40,6 +39,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	quickSave := func() {
 		yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
 	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			taskRecorder.Reason = fmt.Errorf("%v", err).Error()
@@ -86,41 +86,41 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		}
 	}
 	taskRecorder.ScanConfig, _ = json.Marshal(rsp)
-	err = yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
-	if err != nil {
-		return utils.Errorf("save task failed: %s", err)
-	}
+	quickSave()
 
-	swg := utils.NewSizedWaitGroup(concurrent)                                                                    // 设置并发
-	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(totalTimeout)*time.Second) // 设置总超时
+	// 设置并发
+	swg := utils.NewSizedWaitGroup(concurrent)
+	// 设置总超时
+	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(totalTimeout)*time.Second)
 
+	// targetChan 的大小如何估算？目标数量（百万为单位） * 目标大小字节数为 M 数
+	// 即，100w 个目标，每个目标占用大小为 100 字节，那么都在内存中，开销大约为 100M
+	// 这个开销在内存中处理绰绰有余，但是在网络传输中，这个开销就很大了
+	//generate target list
 	targetChan, err := TargetGenerator(manager.Context(), s.GetProjectDatabase(), target)
 	if err != nil {
 		taskRecorder.Reason = err.Error()
 		return utils.Errorf("TargetGenerator failed: %s", err)
 	}
+	// save targets
+	var targetCached []*HybridScanTarget
+	for targetInput := range targetChan {
+		targetCached = append(targetCached, targetInput)
+	}
+	targetsBytes, err := json.Marshal(targetCached)
+	if err != nil {
+		return utils.Errorf("marshal targets failed: %s", err)
+	}
+	taskRecorder.Targets = string(targetsBytes)
 
+	// generate plugin list
 	pluginCache := list.New()
-
-	/*
-		统计状态
-	*/
-	//var totalTarget = int64(len(utils.ParseStringToLines(target.String())))
-	//var targetFinished int64 = 0
-	//var taskFinished int64 = 0
-	//var totalPlugin int64 = 0
-	//var getTotalTasks = func() int64 {
-	//	return totalTarget * totalPlugin
-	//}
-	//var activeTask int64
-	//var activeTarget int64
-	//var taskCount int64
-
 	pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 	if err != nil {
 		taskRecorder.Reason = err.Error()
 		return utils.Errorf("load plugin generator failed: %s", err)
 	}
+	// save plugin list
 	var pluginNames []string
 	for r := range pluginChan {
 		pluginNames = append(pluginNames, r.ScriptName)
@@ -135,38 +135,17 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 	taskRecorder.Plugins = string(pluginBytes)
 
-	// targetChan 的大小如何估算？目标数量（百万为单位） * 目标大小字节数为 M 数
-	// 即，100w 个目标，每个目标占用大小为 100 字节，那么都在内存中，开销大约为 100M
-	// 这个开销在内存中处理绰绰有余，但是在网络传输中，这个开销就很大了
-	var targetCached []*HybridScanTarget
-	for targetInput := range targetChan {
-		targetCached = append(targetCached, targetInput)
-	}
-	targetsBytes, err := json.Marshal(targetCached)
-	if err != nil {
-		return utils.Errorf("marshal targets failed: %s", err)
-	}
-	taskRecorder.Targets = string(targetsBytes)
-
 	statusManager := newHybridScanStatusManager(taskId, len(targetCached), len(pluginNames), taskRecorder.Status)
-
-	setTaskStatus := func(status string) {
+	setTaskStatus := func(status string) { // change status , should set manager status ,need send to front end.
 		taskRecorder.Status = status
 		statusManager.Status = status
-	}
-
-	statusMutex := new(sync.Mutex)
-	getStatus := func() *ypb.HybridScanResponse {
-		statusMutex.Lock()
-		defer statusMutex.Unlock()
-		return statusManager.GetStatus(taskRecorder)
 	}
 	feedbackStatus := func() {
 		statusManager.Feedback(stream)
 	}
 
 	// Send RuntimeID immediately
-	currentStatus := getStatus()
+	currentStatus := statusManager.GetStatus(taskRecorder)
 	currentStatus.ExecResult = &ypb.ExecResult{RuntimeID: taskId}
 	stream.Send(currentStatus)
 
@@ -198,10 +177,11 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		}
 	}()
 
+	quickSave()
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
-		if manager.IsStop() || manager.IsPaused() {
-			break
+		if manager.IsStop() || manager.IsPaused() { // if stop or pause, break immediately
+			break // need send status to front end, can't return
 		}
 		// load targets
 		statusManager.DoActiveTarget()
@@ -219,8 +199,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		// fingerprint match just once
 		portScanCond := &sync.Cond{L: &sync.Mutex{}}
 		fingerprintMatchOK := false
-		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
 		go func() {
+			host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
 			_, err = matcher.Match(host, port)
 			if err != nil {
 				log.Errorf("match fingerprint failed: %s", err)
@@ -235,7 +215,6 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		if err != nil {
 			return utils.Errorf("generate plugin queue failed: %s", err)
 		}
-
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
 			pluginInstance := __pluginInstance
@@ -245,20 +224,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				}
 				continue
 			}
-
 			targetWg.Add(1)
 
-			//manager.Checkpoint(func() {
-			//	// 如果出现了暂停，立即保存进度
-			//	taskRecorder.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
-			//	names, _ := json.Marshal(pluginNames)
-			//	taskRecorder.Plugins = string(names)
-			//	targetBytes, _ := json.Marshal(targetCached)
-			//	taskRecorder.Targets = string(targetBytes)
-			//	feedbackStatus()
-			//	taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
-			//	quickSave()
-			//})
+			taskIndex := statusManager.DoActiveTask(taskRecorder)
+			feedbackStatus()
 
 			for __pluginInstance.Type == "port-scan" && !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
@@ -266,17 +235,15 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				portScanCond.L.Unlock()
 			}
 
-			taskIndex := statusManager.DoActiveTask()
-			feedbackStatus()
-
 			go func() {
 				defer swg.Done()
 				defer targetWg.Done()
 				defer func() {
 					if !manager.IsStop() { // 停止之后不再更新进度
-						statusManager.DoneTask(taskIndex)
+						statusManager.DoneTask(taskIndex, taskRecorder)
 					}
 					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
+					feedbackStatus()
 				}()
 				// shrink context
 				if manager.IsStop() {
@@ -284,19 +251,20 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					return
 				}
 				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
-
-				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
-					if manager.IsStop() || manager.IsPaused() {
-						return nil
-					}
-					result.RuntimeID = taskId
-					currentStatus := getStatus()
-					currentStatus.CurrentPluginName = pluginInstance.ScriptName
-					currentStatus.ExecResult = result
-					return stream.Send(currentStatus)
-				}, &riskCount)
 				callerFilter := scanFilterManager.DequeueFilter()
 				defer scanFilterManager.EnqueueFilter(callerFilter)
+				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(
+					func(result *ypb.ExecResult) error {
+						if manager.IsStop() || manager.IsPaused() {
+							return nil
+						}
+						result.RuntimeID = taskId
+						currentStatus := statusManager.GetStatus(taskRecorder)
+						currentStatus.CurrentPluginName = pluginInstance.ScriptName
+						currentStatus.ExecResult = result
+						return stream.Send(currentStatus)
+					},
+					&riskCount)
 				err := ScanHybridTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
@@ -324,7 +292,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	swg.Wait()
 	statusManager.GetStatus(taskRecorder)
-	if !manager.IsPaused() {
+	if !manager.IsPaused() { // before return , should set status, if not paused,should set done
 		setTaskStatus(yakit.HYBRIDSCAN_DONE)
 	}
 	feedbackStatus()

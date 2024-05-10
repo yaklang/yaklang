@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -35,6 +36,8 @@ type HybridScanStatusManager struct {
 
 	// 任务状态
 	Status string
+
+	ManagerMutex *sync.Mutex
 }
 
 func (h *HybridScanStatusManager) SetCurrentTaskIndex(i int64) {
@@ -48,6 +51,7 @@ func newHybridScanStatusManager(id string, targets int, plugins int, status stri
 		TaskId:        id,
 		ActiveTaskMap: new(sync.Map),
 		Status:        status,
+		ManagerMutex:  new(sync.Mutex),
 	}
 }
 
@@ -61,6 +65,8 @@ func fitStatusToHybridScanTaskRecord(status *ypb.HybridScanResponse, task *yakit
 }
 
 func (h *HybridScanStatusManager) GetStatus(r ...*yakit.HybridScanTask) *ypb.HybridScanResponse {
+	h.ManagerMutex.Lock()
+	defer h.ManagerMutex.Unlock()
 	status := &ypb.HybridScanResponse{
 		TotalTargets:     h.TargetTotal,
 		TotalPlugins:     h.PluginTotal,
@@ -88,10 +94,13 @@ func (h *HybridScanStatusManager) DoActiveTarget() int64 {
 }
 
 // DoActiveTask returns index of task
-func (h *HybridScanStatusManager) DoActiveTask() int64 {
+func (h *HybridScanStatusManager) DoActiveTask(task ...*yakit.HybridScanTask) int64 {
 	atomic.AddInt64(&h.ActiveTask, 1)
 	index := atomic.AddInt64(&h.TotalTaskCount, 1)
 	h.ActiveTaskMap.Store(index, struct{}{})
+	for _, item := range task { // update task survival indexes
+		item.SurvivalTaskIndexes = strings.Join(h.GetCurrentActiveTaskIndexes(), ",")
+	}
 	return index
 }
 
@@ -121,10 +130,13 @@ func (h *HybridScanStatusManager) RemoveActiveTask(index int64, t *HybridScanTar
 	stream.Send(rsp)
 }
 
-func (h *HybridScanStatusManager) DoneTask(index int64) {
+func (h *HybridScanStatusManager) DoneTask(index int64, task ...*yakit.HybridScanTask) {
 	atomic.AddInt64(&h.TaskFinished, 1)
 	atomic.AddInt64(&h.ActiveTask, -1)
 	h.ActiveTaskMap.Delete(index)
+	for _, item := range task { // update task survival indexes
+		item.SurvivalTaskIndexes = strings.Join(h.GetCurrentActiveTaskIndexes(), ",")
+	}
 }
 
 func (h *HybridScanStatusManager) DoneTarget() {
@@ -136,11 +148,11 @@ func (h *HybridScanStatusManager) Feedback(stream HybridScanRequestStream) error
 	return stream.Send(h.GetStatus())
 }
 
-func (h *HybridScanStatusManager) GetCurrentActiveTaskIndexes() []int {
-	var vals []int
+func (h *HybridScanStatusManager) GetCurrentActiveTaskIndexes() []string { // save to db ,use string
+	var vals []string
 	h.ActiveTaskMap.Range(func(key, value any) bool {
 		if ret := codec.Atoi(fmt.Sprint(key)); ret > 0 {
-			vals = append(vals, ret)
+			vals = append(vals, fmt.Sprint(key))
 		}
 		return true
 	})
