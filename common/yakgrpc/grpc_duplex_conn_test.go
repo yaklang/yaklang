@@ -21,6 +21,7 @@ func TestDuplexConnection(t *testing.T) {
 	stream, err := client.DuplexConnection(ctx)
 	require.Nil(t, err, "create duplex connection error")
 	t.Logf("create duplex connection success")
+	currentExpect := "global"
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -29,16 +30,24 @@ func TestDuplexConnection(t *testing.T) {
 		spew.Dump(rsp)
 		result := gjson.ParseBytes(rsp.Data)
 		typ := result.Get("type").String()
-		if typ == "global" {
-			r := yakit.CreateRisk("http://127.0.0.1")
-			err = yakit.SaveRisk(r)
-			require.Nil(t, err, "save risk error")
-			t.Logf("save risk success")
-			defer yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), int64(r.ID))
+		if typ == "exit" {
+			break
+		}
+		if typ == currentExpect {
+			switch typ {
+			case "global":
+				r := yakit.CreateRisk("http://127.0.0.1")
+				err = yakit.SaveRisk(r)
+				require.Nil(t, err, "save risk error")
+				t.Logf("save risk success")
+				defer yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), int64(r.ID))
+				currentExpect = "risk"
+			case "risk":
+				yakit.BroadcastData("exit", "")
+			}
+		} else {
 			continue
 		}
-		require.Equal(t, "risk", typ, "type not match")
-		break
 	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		require.Fail(t, "duplex connection timeout")
