@@ -366,7 +366,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 
 	// 逐个记录 response 中的内容
-	response.Url = urlIns.String()
+	response.Url = urlStr
 
 	// 获取cookiejar
 	cookiejar := GetCookiejar(session)
