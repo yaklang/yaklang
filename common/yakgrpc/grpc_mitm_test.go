@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
 	"strings"
@@ -25,6 +26,49 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestTestGRPCMUSTPASS_MITM_CHUNKED(t *testing.T) {
+	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+		//Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
+		rsp := []byte(`HTTP/1.1 200 OK
+Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n")
+		return rsp
+	})
+	testReq := []byte(`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{"key": "value"}`)
+	//fmt.Printf("%v:%v\n", mockHost, mockPort)
+	//time.Sleep(time.Hour)
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITM(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	time.Sleep(time.Second)
+	rsp, err := lowhttp.HTTP(lowhttp.WithPacketBytes(testReq), lowhttp.WithHost(mockHost), lowhttp.WithPort(mockPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	originBody := rsp.GetBody()
+	rsp, err = lowhttp.HTTP(lowhttp.WithPacketBytes(testReq), lowhttp.WithHost(mockHost), lowhttp.WithPort(mockPort), lowhttp.WithProxyGetter(func() []string {
+		return []string{fmt.Sprintf("http://127.0.0.1:%v", mitmPort)}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxyBody := rsp.GetBody()
+	assert.Equal(t, originBody, proxyBody)
+}
 func TestGRPCMUSTPASS_MITM_WITH_REPLACE_RULE_GZIP_NCHUNKED(t *testing.T) {
 	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
