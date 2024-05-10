@@ -4,6 +4,12 @@ import (
 	"regexp"
 )
 
+type ConfigItem struct {
+	Key            string
+	Value          string
+	SyntaxFlowRule string
+}
+
 type ValueOperator interface {
 	GetName() string
 	GetNames() []string
@@ -25,8 +31,8 @@ type ValueOperator interface {
 	GetMembers() (ValueOperator, error)
 
 	// GetTopDef and GetBottomUse is for OpBottomUse
-	GetSyntaxFlowTopDef() (ValueOperator, error)
-	GetSyntaxFlowBottomUse() (ValueOperator, error)
+	GetSyntaxFlowTopDef(...*ConfigItem) (ValueOperator, error)
+	GetSyntaxFlowBottomUse(...*ConfigItem) (ValueOperator, error)
 
 	// ListIndex for OpListIndex, like a[1] a must be list...
 	ListIndex(i int) (ValueOperator, error)

@@ -96,11 +96,11 @@ func (value Values) GetMembers() (sfvm.ValueOperator, error) {
 	return vals, nil
 }
 
-func (value Values) GetSyntaxFlowTopDef() (sfvm.ValueOperator, error) {
+func (value Values) GetSyntaxFlowTopDef(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
 	return value.GetTopDefs(), nil
 }
 
-func (value Values) GetSyntaxFlowBottomUse() (sfvm.ValueOperator, error) {
+func (value Values) GetSyntaxFlowBottomUse(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
 	return value.GetBottomUses(), nil
 }
 
