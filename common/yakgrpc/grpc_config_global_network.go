@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -64,7 +65,7 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 		return nil, err
 	}
 	if len(config.AiApiPriority) != 3 {
-		config.AiApiPriority = []string{"openai", "chatglm", "moonshot"}
+		config.AiApiPriority = aispec.RegisteredAIGateways()
 	}
 	return &config, nil
 }
