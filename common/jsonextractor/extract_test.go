@@ -2,6 +2,7 @@ package jsonextractor
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -75,4 +76,9 @@ func TestExtractJSONWithRaw(t *testing.T) {
 		panic("abc")
 	}
 	println(string(raw))
+}
+func TestExtractJsonWithQuote(t *testing.T) {
+	res := ExtractStandardJSON("`" + `{"a":1}`)
+	assert.Equal(t, 1, len(res))
+	assert.Equal(t, "{\"a\":1}", res[0])
 }
