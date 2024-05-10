@@ -31,7 +31,38 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
+func TestSaveToDB(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
+`))
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: `POST /icons/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/etc/passwd HTTP/1.1
+Host: www.example.com
+`,
+		ActualAddr: utils.HostPort(host, port),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = stream
+	time.Sleep(time.Second)
+	tasks, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   1,
+			Order:   "desc",
+			OrderBy: "id",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "http://www.example.com/icons/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/etc/passwd", tasks.Data[0].Url)
+}
 func TestGRPCMUSTPASS_ChangeToUpload(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
