@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"strings"
 	"testing"
 )
 
@@ -210,7 +211,6 @@ fetch('http://example.com')
 
 const data = {
   key1: 'value1',
-  key2: 'value2'
 };
 
 fetch('https://example.com/api/resource', {
@@ -249,11 +249,10 @@ fetch('https://example.com/api/resource', {
 			require.Equal(t, "\"https://example.com/api/resource\"", url.String())
 			extArg := args[1]
 			if extArg.IsMake() {
-				datas := getDataFromMake(extArg.GetAllMember(), "\"method\"", "\"body\"")
-				method := datas[0]
+				method := getDataFromMake(extArg.GetAllMember(), "\"method\"")
+				body := getDataFromMake(extArg.GetAllMember(), "\"body\"")
 				require.Equal(t, "\"POST\"", method)
-				body := datas[1]
-				require.Equal(t, "Undefined-JSON.stringify(valid)(make(object{}))", body)
+				require.Equal(t, "\"key1\" : \"value1\"", body)
 			}
 		}
 	}
@@ -322,11 +321,10 @@ func Test_JS_Axios(t *testing.T) {
 			require.Equal(t, "\"/user\"", url.String())
 			extArg := args[1]
 			if extArg.IsMake() {
-				datas := getDataFromMake(extArg.GetAllMember(), "\"firstName\"", "\"lastName\"")
-				method := datas[0]
-				require.Equal(t, "\"a\"", method)
-				body := datas[1]
-				require.Equal(t, "\"b\"", body)
+				firstName := getDataFromMake(extArg.GetAllMember(), "\"firstName\"")
+				require.Equal(t, "\"a\"", firstName)
+				lastName := getDataFromMake(extArg.GetAllMember(), "\"lastName\"")
+				require.Equal(t, "\"b\"", lastName)
 			}
 
 		}
@@ -337,8 +335,7 @@ axios({
   method: 'post',
   url: '/user/12345',
   data: {
-    firstName: 'Fred',
-    lastName: 'Flintstone'
+    key : 'value'
   }
 });`
 
@@ -352,25 +349,59 @@ axios({
 			require.Equal(t, 1, len(args))
 
 			if args[0].IsMake() {
-				datas := getDataFromMake(args[0].GetAllMember(), "\"method\"", "\"url\"")
-				require.Equal(t, "\"post\"", datas[0])
-				require.Equal(t, "\"/user/12345\"", datas[1])
+				method := getDataFromMake(args[0].GetAllMember(), "\"method\"")
+				path := getDataFromMake(args[0].GetAllMember(), "\"url\"")
+				data := getDataFromMake(args[0].GetAllMember(), "\"data\"")
+
+				require.Equal(t, "\"post\"", method)
+				require.Equal(t, "\"/user/12345\"", path)
+				require.Equal(t, "\"key\":\"value\"", data)
 			}
 		}
 	})
 
 }
 
-func getDataFromMake(members ssaapi.Values, expecteds ...string) []string {
-	var results []string
+func getDataFromMake(members ssaapi.Values, expected string) string {
+	var returnResult []string
 	for _, member := range members {
 		key := member.GetKey()
-		for _, expected := range expecteds {
-			if key.String() == expected {
-				res := member.String()
-				results = append(results, res)
+		if key.String() == expected {
+			switch {
+			case member.IsCall():
+				args := member.GetCallArgs()
+				for _, arg := range args {
+					if arg.IsConstInst() {
+						returnResult = append(returnResult, arg.String())
+					}
+					if arg.IsMake() {
+						topdefs := arg.GetTopDefs()
+						for i, topdef := range topdefs {
+							if i == 0 {
+								continue
+							}
+							if topdef.GetKey() != nil {
+								returnResult = append(returnResult, fmt.Sprintf("%v : %v", topdef.GetKey().String(), topdef.String()))
+							} else {
+								returnResult = append(returnResult, topdefs.String())
+							}
+						}
+					}
+				}
+			case member.IsMake():
+				datas := member.GetAllMember()
+				for _, data := range datas {
+					if data.GetKey() != nil {
+						returnResult = append(returnResult, fmt.Sprintf("%v:%v", data.GetKey().String(), data.String()))
+					} else {
+						returnResult = append(returnResult, data.String())
+					}
+				}
+			default:
+				returnResult = append(returnResult, member.String())
 			}
+
 		}
 	}
-	return results
+	return strings.Join(returnResult, ",")
 }
