@@ -138,10 +138,8 @@ func (e *YakError) ErrorWithStack() string {
 func (err *YakError) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
-		if s.Flag('#') {
+		if s.Flag('#') || s.Flag('+') {
 			io.WriteString(s, err.Error())
-			fmt.Fprintf(s, "%+v", err.stack)
-		} else if s.Flag('+') {
 			fmt.Fprintf(s, "%+v", err.stack)
 		} else {
 			io.WriteString(s, err.Error())
