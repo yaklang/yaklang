@@ -78,11 +78,11 @@ func (v *Value) GetMembers() (sfvm.ValueOperator, error) {
 	return v.GetUsers(), nil
 }
 
-func (v *Value) GetSyntaxFlowTopDef() (sfvm.ValueOperator, error) {
+func (v *Value) GetSyntaxFlowTopDef(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
 	return v.GetTopDefs(), nil
 }
 
-func (v *Value) GetSyntaxFlowBottomUse() (sfvm.ValueOperator, error) {
+func (v *Value) GetSyntaxFlowBottomUse(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
 	return v.GetBottomUses(), nil
 }
 
