@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"net/http"
 	"os"
 	"strings"
@@ -21,6 +23,48 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestAiApiPriority(t *testing.T) {
+	client, err := NewLocalClient(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	config.AiApiPriority = []string{"test"}
+	var ok bool
+	aispec.Register("test", func() aispec.AIGateway {
+		ok = true
+		return nil
+	})
+	client.SetGlobalNetworkConfig(context.Background(), config)
+
+	// if not set ai type, use default config ai type
+	ai.Chat("test")
+	if !ok {
+		t.Fatal("ai api priority failed")
+	}
+
+	// is set ai type, but not registered, use default config ai type
+	ok = false
+	ai.Chat("test", aispec.WithType("ai"))
+	if !ok {
+		t.Fatal("ai api priority failed")
+	}
+
+	// is set ai type, and registered
+	ok = false
+	var ok1 bool
+	aispec.Register("ai", func() aispec.AIGateway {
+		ok1 = true
+		return nil
+	})
+	ai.Chat("test", aispec.WithType("ai"))
+	if !(ok1 && !ok) {
+		t.Fatal("ai api priority failed")
+	}
+}
 
 func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
 	client, err := NewLocalClient(true)
