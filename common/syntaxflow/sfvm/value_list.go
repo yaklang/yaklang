@@ -51,10 +51,10 @@ func (v *ValueList) GetCallActualParams() (ValueOperator, error) {
 	return nil, utils.Error("list cannot be handled in ValueList.GetCallActualParams")
 }
 
-func (v *ValueList) GetSyntaxFlowTopDef() (ValueOperator, error) {
+func (v *ValueList) GetSyntaxFlowTopDef(config ...*ConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
-		topDef, err := v.GetSyntaxFlowTopDef()
+		topDef, err := v.GetSyntaxFlowTopDef(config...)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +63,7 @@ func (v *ValueList) GetSyntaxFlowTopDef() (ValueOperator, error) {
 	return NewValues(res), nil
 }
 
-func (v *ValueList) GetSyntaxFlowBottomUse() (ValueOperator, error) {
+func (v *ValueList) GetSyntaxFlowBottomUse(config ...*ConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
 		bottomUse, err := v.GetSyntaxFlowBottomUse()
