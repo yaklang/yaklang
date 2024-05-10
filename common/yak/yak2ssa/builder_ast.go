@@ -454,7 +454,9 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 		})
 	} else {
 		// expression is nil
+		recoverRange := b.SetRangeFromTerminalNode(stmt.Switch())
 		b.NewError(ssa.Warn, TAG, "switch expression is nil")
+		recoverRange()
 	}
 
 	allcase := stmt.AllCase()
