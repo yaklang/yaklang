@@ -52,7 +52,14 @@ func getIdentifersSurroundComments(tokenStream antlr.TokenStream, startToken, en
 	}
 
 	return comments
+}
 
+func (y *YakCompiler) switchIsOMap(isOmap bool) func() {
+	origin := y.isOMap
+	y.isOMap = isOmap
+	return func() {
+		y.isOMap = origin
+	}
 }
 
 func (y *YakCompiler) switchFormatBuffer() func() string {
@@ -152,7 +159,6 @@ type parserGetter interface {
 }
 
 func (y *YakCompiler) keepCommentLine(stmts []parser.IStatementContext, index int) {
-
 	// ts := nowToken.GetParser().GetTokenStream()
 	// commentRaw := ts.GetTextFromInterval(&antlr.Interval{
 	// 	Start: startColumn,

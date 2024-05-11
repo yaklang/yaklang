@@ -44,7 +44,7 @@ Var
 VarTypeName
     : 'uint' |  'uint8' | 'byte' | 'uint16' | 'uint32' | 'uint64'
     | 'int' | 'int8' | 'int16' | 'int32' | 'int64'
-    | 'bool' | 'float' | 'float64' | 'double' | 'string' | Var;
+    | 'bool' | 'float' | 'float64' | 'double' | 'string'  | 'omap' | Var;
 UndefinedLiteral: 'undefined';
 Fallthrough: 'fallthrough';
 NilLiteral: 'nil';

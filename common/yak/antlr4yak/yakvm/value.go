@@ -307,6 +307,14 @@ func NewEmptyMap(lit string) *Value {
 	}
 }
 
+func NewEmptyOMap(lit string) *Value {
+	return &Value{
+		TypeVerbose: "OrderedMap",
+		Value:       orderedmap.New(),
+		Literal:     lit,
+	}
+}
+
 func NewGenericMap(lit string) *Value {
 	return &Value{
 		TypeVerbose: "map[interface{}]interface{}",

@@ -18,21 +18,13 @@ type OrderedMap struct {
 	escapeHTML bool
 }
 
-func SetWithMaybeSameKey(o *OrderedMap, key string, value any) {
-	oldValue, ok := o.values[key]
-	if !ok {
-		o.Set(key, value)
-	} else {
-		if oldValues, ok := oldValue.([]any); ok {
-			oldValues = append(oldValues, value)
-			o.values[key] = oldValues
-		} else {
-			o.values[key] = []any{oldValue, value}
-		}
-	}
+func SetAny(o *OrderedMap, key any, value any) {
+	o.Set(utils.InterfaceToString(key), value)
 }
 
 // New 从零创建一个有序映射或从一个普通映射中创建一个有序映射，其的基本用法与普通映射相同，但内置方法可能不同
+// 值得注意的是，如果传入的是一个普通映射，使用此函数转换为有序映射并不能保证原有的顺序
+// 如果需要保留原有顺序，可以使用 `omap({"a": 1, "b": 2})` 来直接生成一个有序映射
 // Example:
 // ```
 // om = orderedmap.New()

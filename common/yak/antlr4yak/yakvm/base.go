@@ -371,7 +371,12 @@ func (c *Code) String() string {
 			buf.WriteString(fmt.Sprintf("OP:%-20s", "fallthrough") + " ")
 			buf.WriteString(fmt.Sprintf("-> %d (-%d scope)", c.Unary, c.Op1.Int()))
 		}
-	case OpList, OpPushRef, OpNewMap, OpNewMapWithType, OpNewSlice, OpNewSliceWithType, OpPushLeftRef:
+	case OpNewMap:
+		buf.WriteString(fmt.Sprintf("len: %d", c.Unary))
+		if c.Op1.Bool() {
+			buf.WriteString(" (omap)")
+		}
+	case OpList, OpPushRef, OpNewMapWithType, OpNewSlice, OpNewSliceWithType, OpPushLeftRef:
 		buf.WriteString(fmt.Sprint(c.Unary))
 	case OpCatchError:
 		buf.WriteString(fmt.Sprintf("err -> %d", c.Op1.Int()+1))
@@ -386,6 +391,7 @@ func (c *Code) String() string {
 	}
 	return buf.String()
 }
+
 func (c *Code) Dump() {
 	println(fmt.Sprintf("%-13s %v", c.RangeVerbose(), c.String()))
 }
