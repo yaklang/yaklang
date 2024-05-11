@@ -279,6 +279,14 @@ func (lz *LazyInstruction) GetRange() *Range {
 	if lz.Instruction == nil {
 		return nil
 	}
+	if lz.Instruction.GetRange() == nil {
+		editor, start, end, err := lz.ir.GetStartAndEndPositions(lz.cache.DB)
+		if err != nil {
+			log.Warnf("LazyInstruction.GetRange failed: %v", err)
+			return nil
+		}
+		lz.Instruction.SetRange(NewRange(editor, start, end))
+	}
 	return lz.Instruction.GetRange()
 }
 
@@ -288,6 +296,22 @@ func (lz *LazyInstruction) SetRange(r *Range) {
 		return
 	}
 	lz.Instruction.SetRange(r)
+}
+
+func (lz *LazyInstruction) GetSourceCode() string {
+	lz.check()
+	if lz.Instruction == nil {
+		return ""
+	}
+	return lz.Instruction.GetSourceCode()
+}
+
+func (lz *LazyInstruction) GetSourceCodeContext(n int) string {
+	lz.check()
+	if lz.Instruction == nil {
+		return ""
+	}
+	return lz.Instruction.GetSourceCodeContext(n)
 }
 
 func (lz *LazyInstruction) SetExtern(extern bool) {

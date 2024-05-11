@@ -207,6 +207,12 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}
+	if r := instIr.inst.GetRange(); r != nil {
+		err := ssadb.SaveIrSource(c.DB, r.GetEditor(), instIr.irCode.SourceCodeHash)
+		if err != nil {
+			log.Warnf("save source error: %v", err)
+		}
+	}
 	return true
 }
 
