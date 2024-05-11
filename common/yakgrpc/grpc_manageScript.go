@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -434,7 +435,7 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 				target = paramItem.Value
 			}
 		}
-		return s.execScriptWithRequest(script, target, stream, nil)
+		return s.execScriptWithRequest(script, target, stream, nil, uuid.New().String())
 	case "port-scan":
 		params, code, err := s.generatePortScanParams(script.ScriptName, req.GetParams())
 		if err != nil {

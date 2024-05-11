@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,13 +24,12 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, stream sender, params []*ypb.KVPair) error {
+func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string) error {
 	var (
 		scriptName = script.ScriptName
 		scriptType = script.Type
 	)
 	streamCtx, cancel := context.WithCancel(stream.Context())
-	runtimeId := uuid.New().String()
 	stream.Send(&ypb.ExecResult{IsMessage: false, RuntimeID: runtimeId}) // 触发前端切换结果页面
 	defer func() {
 		if err := recover(); err != nil {
@@ -120,7 +118,7 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 	}
 }
 
-func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetInput string, stream sender, execParams []*ypb.KVPair, params ...*ypb.HTTPRequestBuilderParams) error {
+func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetInput string, stream sender, execParams []*ypb.KVPair, runtimeId string, params ...*ypb.HTTPRequestBuilderParams) error {
 	var (
 		scriptName = scriptInstance.ScriptName
 		scriptCode = scriptInstance.Content
@@ -132,7 +130,6 @@ func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetIn
 		return utils.Error("script name is empty")
 	}
 
-	runtimeId := uuid.New().String()
 	stream.Send(&ypb.ExecResult{IsMessage: false, RuntimeID: runtimeId}) // 触发前端切换结果页面
 	var baseBuilderParams *ypb.HTTPRequestBuilderParams
 	if len(params) > 0 {
@@ -252,13 +249,14 @@ func (s *Server) debugScript(
 	debugCode string,
 	stream sender,
 	execParams []*ypb.KVPair,
+	runtimeId string,
 	params ...*ypb.HTTPRequestBuilderParams,
 ) error {
 	script, err := yakit.NewTemporaryYakScript(debugType, debugCode)
 	if err != nil {
 		return err
 	}
-	return s.execScriptEx(input, script, stream, execParams, params...)
+	return s.execScriptEx(input, script, stream, execParams, runtimeId, params...)
 }
 
 func (s *Server) execScript(
@@ -267,13 +265,14 @@ func (s *Server) execScript(
 	name string,
 	stream sender,
 	execParams []*ypb.KVPair, // 脚本执行的参数, only "yak"
+	runtimeId string,
 	params ...*ypb.HTTPRequestBuilderParams, // 用于构建请求, only used in "mitm", "nuclei", "port-scan"
 ) error {
 	script, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), name)
 	if err != nil {
 		return err
 	}
-	return s.execScriptEx(input, script, stream, execParams, params...)
+	return s.execScriptEx(input, script, stream, execParams, runtimeId, params...)
 }
 
 func (s *Server) execScriptEx(
@@ -281,14 +280,15 @@ func (s *Server) execScriptEx(
 	script *yakit.YakScript,
 	stream sender,
 	execParams []*ypb.KVPair, // 脚本执行的参数, only "yak"
+	runtimeId string,
 	params ...*ypb.HTTPRequestBuilderParams, // 用于构建请求, only used in "mitm", "nuclei", "port-scan"
 ) error {
 	scriptType := script.Type
 	switch scriptType {
 	case "yak", "codec":
-		return s.execScriptWithExecParam(script, input, stream, execParams)
+		return s.execScriptWithExecParam(script, input, stream, execParams, runtimeId)
 	case "mitm", "nuclei", "port-scan":
-		return s.execScriptWithRequest(script, input, stream, execParams, params...)
+		return s.execScriptWithRequest(script, input, stream, execParams, runtimeId, params...)
 	}
 	return utils.Error("unsupported plugin type: " + scriptType)
 }

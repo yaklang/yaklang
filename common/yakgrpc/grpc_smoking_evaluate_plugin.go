@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/google/uuid"
 	"sync"
 
 	"github.com/davecgh/go-spew/spew"
@@ -155,6 +156,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 		log.Info("start to echo debug script")
 		var fetchRisk bool
+		runtimeId := uuid.New().String()
 		err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 			if result.IsMessage {
 				m := make(map[string]any)
@@ -169,7 +171,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				}
 			}
 			return nil
-		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}})
+		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}}, runtimeId)
 		if err != nil {
 			score -= 40
 			log.Errorf("debugScript failed: %v", err)

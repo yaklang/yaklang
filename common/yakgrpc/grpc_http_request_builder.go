@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"github.com/google/uuid"
+	"google.golang.org/grpc"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -48,10 +51,15 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		}
 	}
 
-	if req.GetPluginName() != "" {
-		return s.execScript(input, req.GetPluginType(), req.GetPluginName(), stream, execParams, req.GetHTTPRequestTemplate())
+	runtimeId := req.GetRuntimeId()
+	if runtimeId == "" {
+		runtimeId = uuid.New().String()
 	}
-	return s.debugScript(input, req.GetPluginType(), req.GetCode(), stream, execParams, req.GetHTTPRequestTemplate())
+
+	if req.GetPluginName() != "" {
+		return s.execScript(input, req.GetPluginType(), req.GetPluginName(), stream, execParams, runtimeId, req.GetHTTPRequestTemplate())
+	}
+	return s.debugScript(input, req.GetPluginType(), req.GetCode(), stream, execParams, runtimeId, req.GetHTTPRequestTemplate())
 }
 
 func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {
@@ -351,4 +359,31 @@ func BuildHttpRequestPacket(db *gorm.DB, baseBuilderParams *ypb.HTTPRequestBuild
 		}
 	}()
 	return builderRes, nil
+}
+
+type wrapperDebugPluginStream struct {
+	root      ypb.Yak_DebugPluginServer
+	ctx       context.Context
+	sendMutex *sync.Mutex
+	sendHook  func(r *ypb.ExecResult) *ypb.ExecResult
+	grpc.ServerStream
+}
+
+func newWrapperDebugPluginStream(ctx context.Context, stream ypb.Yak_DebugPluginServer) *wrapperDebugPluginStream {
+	return &wrapperDebugPluginStream{
+		root: stream, ctx: ctx,
+		sendMutex: new(sync.Mutex),
+	}
+}
+
+func (w *wrapperDebugPluginStream) Send(r *ypb.ExecResult) error {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
+	return w.root.Send(w.sendHook(r))
+}
+
+func (w *wrapperDebugPluginStream) registerSendHook(hookFunc func(r *ypb.ExecResult) *ypb.ExecResult) {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
+	w.sendHook = hookFunc
 }
