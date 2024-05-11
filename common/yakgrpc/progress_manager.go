@@ -66,8 +66,29 @@ func (p *ProgressManager) AddExecBatchTaskToPool(uid string, percent float64, ya
 	yakit.SetKey(p.db, uid, string(paramJson))
 }
 
-func (p *ProgressManager) AddSimpleDetectTaskToPool(uid string, req *ypb.RecordPortScanRequest) {
+func (p *ProgressManager) AddSimpleDetectTaskToPool(req *ypb.RecordPortScanRequest) {
+	RuntimeId := req.GetRuntimeId()
+	newProgress := &Progress{
+		Uid:                  RuntimeId,
+		CreatedAt:            time.Now().Unix(),
+		CurrentProgress:      req.LastRecord.GetPercent(),
+		YakScriptOnlineGroup: req.LastRecord.GetYakScriptOnlineGroup(),
+		TaskName:             req.PortScanRequest.GetTaskName(),
+		LastRecordPtr:        req.LastRecord.GetLastRecordPtr(),
+		ExtraInfo:            req.LastRecord.GetExtraInfo(),
+	}
 	progress := p.GetProgressFromDatabase(KEY_SimpleDetectManager)
+	hasUpdate := false
+	for i := 0; i < len(progress); i++ {
+		if progress[i].Uid == RuntimeId {
+			progress[i] = newProgress
+			hasUpdate = true
+			break
+		}
+	}
+	if !hasUpdate {
+		progress = append(progress, newProgress)
+	}
 	if len(progress) > p.poolSize {
 		var removed *Progress
 		removed, progress = progress[1], progress[1:]
@@ -75,22 +96,13 @@ func (p *ProgressManager) AddSimpleDetectTaskToPool(uid string, req *ypb.RecordP
 			yakit.DelKey(p.db, removed.Uid)
 		}
 	}
-	progress = append(progress, &Progress{
-		Uid:                  uid,
-		CreatedAt:            time.Now().Unix(),
-		CurrentProgress:      req.LastRecord.GetPercent(),
-		YakScriptOnlineGroup: req.LastRecord.GetYakScriptOnlineGroup(),
-		TaskName:             req.PortScanRequest.GetTaskName(),
-		LastRecordPtr:        req.LastRecord.GetLastRecordPtr(),
-		ExtraInfo:            req.LastRecord.GetExtraInfo(),
-	})
 	p.SaveProgressToDatabase(KEY_SimpleDetectManager, progress)
 	paramJson, err := json.Marshal(req)
 	if err != nil {
 		log.Errorf("marshal request failed: %s", err)
 		return
 	}
-	yakit.SetKey(p.db, uid, string(paramJson))
+	yakit.SetKey(p.db, RuntimeId, string(paramJson))
 }
 
 func (p *ProgressManager) GetProgressFromDatabase(KEY string) []*Progress {

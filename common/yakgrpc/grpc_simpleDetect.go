@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
@@ -26,6 +25,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	reqParams := &ypb.DebugPluginRequest{
 		Code:       string(simpleDetect),
 		PluginType: "yak",
+		RuntimeId:  req.GetRuntimeId(),
 	}
 
 	reqRecord := req.LastRecord
@@ -348,8 +348,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPortScanRequest) (*ypb.Empty, error) {
 	// 用于管理进度保存相关内容
 	manager := NewProgressManager(s.GetProjectDatabase())
-	uid := uuid.New().String()
-	manager.AddSimpleDetectTaskToPool(uid, req)
+	manager.AddSimpleDetectTaskToPool(req)
 	return nil, nil
 }
 
