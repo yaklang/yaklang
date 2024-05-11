@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -368,4 +370,76 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 		t.Fatal("count not match")
 	}
 
+}
+
+func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
+	target1 := utils.RandStringBytes(10)
+	target2 := utils.RandStringBytes(10)
+	var DateTask = []*yakit.HybridScanTask{
+		{
+			Status:  yakit.HYBRIDSCAN_DONE,
+			Targets: target1,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_ERROR,
+			Targets: target1,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_EXECUTING,
+			Targets: target1,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_PAUSED,
+			Targets: target1,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_DONE,
+			Targets: target2,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_ERROR,
+			Targets: target2,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_EXECUTING,
+			Targets: target2,
+		},
+		{
+			Status:  yakit.HYBRIDSCAN_PAUSED,
+			Targets: target2,
+		},
+	}
+	for _, task := range DateTask {
+		task.TaskId = uuid.NewString()
+		err := yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), task)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.QueryHybridScanTask(context.Background(), &ypb.QueryHybridScanTaskRequest{
+		Pagination: &ypb.Paging{},
+		Filter: &ypb.HybridScanTaskFilter{
+			Target: target1[2:8],
+		},
+	})
+	if err != nil {
+		return
+	}
+	require.Equal(t, 4, len(rsp.Data))
+
+	rsp, err = client.QueryHybridScanTask(context.Background(), &ypb.QueryHybridScanTaskRequest{
+		Pagination: &ypb.Paging{},
+		Filter: &ypb.HybridScanTaskFilter{
+			Status: []string{yakit.HYBRIDSCAN_ERROR, yakit.HYBRIDSCAN_DONE},
+		},
+	})
+	if err != nil {
+		return
+	}
+	require.Equal(t, 4, len(rsp.Data))
 }
