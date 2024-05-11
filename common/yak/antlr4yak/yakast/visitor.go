@@ -48,6 +48,8 @@ type YakCompiler struct {
 	lexerErrors    YakMergeError
 	parserErrors   YakMergeError
 	compilerErrors YakMergeError
+	// is omap
+	isOMap bool
 
 	// tokenStream
 	AntlrTokenStream          antlr.TokenStream
@@ -154,6 +156,7 @@ func NewYakCompiler(options ...CompilerOptionsFun) *YakCompiler {
 func (y *YakCompiler) GetLexerErrorListener() *ErrorListener {
 	return y.lexerErrorListener
 }
+
 func (y *YakCompiler) GetParserErrorListener() *ErrorListener {
 	return y.parserErrorListener
 }
@@ -178,20 +181,25 @@ func (y *YakCompiler) newError(msg string, items ...interface{}) *YakError {
 		Message:  msg,
 	}
 }
+
 func (y *YakCompiler) Init(lexer *yak.YaklangLexer, parser *yak.YaklangParser) {
 	y.lexer = lexer
 	y.parser = parser
 }
+
 func (y *YakCompiler) ShowOpcodes() {
 	yakvm.ShowOpcodes(y.codes)
 }
+
 func (y *YakCompiler) ShowOpcodesWithSource(src string) {
 	yakvm.ShowOpcodesWithSource(src, y.codes)
 }
+
 func (y *YakCompiler) CompileSourceCodeWithPath(code string, fPath *string) bool {
 	y.sourceCodeFilePathPointer = fPath
 	return y.Compiler(code)
 }
+
 func (y *YakCompiler) Compiler(code string) bool {
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(code))
 	lexer.RemoveErrorListeners()
@@ -258,17 +266,17 @@ func (y *YakCompiler) Compiler(code string) bool {
 	}
 	return true
 }
-func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) interface{} {
 
+func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) interface{} {
 	defer func() {
-		var prefix = y.GetRangeVerbose()
+		prefix := y.GetRangeVerbose()
 		if prefix != "" {
 			prefix += ": "
 		}
 		if err := recover(); err != nil {
 			msg := fmt.Sprintf("%vexit yak compiling by error: %v", prefix, err)
 			log.Error(msg)
-			//y.errors = append(y.errors, y.NewRangeSyntaxError(msg))
+			// y.errors = append(y.errors, y.NewRangeSyntaxError(msg))
 		}
 		//if err := recover(); err != nil {
 		//	msg := fmt.Sprintf("%vexit yak compiling by error: %v", prefix, err)
@@ -332,16 +340,20 @@ func (y *YakCompiler) SetOpcodes(codes []*yakvm.Code) {
 func (y *YakCompiler) GetRootSymbolTable() *yakvm.SymbolTable {
 	return y.rootSymtbl
 }
+
 func (y *YakCompiler) GetErrors() YakMergeError {
 	return *NewYakMergeError(y.GetLexerErrors(), y.GetParserErrors(), y.GetCompileErrors())
 }
+
 func (y *YakCompiler) GetNormalErrors() (bool, error) {
 	err := y.GetErrors()
 	return len(err) > 0, err
 }
+
 func (y *YakCompiler) GetLexerErrors() YakMergeError {
 	return y.lexerErrors
 }
+
 func (y *YakCompiler) GetParserErrors() YakMergeError {
 	return y.parserErrors
 }

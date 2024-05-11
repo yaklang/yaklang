@@ -41,6 +41,7 @@ func (s *YakCompiler) pushInt64(i int64, origin string) {
 		},
 	})
 }
+
 func (s *YakCompiler) pushChar(i rune, origin string) {
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
@@ -51,6 +52,7 @@ func (s *YakCompiler) pushChar(i rune, origin string) {
 		},
 	})
 }
+
 func (s *YakCompiler) pushByte(i byte, origin string) {
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
@@ -171,7 +173,8 @@ func (s *YakCompiler) pushDefer(codes []*yakvm.Code) {
 		Unary:  len(codes),
 		Op1: yakvm.NewValue(
 			"opcodes", codes, "",
-		)})
+		),
+	})
 }
 
 func (s *YakCompiler) pushIterableCall(i int) {
@@ -180,6 +183,7 @@ func (s *YakCompiler) pushIterableCall(i int) {
 		Unary:  i,
 	})
 }
+
 func (s *YakCompiler) pushListWithLen(i int) {
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpList,
@@ -229,10 +233,11 @@ func (s *YakCompiler) pushValueWithCopy(i *yakvm.Value) {
 	})
 }
 
-func (s *YakCompiler) pushNewMap(count int) {
+func (s *YakCompiler) pushNewMap(count int, isOmap bool) {
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpNewMap,
 		Unary:  count,
+		Op1:    yakvm.NewBoolValue(isOmap),
 	})
 }
 

@@ -39,7 +39,7 @@ func init() {
 			return true
 		},
 	})
-	Import("NewOrderedMap", orderedmap.New)
+	// Import("NewOrderedMap", orderedmap.New)
 	Import("testOrderedMap", map[string]any{
 		"StringMap": func(v map[string]any) map[string]any {
 			return v
@@ -276,7 +276,9 @@ globalVarFailed = true
 assert globalVarFailed
 
 a = {}
+dump(a)
 a["CCC"] = 1
+dump(a)
 assert a.Has("CCC")
 assert !a.Has("BBB")
 a.Remove("CCC")
@@ -901,7 +903,12 @@ func _marshallerTestWithCtx(i string, ctx context.Context, debug bool) {
 	vm.ImportLibs(buildinLib)
 	var checkErr error
 	err = vm.Exec(ctx, func(frame *yakvm.Frame) {
-		frame.NormalExec(codes)
+		frame.SetOriginCode(i)
+		if debug {
+			frame.DebugExec(codes)
+		} else {
+			frame.NormalExec(codes)
+		}
 		checkErr = frame.CheckExit()
 	})
 	if err != nil {
@@ -4055,7 +4062,7 @@ wg.Wait()
 
 func TestOrderedMap(t *testing.T) {
 	code := `
-om = NewOrderedMap({"c":3, 4: 5})
+om = omap({"c":3, 4: 5})
 om["a"] = 1
 om.b = 2
 assert om.a == 1
@@ -4083,7 +4090,7 @@ for i in 100 {
 }
 assert len(om) == 100
 
-om2 = NewOrderedMap()
+om2 = omap()
 om2["a"] = 1
 om2["b"] = 2
 om2["c"] = 3
@@ -4101,6 +4108,16 @@ m2 = make(map[var]var)
 m2[0] = 1
 assert len(testOrderedMap.ToOrderedMap(m)) == 1
 assert len(testOrderedMap.ToOrderedMap(m2)) == 1
+
+om3 = omap({"0": 0, "1": 1, "2": 2})
+for i in 100 {
+	count = 0
+	for k, v in om3 {
+		assert k == string(count), "k[%s] != count[%d]" % [k, count]
+		assert v == count, v, "v[%s] != count[%d]" % [v, count]
+		count++
+	}
+}
 `
 	_marshallerTest(code)
 }

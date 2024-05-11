@@ -824,8 +824,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 		// undefined 处理，返回零值
 		if val.IsUndefined() {
-			rv := reflect.New(typ.Type())
-			v.push(NewAutoValue(rv.Elem().Interface()))
+			if typ.Type() == literalReflectType_OrderedMap {
+				v.push(NewAutoValue(orderedmap.New()))
+			} else {
+				rv := reflect.New(typ.Type())
+				v.push(NewAutoValue(rv.Elem().Interface()))
+			}
 			return
 		}
 
@@ -1706,37 +1710,51 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			fallthrough
 		default:
 			vals := v.popArgN(c.Unary * 2)
+			isOMap := c.Op1.Bool()
 			if len(vals) <= 0 {
-				v.push(NewEmptyMap(""))
+				if isOMap {
+					v.push(NewEmptyOMap(""))
+				} else {
+					v.push(NewEmptyMap(""))
+				}
 				return
 			}
-			keys := make([]*Value, c.Unary)
-			values := make([]*Value, c.Unary)
-			for i := 0; i < c.Unary; i++ {
-				kI := i * 2
-				vI := i*2 + 1
-				keys[i] = vals[kI]
-				values[i] = vals[vI]
-			}
-			kType := GuessValuesTypeToBasicType(keys...)
-			vType := GuessValuesTypeToBasicType(values...)
-			mt := reflect.MapOf(kType, vType)
-			mapVal := reflect.MakeMapWithSize(mt, len(keys))
-			for index := range keys {
-				kV := reflect.ValueOf(keys[index].Value)
-				vV := reflect.ValueOf(values[index].Value)
-				err := v.AutoConvertReflectValueByType(&kV, kType)
-				if err != nil {
-					panic(fmt.Sprintf("cannot convert %v to %v", kV.Type(), kType))
+			if !isOMap {
+				keys := make([]*Value, c.Unary)
+				values := make([]*Value, c.Unary)
+				for i := 0; i < c.Unary; i++ {
+					keys[i] = vals[i*2]
+					values[i] = vals[i*2+1]
 				}
-				err = v.AutoConvertReflectValueByType(&vV, vType)
-				if err != nil {
-					panic(fmt.Sprintf("cannot convert %v to %v", vV.Type(), vType))
+				kType := GuessValuesTypeToBasicType(keys...)
+				vType := GuessValuesTypeToBasicType(values...)
+				mt := reflect.MapOf(kType, vType)
+				mapVal := reflect.MakeMapWithSize(mt, len(keys))
+				for index := range keys {
+					kV := reflect.ValueOf(keys[index].Value)
+					vV := reflect.ValueOf(values[index].Value)
+					err := v.AutoConvertReflectValueByType(&kV, kType)
+					if err != nil {
+						panic(fmt.Sprintf("cannot convert %v to %v", kV.Type(), kType))
+					}
+					err = v.AutoConvertReflectValueByType(&vV, vType)
+					if err != nil {
+						panic(fmt.Sprintf("cannot convert %v to %v", vV.Type(), vType))
+					}
+					mapVal.SetMapIndex(kV, vV)
 				}
-				mapVal.SetMapIndex(kV, vV)
+
+				v.push(NewValue(mt.String(), mapVal.Interface(), ""))
+			} else {
+				omap := orderedmap.New()
+				for i := 0; i < c.Unary; i++ {
+					k := vals[i*2]
+					v := vals[i*2+1]
+					orderedmap.SetAny(omap, k.Value, v.Value)
+				}
+				v.push(NewValue("OrderedMap", omap, ""))
 			}
 
-			v.push(NewValue(mt.String(), mapVal.Interface(), ""))
 			return
 		}
 	case OpNewMapWithType:
@@ -1789,6 +1807,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_Float64))
 		case "any":
 			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_Interface))
+		case "omap":
+			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_OrderedMap))
 		case "slice":
 			if val := v.pop(); val.IsType() {
 				v.push(NewType("[]"+val.TypeVerbose, reflect.TypeOf(reflect.MakeSlice(reflect.SliceOf(val.Type()), 0, 0).Interface())))
