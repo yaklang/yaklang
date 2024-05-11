@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
+	yakMultiPart "github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -874,7 +875,7 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 }
 
-func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, callback func(string, *multipart.Reader, *multipart.Writer) bool) []byte {
+func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, callback func(string, *yakMultiPart.Reader, *multipart.Writer) bool) []byte {
 	var header []string
 	var (
 		buf             bytes.Buffer
@@ -932,7 +933,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 
 	if isFormDataPost {
 		// multipart reader
-		multipartReader := multipart.NewReader(bytes.NewReader(body), multipartWriter.Boundary())
+		multipartReader := yakMultiPart.NewReader(bytes.NewReader(body))
 		// append form
 		fixBody = callback(requestMethod, multipartReader, multipartWriter)
 	} else {
@@ -970,8 +971,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 替换POST请求表单，其中ccc为键，ddd为值
 // ```
 func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
-		handled := false
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -980,25 +980,24 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 					break
 				}
 
+				var reader io.Reader = part
 				if part.FormName() == key {
-					multipartWriter.WriteField(key, value)
-				} else {
-					partWriter, err := multipartWriter.CreatePart(part.Header)
-					if err != nil {
-						break
-					}
-					_, err = io.Copy(partWriter, part)
-					if err != nil {
-						break
-					}
-
+					reader = strings.NewReader(value)
+				}
+				partWriter, err := multipartWriter.CreatePart(part.Header)
+				if err != nil {
+					break
+				}
+				_, err = io.Copy(partWriter, reader)
+				if err != nil {
+					break
 				}
 			}
-		}
-		// append form
-		if !handled && multipartWriter != nil {
+		} else if multipartWriter != nil {
+			// append form
 			multipartWriter.WriteField(key, value)
 		}
+
 		return true
 	})
 }
@@ -1018,7 +1017,7 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 添加POST请求表单，其中ccc为键，ddd为值
 // ```
 func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1053,7 +1052,7 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
 	hasContentType := len(contentType) > 0
 
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1155,7 +1154,7 @@ func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, file
 		}
 	}
 
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1217,7 +1216,7 @@ func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, file
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "aaa") // 删除POST请求表单aaa
 // ```
 func DeleteHTTPPacketForm(packet []byte, key string) []byte {
-	return handleHTTPRequestForm(packet, false, false, func(method string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, false, false, func(method string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
 		if strings.ToUpper(method) != "POST" {
 			return false
 		}
