@@ -3,9 +3,13 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/textproto"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/multipart"
 )
 
 //func FixMultipartPacket(i []byte) ([]byte, bool /* fixed */) {
@@ -122,8 +126,50 @@ import (
 //	return boundary, fullBody.Bytes()
 //}
 
+func FixMultipartBody(i []byte) (boundary string, fixedBody []byte) {
+	buf := new(bytes.Buffer)
+	reader := multipart.NewReader(bytes.NewBuffer(i))
+	dashBoundary := ""
+
+	for {
+		part, err := reader.NextPart()
+		if err != nil || part == nil {
+			break
+		}
+		if dashBoundary == "" {
+			dashBoundary = string(reader.Boundary())
+		}
+
+		buf.WriteString(dashBoundary)
+		buf.Write(multipart.CRLF)
+		rawHeader, err := part.ReadRawHeader()
+		if err != nil {
+			log.Errorf("FixMultipartBody: Part Read Header failed: %v", err)
+		}
+		buf.Write(rawHeader)
+
+		for i := uint8(1); i <= multipart.GetPartEmptyLineNum(part); i++ {
+			buf.Write(multipart.CRLF)
+		}
+		n, err := io.Copy(buf, part)
+		if err != nil {
+			log.Errorf("FixMultipartBody: Part Read Body failed: %v", err)
+		}
+		if n > 0 {
+			buf.Write(multipart.CRLF)
+		}
+	}
+	if reader.PartsRead() > 0 {
+		buf.WriteString(dashBoundary)
+		buf.Write(multipart.BoundaryStartOrEnd)
+		buf.Write(multipart.CRLF)
+	}
+
+	return strings.TrimPrefix(dashBoundary, "--"), buf.Bytes()
+}
+
 // 状态机
-func FixMultipartBody(i []byte) (string, []byte) {
+func FixMultipartBodyLegacy(i []byte) (string, []byte) {
 	var lineBuffer bytes.Buffer
 	var blockBuffer bytes.Buffer
 	var boundary string
@@ -135,7 +181,7 @@ func FixMultipartBody(i []byte) (string, []byte) {
 		BLOCK_FINISHED   = 3
 		FINISHED         = 4
 	)
-	var state = FINDING_BOUNDARY
+	state := FINDING_BOUNDARY
 
 	i = bytes.TrimSpace(i)
 	var blocks []bytes.Buffer
