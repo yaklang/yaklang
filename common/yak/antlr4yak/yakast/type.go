@@ -36,6 +36,9 @@ func (y *YakCompiler) VisitTypeLiteral(raw yak.ITypeLiteralContext) interface{} 
 	case "double", "float", "float32", "float64":
 		y.writeString("float")
 		y.pushType("float")
+	case "omap":
+		y.writeString("omap")
+		y.pushType("omap")
 	default:
 		if slice := i.SliceTypeLiteral(); slice != nil {
 			y.VisitSliceTypeLiteral(slice)

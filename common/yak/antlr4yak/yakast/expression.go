@@ -67,6 +67,12 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		if i.LParen() != nil && i.RParen() != nil {
 			recoverFormatBufferFunc := y.switchFormatBuffer()
 			y.writeString("(")
+			isOMap := op.GetText() == "omap"
+			if isOMap {
+				recoverSwitchOMap := y.switchIsOMap(true)
+				defer recoverSwitchOMap()
+			}
+
 			expression := i.Expression(0)
 			if expression == nil {
 				y.pushUndefined()
@@ -260,7 +266,7 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		y.VisitExpression(i.Expression(2))
 		jmpEnd.Unary = y.GetNextCodeIndex()
 	} else if instanceCode := i.InstanceCode(); instanceCode != nil {
-		//判断当前代码块是否可以立即执行，当处于全局代码块或者InstanceCode函数中时，可以立即执行
+		// 判断当前代码块是否可以立即执行，当处于全局代码块或者InstanceCode函数中时，可以立即执行
 		inGlobal := false
 		if y.currentSymtbl == y.rootSymtbl {
 			inGlobal = true
@@ -282,7 +288,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		y.VisitMemberCall(op)
 	} else {
 		y.panicCompilerError(expressionError, i.GetText())
-
 	}
 
 	return nil

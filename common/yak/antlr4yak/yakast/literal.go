@@ -31,8 +31,8 @@ func (y *YakCompiler) VisitNumericLiteral(raw yak.INumericLiteralContext) interf
 
 	if iLit := i.IntegerLiteral(); iLit != nil {
 		// 0x7fffffffffffffff
-		var originIntStr = iLit.GetText()
-		var intStr = strings.ToLower(originIntStr)
+		originIntStr := iLit.GetText()
+		intStr := strings.ToLower(originIntStr)
 		var resultInt64 int64
 		switch true {
 		case strings.HasPrefix(intStr, "0b"): // 二进制
@@ -62,7 +62,7 @@ func (y *YakCompiler) VisitNumericLiteral(raw yak.INumericLiteralContext) interf
 		if strings.HasPrefix(lit, ".") {
 			lit = "0" + lit
 		}
-		var f, _ = strconv.ParseFloat(lit, 64)
+		f, _ := strconv.ParseFloat(lit, 64)
 		y.pushFloat(f, iFloat.GetText())
 		return nil
 	}
@@ -258,7 +258,7 @@ func (y *YakCompiler) VisitMapLiteral(raw yak.IMapLiteralContext) interface{} {
 
 	pairs := i.MapPairs()
 	if pairs == nil {
-		y.pushNewMap(0)
+		y.pushNewMap(0, y.isOMap)
 		return nil
 	}
 
@@ -273,7 +273,7 @@ func (y *YakCompiler) VisitMapLiteral(raw yak.IMapLiteralContext) interface{} {
 		}
 	}
 
-	y.pushNewMap(lenOfAllPair)
+	y.pushNewMap(lenOfAllPair, y.isOMap)
 
 	return nil
 }
@@ -433,7 +433,7 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 		y.panicCompilerError(compileError, "parse template string literal error")
 	}
 
-	//y.pushString(i.GetText())
+	// y.pushString(i.GetText())
 	return nil
 }
 
@@ -450,15 +450,15 @@ func (y *YakCompiler) VisitStringLiteral(raw yak.IStringLiteralContext) interfac
 	defer recoverRange()
 	y.writeString(raw.GetText())
 
-	var text = i.GetText()
+	text := i.GetText()
 	if text == "" {
 		y.pushString(text, text)
 		return nil
 	}
 
 	var prefix byte
-	var hasPrefix = false
-	var supportPrefix = []byte{'x', 'b', 'r'}
+	hasPrefix := false
+	supportPrefix := []byte{'x', 'b', 'r'}
 ParseStrLit:
 	switch text[0] {
 	case '"':
