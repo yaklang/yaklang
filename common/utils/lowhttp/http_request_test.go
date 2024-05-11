@@ -148,12 +148,12 @@ func TestParseBytesToHttpRequest(t *testing.T) {
 func wait500ms() {
 	time.Sleep(time.Millisecond * 500)
 }
+
 func TestParseBytesToHttpRequest2(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-
 	}))
 	wait500ms()
-	var host, port, _ = utils.ParseStringToHostPort(server.URL)
+	host, port, _ := utils.ParseStringToHostPort(server.URL)
 	rsp, err := HTTPWithoutRedirect(
 		WithHttps(false), WithHost(host),
 		WithPort(port),
@@ -267,17 +267,16 @@ Content-Disposition: form-data; name="stream.body"
 </RDF>
 
 --------------------------aceb88c2159f--`
-	var r = FixHTTPPacketCRLF([]byte(packet), false)
+	r := FixHTTPPacketCRLF([]byte(packet), false)
 	if !bytes.Contains(r, []byte(`boundary=------------------------aceb88c2159f`)) {
 		panic(1)
 	}
-	var req, _ = ParseBytesToHttpRequest(r)
+	req, _ := ParseBytesToHttpRequest(r)
 	println(string(r))
 	println(req.ContentLength)
 	if reader, _ := req.MultipartReader(); reader == nil {
 		panic(1)
 	}
-
 }
 
 func TestFixHTTPPacketCRLF2(t *testing.T) {
@@ -547,7 +546,7 @@ df`)) != 199 {
 }
 
 func TestGZIPCHUNKED(t *testing.T) {
-	var a = ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
+	a := ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
 
 abcdadasdfabcdadasdfabcdadasdfabcdadasdfabcdadasdf`), "Transfer-Encoding", "chunked")
@@ -559,6 +558,6 @@ abcdadasdfabcdadasdfabcdadasdfabcdadasdfabcdadasdf`), "Transfer-Encoding", "chun
 }
 
 func TestHTTPPacketCRLF_EmptyResult(t *testing.T) {
-	var as = FixHTTPPacketCRLF(nil, true)
+	as := FixHTTPPacketCRLF(nil, true)
 	spew.Dump(as)
 }

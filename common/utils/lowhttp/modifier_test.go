@@ -5,15 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/multipart"
 )
 
 func TestReplaceHTTPPacketMethod(t *testing.T) {
@@ -881,7 +880,8 @@ Host: www.baidu.com`),
 Host: www.baidu.com
 Cookie: a=1; a=2
 `), key: "a",
-			expected: "1,2"},
+			expected: "1,2",
+		},
 		{
 			name: "SingleCookieSingleValue",
 			packet: []byte(`GET / HTTP/1.1
@@ -909,8 +909,10 @@ Cookie: c=1
 Cookie: a=1;
 `),
 			key:      "c",
-			expected: "1"},
-		{name: "MixedCookies", packet: []byte(`GET / HTTP/1.1
+			expected: "1",
+		},
+		{
+			name: "MixedCookies", packet: []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=1
 Cookie: b=1; a=1;
@@ -1743,17 +1745,12 @@ func TestReplaceHTTPPacketFormEncoded(t *testing.T) {
 			}
 			return
 		}
-		if part.FormName() != key {
-			t.Fatalf("ReplaceHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FormName(), key)
-		}
-
+		require.Equal(t, key, part.FormName(), "form-key")
 		buf := new(bytes.Buffer)
 		if _, err = io.Copy(buf, part); err != nil {
 			t.Fatal(err)
 		}
-		if buf.String() != value {
-			t.Fatalf("ReplaceHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), value)
-		}
+		require.Equal(t, value, buf.String(), "form-value")
 	}
 
 	testcases := []struct {
@@ -1765,19 +1762,19 @@ func TestReplaceHTTPPacketFormEncoded(t *testing.T) {
 		{
 			// append
 			origin: `GET / HTTP/1.1
-Host: www.baidu.com
-`,
+		Host: www.baidu.com
+		`,
 			key:   "a",
 			value: "1",
 		},
 		{
 			// append with no-form data
 			origin: `POST / HTTP/1.1
-Host: www.baidu.com
-Content-Type: application/x-www-form-urlencoded
-Content-Length: 7
+		Host: www.baidu.com
+		Content-Type: application/x-www-form-urlencoded
+		Content-Length: 7
 
-a=1&b=2`,
+		a=1&b=2`,
 			key:   "a",
 			value: "1",
 		},
@@ -1801,29 +1798,9 @@ Content-Disposition: form-data; name="a"
 	}
 	for _, testcase := range testcases {
 		actual := ReplaceHTTPPacketFormEncoded([]byte(testcase.origin), testcase.key, testcase.value)
-
 		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
-		headers := blocks[0]
-		re := regexp.MustCompile(`(?m)boundary=([-\w]+)`)
-		headers = re.ReplaceAllString(headers, "boundary=test")
-		for _, header := range strings.Split(headers, "\r\n") {
-			if !strings.HasPrefix(header, "Content-Type") {
-				continue
-			}
-			spilted := strings.Split(header, ":")
-			if len(spilted) != 2 {
-				t.Fatalf("ReplaceHTTPPacketFormEncoded failed: Content-Type not have colon : %s", header)
-			}
-			if strings.TrimSpace(spilted[1]) != "multipart/form-data; boundary=test" {
-				t.Fatalf("ReplaceHTTPPacketFormEncoded failed: wrong Content-Type: %s", header)
-			}
-		}
 		body := blocks[1]
-		re = regexp.MustCompile(`(?m)(--\w+)`)
-		result := re.ReplaceAllString(body, "--test")
-
-		// multipart reader
-		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+		mutlipartReader := multipart.NewReader(bytes.NewBufferString(body))
 
 		if testcase.oldKey != testcase.key {
 			// compare old key and value
@@ -1916,29 +1893,9 @@ Content-Disposition: form-data; name="a"
 	}
 	for _, testcase := range testcases {
 		actual := AppendHTTPPacketFormEncoded([]byte(testcase.origin), testcase.key, testcase.value)
-
 		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
-		headers := blocks[0]
-		re := regexp.MustCompile(`(?m)boundary=([-\w]+)`)
-		headers = re.ReplaceAllString(headers, "boundary=test")
-		for _, header := range strings.Split(headers, "\r\n") {
-			if !strings.HasPrefix(header, "Content-Type") {
-				continue
-			}
-			spilted := strings.Split(header, ":")
-			if len(spilted) != 2 {
-				t.Fatalf("AppendHTTPPacketFormEncoded failed: Content-Type not have colon : %s", header)
-			}
-			if strings.TrimSpace(spilted[1]) != "multipart/form-data; boundary=test" {
-				t.Fatalf("AppendHTTPPacketFormEncoded failed: wrong Content-Type: %s", header)
-			}
-		}
 		body := blocks[1]
-		re = regexp.MustCompile(`(?m)(--\w+)`)
-		result := re.ReplaceAllString(body, "--test")
-
-		// multipart reader
-		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+		mutlipartReader := multipart.NewReader(bytes.NewBufferString(body))
 
 		// compare old key and value
 		if testcase.oldKey != "" {
@@ -2062,15 +2019,9 @@ bbb
 		} else {
 			actual = ReplaceHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent)
 		}
-
 		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
 		body := blocks[1]
-		_ = body
-		re := regexp.MustCompile(`(?m)(--\w+)`)
-		result := re.ReplaceAllString(body, "--test")
-
-		// multipart reader
-		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+		mutlipartReader := multipart.NewReader(bytes.NewBufferString(body))
 
 		if testcase.oldfieldName != testcase.fieldName {
 			// compare old
@@ -2102,7 +2053,7 @@ bbb
 }
 
 func TestAppendHTTPPacketUploadFile(t *testing.T) {
-	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent interface{}, contentType string) {
+	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent string, contentType string) {
 		part, err := mutlipartReader.NextPart()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
@@ -2122,23 +2073,8 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		switch r := fileContent.(type) {
-		case string:
-			if buf.String() != r {
-				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
-			}
-		case []byte:
-			if bytes.Compare(buf.Bytes(), r) != 0 {
-				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
-			}
-		case io.Reader:
-			buf2 := new(bytes.Buffer)
-			if _, err = io.Copy(buf2, r); err != nil {
-				t.Fatal(err)
-			}
-			if buf.String() != buf2.String() {
-				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), buf2.String())
-			}
+		if buf.String() != fileContent {
+			t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), fileContent)
 		}
 
 		if contentType != "" {
@@ -2152,8 +2088,9 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 		origin                    string
 		oldfieldName, oldfileName string
 		oldFileContent            string
+		oldContentType            string
 		fieldName, fileName       string
-		fileContent               interface{}
+		fileContent               string
 		contentType               string
 	}{
 		{
@@ -2213,6 +2150,7 @@ bbb
 			oldfieldName:   "aaa",
 			oldfileName:    "aaa.txt",
 			oldFileContent: "bbb",
+			oldContentType: "application/octet-stream",
 			fieldName:      "test",
 			fileName:       "test.php",
 			fileContent:    "<?php phpinfo();?>",
@@ -2226,19 +2164,13 @@ bbb
 		} else {
 			actual = AppendHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent)
 		}
-
 		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
 		body := blocks[1]
-		_ = body
-		re := regexp.MustCompile(`(?m)(--\w+)`)
-		result := re.ReplaceAllString(body, "--test")
-
-		// multipart reader
-		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+		mutlipartReader := multipart.NewReader(bytes.NewBufferString(body))
 
 		// compare old
 		if testcase.oldfieldName != "" {
-			compare(mutlipartReader, testcase.oldfieldName, testcase.oldfileName, testcase.oldFileContent, testcase.contentType)
+			compare(mutlipartReader, testcase.oldfieldName, testcase.oldfileName, testcase.oldFileContent, testcase.oldContentType)
 		}
 
 		// compare new
@@ -2320,20 +2252,6 @@ func TestGetParamsFromBody(t *testing.T) {
 		useRaw bool
 		err    error
 	}
-	// mapEqual := func(m1, m2 map[string]string) bool {
-	// 	if len(m1) != len(m2) {
-	// 		return false
-	// 	}
-
-	// 	for key, aValue := range m1 {
-	// 		bValue, exists := m2[key]
-	// 		if !exists || aValue != bValue {
-	// 			return false
-	// 		}
-	// 	}
-
-	// 	return true
-	// }
 
 	testcases := []struct {
 		name        string

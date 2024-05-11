@@ -1,10 +1,11 @@
 package lowhttp
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestFixMultipartBody(t *testing.T) {
@@ -36,7 +37,7 @@ Content-Type: image/png
 	if strings.Contains(string(body), `phpinfo();`+CRLF) {
 		panic("CRLF in Body")
 	}
-	if !strings.Contains(string(body), "phpinfo();") {
+	if !strings.Contains(string(body), "phpinfo();\n") {
 		panic("FAILED")
 	}
 }
@@ -159,11 +160,11 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 	spew.Dump(body)
 	println(string(body))
 	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+"---------") {
-		panic("CRLF in Body")
+		panic("CRLF in form1")
 	}
 
 	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+CRLF+"---------") {
-		panic("CRLF in Body")
+		panic("CRLF in form2")
 	}
 	// VerifyMultipart(b, body)
 }
@@ -172,7 +173,9 @@ func TestFixMultipartPacket(t *testing.T) {
 	// LS0tLS0tLS0tLS0tRWYxS003R0kzRWYxZWk0SWo1YWUwS003Y0gyS003DQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImZpbGUiOyBmaWxlbmFtZT0iYS5waHAiDQpDb250ZW50LVR5cGU6IGltYWdlL3BuZw0KDQo8P3BocCBwaHBpbmZvKCk7ID8+DQotLS0tLS0tLS0tLS1FZjFLTTdHSTNFZjFlaTRJajVhZTBLTTdjSDJLTTctLQ0K
 	flag := `LS0tLS0tLS0tLS0tRWYxS003R0kzRWYxZWk0SWo1YWUwS003Y0gyS003DQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImZpbGUiOyBmaWxlbmFtZT0iYS5waHAiDQpDb250ZW50LVR5cGU6IGltYWdlL3BuZw0KDQo8P3BocCBwaHBpbmZvKCk7ID8+DQotLS0tLS0tLS0tLS1FZjFLTTdHSTNFZjFlaTRJajVhZTBLTTdjSDJLTTctLQ0K`
 	raw, _ := codec.DecodeBase64(`LS0tLS0tLS0tLS0tRWYxS003R0kzRWYxZWk0SWo1YWUwS003Y0gyS003DQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImZpbGUiOyBmaWxlbmFtZT0iYS5waHAiDQpDb250ZW50LVR5cGU6IGltYWdlL3BuZw0KDQo8P3BocCBwaHBpbmZvKCk7ID8+DQotLS0tLS0tLS0tLS1FZjFLTTdHSTNFZjFlaTRJajVhZTBLTTdjSDJLTTctLQ0K`)
+	spew.Dump(raw)
 	_, raw = FixMultipartBody(raw)
+	spew.Dump(raw)
 	if flag != codec.EncodeBase64(raw) {
 		panic(1)
 	}
