@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -9,13 +10,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 )
-
-type IrSourceCodeResource struct {
-	gorm.Model
-	SourceCodeHash     string `json:"source_code_hash" gorm:"index"`
-	SourceCodeFilename string `json:"source_code_file"`
-	QuotedSourceCode   string `json:"quoted_source_code"`
-}
 
 type IrCode struct {
 	gorm.Model
@@ -184,4 +178,36 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 		log.Warnf("BUG: cannot fetch instruction's extra info: %v", err)
 	}
 	return results
+}
+
+func (r *IrCode) GetStartAndEndPositions(db *gorm.DB) (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
+	editor, err := GetIrSourceFromHash(db, r.SourceCodeHash)
+	if err != nil {
+		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
+	}
+	start, end := editor.GetPositionByOffset(int(r.SourceCodeStartOffset)), editor.GetPositionByOffset(int(r.SourceCodeEndOffset))
+	return editor, start, end, nil
+}
+
+func (r *IrCode) GetSourceCode(db *gorm.DB) string {
+	editor, start, end, err := r.GetStartAndEndPositions(db)
+	if err != nil {
+		log.Warnf("GetSourceCode failed: %v", err)
+		return ""
+	}
+	return editor.GetWordTextFromRange(memedit.NewRange(start, end))
+}
+
+func (r *IrCode) GetSourceCodeContext(db *gorm.DB, n int) string {
+	editor, start, end, err := r.GetStartAndEndPositions(db)
+	if err != nil {
+		log.Warnf("GetSourceCodeContext failed: %v", err)
+		return ""
+	}
+	result, err := editor.GetContextAroundRange(start, end, n)
+	if err != nil {
+		log.Warnf("editor.GetContextAroundRange(start, end, %v) failed: %v", n, err)
+		return ""
+	}
+	return result
 }

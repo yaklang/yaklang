@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
@@ -102,6 +103,15 @@ func (p *Range) GetText() string {
 	}
 	p.text = p.editor.GetTextFromRange(p)
 	return p.text
+}
+
+func (p *Range) GetTextContext(n int) string {
+	result, err := p.editor.GetContextAroundRange(p.GetStart(), p.GetEnd(), n)
+	if err != nil {
+		log.Warnf("editor.GetContextAroundRange(start, end, %v) failed: %v", n, err)
+		return ""
+	}
+	return result
 }
 
 func (p *Range) GetWordText() string {

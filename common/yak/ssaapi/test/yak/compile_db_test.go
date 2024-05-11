@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"strconv"
 	"testing"
@@ -62,6 +63,9 @@ dump(c)
 	}
 	log.Infof("eLazyPhi: %s", eLazyPhi.String())
 	log.Infof("ePhi: %s", ePhi.String())
+
+	assert.Equal(t, ePhi.GetSourceCode(), eLazyPhi.GetSourceCode())
+	assert.Equal(t, ePhi.GetSourceCodeContext(2), eLazyPhi.GetSourceCodeContext(2))
 }
 
 func TestCompileWithDatabase_Scope_Phi2(t *testing.T) {
