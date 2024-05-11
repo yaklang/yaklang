@@ -7,12 +7,13 @@ import (
 	"io"
 	"io/ioutil"
 	"mime"
-	"mime/multipart"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/utils/multipart"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -247,7 +248,7 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 
 	if boundary != "" {
 		// 上传文件的情况
-		reader := multipart.NewReader(bytes.NewBuffer(body), boundary)
+		reader := multipart.NewReader(bytes.NewBuffer(body))
 
 		// 修复数据包
 		var buf bytes.Buffer

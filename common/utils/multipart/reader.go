@@ -71,6 +71,8 @@ func (r *Reader) NextPart() (*Part, error) {
 		headerBuffer = new(bytes.Buffer)
 		blockBuffer  = new(bytes.Buffer)
 		isFirstLine  = true
+
+		emptyLineNum uint8 = 0
 	)
 
 	if r.partsRead > 0 {
@@ -81,8 +83,9 @@ func (r *Reader) NextPart() (*Part, error) {
 	for {
 		line, err := r.bufReader.ReadBytes('\n')
 		trimed := bytes.TrimRightFunc(line, unicode.IsSpace)
+		isEmptyLine := len(trimed) == 0
 
-		if err != nil && len(trimed) == 0 {
+		if err != nil && isEmptyLine {
 			if err != io.EOF {
 				return nil, utils.Wrap(err, "multipart: NextPart")
 			} else {
@@ -95,7 +98,7 @@ func (r *Reader) NextPart() (*Part, error) {
 
 		// when FINDING_BOUNDARY skip empty line
 		// first line should not empty line
-		if len(trimed) == 0 && (state == FINDING_BOUNDARY || isFirstLine) {
+		if isEmptyLine && (state == FINDING_BOUNDARY || isFirstLine) {
 			continue
 		}
 		isFirstLine = false
@@ -116,14 +119,17 @@ func (r *Reader) NextPart() (*Part, error) {
 		case PARSING_BLOCK_HEADER:
 			if currentPart == nil {
 				currentPart = newPart(blockBuffer, headerBuffer)
+				currentPart.setEmptyLineNum(&emptyLineNum)
 			}
 
-			if len(trimed) == 0 {
+			if isEmptyLine {
 				state = PARSING_BLOCK_BODY
+				emptyLineNum++
 				continue
 			}
 
-			headerBuffer.Write(line)
+			headerBuffer.Write(trimed)
+			headerBuffer.Write(CRLF)
 			if bytes.Contains(trimed, COLON) {
 				k, v, ok := strings.Cut(string(trimed), ":")
 				if ok {
@@ -136,8 +142,8 @@ func (r *Reader) NextPart() (*Part, error) {
 				appendNL = nil
 			}
 
-			if !currentPart.hasBody && len(line) > 0 {
-				currentPart.hasBody = true
+			if emptyLineNum < 2 && isEmptyLine && len(line) > 0 {
+				emptyLineNum++
 			}
 			blockBuffer.Write(trimed)
 			if bytes.HasSuffix(line, CRLF) {
@@ -163,10 +169,10 @@ type Part struct {
 	Header       textproto.MIMEHeader
 	headerReader io.Reader
 	bodyReader   io.Reader
+	emptyLineNum *uint8
 
 	disposition       string
 	dispositionParams map[string]string
-	hasBody           bool
 }
 
 func newPart(bodyReader, headerReader io.Reader) *Part {
@@ -199,10 +205,6 @@ func (p *Part) ReadRawHeader() ([]byte, error) {
 		return nil, io.EOF
 	}
 	return io.ReadAll(p.headerReader)
-}
-
-func (p *Part) HasBody() bool {
-	return p.hasBody
 }
 
 func (p *Part) Read(data []byte) (n int, err error) {
@@ -257,4 +259,8 @@ func (p *Part) parseContentDisposition() {
 	if err != nil {
 		p.dispositionParams = emptyParams
 	}
+}
+
+func (p *Part) setEmptyLineNum(num *uint8) {
+	p.emptyLineNum = num
 }

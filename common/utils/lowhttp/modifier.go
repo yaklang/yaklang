@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
-	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
-	yakMultiPart "github.com/yaklang/yaklang/common/utils/multipart"
+	"github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -875,7 +875,7 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 }
 
-func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, callback func(string, *yakMultiPart.Reader, *multipart.Writer) bool) []byte {
+func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, callback func(string, *multipart.Reader, *multipart.Writer) bool) []byte {
 	var header []string
 	var (
 		buf             bytes.Buffer
@@ -933,7 +933,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 
 	if isFormDataPost {
 		// multipart reader
-		multipartReader := yakMultiPart.NewReader(bytes.NewReader(body))
+		multipartReader := multipart.NewReader(bytes.NewReader(body))
 		// append form
 		fixBody = callback(requestMethod, multipartReader, multipartWriter)
 	} else {
@@ -971,7 +971,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 替换POST请求表单，其中ccc为键，ddd为值
 // ```
 func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1017,7 +1017,7 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 添加POST请求表单，其中ccc为键，ddd为值
 // ```
 func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1052,7 +1052,7 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
 	hasContentType := len(contentType) > 0
 
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1154,7 +1154,7 @@ func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, file
 		}
 	}
 
-	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1216,7 +1216,7 @@ func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, file
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "aaa") // 删除POST请求表单aaa
 // ```
 func DeleteHTTPPacketForm(packet []byte, key string) []byte {
-	return handleHTTPRequestForm(packet, false, false, func(method string, multipartReader *yakMultiPart.Reader, multipartWriter *multipart.Writer) bool {
+	return handleHTTPRequestForm(packet, false, false, func(method string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if strings.ToUpper(method) != "POST" {
 			return false
 		}
@@ -1270,42 +1270,25 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 // })
 // ```
 func ParseMultiPartFormWithCallback(req []byte, callback func(part *multipart.Part)) (err error) {
-	// get contentType
-	contentType := GetHTTPPacketContentType(req)
-
-	var contentTypeParams map[string]string
-	_, contentTypeParams, err = mime.ParseMediaType(contentType)
-	if err != nil {
-		return
-	}
 	_, body := SplitHTTPPacketFast(req)
-
-	boundary, ok := contentTypeParams["boundary"]
-	if ok {
-		mr := multipart.NewReader(bytes.NewReader(body), boundary)
-		for {
-			part, err := mr.NextPart()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return err
-			}
-			// 检查part是否为表单字段
-			if formName := part.FormName(); formName != "" {
-				callback(part)
-			}
+	mr := multipart.NewReader(bytes.NewReader(body))
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		// 检查part是否为表单字段
+		if formName := part.FormName(); formName != "" {
+			callback(part)
 		}
 	}
 	return nil
 }
 
 func GetParamsFromBody(contentType string, body []byte) (params map[string][]string, useRaw bool, err error) {
-	var contentTypeParams map[string]string
-	_, contentTypeParams, err = mime.ParseMediaType(contentType)
-	if err != nil {
-		return
-	}
 	params = make(map[string][]string)
 	// 这是为了处理复杂json/xml的情况
 	handleUnmarshalValues := func(v any) ([]string, []string) {
@@ -1352,27 +1335,24 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 
 	// try post form
 	if len(params) == 0 {
-		boundary, ok := contentTypeParams["boundary"]
-		if ok {
-			mr := multipart.NewReader(bytes.NewReader(body), boundary)
-			for {
-				part, err := mr.NextPart()
-				if err == io.EOF {
-					break
-				}
-				if err != nil {
+		mr := multipart.NewReader(bytes.NewReader(body))
+		for {
+			part, err := mr.NextPart()
+			if errors.Is(err, io.EOF) || errors.Is(err, multipart.ErrInvalidBoundary) {
+				break
+			}
+			if err != nil {
+				return nil, false, err
+			}
+
+			// 检查part是否为表单字段
+			if part.FormName() != "" {
+				content, err := io.ReadAll(part)
+				if err != nil && err != io.EOF {
 					return nil, false, err
 				}
-
-				// 检查part是否为表单字段
-				if part.FormName() != "" {
-					content, err := io.ReadAll(part)
-					if err != nil && err != io.EOF {
-						return nil, false, err
-					}
-					key := part.FormName()
-					params[key] = append(params[key], string(content))
-				}
+				key := part.FormName()
+				params[key] = append(params[key], string(content))
 			}
 		}
 	}
