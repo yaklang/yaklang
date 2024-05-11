@@ -50,6 +50,14 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
+func (r *Reader) Boundary() []byte {
+	return r.dashBoundary
+}
+
+func (r *Reader) PartsRead() int {
+	return r.partsRead
+}
+
 func (r *Reader) NextRawPart() (*Part, error) {
 	return r.NextPart()
 }
@@ -62,6 +70,7 @@ func (r *Reader) NextPart() (*Part, error) {
 		state        = FINDING_BOUNDARY
 		headerBuffer = new(bytes.Buffer)
 		blockBuffer  = new(bytes.Buffer)
+		isFirstLine  = true
 	)
 
 	if r.partsRead > 0 {
@@ -69,7 +78,6 @@ func (r *Reader) NextPart() (*Part, error) {
 		dashBoundary = r.dashBoundary
 	}
 
-LOOP:
 	for {
 		line, err := r.bufReader.ReadBytes('\n')
 		trimed := bytes.TrimRightFunc(line, unicode.IsSpace)
@@ -81,14 +89,21 @@ LOOP:
 				if currentPart == nil {
 					return nil, io.EOF
 				}
-				return currentPart, nil
+				break
 			}
 		}
 
-		// PARSING_BLOCK_HEADER need empty line to switch state
-		if len(trimed) == 0 && state != PARSING_BLOCK_HEADER {
+		// when FINDING_BOUNDARY skip empty line
+		// first line should not empty line
+		if len(trimed) == 0 && (state == FINDING_BOUNDARY || isFirstLine) {
 			continue
 		}
+		isFirstLine = false
+		isEnd := bytes.Equal(trimed, dashBoundary) || bytes.Equal(trimed, BytesJoinSize(len(dashBoundary)+2, dashBoundary, BoundaryStartOrEnd))
+		if isEnd {
+			break
+		}
+
 		switch state {
 		case FINDING_BOUNDARY:
 			if !bytes.HasPrefix(trimed, BoundaryStartOrEnd) {
@@ -102,6 +117,7 @@ LOOP:
 			if currentPart == nil {
 				currentPart = newPart(blockBuffer, headerBuffer)
 			}
+
 			if len(trimed) == 0 {
 				state = PARSING_BLOCK_BODY
 				continue
@@ -119,24 +135,23 @@ LOOP:
 				blockBuffer.Write(appendNL)
 				appendNL = nil
 			}
-			// block end or all end
-			if !bytes.Equal(trimed, dashBoundary) && !bytes.Equal(trimed, BytesJoinSize(len(dashBoundary)+2, dashBoundary, BoundaryStartOrEnd)) {
-				blockBuffer.Write(trimed)
-				if bytes.HasSuffix(line, CRLF) {
-					appendNL = CRLF
-				} else if bytes.HasSuffix(line, LF) {
-					appendNL = LF
-				}
-				continue
+
+			if !currentPart.hasBody && len(line) > 0 {
+				currentPart.hasBody = true
 			}
-			state = FINISHED
-			fallthrough
-		case FINISHED:
-			r.partsRead++
-			break LOOP
+			blockBuffer.Write(trimed)
+			if bytes.HasSuffix(line, CRLF) {
+				appendNL = CRLF
+			} else if bytes.HasSuffix(line, LF) {
+				appendNL = LF
+			}
+
+			// case FINISHED:
+			// 	break LOOP
 		}
 	}
 
+	r.partsRead++
 	return currentPart, nil
 }
 
@@ -151,6 +166,7 @@ type Part struct {
 
 	disposition       string
 	dispositionParams map[string]string
+	hasBody           bool
 }
 
 func newPart(bodyReader, headerReader io.Reader) *Part {
@@ -183,6 +199,10 @@ func (p *Part) ReadRawHeader() ([]byte, error) {
 		return nil, io.EOF
 	}
 	return io.ReadAll(p.headerReader)
+}
+
+func (p *Part) HasBody() bool {
+	return p.hasBody
 }
 
 func (p *Part) Read(data []byte) (n int, err error) {
