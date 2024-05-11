@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,9 +17,9 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
 	}
 
 	token := utils.RandStringBytes(16)
-	count := 0
+	count := uint64(0)
 	targetHost, targetPort := utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
-		count++
+		atomic.AddUint64(&count, 1)
 		if count%2 == 0 {
 			conn.Close()
 			return
@@ -71,7 +72,6 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 		client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 			RetryTaskID: taskID,
 		})
-
 		if err != nil {
 			t.Fatal(err)
 		}
