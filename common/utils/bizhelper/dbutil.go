@@ -473,7 +473,7 @@ func FuzzQuery(db *gorm.DB, field string, value string) *gorm.DB {
 	if value == "" {
 		return db
 	}
-	return db.Where(fmt.Sprintf("%s ILIKE ?", field), "%"+value+"%")
+	return db.Where(fmt.Sprintf("%s LIKE ?", field), "%"+value+"%")
 }
 
 func FuzzQueryLike(db *gorm.DB, field string, value string) *gorm.DB {

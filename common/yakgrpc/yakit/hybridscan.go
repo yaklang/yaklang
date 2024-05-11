@@ -64,7 +64,7 @@ func QueryHybridScan(db *gorm.DB, query *ypb.QueryHybridScanTaskRequest) (*bizhe
 }
 
 func FilterHybridScan(db *gorm.DB, filter *ypb.HybridScanTaskFilter) *gorm.DB {
-	db = bizhelper.FuzzQuery(db, "target", filter.GetTarget())
+	db = bizhelper.FuzzQuery(db, "targets", filter.GetTarget())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_id", filter.GetTaskId())
 	db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
 	if filter.GetFromId() > 0 {
