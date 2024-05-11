@@ -22,6 +22,22 @@ type anInstruction struct {
 	isExtern bool
 }
 
+func (v *anInstruction) GetSourceCode() string {
+	r := v.GetRange()
+	if r == nil {
+		return ""
+	}
+	return r.GetText()
+}
+
+func (v *anInstruction) GetSourceCodeContext(n int) string {
+	r := v.GetRange()
+	if r == nil {
+		return ""
+	}
+	return r.GetTextContext(n)
+}
+
 func (i *anInstruction) IsUndefined() bool {
 	return false
 }

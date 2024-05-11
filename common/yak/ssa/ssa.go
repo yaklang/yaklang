@@ -39,6 +39,8 @@ type Instruction interface {
 	// position
 	GetRange() *Range
 	SetRange(*Range)
+	GetSourceCode() string
+	GetSourceCodeContext(n int) string
 
 	// extern
 	IsExtern() bool
