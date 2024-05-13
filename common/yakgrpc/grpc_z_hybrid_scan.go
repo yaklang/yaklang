@@ -115,6 +115,12 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			return err
 		}
 
+		var scanConfig ypb.HybridScanRequest
+		err = json.Unmarshal(t.ScanConfig, &scanConfig)
+		if err != nil {
+			return err
+		}
+
 		stream.Send(&ypb.HybridScanResponse{
 			TotalTargets:     t.TotalTargets,
 			TotalPlugins:     t.TotalPlugins,
@@ -122,8 +128,8 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			FinishedTasks:    t.FinishedTasks,
 			FinishedTargets:  t.FinishedTargets,
 			HybridScanTaskId: t.TaskId,
-			ScanConfig:       string(t.ScanConfig),
 			Status:           t.Status,
+			HybridScanConfig: &scanConfig,
 		})
 
 		client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
