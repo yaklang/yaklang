@@ -180,10 +180,10 @@ func (v *ValueList) RegexpMatch(regexp *regexp.Regexp) (bool, ValueOperator, err
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) GetMembers() (ValueOperator, error) {
+func (v *ValueList) GetMembersByString(key string) (ValueOperator, error) {
 	var result []ValueOperator
 	for _, k := range v.values {
-		members, err := k.GetMembers()
+		members, err := k.GetMembersByString(key)
 		if err != nil {
 			continue
 		}

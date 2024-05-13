@@ -1,11 +1,11 @@
 package ssaapi
 
 import (
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"regexp"
 )
 
 func (v *Value) IsMap() bool {
@@ -71,9 +71,12 @@ func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Errorf("ssa.Value %v is not called", v.String())
 }
 
-func (v *Value) GetMembers() (sfvm.ValueOperator, error) {
+func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, error) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
+		return v.GetMember(NewValue(ssa.NewConst(key))), nil
 	}
+	// return v.GetUsers(), nil
+	return nil, nil
 }
 
 func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {

@@ -116,9 +116,10 @@ func (v *SyntaxFlowVisitor) EmitSearchRegexp(i string) {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitGetMembers() {
+func (v *SyntaxFlowVisitor) EmitGetMembers(i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode: OpGetMembers,
+		OpCode:   OpGetMembers,
+		UnaryStr: i,
 	})
 }
 

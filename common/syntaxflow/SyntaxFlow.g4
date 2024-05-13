@@ -25,8 +25,8 @@ filterExpr
     | '*'                                                   # WildcardFilter
     | identifier                                            # PrimaryFilter
     | regexpLiteral                                         # RegexpLiteralFilter
-    | '.' filterExpr                                        # FieldFilter
-    | filterExpr '.' filterExpr                             # FieldCallFilter
+    | '.' nameFilter                                        # FieldFilter
+    | filterExpr '.' nameFilter                             # FieldCallFilter
     | filterExpr '(' acutalParamFilter* ')'                 # FunctionCallFilter
     | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
     | filterExpr '?{' conditionExpression '}'               # OptionalFilter
