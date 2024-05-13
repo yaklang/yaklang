@@ -2,8 +2,12 @@ package ssadb
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"net/url"
+	"path"
+	"strconv"
 	"sync"
 )
 
@@ -14,7 +18,10 @@ type IrSource struct {
 	gorm.Model
 
 	SourceCodeHash string `json:"source_code_hash" gorm:"unique_index"`
-	Code           string `json:"code"`
+	QuotedCode     string `json:"quoted_code"`
+	FileUrl        string `json:"file_url"`
+	Filename       string `json:"filename"`
+	Filepath       string `json:"filepath"`
 }
 
 func SaveIrSource(db *gorm.DB, editor *memedit.MemEditor, hash string) error {
@@ -22,14 +29,34 @@ func SaveIrSource(db *gorm.DB, editor *memedit.MemEditor, hash string) error {
 		db.AutoMigrate(&IrSource{})
 	})
 
+	if editor.GetSourceCode() == "" {
+		return utils.Errorf("source code is empty")
+	}
+
 	_, ok := irSourceCache.Get(hash)
 	if ok {
 		return nil
 	}
 
+	var fileUrl string
+	var filename, filepath string
+	if editor.GetUrl() != "" {
+		fileUrl = editor.GetUrl()
+		urlIns, err := url.Parse(fileUrl)
+		if err != nil {
+			log.Warnf("parse url %s failed: %v", fileUrl, err)
+		}
+		if urlIns != nil {
+			filename, filepath = path.Split(urlIns.Path)
+		}
+	}
+
 	irSource := &IrSource{
 		SourceCodeHash: hash,
-		Code:           editor.GetSourceCode(),
+		QuotedCode:     strconv.Quote(editor.GetSourceCode()),
+		FileUrl:        fileUrl,
+		Filename:       filename,
+		Filepath:       filepath,
 	}
 	// check existed
 	var existed IrSource
@@ -53,5 +80,13 @@ func GetIrSourceFromHash(db *gorm.DB, hash string) (*memedit.MemEditor, error) {
 	if err := db.Where("source_code_hash = ?", hash).First(&source).Error; err != nil {
 		return nil, utils.Wrapf(err, "query source via hash: %v failed", hash)
 	}
-	return memedit.NewMemEditor(source.Code), nil
+	code, _ := strconv.Unquote(source.QuotedCode)
+	if code == "" {
+		code = source.QuotedCode
+	}
+	editor := memedit.NewMemEditor(code)
+	if source.FileUrl != "" {
+		editor.SetUrl(source.FileUrl)
+	}
+	return editor, nil
 }
