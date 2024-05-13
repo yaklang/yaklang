@@ -1,8 +1,9 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func Test_SideEffect(t *testing.T) {

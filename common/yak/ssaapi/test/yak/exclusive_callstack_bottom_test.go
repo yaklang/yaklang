@@ -3,7 +3,7 @@ package ssaapi
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestYaklang_BottomUses_Basic(t *testing.T) {

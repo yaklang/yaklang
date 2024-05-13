@@ -7,7 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 

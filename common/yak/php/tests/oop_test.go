@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestOOP_static_member(t *testing.T) {

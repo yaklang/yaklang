@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestClosure_FreeValue_Value(t *testing.T) {
