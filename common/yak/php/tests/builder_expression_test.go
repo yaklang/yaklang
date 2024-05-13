@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestExpression_PHP_Name(t *testing.T) {

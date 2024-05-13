@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestYaklangBasic_Variable_InBlock(t *testing.T) {

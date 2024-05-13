@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestUnpack_Line(t *testing.T) {

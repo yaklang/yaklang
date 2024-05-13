@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -18,52 +19,60 @@ type checkFunction func(*ssaapi.Program) error
 
 func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi.Language) {
 	// only in memory
-	if false {
-		opt := make([]ssaapi.Option, 0)
-		if len(languages) > 0 {
-			opt = append(opt, ssaapi.WithLanguage(languages[0]))
-		}
-		progInMemory, err := ssaapi.Parse(code, opt...)
-		if err != nil {
-			t.Fatalf("prog parse error: %v", err)
-		}
-		progInMemory.Show()
+	opt := make([]ssaapi.Option, 0)
+	if len(languages) > 0 {
+		opt = append(opt, ssaapi.WithLanguage(languages[0]))
+	}
+	{
+		prog, err := ssaapi.Parse(code, opt...)
+		assert.Nil(t, err)
+		prog.Show()
 
-		if err := handler(progInMemory); err != nil {
-			t.Fatal("parse check failed in memory: ", err)
-		}
+		err = handler(prog)
+		assert.Nil(t, err)
 	}
 
 	programID := uuid.NewString()
 	// parse with database
 	{
-		opt := make([]ssaapi.Option, 0)
-		if len(languages) > 0 {
-			opt = append(opt, ssaapi.WithLanguage(languages[0]))
-		}
 		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
 		defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), programID)
-		if err != nil {
-			t.Fatalf("prog parse error: %v", err)
-		}
+		assert.Nil(t, err)
 		prog.Show()
 
-		if err := handler(prog); err != nil {
-			t.Fatal("parse check failed with database: ", err)
-		}
+		err = handler(prog)
+		assert.Nil(t, err)
 	}
 
 	// just use database
 	{
-		progFromDB, err := ssaapi.FromDatabase(programID)
-		if err != nil {
-			t.Fatalf("prog parse from database error: %v", err)
-		}
-		if err := handler(progFromDB); err != nil {
-			t.Fatal("parse check failed in database: ", err)
-		}
+		prog, err := ssaapi.FromDatabase(programID)
+		assert.Nil(t, err)
+		err = handler(prog)
+		assert.Nil(t, err)
 	}
+}
+
+func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, language ...ssaapi.Language) {
+	Check(t, code, func(prog *ssaapi.Program) error {
+		results, err := prog.SyntaxFlowWithError(sf)
+		assert.Nil(t, err)
+		for key, value := range results {
+			log.Infof("\nkey: %s", key)
+			value.Show()
+		}
+
+		for k, want := range wants {
+			gotVs, ok := results[k]
+			assert.Truef(t, ok, "key[%s] not found", k)
+			assert.Equal(t, len(want), len(gotVs))
+			for i, got := range gotVs {
+				assert.Equal(t, want[i], got.String())
+			}
+		}
+		return nil
+	}, language...)
 }
 
 func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {

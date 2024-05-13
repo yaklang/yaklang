@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func init() {

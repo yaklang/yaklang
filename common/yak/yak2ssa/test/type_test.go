@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestYaklangBasic_Foreach(t *testing.T) {

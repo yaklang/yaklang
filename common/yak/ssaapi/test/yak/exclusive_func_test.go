@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/yaklang/yaklang/common/utils/dot"
 )
