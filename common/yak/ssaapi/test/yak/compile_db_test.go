@@ -21,6 +21,26 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+func TestDatabase_Audit(t *testing.T) {
+	var code = `
+a = () => {
+	href = request.GetParams("href")	
+	if href.contains("abc") {
+		href = "aaa"
+	}
+	system.getClient().Execute("basc -c " + strconv.Quote(href))
+}
+
+register("/someRoute", a)
+`
+	progName := uuid.NewString()
+	prog, err := ssaapi.Parse(code, ssaapi.WithDatabaseProgramName(progName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = prog
+}
+
 func TestCompileWithDatabase_Scope_Phi(t *testing.T) {
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(`
