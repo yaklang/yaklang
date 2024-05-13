@@ -436,6 +436,7 @@ func (v *Value) GetMember(value *Value) *Value {
 		return nil
 	}
 
+	// TODO: key is string or int
 	key := value.node.String()
 	node := v.node
 	for name, member := range node.GetAllMember() {
@@ -597,7 +598,7 @@ func (v Values) StringEx(flag int) string {
 	for i, v := range v {
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, ssa.SSAOpcode2Name[v.node.GetOpcode()], v)
+			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, ssa.SSAOpcode2Name[v.GetOpcode()], v)
 		case 1:
 			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithSource())
 		}

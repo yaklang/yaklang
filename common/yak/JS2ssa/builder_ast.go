@@ -519,9 +519,9 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			} else {
 				var rValue ssa.Value
 				if s.GetOp().GetText() == "--" {
-					rValue = b.EmitBinOp(ssa.OpSub, lValue.GetValue(), ssa.NewConst(1))
+					rValue = b.EmitBinOp(ssa.OpSub, lValue.GetValue(), b.EmitConstInst(1))
 				} else if s.GetOp().GetText() == "++" {
-					rValue = b.EmitBinOp(ssa.OpAdd, lValue.GetValue(), ssa.NewConst(1))
+					rValue = b.EmitBinOp(ssa.OpAdd, lValue.GetValue(), b.EmitConstInst(1))
 				}
 				b.AssignVariable(lValue, rValue)
 				return lValue.GetValue()
@@ -554,9 +554,9 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 					} else {
 						var value ssa.Value
 						if Unop.GetText() == "--" {
-							value = b.EmitBinOp(ssa.OpSub, b.ReadValueByVariable(variable), ssa.NewConst(1))
+							value = b.EmitBinOp(ssa.OpSub, b.ReadValueByVariable(variable), b.EmitConstInst(1))
 						} else if Unop.GetText() == "++" {
-							value = b.EmitBinOp(ssa.OpAdd, b.ReadValueByVariable(variable), ssa.NewConst(1))
+							value = b.EmitBinOp(ssa.OpAdd, b.ReadValueByVariable(variable), b.EmitConstInst(1))
 						}
 						b.AssignVariable(variable, value)
 						return b.ReadValueByVariable(variable)
@@ -1072,7 +1072,7 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			}
 
 			if s, ok := pro.PropertyName().(*JS.PropertyNameContext); ok {
-				key = ssa.NewConst(s.GetText())
+				key = b.EmitConstInst(s.GetText())
 			}
 
 			if s := pro.SingleExpression(); s != nil {
@@ -1090,7 +1090,7 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			}
 
 			if s := pro.SingleExpression(0); s != nil {
-				key = ssa.NewConst(s.GetText())
+				key = b.EmitConstInst(s.GetText())
 			}
 			if s := pro.SingleExpression(1); s != nil {
 				rv, _ = b.buildSingleExpression(s, false)
@@ -1345,11 +1345,11 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
 		if cond == nil {
-			condition = ssa.NewConst(true)
+			condition = b.EmitConstInst(true)
 		} else {
 			condition = b.buildExpressionSequence(cond)
 			if condition == nil {
-				condition = ssa.NewConst(true)
+				condition = b.EmitConstInst(true)
 			}
 		}
 		return condition
@@ -1382,11 +1382,11 @@ func (b *astbuilder) buildwhileStatement(stmt *JS.WhileStatementContext) {
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
 		if cond == nil {
-			condition = ssa.NewConst(true)
+			condition = b.EmitConstInst(true)
 		} else {
 			condition = b.buildExpressionSequence(cond)
 			if condition == nil {
-				condition = ssa.NewConst(true)
+				condition = b.EmitConstInst(true)
 			}
 		}
 		return condition
@@ -1454,11 +1454,11 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 		var condition ssa.Value
 		// 没有条件就是永真
 		if cond == nil {
-			condition = ssa.NewConst(true)
+			condition = b.EmitConstInst(true)
 		} else {
 			condition = b.buildExpressionSequence(cond)
 			if condition == nil {
-				condition = ssa.NewConst(true)
+				condition = b.EmitConstInst(true)
 			}
 		}
 		return condition

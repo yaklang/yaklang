@@ -61,7 +61,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	for rawKey, member := range c.NormalMember {
 		typ := member.Type
 		value := member.Value
-		key := NewConst(rawKey)
+		key := builder.EmitConstInst(rawKey)
 		log.Infof("apply key: %s, member: %v", key, member)
 
 		objTyp.AddField(key, typ)

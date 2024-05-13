@@ -1644,7 +1644,7 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 			y.EmitConstInst(0), y.EmitConstInst(0))
 	}
 	slice = y.InterfaceAddFieldBuild(len(allExpr),
-		func(i int) ssa.Value { return ssa.NewConst(i) },
+		func(i int) ssa.Value { return y.EmitConstInst(i) },
 		func(i int) ssa.Value { return y.VisitExpression(allExpr[i]) },
 	)
 	if utils.IsNil(slice) {
