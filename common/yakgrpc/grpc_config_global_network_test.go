@@ -3,8 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -24,6 +28,37 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type GetawayClient struct {
+	valid bool
+}
+
+func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
+	if g.valid {
+		return "ok", nil
+	}
+	return "", errors.New("invalid")
+}
+
+func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+	return nil, nil
+}
+
+func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
+	return nil, nil
+}
+
+func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
+	return nil, nil
+}
+
+func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
+
+}
+
+func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
+	return nil, nil
+}
+
 func TestAiApiPriority(t *testing.T) {
 	client, err := NewLocalClient(true)
 	if err != nil {
@@ -32,11 +67,19 @@ func TestAiApiPriority(t *testing.T) {
 
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
-	config.AiApiPriority = []string{"test"}
-	var ok bool
+	config.AiApiPriority = []string{"test", "test1", "test2"}
+	var ok, test1, test2 bool
 	aispec.Register("test", func() aispec.AIGateway {
 		ok = true
 		return nil
+	})
+	aispec.Register("test1", func() aispec.AIGateway {
+		test1 = true
+		return &GetawayClient{valid: false}
+	})
+	aispec.Register("test2", func() aispec.AIGateway {
+		test2 = true
+		return &GetawayClient{valid: true}
 	})
 	client.SetGlobalNetworkConfig(context.Background(), config)
 
@@ -46,22 +89,47 @@ func TestAiApiPriority(t *testing.T) {
 		t.Fatal("ai api priority failed")
 	}
 
+	// if not set ai type, use default config ai type and auto select valid ai type
+	ok = false
+	msg, err := ai.Chat("test")
+	if !ok || !test1 || !test2 {
+		t.Fatal("ai api priority failed")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "ok", msg)
+
 	// is set ai type, but not registered, use default config ai type
+	aispec.Register("ai", func() aispec.AIGateway {
+		return &GetawayClient{valid: false}
+	})
 	ok = false
 	ai.Chat("test", aispec.WithType("ai"))
 	if !ok {
 		t.Fatal("ai api priority failed")
 	}
 
-	// is set ai type, and registered
+	// is set ai type, and registered, and is valid
 	ok = false
 	var ok1 bool
 	aispec.Register("ai", func() aispec.AIGateway {
 		ok1 = true
-		return nil
+		return &GetawayClient{valid: true}
 	})
 	ai.Chat("test", aispec.WithType("ai"))
 	if !(ok1 && !ok) {
+		t.Fatal("ai api priority failed")
+	}
+
+	// is set ai type, and registered, and is invalid
+	ok = false
+	aispec.Register("ai", func() aispec.AIGateway {
+		ok1 = true
+		return &GetawayClient{valid: false}
+	})
+	ai.Chat("test", aispec.WithType("ai"))
+	if !(ok1 && ok) {
 		t.Fatal("ai api priority failed")
 	}
 }
