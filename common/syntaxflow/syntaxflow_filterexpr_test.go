@@ -1,10 +1,11 @@
 package syntaxflow
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
 func TestSyntaxFlowFilter_Search(t *testing.T) {

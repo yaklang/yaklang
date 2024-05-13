@@ -13,6 +13,7 @@ type ConfigItem struct {
 type ValueOperator interface {
 	GetName() string
 	GetNames() []string
+	String() string
 	IsMap() bool
 	IsList() bool
 
@@ -25,7 +26,8 @@ type ValueOperator interface {
 
 	// GetCallActualParams for OpGetCallArgs
 	GetCalled() (ValueOperator, error)
-	GetCallActualParams() (ValueOperator, error)
+	GetCallActualParams(int) (ValueOperator, error)
+	GetAllCallActualParams() (ValueOperator, error)
 
 	// GetMembers for list or objct
 	GetMembersByString(string) (ValueOperator, error)

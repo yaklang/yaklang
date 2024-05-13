@@ -1,8 +1,9 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func AutoValue(i any) ValueOperator {

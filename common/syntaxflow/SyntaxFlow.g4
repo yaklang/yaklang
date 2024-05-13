@@ -27,7 +27,7 @@ filterExpr
     | regexpLiteral                                         # RegexpLiteralFilter
     | '.' nameFilter                                        # FieldFilter
     | filterExpr '.' nameFilter                             # FieldCallFilter
-    | filterExpr '(' acutalParamFilter* ')'                 # FunctionCallFilter
+    | filterExpr '(' actualParamFilter ')'                 # FunctionCallFilter
     | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
     | filterExpr '?{' conditionExpression '}'               # OptionalFilter
     | filterExpr '->' filterExpr                            # NextFilter
@@ -38,12 +38,19 @@ filterExpr
     | filterExpr '#{' (recursiveConfig)? '}->' filterExpr     # ConfiggedTopDefFilter
     ;
 
-acutalParamFilter
-    : ('#>' | '#{' (recursiveConfig)? '}' )? filterStatement ','?   # NamedParam
-    | ','                                                           # EmptyParam
+
+
+actualParamFilter
+    : actualParamFilterItem                # AllParam  
+    | (actualParamFilterItem ',')* (actualParamFilterItem)   # SingleParam  
     ;
 
-recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','?;
+actualParamFilterItem
+    : ( '#>' | '#{' (recursiveConfig)? '}' )? filterStatement  # FilterParam
+    |                                                  # EmptyParam
+    ;
+
+recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','? ;
 recursiveConfigItem: identifier ':' recursiveConfigItemValue;
 recursiveConfigItemValue
     : (identifier | numberLiteral)

@@ -2,9 +2,11 @@ package sfvm
 
 import (
 	"bytes"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
 )
 
 var _ ValueOperator = &ValueList{}
@@ -39,6 +41,13 @@ func (v ValueList) ForEach(h func(i any)) {
 	})
 }
 
+func (v *ValueList) String() string {
+	var res []string
+	for _, v := range v.values {
+		res = append(res, v.String())
+	}
+	return strings.Join(res, "; ")
+}
 func (v *ValueList) GetNames() []string {
 	var res []string
 	for _, v := range v.values {
@@ -47,6 +56,28 @@ func (v *ValueList) GetNames() []string {
 	return res
 }
 
+func (v *ValueList) GetCallActualParams(i int) (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		def, err := v.GetCallActualParams(i)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, def)
+	}
+	return NewValues(res), nil
+}
+func (v *ValueList) GetAllCallActualParams() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		def, err := v.GetAllCallActualParams()
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, def)
+	}
+	return NewValues(res), nil
+}
 
 func (v *ValueList) GetSyntaxFlowDef() (ValueOperator, error) {
 	var res []ValueOperator
