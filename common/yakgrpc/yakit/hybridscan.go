@@ -35,6 +35,8 @@ type HybridScanTask struct {
 	FinishedTargets int64
 
 	ScanConfig []byte
+
+	HybridScanTaskSource string
 }
 
 func GetHybridScanByTaskId(db *gorm.DB, taskId string) (*HybridScanTask, error) {
@@ -67,6 +69,7 @@ func FilterHybridScan(db *gorm.DB, filter *ypb.HybridScanTaskFilter) *gorm.DB {
 	db = bizhelper.FuzzQuery(db, "targets", filter.GetTarget())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_id", filter.GetTaskId())
 	db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
+	db = bizhelper.ExactQueryStringArrayOr(db, "hybrid_scan_task_source", filter.GetHybridScanTaskSource())
 	if filter.GetFromId() > 0 {
 		db = db.Where("id > ?", filter.GetFromId())
 	}
