@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -547,13 +548,21 @@ func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []by
 	if err != nil {
 		return ""
 	}
+	_, body := lowhttp.SplitHTTPPacketFast(req)
+	// 取前200个字节与最后的200个字节
+	if len(body) > 400 {
+		body = utils.BytesJoinSize(400, body[:200], body[len(body)-200:])
+	}
+
 	var params []string
-	fuzzParams := freq.GetCommonParams()
+	fuzzParams := append(freq.GetGetQueryParams(), freq.GetCookieParams()...)
 	for _, r := range fuzzParams {
 		params = append(params, utils.CalcMd5(r.Position(), r.Name()))
 	}
 	sort.Strings(params)
-	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), strings.Join(params, ","), "path-params")
+
+	hash := utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), body, strings.Join(params, ","))
+	return hash
 }
 
 func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) string {

@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	debugName := "retry.yak"
+	debugName := "mixcaller_async.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
