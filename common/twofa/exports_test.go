@@ -2,13 +2,14 @@ package twofa
 
 import (
 	"context"
-	"encoding/base32"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 )
@@ -62,20 +63,26 @@ Host: 127.0.0.1:`+fmt.Sprint(pPort)+`
 }
 
 func TestComputeCode(t *testing.T) {
-	secret := []byte(utils.RandSecret(100))
-	config := &OTPConfig{
-		Secret:     base32.StdEncoding.EncodeToString(secret),
-		WindowSize: 3,
+	for i := 0; i < 1000; i++ {
+
+		secret := []byte(utils.RandNumberStringBytes(12))
+		config := &OTPConfig{
+			Secret:     codec.EncodeBase32(secret),
+			WindowSize: 3,
+			UTC:        true,
+		}
+		url1 := config.ProvisionURIWithIssuer("v1ll4n@yaklang.io", "testv1ll4n")
+		code := config.GetToptUTCCode()
+		result, err := config.Authenticate(fmt.Sprint(code))
+		if err != nil {
+			log.Warnf("invalid code: %v", code)
+			panic(err)
+		}
+		if !result {
+			panic("failed")
+			return
+		}
+		fmt.Println(url1)
+		_ = config
 	}
-	url1 := config.ProvisionURIWithIssuer("v1ll4n@yaklang.io", "testv1ll4n")
-	result, err := config.Authenticate(fmt.Sprint(config.GetToptCode()))
-	if err != nil {
-		panic(err)
-	}
-	if !result {
-		panic("failed")
-		return
-	}
-	fmt.Println(url1)
-	_ = config
 }
