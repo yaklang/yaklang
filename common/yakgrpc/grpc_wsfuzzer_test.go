@@ -1,17 +1,78 @@
 package yakgrpc
 
 import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/types/known/anypb"
-	"testing"
-	"time"
 )
+
+func TestGRPCMUSTPASS_WsFuzzer_Fuzztag(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
+	defer cancel()
+
+	host, port := utils.DebugMockEchoWs("fuzztag")
+	log.Infof("addr: %s:%d", host, port)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	stream, err := client.CreateWebsocketFuzzer(ctx)
+	require.NoError(t, err, "create websocket fuzzer error")
+	err = stream.Send(&ypb.ClientWebsocketRequest{
+		IsTLS: false,
+		UpgradeRequest: []byte(fmt.Sprintf(`GET /fuzztag HTTP/1.1
+Host: %s
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Cache-Control: no-cache
+Pragma: no-cache
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: keep-alive, Upgrade
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
+Accept: */*
+`, utils.HostPort(host, port))),
+		TotalTimeoutSeconds: 20,
+	})
+	require.NoError(t, err, "send websocket upgrade request error")
+	err = stream.Send(&ypb.ClientWebsocketRequest{
+		ToServer: []byte("{{int(1-10)}}"),
+	})
+	require.NoError(t, err, "send websocket data error")
+
+	count := 0
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			log.Errorf("websocket fuzzer recv error: %s", err)
+			break
+		}
+		if msg.GetFromServer() {
+			data := msg.GetData()
+			require.Contains(t, string(data), "server: ", "server response error")
+			count++
+			if count == 10 {
+				cancel()
+				break
+			}
+		}
+	}
+
+	require.Equal(t, 10, count, "server response count error")
+}
 
 func TestWsFuzzer(t *testing.T) {
 	client, err := NewLocalClient()
@@ -64,7 +125,6 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
 	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
 	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-
 }
 
 func TestPBTest(t *testing.T) {
@@ -96,7 +156,7 @@ func TestPBTest(t *testing.T) {
 
 		time.Sleep(time.Second)
 	}
-	//spew.Dump(anyPB.AsMap())
+	// spew.Dump(anyPB.AsMap())
 	jsonRaw, err := protojson.Marshal(anyPB)
 	if err != nil {
 		panic(err)
