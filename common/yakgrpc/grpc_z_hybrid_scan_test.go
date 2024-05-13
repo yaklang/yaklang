@@ -375,44 +375,48 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	target1 := utils.RandStringBytes(10)
 	target2 := utils.RandStringBytes(10)
+	status1 := utils.RandStringBytes(5)
+	status2 := utils.RandStringBytes(5)
+	status3 := utils.RandStringBytes(5)
+	status4 := utils.RandStringBytes(5)
 	var DateTask = []*yakit.HybridScanTask{
 		{
-			Status:               yakit.HYBRIDSCAN_DONE,
+			Status:               status1,
 			Targets:              target1,
 			HybridScanTaskSource: "test",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_ERROR,
+			Status:               status2,
 			Targets:              target1,
 			HybridScanTaskSource: "test",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_EXECUTING,
+			Status:               status3,
 			Targets:              target1,
 			HybridScanTaskSource: "test",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_PAUSED,
+			Status:               status4,
 			Targets:              target1,
 			HybridScanTaskSource: "test",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_DONE,
+			Status:               status1,
 			Targets:              target2,
 			HybridScanTaskSource: "demo",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_ERROR,
+			Status:               status2,
 			Targets:              target2,
 			HybridScanTaskSource: "demo",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_EXECUTING,
+			Status:               status3,
 			Targets:              target2,
 			HybridScanTaskSource: "demo",
 		},
 		{
-			Status:               yakit.HYBRIDSCAN_PAUSED,
+			Status:               status4,
 			Targets:              target2,
 			HybridScanTaskSource: "demo",
 		},
@@ -443,7 +447,7 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	rsp, err = client.QueryHybridScanTask(context.Background(), &ypb.QueryHybridScanTaskRequest{
 		Pagination: &ypb.Paging{},
 		Filter: &ypb.HybridScanTaskFilter{
-			Status: []string{yakit.HYBRIDSCAN_ERROR, yakit.HYBRIDSCAN_DONE},
+			Status: []string{status2, status1},
 		},
 	})
 	if err != nil {
