@@ -39,7 +39,6 @@ func (o *OTPServer) handle(conn net.Conn) error {
 	pathStr := lowhttp.GetHTTPRequestPath(raw)
 	log.Infof("request path: %#v need to verify code: %#v", pathStr, results)
 	if codec.Atoi(results) != o.config.GetToptUTCCode() {
-
 		return utils.Error("y-t-verify-code not match")
 	}
 	isHttps := strings.HasPrefix(strings.ToLower(o.to), "https://")
