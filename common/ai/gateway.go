@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,7 +15,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/openai"
 )
 
-func createAIGateway(t string) aispec.AIGateway {
+func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error {
 	createAIGatewayByType := func(typ string) aispec.AIGateway {
 		gw, ok := aispec.Lookup(typ)
 		if !ok {
@@ -23,25 +24,38 @@ func createAIGateway(t string) aispec.AIGateway {
 		return gw
 	}
 	if utils.StringArrayContains(aispec.RegisteredAIGateways(), t) {
-		return createAIGatewayByType(t)
-	} else {
-		if t != "" {
-			log.Errorf("unsupported ai type: %s, use default config ai type", t)
-		}
-		cfg := yakit.GetNetworkConfig()
-		if cfg == nil {
-			return nil
-		}
-		for _, typ := range cfg.AiApiPriority {
-			agent := createAIGatewayByType(typ)
-			if agent != nil {
-				return agent
-			} else {
-				log.Errorf("create ai agent by type %s failed", typ)
+		gw := createAIGatewayByType(t)
+		if gw != nil {
+			if cb(t, gw) {
+				return nil
 			}
 		}
+	}
+	if t != "" {
+		log.Warnf("unsupported ai type: %s, use default config ai type", t)
+	}
+	cfg := yakit.GetNetworkConfig()
+	if cfg == nil {
 		return nil
 	}
+	for _, typ := range cfg.AiApiPriority {
+		agent := createAIGatewayByType(typ)
+		if agent != nil {
+			if cb(typ, agent) {
+				return nil
+			}
+		} else {
+			log.Warnf("create ai agent by type %s failed", typ)
+		}
+	}
+	return errors.New("not found valid ai agent")
+}
+func createAIGateway(t string) aispec.AIGateway {
+	gw, ok := aispec.Lookup(t)
+	if !ok {
+		return nil
+	}
+	return gw
 }
 
 /*
@@ -112,13 +126,21 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	for _, p := range opts {
 		p(config)
 	}
-
-	agent := createAIGateway(config.Type)
-	if agent == nil {
-		return "", utils.Error("not found valid ai agent config")
+	var responseRsp string
+	var err error
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
+		gateway.LoadOption(opts...)
+		responseRsp, err = gateway.Chat(msg)
+		if err != nil {
+			log.Warnf("chat failed: %s", err)
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return "", err
 	}
-	agent.LoadOption(opts...)
-	return agent.Chat(msg)
+	return responseRsp, nil
 }
 
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
