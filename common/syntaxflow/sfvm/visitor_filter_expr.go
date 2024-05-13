@@ -47,15 +47,14 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		y.EmitSearchRegexp(r.String())
 		return nil
 	case *sf.FieldFilterContext:
-		y.EmitGetMembers()
-		return y.VisitFilterExpr(ret.FilterExpr())
+		y.EmitGetMembers(ret.NameFilter().GetText())
+		// return y.VisitFilterExpr(ret.id())
 	case *sf.FieldCallFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
+		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {
 			return err
 		}
-		y.EmitGetMembers()
-		return y.VisitFilterExpr(ret.FilterExpr(1))
+		y.EmitGetMembers(ret.NameFilter().GetText())
 	case *sf.FunctionCallFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {

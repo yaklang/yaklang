@@ -171,7 +171,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		case OpGetMembers:
 			s.debugSubLog(">> pop")
 			value := s.stack.Pop()
-			valueOperator, err := value.GetMembers()
+			valueOperator, err := value.GetMembersByString(i.UnaryStr)
 			if err != nil {
 				s.debugSubLog("E: %v", err)
 				return err
@@ -181,7 +181,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Error("E: GetMembers should return values list")
 			}
 			l := valuesLen(valueOperator)
-			s.debugSubLog("<< push members [%v]", l)
+			s.debugSubLog("<< push members [%v]: %v", l, valueOperator)
 			s.stack.Push(valueOperator)
 		case OpPop:
 			if s.stack.Len() == 0 {
