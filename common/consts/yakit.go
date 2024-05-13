@@ -3,6 +3,7 @@ package consts
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -606,7 +607,7 @@ func GetGormProjectDatabase() *gorm.DB {
 		if utils.IsDir(profileDatabaseName) {
 			os.RemoveAll(profileDatabaseName)
 		}
-		gormPluginDatabase, err = gorm.Open("sqlite3", profileDatabaseName)
+		gormPluginDatabase, err = gorm.Open("sqlite3", fmt.Sprintf("%s?cache=shared&mode=rwc", profileDatabaseName))
 		if err != nil {
 			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
 		} else {
@@ -639,13 +640,16 @@ func GetGormProjectDatabase() *gorm.DB {
 }
 
 func configureAndOptimizeDB(db *gorm.DB) {
+	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
 	db.DB().SetConnMaxLifetime(time.Hour)
 	db.DB().SetMaxIdleConns(10)
-	db.DB().SetMaxOpenConns(100)
+	// set MaxOpenConns to disable connections pool, for write speed and "database is locked" error
+	db.DB().SetMaxOpenConns(1)
 
 	db.Exec("PRAGMA synchronous = OFF;")
 	// db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
-	db.Exec("PRAGMA journal_mode = OFF;")
+	// set journal_mode for write speed
+	db.Exec("PRAGMA journal_mode = WAL;")
 	db.Exec("PRAGMA temp_store = MEMORY;")
 	db.Exec("PRAGMA cache_size = 8000;")
 	db.Exec("PRAGMA busy_timeout = 10000;")
