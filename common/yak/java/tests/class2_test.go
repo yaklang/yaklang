@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestOOP_1(t *testing.T) {

@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestJava_OOP_Var_member(t *testing.T) {
