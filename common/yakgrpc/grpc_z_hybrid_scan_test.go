@@ -377,36 +377,44 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	target2 := utils.RandStringBytes(10)
 	var DateTask = []*yakit.HybridScanTask{
 		{
-			Status:  yakit.HYBRIDSCAN_DONE,
-			Targets: target1,
+			Status:               yakit.HYBRIDSCAN_DONE,
+			Targets:              target1,
+			HybridScanTaskSource: "test",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_ERROR,
-			Targets: target1,
+			Status:               yakit.HYBRIDSCAN_ERROR,
+			Targets:              target1,
+			HybridScanTaskSource: "test",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_EXECUTING,
-			Targets: target1,
+			Status:               yakit.HYBRIDSCAN_EXECUTING,
+			Targets:              target1,
+			HybridScanTaskSource: "test",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_PAUSED,
-			Targets: target1,
+			Status:               yakit.HYBRIDSCAN_PAUSED,
+			Targets:              target1,
+			HybridScanTaskSource: "test",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_DONE,
-			Targets: target2,
+			Status:               yakit.HYBRIDSCAN_DONE,
+			Targets:              target2,
+			HybridScanTaskSource: "demo",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_ERROR,
-			Targets: target2,
+			Status:               yakit.HYBRIDSCAN_ERROR,
+			Targets:              target2,
+			HybridScanTaskSource: "demo",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_EXECUTING,
-			Targets: target2,
+			Status:               yakit.HYBRIDSCAN_EXECUTING,
+			Targets:              target2,
+			HybridScanTaskSource: "demo",
 		},
 		{
-			Status:  yakit.HYBRIDSCAN_PAUSED,
-			Targets: target2,
+			Status:               yakit.HYBRIDSCAN_PAUSED,
+			Targets:              target2,
+			HybridScanTaskSource: "demo",
 		},
 	}
 	for _, task := range DateTask {
@@ -430,7 +438,7 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	if err != nil {
 		return
 	}
-	require.Equal(t, 4, len(rsp.Data))
+	require.Equal(t, 4, len(rsp.Data), "fuzzy search target fail")
 
 	rsp, err = client.QueryHybridScanTask(context.Background(), &ypb.QueryHybridScanTaskRequest{
 		Pagination: &ypb.Paging{},
@@ -441,5 +449,16 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	if err != nil {
 		return
 	}
-	require.Equal(t, 4, len(rsp.Data))
+	require.Equal(t, 4, len(rsp.Data), "status search fail")
+
+	rsp, err = client.QueryHybridScanTask(context.Background(), &ypb.QueryHybridScanTaskRequest{
+		Pagination: &ypb.Paging{},
+		Filter: &ypb.HybridScanTaskFilter{
+			HybridScanTaskSource: []string{"test"},
+		},
+	})
+	if err != nil {
+		return
+	}
+	require.Equal(t, 4, len(rsp.Data), "source search fail")
 }
