@@ -10,6 +10,8 @@ type SFVMOpCode int
 const (
 	OpPass SFVMOpCode = iota
 
+	OpPushInput
+
 	// OpPushNumber and OpPushString and OpPushBool can push literal into stack
 	OpPushNumber
 	OpPushString
@@ -85,6 +87,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" (len:%v) %v", "push", len(s.UnaryStr), strconv.Quote(s.UnaryStr))
 	case OpPushNumber:
 		return fmt.Sprintf(verboseLen+" %v", "push", s.UnaryInt)
+	case OpPushInput:
+		return fmt.Sprintf(verboseLen+" %v", "push$input", s.UnaryStr)
 
 	case OpPushSearchGlob:
 		return fmt.Sprintf(verboseLen+" %v", "push$glob", s.UnaryStr)

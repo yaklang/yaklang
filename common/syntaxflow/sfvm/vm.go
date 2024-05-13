@@ -2,13 +2,14 @@ package sfvm
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
-	"sync"
 )
 
 type SyntaxFlowVirtualMachine struct {
@@ -51,6 +52,9 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 }
 
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
+	if text == "" {
+		return utils.Errorf("SyntaxFlow compile error: text is nil")
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
@@ -66,14 +70,17 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	astParser.AddErrorListener(errLis)
 
 	result := NewSyntaxFlowVisitor()
-	result.text = text
-	result.VisitFlow(astParser.Flow())
-	var frame = result.CreateFrame(s.vars)
-	s.frames = append(s.frames, frame)
-
+	flow := astParser.Flow()
+	// fmt.Printf("%v\n", flow.ToStringTree(nil, astParser))
 	if len(errLis.GetErrors()) > 0 {
 		return utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrors())
 	}
+
+	result.text = text
+	result.VisitFlow(flow)
+	var frame = result.CreateFrame(s.vars)
+	s.frames = append(s.frames, frame)
+
 	return nil
 }
 
@@ -89,9 +96,6 @@ func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) *omap.OrderedMap[string
 		}
 		if frame.stack.Len() > 0 {
 			log.Infof("stack unbalanced: %v", frame.stack.Len())
-		}
-		if frame.stack.HaveLastStackValue() {
-			result.Push(frame.stack.LastStackValue())
 		}
 	}
 	s.vars.Map(func(s string, a ValueOperator) (string, ValueOperator, error) {

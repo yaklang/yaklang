@@ -2,9 +2,6 @@ package java
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"strings"
 	"testing"
 )
 
@@ -835,7 +832,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 	}
 }
 
-// todo：待完善java官方库的方法
+// TODO：待完善java官方库的方法
 //func Test_Special_Exec_Case(t *testing.T) {
 //	tests := []struct {
 //		name   string
@@ -1460,28 +1457,6 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
 			testExecTopDef(t, tt.code, tt.expect, tt.isSink)
 		})
 	}
-}
-
-func testExecTopDef(t *testing.T, code string, expect string, isSink bool) {
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage("java"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Show()
-	results, err := prog.SyntaxFlowWithError("Runtime.getRuntime().exec()")
-	if err != nil {
-		t.Fatal(err)
-	}
-	topDef := results.GetTopDefs(ssaapi.WithAllowCallStack(true))
-	topDef.ShowWithSource()
-
-	count := strings.Count(topDef.StringEx(0), expect)
-	if isSink {
-		assert.Equal(t, 1, count)
-	} else {
-		assert.Equal(t, 0, count)
-	}
-
 }
 
 func createAllCode(code string) string {

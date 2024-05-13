@@ -235,7 +235,25 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				s.debugSubLog("-")
 				return
 			}
-			s.debugSubLog(">> peek top stack data to ref: %v", i.UnaryStr)
+			s.debugSubLog(">> from ref: %v ", i.UnaryStr)
+			vs, ok := s.symbolTable.Get(i.UnaryStr)
+			if ok {
+				s.debugSubLog(">> get value: %v ", vs)
+				s.stack.Push(vs)
+			} else {
+				s.debugSubLog(">> no this variable %v ", i.UnaryStr)
+			}
+		case OpUpdateRef:
+			if i.UnaryStr == "" {
+				s.debugSubLog("-")
+				return
+			}
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Error("BUG: get top defs failed, empty stack")
+			}
+			s.symbolTable.Set(i.UnaryStr, value)
 		default:
 			msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 			panic(msg)

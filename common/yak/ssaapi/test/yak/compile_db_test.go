@@ -2,15 +2,14 @@ package ssaapi
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
-	"github.com/samber/lo"
-	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -268,7 +268,6 @@ a()
 }
 
 func TestCompile_FromDatabase(t *testing.T) {
-	programID := uuid.NewString()
 	code := `
 	a = (i) => {
 		return i + 1
@@ -276,37 +275,9 @@ func TestCompile_FromDatabase(t *testing.T) {
 	target = a(12)
 	`
 
-	check := func(prog *ssaapi.Program, msg string) {
-		result, err := prog.SyntaxFlowWithError(`target`)
-
-		require.Nilf(t, err, "syntax flow error %s", err)
-		log.Infof("syntax flow: %v", result)
-		tops := result.GetTopDefs()
-		log.Infof("tops: %v", tops)
-		require.Equal(t, 2, len(tops), msg+": tops length should 2")
-		tops_string := lo.Map(tops, func(v *ssaapi.Value, _ int) string {
-			return v.String()
+	ssatest.CheckSyntaxFlow(t, code,
+		`target #-> * as $target`,
+		map[string][]string{
+			"target": {"12", "1"},
 		})
-		require.Equal(t, []string{
-			"12", "1",
-		}, tops_string, msg+": tops should be [Function-a, 12]")
-	}
-
-	prog, err := ssaapi.Parse(
-		code,
-		ssaapi.WithDatabaseProgramName(programID),
-	)
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), programID)
-	require.Nilf(t, err, "parse code error %s", err)
-
-	prog.Show()
-
-	check(prog, "parse from source")
-
-	progFromDB, err := ssaapi.FromDatabase(
-		programID,
-	)
-	require.Nilf(t, err, "parse from database error %s", err)
-
-	check(progFromDB, "get from database")
 }

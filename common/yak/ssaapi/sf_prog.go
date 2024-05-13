@@ -64,7 +64,7 @@ func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
 }
 
-func (p *Program) SyntaxFlow(i string, opts ...any) Values {
+func (p *Program) SyntaxFlow(i string, opts ...any) map[string]Values {
 	vals, err := p.SyntaxFlowWithError(i)
 	if err != nil {
 		log.Warnf("exec syntaxflow: %#v failed: %v", i, err)
@@ -73,11 +73,7 @@ func (p *Program) SyntaxFlow(i string, opts ...any) Values {
 	return vals
 }
 
-func (p *Program) SF(i string, opts ...any) Values {
-	return p.SyntaxFlow(i, opts...)
-}
-
-func (p *Program) SyntaxFlowWithError(i string, opts ...any) (Values, error) {
+func (p *Program) SyntaxFlowWithError(i string, opts ...any) (map[string]Values, error) {
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
 	vm.Debug()
 	err := vm.Compile(i)
@@ -89,8 +85,13 @@ func (p *Program) SyntaxFlowWithError(i string, opts ...any) (Values, error) {
 		return nil, utils.Errorf("SyntaxFlow feed %#v failed: %v", i, err)
 	}
 
-	var vals []*Value
-	for _, v := range results.Values() {
+	// var vals ake([]*Value
+	ret := make(map[string]Values)
+	for key, v := range results.GetMap() {
+		vals, ok := ret[key]
+		if !ok {
+			vals = make(Values, 0)
+		}
 		switch ret := v.(type) {
 		case *Value:
 			vals = append(vals, ret)
@@ -105,8 +106,9 @@ func (p *Program) SyntaxFlowWithError(i string, opts ...any) (Values, error) {
 		default:
 			log.Warnf("cannot handle type(raw): %T", i)
 		}
+		ret[key] = vals
 	}
-	return vals, nil
+	return ret, nil
 }
 
 func SFValueListToValues(list *sfvm.ValueList) (Values, error) {
