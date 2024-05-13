@@ -15,16 +15,16 @@ func (v *Value) IsMap() bool {
 
 func (v *Value) GetNames() []string {
 	var results []string
-	if v.IsCall() {
-		results = append(results, v.GetCallee().GetNames()...)
-	}
-	if v.IsMember() {
-		results = append(results, v.GetKey().GetNames()...)
-	}
-	if v.IsConstInst() {
-		results = append(results, codec.AnyToString(v.GetConstValue()))
-	}
-	results = append(results, v.GetName())
+	// if v.IsCall() {
+	// 	results = append(results, v.GetCallee().GetNames()...)
+	// }
+	// if v.IsMember() {
+	// 	results = append(results, v.GetKey().GetNames()...)
+	// }
+	// if v.IsConstInst() {
+	// 	results = append(results, codec.AnyToString(v.GetConstValue()))
+	// }
+	results = append(results, v.String())
 	return results
 }
 
@@ -73,11 +73,15 @@ func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 
 func (v *Value) GetMembers() (sfvm.ValueOperator, error) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
-		return v.GetAllMember(), nil
 	}
-	return v.GetUsers(), nil
 }
 
+func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
+	return v.GetUsers(), nil
+}
+func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
+	return v.GetOperands(), nil
+}
 func (v *Value) GetSyntaxFlowTopDef(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
 	return v.GetTopDefs(), nil
 }

@@ -12,6 +12,9 @@ var _ sfvm.ValueOperator = &Program{}
 func (p *Program) GetName() string {
 	return p.Program.GetProgramName()
 }
+func (p *Program) String() string {
+	return p.Program.GetProgramName()
+}
 
 func (p *Program) IsMap() bool { return false }
 
@@ -52,6 +55,12 @@ func (p *Program) GetCallActualParams() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported call actual params")
 }
 
+func (p *Program) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
+	return nil, utils.Error("ssa.Program is not supported syntax flow def")
+}
+func (p *Program) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
+	return nil, utils.Error("ssa.Program is not supported syntax flow use")
+}
 func (p *Program) GetSyntaxFlowTopDef(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow top def")
 }

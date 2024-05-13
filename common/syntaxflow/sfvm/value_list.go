@@ -47,10 +47,30 @@ func (v *ValueList) GetNames() []string {
 	return res
 }
 
-func (v *ValueList) GetCallActualParams() (ValueOperator, error) {
-	return nil, utils.Error("list cannot be handled in ValueList.GetCallActualParams")
+
+func (v *ValueList) GetSyntaxFlowDef() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		def, err := v.GetSyntaxFlowDef()
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, def)
+	}
+	return NewValues(res), nil
 }
 
+func (v *ValueList) GetSyntaxFlowUse() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		use, err := v.GetSyntaxFlowUse()
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, use)
+	}
+	return NewValues(res), nil
+}
 func (v *ValueList) GetSyntaxFlowTopDef(config ...*ConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
