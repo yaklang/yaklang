@@ -28,8 +28,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	defer manager.Stop()
 	taskId := manager.TaskId()
 	taskRecorder := &yakit.HybridScanTask{
-		TaskId: taskId,
-		Status: yakit.HYBRIDSCAN_EXECUTING,
+		TaskId:               taskId,
+		Status:               yakit.HYBRIDSCAN_EXECUTING,
+		HybridScanTaskSource: firstRequest.GetHybridScanTaskSource(),
 	}
 	err := yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
 	if err != nil {
