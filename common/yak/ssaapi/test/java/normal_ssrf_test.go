@@ -2,9 +2,6 @@ package java
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"strings"
 	"testing"
 )
 
@@ -58,24 +55,6 @@ func Test_HTTP_SSRF(t *testing.T) {
 			tt.code = createHttpUtilCode(tt.code)
 			testRequestTopDef(t, tt.code, tt.expect, tt.isSink)
 		})
-	}
-}
-
-func testRequestTopDef(t *testing.T, code string, expect string, isSink bool) {
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage("java"))
-	prog.Show()
-	results, err := prog.SyntaxFlowWithError(".createDefault().execute()")
-	if err != nil {
-		t.Fatal(err)
-	}
-	topDef := results.GetTopDefs(ssaapi.WithAllowCallStack(true))
-	topDef.Show()
-
-	count := strings.Count(topDef.StringEx(0), expect)
-	if isSink {
-		assert.Equal(t, 1, count)
-	} else {
-		assert.Equal(t, 0, count)
 	}
 }
 

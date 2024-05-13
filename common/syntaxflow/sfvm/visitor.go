@@ -43,9 +43,9 @@ func (y *SyntaxFlowVisitor) VisitFilters(raw sf.IFiltersContext) interface{} {
 	}
 
 	for _, stmt := range i.AllFilterStatement() {
+		y.EmitPushInput()
 		y.VisitFilterStatement(stmt)
 	}
-	y.EmitPop()
 	return nil
 }
 
@@ -64,11 +64,9 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
 		panic(msg)
 	}
-	y.EmitPop()
 
-	if i.FilterExpr() != nil && i.RefVariable() != nil {
+	if i.RefVariable() != nil {
 		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
-		y.EmitNewRef(varName)
 		y.EmitUpdate(varName)
 	}
 

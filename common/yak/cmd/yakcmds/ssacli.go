@@ -77,7 +77,10 @@ var SSACompilerCommands = []*cli.Command{
 					return nil
 				}
 				log.Infof("syntax flow query result:")
-				result.Show()
+				for k, r := range result {
+					log.Infof("\nkey:%v", k)
+					r.Show()
+				}
 				return nil
 			}
 

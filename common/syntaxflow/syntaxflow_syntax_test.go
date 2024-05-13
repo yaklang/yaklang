@@ -61,6 +61,9 @@ func TestSyntaxInOne(t *testing.T) {
 		"a#{depth:1, " + "\nkey:value}->b",
 		"a-{depth:1, " + "\nkey:value,}->b",
 		"a#{depth:1, " + "\nkey:value,}->b",
+		`*.mem as $a
+		$a.exec() as $exec
+		`,
 	} {
 		checkSyntax(i, t)
 	}
