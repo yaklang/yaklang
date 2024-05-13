@@ -26,7 +26,7 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 	allExpr := s.AllExpression()
 
 	obj := b.InterfaceAddFieldBuild(len(allExpr),
-		func(i int) ssa.Value { return ssa.NewConst(i) },
+		func(i int) ssa.Value { return b.EmitConstInst(i) },
 		func(i int) ssa.Value {
 			return b.buildExpression(allExpr[i].(*yak.ExpressionContext))
 		},
