@@ -57,11 +57,27 @@ func (v *Value) RegexpMatch(regexp *regexp.Regexp) (bool, sfvm.ValueOperator, er
 	return false, nil, nil
 }
 
-func (v *Value) GetCallActualParams() (sfvm.ValueOperator, error) {
+func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 	if !v.IsCall() {
 		return nil, utils.Error("ssa.Value is not a call instruction")
 	}
 	return v.GetCallArgs(), nil
+}
+
+func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
+	if !v.IsCall() {
+		return nil, utils.Error("ssa.Value is not a call instruction")
+	}
+	if c, ok := ssa.ToCall(v.node); ok {
+		if len(c.Args) < i {
+			return NewValue(c.Args[i]), nil
+		} else {
+			return nil, utils.Errorf("ssa.Value %v has %d argument,but index %v", v.String(), len(c.Args), i)
+		}
+	} else {
+		return nil, utils.Errorf("ssa.Value %v cannot get call actual params %v", v.String(), i)
+	}
+	// return v.GetCallArgs(), nil
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {

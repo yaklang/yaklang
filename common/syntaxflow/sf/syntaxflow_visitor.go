@@ -64,8 +64,14 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedDeepNextFilter.
 	VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#NamedParam.
-	VisitNamedParam(ctx *NamedParamContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#AllParam.
+	VisitAllParam(ctx *AllParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#SingleParam.
+	VisitSingleParam(ctx *SingleParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterParam.
+	VisitFilterParam(ctx *FilterParamContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#EmptyParam.
 	VisitEmptyParam(ctx *EmptyParamContext) interface{}

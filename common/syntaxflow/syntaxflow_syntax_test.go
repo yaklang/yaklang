@@ -1,8 +1,9 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
 func checkSyntax(i string, t *testing.T) {
@@ -30,6 +31,18 @@ func TestSyntaxInOne(t *testing.T) {
 		"b?{!1}",
 		"b?{>1}",
 		"b?{!/abc/}",
+		"f()",
+		"f() as $a",
+		"f(*,)",
+		"f(* as $arg1,)",
+		"f(,*)",
+		"f(*,*)",
+		"f(*,*,)",
+		"f(,*,*,)",
+		"f(,*,*)",
+		"runtime.exec",
+		"runtime.exec()",
+		"runtime.exec(,,)",
 		"/(?i)runtime/.exec(,,,#>*exec)",
 		"exec as $rough",
 		"/(?i)runtime/.exec(,,,#>*exec) as $a",

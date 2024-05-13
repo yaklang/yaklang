@@ -11,6 +11,7 @@ const (
 	OpPass SFVMOpCode = iota
 
 	OpPushInput
+	OpDuplicate
 
 	// OpPushNumber and OpPushString and OpPushBool can push literal into stack
 	OpPushNumber
@@ -24,8 +25,11 @@ const (
 	OpPushSearchRegexp
 
 	// handle function call
+	opGetCall
 	OpGetCallArgs
+	OpGetAllCallArgs
 	OpGetMembers
+	// use def chain
 	OpGetUsers
 	OpGetBottomUsers
 	OpGetDefs
@@ -87,6 +91,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" (len:%v) %v", "push", len(s.UnaryStr), strconv.Quote(s.UnaryStr))
 	case OpPushNumber:
 		return fmt.Sprintf(verboseLen+" %v", "push", s.UnaryInt)
+	case OpDuplicate:
+		return fmt.Sprintf(verboseLen+" %v", "duplicate", s.UnaryStr)
 	case OpPushInput:
 		return fmt.Sprintf(verboseLen+" %v", "push$input", s.UnaryStr)
 
@@ -97,8 +103,12 @@ func (s *SFI) String() string {
 	case OpPushSearchRegexp:
 		return fmt.Sprintf(verboseLen+" %v", "push$regexp", s.UnaryStr)
 
+	case opGetCall:
+		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
+	case OpGetAllCallArgs:
+		return fmt.Sprintf(verboseLen+" %v", "getAllCallArgs", s.UnaryStr)
 	case OpGetCallArgs:
-		return fmt.Sprintf(verboseLen+" %v", "getCallArgs", s.UnaryStr)
+		return fmt.Sprintf(verboseLen+" %v", "getCallArgs", s.UnaryInt)
 	case OpGetMembers:
 		return fmt.Sprintf(verboseLen+" %v", "getMembers", s.UnaryStr)
 	case OpGetUsers:

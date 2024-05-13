@@ -83,7 +83,15 @@ func (v *BaseSyntaxFlowVisitor) VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepN
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitNamedParam(ctx *NamedParamContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitAllParam(ctx *AllParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitSingleParam(ctx *SingleParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterParam(ctx *FilterParamContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
