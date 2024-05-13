@@ -12,10 +12,15 @@ import (
 	"encoding/base32"
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/url"
 	"rsc.io/qr"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -148,33 +153,41 @@ func (c *OTPConfig) GetToptPNG(issuer, account string) ([]byte, error) {
 // Authenticate a one-time-password against the given OTPConfig
 // Returns true/false if the authentication was successful.
 // Returns error if the password is incorrectly formatted (not a zero-padded 6 or non-zero-padded 8 digit number).
-func (c *OTPConfig) Authenticate(password string) (bool, error) {
+func (c *OTPConfig) Authenticate(passwordRaw any) (bool, error) {
+	var password string
 
+	var code int64
 	var scratch bool
 
-	switch {
-	case len(password) == 6 && password[0] >= '0' && password[0] <= '9':
-		break
-	case len(password) == 8 && password[0] >= '1' && password[0] <= '9':
-		scratch = true
-		break
-	default:
-		return false, ErrInvalidCode
+	switch ret := passwordRaw.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		code = int64(codec.Atoi(fmt.Sprint(ret)))
+	case string:
+		if len(ret) == 8 && ret[0] >= '1' && ret[0] <= '9' {
+			scratch = true
+		}
+		password = ret
+	case []byte:
+		if len(ret) == 8 && ret[0] >= '1' && ret[0] <= '9' {
+			scratch = true
+		}
+		password = string(ret)
 	}
 
-	code, err := strconv.Atoi(password)
-
-	if err != nil {
-		return false, ErrInvalidCode
+	if code == 0 {
+		if password == "" {
+			return false, utils.Errorf("invalid code in password: %#v", passwordRaw)
+		}
+		code = int64(codec.Atoi(strings.TrimLeft(password, "0")))
 	}
 
 	if scratch {
-		return c.checkScratchCodes(code), nil
+		return c.checkScratchCodes(int(code)), nil
 	}
 
 	// we have a counter value we can use
 	if c.HotpCounter > 0 {
-		return c.checkHotpCode(code), nil
+		return c.checkHotpCode(int(code)), nil
 	}
 
 	var t0 int
@@ -184,7 +197,8 @@ func (c *OTPConfig) Authenticate(password string) (bool, error) {
 	} else {
 		t0 = int(time.Now().Unix() / 30)
 	}
-	return c.checkTotpCode(t0, code), nil
+	log.Infof("start to checkout totp code: %#v origin: %#v", code, password)
+	return c.checkTotpCode(t0, int(code)), nil
 }
 
 // ProvisionURI generates a URI that can be turned into a QR code to configure
