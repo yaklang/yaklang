@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -153,6 +154,17 @@ func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {
 
 func (v *SyntaxFlowVisitor) EmitPushInput() {
 	v.codes = append(v.codes, &SFI{OpCode: OpPushInput})
+}
+func (v *SyntaxFlowVisitor) EmitDuplicate() {
+	v.codes = append(v.codes, &SFI{OpCode: OpDuplicate})
+}
+
+func (v *SyntaxFlowVisitor) EmitGetCall() {
+	v.codes = append(v.codes, &SFI{OpCode: opGetCall})
+}
+
+func (v *SyntaxFlowVisitor) EmitPushAllCallArgs() {
+	v.codes = append(v.codes, &SFI{OpCode: OpGetAllCallArgs})
 }
 
 func (v *SyntaxFlowVisitor) Show() {

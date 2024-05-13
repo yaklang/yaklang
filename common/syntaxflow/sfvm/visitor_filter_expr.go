@@ -1,12 +1,12 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/log"
+	"reflect"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"regexp"
-	"strings"
 )
 
 func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
@@ -60,21 +60,8 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
-		actualParamsAtLeast := ret.AllAcutalParamFilter()
-		y.EmitPushCallArgs(len(actualParamsAtLeast))
-		for idx, actualFilter := range actualParamsAtLeast {
-			switch ret := actualFilter.(type) {
-			case *sf.EmptyParamContext:
-				continue
-			case *sf.NamedParamContext:
-				y.EmitListIndex(idx)
-				t := ret.GetText()
-				if strings.HasPrefix(t, "#") {
-					y.EmitGetTopDef()
-				}
-			}
-		}
-		//y.EmitPop()
+		y.EmitGetCall()
+		y.VisitActualParamFilter(ret.ActualParamFilter())
 	case *sf.FieldIndexFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {
@@ -198,4 +185,37 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(i sf.INameFilterContext) error {
 		return nil
 	}
 	return utils.Error("BUG: in nameFilter, unknown type")
+}
+
+func (y *SyntaxFlowVisitor) VisitActualParamFilter(i sf.IActualParamFilterContext) error {
+
+	handlerItem := func(ret *sf.FilterParamContext) {
+		if ret.FilterStatement() != nil {
+			y.VisitFilterStatement(ret.FilterStatement())
+		}
+		// TODO: handler recursive config
+	}
+
+	switch ret := i.(type) {
+	case *sf.AllParamContext:
+		switch item := ret.ActualParamFilterItem().(type) {
+		case *sf.FilterParamContext:
+			y.EmitPushAllCallArgs()
+			handlerItem(item)
+		case *sf.EmptyParamContext:
+		}
+	case *sf.SingleParamContext:
+		for i, item := range ret.AllActualParamFilterItem() {
+			switch item := item.(type) {
+			case *sf.FilterParamContext:
+				y.EmitDuplicate()
+				y.EmitPushCallArgs(i)
+				handlerItem(item)
+			case *sf.EmptyParamContext:
+			}
+		}
+	default:
+		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))
+	}
+	return nil
 }

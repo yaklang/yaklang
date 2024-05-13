@@ -2,10 +2,12 @@ package sfvm
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"regexp"
 )
 
 type SFFrame struct {
@@ -68,10 +70,11 @@ func (s *SFFrame) ToRight() bool {
 }
 
 func (s *SFFrame) exec(input ValueOperator) (ret error) {
-	s.stack.Push(input)
+	// s.stack.Push(input)
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)
+			log.Infof("%+v", ret)
 		}
 	}()
 
@@ -84,10 +87,20 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 
 		s.debugLog(i.String())
 		switch i.OpCode {
-		case OpCheckStackTop:
+		case OpDuplicate:
 			if s.stack.Len() == 0 {
 				return utils.Errorf("stack top is empty")
 			}
+			s.debugSubLog(">> duplicate ")
+			v := s.stack.Peek()
+			s.stack.Push(v)
+		case OpPushInput:
+			s.debugSubLog(">> push input")
+			s.stack.Push(input)
+		case OpCheckStackTop:
+			// if s.stack.Len() == 0 {
+			// 	return utils.Errorf("stack top is empty")
+			// }
 		case OpPushSearchExact:
 			s.debugSubLog(">> pop match exactly: %v", i.UnaryStr)
 			value := s.stack.Pop()
@@ -190,18 +203,48 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			}
 			i := s.stack.Pop()
 			s.debugSubLog(">> pop %v", i.GetNames())
-		case OpGetCallArgs:
+		case opGetCall:
 			s.debugSubLog(">> pop")
 			value := s.stack.Pop()
 			if value == nil {
-				return utils.Error("get call args failed: stack top is empty")
+				return utils.Error("get call instruction failed: stack top is empty")
 			}
 			results, err := value.GetCalled()
 			if err != nil {
 				return utils.Errorf("get calling instruction failed: %s", err)
 			}
 			callLen := valuesLen(results)
-			s.debugSubLog("- call Called: %v", callLen)
+			s.debugSubLog("- call Called: %v", results.String())
+			s.debugSubLog("<< push len: %v", callLen)
+			s.stack.Push(results)
+
+		case OpGetCallArgs:
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Error("get call args failed: stack top is empty")
+			}
+			results, err := value.GetCallActualParams(i.UnaryInt)
+			if err != nil {
+				return utils.Errorf("get calling argument failed: %s", err)
+			}
+			callLen := valuesLen(results)
+			s.debugSubLog("- get argument: %v", results.String())
+			s.debugSubLog("<< push arg len: %v", callLen)
+			s.stack.Push(results)
+
+		case OpGetAllCallArgs:
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Error("get call args failed: stack top is empty")
+			}
+			results, err := value.GetAllCallActualParams()
+			if err != nil {
+				return utils.Errorf("get calling argument failed: %s", err)
+			}
+			callLen := valuesLen(results)
+			s.debugSubLog("- get all argument: %v", results.String())
 			s.debugSubLog("<< push arg len: %v", callLen)
 			s.stack.Push(results)
 

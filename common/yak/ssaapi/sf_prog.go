@@ -1,10 +1,11 @@
 package ssaapi
 
 import (
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
 )
 
 var _ sfvm.ValueOperator = &Program{}
@@ -50,8 +51,11 @@ func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported list index")
 }
 
-func (p *Program) GetCallActualParams() (sfvm.ValueOperator, error) {
+func (p *Program) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported call actual params")
+}
+func (p *Program) GetCallActualParams(int) (sfvm.ValueOperator, error) {
+	return nil, utils.Error("ssa.Program is not supported call all actual params")
 }
 
 func (p *Program) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {

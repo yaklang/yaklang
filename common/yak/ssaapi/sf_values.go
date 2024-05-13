@@ -77,7 +77,23 @@ func (value Values) RegexpMatch(regexp *regexp.Regexp) (bool, sfvm.ValueOperator
 	panic("implement me")
 }
 
-func (value Values) GetCallActualParams() (sfvm.ValueOperator, error) {
+func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
+	ret := make([]sfvm.ValueOperator, 0)
+	for _, i := range value {
+		if c, ok := ssa.ToCall(i.node); ok {
+			if len(c.Args) > index {
+				ret = append(ret, NewValue(c.Args[index]))
+			}
+		}
+	}
+	if len(ret) == 0 {
+		return nil, utils.Errorf("ssa.Values no this argument by index %d", index)
+	} else {
+		return sfvm.NewValues(ret), nil
+	}
+}
+
+func (value Values) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 	var vv []sfvm.ValueOperator
 	for _, i := range value {
 		if i.IsCall() {
