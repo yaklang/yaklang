@@ -150,6 +150,10 @@ func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetCallArgs, UnaryInt: i})
 }
 
+func (v *SyntaxFlowVisitor) EmitPushInput() {
+	v.codes = append(v.codes, &SFI{OpCode: OpPushInput})
+}
+
 func (v *SyntaxFlowVisitor) Show() {
 	for _, c := range v.codes {
 		fmt.Println(c.String())

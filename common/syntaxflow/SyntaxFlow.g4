@@ -152,3 +152,5 @@ fragment RegexpLiteralChar
     : '\\' '/'
     | ~[/]
     ;
+
+WS: [ \t\r]+ -> skip;

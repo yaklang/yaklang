@@ -2,9 +2,11 @@ package php
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"testing"
 )
 
 func mustCompile(raw ...string) []*ssaapi.Program {
@@ -40,5 +42,8 @@ system($command); //system函数特性 执行结果会自动打印
 	if err != nil {
 		t.Fatal(err)
 	}
-	values.Show()
+	for k, value := range values {
+		log.Infof("key: %s", k)
+		value.Show()
+	}
 }

@@ -16,11 +16,15 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 
 	switch ret := raw.(type) {
 	case *sf.WildcardFilterContext:
-		y.EmitSearchGlob("*")
+		// y.EmitSearchGlob("*")
 		return nil
 	case *sf.CurrentRootFilterContext:
-		y.EmitCheckStackTop()
-		log.Warnf("TBD for CurrentRootFilter")
+		// y.EmitCheckStackTop()
+		// log.Warnf("TBD for CurrentRootFilter")
+		if id := ret.Identifier(); id != nil {
+			y.EmitNewRef(id.GetText())
+			return nil
+		}
 		return nil
 	case *sf.PrimaryFilterContext:
 		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
