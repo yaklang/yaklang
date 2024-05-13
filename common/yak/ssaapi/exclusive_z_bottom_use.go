@@ -26,7 +26,15 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 			vals = append(vals, ret...)
 		}
 	})
-	if v.IsMember() && actx.TheMemberShouldBeVisited(v) {
+
+	// member.IsUndefined()
+	undefineMember := false
+	if un, ok := ssa.ToUndefined(v.node); ok {
+		if un.Kind == ssa.UndefinedMemberInValid || un.Kind == ssa.UndefinedMemberValid {
+			undefineMember = true
+		}
+	}
+	if v.IsMember() && !undefineMember && actx.TheMemberShouldBeVisited(v) {
 		obj := v.GetObject()
 		actx.PushObject(obj, v.GetKey(), v)
 		vals = append(vals, obj.getBottomUses(actx)...)

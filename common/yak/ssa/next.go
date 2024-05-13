@@ -7,7 +7,6 @@ var (
 )
 
 func newNextType(iterType Type, isIn bool) Type {
-
 	typ := NewStructType()
 	typ.AddField(NextOk, BasicTypes[BooleanTypeKind])
 
