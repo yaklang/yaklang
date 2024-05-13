@@ -28,7 +28,7 @@ type ValueOperator interface {
 	GetCallActualParams() (ValueOperator, error)
 
 	// GetMembers for list or objct
-	GetMembers() (ValueOperator, error)
+	GetMembersByString(string) (ValueOperator, error)
 
 	// GetTopDef and GetBottomUse is for OpBottomUse
 	// use and def

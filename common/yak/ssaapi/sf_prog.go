@@ -38,13 +38,12 @@ func (p *Program) RegexpMatch(re *regexp.Regexp) (bool, sfvm.ValueOperator, erro
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) GetMembers() (sfvm.ValueOperator, error) {
-	return p.GlobRefRaw("*").Flat(func(value *Value) Values {
-		if value.IsObject() {
-			return value.GetAllMember()
-		}
-		return nil
-	}), nil
+func (p *Program) GetMembersByString(key string) (sfvm.ValueOperator, error) {
+	ret := make(Values, 0)
+	for _, v := range p.DBCache.GetAllMember(key) {
+		ret = append(ret, NewValue(v))
+	}
+	return ret, nil
 }
 
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {

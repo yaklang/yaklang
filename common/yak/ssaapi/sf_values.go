@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 var _ sfvm.ValueOperator = new(Values)
@@ -86,11 +87,15 @@ func (value Values) GetCallActualParams() (sfvm.ValueOperator, error) {
 	return sfvm.NewValues(vv), nil
 }
 
-func (value Values) GetMembers() (sfvm.ValueOperator, error) {
+func (value Values) GetMembersByString(key string) (sfvm.ValueOperator, error) {
 	var vals Values
 	for _, v := range value {
-		if v.IsObject() {
-			vals = append(vals, v.GetAllMember()...)
+		if !v.IsObject() {
+			continue
+		}
+		if v.IsMap() || v.IsList() || v.IsObject() {
+			res := v.GetMember(NewValue(ssa.NewConst(key)))
+			vals = append(vals, res)
 		}
 	}
 	return vals, nil
