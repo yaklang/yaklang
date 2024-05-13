@@ -44,6 +44,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 	if !nodAddToBlocks {
 		addToBlocks(b)
 	}
+	b.SetRange(f.GetRange())
 	return b
 }
 

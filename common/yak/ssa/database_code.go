@@ -61,6 +61,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		codeRange = ret
 	} else if ret := inst.GetFunc().GetRange(); ret != nil {
 		log.Warnf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
+		inst.SetRange(ret)
 		codeRange = ret
 	}
 	if codeRange == nil {

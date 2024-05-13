@@ -303,6 +303,10 @@ func (lz *LazyInstruction) GetSourceCode() string {
 	if lz.Instruction == nil {
 		return ""
 	}
+	r := lz.Instruction.GetRange()
+	if r == nil {
+		lz.Instruction.SetRange(lz.GetRange())
+	}
 	return lz.Instruction.GetSourceCode()
 }
 
@@ -310,6 +314,10 @@ func (lz *LazyInstruction) GetSourceCodeContext(n int) string {
 	lz.check()
 	if lz.Instruction == nil {
 		return ""
+	}
+	r := lz.Instruction.GetRange()
+	if r == nil {
+		lz.Instruction.SetRange(lz.GetRange())
 	}
 	return lz.Instruction.GetSourceCodeContext(n)
 }
