@@ -64,6 +64,14 @@ dump(c)
 	log.Infof("eLazyPhi: %s", eLazyPhi.String())
 	log.Infof("ePhi: %s", ePhi.String())
 
+	if ePhi.GetSourceCode() == "" {
+		t.Fatal("failed to get variable e(a) source code (memory)")
+	}
+
+	if eLazyPhi.GetSourceCode() == "" {
+		t.Fatal("failed to get variable e(a) source code (lazy)")
+	}
+
 	assert.Equal(t, ePhi.GetSourceCode(), eLazyPhi.GetSourceCode())
 	assert.Equal(t, ePhi.GetSourceCodeContext(2), eLazyPhi.GetSourceCodeContext(2))
 }
