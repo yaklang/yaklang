@@ -204,6 +204,20 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			s.debugSubLog("- call Called: %v", callLen)
 			s.debugSubLog("<< push arg len: %v", callLen)
 			s.stack.Push(results)
+
+		case OpGetUsers:
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Error("get users failed: stack top is empty")
+			}
+			s.debugSubLog("- call GetUser")
+			vals, err := value.GetSyntaxFlowUse()
+			if err != nil {
+				return utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
+			}
+			s.debugSubLog("<< push users")
+			s.stack.Push(vals)
 		case OpGetBottomUsers:
 			s.debugSubLog(">> pop")
 			value := s.stack.Pop()
@@ -216,6 +230,19 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 			}
 			s.debugSubLog("<< push bottom uses")
+			s.stack.Push(vals)
+		case OpGetDefs:
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Error("get users failed: stack top is empty")
+			}
+			s.debugSubLog("- call GetDefs")
+			vals, err := value.GetSyntaxFlowDef()
+			if err != nil {
+				return utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
+			}
+			s.debugSubLog("<< push users")
 			s.stack.Push(vals)
 		case OpGetTopDefs:
 			s.debugSubLog(">> pop")

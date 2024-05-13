@@ -31,6 +31,10 @@ type ValueOperator interface {
 	GetMembers() (ValueOperator, error)
 
 	// GetTopDef and GetBottomUse is for OpBottomUse
+	// use and def
+	GetSyntaxFlowUse() (ValueOperator, error)
+	GetSyntaxFlowDef() (ValueOperator, error)
+	// top and bottom
 	GetSyntaxFlowTopDef(...*ConfigItem) (ValueOperator, error)
 	GetSyntaxFlowBottomUse(...*ConfigItem) (ValueOperator, error)
 

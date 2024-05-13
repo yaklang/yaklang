@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
@@ -28,6 +29,7 @@ func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi
 		assert.Nil(t, err)
 		prog.Show()
 
+		log.Infof("only in memory ")
 		err = handler(prog)
 		assert.Nil(t, err)
 	}
@@ -41,6 +43,7 @@ func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi
 		assert.Nil(t, err)
 		prog.Show()
 
+		log.Infof("with database ")
 		err = handler(prog)
 		assert.Nil(t, err)
 	}
@@ -49,12 +52,20 @@ func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi
 	{
 		prog, err := ssaapi.FromDatabase(programID)
 		assert.Nil(t, err)
+
+		log.Infof("only use database ")
 		err = handler(prog)
 		assert.Nil(t, err)
 	}
 }
 
+func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, language ...ssaapi.Language) {
+	CheckSyntaxFlowEx(t, code, sf, true, wants, language...)
+}
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, language ...ssaapi.Language) {
+	CheckSyntaxFlowEx(t, code, sf, false, wants, language...)
+}
+func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, language ...ssaapi.Language) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		results, err := prog.SyntaxFlowWithError(sf)
 		assert.Nil(t, err)
@@ -66,9 +77,16 @@ func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]st
 		for k, want := range wants {
 			gotVs, ok := results[k]
 			assert.Truef(t, ok, "key[%s] not found", k)
-			assert.Equal(t, len(want), len(gotVs))
-			for i, got := range gotVs {
-				assert.Equal(t, want[i], got.String())
+			if contain {
+				got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+				if !utils.ContainsAll(got, want...) {
+					t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
+				}
+			} else {
+				assert.Equal(t, len(want), len(gotVs))
+				for i, got := range gotVs {
+					assert.Equal(t, want[i], got.String())
+				}
 			}
 		}
 		return nil

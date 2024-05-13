@@ -1,8 +1,7 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"context"
 	"regexp"
 	"time"
 
@@ -10,7 +9,9 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"go.uber.org/atomic"
@@ -221,6 +222,41 @@ func (c *Cache) GetByVariableGlob(g sfvm.Glob) []Instruction {
 		}
 	})
 	return ins
+}
+
+func (c *Cache) GetAllMember(key string) []Value {
+	ret := make([]Value, 0)
+	if c.DB == nil {
+		// get from cache, only memory mode
+		for _, inst := range c.InstructionCache.GetAll() {
+			value, ok := ToValue(inst.inst)
+			if !ok {
+				continue
+			}
+			log.Infof("value: %s", value.String())
+			if value.IsMember() && value.GetKey().String() == key {
+				ret = append(ret, value)
+			}
+		}
+		return ret
+	}
+
+	ch := ssadb.YieldIrCodesProgramName(c.DB, context.Background(), c.ProgramName)
+	for insts := range ch {
+		// handle(insts)
+		if insts.IsObjectMember {
+			// check key
+			keyInst := ssadb.GetIrCodeById(c.DB, insts.ObjectKey)
+			if keyInst == nil {
+				log.Warn("BUG: ssadb IrCode ObjectKey is nil")
+				continue
+			}
+			if Opcode(keyInst.Opcode) == SSAOpcodeConstInst && keyInst.String == key {
+				ret = append(ret, newLazyInstruction(insts.GetIdInt64(), insts, c))
+			}
+		}
+	}
+	return ret
 }
 
 // GetByVariableRegexp will filter Instruction via variable regexp name
