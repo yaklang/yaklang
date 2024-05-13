@@ -96,40 +96,49 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 				log.Errorf("stream recv wsfuzzer req failed: %s", err)
 				return
 			}
-			message := req.GetToServer()
-			fuzzResult := mutate.MutateQuick(message)
-			if len(fuzzResult) > 0 {
-				message = utils.UnsafeStringToBytes(fuzzResult[0])
+			raw := req.GetToServer()
+			fuzzResult := mutate.MutateQuick(raw)
+			// fallback
+			if len(fuzzResult) == 0 {
+				fuzzResult = append(fuzzResult, utils.UnsafeBytesToString(raw))
 			}
-			messageStr := string(message)
-			client.Write(message)
 
-			_, isJson := utils.IsJSON(string(req.GetToServer()))
-			dataVerbose := ""
-			if isJson {
-				var buf bytes.Buffer
-				_ = json.Indent(&buf, req.GetToServer(), "", "")
-				if buf.Len() > 0 {
-					dataVerbose = strings.ReplaceAll(string(buf.Bytes()), "\n", "")
+			for _, message := range fuzzResult {
+				messageBytes := utils.UnsafeStringToBytes(message)
+				dataVerbose := ""
+				_, isJson := utils.IsJSON(message)
+				if isJson {
+					var buf bytes.Buffer
+					_ = json.Indent(&buf, req.GetToServer(), "", "")
+					if buf.Len() > 0 {
+						dataVerbose = strings.ReplaceAll(string(buf.Bytes()), "\n", "")
+					}
 				}
-			}
-			if dataVerbose == "" {
-				dataVerbose = strings.Trim(strconv.Quote(messageStr), `"`)
+				if dataVerbose == "" {
+					dataVerbose = strings.Trim(strconv.Quote(message), `"`)
+				}
+
+				err = client.WriteText(messageBytes)
+				if err != nil {
+					log.Errorf("wsfuzzer write text failed: %s", err)
+					continue
+				}
+
+				msg := &ypb.ClientWebsocketResponse{
+					SwitchProtocolSucceeded: true,
+					IsDataFrame:             true,
+					FromServer:              false,
+					Data:                    messageBytes,
+					DataVerbose:             dataVerbose,
+					DataLength:              int64(len(message)),
+					DataSizeVerbose:         utils.ByteSize(uint64(len(message))),
+					IsJson:                  isJson,
+					IsProtobuf:              utils.IsProtobuf(messageBytes),
+					DataFrameIndex:          requireDataFrameID(),
+				}
+				stream.Send(msg)
 			}
 
-			msg := &ypb.ClientWebsocketResponse{
-				SwitchProtocolSucceeded: true,
-				IsDataFrame:             true,
-				FromServer:              false,
-				Data:                    []byte(messageStr),
-				DataVerbose:             dataVerbose,
-				DataLength:              int64(len(messageStr)),
-				DataSizeVerbose:         utils.ByteSize(uint64(len(messageStr))),
-				IsJson:                  isJson,
-				IsProtobuf:              utils.IsProtobuf([]byte(messageStr)),
-				DataFrameIndex:          requireDataFrameID(),
-			}
-			stream.Send(msg)
 		}
 	}()
 	client.Wait()
