@@ -459,9 +459,14 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 			}
 
 			fReq, _ := mutate.NewFuzzHTTPRequest(flow.Request, mutate.OptHTTPS(flow.IsHTTPS))
+			const maxParams = 150
+			var index int
 			if fReq != nil {
 				for _, r := range fReq.GetCommonParams() {
-					fReq := &ypb.FuzzableParam{
+					if index >= maxParams {
+						break
+					}
+					fParam := &ypb.FuzzableParam{
 						Position:  r.PositionVerbose(),
 						ParamName: utf8safe(utils.ParseStringToVisible(r.Name())),
 						IsHTTPS:   flow.IsHTTPS,
@@ -469,18 +474,19 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 
 					if full {
 						// 详情模式，这个很耗时。
-						fReq = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
+						fParam = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
 					}
-					fReq.ParamName = utils.EscapeInvalidUTF8Byte([]byte(fReq.ParamName))
+					fParam.ParamName = utils.EscapeInvalidUTF8Byte([]byte(fParam.ParamName))
 					if r.IsGetParams() {
-						flow.GetParams = append(flow.GetParams, fReq)
+						flow.GetParams = append(flow.GetParams, fParam)
 					}
 					if r.IsPostParams() {
-						flow.PostParams = append(flow.PostParams, fReq)
+						flow.PostParams = append(flow.PostParams, fParam)
 					}
 					if r.IsCookieParams() {
-						flow.CookieParams = append(flow.CookieParams, fReq)
+						flow.CookieParams = append(flow.CookieParams, fParam)
 					}
+					index++
 				}
 
 				flow.GetParamsTotal = int64(len(flow.GetParams))
