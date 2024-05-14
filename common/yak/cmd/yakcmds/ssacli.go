@@ -41,6 +41,10 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "syntaxflow,sf",
 				Usage: "syntax flow query language",
 			},
+			cli.BoolFlag{
+				Name:  "database-debug,dbdebug",
+				Usage: "enable database debug mode",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			programName := c.String("program")
@@ -49,6 +53,8 @@ var SSACompilerCommands = []*cli.Command{
 			inMemory := c.Bool("memory")
 			rawFile := c.String("target")
 			file := utils.GetFirstExistedPath(rawFile)
+
+			dbDebug := c.Bool("database-debug")
 
 			// syntax flow query
 			if sf := c.String("syntaxflow"); sf != "" {
@@ -61,6 +67,9 @@ var SSACompilerCommands = []*cli.Command{
 				if err != nil {
 					log.Errorf("load program [%v] from database failed: %v", programName, err)
 					return nil
+				}
+				if prog.DBCache != nil && dbDebug {
+					prog.DBCache.DB = prog.DBCache.DB.Debug()
 				}
 				result, err := prog.SyntaxFlowWithError(sf)
 				if err != nil {

@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
@@ -55,7 +54,7 @@ func (value Values) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
 	return len(newValue) > 0, newValue, nil
 }
 
-func (value Values) GlobMatch(glob glob.Glob) (bool, sfvm.ValueOperator, error) {
+func (value Values) GlobMatch(glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
 	//TODO implement me
 	panic("implement me")
 }
