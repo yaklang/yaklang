@@ -99,13 +99,6 @@ func (g *Program) GlobRefRaw(rule string) Values {
 }
 
 func (p *Program) GlobRef(r sfvm.Glob) Values {
-	if p.comeFromDatabase {
-		for result := range p.DBCache.GlobSearch(r.String()) {
-			log.Infof("search glob value: %v", result.GetShortVerboseName())
-		}
-		return nil
-	}
-
 	return lo.FilterMap(
 		p.DBCache.GetByVariableGlob(r),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
