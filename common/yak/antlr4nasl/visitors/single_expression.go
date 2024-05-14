@@ -1,6 +1,5 @@
 package visitors
 
-import "C"
 import (
 	"fmt"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
