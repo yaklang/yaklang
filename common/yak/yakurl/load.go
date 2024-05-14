@@ -1,16 +1,35 @@
 package yakurl
 
 import (
+	"net/url"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
-	"strings"
 )
+
+var windowsPathPrefixRegex = regexp.MustCompile(`([a-zA-Z]):(\\|\/)`)
 
 func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 	if raw == "" {
 		return nil, utils.Error("empty yak url")
 	}
+	var (
+		isWindowsPath = false
+		volumeName    string
+	)
+
+	before, rawPath, _ := strings.Cut(raw, "://")
+	if ret := windowsPathPrefixRegex.FindStringSubmatch(rawPath); len(ret) > 1 && ret[0] != "" {
+		// maybe windows path
+		isWindowsPath = true
+		volumeName = ret[1] + ":"
+		// replace windows path prefix, to avoid url.Parse error
+		raw = before + "://" + windowsPathPrefixRegex.ReplaceAllString(strings.ReplaceAll(rawPath, "\\", "/"), "/")
+	}
+	_ = isWindowsPath
+
 	u, err := url.Parse(raw)
 	if err != nil {
 		return nil, utils.Errorf("cannot parse raw[%v] as url: %s", raw, err)
@@ -37,6 +56,9 @@ func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 		if yu.Path[2] == ':' {
 			yu.Path = strings.TrimPrefix(yu.Path, "/")
 		}
+	}
+	if isWindowsPath {
+		yu.Path = volumeName + strings.ReplaceAll(yu.Path, "/", "\\")
 	}
 	return yu, nil
 }
