@@ -1,6 +1,7 @@
 package aispec
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"os"
 	"time"
@@ -29,6 +30,22 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	}
 	for _, p := range opts {
 		p(c)
+	}
+	cfg := consts.GetThirdPartyApplicationConfig(c.Type)
+	if cfg.APIKey != "" {
+		c.APIKey = cfg.APIKey
+	}
+	if cfg.Domain != "" {
+		c.Domain = cfg.Domain
+	}
+	if cfg.GetExtraParam("model") != "" {
+		c.Model = cfg.GetExtraParam("model")
+	}
+	if cfg.GetExtraParam("domain") != "" {
+		c.Domain = cfg.GetExtraParam("domain")
+	}
+	if cfg.GetExtraParam("proxy") != "" {
+		c.Proxy = cfg.GetExtraParam("proxy")
 	}
 	return c
 }
