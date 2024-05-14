@@ -1,8 +1,8 @@
 package chatglm
 
 import (
+	"errors"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 )
@@ -36,16 +36,13 @@ func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
 	} else {
 		g.targetUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 	}
-
-	if g.config.APIKey == "" {
-		g.config.APIKey = consts.GetThirdPartyApplicationConfig("chatglm").APIKey
-	}
-
-	if g.config.Proxy == "" {
-		g.config.Proxy = consts.GetThirdPartyApplicationConfig("chatglm").GetExtraParam("proxy")
-	}
 }
-
+func (g *GLMClient) CheckValid() error {
+	if g.config.APIKey == "" {
+		return errors.New("APIKey is required")
+	}
+	return nil
+}
 func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	k, err := generateToken(g.config.APIKey)
 	if err != nil {
