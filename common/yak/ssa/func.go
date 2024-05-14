@@ -94,10 +94,7 @@ func (f *FunctionBuilder) NewParam(name string) *Parameter {
 }
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
-	new := &ParameterMember{
-		Parameter:            NewParam(name, false, f),
-		parameterMemberInner: newParameterMember(obj, key),
-	}
+	new := NewParamMember(name, f, obj, key)
 	f.ParameterMember = append(f.ParameterMember, new)
 	new.FormalParameterIndex = len(f.ParameterMember) - 1
 	return new
