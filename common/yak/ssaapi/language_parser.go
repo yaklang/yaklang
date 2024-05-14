@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -56,7 +57,10 @@ func (c *config) parseProject() ([]*Program, error) {
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
 			log.Infof("start to compile from: %v", path)
+			startTime := time.Now()
 			prog, err := c.parseSimple(path, f)
+			endTime := time.Now()
+			log.Infof("compile %s cost: %v", path, endTime.Sub(startTime))
 			if err != nil {
 				log.Warnf("parse %#v failed: %v", path, err)
 				return nil, utils.Errorf("parse file %s error : %v", path, err)
