@@ -710,6 +710,10 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 	if rawBody == nil {
 		rawBody = []byte("{}")
 	}
+	jsonBody := string(rawBody)
+	if _, ok := utils.IsJSON(jsonBody); !ok {
+		return nil, utils.Errorf("body is not json")
+	}
 
 	values := InterfaceToFuzzResults(originValue)
 	if values == nil {
@@ -724,7 +728,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 	}, func(result []string) error {
 		value := result[0]
 
-		modifiedBody, err := modifyJSONValue(string(rawBody), p.path, value, originValue, valueIndex)
+		modifiedBody, err := modifyJSONValue(jsonBody, p.path, value, originValue, valueIndex)
 		if err != nil {
 			return err
 		}
