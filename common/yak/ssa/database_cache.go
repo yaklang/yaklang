@@ -71,7 +71,6 @@ func (c *Cache) Yield(db *gorm.DB) chan Instruction {
 			}
 			page++
 		}
-		db.Find(&pack)
 	}()
 	return ch
 }
@@ -190,13 +189,6 @@ func (c *Cache) HaveDatabaseBackend() bool {
 }
 
 func (c *Cache) GetByVariable(name string) []Instruction {
-	if c.HaveDatabaseBackend() {
-		var ins []Instruction
-		for i := range c.exactSearchVariable(name) {
-			ins = append(ins, i)
-		}
-		return ins
-	}
 	ret, ok := c.VariableCache.Get(name)
 	if !ok && c.DB != nil {
 		// get from database
