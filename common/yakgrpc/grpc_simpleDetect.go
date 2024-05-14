@@ -26,6 +26,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	reqParams := &ypb.DebugPluginRequest{
 		Code:       string(simpleDetect),
 		PluginType: "yak",
+		RuntimeId:  req.GetRuntimeId(),
 	}
 
 	reqRecord := req.LastRecord
