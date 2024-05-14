@@ -2,44 +2,52 @@ package yakurl
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type fileSystemAction struct {
-}
+type fileSystemAction struct{}
 
 func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, inDir bool) *ypb.YakURLResource {
-	var newParam = &ypb.YakURL{
+	rawPath := filepath.Join(originParam.GetPath(), info.Name())
+	absPath, err := filepath.Abs(rawPath)
+	if err != nil {
+		absPath = rawPath
+	}
+	newParam := &ypb.YakURL{
 		Schema:   originParam.Schema,
 		User:     originParam.GetUser(),
 		Pass:     originParam.GetPass(),
 		Location: originParam.GetLocation(),
-		Path:     filepath.Join(originParam.GetPath(), info.Name()),
+		Path:     absPath,
 		Query:    originParam.GetQuery(),
 	}
 	if !inDir {
 		newParam.Path = originParam.GetPath()
 	}
 
-	var src = &ypb.YakURLResource{
+	src := &ypb.YakURLResource{
 		Size:              info.Size(),
 		SizeVerbose:       utils.ByteSize(uint64(info.Size())),
 		ModifiedTimestamp: info.ModTime().Unix(),
-		Path:              newParam.Path,
+		Path:              absPath,
 		YakURLVerbose:     "",
 		Url:               newParam,
 	}
 	if info.IsDir() {
 		src.ResourceType = "dir"
 		src.VerboseType = "filesystem-directory"
-		src.HaveChildrenNodes = true
+		infos, err := os.ReadDir(absPath)
+		if err == nil {
+			src.HaveChildrenNodes = len(infos) > 0
+		}
 	}
 
-	dirName, fileName := filepath.Split(src.Path)
+	dirName, fileName := filepath.Split(absPath)
 	src.ResourceName = fileName
 	if !info.IsDir() && info.Size() > 0 {
 		src.VerboseName = fmt.Sprintf("%v [%v]", fileName, src.SizeVerbose)
@@ -79,7 +87,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
 	}
 
-	var query = make(url.Values)
+	query := make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
@@ -94,16 +102,16 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 			}
 			for _, i := range infos {
 				info, _ := i.Info()
-				if info != nil {
-					res = append(res, fileInfoToResource(params.GetUrl(), info, true))
+				if info == nil {
+					continue
 				}
+				res = append(res, fileInfoToResource(params.GetUrl(), info, true))
 			}
-			goto END
 		}
+	default:
+		res = append(res, fileInfoToResource(params.GetUrl(), info, false))
 	}
-	res = append(res, fileInfoToResource(params.GetUrl(), info, false))
 
-END:
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
@@ -113,26 +121,26 @@ END:
 }
 
 func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	return nil, utils.Error("not implemented")
 }
 
 func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	return nil, utils.Error("not implemented")
 }
 
 func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	return nil, utils.Error("not implemented")
 }
 
 func (f fileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	return nil, utils.Error("not implemented")
 }
 
 func (f fileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	return nil, utils.Error("not implemented")
 }
