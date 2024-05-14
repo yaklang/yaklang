@@ -18,6 +18,7 @@ type FunctionCaller interface {
 type Configurable interface {
 	LoadOption(opt ...AIConfigOption)
 	BuildHTTPOptions() ([]poc.PocConfigOption, error)
+	CheckValid() error
 }
 
 type AIGateway interface {

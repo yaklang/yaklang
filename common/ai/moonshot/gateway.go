@@ -1,8 +1,8 @@
 package moonshot
 
 import (
+	"errors"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 )
@@ -55,16 +55,13 @@ func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 	} else {
 		g.targetUrl = "https://api.moonshot.cn/v1/chat/completions"
 	}
-
-	if g.config.APIKey == "" {
-		g.config.APIKey = consts.GetThirdPartyApplicationConfig("moonshot").APIKey
-	}
-
-	if g.config.Proxy == "" {
-		g.config.Proxy = consts.GetThirdPartyApplicationConfig("moonshot").GetExtraParam("proxy")
-	}
 }
-
+func (g *GatewayClient) CheckValid() error {
+	if g.config.APIKey == "" {
+		return errors.New("APIKey is required")
+	}
+	return nil
+}
 func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(map[string]string{

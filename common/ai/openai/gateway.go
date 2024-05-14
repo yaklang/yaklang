@@ -1,8 +1,8 @@
 package openai
 
 import (
+	"errors"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 )
@@ -61,16 +61,14 @@ func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
 	} else {
 		g.targetUrl = "https://api.openai.com/v1/chat/completions"
 	}
-
-	if g.config.APIKey == "" {
-		g.config.APIKey = consts.GetThirdPartyApplicationConfig("openai").APIKey
-	}
-
-	if g.config.Proxy == "" {
-		g.config.Proxy = consts.GetThirdPartyApplicationConfig("openai").GetExtraParam("proxy")
-	}
 }
 
+func (g *GetawayClient) CheckValid() error {
+	if g.config.APIKey == "" {
+		return errors.New("APIKey is required")
+	}
+	return nil
+}
 func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(map[string]string{

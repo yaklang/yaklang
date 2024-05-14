@@ -129,10 +129,14 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	var responseRsp string
 	var err error
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
-		gateway.LoadOption(opts...)
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", typ, err)
+			return false
+		}
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
-			log.Warnf("chat failed: %s", err)
+			log.Warnf("chat by %s failed: %s", typ, err)
 			return false
 		}
 		return true
