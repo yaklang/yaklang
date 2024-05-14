@@ -107,7 +107,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
 	github.com/xdg-go/scram v1.1.2
-	github.com/yaklang/pcap v0.0.0-20240429012614-594b487c39ce
+	github.com/yaklang/pcap v1.0.0-rc2
 	github.com/ysmood/gson v0.7.3
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.7.0
