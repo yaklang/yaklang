@@ -250,14 +250,14 @@ func ExtractHostPort(raw string) string {
 	return raw
 }
 
-// ParseStringToHosts 将字符串解析成 Host 列表， Host 可以以逗号分隔，并且会解析 CIDR 网段
+// ParseStringToHosts 将字符串解析成 Host 列表， Host 可以以逗号、换行分隔，并且会解析 CIDR 网段
 // Example:
 // ```
 // str.ParseStringToHosts("192.168.0.1/32,127.0.0.1") // ["192.168.0.1", "127.0.0.1"]
 // ```
 func ParseStringToHosts(raw string) []string {
 	targets := []string{}
-	for _, h := range strings.Split(raw, ",") {
+	for _, h := range PrettifyListFromStringSplitEx(raw, ",", "\n") {
 		// 解析 IP
 		if ret := net.ParseIP(FixForParseIP(h)); ret != nil {
 			targets = append(targets, ret.String())
