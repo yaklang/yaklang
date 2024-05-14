@@ -3,16 +3,24 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) GetExecBatchYakScriptUnfinishedTask(ctx context.Context, req *ypb.Empty) (*ypb.GetExecBatchYakScriptUnfinishedTaskResponse, error) {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	tasks := funk.Map(manager.GetProgressFromDatabase(KEY_ProgressManager), func(i *Progress) *ypb.ExecBatchYakScriptUnfinishedTask {
+	_, data, err := yakit.QueryProgress(s.GetProjectDatabase(), &ypb.Paging{
+		Limit: 30,
+	}, &ypb.UnfinishedTaskFilter{
+		ProgressSource: []string{KEY_ProgressManager},
+	})
+	if err != nil {
+		return nil, err
+	}
+	tasks := funk.Map(data, func(i *yakit.Progress) *ypb.ExecBatchYakScriptUnfinishedTask {
 		return &ypb.ExecBatchYakScriptUnfinishedTask{
 			Percent:              i.CurrentProgress,
-			CreatedAt:            i.CreatedAt,
-			Uid:                  i.Uid,
+			CreatedAt:            i.CreatedAt.Unix(),
+			Uid:                  i.RuntimeId,
 			YakScriptOnlineGroup: i.YakScriptOnlineGroup,
 			TaskName:             i.TaskName,
 		}
@@ -21,52 +29,38 @@ func (s *Server) GetExecBatchYakScriptUnfinishedTask(ctx context.Context, req *y
 }
 
 func (s *Server) GetExecBatchYakScriptUnfinishedTaskByUid(ctx context.Context, req *ypb.GetExecBatchYakScriptUnfinishedTaskByUidRequest) (*ypb.ExecBatchYakScriptRequest, error) {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	reqResult, err := manager.GetProgressByUid(req.GetUid(), false)
-	if err != nil {
-		return nil, err
-	}
-	return reqResult, nil
+	return GetBatchYakScriptRequestByRuntimeId(s.GetProjectDatabase(), req.GetUid())
 }
 
 func (s *Server) PopExecBatchYakScriptUnfinishedTaskByUid(ctx context.Context, req *ypb.GetExecBatchYakScriptUnfinishedTaskByUidRequest) (*ypb.ExecBatchYakScriptRequest, error) {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	reqResult, err := manager.GetProgressByUid(req.GetUid(), true)
-	if err != nil {
-		return nil, err
-	}
-	return reqResult, nil
+	return DeleteBatchYakScriptRequestByRuntimeId(s.GetProjectDatabase(), req.GetUid())
 }
 
 func (s *Server) GetSimpleDetectUnfinishedTask(ctx context.Context, req *ypb.Empty) (*ypb.GetSimpleDetectUnfinishedTaskResponse, error) {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	tasks := funk.Map(manager.GetProgressFromDatabase(KEY_SimpleDetectManager), func(i *Progress) *ypb.SimpleDetectUnfinishedTask {
+	_, data, err := yakit.QueryProgress(s.GetProjectDatabase(), &ypb.Paging{
+		Limit: 30,
+	}, &ypb.UnfinishedTaskFilter{
+		ProgressSource: []string{KEY_SimpleDetectManager},
+	})
+	if err != nil {
+		return nil, err
+	}
+	tasks := funk.Map(data, func(i *yakit.Progress) *ypb.SimpleDetectUnfinishedTask {
 		return &ypb.SimpleDetectUnfinishedTask{
 			Percent:              i.CurrentProgress,
-			CreatedAt:            i.CreatedAt,
-			Uid:                  i.Uid,
+			CreatedAt:            i.CreatedAt.Unix(),
+			Uid:                  i.RuntimeId,
 			YakScriptOnlineGroup: i.YakScriptOnlineGroup,
 			TaskName:             i.TaskName,
-			LastRecordPtr:        i.LastRecordPtr,
 		}
 	}).([]*ypb.SimpleDetectUnfinishedTask)
 	return &ypb.GetSimpleDetectUnfinishedTaskResponse{Tasks: tasks}, nil
 }
 
 func (s *Server) GetSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *ypb.GetExecBatchYakScriptUnfinishedTaskByUidRequest) (*ypb.RecordPortScanRequest, error) {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	reqResult, err := manager.GetSimpleProgressByUid(req.GetUid(), false, false)
-	if err != nil {
-		return nil, err
-	}
-	return reqResult, nil
+	return GetSimpleDetectUnfinishedTaskByUid(s.GetProjectDatabase(), req.GetUid())
 }
 
 func (s *Server) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, req *ypb.GetExecBatchYakScriptUnfinishedTaskByUidRequest) (*ypb.RecordPortScanRequest, error) {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	reqResult, err := manager.GetSimpleProgressByUid(req.GetUid(), true, true)
-	if err != nil {
-		return nil, err
-	}
-	return reqResult, nil
+	return DeleteSimpleDetectUnfinishedTaskByUid(s.GetProjectDatabase(), req.GetUid())
 }

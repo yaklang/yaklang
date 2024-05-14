@@ -322,12 +322,19 @@ service Yak {
   rpc SaveCancelSimpleDetect(RecordPortScanRequest) returns (Empty);
   rpc SimpleDetectCreatReport(CreatReportRequest) returns (stream ExecResult);
 
+  // new interface
+  rpc QuerySimpleDetectUnfinishedTask(QueryUnfinishedTaskRequest) returns (QueryUnfinishedTaskResponse);
+  rpc GetSimpleDetectRecordRequestById(GetUnfinishedTaskDetailByIdRequest) returns (RecordPortScanRequest);
+  rpc DeleteSimpleDetectUnfinishedTask(DeleteUnfinishedTaskRequest) returns (Empty);
+  rpc RecoverSimpleDetectTask(RecoverUnfinishedTaskRequest) returns (stream ExecResult);
+  //----
 
+  // Deprecated interface
   rpc GetSimpleDetectUnfinishedTask(Empty) returns (GetSimpleDetectUnfinishedTaskResponse);
   rpc GetSimpleDetectUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (RecordPortScanRequest);
   rpc PopSimpleDetectUnfinishedTaskByUid(GetExecBatchYakScriptUnfinishedTaskByUidRequest) returns (RecordPortScanRequest);
   rpc RecoverSimpleDetectUnfinishedTask(RecoverExecBatchYakScriptUnfinishedTaskRequest) returns (stream ExecResult);
-
+  // ----
 
   // 资产管理
   rpc QueryPorts(QueryPortsRequest) returns (QueryPortsResponse);
@@ -2152,6 +2159,7 @@ message GetSystemProxyResult {
   bool Enable = 2;
 }
 
+// --- Deprecated interface--
 message GetExecBatchYakScriptUnfinishedTaskByUidRequest {
   string Uid = 1;
 }
@@ -2181,8 +2189,45 @@ message GetExecBatchYakScriptUnfinishedTaskResponse {
   repeated ExecBatchYakScriptUnfinishedTask Tasks = 1;
 }
 
-message    GetSimpleDetectUnfinishedTaskResponse {
+message GetSimpleDetectUnfinishedTaskResponse {
   repeated SimpleDetectUnfinishedTask Tasks = 1;
+}
+// -------------------
+
+message UnfinishedTaskFilter {
+  string RuntimeId = 1;
+  repeated string ProgressSource = 2;
+  string TaskName = 3; // support fuzzy search
+}
+
+message QueryUnfinishedTaskRequest { // query unfinished task list ,just brief info
+  Paging Pagination = 1;
+  UnfinishedTaskFilter Filter = 2;
+}
+
+message DeleteUnfinishedTaskRequest {
+  UnfinishedTaskFilter Filter = 1;
+}
+
+message UnfinishedTask {
+  double Percent = 1;
+  int64 CreatedAt = 2;
+  string RuntimeId = 3;
+  string YakScriptOnlineGroup = 4;
+  string TaskName = 5;
+  int64  LastRecordPtr = 6;
+}
+
+message QueryUnfinishedTaskResponse { // brief information for unfinished task
+  repeated UnfinishedTask Tasks = 1;
+}
+
+message GetUnfinishedTaskDetailByIdRequest { // get unfinished task detail by runtime id, get task start param or last record
+  string RuntimeId = 1;
+}
+
+message RecoverUnfinishedTaskRequest {// recover unfinished simple detect task by runtime id
+  string RuntimeId = 1;
 }
 
 message FixUploadPacketRequest {
@@ -3359,6 +3404,7 @@ message RecordPortScanRequest {
   LastRecord LastRecord = 1;
   StartBruteParams StartBruteParams = 3;
   PortScanRequest PortScanRequest = 2;
+  string RuntimeId = 4;
 }
 
 message CreatReportRequest {

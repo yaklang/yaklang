@@ -28,7 +28,6 @@ var batchExecScripts []byte
 
 func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream ypb.Yak_ExecBatchYakScriptServer) error {
 	// 用于管理进度保存相关内容
-	manager := NewProgressManager(s.GetProjectDatabase())
 
 	ctx, cancel := context.WithTimeout(stream.Context(), time.Duration(req.TotalTimeoutSeconds)*time.Second)
 	defer cancel()
@@ -169,7 +168,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 			return
 		}
 		uid := uuid.New().String()
-		manager.AddExecBatchTaskToPool(uid, getPercent(), yakScriptOnlineGroup, taskName, &ypb.ExecBatchYakScriptRequest{
+		AddExecBatchTask(uid, getPercent(), yakScriptOnlineGroup, taskName, &ypb.ExecBatchYakScriptRequest{
 			Target:                req.Target,
 			ExtraParams:           req.ExtraParams,
 			Keyword:               req.Keyword,
@@ -388,8 +387,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 }
 
 func (s *Server) RecoverExecBatchYakScriptUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverExecBatchYakScriptUnfinishedTaskServer) error {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	reqTask, err := manager.GetProgressByUid(req.GetUid(), true)
+	reqTask, err := GetBatchYakScriptRequestByRuntimeId(s.GetProjectDatabase(), req.GetUid())
 	if err != nil {
 		return utils.Errorf("recover request by uid[%s] failed: %s", req.GetUid(), err)
 	}
