@@ -2,15 +2,20 @@ package mutate_tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/url"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func initDB() {
@@ -2135,4 +2140,64 @@ a=ab&c=W3siaWQiOiAxfSx7ImlkIjogMn1d`,
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}
+}
+
+func TestOOM(t *testing.T) {
+	t.SkipNow()
+	list := make([]string, 1<<21)
+
+	for i := range list {
+		list[i] = fmt.Sprintf("Value %d", i)
+	}
+
+	fmt.Println("list len:", len(list))
+
+	jsonData, err := json.Marshal(list)
+	if err != nil {
+		t.FailNow()
+	}
+	dumpfile, err := os.CreateTemp("", "example")
+	if err != nil {
+		t.FailNow()
+	}
+	defer os.Remove(dumpfile.Name()) // clean up
+
+	if _, err := dumpfile.Write(jsonData); err != nil {
+		t.FailNow()
+
+	}
+
+	prefix := `POST / HTTP/1.1
+Host: www.baidu.com
+
+`
+	run := func() {
+		content, err := os.ReadFile(dumpfile.Name())
+		if err != nil {
+			t.FailNow()
+		}
+		request, err := mutate.NewFuzzHTTPRequest(append([]byte(prefix), content...))
+		if err != nil {
+			t.FailNow()
+		}
+		params := request.GetPostJsonParams()
+		for _, param := range params {
+			//fmt.Println(param)
+			_ = param
+		}
+	}
+	var m1, m2 runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+	start := time.Now()
+	run()
+	elapsed := time.Since(start)
+
+	runtime.ReadMemStats(&m2)
+	fmt.Println("Time elapsed:", elapsed)
+	fmt.Println("Alloc:", (m2.Alloc-m1.Alloc)/1024/1024, "m")
+	fmt.Println("TotalAlloc:", (m2.TotalAlloc-m1.TotalAlloc)/1024/1024, "m")
+	fmt.Println("HeapAlloc:", (m2.HeapAlloc-m1.HeapAlloc)/1024/1024, "m")
+	fmt.Println("Mallocs:", (m2.Mallocs-m1.Mallocs)/1024/1024, "m")
+
 }
