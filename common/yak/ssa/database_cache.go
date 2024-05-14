@@ -1,10 +1,10 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"regexp"
 	"time"
-
-	"github.com/gobwas/glob"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -46,6 +46,58 @@ type Cache struct {
 	id               *atomic.Int64
 	InstructionCache *utils.CacheWithKey[int64, instructionIrCode] // instructionID to instruction
 	VariableCache    *utils.CacheWithKey[string, []Instruction]    // variable(name:string) to []instruction
+}
+
+func (c *Cache) Yield(db *gorm.DB) chan Instruction {
+	var ch = make(chan Instruction)
+	go func() {
+		defer close(ch)
+
+		var pack []*ssadb.IrCode
+		var pg *bizhelper.Paginator
+		var page = 1
+		for {
+			pg, db = bizhelper.Paging(db, page, 100, &pack)
+			if pg.TotalPage == 0 {
+				break
+			}
+			for _, inst := range pack {
+				ch <- c.newLazyInstruction(inst.GetIdInt64())
+			}
+			if pg.TotalPage == page {
+				break
+			}
+			page++
+		}
+		db.Find(&pack)
+	}()
+	return ch
+}
+
+func (c *Cache) ExactSearch(value string) chan Instruction {
+	db := c.DB.Where("program_name = ?", c.ProgramName)
+	db = db.Where("("+
+		"short_verbose_name = ? "+
+		"OR verbose_name = ?"+
+		"OR name = ?"+
+		"OR variable = ?"+
+		"OR constant_value = ?"+
+		"OR `string` = ?"+
+		")", value, value, value, value, value, value)
+	return c.Yield(db)
+}
+
+func (c *Cache) GlobSearch(value string) chan Instruction {
+	db := c.DB.Where("program_name = ?", c.ProgramName)
+	db = db.Where("("+
+		"short_verbose_name GLOB ? "+
+		"OR verbose_name GLOB ?"+
+		"OR name GLOB ?"+
+		"OR variable GLOB ?"+
+		"OR constant_value GLOB ?"+
+		"OR `string` GLOB ?"+
+		")", value, value, value, value, value, value)
+	return c.Yield(db)
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -145,9 +197,10 @@ func (c *Cache) GetByVariable(name string) []Instruction {
 }
 
 // GetByVariableGlob means get variable name(glob).
-func (c *Cache) GetByVariableGlob(g glob.Glob) []Instruction {
+func (c *Cache) GetByVariableGlob(g sfvm.Glob) []Instruction {
 	var ins []Instruction
 	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
+		log.Infof("GetByVariableGlob: %s", s)
 		if g.Match(s) {
 			ins = append(ins, instructions...)
 		}

@@ -12,6 +12,6 @@ func (c *config) fromDatabase() (*Program, error) {
 	// all function and instruction will be lazy
 	db := consts.GetGormProjectDatabase()
 	ret := NewProgram(ssa.NewProgramFromDatabase(db, c.DatabaseProgramName), c)
-
+	ret.comeFromDatabase = true
 	return ret, nil
 }

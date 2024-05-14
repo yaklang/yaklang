@@ -2,7 +2,6 @@ package sfvm
 
 import (
 	"bytes"
-	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
@@ -125,7 +124,7 @@ func (v *ValueList) ExactMatch(s string) (bool, ValueOperator, error) {
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) GlobMatch(s glob.Glob) (bool, ValueOperator, error) {
+func (v *ValueList) GlobMatch(s Glob) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
 		match, next, err := value.GlobMatch(s)
