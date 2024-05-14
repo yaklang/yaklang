@@ -9,8 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (s *FuzzHTTPRequest) GetFirstFuzzHTTPRequest() (*FuzzHTTPRequest, error) {
-	return NewFuzzHTTPRequest(s.originRequest, s.GetCurrentOptions()...)
+func (f *FuzzHTTPRequest) GetFirstFuzzHTTPRequest() (*FuzzHTTPRequest, error) {
+	return NewFuzzHTTPRequest(f.originRequest, f.GetCurrentOptions()...)
 }
 
 func (s *FuzzHTTPRequestBatch) GetFirstFuzzHTTPRequest() (*FuzzHTTPRequest, error) {
