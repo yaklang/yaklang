@@ -163,6 +163,19 @@ func (p *Parameter) Copy() *Parameter {
 	return new
 }
 
+func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, key Value) *ParameterMember {
+	p := &ParameterMember{
+		anValue:              NewValue(),
+		parameterMemberInner: newParameterMember(obj, key),
+	}
+	p.SetName(variable)
+	p.SetFunc(builder.Function)
+	p.SetBlock(builder.EnterBlock)
+	p.SetRange(builder.CurrentRange)
+	p.GetProgram().SetVirtualRegister(p)
+	return p
+}
+
 func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
 		anValue:  NewValue(),

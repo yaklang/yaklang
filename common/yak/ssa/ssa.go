@@ -368,7 +368,8 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 }
 
 type ParameterMember struct {
-	*Parameter
+	anValue
+	FormalParameterIndex int
 	*parameterMemberInner
 }
 
