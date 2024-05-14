@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,7 +25,7 @@ func (p *Program) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) GlobMatch(g glob.Glob) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
 	values := p.GlobRef(g)
 	return len(values) > 0, values, nil
 }

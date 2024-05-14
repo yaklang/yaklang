@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"regexp"
 	"sort"
 
@@ -15,6 +16,9 @@ type Program struct {
 	Program *ssa.Program
 	DBCache *ssa.Cache
 	config  *config
+
+	// come from database will affect search operation
+	comeFromDatabase bool
 }
 
 func (p *Program) GetNames() []string {
@@ -91,10 +95,17 @@ func (g *Program) GlobRefRaw(rule string) Values {
 		log.Warnf("GlobRef for %v compile failed: %s", rule, err)
 		return nil
 	}
-	return g.GlobRef(r)
+	return g.GlobRef(&sfvm.GlobEx{Origin: r, Rule: rule})
 }
 
-func (p *Program) GlobRef(r glob.Glob) Values {
+func (p *Program) GlobRef(r sfvm.Glob) Values {
+	if p.comeFromDatabase {
+		for result := range p.DBCache.GlobSearch(r.String()) {
+			log.Infof("search glob value: %v", result.GetShortVerboseName())
+		}
+		return nil
+	}
+
 	return lo.FilterMap(
 		p.DBCache.GetByVariableGlob(r),
 		func(i ssa.Instruction, _ int) (*Value, bool) {

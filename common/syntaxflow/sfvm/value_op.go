@@ -1,7 +1,6 @@
 package sfvm
 
 import (
-	"github.com/gobwas/glob"
 	"regexp"
 )
 
@@ -14,7 +13,7 @@ type ValueOperator interface {
 	// ExactMatch return ops, for OpPushSearchExact
 	ExactMatch(string) (bool, ValueOperator, error)
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(glob.Glob) (bool, ValueOperator, error)
+	GlobMatch(Glob) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
 	RegexpMatch(*regexp.Regexp) (bool, ValueOperator, error)
 

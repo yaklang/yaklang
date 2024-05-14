@@ -17,6 +17,24 @@ type SFFrame struct {
 	debug       bool
 }
 
+type Glob interface {
+	Match(string) bool
+	String() string
+}
+
+type GlobEx struct {
+	Origin glob.Glob
+	Rule   string
+}
+
+func (g *GlobEx) Match(d string) bool {
+	return g.Origin.Match(d)
+}
+
+func (g *GlobEx) String() string {
+	return g.Rule
+}
+
 func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
 	v := vars
 	if v == nil {
@@ -82,7 +100,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Wrapf(err, "search exact failed")
 			}
 			if !result {
-				s.debugSubLog("result: %v, not found, got: %s", i.UnaryStr, value.GetName())
+				s.debugSubLog("result: %v, not found（exactly）, got: %s", i.UnaryStr, value.GetName())
 				return utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
@@ -104,12 +122,13 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if err != nil {
 				return utils.Wrap(err, "compile glob failed")
 			}
-			result, next, err := value.GlobMatch(globIns)
+
+			result, next, err := value.GlobMatch(&GlobEx{Origin: globIns, Rule: i.UnaryStr})
 			if err != nil {
 				return utils.Wrap(err, "search glob failed")
 			}
 			if !result {
-				s.debugSubLog("result: %v, not found", i.UnaryStr)
+				s.debugSubLog("result: %v, not found(glob search)", i.UnaryStr)
 				return utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
@@ -137,7 +156,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Wrap(err, "search regexp failed")
 			}
 			if !result {
-				s.debugSubLog("result: %v, not found", i.UnaryStr)
+				s.debugSubLog("result: %v, not found(regexp search)", i.UnaryStr)
 				return utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
