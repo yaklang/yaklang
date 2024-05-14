@@ -53,7 +53,7 @@ func (c *Cache) Yield(db *gorm.DB) chan Instruction {
 	go func() {
 		defer close(ch)
 
-		var pack []*ssadb.IrCode
+		var pack []*ssadb.IrVariable
 		var pg *bizhelper.Paginator
 		var page = 1
 		for {
@@ -62,7 +62,9 @@ func (c *Cache) Yield(db *gorm.DB) chan Instruction {
 				break
 			}
 			for _, inst := range pack {
-				ch <- c.newLazyInstruction(inst.GetIdInt64())
+				for _, id := range inst.InstructionID {
+					ch <- c.newLazyInstruction(id)
+				}
 			}
 			if pg.TotalPage == page {
 				break
@@ -72,32 +74,6 @@ func (c *Cache) Yield(db *gorm.DB) chan Instruction {
 		db.Find(&pack)
 	}()
 	return ch
-}
-
-func (c *Cache) ExactSearch(value string) chan Instruction {
-	db := c.DB.Where("program_name = ?", c.ProgramName)
-	db = db.Where("("+
-		"short_verbose_name = ? "+
-		"OR verbose_name = ?"+
-		"OR name = ?"+
-		"OR variable = ?"+
-		"OR constant_value = ?"+
-		"OR `string` = ?"+
-		")", value, value, value, value, value, value)
-	return c.Yield(db)
-}
-
-func (c *Cache) GlobSearch(value string) chan Instruction {
-	db := c.DB.Where("program_name = ?", c.ProgramName)
-	db = db.Where("("+
-		"short_verbose_name GLOB ? "+
-		"OR verbose_name GLOB ?"+
-		"OR name GLOB ?"+
-		"OR variable GLOB ?"+
-		"OR constant_value GLOB ?"+
-		"OR `string` GLOB ?"+
-		")", value, value, value, value, value, value)
-	return c.Yield(db)
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -179,8 +155,48 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 }
 
 // =============================================== Variable =======================================================
+func (c *Cache) exactSearchVariable(value string) chan Instruction {
+	db := c.DB.Model(&ssadb.IrVariable{}).Where("program_name = ?", c.ProgramName)
+	db = db.Where("("+
+		"variable_name = ?"+
+		"OR slice_member_name = ?"+
+		"OR field_member_name = ?"+
+		")", value, value, value)
+	return c.Yield(db)
+}
+
+func (c *Cache) globSearchVariable(value string) chan Instruction {
+	db := c.DB.Model(&ssadb.IrVariable{}).Where("program_name = ?", c.ProgramName)
+	db = db.Where("("+
+		"variable_name GLOB ? "+
+		"OR slice_member_name GLOB ? "+
+		"OR field_member_name GLOB ?"+
+		")", value, value, value)
+	return c.Yield(db)
+}
+
+func (c *Cache) regexpSearchVariable(value string) chan Instruction {
+	db := c.DB.Model(&ssadb.IrVariable{}).Where("program_name = ?", c.ProgramName)
+	db = db.Where("("+
+		"variable_name REGEXP ?"+
+		"OR slice_member_name REGEXP ?"+
+		"OR field_member_name REGEXP ?"+
+		")", value, value, value)
+	return c.Yield(db)
+}
+
+func (c *Cache) HaveDatabaseBackend() bool {
+	return c.DB != nil && c.ProgramName != ""
+}
 
 func (c *Cache) GetByVariable(name string) []Instruction {
+	if c.HaveDatabaseBackend() {
+		var ins []Instruction
+		for i := range c.exactSearchVariable(name) {
+			ins = append(ins, i)
+		}
+		return ins
+	}
 	ret, ok := c.VariableCache.Get(name)
 	if !ok && c.DB != nil {
 		// get from database
@@ -198,6 +214,13 @@ func (c *Cache) GetByVariable(name string) []Instruction {
 
 // GetByVariableGlob means get variable name(glob).
 func (c *Cache) GetByVariableGlob(g sfvm.Glob) []Instruction {
+	if c.HaveDatabaseBackend() {
+		var ins []Instruction
+		for i := range c.globSearchVariable(g.String()) {
+			ins = append(ins, i)
+		}
+		return ins
+	}
 	var ins []Instruction
 	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
 		log.Infof("GetByVariableGlob: %s", s)
@@ -210,6 +233,14 @@ func (c *Cache) GetByVariableGlob(g sfvm.Glob) []Instruction {
 
 // GetByVariableRegexp will filter Instruction via variable regexp name
 func (c *Cache) GetByVariableRegexp(r *regexp.Regexp) []Instruction {
+	if c.HaveDatabaseBackend() {
+		var ins []Instruction
+		for i := range c.regexpSearchVariable(r.String()) {
+			ins = append(ins, i)
+		}
+		return ins
+	}
+
 	var ins []Instruction
 	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
 		if r.MatchString(s) {
