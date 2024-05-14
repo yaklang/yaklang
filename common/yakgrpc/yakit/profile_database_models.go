@@ -51,6 +51,9 @@ var ProjectTables = []interface{}{
 
 	// HybridScan
 	&HybridScanTask{},
+
+	// Progress
+	&Progress{},
 }
 
 func UserDataAndPluginDatabaseScope(db *gorm.DB) *gorm.DB {

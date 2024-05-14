@@ -4,7 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
@@ -345,20 +345,64 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	return s.DebugPlugin(reqParams, stream)
 }
 
-func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPortScanRequest) (*ypb.Empty, error) {
-	// 用于管理进度保存相关内容
-	manager := NewProgressManager(s.GetProjectDatabase())
-	uid := uuid.New().String()
-	manager.AddSimpleDetectTaskToPool(uid, req)
-	return nil, nil
-}
-
 func (s *Server) RecoverSimpleDetectUnfinishedTask(req *ypb.RecoverExecBatchYakScriptUnfinishedTaskRequest, stream ypb.Yak_RecoverSimpleDetectUnfinishedTaskServer) error {
-	manager := NewProgressManager(s.GetProjectDatabase())
-	reqTask, err := manager.GetSimpleProgressByUid(req.GetUid(), true, false)
+	reqTask, err := s.GetSimpleDetectRecordRequestById(context.Background(), &ypb.GetUnfinishedTaskDetailByIdRequest{RuntimeId: req.GetUid()})
 	if err != nil {
 		return utils.Errorf("recover request by uid[%s] failed: %s", req.GetUid(), err)
 	}
-
 	return s.SimpleDetect(reqTask, stream)
+}
+
+func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPortScanRequest) (*ypb.Empty, error) {
+	// 用于管理进度保存相关内容
+	runtimeId := req.GetRuntimeId()
+	if runtimeId == "" {
+		runtimeId = uuid.New().String()
+	}
+	AddSimpleDetectTask(runtimeId, req)
+	return nil, nil
+}
+
+func (s *Server) QuerySimpleDetectUnfinishedTask(ctx context.Context, req *ypb.QueryUnfinishedTaskRequest) (*ypb.QueryUnfinishedTaskResponse, error) {
+	filter := req.GetFilter()
+	filter.ProgressSource = []string{KEY_SimpleDetectManager}
+	_, progressList, err := yakit.QueryProgress(s.GetProjectDatabase(), req.GetPagination(), filter)
+	if err != nil {
+		return nil, err
+	}
+
+	var tasks []*ypb.UnfinishedTask
+	for _, progress := range progressList {
+		tasks = append(tasks, &ypb.UnfinishedTask{
+			Percent:              progress.CurrentProgress,
+			CreatedAt:            progress.CreatedAt.Unix(),
+			RuntimeId:            progress.RuntimeId,
+			YakScriptOnlineGroup: progress.YakScriptOnlineGroup,
+			TaskName:             progress.TaskName,
+			LastRecordPtr:        progress.LastRecordPtr,
+		})
+	}
+	return &ypb.QueryUnfinishedTaskResponse{Tasks: tasks}, nil
+}
+
+func (s *Server) GetSimpleDetectRecordRequestById(ctx context.Context, req *ypb.GetUnfinishedTaskDetailByIdRequest) (*ypb.RecordPortScanRequest, error) {
+	return GetSimpleDetectUnfinishedTaskByUid(s.GetProjectDatabase(), req.GetRuntimeId())
+}
+
+func (s *Server) RecoverSimpleDetectTask(req *ypb.RecoverUnfinishedTaskRequest, stream ypb.Yak_RecoverSimpleDetectTaskServer) error {
+	reqTask, err := s.GetSimpleDetectRecordRequestById(context.Background(), &ypb.GetUnfinishedTaskDetailByIdRequest{RuntimeId: req.GetRuntimeId()})
+	if err != nil {
+		return utils.Errorf("recover request by uid[%s] failed: %s", req.GetRuntimeId(), err)
+	}
+	return s.SimpleDetect(reqTask, stream)
+}
+
+func (s *Server) DeleteSimpleDetectUnfinishedTask(ctx context.Context, req *ypb.DeleteUnfinishedTaskRequest) (*ypb.Empty, error) {
+	filter := req.GetFilter()
+	filter.ProgressSource = []string{KEY_SimpleDetectManager}
+	_, err := yakit.DeleteProgress(s.GetProjectDatabase(), filter)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
