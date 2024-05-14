@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"strings"
 
@@ -101,7 +102,7 @@ func (s *Server) StartBrute(params *ypb.StartBruteParams, stream ypb.Yak_StartBr
 	}
 
 	return s.debugScript(
-		"", "yak", startBruteScript, stream, execParams, nil,
+		"", "yak", startBruteScript, stream, execParams, uuid.New().String(), nil,
 	)
 }
 
