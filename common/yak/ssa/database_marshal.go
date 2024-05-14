@@ -169,6 +169,13 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			params["formalParam_default"] = ret.defaultValue.GetId()
 		}
 		params["formalParam_index"] = ret.FormalParameterIndex
+	case *ParameterMember:
+		params["formalParamMember_index"] = ret.FormalParameterIndex
+		params["member_call_kind"] = ret.MemberCallKind
+		params["member_call_index"] = ret.MemberCallObjectIndex
+		params["member_call_name"] = ret.MemberCallObjectName
+		params["member_call_key"] = ret.MemberCallKey.GetId()
+		// params["member_call_obj"] = ret.GetObject().GetId()
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
 	case *Recover:
@@ -344,6 +351,12 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.defaultValue = newLazyInstruction(defaultValue)
 		}
 		ret.FormalParameterIndex = int(params["formalParam_index"].(float64))
+	case *ParameterMember:
+		ret.FormalParameterIndex = int(params["formalParamMember_index"].(float64))
+		ret.MemberCallKind = ParameterMemberCallKind(params["member_call_kind"].(float64))
+		ret.MemberCallObjectIndex = int(params["member_call_index"].(float64))
+		ret.MemberCallObjectName = params["member_call_name"].(string)
+		ret.MemberCallKey = newLazyInstruction(params["member_call_key"])
 	case *Phi:
 		ret.Edge = unmarshalValues(params["phi_edges"])
 	// case *Recover:

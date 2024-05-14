@@ -111,9 +111,9 @@ func CreateInstruction(op Opcode) Instruction {
 		}
 	case SSAOpcodeParameterMember:
 		return &ParameterMember{
-			Parameter: &Parameter{
-				anValue: NewValue(),
-			},
+			anValue:              NewValue(),
+			FormalParameterIndex: 0,
+			parameterMemberInner: &parameterMemberInner{},
 		}
 	case SSAOpcodeFreeValue:
 		return &Parameter{

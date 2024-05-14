@@ -261,7 +261,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			var vals Values
 			vals = append(vals, i)
 			// 获取ParameterMember的形参定义
-			obj := inst.Parameter.GetObject()
+			obj := inst.GetObject()
 			if obj != nil {
 				if inst.MemberCallKind == ssa.ParameterMemberCall {
 					objValue := NewValue(obj)

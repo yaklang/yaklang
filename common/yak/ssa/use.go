@@ -79,6 +79,9 @@ func (e *ExternLib) ReplaceValue(v Value, to Value) {
 func (p *Parameter) HasValues() bool   { return false }
 func (p *Parameter) GetValues() Values { return nil }
 
+func (p *ParameterMember) HasValues() bool   { return false }
+func (p *ParameterMember) GetValues() Values { return nil }
+
 // ----------- ConstInst
 func (c *ConstInst) HasValues() bool {
 	return c.Origin != nil
