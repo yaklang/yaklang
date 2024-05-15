@@ -1,6 +1,8 @@
 package yak
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -9,6 +11,7 @@ import (
 type Sandbox struct {
 	config *SandboxConfig
 	engine *antlr4yak.Engine
+	mutex  *sync.Mutex
 }
 
 type SandboxConfig struct {
@@ -42,10 +45,14 @@ func NewSandbox(opts ...SandboxOption) *Sandbox {
 	return &Sandbox{
 		config: c,
 		engine: s,
+		mutex:  new(sync.Mutex),
 	}
 }
 
 func (s Sandbox) ExecuteAsExpressionRaw(code string, vars map[string]any) (ret any, err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	return s.engine.ExecuteAsExpression(code, vars)
 }
 
@@ -56,6 +63,9 @@ func (s *Sandbox) ExecuteAsExpression(code string, vars ...any) (ret any, err er
 			merged[k] = v
 		}
 	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	return s.engine.ExecuteAsExpression(code, merged)
 }
 
@@ -66,6 +76,9 @@ func (s *Sandbox) ExecuteAsBoolean(code string, vars ...any) (ret bool, err erro
 			merged[k] = v
 		}
 	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	return s.engine.ExecuteAsBooleanExpression(code, merged)
 }
 
