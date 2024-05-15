@@ -342,7 +342,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		called := actx.GetCurrentCall()
 		if called == nil {
 			// 允许跨类进行TopDef的查找
-			if actx.config.AllowCallStack {
+			if actx.config.AllowIgnoreCallStack {
 				fun := i.GetFunction()
 				if fun != nil {
 					call2fun := fun.GetCalledBy()
@@ -363,7 +363,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		calledByValue := getCalledByValue(called)
 		vals = append(vals, calledByValue...)
-		if actx.config.AllowCallStack {
+		if actx.config.AllowIgnoreCallStack {
 			fun := i.GetFunction()
 			if fun != nil {
 				call2fun := fun.GetCalledBy()

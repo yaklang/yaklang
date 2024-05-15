@@ -7,8 +7,8 @@ type OperationConfig struct {
 	MinDepth int
 
 	// Hook
-	HookEveryNode  func(*Value) error
-	AllowCallStack bool
+	HookEveryNode        func(*Value) error
+	AllowIgnoreCallStack bool
 }
 
 type OperationOption func(*OperationConfig)
@@ -27,7 +27,7 @@ func WithMinDepth(minDepth int) OperationOption {
 
 func WithAllowCallStack(allowCallStack bool) OperationOption {
 	return func(operationConfig *OperationConfig) {
-		operationConfig.AllowCallStack = allowCallStack
+		operationConfig.AllowIgnoreCallStack = allowCallStack
 	}
 }
 
@@ -51,7 +51,8 @@ func WithHookEveryNode(hookNode func(*Value) error) OperationOption {
 
 func NewOperations(opt ...OperationOption) *OperationConfig {
 	config := &OperationConfig{
-		MaxDepth: -1,
+		MaxDepth:             -1,
+		AllowIgnoreCallStack: true,
 	}
 
 	for _, o := range opt {
