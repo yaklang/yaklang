@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/samber/lo"
 	"io"
 	"net"
 	"strings"
@@ -121,10 +120,10 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 	}
 
 	mergeResults := func(results []*tpb.DNSLogEvent) []*tpb.DNSLogEvent {
-		var extraEvents = make([]*tpb.DNSLogEvent, len(results)+len(httpResults))
+		var extraEvents = make([]*tpb.DNSLogEvent, len(results), len(results)+len(httpResults)+len(httpResults))
 		copy(extraEvents, results)
 		if len(httpResults) > 0 {
-			copy(extraEvents[len(results):], lo.Map(httpResults, func(item *tpb.HTTPRequestTriggerNotification, index int) *tpb.DNSLogEvent {
+			for _, item := range httpResults {
 				var t string
 				if item.IsHttps {
 					t = "HTTPS"
@@ -134,7 +133,7 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 				_ = t
 				domain := utils.ExtractHost(item.Url)
 				ip, port, _ := utils.ParseStringToHostPort(item.GetRemoteAddr())
-				return &tpb.DNSLogEvent{
+				event := &tpb.DNSLogEvent{
 					Type:       t,
 					Token:      token,
 					Domain:     domain,
@@ -145,7 +144,20 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 					Timestamp:  item.GetTriggerTimestamp(),
 					Mode:       mode,
 				}
-			}))
+				eventCompact := &tpb.DNSLogEvent{
+					Type:       "A",
+					Token:      token,
+					Domain:     domain,
+					RemoteAddr: item.GetRemoteAddr(),
+					RemoteIP:   ip,
+					RemotePort: int32(port),
+					Raw:        item.GetRequest(),
+					Timestamp:  item.GetTriggerTimestamp(),
+					Mode:       mode,
+				}
+				extraEvents = append(extraEvents, event)
+				extraEvents = append(extraEvents, eventCompact)
+			}
 		}
 		return extraEvents
 	}
