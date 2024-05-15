@@ -99,25 +99,12 @@ func TestOUTPUT_AiChat(t *testing.T) {
 	subMsgN := 0
 	msg := ""
 	time.Sleep(time.Second)
-	endCh := make(chan struct{})
-	sendEndFlag := func() {
-		endCh <- struct{}{}
-	}
-	wait = func() {
-		select {
-		case <-endCh:
-		case <-time.After(time.Second * 10):
-		}
-	}
 	engine = yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
 		s := re.FindAllString(string(i.Message), -1)
 		for _, s2 := range s {
 			msg += s2
 		}
 		subMsgN++
-		if strings.Contains(msg, "你好我是人工智障助手") {
-			sendEndFlag()
-		}
 		print(string(i.Raw))
 		return nil
 	}))
@@ -125,7 +112,6 @@ func TestOUTPUT_AiChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wait()
 	assert.Equal(t, true, subMsgN >= 3)
 	assert.Contains(t, msg, "你好我是人工智障助手")
 }
