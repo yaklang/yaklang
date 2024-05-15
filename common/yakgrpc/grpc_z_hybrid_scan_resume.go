@@ -101,7 +101,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	swg := utils.NewSizedWaitGroup(int(scanConfig.Concurrent))                                                                     // 设置并发数
 	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(scanConfig.TotalTimeoutSecond)*time.Second) // 设置总超时
 	// init some config
-	var riskCount, _ = yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
+	var riskCount, _ = yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), task.TaskId)
 	var resumeFilterManager = NewFilterManager(12, 1<<15, 30)
 	var hasUnavailableTarget = false
 
