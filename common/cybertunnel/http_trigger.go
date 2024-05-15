@@ -104,6 +104,16 @@ func (t *HTTPTrigger) serveRequest(isTls bool, req []byte, conn net.Conn) error 
 	return nil
 }
 
+func (t *HTTPTrigger) QueryResults(token string) ([]*tpb.HTTPRequestTriggerNotification, bool) {
+	if defaultHTTPTrigger == nil {
+		return nil, false
+	}
+	if defaultHTTPTrigger.notificationCache == nil {
+		return nil, false
+	}
+	return defaultHTTPTrigger.notificationCache.Get(strings.ToLower(token))
+}
+
 func (t *HTTPTrigger) Register(token string, response func([]byte) []byte) ([]string, error) {
 	token = strings.ToLower(token)
 	if t == nil {

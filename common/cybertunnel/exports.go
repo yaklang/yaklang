@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
-	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/dnslog/brokers"
+	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/brokers"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
