@@ -87,15 +87,15 @@ func (v *BaseSyntaxFlowVisitor) VisitAllParam(ctx *AllParamContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitEveryParam(ctx *EveryParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitActualParamFilter(ctx *ActualParamFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitSingleParam(ctx *SingleParamContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFilterParam(ctx *FilterParamContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitEmptyParam(ctx *EmptyParamContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
