@@ -2,7 +2,6 @@ package cybertunnel
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/cybertunnel/dnslog"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -103,7 +102,7 @@ func NewTunnelServer(dnslogDomain, externalIPConfigged string) (*TunnelServer, e
 		DNSLogDomain: strings.Trim(strings.TrimSpace(strings.ToLower(dnslogDomain)), "."),
 	}
 	if s.ExternalIP == "" {
-		i, err := dnslog.GetExternalIP()
+		i, err := GetExternalIP()
 		if err != nil {
 			return nil, err
 		}

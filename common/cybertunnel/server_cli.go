@@ -14,7 +14,6 @@ import (
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 
-	"github.com/yaklang/yaklang/common/cybertunnel/dnslog"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -233,7 +232,7 @@ func GetTunnelServerCommandCli() *cli.App {
 			if c.String("domain") == "" {
 				return utils.Error("empty dnslog domain config")
 			}
-			dnslogServer, err := dnslog.NewDNSLogServer(c.String("domain"), c.String("public-ip"))
+			dnslogServer, err := NewDNSLogServer(c.String("domain"), c.String("public-ip"))
 			if err != nil {
 				return utils.Errorf("serve dns log failed: %s", err)
 			}

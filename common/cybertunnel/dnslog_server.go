@@ -1,15 +1,16 @@
-package dnslog
+package cybertunnel
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"net"
 	"strings"
 	"time"
 
-	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/dnslog/brokers"
+	dnslogbrokers "github.com/yaklang/yaklang/common/cybertunnel/brokers"
 
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/facades"
@@ -64,11 +65,20 @@ type DNSLogGRPCServer struct {
 	core             *facades.DNSServer
 }
 
+func tryRegisterHTTPTrigger(token string) {
+	defaultHTTPTrigger.Register(token, func(raw []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\n" +
+			"Content-Length: " + fmt.Sprint(len(token)) + "\r\n" +
+			"\r\n" + token)
+	})
+}
+
 func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.RequireDomainParams) (*tpb.RequireDomainResponse, error) {
 	mode := params.GetMode()
 	if mode == "*" {
 		mode = dnslogbrokers.Random()
 	}
+
 	a, _ := dnslogbrokers.Get(mode)
 	if a != nil {
 		domain, token, err := a.Require(15 * time.Second)
@@ -76,6 +86,7 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 			return nil, utils.Errorf("require[%v] dnslog failed: %s", mode, err)
 		}
 		D.tokenToModeCache.Set(token, a.Name())
+		tryRegisterHTTPTrigger(token)
 		return &tpb.RequireDomainResponse{
 			Domain: domain,
 			Token:  token,
@@ -84,6 +95,7 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 	}
 	token := utils.RandStringBytes(10)
 	token = strings.ToLower(token)
+	tryRegisterHTTPTrigger(token)
 	return &tpb.RequireDomainResponse{
 		Domain: fmt.Sprintf("%v.%v", token, D.domain),
 		Token:  token,
@@ -97,6 +109,9 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 		mode = dnslogbrokers.Random()
 	}
 
+	var token = params.GetToken()
+	httpResults, _ := defaultHTTPTrigger.QueryResults(strings.ToLower(params.GetToken()))
+
 	if mode == "" {
 		raw, _ := D.tokenToModeCache.Get(params.GetToken())
 		ret := utils.InterfaceToString(raw)
@@ -104,6 +119,36 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 			mode = ret
 		}
 	}
+
+	mergeResults := func(results []*tpb.DNSLogEvent) []*tpb.DNSLogEvent {
+		var extraEvents = make([]*tpb.DNSLogEvent, len(results)+len(httpResults))
+		copy(extraEvents, results)
+		if len(httpResults) > 0 {
+			copy(extraEvents[len(results):], lo.Map(httpResults, func(item *tpb.HTTPRequestTriggerNotification, index int) *tpb.DNSLogEvent {
+				var t string
+				if item.IsHttps {
+					t = "HTTPS"
+				} else {
+					t = "HTTP"
+				}
+				domain := utils.ExtractHost(item.Url)
+				ip, port, _ := utils.ParseStringToHostPort(item.GetRemoteAddr())
+				return &tpb.DNSLogEvent{
+					Type:       t,
+					Token:      token,
+					Domain:     domain,
+					RemoteAddr: item.GetRemoteAddr(),
+					RemoteIP:   ip,
+					RemotePort: int32(port),
+					Raw:        item.GetRequest(),
+					Timestamp:  item.GetTriggerTimestamp(),
+					Mode:       mode,
+				}
+			}))
+		}
+		return extraEvents
+	}
+
 	if mode != "" {
 		a, _ := dnslogbrokers.Get(params.Mode)
 		if a != nil {
@@ -112,16 +157,16 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 				return nil, utils.Errorf("require[%v] dnslog failed: %s", a.Name(), err)
 			}
 			return &tpb.QueryExistedDNSLogResponse{
-				Events: results,
+				Events: mergeResults(results),
 			}, nil
 		}
 	}
 
 	events, ok := D.cache.Get(params.GetToken())
 	if !ok {
-		return &tpb.QueryExistedDNSLogResponse{Events: nil}, nil
+		return &tpb.QueryExistedDNSLogResponse{Events: mergeResults(nil)}, nil
 	}
-	rsp := &tpb.QueryExistedDNSLogResponse{Events: events}
+	rsp := &tpb.QueryExistedDNSLogResponse{Events: mergeResults(events)}
 	return rsp, nil
 }
 
