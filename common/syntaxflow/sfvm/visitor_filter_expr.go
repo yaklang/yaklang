@@ -61,7 +61,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			return err
 		}
 		y.EmitGetCall()
-		y.VisitActualParamFilter(ret.ActualParamFilter())
+		if ret.ActualParam() != nil {
+			y.VisitActualParam(ret.ActualParam())
+		}
 	case *sf.FieldIndexFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {
@@ -187,9 +189,13 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(i sf.INameFilterContext) error {
 	return utils.Error("BUG: in nameFilter, unknown type")
 }
 
-func (y *SyntaxFlowVisitor) VisitActualParamFilter(i sf.IActualParamFilterContext) error {
+func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
+	handlerItem := func(i sf.ISingleParamContext) {
+		ret, ok := (i).(*sf.SingleParamContext)
+		if !ok {
+			return
+		}
 
-	handlerItem := func(ret *sf.FilterParamContext) {
 		if ret.FilterStatement() != nil {
 			y.VisitFilterStatement(ret.FilterStatement())
 		}
@@ -198,21 +204,26 @@ func (y *SyntaxFlowVisitor) VisitActualParamFilter(i sf.IActualParamFilterContex
 
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
-		switch item := ret.ActualParamFilterItem().(type) {
-		case *sf.FilterParamContext:
-			y.EmitPushAllCallArgs()
-			handlerItem(item)
-		case *sf.EmptyParamContext:
-		}
-	case *sf.SingleParamContext:
-		for i, item := range ret.AllActualParamFilterItem() {
-			switch item := item.(type) {
-			case *sf.FilterParamContext:
-				y.EmitDuplicate()
-				y.EmitPushCallArgs(i)
-				handlerItem(item)
-			case *sf.EmptyParamContext:
+		y.EmitPushAllCallArgs()
+		handlerItem(ret.SingleParam())
+	case *sf.EveryParamContext:
+		for i, paraI := range ret.AllActualParamFilter() {
+			para, ok := paraI.(*sf.ActualParamFilterContext)
+			if !ok {
+				continue
 			}
+			single := para.SingleParam()
+			if single == nil {
+				continue
+			}
+			y.EmitDuplicate()
+			y.EmitPushCallArgs(i)
+			handlerItem(single)
+		}
+		if ret.SingleParam() != nil {
+			y.EmitDuplicate()
+			y.EmitPushCallArgs(len(ret.AllActualParamFilter()))
+			handlerItem(ret.SingleParam())
 		}
 	default:
 		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))
