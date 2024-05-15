@@ -1934,6 +1934,13 @@ message YaklangInspectInformationResponse {
   repeated YaklangInformation Information = 1;
   repeated YakScriptParam CliParameter = 2;
   repeated YakRiskInfo RiskInfo = 3;
+  repeated YakUIInfo UIInfo = 4;
+}
+
+message YakUIInfo {
+    string Typ = 1;
+    repeated string Effected = 2;
+    string WhenExpression = 3;
 }
 
 message YakRiskInfo {

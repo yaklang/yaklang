@@ -31,6 +31,18 @@ type PluginParamSelectData struct {
 	Value string `json:"value"`
 }
 
+func uiInfo2grpc(info []*information.UIInfo) []*ypb.YakUIInfo {
+	ret := make([]*ypb.YakUIInfo, 0, len(info))
+	for _, i := range info {
+		ret = append(ret, &ypb.YakUIInfo{
+			Typ:            i.Typ,
+			Effected:       i.Effected,
+			WhenExpression: i.WhenExpression,
+		})
+	}
+	return ret
+}
+
 func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 	ret := make([]*ypb.YakScriptParam, 0, len(params))
 
@@ -110,8 +122,11 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	ret.CliParameter = cliParam2grpc(information.ParseCliParameter(prog))
+	parameters, uiInfos := information.ParseCliParameter(prog)
+	ret.CliParameter = cliParam2grpc(parameters)
+	ret.UIInfo = uiInfo2grpc(uiInfos)
 	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
+
 	return ret, nil
 }
 
@@ -292,8 +307,9 @@ func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
+	parameters, _ := information.ParseCliParameter(prog)
 	codeParameter := lo.SliceToMap(
-		cliParam2grpc(information.ParseCliParameter(prog)),
+		cliParam2grpc(parameters),
 		func(ysp *ypb.YakScriptParam) (string, *ypb.YakScriptParam) {
 			return ysp.Field, ysp
 		},
