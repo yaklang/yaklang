@@ -651,6 +651,9 @@ service Yak {
   rpc GetSpaceEngineAccountStatus(GetSpaceEngineAccountStatusRequest) returns(SpaceEngineStatus);
   rpc FetchPortAssetFromSpaceEngine(FetchPortAssetFromSpaceEngineRequest) returns (stream ExecResult);
 
+  // 表达式执行
+  rpc EvaluateExpression(EvaluateExpressionRequest) returns (EvaluateExpressionResponse);
+
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -4936,4 +4939,14 @@ message TraceRouteResponse{
   int64 Rtt = 2;
   string Reason = 3;
   int64 Hop = 4;
+}
+
+message EvaluateExpressionRequest {
+    string Expression = 1;
+    repeated KVPair Variables = 2;
+}
+
+message EvaluateExpressionResponse {
+    string Result = 1; // json marshal
+    bool BoolResult = 2;
 }

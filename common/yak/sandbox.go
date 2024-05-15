@@ -45,8 +45,12 @@ func NewSandbox(opts ...SandboxOption) *Sandbox {
 	}
 }
 
+func (s Sandbox) ExecuteAsExpressionRaw(code string, vars map[string]any) (ret any, err error) {
+	return s.engine.ExecuteAsExpression(code, vars)
+}
+
 func (s *Sandbox) ExecuteAsExpression(code string, vars ...any) (ret any, err error) {
-	var merged = make(map[string]any)
+	merged := make(map[string]any)
 	for _, v := range vars {
 		for k, v := range utils.InterfaceToGeneralMap(v) {
 			merged[k] = v
@@ -56,7 +60,7 @@ func (s *Sandbox) ExecuteAsExpression(code string, vars ...any) (ret any, err er
 }
 
 func (s *Sandbox) ExecuteAsBoolean(code string, vars ...any) (ret bool, err error) {
-	var merged = make(map[string]any)
+	merged := make(map[string]any)
 	for _, v := range vars {
 		for k, v := range utils.InterfaceToGeneralMap(v) {
 			merged[k] = v
