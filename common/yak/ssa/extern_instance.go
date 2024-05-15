@@ -161,6 +161,7 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 		value.SetType(prog.handlerType(itype, 0))
 	}
 	value.SetExtern(true)
+	prog.SetVirtualRegister(value)
 	prog.SetInstructionWithName(str, value)
 	return
 }
