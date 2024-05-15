@@ -74,7 +74,7 @@ func AnyToBytes(i interface{}) (result []byte) {
 		return []byte(s.String())
 	case error:
 		return []byte(s.Error())
-	//case io.Reader:
+	// case io.Reader:
 	//	if ret != nil && ret.Read != nil {
 	//		bytes, _ = ioutil.ReadAll(ret)
 	//		return bytes
@@ -93,6 +93,63 @@ func AnyToBytes(i interface{}) (result []byte) {
 	return b
 }
 
-func AnyToString(i interface{}) string {
-	return string(AnyToBytes(i))
+func AnyToString(i interface{}) (result string) {
+	defer func() {
+		if err := recover(); err != nil {
+			result = string(fmt.Sprintf("%v", i))
+		}
+	}()
+
+	if i == nil {
+		return ""
+	}
+
+	switch s := i.(type) {
+	case nil:
+		return ""
+	case string:
+		result = s
+	case []byte:
+		result = string(s[0:])
+	case bool:
+		result = strconv.FormatBool(s)
+	case float64:
+		return strconv.FormatFloat(s, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(s), 'f', -1, 32)
+	case int:
+		return strconv.Itoa(s)
+	case int64:
+		return strconv.FormatInt(s, 10)
+	case int32:
+		return strconv.Itoa(int(s))
+	case int16:
+		return strconv.FormatInt(int64(s), 10)
+	case int8:
+		return strconv.FormatInt(int64(s), 10)
+	case uint:
+		return strconv.FormatUint(uint64(s), 10)
+	case uint64:
+		return strconv.FormatUint(s, 10)
+	case uint32:
+		return strconv.FormatUint(uint64(s), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(s), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(s), 10)
+	case fmt.Stringer:
+		return s.String()
+	case error:
+		return s.Error()
+	default:
+		// 尝试将i作为map转换成JSON
+		if jsonBytes, err := json.Marshal(i); err == nil {
+			result = string(jsonBytes)
+		} else {
+			// 如果转换失败，则回退到使用fmt.Sprintf
+			result = fmt.Sprintf("%v", i)
+		}
+	}
+
+	return
 }
