@@ -1,6 +1,11 @@
 package information
 
-import "github.com/yaklang/yaklang/common/yak/ssaapi"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+)
 
 type CliParameter struct {
 	Name           string
@@ -13,6 +18,13 @@ type CliParameter struct {
 	Group          string
 	MultipleSelect bool
 	SelectOption   map[string]string
+}
+
+type UIInfo struct {
+	Typ            string   // "show", "hide", "..."
+	Effected       []string // parameter names
+	effectGroup    []string // group names, will turn to `effected`
+	WhenExpression string   // when expression
 }
 
 func newCliParameter(name, typ, methodTyp string) *CliParameter {
@@ -30,9 +42,11 @@ func newCliParameter(name, typ, methodTyp string) *CliParameter {
 	}
 }
 
-func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
+func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 	// prog.Show()
-	ret := make([]*CliParameter, 0)
+	params := make([]*CliParameter, 0)
+	uiInfos := make([]*UIInfo, 0)
+	groups := make(map[string][]*CliParameter)
 
 	getConstString := func(v *ssaapi.Value) string {
 		if str, ok := v.GetConstValue().(string); ok {
@@ -45,6 +59,52 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			return b
 		}
 		return false
+	}
+
+	handleUIOption := func(ui *UIInfo, opt *ssaapi.Value) {
+		// opt.ShowUseDefChain()
+		if !opt.IsCall() {
+			// skip no function call
+			return
+		}
+		// check option function, get information
+		funcName := opt.GetOperand(0).GetName()
+		if strings.HasPrefix(funcName, "cli.show") {
+			ui.Typ = "show"
+		} else if strings.HasPrefix(funcName, "cli.hide") {
+			ui.Typ = "hide"
+		}
+
+		switch funcName {
+		case "cli.showGroup", "cli.hideGroup":
+			ui.effectGroup = append(ui.effectGroup, getConstString(opt.GetOperand(1)))
+		case "cli.showParams", "cli.hideParams":
+			operands := opt.GetOperands()
+			if len(operands) < 2 {
+				break
+			} else {
+				operands = operands[1:] // skip self
+			}
+
+			if ui.Effected == nil {
+				ui.Effected = make([]string, 0, len(operands))
+			}
+			operands.ForEach(func(v *ssaapi.Value) {
+				ui.Effected = append(ui.Effected, getConstString(v))
+			})
+		case "cli.when":
+			ui.WhenExpression = getConstString(opt.GetOperand(1))
+		case "cli.whenTrue":
+			ui.WhenExpression = fmt.Sprintf("%s == true", getConstString(opt.GetOperand(1)))
+		case "cli.whenFalse":
+			ui.WhenExpression = fmt.Sprintf("%s == false", getConstString(opt.GetOperand(1)))
+		case "cli.whenEqual":
+			ui.WhenExpression = fmt.Sprintf("%s == %s", getConstString(opt.GetOperand(1)), getConstString(opt.GetOperand(2)))
+		case "cli.whenNotEqual":
+			ui.WhenExpression = fmt.Sprintf("%s != %s", getConstString(opt.GetOperand(1)), getConstString(opt.GetOperand(2)))
+		case "cli.whenDefault":
+			ui.WhenExpression = "true"
+		}
 	}
 
 	handleOption := func(cli *CliParameter, opt *ssaapi.Value) {
@@ -66,6 +126,11 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			cli.Default = opt.GetOperand(1).GetConstValue()
 		case "cli.setCliGroup":
 			cli.Group = arg1
+			if _, ok := groups[arg1]; !ok {
+				groups[arg1] = make([]*CliParameter, 0)
+			}
+			groups[arg1] = append(groups[arg1], cli)
+
 		case "cli.setVerboseName":
 			cli.NameVerbose = arg1
 		case "cli.setMultipleSelect": // only for `cli.StringSlice`
@@ -83,8 +148,23 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			cli.SelectOption[arg1] = arg2
 		}
 	}
+	parseUiFunc := func(v *ssaapi.Value) {
+		v.GetUsers().Filter(
+			func(v *ssaapi.Value) bool {
+				// only function call and must be reachable
+				return v.IsCall() && v.IsReachable() != -1
+			},
+		).ForEach(func(v *ssaapi.Value) {
+			ui := new(UIInfo)
+			uiInfos = append(uiInfos, ui)
 
-	parseCliFunction := func(v *ssaapi.Value, typ, methodTyp string) {
+			v.GetOperands().ForEach(func(v *ssaapi.Value) {
+				handleUIOption(ui, v)
+			})
+		})
+	}
+
+	parseCliParameterFunc := func(v *ssaapi.Value, typ, methodTyp string) {
 		v.GetUsers().Filter(
 			func(v *ssaapi.Value) bool {
 				// only function call and must be reachable
@@ -95,6 +175,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			// op(0) => cli.String
 			// op(1) => "arg1"
 			// op(2...) => opt
+
 			nameValue := v.GetOperand(1)
 			name := ""
 			if nameValue.IsConstInst() {
@@ -115,7 +196,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			for i := 2; i < opLen; i++ {
 				handleOption(cli, v.GetOperand(i))
 			}
-			ret = append(ret, cli)
+			params = append(params, cli)
 		})
 	}
 
@@ -123,14 +204,34 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		if !v.IsFunction() {
 			return
 		}
-		pair, ok := methodMap[v.GetName()]
-		if !ok {
+		// ui info
+		funcName := v.GetName()
+		if funcName == "cli.UI" {
+			parseUiFunc(v)
 			return
 		}
-		parseCliFunction(v, pair.typ, pair.methodTyp)
+
+		// cli parameter
+		pair, ok := methodMap[funcName]
+		if ok {
+			parseCliParameterFunc(v, pair.typ, pair.methodTyp)
+		}
 	})
 
-	return ret
+	// handle effect group
+	for _, info := range uiInfos {
+		for _, name := range info.effectGroup {
+			group, ok := groups[name]
+			if !ok {
+				continue
+			}
+			for _, param := range group {
+				info.Effected = append(info.Effected, param.Name)
+			}
+		}
+	}
+
+	return params, uiInfos
 }
 
 type pair struct {
