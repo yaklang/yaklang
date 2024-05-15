@@ -2,6 +2,7 @@ package ssatest
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -18,16 +19,12 @@ import (
 
 type checkFunction func(*ssaapi.Program) error
 
-func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi.Language) {
+func Check(t *testing.T, code string, handler checkFunction, opt ...ssaapi.Option) {
 	// only in memory
-	opt := make([]ssaapi.Option, 0)
-	if len(languages) > 0 {
-		opt = append(opt, ssaapi.WithLanguage(languages[0]))
-	}
 	{
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
-		prog.Show()
+		// prog.Show()
 
 		log.Infof("only in memory ")
 		err = handler(prog)
@@ -41,7 +38,7 @@ func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi
 		prog, err := ssaapi.Parse(code, opt...)
 		defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), programID)
 		assert.Nil(t, err)
-		prog.Show()
+		// prog.Show()
 
 		log.Infof("with database ")
 		err = handler(prog)
@@ -59,13 +56,13 @@ func Check(t *testing.T, code string, handler checkFunction, languages ...ssaapi
 	}
 }
 
-func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, language ...ssaapi.Language) {
-	CheckSyntaxFlowEx(t, code, sf, true, wants, language...)
+func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
+	CheckSyntaxFlowEx(t, code, sf, true, wants, opt...)
 }
-func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, language ...ssaapi.Language) {
-	CheckSyntaxFlowEx(t, code, sf, false, wants, language...)
+func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
+	CheckSyntaxFlowEx(t, code, sf, false, wants, opt...)
 }
-func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, language ...ssaapi.Language) {
+func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, opt ...ssaapi.Option) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		results, err := prog.SyntaxFlowWithError(sf)
 		assert.Nil(t, err)
@@ -77,20 +74,20 @@ func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 		for k, want := range wants {
 			gotVs, ok := results[k]
 			assert.Truef(t, ok, "key[%s] not found", k)
+			got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+			sort.Strings(got)
+			sort.Strings(want)
 			if contain {
-				got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
 				if !utils.ContainsAll(got, want...) {
 					t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
 				}
 			} else {
 				assert.Equal(t, len(want), len(gotVs))
-				for i, got := range gotVs {
-					assert.Equal(t, want[i], got.String())
-				}
+				assert.Equal(t, want, got)
 			}
 		}
 		return nil
-	}, language...)
+	}, opt...)
 }
 
 func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {
