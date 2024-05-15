@@ -131,6 +131,7 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 				} else {
 					t = "HTTP"
 				}
+				_ = t
 				domain := utils.ExtractHost(item.Url)
 				ip, port, _ := utils.ParseStringToHostPort(item.GetRemoteAddr())
 				return &tpb.DNSLogEvent{
