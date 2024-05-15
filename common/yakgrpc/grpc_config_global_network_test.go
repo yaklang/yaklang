@@ -32,6 +32,13 @@ type GetawayClient struct {
 	valid bool
 }
 
+func (g *GetawayClient) CheckValid() error {
+	if g.valid {
+		return nil
+	}
+	return errors.New("invalid")
+}
+
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
 	if g.valid {
 		return "ok", nil
