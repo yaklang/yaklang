@@ -143,7 +143,12 @@ func (param *cliExtraParams) GetDefaultValue(i interface{}) interface{} {
 	return i
 }
 
-type SetCliExtraParam func(c *cliExtraParams)
+type (
+	SetCliExtraParam func(c *cliExtraParams)
+	UIParams         func()
+)
+
+var defaultUIParams = func() {}
 
 func parseInt(s string) int {
 	i, err := strconv.ParseInt(s, 10, 64)
@@ -746,6 +751,49 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
+func (c *CliApp) UI(opts ...UIParams) {
+}
+
+func (c *CliApp) showGroup(group string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) showParams(params ...string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) hideGroup(group string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) hideParams(params ...string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) whenTrue(param string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) whenFalse(param string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) whenEqual(param string, value string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) whenNotEqual(param string, value string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) when(expression string) UIParams {
+	return defaultUIParams
+}
+
+func (c *CliApp) whenDefault() UIParams {
+	return defaultUIParams
+}
+
 var CliExports = map[string]interface{}{
 	"Args":        DefaultCliApp.Args,
 	"Bool":        DefaultCliApp.Bool,
@@ -793,6 +841,19 @@ var CliExports = map[string]interface{}{
 	"setMultipleSelect": DefaultCliApp.SetMultipleSelect,
 	// 设置下拉框选项 (只支持`cli.StringSlice`)
 	"setSelectOption": DefaultCliApp.SetSelectOption,
+
+	// UI Info
+	"UI":           DefaultCliApp.UI,
+	"showGroup":    DefaultCliApp.showGroup,
+	"showParams":   DefaultCliApp.showParams,
+	"hideGroup":    DefaultCliApp.hideGroup,
+	"hideParams":   DefaultCliApp.hideParams,
+	"whenTrue":     DefaultCliApp.whenTrue,
+	"whenFalse":    DefaultCliApp.whenFalse,
+	"whenEqual":    DefaultCliApp.whenEqual,
+	"whenNotEqual": DefaultCliApp.whenEqual,
+	"whenDefault":  DefaultCliApp.whenDefault,
+	"when":         DefaultCliApp.when,
 
 	// 设置cli属性
 	"SetCliName": DefaultCliApp.SetCliName,

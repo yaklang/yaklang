@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -198,6 +199,87 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 					Group:        "",
 					ExtraSetting: "{\"double\":true,\"data\":[{\"label\":\"c\",\"value\":\"c\"},{\"label\":\"a\",\"value\":\"A\"},{\"label\":\"b\",\"value\":\"B\"}]}",
 				},
+			},
+			t,
+		)
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli_UI(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	check := func(code string, want []*ypb.YakUIInfo, t *testing.T) {
+		rsp := yaklangInspectInformationSend(local, "yak", code, nil)
+		if rsp == nil {
+			t.Fatal("no response")
+		}
+		// check ui
+		got := rsp.GetUIInfo()
+		require.Len(t, got, len(want), "ui length not match")
+
+		for i := range want {
+			require.Equal(t, want[i].Typ, got[i].Typ, "ui typ not match")
+			require.Equal(t, want[i].Effected, got[i].Effected, "ui effected parameter names not match")
+			require.Equal(t, want[i].WhenExpression, got[i].WhenExpression, "ui when expression not match")
+		}
+	}
+
+	t.Run("show/hide group", func(t *testing.T) {
+		check(
+			`
+		cli.String("a", cli.setCliGroup("group1"))
+		cli.Int("b", cli.setCliGroup("group1"))
+		cli.String("a2", cli.setCliGroup("group2"))
+		cli.Int("b2", cli.setCliGroup("group2"))
+		cli.Bool("c")
+		cli.UI(cli.showGroup("group1"), cli.whenTrue("c"))
+		cli.UI(cli.hideGroup("group2"), cli.whenFalse("c"))
+		`,
+			[]*ypb.YakUIInfo{
+				{Typ: "show", Effected: []string{"a", "b"}, WhenExpression: "c == true"},
+				{Typ: "hide", Effected: []string{"a2", "b2"}, WhenExpression: "c == false"},
+			},
+			t,
+		)
+	})
+
+	t.Run("show/hide params", func(t *testing.T) {
+		check(
+			`
+		cli.String("a", cli.setCliGroup("group1"))
+		cli.Int("b", cli.setCliGroup("group1"))
+		cli.String("a2", cli.setCliGroup("group2"))
+		cli.Int("b2", cli.setCliGroup("group2"))
+		cli.Bool("c")
+		cli.UI(cli.showParams("a", "b"), cli.whenTrue("c"))
+		cli.UI(cli.hideParams("a2", "b2"), cli.whenFalse("c"))
+		`,
+			[]*ypb.YakUIInfo{
+				{Typ: "show", Effected: []string{"a", "b"}, WhenExpression: "c == true"},
+				{Typ: "hide", Effected: []string{"a2", "b2"}, WhenExpression: "c == false"},
+			},
+			t,
+		)
+	})
+
+	t.Run("when expression test", func(t *testing.T) {
+		check(
+			`
+		cli.UI(cli.when("zxc && qwe"))
+		cli.UI(cli.whenTrue("zxc"))
+		cli.UI(cli.whenFalse("qwe"))
+		cli.UI(cli.whenEqual("zxc", "qwe"))
+		cli.UI(cli.whenNotEqual("zxc", "qwe"))
+		cli.UI(cli.whenDefault())
+		`,
+			[]*ypb.YakUIInfo{
+				{WhenExpression: "zxc && qwe"},
+				{WhenExpression: "zxc == true"},
+				{WhenExpression: "qwe == false"},
+				{WhenExpression: "zxc == qwe"},
+				{WhenExpression: "zxc != qwe"},
+				{WhenExpression: "true"},
 			},
 			t,
 		)
