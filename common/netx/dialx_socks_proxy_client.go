@@ -236,8 +236,6 @@ RECON:
 	resp, err = cfg.sendReceive(conn, req.Bytes())
 	if err != nil {
 		return
-	} else if len(resp) != 10 {
-		return nil, errors.New("server does not respond properly")
 	} else if resp[1] != 0 {
 		return nil, errors.New("can't complete SOCKS5 connection")
 	}
@@ -331,8 +329,6 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	resp, err := cfg.sendReceive(conn, req)
 	if err != nil {
 		return nil, err
-	} else if len(resp) != 8 {
-		return nil, errors.New("server does not respond properly")
 	}
 	switch resp[1] {
 	case 90:
