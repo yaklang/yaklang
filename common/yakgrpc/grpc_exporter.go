@@ -105,8 +105,8 @@ func (s *Server) ExtractDataToFile(input ypb.Yak_ExtractDataToFileServer) error 
 	}
 
 	if csvOutput {
-
 		fp, err := ioutil.TempFile(dirName, filePattern+".csv")
+		fp.Write([]byte("\xEF\xBB\xBF"))
 		if err != nil {
 			return utils.Errorf("open %v/%v.json failed: %s", dirName, filePattern, err)
 		}
