@@ -6,54 +6,66 @@ import (
 )
 
 func Test_HTTP_SSRF(t *testing.T) {
-	tests := []struct {
-		name   string
-		expect string
-		isSink bool
-		code   string
-	}{
-		{"aTaintCase023", "Parameter: Parameter-path", true, `/**
-     * 字符级别
-     * case应该被检出
-     * @param url
-     * @return
-     */
-    @PostMapping(value = "case023")
-    public Map<String, Object> aTaintCase023(@RequestParam String path) {
-        Map<String, Object> modelMap = new HashMap<>();
-		HttpUtil httpUtil = new HttpUtil();
-        try {
-            httpUtil.doGet(path+"/api/test.json");
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }
-`},
-		{"aTaintCase023_2", "Parameter: Parameter-path", false, ` /**
-     * 字符级别
-     * case不应被检出
-     * @param path
-     * @return
-     */
-    @PostMapping(value = "case023-2")
-    public Map<String, Object> aTaintCase023_2(@RequestParam String path) {
-        Map<String, Object> modelMap = new HashMap<>();
-		HttpUtil httpUtil = new HttpUtil();
-        try {
-            httpUtil.doGet("https://www.test.com/api");
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
+	data := []*TestCase{
+		{
+			Name: "aTaintCase023",
+			Code: `
+                /**
+                    * 字符级别
+                    * case应该被检出
+                    * @param url
+                    * @return
+                */
+                @PostMapping(value = "case023")
+                public Map<String, Object> aTaintCase023(@RequestParam String path) {
+                    Map<String, Object> modelMap = new HashMap<>();
+                    HttpUtil httpUtil = new HttpUtil();
+                    try {
+                        httpUtil.doGet(path+"/api/test.json");
+                        modelMap.put("status", "success");
+                    } catch (Exception e) {
+                        modelMap.put("status", "error");
+                    }
+                    return modelMap;
+                }
+                `,
+			Contain: true,
+			Expect: []string{
+				"Parameter-path",
+				"Parameter-param",
+				"Parameter-url",
+				`"/api/test.json"`,
+			},
+		},
+
+		{
+			Name: "aTaintCase023_2",
+			Code: `
+                @PostMapping(value = "case023")
+                public Map<String, Object> aTaintCase023(@RequestParam String path) {
+                    Map<String, Object> modelMap = new HashMap<>();
+                    HttpUtil httpUtil = new HttpUtil();
+                    try {
+                        httpUtil.doGet("/api/test.json");
+                        modelMap.put("status", "success");
+                    } catch (Exception e) {
+                        modelMap.put("status", "error");
+                    }
+                    return modelMap;
+                }
+                `,
+			Contain: true,
+			Expect: []string{
+				"Parameter-param",
+				"Parameter-url",
+				`"/api/test.json"`,
+			},
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.code = createHttpUtilCode(tt.code)
-			testRequestTopDef(t, tt.code, tt.expect, tt.isSink)
+	for _, tt := range data {
+		t.Run(tt.Name, func(t *testing.T) {
+			tt.Code = createHttpUtilCode(tt.Code)
+			testRequestTopDef(t, tt)
 		})
 	}
 }
