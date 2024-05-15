@@ -8,10 +8,11 @@ import (
 func Test_Simple_Exec_Case(t *testing.T) {
 	tests := []struct {
 		name   string
-		expect string
+		equal  bool
+		expect []string
 		code   string
 	}{
-		{"aTaintCase011", "Parameter: Parameter-cmd", `@GetMapping("case011/{cmd}")
+		{"aTaintCase011", true, []string{"Parameter-cmd"}, `@GetMapping("case011/{cmd}")
     public Map<String, Object> aTaintCase011(@PathVariable String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         try {
@@ -24,7 +25,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase012", "Parameter: Parameter-cmd", `@GetMapping("case011/{cmd}")
+		{"aTaintCase012", true, []string{"Parameter-cmd"}, `@GetMapping("case011/{cmd}")
     public Map<String, Object> aTaintCase011(@PathVariable String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         try {
@@ -37,13 +38,23 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0110", "Parameter: Parameter-request", ` @PostMapping("case0110")
-    public Map<String, Object> aTaintCase0110(@RequestParam("cmd") String cmd, HttpServletRequest request) {
-            String cmdStr = request.getParameterMap().get("cmd")[0];
-            Runtime.getRuntime().exec(cmdStr);
-       
-    }`},
-		{"aTaintCase0111", "Parameter: Parameter-request", ` /**
+		{"aTaintCase0110",
+			false, []string{
+				`Parameter-request`,
+				`"cmd"`,
+			},
+			` @PostMapping("case0110")
+            public Map<String, Object> aTaintCase0110(@RequestParam("cmd") String cmd, HttpServletRequest request) {
+                    String cmdStr = request.getParameterMap().get("cmd")[0];
+                    Runtime.getRuntime().exec(cmdStr);
+            
+            }`,
+		},
+		{"aTaintCase0111", false,
+			[]string{
+				"Parameter-request",
+			},
+			` /**
      * Arrayaccess
      * @param request
      * @return
@@ -60,8 +71,9 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }
-    }`},
-		{"aTaintCase0113", "Parameter: Parameter-cmd", `/**
+    `},
+		{"aTaintCase0113", false, []string{"Parameter-cmd"},
+			`/**
      * classinstance + initfix
      */
     @PostMapping(value = "case0113")
@@ -75,7 +87,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0117", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0117", true, []string{"Parameter-cmd"}, ` /**
      * arrayaccess
      */
     @PostMapping(value = "case0117")
@@ -93,7 +105,11 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0118", "Parameter: Parameter-cmd", `    /**
+		{"aTaintCase0118", true, []string{
+			"Parameter-cmd",
+			`"mkdir"`, `" "`,
+		},
+			`    /**
      * WhileStatement
      * @param cmd
      * @param type
@@ -115,7 +131,11 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0127", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0127", true, []string{
+			"Parameter-cmd",
+			`"mkdir"`, `"|"`,
+		},
+			` /**
      * forstatement
      * @param cmd
      * @return
@@ -136,7 +156,11 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0128", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0128", true, []string{
+			"Parameter-cmd",
+			`"|"`, `"mkdir"`,
+		},
+			`/**
      * DoStatement
      * @param cmd
      * @return
@@ -160,7 +184,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0129", "Parameter: Parameter-cmd", `   /**
+		{"aTaintCase0129", true, []string{"Parameter-cmd"}, `   /**
      * CastExpression
      * @param cmd
      * @return
@@ -178,7 +202,12 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0134", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0134", false, []string{
+			"Parameter-cmd",
+			"Parameter-methodname",
+			"Undefined-clazz",
+		},
+			`/**
 		* 反射调用
 		* @param cmd
 		* @return
@@ -202,7 +231,9 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		   }
 		   return modelMap;
 		}`},
-		{"aTaintCase0135", "Parameter: Parameter-cmd", `
+		{"aTaintCase0135", false, []string{
+			"Parameter-cmd", "1",
+		}, `
     /**
      * PrefixExpression
      */
@@ -218,7 +249,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0136", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0136", false, []string{"Parameter-cmd", "1"}, ` /**
      * PostfixExpression
      */
     @GetMapping("case0136/{cmd}")
@@ -233,7 +264,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0137", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0137", false, []string{"Parameter-cmd"},
+			`/**
 * 基本类型char 作为污点源
      * 测试数据传（0～9）
      * @return
@@ -250,7 +282,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0138", "Parameter: Parameter-cmd", `  /**
+		{"aTaintCase0138", false, []string{"Parameter-cmd"}, `  /**
      * 基本类型byte 作为污点源
      * @param cmd
      * @return
@@ -267,7 +299,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0139", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0139", false, []string{"Parameter-cmd"},
+			`/**
      * 基础类型long 作为污点源
      *
      * @param cmd
@@ -285,7 +318,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0140", "Parameter: Parameter-cmd", `  /**
+		{"aTaintCase0140", false, []string{"Parameter-cmd"}, `  /**
      * 引用类型Map 作为污点源
      *
      * @param cmd
@@ -306,7 +339,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0141", "Parameter: Parameter-cmd", `
+		{"aTaintCase0141", false, []string{"Parameter-cmd"}, `
     /**
      * 引用类型List 作为污点源
      *
@@ -329,7 +362,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0144", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0144", false, []string{"Parameter-cmd"}, ` /**
      * 基本数据类型的封装类型 Byte 作为污点源
      *
      * @param cmd
@@ -350,7 +383,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0145", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0145", false, []string{"Parameter-cmd"},
+			`/**
      * 基本数据类型的封装类型 Integer 作为污点源
      *
      * @param cmd
@@ -372,7 +406,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0146", "Parameter: Parameter-cmd", `
+		{"aTaintCase0146", false, []string{"Parameter-cmd"}, `
     /**
      * 基本数据类型的封装类型 Long 作为污点源
      * @param cmd
@@ -394,7 +428,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0147", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0147", false, []string{"Parameter-cmd"}, ` /**
      * 基本数据类型的封装类型 Character 作为污点源
      * @param cmd 测试数据使用（0~9）
      * @return
@@ -414,7 +448,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0149", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0149", false, []string{"Parameter-cmd"},
+			`/**
      * 数组 String[] 作为污点源
      *
      * @param cmd
@@ -436,7 +471,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `}, //数组 String[] 作为污点源
-		{"aTaintCase0150", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0150", false, []string{"Parameter-cmd", "2"},
+			`/**
      * 数组 char[] 作为污点源
      *
      * @param cmd [1,2]
@@ -458,7 +494,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`}, //数组 char[] 作为污点源
-		{"aTaintCase0151", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0151", false, []string{"Parameter-cmd"}, ` /**
      * 数组 byte[] 作为污点源
      *
      * @param cmd
@@ -480,7 +516,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0152", "Parameter: Parameter-cmd", `    /**
+		{"aTaintCase0152", true, []string{"Parameter-cmd"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -501,7 +537,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0153", "Parameter: Parameter-cmd", `    /**
+		{"aTaintCase0153", true, []string{"Parameter-cmd"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -523,7 +559,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }`},
 
-		{"aTaintCase0155", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0155", false, []string{"Parameter-cmd"}, ` /**
      * 类对象找不到对应的实现类
      *
      * @param
@@ -542,7 +578,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0158", "ls", `/**
+		{"aTaintCase0158", true, []string{`"ls"`},
+			`/**
      * 传播场景
      */
     /**
@@ -560,7 +597,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0159", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0159", false, []string{"Parameter-cmd", "1"},
+			`/**
      * 61 传播场景->运算符->位运算
      */
     @PostMapping(value = "case0159")
@@ -576,7 +614,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }`},
 		//传播场景->String操作
-		{"aTaintCase0161", "Parameter: Parameter-cmd", `  /**
+		{"aTaintCase0161", false, []string{"Parameter-cmd", `" -la"`}, `  /**
      * 63 传播场景->String操作->conact
      */
     @PostMapping(value = "case0161")
@@ -591,7 +629,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0162", "Parameter: Parameter-cmd", `  /**
+		{"aTaintCase0162", false, []string{"Parameter-cmd"}, `  /**
      * 传播场景->String操作->copyValueOf
      */
     @PostMapping(value = "case0162")
@@ -606,7 +644,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0163", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0163", false, []string{`"%s -la"`, "Parameter-cmd"}, ` /**
 		* 65 传播场景->String操作->format
 		*/
 		@PostMapping(value = "case0163")
@@ -621,7 +659,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		   }
 		   return modelMap;
 		}`},
-		{"aTaintCase0164", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0164", false, []string{"Parameter-cmd"},
+			`/**
      * 66 传播场景->String操作->getBytes
      */
 
@@ -639,7 +678,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
     }
 `},
 
-		{"aTaintCase0166", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0166", false, []string{"Parameter-cmd"},
+			`/**
      * 68 传播场景->String操作->intern
      */
     @PostMapping(value = "case0166")
@@ -653,7 +693,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0167", "Parameter: Parameter-cmd", `/**
+		{"aTaintCase0167", false, []string{"Parameter-cmd", `" "`, `"-la"`},
+			`/**
 		    * 69 传播场景->String操作->join
 		    */
 		   @PostMapping(value = "case0167")
@@ -669,83 +710,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		       return modelMap;
 		   }
 		`},
-		{"aTaintCase0168", "Parameter: Parameter-cmd", `
-    /**
-     * 70 传播场景->String操作->repeat
-     *
-     */
-    @PostMapping(value = "case0168")
-    public Map<String, Object> aTaintCase0168(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
 
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0171", "Parameter: Parameter-cmd", ` /**
-     * 72 传播场景->String操作->split
-     */
-    @PostMapping(value = "case0171")
-    public Map<String, Object> aTaintCase0171(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=cmd.split(" ")[0];
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0172", "Parameter: Parameter-cmd", `/**
-     * 73 传播场景->String操作->strip
-     */
-    @PostMapping(value = "case0172")
-    public Map<String, Object> aTaintCase0172(@RequestParam String cmd ) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0175", "Parameter: Parameter-cmd", ` /**
-     * 76 传播场景->String操作->toCharArray
-     */
-    @PostMapping(value = "case0175")
-    public Map<String, Object> aTaintCase0175(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            char[] chars=cmd.toCharArray();
-            Runtime.getRuntime().exec(String.valueOf(chars));
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0176", "Parameter: Parameter-cmd", `/**
-     * 77 传播场景->String操作->toLowerCase
-     */
-    @PostMapping(value = "case0176")
-    public Map<String, Object> aTaintCase0176(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=cmd.toLowerCase();
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0177", "Parameter: Parameter-cmd", ` /**
+		{"aTaintCase0177", false, []string{"Parameter-cmd"}, ` /**
      * 78 传播场景->String操作->toString
      */
     @PostMapping(value = "case0177")
@@ -760,54 +726,11 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0178", "Parameter: Parameter-cmd", `/**
-     *传播场景->String操作->toUpperCase
-     */
-    @PostMapping(value = "case0178")
-    public Map<String, Object> aTaintCase0178(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=cmd.toUpperCase();
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0179", "Parameter: Parameter-cmd", `/**
-     *传播场景->String操作->trim
-     */
 
-    @PostMapping(value = "case0179")
-    public Map<String, Object> aTaintCase0179(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=cmd.trim();
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-		{"aTaintCase0180", "Parameter: Parameter-cmd", ` /**
-     * 传播场景->String操作->valueOf
-     */
-    @PostMapping(value = "case0180")
-    public Map<String, Object> aTaintCase0180(@RequestParam String cmd) {
-        Map<String, Object> modelMap = new HashMap<>();
-        try {
-            cmd=String.valueOf(cmd);
-            Runtime.getRuntime().exec(cmd);
-            modelMap.put("status", "success");
-        } catch (Exception e) {
-            modelMap.put("status", "error");
-        }
-        return modelMap;
-    }`},
-
-		{"aTaintCase0195", "ParameterMember: ParameterMember-parameter[1].0", ` /**
+		{"aTaintCase0195", false, []string{
+			"ParameterMember-parameter[1].0",
+			"ParameterMember-parameter[1].1",
+		}, ` /**
      * 传播场景-数组初始化->new 方式初始化
      */
     @PostMapping(value = "case0195")
@@ -821,13 +744,23 @@ func Test_Simple_Exec_Case(t *testing.T) {
             modelMap.put("status", "error");
         }
         return modelMap;
-    }`}, // 参数为数组的时候，参数名为Parameter-#形式，而非cmd
+    }`},
 	}
 
 	for _, tt := range tests {
+		allCode := fmt.Sprintf(`
+            package com.sast.astbenchmark.cases;
+            @RestController()
+            public class AstTaintCase{
+                private SSRFShowManager ssrfShowManager = new SSRFShowManageImpl();
+                %v
+            }`, tt.code)
 		t.Run(tt.name, func(t *testing.T) {
-			tt.code = createAllCode(tt.code)
-			testExecTopDef(t, tt.code, tt.expect, true)
+			testExecTopDef(t, &TestCase{
+				Code:    allCode,
+				Expect:  tt.expect,
+				Contain: !tt.equal,
+			})
 		})
 	}
 }
@@ -839,7 +772,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //		target string
 //		code   string
 //	}{
-//		{"aTaintCase018", "Parameter: Parameter-cmd", `@PostMapping("case018/{cmd}")
+//		{"aTaintCase018",true, []string{"Parameter-cmd"}, `@PostMapping("case018/{cmd}")
 //   public Map<String, Object> aTaintCase018(@PathVariable String cmd) {
 //       Map<String, Object> modelMap = new HashMap<>();
 //       if (cmd == null) {
@@ -857,7 +790,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //       return modelMap;
 //   }
 //`}, //System.arraycopy方法
-//		{"aTaintCase019", "Parameter: Parameter-cmd", ` @PostMapping("case019")
+//		{"aTaintCase019",true, []string{"Parameter-cmd"}, ` @PostMapping("case019")
 //    public Map<String, Object> aTaintCase019(@RequestParam String cmd) {
 //        Map<String, Object> modelMap = new HashMap<>();
 //        char[] data = cmd.toCharArray();
@@ -869,7 +802,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`}, // 实例化一个不存在的类
-//		{"aTaintCase0114", "Parameter: Parameter-cmd", `  /**
+//		{"aTaintCase0114",true, []string{"Parameter-cmd"}, `  /**
 //     * MI+MI
 //     * @param cmd
 //     * @return
@@ -887,7 +820,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`}, //StringBuilder
-//		{"aTaintCase0115", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0115",true, []string{"Parameter-cmd"},
+//  `/**
 //     * MI+arguement
 //     */
 //    @PostMapping(value = "case0115")
@@ -903,7 +837,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`}, //getChars
-//		{"aTaintCase0142", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0142",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 引用类型queue 作为污点源
 //     *
 //     * @param cmd
@@ -926,7 +861,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`}, //引用类型queue 作为污点源
-//		{"aTaintCase0143", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0143",true, []string{"Parameter-cmd"}, ` /**
 //     * 引用类型Set 作为污点源
 //     *
 //     * @param cmd
@@ -950,7 +885,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        return modelMap;
 //    }
 //`}, //引用类型Set 作为污点源
-//		{"aTaintCase0154", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0154",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 其他对象 StringBuilder 作为污点源
 //     *
 //     * @param cmd
@@ -975,7 +911,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //    }
 //
 //`}, // StringBuilder 作为污点源
-//		{"aTaintCase0160", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0160",true, []string{"Parameter-cmd"}, ` /**
 //     * 62 传播场景->String操作->构造方法
 //     */
 //    @PostMapping(value = "case0160")
@@ -989,7 +925,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0165", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0165",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 67 传播场景->String操作->getChars
 //     */
 //    @PostMapping(value = "case0165")
@@ -1005,7 +942,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0169", "Parameter: Parameter-cmd", `  /**
+//		{"aTaintCase0169",true, []string{"Parameter-cmd"}, `  /**
 //     * 71 传播场景->String操作->replace
 //     * ls;-la
 //     */
@@ -1022,7 +959,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        return modelMap;
 //    }
 //`},
-//		{"aTaintCase0170", "Parameter: Parameter-cmd", `    /**
+//		{"aTaintCase0170",true, []string{"Parameter-cmd"}, `    /**
 //     *  传播场景->String操作->replace
 //     * alasa
 //     */
@@ -1038,7 +975,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0173", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0173",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 74 传播场景->String操作->subSequence
 //     */
 //    @PostMapping(value = "case0173")
@@ -1052,7 +990,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0174", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0174",true, []string{"Parameter-cmd"}, ` /**
 //     * 75 传播场景->String操作->substring
 //     * lsabc
 //     */
@@ -1068,7 +1006,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        return modelMap;
 //    }`},
 //		//传播场景->StringBuilder操作
-//		{"aTaintCase0181", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0181",true, []string{"Parameter-cmd"}, ` /**
 //     *传播场景->StringBuilder操作->构造方法
 //     */
 //    @PostMapping(value = "case0181")
@@ -1083,7 +1021,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        return modelMap;
 //    }
 //    `},
-//		{"aTaintCase0182", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0182",true, []string{"Parameter-cmd"}, ` /**
 //     *传播场景->StringBuilder操作->append
 //     */
 //    @PostMapping(value = "case0182")
@@ -1099,7 +1037,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0183", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0183",true, []string{"Parameter-cmd"},
+//  `/**
 //     *传播场景->StringBuilder操作->charAt
 //     *
 //     */
@@ -1117,7 +1056,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0184", "Parameter: Parameter-cmd", `  /**
+//		{"aTaintCase0184",true, []string{"Parameter-cmd"}, `  /**
 //     * 传播场景->StringBuilder操作->delete
 //     */
 //    @PostMapping(value = "case0184")
@@ -1134,7 +1073,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0185", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0185",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景->StringBuilder操作->deleteCharAt
 //     */
 //    @PostMapping(value = "case0185")
@@ -1151,7 +1091,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0186", "Parameter: Parameter-cmd", `  /**
+//		{"aTaintCase0186",true, []string{"Parameter-cmd"}, `  /**
 //     * 传播场景->StringBuilder操作->getChars
 //     */
 //    @PostMapping(value = "case0186")
@@ -1169,7 +1109,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0187", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0187",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景->StringBuilder操作->insert
 //     */
 //    @PostMapping(value = "case0187")
@@ -1185,7 +1126,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0188", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0188",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景->StringBuilder操作->replace
 //     */
 //    @PostMapping(value = "case0188")
@@ -1201,7 +1143,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0189", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0189",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景->StringBuilder操作->subSequence
 //     */
 //    @PostMapping(value = "case0189")
@@ -1218,7 +1161,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0190", "Parameter: Parameter-cmd", `/**
+//		{"aTaintCase0190",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景->StringBuilder操作->subString
 //     */
 //    @PostMapping(value = "case0190")
@@ -1235,7 +1179,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0191", "Parameter: Parameter-cmd", `/**
+// {"aTaintCase0191",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景->StringBuilder操作->toString
 //     */
 //    @PostMapping(value = "case0191")
@@ -1251,7 +1196,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0192", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0192",true, []string{"Parameter-cmd"}, ` /**
 //     * 传播场景-char[],byte[]操作->copyOf
 //     */
 //    @PostMapping(value = "case0192")
@@ -1267,7 +1212,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`},
-//		{"aTaintCase0193", "Parameter: Parameter-cmd", ` /**
+//		{"aTaintCase0193",true, []string{"Parameter-cmd"}, ` /**
 //     * 传播场景-char[],byte[]操作-->copyOfRange
 //     */
 //    @PostMapping(value = "case0193")
@@ -1283,7 +1228,8 @@ func Test_Simple_Exec_Case(t *testing.T) {
 //        }
 //        return modelMap;
 //    }`,
-//   {"aTaintCase0194", "Parameter: Parameter-cmd", `/**
+//   {"aTaintCase0194",true, []string{"Parameter-cmd"},
+//  `/**
 //     * 传播场景-char[],byte[]操作->toString
 //     */
 //    @PostMapping(value = "case0194")
@@ -1317,11 +1263,17 @@ func Test_Simple_Exec_Case(t *testing.T) {
 func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 	tests := []struct {
 		name   string
-		expect string
-		isSink bool
+		equal  bool
+		expect []string
 		code   string
 	}{
-		{"aTaintCase013", "Parameter: Parameter-cmd", true, ` /**
+		{"aTaintCase013", true,
+			[]string{
+				"Parameter-cmd",
+				"Parameter-path",
+				`"|grep a"`,
+			},
+			`  /**
     * MethodInvocation
     */
    @GetMapping("case013/{cmd}")
@@ -1336,7 +1288,13 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
        }
        return modelMap;
    }`}, //方法调用
-		{"aTaintCase014", "Parameter: Parameter-cmd", true, ` /**
+		{"aTaintCase014", false,
+			[]string{
+				"Parameter-cmd",
+				`"www.test.com"`,
+				"Parameter-path",
+			},
+			` /**
     * MethodInvocation+InfixExpression
     */
    @GetMapping("case014/{cmd}")
@@ -1351,7 +1309,14 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
        }
        return modelMap;
    }`}, //方法调用+中缀表达式
-		{"aTaintCase015", "Parameter: Parameter-cmd", true, ` /**
+		{"aTaintCase015", false,
+			[]string{
+				"Parameter-cmd",
+				"Parameter-path",
+				`"www.test.com"`,
+			},
+			`  
+    /**
     * ifStatement
     */
    @GetMapping("case015/{cmd}")
@@ -1371,7 +1336,12 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
        }
        return modelMap;
    }`}, //if语句
-		{"aTaintCase016", "Parameter: Parameter-cmd", true, ` /**
+		{"aTaintCase016", true, []string{
+			"Parameter-cmd",
+			"Parameter-path",
+			`"mkdir"`,
+			`" "`,
+		}, ` /**
     * Switch
     */
    @GetMapping("case016/{type}/{cmd}")
@@ -1400,7 +1370,11 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.code = createCmdUtilCode(tt.code)
-			testExecTopDef(t, tt.code, tt.expect, tt.isSink)
+			testExecTopDef(t, &TestCase{
+				Code:    tt.code,
+				Contain: !tt.equal,
+				Expect:  tt.expect,
+			})
 		})
 	}
 
@@ -1409,11 +1383,12 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
 	tests := []struct {
 		name   string
-		expect string
-		isSink bool
+		equal  bool
+		expect []string
 		code   string
 	}{
-		{"aTaintCase022", "Parameter: Parameter-cmd", true, `/**
+		{"aTaintCase022", true, []string{"Parameter-cmd"},
+			`/**
    * 字段/元素级别->对象字段->对象元素
    * case应该被检出
    */
@@ -1431,7 +1406,7 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
       }
       return modelMap;
   }`},
-		{"aTaintCase022_2", "Parameter: Parameter-cmd", false, ` /**
+		{"aTaintCase022_2", true, []string{`"cd /"`}, ` /**
    * 字段/元素级别->对象字段->对象元素
    * case不应被检出
    */
@@ -1454,19 +1429,13 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.code = createCmdObject(tt.code)
-			testExecTopDef(t, tt.code, tt.expect, tt.isSink)
+			testExecTopDef(t, &TestCase{
+				Code:    tt.code,
+				Contain: !tt.equal,
+				Expect:  tt.expect,
+			})
 		})
 	}
-}
-
-func createAllCode(code string) string {
-	allCode := fmt.Sprintf(`package com.sast.astbenchmark.cases;
-		@RestController()
-	public class AstTaintCase{
-	private SSRFShowManager ssrfShowManager = new SSRFShowManageImpl();
-	%v
-	}`, code)
-	return allCode
 }
 
 func createCmdUtilCode(code string) string {
