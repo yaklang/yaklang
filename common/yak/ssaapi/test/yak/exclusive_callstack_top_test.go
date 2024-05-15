@@ -63,7 +63,7 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 		$a = $obj->i;
 		`,
 			ssatest.CheckTopDef_Equal("$a", []string{"333333"}),
-			ssaapi.PHP,
+			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
 
