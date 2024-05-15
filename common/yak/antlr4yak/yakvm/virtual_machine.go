@@ -54,7 +54,7 @@ type (
 		globalVarFallback           func(string) interface{}
 		GetExternalVar              func(name string) (any, bool)
 
-		//sandbox
+		// sandbox
 		sandboxMode bool
 	}
 )
@@ -255,7 +255,7 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 				v.AsyncEnd()
 				if err := frame.recover(); err != nil {
 					log.Errorf("yakvm async function panic: %v", err)
-					//utils.PrintCurrentGoroutineRuntimeStack()
+					// utils.PrintCurrentGoroutineRuntimeStack()
 				}
 				if err := recover(); err != nil {
 					log.Errorf("yakvm async function panic: %v", err)
@@ -316,6 +316,11 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		frame = topFrame.(*Frame)
 		codes := frame.codes
 		p := frame.codePointer
+
+		// set vm global var to frame
+		for k, val := range v.globalVar {
+			frame.GlobalVariables[k] = val
+		}
 		defer func() {
 			frame.codes = codes
 			frame.codePointer = p
