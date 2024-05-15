@@ -91,6 +91,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["call_method"] = ret.Method.GetId()
 		params["call_args"] = marshalValues(ret.Args)
 		params["call_binding"] = fetchIds(ret.Binding)
+		params["call_arg_member"] = marshalValues(ret.ArgMember)
 		params["call_async"] = ret.Async
 		params["call_unpack"] = ret.Unpack
 		params["call_drop_error"] = ret.IsDropError
@@ -272,6 +273,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *Call:
 		ret.Method = newLazyInstruction(params["call_method"])
 		ret.Args = unmarshalValues(params["call_args"])
+		ret.ArgMember = unmarshalValues(params["call_arg_member"])
 		ret.Binding = unmarshalMapValues(params["call_binding"])
 		ret.Async = params["call_async"].(bool)
 		ret.Unpack = params["call_unpack"].(bool)
