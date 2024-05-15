@@ -27,7 +27,7 @@ filterExpr
     | regexpLiteral                                         # RegexpLiteralFilter
     | '.' nameFilter                                        # FieldFilter
     | filterExpr '.' nameFilter                             # FieldCallFilter
-    | filterExpr '(' actualParamFilter ')'                 # FunctionCallFilter
+    | filterExpr '(' actualParam? ')'                 # FunctionCallFilter
     | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
     | filterExpr '?{' conditionExpression '}'               # OptionalFilter
     | filterExpr '->' filterExpr                            # NextFilter
@@ -40,15 +40,14 @@ filterExpr
 
 
 
-actualParamFilter
-    : actualParamFilterItem                # AllParam  
-    | (actualParamFilterItem ',')* (actualParamFilterItem)   # SingleParam  
+actualParam
+    : singleParam                      # AllParam
+    | actualParamFilter+ singleParam?  # EveryParam
     ;
 
-actualParamFilterItem
-    : ( '#>' | '#{' (recursiveConfig)? '}' )? filterStatement  # FilterParam
-    |                                                  # EmptyParam
-    ;
+actualParamFilter: singleParam ',' | ',';
+
+singleParam: ( '#>' | '#{' (recursiveConfig)? '}' )? filterStatement ;
 
 recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','? ;
 recursiveConfigItem: identifier ':' recursiveConfigItemValue;
