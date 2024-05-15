@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -355,8 +356,32 @@ func portOnly(hostport string) string {
 	return hostport[colon+len(":"):]
 }
 
+// by json unmarshal
+func StringLiteralToAny(s string) any {
+	var result any
+	err := json.Unmarshal([]byte(s), &result)
+	if err != nil {
+		// fallback to string
+		log.Errorf("json unmarshal error: %v", err)
+		result = fmt.Sprintf("%v", s)
+	}
+	return result
+}
+
 func InterfaceToBytes(i interface{}) (result []byte) {
 	return codec.AnyToBytes(i)
+}
+
+func InterfaceToJsonString(i interface{}) string {
+	if i == nil {
+		return ""
+	}
+	b, err := json.Marshal(i)
+	if err != nil {
+		log.Errorf("json marshal error: %v", err)
+		return ""
+	}
+	return string(b)
 }
 
 func InterfaceToString(i interface{}) string {
