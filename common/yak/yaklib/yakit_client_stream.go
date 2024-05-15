@@ -108,6 +108,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		}
 	}()
 	for bstream.Scan() {
+		println(bstream.Text())
 		bufChannel <- bstream.Text()
 	}
 	close(bufChannel)
