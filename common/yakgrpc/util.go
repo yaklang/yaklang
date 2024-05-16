@@ -157,10 +157,6 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 	return params, callback, nil
 }
 
-func NewLocalClientWithReverseServer(locals ...bool) (ypb.YakClient, error) {
-	return newLocalClientEx(true, locals...)
-}
-
 var (
 	localClient         ypb.YakClient
 	initLocalClientOnce sync.Once
@@ -169,10 +165,10 @@ var (
 )
 
 func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
-	return newLocalClientEx(false, locals...)
+	return newLocalClientEx(locals...)
 }
 
-func newLocalClientEx(initFacadeServer bool, locals ...bool) (ypb.YakClient, error) {
+func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
 	var port int
 	var addr string
 	netx.UnsetProxyFromEnv()
@@ -201,7 +197,7 @@ func newLocalClientEx(initFacadeServer bool, locals ...bool) (ypb.YakClient, err
 				grpc.MaxRecvMsgSize(100*1024*1024),
 				grpc.MaxSendMsgSize(100*1024*1024),
 			)
-			s, err := newServerEx(WithInitFacadeServer(initFacadeServer))
+			s, err := newServerEx(WithInitFacadeServer(true))
 			if err != nil {
 				log.Errorf("build yakit server failed: %s", err)
 				finalErr = err
