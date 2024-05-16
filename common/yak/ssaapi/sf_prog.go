@@ -87,7 +87,6 @@ func (p *Program) SyntaxFlow(i string, opts ...any) map[string]Values {
 
 func (p *Program) SyntaxFlowWithError(i string, opts ...any) (map[string]Values, error) {
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	vm.Debug()
 	err := vm.Compile(i)
 	if err != nil {
 		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", i, err)
