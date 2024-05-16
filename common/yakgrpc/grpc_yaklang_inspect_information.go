@@ -126,6 +126,7 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	ret.CliParameter = cliParam2grpc(parameters)
 	ret.UIInfo = uiInfo2grpc(uiInfos)
 	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
+	ret.Tags = information.ParseTags(prog)
 
 	return ret, nil
 }
