@@ -16,13 +16,35 @@ import (
 )
 
 type WebsocketController struct {
-	Token string
-	Port  int
-	Ctx   context.Context
+	Token     string
+	Port      int
+	Ctx       context.Context
+	clientsFw map[string]*lowhttp.FrameWriter
+	clientsFr map[string]*lowhttp.FrameReader
+	clients   map[string]net.Conn
 }
 
 func NewWebsocketController(token string, port int) *WebsocketController {
-	return &WebsocketController{Port: port, Token: token}
+	return &WebsocketController{Port: port, Token: token, clientsFw: make(map[string]*lowhttp.FrameWriter), clientsFr: make(map[string]*lowhttp.FrameReader), clients: make(map[string]net.Conn)}
+}
+
+// 在连接建立时将客户端连接存储起来
+func (w *WebsocketController) storeClient(clientAddr string, conn net.Conn) {
+	w.clients[clientAddr] = conn
+}
+
+// 在连接断开时将客户端连接从存储中移除
+func (w *WebsocketController) removeClient() {
+	delete(w.clientsFw, w.Token)
+	delete(w.clientsFr, w.Token)
+}
+
+func (w *WebsocketController) getClientFw() *lowhttp.FrameWriter {
+	return w.clientsFw[w.Token]
+}
+
+func (w *WebsocketController) getClientFr() *lowhttp.FrameReader {
+	return w.clientsFr[w.Token]
 }
 
 func (w *WebsocketController) Run() error {
@@ -50,6 +72,7 @@ func (w *WebsocketController) Run() error {
 		conn = ctxio.NewConn(rootCtx, conn)
 		serverReader := bufio.NewReader(conn)
 		serverWriter := bufio.NewWriter(conn)
+
 		go func() {
 			defer func() {
 				conn.Close()
@@ -77,9 +100,7 @@ func (w *WebsocketController) handle(br *bufio.Reader, bw *bufio.Writer) error {
 		isDeflate = true
 	}
 
-	//if lowhttp.GetHTTPRequestQueryParam(raw, "token") != w.Token {
-	//	return utils.Error("token is not right")
-	//}
+	w.Token = lowhttp.GetHTTPRequestQueryParam(raw, "token")
 
 	fmt.Println(string(raw))
 
@@ -121,14 +142,15 @@ func (w *WebsocketController) handle(br *bufio.Reader, bw *bufio.Writer) error {
 		return utils.Errorf("flush ws controller response failed: %v", err)
 	}
 
-	frameReader, frameWriter := lowhttp.NewFrameReader(br, isDeflate), lowhttp.NewFrameWriter(bw, isDeflate)
-	return w.frameHandler(frameReader, frameWriter)
+	w.clientsFr[w.Token], w.clientsFw[w.Token] = lowhttp.NewFrameReader(br, isDeflate), lowhttp.NewFrameWriter(bw, isDeflate)
+	return w.frameHandler()
 }
 
-func (w *WebsocketController) frameHandler(fr *lowhttp.FrameReader, fw *lowhttp.FrameWriter) error {
+func (w *WebsocketController) frameHandler() error {
 	count := 0
+	_ = count
 	for {
-		frame, err := fr.ReadFrame()
+		frame, err := w.getClientFr().ReadFrame()
 		if err != nil {
 			log.Errorf("ws controller read frame failed: %v", err)
 			return err
@@ -137,17 +159,17 @@ func (w *WebsocketController) frameHandler(fr *lowhttp.FrameReader, fw *lowhttp.
 		masked := frame.GetMask()
 		switch frame.Type() {
 		case lowhttp.PingMessage:
-			fw.WritePong(frame.GetData(), masked)
+			w.getClientFw().WritePong(frame.GetData(), masked)
 			continue
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			w.onMessage(frame.GetData())
 		}
-		err = fw.WriteText([]byte(fmt.Sprintf(`test %d`, count)), false)
-		if err := fw.Flush(); err != nil {
-			log.Errorf("ws controller flush failed: %v", err)
-			return err
-		}
-		count++
+		//err = w.getClientFw().WriteText([]byte(fmt.Sprintf(`test %d`, count)), false)
+		//if err := w.getClientFw().Flush(); err != nil {
+		//	log.Errorf("ws controller flush failed: %v", err)
+		//	return err
+		//}
+		//count++
 	}
 }
 
@@ -157,7 +179,36 @@ func (w *WebsocketController) onMessage(jsonText []byte) {
 	switch strings.ToLower(strings.TrimSpace(msgType)) {
 	case "heartbeat":
 		log.Infof("heartbeat message from ws client")
+	case "chrome-extension":
+		w.getClientFw().WriteText(jsonText, false)
+		if err := w.getClientFw().Flush(); err != nil {
+			log.Errorf("ws controller flush failed: %v", err)
+		}
 	default:
-		log.Infof("recv client: %v", string(result.String()))
+		if w.Token == "fuzzer" {
+			// 往 chrome client 发
+			fw := w.clientsFw["chrome"]
+			if fw != nil {
+				fw.WriteText(jsonText, false)
+				if err := fw.Flush(); err != nil {
+					log.Errorf("ws controller flush failed: %v", err)
+				}
+
+			}
+			log.Infof("from fuzzer recv client: %v", string(result.String()))
+
+		}
+		if w.Token == "chrome" {
+			// 往 fuzzer client 发
+			fw := w.clientsFw["fuzzer"]
+			if fw != nil {
+				fw.WriteText(jsonText, false)
+				if err := fw.Flush(); err != nil {
+					log.Errorf("ws controller flush failed: %v", err)
+				}
+			}
+			log.Infof("from chrome recv client: %v", string(result.String()))
+
+		}
 	}
 }

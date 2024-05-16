@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/tidwall/gjson"
 	"net/http"
 	"reflect"
 	"strings"
@@ -293,6 +296,59 @@ func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfi
 								results = append(results, i)
 							})
 						}
+					}
+				case "Body":
+					rawBody := string(freq.GetBody())
+					message := map[string]string{
+						"type": "eval",
+						"code": fmt.Sprintf(`
+let jsonData = %s;
+JSON.stringify(outputObj(jsonData), null, 2)
+`, rawBody),
+					}
+					msg, err := json.Marshal(message)
+					if err != nil {
+						log.Errorf("json marshal failed: %s", err)
+						return nil
+					}
+
+					read := func(data []byte) {
+						log.Infof("read: %s", string(data))
+						if strings.Contains(string(data), "chrome-extension") {
+							enRes := gjson.GetBytes(data, "res").String()
+							req, err := freq.fuzzPostRaw(enRes)
+							if err != nil {
+								log.Errorf("fuzz post raw failed: %s", err)
+								return
+							}
+							res, _ := utils.DumpHTTPRequest(req[0], true)
+							results = append(results, res)
+							return
+						}
+					}
+					wsClient, err := lowhttp.NewWebsocketClient([]byte(`GET /?token=fuzzer HTTP/1.1
+Host: 127.0.0.1:11213
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Cache-Control: no-cache
+Pragma: no-cache
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: keep-alive, Upgrade
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
+Accept: */*
+`), lowhttp.WithWebsocketFromServerHandler(read))
+					if err != nil {
+						log.Errorf("websocket client failed: %s", err)
+						return nil
+					}
+					wsClient.StartFromServer()
+
+					err = wsClient.WriteText(msg)
+					if err != nil {
+						log.Errorf("write text failed: %s", err)
+						return nil
 					}
 				}
 			}

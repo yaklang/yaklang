@@ -447,8 +447,11 @@ func (fw *FrameWriter) writeControl(data []byte, messageType int, mask bool) err
 }
 
 func WebsocketFrameToData(frame *Frame) (data []byte) {
-
-	return frame.GetData()
+	data = frame.GetData()
+	if len(frame.GetData()) == 0 {
+		data = frame.GetPayload()
+	}
+	return data
 }
 
 func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame *Frame, err error) {
