@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	AI_PLUGIN           = "AI插件"
+	AI_PLUGIN           = "AI工具"
 	DROP_HTTP_PACKET    = "可能丢弃HTTP数据包"
 	FORWARD_HTTP_PACKET = "可能修改HTTP数据包"
 )

@@ -1957,6 +1957,7 @@ message YaklangInspectInformationResponse {
   repeated YakScriptParam CliParameter = 2;
   repeated YakRiskInfo RiskInfo = 3;
   repeated YakUIInfo UIInfo = 4;
+  repeated string Tags = 5;
 }
 
 message YakUIInfo {

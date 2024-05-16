@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"os"
 	"sort"
 	"strconv"
@@ -874,4 +876,75 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 		}
 		compareRisks(got, want, t)
 	})
+}
+
+type pluginTagCheck struct {
+	code       string
+	expectTag  []string
+	pluginType string
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Tag(t *testing.T) {
+	var testcase = []pluginTagCheck{
+		{
+			code: `
+handle = func(a){
+ai.Chat()
+}
+`,
+			expectTag:  []string{information.AI_PLUGIN},
+			pluginType: "codec",
+		},
+		{
+			code: `
+handle = func(a){
+println(ai.Chat)
+}
+`,
+			expectTag:  []string{},
+			pluginType: "codec",
+		},
+		{
+			code: `
+handle = func(a){
+ai.OpenAI()
+}
+`,
+			expectTag:  []string{},
+			pluginType: "codec",
+		},
+		{
+			code: `
+hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
+	forward()	
+}
+hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
+	drop()
+}
+`,
+			expectTag:  []string{information.DROP_HTTP_PACKET, information.FORWARD_HTTP_PACKET},
+			pluginType: "mitm",
+		},
+		{
+			code: `
+hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
+	drop()	
+}
+hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
+	println(forward)
+}
+`,
+			expectTag:  []string{information.DROP_HTTP_PACKET},
+			pluginType: "mitm",
+		},
+	}
+
+	for _, check := range testcase {
+		prog, err := ssaapi.Parse(check.code, static_analyzer.GetPluginSSAOpt(check.pluginType)...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.ElementsMatch(t, check.expectTag, information.ParseTags(prog))
+	}
+
 }
