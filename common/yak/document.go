@@ -149,7 +149,7 @@ func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName,
 			}
 			if decl.Recv != nil && len(decl.Recv.List) > 0 {
 				receiver := decl.Recv.List[0]
-				typName := yakdoc.GetTypeName(receiver.Type, fset)
+				typName := yakdoc.ASTGetTypeName(receiver.Type, fset)
 				if !IsSameTypeName(typName, structName) {
 					continue
 				}
@@ -349,8 +349,8 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 		filter[typ] = struct{}{}
 
 		var (
-			structName   string
 			pkgPath      string
+			pkgPathName  string
 			documents    map[string]string
 			shouldHandle bool
 
@@ -358,65 +358,66 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 			ok  bool
 		)
 
-		for {
-			typKind := typ.Kind()
-			// 需要额外处理Array的元素类型
-			if typKind == reflect.Array || typKind == reflect.Slice || typKind == reflect.Chan {
-				pushBackWithoutNil(handleTypesList, typ.Elem())
-			} else {
-				break
-			}
-			// 别名类型
-			if typKind.String() != typName {
-				structName = typName
-				shouldHandle = true
-				break
-			}
-		}
+		// use yakdoc.GetTypeNameWithPkgPath instead
+		pkgPath, pkgPathName = yakdoc.GetTypeNameWithPkgPath(typ)
 
 		typKind := typ.Kind()
-		pkgPath = typ.PkgPath()
-		if !shouldHandle {
-			if typKind == reflect.Struct || typKind == reflect.Interface {
-				shouldHandle = true
-				structName = typ.Name()
-			} else if typKind == reflect.Ptr {
-				shouldHandle = typ.Elem().Kind() == reflect.Struct || typ.Elem().Kind() == reflect.Interface
-				pkgPath = typ.Elem().PkgPath()
-				structName = typ.Elem().Name()
-			} else if typKind == reflect.Func {
-				// 形如 (s *Struct) MethodName() (callback func(*Struct2)) {}
-				// 需要递归再获取类型
-				for _, newTyp := range getTypeFromReflectFunctionType(typ, 0) {
-					pushBackWithoutNil(handleTypesList, newTyp)
-				}
+		// 需要额外处理复杂类型的元素类型
+		if typKind == reflect.Array || typKind == reflect.Slice || typKind == reflect.Chan || typKind == reflect.Map {
+			if typKind == reflect.Map {
+				pushBackWithoutNil(handleTypesList, typ.Key())
 			}
+			pushBackWithoutNil(handleTypesList, typ.Elem())
+		} else if typKind == reflect.Struct {
+			// 结构体类型，需要转到指针，因为指针拿到的方法比较全
+			pushBackWithoutNil(handleTypesList, reflect.New(typ).Type())
+			continue
+		} else if typKind == reflect.Func {
+			// 形如 func() (callback func()) {}
+			for _, newTyp := range getTypeFromReflectFunctionType(typ, 0) {
+				pushBackWithoutNil(handleTypesList, newTyp)
+			}
+		} else if typKind == reflect.Ptr && typ.Elem().Kind() == reflect.Struct {
+			// 结构体指针,如果有成员的话需要处理
+			shouldHandle = typ.Elem().NumField() > 0
 		}
 
-		if structName == "" || !shouldHandle {
+		// 如果有别名类型，可能存在方法，应该处理
+		shouldHandle = shouldHandle || typ.NumMethod() > 0
+
+		// 匿名结构体应该忽略
+		if !shouldHandle || strings.HasPrefix(pkgPathName, "struct {") {
 			continue
 		}
 
 		// 如果是接口类型，那么需要获取其对应的包，然后再获取其对应的文档
 		if typKind == reflect.Interface {
+			if typName == "" {
+				_, after, ok := strings.Cut(pkgPathName, ".")
+				if ok {
+					typName = after
+				} else if index := strings.LastIndex(pkgPathName, "/"); index != -1 {
+					typName = pkgPathName[index+1:]
+				}
+			}
+
 			if canAutoInjectInterface {
 				pkg, ok = pkgs[pkgPath]
 				if ok {
-					documents = GetInterfaceDocumentFromAST(pkg, structName)
+					documents = GetInterfaceDocumentFromAST(pkg, typName)
 				}
 			}
 			if !ok && strings.HasPrefix(pkgPath, "github.com/yaklang/yaklang") {
-				log.Warnf("need inject interface document for: %s.%s", pkgPath, structName)
+				log.Warnf("need inject interface document for: %s.%s", pkgPath, typName)
 			}
 		}
 
-		structName = fmt.Sprintf("%s.%s", pkgPath, structName)
 		lib := &yakdoc.ScriptLib{
-			Name:      structName,
+			Name:      pkgPathName,
 			Functions: make(map[string]*yakdoc.FuncDecl),
 			Instances: make(map[string]*yakdoc.LibInstance),
 		}
-		// 成员
+		// 获取成员
 		if typKind == reflect.Struct || typKind == reflect.Pointer {
 			targetTyp := typ
 			if typKind == reflect.Pointer {
@@ -428,10 +429,10 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 					for i := 0; i < typ.NumField(); i++ {
 						field := typ.Field(i)
 						if !field.Anonymous {
-							lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(structName, field.Name, field.Type, nil)
+							lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(pkgPathName, field.Name, field.Type, nil)
 							continue
 						}
-						lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(structName, field.Name, field.Type, nil)
+						lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(pkgPathName, field.Name, field.Type, nil)
 
 						innerTyp := field.Type
 						if innerTyp.Kind() == reflect.Pointer {
@@ -446,7 +447,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 			}
 		}
 
-		// 方法与文档
+		// 获取方法与文档
 		for i := 0; i < typ.NumMethod(); i++ {
 			method := typ.Method(i)
 			methodName := method.Name
@@ -489,7 +490,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 					document, _ := documents[methodName]
 
 					funcDecl := &yakdoc.FuncDecl{
-						LibName:    structName,
+						LibName:    pkgPathName,
 						MethodName: methodName,
 						Document:   document,
 						Decl:       declStr,
@@ -529,7 +530,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 					funcDecl.VSCodeSnippets = fmt.Sprintf("%s(%s)", methodName, strings.Join(paramsStr, ", "))
 					lib.Functions[methodName] = funcDecl
 				} else {
-					funcDecl, err = yakdoc.FuncToFuncDecl(f.Interface(), structName, methodName)
+					funcDecl, err = yakdoc.FuncToFuncDecl(f.Interface(), pkgPathName, methodName)
 					if err == nil {
 						lib.Functions[methodName] = funcDecl
 						break
@@ -554,13 +555,13 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 							})
 						}
 					} else {
-						log.Warnf("failed to get func decl from %s.%s: %v", structName, methodName, err)
+						log.Warnf("failed to get func decl from %s.%s: %v", pkgPathName, methodName, err)
 						break
 					}
 				}
 			}
 		}
-		helper.StructMethods[structName] = lib
+		helper.StructMethods[pkgPathName] = lib
 
 	}
 	// 实例方法
