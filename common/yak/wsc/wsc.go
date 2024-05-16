@@ -29,10 +29,13 @@ func (w *WebsocketController) storeClient(clientAddr string, conn *websocket.Con
 }
 
 // Remove the client connection on disconnection
-func (w *WebsocketController) removeClient(clientAddr string) {
-	if _, ok := w.clients[clientAddr]; ok {
-		//w.clients[clientAddr].Close()
-		delete(w.clients, clientAddr)
+func (w *WebsocketController) removeClient() {
+	token := w.Token
+	if _, ok := w.clients[token]; ok {
+		msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "wsc server closing connection")
+		w.clients[token].WriteMessage(websocket.CloseMessage, msg)
+		w.clients[token] = nil
+		delete(w.clients, token)
 	}
 }
 
@@ -67,7 +70,7 @@ func (w *WebsocketController) handleWebSocket(wr http.ResponseWriter, req *http.
 	//w.storeClient(clientAddr, conn)
 	//defer w.removeClient(clientAddr)
 	w.clients[w.Token] = conn
-	defer w.removeClient(w.Token)
+	defer w.removeClient()
 	log.Infof("Accepted ws connection from %v", clientAddr)
 
 	for {

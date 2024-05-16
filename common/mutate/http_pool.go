@@ -222,6 +222,11 @@ func (c *WebsocketClient) WriteText(message []byte) error {
 	return c.conn.WriteMessage(websocket.TextMessage, message)
 }
 
+func (c *WebsocketClient) Close(code int, text string) error {
+	message := websocket.FormatCloseMessage(code, text)
+	return c.conn.WriteMessage(websocket.CloseMessage, message)
+}
+
 func (c *WebsocketClient) ReadMessage() ([]byte, error) {
 	_, message, err := c.conn.ReadMessage()
 	if err != nil {
@@ -376,10 +381,13 @@ JSON.stringify(outputObj(jsonData), null, 2)
 
 					go func() {
 						for i := 0; i < reqCount; i++ {
-							<-readChan // 从 readChan 信道中读取数据，每次读取表示一个请求完成
+							<-readChan
 						}
 						// 所有请求都完成了，关闭 wsClient
-						client.conn.Close()
+						err := client.Close(websocket.CloseNormalClosure, "fuzzer client closing connection")
+						if err != nil {
+							client.conn.Close()
+						}
 						close(readChan)
 					}()
 				case "Post":
