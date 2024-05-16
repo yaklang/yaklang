@@ -1,15 +1,9 @@
-package permutil
+package permutil_test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	uuid "github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/ziputil"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -18,6 +12,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	uuid "github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ziputil"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestDarwinSudo(t *testing.T) {

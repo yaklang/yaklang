@@ -5,13 +5,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
@@ -820,7 +821,7 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 }
 
 func TestGRPCMUSTPASS_MITM_DnsAndHosts(t *testing.T) {
-	client, err := NewLocalClientWithReverseServer() // 新建一个 yakit client
+	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
 		t.Fatal(err)
 	}
