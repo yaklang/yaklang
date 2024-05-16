@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/yak/wsc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"io/ioutil"
 	"net"
@@ -44,7 +46,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 	// start pprof
 	_ "net/http/pprof"
@@ -477,6 +478,13 @@ var startGRPCServerCommand = cli.Command{
 			log.Errorf("build yakit server failed: %s", err)
 			return err
 		}
+		wscs := wsc.NewWebsocketController("yak", 11213)
+		go func() {
+			err := wscs.Run()
+			if err != nil {
+				log.Errorf("build WebsocketController  server failed: %s", err)
+			}
+		}()
 		ypb.RegisterYakServer(grpcTrans, s)
 
 		log.Infof("start to listen on: %v", utils.HostPort(c.String("host"), c.Int("port")))

@@ -4,6 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/gorilla/websocket"
+	"github.com/tidwall/gjson"
 	"net/http"
 	"reflect"
 	"strings"
@@ -195,6 +199,42 @@ func _httpPool_MutateHook(hook func([]byte) [][]byte) HttpPoolConfigOption {
 	}
 }
 
+type WebsocketClient struct {
+	conn *websocket.Conn
+}
+
+func NewWebsocketClient(url string) (*WebsocketClient, error) {
+	dialer := websocket.DefaultDialer
+	conn, _, err := dialer.Dial(url, http.Header{
+		"Accept-Encoding": {"gzip, deflate"},
+		"Accept-Language": {"zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2"},
+		"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0"},
+		"Accept":          {"*/*"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &WebsocketClient{conn: conn}, nil
+}
+
+func (c *WebsocketClient) WriteText(message []byte) error {
+	return c.conn.WriteMessage(websocket.TextMessage, message)
+}
+
+func (c *WebsocketClient) Close(code int, text string) error {
+	message := websocket.FormatCloseMessage(code, text)
+	return c.conn.WriteMessage(websocket.CloseMessage, message)
+}
+
+func (c *WebsocketClient) ReadMessage() ([]byte, error) {
+	_, message, err := c.conn.ReadMessage()
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
 func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfigOption {
 	if len(params) == 0 {
 		return func(config *httpPoolConfig) {
@@ -217,6 +257,9 @@ func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfi
 			//var newFReq mutate.FuzzHTTPRequestIf
 			//newFReq = freq
 			//_ = newFReq
+
+			readChan := make(chan struct{})
+			var reqCount int
 
 			for _, mm := range params {
 				if len(mm.GetValue()) == 0 {
@@ -260,43 +303,188 @@ func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfi
 						}
 					}
 				case "Get":
-					for _, kv := range mm.GetValue() {
-						var check bool
-						for _, v := range freq.GetGetQueryParams() {
-							if v.Name() == kv.GetKey() {
-								check = true
-								v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
-									results = append(results, i)
-								})
+					//for _, kv := range mm.GetValue() {
+					//	var check bool
+					//	for _, v := range freq.GetGetQueryParams() {
+					//		if v.Name() == kv.GetKey() {
+					//			check = true
+					//			v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+					//				results = append(results, i)
+					//			})
+					//		}
+					//	}
+					//	if !check {
+					//		freq.FuzzGetParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+					//			results = append(results, i)
+					//		})
+					//	}
+					//}
+					rawBody := string(freq.GetBody())
+
+					url := "ws://127.0.0.1:11213/?token=fuzzer"
+					client, err := NewWebsocketClient(url)
+					if err != nil {
+						log.Errorf("websocket client failed: %s", err)
+					}
+					read := func(data []byte) {
+						defer func() {
+							readChan <- struct{}{} // 读取完成后向 readChan 发送信号
+						}()
+						log.Infof("read: %s", string(data))
+						if strings.Contains(string(data), "chrome-extension") {
+							enRes := gjson.GetBytes(data, "res").String()
+
+							res := lowhttp.ReplaceHTTPPacketBody(freq.originRequest, []byte(enRes), false)
+							results = append(results, res)
+						}
+					}
+					go func() {
+						for {
+							message, err := client.ReadMessage()
+							if err != nil {
+								log.Errorf("read message error: %v", err)
+								break
 							}
+							read(message)
 						}
-						if !check {
-							freq.FuzzGetParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
-								results = append(results, i)
-							})
+					}()
+
+					req, err := freq.fuzzPostRaw(rawBody)
+					if err != nil {
+						log.Errorf("fuzz post raw failed: %s", err)
+						return nil
+					}
+					reqCount = len(req) // 记录请求的数量
+
+					for _, r := range req {
+						rb, _ := utils.DumpHTTPRequest(r, true)
+						currBody := string(lowhttp.GetHTTPPacketBody(rb))
+						message := map[string]string{
+							"type": "eval",
+							"code": fmt.Sprintf(`
+let jsonData = %s;
+JSON.stringify(outputObj(jsonData), null, 2)
+`, currBody),
 						}
+						msg, err := json.Marshal(message)
+						if err != nil {
+							log.Errorf("json marshal failed: %s", err)
+							continue
+						}
+						err = client.WriteText(msg)
+						if err != nil {
+							log.Errorf("write text failed: %s", err)
+							continue
+						}
+						time.Sleep(100 * time.Millisecond)
 					}
 
-				case "Post":
-					for _, kv := range mm.GetValue() {
-						var check bool
-						for _, v := range freq.GetPostCommonParams() {
-							if v.Name() == kv.GetKey() {
-								check = true
-								v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
-									results = append(results, i)
-								})
-							}
+					go func() {
+						for i := 0; i < reqCount; i++ {
+							<-readChan
 						}
-						if !check {
-							freq.FuzzPostParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
-								results = append(results, i)
-							})
+						// 所有请求都完成了，关闭 wsClient
+						err := client.Close(websocket.CloseNormalClosure, "fuzzer client closing connection")
+						if err != nil {
+							client.conn.Close()
+						}
+						close(readChan)
+					}()
+				case "Post":
+					//	for _, kv := range mm.GetValue() {
+					//		var check bool
+					//		for _, v := range freq.GetPostCommonParams() {
+					//			if v.Name() == kv.GetKey() {
+					//				check = true
+					//				v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+					//					results = append(results, i)
+					//				})
+					//			}
+					//		}
+					//		if !check {
+					//			freq.FuzzPostParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+					//				results = append(results, i)
+					//			})
+					//		}
+					//	}
+					//case "Body":
+					rawBody := string(freq.GetBody())
+
+					read := func(data []byte) {
+						defer func() {
+							readChan <- struct{}{} // 读取完成后向 readChan 发送信号
+						}()
+						log.Infof("read: %s", string(data))
+						if strings.Contains(string(data), "chrome-extension") {
+							enRes := gjson.GetBytes(data, "res").String()
+
+							res := lowhttp.ReplaceHTTPPacketBody(freq.originRequest, []byte(enRes), false)
+							results = append(results, res)
 						}
 					}
+					wsClient, err := lowhttp.NewWebsocketClient([]byte(`GET /?token=fuzzer HTTP/1.1
+Host: 127.0.0.1:11213
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Cache-Control: no-cache
+Pragma: no-cache
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: keep-alive, Upgrade
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
+Accept: */*
+`), lowhttp.WithWebsocketFromServerHandler(read))
+					if err != nil {
+						log.Errorf("websocket client failed: %s", err)
+						return nil
+					}
+					wsClient.StartFromServer()
+					req, err := freq.fuzzPostRaw(rawBody)
+					if err != nil {
+						log.Errorf("fuzz post raw failed: %s", err)
+						return nil
+					}
+					reqCount = len(req) // 记录请求的数量
+					for _, r := range req {
+						rb, _ := utils.DumpHTTPRequest(r, true)
+						currBody := string(lowhttp.GetHTTPPacketBody(rb))
+						message := map[string]string{
+							"type": "eval",
+							"code": fmt.Sprintf(`
+let jsonData = %s;
+JSON.stringify(outputObj(jsonData), null, 2)
+`, currBody),
+						}
+						msg, err := json.Marshal(message)
+						if err != nil {
+							log.Errorf("json marshal failed: %s", err)
+							continue
+						}
+						err = wsClient.WriteText(msg)
+						if err != nil {
+							log.Errorf("write text failed: %s", err)
+							continue
+						}
+						time.Sleep(100 * time.Millisecond)
+					}
+
+					go func() {
+						for i := 0; i < reqCount; i++ {
+							<-readChan // 从 readChan 信道中读取数据，每次读取表示一个请求完成
+						}
+						// 所有请求都完成了，关闭 wsClient
+						wsClient.WriteClose()
+					}()
 				}
 			}
-			return results
+
+			select {
+			case <-readChan:
+				return results
+			case <-time.After(3 * time.Second):
+				return results
+			}
 		})
 	}
 }
