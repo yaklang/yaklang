@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
 )
 
 const (
@@ -192,17 +193,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 		return t
 	}
 
-	var PkgPath string
-	typKind := typ.Kind()
-	if typKind == reflect.Struct || typKind == reflect.Interface {
-		pkg := typ.PkgPath()
-		name := typ.Name()
-		PkgPath = fmt.Sprintf("%s.%s", pkg, name)
-	} else if typKind == reflect.Ptr {
-		pkg := typ.Elem().PkgPath()
-		name := typ.Elem().Name()
-		PkgPath = fmt.Sprintf("%s.%s", pkg, name)
-	}
+	_, pkgPathName := yakdoc.GetTypeNameWithPkgPath(typ)
 
 	if hijackType, ok := prog.externType[Name]; ok {
 		return hijackType
@@ -212,7 +203,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 
 	// alias type
 	if t := GetTypeByStr(typ.Kind().String()); t != nil {
-		ret = NewAliasType(Name, PkgPath, t)
+		ret = NewAliasType(Name, pkgPathName, t)
 	}
 
 	// before this check, code will not recursive.
@@ -225,44 +216,44 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 
 	isInterface := false
 	// complex type
-	switch typ.Kind() {
-	case reflect.Array, reflect.Slice:
-		ret = NewSliceType(prog.handlerType(typ.Elem(), level))
-	case reflect.Map:
-		ret = NewMapType(prog.handlerType(typ.Key(), level), prog.handlerType(typ.Elem(), level))
-	case reflect.Struct:
-		structType := NewStructType()
-		structType.Name = Name
-		structType.pkgPath = PkgPath
-		prog.externType[Name] = structType
-		for i := 0; i < typ.NumField(); i++ {
-			field := typ.Field(i)
-			fieldType := prog.handlerType(field.Type, level)
-			structType.AddField(NewConst(field.Name), fieldType)
-			if field.Anonymous && IsObjectType(fieldType) {
-				structType.AnonymousField = append(structType.AnonymousField, fieldType.(*ObjectType))
+	if ret == nil {
+		switch typ.Kind() {
+		case reflect.Array, reflect.Slice:
+			ret = NewSliceType(prog.handlerType(typ.Elem(), level))
+		case reflect.Map:
+			ret = NewMapType(prog.handlerType(typ.Key(), level), prog.handlerType(typ.Elem(), level))
+		case reflect.Struct:
+			structType := NewStructType()
+			prog.externType[Name] = structType
+			for i := 0; i < typ.NumField(); i++ {
+				field := typ.Field(i)
+				fieldType := prog.handlerType(field.Type, level)
+				structType.AddField(NewConst(field.Name), fieldType)
+				if field.Anonymous && IsObjectType(fieldType) {
+					structType.AnonymousField = append(structType.AnonymousField, fieldType.(*ObjectType))
+				}
 			}
-		}
-		structType.Finish()
-		ret = structType
-	case reflect.Func:
-		ret = prog.CoverReflectFunctionType(typ, level)
-	case reflect.Pointer:
-		ret = prog.handlerType(typ.Elem(), level)
-		return ret
-	case reflect.UnsafePointer:
-		obj := NewObjectType()
-		obj.SetName(Name)
-		ret = obj
-	case reflect.Interface:
-		isInterface = true
-		ret = NewInterfaceType(Name, PkgPath)
-	case reflect.Chan:
-		ret = NewChanType(prog.handlerType(typ.Elem(), level))
-	default:
-		if ret == nil {
-			fmt.Println("cannot handler this type:" + typ.Kind().String())
-			ret = NewObjectType()
+			structType.Finish()
+			ret = structType
+		case reflect.Func:
+			ret = prog.CoverReflectFunctionType(typ, level)
+		case reflect.Pointer:
+			ret = prog.handlerType(typ.Elem(), level)
+			return ret
+		case reflect.UnsafePointer:
+			obj := NewObjectType()
+			obj.SetName(Name)
+			ret = obj
+		case reflect.Interface:
+			isInterface = true
+			ret = NewInterfaceType(Name, pkgPathName)
+		case reflect.Chan:
+			ret = NewChanType(prog.handlerType(typ.Elem(), level))
+		default:
+			if ret == nil {
+				fmt.Println("cannot handler this type:" + typ.Kind().String())
+				ret = NewObjectType()
+			}
 		}
 	}
 
@@ -270,6 +261,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 		prog.externType[Name] = ret
 		if ityp, ok := ret.(*ObjectType); ok {
 			ityp.SetName(Name)
+			ityp.SetPkgPath(pkgPathName)
 		}
 	}
 
@@ -283,7 +275,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 			if isInterface {
 				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
 			}
-			funTyp.SetName(fmt.Sprintf("%s.%s", PkgPath, method.Name))
+			funTyp.SetName(fmt.Sprintf("%s.%s", pkgPathName, method.Name))
 			Methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
 		}
 	}

@@ -616,6 +616,10 @@ func (i *ObjectType) SetName(name string) {
 	i.Name = name
 }
 
+func (i *ObjectType) SetPkgPath(pkg string) {
+	i.pkgPath = pkg
+}
+
 func NewObjectType() *ObjectType {
 	return &ObjectType{
 		Kind:       ObjectTypeKind,

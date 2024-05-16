@@ -138,22 +138,22 @@ func ShrinkTypeVerboseName(i string) string {
 	return i
 }
 
-func GetTypeName(expr ast.Expr, fset *token.FileSet) string {
+func ASTGetTypeName(expr ast.Expr, fset *token.FileSet) string {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		return t.Name
 	case *ast.StarExpr:
-		return "*" + GetTypeName(t.X, fset)
+		return "*" + ASTGetTypeName(t.X, fset)
 	case *ast.SelectorExpr:
-		return GetTypeName(t.X, fset) + "." + t.Sel.Name
+		return ASTGetTypeName(t.X, fset) + "." + t.Sel.Name
 	case *ast.InterfaceType:
 		return "any"
 	case *ast.Ellipsis:
-		return "..." + GetTypeName(t.Elt, fset)
+		return "..." + ASTGetTypeName(t.Elt, fset)
 	case *ast.ArrayType:
-		return "[]" + GetTypeName(t.Elt, fset)
+		return "[]" + ASTGetTypeName(t.Elt, fset)
 	case *ast.MapType:
-		return "map[" + GetTypeName(t.Key, fset) + "]" + GetTypeName(t.Value, fset)
+		return "map[" + ASTGetTypeName(t.Key, fset) + "]" + ASTGetTypeName(t.Value, fset)
 	default:
 		var buf strings.Builder
 		err := format.Node(&buf, fset, expr)
@@ -182,7 +182,7 @@ func HandleParams(funcRefType reflect.Type, typ *ast.FuncType, fset *token.FileS
 			fieldRefType = funcRefType.In(i)
 		}
 
-		typName := ShrinkTypeVerboseName(GetTypeName(field.Type, fset))
+		typName := ShrinkTypeVerboseName(ASTGetTypeName(field.Type, fset))
 		for _, name := range field.Names {
 			param := &Field{
 				Name: name.Name,
@@ -215,7 +215,7 @@ func HandleResults(funcRefType reflect.Type, typ *ast.FuncType, fset *token.File
 			fieldRefType = funcRefType.Out(i)
 		}
 
-		typName := ShrinkTypeVerboseName(GetTypeName(field.Type, fset))
+		typName := ShrinkTypeVerboseName(ASTGetTypeName(field.Type, fset))
 
 		for _, name := range field.Names {
 			result := &Field{
