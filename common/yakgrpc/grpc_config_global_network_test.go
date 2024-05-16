@@ -2,21 +2,22 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 
 	"github.com/davecgh/go-spew/spew"
@@ -574,7 +575,8 @@ func TestPluginScanLists(t *testing.T) {
 
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	host, port := utils.DebugMockHTTP([]byte("Hello"))
-	yakit.SetGlobalPluginScanLists([]string{}, []string{host})
+	recoverList := yakit.SetGlobalPluginScanLists([]string{}, []string{host})
+	defer recoverList()
 
 	manager, err := yak.NewMixPluginCaller()
 	require.Nil(t, err, "new mix plugin caller error")

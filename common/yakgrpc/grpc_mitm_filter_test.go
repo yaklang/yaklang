@@ -3,12 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"golang.org/x/net/websocket"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"golang.org/x/net/websocket"
+
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/davecgh/go-spew/spew"
@@ -92,8 +94,8 @@ func Test_ForExcludeBadCase(t *testing.T) {
 		} {
 			// path := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
-			token = "Xsjip0QIZ8tyhnq"
-			packet = []byte(`GET /-L-Xsjip0QIZ8tyhnq/v.gif?logactid=1234567890&showTab=10000&opType=showpv&mod=superman%3Alib&submod=index&superver=supernewplus&glogid=2147883968&type=2011&pid=315&isLogin=0&version=PCHome&terminal=PC&qid=0xc349374900061bc0&sid=36551_38642_38831_39027_39022_38958_38955_39014_39038_38811_39084_38639_26350_39095_39100&super_frm=&from_login=&from_reg=&query=&curcard=2&curcardtab=&_r=0.9024198609355389 HTTP/1.1
+			token = uuid.NewString()
+			packet = []byte(`GET /-L-` + token + `/v.gif?logactid=1234567890&showTab=10000&opType=showpv&mod=superman%3Alib&submod=index&superver=supernewplus&glogid=2147883968&type=2011&pid=315&isLogin=0&version=PCHome&terminal=PC&qid=0xc349374900061bc0&sid=36551_38642_38831_39027_39022_38958_38955_39014_39038_38811_39084_38639_26350_39095_39100&super_frm=&from_login=&from_reg=&query=&curcard=2&curcardtab=&_r=0.9024198609355389 HTTP/1.1
 Host: sp1.baidu.com
 Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8
 Accept-Encoding: gzip, deflate, br
