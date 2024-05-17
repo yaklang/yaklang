@@ -48,6 +48,7 @@ func AddExecBatchTask(runtimeId string, percent float64, yakScriptOnlineGroup, t
 		TaskName:             taskName,
 		ProgressTaskParam:    paramJson,
 		ProgressSource:       KEY_ProgressManager,
+		Target:               req.Target,
 	}
 
 	err = yakit.CreateOrUpdateProgress(consts.GetGormProjectDatabase(), runtimeId, progress)
@@ -72,6 +73,7 @@ func AddSimpleDetectTask(runtimeId string, req *ypb.RecordPortScanRequest) {
 		ExtraInfo:            req.LastRecord.GetExtraInfo(),
 		ProgressTaskParam:    paramJson,
 		ProgressSource:       KEY_SimpleDetectManager,
+		Target:               req.GetPortScanRequest().GetTargets(),
 	}
 	err = yakit.CreateOrUpdateProgress(consts.GetGormProjectDatabase(), runtimeId, progress)
 	if err != nil {

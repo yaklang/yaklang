@@ -2201,6 +2201,7 @@ message UnfinishedTaskFilter {
   string RuntimeId = 1;
   repeated string ProgressSource = 2;
   string TaskName = 3; // support fuzzy search
+  string Target = 4; // support fuzzy search
 }
 
 message QueryUnfinishedTaskRequest { // query unfinished task list ,just brief info
@@ -2219,6 +2220,7 @@ message UnfinishedTask {
   string YakScriptOnlineGroup = 4;
   string TaskName = 5;
   int64  LastRecordPtr = 6;
+  string Target = 7;
 }
 
 message QueryUnfinishedTaskResponse { // brief information for unfinished task
