@@ -361,7 +361,7 @@ func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPort
 		runtimeId = uuid.New().String()
 	}
 	AddSimpleDetectTask(runtimeId, req)
-	return nil, nil
+	return &ypb.Empty{}, nil
 }
 
 func (s *Server) QuerySimpleDetectUnfinishedTask(ctx context.Context, req *ypb.QueryUnfinishedTaskRequest) (*ypb.QueryUnfinishedTaskResponse, error) {
@@ -381,6 +381,7 @@ func (s *Server) QuerySimpleDetectUnfinishedTask(ctx context.Context, req *ypb.Q
 			YakScriptOnlineGroup: progress.YakScriptOnlineGroup,
 			TaskName:             progress.TaskName,
 			LastRecordPtr:        progress.LastRecordPtr,
+			Target:               progress.Target,
 		})
 	}
 	return &ypb.QueryUnfinishedTaskResponse{Tasks: tasks}, nil

@@ -22,6 +22,9 @@ type Progress struct {
 
 	// 任务记录的参数
 	ProgressTaskParam []byte
+
+	// 目标 大部分的progress都应该有制定目标，所以尝试提取出来作为单独的数据使用
+	Target string
 }
 
 func CreateOrUpdateProgress(db *gorm.DB, runtimeId string, i interface{}) error {
@@ -35,7 +38,8 @@ func CreateOrUpdateProgress(db *gorm.DB, runtimeId string, i interface{}) error 
 }
 
 func FilterProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) *gorm.DB {
-	db = bizhelper.FuzzQuery(db, "task_name", filter.GetTaskName())
+	db = bizhelper.FuzzQueryLike(db, "task_name", filter.GetTaskName())
+	db = bizhelper.FuzzQueryLike(db, "target", filter.GetTarget())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "progress_source", filter.GetProgressSource())
 	db = bizhelper.ExactQueryString(db, "runtime_id", filter.GetRuntimeId())
 	return db
