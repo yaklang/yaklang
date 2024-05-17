@@ -2,8 +2,8 @@ package ssadb
 
 import (
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -92,15 +92,8 @@ func emptyIrCode() *IrCode {
 	return &IrCode{}
 }
 
-var verifyExisted = new(sync.Once)
-
 func RequireIrCode(db *gorm.DB, program string) (uint, *IrCode) {
-	verifyExisted.Do(func() {
-		db.AutoMigrate(&IrCode{})
-	})
 	db = db.Model(&IrCode{})
-	// log.Infof("RequireIrCode: %v", program)
-	// save new ircode
 	ircode := emptyIrCode()
 	ircode.ProgramName = program
 	db.Create(ircode)

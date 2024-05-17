@@ -7,7 +7,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,8 +26,6 @@ func GetCacheFromPool(programName string) *Cache {
 	CachePool.Set(programName, cache)
 	return cache
 }
-
-var DB = consts.GetGormProjectDatabase() // not good here...
 
 type instructionIrCode struct {
 	inst   Instruction
@@ -94,7 +91,7 @@ func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 	}
 
 	if databaseEnable {
-		cache.DB = DB
+		cache.DB = ssadb.GetDB()
 		instructionCache.SetCheckExpirationCallback(func(key int64, inst instructionIrCode) bool {
 			return cache.saveInstruction(inst)
 		})

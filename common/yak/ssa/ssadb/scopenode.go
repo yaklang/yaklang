@@ -2,9 +2,7 @@ package ssadb
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 )
 
 type IrScopeNode struct {
@@ -16,25 +14,15 @@ type IrScopeNode struct {
 	ExtraInfo     string     `json:"extraInfo"`
 }
 
-var migrateTreeNodeOnce = new(sync.Once)
-
-func migrateTreeNode(db *gorm.DB) {
-	migrateTreeNodeOnce.Do(func() {
-		db.AutoMigrate(&IrScopeNode{})
-	})
-}
-
 func RequireScopeNode() (int64, *IrScopeNode) {
-	db := consts.GetGormProjectDatabase()
-	migrateTreeNode(db)
+	db := GetDB()
 	treeNode := &IrScopeNode{}
 	db.Create(&treeNode)
 	return int64(treeNode.ID), treeNode
 }
 
 func GetIrScope(id int64) (*IrScopeNode, error) {
-	db := consts.GetGormProjectDatabase()
-	migrateTreeNode(db)
+	db := GetDB()
 	treeNode := &IrScopeNode{}
 	if db := db.First(treeNode, id); db.Error != nil {
 		return nil, utils.Errorf("failed to get tree node: %v", db.Error)

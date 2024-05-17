@@ -1,9 +1,9 @@
 package ssadb
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
-	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/jinzhu/gorm"
 )
@@ -22,12 +22,7 @@ type IrVariable struct {
 	InstructionID Int64Slice `json:"instruction_id" gorm:"type:text"`
 }
 
-var variableOnce = new(sync.Once)
-
 func SaveVariable(db *gorm.DB, program, variable string, instIDs []int64) error {
-	variableOnce.Do(func() {
-		db.AutoMigrate(&IrVariable{})
-	})
 	db = db.Model(&IrVariable{})
 	// save new ircode
 
@@ -52,9 +47,6 @@ func SaveVariable(db *gorm.DB, program, variable string, instIDs []int64) error 
 }
 
 func GetVariable(db *gorm.DB, program, variable string) (*IrVariable, error) {
-	variableOnce.Do(func() {
-		db.AutoMigrate(&IrVariable{})
-	})
 	db = db.Model(&IrVariable{})
 	irVariable := &IrVariable{}
 	err := db.Where("program_name = ? AND variable_name = ?", program, variable).First(irVariable).Error

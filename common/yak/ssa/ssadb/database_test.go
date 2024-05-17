@@ -8,14 +8,13 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestSqliteID(t *testing.T) {
-	db := consts.GetGormProjectDatabase().Debug()
+	db := ssadb.GetDB().Debug()
 	projectName := uuid.NewString()
 	id, _ := ssadb.RequireIrCode(db, projectName)
 	id2, _ := ssadb.RequireIrCode(db, projectName)
@@ -25,7 +24,7 @@ func TestSqliteID(t *testing.T) {
 }
 
 func TestBuild(t *testing.T) {
-	db := consts.GetGormProjectDatabase().Debug()
+	db := ssadb.GetDB().Debug()
 	programName := uuid.NewString()
 	code := `
 		a = 1
@@ -59,7 +58,7 @@ func TestBuild(t *testing.T) {
 }
 
 func TestBuild_Multiple_Program(t *testing.T) {
-	db := consts.GetGormProjectDatabase().Debug()
+	db := ssadb.GetDB().Debug()
 
 	check := func(code, variable string) {
 		programName := uuid.NewString()
@@ -94,7 +93,7 @@ func TestBuild_Multiple_Program(t *testing.T) {
 func TestSyncFromDatabase(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		programName := uuid.NewString()
-		// db := consts.GetGormProjectDatabase()
+		// db := ssadb.GetDB()
 		prog, err := ssaapi.Parse(`
 		a = 1 
 		print(a)
@@ -102,7 +101,7 @@ func TestSyncFromDatabase(t *testing.T) {
 			ssaapi.WithLanguage(ssaapi.Yak),
 			ssaapi.WithDatabaseProgramName(programName),
 		)
-		defer ssadb.DeleteProgram(ssa.DB, programName)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 		require.NoError(t, err)
 
 		prog.Program.ShowWithSource()

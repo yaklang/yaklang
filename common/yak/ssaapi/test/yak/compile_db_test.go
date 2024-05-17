@@ -51,7 +51,7 @@ if (c > 1) {
 e = a
 dump(c)
 `, ssaapi.WithDatabaseProgramName(progName))
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
 	}
@@ -104,7 +104,7 @@ if (c > 1) {
 }
 d = a
 `, ssaapi.WithDatabaseProgramName("a"))
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), "a")
+	defer ssadb.DeleteProgram(ssadb.GetDB(), "a")
 	if err != nil {
 		panic(err)
 	}
@@ -121,7 +121,7 @@ include `+strconv.Quote(filename)+`
 
 c("d")
 `, ssaapi.WithDatabaseProgramName(progName))
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +129,7 @@ c("d")
 
 	count := 0
 	includeFile := omap.NewOrderedMap(make(map[string]any))
-	for result := range ssadb.YieldIrCodesProgramName(consts.GetGormProjectDatabase(), context.Background(), progName) {
+	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
 		if result.Opcode <= 0 {
 			continue
 		}
@@ -160,7 +160,7 @@ include `+strconv.Quote(filename)+`
 
 c("d")
 `, ssaapi.WithDatabaseProgramName(progName))
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
 	}
@@ -169,7 +169,7 @@ c("d")
 	haveIncluded := false
 	includeFile := omap.NewOrderedMap(make(map[string]any))
 	includeHash := utils.CalcMd5(includeCode)
-	for result := range ssadb.YieldIrCodesProgramName(consts.GetGormProjectDatabase(), context.Background(), progName) {
+	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
 		if result.IsEmptySourceCodeHash() {
 			panic("source code hash is empty")
 		}
@@ -195,7 +195,7 @@ dump("HJello")
 a = i => i + 1
 dump(a(3))
 `, ssaapi.WithDatabaseProgramName(progName))
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ dump(a(3))
 	m := omap.NewGeneralOrderedMap()
 
 	// test source code
-	for result := range ssadb.YieldIrCodesProgramName(consts.GetGormProjectDatabase(), context.Background(), progName) {
+	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
 		count++
 		result.Show()
 		if result.SourceCodeHash == "" {
@@ -241,7 +241,7 @@ a()
 			matchAtFirst = true
 		}),
 	)
-	defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), progName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		t.Fatal(err)
 	}

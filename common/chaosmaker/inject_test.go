@@ -2,18 +2,15 @@ package chaosmaker
 
 import (
 	"context"
+	"net/http"
+	_ "net/http/pprof"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"net/http"
-	_ "net/http/pprof"
-	"testing"
 )
-
-func init() {
-	consts.InitilizeDatabase("", "")
-}
 
 func TestChaosRules(t *testing.T) {
 	// 注册/pprof路由
