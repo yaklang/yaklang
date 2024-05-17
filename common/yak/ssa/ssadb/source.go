@@ -1,22 +1,21 @@
 package ssadb
 
 import (
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"net/url"
 	"path"
 	"strconv"
 	"sync"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
 var migrateIrSource = new(sync.Once)
 
 type IrSource struct {
-	gorm.Model
-
 	SourceCodeHash string `json:"source_code_hash" gorm:"unique_index"`
 	QuotedCode     string `json:"quoted_code"`
 	FileUrl        string `json:"file_url"`
@@ -25,9 +24,6 @@ type IrSource struct {
 }
 
 func SaveIrSource(db *gorm.DB, editor *memedit.MemEditor, hash string) error {
-	migrateIrSource.Do(func() {
-		db.AutoMigrate(&IrSource{})
-	})
 
 	if editor.GetSourceCode() == "" {
 		return utils.Errorf("source code is empty")

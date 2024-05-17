@@ -3,10 +3,11 @@ package ssautil
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strconv"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 func (s *ScopedVersionedTable[T]) SetParentId(i int64) {
@@ -96,7 +97,7 @@ func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 	s.persistentNode.ExtraInfo = string(raw)
 
 	s.persistentNode.ProgramName = s.persistentProgramName
-	if err := consts.GetGormProjectDatabase().Save(s.persistentNode).Error; err != nil {
+	if err := ssadb.GetDB().Save(s.persistentNode).Error; err != nil {
 		return utils.Error(err.Error())
 	}
 	return nil

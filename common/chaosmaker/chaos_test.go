@@ -3,6 +3,10 @@ package chaosmaker
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
@@ -13,9 +17,6 @@ import (
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"os"
-	"strings"
-	"testing"
 )
 
 var rules = []string{
@@ -129,11 +130,6 @@ func TestMUSTPASS_CrossVerifyGroup(t *testing.T) {
 			return
 		}
 	}
-}
-
-func init() {
-	consts.InitilizeDatabase("", "")
-	consts.GetGormProjectDatabase()
 }
 
 func TestHTTPRequest(t *testing.T) {
@@ -339,13 +335,13 @@ func TestParseTCP(t *testing.T) {
 	}
 */
 func TestExportChaosRulesToFile(t *testing.T) {
-	consts.InitilizeDatabase("", "")
+	consts.InitilizeYakitDatabase("", "")
 	consts.GetGormProjectDatabase()
 	rule.ExportRulesToFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")
 }
 
 func TestImportChaosRulesToFile(t *testing.T) {
-	consts.InitilizeDatabase("", "")
+	consts.InitilizeYakitDatabase("", "")
 	consts.GetGormProjectDatabase()
 	consts.GetGormProfileDatabase().AutoMigrate(&rule.Storage{})
 	rule.ImportRulesFromFile(consts.GetGormProfileDatabase(), "/tmp/chaosmaker.json.txt")

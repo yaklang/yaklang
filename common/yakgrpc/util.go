@@ -188,7 +188,7 @@ func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
 	if local || !utils.InGithubActions() {
 		var finalErr error
 		initLocalClientOnce.Do(func() {
-			consts.InitilizeDatabase("", "")
+			consts.InitilizeYakitDatabase("", "")
 			yakit.InitializeDefaultDatabaseSchema()
 
 			port = utils.GetRandomAvailableTCPPort()

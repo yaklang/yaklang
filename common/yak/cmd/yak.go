@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/crep"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io"
 	"io/ioutil"
 	"net"
@@ -19,6 +17,9 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
@@ -46,6 +47,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+
 	// start pprof
 	_ "net/http/pprof"
 )
@@ -58,7 +60,7 @@ var (
 )
 
 func initializeDatabase(projectDatabase string, profileDBName string) error {
-	consts.InitilizeDatabase(projectDatabase, profileDBName)
+	consts.InitilizeYakitDatabase(projectDatabase, profileDBName)
 	_, err := consts.InitializeCVEDatabase()
 	if err != nil {
 		log.Debugf("initialized cve database warning: %s", err)
