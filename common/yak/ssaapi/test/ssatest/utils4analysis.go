@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -36,7 +35,7 @@ func Check(t *testing.T, code string, handler checkFunction, opt ...ssaapi.Optio
 	{
 		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
-		defer ssadb.DeleteProgram(consts.GetGormProjectDatabase(), programID)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		assert.Nil(t, err)
 		// prog.Show()
 

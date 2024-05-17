@@ -3,7 +3,6 @@ package ssa
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -49,7 +48,7 @@ func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T,
 
 // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(id int64) (Value, error) {
-	ir := ssadb.GetIrCodeById(consts.GetGormProjectDatabase(), id)
+	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
 	if ir == nil {
 		return nil, utils.Error("ircode [" + fmt.Sprint(id) + "]not found")
 	}
@@ -70,7 +69,7 @@ func (c *Cache) newLazyInstruction(id int64) *LazyInstruction {
 }
 func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) *LazyInstruction {
 	if ir == nil {
-		ir = ssadb.GetIrCodeById(consts.GetGormProjectDatabase(), id)
+		ir = ssadb.GetIrCodeById(ssadb.GetDB(), id)
 		if ir == nil {
 			log.Error("ircode [" + fmt.Sprint(id) + "]not found")
 			return nil
