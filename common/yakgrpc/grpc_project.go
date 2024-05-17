@@ -5,6 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,21 +24,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/encoding/protowire"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var (
-	currentProjectMutex = new(sync.Mutex)
-)
+var currentProjectMutex = new(sync.Mutex)
 
 func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProjectRequest) (*ypb.Empty, error) {
 	currentProjectMutex.Lock()
@@ -255,7 +254,7 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 		suffix = ".enc"
 	}
 	outputFile = filepath.Join(consts.GetDefaultYakitProjectsDir(), "project-"+projectNameToFileName(proj.ToGRPCModel().GetProjectName())+".yakitproject"+suffix)
-	outFp, err := os.OpenFile(outputFile, os.O_CREATE|os.O_RDWR, 0666)
+	outFp, err := os.OpenFile(outputFile, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		feedProgress("打开输出文件失败！", 0.5)
 		return err
@@ -275,13 +274,13 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 	feedProgress("导出项目基本数据成功，开始导出项目数据库", 0.65)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	var finished = false
+	finished := false
 	go func() {
 		defer func() {
 			finished = true
 		}()
 		var percent float64 = 0.65
-		var count = 0
+		count := 0
 		for {
 			count++
 			select {
@@ -411,7 +410,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		paramsBytes, n := protowire.ConsumeBytes(rawBytes)
 		rawBytes = rawBytes[n:]
 
-		var params = make(map[string]interface{})
+		params := make(map[string]interface{})
 		json.Unmarshal(paramsBytes, &params)
 		if params != nil && len(params) > 0 {
 			// handle params
@@ -447,7 +446,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	err = os.WriteFile(
 		fileName,
 		rawBytes,
-		0666,
+		0o666,
 	)
 	if err != nil {
 		feedProgress("创建新数据库失败："+err.Error(), 0.9)
@@ -507,6 +506,9 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 				if err != nil {
 					log.Error("删除本地数据库失败：" + err.Error())
 				}
+				// delete wal log and shm file
+				os.RemoveAll(k.DatabasePath + "-wal")
+				os.RemoveAll(k.DatabasePath + "-shm")
 			}
 			defaultDb, err := gorm.Open("sqlite3", proj.DatabasePath)
 			if err != nil {
