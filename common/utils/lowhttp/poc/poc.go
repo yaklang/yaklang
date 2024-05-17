@@ -54,8 +54,8 @@ type PocConfig struct {
 	Session              interface{} // session的标识符，可以用任意对象
 	SaveHTTPFlow         *bool
 	Source               string
-	Username             string
-	Password             string
+	Username             *string
+	Password             *string
 
 	// packetHandler
 	PacketHandler []func([]byte) []byte
@@ -159,9 +159,6 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Source != "" {
 		opts = append(opts, lowhttp.WithSource(c.Source))
 	}
-	if c.RuntimeId != "" {
-		opts = append(opts, lowhttp.WithRuntimeId(c.RuntimeId))
-	}
 	if c.FromPlugin != "" {
 		opts = append(opts, lowhttp.WithFromPlugin(c.FromPlugin))
 	}
@@ -177,38 +174,31 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	opts = append(opts, lowhttp.WithDNSNoCache(c.DNSNoCache))
 
-	if c.Context != nil {
-		opts = append(opts, lowhttp.WithContext(c.Context))
-	}
-
 	if c.BodyStreamHandler != nil {
 		opts = append(opts, lowhttp.WithBodyStreamReaderHandler(c.BodyStreamHandler))
 	}
 
-	opts = append(opts, lowhttp.WithUsername(c.Username))
-	opts = append(opts, lowhttp.WithPassword(c.Password))
+	if c.Username != nil {
+		opts = append(opts, lowhttp.WithUsername(*c.Username))
+	}
+	if c.Password != nil {
+		opts = append(opts, lowhttp.WithPassword(*c.Password))
+	}
 	return opts
 }
 
 func NewDefaultPoCConfig() *PocConfig {
-	saveHTTPFlow := consts.GLOBAL_HTTP_FLOW_SAVE.IsSet()
-
 	config := &PocConfig{
 		Host:                   "",
 		Port:                   0,
-		Timeout:                &defaultTimeout,
-		ConnectTimeout:         &defaultTimeout,
 		RetryTimes:             nil,
 		RetryInStatusCode:      []int{},
 		RetryNotInStatusCode:   []int{},
-		RetryWaitTime:          &defaultWaitTime,
-		RetryMaxWaitTime:       &defaultMaxWaitTime,
 		RedirectTimes:          nil,
 		Proxy:                  nil,
 		FuzzParams:             nil,
 		RedirectHandler:        nil,
 		Session:                nil,
-		SaveHTTPFlow:           &saveHTTPFlow,
 		Source:                 "",
 		Websocket:              false,
 		WebsocketHandler:       nil,
@@ -393,6 +383,28 @@ func WithForceHTTP2(isHttp2 bool) PocConfigOption {
 func WithSNI(sni string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.SNI = &sni
+	}
+}
+
+// username 是一个请求选项参数，用于指定认证时的用户名
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.username("admin"), poc.password("admin"))
+// ```
+func WithUsername(username string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.Username = &username
+	}
+}
+
+// password 是一个请求选项参数，用于指定认证时的密码
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.username("admin"), poc.password("admin"))
+// ```
+func WithPassword(password string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.Password = &password
 	}
 }
 
@@ -1617,6 +1629,8 @@ var PoCExports = map[string]interface{}{
 	"websocket":            WithWebsocket,
 	"websocketFromServer":  WithWebsocketHandler,
 	"websocketOnClient":    WithWebsocketClientHandler,
+	"username":             WithUsername,
+	"password":             WithPassword,
 
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,
