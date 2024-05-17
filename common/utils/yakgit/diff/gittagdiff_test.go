@@ -53,7 +53,10 @@ func TestGitTagOrHashDiff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hash1Tag, err := repo.CreateTag("tag1", hash1, &git.CreateTagOptions{Message: "tag1"})
+	hash1Tag, err := repo.CreateTag("tag1", hash1, &git.CreateTagOptions{
+		Tagger:  &object.Signature{Name: "yaklang", Email: ""},
+		Message: "tag1",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +94,9 @@ func TestGitTagOrHashDiff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hash2Tag, _ := repo.CreateTag("tag2", hash2, &git.CreateTagOptions{Message: "tag2"})
+	hash2Tag, _ := repo.CreateTag("tag2", hash2, &git.CreateTagOptions{
+		Tagger:  &object.Signature{Name: "yaklang", Email: ""},
+		Message: "tag2"})
 	_, _ = hash1Tag, hash2Tag
 	log.Infof("tag1: %s, tag2: %s", hash1Tag.String(), hash2Tag.String())
 	log.Infof("hash1: %s, hash2: %s", hash1.String(), hash2.String())
