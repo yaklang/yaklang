@@ -88,8 +88,16 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 
 	sampleField := keys[0]
 
-	var text = `我在完成数据精炼和提取任务，数据源是：` + strconv.Quote(msg) + "，如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: \n" + buf.String()
+	var text = `我在完成数据精炼和提取任务，数据源是
+-------------------------------------------------------
+` + strconv.Quote(msg) + "\n" +
+		"-------------------------------------------------------\n\n" +
+		"如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: \n" + buf.String()
 	msg = text + "\n\n注意：尽量不要输出和JSON的东西 尽量少提出意见"
+
+	if streamHandler != nil {
+		fmt.Println(text)
+	}
 	result, err := ChatBase(url, model, msg, nil, opt, streamHandler)
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
@@ -214,6 +222,9 @@ func ExtractDataBase(
 		Name:        mainFunction,
 		Description: description,
 		Parameters:  *parameters,
+	}
+	if main.Description == "" {
+		main.Description = "extract and summary some useful info"
 	}
 	choice, err := ChatExBase(url, model, []ChatDetail{NewUserChatDetail(input)}, []Function{main}, opt, streamHandler)
 	if err != nil {
