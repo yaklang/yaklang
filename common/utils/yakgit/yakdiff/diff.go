@@ -1,4 +1,4 @@
-package diff
+package yakdiff
 
 import (
 	"context"
@@ -21,6 +21,10 @@ func Diff(raw1, raw2 any, handler ...DiffHandler) error {
 }
 
 func DiffContext(ctx context.Context, raw1, raw2 any, handler ...DiffHandler) error {
+	if len(handler) == 0 {
+		handler = append(handler, _defaultPatchHandler)
+	}
+
 	r1, r2 := codec.AnyToBytes(raw1), codec.AnyToBytes(raw2)
 
 	storage := memory.NewStorage()

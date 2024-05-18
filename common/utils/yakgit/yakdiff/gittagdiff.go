@@ -1,4 +1,4 @@
-package diff
+package yakdiff
 
 import (
 	"context"
@@ -18,7 +18,11 @@ func getCommit(repo *git.Repository, i string) (*object.Commit, error) {
 	if tag != nil {
 		tagIns, err := repo.TagObject(tag.Hash())
 		if err != nil {
-			return nil, utils.Wrap(err, `repo.TagObject(tag.Hash())`)
+			commit, err := repo.CommitObject(tag.Hash())
+			if err != nil {
+				return nil, utils.Wrap(err, `repo.TagObject(tag.Hash()) nor repo.CommitObject(tag.Hash()) failed`)
+			}
+			return commit, nil
 		}
 		commit, err = tagIns.Commit()
 		if err != nil {
@@ -43,6 +47,9 @@ func getCommit(repo *git.Repository, i string) (*object.Commit, error) {
 
 // GitHashDiffContext compares the trees of two git commit hashes and processes the differences using the provided handlers.
 func GitHashDiffContext(ctx context.Context, repo *git.Repository, hash1, hash2 string, handler ...DiffHandler) error {
+	if len(handler) == 0 {
+		handler = append(handler, _defaultPatchHandler)
+	}
 	// Get the first commit using the first hash
 	commit1, err := getCommit(repo, hash1)
 	if err != nil {

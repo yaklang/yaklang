@@ -1,4 +1,4 @@
-package diff
+package yakdiff
 
 import (
 	"context"
@@ -16,6 +16,10 @@ import (
 )
 
 func FileSystemDiffContext(ctx context.Context, fs1 filesys.FileSystem, fs2 filesys.FileSystem, handler ...DiffHandler) error {
+	if len(handler) == 0 {
+		handler = append(handler, _defaultPatchHandler)
+	}
+
 	storage := memory.NewStorage()
 
 	rootFS := memfs.New()
