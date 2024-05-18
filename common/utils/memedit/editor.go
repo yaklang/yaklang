@@ -399,6 +399,19 @@ func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) erro
 	return nil
 }
 
+func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, callback func(RangeIf)) (end int, ok bool) {
+	index := strings.Index(ve.sourceCode[startIndex:], feature)
+	if index == -1 {
+		return startIndex, false
+	}
+
+	absoluteIndex := startIndex + index
+	startPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex)
+	endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + len(feature))
+	callback(NewRange(startPos, endPos))
+	return startIndex + len(feature), true
+}
+
 func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) error) error {
 	pattern, err := regexp.Compile(patternStr)
 	if err != nil {
