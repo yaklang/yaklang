@@ -1067,11 +1067,15 @@ func (s *Server) GetAllCodecMethods(ctx context.Context, in *ypb.Empty) (*ypb.Co
 }
 
 func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow) (*ypb.Empty, error) {
+	flowByte, err := json.Marshal(req.WorkFlow)
+	if err != nil {
+		return nil, err
+	}
 	var cf = &yakit.CodecFlow{
 		FlowName: req.FlowName,
-		WorkFlow: req.WorkFlow,
+		WorkFlow: flowByte,
 	}
-	err := yakit.CreateOrUpdateCodecFlow(s.GetProfileDatabase(), cf)
+	err = yakit.CreateOrUpdateCodecFlow(s.GetProfileDatabase(), cf)
 	if err != nil {
 		return nil, err
 	}

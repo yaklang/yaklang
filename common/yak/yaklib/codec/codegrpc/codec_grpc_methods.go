@@ -76,7 +76,7 @@ func init() {
 	}
 
 	mutate.AddFuzzTagToGlobal(&mutate.FuzzTagDescription{
-		TagName: "CodecFlow",
+		TagName: "codecflow",
 		Handler: func(s string) []string {
 			lastDividerIndex := strings.LastIndexByte(s, '|')
 			if lastDividerIndex < 0 {
@@ -90,7 +90,7 @@ func init() {
 			res, err := CodecFlowExec(&ypb.CodecRequestFlow{
 				Text:       input,
 				Auto:       false,
-				WorkFlow:   codecFlow.WorkFlow,
+				WorkFlow:   codecFlow.ToGRPC().WorkFlow,
 				InputBytes: nil,
 			})
 			if err != nil {
