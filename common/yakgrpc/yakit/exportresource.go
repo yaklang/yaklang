@@ -7,6 +7,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"os"
@@ -92,7 +93,7 @@ func ImportResource(db *gorm.DB, fileName string) error {
 			if err != nil {
 				continue
 			}
-			var s YakScript
+			var s schema.YakScript
 			err = json.Unmarshal(decodedRaw, &s)
 			if err != nil {
 				log.Error(err)

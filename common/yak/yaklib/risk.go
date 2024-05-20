@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -51,13 +52,13 @@ var (
 		"Save":                   yakit.SaveRisk,
 		"NewRisk":                YakitNewRiskBuilder(GetYakitClientInstance()),
 		"RegisterBeforeRiskSave": yakit.RegisterBeforeRiskSave,
-		"YieldRiskByTarget": func(target string) chan *yakit.Risk {
+		"YieldRiskByTarget": func(target string) chan *schema.Risk {
 			return yakit.YieldRisksByTarget(consts.GetGormProjectDatabase(), context.Background(), target)
 		},
-		"YieldRiskByRuntimeId": func(runtimeId string) chan *yakit.Risk {
+		"YieldRiskByRuntimeId": func(runtimeId string) chan *schema.Risk {
 			return yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
 		},
-		"YieldRiskByCreateAt": func(timestamp int64) chan *yakit.Risk {
+		"YieldRiskByCreateAt": func(timestamp int64) chan *schema.Risk {
 			return yakit.YieldRisksByCreateAt(consts.GetGormProjectDatabase(), context.Background(), timestamp)
 		},
 		"DeleteRiskByTarget": func(addr string) {

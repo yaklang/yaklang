@@ -3,6 +3,7 @@ package yakurl
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"path"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 type websiteFromHttpFlow struct {
-	yakit.HTTPFlow
+	schema.HTTPFlow
 }
 
 func parseQueryToRequest(db *gorm.DB, query string) *gorm.DB {
@@ -38,7 +39,7 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 	websiteRoot := u.GetLocation()
 
 	db := consts.GetGormProjectDatabase()
-	db = db.Model(&yakit.HTTPFlow{})
+	db = db.Model(&schema.HTTPFlow{})
 
 	if ret := query.Get("params"); ret != "" {
 		db = parseQueryToRequest(db, ret)

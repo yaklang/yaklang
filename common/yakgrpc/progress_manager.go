@@ -5,6 +5,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -41,7 +42,7 @@ func AddExecBatchTask(runtimeId string, percent float64, yakScriptOnlineGroup, t
 		log.Errorf("marshal request failed: %s", err)
 		return
 	}
-	progress := &yakit.Progress{
+	progress := &schema.Progress{
 		RuntimeId:            runtimeId,
 		CurrentProgress:      percent,
 		YakScriptOnlineGroup: yakScriptOnlineGroup,
@@ -64,7 +65,7 @@ func AddSimpleDetectTask(runtimeId string, req *ypb.RecordPortScanRequest) {
 		log.Errorf("marshal request failed: %s", err)
 		return
 	}
-	progress := &yakit.Progress{
+	progress := &schema.Progress{
 		RuntimeId:            runtimeId,
 		CurrentProgress:      req.LastRecord.GetPercent(),
 		YakScriptOnlineGroup: req.LastRecord.GetYakScriptOnlineGroup(),

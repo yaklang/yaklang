@@ -2,9 +2,9 @@ package yakgrpc
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"sync"
@@ -55,7 +55,7 @@ func newHybridScanStatusManager(id string, targets int, plugins int, status stri
 	}
 }
 
-func fitStatusToHybridScanTaskRecord(status *ypb.HybridScanResponse, task *yakit.HybridScanTask) {
+func fitStatusToHybridScanTaskRecord(status *ypb.HybridScanResponse, task *schema.HybridScanTask) {
 	task.TotalTargets = status.TotalTargets
 	task.TotalPlugins = status.TotalPlugins
 	task.TotalTasks = status.TotalTasks
@@ -64,7 +64,7 @@ func fitStatusToHybridScanTaskRecord(status *ypb.HybridScanResponse, task *yakit
 	task.Status = status.Status
 }
 
-func (h *HybridScanStatusManager) GetStatus(r ...*yakit.HybridScanTask) *ypb.HybridScanResponse {
+func (h *HybridScanStatusManager) GetStatus(r ...*schema.HybridScanTask) *ypb.HybridScanResponse {
 	h.ManagerMutex.Lock()
 	defer h.ManagerMutex.Unlock()
 	status := &ypb.HybridScanResponse{
@@ -94,7 +94,7 @@ func (h *HybridScanStatusManager) DoActiveTarget() int64 {
 }
 
 // DoActiveTask returns index of task
-func (h *HybridScanStatusManager) DoActiveTask(task ...*yakit.HybridScanTask) int64 {
+func (h *HybridScanStatusManager) DoActiveTask(task ...*schema.HybridScanTask) int64 {
 	atomic.AddInt64(&h.ActiveTask, 1)
 	index := atomic.AddInt64(&h.TotalTaskCount, 1)
 	h.ActiveTaskMap.Store(index, struct{}{})
@@ -130,7 +130,7 @@ func (h *HybridScanStatusManager) RemoveActiveTask(index int64, t *HybridScanTar
 	stream.Send(rsp)
 }
 
-func (h *HybridScanStatusManager) DoneTask(index int64, task ...*yakit.HybridScanTask) {
+func (h *HybridScanStatusManager) DoneTask(index int64, task ...*schema.HybridScanTask) {
 	atomic.AddInt64(&h.TaskFinished, 1)
 	atomic.AddInt64(&h.ActiveTask, -1)
 	h.ActiveTaskMap.Delete(index)

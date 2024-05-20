@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -18,7 +19,7 @@ func (s *Server) QueryWebsocketFlowByHTTPFlowWebsocketHash(ctx context.Context, 
 		return nil, err
 	}
 
-	data := funk.Map(flows, func(i *yakit.WebsocketFlow) *ypb.WebsocketFlow {
+	data := funk.Map(flows, func(i *schema.WebsocketFlow) *ypb.WebsocketFlow {
 		return i.ToGRPCModel()
 	}).([]*ypb.WebsocketFlow)
 	return &ypb.WebsocketFlows{

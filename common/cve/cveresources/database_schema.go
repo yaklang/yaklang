@@ -1,7 +1,7 @@
 package cveresources
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 var CVETbles = []any{
@@ -10,5 +10,5 @@ var CVETbles = []any{
 }
 
 func init() {
-	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_CVE_DATABASE, CVETbles...)
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_CVE_DATABASE, CVETbles...)
 }

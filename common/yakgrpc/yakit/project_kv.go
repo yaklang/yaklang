@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"time"
 
@@ -14,27 +15,6 @@ const (
 	BARE_REQUEST_GROUP  = "FLOW_ID_TO_BARE_REQUEST"
 	BARE_RESPONSE_GROUP = "FLOW_ID_TO_BARE_RESPONSE"
 )
-
-type ProjectGeneralStorage struct {
-	gorm.Model
-
-	Key string `json:"key" gorm:"unique_index"`
-
-	// 经过 JSON + Strconv
-	Value string `json:"value"`
-
-	// 过期时间
-	ExpiredAt time.Time
-
-	// YAKIT SUBPROC_ENV
-	ProcessEnv bool
-
-	// 帮助信息，描述这个变量是干嘛的
-	Verbose string
-
-	// 描述变量所在的组是啥
-	Group string
-}
 
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
@@ -93,9 +73,9 @@ func SetProjectKeyWithGroup(db *gorm.DB, key interface{}, value interface{}, gro
 	if value != "" {
 		valueStr = strconv.Quote(utils.InterfaceToString(value))
 	}
-	if db := db.Model(&ProjectGeneralStorage{}).Where(`key = ?`, keyStr).Assign(map[string]interface{}{
+	if db := db.Model(&schema.ProjectGeneralStorage{}).Where(`key = ?`, keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr, "group": group,
-	}).FirstOrCreate(&ProjectGeneralStorage{}); db.Error != nil {
+	}).FirstOrCreate(&schema.ProjectGeneralStorage{}); db.Error != nil {
 		return utils.Errorf("create project storage kv failed: %s", db.Error)
 	}
 	return nil
@@ -111,21 +91,21 @@ func SetProjectKey(db *gorm.DB, key interface{}, value interface{}) error {
 	if value != "" {
 		valueStr = strconv.Quote(utils.InterfaceToString(value))
 	}
-	if db := db.Model(&ProjectGeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
+	if db := db.Model(&schema.ProjectGeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr,
-	}).FirstOrCreate(&ProjectGeneralStorage{}); db.Error != nil {
+	}).FirstOrCreate(&schema.ProjectGeneralStorage{}); db.Error != nil {
 		return utils.Errorf("create project storage kv failed: %s", db.Error)
 	}
 	return nil
 }
 
-func GetProjectKeyModel(db *gorm.DB, key interface{}) (*ProjectGeneralStorage, error) {
+func GetProjectKeyModel(db *gorm.DB, key interface{}) (*schema.ProjectGeneralStorage, error) {
 	if db == nil {
 		return nil, utils.Error("no database set")
 	}
 	keyStr := strconv.Quote(utils.InterfaceToString(key))
 
-	var kv ProjectGeneralStorage
+	var kv schema.ProjectGeneralStorage
 	if db := db.Where("key = ?", keyStr).Where(
 		"(expired_at IS NULL) OR (expired_at <= ?) OR (expired_at >= ?)",
 		yakitZeroTime,
@@ -143,19 +123,19 @@ func SetProjectKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, secon
 	}
 	var keyStr = strconv.Quote(utils.InterfaceToString(key))
 	var valueStr = strconv.Quote(utils.InterfaceToString(value))
-	if db := db.Model(&ProjectGeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
+	if db := db.Model(&schema.ProjectGeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr, "expired_at": time.Now().Add(time.Duration(seconds) * time.Second),
-	}).FirstOrCreate(&ProjectGeneralStorage{}); db.Error != nil {
+	}).FirstOrCreate(&schema.ProjectGeneralStorage{}); db.Error != nil {
 		return utils.Errorf("create project storage kv failed: %s", db.Error)
 	}
 	return nil
 }
 
-func GetProjectKeyByWhere(db *gorm.DB, key []string) ([]*ProjectGeneralStorage, error) {
+func GetProjectKeyByWhere(db *gorm.DB, key []string) ([]*schema.ProjectGeneralStorage, error) {
 	if db == nil {
 		return nil, utils.Error("no database set")
 	}
-	var kv []*ProjectGeneralStorage
+	var kv []*schema.ProjectGeneralStorage
 	if db := db.Where("key in (?)", key).Where(
 		"(expired_at IS NULL) OR (expired_at <= ?) OR (expired_at >= ?)",
 		yakitZeroTime,
@@ -171,7 +151,7 @@ func DeleteProjectKeyBareRequestAndResponse(db *gorm.DB) error {
 		return utils.Error("no set database")
 	}
 
-	if db := db.Where("key LIKE ? or key LIKE ?", `%_request"`, `%_response"`).Unscoped().Delete(&ProjectGeneralStorage{}); db.Error != nil {
+	if db := db.Where("key LIKE ? or key LIKE ?", `%_request"`, `%_response"`).Unscoped().Delete(&schema.ProjectGeneralStorage{}); db.Error != nil {
 		return utils.Errorf("delete project storage kv bare request and bare response failed: %s", db.Error)
 	}
 	return nil

@@ -9,6 +9,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -215,7 +216,7 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 
 	start := time.Now()
 	err = cmd.Run()
-	history := &yakit.ExecHistory{
+	history := &schema.ExecHistory{
 		Script:        code,
 		RuntimeId:     runtimeId,
 		ScriptId:      scriptId,

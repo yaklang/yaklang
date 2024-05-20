@@ -12,7 +12,7 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 		domains = cli.String("domains")
 		cli.check()
 
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			a = 1
 		}
 			`,
@@ -33,7 +33,6 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 }
 
 func TestSSARuleMustPassMitmDisable(t *testing.T) {
-
 	t.Run("test pack in mitm main with multiple same error", func(t *testing.T) {
 		check(t, `
 		r = risk.CreateRisk(
@@ -45,7 +44,7 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		println(r)
 		risk.Save(r)
 
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			a = 1
 		}
 			`,
@@ -69,7 +68,7 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		println(r)
 		risk.Save(r)
 
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			a = 1
 		}
 			`,
@@ -93,7 +92,7 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 			risk.Save(r)
 		}
 
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			a = 1
 		}
 			`,
@@ -127,7 +126,7 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 	// 	fuzz.HTTPRequest("")~.ExecFirst()
 	// 	fuzz.HTTPRequest("")~.FuzzGetParamsRaw().ExecFirst()
 
-	// 	hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+	// 	hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 	// 		a = 1
 	// 	}
 	// 		`,

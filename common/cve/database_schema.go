@@ -1,7 +1,7 @@
 package cve
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 var CVEDescriptionTables = []any{
@@ -9,5 +9,5 @@ var CVEDescriptionTables = []any{
 }
 
 func init() {
-	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_CVE_DESCRIPTION_DATABASE, CVEDescriptionTables...)
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_CVE_DESCRIPTION_DATABASE, CVEDescriptionTables...)
 }

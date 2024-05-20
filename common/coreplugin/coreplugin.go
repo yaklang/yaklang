@@ -1,6 +1,7 @@
 package coreplugin
 
 import (
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 
 	uuid "github.com/google/uuid"
@@ -11,7 +12,7 @@ import (
 )
 
 var (
-	buildInPlugin = make(map[string]*yakit.YakScript)
+	buildInPlugin = make(map[string]*schema.YakScript)
 )
 
 type pluginConfig struct {
@@ -44,7 +45,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		o(config)
 	}
 
-	var plugin = &yakit.YakScript{
+	var plugin = &schema.YakScript{
 		ScriptName:         name,
 		Type:               pluginType,
 		Content:            codes,
@@ -144,7 +145,7 @@ func OverWriteCorePluginToLocal() {
 	}
 }
 
-func OverWriteYakPlugin(name string, scriptData *yakit.YakScript) {
+func OverWriteYakPlugin(name string, scriptData *schema.YakScript) {
 	codeBytes := GetCorePluginData(name)
 	if codeBytes == nil {
 		log.Errorf("fetch buildin-plugin: %v failed", name)

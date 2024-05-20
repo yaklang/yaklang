@@ -5,52 +5,14 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strconv"
 )
 
-type WebsocketFlow struct {
-	gorm.Model
-
-	// HTTPFlow 过来的应该有 WebsocketHash
-	WebsocketRequestHash string `json:"websocket_request_hash" gorm:"index"`
-
-	FrameIndex  int    `json:"frame_index" gorm:"index"`
-	FromServer  bool   `json:"from_server"`
-	QuotedData  string `json:"quoted_data"`
-	MessageType string `json:"message_type"`
-
-	Hash string `json:"hash"`
-}
-
-func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
-	raw, _ := strconv.Unquote(i.QuotedData)
-	if len(raw) <= 0 {
-		raw = i.QuotedData
-	}
-
-	length := len(raw)
-	_, isJson := utils.IsJSON(raw)
-	return &ypb.WebsocketFlow{
-		ID:                   int64(i.ID),
-		CreatedAt:            i.CreatedAt.Unix(),
-		WebsocketRequestHash: i.WebsocketRequestHash,
-		FrameIndex:           int64(i.FrameIndex),
-		FromServer:           i.FromServer,
-		MessageType:          i.MessageType,
-		Data:                 []byte(raw),
-		DataSizeVerbose:      utils.ByteSize(uint64(length)),
-		DataLength:           int64(length),
-		DataVerbose:          utils.DataVerbose(raw),
-		IsJson:               isJson,
-		IsProtobuf:           utils.IsProtobuf([]byte(raw)),
-	}
-}
-
 func SaveToServerWebsocketFlow(db *gorm.DB, owner string, index int, data []byte) error {
-	f := &WebsocketFlow{
+	f := &schema.WebsocketFlow{
 		WebsocketRequestHash: owner,
 		FrameIndex:           index,
 		FromServer:           false,
@@ -68,7 +30,7 @@ func SaveToServerWebsocketFlow(db *gorm.DB, owner string, index int, data []byte
 }
 
 func SaveFromServerWebsocketFlow(db *gorm.DB, owner string, index int, data []byte) error {
-	f := &WebsocketFlow{
+	f := &schema.WebsocketFlow{
 		WebsocketRequestHash: owner,
 		FrameIndex:           index,
 		FromServer:           true,
@@ -85,28 +47,19 @@ func SaveFromServerWebsocketFlow(db *gorm.DB, owner string, index int, data []by
 	})
 }
 
-func (f *WebsocketFlow) CalcHash() string {
-	return utils.CalcSha1(f.WebsocketRequestHash, f.FrameIndex)
-}
-
-func (f *WebsocketFlow) BeforeSave() error {
-	f.Hash = f.CalcHash()
-	return nil
-}
-
 func CreateOrUpdateWebsocketFlow(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&WebsocketFlow{})
+	db = db.Model(&schema.WebsocketFlow{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&WebsocketFlow{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.WebsocketFlow{}); db.Error != nil {
 		return utils.Errorf("create/update WebsocketFlow failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func GetWebsocketFlow(db *gorm.DB, id int64) (*WebsocketFlow, error) {
-	var req WebsocketFlow
-	if db := db.Model(&WebsocketFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetWebsocketFlow(db *gorm.DB, id int64) (*schema.WebsocketFlow, error) {
+	var req schema.WebsocketFlow
+	if db := db.Model(&schema.WebsocketFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get WebsocketFlow failed: %s", db.Error)
 	}
 
@@ -116,15 +69,15 @@ func GetWebsocketFlow(db *gorm.DB, id int64) (*WebsocketFlow, error) {
 func SearchWebsocketFlow(keyword string) int {
 	db := consts.GetGormProjectDatabase()
 	var count int
-	db.Model(&WebsocketFlow{}).Where(
+	db.Model(&schema.WebsocketFlow{}).Where(
 		"quoted_data like ?",
 		"%"+keyword+"%",
 	).Count(&count)
 	return count
 }
 
-func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit int) (*bizhelper.Paginator, []*WebsocketFlow, error) {
-	db = db.Model(&WebsocketFlow{})
+func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit int) (*bizhelper.Paginator, []*schema.WebsocketFlow, error) {
+	db = db.Model(&schema.WebsocketFlow{})
 
 	if hash == "" {
 		return nil, nil, utils.Errorf("empty hash")
@@ -133,7 +86,7 @@ func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit
 	db = bizhelper.ExactQueryString(db, "websocket_request_hash", hash)
 	db = bizhelper.QueryOrder(db, "frame_index", "desc")
 
-	var ret []*WebsocketFlow
+	var ret []*schema.WebsocketFlow
 	paging, db := bizhelper.Paging(db, page, limit, &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -143,48 +96,48 @@ func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit
 }
 
 func DeleteWebsocketFlowByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&WebsocketFlow{}).Where(
+	if db := db.Model(&schema.WebsocketFlow{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&WebsocketFlow{}); db.Error != nil {
+	).Unscoped().Delete(&schema.WebsocketFlow{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteWebsocketFlowByWebsocketHash(db *gorm.DB, hash string) error {
-	if db := db.Model(&WebsocketFlow{}).Where(
+	if db := db.Model(&schema.WebsocketFlow{}).Where(
 		"websocket_request_hash = ?", hash,
-	).Unscoped().Delete(&WebsocketFlow{}); db.Error != nil {
+	).Unscoped().Delete(&schema.WebsocketFlow{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteWebsocketFlowAll(db *gorm.DB) error {
-	if db := db.Model(&WebsocketFlow{}).Where("true").Unscoped().Delete(&WebsocketFlow{}); db.Error != nil {
+	if db := db.Model(&schema.WebsocketFlow{}).Where("true").Unscoped().Delete(&schema.WebsocketFlow{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteWebsocketFlowsByHTTPFlowHash(db *gorm.DB, hash []string) error {
-	db = db.Model(&WebsocketFlow{}).Where(
+	db = db.Model(&schema.WebsocketFlow{}).Where(
 		"websocket_request_hash in (?)", hash,
-	).Unscoped().Delete(&WebsocketFlow{})
+	).Unscoped().Delete(&schema.WebsocketFlow{})
 	if db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func BatchWebsocketFlows(db *gorm.DB, ctx context.Context) chan *WebsocketFlow {
-	outC := make(chan *WebsocketFlow)
+func BatchWebsocketFlows(db *gorm.DB, ctx context.Context) chan *schema.WebsocketFlow {
+	outC := make(chan *schema.WebsocketFlow)
 	go func() {
 		defer close(outC)
 
 		var page = 1
 		for {
-			var items []*WebsocketFlow
+			var items []*schema.WebsocketFlow
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,

@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -13,34 +14,8 @@ const (
 	HYBRIDSCAN_ERROR     = "error"
 )
 
-type HybridScanTask struct {
-	gorm.Model
-
-	TaskId string `gorm:"unique_index"`
-	// executing
-	// paused
-	// done
-	Status              string
-	Reason              string // user cancel / finished / recover failed so on
-	SurvivalTaskIndexes string // 暂停的时候正在执行的任务
-
-	// struct{ https bool; request bytes }[]
-	Targets string
-	// string[]
-	Plugins         string
-	TotalTargets    int64
-	TotalPlugins    int64
-	TotalTasks      int64
-	FinishedTasks   int64
-	FinishedTargets int64
-
-	ScanConfig []byte
-
-	HybridScanTaskSource string
-}
-
-func GetHybridScanByTaskId(db *gorm.DB, taskId string) (*HybridScanTask, error) {
-	var task HybridScanTask
+func GetHybridScanByTaskId(db *gorm.DB, taskId string) (*schema.HybridScanTask, error) {
+	var task schema.HybridScanTask
 	err := db.Where("task_id = ?", taskId).First(&task).Error
 	if err != nil {
 		return nil, err
@@ -48,14 +23,14 @@ func GetHybridScanByTaskId(db *gorm.DB, taskId string) (*HybridScanTask, error) 
 	return &task, nil
 }
 
-func SaveHybridScanTask(db *gorm.DB, task *HybridScanTask) error {
+func SaveHybridScanTask(db *gorm.DB, task *schema.HybridScanTask) error {
 	return db.Save(task).Error
 }
 
-func QueryHybridScan(db *gorm.DB, query *ypb.QueryHybridScanTaskRequest) (*bizhelper.Paginator, []*HybridScanTask, error) {
-	db = db.Model(&HybridScanTask{})
+func QueryHybridScan(db *gorm.DB, query *ypb.QueryHybridScanTaskRequest) (*bizhelper.Paginator, []*schema.HybridScanTask, error) {
+	db = db.Model(&schema.HybridScanTask{})
 	db = FilterHybridScan(db, query.GetFilter())
-	var data []*HybridScanTask
+	var data []*schema.HybridScanTask
 	paging := query.GetPagination()
 	db = bizhelper.QueryOrder(db, paging.GetOrderBy(), paging.GetOrder())
 	p, db := bizhelper.Paging(db, int(paging.GetPage()), int(paging.GetLimit()), &data)

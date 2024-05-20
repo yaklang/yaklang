@@ -9,7 +9,6 @@ import (
 )
 
 func TestRulesDefineFunction(t *testing.T) {
-
 	t.Run("test no implement define function in codec", func(t *testing.T) {
 		check(t,
 			`a = 1
@@ -59,7 +58,7 @@ func TestRulesDefineFunction(t *testing.T) {
 	t.Run("test implement define function in mitm", func(t *testing.T) {
 		check(t,
 			` 
-			hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 				a = 1
 			}
 			`,
@@ -70,10 +69,10 @@ func TestRulesDefineFunction(t *testing.T) {
 	t.Run("test duplicate define function in mitm", func(t *testing.T) {
 		check(t,
 			` 
-			hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 				a = 1
 			}
-			hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 				b = 1
 			}
 			`,
@@ -89,7 +88,7 @@ func TestRulesDefineFunction(t *testing.T) {
 		_test_ = () => {
 			hijackSaveHTTPFlow()
 		}
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			b = 1
 		}
 		`, []string{
@@ -107,7 +106,6 @@ func TestRulesDefineFunction(t *testing.T) {
 			ssa4analyze.FreeValueUndefine("handle"),
 		}, "codec")
 	})
-
 }
 
 func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
@@ -152,5 +150,4 @@ handle = r => {
 			[]string{}, "codec",
 		)
 	})
-
 }

@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -15,7 +16,7 @@ func (s *Server) AddToNavigation(ctx context.Context, req *ypb.AddToNavigationRe
 		var errVerbose []string
 		for _, v := range req.Data {
 			for _, k := range v.Items {
-				item := &yakit.NavigationBar{
+				item := &schema.NavigationBar{
 					Group:         v.Group,
 					YakScriptName: k.YakScriptName,
 					Mode:          v.Mode,
@@ -84,7 +85,7 @@ func (s *Server) GetAllNavigationItem(ctx context.Context, req *ypb.GetAllNaviga
 	return &ypb.GetAllNavigationItemResponse{Data: groupItems}, nil
 }
 
-func (s *Server) ToGRPCNavigation(i *yakit.NavigationBar) (*ypb.NavigationItem, error) {
+func (s *Server) ToGRPCNavigation(i *schema.NavigationBar) (*ypb.NavigationItem, error) {
 	var (
 		yakScriptId int64
 		headImg     string
@@ -130,7 +131,7 @@ func (s *Server) AddOneNavigation(ctx context.Context, req *ypb.AddOneNavigation
 		return nil, utils.Errorf("no script name...")
 	}
 
-	item := &yakit.NavigationBar{
+	item := &schema.NavigationBar{
 		Group:         req.Group,
 		Verbose:       req.Verbose,
 		YakScriptName: req.YakScriptName,
@@ -150,7 +151,7 @@ func (s *Server) AddOneNavigation(ctx context.Context, req *ypb.AddOneNavigation
 }
 
 func (s *Server) QueryNavigationGroups(ctx context.Context, req *ypb.QueryNavigationGroupsRequest) (*ypb.GroupNames, error) {
-	var items []*yakit.NavigationBar
+	var items []*schema.NavigationBar
 	db := s.GetProfileDatabase().Where("yak_script_name = ?", req.YakScriptName)
 	if req.GetMode() != "" {
 		db = db.Where("mode = ?", req.GetMode())

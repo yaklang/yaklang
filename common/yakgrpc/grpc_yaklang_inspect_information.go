@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"strings"
 
@@ -303,7 +304,7 @@ func getParameterFromParamJson(j string) ([]*ypb.YakScriptParam, error) {
 	return paras, nil
 }
 
-func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
+func getNeedReturn(script *schema.YakScript) ([]*ypb.YakScriptParam, error) {
 	prog, err := ssaapi.Parse(script.Content, pta.GetPluginSSAOpt("yak")...)
 	if err != nil {
 		return nil, errors.New("ssa parse error")

@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -11,27 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type Port struct {
-	gorm.Model
-
-	Host        string `json:"host" gorm:"index"`
-	IPInteger   int    `json:"ip_integer" gorm:"column:ip_integer" json:"ip_integer"`
-	Port        int    `json:"port" gorm:"index"`
-	Proto       string `json:"proto"`
-	ServiceType string `json:"service_type"`
-	State       string `json:"state"`
-	Reason      string `json:"reason"`
-	Fingerprint string `json:"fingerprint"`
-	CPE         string `json:"cpe"`
-	HtmlTitle   string `json:"html_title"`
-	From        string `json:"from"`
-	Hash        string `json:"hash"`
-	TaskName    string `json:"task_name"`
-
-	// runtime id 运行时 ID
-	RuntimeId string `json:"runtime_id"`
-}
 
 type PortsTypeGroup struct {
 	Nginx                   int32
@@ -86,25 +66,12 @@ type PortsTypeGroup struct {
 	Splunkd                 int32
 }
 
-func (p *Port) CalcHash() string {
-	return utils.CalcSha1(p.Host, p.Port, p.Proto, p.TaskName, p.RuntimeId)
-}
-
-func (p *Port) BeforeSave() error {
-	if p.IPInteger <= 0 {
-		ipInt, _ := utils.IPv4ToUint64(p.Host)
-		p.IPInteger = int(ipInt)
-	}
-	p.Hash = p.CalcHash()
-	return nil
-}
-
 func CreateOrUpdatePort(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&Port{})
+	db = db.Model(&schema.Port{})
 
 	switch ret := i.(type) {
-	case *Port:
-		var existed Port
+	case *schema.Port:
+		var existed schema.Port
 		db.Where("hash = ?", hash).First(&existed)
 		if existed.ID > 0 {
 			p := &existed
@@ -115,15 +82,15 @@ func CreateOrUpdatePort(db *gorm.DB, hash string, i interface{}) error {
 			return db.Save(p).Error
 		}
 	}
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&Port{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.Port{}); db.Error != nil {
 		return utils.Errorf("create/update Port failed: %s", db.Error)
 	}
 	return nil
 }
 
-func GetPort(db *gorm.DB, id int64) (*Port, error) {
-	var req Port
-	if db := db.Model(&Port{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetPort(db *gorm.DB, id int64) (*schema.Port, error) {
+	var req schema.Port
+	if db := db.Model(&schema.Port{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get Port failed: %s", db.Error)
 	}
 
@@ -131,19 +98,19 @@ func GetPort(db *gorm.DB, id int64) (*Port, error) {
 }
 
 func DeletePortByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&Port{}).Where(
+	if db := db.Model(&schema.Port{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&Port{}); db.Error != nil {
+	).Unscoped().Delete(&schema.Port{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginator, []*Port, error) {
+func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginator, []*schema.Port, error) {
 	if params == nil {
 		return nil, nil, utils.Errorf("empty params")
 	}
-	db = db.Model(&Port{}) // .Debug()
+	db = db.Model(&schema.Port{}) // .Debug()
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
 			Page:    1,
@@ -180,7 +147,7 @@ func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginato
 		db = bizhelper.ExactQueryString(db, "state", params.GetState())
 	}*/
 
-	var ret []*Port
+	var ret []*schema.Port
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -257,14 +224,14 @@ func YieldSimplePorts(db *gorm.DB, ctx context.Context) chan *SimplePort {
 	return outC
 }
 
-func YieldPorts(db *gorm.DB, ctx context.Context) chan *Port {
-	outC := make(chan *Port)
+func YieldPorts(db *gorm.DB, ctx context.Context) chan *schema.Port {
+	outC := make(chan *schema.Port)
 	go func() {
 		defer close(outC)
 
 		var page = 1
 		for {
-			var items []*Port
+			var items []*schema.Port
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -308,9 +275,9 @@ func YieldPorts(db *gorm.DB, ctx context.Context) chan *Port {
 }*/
 
 func DeletePortsByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&Port{}).Where(
+	if db := db.Model(&schema.Port{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&Port{}); db.Error != nil {
+	).Unscoped().Delete(&schema.Port{}); db.Error != nil {
 		return db.Error
 	}
 	return nil

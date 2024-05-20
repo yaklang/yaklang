@@ -565,7 +565,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 
 		check := CheckHover(t)
 		check(t, `
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			responseBytes, _ = codec.StrconvUnquote(flow.Response)
 			a = flow.BeforeSave() //error
 		}
@@ -576,9 +576,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 				StartLine:   2,
 				StartColumn: 57,
 				EndLine:     2,
-				EndColumn:   63,
+				EndColumn:   64,
 			},
-			"```go\nfunc modify(r1 yakit.HTTPFlow) null\n```",
+			"```go\nfunc modify(r1 schema.HTTPFlow) null\n```",
 		)
 	})
 }

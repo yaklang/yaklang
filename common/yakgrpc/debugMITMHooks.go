@@ -2,13 +2,13 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -64,7 +64,7 @@ func (s *Server) generateMITMTask(pluginName string, ctx ypb.Yak_ExecServer, par
 	}, ctx)
 }
 
-func execTestCaseMITMHooksCaller(rootCtx context.Context, y *yakit.YakScript, params []*ypb.ExecParamItem, db *gorm.DB, streamFeedback func(r *ypb.ExecResult) error) error {
+func execTestCaseMITMHooksCaller(rootCtx context.Context, y *schema.YakScript, params []*ypb.ExecParamItem, db *gorm.DB, streamFeedback func(r *ypb.ExecResult) error) error {
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 

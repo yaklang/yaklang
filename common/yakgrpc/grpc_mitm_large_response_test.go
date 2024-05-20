@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
@@ -206,7 +207,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 			if err != nil {
 				t.Fatal("query taged flow failed", err)
 			}
-			ins, _ := raw.ToGRPCModel(true)
+			ins, _ := model.ToHTTPFlowGRPCModel(raw, true)
 			if len(ins.Response) > 5*1000*1000 {
 				t.Fatal("query taged flow failed")
 			}
@@ -292,7 +293,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 			if err != nil {
 				t.Fatal("query taged flow failed", err)
 			}
-			ins, _ := raw.ToGRPCModel(true)
+			ins, _ := model.ToHTTPFlowGRPCModel(raw, true)
 			if len(ins.Response) > 111110000 {
 				t.Fatal("query taged flow failed")
 			}

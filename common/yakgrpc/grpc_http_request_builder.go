@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/schema"
 	"google.golang.org/grpc"
 	"net/url"
 	"strings"
@@ -232,7 +233,7 @@ Host: example.com
 func (s *Server) PluginListGenerator(plugin *ypb.HybridScanPluginConfig, ctx context.Context) (res []string) {
 	// 生成插件列表参数
 	for _, i := range plugin.GetPluginNames() {
-		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase().Model(&yakit.YakScript{}), i)
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase().Model(&schema.YakScript{}), i)
 		if err != nil {
 			continue
 		}
@@ -240,7 +241,7 @@ func (s *Server) PluginListGenerator(plugin *ypb.HybridScanPluginConfig, ctx con
 	}
 	if plugin.GetFilter() != nil {
 		for pluginInstance := range yakit.YieldYakScripts(yakit.FilterYakScript(
-			s.GetProfileDatabase().Model(&yakit.YakScript{}), plugin.GetFilter(),
+			s.GetProfileDatabase().Model(&schema.YakScript{}), plugin.GetFilter(),
 		), ctx) {
 			res = append(res, pluginInstance.ScriptName)
 		}

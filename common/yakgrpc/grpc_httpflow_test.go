@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
 	"testing"
@@ -30,7 +31,7 @@ func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize(t *testing.T) {
 Server: test
 `))
 
-	var flow *yakit.HTTPFlow
+	var flow *schema.HTTPFlow
 	flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, lowhttp.FixHTTPRequest([]byte(
 		`GET / HTTP/1.1
 Host: www.example.com

@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,7 +28,7 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 	}
 	return &ypb.QueryScreenRecorderResponse{
 		Pagination: req.GetPagination(),
-		Data: funk.Map(data, func(i *yakit.ScreenRecorder) *ypb.ScreenRecorder {
+		Data: funk.Map(data, func(i *schema.ScreenRecorder) *ypb.ScreenRecorder {
 			before, after := AfterAndBeforeIsExit(int64(i.ID))
 			return &ypb.ScreenRecorder{
 				Id:        int64(i.ID),
@@ -132,7 +133,7 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 		if err != nil {
 			log.Errorf("convert video to base64 failed: %v, use default(empty)", err)
 		}
-		record := &yakit.ScreenRecorder{
+		record := &schema.ScreenRecorder{
 			Filename:  r,
 			Project:   proj.ProjectName,
 			Cover:     base64Images,

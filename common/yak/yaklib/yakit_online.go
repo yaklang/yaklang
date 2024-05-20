@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -395,7 +396,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		return utils.Error("empty database")
 	}
 
-	scripts := funk.Map(plugins, func(i *OnlinePlugin) *yakit.YakScript {
+	scripts := funk.Map(plugins, func(i *OnlinePlugin) *schema.YakScript {
 		var params []*ypb.YakScriptParam
 		for _, paramInstance := range i.Params {
 			params = append(params, &ypb.YakScriptParam{
@@ -436,7 +437,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		}
 		// 更新组
 		for _, group := range onlineGroup {
-			saveData := &yakit.PluginGroup{
+			saveData := &schema.PluginGroup{
 				YakScriptName: i.ScriptName,
 				Group:         group,
 			}
@@ -447,7 +448,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 			}
 		}
 
-		y := &yakit.YakScript{
+		y := &schema.YakScript{
 			ScriptName:           scriptName,
 			OnlineScriptName:     i.ScriptName,
 			Type:                 i.Type,
@@ -502,7 +503,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 			y.Author = strings.Join(utils.RemoveRepeatStringSlice(utils.PrettifyListFromStringSplited(y.Author, ",")), ",")
 		}
 		return y
-	}).([]*yakit.YakScript)
+	}).([]*schema.YakScript)
 	if len(scripts) < 0 {
 		return utils.Error("empty plugins...")
 	}
@@ -703,7 +704,7 @@ func (s *OnlineClient) downloadNewOnlinePlugins(
 	return _container.Data, _container.Pagemeta, nil
 }
 
-func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptToOnlineRequest, plugin *yakit.YakScript) error {
+func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptToOnlineRequest, plugin *schema.YakScript) error {
 	err := s.SaveYakScriptToOnline(ctx,
 		req.Token,
 		plugin.ScriptName,

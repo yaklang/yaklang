@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -100,7 +101,7 @@ func (s *Server) SaveYakScriptGroup(ctx context.Context, req *ypb.SaveYakScriptG
 		return nil, utils.Errorf("params is empty")
 	}
 	var errGroup []string
-	db := s.GetProfileDatabase().Model(&yakit.YakScript{})
+	db := s.GetProfileDatabase().Model(&schema.YakScript{})
 	db = yakit.FilterYakScript(db, req.Filter)
 	yakScripts := yakit.YieldYakScripts(db, context.Background())
 	for yakScript := range yakScripts {
@@ -110,7 +111,7 @@ func (s *Server) SaveYakScriptGroup(ctx context.Context, req *ypb.SaveYakScriptG
 		}
 		if len(req.SaveGroup) > 0 {
 			for _, group := range req.SaveGroup {
-				saveData := &yakit.PluginGroup{
+				saveData := &schema.PluginGroup{
 					YakScriptName: yakScript.ScriptName,
 					Group:         group,
 					TemporaryId:   req.GetPageId(),
@@ -125,7 +126,7 @@ func (s *Server) SaveYakScriptGroup(ctx context.Context, req *ypb.SaveYakScriptG
 		}
 		if len(req.RemoveGroup) > 0 {
 			for _, group := range req.RemoveGroup {
-				saveData := &yakit.PluginGroup{
+				saveData := &schema.PluginGroup{
 					YakScriptName: yakScript.ScriptName,
 					Group:         group,
 					TemporaryId:   req.GetPageId(),
@@ -155,7 +156,7 @@ func (s *Server) RenameYakScriptGroup(ctx context.Context, req *ypb.RenameYakScr
 	}
 	sw := s.GetProfileDatabase().Begin()
 	for _, ret := range rets {
-		saveData := &yakit.PluginGroup{
+		saveData := &schema.PluginGroup{
 			YakScriptName: ret.YakScriptName,
 			Group:         req.NewGroup,
 		}
@@ -194,7 +195,7 @@ func (s *Server) GetYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptR
 	var data ypb.GetYakScriptGroupResponse
 	allGroup, _ := yakit.GetGroup(s.GetProfileDatabase(), nil)
 
-	db := s.GetProfileDatabase().Model(&yakit.YakScript{})
+	db := s.GetProfileDatabase().Model(&schema.YakScript{})
 	db = yakit.FilterYakScript(db, req)
 	yakScripts := yakit.YieldYakScripts(db, context.Background())
 

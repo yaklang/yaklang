@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -69,7 +71,7 @@ func CreateCVEDescriptionDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	AutoMigrate(db, KEY_SCHEMA_CVE_DESCRIPTION_DATABASE)
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_CVE_DESCRIPTION_DATABASE)
 	return db, nil
 }
 
@@ -79,7 +81,7 @@ func CreateCVEDatabase(path string, patch ...bool) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	AutoMigrate(db, KEY_SCHEMA_CVE_DATABASE)
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_CVE_DATABASE)
 	shouldPatch := true
 	if len(patch) > 0 {
 		shouldPatch = patch[0]
@@ -184,8 +186,8 @@ func doCVEPatch(db *gorm.DB) {
 		log.Warnf("failed to add index on cves.CVE: %v", err)
 	}
 
-	err = db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_cwes_id_str ON cwes(IdStr);`).Error
+	err = db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_cwes_id_str ON cwes(id_str);`).Error
 	if err != nil {
-		log.Warnf("failed to add index on cwes.IdStr: %v", err)
+		log.Warnf("failed to add index on cwes.id_str: %v", err)
 	}
 }

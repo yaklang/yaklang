@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -28,7 +28,7 @@ type ScreenRecordersUploadToOnlineRequest struct {
 	ScreenRecordersCreatedAt int64   `json:"screen_recorders_created_at"`
 }
 
-func (s *OnlineClient) UploadScreenRecordersWithToken(ctx context.Context, token string, file os.File, screenRecorders *yakit.ScreenRecorder) error {
+func (s *OnlineClient) UploadScreenRecordersWithToken(ctx context.Context, token string, file os.File, screenRecorders *schema.ScreenRecorder) error {
 	err := s.UploadScreenRecordersToOnline(ctx,
 		token,
 		file,

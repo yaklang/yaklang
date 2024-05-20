@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"reflect"
 	"strings"
@@ -1464,7 +1465,7 @@ func loadScriptCtx(mng *YakToCallerManager, ctx context.Context, scriptType stri
 	if db == nil {
 		return nil
 	}
-	db = db.Model(&yakit.YakScript{}).Where("type = ?", scriptType)
+	db = db.Model(&schema.YakScript{}).Where("type = ?", scriptType)
 	counter := 0
 	for script := range yakit.YieldYakScripts(db, ctx) {
 		counter++
@@ -1493,7 +1494,7 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 	if db == nil {
 		return nil
 	}
-	db = db.Model(&yakit.YakScript{}).Where("script_name = ?", scriptName)
+	db = db.Model(&schema.YakScript{}).Where("script_name = ?", scriptName)
 	counter := 0
 	for script := range yakit.YieldYakScripts(db, ctx) {
 		counter++

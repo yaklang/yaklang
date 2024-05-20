@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,7 +48,7 @@ func (s *Server) GetHTTPFlowByHash(_ context.Context, r *ypb.GetHTTPFlowByHashRe
 	if err != nil {
 		return nil, err
 	}
-	return flow.ToGRPCModelFull()
+	return model.ToHTTPFlowGRPCModelFull(flow)
 }
 
 func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdRequest) (*ypb.HTTPFlow, error) {
@@ -54,17 +56,17 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 	if err != nil {
 		return nil, err
 	}
-	return flow.ToGRPCModelFull()
+	return model.ToHTTPFlowGRPCModelFull(flow)
 }
 
 func (s *Server) GetHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequest) (*ypb.HTTPFlows, error) {
-	db := s.GetProjectDatabase().Model(&yakit.HTTPFlow{})
+	db := s.GetProjectDatabase().Model(&schema.HTTPFlow{})
 	var full []*ypb.HTTPFlow
-	var g []*yakit.HTTPFlow
+	var g []*schema.HTTPFlow
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", r.Ids)
 	db.Find(&g)
 	for _, flow := range g {
-		r, _ := flow.ToGRPCModelFull()
+		r, _ := model.ToHTTPFlowGRPCModelFull(flow)
 		if r != nil {
 			full = append(full, r)
 		}
@@ -99,7 +101,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModel(req.Full)
+		m, err := model.ToHTTPFlowGRPCModel(r, req.Full)
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
@@ -127,7 +129,7 @@ func (s *Server) ConvertFuzzerResponseToHTTPFlow(ctx context.Context, in *ypb.Fu
 	if err != nil {
 		return nil, err
 	}
-	return flow.ToGRPCModelFull()
+	return model.ToHTTPFlowGRPCModelFull(flow)
 }
 
 func (s *Server) SetTagForHTTPFlow(ctx context.Context, req *ypb.SetTagForHTTPFlowRequest) (*ypb.Empty, error) {
@@ -168,8 +170,8 @@ func (s *Server) SaveSetTagForHTTPFlow(id int64, hash string, tags []string) err
 	}
 	flow.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
 	err = yakit.UpdateHTTPFlowTags(s.GetProjectDatabase(), flow)
-	m, _ := flow.ToGRPCModel(true)
-	flow.SetCacheGRPCModel(false, m)
+	m, _ := model.ToHTTPFlowGRPCModel(flow, true)
+	model.SetHTTPFlowCacheGRPCModel(flow, false, m)
 	if err != nil {
 		return err
 	}
@@ -239,7 +241,7 @@ func (s *Server) GetRequestBodyByHTTPFlowID(ctx context.Context, req *ypb.Downlo
 	if err != nil {
 		return nil, err
 	}
-	flowIns, err := flow.ToGRPCModelFull()
+	flowIns, err := model.ToHTTPFlowGRPCModelFull(flow)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +257,7 @@ func (s *Server) GetResponseBodyByHTTPFlowID(ctx context.Context, req *ypb.Downl
 	if err != nil {
 		return nil, err
 	}
-	flowIns, err := flow.ToGRPCModelFull()
+	flowIns, err := model.ToHTTPFlowGRPCModelFull(flow)
 	if err != nil {
 		return nil, err
 	}
@@ -267,10 +269,10 @@ func (s *Server) GetResponseBodyByHTTPFlowID(ctx context.Context, req *ypb.Downl
 }
 
 type HTTPFlowShare struct {
-	*yakit.HTTPFlow
-	ExtractedList         []*yakit.ExtractedData
-	WebsocketFlowsList    []*yakit.WebsocketFlow
-	ProjectGeneralStorage []*yakit.ProjectGeneralStorage
+	*schema.HTTPFlow
+	ExtractedList         []*schema.ExtractedData
+	WebsocketFlowsList    []*schema.WebsocketFlow
+	ProjectGeneralStorage []*schema.ProjectGeneralStorage
 }
 
 func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequest) (*ypb.HTTPFlowsShareResponse, error) {
@@ -323,7 +325,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 	}
 	sw := s.GetProjectDatabase().Begin()
 	for _, data := range shareData {
-		shareHttpFlow := &yakit.HTTPFlow{
+		shareHttpFlow := &schema.HTTPFlow{
 			HiddenIndex:        data.HiddenIndex,
 			NoFixContentLength: data.NoFixContentLength,
 			Hash:               data.Hash,
@@ -356,7 +358,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 		}
 		var httpFlowId int64
 		if shareHttpFlow != nil {
-			var httpFlow yakit.HTTPFlow
+			var httpFlow schema.HTTPFlow
 			db := s.GetProjectDatabase().Where("hash = ?", shareHttpFlow.Hash).Assign(shareHttpFlow).FirstOrCreate(&httpFlow)
 			if db.Error != nil {
 				sw.Rollback()
@@ -365,7 +367,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 			httpFlowId = int64(httpFlow.ID)
 		}
 		for _, v := range data.ExtractedList {
-			err = yakit.CreateOrUpdateExtractedData(s.GetProjectDatabase(), -1, &yakit.ExtractedData{
+			err = yakit.CreateOrUpdateExtractedData(s.GetProjectDatabase(), -1, &schema.ExtractedData{
 				SourceType:  v.SourceType,
 				TraceId:     v.TraceId,
 				Regexp:      v.Regexp,
@@ -379,7 +381,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 		}
 
 		for _, v := range data.WebsocketFlowsList {
-			if db1 := s.GetProjectDatabase().Create(&yakit.WebsocketFlow{
+			if db1 := s.GetProjectDatabase().Create(&schema.WebsocketFlow{
 				WebsocketRequestHash: v.WebsocketRequestHash,
 				FrameIndex:           v.FrameIndex,
 				FromServer:           v.FromServer,
@@ -398,7 +400,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 			} else if strings.Contains(v.Key, "_response") {
 				v.Key = "_response"
 			}
-			shareProjectGeneralStorage := &yakit.ProjectGeneralStorage{
+			shareProjectGeneralStorage := &schema.ProjectGeneralStorage{
 				Key:        strconv.Quote(strconv.FormatInt(httpFlowId, 10) + v.Key),
 				Value:      v.Value,
 				ExpiredAt:  v.ExpiredAt,
@@ -407,7 +409,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				Group:      v.Group,
 			}
 			if httpFlowId > 0 {
-				if db2 := s.GetProjectDatabase().Where("key = ?", strconv.FormatInt(httpFlowId, 10)+v.Key).Assign(shareProjectGeneralStorage).FirstOrCreate(&yakit.ProjectGeneralStorage{}); db2.Error != nil {
+				if db2 := s.GetProjectDatabase().Where("key = ?", strconv.FormatInt(httpFlowId, 10)+v.Key).Assign(shareProjectGeneralStorage).FirstOrCreate(&schema.ProjectGeneralStorage{}); db2.Error != nil {
 					sw.Rollback()
 					return nil, utils.Errorf("SetProjectKey failed: %s", db2.Error)
 				}
@@ -449,7 +451,7 @@ func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRe
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModel(req.ExportWhere.Full)
+		m, err := model.ToHTTPFlowGRPCModel(r, req.ExportWhere.Full)
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
@@ -472,18 +474,18 @@ func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRe
 	}, nil
 }
 
-func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *yakit.HTTPFlow) (*yakit.HTTPFlow, []*yakit.ExtractedData, []*yakit.WebsocketFlow, []*yakit.ProjectGeneralStorage) {
+func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (*schema.HTTPFlow, []*schema.ExtractedData, []*schema.WebsocketFlow, []*schema.ProjectGeneralStorage) {
 	var (
-		httpFlowShare         *yakit.HTTPFlow
-		extractedData         []*yakit.ExtractedData
-		websocketFlowsData    []*yakit.WebsocketFlow
-		projectGeneralStorage []*yakit.ProjectGeneralStorage
+		httpFlowShare         *schema.HTTPFlow
+		extractedData         []*schema.ExtractedData
+		websocketFlowsData    []*schema.WebsocketFlow
+		projectGeneralStorage []*schema.ProjectGeneralStorage
 	)
 	if httpFlow.Hash != "" {
 		db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.Hash)
 		extracted := yakit.BatchExtractedData(db1, ctx)
 		for v := range extracted {
-			extractedData = append(extractedData, &yakit.ExtractedData{
+			extractedData = append(extractedData, &schema.ExtractedData{
 				SourceType:  v.SourceType,
 				TraceId:     v.TraceId,
 				Regexp:      utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
@@ -500,7 +502,7 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *yakit.HTTPFlow) (*
 			if len(raw) <= 0 {
 				raw = string(v.QuotedData)
 			}
-			websocketFlowsData = append(websocketFlowsData, &yakit.WebsocketFlow{
+			websocketFlowsData = append(websocketFlowsData, &schema.WebsocketFlow{
 				WebsocketRequestHash: v.WebsocketRequestHash,
 				FrameIndex:           v.FrameIndex,
 				FromServer:           v.FromServer,
@@ -511,7 +513,7 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *yakit.HTTPFlow) (*
 		}
 	}
 
-	httpFlowShare = &yakit.HTTPFlow{
+	httpFlowShare = &schema.HTTPFlow{
 		Model: gorm.Model{
 			CreatedAt: httpFlow.CreatedAt,
 			UpdatedAt: httpFlow.UpdatedAt,
@@ -550,7 +552,7 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *yakit.HTTPFlow) (*
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
 	projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
 	for _, v := range projectStorages {
-		projectGeneralStorage = append(projectGeneralStorage, &yakit.ProjectGeneralStorage{
+		projectGeneralStorage = append(projectGeneralStorage, &schema.ProjectGeneralStorage{
 			Key:        v.Key,
 			Value:      v.Value,
 			Group:      v.Group,
@@ -583,7 +585,7 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 
 		limit <- struct{}{}
 
-		go func(httpFlow *yakit.HTTPFlow) {
+		go func(httpFlow *schema.HTTPFlow) {
 			defer func() {
 				<-limit
 			}()

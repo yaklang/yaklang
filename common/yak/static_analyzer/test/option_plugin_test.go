@@ -11,7 +11,7 @@ func TestMitmPluginOptionValue(t *testing.T) {
 	t.Run("test MITM_PLUGIN in mitm ", func(t *testing.T) {
 		check(t, `
 		println(MITM_PLUGIN)
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			a = 1
 		}
 		`,
@@ -35,7 +35,7 @@ func TestMitmPluginOptionValue(t *testing.T) {
 func TestPluginOptionDefineFunc(t *testing.T) {
 	t.Run("test define func in mitm ", func(t *testing.T) {
 		check(t, `
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			responseBytes, _ = codec.StrconvUnquote(flow.Response)
 			a = flow.BeforeSave() //error
 		}
@@ -54,7 +54,7 @@ func TestPluginOption_MarkedFunction(t *testing.T) {
 		f = () => {
 			println("a")
 		}
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			f()
 			a = 1
 		}
@@ -63,7 +63,7 @@ func TestPluginOption_MarkedFunction(t *testing.T) {
 
 	t.Run("mark error", func(t *testing.T) {
 		check(t, `
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			f()
 			a = 1
 		}
@@ -75,7 +75,7 @@ func TestPluginOption_MarkedFunction(t *testing.T) {
 
 	t.Run("mark success", func(t *testing.T) {
 		check(t, `
-		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			f()
 			a = 1
 		}
@@ -86,5 +86,4 @@ func TestPluginOption_MarkedFunction(t *testing.T) {
 			ssa4analyze.FreeValueUndefine("f"),
 		}, "mitm")
 	})
-
 }

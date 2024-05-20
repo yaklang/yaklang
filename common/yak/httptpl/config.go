@@ -3,6 +3,7 @@ package httptpl
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -76,7 +77,7 @@ type Config struct {
 
 	// 搜索 yakit.YakScript
 	SingleTemplateRaw      string
-	ExactTemplateInstances []*yakit.YakScript
+	ExactTemplateInstances []*schema.YakScript
 	TemplateName           []string
 	FuzzQueryTemplate      []string
 	ExcludeTemplates       []string
@@ -191,7 +192,7 @@ func WithTemplateName(s ...string) ConfigOption {
 	}
 }
 
-func WithExactTemplateInstance(script *yakit.YakScript) ConfigOption {
+func WithExactTemplateInstance(script *schema.YakScript) ConfigOption {
 	return func(config *Config) {
 		config.ExactTemplateInstances = append(config.ExactTemplateInstances, script)
 	}

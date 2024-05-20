@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"os"
 	"strings"
@@ -24,7 +25,7 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string) error {
+func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string) error {
 	var (
 		scriptName = script.ScriptName
 		scriptType = script.Type
@@ -118,7 +119,7 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 	}
 }
 
-func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetInput string, stream sender, execParams []*ypb.KVPair, runtimeId string, params ...*ypb.HTTPRequestBuilderParams) error {
+func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetInput string, stream sender, execParams []*ypb.KVPair, runtimeId string, params ...*ypb.HTTPRequestBuilderParams) error {
 	var (
 		scriptName = scriptInstance.ScriptName
 		scriptCode = scriptInstance.Content
@@ -277,7 +278,7 @@ func (s *Server) execScript(
 
 func (s *Server) execScriptEx(
 	input string, // only "codec" / url: "mitm" "nuclei" "port-scan"
-	script *yakit.YakScript,
+	script *schema.YakScript,
 	stream sender,
 	execParams []*ypb.KVPair, // 脚本执行的参数, only "yak"
 	runtimeId string,

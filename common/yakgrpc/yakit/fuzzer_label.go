@@ -2,42 +2,29 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
-type WebFuzzerLabel struct {
-	gorm.Model
-	Label string `json:"label"`
-	// 模版数据唯一标识，用来兼容做对比
-	DefaultDescription string `json:"default_description"`
-	Description        string `json:"description"`
-	Hash               string `gorm:"unique_index"`
-}
-
 func init() {
-	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_PROFILE_DATABASE, &WebFuzzerLabel{})
-}
-
-func (w *WebFuzzerLabel) CalcHash() string {
-	return utils.CalcSha1(w.DefaultDescription, w.Label)
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_PROFILE_DATABASE, &schema.WebFuzzerLabel{})
 }
 
 func CreateOrUpdateWebFuzzerLabel(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&WebFuzzerLabel{})
+	db = db.Model(&schema.WebFuzzerLabel{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&WebFuzzerLabel{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.WebFuzzerLabel{}); db.Error != nil {
 		return utils.Errorf("create/update WebFuzzerLabel failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func QueryWebFuzzerLabel(db *gorm.DB) ([]*WebFuzzerLabel, error) {
-	var task []*WebFuzzerLabel
+func QueryWebFuzzerLabel(db *gorm.DB) ([]*schema.WebFuzzerLabel, error) {
+	var task []*schema.WebFuzzerLabel
 
-	db = db.Model(&WebFuzzerLabel{})
+	db = db.Model(&schema.WebFuzzerLabel{})
 	db = bizhelper.QueryOrder(db, "id", "desc")
 	db = db.Find(&task)
 	if db.Error != nil {
@@ -47,11 +34,11 @@ func QueryWebFuzzerLabel(db *gorm.DB) ([]*WebFuzzerLabel, error) {
 }
 
 func DeleteWebFuzzerLabel(db *gorm.DB, hash string) error {
-	db = db.Model(&WebFuzzerLabel{})
+	db = db.Model(&schema.WebFuzzerLabel{})
 	if hash != "" {
 		db = db.Where("hash = ?", hash)
 	}
-	db = db.Unscoped().Delete(&WebFuzzerLabel{})
+	db = db.Unscoped().Delete(&schema.WebFuzzerLabel{})
 	if db.Error != nil {
 		return utils.Errorf("delete web fuzzer label by label failed: %s", db.Error)
 	}
@@ -60,7 +47,7 @@ func DeleteWebFuzzerLabel(db *gorm.DB, hash string) error {
 
 func QueryWebFuzzerLabelCount(db *gorm.DB) int64 {
 	var count int64
-	db = db.Model(&WebFuzzerLabel{})
+	db = db.Model(&schema.WebFuzzerLabel{})
 	db = db.Find(&count)
 	if db.Error != nil {
 		return 0

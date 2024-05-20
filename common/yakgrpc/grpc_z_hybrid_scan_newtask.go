@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
@@ -27,7 +28,7 @@ import (
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
 	defer manager.Stop()
 	taskId := manager.TaskId()
-	taskRecorder := &yakit.HybridScanTask{
+	taskRecorder := &schema.HybridScanTask{
 		TaskId:               taskId,
 		Status:               yakit.HYBRIDSCAN_EXECUTING,
 		HybridScanTaskSource: firstRequest.GetHybridScanTaskSource(),
@@ -311,7 +312,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 var execTargetWithPluginScript string
 
 func ScanHybridTargetWithPlugin(
-	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
+	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *schema.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
@@ -334,11 +335,11 @@ func ScanHybridTargetWithPlugin(
 	return nil
 }
 
-func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.HybridScanPluginConfig) (chan *yakit.YakScript, error) {
+func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.HybridScanPluginConfig) (chan *schema.YakScript, error) {
 	if l.Len() > 0 {
 		// use cache
 		front := l.Front()
-		outC := make(chan *yakit.YakScript)
+		outC := make(chan *schema.YakScript)
 		go func() {
 			defer func() {
 				close(outC)
@@ -347,18 +348,18 @@ func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.
 				if front == nil {
 					break
 				}
-				outC <- front.Value.(*yakit.YakScript)
+				outC <- front.Value.(*schema.YakScript)
 				front = front.Next()
 			}
 		}()
 		return outC, nil
 	}
-	outC := make(chan *yakit.YakScript)
+	outC := make(chan *schema.YakScript)
 	go func() {
 		defer close(outC)
 
 		for _, i := range plugin.GetPluginNames() {
-			script, err := yakit.GetYakScriptByName(s.GetProfileDatabase().Model(&yakit.YakScript{}), i)
+			script, err := yakit.GetYakScriptByName(s.GetProfileDatabase().Model(&schema.YakScript{}), i)
 			if err != nil {
 				continue
 			}
@@ -367,7 +368,7 @@ func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.
 		}
 		if plugin.GetFilter() != nil {
 			for pluginInstance := range yakit.YieldYakScripts(yakit.FilterYakScript(
-				s.GetProfileDatabase().Model(&yakit.YakScript{}), plugin.GetFilter(),
+				s.GetProfileDatabase().Model(&schema.YakScript{}), plugin.GetFilter(),
 			), ctx) {
 				l.PushBack(pluginInstance)
 				outC <- pluginInstance
