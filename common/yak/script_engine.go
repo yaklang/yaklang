@@ -572,6 +572,18 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	yaklib.SetEngineClient(engine, client)
 	if iaiLib, ok := engine.GetVar("ai"); ok {
 		if aiLib, ok := iaiLib.(map[string]interface{}); ok {
+			aiLib["FunctionCall"] = func(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+				iruntimeId, err := engine.RuntimeInfo("runtimeId")
+				if err != nil {
+					return nil, utils.Errorf("build output stream failed: get runtime id failed: %s", err)
+				}
+				runtimeId := utils.InterfaceToString(iruntimeId)
+				opts = append([]aispec.AIConfigOption{aispec.WithStreamHandler(func(reader io.Reader) {
+					engine.GetVar("yakit")
+					client.Stream("ai", runtimeId, reader)
+				})}, opts...)
+				return ai.FunctionCall(input, funcs, opts...)
+			}
 			aiLib["Chat"] = func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 				iruntimeId, err := engine.RuntimeInfo("runtimeId")
 				if err != nil {
