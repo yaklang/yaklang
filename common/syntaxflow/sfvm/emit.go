@@ -96,31 +96,27 @@ func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	}
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchExact(i string) {
+func (v *SyntaxFlowVisitor) EmitSearchExact(isMember bool, i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushSearchExact,
-		UnaryStr: i,
+		OpCode:    OpPushSearchExact,
+		UnaryStr:  i,
+		UnaryBool: isMember,
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchGlob(i string) {
+func (v *SyntaxFlowVisitor) EmitSearchGlob(isMember bool, i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushSearchGlob,
-		UnaryStr: i,
+		OpCode:    OpPushSearchGlob,
+		UnaryStr:  i,
+		UnaryBool: isMember,
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchRegexp(i string) {
+func (v *SyntaxFlowVisitor) EmitSearchRegexp(isMember bool, i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushSearchRegexp,
-		UnaryStr: i,
-	})
-}
-
-func (v *SyntaxFlowVisitor) EmitGetMembers(i string) {
-	v.codes = append(v.codes, &SFI{
-		OpCode:   OpGetMembers,
-		UnaryStr: i,
+		OpCode:    OpPushSearchRegexp,
+		UnaryStr:  i,
+		UnaryBool: isMember,
 	})
 }
 

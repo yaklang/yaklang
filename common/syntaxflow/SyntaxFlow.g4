@@ -22,9 +22,7 @@ refVariable
 
 filterExpr
     : '$'    identifier?                                    # CurrentRootFilter
-    | '*'                                                   # WildcardFilter
-    | identifier                                            # PrimaryFilter
-    | regexpLiteral                                         # RegexpLiteralFilter
+    | nameFilter                                            # PrimaryFilter
     | '.' nameFilter                                        # FieldFilter
     | filterExpr '.' nameFilter                             # FieldCallFilter
     | filterExpr '(' actualParam? ')'                 # FunctionCallFilter
@@ -58,7 +56,7 @@ recursiveConfigItemValue
 
 sliceCallItem: nameFilter | numberLiteral;
 
-nameFilter: identifier | regexpLiteral;
+nameFilter: '*' | identifier | regexpLiteral;
 
 chainFilter
     : '[' ((filters (',' filters)*) | '...') ']'          # Flat

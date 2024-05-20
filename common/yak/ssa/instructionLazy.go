@@ -53,26 +53,31 @@ func NewLazyInstruction(id int64) (Value, error) {
 		return nil, utils.Error("ircode [" + fmt.Sprint(id) + "]not found")
 	}
 	cache := GetCacheFromPool(ir.ProgramName)
-	if ret := cache.GetInstruction(id); ret != nil {
-		value, ok := ToValue(ret)
+	return newLazyInstruction(id, ir, cache)
+}
+
+func (c *Cache) newLazyInstruction(id int64) Value {
+	v, err := newLazyInstruction(id, nil, c)
+	if err != nil {
+		log.Errorf("newLazyInstruction failed: %v", err)
+		return nil
+	}
+	return v
+}
+
+func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error) {
+	if ret, ok := cache.InstructionCache.Get(id); ok {
+		value, ok := ToValue(ret.inst)
 		if !ok {
 			log.Warnf("BUG: cache return not a value")
-			return nil, utils.Errorf("BUG: LazyInstruction cache return not a value")
+			return nil, utils.Errorf("BUG: LazyInstruction cache return not a value\n")
 		}
 		return value, nil
 	}
-	return newLazyInstruction(id, ir, cache), nil
-}
-
-func (c *Cache) newLazyInstruction(id int64) *LazyInstruction {
-	return newLazyInstruction(id, nil, c)
-}
-func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) *LazyInstruction {
 	if ir == nil {
 		ir = ssadb.GetIrCodeById(ssadb.GetDB(), id)
 		if ir == nil {
-			log.Error("ircode [" + fmt.Sprint(id) + "]not found")
-			return nil
+			return nil, utils.Errorf("ircode [" + fmt.Sprint(id) + "]not found")
 		}
 	}
 	lz := &LazyInstruction{
@@ -85,7 +90,7 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) *LazyInstructi
 		inst:   lz,
 		irCode: lz.ir,
 	})
-	return lz
+	return lz, nil
 }
 
 func (lz *LazyInstruction) Self() Value {

@@ -19,9 +19,6 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#refVariable.
 	VisitRefVariable(ctx *RefVariableContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#RegexpLiteralFilter.
-	VisitRegexpLiteralFilter(ctx *RegexpLiteralFilterContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#FunctionCallFilter.
 	VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{}
 
@@ -42,9 +39,6 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedTopDefFilter.
 	VisitConfiggedTopDefFilter(ctx *ConfiggedTopDefFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#WildcardFilter.
-	VisitWildcardFilter(ctx *WildcardFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FieldIndexFilter.
 	VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{}

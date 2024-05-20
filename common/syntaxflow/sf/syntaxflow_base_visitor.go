@@ -23,10 +23,6 @@ func (v *BaseSyntaxFlowVisitor) VisitRefVariable(ctx *RefVariableContext) interf
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitRegexpLiteralFilter(ctx *RegexpLiteralFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowVisitor) VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -52,10 +48,6 @@ func (v *BaseSyntaxFlowVisitor) VisitTopDefFilter(ctx *TopDefFilterContext) inte
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitConfiggedTopDefFilter(ctx *ConfiggedTopDefFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitWildcardFilter(ctx *WildcardFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

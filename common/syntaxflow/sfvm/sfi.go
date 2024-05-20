@@ -28,7 +28,7 @@ const (
 	opGetCall
 	OpGetCallArgs
 	OpGetAllCallArgs
-	OpGetMembers
+
 	// use def chain
 	OpGetUsers
 	OpGetBottomUsers
@@ -70,6 +70,7 @@ type SFI struct {
 	OpCode           SFVMOpCode
 	UnaryInt         int
 	UnaryStr         string
+	UnaryBool        bool
 	Desc             string
 	Values           []string
 	SyntaxFlowConfig []*ConfigItem
@@ -97,20 +98,17 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "push$input", s.UnaryStr)
 
 	case OpPushSearchGlob:
-		return fmt.Sprintf(verboseLen+" %v", "push$glob", s.UnaryStr)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, s.UnaryBool)
 	case OpPushSearchExact:
-		return fmt.Sprintf(verboseLen+" %v", "push$exact", s.UnaryStr)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, s.UnaryBool)
 	case OpPushSearchRegexp:
-		return fmt.Sprintf(verboseLen+" %v", "push$regexp", s.UnaryStr)
-
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, s.UnaryBool)
 	case opGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
 	case OpGetAllCallArgs:
 		return fmt.Sprintf(verboseLen+" %v", "getAllCallArgs", s.UnaryStr)
 	case OpGetCallArgs:
 		return fmt.Sprintf(verboseLen+" %v", "getCallArgs", s.UnaryInt)
-	case OpGetMembers:
-		return fmt.Sprintf(verboseLen+" %v", "getMembers", s.UnaryStr)
 	case OpGetUsers:
 		return fmt.Sprintf(verboseLen+" %v", "users", s.UnaryStr)
 	case OpGetDefs:
