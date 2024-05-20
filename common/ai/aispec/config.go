@@ -22,11 +22,14 @@ type AIConfig struct {
 	Proxy         string
 	StreamHandler func(io.Reader)
 	Type          string
+
+	FunctionCallRetryTimes int
 }
 
 func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	c := &AIConfig{
-		Timeout: 30,
+		Timeout:                30,
+		FunctionCallRetryTimes: 5,
 	}
 	for _, p := range opts {
 		p(c)
@@ -119,5 +122,11 @@ func WithAPIKey(k string) AIConfigOption {
 func WithNoHttps(b bool) AIConfigOption {
 	return func(c *AIConfig) {
 		c.NoHttps = b
+	}
+}
+
+func WithFunctionCallRetryTimes(times int) AIConfigOption {
+	return func(c *AIConfig) {
+		c.FunctionCallRetryTimes = times
 	}
 }
