@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -23,7 +22,8 @@ type IrSource struct {
 	Filepath       string `json:"filepath"`
 }
 
-func SaveIrSource(db *gorm.DB, editor *memedit.MemEditor, hash string) error {
+func SaveIrSource(editor *memedit.MemEditor, hash string) error {
+	db := GetDB()
 
 	if editor.GetSourceCode() == "" {
 		return utils.Errorf("source code is empty")
@@ -66,7 +66,8 @@ func SaveIrSource(db *gorm.DB, editor *memedit.MemEditor, hash string) error {
 	return nil
 }
 
-func GetIrSourceFromHash(db *gorm.DB, hash string) (*memedit.MemEditor, error) {
+func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
+	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
 	if ok {
 		return result, nil

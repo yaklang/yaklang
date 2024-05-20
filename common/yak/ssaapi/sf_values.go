@@ -2,19 +2,14 @@ package ssaapi
 
 import (
 	"regexp"
-	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 var _ sfvm.ValueOperator = new(Values)
-
-func (value Values) GetName() string {
-	result := strings.ReplaceAll(value.String(), "\n", "; ")
-	return strings.ReplaceAll(result, "\r", "")
-}
 
 func (value Values) GetCalled() (sfvm.ValueOperator, error) {
 	var vv []sfvm.ValueOperator
@@ -26,14 +21,6 @@ func (value Values) GetCalled() (sfvm.ValueOperator, error) {
 		vv = append(vv, i)
 	}
 	return sfvm.NewValues(vv), nil
-}
-
-func (value Values) GetNames() []string {
-	var a []string
-	for _, i := range value {
-		a = append(a, i.GetNames()...)
-	}
-	return a
 }
 
 func (value Values) IsMap() bool {
@@ -48,37 +35,24 @@ func (value Values) Len() int {
 	return len(value)
 }
 
-func (value Values) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
-	var newValue Values
-	for _, i := range value {
-		for _, name := range i.GetNames() {
-			if s == name {
-				newValue = append(newValue, i)
-			}
-		}
-	}
+func (values Values) ExactMatch(isMember bool, want string) (bool, sfvm.ValueOperator, error) {
+	log.Infof("ExactMatch: %v %v", isMember, want)
+	newValue := _SearchValues(values, isMember, func(s string) bool { return s == want })
 	return len(newValue) > 0, newValue, nil
 }
 
-func (value Values) GlobMatch(glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
-	var newValue Values
-	for _, i := range value {
-		for _, name := range i.GetNames() {
-			if glob.Match(name) {
-				newValue = append(newValue, i)
-			}
-		}
-	}
+func (values Values) GlobMatch(isMember bool, glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+	newValue := _SearchValues(values, isMember, glob.Match)
 	return len(newValue) > 0, newValue, nil
 }
 
-func (value Values) RegexpMatch(regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	//TODO implement me
-	panic("implement me")
+func (values Values) RegexpMatch(isMember bool, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+	newValue := _SearchValues(values, isMember, regexp.MatchString)
+	return len(newValue) > 0, newValue, nil
 }
 
 func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
-	ret := make([]sfvm.ValueOperator, 0)
+	var ret Values
 	for _, i := range value {
 		if c, ok := ssa.ToCall(i.node); ok {
 			if len(c.Args) > index {
@@ -89,18 +63,18 @@ func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
 	if len(ret) == 0 {
 		return nil, utils.Errorf("ssa.Values no this argument by index %d", index)
 	} else {
-		return sfvm.NewValues(ret), nil
+		return ret, nil
 	}
 }
 
 func (value Values) GetAllCallActualParams() (sfvm.ValueOperator, error) {
-	var vv []sfvm.ValueOperator
+	var vv Values
 	for _, i := range value {
 		if i.IsCall() {
-			vv = append(vv, i.GetCallArgs())
+			vv = append(vv, i.GetCallArgs()...)
 		}
 	}
-	return sfvm.NewValues(vv), nil
+	return vv, nil
 }
 
 func (value Values) GetMembersByString(key string) (sfvm.ValueOperator, error) {

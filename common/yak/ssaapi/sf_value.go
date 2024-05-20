@@ -8,53 +8,30 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+var _ sfvm.ValueOperator = (*Value)(nil)
+
 func (v *Value) IsMap() bool {
 	kind := v.GetTypeKind()
 	return kind == ssa.MapTypeKind || kind == ssa.ObjectTypeKind
-}
-
-func (v *Value) GetNames() []string {
-	var results []string
-	// if v.IsCall() {
-	// 	results = append(results, v.GetCallee().GetNames()...)
-	// }
-	// if v.IsMember() {
-	// 	results = append(results, v.GetKey().GetNames()...)
-	// }
-	// if v.IsConstInst() {
-	// 	results = append(results, codec.AnyToString(v.GetConstValue()))
-	// }
-	results = append(results, v.String())
-	return results
 }
 
 func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
-func (v *Value) ExactMatch(s string) (bool, sfvm.ValueOperator, error) {
-	for _, name := range v.GetNames() {
-		if name == s {
-			return true, v, nil
-		}
-	}
-	return false, nil, nil
+func (v *Value) ExactMatch(isMember bool, want string) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, isMember, func(s string) bool { return s == want })
+	return value != nil, value, nil
 }
 
-func (v *Value) GlobMatch(g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
-	for _, name := range v.GetNames() {
-		if g.Match(name) {
-			return true, v, nil
-		}
-	}
-	return false, nil, nil
+func (v *Value) GlobMatch(isMember bool, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, isMember, g.Match)
+	return value != nil, value, nil
 }
 
-func (v *Value) RegexpMatch(regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	if regexp.MatchString(v.GetName()) {
-		return true, v, nil
-	}
-	return false, nil, nil
+func (v *Value) RegexpMatch(isMember bool, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, isMember, regexp.MatchString)
+	return value != nil, value, nil
 }
 
 func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
