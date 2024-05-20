@@ -40,8 +40,6 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		return
 	}
 
-	//go func() {
-	// read with buf until EOF, set 0.2s as interval
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("stream panic: %v", err)
@@ -108,10 +106,8 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		}
 	}()
 	for bstream.Scan() {
-		println(bstream.Text())
 		bufChannel <- bstream.Text()
 	}
 	close(bufChannel)
 	wg.Wait()
-	//}()
 }
