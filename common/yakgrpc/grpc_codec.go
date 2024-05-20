@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec/codegrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -1061,66 +1059,47 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (resp 
 		}
 	}()
 
-	getParamsInfo := func(funcName string) []*yakdoc.Field {
-		return codegrpc.CodecLibs.Functions[funcName].Params
-	}
-
-	covertParamType := func(param string, fieldType reflect.Type) (any, error) {
-		switch fieldType.Kind() {
-		case reflect.String:
-			return param, nil
-		case reflect.Int:
-			return strconv.Atoi(param)
-		case reflect.Int64:
-			return strconv.ParseInt(param, 10, 64)
-		case reflect.Float64:
-			return strconv.ParseFloat(param, 64)
-		case reflect.Bool:
-			return codec.Atob(param), nil
-		case reflect.Slice:
-			if fieldType.Elem().Kind() == reflect.Uint8 {
-				return utils.UnsafeStringToBytes(param), nil
-			}
-		}
-		return nil, utils.Errorf("not support type %v", fieldType.Kind())
-	}
-
-	codecFlow := codegrpc.NewCodecExecFlow([]byte(req.GetText()), req.GetWorkFlow())
-	flowValue := reflect.ValueOf(codecFlow)
-	for _, work := range codecFlow.Flow {
-		methodValue := flowValue.MethodByName(work.CodecType)
-		methodType := methodValue.Type()
-
-		params := make(map[string]string)
-		for _, param := range work.Params {
-			params[param.Key] = param.Value
-		}
-
-		var callParams []reflect.Value
-		paramsInfo := getParamsInfo(work.CodecType)
-		for i := 0; i < methodType.NumIn(); i++ {
-			fieldType := methodType.In(i)
-			if param, ok := params[paramsInfo[i].Name]; ok {
-				value, err := covertParamType(param, fieldType)
-				if err != nil {
-					return nil, err
-				}
-				callParams = append(callParams, reflect.ValueOf(value))
-			} else {
-				return nil, utils.Errorf("codec param %v not found", paramsInfo[i].Name)
-			}
-		}
-		ret := methodValue.Call(callParams)
-		if len(ret) != 1 {
-			return nil, utils.Error("codec return invalid")
-		}
-		if err, ok := ret[0].Interface().(error); ok {
-			return nil, err
-		}
-	}
-	return &ypb.CodecResponse{Result: utils.EscapeInvalidUTF8Byte(codecFlow.Text), RawResult: codecFlow.Text}, nil
+	return codegrpc.CodecFlowExec(req)
 }
 
 func (s *Server) GetAllCodecMethods(ctx context.Context, in *ypb.Empty) (*ypb.CodecMethods, error) {
 	return &ypb.CodecMethods{Methods: codegrpc.CodecLibsDoc}, nil
+}
+
+func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow) (*ypb.Empty, error) {
+	var cf = &yakit.CodecFlow{
+		FlowName: req.FlowName,
+		WorkFlow: req.WorkFlow,
+	}
+	err := yakit.CreateOrUpdateCodecFlow(s.GetProfileDatabase(), cf)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) DeleteCodecFlow(ctx context.Context, req *ypb.DeleteCodecFlowRequest) (*ypb.Empty, error) {
+	var err error
+	if req.GetDeleteAll() {
+		err = yakit.ClearCodecFlow(s.GetProfileDatabase())
+	} else {
+		err = yakit.DeleteCodecFlow(s.GetProfileDatabase(), req.GetFlowName())
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) GetAllCodecFlow(ctx context.Context, req *ypb.Empty) (*ypb.GetCodecFlowResponse, error) {
+	flows, err := yakit.GetAllCodecFlow(s.GetProfileDatabase())
+	if err != nil {
+		return nil, err
+	}
+	var res []*ypb.CustomizeCodecFlow
+	for _, flow := range flows {
+		res = append(res, flow.ToGRPC())
+	}
+
+	return &ypb.GetCodecFlowResponse{Flows: res}, nil
 }
