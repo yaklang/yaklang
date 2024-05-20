@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/openai"
@@ -12,9 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"strconv"
-	"sync"
-	"time"
 )
 
 type CVEDescription struct {
@@ -24,14 +25,6 @@ type CVEDescription struct {
 	Description        string
 	ChineseDescription string
 	OpenAISolution     string
-}
-
-func InitializeCVEDescription() {
-	db := consts.GetGormCVEDescriptionDatabase()
-	if db == nil {
-		return
-	}
-	db.AutoMigrate(&CVEDescription{}, &cveresources.CWE{})
 }
 
 type gormLog func(i ...interface{})
@@ -98,7 +91,6 @@ func _migrateTable() error {
 	if dstDB == nil {
 		return utils.Error("no dst cve desc db")
 	}
-	dstDB.AutoMigrate(&CVEDescription{})
 
 	for result := range YieldCVEDescriptions(srcDB, context.Background()) {
 		dstDB.Save(result)
@@ -106,15 +98,9 @@ func _migrateTable() error {
 	return nil
 }
 
-var once = sync.Once{}
-
 var transLock = sync.Mutex{}
 
 func MakeOpenAITranslateCWE(cwe *cveresources.CWE, apiKey string, proxies ...string) (*cveresources.CWE, error) {
-	once.Do(func() {
-		InitializeCVEDescription()
-	})
-
 	db := consts.GetGormCVEDescriptionDatabase()
 	if db == nil {
 		return nil, utils.Errorf("no database found")
@@ -168,10 +154,6 @@ func MakeOpenAITranslateCWE(cwe *cveresources.CWE, apiKey string, proxies ...str
 }
 
 func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
-	once.Do(func() {
-		InitializeCVEDescription()
-	})
-
 	db := consts.GetGormCVEDescriptionDatabase()
 	if db == nil {
 		return utils.Error("no database (cve desc) found")
@@ -179,7 +161,6 @@ func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
 
 	var d CVEDescription
 	if db := db.Where("cve = ?", src.CVE).First(&d); db.Error != nil {
-
 	}
 	if d.CVE != "" && d.ChineseTitle != "" {
 		log.Debugf("cve: %s 's ch-Description is existed", d.CVE)
@@ -187,7 +168,7 @@ func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
 	}
 
 	log.Debugf("cve: %s's being translated...", src.CVE)
-	var start = time.Now()
+	start := time.Now()
 
 	data, err := json.Marshal(src.DescriptionMain)
 	if err != nil {
@@ -239,7 +220,7 @@ func YieldCVEDescriptions(db *gorm.DB, ctx context.Context) chan *CVEDescription
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*CVEDescription
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{

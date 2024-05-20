@@ -2,11 +2,12 @@ package yakit
 
 import (
 	"encoding/json"
+	"strconv"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
 )
 
 type MenuItem struct {
@@ -80,8 +81,6 @@ func (m *MenuItem) BeforeSave() error {
 }
 
 func CreateOrUpdateMenuItem(db *gorm.DB, hash string, i interface{}) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	db = db.Model(&MenuItem{})
 
 	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&MenuItem{}); db.Error != nil {
@@ -92,8 +91,6 @@ func CreateOrUpdateMenuItem(db *gorm.DB, hash string, i interface{}) error {
 }
 
 func GetMenuItemById(db *gorm.DB, id int64) (*MenuItem, error) {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	var req MenuItem
 	if db := db.Model(&MenuItem{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get MenuItem failed: %s", db.Error)
@@ -103,8 +100,6 @@ func GetMenuItemById(db *gorm.DB, id int64) (*MenuItem, error) {
 }
 
 func DeleteMenuItemByID(db *gorm.DB, id int64) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db := db.Model(&MenuItem{}).Where(
 		"id = ?", id,
 	).Unscoped().Delete(&MenuItem{}); db.Error != nil {
@@ -114,7 +109,6 @@ func DeleteMenuItemByID(db *gorm.DB, id int64) error {
 }
 
 func DeleteMenuItem(db *gorm.DB, group string, name string, mode string) error {
-	db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&MenuItem{}).Where(
 		"`group` = ? AND yak_script_name = ?", group, name,
 	)
@@ -129,8 +123,6 @@ func DeleteMenuItem(db *gorm.DB, group string, name string, mode string) error {
 }
 
 func DeleteMenuItemAll(db *gorm.DB) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db := db.Model(&MenuItem{}).Where(
 		"true",
 	).Unscoped().Delete(&MenuItem{}); db.Error != nil {
@@ -140,8 +132,6 @@ func DeleteMenuItemAll(db *gorm.DB) error {
 }
 
 func GetAllMenuItem(db *gorm.DB) []*MenuItem {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	var items []*MenuItem
 	if db := db.Model(&MenuItem{}).Where("true").Find(&items); db.Error != nil {
 		return nil
@@ -150,8 +140,6 @@ func GetAllMenuItem(db *gorm.DB) []*MenuItem {
 }
 
 func GetMenuItem(db *gorm.DB, group string, name string) (*MenuItem, error) {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	var req MenuItem
 	if db := db.Model(&MenuItem{}).Where("`group` = ? AND yak_script_string = ?", group, name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get MenuItem failed: %s", db.Error)
@@ -162,7 +150,7 @@ func GetMenuItem(db *gorm.DB, group string, name string) (*MenuItem, error) {
 
 func QueryAllMenuItemByWhere(db *gorm.DB, req *ypb.QueryAllMenuItemRequest) []*MenuItem {
 	var items []*MenuItem
-	db = UserDataAndPluginDatabaseScope(db)
+
 	db = db.Model(&MenuItem{})
 	if req.Mode != "" {
 		db = db.Where("mode = ?", req.Mode)

@@ -2,10 +2,13 @@ package cveresources
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"strings"
+	"github.com/ysmood/leakless/pkg/utils"
 )
 
 type SqliteManager struct {
@@ -13,13 +16,18 @@ type SqliteManager struct {
 }
 
 func GetManager(path string) *SqliteManager {
-	db, err := gorm.Open("sqlite3", path)
+	var (
+		db  *gorm.DB
+		err error
+	)
+	if utils.FileExists(path) {
+		db, err = gorm.Open(consts.SQLite, path)
+	} else {
+		db, err = consts.CreateCVEDatabase(path)
+	}
 	if err != nil {
 		panic("failed to connect database")
 	}
-
-	db.AutoMigrate(&CVE{}, &ProductsTable{})
-
 	return &SqliteManager{db}
 }
 

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -65,14 +64,41 @@ func GetGormCVEDescriptionDatabase() *gorm.DB {
 	return gormCVEDescDatabase
 }
 
+func CreateCVEDescriptionDatabase(path string) (*gorm.DB, error) {
+	db, err := createAndConfigDatabase(path)
+	if err != nil {
+		return nil, err
+	}
+	AutoMigrate(db, KEY_SCHEMA_CVE_DESCRIPTION_DATABASE)
+	return db, nil
+}
+
+func CreateCVEDatabase(path string, patch ...bool) (*gorm.DB, error) {
+	db, err := createAndConfigDatabase(path)
+	if err != nil {
+		return nil, err
+	}
+
+	AutoMigrate(db, KEY_SCHEMA_CVE_DATABASE)
+	shouldPatch := true
+	if len(patch) > 0 {
+		shouldPatch = patch[0]
+	}
+	if shouldPatch {
+		doCVEPatch(db)
+	}
+
+	return db, nil
+}
+
 func InitializeCVEDescriptionDatabase() (*gorm.DB, error) {
 	log.Info("start to initialize cve desc db")
 	cveDescDb := GetCVEDescriptionDatabasePath()
 	cveDescGzip := GetCVEDescriptionDatabaseGzipPath()
 	ret := utils.GetFirstExistedFile(cveDescDb, cveDescGzip)
-	log.Infof("found first existed file: %s", ret)
+	log.Infof("init CVE Description database: found first existed file: %s", ret)
 	if ret == cveDescGzip {
-		log.Infof("start to un-gzip %v", cveDescGzip)
+		log.Infof("init CVE Description database: start to un-gzip %v", cveDescGzip)
 		fp, err := os.Open(cveDescGzip)
 		if err != nil {
 			return nil, err
@@ -89,12 +115,19 @@ func InitializeCVEDescriptionDatabase() (*gorm.DB, error) {
 			return nil, utils.Errorf("un-gzip for %v failed: %s", cveDescDb, err)
 		}
 		io.Copy(dbFp, gr)
-		log.Infof("finished to create: %s", cveDescGzip)
+		log.Infof("init CVE Description database: finished to create: %s", cveDescGzip)
 	}
+
 	if ret == "" {
 		return nil, utils.Error("no cve description db found")
 	}
-	return gorm.Open("sqlite3", cveDescDb)
+
+	db, err := CreateCVEDescriptionDatabase(cveDescDb)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 func InitializeCVEDatabase() (*gorm.DB, error) {
@@ -125,36 +158,34 @@ func InitializeCVEDatabase() (*gorm.DB, error) {
 
 	var err error
 
-	gormCVEDatabase, err = createAndConfigDatabase(cveDatabase)
+	gormCVEDatabase, err = CreateCVEDatabase(cveDatabase, false)
 	if err != nil {
 		return nil, utils.Errorf(`cve database[%v] failed: %s`, cveDatabase, err)
 	}
 	// issue #725 这一步要在添加索引之前，否则会从添加索引的 return 语句中返回
 	// 如果没有表就删除 open 产生的文件
-	if !gormCVEDatabase.HasTable(&cveresources.CVE{}) {
+	if !gormCVEDatabase.HasTable("cves") {
 		gormCVEDatabase.Close()
 		gormCVEDatabase = nil
-		err := os.RemoveAll(cveDatabase)
+		err := DeleteDatabaseFile(cveDatabase)
 		if err != nil {
 			return nil, utils.Errorf("remove [%s] failed: %v", cveDatabase, err)
 		}
 		return nil, utils.Errorf("cve database failed: %s", "empty")
 	}
-	var count int
-	_ = gormCVEDatabase.DB().QueryRow("PRAGMA index_info(idx_cves_cve)").Scan(&count)
-	// 如果没有索引就添加
-	if count == 0 {
-		err = gormCVEDatabase.Model(&cveresources.CVE{}).AddIndex("idx_cves_cve", "CVE").Error
-		if err != nil {
-			return nil, utils.Errorf(`add index  failed: %s`, err)
-		}
-	}
-	var cweCount int
-	err = gormCVEDatabase.Model(&cveresources.CWE{}).AddIndex("idx_cwes_id_str", "IdStr").Error
-	if cweCount == 0 {
-		if err != nil {
-			return nil, utils.Errorf(`cwe database[%v] failed: %s`, cveDatabase, err)
-		}
-	}
+	doCVEPatch(gormCVEDatabase)
+
 	return gormCVEDatabase, nil
+}
+
+func doCVEPatch(db *gorm.DB) {
+	err := db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_cves_cve ON cves(CVE);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on cves.CVE: %v", err)
+	}
+
+	err = db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_cwes_id_str ON cwes(IdStr);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on cwes.IdStr: %v", err)
+	}
 }

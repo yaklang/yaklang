@@ -17,12 +17,7 @@ type WebFuzzerLabel struct {
 }
 
 func init() {
-	RegisterPostInitDatabaseFunction(func() error {
-		if db := consts.GetGormProfileDatabase(); db != nil {
-			db.AutoMigrate(&WebFuzzerLabel{})
-		}
-		return nil
-	})
+	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_PROFILE_DATABASE, &WebFuzzerLabel{})
 }
 
 func (w *WebFuzzerLabel) CalcHash() string {
@@ -30,8 +25,6 @@ func (w *WebFuzzerLabel) CalcHash() string {
 }
 
 func CreateOrUpdateWebFuzzerLabel(db *gorm.DB, hash string, i interface{}) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	db = db.Model(&WebFuzzerLabel{})
 
 	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&WebFuzzerLabel{}); db.Error != nil {
@@ -43,7 +36,7 @@ func CreateOrUpdateWebFuzzerLabel(db *gorm.DB, hash string, i interface{}) error
 
 func QueryWebFuzzerLabel(db *gorm.DB) ([]*WebFuzzerLabel, error) {
 	var task []*WebFuzzerLabel
-	db = UserDataAndPluginDatabaseScope(db)
+
 	db = db.Model(&WebFuzzerLabel{})
 	db = bizhelper.QueryOrder(db, "id", "desc")
 	db = db.Find(&task)
