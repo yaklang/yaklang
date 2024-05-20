@@ -29,13 +29,14 @@ func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.F
 }
 
 func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ExtractDataBase(
-		g.targetUrl,
-		g.config.Model,
-		msg, desc, fields,
-		g.BuildHTTPOptions,
-		g.config.StreamHandler,
-	)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler)
+	//return aispec.ExtractDataBase(
+	//	g.targetUrl,
+	//	g.config.Model,
+	//	msg, desc, fields,
+	//	g.BuildHTTPOptions,
+	//	g.config.StreamHandler,
+	//)
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {

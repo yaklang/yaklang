@@ -122,10 +122,7 @@ func GetPrimaryAgent() aispec.AIGateway {
 }
 
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
-	config := &aispec.AIConfig{}
-	for _, p := range opts {
-		p(config)
-	}
+	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
 	var err error
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
@@ -148,11 +145,7 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 }
 
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
-	config := &aispec.AIConfig{}
-	for _, p := range opts {
-		p(config)
-	}
-
+	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp map[string]any
 	var err error
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
@@ -161,9 +154,17 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 			log.Warnf("check valid by %s failed: %s", typ, err)
 			return false
 		}
-		responseRsp, err = gateway.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
-		if err != nil {
-			log.Warnf("chat by %s failed: %s", typ, err)
+		var ok bool
+		for i := 0; i < config.FunctionCallRetryTimes; i++ {
+			responseRsp, err = gateway.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
+			if err != nil {
+				log.Warnf("chat by %s failed: %s, retry times: %d", typ, err, i)
+			} else {
+				ok = true
+				break
+			}
+		}
+		if !ok {
 			return false
 		}
 		return true
@@ -182,14 +183,15 @@ var Exports = map[string]any{
 	"Chat":         Chat,
 	"FunctionCall": FunctionCall,
 
-	"timeout":     aispec.WithTimeout,
-	"proxy":       aispec.WithProxy,
-	"model":       aispec.WithModel,
-	"apiKey":      aispec.WithAPIKey,
-	"noHttps":     aispec.WithNoHttps,
-	"domain":      aispec.WithDomain,
-	"baseURL":     aispec.WithBaseURL,
-	"onStream":    aispec.WithStreamHandler,
-	"debugStream": aispec.WithDebugStream,
-	"type":        aispec.WithType,
+	"timeout":            aispec.WithTimeout,
+	"proxy":              aispec.WithProxy,
+	"model":              aispec.WithModel,
+	"apiKey":             aispec.WithAPIKey,
+	"noHttps":            aispec.WithNoHttps,
+	"funcCallRetryTimes": aispec.WithFunctionCallRetryTimes,
+	"domain":             aispec.WithDomain,
+	"baseURL":            aispec.WithBaseURL,
+	"onStream":           aispec.WithStreamHandler,
+	"debugStream":        aispec.WithDebugStream,
+	"type":               aispec.WithType,
 }
