@@ -3,6 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 
@@ -273,4 +276,56 @@ bbb
 	if rsp.GetResult() != "cccccc" {
 		t.Fatal("check find method fail")
 	}
+}
+
+func TestGRPCCodecFlowFuzztag(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType:  "Base64Encode",
+			Script:     "",
+			PluginName: "",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "Alphabet",
+					Value: "standard",
+				},
+			},
+		},
+		{
+			CodecType:  "URLEncode",
+			Script:     "",
+			PluginName: "",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "fullEncode",
+					Value: "true",
+				},
+			},
+		},
+	}
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	flowName := utils.RandStringBytes(10)
+	_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+		&ypb.CustomizeCodecFlow{
+			FlowName: flowName,
+			WorkFlow: workFlow,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := utils.RandStringBytes(10)
+	expected := codec.EncodeUrlCode(codec.EncodeBase64(data))
+
+	res, err := mutate.FuzzTagExec("{{codecflow(" + flowName + "|" + data + ")}}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) == 0 {
+		t.Fatal("fuzztag exec failed")
+	}
+	require.Equal(t, expected, res[0])
 }
