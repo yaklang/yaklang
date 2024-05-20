@@ -152,12 +152,26 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	for _, p := range opts {
 		p(config)
 	}
-	agent := createAIGateway(config.Type)
-	if agent == nil {
-		return nil, utils.Error("not found valid ai agent config")
+
+	var responseRsp map[string]any
+	var err error
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", typ, err)
+			return false
+		}
+		responseRsp, err = gateway.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
+		if err != nil {
+			log.Warnf("chat by %s failed: %s", typ, err)
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
-	agent.LoadOption(opts...)
-	return agent.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
+	return responseRsp, nil
 }
 
 var Exports = map[string]any{

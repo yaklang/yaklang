@@ -71,7 +71,10 @@ func TestAiApiPriority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	config_bak, _ := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	defer func() {
+		client.SetGlobalNetworkConfig(context.Background(), config_bak)
+	}()
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	config.AiApiPriority = []string{"test", "test1", "test2"}
@@ -137,6 +140,11 @@ func TestAiApiPriority(t *testing.T) {
 	})
 	ai.Chat("test", aispec.WithType("ai"))
 	if !(ok1 && ok) {
+		t.Fatal("ai api priority failed")
+	}
+	test2 = false
+	ai.FunctionCall("test", map[string]any{"translate": "翻译为英文"})
+	if !test2 {
 		t.Fatal("ai api priority failed")
 	}
 }
