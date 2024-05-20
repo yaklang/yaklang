@@ -124,12 +124,6 @@ func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
 	return ret
 }
 
-func DeleteProgram(db *gorm.DB, program string) {
-	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
-	db.Model(&IrVariable{}).Where("program_name = ?", program).Unscoped().Delete(&IrVariable{})
-	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrScopeNode{})
-}
-
 func (r *IrCode) IsEmptySourceCodeHash() bool {
 	if r == nil {
 		return true
@@ -174,7 +168,7 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 }
 
 func (r *IrCode) GetStartAndEndPositions(db *gorm.DB) (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
-	editor, err := GetIrSourceFromHash(db, r.SourceCodeHash)
+	editor, err := GetIrSourceFromHash(r.SourceCodeHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}

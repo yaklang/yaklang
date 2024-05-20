@@ -8,7 +8,9 @@ import (
 )
 
 func TestParameterMember(t *testing.T) {
+	// from free-value(println) to Parameter(a)
 	code := `
+	println = () => {}
 	f = (a)  => {
 		target = a.c
 		print(target)

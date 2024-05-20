@@ -1,16 +1,12 @@
 package ssa
 
 import (
-	"context"
-	"regexp"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"go.uber.org/atomic"
@@ -46,33 +42,6 @@ type Cache struct {
 	VariableCache    *utils.CacheWithKey[string, []Instruction]    // variable(name:string) to []instruction
 }
 
-func (c *Cache) Yield(db *gorm.DB) chan Instruction {
-	var ch = make(chan Instruction)
-	go func() {
-		defer close(ch)
-
-		var pack []*ssadb.IrVariable
-		var pg *bizhelper.Paginator
-		var page = 1
-		for {
-			pg, db = bizhelper.Paging(db, page, 100, &pack)
-			if pg.TotalPage == 0 {
-				break
-			}
-			for _, inst := range pack {
-				for _, id := range inst.InstructionID {
-					ch <- c.newLazyInstruction(id)
-				}
-			}
-			if pg.TotalPage == page {
-				break
-			}
-			page++
-		}
-	}()
-	return ch
-}
-
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
 func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 	databaseEnable := programName != ""
@@ -91,7 +60,7 @@ func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 	}
 
 	if databaseEnable {
-		cache.DB = ssadb.GetDB()
+		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 		instructionCache.SetCheckExpirationCallback(func(key int64, inst instructionIrCode) bool {
 			return cache.saveInstruction(inst)
 		})
@@ -152,35 +121,6 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 }
 
 // =============================================== Variable =======================================================
-func (c *Cache) exactSearchVariable(value string) chan Instruction {
-	db := c.DB.Model(&ssadb.IrVariable{}).Where("program_name = ?", c.ProgramName)
-	db = db.Where("("+
-		"variable_name = ?"+
-		"OR slice_member_name = ?"+
-		"OR field_member_name = ?"+
-		")", value, value, value)
-	return c.Yield(db)
-}
-
-func (c *Cache) globSearchVariable(value string) chan Instruction {
-	db := c.DB.Model(&ssadb.IrVariable{}).Where("program_name = ?", c.ProgramName)
-	db = db.Where("("+
-		"variable_name GLOB ? "+
-		"OR slice_member_name GLOB ? "+
-		"OR field_member_name GLOB ?"+
-		")", value, value, value)
-	return c.Yield(db)
-}
-
-func (c *Cache) regexpSearchVariable(value string) chan Instruction {
-	db := c.DB.Model(&ssadb.IrVariable{}).Where("program_name = ?", c.ProgramName)
-	db = db.Where("("+
-		"variable_name REGEXP ?"+
-		"OR slice_member_name REGEXP ?"+
-		"OR field_member_name REGEXP ?"+
-		")", value, value, value)
-	return c.Yield(db)
-}
 
 func (c *Cache) HaveDatabaseBackend() bool {
 	return c.DB != nil && c.ProgramName != ""
@@ -200,79 +140,6 @@ func (c *Cache) GetByVariable(name string) []Instruction {
 		c.VariableCache.Set(name, ret)
 	}
 	return ret
-}
-
-// GetByVariableGlob means get variable name(glob).
-func (c *Cache) GetByVariableGlob(g sfvm.Glob) []Instruction {
-	if c.HaveDatabaseBackend() {
-		var ins []Instruction
-		for i := range c.globSearchVariable(g.String()) {
-			ins = append(ins, i)
-		}
-		return ins
-	}
-	var ins []Instruction
-	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
-		log.Infof("GetByVariableGlob: %s", s)
-		if g.Match(s) {
-			ins = append(ins, instructions...)
-		}
-	})
-	return ins
-}
-
-func (c *Cache) GetAllMember(key string) []Value {
-	ret := make([]Value, 0)
-	if c.DB == nil {
-		// get from cache, only memory mode
-		for _, inst := range c.InstructionCache.GetAll() {
-			value, ok := ToValue(inst.inst)
-			if !ok {
-				continue
-			}
-			log.Infof("value: %s", value.String())
-			if value.IsMember() && value.GetKey().String() == key {
-				ret = append(ret, value)
-			}
-		}
-		return ret
-	}
-
-	ch := ssadb.YieldIrCodesProgramName(c.DB, context.Background(), c.ProgramName)
-	for insts := range ch {
-		// handle(insts)
-		if insts.IsObjectMember {
-			// check key
-			keyInst := ssadb.GetIrCodeById(c.DB, insts.ObjectKey)
-			if keyInst == nil {
-				log.Warn("BUG: ssadb IrCode ObjectKey is nil")
-				continue
-			}
-			if Opcode(keyInst.Opcode) == SSAOpcodeConstInst && keyInst.String == key {
-				ret = append(ret, newLazyInstruction(insts.GetIdInt64(), insts, c))
-			}
-		}
-	}
-	return ret
-}
-
-// GetByVariableRegexp will filter Instruction via variable regexp name
-func (c *Cache) GetByVariableRegexp(r *regexp.Regexp) []Instruction {
-	if c.HaveDatabaseBackend() {
-		var ins []Instruction
-		for i := range c.regexpSearchVariable(r.String()) {
-			ins = append(ins, i)
-		}
-		return ins
-	}
-
-	var ins []Instruction
-	c.VariableCache.ForEach(func(s string, instructions []Instruction) {
-		if r.MatchString(s) {
-			ins = append(ins, instructions...)
-		}
-	})
-	return ins
 }
 
 func (c *Cache) SetVariable(name string, instructions []Instruction) {
@@ -317,7 +184,7 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 		log.Errorf("Save irCode error: %v", err)
 	}
 	if r := instIr.inst.GetRange(); r != nil {
-		err := ssadb.SaveIrSource(c.DB, r.GetEditor(), instIr.irCode.SourceCodeHash)
+		err := ssadb.SaveIrSource(r.GetEditor(), instIr.irCode.SourceCodeHash)
 		if err != nil {
 			log.Warnf("save source error: %v", err)
 		}

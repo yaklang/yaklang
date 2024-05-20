@@ -6,17 +6,12 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
-func checkSyntax(i string, t *testing.T) {
-	vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
-	err := vm.Compile(i)
-	if err != nil {
-		t.Fatalf("syntax failed: %#v, reason: %v", i, err)
-	}
-}
-
 func TestSyntaxInOne(t *testing.T) {
 	for _, i := range []string{
 		"$",
+		"*",
+		".*",
+		"a.*",
 		"exec",    // Ref
 		".member", // Field
 		".*exec*",
@@ -78,6 +73,10 @@ func TestSyntaxInOne(t *testing.T) {
 		$a.exec() as $exec
 		`,
 	} {
-		checkSyntax(i, t)
+		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
+		err := vm.Compile(i)
+		if err != nil {
+			t.Fatalf("syntax failed: %#v, reason: %v", i, err)
+		}
 	}
 }

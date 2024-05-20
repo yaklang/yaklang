@@ -15,46 +15,22 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	}
 
 	switch ret := raw.(type) {
-	case *sf.WildcardFilterContext:
-		// y.EmitSearchGlob("*")
-		return nil
 	case *sf.CurrentRootFilterContext:
-		// y.EmitCheckStackTop()
-		// log.Warnf("TBD for CurrentRootFilter")
 		if id := ret.Identifier(); id != nil {
 			y.EmitNewRef(id.GetText())
 			return nil
 		}
 		return nil
 	case *sf.PrimaryFilterContext:
-		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
-		if glob {
-			y.EmitSearchGlob(filter)
-		} else {
-			y.EmitSearchExact(filter)
-		}
-		return nil
-	case *sf.RegexpLiteralFilterContext:
-		regexpRaw := ret.RegexpLiteral().GetText()
-		if !(len(regexpRaw) > 2 && regexpRaw[0] == '/' && regexpRaw[len(regexpRaw)-1] == '/') {
-			return utils.Errorf("regexp format error: %v", regexpRaw)
-		}
-		regexpRaw = regexpRaw[1 : len(regexpRaw)-1]
-		r, err := regexp.Compile(regexpRaw)
-		if err != nil {
-			return utils.Errorf("regexp compile error: %v", err)
-		}
-		y.EmitSearchRegexp(r.String())
-		return nil
+		return y.VisitNameFilter(false, ret.NameFilter())
 	case *sf.FieldFilterContext:
-		y.EmitGetMembers(ret.NameFilter().GetText())
-		// return y.VisitFilterExpr(ret.id())
+		return y.VisitNameFilter(true, ret.NameFilter())
 	case *sf.FieldCallFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {
 			return err
 		}
-		y.EmitGetMembers(ret.NameFilter().GetText())
+		return y.VisitNameFilter(true, ret.NameFilter())
 	case *sf.FunctionCallFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
 		if err != nil {
@@ -77,7 +53,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if member.NumberLiteral() != nil {
 			y.EmitListIndex(codec.Atoi(member.NumberLiteral().GetText()))
 		} else {
-			y.VisitNameFilter(member.NameFilter())
+			y.VisitNameFilter(true, member.NameFilter())
 		}
 	case *sf.OptionalFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
@@ -160,33 +136,44 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitNameFilter(i sf.INameFilterContext) error {
+func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterContext) error {
 	if i == nil {
 		return nil
 	}
 
 	ret, ok := i.(*sf.NameFilterContext)
 	if !ok {
-		return utils.Error("BUG: in nameFilter")
+		return utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
 	}
 
-	if id := ret.Identifier(); id != nil {
-		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
-		if glob {
-			y.EmitSearchGlob(filter)
+	if s := ret.Star(); s != nil {
+		if isMember {
+			// get all member
+			y.EmitSearchGlob(true, "*")
+		}
+		// skip
+		return nil
+	} else if id := ret.Identifier(); id != nil {
+		text := ret.Identifier().GetText()
+		filter, isGlob := y.FormatStringOrGlob(text) // emit field
+		if isGlob {
+			y.EmitSearchGlob(isMember, filter)
 		} else {
-			y.EmitSearchExact(filter)
+			y.EmitSearchExact(isMember, filter)
 		}
 		return nil
-	} else if re := ret.RegexpLiteral(); re != nil {
-		reIns, err := regexp.Compile(re.GetText())
+	} else if re, ok := ret.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
+		text := re.RegexpLiteral().GetText()
+		text = text[1 : len(text)-1]
+		// log.Infof("regexp: %s", text)
+		reIns, err := regexp.Compile(text)
 		if err != nil {
 			return err
 		}
-		y.EmitSearchRegexp(reIns.String())
+		y.EmitSearchRegexp(isMember, reIns.String())
 		return nil
 	}
-	return utils.Error("BUG: in nameFilter, unknown type")
+	return utils.Errorf("BUG: in nameFilter, unknown type: %s", reflect.TypeOf(ret))
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {

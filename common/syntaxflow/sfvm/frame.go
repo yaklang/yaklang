@@ -108,20 +108,20 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Errorf("search exact failed: stack top is empty")
 			}
 
-			result, next, err := value.ExactMatch(i.UnaryStr)
+			result, next, err := value.ExactMatch(i.UnaryBool, i.UnaryStr)
 			if err != nil {
 				return utils.Wrapf(err, "search exact failed")
 			}
 			if !result {
-				s.debugSubLog("result: %v, not found（exactly）, got: %s", i.UnaryStr, value.GetName())
+				s.debugSubLog("result: %v, not found（exactly）, got: %s", i.UnaryStr, value.String())
 				return utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
-				s.debugSubLog("result next: %v", next.GetName())
+				s.debugSubLog("result next: %v", next.String())
 				s.stack.Push(next)
 				s.debugSubLog("<< push next")
 			} else {
-				s.debugSubLog("result: %v", value.GetName())
+				s.debugSubLog("result: %v", value.String())
 				s.stack.Push(value)
 				s.debugSubLog("<< push")
 			}
@@ -136,7 +136,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Wrap(err, "compile glob failed")
 			}
 
-			result, next, err := value.GlobMatch(&GlobEx{Origin: globIns, Rule: i.UnaryStr})
+			result, next, err := value.GlobMatch(i.UnaryBool, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
 			if err != nil {
 				return utils.Wrap(err, "search glob failed")
 			}
@@ -145,15 +145,14 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
-				s.debugSubLog("result: %v", next.GetName())
+				s.debugSubLog("result: %v", next.String())
 				s.stack.Push(next)
 				s.debugSubLog("<< push")
-				return nil
+			} else {
+				s.debugSubLog("result: %v", value.String())
+				s.stack.Push(value)
+				s.debugSubLog("<< push")
 			}
-			s.debugSubLog("result: %v", value.GetName())
-			s.stack.Push(value)
-			s.debugSubLog("<< push")
-			return nil
 		case OpPushSearchRegexp:
 			s.debugSubLog(">> pop search regexp: %v", i.UnaryStr)
 			value := s.stack.Pop()
@@ -164,7 +163,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if err != nil {
 				return utils.Wrap(err, "compile regexp failed")
 			}
-			result, next, err := value.RegexpMatch(regexpIns)
+			result, next, err := value.RegexpMatch(i.UnaryBool, regexpIns)
 			if err != nil {
 				return utils.Wrap(err, "search regexp failed")
 			}
@@ -173,36 +172,22 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 			}
 			if next != nil {
-				s.debugSubLog("result: %v", next.GetName())
+				s.debugSubLog("result: %v", next.String())
 				s.stack.Push(next)
 				s.debugSubLog("<< push")
-				return nil
+				// return nil
+			} else {
+				s.debugSubLog("result: %v", value.String())
+				s.stack.Push(value)
+				s.debugSubLog("<< push")
 			}
-			s.debugSubLog("result: %v", value.GetName())
-			s.stack.Push(value)
-			s.debugSubLog("<< push")
-		case OpGetMembers:
-			s.debugSubLog(">> pop")
-			value := s.stack.Pop()
-			valueOperator, err := value.GetMembersByString(i.UnaryStr)
-			if err != nil {
-				s.debugSubLog("E: %v", err)
-				return err
-			}
-			s.debugSubLog("- call GetMembers: %v", valueOperator.GetNames())
-			if !valueOperator.IsList() {
-				return utils.Error("E: GetMembers should return values list")
-			}
-			l := valuesLen(valueOperator)
-			s.debugSubLog("<< push members [%v]: %v", l, valueOperator)
-			s.stack.Push(valueOperator)
 		case OpPop:
 			if s.stack.Len() == 0 {
 				s.debugSubLog(">> pop Error: empty stack")
 				return utils.Error("E: stack is empty, cannot pop")
 			}
 			i := s.stack.Pop()
-			s.debugSubLog(">> pop %v", i.GetNames())
+			s.debugSubLog(">> pop %v", i.String())
 		case opGetCall:
 			s.debugSubLog(">> pop")
 			value := s.stack.Pop()

@@ -37,3 +37,144 @@ func TestProgramSyntaxFlow_Match(t *testing.T) {
 		check(t, `.getRuntime as $target`, `Undefined-Runtime.getRuntime(valid)`)
 	})
 }
+
+func TestGetVariable(t *testing.T) {
+	code := `
+	a1 = 1 
+	a2 = 2 
+	b1 = 3
+	c1 = 4
+	`
+
+	t.Run("test from variable by name", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`a1 as $target`,
+			map[string][]string{
+				"target": {"1"},
+			})
+	})
+
+	t.Run("by glob", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`a* as $target`,
+			map[string][]string{
+				"target": {"1", "2"},
+			})
+	})
+
+	t.Run("by glob 2 ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`*1 as $target`,
+			map[string][]string{
+				"target": {"1", "3", "4"},
+			})
+	})
+
+	t.Run("by regexp", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`/(a1|b1)/ as $target`,
+			map[string][]string{
+				"target": {"1", "3"},
+			})
+	})
+
+}
+
+func TestGetMemberAndVariable(t *testing.T) {
+	code := `
+	obj = {
+		"a1": 1, 
+		"a2": 2, 
+		"b1": 3,
+	}
+	a1 = 4 
+	a2 = 5
+	b1 = 6
+	`
+
+	t.Run("test from variable by name", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`a* as $target`,
+			map[string][]string{
+				"target": {"4", "5"},
+			})
+	})
+}
+
+func TestGetMember(t *testing.T) {
+	code := `
+	obj = {
+		"a1": 1, 
+		"a2": 2, 
+		"b1": 3,
+	}
+	`
+
+	t.Run("test from variable by name", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`obj.a1 as $target`,
+			map[string][]string{
+				"target": {"1"},
+			})
+	})
+
+	t.Run("test name", func(t *testing.T) {
+		want := map[string][]string{
+			"target": {"1", "Undefined-obj.a1(valid)"},
+		}
+		for _, sf := range []string{
+			`*.a1 as $target`,
+			`.a1 as $target`,
+		} {
+			ssatest.CheckSyntaxFlow(t, code, sf, want)
+		}
+	})
+
+	t.Run("from variable by *", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`obj.* as $target`,
+			map[string][]string{
+				"target": {"1", "2", "3"},
+			})
+	})
+
+	t.Run("from variable by regexp", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`obj.a* as $target`,
+			map[string][]string{
+				"target": {"1", "2"},
+			})
+	})
+
+	t.Run("from variable by regexp 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`obj.*1 as $target`,
+			map[string][]string{
+				"target": {"1", "3"},
+			})
+	})
+}
+
+func TestMember_Multiple_member(t *testing.T) {
+	code := `
+	obj = {}
+	obj.a = 1
+	f1(obj.a)
+	obj.a = 2 
+	f2(obj.a)
+
+	obj2  = {}
+	obj2.a = 3 
+	f
+	`
+
+	ssatest.CheckSyntaxFlow(t, code,
+		`obj.a -> * as $target`,
+		map[string][]string{
+			"target": {
+				"Undefined-f1(1)",
+				"Undefined-f2(2)",
+			},
+		},
+	)
+}
