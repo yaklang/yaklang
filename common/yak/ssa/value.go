@@ -137,29 +137,28 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	scope := b.CurrentBlock.ScopeTable
 	scope.AssignVariable(variable, value)
-	checkAssign := func() {
-		if value.GetName() == variable.GetName() {
-			if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
-				return
-			}
+	if value.GetName() == variable.GetName() {
+		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
+			return
 		}
+	}
 
-		if b.TryBuildExternValue(variable.GetName()) != nil {
-			b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
-		}
+	if b.TryBuildExternValue(variable.GetName()) != nil {
+		b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
+	}
 
-		// if not freeValue, or not `a = a`(just create FreeValue)
+	// if not freeValue, or not `a = a`(just create FreeValue)
+	if !variable.GetLocal() && b.SupportClosure {
 		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok {
 			parentValue.AddMask(value)
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)
 		}
-		if _, ok := b.RefParameter[variable.GetName()]; ok {
-			b.AddForceSideEffect(variable.GetName(), value)
-		}
-		b.CheckAndSetSideEffect(variable, value)
 	}
-	checkAssign()
+	if _, ok := b.RefParameter[variable.GetName()]; ok {
+		b.AddForceSideEffect(variable.GetName(), value)
+	}
+	b.CheckAndSetSideEffect(variable, value)
 
 	if !value.IsExtern() || value.GetName() != variable.GetName() {
 		// if value not extern instance

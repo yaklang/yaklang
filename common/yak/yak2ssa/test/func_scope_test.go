@@ -369,3 +369,30 @@ func TestClosure_SideEffect(t *testing.T) {
 		}, t)
 	})
 }
+
+func TestClosure_HasSideEffect(t *testing.T) {
+	t.Run("exist side-effect", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		a = 1 
+		() => {
+			a = 3
+		}()
+		println(a)
+	`, []string{
+			"side-effect(3, a)",
+		}, t)
+	})
+
+	t.Run("local variable not side-effect", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		a = 1 
+		() => {
+			a := 3
+		}()
+		println(a)
+	`, []string{
+			"1",
+		}, t)
+	})
+
+}
