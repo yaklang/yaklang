@@ -6,6 +6,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -37,7 +38,7 @@ func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacad
 		if err != nil {
 			return nil, err
 		}
-		flowGrpc, err := flow.ToGRPCModelFull()
+		flowGrpc, err := model.ToHTTPFlowGRPCModelFull(flow)
 		if err != nil {
 			return nil, err
 		}

@@ -4,23 +4,24 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"sync"
 	"time"
 )
 
-type AliveHostParamsOpt func(r *AliveHost)
+type AliveHostParamsOpt func(r *schema.AliveHost)
 
-func NewAliveHost(u string, opts ...AliveHostParamsOpt) (*AliveHost, error) {
+func NewAliveHost(u string, opts ...AliveHostParamsOpt) (*schema.AliveHost, error) {
 	r := _createAliveHost(u, opts...)
 	return r, _saveAliveHost(r)
 }
 
-var beforeAliveHostSave []func(*AliveHost)
+var beforeAliveHostSave []func(*schema.AliveHost)
 var beforeAliveHostSaveMutex = new(sync.Mutex)
 
-func _saveAliveHost(r *AliveHost) error {
+func _saveAliveHost(r *schema.AliveHost) error {
 
 	beforeAliveHostSaveMutex.Lock()
 	defer beforeAliveHostSaveMutex.Unlock()
@@ -51,8 +52,8 @@ func _saveAliveHost(r *AliveHost) error {
 
 }
 
-func _createAliveHost(u string, opts ...AliveHostParamsOpt) *AliveHost {
-	r := &AliveHost{
+func _createAliveHost(u string, opts ...AliveHostParamsOpt) *schema.AliveHost {
+	r := &schema.AliveHost{
 		Hash: uuid.New().String(),
 	}
 	r.IP = u

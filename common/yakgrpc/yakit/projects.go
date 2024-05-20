@@ -2,8 +2,8 @@ package yakit
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"path/filepath"
 
 	"github.com/jinzhu/gorm"
@@ -26,7 +26,7 @@ const (
 
 func InitializingProjectDatabase() error {
 	profileDB := consts.GetGormProfileDatabase()
-	profileDB.Model(&Project{}).RemoveIndex("uix_projects_project_name")
+	profileDB.Model(&schema.Project{}).RemoveIndex("uix_projects_project_name")
 	defaultProj, _ := GetDefaultProject(profileDB)
 
 	defaultYakitPath := consts.GetDefaultYakitBaseDir()
@@ -55,7 +55,7 @@ func InitializingProjectDatabase() error {
 		if defaultProj != nil {
 			log.Debugf("migrate default database path from %s to %s", defaultProj.DatabasePath, defaultDBPath)
 		}
-		projectData := &Project{
+		projectData := &schema.Project{
 			ProjectName:   INIT_DATABASE_RECORD_NAME,
 			Description:   "默认数据库(~/yakit-projects/***.db): Default Database!",
 			DatabasePath:  defaultDBPath,
@@ -78,110 +78,8 @@ func init() {
 	})
 }
 
-// Project 描述一个 Yakit 项目
-// 一般项目数据都是应该用 ProjectDatabase 作为连接的
-// 但是项目本身的元数据应该存在 ProfileDatabase 中
-type Project struct {
-	gorm.Model
-
-	ProjectName  string
-	Description  string
-	DatabasePath string
-
-	IsCurrentProject bool
-	FolderID         int64
-	ChildFolderID    int64
-	Type             string
-	// Hash string `gorm:"unique_index"`
-}
-
-type BackProject struct {
-	Project
-	FolderName      string
-	ChildFolderName string
-}
-
-func (p *Project) ToGRPCModel() *ypb.ProjectDescription {
-	db := consts.GetGormProfileDatabase()
-	var folderName, childFolderName string
-	if p.FolderID > 0 {
-		folder, _ := GetProjectById(db, p.FolderID, TypeFile)
-		if folder != nil {
-			folderName = folder.ProjectName
-		}
-	}
-	if p.ChildFolderID > 0 {
-		childFolder, _ := GetProjectById(db, p.ChildFolderID, TypeFile)
-		if childFolder != nil {
-			childFolderName = childFolder.ProjectName
-		}
-	}
-	var fileSize string
-	fileInfo, _ := os.Stat(p.DatabasePath)
-	if fileInfo == nil {
-		fileSize = formatFileSize(0)
-	} else {
-		fileSize = formatFileSize(fileInfo.Size())
-	}
-	return &ypb.ProjectDescription{
-		ProjectName:     p.ProjectName,
-		Description:     p.Description,
-		Id:              int64(p.ID),
-		DatabasePath:    p.DatabasePath,
-		CreatedAt:       p.CreatedAt.Unix(),
-		FolderId:        p.FolderID,
-		ChildFolderId:   p.ChildFolderID,
-		Type:            p.Type,
-		UpdateAt:        p.UpdatedAt.Unix(),
-		FolderName:      folderName,
-		ChildFolderName: childFolderName,
-		FileSize:        fileSize,
-	}
-}
-
-func formatFileSize(size int64) string {
-	const (
-		kb = 1 << 10
-		mb = 1 << 20
-		gb = 1 << 30
-		tb = 1 << 40
-	)
-	switch {
-	case size < kb:
-		return fmt.Sprintf("%d B", size)
-	case size < mb:
-		return fmt.Sprintf("%.2f KB", float64(size)/float64(kb))
-	case size < gb:
-		return fmt.Sprintf("%.2f MB", float64(size)/float64(mb))
-	case size < tb:
-		return fmt.Sprintf("%.2f GB", float64(size)/float64(gb))
-	default:
-		return fmt.Sprintf("%.2f TB", float64(size)/float64(tb))
-	}
-}
-
-func (p *BackProject) BackGRPCModel() *ypb.ProjectDescription {
-	return &ypb.ProjectDescription{
-		ProjectName:     utils.EscapeInvalidUTF8Byte([]byte(p.ProjectName)),
-		Description:     utils.EscapeInvalidUTF8Byte([]byte(p.Description)),
-		Id:              int64(p.ID),
-		DatabasePath:    utils.EscapeInvalidUTF8Byte([]byte(p.DatabasePath)),
-		CreatedAt:       p.CreatedAt.Unix(),
-		FolderId:        p.FolderID,
-		ChildFolderId:   p.ChildFolderID,
-		Type:            p.Type,
-		UpdateAt:        p.UpdatedAt.Unix(),
-		FolderName:      p.FolderName,
-		ChildFolderName: p.ChildFolderName,
-	}
-}
-
-func (p *Project) CalcHash() string {
-	return utils.CalcSha1(p.ProjectName, p.FolderID, p.ChildFolderID, p.Type)
-}
-
 func CreateOrUpdateProject(db *gorm.DB, name string, folderID, childFolderID int64, Type string, i interface{}) error {
-	db = db.Model(&Project{})
+	db = db.Model(&schema.Project{})
 
 	db = db.Where("project_name = ? and (folder_id = ? or folder_id IS NULL) and (child_folder_id = ? or child_folder_id IS NULL )", name, folderID, childFolderID)
 	if Type == TypeFile {
@@ -189,7 +87,7 @@ func CreateOrUpdateProject(db *gorm.DB, name string, folderID, childFolderID int
 	} else {
 		db = db.Where("type IS NULL or type = ?", Type)
 	}
-	db = db.Assign(i).FirstOrCreate(&Project{})
+	db = db.Assign(i).FirstOrCreate(&schema.Project{})
 	if db.Error != nil {
 		return utils.Errorf("create/update Project failed: %s", db.Error)
 	}
@@ -197,18 +95,18 @@ func CreateOrUpdateProject(db *gorm.DB, name string, folderID, childFolderID int
 	return nil
 }
 
-func GetProjectByID(db *gorm.DB, id int64) (*Project, error) {
-	var req Project
-	if db := db.Model(&Project{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetProjectByID(db *gorm.DB, id int64) (*schema.Project, error) {
+	var req schema.Project
+	if db := db.Model(&schema.Project{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetProjectByName(db *gorm.DB, name string) (*Project, error) {
-	var req Project
-	if db := db.Model(&Project{}).Where("project_name = ?", name).First(&req); db.Error != nil {
+func GetProjectByName(db *gorm.DB, name string) (*schema.Project, error) {
+	var req schema.Project
+	if db := db.Model(&schema.Project{}).Where("project_name = ?", name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)
 	}
 
@@ -216,25 +114,25 @@ func GetProjectByName(db *gorm.DB, name string) (*Project, error) {
 }
 
 func DeleteProjectByProjectName(db *gorm.DB, name string) error {
-	if db := db.Model(&Project{}).Where(
+	if db := db.Model(&schema.Project{}).Where(
 		"project_name = ?", name,
-	).Unscoped().Delete(&Project{}); db.Error != nil {
+	).Unscoped().Delete(&schema.Project{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteProjectByUid(db *gorm.DB, id string) error {
-	if db := db.Model(&Project{}).Where(
+	if db := db.Model(&schema.Project{}).Where(
 		"uid = ?", id,
-	).Unscoped().Delete(&Project{}); db.Error != nil {
+	).Unscoped().Delete(&schema.Project{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Paginator, []*Project, error) {
-	db = db.Model(&Project{})
+func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Paginator, []*schema.Project, error) {
+	db = db.Model(&schema.Project{})
 	db = db.Where("deleted_at = '' or deleted_at IS NULL ")
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
@@ -274,7 +172,7 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = db.Unscoped()
-	var ret []*Project
+	var ret []*schema.Project
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -283,16 +181,16 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 	return paging, ret, nil
 }
 
-func GetCurrentProject(db *gorm.DB) (*Project, error) {
-	var proj Project
-	if db1 := db.Model(&Project{}).Where("is_current_project = true").First(&proj); db1.Error != nil {
-		var defaultProj Project
-		if db2 := db.Model(&Project{}).Where("project_name = ?", INIT_DATABASE_RECORD_NAME).First(&defaultProj); db2.Error != nil {
+func GetCurrentProject(db *gorm.DB) (*schema.Project, error) {
+	var proj schema.Project
+	if db1 := db.Model(&schema.Project{}).Where("is_current_project = true").First(&proj); db1.Error != nil {
+		var defaultProj schema.Project
+		if db2 := db.Model(&schema.Project{}).Where("project_name = ?", INIT_DATABASE_RECORD_NAME).First(&defaultProj); db2.Error != nil {
 			return nil, utils.Errorf("cannot found current project or default database: %s", db2.Error)
 		}
 
-		db.Model(&Project{}).Where("true").Update(map[string]interface{}{"is_current_project": false})
-		db.Model(&Project{}).Where("project_name = ?", INIT_DATABASE_RECORD_NAME).Update(map[string]interface{}{
+		db.Model(&schema.Project{}).Where("true").Update(map[string]interface{}{"is_current_project": false})
+		db.Model(&schema.Project{}).Where("project_name = ?", INIT_DATABASE_RECORD_NAME).Update(map[string]interface{}{
 			"is_current_project": true,
 		})
 
@@ -302,16 +200,16 @@ func GetCurrentProject(db *gorm.DB) (*Project, error) {
 }
 
 func SetCurrentProject(db *gorm.DB, name string) error {
-	if db1 := db.Model(&Project{}).Where("true").Update(map[string]interface{}{
+	if db1 := db.Model(&schema.Project{}).Where("true").Update(map[string]interface{}{
 		"is_current_project": false,
 	}); db1.Error != nil {
 		log.Errorf("unset all projects current status: %s", db1.Error)
 	}
 
-	if db := db.Model(&Project{}).Where("project_name = ?", name).Update(map[string]interface{}{
+	if db := db.Model(&schema.Project{}).Where("project_name = ?", name).Update(map[string]interface{}{
 		"is_current_project": true,
 	}); db.Error != nil {
-		db.Model(&Project{}).Where("project_name = ?", name).Update(map[string]interface{}{
+		db.Model(&schema.Project{}).Where("project_name = ?", name).Update(map[string]interface{}{
 			"is_current_project": false,
 		})
 		return utils.Errorf("cannot set current project: %s", db.Error)
@@ -319,9 +217,9 @@ func SetCurrentProject(db *gorm.DB, name string) error {
 	return nil
 }
 
-func GetProject(db *gorm.DB, params *ypb.IsProjectNameValidRequest) (*Project, error) {
-	var req Project
-	db = db.Model(&Project{}).Where("project_name = ? ", params.ProjectName)
+func GetProject(db *gorm.DB, params *ypb.IsProjectNameValidRequest) (*schema.Project, error) {
+	var req schema.Project
+	db = db.Model(&schema.Project{}).Where("project_name = ? ", params.ProjectName)
 	db = db.Where("folder_id = ? or folder_id IS NULL", params.FolderId)
 	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", params.ChildFolderId)
 	if params.Type == TypeFile {
@@ -338,7 +236,7 @@ func GetProject(db *gorm.DB, params *ypb.IsProjectNameValidRequest) (*Project, e
 }
 
 func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Paginator, error) {
-	db = db.Model(&Project{})
+	db = db.Model(&schema.Project{})
 	db = db.Where("deleted_at = '' or deleted_at IS NULL ")
 	db = db.Unscoped()
 	if req.Pagination == nil {
@@ -352,7 +250,7 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 	params := req.Pagination
 	db = db.Where("type IS NULL or type = ? ", TypeProject)
 	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
-	var ret []*Project
+	var ret []*schema.Project
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
 	if db.Error != nil {
 		return nil, utils.Errorf("paging failed: %s", db.Error)
@@ -360,30 +258,17 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 	return paging, nil
 }
 
-func GetProjectById(db *gorm.DB, id int64, Type string) (*Project, error) {
-	var req Project
-	db = db.Model(&Project{}).Where("id = ?", id)
-	if Type == TypeFile {
-		db = db.Where("type = ?", Type)
-	} else {
-		db = db.Where("type IS NULL or type = ?", Type)
-	}
-	db = db.First(&req)
-	if db.Error != nil {
-		return nil, utils.Errorf("get Project failed: %s", db.Error)
-	}
+// Project.ToGRPCModel use GetProjectById, so move GetProjectById to schema package
+var GetProjectById = model.GetProjectById
 
-	return &req, nil
-}
-
-func YieldProject(db *gorm.DB, ctx context.Context) chan *Project {
-	outC := make(chan *Project)
+func YieldProject(db *gorm.DB, ctx context.Context) chan *schema.Project {
+	outC := make(chan *schema.Project)
 	go func() {
 		defer close(outC)
 
 		page := 1
 		for {
-			var items []*Project
+			var items []*schema.Project
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -412,16 +297,16 @@ func YieldProject(db *gorm.DB, ctx context.Context) chan *Project {
 }
 
 func SetCurrentProjectById(db *gorm.DB, id int64) error {
-	if db1 := db.Model(&Project{}).Where("is_current_project = true").Update(map[string]interface{}{
+	if db1 := db.Model(&schema.Project{}).Where("is_current_project = true").Update(map[string]interface{}{
 		"is_current_project": false,
 	}); db1.Error != nil {
 		log.Errorf("unset all projects current status: %s", db1.Error)
 	}
 
-	if db := db.Model(&Project{}).Where("id = ?", id).Update(map[string]interface{}{
+	if db := db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
 		"is_current_project": true,
 	}); db.Error != nil {
-		db.Model(&Project{}).Where("id = ?", id).Update(map[string]interface{}{
+		db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
 			"is_current_project": false,
 		})
 		return utils.Errorf("cannot set current project: %s", db.Error)
@@ -430,17 +315,17 @@ func SetCurrentProjectById(db *gorm.DB, id int64) error {
 }
 
 func DeleteProjectById(db *gorm.DB, id int64) error {
-	db = db.Model(&Project{})
-	db = db.Where("id = ?", id).Unscoped().Delete(&Project{})
+	db = db.Model(&schema.Project{})
+	db = db.Where("id = ?", id).Unscoped().Delete(&schema.Project{})
 	if db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func GetDefaultProject(db *gorm.DB) (*Project, error) {
-	var req Project
-	db = db.Model(&Project{})
+func GetDefaultProject(db *gorm.DB) (*schema.Project, error) {
+	var req schema.Project
+	db = db.Model(&schema.Project{})
 	db = db.Where("folder_id = ? or folder_id IS NULL", 0)
 	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", 0)
 	db = db.Where("type IS NULL or type = ?", TypeProject).Where("project_name = ?", INIT_DATABASE_RECORD_NAME)
@@ -452,9 +337,9 @@ func GetDefaultProject(db *gorm.DB) (*Project, error) {
 	return &req, nil
 }
 
-func GetProjectDetail(db *gorm.DB, id int64) (*BackProject, error) {
-	var req BackProject
-	db = db.Model(&Project{})
+func GetProjectDetail(db *gorm.DB, id int64) (*schema.BackProject, error) {
+	var req schema.BackProject
+	db = db.Model(&schema.Project{})
 	db = db.Select("projects.*, F.project_name as folder_name, C.project_name as child_folder_name")
 	db = db.Where("projects.id = ? and (projects.type = ? or projects.type IS NULL)", id, TypeProject)
 	db = db.Joins("left join projects F on projects.folder_id = F.id ")
@@ -467,9 +352,9 @@ func GetProjectDetail(db *gorm.DB, id int64) (*BackProject, error) {
 	return &req, nil
 }
 
-func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, Type string, id int64) (*Project, error) {
-	var req Project
-	db = db.Model(&Project{})
+func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, Type string, id int64) (*schema.Project, error) {
+	var req schema.Project
+	db = db.Model(&schema.Project{})
 	db = db.Where("project_name = ? and (folder_id = ? or folder_id IS NULL) and (child_folder_id = ? or child_folder_id IS NULL )", name, folderID, childFolderID)
 	if Type == TypeFile {
 		db = db.Where("type = ?", Type)
@@ -486,8 +371,8 @@ func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, 
 	return &req, nil
 }
 
-func UpdateProject(db *gorm.DB, id int64, i Project) error {
-	db = db.Model(&Project{}).Where("id = ?", id).Update(i)
+func UpdateProject(db *gorm.DB, id int64, i schema.Project) error {
+	db = db.Model(&schema.Project{}).Where("id = ?", id).Update(i)
 	if db.Error != nil {
 		return utils.Errorf("update project: %s", db.Error)
 	}
@@ -495,16 +380,16 @@ func UpdateProject(db *gorm.DB, id int64, i Project) error {
 }
 
 func UpdateProjectDatabasePath(db *gorm.DB, id int64, databasePath string) error {
-	db = db.Model(&Project{}).Where("id = ?", id).Update("database_path", databasePath)
+	db = db.Model(&schema.Project{}).Where("id = ?", id).Update("database_path", databasePath)
 	if db.Error != nil {
 		return utils.Errorf("update project: %s", db.Error)
 	}
 	return nil
 }
 
-func GetTemporaryProject(db *gorm.DB) (*Project, error) {
-	var req Project
-	db = db.Model(&Project{})
+func GetTemporaryProject(db *gorm.DB) (*schema.Project, error) {
+	var req schema.Project
+	db = db.Model(&schema.Project{})
 	db = db.Where("folder_id = ? or folder_id IS NULL", 0)
 	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", 0)
 	db = db.Where("type IS NULL or type = ?", TypeProject).Where("project_name = ?", TEMPORARY_PROJECT_NAME)

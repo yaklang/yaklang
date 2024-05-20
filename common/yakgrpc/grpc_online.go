@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -132,8 +133,8 @@ func (s *Server) DeletePluginByUserID(ctx context.Context, req *ypb.DeletePlugin
 }
 
 func (s *Server) DeleteAllLocalPlugins(ctx context.Context, req *ypb.Empty) (*ypb.Empty, error) {
-	if db := s.GetProfileDatabase().DropTableIfExists(&yakit.YakScript{}); db.Error == nil {
-		if db := s.GetProfileDatabase().AutoMigrate(&yakit.YakScript{}); db.Error == nil {
+	if db := s.GetProfileDatabase().DropTableIfExists(&schema.YakScript{}); db.Error == nil {
+		if db := s.GetProfileDatabase().AutoMigrate(&schema.YakScript{}); db.Error == nil {
 			return &ypb.Empty{}, nil
 		}
 	}
@@ -158,8 +159,8 @@ func (s *Server) DeleteLocalPluginsByWhere(ctx context.Context, req *ypb.DeleteL
 			log.Error(err)
 		}
 
-		db1 := bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase().Model(&yakit.YakScript{}), "script_name", v)
-		err = db1.Unscoped().Delete(&yakit.YakScript{}).Error
+		db1 := bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase().Model(&schema.YakScript{}), "script_name", v)
+		err = db1.Unscoped().Delete(&schema.YakScript{}).Error
 		if err != nil {
 			log.Error(db.Error)
 		}

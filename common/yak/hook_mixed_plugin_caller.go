@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"sort"
 	"strings"
@@ -360,7 +361,7 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
 	var (
-		ins  *yakit.YakScript
+		ins  *schema.YakScript
 		err  error
 		code string
 	)
@@ -389,7 +390,7 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 		}
 		return m.LoadPluginEx(ctx, ins)
 	} else {
-		ins = &yakit.YakScript{
+		ins = &schema.YakScript{
 			ScriptName: name,
 			Content:    code,
 		}
@@ -398,7 +399,7 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 	return m.LoadPluginEx(ctx, ins)
 }
 
-func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScript, params ...*ypb.ExecParamItem) error {
+func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakScript, params ...*ypb.ExecParamItem) error {
 	if m.ctx == nil {
 		m.ctx = context.Background()
 	}
@@ -872,7 +873,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	}
 }
 
-func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *yakit.HTTPFlow, reject func(httpFlow *yakit.HTTPFlow), drop func()) {
+func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *schema.HTTPFlow, reject func(httpFlow *schema.HTTPFlow), drop func()) {
 	if !m.IsPassed(flow.Url) {
 		log.Infof("call HijackSaveHTTPFlow error: url[%v] not passed", flow.Url)
 		return

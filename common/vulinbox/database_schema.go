@@ -1,16 +1,16 @@
 package vulinbox
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 var VulinBoxTables = []any{
-	&VulinServer{},
+	&VulinUser{},
 	&Session{},
 	&UserOrder{},
 	&UserCart{},
 }
 
 func init() {
-	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_VULINBOX_DATABASE, VulinBoxTables...)
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_VULINBOX_DATABASE, VulinBoxTables...)
 }

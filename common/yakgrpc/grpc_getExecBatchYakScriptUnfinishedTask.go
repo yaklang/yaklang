@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -16,7 +17,7 @@ func (s *Server) GetExecBatchYakScriptUnfinishedTask(ctx context.Context, req *y
 	if err != nil {
 		return nil, err
 	}
-	tasks := funk.Map(data, func(i *yakit.Progress) *ypb.ExecBatchYakScriptUnfinishedTask {
+	tasks := funk.Map(data, func(i *schema.Progress) *ypb.ExecBatchYakScriptUnfinishedTask {
 		return &ypb.ExecBatchYakScriptUnfinishedTask{
 			Percent:              i.CurrentProgress,
 			CreatedAt:            i.CreatedAt.Unix(),
@@ -45,7 +46,7 @@ func (s *Server) GetSimpleDetectUnfinishedTask(ctx context.Context, req *ypb.Emp
 	if err != nil {
 		return nil, err
 	}
-	tasks := funk.Map(data, func(i *yakit.Progress) *ypb.SimpleDetectUnfinishedTask {
+	tasks := funk.Map(data, func(i *schema.Progress) *ypb.SimpleDetectUnfinishedTask {
 		return &ypb.SimpleDetectUnfinishedTask{
 			Percent:              i.CurrentProgress,
 			CreatedAt:            i.CreatedAt.Unix(),

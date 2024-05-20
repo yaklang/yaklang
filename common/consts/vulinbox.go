@@ -1,12 +1,15 @@
 package consts
 
-import "github.com/jinzhu/gorm"
+import (
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
+)
 
 func CreateVulinboxDatabase(path string) (*gorm.DB, error) {
 	db, err := createAndConfigDatabase(path, SQLiteExtend)
 	if err != nil {
 		return nil, err
 	}
-	AutoMigrate(db, KEY_SCHEMA_VULINBOX_DATABASE)
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_VULINBOX_DATABASE)
 	return db, nil
 }

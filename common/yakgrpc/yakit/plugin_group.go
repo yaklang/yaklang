@@ -5,6 +5,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -67,7 +68,7 @@ func init() {
 				return nil
 			}
 
-			db = db.Model(&YakScript{})
+			db = db.Model(&schema.YakScript{})
 			for group, keywords := range pocBuiltInGroups {
 				filterDb := FilterYakScript(db, &ypb.QueryYakScriptRequest{
 					Keyword: keywords,
@@ -84,7 +85,7 @@ func init() {
 						continue
 					}
 
-					saveData := &PluginGroup{
+					saveData := &schema.PluginGroup{
 						YakScriptName: yakScript.ScriptName,
 						Group:         group,
 						IsPocBuiltIn:  true,
@@ -103,24 +104,10 @@ func init() {
 	})
 }
 
-type PluginGroup struct {
-	gorm.Model
-
-	YakScriptName string `json:"yak_script_name" gorm:"index"`
-	Group         string `json:"group"`
-	Hash          string `json:"hash" gorm:"unique_index"`
-	TemporaryId   string `json:"temporary_id"`
-	IsPocBuiltIn  bool   `json:"is_poc_built_in"`
-}
-
-func (p *PluginGroup) CalcHash() string {
-	return utils.CalcSha1(p.YakScriptName, p.Group, p.TemporaryId)
-}
-
 func CreateOrUpdatePluginGroup(db *gorm.DB, hash string, i interface{}) error {
 	yakScriptOpLock.Lock()
-	db = db.Model(&PluginGroup{})
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&PluginGroup{}); db.Error != nil {
+	db = db.Model(&schema.PluginGroup{})
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.PluginGroup{}); db.Error != nil {
 		return utils.Errorf("create/update PluginGroup failed: %s", db.Error)
 	}
 	yakScriptOpLock.Unlock()
@@ -128,7 +115,7 @@ func CreateOrUpdatePluginGroup(db *gorm.DB, hash string, i interface{}) error {
 }
 
 func DeletePluginGroupByHash(db *gorm.DB, hash string) error {
-	db = db.Model(&PluginGroup{}).Where("hash = ?", hash).Unscoped().Delete(&PluginGroup{})
+	db = db.Model(&schema.PluginGroup{}).Where("hash = ?", hash).Unscoped().Delete(&schema.PluginGroup{})
 	if db.Error != nil {
 		return db.Error
 	}
@@ -136,15 +123,15 @@ func DeletePluginGroupByHash(db *gorm.DB, hash string) error {
 }
 
 func DeletePluginGroupsWithNonEmptyTemporaryId(db *gorm.DB) error {
-	db = db.Model(&PluginGroup{}).Where("temporary_id != ''").Unscoped().Delete(&PluginGroup{})
+	db = db.Model(&schema.PluginGroup{}).Where("temporary_id != ''").Unscoped().Delete(&schema.PluginGroup{})
 	if db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func GetPluginByGroup(db *gorm.DB, group string) (req []*PluginGroup, err error) {
-	db = db.Model(&PluginGroup{}).Where("`group` = ?", group).Scan(&req)
+func GetPluginByGroup(db *gorm.DB, group string) (req []*schema.PluginGroup, err error) {
+	db = db.Model(&schema.PluginGroup{}).Where("`group` = ?", group).Scan(&req)
 	if db.Error != nil {
 		return nil, db.Error
 	}
@@ -152,11 +139,11 @@ func GetPluginByGroup(db *gorm.DB, group string) (req []*PluginGroup, err error)
 }
 
 func DeletePluginGroup(db *gorm.DB, group string) error {
-	db = db.Model(&PluginGroup{})
+	db = db.Model(&schema.PluginGroup{})
 	if group != "" {
 		db = db.Where(" `group` = ?", group)
 	}
-	db = db.Unscoped().Delete(&PluginGroup{})
+	db = db.Unscoped().Delete(&schema.PluginGroup{})
 	if db.Error != nil {
 		return db.Error
 	}
@@ -164,7 +151,7 @@ func DeletePluginGroup(db *gorm.DB, group string) error {
 }
 
 func GroupCount(db *gorm.DB) (req []*TagAndTypeValue, err error) {
-	db = db.Model(&PluginGroup{}).Select(" `group` as value, count(*) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
+	db = db.Model(&schema.PluginGroup{}).Select(" `group` as value, count(*) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
 	db = db.Joins("INNER JOIN yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 	//db = db.Where("yak_script_name IN (SELECT DISTINCT(script_name) FROM yak_scripts)")
 	db = db.Group(" `group`,`temporary_id`,`is_poc_built_in` ").Order(`count desc`).Scan(&req)
@@ -175,8 +162,8 @@ func GroupCount(db *gorm.DB) (req []*TagAndTypeValue, err error) {
 	return req, nil
 }
 
-func GetGroup(db *gorm.DB, scriptNames []string) (req []*PluginGroup, err error) {
-	db = db.Model(&PluginGroup{}).Select(" `group`")
+func GetGroup(db *gorm.DB, scriptNames []string) (req []*schema.PluginGroup, err error) {
+	db = db.Model(&schema.PluginGroup{}).Select(" `group`")
 	if len(scriptNames) > 0 {
 		db = db.Joins("inner join yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 		db = bizhelper.ExactQueryStringArrayOr(db, "plugin_groups.yak_script_name", scriptNames)
@@ -194,8 +181,8 @@ func GetGroup(db *gorm.DB, scriptNames []string) (req []*PluginGroup, err error)
 }
 
 func DeletePluginGroupByScriptName(db *gorm.DB, scriptName []string) error {
-	db = db.Model(&PluginGroup{})
-	db = bizhelper.ExactQueryStringArrayOr(db, "yak_script_name", scriptName).Unscoped().Delete(&PluginGroup{})
+	db = db.Model(&schema.PluginGroup{})
+	db = bizhelper.ExactQueryStringArrayOr(db, "yak_script_name", scriptName).Unscoped().Delete(&schema.PluginGroup{})
 	if db.Error != nil {
 		return db.Error
 	}
@@ -203,7 +190,7 @@ func DeletePluginGroupByScriptName(db *gorm.DB, scriptName []string) error {
 }
 
 func QueryGroupCount(db *gorm.DB, excludeType []string) (req []*TagAndTypeValue, err error) {
-	db = db.Model(&PluginGroup{}).Select(" `group` as value, count(*) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
+	db = db.Model(&schema.PluginGroup{}).Select(" `group` as value, count(*) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
 	db = db.Joins("INNER JOIN yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 	//db = db.Where("yak_script_name IN (SELECT DISTINCT(script_name) FROM yak_scripts)")
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "Y.type", excludeType)

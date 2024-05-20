@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -36,11 +38,12 @@ func GetDefaultSSADataBase() string {
 
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
-		ssaDatabase, err := createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
+		var err error
+		ssaDatabase, err = createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
 		if err != nil {
 			log.Errorf("create ssa database err: %v", err)
 		}
-		AutoMigrate(ssaDatabase, KEY_SCHEMA_SSA_DATABASE)
+		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
 	})
 }
 

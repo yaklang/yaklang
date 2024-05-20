@@ -3,6 +3,8 @@ package consts
 import (
 	"sync"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/log"
@@ -19,7 +21,7 @@ func CreateProjectDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	AutoMigrate(db, KEY_SCHEMA_YAKIT_DATABASE)
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	doHTTPFlowPatch(db)
 	doDBRiskPatch(db)
 	return db, nil
@@ -30,13 +32,14 @@ func CreateProfileDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	AutoMigrate(db, KEY_SCHEMA_PROFILE_DATABASE)
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
 	return db, nil
 }
 
 func SetGormProjectDatabase(d *gorm.DB) {
 	log.Info("load gorm database connection")
 	projectDataBase = d
+	schema.SetGormProjectDatabase(d)
 }
 
 func GetGormProfileDatabase() *gorm.DB {
@@ -83,6 +86,9 @@ func initYakitDatabase() {
 		if err != nil {
 			log.Errorf("init plugin-db[%v] failed: %s", projectDatabaseName, err)
 		}
+
+		schema.SetGormProjectDatabase(projectDataBase)
+		schema.SetGormProfileDatabase(profileDatabase)
 	})
 }
 

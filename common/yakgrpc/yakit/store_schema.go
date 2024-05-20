@@ -5,18 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"gopkg.in/yaml.v2"
-	"runtime"
-	"time"
-
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/ziputil"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -24,9 +12,23 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
+
+	"github.com/jinzhu/gorm"
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"gopkg.in/yaml.v2"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ziputil"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	git "github.com/go-git/go-git/v5"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
@@ -106,7 +108,7 @@ const (
 )
 
 func UpdateYakitStore(db *gorm.DB, baseUrl string) error {
-	var downloadUrl = baseUrl
+	downloadUrl := baseUrl
 	if downloadUrl == "" {
 		ins, _ := url.Parse(aliyunOSSBase)
 		if ins != nil {
@@ -124,7 +126,7 @@ func UpdateYakitStore(db *gorm.DB, baseUrl string) error {
 
 	localZip := filepath.Join(consts.GetDefaultYakitBaseDir(), "yakit-resources.zip")
 	_ = os.RemoveAll(localZip)
-	f, err := os.OpenFile(localZip, os.O_RDWR|os.O_CREATE, 0666)
+	f, err := os.OpenFile(localZip, os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return utils.Errorf("[%v] create failed: %s", localZip, err)
 	}
@@ -173,7 +175,7 @@ func UpdateYakitStore(db *gorm.DB, baseUrl string) error {
 	return nil
 }
 
-func LoadYakitResources(dirName string) ([]*YakScript, []*MarkdownDoc, error) {
+func LoadYakitResources(dirName string) ([]*schema.YakScript, []*schema.MarkdownDoc, error) {
 	typesSchema := filepath.Join(dirName, "sources.json")
 	raw, err := ioutil.ReadFile(typesSchema)
 	if err != nil {
@@ -186,8 +188,8 @@ func LoadYakitResources(dirName string) ([]*YakScript, []*MarkdownDoc, error) {
 		return nil, nil, err
 	}
 
-	var scripts []*YakScript
-	var mds []*MarkdownDoc
+	var scripts []*schema.YakScript
+	var mds []*schema.MarkdownDoc
 	for _, r := range sources.Types {
 		log.Infof("start to load: %v [%v/%v]", r.Name, r.VerboseCN, r.VerboseEn)
 		if r.External {
@@ -229,7 +231,7 @@ func LoadYakitResources(dirName string) ([]*YakScript, []*MarkdownDoc, error) {
 	return scripts, mds, nil
 }
 
-func LoadPackage(typeStr string, basePath string) (*YakScript, *MarkdownDoc, error) {
+func LoadPackage(typeStr string, basePath string) (*schema.YakScript, *schema.MarkdownDoc, error) {
 	// 检查每一个包
 	// 处理源信息
 	metaFile := utils.GetFirstExistedFile(
@@ -258,7 +260,7 @@ func LoadPackage(typeStr string, basePath string) (*YakScript, *MarkdownDoc, err
 	}
 
 	_, moduleName := path.Split(basePath)
-	var script = &YakScript{
+	script := &schema.YakScript{
 		ScriptName:           modMeta.ModuleName,
 		Type:                 typeStr,
 		Help:                 modMeta.Help,
@@ -315,7 +317,7 @@ func LoadPackage(typeStr string, basePath string) (*YakScript, *MarkdownDoc, err
 		if err != nil {
 			return nil, nil, utils.Errorf("read doc[%s] failed: %s", docPath, err.Error())
 		}
-		mk := &MarkdownDoc{
+		mk := &schema.MarkdownDoc{
 			YakScriptId:   0,
 			YakScriptName: script.ScriptName,
 			Markdown:      utils.EscapeInvalidUTF8Byte([]byte(mdRaw)),
@@ -418,7 +420,7 @@ func LoadYakitThirdpartySourceScripts(
 		log.Infof("proxy: %v", proxy)
 	}
 	// 设置 client
-	//client := utils.NewDefaultHTTPClient()
+	// client := utils.NewDefaultHTTPClient()
 	// Create a custom http(s) client with your config
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -497,7 +499,7 @@ func YakScriptLocalTotal(dir []string) int {
 	for _, dirName := range dir {
 		typeStr := YakScriptLocalType(dirName)
 		if typeStr != "" {
-			//dirImport = append(dirImport, dirName)
+			// dirImport = append(dirImport, dirName)
 			modDir := filepath.Join(dirName)
 			fs, _ := utils.ReadDirsRecursively(modDir)
 			total += len(fs)

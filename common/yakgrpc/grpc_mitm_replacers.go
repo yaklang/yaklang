@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"sort"
 	"strconv"
@@ -581,7 +582,7 @@ func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
 	return m._hijackingRules.MITMContentReplacers()
 }
 
-func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
+func stringForSettingColor(s string, extraTag []string, flow *schema.HTTPFlow) {
 	flow.AddTag(extraTag...)
 	log.Debugf("set color[%v] for %v", s, flow.Url)
 	switch strings.ToLower(s) {
@@ -605,7 +606,7 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 	return
 }
 
-func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *yakit.HTTPFlow) []*yakit.ExtractedData {
+func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *schema.HTTPFlow) []*schema.ExtractedData {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
@@ -613,7 +614,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	}()
 	var (
 		// packetInfo      *yakit.PacketInfo
-		extracted []*yakit.ExtractedData
+		extracted []*schema.ExtractedData
 
 		err error
 	)

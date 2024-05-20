@@ -2,7 +2,7 @@ package openapi
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/schema"
 	"testing"
 )
 
@@ -11,7 +11,7 @@ var openapi2demo string
 
 func TestRequest_V2(t *testing.T) {
 	var count = 0
-	err := Generate(openapi2demo, WithFlowHandler(func(flow *yakit.HTTPFlow) {
+	err := Generate(openapi2demo, WithFlowHandler(func(flow *schema.HTTPFlow) {
 		count++
 		flow.SourceType = "mitm"
 		//yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
@@ -29,7 +29,7 @@ var openapi3demo string
 
 func TestRequest_V3(t *testing.T) {
 	var count = 0
-	err := Generate(openapi3demo, WithFlowHandler(func(flow *yakit.HTTPFlow) {
+	err := Generate(openapi3demo, WithFlowHandler(func(flow *schema.HTTPFlow) {
 		count++
 		flow.SourceType = "mitm"
 		//yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)

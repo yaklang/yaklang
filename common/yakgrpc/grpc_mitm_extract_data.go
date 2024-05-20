@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,7 +24,7 @@ func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryM
 		return nil, err
 	}
 	return &ypb.QueryMITMRuleExtractedDataResponse{
-		Data: funk.Map(data, func(i *yakit.ExtractedData) *ypb.MITMRuleExtractedData {
+		Data: funk.Map(data, func(i *schema.ExtractedData) *ypb.MITMRuleExtractedData {
 			return &ypb.MITMRuleExtractedData{
 				Id:             int64(i.ID),
 				CreatedAt:      i.CreatedAt.Unix(),

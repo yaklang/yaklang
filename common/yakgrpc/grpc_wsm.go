@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -74,7 +75,7 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 			posts = string(marshal)
 		}
 	}
-	shell := &yakit.WebShell{
+	shell := &schema.WebShell{
 		Url:              req.GetUrl(),
 		Pass:             req.GetPass(),
 		SecretKey:        req.GetSecretKey(),

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -14,7 +15,7 @@ func (s *Server) SaveFuzzerLabel(ctx context.Context, req *ypb.SaveFuzzerLabelRe
 	}
 	var errLabel []string
 	for _, v := range req.Data {
-		item := &yakit.WebFuzzerLabel{
+		item := &schema.WebFuzzerLabel{
 			Label:              v.Label,
 			Description:        v.Description,
 			DefaultDescription: v.DefaultDescription,

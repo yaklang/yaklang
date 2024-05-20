@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -22,7 +23,7 @@ func (s *Server) AddToMenu(ctx context.Context, req *ypb.AddToMenuRequest) (*ypb
 		return nil, utils.Errorf("no script name...")
 	}
 
-	item := &yakit.MenuItem{
+	item := &schema.MenuItem{
 		Group:         req.Group,
 		Verbose:       req.Verbose,
 		YakScriptName: r.ScriptName,
@@ -71,7 +72,7 @@ func (s *Server) YakScriptIsInMenu(ctx context.Context, req *ypb.YakScriptIsInMe
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) _yakitMenuItemToGRPCMenuItem(i *yakit.MenuItem) (*ypb.MenuItem, error) {
+func (s *Server) _yakitMenuItemToGRPCMenuItem(i *schema.MenuItem) (*ypb.MenuItem, error) {
 	var YakScriptId int64
 	if i.YakScriptName != "" {
 		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), i.YakScriptName)
@@ -136,7 +137,7 @@ func (s *Server) QueryGroupsByYakScriptId(ctx context.Context, req *ypb.QueryGro
 		return nil, utils.Errorf("no script name...")
 	}
 
-	var items []*yakit.MenuItem
+	var items []*schema.MenuItem
 	db := s.GetProfileDatabase().Where("yak_script_name = ?", r.ScriptName)
 	if req.GetMode() != "" {
 		db = db.Where("mode = ?", req.GetMode())
@@ -187,16 +188,16 @@ func (s *Server) ImportMenuItem(ctx context.Context, req *ypb.ImportMenuItemRequ
 		req.RawJson = string(content)
 	}
 
-	var items []*yakit.MenuItem
+	var items []*schema.MenuItem
 	err := json.Unmarshal([]byte(req.RawJson), &items)
 	if err != nil {
 		return nil, err
 	}
 
-	items = funk.Map(items, func(i *yakit.MenuItem) *yakit.MenuItem {
+	items = funk.Map(items, func(i *schema.MenuItem) *schema.MenuItem {
 		i.ID = 0
 		return i
-	}).([]*yakit.MenuItem)
+	}).([]*schema.MenuItem)
 	for _, i := range items {
 		i.Hash = i.CalcHash()
 		yakit.CreateOrUpdateMenuItem(s.GetProfileDatabase(), i.CalcHash(), i)
@@ -245,7 +246,7 @@ func IsContain(items []*ypb.MenuItemGroup, item string) bool {
 	return false
 }
 
-func (s *Server) _queryAllYakitMenuItemToGRPCMenuItem(i *yakit.MenuItem) (*ypb.MenuItem, error) {
+func (s *Server) _queryAllYakitMenuItemToGRPCMenuItem(i *schema.MenuItem) (*ypb.MenuItem, error) {
 	var YakScriptId int64
 	if i.YakScriptName != "" {
 		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), i.YakScriptName)
@@ -285,7 +286,7 @@ func (s *Server) AddMenus(ctx context.Context, req *ypb.AddMenuRequest) (*ypb.Em
 			if r != nil {
 				ScriptName = r.ScriptName
 			}
-			item := &yakit.MenuItem{
+			item := &schema.MenuItem{
 				Group:         v.Group,
 				Verbose:       k.Verbose,
 				YakScriptName: ScriptName,
@@ -310,7 +311,7 @@ func (s *Server) AddMenus(ctx context.Context, req *ypb.AddMenuRequest) (*ypb.Em
 }
 
 func (s *Server) DeleteAllMenu(ctx context.Context, req *ypb.QueryAllMenuItemRequest) (*ypb.Empty, error) {
-	db := s.GetProfileDatabase().Model(&yakit.MenuItem{})
+	db := s.GetProfileDatabase().Model(&schema.MenuItem{})
 	if req.GetVerbose() != "" {
 		db = db.Where("verbose = ?", req.Verbose)
 	} else {
@@ -320,7 +321,7 @@ func (s *Server) DeleteAllMenu(ctx context.Context, req *ypb.QueryAllMenuItemReq
 			db = db.Where("mode IS NULL OR mode = '' ")
 		}
 	}
-	db = db.Unscoped().Delete(&yakit.MenuItem{})
+	db = db.Unscoped().Delete(&schema.MenuItem{})
 	if db.Error != nil {
 		return nil, db.Error
 	}

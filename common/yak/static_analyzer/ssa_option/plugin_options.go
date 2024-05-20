@@ -2,9 +2,9 @@ package ssa_option
 
 import (
 	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func init() {
@@ -23,7 +23,7 @@ func MitmGetTypeSSAOpt() []ssaapi.Option {
 	ret = append(ret, ssaapi.WithExternValue(valueTable))
 
 	ret = append(ret, ssaapi.WithDefineFunc(map[string]any{
-		"hijackSaveHTTPFlow":         func(flow *yakit.HTTPFlow, modify func(*yakit.HTTPFlow), drop func()) {},
+		"hijackSaveHTTPFlow":         func(flow *schema.HTTPFlow, modify func(*schema.HTTPFlow), drop func()) {},
 		"hijackHTTPResponse":         func(isHttps bool, url string, rsp []byte, forward func([]byte), drop func()) {},
 		"hijackHTTPResponseEx":       func(isHttps bool, url string, req []byte, rsp []byte, forward func([]byte), drop func()) {},
 		"hijackHTTPRequest":          func(isHttps bool, url string, req []byte, forward func([]byte), drop func()) {},

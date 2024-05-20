@@ -15,12 +15,17 @@ type SqliteManager struct {
 	*gorm.DB
 }
 
-func GetManager(path string) *SqliteManager {
+func GetManager(path string, forceCreates ...bool) *SqliteManager {
 	var (
 		db  *gorm.DB
 		err error
 	)
-	if utils.FileExists(path) {
+	forceCreate := false
+	if len(forceCreates) > 0 {
+		forceCreate = forceCreates[0]
+	}
+
+	if utils.FileExists(path) && !forceCreate {
 		db, err = gorm.Open(consts.SQLite, path)
 	} else {
 		db, err = consts.CreateCVEDatabase(path)

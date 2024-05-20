@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -339,7 +340,7 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 		return "fingerprint", string(raw)
 	case *synscan.SynScanResult:
 		return "synscan-result", string(raw)
-	case *yakit.Risk:
+	case *schema.Risk:
 		ret.CreatedAt = time.Now()
 		ret.UpdatedAt = time.Now()
 		output := ret.ToGRPCModel()
@@ -390,8 +391,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 	}
 }
 
-func NewPortFromMatchResult(f *fp.MatchResult) *yakit.Port {
-	return &yakit.Port{
+func NewPortFromMatchResult(f *fp.MatchResult) *schema.Port {
+	return &schema.Port{
 		Host:        f.Target,
 		Port:        f.Port,
 		Proto:       string(f.GetProto()),
@@ -405,9 +406,9 @@ func NewPortFromMatchResult(f *fp.MatchResult) *yakit.Port {
 	}
 }
 
-func NewPortFromSpaceEngineResult(f *spacengine.NetSpaceEngineResult) *yakit.Port {
+func NewPortFromSpaceEngineResult(f *spacengine.NetSpaceEngineResult) *schema.Port {
 	host, port, _ := utils.ParseStringToHostPort(f.Addr)
-	return &yakit.Port{
+	return &schema.Port{
 		Host:        host,
 		Port:        port,
 		Proto:       "tcp",
@@ -419,8 +420,8 @@ func NewPortFromSpaceEngineResult(f *spacengine.NetSpaceEngineResult) *yakit.Por
 	}
 }
 
-func NewPortFromSynScanResult(f *synscan.SynScanResult) *yakit.Port {
-	return &yakit.Port{
+func NewPortFromSynScanResult(f *synscan.SynScanResult) *schema.Port {
+	return &schema.Port{
 		Host:  f.Host,
 		Port:  f.Port,
 		Proto: "tcp",

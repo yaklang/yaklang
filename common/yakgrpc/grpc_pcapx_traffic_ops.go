@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -19,7 +20,7 @@ func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPa
 		return nil, err
 	}
 
-	rspData := lo.Map(data, func(item *yakit.TrafficPacket, index int) *ypb.TrafficPacket {
+	rspData := lo.Map(data, func(item *schema.TrafficPacket, index int) *ypb.TrafficPacket {
 		payloadBytes, _ := strconv.Unquote(item.Payload)
 		raw, _ := strconv.Unquote(item.QuotedRaw)
 		info, err := ParseTraffic([]byte(raw), "ethernet")
@@ -70,7 +71,7 @@ func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryT
 		return nil, err
 	}
 
-	rspData := lo.Map(data, func(item *yakit.TrafficTCPReassembledFrame, index int) *ypb.TrafficTCPReassembled {
+	rspData := lo.Map(data, func(item *schema.TrafficTCPReassembledFrame, index int) *ypb.TrafficTCPReassembled {
 		protocol := ""
 		source := ""
 		destination := ""
@@ -126,7 +127,7 @@ func (s *Server) QueryTrafficSession(ctx context.Context, req *ypb.QueryTrafficS
 		return nil, err
 	}
 
-	rspData := lo.Map(data, func(item *yakit.TrafficSession, index int) *ypb.TrafficSession {
+	rspData := lo.Map(data, func(item *schema.TrafficSession, index int) *ypb.TrafficSession {
 		return &ypb.TrafficSession{
 			Id:                    int64(item.ID),
 			SessionType:           item.SessionType,

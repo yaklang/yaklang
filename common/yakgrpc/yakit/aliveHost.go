@@ -4,41 +4,30 @@ import (
 	"context"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
-type AliveHost struct {
-	gorm.Model
-
-	Hash string `json:"hash"`
-
-	IP        string `json:"ip"`
-	IPInteger int64  `json:"ip_integer"`
-
-	// 设置运行时 ID 为了关联具体漏洞
-	RuntimeId string `json:"runtime_id"`
-}
-
 func CreateOrUpdateAliveHost(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&AliveHost{})
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&AliveHost{}); db.Error != nil {
+	db = db.Model(&schema.AliveHost{})
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.AliveHost{}); db.Error != nil {
 		return utils.Errorf("create/update AliveHost failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func YieldAliveHostRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) chan *AliveHost {
-	outC := make(chan *AliveHost)
-	db = db.Model(&AliveHost{})
+func YieldAliveHostRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) chan *schema.AliveHost {
+	outC := make(chan *schema.AliveHost)
+	db = db.Model(&schema.AliveHost{})
 	db = db.Where("runtime_id = ?", runtimeId)
 	go func() {
 		defer close(outC)
 
 		var page = 1
 		for {
-			var items []*AliveHost
+			var items []*schema.AliveHost
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,

@@ -6,11 +6,11 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net"
 	"strings"
 )
@@ -32,7 +32,7 @@ func NewScannerAgentReporter(taskId string, subTaskId string, runtimeId string, 
 	}
 }
 
-func (r *ScannerAgentReporter) Report(record *yakit.Report) error {
+func (r *ScannerAgentReporter) Report(record *schema.Report) error {
 	if r.agent != nil {
 		raw, err := json.Marshal(record)
 		if err != nil {

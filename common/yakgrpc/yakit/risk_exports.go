@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"os"
 	"strconv"
@@ -25,7 +26,7 @@ import (
 )
 
 type (
-	RiskParamsOpt func(r *Risk)
+	RiskParamsOpt func(r *schema.Risk)
 	riskType      struct {
 		Types   []string
 		Verbose string
@@ -88,62 +89,62 @@ func RiskTypeToVerbose(i string) string {
 }
 
 func WithRiskParam_Payload(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.Payload = strconv.Quote(i)
 	}
 }
 
 func WithRiskParam_Title(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.Title = i
 	}
 }
 
 func WithRiskParam_TitleVerbose(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.TitleVerbose = i
 	}
 }
 
 func WithRiskParam_Description(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.Description = i
 	}
 }
 
 func WithRiskParam_YakitPluginName(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.FromYakScript = i
 	}
 }
 
 func WithRiskParam_Solution(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.Solution = i
 	}
 }
 
 func WithRiskParam_RiskType(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.RiskType = i
 		r.RiskTypeVerbose = RiskTypeToVerbose(i)
 	}
 }
 
 func WithRiskParam_RiskVerbose(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.RiskTypeVerbose = i
 	}
 }
 
 func WithRiskParam_Parameter(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.Parameter = i
 	}
 }
 
 func WithRiskParam_Token(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.ReverseToken = i
 	}
 }
@@ -177,7 +178,7 @@ func limitSize(s string, maxSize int) string {
 func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 	data := utils.InterfaceToString(i)
 	data = limitSize(data, MaxSize)
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.QuotedRequest = utils.InterfaceToQuotedString(data)
 	}
 }
@@ -185,13 +186,13 @@ func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 	data := utils.InterfaceToString(i)
 	data = limitSize(data, MaxSize)
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.QuotedResponse = utils.InterfaceToQuotedString(data)
 	}
 }
 
 func WithRiskParam_Details(i interface{}) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		if i == nil {
 			return
 		}
@@ -266,25 +267,25 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 }
 
 func WithRiskParam_RuntimeId(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.RuntimeId = i
 	}
 }
 
 func WithRiskParam_Potential(i bool) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.IsPotential = i
 	}
 }
 
 func WithRiskParam_CVE(s string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.CVE = s
 	}
 }
 
 func WithRiskParam_Severity(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		switch strings.TrimSpace(strings.ToLower(i)) {
 		case "high":
 			r.Severity = "high"
@@ -303,23 +304,23 @@ func WithRiskParam_Severity(i string) RiskParamsOpt {
 }
 
 func WithRiskParam_FromScript(i string) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.FromYakScript = i
 	}
 }
 
 func WithRiskParam_Ignore(i bool) RiskParamsOpt {
-	return func(r *Risk) {
+	return func(r *schema.Risk) {
 		r.Ignore = true
 	}
 }
 
-func CreateRisk(u string, opts ...RiskParamsOpt) *Risk {
+func CreateRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 	return _createRisk(u, opts...)
 }
 
-func _createRisk(u string, opts ...RiskParamsOpt) *Risk {
-	r := &Risk{
+func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
+	r := &schema.Risk{
 		Hash: uuid.New().String(),
 	}
 
@@ -370,16 +371,16 @@ func _createRisk(u string, opts ...RiskParamsOpt) *Risk {
 	return r
 }
 
-func NewRisk(u string, opts ...RiskParamsOpt) (*Risk, error) {
+func NewRisk(u string, opts ...RiskParamsOpt) (*schema.Risk, error) {
 	r := _createRisk(u, opts...)
 	return r, _saveRisk(r)
 }
 
-func SaveRisk(r *Risk) error {
+func SaveRisk(r *schema.Risk) error {
 	return _saveRisk(r)
 }
 
-func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*Risk, error) {
+func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*schema.Risk, error) {
 	r := _createRisk(u, opts...)
 	r.WaitingVerified = true
 	r.ReverseToken = token
@@ -387,14 +388,14 @@ func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*Risk, er
 }
 
 var (
-	beforeRiskSave      []func(*Risk)
+	beforeRiskSave      []func(*schema.Risk)
 	beforeRiskSaveMutex = new(sync.Mutex)
 )
 
-func RegisterBeforeRiskSave(f func(*Risk)) {
+func RegisterBeforeRiskSave(f func(*schema.Risk)) {
 	beforeRiskSaveMutex.Lock()
 	defer beforeRiskSaveMutex.Unlock()
-	beforeRiskSave = append(beforeRiskSave, func(risk *Risk) {
+	beforeRiskSave = append(beforeRiskSave, func(risk *schema.Risk) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("risk save callback error: %v", err)
@@ -404,7 +405,7 @@ func RegisterBeforeRiskSave(f func(*Risk)) {
 	})
 }
 
-func _saveRisk(r *Risk) error {
+func _saveRisk(r *schema.Risk) error {
 	if r.Ignore {
 		log.Infof("ignore risk: %v", r.Title)
 		return nil
@@ -496,7 +497,7 @@ func HaveReverseRisk(token string) bool {
 	for {
 		retryCount++
 		var count int
-		if db := db.Model(&Risk{}).Where(
+		if db := db.Model(&schema.Risk{}).Where(
 			"reverse_token LIKE ?", "%"+token+"%",
 		).Where("waiting_verified = ?", false).Count(&count); db.Error != nil {
 		}

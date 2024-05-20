@@ -2,7 +2,7 @@ package openapi
 
 import "github.com/yaklang/yaklang/common/utils"
 
-// Generate means generate yakit.HTTPFlow via openapi2/3 scheme
+// Generate means generate schema.HTTPFlow via openapi2/3 scheme
 // use WithFlowHandler to recv and handle it
 // Example:
 //

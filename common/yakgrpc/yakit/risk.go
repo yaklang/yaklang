@@ -1,206 +1,27 @@
 package yakit
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"github.com/kataras/pio"
-	"strconv"
-	"strings"
-
-	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type Risk struct {
-	gorm.Model
-
-	Hash string `json:"hash"`
-
-	// essential
-	IP        string `json:"ip"`
-	IPInteger int64  `json:"ip_integer"`
-
-	// extraTargets
-	Url  string `json:"url"`
-	Port int    `json:"port"`
-	Host string `json:"host"`
-
-	//
-	Title           string `json:"title"`
-	TitleVerbose    string `json:"title_verbose"`
-	Description     string `json:"description"`
-	Solution        string `json:"solution"`
-	RiskType        string `json:"risk_type"`
-	RiskTypeVerbose string `json:"risk_verbose"`
-	Parameter       string `json:"parameter"`
-	Payload         string `json:"payload"`
-	Details         string `json:"details"`
-	Severity        string `json:"severity"`
-
-	// 来源于哪个插件？
-	FromYakScript string `json:"from_yak_script"`
-
-	// 等待验证中？
-	WaitingVerified bool `json:"waiting_verified"`
-	// 用于验证的 ReverseToken
-	ReverseToken string `json:"reverse_token"`
-
-	// 设置运行时 ID 为了关联具体漏洞
-	RuntimeId      string `json:"runtime_id"`
-	QuotedRequest  string `json:"quoted_request"`
-	QuotedResponse string `json:"quoted_response"`
-
-	// 潜在威胁：用于输出合规性质的漏洞内容
-	IsPotential bool `json:"is_potential"`
-
-	CVE                 string `json:"cve"`
-	IsRead              bool   `json:"is_read"`
-	Ignore              bool   `json:"ignore"`
-	UploadOnline        bool   `json:"upload_online"`
-	TaskName            string `json:"task_name"`
-	CveAccessVector     string `json:"cve_access_vector"`
-	CveAccessComplexity string `json:"cve_access_complexity"`
-}
-
-func (p *Risk) ColorizedShow() {
-	buf := bytes.NewBufferString("")
-	buf.WriteString(pio.Red("========RISK: " + p.Title + "========"))
-	buf.WriteByte('\n')
-	buf.WriteString(pio.Red("    TYPE: " + p.RiskType + "(" + p.RiskTypeVerbose + ")"))
-	buf.WriteByte('\n')
-	buf.WriteString(pio.Red("    Target: " + p.Url + " (" + p.IP + ":" + fmt.Sprint(p.Port) + ")"))
-	buf.WriteByte('\n')
-	buf.WriteString(pio.Red("    REQUEST:"))
-	buf.WriteByte('\n')
-	requsetRaw, _ := strconv.Unquote(p.QuotedRequest)
-	if len(requsetRaw) > 0 {
-		buf.WriteString(pio.Yellow(string(requsetRaw)))
-	}
-	buf.WriteByte('\n')
-	buf.WriteString(pio.Red(`========================================`))
-	buf.WriteByte('\n')
-	fmt.Println(buf.String())
-}
-
-func (p *Risk) ToGRPCModel() *ypb.Risk {
-	details, _ := strconv.Unquote(p.Details)
-	if details == "" {
-		details = p.Details
-	}
-
-	var request []byte
-	var response []byte
-
-	reqRaw, _ := strconv.Unquote(p.QuotedRequest)
-	if reqRaw != "" {
-		request = []byte(reqRaw)
-	} else {
-		request = []byte(p.QuotedRequest)
-	}
-
-	rspRaw, _ := strconv.Unquote(p.QuotedResponse)
-	if rspRaw != "" {
-		response = []byte(rspRaw)
-	} else {
-		response = []byte(p.QuotedResponse)
-	}
-
-	return &ypb.Risk{
-		Hash:            utils.EscapeInvalidUTF8Byte([]byte(p.Hash)),
-		IP:              utils.EscapeInvalidUTF8Byte([]byte(p.IP)),
-		Url:             utils.EscapeInvalidUTF8Byte([]byte(p.Url)),
-		Port:            int32(p.Port),
-		Host:            utils.EscapeInvalidUTF8Byte([]byte(p.Host)),
-		Title:           utils.EscapeInvalidUTF8Byte([]byte(p.Title)),
-		TitleVerbose:    utils.EscapeInvalidUTF8Byte([]byte(p.TitleVerbose)),
-		Description:     utils.EscapeInvalidUTF8Byte([]byte(p.Description)),
-		Solution:        utils.EscapeInvalidUTF8Byte([]byte(p.Solution)),
-		RiskType:        utils.EscapeInvalidUTF8Byte([]byte(p.RiskType)),
-		RiskTypeVerbose: utils.EscapeInvalidUTF8Byte([]byte(p.RiskTypeVerbose)),
-		Parameter:       utils.EscapeInvalidUTF8Byte([]byte(p.Parameter)),
-		Payload:         utils.EscapeInvalidUTF8Byte([]byte(p.Payload)),
-		Details:         details,
-		FromYakScript:   utils.EscapeInvalidUTF8Byte([]byte(p.FromYakScript)),
-		WaitingVerified: p.WaitingVerified,
-		ReverseToken:    utils.EscapeInvalidUTF8Byte([]byte(p.ReverseToken)),
-		Id:              int64(p.ID),
-		CreatedAt:       p.CreatedAt.Unix(),
-		UpdatedAt:       p.UpdatedAt.Unix(),
-		Severity:        utils.EscapeInvalidUTF8Byte([]byte(p.Severity)),
-
-		Request:  request,
-		Response: response,
-
-		RuntimeId: utils.EscapeInvalidUTF8Byte([]byte(p.RuntimeId)),
-		CVE:       utils.EscapeInvalidUTF8Byte([]byte(p.CVE)),
-		TaskName:  utils.EscapeInvalidUTF8Byte([]byte(p.TaskName)),
-	}
-}
-
-func (p *Risk) BeforeSave() error {
-	if p.Hash == "" {
-		p.Hash = uuid.New().String()
-	}
-
-	p.RiskType = strings.ReplaceAll(p.RiskType, "|", "_")
-	p.Severity = strings.ReplaceAll(p.Severity, "|", "_")
-
-	if p.IPInteger <= 0 && p.IP != "" {
-		p.IPInteger, _ = utils.IPv4ToUint64(p.IP)
-	}
-
-	if p.Severity == "" {
-		p.Severity = "info"
-	}
-
-	if p.RiskType == "" {
-		p.RiskType = "info"
-	}
-
-	if p.RiskTypeVerbose == "" {
-		p.RiskTypeVerbose = "信息"
-	}
-
-	return nil
-}
-
-func (r *Risk) AfterCreate(tx *gorm.DB) (err error) {
-	BroadcastData("risk", "create")
-	return nil
-}
-
-func (r *Risk) AfterSave(tx *gorm.DB) (err error) {
-	BroadcastData("risk", "save")
-	return nil
-}
-
-func (r *Risk) AfterUpdate(tx *gorm.DB) (err error) {
-	BroadcastData("risk", "update")
-	return nil
-}
-
-func (r *Risk) AfterDelete(tx *gorm.DB) (err error) {
-	BroadcastData("risk", "delete")
-	return nil
-}
-
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&Risk{})
+	db = db.Model(&schema.Risk{})
 
 	var token string
 	switch ret := i.(type) {
-	case *Risk:
+	case *schema.Risk:
 		token = ret.ReverseToken
 		if ret.FromYakScript == "" {
 			ret.FromYakScript = consts.GetCurrentYakitPluginID()
 		}
-	case Risk:
+	case schema.Risk:
 		token = ret.ReverseToken
 		if ret.FromYakScript == "" {
 			ret.FromYakScript = consts.GetCurrentYakitPluginID()
@@ -217,7 +38,7 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 	}
 
 	if token != "" {
-		if db := db.Model(&Risk{}).Where(
+		if db := db.Model(&schema.Risk{}).Where(
 			"reverse_token LIKE ?", "%"+token+"%",
 		).Update(map[string]interface{}{
 			"waiting_verified": false,
@@ -226,24 +47,24 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 		}
 	}
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&Risk{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.Risk{}); db.Error != nil {
 		return utils.Errorf("create/update Risk failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func GetRisk(db *gorm.DB, id int64) (*Risk, error) {
-	var r Risk
-	if db := db.Model(&Risk{}).Where("id = ?", id).First(&r); db.Error != nil {
+func GetRisk(db *gorm.DB, id int64) (*schema.Risk, error) {
+	var r schema.Risk
+	if db := db.Model(&schema.Risk{}).Where("id = ?", id).First(&r); db.Error != nil {
 		return nil, utils.Errorf("get Risk failed: %s", db.Error)
 	}
 	return &r, nil
 }
 
-func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*Risk, error) {
-	var r []*Risk
-	if db := db.Model(&Risk{}).Where("runtime_id = ?", runtimeId).Find(&r); db.Error != nil {
+func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*schema.Risk, error) {
+	var r []*schema.Risk
+	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Find(&r); db.Error != nil {
 		return nil, utils.Errorf("get Risks failed: %s", db.Error)
 	}
 	return r, nil
@@ -251,15 +72,15 @@ func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*Risk, error) {
 
 func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (uint32, error) {
 	var count uint32
-	if db := db.Model(&Risk{}).Where("runtime_id = ?", runtimeId).Count(&count); db.Error != nil {
+	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Count(&count); db.Error != nil {
 		return 0, utils.Errorf("get Risks count failed: %s", db.Error)
 	}
 	return count, nil
 }
 
-func GetRiskByHash(db *gorm.DB, hash string) (*Risk, error) {
-	var r Risk
-	if db := db.Model(&Risk{}).Where("hash = ?", hash).First(&r); db.Error != nil {
+func GetRiskByHash(db *gorm.DB, hash string) (*schema.Risk, error) {
+	var r schema.Risk
+	if db := db.Model(&schema.Risk{}).Where("hash = ?", hash).First(&r); db.Error != nil {
 		return nil, utils.Errorf("get Risk failed: %s", db.Error)
 	}
 	return &r, nil
@@ -268,15 +89,15 @@ func GetRiskByHash(db *gorm.DB, hash string) (*Risk, error) {
 func DeleteRiskByID(db *gorm.DB, ids ...int64) error {
 	if len(ids) == 1 {
 		id := ids[0]
-		if db := db.Model(&Risk{}).Where(
+		if db := db.Model(&schema.Risk{}).Where(
 			"id = ?", id,
-		).Unscoped().Delete(&Risk{}); db.Error != nil {
+		).Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 			return db.Error
 		}
 		return nil
 	}
 
-	if db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids).Unscoped().Delete(&Risk{}); db.Error != nil {
+	if db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids).Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 		return utils.Errorf("delete id(s) failed: %v", db.Error)
 	}
 
@@ -284,10 +105,10 @@ func DeleteRiskByID(db *gorm.DB, ids ...int64) error {
 }
 
 func FixRiskType(db *gorm.DB) {
-	db.Model(&Risk{}).Where("(severity = ?) OR (severity is null)", "").Updates(map[string]interface{}{
+	db.Model(&schema.Risk{}).Where("(severity = ?) OR (severity is null)", "").Updates(map[string]interface{}{
 		"severity": "default",
 	})
-	db.Model(&Risk{}).Where("(risk_type = ?) OR (risk_type is null)", "").Updates(map[string]interface{}{
+	db.Model(&schema.Risk{}).Where("(risk_type = ?) OR (risk_type is null)", "").Updates(map[string]interface{}{
 		"risk_type": "default",
 	})
 
@@ -295,7 +116,7 @@ func FixRiskType(db *gorm.DB) {
 }
 
 func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB, _ error) {
-	db = db.Model(&Risk{})
+	db = db.Model(&schema.Risk{})
 	db = db.Where("waiting_verified = ?", params.GetWaitingVerified())
 	db = bizhelper.QueryBySpecificPorts(db, "port", params.GetPorts())
 	db = bizhelper.QueryBySpecificAddress(db, "ip_integer", params.GetNetwork())
@@ -317,11 +138,11 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 	return db, nil
 }
 
-func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginator, []*Risk, error) {
+func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginator, []*schema.Risk, error) {
 	if params == nil {
 		return nil, nil, utils.Errorf("empty params")
 	}
-	db = db.Model(&Risk{}) // .Debug()
+	db = db.Model(&schema.Risk{}) // .Debug()
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
 			Page:    1,
@@ -357,7 +178,7 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 	//	db = bizhelper.ExactQueryString(db, "state", params.GetState())
 	//}
 
-	var ret []*Risk
+	var ret []*schema.Risk
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -367,7 +188,7 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 }
 
 func DeleteRiskByTarget(db *gorm.DB, target string) {
-	db = db.Model(&Risk{})
+	db = db.Model(&schema.Risk{})
 	host, port, _ := utils.ParseStringToHostPort(target)
 	if port > 0 {
 		db = db.Where("port = ?", port)
@@ -378,15 +199,15 @@ func DeleteRiskByTarget(db *gorm.DB, target string) {
 		db = db.Where("(ip = ?) OR (url LIKE ?) OR (host LIKE ?) OR (host = ?)", target, target, target, target)
 	}
 
-	if db := db.Unscoped().Delete(&Risk{}); db.Error != nil {
+	if db := db.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 		log.Errorf("delete risks failed: %s", db.Error)
 	}
 	log.Infof("delete risk by targets: %s finished", target)
 }
 
-func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *Risk {
-	outC := make(chan *Risk)
-	db = db.Model(&Risk{})
+func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *schema.Risk {
+	outC := make(chan *schema.Risk)
+	db = db.Model(&schema.Risk{})
 	host, port, _ := utils.ParseStringToHostPort(target)
 	if port > 0 {
 		db = db.Where("port = ?", port)
@@ -402,7 +223,7 @@ func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *R
 
 		page := 1
 		for {
-			var items []*Risk
+			var items []*schema.Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -430,9 +251,9 @@ func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *R
 	return outC
 }
 
-func YieldRisksByRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) chan *Risk {
-	outC := make(chan *Risk)
-	db = db.Model(&Risk{})
+func YieldRisksByRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) chan *schema.Risk {
+	outC := make(chan *schema.Risk)
+	db = db.Model(&schema.Risk{})
 	db = db.Where("runtime_id = ?", runtimeId)
 
 	go func() {
@@ -440,7 +261,7 @@ func YieldRisksByRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) c
 
 		page := 1
 		for {
-			var items []*Risk
+			var items []*schema.Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -468,9 +289,9 @@ func YieldRisksByRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) c
 	return outC
 }
 
-func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) chan *Risk {
-	outC := make(chan *Risk)
-	db = db.Model(&Risk{})
+func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) chan *schema.Risk {
+	outC := make(chan *schema.Risk)
+	db = db.Model(&schema.Risk{})
 	db = bizhelper.QueryDateTimeAfterTimestampOr(db, "created_at", timestamp)
 
 	go func() {
@@ -478,7 +299,7 @@ func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) cha
 
 		page := 1
 		for {
-			var items []*Risk
+			var items []*schema.Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -506,11 +327,11 @@ func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) cha
 	return outC
 }
 
-func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRead bool) (*bizhelper.Paginator, []*Risk, error) {
+func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRead bool) (*bizhelper.Paginator, []*schema.Risk, error) {
 	if req == nil {
 		return nil, nil, utils.Errorf("empty params")
 	}
-	db = db.Model(&Risk{})
+	db = db.Model(&schema.Risk{})
 	if newRisk {
 		db = db.Where("id > ?", req.AfterId)
 	}
@@ -520,7 +341,7 @@ func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRea
 	}
 	db = db.Where("risk_type NOT IN (?) OR ip <> ?", []string{"reverse-http", "reverse-tcp", "reverse-https"}, "127.0.0.1")
 	db = db.Order("id desc")
-	var ret []*Risk
+	var ret []*schema.Risk
 	paging, db := bizhelper.Paging(db, 1, 5, &ret)
 
 	if db.Error != nil {
@@ -531,7 +352,7 @@ func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRea
 }
 
 func NewRiskReadRequest(db *gorm.DB, req *ypb.NewRiskReadRequest, Ids []int64) error {
-	db = db.Model(&Risk{})
+	db = db.Model(&schema.Risk{})
 	if len(Ids) > 0 {
 		db = db.Where("id in (?)", Ids)
 	} else {
@@ -544,15 +365,15 @@ func NewRiskReadRequest(db *gorm.DB, req *ypb.NewRiskReadRequest, Ids []int64) e
 	return nil
 }
 
-func YieldRisks(db *gorm.DB, ctx context.Context) chan *Risk {
-	outC := make(chan *Risk)
-	db = db.Model(&Risk{})
+func YieldRisks(db *gorm.DB, ctx context.Context) chan *schema.Risk {
+	outC := make(chan *schema.Risk)
+	db = db.Model(&schema.Risk{})
 	go func() {
 		defer close(outC)
 
 		page := 1
 		for {
-			var items []*Risk
+			var items []*schema.Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -581,7 +402,7 @@ func YieldRisks(db *gorm.DB, ctx context.Context) chan *Risk {
 }
 
 func UploadRiskToOnline(db *gorm.DB, hash []string) error {
-	db = db.Model(&Risk{})
+	db = db.Model(&schema.Risk{})
 	db = db.Where("hash in (?)", hash)
 	db = db.Update(map[string]interface{}{"upload_online": true})
 	if db.Error != nil {

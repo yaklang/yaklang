@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
@@ -66,7 +67,7 @@ type NaslVhost struct {
 	Source   string
 }
 type NaslScriptInfo struct {
-	naslScript     *yakit.NaslScript
+	naslScript     *schema.NaslScript
 	OriginFileName string
 	Hash           string
 	OID            string
@@ -107,7 +108,7 @@ func NewNaslScriptObjectFromDb(originName string) (*NaslScriptInfo, error) {
 	if db == nil {
 		return nil, utils.Errorf("gorm database is nil")
 	}
-	var scripts []*yakit.NaslScript
+	var scripts []*schema.NaslScript
 	if err := db.Where("origin_file_name = ?", originName).First(&scripts).Error; err != nil {
 		log.Error(err)
 		return nil, err
@@ -127,7 +128,7 @@ func NewNaslScriptObjectFromFile(path string) (*NaslScriptInfo, error) {
 	}
 	return e.GetScriptObject(), nil
 }
-func NewNaslScriptObjectFromNaslScript(s *yakit.NaslScript) *NaslScriptInfo {
+func NewNaslScriptObjectFromNaslScript(s *schema.NaslScript) *NaslScriptInfo {
 	info := NewNaslScriptObject()
 	n := func() error {
 		if err := json.Unmarshal([]byte(s.Tags), &info.Tags); err != nil {

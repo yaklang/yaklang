@@ -2,6 +2,8 @@ package yakit
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"testing"
 
 	"github.com/go-rod/rod/lib/utils"
@@ -22,9 +24,9 @@ key=MQ==`)))
 	test.NoError(err, "parse request failed")
 	flow, err := CreateHTTPFlowFromHTTPWithNoRspSaved(true, reqInst, "", "https://example.com", "127.0.0.1")
 	test.NoError(err, "create http flow failed")
-	model, err := flow.ToGRPCModel(true)
+	m, err := model.ToHTTPFlowGRPCModel(flow, true)
 	test.NoError(err, "convert to grpc model failed")
-	for _, param := range model.PostParams {
+	for _, param := range m.PostParams {
 		if param.Position == "post-query" {
 			test.Equal("key", param.ParamName)
 			test.Equal("MQ==", param.OriginValue)
@@ -74,12 +76,12 @@ key=MQ==`)))
 
 func TestHTTPFlow_Inset_FixUrl(t *testing.T) {
 	token := utils.RandString(10)
-	httpsFlow := &HTTPFlow{
+	httpsFlow := &schema.HTTPFlow{
 		Url: fmt.Sprintf("https://baidu.com:443?a=%s", token),
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), httpsFlow)
 
-	httpFlow := &HTTPFlow{
+	httpFlow := &schema.HTTPFlow{
 		Url: fmt.Sprintf("http://baidu.com:80?a=%s", token),
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), httpFlow)
@@ -93,7 +95,7 @@ func TestHTTPFlow_Inset_FixUrl(t *testing.T) {
 			if flow.Url != "https://baidu.com?a="+token {
 				t.Fatal("insert fix https url error")
 			}
-			CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &HTTPFlow{
+			CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &schema.HTTPFlow{
 				Url: fmt.Sprintf("https://baidu.com:443?a=%s", token),
 			})
 		}
@@ -102,7 +104,7 @@ func TestHTTPFlow_Inset_FixUrl(t *testing.T) {
 			if flow.Url != "http://baidu.com?a="+token {
 				t.Fatal("insert fix http url error")
 			}
-			CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &HTTPFlow{
+			CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &schema.HTTPFlow{
 				Url: fmt.Sprintf("http://baidu.com:80?a=%s", token),
 			})
 		}

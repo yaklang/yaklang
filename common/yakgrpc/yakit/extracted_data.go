@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
 
@@ -12,34 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type ExtractedData struct {
-	gorm.Model
-
-	// sourcetype 一般来说是标注数据来源
-	SourceType string `gorm:"index"`
-
-	// trace id 表示数据源的 ID
-	TraceId string `gorm:"index"`
-
-	// 提取数据的正则数据
-	Regexp string
-
-	// 规则 Verbose
-	RuleVerbose string
-
-	// UTF8 safe escape
-	Data string
-
-	// DataIndex 表示数据的位置
-	DataIndex int
-
-	// Length 表示数据的长度
-	Length int
-
-	// IsMatchRequest 表示是否是匹配请求
-	IsMatchRequest bool
-}
 
 type PacketInfo struct {
 	IsRequest     bool
@@ -66,23 +39,23 @@ type MatchResult struct {
 
 func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error {
 	if mainId <= 0 {
-		if db := db.Model(&ExtractedData{}).Save(i); db.Error != nil {
+		if db := db.Model(&schema.ExtractedData{}).Save(i); db.Error != nil {
 			return db.Error
 		}
 		return nil
 	}
-	db = db.Model(&ExtractedData{})
+	db = db.Model(&schema.ExtractedData{})
 
-	if db := db.Where("id = ?", mainId).Assign(i).FirstOrCreate(&ExtractedData{}); db.Error != nil {
+	if db := db.Where("id = ?", mainId).Assign(i).FirstOrCreate(&schema.ExtractedData{}); db.Error != nil {
 		return utils.Errorf("create/update ExtractedData failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func GetExtractedData(db *gorm.DB, id int64) (*ExtractedData, error) {
-	var req ExtractedData
-	if db := db.Model(&ExtractedData{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetExtractedData(db *gorm.DB, id int64) (*schema.ExtractedData, error) {
+	var req schema.ExtractedData
+	if db := db.Model(&schema.ExtractedData{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get ExtractedData failed: %s", db.Error)
 	}
 
@@ -90,22 +63,22 @@ func GetExtractedData(db *gorm.DB, id int64) (*ExtractedData, error) {
 }
 
 func DeleteExtractedDataByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&ExtractedData{}).Where(
+	if db := db.Model(&schema.ExtractedData{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&ExtractedData{}); db.Error != nil {
+	).Unscoped().Delete(&schema.ExtractedData{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*ExtractedData, error) {
-	db = db.Model(&ExtractedData{})
+func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest) (*bizhelper.Paginator, []*schema.ExtractedData, error) {
+	db = db.Model(&schema.ExtractedData{})
 
 	params := req.GetPagination()
 
 	db = bizhelper.QueryOrder(db, params.OrderBy, params.Order)
 
-	var ret []*ExtractedData
+	var ret []*schema.ExtractedData
 	paging, db := bizhelper.Paging(db, int(params.GetPage()), int(params.GetLimit()), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -114,13 +87,13 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	return paging, ret, nil
 }
 
-func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *ExtractedData {
+func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matchResult *MatchResult, data string, regexpStr ...string) *schema.ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
 	}
 
-	extractData := &ExtractedData{
+	extractData := &schema.ExtractedData{
 		SourceType:     "httpflow",
 		TraceId:        flowHash,
 		Regexp:         r,
@@ -133,14 +106,14 @@ func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matchResult *Ma
 	return extractData
 }
 
-func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *ExtractedData {
-	outC := make(chan *ExtractedData)
+func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *schema.ExtractedData {
+	outC := make(chan *schema.ExtractedData)
 	go func() {
 		defer close(outC)
 
 		page := 1
 		for {
-			var items []*ExtractedData
+			var items []*schema.ExtractedData
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,

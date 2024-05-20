@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 	"time"
 
@@ -9,6 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func init() {
+	// set broadcast schema
+	schema.SetBoardCast_Data(BroadcastData)
+}
 
 type serverPushDescription struct {
 	Name   string

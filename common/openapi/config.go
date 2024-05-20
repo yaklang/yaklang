@@ -2,18 +2,18 @@ package openapi
 
 import (
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type OpenAPIConfig struct {
 	Domain      string
-	FlowHandler func(flow *yakit.HTTPFlow)
+	FlowHandler func(flow *schema.HTTPFlow)
 	IsHttps     bool
 }
 
 func NewDefaultOpenAPIConfig() *OpenAPIConfig {
 	return &OpenAPIConfig{
-		FlowHandler: func(flow *yakit.HTTPFlow) {
+		FlowHandler: func(flow *schema.HTTPFlow) {
 			log.Infof("openapi generator create: %v", flow.Url)
 		},
 		IsHttps: false,
@@ -37,7 +37,7 @@ func WithDomain(domain string) Option {
 }
 
 // WithFlowHandler means use this handler
-func WithFlowHandler(handler func(flow *yakit.HTTPFlow)) Option {
+func WithFlowHandler(handler func(flow *schema.HTTPFlow)) Option {
 	return func(config *OpenAPIConfig) {
 		config.FlowHandler = handler
 	}

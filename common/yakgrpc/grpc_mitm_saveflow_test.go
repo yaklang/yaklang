@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"net/http"
 	"strings"
 	"testing"
@@ -87,7 +88,8 @@ Content-Disposition: form-data; name="files"; filename="1.xlsx"
 	if len(rets) == 0 {
 		t.Fatal("httpflow not found")
 	}
-	if flow, err := rets[0].ToGRPCModel(true); err != nil {
+	
+	if flow, err := model.ToHTTPFlowGRPCModel(rets[0], true); err != nil {
 		t.Fatal(err)
 	} else if !strings.Contains(flow.SafeHTTPRequest, `{{unquote("\xff\xff\xff\xff")}}`) {
 		t.Fatalf("safe HTTP request not found quote tags: %#v", flow.SafeHTTPRequest)

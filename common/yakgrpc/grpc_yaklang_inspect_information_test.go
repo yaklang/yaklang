@@ -3,12 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"os"
 	"sort"
 	"strconv"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -381,7 +383,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 		raw, _ := json.Marshal(param)
 		jsonBytes := strconv.Quote(string(raw))
 
-		ret, err := getNeedReturn(&yakit.YakScript{
+		ret, err := getNeedReturn(&schema.YakScript{
 			Content: code,
 			Params:  jsonBytes,
 		})
@@ -847,7 +849,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 		}
 		defer tempFp.Close()
 
-		M := cveresources.GetManager(tempFp.Name())
+		M := cveresources.GetManager(tempFp.Name(), true)
 		db := M.DB
 		if db == nil {
 			t.Fatal("no database")
@@ -885,7 +887,7 @@ type pluginTagCheck struct {
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Tag(t *testing.T) {
-	var testcase = []pluginTagCheck{
+	testcase := []pluginTagCheck{
 		{
 			code: `
 handle = func(a){
@@ -946,5 +948,4 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 		}
 		require.ElementsMatch(t, check.expectTag, information.ParseTags(prog))
 	}
-
 }

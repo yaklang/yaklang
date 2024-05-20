@@ -2,35 +2,16 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type Progress struct {
-	gorm.Model
-	RuntimeId            string
-	CurrentProgress      float64
-	YakScriptOnlineGroup string
-	// 记录指针
-	LastRecordPtr int64
-	TaskName      string
-	// 额外信息
-	ExtraInfo string
-
-	ProgressSource string
-
-	// 任务记录的参数
-	ProgressTaskParam []byte
-
-	// 目标 大部分的progress都应该有制定目标，所以尝试提取出来作为单独的数据使用
-	Target string
-}
-
 func CreateOrUpdateProgress(db *gorm.DB, runtimeId string, i interface{}) error {
-	db = db.Model(&Progress{})
+	db = db.Model(&schema.Progress{})
 
-	if db := db.Where("runtime_id = ?", runtimeId).Assign(i).FirstOrCreate(&Progress{}); db.Error != nil {
+	if db := db.Where("runtime_id = ?", runtimeId).Assign(i).FirstOrCreate(&schema.Progress{}); db.Error != nil {
 		return utils.Errorf("create/update Progress failed: %s", db.Error)
 	}
 
@@ -45,8 +26,8 @@ func FilterProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) *gorm.DB {
 	return db
 }
 
-func QueryProgress(db *gorm.DB, paging *ypb.Paging, filter *ypb.UnfinishedTaskFilter) (*bizhelper.Paginator, []*Progress, error) {
-	var ProgressList []*Progress
+func QueryProgress(db *gorm.DB, paging *ypb.Paging, filter *ypb.UnfinishedTaskFilter) (*bizhelper.Paginator, []*schema.Progress, error) {
+	var ProgressList []*schema.Progress
 	db = FilterProgress(db, filter)
 	db = bizhelper.QueryOrder(db, paging.GetOrderBy(), paging.GetOrder())
 	p, db := bizhelper.Paging(db, int(paging.GetPage()), int(paging.GetLimit()), &ProgressList)
@@ -56,8 +37,8 @@ func QueryProgress(db *gorm.DB, paging *ypb.Paging, filter *ypb.UnfinishedTaskFi
 	return p, ProgressList, nil
 }
 
-func DeleteProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) ([]*Progress, error) {
-	var ProgressList []*Progress
+func DeleteProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) ([]*schema.Progress, error) {
+	var ProgressList []*schema.Progress
 	db = FilterProgress(db, filter)
 	db.Delete(&ProgressList)
 	if db.Error != nil {
@@ -66,16 +47,16 @@ func DeleteProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) ([]*Progress,
 	return ProgressList, nil
 }
 
-func GetProgressByRuntimeId(db *gorm.DB, runtimeId string) (*Progress, error) {
-	var p Progress
+func GetProgressByRuntimeId(db *gorm.DB, runtimeId string) (*schema.Progress, error) {
+	var p schema.Progress
 	if db := db.Where("runtime_id = ?", runtimeId).First(&p); db.Error != nil {
 		return nil, utils.Errorf("get Progress by runtimdId failed: %s", db.Error)
 	}
 	return &p, nil
 }
 
-func DeleteProgressByRuntimeId(db *gorm.DB, runtimeId string) (*Progress, error) {
-	var p Progress
+func DeleteProgressByRuntimeId(db *gorm.DB, runtimeId string) (*schema.Progress, error) {
+	var p schema.Progress
 	if db := db.Where("runtime_id = ?", runtimeId).First(&p); db.Error != nil {
 		return nil, utils.Errorf("get Progress by runtimdId failed: %s", db.Error)
 	}

@@ -2,6 +2,7 @@ package yaktest
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestMisc_RuntimeDB(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	_ = yakit.ExecResult{}
+	_ = schema.ExecResult{}
 	os.Setenv(consts.CONST_YAK_SAVE_HTTPFLOW, "true")
 	cases := []YakTestCase{
 		{
