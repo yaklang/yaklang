@@ -1,15 +1,23 @@
 package openapi
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"context"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/openapi/openapi3"
+	"github.com/yaklang/yaklang/common/openapi/openapigen"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"strconv"
+)
 
-// Generate means generate schema.HTTPFlow via openapi2/3 scheme
+// GenerateHTTPFlows means generate yakit.HTTPFlow via openapi2/3 scheme
 // use WithFlowHandler to recv and handle it
 // Example:
 //
 //	openapi.Generate(fileName, openapi.flowHandler(flow => {
 //		dump(flow.Url)
 //	}))
-func Generate(doc string, opt ...Option) error {
+func GenerateHTTPFlows(doc string, opt ...Option) error {
 	config := NewDefaultOpenAPIConfig()
 	for _, p := range opt {
 		p(config)
@@ -22,4 +30,38 @@ func Generate(doc string, opt ...Option) error {
 		}
 	}
 	return nil
+}
+
+// ExtractOpenAPI3Scheme fetch openapi3 scheme from yakit.HTTPFlows
+// Example:
+//
+// scheme := openapi.ExtractOpenAPI3Scheme(domain)~
+// schemeJSON = scheme.MarshalJSON()~
+func ExtractOpenAPI3Scheme(domain string) (*openapi3.T, error) {
+	var err error
+	db := consts.GetGormProjectDatabase()
+	db = db.Where("(url GLOB ?) or (url GLOB ?)", `http://`+domain+`/*`, `https://`+domain+`/*`)
+	var c = make(chan *openapigen.BasicHTTPFlow)
+	go func() {
+		defer func() {
+			close(c)
+		}()
+
+		for result := range yakit.YieldHTTPFlows(db, context.Background()) {
+			req, _ := strconv.Unquote(result.Request)
+			rsp, _ := strconv.Unquote(result.Response)
+			if len(req) <= 0 {
+				continue
+			}
+			c <- &openapigen.BasicHTTPFlow{
+				Request:  []byte(req),
+				Response: []byte(rsp),
+			}
+		}
+	}()
+	scheme, err := openapigen.GenerateV3Scheme(c)
+	if err != nil {
+		return nil, err
+	}
+	return scheme, nil
 }

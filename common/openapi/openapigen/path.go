@@ -345,6 +345,14 @@ type BasicHTTPFlow struct {
 }
 
 func generate(c chan *BasicHTTPFlow) ([]byte, error) {
+	res, err := generateScheme(c)
+	if err != nil {
+		return nil, err
+	}
+	return res.MarshalJSON()
+}
+
+func generateScheme(c chan *BasicHTTPFlow) (*openapi3.T, error) {
 	results := omap.NewOrderedMap(map[string]*openapi3.PathItem{})
 	for flow := range c {
 		pathWithoutQ := lowhttp.GetHTTPRequestPathWithoutQuery(flow.Request)
@@ -390,5 +398,12 @@ func generate(c chan *BasicHTTPFlow) ([]byte, error) {
 		t.Paths.Set(i, v)
 		return true
 	})
-	return t.MarshalJSON()
+	if t.Paths == nil || t.Paths.Len() <= 0 {
+		return nil, utils.Error("no path item")
+	}
+	return &t, nil
+}
+
+func GenerateV3Scheme(c chan *BasicHTTPFlow) (*openapi3.T, error) {
+	return generateScheme(c)
 }
