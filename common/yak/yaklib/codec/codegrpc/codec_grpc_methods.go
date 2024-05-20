@@ -74,6 +74,31 @@ func init() {
 		CodecMethod.CodecMethod = funcName
 		CodecLibsDoc = append(CodecLibsDoc, &CodecMethod)
 	}
+
+	mutate.AddFuzzTagToGlobal(&mutate.FuzzTagDescription{
+		TagName: "CodecFlow",
+		Handler: func(s string) []string {
+			lastDividerIndex := strings.LastIndexByte(s, '|')
+			if lastDividerIndex < 0 {
+				return []string{}
+			}
+			flowName, input := s[:lastDividerIndex], s[lastDividerIndex+1:]
+			codecFlow, err := yakit.GetCodecFlowByName(consts.GetGormProfileDatabase(), flowName)
+			if err != nil {
+				return []string{}
+			}
+			res, err := CodecFlowExec(&ypb.CodecRequestFlow{
+				Text:       input,
+				Auto:       false,
+				WorkFlow:   codecFlow.WorkFlow,
+				InputBytes: nil,
+			})
+			if err != nil {
+				return []string{}
+			}
+			return []string{res.GetResult()}
+		},
+	})
 }
 
 type CodecExecFlow struct {
