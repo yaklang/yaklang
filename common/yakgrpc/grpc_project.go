@@ -14,6 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
+
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/consts"
@@ -35,7 +38,7 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	defer currentProjectMutex.Unlock()
 	if req.GetId() > 0 {
 		db := s.GetProfileDatabase()
-		proj, err := yakit.GetProjectById(db, req.GetId(), yakit.TypeProject)
+		proj, err := model.GetProjectById(db, req.GetId(), yakit.TypeProject)
 		if err != nil {
 			err := yakit.InitializingProjectDatabase()
 			if err != nil {
@@ -78,8 +81,8 @@ func (s *Server) GetProjects(ctx context.Context, req *ypb.GetProjectsRequest) (
 	}
 	total, _ := yakit.QueryProjectTotal(s.GetProfileDatabase(), req)
 	return &ypb.GetProjectsResponse{
-		Projects: funk.Map(data, func(i *yakit.Project) *ypb.ProjectDescription {
-			return i.ToGRPCModel()
+		Projects: funk.Map(data, func(i *schema.Project) *ypb.ProjectDescription {
+			return model.ToProjectGRPCModel(i, consts.GetGormProfileDatabase())
 		}).([]*ypb.ProjectDescription),
 		Pagination:   req.GetPagination(),
 		Total:        int64(paging.TotalRecord),
@@ -114,7 +117,7 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 			return nil, utils.Errorf("path: %v is not existed", pathName)
 		}
 	}
-	projectData := &yakit.Project{
+	projectData := &schema.Project{
 		ProjectName:   req.GetProjectName(),
 		Description:   req.GetDescription(),
 		DatabasePath:  pathName,
@@ -208,7 +211,7 @@ func (s *Server) GetCurrentProject(ctx context.Context, _ *ypb.Empty) (*ypb.Proj
 	if err != nil {
 		return nil, utils.Errorf("cannot fetch current project")
 	}
-	return proj.ToGRPCModel(), nil
+	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
 }
 
 func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_ExportProjectServer) error {
@@ -227,7 +230,7 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 		feedProgress("导出失败-"+"数据库不存在："+path, 0.9)
 		return utils.Errorf("cannot found database file in: %s", path)
 	}*/
-	proj, err := yakit.GetProjectById(s.GetProfileDatabase(), req.GetId(), yakit.TypeProject)
+	proj, err := model.GetProjectById(s.GetProfileDatabase(), req.GetId(), yakit.TypeProject)
 	if err != nil {
 		feedProgress("导出失败-"+"数据库不存在：", 0.9)
 		return utils.Errorf("cannot found database file in: %s", err.Error())
@@ -251,7 +254,10 @@ func (s *Server) ExportProject(req *ypb.ExportProjectRequest, stream ypb.Yak_Exp
 	if req.GetPassword() != "" {
 		suffix = ".enc"
 	}
-	outputFile = filepath.Join(consts.GetDefaultYakitProjectsDir(), "project-"+projectNameToFileName(proj.ToGRPCModel().GetProjectName())+".yakitproject"+suffix)
+	outputFile = filepath.Join(consts.GetDefaultYakitProjectsDir(),
+		"project-"+projectNameToFileName(
+			model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()).GetProjectName(),
+		)+".yakitproject"+suffix)
 	outFp, err := os.OpenFile(outputFile, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		feedProgress("打开输出文件失败！", 0.5)
@@ -452,7 +458,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	}
 
 	feedProgress("创建项目："+projectName, 0.7)
-	proj := &yakit.Project{
+	proj := &schema.Project{
 		ProjectName:   projectName,
 		Description:   description,
 		DatabasePath:  fileName,
@@ -528,7 +534,7 @@ func (s *Server) GetDefaultProject(ctx context.Context, req *ypb.Empty) (*ypb.Pr
 	if err != nil {
 		return nil, utils.Errorf("cannot fetch default project")
 	}
-	return proj.ToGRPCModel(), nil
+	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
 }
 
 func (s *Server) QueryProjectDetail(ctx context.Context, req *ypb.QueryProjectDetailRequest) (*ypb.ProjectDescription, error) {
@@ -548,5 +554,5 @@ func (s *Server) GetTemporaryProject(ctx context.Context, req *ypb.Empty) (*ypb.
 	if err != nil {
 		return nil, utils.Errorf("cannot fetch temporary project")
 	}
-	return proj.ToGRPCModel(), nil
+	return model.ToProjectGRPCModel(proj, consts.GetGormProfileDatabase()), nil
 }

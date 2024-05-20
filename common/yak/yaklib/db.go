@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -28,7 +29,7 @@ func saveYakitPlugin(scriptName string, typeStr string, content interface{}) err
 		return utils.Errorf("existed plugin name: %s", scriptName)
 	}
 
-	return yakit.CreateOrUpdateYakScriptByName(db, scriptName, &yakit.YakScript{
+	return yakit.CreateOrUpdateYakScriptByName(db, scriptName, &schema.YakScript{
 		ScriptName: scriptName,
 		Type:       typeStr,
 		Content:    utils.InterfaceToString(content),
@@ -83,7 +84,7 @@ var DatabaseExports = map[string]interface{}{
 	"QueryUrlsByKeyword":      queryUrlsByKeyword,
 	"QueryUrlsAll":            queryAllUrls,
 	"QueryHTTPFlowsByKeyword": queryHTTPFlowByKeyword,
-	"QueryHTTPFlowsAll": func() chan *yakit.HTTPFlow {
+	"QueryHTTPFlowsAll": func() chan *schema.HTTPFlow {
 		return queryHTTPFlowByKeyword("")
 	},
 	"QueryPortsByUpdatedAt":       queryPortsByUpdatedAt,
@@ -128,7 +129,7 @@ var DatabaseExports = map[string]interface{}{
 	"CreateTemporaryYakScript": yakit.CreateTemporaryYakScript,
 
 	"NewAliveHost": YakitNewAliveHost,
-	"QueryAliveHost": func(runtimeId string) chan *yakit.AliveHost {
+	"QueryAliveHost": func(runtimeId string) chan *schema.AliveHost {
 		return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
 	},
 }
@@ -137,7 +138,7 @@ func _deleteYakScriptByName(i string) error {
 	return yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), i)
 }
 
-func _yieldYakScript() chan *yakit.YakScript {
+func _yieldYakScript() chan *schema.YakScript {
 	return yakit.YieldYakScripts(consts.GetGormProfileDatabase(), context.Background())
 }
 
@@ -162,7 +163,7 @@ func saveYakitMenuItemByBatchExecuteConfig(raw interface{}) error {
 	return yakit.CreateOrUpdateMenuItem(db, item.CalcHash(), item)
 }
 
-func queryYakitPluginByName(name string) (*yakit.YakScript, error) {
+func queryYakitPluginByName(name string) (*schema.YakScript, error) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		return nil, utils.Error("no database found")

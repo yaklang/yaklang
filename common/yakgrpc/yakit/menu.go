@@ -4,26 +4,12 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type MenuItem struct {
-	gorm.Model
-
-	Group         string `json:"group" `
-	Verbose       string `json:"verbose"`
-	YakScriptName string `json:"yak_script_name"`
-	Hash          string `json:"-" gorm:"unique_index"`
-
-	// quoted json
-	BatchPluginFilterJson string `json:"batch_plugin_filter_json"`
-	Mode                  string `json:"mode"`
-	MenuSort              int64  `json:"menu_sort"`
-	GroupSort             int64  `json:"group_sort"`
-}
 
 /*
 {"group":"12312","name":"aaa","query":{"type":"mitm,port-scan,nuclei","tags":"","include":["ElasticSearch 未授权访问","[wptouch-open-redirect]: WPTouch Switch Desktop 3.x Open Redirection","[wpmudev-pub-keys]: Wpmudev Dashboard Pub Key","[wpdm-cache-session]: Wpdm-Cache Session"],"exclude":[]}}
@@ -40,59 +26,39 @@ type batchExecutionSchemaFilter struct {
 	Exclude []string `json:"exclude"`
 }
 
-func NewMenuItemByBatchExecuteConfig(raw interface{}) (*MenuItem, error) {
+func NewMenuItemByBatchExecuteConfig(raw interface{}) (*schema.MenuItem, error) {
 	jsonBody := utils.InterfaceToBytes(raw)
-	var schema batchExecutionSchema
-	err := json.Unmarshal(jsonBody, &schema)
+	var executionSchema batchExecutionSchema
+	err := json.Unmarshal(jsonBody, &executionSchema)
 	if err != nil {
 		return nil, utils.Errorf("cannot load json to (menuItem): %s", err)
 	}
 
-	queryFilter, err := json.Marshal(schema.Query)
+	queryFilter, err := json.Marshal(executionSchema.Query)
 	if err != nil {
 		return nil, utils.Errorf("loading query filter failed: %s", err)
 	}
-	item := &MenuItem{
-		Group:                 schema.Group,
-		Verbose:               schema.Name,
+	item := &schema.MenuItem{
+		Group:                 executionSchema.Group,
+		Verbose:               executionSchema.Name,
 		BatchPluginFilterJson: strconv.Quote(string(queryFilter)),
 	}
 	return item, nil
 }
 
-func (m *MenuItem) CalcHash() string {
-	key := m.Verbose
-	if key == "" {
-		key = m.YakScriptName
-	}
-	if key == "" {
-		key = codec.Sha256(m.BatchPluginFilterJson)
-	}
-	return utils.CalcSha1(m.Group, m.Mode, key)
-}
-
-func (m *MenuItem) BeforeSave() error {
-	if m.Group == "" {
-		m.Group = "UserDefined"
-	}
-
-	m.Hash = m.CalcHash()
-	return nil
-}
-
 func CreateOrUpdateMenuItem(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&MenuItem{})
+	db = db.Model(&schema.MenuItem{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&MenuItem{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.MenuItem{}); db.Error != nil {
 		return utils.Errorf("create/update MenuItem failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func GetMenuItemById(db *gorm.DB, id int64) (*MenuItem, error) {
-	var req MenuItem
-	if db := db.Model(&MenuItem{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetMenuItemById(db *gorm.DB, id int64) (*schema.MenuItem, error) {
+	var req schema.MenuItem
+	if db := db.Model(&schema.MenuItem{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get MenuItem failed: %s", db.Error)
 	}
 
@@ -100,22 +66,22 @@ func GetMenuItemById(db *gorm.DB, id int64) (*MenuItem, error) {
 }
 
 func DeleteMenuItemByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&MenuItem{}).Where(
+	if db := db.Model(&schema.MenuItem{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&MenuItem{}); db.Error != nil {
+	).Unscoped().Delete(&schema.MenuItem{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteMenuItem(db *gorm.DB, group string, name string, mode string) error {
-	db = db.Model(&MenuItem{}).Where(
+	db = db.Model(&schema.MenuItem{}).Where(
 		"`group` = ? AND yak_script_name = ?", group, name,
 	)
 	if mode != "" {
 		db = db.Where("mode = ?", mode)
 	}
-	db = db.Unscoped().Delete(&MenuItem{})
+	db = db.Unscoped().Delete(&schema.MenuItem{})
 	if db.Error != nil {
 		return db.Error
 	}
@@ -123,35 +89,35 @@ func DeleteMenuItem(db *gorm.DB, group string, name string, mode string) error {
 }
 
 func DeleteMenuItemAll(db *gorm.DB) error {
-	if db := db.Model(&MenuItem{}).Where(
+	if db := db.Model(&schema.MenuItem{}).Where(
 		"true",
-	).Unscoped().Delete(&MenuItem{}); db.Error != nil {
+	).Unscoped().Delete(&schema.MenuItem{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func GetAllMenuItem(db *gorm.DB) []*MenuItem {
-	var items []*MenuItem
-	if db := db.Model(&MenuItem{}).Where("true").Find(&items); db.Error != nil {
+func GetAllMenuItem(db *gorm.DB) []*schema.MenuItem {
+	var items []*schema.MenuItem
+	if db := db.Model(&schema.MenuItem{}).Where("true").Find(&items); db.Error != nil {
 		return nil
 	}
 	return items
 }
 
-func GetMenuItem(db *gorm.DB, group string, name string) (*MenuItem, error) {
-	var req MenuItem
-	if db := db.Model(&MenuItem{}).Where("`group` = ? AND yak_script_string = ?", group, name).First(&req); db.Error != nil {
+func GetMenuItem(db *gorm.DB, group string, name string) (*schema.MenuItem, error) {
+	var req schema.MenuItem
+	if db := db.Model(&schema.MenuItem{}).Where("`group` = ? AND yak_script_string = ?", group, name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get MenuItem failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func QueryAllMenuItemByWhere(db *gorm.DB, req *ypb.QueryAllMenuItemRequest) []*MenuItem {
-	var items []*MenuItem
+func QueryAllMenuItemByWhere(db *gorm.DB, req *ypb.QueryAllMenuItemRequest) []*schema.MenuItem {
+	var items []*schema.MenuItem
 
-	db = db.Model(&MenuItem{})
+	db = db.Model(&schema.MenuItem{})
 	if req.Mode != "" {
 		db = db.Where("mode = ?", req.Mode)
 	} else {

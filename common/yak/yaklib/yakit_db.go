@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -19,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func queryDomainAssetByNetwork(network string) (chan *yakit.Domain, error) {
+func queryDomainAssetByNetwork(network string) (chan *schema.Domain, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
@@ -30,7 +31,7 @@ func queryDomainAssetByNetwork(network string) (chan *yakit.Domain, error) {
 	return yakit.YieldDomains(db, context.Background()), nil
 }
 
-func queryDomainAssetByDomainKeyword(keyword string) (chan *yakit.Domain, error) {
+func queryDomainAssetByDomainKeyword(keyword string) (chan *schema.Domain, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
@@ -41,7 +42,7 @@ func queryDomainAssetByDomainKeyword(keyword string) (chan *yakit.Domain, error)
 	return yakit.YieldDomains(db, context.Background()), nil
 }
 
-func queryDomainAssetByHTMLTitle(title string) (chan *yakit.Domain, error) {
+func queryDomainAssetByHTMLTitle(title string) (chan *schema.Domain, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
@@ -52,7 +53,7 @@ func queryDomainAssetByHTMLTitle(title string) (chan *yakit.Domain, error) {
 	return yakit.YieldDomains(db, context.Background()), nil
 }
 
-func queryHostAssetByNetwork(network string) (chan *yakit.Host, error) {
+func queryHostAssetByNetwork(network string) (chan *schema.Host, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
@@ -63,7 +64,7 @@ func queryHostAssetByNetwork(network string) (chan *yakit.Host, error) {
 	return yakit.YieldHosts(db, context.Background()), nil
 }
 
-func queryHostAssetByDomainKeyword(keyword string) (chan *yakit.Host, error) {
+func queryHostAssetByDomainKeyword(keyword string) (chan *schema.Host, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
@@ -74,35 +75,35 @@ func queryHostAssetByDomainKeyword(keyword string) (chan *yakit.Host, error) {
 	return yakit.YieldHosts(db, context.Background()), nil
 }
 
-func queryPortAssetByNetwork(network string) (chan *yakit.Port, error) {
+func queryPortAssetByNetwork(network string) (chan *schema.Port, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
-	db = db.Model(&yakit.Port{})
+	db = db.Model(&schema.Port{})
 	db = bizhelper.ExactQueryString(db, "state", "open")
 	db = bizhelper.QueryBySpecificAddress(db, "ip_integer", network)
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
-func queryPortAssetByNetworkAndPort(network string, port string) (chan *yakit.Port, error) {
+func queryPortAssetByNetworkAndPort(network string, port string) (chan *schema.Port, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
-	db = db.Model(&yakit.Port{})
+	db = db.Model(&schema.Port{})
 	db = bizhelper.ExactQueryString(db, "state", "open")
 	db = bizhelper.QueryBySpecificAddress(db, "ip_integer", network)
 	db = bizhelper.QueryBySpecificPorts(db, "port", port)
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
-func queryPortAssetByKeyword(keyword string) (chan *yakit.Port, error) {
+func queryPortAssetByKeyword(keyword string) (chan *schema.Port, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
-	db = db.Model(&yakit.Port{})
+	db = db.Model(&schema.Port{})
 	db = bizhelper.ExactQueryString(db, "state", "open")
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"host", "service_type",
@@ -236,8 +237,8 @@ func saveDomain(domain string, ip ...string) error {
 	return nil
 }
 
-func interfaceToPort(t interface{}) (*yakit.Port, error) {
-	var r *yakit.Port
+func interfaceToPort(t interface{}) (*schema.Port, error) {
+	var r *schema.Port
 	switch ret := t.(type) {
 	case *fp.MatchResult:
 		r = NewPortFromMatchResult(ret)
@@ -245,7 +246,7 @@ func interfaceToPort(t interface{}) (*yakit.Port, error) {
 		r = NewPortFromSynScanResult(ret)
 	case *spacengine.NetSpaceEngineResult:
 		r = NewPortFromSpaceEngineResult(ret)
-	case *yakit.Port:
+	case *schema.Port:
 		r = ret
 	default:
 		return nil, utils.Errorf("unsupported(%v): %#v", reflect.TypeOf(t), spew.Sdump(t))
@@ -281,8 +282,8 @@ func queryUrlsByKeyword(k string) chan string {
 	return ch
 }
 
-func queryHTTPFlowByKeyword(k string) chan *yakit.HTTPFlow {
-	ch := make(chan *yakit.HTTPFlow, 100)
+func queryHTTPFlowByKeyword(k string) chan *schema.HTTPFlow {
+	ch := make(chan *schema.HTTPFlow, 100)
 	go func() {
 		defer close(ch)
 		var db = consts.GetGormProjectDatabase()
@@ -299,12 +300,12 @@ func queryHTTPFlowByKeyword(k string) chan *yakit.HTTPFlow {
 	return ch
 }
 
-func queryPortsByUpdatedAt(timestamp int64) (chan *yakit.Port, error) {
+func queryPortsByUpdatedAt(timestamp int64) (chan *schema.Port, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
-	db = db.Model(&yakit.Port{})
+	db = db.Model(&schema.Port{})
 	db = bizhelper.ExactQueryString(db, "state", "open")
 	db = bizhelper.QueryDateTimeAfterTimestampOr(db, "updated_at", timestamp)
 	db = bizhelper.FuzzSearchEx(db, []string{
@@ -314,12 +315,12 @@ func queryPortsByUpdatedAt(timestamp int64) (chan *yakit.Port, error) {
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
-func queryPortsByTaskName(taskName string) (chan *yakit.Port, error) {
+func queryPortsByTaskName(taskName string) (chan *schema.Port, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
-	db = db.Model(&yakit.Port{})
+	db = db.Model(&schema.Port{})
 	db = bizhelper.ExactQueryString(db, "task_name", taskName)
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"host", "service_type",
@@ -328,12 +329,12 @@ func queryPortsByTaskName(taskName string) (chan *yakit.Port, error) {
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
-func queryPortsByRuntimeId(runtimeID string) (chan *yakit.Port, error) {
+func queryPortsByRuntimeId(runtimeID string) (chan *schema.Port, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
-	db = db.Model(&yakit.Port{})
+	db = db.Model(&schema.Port{})
 	db = bizhelper.ExactQueryString(db, "runtime_id", runtimeID)
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"host", "service_type",
@@ -342,8 +343,8 @@ func queryPortsByRuntimeId(runtimeID string) (chan *yakit.Port, error) {
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
-func queryHTTPFlowByID(id ...int64) chan *yakit.HTTPFlow {
-	ch := make(chan *yakit.HTTPFlow, 100)
+func queryHTTPFlowByID(id ...int64) chan *schema.HTTPFlow {
+	ch := make(chan *schema.HTTPFlow, 100)
 	go func() {
 		defer close(ch)
 		var db = consts.GetGormProjectDatabase()
@@ -394,7 +395,7 @@ func getPayloadGroups(group string) []string {
 
 // YieldPayload means
 func YieldPayload(raw any, extra ...any) chan string {
-	db := consts.GetGormProfileDatabase().Model(&yakit.Payload{})
+	db := consts.GetGormProfileDatabase().Model(&schema.Payload{})
 	results := make([]any, 0, 1+len(extra))
 	results = append(results, raw)
 	for _, e := range extra {
@@ -433,7 +434,7 @@ func init() {
 	YakitExports["QueryUrlsByKeyword"] = queryUrlsByKeyword
 	YakitExports["QueryUrlsAll"] = queryAllUrls
 	YakitExports["QueryHTTPFlowsByKeyword"] = queryHTTPFlowByKeyword
-	YakitExports["QueryHTTPFlowsAll"] = func() chan *yakit.HTTPFlow {
+	YakitExports["QueryHTTPFlowsAll"] = func() chan *schema.HTTPFlow {
 		return queryHTTPFlowByKeyword("")
 	}
 

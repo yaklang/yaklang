@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
@@ -1071,7 +1072,7 @@ func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow)
 	if err != nil {
 		return nil, err
 	}
-	var cf = &yakit.CodecFlow{
+	var cf = &schema.CodecFlow{
 		FlowName: req.FlowName,
 		WorkFlow: flowByte,
 	}

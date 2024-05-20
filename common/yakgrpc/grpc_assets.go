@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func SaveFromYakitLog(l *yaklib.YakitLog, db *gorm.DB) {
 
 	switch l.Level {
 	case "asset-port":
-		var port yakit.Port
+		var port schema.Port
 		err := json.Unmarshal([]byte(l.Data), &port)
 		if err != nil {
 			log.Errorf("unmarshal yakit.Port failed: %s", err)
@@ -81,7 +82,7 @@ func (s *Server) QueryPorts(ctx context.Context, req *ypb.QueryPortsRequest) (*y
 	var results []*ypb.Port
 	if req.GetAll() {
 		db := yakit.FilterPort(s.GetProjectDatabase(), req)
-		count := bizhelper.QueryCount(db, &yakit.Port{}, nil)
+		count := bizhelper.QueryCount(db, &schema.Port{}, nil)
 		db = bizhelper.QueryOrder(db, req.GetOrderBy(), req.GetOrder())
 		data := yakit.YieldPorts(db, context.Background())
 		for r := range data {
@@ -108,7 +109,7 @@ func (s *Server) QueryPorts(ctx context.Context, req *ypb.QueryPortsRequest) (*y
 	}
 }
 
-func ToGrpcPort(r *yakit.Port) *ypb.Port {
+func ToGrpcPort(r *schema.Port) *ypb.Port {
 	return &ypb.Port{
 		Host:        utils.EscapeInvalidUTF8Byte([]byte(r.Host)),
 		IPInteger:   int64(r.IPInteger),
@@ -133,15 +134,15 @@ func (s *Server) DeletePorts(ctx context.Context, req *ypb.DeletePortsRequest) (
 	db := s.GetProjectDatabase().Model(&ypb.Port{})
 
 	if req.GetAll() {
-		db.Unscoped().Where("true").Delete(&yakit.Port{})
+		db.Unscoped().Where("true").Delete(&schema.Port{})
 		return &ypb.Empty{}, nil
 	}
 	if req.GetDeleteAll() {
-		db.Unscoped().Where("true").Delete(&yakit.Port{})
+		db.Unscoped().Where("true").Delete(&schema.Port{})
 		return &ypb.Empty{}, nil
 	}
 	if req.GetFilter() != nil {
-		if db := yakit.FilterPort(s.GetProjectDatabase(), req.GetFilter()).Unscoped().Delete(&yakit.Port{}); db.Error != nil {
+		if db := yakit.FilterPort(s.GetProjectDatabase(), req.GetFilter()).Unscoped().Delete(&schema.Port{}); db.Error != nil {
 			return nil, utils.Errorf("delete error: %s", db.Error)
 		}
 		return &ypb.Empty{}, nil
@@ -169,25 +170,25 @@ func (s *Server) DeletePorts(ctx context.Context, req *ypb.DeletePortsRequest) (
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetId())
 	}
 
-	db.Unscoped().Delete(&yakit.Port{})
+	db.Unscoped().Delete(&schema.Port{})
 
 	return &ypb.Empty{}, nil
 }
 
 func (s *Server) DeleteHosts(ctx context.Context, req *ypb.DeleteHostsRequest) (*ypb.Empty, error) {
 	if req.DeleteAll {
-		s.GetProjectDatabase().Model(&yakit.Host{}).Unscoped().Delete(&yakit.Host{})
+		s.GetProjectDatabase().Model(&schema.Host{}).Unscoped().Delete(&schema.Host{})
 		return &ypb.Empty{}, nil
 	}
 
-	var db = s.GetProjectDatabase().Model(&yakit.Host{}).Unscoped()
+	var db = s.GetProjectDatabase().Model(&schema.Host{}).Unscoped()
 	if req.DomainKeyword != "" {
-		bizhelper.FuzzQueryLike(db, "domain", req.DomainKeyword).Delete(&yakit.Host{})
+		bizhelper.FuzzQueryLike(db, "domain", req.DomainKeyword).Delete(&schema.Host{})
 		return &ypb.Empty{}, nil
 	}
 
 	if req.Network != "" {
-		bizhelper.QueryBySpecificAddress(db, "ip_integer", req.Network).Delete(&yakit.Host{})
+		bizhelper.QueryBySpecificAddress(db, "ip_integer", req.Network).Delete(&schema.Host{})
 		return &ypb.Empty{}, nil
 	}
 
@@ -225,12 +226,12 @@ func (s *Server) QueryHosts(ctx context.Context, req *ypb.QueryHostsRequest) (*y
 
 func (s *Server) DeleteDomains(ctx context.Context, req *ypb.DeleteDomainsRequest) (*ypb.Empty, error) {
 	if req.DeleteAll {
-		s.GetProjectDatabase().Model(&yakit.Domain{}).Unscoped().Delete(&yakit.Domain{})
+		s.GetProjectDatabase().Model(&schema.Domain{}).Unscoped().Delete(&schema.Domain{})
 		return &ypb.Empty{}, nil
 	}
 	if req.GetFilter() != nil {
 		db := yakit.FilterDomain(s.GetProjectDatabase(), req.GetFilter())
-		if db := db.Unscoped().Delete(&yakit.Domain{}); db.Error != nil {
+		if db := db.Unscoped().Delete(&schema.Domain{}); db.Error != nil {
 			return &ypb.Empty{}, nil
 		}
 	}
@@ -242,14 +243,14 @@ func (s *Server) DeleteDomains(ctx context.Context, req *ypb.DeleteDomainsReques
 		return &ypb.Empty{}, nil
 	}
 
-	var db = s.GetProjectDatabase().Model(&yakit.Domain{}).Unscoped()
+	var db = s.GetProjectDatabase().Model(&schema.Domain{}).Unscoped()
 	if req.DomainKeyword != "" {
-		bizhelper.FuzzQueryLike(db, "domain", req.DomainKeyword).Delete(&yakit.Domain{})
+		bizhelper.FuzzQueryLike(db, "domain", req.DomainKeyword).Delete(&schema.Domain{})
 		return &ypb.Empty{}, nil
 	}
 
 	if req.Network != "" {
-		bizhelper.QueryBySpecificAddress(db, "ip_integer", req.Network).Delete(&yakit.Domain{})
+		bizhelper.QueryBySpecificAddress(db, "ip_integer", req.Network).Delete(&schema.Domain{})
 		return &ypb.Empty{}, nil
 	}
 
@@ -338,7 +339,7 @@ func (s *Server) DeleteRisk(ctx context.Context, req *ypb.DeleteRiskRequest) (*y
 		if req.GetFilter() != nil && req.GetId() > 0 {
 			rdb, _ := yakit.FilterByQueryRisks(s.GetProjectDatabase(), req.GetFilter())
 			if rdb != nil {
-				if db := rdb.Unscoped().Where("id <> ?", req.GetId()).Delete(&yakit.Risk{}); db.Error != nil {
+				if db := rdb.Unscoped().Where("id <> ?", req.GetId()).Delete(&schema.Risk{}); db.Error != nil {
 					return nil, utils.Errorf("delete error: %s", db.Error)
 				}
 			}
@@ -362,7 +363,7 @@ func (s *Server) DeleteRisk(ctx context.Context, req *ypb.DeleteRiskRequest) (*y
 	if req.GetFilter() != nil {
 		rdb, _ := yakit.FilterByQueryRisks(s.GetProjectDatabase(), req.GetFilter())
 		if rdb != nil {
-			if db := rdb.Unscoped().Delete(&yakit.Risk{}); db.Error != nil {
+			if db := rdb.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 				return nil, utils.Errorf("delete error: %s", db.Error)
 			}
 		}
@@ -374,7 +375,7 @@ func (s *Server) DeleteRisk(ctx context.Context, req *ypb.DeleteRiskRequest) (*y
 	}
 
 	if req.GetDeleteAll() {
-		if db := s.GetProjectDatabase().Model(&yakit.Risk{}).Where("true").Unscoped().Delete(&yakit.Risk{}); db.Error != nil {
+		if db := s.GetProjectDatabase().Model(&schema.Risk{}).Where("true").Unscoped().Delete(&schema.Risk{}); db.Error != nil {
 			return nil, db.Error
 		}
 	}
@@ -561,8 +562,8 @@ func (s *Server) QueryRiskTableStats(ctx context.Context, e *ypb.Empty) (*ypb.Ri
 	riskStatsLock.Lock()
 	defer riskStatsLock.Unlock()
 
-	var latestVul yakit.Risk
-	if db := s.GetProjectDatabase().Model(&yakit.Risk{}).Where("").Order("updated_at desc").First(&latestVul); db.Error != nil {
+	var latestVul schema.Risk
+	if db := s.GetProjectDatabase().Model(&schema.Risk{}).Where("").Order("updated_at desc").First(&latestVul); db.Error != nil {
 		return nil, utils.Errorf("fetch newest vul failed: %s", db.Error)
 	}
 
@@ -618,7 +619,7 @@ func (s *Server) QueryReports(ctx context.Context, d *ypb.QueryReportsRequest) (
 		return nil, err
 	}
 
-	result := funk.Map(res, func(i *yakit.ReportRecord) *ypb.Report {
+	result := funk.Map(res, func(i *schema.ReportRecord) *ypb.Report {
 		return i.ToGRPCModel()
 	}).([]*ypb.Report)
 	return &ypb.QueryReportsResponse{
@@ -644,12 +645,12 @@ func (s *Server) DeleteReport(ctx context.Context, d *ypb.DeleteReportRequest) (
 	_ = yakit.DeleteReportRecordByID(s.GetProjectDatabase(), d.GetId())
 	_ = yakit.DeleteReportRecordByHash(s.GetProjectDatabase(), d.GetHash())
 	if d.GetDeleteAll() {
-		if db := s.GetProjectDatabase().Model(&yakit.ReportRecord{}).Where("true").Unscoped().Delete(&yakit.ReportRecord{}); db.Error != nil {
+		if db := s.GetProjectDatabase().Model(&schema.ReportRecord{}).Where("true").Unscoped().Delete(&schema.ReportRecord{}); db.Error != nil {
 			return nil, db.Error
 		}
 	}
 	if d.GetFilter() != nil {
-		if db := yakit.FilterReportRecord(s.GetProjectDatabase().Model(&yakit.ReportRecord{}), d.GetFilter()).Unscoped().Delete(&yakit.ReportRecord{}); db.Error != nil {
+		if db := yakit.FilterReportRecord(s.GetProjectDatabase().Model(&schema.ReportRecord{}), d.GetFilter()).Unscoped().Delete(&schema.ReportRecord{}); db.Error != nil {
 			log.Errorf("error: %s", db.Error)
 		}
 	}
@@ -686,7 +687,7 @@ func (s *Server) QueryNewRisk(ctx context.Context, req *ypb.QueryNewRiskRequest)
 	return rsp, nil
 }
 
-func NewRiskGRPCModel(p *yakit.Risk) *ypb.NewRisk {
+func NewRiskGRPCModel(p *schema.Risk) *ypb.NewRisk {
 	return &ypb.NewRisk{
 		Title:        p.Title,
 		TitleVerbose: p.TitleVerbose,

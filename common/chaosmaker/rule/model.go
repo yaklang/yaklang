@@ -3,6 +3,7 @@ package rule
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"os"
 	"regexp"
@@ -68,7 +69,7 @@ type Storage struct {
 }
 
 func init() {
-	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_PROFILE_DATABASE, &Storage{})
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_PROFILE_DATABASE, &Storage{})
 }
 
 func (Storage) TableName() string {

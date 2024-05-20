@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"math"
 	"math/rand"
 	"strings"
@@ -331,7 +332,7 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 	return string(jsonBytes), nil
 }
 
-func WithOnRisk(target string, onRisk func(i *yakit.Risk)) ConfigOption {
+func WithOnRisk(target string, onRisk func(i *schema.Risk)) ConfigOption {
 	vCh := make(chan *tools.PocVul)
 	filterVul := filter.NewFilter()
 	i := processVulnerability(target, filterVul, vCh, onRisk)
@@ -346,7 +347,7 @@ func WithOnRisk(target string, onRisk func(i *yakit.Risk)) ConfigOption {
 	}
 }
 
-func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul, handlers ...func(i *yakit.Risk)) func(i map[string]interface{}) {
+func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul, handlers ...func(i *schema.Risk)) func(i map[string]interface{}) {
 	return func(i map[string]interface{}) {
 		if i["match"].(bool) {
 			tpl := i["template"].(*YakTemplate)

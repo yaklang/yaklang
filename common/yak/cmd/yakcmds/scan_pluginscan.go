@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -203,7 +204,7 @@ var hybridScanCommand = &cli.Command{
 			log.Warn("mitm plugin is unfinished supporting")
 		}
 
-		db = db.Model(&yakit.YakScript{}).Where("type IN (?)", plugins)
+		db = db.Model(&schema.YakScript{}).Where("type IN (?)", plugins)
 		if handledUUID {
 			db = db.Where("script_name LIKE ?", "%"+uid)
 		}
@@ -214,7 +215,7 @@ var hybridScanCommand = &cli.Command{
 		}
 		db = db.Order("updated_at desc")
 
-		pluginList := omap.NewOrderedMap(map[string]*yakit.YakScript{})
+		pluginList := omap.NewOrderedMap(map[string]*schema.YakScript{})
 		for result := range yakit.YieldYakScripts(db, context.Background()) {
 			if pluginName != "" && pluginName != result.ScriptName {
 				continue
@@ -368,7 +369,7 @@ var hybridScanCommand = &cli.Command{
 
 func ShowHistoryHTTPFlowByRuntimeId(last int64, runtimeId string) int64 {
 	db := consts.GetGormProjectDatabase()
-	db = db.Model(&yakit.HTTPFlow{}).Where("runtime_id = ?", runtimeId)
+	db = db.Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeId)
 	var count int64
 	if db.Count(&count).Error == nil {
 		if count != last {

@@ -2,15 +2,13 @@ package yakit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,205 +20,13 @@ import (
 
 var yakScriptOpLock = new(sync.Mutex)
 
-type YakScript struct {
-	gorm.Model
-
-	ScriptName string `json:"script_name" gorm:"unique_index"`
-	Type       string `json:"type" gorm:"index"`
-	Content    string `json:"content"`
-	Level      string `json:"level"`
-	Params     string `json:"params"`
-	Help       string `json:"help"`
-	Author     string `json:"author"`
-	Tags       string `json:"tags,omitempty"`
-	Ignored    bool   `json:"ignore"`
-
-	// 加载本地的数据
-	FromLocal bool   `json:"from_local"`
-	LocalPath string `json:"local_path"`
-
-	// History string
-	IsHistory bool `json:"is_history"`
-
-	// Force Interactive
-	// Means that this script will be executed in interactive mode
-	// cannot load as a plugin or a module by mix caller
-	ForceInteractive bool `json:"force_interactive"`
-
-	FromStore bool `json:"from_store"`
-
-	IsGeneralModule      bool   `json:"is_general_module"`
-	GeneralModuleVerbose string `json:"general_module_verbose"`
-	GeneralModuleKey     string `json:"general_module_key"`
-	FromGit              string `json:"from_git"`
-
-	// 这个是自动填写的，一般不需要自己来填写
-	// 条件是 Params 中有一个名字为 target 的必填参数
-	IsBatchScript bool `json:"is_batch_script"`
-	IsExternal    bool `json:"is_external"`
-
-	EnablePluginSelector bool   `json:"enable_plugin_selector"`
-	PluginSelectorTypes  string `json:"plugin_selector_types"`
-
-	// Online ID: 线上插件的 ID
-	OnlineId           int64  `json:"online_id"`
-	OnlineScriptName   string `json:"online_script_name"`
-	OnlineContributors string `json:"online_contributors"`
-	OnlineIsPrivate    bool   `json:"online_is_private"`
-
-	// 这个插件所属用户 ID
-	UserId int64 `json:"user_id"`
-	// 这个插件的 UUID
-	Uuid           string      `json:"uuid"`
-	HeadImg        string      `json:"head_img"`
-	OnlineBaseUrl  string      `json:"online_base_url"`
-	BaseOnlineId   int64       `json:"BaseOnlineId"`
-	OnlineOfficial bool        `json:"online_official"`
-	OnlineGroup    string      `json:"online_group"`
-	sourceScript   interface{} // 用于存储原始的 script(可能是由原类型是NaslScript)
-
-	IsCorePlugin bool `json:"is_core_plugin"` // 判断是否是核心插件
-	// 废弃字段
-	RiskType string `json:"risk_type"`
-	// 漏洞详情 建议，描述，cwe
-	RiskDetail string `json:"risk_detail"`
-	// 漏洞类型-补充说明 废弃
-	RiskAnnotation string `json:"risk_annotation"`
-	// 协作者
-	CollaboratorInfo string `json:"collaborator_info"`
-}
-
-func (s *YakScript) BeforeSave() error {
-	if s.ScriptName == "" {
-		return utils.Errorf("empty script name is denied")
-	}
-
-	if utils.MatchAnyOfSubString(s.ScriptName, "|") {
-		s.ScriptName = strings.ReplaceAll(s.ScriptName, "|", "/")
-	}
-
-	resRaw, _ := strconv.Unquote(s.Params)
-	if resRaw != "" {
-		var res interface{}
-		_ = json.Unmarshal([]byte(resRaw), &res)
-		switch ret := res.(type) {
-		case []interface{}:
-			for _, rawIf := range ret {
-				i, ok := rawIf.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				if utils.MapGetString(i, "Field") == "target" && utils.MapGetBool(i, "Required") {
-					s.IsBatchScript = true
-					break
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func (s *YakScript) AfterCreate(tx *gorm.DB) (err error) {
-	BroadcastData("yakscript", "create")
-	return nil
-}
-
-func (s *YakScript) AfterSave(tx *gorm.DB) (err error) {
-	BroadcastData("yakscript", "save")
-	return nil
-}
-
-func (s *YakScript) AfterUpdate(tx *gorm.DB) (err error) {
-	BroadcastData("yakscript", "update")
-	return nil
-}
-
-func (s *YakScript) AfterDelete(tx *gorm.DB) (err error) {
-	BroadcastData("yakscript", "delete")
-	return nil
-}
-
-func (s *YakScript) ToGRPCModel() *ypb.YakScript {
-	var params []*ypb.YakScriptParam
-	if s.Params != "" && s.Params != `""` {
-		r, _ := strconv.Unquote(s.Params)
-		err := json.Unmarshal([]byte(r), &params)
-		if err != nil {
-			log.Errorf("unmarshal params failed: %s", err)
-			spew.Dump([]byte(r))
-		}
-	}
-	var riskDetail []*ypb.YakRiskInfo
-	if s.RiskDetail != "" && s.RiskDetail != `""` && s.RiskDetail != "{}" { //"{}"
-		r, err := strconv.Unquote(s.RiskDetail)
-		if err != nil {
-			r = s.RiskDetail
-		}
-		err = json.Unmarshal([]byte(r), &riskDetail)
-		if err != nil { // errors may occur due to version iterations has break change, so we just ignore it (this field has been deprecated actually)
-			// log.Errorf("unmarshal RiskDetail failed: %s", err)
-			// spew.Dump([]byte(r))
-		}
-	}
-
-	var collaboratorInfo []*ypb.Collaborator
-	if s.CollaboratorInfo != "" && s.CollaboratorInfo != `""` {
-		c, _ := strconv.Unquote(s.CollaboratorInfo)
-		err := json.Unmarshal([]byte(c), &collaboratorInfo)
-		if err != nil {
-			log.Errorf("unmarshal collaboratorInfo failed: %s", err)
-			spew.Dump([]byte(c))
-		}
-	}
-
-	script := &ypb.YakScript{
-		Id:                   int64(s.ID),
-		Content:              s.Content,
-		Type:                 s.Type,
-		Params:               params,
-		CreatedAt:            s.CreatedAt.Unix(),
-		ScriptName:           s.ScriptName,
-		Help:                 s.Help,
-		Level:                s.Level,
-		Author:               s.Author,
-		Tags:                 s.Tags,
-		IsHistory:            s.IsHistory,
-		IsIgnore:             s.Ignored,
-		IsGeneralModule:      s.IsGeneralModule,
-		GeneralModuleVerbose: s.GeneralModuleVerbose,
-		GeneralModuleKey:     s.GeneralModuleKey,
-		FromGit:              s.FromGit,
-		EnablePluginSelector: s.EnablePluginSelector,
-		PluginSelectorTypes:  s.PluginSelectorTypes,
-		OnlineId:             s.OnlineId,
-		OnlineScriptName:     s.OnlineScriptName,
-		OnlineContributors:   s.OnlineContributors,
-		OnlineIsPrivate:      s.OnlineIsPrivate,
-		UserId:               s.UserId,
-		UUID:                 s.Uuid,
-		HeadImg:              s.HeadImg,
-		OnlineBaseUrl:        s.OnlineBaseUrl,
-		BaseOnlineId:         s.BaseOnlineId,
-		OnlineOfficial:       s.OnlineOfficial,
-		OnlineGroup:          s.OnlineGroup,
-		UpdatedAt:            s.UpdatedAt.Unix(),
-		RiskAnnotation:       s.RiskAnnotation,
-		RiskInfo:             riskDetail,
-		IsCorePlugin:         s.IsCorePlugin,
-	}
-	/*if s.Type == "mitm" {
-		script.Params = mitmPluginDefaultPlugins
-	}*/
-	return script
-}
-
 func CreateOrUpdateYakScript(db *gorm.DB, id int64, i interface{}) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = db.Model(&YakScript{})
+	db = db.Model(&schema.YakScript{})
 
-	if db := db.Where("id = ?", id).Assign(i).FirstOrCreate(&YakScript{}); db.Error != nil {
+	if db := db.Where("id = ?", id).Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 
@@ -233,9 +39,9 @@ func DeleteYakScriptByOnlineId(db *gorm.DB, onlineId int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&YakScript{}).Where(
+	if db := db.Model(&schema.YakScript{}).Where(
 		"online_id = ?", onlineId,
-	).Unscoped().Delete(&YakScript{}); db.Error != nil {
+	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -255,17 +61,17 @@ func CreateOrUpdateYakScriptByOnlineId(db *gorm.DB, onlineId int64, i interface{
 		}
 	}()
 
-	db = db.Model(&YakScript{})
+	db = db.Model(&schema.YakScript{})
 
 	_ = DeleteYakScriptByOnlineId(db, onlineId)
-	if db := db.Where("online_id = ?", onlineId).Assign(i).FirstOrCreate(&YakScript{}); db.Error != nil {
+	if db := db.Where("online_id = ?", onlineId).Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 
 	switch ret := i.(type) {
-	case *YakScript:
+	case *schema.YakScript:
 		return UpdateGeneralModuleFromByYakScriptName(db, ret.ScriptName, ret.IsGeneralModule)
-	case YakScript:
+	case schema.YakScript:
 		return UpdateGeneralModuleFromByYakScriptName(db, ret.ScriptName, ret.IsGeneralModule)
 	}
 
@@ -273,20 +79,20 @@ func CreateOrUpdateYakScriptByOnlineId(db *gorm.DB, onlineId int64, i interface{
 }
 
 func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}) error {
-	db = db.Model(&YakScript{})
+	db = db.Model(&schema.YakScript{})
 
 	// 锁住更新步骤，太快容易整体被锁
 	yakScriptOpLock.Lock()
-	if db := db.Where("script_name = ?", scriptName).Assign(i).FirstOrCreate(&YakScript{}); db.Error != nil {
+	if db := db.Where("script_name = ?", scriptName).Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		yakScriptOpLock.Unlock()
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 	yakScriptOpLock.Unlock()
 
 	switch ret := i.(type) {
-	case *YakScript:
+	case *schema.YakScript:
 		return UpdateGeneralModuleFromByYakScriptName(db, scriptName, ret.IsGeneralModule)
-	case YakScript:
+	case schema.YakScript:
 		return UpdateGeneralModuleFromByYakScriptName(db, scriptName, ret.IsGeneralModule)
 	}
 
@@ -306,7 +112,7 @@ func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, 
 	return name, nil
 }
 
-func NewTemporaryYakScript(t string, code string, suffix ...string) (*YakScript, error) {
+func NewTemporaryYakScript(t string, code string, suffix ...string) (*schema.YakScript, error) {
 	name := fmt.Sprintf("tmp-%v", ksuid.New().String())
 	if strings.TrimSpace(strings.ToLower(t)) == "nuclei" {
 		// nuclei
@@ -318,7 +124,7 @@ func NewTemporaryYakScript(t string, code string, suffix ...string) (*YakScript,
 		nameInfo := utils.MapGetString(tempInfo, "id")
 		name = "[TMP]-" + nameInfo + "-" + ksuid.New().String() + strings.Join(suffix, "-")
 	}
-	return &YakScript{
+	return &schema.YakScript{
 		ScriptName: name,
 		Type:       t,
 		Content:    code,
@@ -328,8 +134,8 @@ func NewTemporaryYakScript(t string, code string, suffix ...string) (*YakScript,
 }
 
 func RemoveTemporaryYakScriptAll(db *gorm.DB, suffix string) {
-	db = db.Model(&YakScript{}).Where("script_name LIKE ?", "[TMP]%"+suffix).Where("ignored = true")
-	if db := db.Unscoped().Delete(&YakScript{}); db.Error != nil {
+	db = db.Model(&schema.YakScript{}).Where("script_name LIKE ?", "[TMP]%"+suffix).Where("ignored = true")
+	if db := db.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		log.Errorf("remove temporary yak script failed: %s", db.Error)
 	}
 }
@@ -340,30 +146,30 @@ func UpdateGeneralModuleFromByYakScriptName(db *gorm.DB, scriptName string, i bo
 	})
 }
 
-func GetYakScript(db *gorm.DB, id int64) (*YakScript, error) {
-	var req YakScript
+func GetYakScript(db *gorm.DB, id int64) (*schema.YakScript, error) {
+	var req schema.YakScript
 
-	if db := db.Model(&YakScript{}).Where("id = ?", id).First(&req); db.Error != nil {
+	if db := db.Model(&schema.YakScript{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetYakScriptIdOrName(db *gorm.DB, id int64, name string) (*YakScript, error) {
-	var req YakScript
+func GetYakScriptIdOrName(db *gorm.DB, id int64, name string) (*schema.YakScript, error) {
+	var req schema.YakScript
 
-	if db := db.Model(&YakScript{}).Where("(id = ?) OR (script_name = ?)", id, name).First(&req); db.Error != nil {
+	if db := db.Model(&schema.YakScript{}).Where("(id = ?) OR (script_name = ?)", id, name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetYakScriptByName(db *gorm.DB, name string) (*YakScript, error) {
-	var req YakScript
+func GetYakScriptByName(db *gorm.DB, name string) (*schema.YakScript, error) {
+	var req schema.YakScript
 
-	if db := db.Model(&YakScript{}).Where("script_name = ?", name).First(&req); db.Error != nil {
+	if db := db.Model(&schema.YakScript{}).Where("script_name = ?", name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
 
@@ -371,10 +177,10 @@ func GetYakScriptByName(db *gorm.DB, name string) (*YakScript, error) {
 }
 
 // GetNucleiYakScriptByName
-func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*YakScript, error) {
-	var req YakScript
+func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*schema.YakScript, error) {
+	var req schema.YakScript
 
-	if db := db.Model(&YakScript{}).Where(
+	if db := db.Model(&schema.YakScript{}).Where(
 		"`type` = 'nuclei'",
 	).Where(
 		"(script_name LIKE ?) OR (script_name LIKE ?) OR (script_name = ?)",
@@ -388,20 +194,20 @@ func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*YakScript, error
 	return &req, nil
 }
 
-func GetYakScriptByOnlineID(db *gorm.DB, onlineId int64) (*YakScript, error) {
-	var req YakScript
+func GetYakScriptByOnlineID(db *gorm.DB, onlineId int64) (*schema.YakScript, error) {
+	var req schema.YakScript
 
-	if db := db.Model(&YakScript{}).Where("online_id = ?", onlineId).First(&req); db.Error != nil {
+	if db := db.Model(&schema.YakScript{}).Where("online_id = ?", onlineId).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetYakScriptByUUID(db *gorm.DB, uuid string) (*YakScript, error) {
-	var req YakScript
+func GetYakScriptByUUID(db *gorm.DB, uuid string) (*schema.YakScript, error) {
+	var req schema.YakScript
 
-	if db := db.Model(&YakScript{}).Where("uuid = ?", uuid).First(&req); db.Error != nil {
+	if db := db.Model(&schema.YakScript{}).Where("uuid = ?", uuid).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
 
@@ -412,9 +218,9 @@ func DeleteYakScriptByID(db *gorm.DB, id int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&YakScript{}).Where(
+	if db := db.Model(&schema.YakScript{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&YakScript{}); db.Error != nil {
+	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -424,9 +230,9 @@ func DeleteYakScriptByName(db *gorm.DB, s string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&YakScript{}).Where(
+	if db := db.Model(&schema.YakScript{}).Where(
 		"script_name = ?", s,
-	).Unscoped().Delete(&YakScript{}); db.Error != nil {
+	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -439,13 +245,13 @@ func DeleteYakScriptByUserID(db *gorm.DB, s int64, onlineBaseUrl string) error {
 	if s <= 0 {
 		return nil
 	}
-	db = db.Model(&YakScript{}).Where(
+	db = db.Model(&schema.YakScript{}).Where(
 		"user_id = ? and online_is_private = true", s,
 	)
 	if onlineBaseUrl != "" {
 		db = db.Where("online_base_url = ?", onlineBaseUrl)
 	}
-	db = db.Unscoped().Delete(&YakScript{})
+	db = db.Unscoped().Delete(&schema.YakScript{})
 	if db.Error != nil {
 		return db.Error
 	}
@@ -456,16 +262,16 @@ func DeleteYakScriptAll(db *gorm.DB) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&YakScript{}).Where(
+	if db := db.Model(&schema.YakScript{}).Where(
 		"true",
-	).Unscoped().Delete(&YakScript{}); db.Error != nil {
+	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteYakScriptByWhere(db *gorm.DB) error {
-	if db = db.Delete(&YakScript{}); db.Error != nil {
+	if db = db.Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -483,14 +289,14 @@ func IgnoreYakScriptByID(db *gorm.DB, id int64, ignored bool) error {
 	})
 }
 
-func QueryYakScriptByNames(db *gorm.DB, names ...string) []*YakScript {
+func QueryYakScriptByNames(db *gorm.DB, names ...string) []*schema.YakScript {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = db.Model(&YakScript{})
-	var all []*YakScript
+	db = db.Model(&schema.YakScript{})
+	var all []*schema.YakScript
 	for _, i := range utils.SliceGroup(names, 100) {
-		var tmp []*YakScript
+		var tmp []*schema.YakScript
 		nDB := bizhelper.ExactQueryStringArrayOr(db, "script_name", i)
 		if err := nDB.Find(&tmp).Error; err != nil {
 			log.Errorf("dberror(query yak scripts): %v", err)
@@ -500,12 +306,12 @@ func QueryYakScriptByNames(db *gorm.DB, names ...string) []*YakScript {
 	return all
 }
 
-func QueryYakScriptByIsCore(db *gorm.DB, isCore bool) []*YakScript {
+func QueryYakScriptByIsCore(db *gorm.DB, isCore bool) []*schema.YakScript {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = db.Model(&YakScript{})
-	var yakScripts []*YakScript
+	db = db.Model(&schema.YakScript{})
+	var yakScripts []*schema.YakScript
 	if err := db.Where("is_core_plugin = ?", isCore).Find(&yakScripts).Error; err != nil {
 		log.Errorf("dberror(query yak scripts): %v", err)
 	}
@@ -584,13 +390,13 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	return db
 }
 
-func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*YakScript, error) {
+func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.YakScript, error) {
 	if params == nil {
 		params = &ypb.QueryYakScriptRequest{}
 	}
 	if params.Type == "nasl" {
 		p, scripts, err := QueryRootNaslScriptByYakScriptRequest(db, params)
-		var yakScripts []*YakScript
+		var yakScripts []*schema.YakScript
 		for _, i := range scripts {
 			yakScript := i.ToYakScript()
 			if yakScript == nil {
@@ -602,7 +408,7 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		return p, yakScripts, err
 	}
 	//
-	db = db.Model(&YakScript{}) // .Debug()
+	db = db.Model(&schema.YakScript{}) // .Debug()
 
 	/*pagination*/
 	if params.Pagination == nil {
@@ -636,7 +442,7 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 	}
 
 	db = FilterYakScript(db, params) // .LogMode(true).Debug()
-	var ret []*YakScript
+	var ret []*schema.YakScript
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -650,15 +456,15 @@ YieldYakScripts no use spec, checking
 
 	calling
 */
-func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *YakScript {
-	outC := make(chan *YakScript)
+func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *schema.YakScript {
+	outC := make(chan *schema.YakScript)
 
 	go func() {
 		defer close(outC)
 
 		page := 1
 		for {
-			var items []*YakScript
+			var items []*schema.YakScript
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -686,10 +492,10 @@ func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *YakScript {
 	return outC
 }
 
-func GetYakScriptList(db *gorm.DB, id int64, ids []int64) ([]*YakScript, error) {
-	var req []*YakScript
+func GetYakScriptList(db *gorm.DB, id int64, ids []int64) ([]*schema.YakScript, error) {
+	var req []*schema.YakScript
 
-	db = db.Model(&YakScript{})
+	db = db.Model(&schema.YakScript{})
 	if id > 0 {
 		db = db.Where("id = ?", id)
 	}
@@ -705,7 +511,7 @@ func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) 
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = db.Model(&YakScript{}).Unscoped()
+	db = db.Model(&schema.YakScript{}).Unscoped()
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 		"script_name", "content", "help", "author", "tags",
@@ -717,7 +523,7 @@ func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) 
 }
 
 func CountYakScriptByWhere(db *gorm.DB, isGroup bool, req *ypb.QueryYakScriptGroupRequest) (total int64, err error) {
-	db = db.Model(&YakScript{})
+	db = db.Model(&schema.YakScript{})
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", req.ExcludeType)
 	if isGroup {
 		db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
@@ -733,7 +539,7 @@ func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) 
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = db.Model(&YakScript{}).Unscoped()
+	db = db.Model(&schema.YakScript{}).Unscoped()
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 		"script_name", "content", "help", "author", "tags",

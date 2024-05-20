@@ -4,53 +4,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
 	"strings"
 	"sync"
 )
 
-type NaslScript struct {
-	gorm.Model
-	OriginFileName  string `json:"origin_file_name"`
-	Hash            string `json:"hash" gorm:"unique_index"`
-	OID             string `json:"oid"`
-	CVE             string `json:"cve"`
-	ScriptName      string `json:"script_name"`
-	Script          string `json:"script"`
-	Tags            string `json:"tags,omitempty"`
-	Version         string `json:"version"`
-	Category        string `json:"category"`
-	Family          string `json:"family"`
-	Copyright       string `json:"copyright"`
-	Dependencies    string `json:"dependencies,omitempty"`
-	RequirePorts    string `json:"require_ports,omitempty"`
-	RequireUdpPorts string `json:"require_udp_ports,omitempty"`
-	ExcludeKeys     string `json:"exclude_keys,omitempty"`
-	Xref            string `json:"xref,omitempty"`
-	Preferences     string `json:"preferences,omitempty"`
-	BugtraqId       string `json:"bugtraqId,omitempty"`
-	MandatoryKeys   string `json:"mandatory_keys,omitempty"`
-	Timeout         int    `json:"timeout,omitempty"`
-	RequireKeys     string `json:"require_keys,omitempty"`
-}
-
 var createNaslScript = new(sync.Mutex)
 
-func NewEmptyNaslScript() *NaslScript {
-	return &NaslScript{}
+func NewEmptyNaslScript() *schema.NaslScript {
+	return &schema.NaslScript{}
 }
-func NewNaslScript(name, content string) *NaslScript {
+func NewNaslScript(name, content string) *schema.NaslScript {
 	obj := NewEmptyNaslScript()
 	obj.ScriptName = name
 	obj.Script = content
 	obj.Hash = obj.CalcHash()
 	return obj
 }
-func FilterRootScriptsWithDbModelType(scripts []*NaslScript) []*NaslScript {
-	newScripts := []*NaslScript{}
+func FilterRootScriptsWithDbModelType(scripts []*schema.NaslScript) []*schema.NaslScript {
+	newScripts := []*schema.NaslScript{}
 	tmp := map[string]struct{}{}
 	for _, script := range scripts {
 		var dep []string
@@ -69,14 +44,14 @@ func FilterRootScriptsWithDbModelType(scripts []*NaslScript) []*NaslScript {
 	}
 	return newScripts
 }
-func QueryRootNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*NaslScript, error) {
+func QueryRootNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.NaslScript, error) {
 	p, scripts, err := QueryNaslScriptByYakScriptRequest(db, params)
 	if err != nil {
 		return nil, nil, err
 	}
 	return p, FilterRootScriptsWithDbModelType(scripts), nil
 }
-func QueryNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*NaslScript, error) {
+func QueryNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.NaslScript, error) {
 	if params == nil {
 		params = &ypb.QueryYakScriptRequest{}
 	}
@@ -107,10 +82,10 @@ func QueryNaslScriptByYakScriptRequest(db *gorm.DB, params *ypb.QueryYakScriptRe
 	}
 
 	p := params.Pagination
-	db = db.Model(&NaslScript{}).Order(orderOrdinary)
+	db = db.Model(&schema.NaslScript{}).Order(orderOrdinary)
 	db = FilterNaslScript(db, params)
 
-	var ret []*NaslScript
+	var ret []*schema.NaslScript
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -146,64 +121,17 @@ func FilterNaslScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	return db
 }
 
-func QueryNaslScriptByOID(db *gorm.DB, oid string) (*NaslScript, error) {
-	req := &NaslScript{}
-	if db := db.Model(&NaslScript{}).Where("o_id = ?", oid).First(req); db.Error != nil {
+func QueryNaslScriptByOID(db *gorm.DB, oid string) (*schema.NaslScript, error) {
+	req := &schema.NaslScript{}
+	if db := db.Model(&schema.NaslScript{}).Where("o_id = ?", oid).First(req); db.Error != nil {
 		return nil, utils.Errorf("get NaslScript failed: %s", db.Error)
 	}
 	return req, nil
 }
-func QueryNaslScriptByName(db *gorm.DB, name string) (*NaslScript, error) {
-	req := &NaslScript{}
-	if db := db.Model(&NaslScript{}).Where("script_name = ?", name).First(req); db.Error != nil {
+func QueryNaslScriptByName(db *gorm.DB, name string) (*schema.NaslScript, error) {
+	req := &schema.NaslScript{}
+	if db := db.Model(&schema.NaslScript{}).Where("script_name = ?", name).First(req); db.Error != nil {
 		return nil, utils.Errorf("get NaslScript failed: %s", db.Error)
 	}
 	return req, nil
-}
-
-func (p *NaslScript) CalcHash() string {
-	return utils.CalcSha1(p.Script)
-}
-func (p *NaslScript) CreateOrUpdateNaslScript(db *gorm.DB) error {
-	p.Hash = p.CalcHash()
-	if p.OID == "" {
-		return utils.Error("empty oid")
-	}
-	createNaslScript.Lock()
-	defer createNaslScript.Unlock()
-	db = db.Model(&NaslScript{})
-	if db := db.Where("hash = ?", p.Hash).Assign(p).FirstOrCreate(&NaslScript{}); db.Error != nil {
-		return utils.Errorf("create/update YakScript failed: %s", db.Error)
-	}
-	return nil
-}
-func (p *NaslScript) ToYakScript() *YakScript {
-	params := []*ypb.YakScriptParam{}
-	raw, err := json.Marshal(params)
-	if err != nil {
-		return nil
-	}
-	paramsStr := strconv.Quote(string(raw))
-	return &YakScript{
-		ScriptName:           utils.EscapeInvalidUTF8Byte([]byte(p.OriginFileName)),
-		Type:                 "nasl",
-		Content:              utils.EscapeInvalidUTF8Byte([]byte(p.Script)),
-		Level:                "info",
-		Params:               paramsStr,
-		Help:                 "",
-		Author:               "",
-		Tags:                 p.Tags,
-		Ignored:              false,
-		FromLocal:            false,
-		LocalPath:            "",
-		IsHistory:            false,
-		FromStore:            false,
-		IsGeneralModule:      false,
-		FromGit:              "",
-		IsBatchScript:        false,
-		IsExternal:           false,
-		EnablePluginSelector: false,
-		PluginSelectorTypes:  "",
-		sourceScript:         p,
-	}
 }

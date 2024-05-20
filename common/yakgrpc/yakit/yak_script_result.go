@@ -3,17 +3,11 @@ package yakit
 import (
 	"encoding/json"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type ExecResult struct {
-	gorm.Model
-
-	YakScriptName string `json:"yak_script_name" gorm:"index"`
-	Raw           string `json:"raw"`
-}
 
 type TagAndTypeValue struct {
 	Value        string
@@ -22,9 +16,9 @@ type TagAndTypeValue struct {
 	IsPocBuiltIn bool
 }
 
-func IsRiskExecResult(i any) (*Risk, bool) {
+func IsRiskExecResult(i any) (*schema.Risk, bool) {
 	switch ret := i.(type) {
-	case *ExecResult:
+	case *schema.ExecResult:
 		var r ypb.ExecResult
 		err := json.Unmarshal([]byte(ret.Raw), &r)
 		if err != nil {
@@ -35,23 +29,13 @@ func IsRiskExecResult(i any) (*Risk, bool) {
 		if !ret.IsMessage {
 			return nil, false
 		}
-		var risk *Risk
+		var risk *schema.Risk
 		err := json.Unmarshal([]byte(ret.Message), &risk)
 		if err != nil {
 			return nil, false
 		}
 	}
 	return nil, false
-}
-
-func (e *ExecResult) ToGRPCModel() *ypb.ExecResult {
-	var res ypb.ExecResult
-	err := json.Unmarshal([]byte(e.Raw), &res)
-	if err != nil {
-		return nil
-	}
-	res.Id = int64(e.ID)
-	return &res
 }
 
 func SaveExecResult(db *gorm.DB, yakScriptName string, r *ypb.ExecResult) error {
@@ -63,7 +47,7 @@ func SaveExecResult(db *gorm.DB, yakScriptName string, r *ypb.ExecResult) error 
 		return err
 	}
 
-	db.Save(&ExecResult{
+	db.Save(&schema.ExecResult{
 		YakScriptName: yakScriptName,
 		Raw:           string(raw),
 	})
@@ -71,18 +55,18 @@ func SaveExecResult(db *gorm.DB, yakScriptName string, r *ypb.ExecResult) error 
 }
 
 func CreateOrUpdateExecResult(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&ExecResult{})
+	db = db.Model(&schema.ExecResult{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&ExecResult{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.ExecResult{}); db.Error != nil {
 		return utils.Errorf("create/update ExecResult failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func GetExecResult(db *gorm.DB, id int64) (*ExecResult, error) {
-	var req ExecResult
-	if db := db.Model(&ExecResult{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetExecResult(db *gorm.DB, id int64) (*schema.ExecResult, error) {
+	var req schema.ExecResult
+	if db := db.Model(&schema.ExecResult{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get ExecResult failed: %s", db.Error)
 	}
 
@@ -90,29 +74,29 @@ func GetExecResult(db *gorm.DB, id int64) (*ExecResult, error) {
 }
 
 func DeleteExecResultByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&ExecResult{}).Where(
+	if db := db.Model(&schema.ExecResult{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&ExecResult{}); db.Error != nil {
+	).Unscoped().Delete(&schema.ExecResult{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
 func DeleteExecResultByYakScriptName(db *gorm.DB, name string) error {
-	if db := db.Model(&ExecResult{}).Where(
+	if db := db.Model(&schema.ExecResult{}).Where(
 		"yak_script_name = ?", name,
-	).Unscoped().Delete(&ExecResult{}); db.Error != nil {
+	).Unscoped().Delete(&schema.ExecResult{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func QueryExecResult(db *gorm.DB, params *ypb.QueryYakScriptExecResultRequest) (*bizhelper.Paginator, []*ExecResult, error) {
+func QueryExecResult(db *gorm.DB, params *ypb.QueryYakScriptExecResultRequest) (*bizhelper.Paginator, []*schema.ExecResult, error) {
 	if params == nil {
 		params = &ypb.QueryYakScriptExecResultRequest{}
 	}
 
-	db = db.Model(&YakScript{}) //.Debug()
+	db = db.Model(&schema.YakScript{}) //.Debug()
 
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
@@ -126,7 +110,7 @@ func QueryExecResult(db *gorm.DB, params *ypb.QueryYakScriptExecResultRequest) (
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = bizhelper.ExactQueryString(db, "yak_script_name", params.YakScriptName)
 
-	var ret []*ExecResult
+	var ret []*schema.ExecResult
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -136,9 +120,9 @@ func QueryExecResult(db *gorm.DB, params *ypb.QueryYakScriptExecResultRequest) (
 }
 
 func DeleteExecResult(db *gorm.DB) error {
-	if db = db.Model(&ExecResult{}).Where(
+	if db = db.Model(&schema.ExecResult{}).Where(
 		"true",
-	).Unscoped().Delete(&ExecResult{}); db.Error != nil {
+	).Unscoped().Delete(&schema.ExecResult{}); db.Error != nil {
 		return db.Error
 	}
 	return nil

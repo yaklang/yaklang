@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -308,7 +309,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	/*
 		Plugins
 	*/
-	var pocs []*yakit.YakScript
+	var pocs []*schema.YakScript
 	for _, i := range req.GetYamlPoCNames() {
 		poc, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), i)
 		if err != nil {
@@ -386,7 +387,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 								log.Errorf("yaml poc send failed")
 							}
 						}),
-						httptpl.WithOnRisk(rsp.Url, func(i *yakit.Risk) {
+						httptpl.WithOnRisk(rsp.Url, func(i *schema.Risk) {
 							log.Infof("found risk: %s", i.Title)
 						}),
 					)
@@ -648,7 +649,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		iInput = rawRequest
 	} else {
 		// 找到上次任务的包
-		failedResponses := make([]*yakit.WebFuzzerResponse, 0)
+		failedResponses := make([]*schema.WebFuzzerResponse, 0)
 		for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(req.RetryTaskID)) {
 			if !resp.OK {
 				failedResponses = append(failedResponses, resp)
@@ -675,7 +676,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 		}
 
-		iInput = lo.Map(failedResponses, func(i *yakit.WebFuzzerResponse, _ int) []byte {
+		iInput = lo.Map(failedResponses, func(i *schema.WebFuzzerResponse, _ int) []byte {
 			return utils.UnsafeStringToBytes(i.Request)
 		})
 	}
@@ -1320,7 +1321,7 @@ func (s *Server) QueryHistoryHTTPFuzzerTaskEx(ctx context.Context, req *ypb.Quer
 	if err != nil {
 		return nil, err
 	}
-	newTasks := funk.Map(tasks, func(i *yakit.WebFuzzerTask) *ypb.HistoryHTTPFuzzerTaskDetail {
+	newTasks := funk.Map(tasks, func(i *schema.WebFuzzerTask) *ypb.HistoryHTTPFuzzerTaskDetail {
 		return i.ToGRPCModelDetail()
 	}).([]*ypb.HistoryHTTPFuzzerTaskDetail)
 	return &ypb.HistoryHTTPFuzzerTasksResponse{

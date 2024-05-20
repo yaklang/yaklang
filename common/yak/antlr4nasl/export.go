@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 )
 
@@ -25,7 +25,7 @@ func QueryAllScripts(script ...any) []*NaslScriptInfo {
 		return nil
 	}
 
-	var scripts []*yakit.NaslScript
+	var scripts []*schema.NaslScript
 	if db := db.Where(queryCondition).Find(&scripts); db.Error != nil {
 		log.Errorf("cannot query script: %s", db.Error.Error())
 		return nil
@@ -41,7 +41,7 @@ func RemoveDatabase() error {
 	if db == nil {
 		return utils.Errorf("cannot fetch database: %s", db.Error)
 	}
-	if db := db.Model(&yakit.NaslScript{}).Unscoped().Delete(&yakit.NaslScript{}); db.Error != nil {
+	if db := db.Model(&schema.NaslScript{}).Unscoped().Delete(&schema.NaslScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -320,7 +321,7 @@ func HandleXrayResultChan(r io.Reader) chan *PocVul {
 	return ch
 }
 
-func PocVulToRisk(p *PocVul) *yakit.Risk {
+func PocVulToRisk(p *PocVul) *schema.Risk {
 	var title string
 	if p.CVE != "" {
 		title = fmt.Sprintf("[%v] %v", p.CVE, p.PocName)

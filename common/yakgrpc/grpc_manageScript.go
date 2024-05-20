@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -44,12 +45,12 @@ func (s *Server) LoadNucleiTemplates(ctx context.Context, req *ypb.Empty) (*ypb.
 		}
 
 		if len(descs) > 0 {
-			consts.GetGormProfileDatabase().Model(&yakit.YakScript{}).Where("(type = ?) AND (from_local = ?) AND (is_external = true)", "nuclei", true).Unscoped().Delete(&yakit.YakScript{})
+			consts.GetGormProfileDatabase().Model(&schema.YakScript{}).Where("(type = ?) AND (from_local = ?) AND (is_external = true)", "nuclei", true).Unscoped().Delete(&schema.YakScript{})
 		}
 
 		for _, r := range descs {
 			raw, _ := json.Marshal(buildinNucleiYakScriptParam)
-			y := &yakit.YakScript{
+			y := &schema.YakScript{
 				ScriptName: fmt.Sprintf("[%v]: %v", r.Id, r.Info.Name),
 				Type:       "nuclei",
 				Content:    r.Raw,
@@ -214,13 +215,13 @@ func (s *Server) QueryYakScript(ctx context.Context, req *ypb.QueryYakScriptRequ
 	return rsp, nil
 }
 
-func GRPCYakScriptToYakitScript(script *ypb.YakScript) *yakit.YakScript {
+func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 	raw, _ := json.Marshal(script.Params)
 	if script.IsGeneralModule && script.GeneralModuleKey == "" {
 		script.GeneralModuleKey = script.ScriptName
 		script.GeneralModuleVerbose = script.ScriptName
 	}
-	return &yakit.YakScript{
+	return &schema.YakScript{
 		ScriptName:           script.ScriptName,
 		Type:                 script.Type,
 		Content:              script.Content,
@@ -305,7 +306,7 @@ func (s *Server) DeleteYakScript(ctx context.Context, req *ypb.DeleteYakScriptRe
 	return &ypb.Empty{}, nil
 }
 
-func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *yakit.YakScript, batchMode bool) (*ypb.ExecRequest, []func(), error) {
+func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *schema.YakScript, batchMode bool) (*ypb.ExecRequest, []func(), error) {
 	var defers []func()
 	switch script.Type {
 	case "mitm", "port-scan":
@@ -371,7 +372,7 @@ func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *yakit.YakScript
 
 func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScriptServer) error {
 	var (
-		script *yakit.YakScript
+		script *schema.YakScript
 		err    error
 	)
 	if req.GetYakScriptId() > 0 {
@@ -535,7 +536,7 @@ func (s *Server) ExportYakScript(ctx context.Context, req *ypb.ExportYakScriptRe
 	return &ypb.ExportYakScriptResponse{OutputDir: dir}, nil
 }
 
-func (s *Server) ExportYakPluginBatch(script *yakit.YakScript, dir, OutputPluginDir string) (string, error) {
+func (s *Server) ExportYakPluginBatch(script *schema.YakScript, dir, OutputPluginDir string) (string, error) {
 	if dir == "" {
 		dir = filepath.Join(consts.GetDefaultYakitBaseDir(), "user-plugins", script.Type)
 		os.MkdirAll(dir, os.ModePerm)
@@ -678,7 +679,7 @@ func (s *Server) QueryYakScriptExecResult(ctx context.Context, req *ypb.QueryYak
 }
 
 func (s *Server) QueryYakScriptNameInExecResult(ctx context.Context, req *ypb.Empty) (*ypb.YakScriptNames, error) {
-	var res []*yakit.ExecResult
+	var res []*schema.ExecResult
 	s.GetProjectDatabase().Raw("select distinct yak_script_name from exec_results").Scan(&res)
 	var plugins []string
 	for _, r := range res {

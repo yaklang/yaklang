@@ -6,6 +6,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -224,7 +225,7 @@ func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybr
 		return nil, err
 	}
 	var data []*ypb.HybridScanTask
-	data = lo.Map(tasks, func(item *yakit.HybridScanTask, index int) *ypb.HybridScanTask {
+	data = lo.Map(tasks, func(item *schema.HybridScanTask, index int) *ypb.HybridScanTask {
 
 		var firstTarget = "未知目标"
 		var targets []*HybridScanTarget
@@ -258,14 +259,14 @@ func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybr
 func (s *Server) DeleteHybridScanTask(ctx context.Context, request *ypb.DeleteHybridScanTaskRequest) (*ypb.Empty, error) {
 	db := s.GetProjectDatabase().Unscoped()
 	if request.GetDeleteAll() {
-		if err := db.Where("true").Delete(&yakit.HybridScanTask{}).Error; err != nil {
+		if err := db.Where("true").Delete(&schema.HybridScanTask{}).Error; err != nil {
 			return nil, err
 		}
 		return &ypb.Empty{}, nil
 	}
 
 	db = yakit.FilterHybridScan(db, request.GetFilter())
-	if err := db.Delete(&yakit.HybridScanTask{}).Error; err != nil {
+	if err := db.Delete(&schema.HybridScanTask{}).Error; err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil

@@ -6,74 +6,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
-type Payload struct {
-	gorm.Model
-
-	// Must: payload group
-	Group string `json:"group" gorm:"index"`
-
-	// payload folder
-	Folder     *string `json:"folder" gorm:"column:folder;default:''"`          // default empty string
-	GroupIndex *int64  `json:"group_index" gorm:"column:group_index;default:0"` // default 0
-
-	// strconv Quoted
-	// Must: payload data
-	Content *string `json:"content"`
-
-	// hit count
-	HitCount *int64 `json:"hit_count" gorm:"column:hit_count;default:0"` // default 0
-
-	// the group save in file only contain one payload, and this `payload.IsFile = true` `payload.Content` is filepath
-	IsFile *bool `json:"is_file" gorm:"column:is_file;default:false"` // default false
-
-	// Hash string
-	Hash string `json:"hash" gorm:"unique_index"`
-}
-
-func (p *Payload) CalcHash() string {
-	content := ""
-	folder := ""
-	if p.Content != nil {
-		content = *p.Content
-	}
-	if p.Folder != nil {
-		folder = *p.Folder
-	}
-	return utils.CalcSha1(p.Group, content, folder)
-}
-
-func (p *Payload) BeforeUpdate() error {
-	p.Hash = p.CalcHash()
-	return nil
-}
-
-func (p *Payload) BeforeSave() error {
-	p.Hash = p.CalcHash()
-	return nil
-}
-
-func (p *Payload) BeforeCreate() error {
-	p.Hash = p.CalcHash()
-	return nil
-}
-
-type gormNoLog int
-
-func (i gormNoLog) Print(v ...interface{}) {
-}
-
 // / payload
-func NewPayload(group string, content string) *Payload {
+func NewPayload(group string, content string) *schema.Payload {
 	s := ""
 	var h int64 = 0
 	var f bool = false
-	p := &Payload{
+	p := &schema.Payload{
 		Group:    group,
 		Content:  &content,
 		Folder:   &s,
@@ -84,8 +30,8 @@ func NewPayload(group string, content string) *Payload {
 	return p
 }
 
-func QueryPayloadWithCallBack(db *gorm.DB, p *Payload, notExistCallback, existCallback func(*gorm.DB, *Payload) error) error {
-	db = db.Model(&Payload{})
+func QueryPayloadWithCallBack(db *gorm.DB, p *schema.Payload, notExistCallback, existCallback func(*gorm.DB, *schema.Payload) error) error {
+	db = db.Model(&schema.Payload{})
 	p.Hash = p.CalcHash()
 	var (
 		count int64
@@ -100,27 +46,27 @@ func QueryPayloadWithCallBack(db *gorm.DB, p *Payload, notExistCallback, existCa
 	return err
 }
 
-func createOrUpdatePayload(db *gorm.DB, p *Payload) error {
+func createOrUpdatePayload(db *gorm.DB, p *schema.Payload) error {
 	return QueryPayloadWithCallBack(
 		db,
 		p,
-		func(db *gorm.DB, i *Payload) error {
+		func(db *gorm.DB, i *schema.Payload) error {
 			i.Hash = i.CalcHash()
 			return db.Create(&i).Error
 		},
-		func(db *gorm.DB, i *Payload) error {
+		func(db *gorm.DB, i *schema.Payload) error {
 			return db.Where("`hash` = ?", i.Hash).Updates(map[string]any{"hit_count": i.HitCount, "group_index": i.GroupIndex}).Error
 		})
 }
 
-func updateOrDeletePayload(db *gorm.DB, p *Payload) error {
+func updateOrDeletePayload(db *gorm.DB, p *schema.Payload) error {
 	return QueryPayloadWithCallBack(
 		db,
 		p,
-		func(db *gorm.DB, p *Payload) error {
+		func(db *gorm.DB, p *schema.Payload) error {
 			return UpdatePayload(db, int(p.ID), p)
 		},
-		func(db *gorm.DB, p *Payload) error {
+		func(db *gorm.DB, p *schema.Payload) error {
 			return DeletePayloadByID(db, int64(p.ID))
 		})
 }
@@ -147,7 +93,7 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 
 func CheckExistGroup(db *gorm.DB, group string) (bool, error) {
 	var count int64
-	if db := db.Model(&Payload{}).Where("`group` = ?", group).Count(&count); db.Error != nil {
+	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).Count(&count); db.Error != nil {
 		return false, db.Error
 	}
 	return count > 0, nil
@@ -235,26 +181,26 @@ func ReadQuotedLinesWithCallBack(data string, handler func(string) error) error 
 	return nil
 }
 
-func GetPayloadById(db *gorm.DB, id int64) (*Payload, error) {
-	var req Payload
-	if db := db.Model(&Payload{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetPayloadById(db *gorm.DB, id int64) (*schema.Payload, error) {
+	var req schema.Payload
+	if db := db.Model(&schema.Payload{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get Payload failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetPayloadsByGroup(db *gorm.DB, group string) ([]*Payload, error) {
-	var reqs []*Payload
-	if db := db.Model(&Payload{}).Where("`group` = ?", group).Find(&reqs); db.Error != nil {
+func GetPayloadsByGroup(db *gorm.DB, group string) ([]*schema.Payload, error) {
+	var reqs []*schema.Payload
+	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).Find(&reqs); db.Error != nil {
 		return nil, utils.Errorf("get Payload failed: %s", db.Error)
 	}
 	return reqs, nil
 }
 
-func GetPayloadsByFolder(db *gorm.DB, folder string) ([]*Payload, error) {
-	var reqs []*Payload
-	if db := db.Model(&Payload{}).Where("`folder` = ?", folder).Find(&reqs); db.Error != nil {
+func GetPayloadsByFolder(db *gorm.DB, folder string) ([]*schema.Payload, error) {
+	var reqs []*schema.Payload
+	if db := db.Model(&schema.Payload{}).Where("`folder` = ?", folder).Find(&reqs); db.Error != nil {
 		return nil, utils.Errorf("get Payload by folder failed: %s", db.Error)
 	}
 	return reqs, nil
@@ -262,19 +208,19 @@ func GetPayloadsByFolder(db *gorm.DB, folder string) ([]*Payload, error) {
 
 func SetGroupInEnd(db *gorm.DB, group string) error {
 	var groups []string
-	if err := db.Model(&Payload{}).Select("`group`").Group("`group`").Pluck("`group`", &groups).Error; err != nil {
+	if err := db.Model(&schema.Payload{}).Select("`group`").Group("`group`").Pluck("`group`", &groups).Error; err != nil {
 		return err
 	}
 	// 更新group_index
-	if err := db.Model(&Payload{}).Where("`group` = ?", group).Update("group_index", len(groups)+1).Error; err != nil {
+	if err := db.Model(&schema.Payload{}).Where("`group` = ?", group).Update("group_index", len(groups)+1).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func GetPayloadFirst(db *gorm.DB, group string) (*Payload, error) {
-	var req Payload
-	if db := db.Model(&Payload{}).Where("`group` = ?", group).First(&req); db.Error != nil {
+func GetPayloadFirst(db *gorm.DB, group string) (*schema.Payload, error) {
+	var req schema.Payload
+	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).First(&req); db.Error != nil {
 		return nil, utils.Wrapf(db.Error, "get Payload by group %s failed", group)
 	} else {
 		return &req, nil
@@ -295,14 +241,14 @@ func GetPayloadGroupFileName(db *gorm.DB, group string) (string, error) {
 
 func GetPayloadCountInGroup(db *gorm.DB, group string) int64 {
 	var i int64
-	if db := db.Model(&Payload{}).Where("`group` = ?", group).Count(&i); db.Error != nil {
+	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).Count(&i); db.Error != nil {
 		return 0
 	}
 	return i
 }
 
 func DeletePayloadByID(db *gorm.DB, id int64) error {
-	if err := db.Unscoped().Delete(&Payload{}, id).Error; err != nil {
+	if err := db.Unscoped().Delete(&schema.Payload{}, id).Error; err != nil {
 		return err
 	} else {
 		return nil
@@ -310,7 +256,7 @@ func DeletePayloadByID(db *gorm.DB, id int64) error {
 }
 
 func DeletePayloadByIDs(db *gorm.DB, ids []int64) error {
-	if err := db.Unscoped().Delete(&Payload{}, ids).Error; err != nil {
+	if err := db.Unscoped().Delete(&schema.Payload{}, ids).Error; err != nil {
 		return err
 	} else {
 		return nil
@@ -318,9 +264,9 @@ func DeletePayloadByIDs(db *gorm.DB, ids []int64) error {
 }
 
 func DeletePayloadByGroup(db *gorm.DB, group string) error {
-	if db := db.Model(&Payload{}).Where(
+	if db := db.Model(&schema.Payload{}).Where(
 		"`group` = ?", group,
-	).Unscoped().Delete(&Payload{}); db.Error != nil {
+	).Unscoped().Delete(&schema.Payload{}); db.Error != nil {
 		return db.Error
 	} else {
 		return nil
@@ -328,9 +274,9 @@ func DeletePayloadByGroup(db *gorm.DB, group string) error {
 }
 
 func DeletePayloadByFolder(db *gorm.DB, folder string) error {
-	if db := db.Model(&Payload{}).Where(
+	if db := db.Model(&schema.Payload{}).Where(
 		"`folder` = ?", folder,
-	).Unscoped().Delete(&Payload{}); db.Error != nil {
+	).Unscoped().Delete(&schema.Payload{}); db.Error != nil {
 		return db.Error
 	} else {
 		return nil
@@ -338,14 +284,14 @@ func DeletePayloadByFolder(db *gorm.DB, folder string) error {
 }
 
 func RenamePayloadFolder(db *gorm.DB, folder, newFolder string) error {
-	return db.Model(&Payload{}).Where("`folder` = ?", folder).Update("folder", newFolder).Error
+	return db.Model(&schema.Payload{}).Where("`folder` = ?", folder).Update("folder", newFolder).Error
 }
 
 func RenamePayloadGroup(db *gorm.DB, oldGroup, newGroup string) error {
-	return db.Model(&Payload{}).Where("`group` = ?", oldGroup).Update("group", newGroup).Error
+	return db.Model(&schema.Payload{}).Where("`group` = ?", oldGroup).Update("group", newGroup).Error
 }
 
-func CopyPayloads(db *gorm.DB, payloads []*Payload, group, folder string) error {
+func CopyPayloads(db *gorm.DB, payloads []*schema.Payload, group, folder string) error {
 	for _, payload := range payloads {
 		payload.ID = 0
 		payload.Group = group
@@ -357,7 +303,7 @@ func CopyPayloads(db *gorm.DB, payloads []*Payload, group, folder string) error 
 	return nil
 }
 
-func MovePayloads(db *gorm.DB, payloads []*Payload, group, folder string) error {
+func MovePayloads(db *gorm.DB, payloads []*schema.Payload, group, folder string) error {
 	for _, payload := range payloads {
 		payload.Group = group
 		payload.Folder = &folder
@@ -369,14 +315,14 @@ func MovePayloads(db *gorm.DB, payloads []*Payload, group, folder string) error 
 }
 
 func SetIndexToFolder(db *gorm.DB, folder, group string, group_index int64) error {
-	db = db.Model(&Payload{})
+	db = db.Model(&schema.Payload{})
 	// 查找或创建一个新的记录
-	payload := Payload{
+	payload := schema.Payload{
 		Folder:     &folder,
 		Group:      group,
 		GroupIndex: &group_index,
 	}
-	db = db.FirstOrCreate(&payload, Payload{Folder: &folder, Group: group})
+	db = db.FirstOrCreate(&payload, schema.Payload{Folder: &folder, Group: group})
 
 	// 如果创建失败，返回错误
 	if db.Error != nil {
@@ -384,7 +330,7 @@ func SetIndexToFolder(db *gorm.DB, folder, group string, group_index int64) erro
 	}
 
 	// 更新group_index
-	if err := db.Model(&Payload{}).Where("`folder` = ?", folder).Where("`group` = ?", group).Update("group_index", group_index).Error; err != nil {
+	if err := db.Model(&schema.Payload{}).Where("`folder` = ?", folder).Where("`group` = ?", group).Update("group_index", group_index).Error; err != nil {
 		return err
 	}
 	return nil
@@ -392,7 +338,7 @@ func SetIndexToFolder(db *gorm.DB, folder, group string, group_index int64) erro
 
 func UpdatePayloadGroup(db *gorm.DB, group, folder string, group_index int64) error {
 	return db.
-		Model(&Payload{}).
+		Model(&schema.Payload{}).
 		Where("`group` = ?", group).
 		Updates(map[string]any{
 			"folder":      folder,
@@ -400,8 +346,8 @@ func UpdatePayloadGroup(db *gorm.DB, group, folder string, group_index int64) er
 		}).Error
 }
 
-func UpdatePayload(db *gorm.DB, id int, payload *Payload) error {
-	db = db.Model(&Payload{}).Where("`id` = ?", id).Updates(map[string]any{"group": payload.Group, "folder": payload.Folder, "group_index": payload.GroupIndex, "content": payload.Content, "hit_count": payload.HitCount, "is_file": payload.IsFile, "hash": payload.Hash})
+func UpdatePayload(db *gorm.DB, id int, payload *schema.Payload) error {
+	db = db.Model(&schema.Payload{}).Where("`id` = ?", id).Updates(map[string]any{"group": payload.Group, "folder": payload.Folder, "group_index": payload.GroupIndex, "content": payload.Content, "hit_count": payload.HitCount, "is_file": payload.IsFile, "hash": payload.Hash})
 	if err := db.Error; err != nil {
 		return utils.Wrap(err, "update payload error")
 	}
@@ -409,7 +355,7 @@ func UpdatePayload(db *gorm.DB, id int, payload *Payload) error {
 }
 
 func UpdatePayloadColumns(db *gorm.DB, id int, m map[string]any) error {
-	if err := db.Model(&Payload{}).Where("`id` = ?", id).Updates(m).Error; err != nil {
+	if err := db.Model(&schema.Payload{}).Where("`id` = ?", id).Updates(m).Error; err != nil {
 		return utils.Wrap(err, "update payload error")
 	}
 	return nil
@@ -419,7 +365,7 @@ func PayloadGroups(db *gorm.DB, search ...string) []string {
 	if len(search) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "`group`", search)
 	}
-	rows, err := db.Model(&Payload{}).Select("distinct `group`").Rows()
+	rows, err := db.Model(&schema.Payload{}).Select("distinct `group`").Rows()
 	if err != nil {
 		log.Errorf("query distinct payload group failed: %s", err)
 		return []string{}
@@ -453,8 +399,8 @@ func NewPaging() *Paging {
 	}
 }
 
-func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*Payload, error) {
-	db = db.Model(&Payload{})
+func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*schema.Payload, error) {
+	db = db.Model(&schema.Payload{})
 	if group != "" {
 		db = db.Where("`group` = ?", group)
 	}
@@ -465,7 +411,7 @@ func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*P
 		db = db.Where("`content` = ?", keyword)
 	}
 
-	var ret []*Payload
+	var ret []*schema.Payload
 	db = db.Find(&ret)
 	if db.Error != nil {
 		return nil, utils.Errorf("query payload failed: %s", db.Error)
@@ -473,14 +419,14 @@ func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*P
 	return ret, nil
 }
 
-func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*bizhelper.Paginator, []*Payload, error) {
-	db = db.Model(&Payload{})
+func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*bizhelper.Paginator, []*schema.Payload, error) {
+	db = db.Model(&schema.Payload{})
 	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)
 	db = bizhelper.ExactQueryString(db, "`folder`", folder)
 	db = bizhelper.ExactQueryString(db, "`group`", group)
 	// db = bizhelper.QueryByBool(db, "`is_file`", false)
 	db = bizhelper.FuzzQueryLike(db, "content", keyword)
-	var ret []*Payload
+	var ret []*schema.Payload
 	pag, db := bizhelper.Paging(db, paging.Page, paging.Limit, &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -488,14 +434,14 @@ func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*
 	return pag, ret, nil
 }
 
-func YieldPayloads(db *gorm.DB, ctx context.Context) chan *Payload {
-	outC := make(chan *Payload)
+func YieldPayloads(db *gorm.DB, ctx context.Context) chan *schema.Payload {
+	outC := make(chan *schema.Payload)
 	go func() {
 		defer close(outC)
 
 		page := 1
 		for {
-			var items []*Payload
+			var items []*schema.Payload
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,

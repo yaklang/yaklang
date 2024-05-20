@@ -1,7 +1,6 @@
 package yakit
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -9,37 +8,21 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-	"unicode/utf8"
 
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/domainextractor"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-var (
-	globalHTTPFlowCache = utils.NewTTLCache[*ypb.HTTPFlow](10 * time.Minute)
-	cacheMu             = new(sync.RWMutex)
-)
-
-const COLORPREFIX = "YAKIT_COLOR_"
-
-func yakitColor(i string) string {
-	return COLORPREFIX + i
-}
 
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
@@ -80,52 +63,6 @@ func init() {
 		})
 		return nil
 	})
-}
-
-type HTTPFlow struct {
-	gorm.Model
-
-	HiddenIndex        string
-	NoFixContentLength bool   `json:"no_fix_content_length"`
-	Hash               string `gorm:"unique_index"`
-	IsHTTPS            bool
-	Url                string `gorm:"index"`
-	Path               string
-	Method             string
-	BodyLength         int64
-	ContentType        string
-	StatusCode         int64
-	SourceType         string
-	Request            string
-	Response           string
-	GetParamsTotal     int
-	PostParamsTotal    int
-	CookieParamsTotal  int
-	IPAddress          string
-	RemoteAddr         string
-	IPInteger          int
-	Tags               string // 用来打标！
-	Payload            string
-
-	// Websocket 相关字段
-	IsWebsocket bool
-	// 用来计算 websocket hash, 每次连接都不一样，一般来说，内部对象 req 指针足够了
-	WebsocketHash string
-
-	RuntimeId  string
-	FromPlugin string
-
-	// friendly for gorm build instance, not for store
-	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖
-	// 主要用来标记用户的 Request 和 Response 是否超大
-	IsRequestOversize  bool `gorm:"-"`
-	IsResponseOversize bool `gorm:"-"`
-
-	IsTooLargeResponse         bool
-	TooLargeResponseHeaderFile string
-	TooLargeResponseBodyFile   string
-	// 同步到企业端
-	UploadOnline bool `json:"upload_online"`
 }
 
 type TagAndStatusCode struct {
@@ -197,430 +134,15 @@ func CreateHTTPFlowWithRequestIns(reqIns *http.Request) CreateHTTPFlowOptions {
 	}
 }
 
-func (f *HTTPFlow) FixHTTPRequest(req *http.Request) {
-	if req == nil {
-		return
-	}
-	if httpctx.GetResponseTooLarge(req) {
-		f.IsTooLargeResponse = true
-		f.TooLargeResponseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(req)
-		f.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(req)
-		f.BodyLength = httpctx.GetResponseTooLargeSize(req)
-	}
-}
-
-// 颜色与 Tag API
-func (f *HTTPFlow) AddTag(appendTags ...string) {
-	existed := utils.PrettifyListFromStringSplited(f.Tags, "|")
-	existedCount := len(existed)
-	extLen := len(appendTags)
-	tags := make([]string, existedCount+extLen)
-	copy(tags, existed)
-	for i := 0; i < extLen; i++ {
-		tags[i+existedCount] = appendTags[i]
-	}
-	f.Tags = strings.Join(utils.RemoveRepeatStringSlice(tags), "|")
-}
-
-func (f *HTTPFlow) AddTagToFirst(appendTags ...string) {
-	existed := utils.PrettifyListFromStringSplited(f.Tags, "|")
-	f.Tags = strings.Join(utils.RemoveRepeatStringSlice(append(appendTags, existed...)), "|")
-}
-
-func (f *HTTPFlow) RemoveColor() {
-	f.Tags = strings.Join(lo.Filter(utils.PrettifyListFromStringSplited(f.Tags, "|"), func(i string, _ int) bool {
-		return !strings.HasPrefix(i, COLORPREFIX)
-	}), "|")
-}
-
-func (f *HTTPFlow) Red() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("RED"))
-}
-
-func (f *HTTPFlow) Green() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("GREEN"))
-}
-
-func (f *HTTPFlow) Blue() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("BLUE"))
-}
-
-func (f *HTTPFlow) Yellow() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("YELLOW"))
-}
-
-func (f *HTTPFlow) Orange() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("ORANGE"))
-}
-
-func (f *HTTPFlow) Purple() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("PURPLE"))
-}
-
-func (f *HTTPFlow) Cyan() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("CYAN"))
-}
-
-func (f *HTTPFlow) Grey() {
-	f.RemoveColor()
-	f.AddTag(yakitColor("GREY"))
-}
-
-func (f *HTTPFlow) ColorSharp(rgbHex string) {
-	f.RemoveColor()
-	f.AddTag(yakitColor(rgbHex))
-}
-
-func FuzzerResponseToHTTPFlow(db *gorm.DB, rsp *ypb.FuzzerResponse) (*HTTPFlow, error) {
+func FuzzerResponseToHTTPFlow(db *gorm.DB, rsp *ypb.FuzzerResponse) (*schema.HTTPFlow, error) {
 	return SaveFromHTTPFromRaw(db, rsp.IsHTTPS, rsp.RequestRaw, rsp.GetResponseRaw(), "fuzzer", rsp.GetUrl(), rsp.Host)
 }
 
-func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool) *ypb.FuzzableParam {
-	p := &ypb.FuzzableParam{
-		Position:  r.PositionVerbose(),
-		ParamName: r.Name(),
-		IsHTTPS:   isHttps,
-	}
-
-	switch ret := r.Value().(type) {
-	case []string:
-		if len(ret) == 1 {
-			p.OriginValue = []byte(ret[0])
-		} else {
-			p.OriginValue = utils.InterfaceToBytes(r.Value())
-		}
-	default:
-		p.OriginValue = utils.InterfaceToBytes(r.Value())
-	}
-
-	flag := utils.RandNumberStringBytes(6)
-	res, err := r.FriendlyDisplay().Fuzz(flag).Results()
-	if err != nil {
-		return p
-	}
-
-	var raw []byte
-	for _, r := range res {
-		raw, err = utils.HttpDumpWithBody(r, true)
-		if err != nil {
-			continue
-		}
-	}
-	if raw != nil {
-		if bytes.Contains(raw, []byte(flag)) {
-			p.AutoTemplate = bytes.ReplaceAll(raw, []byte(flag), []byte("{{randstr(10,10,1)}}"))
-		} else if bytes.Contains(raw, []byte(codec.EncodeBase64(flag))) {
-			p.AutoTemplate = bytes.ReplaceAll(raw, []byte(codec.EncodeBase64(flag)), []byte("{{base64({{randstr(10,10,1)}})}}"))
-		}
-	}
-	return p
-}
-
-func (f *HTTPFlow) ToGRPCModel(full bool) (*ypb.HTTPFlow, error) {
-	return f.toGRPCModel(full)
-}
-
-func (f *HTTPFlow) ToGRPCModelFull() (*ypb.HTTPFlow, error) {
-	return f.toGRPCModel(true)
-}
-
-func utf8safe(i string) string {
-	return utils.EscapeInvalidUTF8Byte([]byte(i))
-}
-
-func (f *HTTPFlow) getCacheGRPCModel(full bool) *ypb.HTTPFlow {
-	if f == nil {
-		return nil
-	}
-	cacheMu.RLock()
-	defer cacheMu.RUnlock()
-	if v, ok := globalHTTPFlowCache.Get(f.CalcCacheHash(full)); ok {
-		return v
-	}
-	return nil
-}
-
-func (f *HTTPFlow) SetCacheGRPCModel(full bool, m *ypb.HTTPFlow) {
-	if f == nil {
-		return
-	}
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-	globalHTTPFlowCache.Set(f.CalcCacheHash(full), m)
-}
-
-func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
-	if flow := f.getCacheGRPCModel(full); flow != nil {
-		return flow, nil
-	}
-	flow := &ypb.HTTPFlow{
-		Id:                         uint64(f.ID),
-		IsHTTPS:                    f.IsHTTPS,
-		Url:                        utf8safe(f.Url),
-		SourceType:                 f.SourceType,
-		Path:                       utf8safe(f.Path),
-		Method:                     utf8safe(f.Method),
-		BodyLength:                 f.BodyLength,
-		ContentType:                utf8safe(f.ContentType),
-		StatusCode:                 f.StatusCode,
-		GetParamsTotal:             int64(f.GetParamsTotal),
-		PostParamsTotal:            int64(f.PostParamsTotal),
-		UpdatedAt:                  f.UpdatedAt.Unix(),
-		CreatedAt:                  f.CreatedAt.Unix(),
-		HostPort:                   utf8safe(f.RemoteAddr),
-		IPAddress:                  utf8safe(f.IPAddress),
-		HtmlTitle:                  "",
-		Tags:                       f.Tags,
-		NoFixContentLength:         f.NoFixContentLength,
-		IsWebsocket:                f.IsWebsocket,
-		WebsocketHash:              f.WebsocketHash,
-		IsTooLargeResponse:         f.IsTooLargeResponse,
-		TooLargeResponseBodyFile:   f.TooLargeResponseBodyFile,
-		TooLargeResponseHeaderFile: f.TooLargeResponseHeaderFile,
-		Payloads:                   strings.Split(f.Payload, ","),
-	}
-	// 设置 title
-	var (
-		unquotedResponse string
-		unquotedRequest  string
-		err              error
-	)
-	if f.Response != "" {
-		unquotedResponse, err = strconv.Unquote(f.Response)
-		if err != nil {
-			log.Errorf("unquoted response failed: %s", err)
-			fmt.Println(f.Response)
-			unquotedResponse = f.Response
-		}
-	}
-	flow.HtmlTitle = utf8safe(strings.TrimSpace(utils.ExtractTitleFromHTMLTitle(unquotedResponse, "")))
-
-	if f.UpdatedAt.IsZero() {
-		flow.UpdatedAt = time.Now().Unix()
-		flow.CreatedAt = time.Now().Unix()
-	}
-	if f.Hash == "" {
-		flow.Hash = f.CalcHash()
-	} else {
-		flow.Hash = f.Hash
-	}
-	host, port, _ := utils.ParseStringToHostPort(flow.Url)
-	flow.HostPort = utils.HostPort(host, port)
-
-	flow.BodySizeVerbose = utils.ByteSize(uint64(flow.BodyLength))
-
-	if f.Request != "" {
-		unquotedRequest, err = strconv.Unquote(f.Request)
-		if err != nil {
-			unquotedRequest = f.Request
-			log.Errorf("unquoted request failed: %s", err)
-			fmt.Println(f.Request)
-		}
-	}
-
-	flow.RequestLength = int64(len(unquotedRequest))
-	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedRequest)))
-
-	requireRequest := full || !f.IsRequestOversize
-	requireResponse := full || !f.IsResponseOversize
-	isStandardRequest := !flow.NoFixContentLength
-
-	haveRequest := funk.NotEmpty(unquotedRequest)
-	var requestBody []byte
-	if requireRequest {
-		// return request:
-		// 1. request is not required (!full)
-		// 2. not a large request
-		// 3. request is not oversize
-		flow.Request = []byte(unquotedRequest)
-		if isStandardRequest && haveRequest {
-			// unfix request:
-			var requestURI string
-			_, requestBody = lowhttp.SplitHTTPPacket(flow.Request, func(method string, requestUri string, proto string) error {
-				requestURI = requestUri
-				return nil
-			}, nil, func(line string) string {
-				k, v := lowhttp.SplitHTTPHeader(line)
-				flow.RequestHeader = append(flow.RequestHeader, &ypb.HTTPHeader{
-					Header: utf8safe(utils.ParseStringToVisible(k)),
-					Value:  utf8safe(utils.ParseStringToVisible(v)),
-				})
-				return line
-			})
-			if flow.Path == "" {
-				flow.Path = utf8safe(requestURI)
-			}
-
-			fReq, _ := mutate.NewFuzzHTTPRequest(flow.Request, mutate.OptHTTPS(flow.IsHTTPS))
-			const maxParams = 150
-			var index int
-			if fReq != nil {
-				for _, r := range fReq.GetCommonParams() {
-					if index >= maxParams {
-						break
-					}
-					fParam := &ypb.FuzzableParam{
-						Position:  r.PositionVerbose(),
-						ParamName: utf8safe(utils.ParseStringToVisible(r.Name())),
-						IsHTTPS:   flow.IsHTTPS,
-					}
-
-					if full {
-						// 详情模式，这个很耗时。
-						fParam = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
-					}
-					fParam.ParamName = utils.EscapeInvalidUTF8Byte([]byte(fParam.ParamName))
-					if r.IsGetParams() {
-						flow.GetParams = append(flow.GetParams, fParam)
-					}
-					if r.IsPostParams() {
-						flow.PostParams = append(flow.PostParams, fParam)
-					}
-					if r.IsCookieParams() {
-						flow.CookieParams = append(flow.CookieParams, fParam)
-					}
-					index++
-				}
-
-				flow.GetParamsTotal = int64(len(flow.GetParams))
-				flow.PostParamsTotal = int64(len(flow.PostParams))
-				flow.CookieParamsTotal = int64(len(flow.CookieParams))
-			}
-		}
-	}
-
-	haveResponse := funk.NotEmpty(unquotedResponse)
-	var responseBody []byte
-	if requireResponse {
-		flow.Response = []byte(unquotedResponse)
-		flow.DisableRenderStyles = len(flow.Response) > 2*1000*1000
-		if isStandardRequest && haveResponse {
-			_, responseBody = lowhttp.SplitHTTPPacket(flow.Response, nil, nil, func(line string) string {
-				k, v := lowhttp.SplitHTTPHeader(line)
-				flow.ResponseHeader = append(flow.ResponseHeader, &ypb.HTTPHeader{
-					Header: utf8safe(utils.ParseStringToVisible(k)),
-					Value:  utf8safe(utils.ParseStringToVisible(v)),
-				})
-				return line
-			})
-		}
-	}
-
-	// 这里用来标记一下，UTF8 支持情况，要根据情况提供给用户合理 body 建议处理方案
-	if requireRequest {
-		flow.InvalidForUTF8Request = !utf8.ValidString(unquotedRequest)
-		if flow.InvalidForUTF8Request {
-			flow.RawRequestBodyBase64 = codec.EncodeBase64(requestBody)
-			// 这里需要修复请求，这是为了解决Content-Type与body中boundary不一致的问题
-			fixReq := lowhttp.FixHTTPRequest(flow.Request)
-			flow.SafeHTTPRequest = codec.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(fixReq))
-		}
-	}
-
-	if requireResponse {
-		flow.InvalidForUTF8Response = !utf8.ValidString(unquotedResponse)
-		if flow.InvalidForUTF8Response {
-			flow.RawResponseBodyBase64 = codec.EncodeBase64(responseBody)
-		}
-	}
-
-	// 提取数据 - 完整详细的数据的时候，才应该提取
-	if full {
-		domains, rootDomains := domainextractor.ExtractDomainsEx(string(flow.Response))
-		var jsonObjects []string
-		if !utils.MatchAnyOfSubString(strings.ToLower(f.ContentType), "json") {
-			if len(flow.Response) > 200*1000 {
-				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response[:200*1000]))
-			} else {
-				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response))
-			}
-		}
-		flow.Domains = make([]string, len(domains))
-		for i, d := range domains {
-			flow.Domains[i] = utils.EscapeInvalidUTF8Byte([]byte(d))
-		}
-		flow.RootDomains = make([]string, len(rootDomains))
-		for i, d := range rootDomains {
-			flow.RootDomains[i] = utils.EscapeInvalidUTF8Byte([]byte(d))
-		}
-		for _, j := range jsonObjects {
-			if j == "" || j == "&&" || j == "{}" {
-				continue
-			}
-
-			if !utf8.ValidString(j) {
-				continue
-			}
-			if strings.HasPrefix(j, `{"":`) {
-				continue
-			}
-			flow.JsonObjects = append(flow.JsonObjects, utf8safe(j))
-		}
-	}
-	f.SetCacheGRPCModel(full, flow)
-	return flow, nil
-}
-
-func (f *HTTPFlow) CalcHash() string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
-}
-
-func (f *HTTPFlow) CalcCacheHash(full bool) string {
-	return utils.CalcSha1(f.ID, f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
-}
-
-func (f *HTTPFlow) BeforeSave() error {
-	f.fixURL()
-	f.Hash = f.CalcHash()
-	return nil
-}
-
-func (f *HTTPFlow) fixURL() {
-	urlIns := utils.ParseStringToUrl(f.Url)
-	if f.IsHTTPS {
-		urlIns.Scheme = "https"
-	}
-	if urlIns != nil {
-		host, port, _ := utils.ParseStringToHostPort(urlIns.Host)
-		if (port == 443 && urlIns.Scheme == "https") || (port == 80 && urlIns.Scheme == "http") {
-			urlIns.Host = host
-			f.Url = urlIns.String()
-		}
-	}
-}
-
-func (f *HTTPFlow) AfterCreate(tx *gorm.DB) (err error) {
-	BroadcastData("httpflow", "create")
-	return nil
-}
-
-func (f *HTTPFlow) AfterSave(tx *gorm.DB) (err error) {
-	BroadcastData("httpflow", "save")
-	return nil
-}
-
-func (f *HTTPFlow) AfterUpdate(tx *gorm.DB) (err error) {
-	BroadcastData("httpflow", "update")
-	return nil
-}
-
-func (f *HTTPFlow) AfterDelete(tx *gorm.DB) (err error) {
-	BroadcastData("httpflow", "delete")
-	return nil
-}
-
-func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
+func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*schema.HTTPFlow, error) {
 	return SaveFromHTTPWithBodySaved(db, isHttps, req, rsp, source, url, remoteAddr)
 }
 
-func SaveFromHTTPFromRaw(db *gorm.DB, isHttps bool, req []byte, rsp []byte, source string, url string, remoteAddr string) (*HTTPFlow, error) {
+func SaveFromHTTPFromRaw(db *gorm.DB, isHttps bool, req []byte, rsp []byte, source string, url string, remoteAddr string) (*schema.HTTPFlow, error) {
 	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, req, rsp, source, url, remoteAddr)
 	if err != nil {
 		return nil, utils.Errorf("create httpflow failed: %s", err)
@@ -632,7 +154,7 @@ func SaveFromHTTPFromRaw(db *gorm.DB, isHttps bool, req []byte, rsp []byte, sour
 	return flow, nil
 }
 
-func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
+func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*schema.HTTPFlow, error) {
 	flow, err := CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, source, url, remoteAddr)
 	if err != nil {
 		return nil, utils.Errorf("create httpflow failed: %s", err)
@@ -646,7 +168,7 @@ func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp
 
 const maxBodyLength = 4 * 1024 * 1024
 
-func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	c := &CreateHTTPFlowConfig{}
 	for _, opt := range opts {
 		opt(c)
@@ -714,7 +236,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
 	}
 
-	flow := &HTTPFlow{
+	flow := &schema.HTTPFlow{
 		IsHTTPS:     isHttps,
 		Url:         url,
 		Path:        requestUri,
@@ -756,7 +278,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 	return flow, nil
 }
 
-func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rspRaw []byte, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rspRaw []byte, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	extOpts := []CreateHTTPFlowOptions{
 		CreateHTTPFlowWithHTTPS(isHttps), CreateHTTPFlowWithRequestRaw(reqRaw), CreateHTTPFlowWithResponseRaw(rspRaw), CreateHTTPFlowWithSource(source), CreateHTTPFlowWithURL(url), CreateHTTPFlowWithRemoteAddr(remoteAddr),
 	}
@@ -768,7 +290,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 	return flow, nil
 }
 
-func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
@@ -833,19 +355,19 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, plainRequest, plainResponse, source, urlRaw, remoteAddr, opts...)
 }
 
-func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	return createHTTPFlowFromHTTP(isHttps, req, nil, source, url, remoteAddr, opts...)
 }
 
-func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	return createHTTPFlowFromHTTP(isHttps, req, rsp, source, url, remoteAddr, opts...)
 }
 
-func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {
+func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) error {
 	if i == nil {
 		return nil
 	}
-	db = db.Model(&HTTPFlow{})
+	db = db.Model(&schema.HTTPFlow{})
 
 	if i.ID > 0 {
 		if db = db.Where("id = ?", i.ID).Update("tags", i.Tags); db.Error != nil {
@@ -866,7 +388,7 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {
 	return nil
 }
 
-func InsertHTTPFlow(db *gorm.DB, i *HTTPFlow) (fErr error) {
+func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
@@ -875,21 +397,21 @@ func InsertHTTPFlow(db *gorm.DB, i *HTTPFlow) (fErr error) {
 	}()
 
 	i.ID = 0
-	if db = db.Model(&HTTPFlow{}).Save(i); db.Error != nil {
+	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
 
 	return nil
 }
 
-func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *HTTPFlow) (fErr error) {
+func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
 		}
 	}()
 
-	db = db.Model(&HTTPFlow{})
+	db = db.Model(&schema.HTTPFlow{})
 
 	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(i); db.Error != nil {
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
@@ -897,27 +419,27 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *HTTPFlow) (fErr error) 
 	return nil
 }
 
-func GetHTTPFlow(db *gorm.DB, id int64) (*HTTPFlow, error) {
-	var req HTTPFlow
-	if db := db.Model(&HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
+func GetHTTPFlow(db *gorm.DB, id int64) (*schema.HTTPFlow, error) {
+	var req schema.HTTPFlow
+	if db := db.Model(&schema.HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*HTTPFlow, error) {
-	var req HTTPFlow
-	if db := db.Model(&HTTPFlow{}).Where("id = ? OR hash = ?", id, hash).First(&req); db.Error != nil {
+func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.HTTPFlow, error) {
+	var req schema.HTTPFlow
+	if db := db.Model(&schema.HTTPFlow{}).Where("id = ? OR hash = ?", id, hash).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
 	}
 
 	return &req, nil
 }
 
-func GetHTTPFlowByHash(db *gorm.DB, hash string) (*HTTPFlow, error) {
-	var req HTTPFlow
-	if db := db.Model(&HTTPFlow{}).Where("hash = ?", hash).First(&req); db.Error != nil {
+func GetHTTPFlowByHash(db *gorm.DB, hash string) (*schema.HTTPFlow, error) {
+	var req schema.HTTPFlow
+	if db := db.Model(&schema.HTTPFlow{}).Where("hash = ?", hash).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
 	}
 
@@ -925,9 +447,9 @@ func GetHTTPFlowByHash(db *gorm.DB, hash string) (*HTTPFlow, error) {
 }
 
 func DeleteHTTPFlowByID(db *gorm.DB, id int64) error {
-	if db := db.Model(&HTTPFlow{}).Where(
+	if db := db.Model(&schema.HTTPFlow{}).Where(
 		"id = ?", id,
-	).Unscoped().Delete(&HTTPFlow{}); db.Error != nil {
+	).Unscoped().Delete(&schema.HTTPFlow{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -935,11 +457,11 @@ func DeleteHTTPFlowByID(db *gorm.DB, id int64) error {
 
 func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 	if req.GetDeleteAll() {
-		db.DropTableIfExists(&HTTPFlow{})
+		db.DropTableIfExists(&schema.HTTPFlow{})
 		if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='http_flows';`); db.Error != nil {
 			log.Errorf("update sqlite sequence failed: %s", db.Error)
 		}
-		db.AutoMigrate(&HTTPFlow{})
+		db.AutoMigrate(&schema.HTTPFlow{})
 		DeleteProjectKeyBareRequestAndResponse(db)
 		return nil
 	}
@@ -950,19 +472,19 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 		// for _, id := range req.GetId() {
 		// 	db = db.Or("id = ?", id)
 		// }
-		db.Unscoped().Delete(&HTTPFlow{})
+		db.Unscoped().Delete(&schema.HTTPFlow{})
 		return nil
 	}
 
 	if req.GetFilter() != nil {
 		db = FilterHTTPFlow(db, req.GetFilter())
-		db.Unscoped().Delete(&HTTPFlow{})
+		db.Unscoped().Delete(&schema.HTTPFlow{})
 		return nil
 	}
 
 	if req.GetURLPrefix() != "" {
-		db = db.Model(&HTTPFlow{})
-		db = bizhelper.FuzzQueryLike(db, "url", req.GetURLPrefix()).Unscoped().Delete(&HTTPFlow{})
+		db = db.Model(&schema.HTTPFlow{})
+		db = bizhelper.FuzzQueryLike(db, "url", req.GetURLPrefix()).Unscoped().Delete(&schema.HTTPFlow{})
 		if db.Error != nil {
 			return nil
 		}
@@ -970,18 +492,18 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 	}
 
 	if req.GetItemHash() != nil {
-		db = db.Model(&HTTPFlow{})
+		db = db.Model(&schema.HTTPFlow{})
 		db = bizhelper.ExactQueryStringArrayOr(db, "hash", req.GetItemHash())
-		if db := db.Where("true").Unscoped().Delete(&HTTPFlow{}); db.Error != nil {
+		if db := db.Where("true").Unscoped().Delete(&schema.HTTPFlow{}); db.Error != nil {
 			return db.Error
 		}
 		return nil
 	}
 
 	if len(req.GetURLPrefixBatch()) > 0 {
-		db = db.Model(&HTTPFlow{})
+		db = db.Model(&schema.HTTPFlow{})
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "url", req.GetURLPrefixBatch())
-		db = db.Unscoped().Delete(&HTTPFlow{})
+		db = db.Unscoped().Delete(&schema.HTTPFlow{})
 		if db.Error != nil {
 			return db.Error
 		}
@@ -991,7 +513,7 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 }
 
 func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
-	db = db.Model(&HTTPFlow{}) //.Debug()
+	db = db.Model(&schema.HTTPFlow{}) //.Debug()
 	if params == nil {
 		params = &ypb.QueryHTTPFlowRequest{}
 	}
@@ -1108,7 +630,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 func QuickSearchHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
 	var count int
-	db.Model(&HTTPFlow{}).Where(
+	db.Model(&schema.HTTPFlow{}).Where(
 		"(request like ?) OR (response like ?) OR (url like ?)",
 		"%"+token+"%",
 		"%"+token+"%",
@@ -1120,7 +642,7 @@ func QuickSearchHTTPFlowCount(token string) int {
 func QuickSearchMITMHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
 	var count int
-	db.Model(&HTTPFlow{}).Where(
+	db.Model(&schema.HTTPFlow{}).Where(
 		"(request like ?) OR (response like ?) OR (url like ?)",
 		"%"+token+"%",
 		"%"+token+"%",
@@ -1218,20 +740,20 @@ too_large_response_header_file, too_large_response_body_file
 	return db
 }
 
-func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlow, err error) {
+func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*schema.HTTPFlow, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	queryDB := BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params)
+	queryDB := BuildHTTPFlowQuery(db.Model(&schema.HTTPFlow{}), params)
 
 	return SelectHTTPFlowFromDB(queryDB, params)
 }
 
-func SelectHTTPFlowFromDB(queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlow, err error) {
-	var limitFlows, fullFlows []*HTTPFlow
+func SelectHTTPFlowFromDB(queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*schema.HTTPFlow, err error) {
+	var limitFlows, fullFlows []*schema.HTTPFlow
 
 	if params.OffsetId > 0 {
 		offsetDB := queryDB
@@ -1292,14 +814,14 @@ func YieldHTTPUrl(db *gorm.DB, ctx context.Context) chan *HTTPFlowUrl {
 	return outC
 }
 
-func YieldHTTPFlows(db *gorm.DB, ctx context.Context) chan *HTTPFlow {
-	outC := make(chan *HTTPFlow)
+func YieldHTTPFlows(db *gorm.DB, ctx context.Context) chan *schema.HTTPFlow {
+	outC := make(chan *schema.HTTPFlow)
 	go func() {
 		defer close(outC)
 
 		page := 1
 		for {
-			var items []*HTTPFlow
+			var items []*schema.HTTPFlow
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
@@ -1381,7 +903,7 @@ const (
 
 func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	tagCounts := make(map[string]int)
-	for _, v := range globalHTTPFlowCache.GetAll() {
+	for _, v := range model.GlobalHTTPFlowCache.GetAll() {
 		for _, tag := range strings.Split(v.Tags, "|") {
 			tag = strings.TrimSpace(tag)
 			if tag != "" {
@@ -1391,7 +913,7 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	}
 	tags := make([]*TagAndStatusCode, 0)
 	for k, v := range tagCounts {
-		if !strings.HasPrefix(k, COLORPREFIX) {
+		if !strings.HasPrefix(k, schema.COLORPREFIX) {
 			tags = append(tags, &TagAndStatusCode{
 				Value: k,
 				Count: v,
@@ -1402,7 +924,7 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 }
 
 func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) *gorm.DB {
-	db = db.Model(&HTTPFlow{})
+	db = db.Model(&schema.HTTPFlow{})
 
 	if len(req.GetId()) > 0 {
 		db = db.Or("false")
@@ -1426,7 +948,7 @@ func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowReque
 	return db
 }
 
-func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*schema.HTTPFlow, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
@@ -1436,7 +958,7 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 	queryParams := params.ExportWhere
 	queryParams.IncludeId = params.Ids
 
-	db = db.Model(&HTTPFlow{})
+	db = db.Model(&schema.HTTPFlow{})
 	// overwrite Select Field, fix payloads
 	for i, field := range params.FieldName {
 		if field != "payloads" {
@@ -1451,7 +973,7 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 }
 
 func HTTPFlowToOnline(db *gorm.DB, hash []string) error {
-	db = db.Model(&HTTPFlow{})
+	db = db.Model(&schema.HTTPFlow{})
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", hash)
 	db = db.Update(map[string]interface{}{"upload_online": true})
 	if db.Error != nil {

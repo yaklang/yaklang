@@ -3,6 +3,7 @@ package antlr4nasl
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"path"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type ScriptEngine struct {
@@ -220,7 +220,7 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 			}
 		}
 		db := consts.GetGormProfileDatabase()
-		scriptsModel := []*yakit.NaslScript{}
+		scriptsModel := []*schema.NaslScript{}
 		scripts := cachedScript
 		if len(unLoadedScript) > 0 {
 			if err := db.Where("origin_file_name in (?)", unLoadedScript).Unscoped().Find(&scriptsModel).Error; err != nil {
@@ -316,7 +316,7 @@ func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
 		}
 	}
 
-	var scripts []*yakit.NaslScript
+	var scripts []*schema.NaslScript
 	if db := db.Where(conditions).Find(&scripts); db.Error != nil {
 		log.Errorf("load scripts with conditions error: %v", db.Error)
 	}

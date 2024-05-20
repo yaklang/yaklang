@@ -3,6 +3,7 @@ package yaktest
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
@@ -14,7 +15,7 @@ func TestMisc_Hook(t *testing.T) {
 
 	})
 
-	s := &yakit.YakScript{
+	s := &schema.YakScript{
 		ScriptName: "yakit-plugin-test-abcccc",
 		Type:       "testtype",
 		Content:    `clear = func() {println("Hello World")}`,

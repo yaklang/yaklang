@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
 	"testing"
@@ -12,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -55,7 +55,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 		t.Fatal(err)
 	}
 
-	extractedData := replacer.hookColor(requestBytes, []byte(""), req, &yakit.HTTPFlow{})
+	extractedData := replacer.hookColor(requestBytes, []byte(""), req, &schema.HTTPFlow{})
 	if len(extractedData) == 0 {
 		t.Fatal("no data extracted")
 	}
@@ -88,7 +88,7 @@ secret-id:`)
 		t.Fatal(err)
 	}
 
-	extractedData := replacer.hookColor([]byte(""), responseBytes, req, &yakit.HTTPFlow{})
+	extractedData := replacer.hookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
 	if len(extractedData) == 0 {
 		t.Fatal("no data extracted")
 	}
@@ -199,7 +199,7 @@ testBody`
 			for _, re := range []string{"testUri\\w*", "testHeader\\w*", "testBody\\w*"} {
 				rule.Rule = re
 				replacer.SetRules(rule)
-				extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &yakit.HTTPFlow{})
+				extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &schema.HTTPFlow{})
 				if len(extractedData) == 1 {
 					matchRes = append(matchRes, extractedData[0].Data)
 				} else {
@@ -268,7 +268,7 @@ testBody`
 		t.Run(testCase.name, func(t *testing.T) {
 			rule.Rule = testCase.re
 			replacer.SetRules(rule)
-			extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &yakit.HTTPFlow{})
+			extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &schema.HTTPFlow{})
 			assert.Equal(t, extractedData[0].Data, testCase.expect)
 		})
 	}
@@ -629,7 +629,7 @@ test`)
 	reqRaw, err := utils.DumpHTTPRequest(req, true)
 	require.NoError(t, err)
 
-	extractedData := replacer.hookColor(reqRaw, responseBytes, req, &yakit.HTTPFlow{})
+	extractedData := replacer.hookColor(reqRaw, responseBytes, req, &schema.HTTPFlow{})
 	require.Len(t, extractedData, 2)
 }
 
@@ -651,7 +651,7 @@ Content-Length: 4`))
 	testOffset := func(t *testing.T, name string, rule *ypb.MITMContentReplacer, wantLen, wantOffset int) {
 		replacer := NewMITMReplacer()
 		replacer.SetRules(rule)
-		extractedData := replacer.hookColor(reqRaw, responseBytes, req, &yakit.HTTPFlow{})
+		extractedData := replacer.hookColor(reqRaw, responseBytes, req, &schema.HTTPFlow{})
 		require.Lenf(t, extractedData, wantLen, "testcase name: %s", name)
 		require.Equalf(t, wantOffset, extractedData[0].DataIndex, "testcase name: %s", name)
 	}

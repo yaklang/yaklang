@@ -5,12 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -19,6 +13,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/go-git/go-git/v5"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
@@ -194,7 +196,7 @@ func LoadYamlPoCDatabase(nucleiDir ...string) error {
 	log.Infof("start to save yaml poc to database total: %v", total)
 	for _, r := range descs {
 		raw, _ := json.Marshal(BuildinNucleiYakScriptParam)
-		y := &yakit.YakScript{
+		y := &schema.YakScript{
 			ScriptName: fmt.Sprintf("[%v]: %v", r.Id, r.Info.Name),
 			Type:       "nuclei",
 			Content:    r.Raw,
@@ -222,9 +224,9 @@ func RemovePoCDatabase() error {
 		return utils.Errorf("cannot fetch database: %s", db.Error)
 	}
 
-	if db := db.Model(&yakit.YakScript{}).Where(
+	if db := db.Model(&schema.YakScript{}).Where(
 		"(type = ?) AND (from_local = ?)",
-		"nuclei", true).Unscoped().Delete(&yakit.YakScript{}); db.Error != nil {
+		"nuclei", true).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 

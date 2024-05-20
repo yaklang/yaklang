@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -46,7 +47,7 @@ func grpc2Paging(pag *ypb.Paging) *yakit.Paging {
 	return ret
 }
 
-func Payload2Grpc(payload *yakit.Payload) *ypb.Payload {
+func Payload2Grpc(payload *schema.Payload) *ypb.Payload {
 	content := getPayloadContent(payload)
 	p := &ypb.Payload{
 		Id:           int64(payload.ID),
@@ -69,9 +70,9 @@ func Payload2Grpc(payload *yakit.Payload) *ypb.Payload {
 	return p
 }
 
-func grpc2Payload(p *ypb.Payload) *yakit.Payload {
+func grpc2Payload(p *ypb.Payload) *schema.Payload {
 	content := strconv.Quote(p.Content)
-	payload := &yakit.Payload{
+	payload := &schema.Payload{
 		Group:    p.Group,
 		Content:  &content,
 		Folder:   &p.Folder,
@@ -82,7 +83,7 @@ func grpc2Payload(p *ypb.Payload) *yakit.Payload {
 	return payload
 }
 
-func getPayloadContent(p *yakit.Payload) string {
+func getPayloadContent(p *schema.Payload) string {
 	if p.Content == nil {
 		return ""
 	}
@@ -696,9 +697,9 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 		return nil, err
 	}
 
-	var payloads []*yakit.Payload
+	var payloads []*schema.Payload
 
-	db = db.Model(&yakit.Payload{})
+	db = db.Model(&schema.Payload{})
 	if err := bizhelper.ExactQueryInt64ArrayOr(db, "id", ids).Find(&payloads).Error; err != nil {
 		return nil, utils.Wrap(err, "error finding payloads")
 	}
@@ -799,7 +800,7 @@ func (s *Server) UpdateAllPayloadGroup(ctx context.Context, req *ypb.UpdateAllPa
 func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.GetAllPayloadGroupResponse, error) {
 	var res []getAllPayloadResult
 
-	rows, err := s.GetProfileDatabase().Model(&yakit.Payload{}).Select(`"group", COUNT("group") as num_group, folder, is_file`).Group(`"group"`).Order("group_index asc").Rows()
+	rows, err := s.GetProfileDatabase().Model(&schema.Payload{}).Select(`"group", COUNT("group") as num_group, folder, is_file`).Group(`"group"`).Order("group_index asc").Rows()
 	if err != nil {
 		return nil, utils.Wrap(err, "get all payload group error")
 	}
@@ -911,12 +912,12 @@ func (s *Server) ExportAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_
 	// 获取payload总长度
 	if isCSV {
 		contentSize, num, hitCountSize := 0, 0, 0
-		db = s.GetProfileDatabase().Model(&yakit.Payload{}).Select("SUM(LENGTH(content)),COUNT(id),SUM(LENGTH(hit_count))").Where("`group` = ?", group).Where("`folder` = ?", folder)
+		db = s.GetProfileDatabase().Model(&schema.Payload{}).Select("SUM(LENGTH(content)),COUNT(id),SUM(LENGTH(hit_count))").Where("`group` = ?", group).Where("`folder` = ?", folder)
 		row := db.Row()
 		row.Scan(&contentSize, &num, &hitCountSize)
 		total = contentSize + num + hitCountSize
 	} else {
-		db = s.GetProfileDatabase().Model(&yakit.Payload{}).Select("SUM(LENGTH(content))").Where("`group` = ?", group).Where("`folder` = ?", folder)
+		db = s.GetProfileDatabase().Model(&schema.Payload{}).Select("SUM(LENGTH(content))").Where("`group` = ?", group).Where("`folder` = ?", folder)
 		row := db.Row()
 		row.Scan(&total)
 	}
@@ -1171,7 +1172,7 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 
 	size, total := int64(0), int64(0)
 	// 计算payload总数
-	err := s.GetProfileDatabase().Model(&yakit.Payload{}).Count(&total).Error
+	err := s.GetProfileDatabase().Model(&schema.Payload{}).Count(&total).Error
 	if err != nil {
 		return utils.Wrap(err, "migrate payload error: get payload count error")
 	}
@@ -1198,7 +1199,7 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 	}()
 
 	feedback(0)
-	gen := yakit.YieldPayloads(s.GetProfileDatabase().Model(&yakit.Payload{}), ctx)
+	gen := yakit.YieldPayloads(s.GetProfileDatabase().Model(&schema.Payload{}), ctx)
 	db := s.GetProfileDatabase()
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
 		for p := range gen {

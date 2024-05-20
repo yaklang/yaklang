@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -1477,7 +1478,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// 保存到数据库
 		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
 		startCreateFlow := time.Now()
-		var flow *yakit.HTTPFlow
+		var flow *schema.HTTPFlow
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
 			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, req, "mitm", reqUrl, remoteAddr)
 			flow.StatusCode = 200 // 先设置成200
@@ -1519,7 +1520,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isDroppedSaveFlow := utils.NewBool(false)
 		mitmPluginCaller.HijackSaveHTTPFlow(
 			flow,
-			func(replaced *yakit.HTTPFlow) {
+			func(replaced *schema.HTTPFlow) {
 				if replaced == nil {
 					return
 				}
@@ -1541,7 +1542,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			startCreateFlow = time.Now()
 
 			colorOK := make(chan struct{})
-			var extracted []*yakit.ExtractedData
+			var extracted []*schema.ExtractedData
 
 			if replacer != nil {
 				go func() {

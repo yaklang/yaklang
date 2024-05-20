@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -187,7 +188,7 @@ func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
 		spew.Dump(rsp)
 	}
 	var count int
-	consts.GetGormProjectDatabase().Model(&yakit.HTTPFlow{}).Where("runtime_id = ?", runtimeID).Count(&count)
+	consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeID).Count(&count)
 	if count < 1 {
 		t.Fatal("count not match")
 	}
@@ -379,7 +380,7 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	status2 := utils.RandStringBytes(5)
 	status3 := utils.RandStringBytes(5)
 	status4 := utils.RandStringBytes(5)
-	var DateTask = []*yakit.HybridScanTask{
+	var DateTask = []*schema.HybridScanTask{
 		{
 			Status:               status1,
 			Targets:              target1,

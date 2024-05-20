@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"time"
 
@@ -116,9 +117,9 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 	return s, nil
 }
 
-var YakitProfileTables = yakit.ProfileTables
+var YakitProfileTables = schema.ProfileTables
 
-var YakitAllTables = yakit.ProjectTables
+var YakitAllTables = schema.ProjectTables
 
 func (s *Server) initDatabase() error {
 	var err error
