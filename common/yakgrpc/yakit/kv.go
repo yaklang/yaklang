@@ -151,8 +151,6 @@ func (s *GeneralStorage) ToGRPCModel() *ypb.GeneralStorage {
 func GetProcessEnvKey(db *gorm.DB) []*GeneralStorage {
 	var keys []*GeneralStorage
 
-	db = UserDataAndPluginDatabaseScope(db)
-
 	db = db.Model(&GeneralStorage{}).Where("process_env = true").Where(
 		"(expired_at IS NULL) OR (expired_at <= ?) OR (expired_at >= ?)",
 		yakitZeroTime,
@@ -201,8 +199,6 @@ func RefreshProcessEnv(db *gorm.DB) {
 	refreshLock.Lock()
 	defer refreshLock.Unlock()
 
-	db = UserDataAndPluginDatabaseScope(db)
-
 	TidyGeneralStorage(db)
 	for _, key := range GetProcessEnvKey(db) {
 		key.EnableProcessEnv()
@@ -213,8 +209,6 @@ func RefreshProcessEnv(db *gorm.DB) {
 }
 
 func SetKey(db *gorm.DB, key interface{}, value interface{}) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db == nil {
 		return utils.Error("no set database")
 	}
@@ -233,8 +227,6 @@ func SetKey(db *gorm.DB, key interface{}, value interface{}) error {
 }
 
 func InitKey(db *gorm.DB, key interface{}, verbose interface{}, env bool) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db == nil {
 		return utils.Error("no set database")
 	}
@@ -250,8 +242,6 @@ func InitKey(db *gorm.DB, key interface{}, verbose interface{}, env bool) error 
 }
 
 func SetKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, seconds int) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db == nil {
 		return utils.Error("no set database")
 	}
@@ -267,8 +257,6 @@ func SetKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, seconds int)
 }
 
 func SetKeyProcessEnv(db *gorm.DB, key interface{}, processEnv bool) {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	keyStr := strconv.Quote(utils.InterfaceToString(key))
 	if db := db.Model(&GeneralStorage{}).Where("key = ?", keyStr).Updates(map[string]interface{}{
 		"process_env": processEnv,
@@ -278,16 +266,12 @@ func SetKeyProcessEnv(db *gorm.DB, key interface{}, processEnv bool) {
 }
 
 func DelKey(db *gorm.DB, key interface{}) {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db := db.Where(`key = ?`, strconv.Quote(utils.InterfaceToString(key))).Unscoped().Delete(&GeneralStorage{}); db.Error != nil {
 		log.Errorf("del general storage failed: %s", db.Error)
 	}
 }
 
 func GetKeyModel(db *gorm.DB, key interface{}) (*GeneralStorage, error) {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db == nil {
 		return nil, utils.Error("no database set")
 	}
@@ -321,8 +305,6 @@ func Set(key interface{}, value interface{}) {
 }
 
 func GetKey(db *gorm.DB, key interface{}) string {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	kv, err := GetKeyModel(db, key)
 	if err != nil {
 		return ""
@@ -339,8 +321,6 @@ func GetKey(db *gorm.DB, key interface{}) string {
 }
 
 func TidyGeneralStorage(db *gorm.DB) {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	if db == nil {
 		return
 	}

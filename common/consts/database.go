@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/permutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 const (
@@ -25,9 +26,18 @@ const (
 	DEFAULT_DRIVER = SQLite
 )
 
-var (
-	RegisterDriverOnce = new(sync.Once)
-)
+var RegisterDriverOnce = new(sync.Once)
+
+func DeleteDatabaseFile(path string) error {
+	err := os.RemoveAll(path)
+	if err != nil {
+		return err
+	}
+	// delete wal log and shm file
+	os.RemoveAll(path + "-wal")
+	os.RemoveAll(path + "-shm")
+	return nil
+}
 
 func registerDriver() {
 	{
@@ -41,7 +51,18 @@ func registerDriver() {
 	sql.Register(SQLiteExtend,
 		&sqlite3.SQLiteDriver{
 			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
-				return conn.RegisterFunc("regexp", regex, true)
+				err := conn.RegisterFunc("md5", func(s any) any {
+					return codec.Md5(s)
+				}, true)
+				if err != nil {
+					return err
+				}
+
+				err = conn.RegisterFunc("regexp", regex, true)
+				if err != nil {
+					return err
+				}
+				return nil
 			},
 		})
 }
