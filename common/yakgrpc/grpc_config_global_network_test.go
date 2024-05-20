@@ -30,7 +30,8 @@ import (
 )
 
 type GetawayClient struct {
-	valid bool
+	valid              bool
+	functionCallHandle func(msg string) (map[string]any, error)
 }
 
 func (g *GetawayClient) CheckValid() error {
@@ -52,7 +53,7 @@ func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.F
 }
 
 func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return nil, nil
+	return g.functionCallHandle(msg)
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
@@ -143,11 +144,30 @@ func TestAiApiPriority(t *testing.T) {
 	if !(ok1 && ok) {
 		t.Fatal("ai api priority failed")
 	}
-	test2 = false
-	ai.FunctionCall("test", map[string]any{"translate": "翻译为英文"})
-	if !test2 {
+
+	functionCallOk := false
+	times := 0
+	aispec.Register("functionCall", func() aispec.AIGateway {
+		functionCallOk = true
+		return &GetawayClient{valid: true, functionCallHandle: func(msg string) (map[string]any, error) {
+			defer func() {
+				times++
+			}()
+			if times != 3 {
+				return nil, errors.New("error")
+			} else {
+				return map[string]any{
+					"translate": "ok",
+				}, nil
+			}
+		}}
+	})
+	res, err := ai.FunctionCall("test", map[string]any{"translate": "翻译为英文"}, aispec.WithType("functionCall"))
+	if !functionCallOk {
 		t.Fatal("ai api priority failed")
 	}
+	assert.Equal(t, "ok", res["translate"])
+	assert.Equal(t, 4, times)
 }
 
 func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
