@@ -1,7 +1,9 @@
 package yakit
 
 import (
+	"encoding/json"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -9,13 +11,18 @@ import (
 type CodecFlow struct {
 	gorm.Model
 	FlowName string
-	WorkFlow []*ypb.CodecWork
+	WorkFlow []byte
 }
 
 func (cf *CodecFlow) ToGRPC() *ypb.CustomizeCodecFlow {
+	var workFlow []*ypb.CodecWork
+	err := json.Unmarshal(cf.WorkFlow, &workFlow)
+	if err != nil {
+		log.Errorf("unmarshal codec flow failed: %s", err)
+	}
 	return &ypb.CustomizeCodecFlow{
 		FlowName: cf.FlowName,
-		WorkFlow: cf.WorkFlow,
+		WorkFlow: workFlow,
 	}
 }
 
