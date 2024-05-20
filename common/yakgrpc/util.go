@@ -15,12 +15,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/consts"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
@@ -188,8 +186,6 @@ func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
 	if local || !utils.InGithubActions() {
 		var finalErr error
 		initLocalClientOnce.Do(func() {
-			consts.InitilizeYakitDatabase("", "")
-			yakit.InitializeDefaultDatabaseSchema()
 
 			port = utils.GetRandomAvailableTCPPort()
 			addr = utils.HostPort("127.0.0.1", port)

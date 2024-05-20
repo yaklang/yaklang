@@ -2,6 +2,12 @@ package cve
 
 import (
 	"context"
+	"io/ioutil"
+	"math"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -9,11 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
-	"math"
-	"os"
-	"strings"
-	"time"
 )
 
 func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) error {
@@ -30,7 +31,7 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 	if cveResourceDb == "" {
 		db = consts.GetGormCVEDatabase()
 	} else {
-		db, err = gorm.Open("sqlite3", cveResourceDb)
+		db, err = consts.CreateCVEDatabase(cveResourceDb)
 		if err != nil {
 			log.Errorf("cannot open: %s with error: %s", cveResourceDb, err)
 		}
@@ -43,9 +44,7 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 	if descDB == nil {
 		return utils.Error("empty description database")
 	}
-	descDB.AutoMigrate(&cveresources.CWE{})
 
-	db.AutoMigrate(&cveresources.CVE{}, &cveresources.CWE{})
 	db = db.Model(&cveresources.CWE{}).Where(
 		"(name_zh = '') OR " +
 			"(description_zh = '') OR " +
@@ -102,9 +101,7 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 }
 
 func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResourceDb string, opts ...aispec.AIConfigOption) error {
-	var (
-		err error
-	)
+	var err error
 
 	if aiGatewayType == "" {
 		aiGatewayType = "openai"
@@ -118,7 +115,7 @@ func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResou
 	if cveResourceDb == "" {
 		db = consts.GetGormCVEDatabase()
 	} else {
-		db, err = gorm.Open("sqlite3", cveResourceDb)
+		db, err = consts.CreateCVEDatabase(cveResourceDb)
 		if err != nil {
 			log.Errorf("cannot open: %s with error: %s", cveResourceDb, err)
 		}
@@ -126,7 +123,7 @@ func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResou
 	if db == nil {
 		return utils.Error("no cve database found")
 	}
-	db.AutoMigrate(&cveresources.CVE{}, &cveresources.CWE{})
+
 	db = db.Model(&cveresources.CVE{}).Where("(title_zh is null) OR (title_zh = '')")
 	if concurrent <= 0 {
 		concurrent = 10

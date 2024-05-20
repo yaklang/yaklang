@@ -3,6 +3,11 @@ package yakcmds
 import (
 	"compress/gzip"
 	"context"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/jinzhu/gorm"
 	"github.com/urfave/cli"
@@ -14,10 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"os"
-	"path/filepath"
-	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -57,7 +58,6 @@ var CVEUtilCommands = []*cli.Command{
 		Action: func(c *cli.Context) error {
 			totalTimeout := c.Float64("total-timeout")
 			if totalTimeout <= 0 {
-
 			}
 
 			if c.Bool("chaosmaker-rules") {
@@ -101,11 +101,11 @@ var CVEUtilCommands = []*cli.Command{
 			if outputFile == "" {
 				outputFile = consts.GetCVEDatabasePath()
 			}
-			outputDB, err := gorm.Open("sqlite3", outputFile)
+			outputDB, err := consts.CreateCVEDatabase(outputFile)
 			if err != nil {
 				return err
 			}
-			outputDB.AutoMigrate(&cveresources.CVE{}, &cveresources.CWE{})
+
 			gzipHandler := func() error {
 				if c.Bool("no-gzip") {
 					return nil
@@ -143,6 +143,7 @@ var CVEUtilCommands = []*cli.Command{
 
 			if c.Bool("cwe") {
 				cveDB := outputDB
+				// merge cwe
 				if descDB != nil && descDB.HasTable("cwes") && cveDB != nil {
 					log.Info("cve-description database is detected, merge cve db")
 					if cveDB.HasTable("cwes") {

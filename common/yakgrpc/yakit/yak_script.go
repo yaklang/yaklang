@@ -218,7 +218,6 @@ func CreateOrUpdateYakScript(db *gorm.DB, id int64, i interface{}) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&YakScript{})
 
 	if db := db.Where("id = ?", id).Assign(i).FirstOrCreate(&YakScript{}); db.Error != nil {
@@ -234,7 +233,6 @@ func DeleteYakScriptByOnlineId(db *gorm.DB, onlineId int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = UserDataAndPluginDatabaseScope(db)
 	if db := db.Model(&YakScript{}).Where(
 		"online_id = ?", onlineId,
 	).Unscoped().Delete(&YakScript{}); db.Error != nil {
@@ -256,7 +254,6 @@ func CreateOrUpdateYakScriptByOnlineId(db *gorm.DB, onlineId int64, i interface{
 			log.Errorf("error: %s", err)
 		}
 	}()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	db = db.Model(&YakScript{})
 
@@ -276,8 +273,6 @@ func CreateOrUpdateYakScriptByOnlineId(db *gorm.DB, onlineId int64, i interface{
 }
 
 func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	db = db.Model(&YakScript{})
 
 	// 锁住更新步骤，太快容易整体被锁
@@ -340,8 +335,6 @@ func RemoveTemporaryYakScriptAll(db *gorm.DB, suffix string) {
 }
 
 func UpdateGeneralModuleFromByYakScriptName(db *gorm.DB, scriptName string, i bool) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	return CreateOrUpdateYakScriptByName(db, scriptName, map[string]interface{}{
 		"is_general_module": i,
 	})
@@ -349,7 +342,6 @@ func UpdateGeneralModuleFromByYakScriptName(db *gorm.DB, scriptName string, i bo
 
 func GetYakScript(db *gorm.DB, id int64) (*YakScript, error) {
 	var req YakScript
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where("id = ?", id).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
@@ -360,7 +352,6 @@ func GetYakScript(db *gorm.DB, id int64) (*YakScript, error) {
 
 func GetYakScriptIdOrName(db *gorm.DB, id int64, name string) (*YakScript, error) {
 	var req YakScript
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where("(id = ?) OR (script_name = ?)", id, name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
@@ -371,7 +362,6 @@ func GetYakScriptIdOrName(db *gorm.DB, id int64, name string) (*YakScript, error
 
 func GetYakScriptByName(db *gorm.DB, name string) (*YakScript, error) {
 	var req YakScript
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where("script_name = ?", name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
@@ -383,7 +373,7 @@ func GetYakScriptByName(db *gorm.DB, name string) (*YakScript, error) {
 // GetNucleiYakScriptByName
 func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*YakScript, error) {
 	var req YakScript
-	db = UserDataAndPluginDatabaseScope(db)
+
 	if db := db.Model(&YakScript{}).Where(
 		"`type` = 'nuclei'",
 	).Where(
@@ -400,7 +390,6 @@ func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*YakScript, error
 
 func GetYakScriptByOnlineID(db *gorm.DB, onlineId int64) (*YakScript, error) {
 	var req YakScript
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where("online_id = ?", onlineId).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
@@ -411,7 +400,6 @@ func GetYakScriptByOnlineID(db *gorm.DB, onlineId int64) (*YakScript, error) {
 
 func GetYakScriptByUUID(db *gorm.DB, uuid string) (*YakScript, error) {
 	var req YakScript
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where("uuid = ?", uuid).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
@@ -423,7 +411,6 @@ func GetYakScriptByUUID(db *gorm.DB, uuid string) (*YakScript, error) {
 func DeleteYakScriptByID(db *gorm.DB, id int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where(
 		"id = ?", id,
@@ -436,7 +423,6 @@ func DeleteYakScriptByID(db *gorm.DB, id int64) error {
 func DeleteYakScriptByName(db *gorm.DB, s string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where(
 		"script_name = ?", s,
@@ -449,7 +435,6 @@ func DeleteYakScriptByName(db *gorm.DB, s string) error {
 func DeleteYakScriptByUserID(db *gorm.DB, s int64, onlineBaseUrl string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if s <= 0 {
 		return nil
@@ -470,7 +455,6 @@ func DeleteYakScriptByUserID(db *gorm.DB, s int64, onlineBaseUrl string) error {
 func DeleteYakScriptAll(db *gorm.DB) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	if db := db.Model(&YakScript{}).Where(
 		"true",
@@ -492,7 +476,6 @@ func IgnoreYakScriptByID(db *gorm.DB, id int64, ignored bool) error {
 	if err != nil {
 		return err
 	}
-	db = UserDataAndPluginDatabaseScope(db)
 
 	_ = r
 	return CreateOrUpdateYakScript(db, id, map[string]interface{}{
@@ -503,7 +486,6 @@ func IgnoreYakScriptByID(db *gorm.DB, id int64, ignored bool) error {
 func QueryYakScriptByNames(db *gorm.DB, names ...string) []*YakScript {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	db = db.Model(&YakScript{})
 	var all []*YakScript
@@ -521,7 +503,6 @@ func QueryYakScriptByNames(db *gorm.DB, names ...string) []*YakScript {
 func QueryYakScriptByIsCore(db *gorm.DB, isCore bool) []*YakScript {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	db = db.Model(&YakScript{})
 	var yakScripts []*YakScript
@@ -620,7 +601,7 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		}
 		return p, yakScripts, err
 	}
-	// db = UserDataAndPluginDatabaseScope(db)
+	//
 	db = db.Model(&YakScript{}) // .Debug()
 
 	/*pagination*/
@@ -707,7 +688,6 @@ func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *YakScript {
 
 func GetYakScriptList(db *gorm.DB, id int64, ids []int64) ([]*YakScript, error) {
 	var req []*YakScript
-	db = UserDataAndPluginDatabaseScope(db)
 
 	db = db.Model(&YakScript{})
 	if id > 0 {
@@ -724,7 +704,7 @@ func GetYakScriptList(db *gorm.DB, id int64, ids []int64) ([]*YakScript, error) 
 func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) *gorm.DB {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
+
 	db = db.Model(&YakScript{}).Unscoped()
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
@@ -737,7 +717,6 @@ func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) 
 }
 
 func CountYakScriptByWhere(db *gorm.DB, isGroup bool, req *ypb.QueryYakScriptGroupRequest) (total int64, err error) {
-	db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&YakScript{})
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", req.ExcludeType)
 	if isGroup {
@@ -753,7 +732,6 @@ func CountYakScriptByWhere(db *gorm.DB, isGroup bool, req *ypb.QueryYakScriptGro
 func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) *gorm.DB {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
 
 	db = db.Model(&YakScript{}).Unscoped()
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))

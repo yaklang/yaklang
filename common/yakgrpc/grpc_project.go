@@ -55,16 +55,15 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 		if CheckDefault(proj.ProjectName, proj.Type, proj.FolderID, proj.ChildFolderID) == nil {
 			old, err := os.Open(proj.DatabasePath)
 			if err != nil {
-				return nil, utils.Errorf("找不到本地数据库文件: %s", err)
+				return nil, utils.Errorf("can't open local database: %s", err)
 			}
 			old.Close()
 		}
 
-		projectDatabase, err := gorm.Open("sqlite3", proj.DatabasePath)
+		projectDatabase, err := gorm.Open(consts.SQLite, proj.DatabasePath)
 		if err != nil {
 			return nil, utils.Errorf("open project database failed: %s", err)
 		}
-		projectDatabase.AutoMigrate(yakit.ProjectTables...)
 		consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
 		consts.SetGormProjectDatabase(projectDatabase)
 		return &ypb.Empty{}, nil
@@ -160,11 +159,10 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		return nil, db.Error
 	}
 	// 创建库
-	projectDatabase, err := gorm.Open("sqlite3", pathName)
+	projectDatabase, err := consts.CreateProjectDatabase(pathName)
 	if err != nil {
-		return nil, utils.Errorf("open project database failed: %s", err)
+		return nil, utils.Errorf("create project database failed: %s", err)
 	}
-	projectDatabase.AutoMigrate(yakit.ProjectTables...)
 	projectDatabase.Close()
 
 	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
@@ -484,7 +482,7 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 		db = db.Where(" id = ? or folder_id = ? or child_folder_id = ? ", req.GetId(), req.GetId(), req.GetId())
 		projects := yakit.YieldProject(db, ctx)
 		if projects == nil {
-			return nil, utils.Error("删除项目不存在")
+			return nil, utils.Error("project is not exist")
 		}
 		proj, err := yakit.GetDefaultProject(s.GetProfileDatabase())
 		if err != nil {
@@ -502,25 +500,22 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 			}
 			if req.IsDeleteLocal {
 				consts.GetGormProjectDatabase().Close()
-				err := os.RemoveAll(k.DatabasePath)
+				err := consts.DeleteDatabaseFile(k.DatabasePath)
 				if err != nil {
-					log.Error("删除本地数据库失败：" + err.Error())
+					log.Errorf("delete local database error: %v", err)
 				}
-				// delete wal log and shm file
-				os.RemoveAll(k.DatabasePath + "-wal")
-				os.RemoveAll(k.DatabasePath + "-shm")
 			}
-			defaultDb, err := gorm.Open("sqlite3", proj.DatabasePath)
+			defaultDB, err := consts.CreateProjectDatabase(proj.DatabasePath)
 			if err != nil {
-				log.Errorf("切换默认数据库失败%s", err)
+				log.Errorf("switch default database error: %v", err)
 			}
-			defaultDb.AutoMigrate(yakit.ProjectTables...)
+
 			consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
-			consts.SetGormProjectDatabase(defaultDb)
+			consts.SetGormProjectDatabase(defaultDB)
 
 			err = yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
 			if err != nil {
-				log.Error("删除项目失败：" + err.Error())
+				log.Errorf("delete project error: %v", err)
 			}
 		}
 		return &ypb.Empty{}, nil

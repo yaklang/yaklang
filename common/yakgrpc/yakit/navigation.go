@@ -22,12 +22,7 @@ type NavigationBar struct {
 }
 
 func init() {
-	RegisterPostInitDatabaseFunction(func() error {
-		if db := consts.GetGormProfileDatabase(); db != nil {
-			db.AutoMigrate(&NavigationBar{})
-		}
-		return nil
-	})
+	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_PROFILE_DATABASE, &NavigationBar{})
 }
 
 func (m *NavigationBar) CalcHash() string {
@@ -40,8 +35,6 @@ func (m *NavigationBar) CalcHash() string {
 }
 
 func CreateOrUpdateNavigation(db *gorm.DB, hash string, i interface{}) error {
-	db = UserDataAndPluginDatabaseScope(db)
-
 	db = db.Model(&NavigationBar{})
 
 	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&NavigationBar{}); db.Error != nil {
@@ -53,7 +46,7 @@ func CreateOrUpdateNavigation(db *gorm.DB, hash string, i interface{}) error {
 
 func GetAllNavigation(db *gorm.DB, req *ypb.GetAllNavigationRequest) []*NavigationBar {
 	var items []*NavigationBar
-	db = UserDataAndPluginDatabaseScope(db)
+
 	db = db.Model(&NavigationBar{})
 	if req.Mode != "" {
 		db = db.Where("mode = ?", req.Mode)
@@ -71,7 +64,6 @@ func GetAllNavigation(db *gorm.DB, req *ypb.GetAllNavigationRequest) []*Navigati
 }
 
 func DeleteNavigationByWhere(db *gorm.DB, req *ypb.GetAllNavigationRequest) error {
-	db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&NavigationBar{})
 	if req.GetMode() != "" {
 		db = db.Where("mode = ? ", req.Mode)

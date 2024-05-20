@@ -60,15 +60,14 @@ var (
 )
 
 func initializeDatabase(projectDatabase string, profileDBName string) error {
-	consts.InitilizeYakitDatabase(projectDatabase, profileDBName)
+	// project and profile
+	consts.InitializeYakitDatabase(projectDatabase, profileDBName)
+
+	// cve
 	_, err := consts.InitializeCVEDatabase()
 	if err != nil {
-		log.Debugf("initialized cve database warning: %s", err)
+		log.Warnf("initialized cve database failed: %v", err)
 	}
-
-	// 这个顺序一般不要换
-	consts.GetGormProjectDatabase().AutoMigrate(yakit.ProjectTables...)
-	consts.GetGormProfileDatabase().AutoMigrate(yakit.ProfileTables...)
 
 	if isVersionCommand() {
 		return nil

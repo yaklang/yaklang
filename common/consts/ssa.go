@@ -2,6 +2,7 @@ package consts
 
 import (
 	"path/filepath"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,6 +10,9 @@ import (
 
 var (
 	YAK_SSA_PROJECT_DB_NAME = "default-yakssa.db"
+
+	ssaDatabase         *gorm.DB
+	initSSADatabaseOnce = new(sync.Once)
 )
 
 const (
@@ -30,10 +34,17 @@ func GetDefaultSSADataBase() string {
 	return filepath.Join(GetDefaultYakitBaseDir(), YAK_SSA_PROJECT_DB_NAME)
 }
 
+func initSSADatabase() {
+	initSSADatabaseOnce.Do(func() {
+		ssaDatabase, err := createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
+		if err != nil {
+			log.Errorf("create ssa database err: %v", err)
+		}
+		AutoMigrate(ssaDatabase, KEY_SCHEMA_SSA_DATABASE)
+	})
+}
+
 func GetGormDefaultSSADataBase() *gorm.DB {
-	db, err := createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
-	if err != nil {
-		log.Errorf("create ssa database err: %v", err)
-	}
-	return db
+	initSSADatabase()
+	return ssaDatabase
 }

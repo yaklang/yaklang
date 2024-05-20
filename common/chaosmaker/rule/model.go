@@ -3,6 +3,14 @@ package rule
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -12,15 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"os"
-	"regexp"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Storage struct {
@@ -65,6 +65,10 @@ type Storage struct {
 	Confidence         string `json:"confidence"`
 	ReviewedAt         string `json:"reviewed_at"`
 	CVE                string `json:"cve"`
+}
+
+func init() {
+	consts.RegisterDatabaseSchema(consts.KEY_SCHEMA_PROFILE_DATABASE, &Storage{})
 }
 
 func (Storage) TableName() string {
@@ -209,7 +213,7 @@ func (origin *Storage) DecoratedByOpenAI(t string, opts ...aispec.AIConfigOption
 }
 
 func DecorateRules(t string, concurrent int, proxy string) {
-	var db = consts.GetGormProfileDatabase()
+	db := consts.GetGormProfileDatabase()
 	swg := utils.NewSizedWaitGroup(concurrent)
 	db = db.Where("name_zh = '' or name_zh is null")
 	for r := range YieldRules(db, context.Background()) {
@@ -262,15 +266,6 @@ func (c *Storage) BeforeSave() error {
 		c.CalcHash()
 	}
 	return nil
-}
-
-func init() {
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		if db := consts.GetGormProfileDatabase(); db != nil {
-			db.AutoMigrate(&Storage{})
-		}
-		return nil
-	})
 }
 
 func NewRuleFromSuricata(s *rule.Rule) *Storage {
@@ -352,6 +347,7 @@ var saveChaosMaker sync.Mutex
 func SaveToDB(rule *Storage) error {
 	return UpsertRule(consts.GetGormProfileDatabase(), rule.CalcHash(), rule)
 }
+
 func UpsertRule(db *gorm.DB, hash string, i interface{}) error {
 	saveChaosMaker.Lock()
 	defer saveChaosMaker.Unlock()
@@ -397,7 +393,7 @@ func YieldRules(db *gorm.DB, ctx context.Context) chan *Storage {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Storage
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -428,7 +424,7 @@ func YieldRules(db *gorm.DB, ctx context.Context) chan *Storage {
 }
 
 func ExportRulesToFile(db *gorm.DB, fileName string) error {
-	fp, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
+	fp, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return err
 	}
@@ -440,7 +436,7 @@ func ExportRulesToFile(db *gorm.DB, fileName string) error {
 			log.Errorf("marshal rules failed: %s", err)
 			continue
 		}
-		var rawMap = make(map[string]any)
+		rawMap := make(map[string]any)
 		if err := json.Unmarshal(raw, &rawMap); err != nil {
 			log.Errorf("unmarshal rules failed: %s", err)
 			continue
