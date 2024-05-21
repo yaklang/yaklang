@@ -460,7 +460,7 @@ var startGRPCServerCommand = cli.Command{
 			unaryInterceptors = append(unaryInterceptors, slowLogUnaryInterceptor)
 			log.SetLevel(log.DebugLevel)
 		}
-		log.Infof("start to create grpc schema...")
+		log.Debug("start to create grpc schema...")
 		grpcTrans := grpc.NewServer(
 			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(streamInterceptors...)),
 			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(unaryInterceptors...)),
