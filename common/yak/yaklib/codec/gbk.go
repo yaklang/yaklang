@@ -2,7 +2,10 @@ package codec
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/encoding/traditionalchinese"
@@ -88,6 +91,95 @@ func preNUm(data byte) int {
 	}
 	return num
 }
+
+// UTF8SafeEscapeForEditorView will remove some unfriendly chars for editor
+func UTF8SafeEscapeForEditorView(i any) string {
+	var res = bytes.NewBuffer(nil)
+	var raw = AnyToBytes(i)
+	idx := 0
+	for idx <= len(raw) {
+		runeWord, n := utf8.DecodeRune(raw[idx:])
+		if n == 0 {
+			break
+		}
+
+		lastIdx := idx
+		idx += n
+		if runeWord == utf8.RuneError {
+			word := raw[lastIdx]
+			res.WriteString(`\x`)
+			res.WriteString(fmt.Sprintf("%02x", word))
+			continue
+		}
+
+		// break line
+		if n == 1 {
+			if !unicode.IsPrint(runeWord) {
+				continue
+			}
+			switch runeWord {
+			case '\x00', // NULL
+				'\x01', // Start of Heading
+				'\x02', // Start of Text
+				'\x03', // End of Text
+				'\x04', // End of Transmission
+				'\x05', // Enquiry
+				'\x06', // Acknowledge
+				'\x07', // Bell
+				'\x08', // Backspace
+				'\x0d', // Carriage Return
+				'\x0e', // Shift Out
+				'\x0f', // Shift In
+				'\x10', // Data Link Escape
+				'\x11', // Device Control One
+				'\x12', // Device Control Two
+				'\x13', // Device Control Three
+				'\x14', // Device Control Four
+				'\x15', // Negative Acknowledge
+				'\x16', // Synchronous Idle
+				'\x17', // End of Transmission Block
+				'\x18', // Cancel
+				'\x19', // End of Medium
+				'\x1a', // Substitute
+				'\x1b', // Escape
+				'\x1c', // File Separator
+				'\x1d', // Group Separator
+				'\x1e', // Record Separator
+				'\x1f': // Unit Separator
+				continue
+			}
+			if runeWord > 0x7f {
+				continue
+			}
+		}
+		res.WriteRune(runeWord)
+	}
+	return res.String()
+}
+
+func UTF8SafeEscape(i any) string {
+	var res = bytes.NewBuffer(nil)
+	var raw = AnyToBytes(i)
+	idx := 0
+	for idx <= len(raw) {
+		runeWord, n := utf8.DecodeRune(raw[idx:])
+		if n == 0 {
+			break
+		}
+
+		lastIdx := idx
+		idx += n
+		if runeWord == utf8.RuneError {
+			word := raw[lastIdx]
+			res.WriteString(`\x`)
+			res.WriteString(fmt.Sprintf("%02x", word))
+			continue
+		}
+		res.WriteRune(runeWord)
+	}
+	return res.String()
+}
+
 func IsUtf8(data []byte) bool {
 	i := 0
 	for i < len(data) {
