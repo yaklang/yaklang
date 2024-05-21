@@ -1258,11 +1258,11 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 //
 // ------WebKitFormBoundary7MA4YWxkTrZu0gW
 // Content-Disposition: form-data; name="a"
-
+//
 // 1
 // ------WebKitFormBoundary7MA4YWxkTrZu0gW
 // Content-Disposition: form-data; name="b"
-
+//
 // 2
 // ------WebKitFormBoundary7MA4YWxkTrZu0gW--`, func(part) {
 // content = string(io.ReadAll(part)~)

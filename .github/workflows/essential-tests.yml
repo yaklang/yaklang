@@ -197,9 +197,7 @@ jobs:
               # cli
               go test --timeout 1m ./common/utils/cli
               # doc
-              go test --timeout 1m -run TestGenerateDoc ./common/yak/yakdoc/generate_doc
-              # doc type
-              go test --timeout 1m -run TestGetTypeNameWithPkgPath ./common/yak/yakdoc/
+              go test --timeout 1m  ./common/yak/yakdoc/...
           - name: Test BinParser
             run: |
               # binary parser
