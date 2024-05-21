@@ -92,8 +92,8 @@ func preNUm(data byte) int {
 	return num
 }
 
-// UTF8SafeEscapeForEditorView will remove some unfriendly chars for editor
-func UTF8SafeEscapeForEditorView(i any) string {
+// UTF8AndControlEscapeForEditorView will remove some unfriendly chars for editor
+func UTF8AndControlEscapeForEditorView(i any) string {
 	var res = bytes.NewBuffer(nil)
 	var raw = AnyToBytes(i)
 	idx := 0
@@ -114,9 +114,6 @@ func UTF8SafeEscapeForEditorView(i any) string {
 
 		// break line
 		if n == 1 {
-			if !unicode.IsPrint(runeWord) {
-				continue
-			}
 			switch runeWord {
 			case '\x00', // NULL
 				'\x01', // Start of Heading
@@ -151,7 +148,10 @@ func UTF8SafeEscapeForEditorView(i any) string {
 			if runeWord > 0x7f {
 				continue
 			}
+		} else if unicode.IsControl(runeWord) {
+			continue
 		}
+
 		res.WriteRune(runeWord)
 	}
 	return res.String()
