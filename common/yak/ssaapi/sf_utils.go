@@ -66,6 +66,18 @@ func (p *Program) SyntaxFlow(i string, opts ...any) map[string]Values {
 	return vals
 }
 
+func (p *Program) SyntaxFlowChain(i string, opts ...any) Values {
+	var results Values
+	vals, _ := p.SyntaxFlowWithError(i)
+	if vals == nil {
+		return results
+	}
+	for _, element := range vals {
+		results = append(results, element...)
+	}
+	return results
+}
+
 func (p *Program) SyntaxFlowWithError(i string, opts ...any) (map[string]Values, error) {
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
 	vm.Debug()

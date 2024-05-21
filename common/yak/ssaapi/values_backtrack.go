@@ -48,6 +48,22 @@ func (v *Value) RecursiveDependsAndEffects(h func(value *Value) error) {
 	}, h)
 }
 
+// FindStrictCommonDepends 在给定的值集合中查找具有严格共同依赖的值。
+//
+// FindStrictCommonDepends searches for values with strictly common dependencies
+// in the given collection of values.
+//
+// 它遍历给定的值集合，比较每对值之间的依赖关系，并返回所有具有严格共同依赖的值的集合。
+//
+// It iterates over the given collection of values, compares the dependencies
+// between each pair of values, and returns a collection of all values with strictly
+// common dependencies.
+//
+// 严格共同依赖是指只有当值 A 依赖于值 B，而值 B 也依赖于值 A 时，这两个值才被认为具有严格共同依赖。
+//
+// Strict common dependencies refer to the scenario where value A depends on
+// value B, and value B depends on value A for them to be considered to have
+// strict common dependencies.
 func FindStrictCommonDepends(val Values) Values {
 	for _, v := range val {
 		if len(v.DependOn) == 0 && len(v.EffectOn) == 0 {
@@ -78,6 +94,20 @@ func FindStrictCommonDepends(val Values) Values {
 	return common
 }
 
+// FindFlexibleCommonDepends 在给定的值集合中查找具有灵活共同依赖的值。
+//
+// FindFlexibleCommonDepends searches for values with flexible common dependencies
+// in the given collection of values.
+//
+// 它与 FindStrictCommonDepends 类似，但在查找共同依赖时，会尝试重新构建值的顶层定义。
+//
+// It is similar to FindStrictCommonDepends, but when searching for common dependencies,
+// it attempts to rebuild the top-level definition of values.
+//
+// 具有灵活共同依赖的值是指通过重新构建顶层定义，从而可能包括更多的依赖关系。
+//
+// Values with flexible common dependencies are those that may include more
+// dependencies by rebuilding the top-level definition.
 func FindFlexibleCommonDepends(val Values) Values {
 	for _, v := range val {
 		if len(v.DependOn) == 0 && len(v.EffectOn) == 0 {
@@ -93,6 +123,11 @@ func FindFlexibleCommonDepends(val Values) Values {
 	for _, fromTo := range results {
 		from := fromTo[0]
 		to := fromTo[1]
+
+		if from.GetId() == to.GetId() {
+			continue
+		}
+
 		// rebuild the top defs
 		from.GetTopDefs()
 		from.RecursiveDepends(func(value *Value) error {
