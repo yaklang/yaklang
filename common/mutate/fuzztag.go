@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils/dateparse"
 	"github.com/yaklang/yaklang/common/utils/regen"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yso"
 
@@ -997,6 +998,19 @@ func init() {
 		},
 		Alias:       []string{"rand:str", "rs", "rands"},
 		Description: "随机生成个字符串，定义为 {{randstr(10)}} 生成长度为 10 的随机字符串，{{randstr(1,30)}} 生成长度为 1-30 为随机字符串，{{randstr(1,30,10)}} 生成 10 个随机字符串，长度为 1-30",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "unquoteex",
+		Handler: func(s string) []string {
+			raw, err := yakunquote.Unquote(s, true)
+			if err != nil {
+				return []string{s}
+			}
+
+			return []string{raw}
+		},
+		Description: "把内容进行去转义",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
