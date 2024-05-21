@@ -29,3 +29,29 @@ func TestUTF8Safe(t *testing.T) {
 		}
 	}
 }
+
+func TestUTF8View(t *testing.T) {
+	for _, c := range []struct {
+		Input   string
+		Contain []string
+	}{
+		{
+			Input: "abcdefg\x00", Contain: []string{`abcdefg`},
+		},
+		{
+			Input: "\u202eabc", Contain: []string{`abc`},
+		},
+		{
+			Input: "\n\u202eabc", Contain: []string{"\nabc"},
+		},
+	} {
+		ret := UTF8AndControlEscapeForEditorView(c.Input)
+		log.Infof("UTF8SafeEscape(%#v) -> %#v", c.Input, ret)
+		fmt.Println(ret)
+		for _, s := range c.Contain {
+			if !strings.Contains(ret, s) {
+				t.Fatalf("expect: %#v in %#v", s, ret)
+			}
+		}
+	}
+}
