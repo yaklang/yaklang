@@ -5,6 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"reflect"
+	"sort"
+	"strings"
+
 	"github.com/antchfx/xmlquery"
 	"github.com/asaskevich/govalidator"
 	"github.com/tidwall/gjson"
@@ -13,13 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"reflect"
-	"sort"
-	"strings"
 )
 
 const (
@@ -519,13 +520,25 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 	}
 
 	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
+	vals := lowhttp.ParseQueryParams(req.URL.RawQuery)
+	filtered := make(map[string]struct{})
 
-	for key, values := range req.URL.Query() {
+	for _, item := range vals.Items {
+		key, value, valueRaw := item.Key, item.Value, item.ValueRaw
+		if _, ok := filtered[key]; ok {
+			// 重复的参数不再处理
+			continue
+		} else {
+			filtered[key] = struct{}{}
+		}
+		if key == "" {
+			key = item.Raw
+		}
 		if !strVisible(key) {
 			continue
 		}
 
-		if raw, ok := utils.IsJSON(values[0]); ok {
+		if raw, ok := utils.IsJSON(value); ok {
 			fixRaw := strings.TrimSpace(raw)
 			call := func(jk, jv gjson.Result, gPath, jPath string) {
 				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
@@ -541,7 +554,7 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if bs64Raw, ok := isStrictBase64(values[0]); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := isStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
@@ -564,22 +577,17 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 				position:   posGetQueryBase64,
 				param:      key,
 				paramValue: bs64Raw,
-				raw:        values,
+				raw:        valueRaw,
 				origin:     f,
 			})
 
 		}
-		var pv any
-		if len(values) == 1 {
-			pv = values[0]
-		} else {
-			pv = values
-		}
+
 		param := &FuzzHTTPRequestParam{
 			position:   posGetQuery,
 			param:      key,
-			raw:        values,
-			paramValue: pv,
+			raw:        valueRaw,
+			paramValue: value,
 			origin:     f,
 		}
 		fuzzParams = append(fuzzParams, param)
@@ -730,22 +738,27 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 
 	body := httpRequestReadBody(req)
 	bodyStr := string(body)
-	r, err := url.ParseQuery(bodyStr)
-	if err != nil {
-		return nil
-	}
-
 	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
-	for key, values := range r {
+
+	vals := lowhttp.ParseQueryParams(bodyStr)
+	filtered := make(map[string]struct{})
+
+	for _, item := range vals.Items {
+		key, value, valueRaw := item.Key, item.Value, item.ValueRaw
+		if _, ok := filtered[key]; ok {
+			// 重复的参数不再处理
+			continue
+		} else {
+			filtered[key] = struct{}{}
+		}
+		if key == "" {
+			key = item.Raw
+		}
 		if !strVisible(key) {
 			continue
 		}
 
-		if len(values) <= 0 || len(r.Get(key)) == 0 {
-			continue
-		}
-
-		if raw, ok := utils.IsJSON(values[0]); ok {
+		if raw, ok := utils.IsJSON(value); ok {
 			fixRaw := strings.TrimSpace(raw)
 			call := func(jk, jv gjson.Result, gPath, jPath string) {
 				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
@@ -762,7 +775,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if bs64Raw, ok := isStrictBase64(values[0]); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := isStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
@@ -783,22 +796,17 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 				position:   posPostQueryBase64,
 				param:      key,
 				paramValue: bs64Raw,
-				raw:        values,
+				raw:        valueRaw,
 				origin:     f,
 			})
 
 		}
-		var pv any
-		if len(values) == 1 {
-			pv = values[0]
-		} else {
-			pv = values
-		}
+
 		param := &FuzzHTTPRequestParam{
 			position:   posPostQuery,
 			param:      key,
-			paramValue: pv,
-			raw:        bodyStr,
+			paramValue: value,
+			raw:        valueRaw,
 			origin:     f,
 		}
 		fuzzParams = append(fuzzParams, param)
