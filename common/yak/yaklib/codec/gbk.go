@@ -148,7 +148,7 @@ func UTF8AndControlEscapeForEditorView(i any) string {
 			if runeWord > 0x7f {
 				continue
 			}
-		} else if unicode.IsControl(runeWord) {
+		} else if IsControl(runeWord) {
 			continue
 		}
 
@@ -208,4 +208,26 @@ func IsUtf8(data []byte) bool {
 		}
 	}
 	return true
+}
+
+var controlChars = []rune{
+	0x061C,
+	0x200E,
+	0x200F,
+	0x202A,
+	0x202B,
+	0x202C,
+	0x202D,
+	0x202E,
+	0x2066,
+	0x2067,
+	0x2068,
+	0x2069,
+	0xFFF9,
+	0xFFFA,
+	0xFFFB,
+}
+
+func IsControl(r rune) bool {
+	return unicode.IsControl(r) || unicode.In(r, unicode.Bidi_Control) || unicode.In(r, unicode.Join_Control)
 }
