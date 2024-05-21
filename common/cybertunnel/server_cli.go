@@ -208,7 +208,7 @@ func GetTunnelServerCommandCli() *cli.App {
 			unaryInterceptors = append(unaryInterceptors, authUnaryInterceptor)
 		}
 
-		log.Infof("start to create grpc schema...")
+		log.Info("start to create grpc schema...")
 		grpcTrans := grpc.NewServer(
 			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(streamInterceptors...)),
 			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(unaryInterceptors...)),

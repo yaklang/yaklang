@@ -26,42 +26,46 @@ import (
 
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
-		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string, payloads []string) {
-			if rsp == nil || len(rsp) == 0 {
-				return
-			}
-			db := consts.GetGormProjectDatabase()
-			flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr)
-			if err != nil {
-				log.Errorf("create httpflow from lowhttp failed: %s", err)
-				return
-			}
-			if reqSource != "" {
-				flow.AddTag(reqSource)
-			} else {
-				if reqSource := os.Getenv(consts.YAKIT_PLUGIN_ID); reqSource != "" {
-					flow.AddTag(reqSource)
-				}
-			}
-			switch ret := strings.ToLower(reqSource); ret {
-			case "mitm":
-				flow.SourceType = "mitm"
-			case "basic-crawler", "crawler", "crawlerx":
-				flow.SourceType = "basic-crawler"
-			case "scan", "port-scan", "plugin":
-				flow.SourceType = "scan"
-
-			}
-			flow.FromPlugin = fromPlugin
-			flow.RuntimeId = runtimeId
-			flow.HiddenIndex = hiddenIndex
-			flow.Payload = strings.Join(payloads, ",")
-			err = InsertHTTPFlow(db, flow)
-			if err != nil {
-				log.Errorf("save httpflow failed: %s", err)
-			}
-		})
+		RegisterLowHTTPSaveCallback()
 		return nil
+	})
+}
+
+func RegisterLowHTTPSaveCallback() {
+	lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string, payloads []string) {
+		if rsp == nil || len(rsp) == 0 {
+			return
+		}
+		db := consts.GetGormProjectDatabase()
+		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr)
+		if err != nil {
+			log.Errorf("create httpflow from lowhttp failed: %s", err)
+			return
+		}
+		if reqSource != "" {
+			flow.AddTag(reqSource)
+		} else {
+			if reqSource := os.Getenv(consts.YAKIT_PLUGIN_ID); reqSource != "" {
+				flow.AddTag(reqSource)
+			}
+		}
+		switch ret := strings.ToLower(reqSource); ret {
+		case "mitm":
+			flow.SourceType = "mitm"
+		case "basic-crawler", "crawler", "crawlerx":
+			flow.SourceType = "basic-crawler"
+		case "scan", "port-scan", "plugin":
+			flow.SourceType = "scan"
+
+		}
+		flow.FromPlugin = fromPlugin
+		flow.RuntimeId = runtimeId
+		flow.HiddenIndex = hiddenIndex
+		flow.Payload = strings.Join(payloads, ",")
+		err = InsertHTTPFlow(db, flow)
+		if err != nil {
+			log.Errorf("save httpflow failed: %s", err)
+		}
 	})
 }
 
