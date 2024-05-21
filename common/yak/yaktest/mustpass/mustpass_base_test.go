@@ -50,7 +50,7 @@ func init() {
 
 func TestMustPass(t *testing.T) {
 	yakit.RegisterLowHTTPSaveCallback()
-	
+
 	var cases [][]string
 	for k, v := range files {
 		cases = append(cases, []string{k, v})
