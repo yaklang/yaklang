@@ -41,7 +41,7 @@ func ExtractOpenAPI3Scheme(domain string) (*openapi3.T, error) {
 	var err error
 	db := consts.GetGormProjectDatabase()
 	db = db.Where("(url GLOB ?) or (url GLOB ?)", `http://`+domain+`/*`, `https://`+domain+`/*`)
-	db = db.Debug()
+	// db = db.Debug()
 	var c = make(chan *openapigen.BasicHTTPFlow)
 	go func() {
 		defer func() {
