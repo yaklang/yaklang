@@ -329,3 +329,42 @@ func TestGRPCCodecFlowFuzztag(t *testing.T) {
 	}
 	require.Equal(t, expected, res[0])
 }
+
+func TestGRPCCodecFlow(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType:  "Base64Decode",
+			Script:     "",
+			PluginName: "",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "Alphabet",
+					Value: "standard",
+				},
+			},
+		},
+	}
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	codeData := "\u202etest\x00\n\xff你好"
+	expectViewData := "test\n\\xff你好"
+
+	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       codec.EncodeBase64(codeData),
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil || rsp == nil {
+		t.Fatal(err)
+	}
+
+	require.Equal(t, codeData, string(rsp.GetRawResult()), "rawRes decode error")
+	require.Equal(t, true, rsp.GetIsFalseAppearance(), "IsFalseAppearance check error")
+	require.Equal(t, expectViewData, rsp.GetResult(), "result check error")
+
+}
