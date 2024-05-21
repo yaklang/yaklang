@@ -67,5 +67,9 @@ func CodecFlowExec(req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err erro
 			return nil, err
 		}
 	}
-	return &ypb.CodecResponse{Result: utils.EscapeInvalidUTF8Byte(codecFlow.Text), RawResult: codecFlow.Text}, nil
+	return &ypb.CodecResponse{
+		//ResultVerbose: codec.UTF8SafeEscapeForEditorView(codecFlow.Text),
+		Result:    codec.UTF8SafeEscapeForEditorView(codecFlow.Text),
+		RawResult: codecFlow.Text,
+	}, nil
 }
