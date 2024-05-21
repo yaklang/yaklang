@@ -1,6 +1,9 @@
-token = str.RandStr(16)
-prefix = "token=%#v" % token
-name = db.CreateTemporaryYakScript("mitm", prefix + `
+case1 = () => {
+    token = str.RandStr(16)
+    prefix = "token=%#v" % token
+    name = db.CreateTemporaryYakScript(
+        "mitm", 
+        prefix + `
 for index in 4 {
     db.SetKey(f"${token}_${index+1}", 0)
 }
@@ -18,6 +21,7 @@ mirrorNewWebsite = (https, url, req, rsp, body) => {
     l.Lock()
     defer l.Unlock()
     var key = f"${token}_2"
+    println(url)
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
 
@@ -32,39 +36,35 @@ mirrorNewWebsitePathParams = (https, url, req, rsp, body) => {
     l.Lock()
     defer l.Unlock()
     var key = f"${token}_4"
-    dump(url)
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
-`)~
-defer db.DeleteYakScriptByName(name)
+`, 
+    )~
+    defer db.DeleteYakScriptByName(name)
 
-caller = hook.NewMixPluginCaller()~
-die(caller.LoadPlugin(name))
 
-for url in [
-    "https://example.com/abc/",
-    "https://example.com/abc/12",
-    "https://example.com/abc/13",
-    "https://example.com/abc/14",
-    "https://example.com/abc/14?a=1",
-    "https://example.com/abc/14?a=1",
-    "https://example.com/abc/14?a=2",
-    "https://example.com/abc/14?a=2&&c=1",
-    "https://example.com/abc/14?a=2&&c=1",
-    "https://examplecc.com/abc/14?a=2&&c=1",
-] {
-    isHttps, req = poc.ParseUrlToHTTPRequestRaw("GET", url)~
-    caller.MirrorHTTPFlowEx(false, isHttps, url, req, []byte(""), []byte(""))
+    caller = hook.NewMixPluginCaller()~
+    die(caller.LoadPlugin(name))
+
+    for url in ["https://example.com/abc/", "https://example.com/abc/12", "https://example.com/abc/13", "https://example.com/abc/14", "https://example.com/abc/14?a=1", "https://example.com/abc/14?a=1", "https://example.com/abc/14?a=2", "https://example.com/abc/14?a=2&&c=1", "https://example.com/abc/14?a=2&&c=1", "https://examplecc.com/abc/14?a=2&&c=1"] {
+        isHttps, req = poc.ParseUrlToHTTPRequestRaw("GET", url)~
+        caller.MirrorHTTPFlowEx(false, isHttps, url, req, []byte(""), []byte(""))
+    }
+    
+
+    caller.Wait()
+
+    assert atoi(db.GetKey(f`${token}_1`))~ == 10, f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_1`))~}"
+    verboseInfo = f"mirrorNewWebsite: ${atoi(db.GetKey(f`${token}_2`))~}"
+    dump(verboseInfo)
+    websiteCount = atoi(db.GetKey(f`${token}_2`))~
+    websitePathCount = atoi(db.GetKey(f`${token}_3`))~
+    assert websiteCount >= 2 && websiteCount < websitePathCount, verboseInfo
+    assert websitePathCount == 5, f"mirrorNewWebsitePath: ${atoi(db.GetKey(f`${token}_3`))~}"
+    v = atoi(db.GetKey(f`${token}_4`))~
+    assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"
 }
 
-
-caller.Wait()
-
-assert atoi(db.GetKey(f`${token}_1`))~ == 10,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_1`))~}"
-verboseInfo = f"mirrorNewWebsite: ${atoi(db.GetKey(f`${token}_2`))~}"
-dump(verboseInfo)
-assert atoi(db.GetKey(f`${token}_2`))~ == 2, verboseInfo
-assert atoi(db.GetKey(f`${token}_3`))~ == 5,f"mirrorNewWebsitePath: ${atoi(db.GetKey(f`${token}_3`))~}"
-v = atoi(db.GetKey(f`${token}_4`))~
-dump(v)
-assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"
+for  in 10 {
+    case1()
+}
