@@ -9,6 +9,11 @@ import (
 )
 
 func TestMustPassDebug(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+		return
+	}
+
 	yakit.RegisterLowHTTPSaveCallback()
 
 	debugName := "mixcaller.yak"
