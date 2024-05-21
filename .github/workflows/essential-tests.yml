@@ -196,6 +196,8 @@ jobs:
             run: |
               # cli
               go test --timeout 1m ./common/utils/cli
+              # doc
+              go test --timeout 1m  ./common/yak/yakdoc/...
           - name: Test BinParser
             run: |
               # binary parser
