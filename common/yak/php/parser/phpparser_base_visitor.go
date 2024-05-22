@@ -471,6 +471,10 @@ func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitSliceCallAutoAssignmentExpression(ctx *SliceCallAutoAssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -520,6 +524,10 @@ func (v *BasePHPParserVisitor) VisitFieldMemberCallAssignmentExpression(ctx *Fie
 }
 
 func (v *BasePHPParserVisitor) VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitIndexLegacyCallExpression(ctx *IndexLegacyCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

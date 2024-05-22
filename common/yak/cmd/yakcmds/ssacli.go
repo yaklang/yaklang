@@ -5,6 +5,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -47,6 +48,9 @@ var SSACompilerCommands = []*cli.Command{
 			},
 		},
 		Action: func(c *cli.Context) error {
+			db := ssadb.GetDB()
+			_ = db
+
 			programName := c.String("program")
 			entry := c.String("entry")
 			language := c.String("language")

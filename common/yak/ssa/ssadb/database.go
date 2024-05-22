@@ -23,4 +23,5 @@ func DeleteProgram(db *gorm.DB, program string) {
 	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
 	db.Model(&IrVariable{}).Where("program_name = ?", program).Unscoped().Delete(&IrVariable{})
 	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrScopeNode{})
+	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
 }

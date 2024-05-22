@@ -180,6 +180,7 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 		log.Errorf("FitIRCode error: %s", err)
 		return false
 	}
+
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}

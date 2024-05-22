@@ -107,6 +107,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
 		return y.ReadMemberCallVariable(obj, key)
+	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
+		obj := y.VisitExpression(ret.Expression())
+		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.MemberCallExpressionContext: // $a->b
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
@@ -115,6 +119,23 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		// build left
 		object := y.VisitExpression(ret.Expression(0))
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		member := y.CreateMemberCallVariable(object, key)
+		// right
+		rightValue := y.VisitExpression(ret.Expression(1))
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
+		y.AssignVariable(member, rightValue)
+		return rightValue
+	case *phpparser.SliceCallAutoAssignmentExpressionContext: // $a[] = expr
+		// build left
+		object := y.VisitExpression(ret.Expression(0))
+		//key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		key := y.EmitUndefined("-1")
+		log.Warn("TBD: $a[] = expr; auto assign for slice")
+		log.Warn("TBD: $a[] = expr; auto assign for slice")
+		log.Warn("TBD: $a[] = expr; auto assign for slice")
+		log.Warn("TBD: $a[] = expr; auto assign for slice")
+		log.Warn("TBD: $a[] = expr; auto assign for slice")
+		log.Warn("TBD: $a[] = expr; auto assign for slice")
 		member := y.CreateMemberCallVariable(object, key)
 		// right
 		rightValue := y.VisitExpression(ret.Expression(1))
@@ -139,6 +160,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}()
 
 		fname := y.VisitExpression(ret.Expression())
+		if ret, isConst := ssa.ToConst(fname); isConst {
+			funcName := ret.VarString()
+			fname = y.ReadValue(funcName)
+		}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
 		callInst := y.NewCall(fname, args)
 		if ellipsis {
@@ -1017,6 +1042,10 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 			initVal = y.EmitBinOp(ssa.OpAdd, initVal, y.VisitConstantString(c))
 		}
 		if initVal == nil {
+			if i.GetText() == "array()" {
+				log.Warnf("create an emtpy make via `array()`")
+				return y.EmitMakeWithoutType(y.EmitConstInst(0), y.EmitConstInst(0))
+			}
 			log.Errorf("unhandled constant initializer: %v", i.GetText())
 			return y.EmitConstInstNil()
 		}

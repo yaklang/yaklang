@@ -355,6 +355,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#SliceCallAutoAssignmentExpression.
+	VisitSliceCallAutoAssignmentExpression(ctx *SliceCallAutoAssignmentExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#StaticClassMemberCallAssignmentExpression.
 	VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{}
 
@@ -393,6 +396,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#ComparisonExpression.
 	VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#IndexLegacyCallExpression.
+	VisitIndexLegacyCallExpression(ctx *IndexLegacyCallExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#OrdinaryAssignmentExpression.
 	VisitOrdinaryAssignmentExpression(ctx *OrdinaryAssignmentExpressionContext) interface{}
