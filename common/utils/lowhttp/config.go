@@ -42,7 +42,7 @@ type LowhttpExecConfig struct {
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
 	Proxy                            []string
-	ForceLegacyProxy                 bool
+	ForceLegacyProxy                 bool // use http proxy
 	NoFixContentLength               bool
 	RedirectHandler                  func(bool, []byte, []byte) bool
 	Session                          interface{}

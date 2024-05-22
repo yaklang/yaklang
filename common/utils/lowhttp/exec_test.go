@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"net"
 	"net/http"
@@ -18,6 +19,72 @@ import (
 
 	_ "github.com/yaklang/yaklang/common/utils/tlsutils"
 )
+
+/*
+TestProxy
+
+1. test http proxy
+2. test socks proxy
+3. test auto switch valid proxy
+4. test force proxy
+*/
+func TestProxy(t *testing.T) {
+	// test http proxy and auto switch valid proxy
+	port := utils.GetRandomAvailableTCPPort()
+	l, err := net.Listen("tcp", spew.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := ""
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		conn, err := l.Accept()
+		conn, err = l.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		content = string(utils.StableReader(conn, time.Second, 1024))
+		cancel()
+		conn.Close()
+	}()
+	err = utils.WaitConnect(spew.Sprintf("127.0.0.1:%d", port), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	HTTPWithoutRedirect(WithPacketBytes(reqRaw), WithProxy("http://127.0.0.1:65510", "http://127.0.0.1:"+spew.Sprint(port)), WithContext(ctx))
+	assert.Equal(t, `CONNECT www.example.com:80 HTTP/1.1
+Host: www.example.com:80
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36
+Connection: keep-alive
+Proxy-Connection: keep-alive
+
+`, strings.Replace(content, "\r", "", -1))
+
+	// test socks proxy
+	port = utils.GetRandomAvailableTCPPort()
+	l, err = net.Listen("tcp", spew.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentBytes := []byte{}
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() {
+		conn, err := l.Accept()
+		conn, err = l.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		contentBytes = (utils.StableReader(conn, time.Second, 1024))
+		cancel()
+		conn.Close()
+	}()
+	err = utils.WaitConnect(spew.Sprintf("127.0.0.1:%d", port), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	HTTPWithoutRedirect(WithPacketBytes(reqRaw), WithProxy("socks5://127.0.0.1:"+spew.Sprint(port)), WithContext(ctx))
+	assert.Equal(t, []byte{5, 1, 0}, contentBytes)
+}
 
 func TestLowhttp_Pipeline_AutoFix(t *testing.T) {
 	count := 0
@@ -528,3 +595,11 @@ func TestLowhttp_RESP_StreamBody(t *testing.T) {
 		panic("Response has content")
 	}
 }
+
+var (
+	reqRaw = []byte(`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{"key": "value"}`)
+)

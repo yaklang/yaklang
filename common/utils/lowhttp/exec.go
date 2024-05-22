@@ -153,6 +153,38 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		opt(option)
 	}
 
+	// filter invalid proxy , split legacy proxy(http) and ordinary proxy(socks5)
+	// forceProxy := len(proxy) > 0
+	var httpProxy []string
+	var socksProxy []string
+	for _, p := range option.Proxy {
+		i, err := url.Parse(p)
+		if err != nil {
+			log.Warnf("parse proxy url failed: %s", err)
+			continue
+		}
+		if i.Hostname() == "" {
+			log.Warnf("empty hostname in proxy url: %s", p)
+			continue
+		}
+		if i.Scheme == "http" || i.Scheme == "https" {
+			httpProxy = append(httpProxy, p)
+		} else if i.Scheme == "socks5" || i.Scheme == "socks5h" || i.Scheme == "socks4" || i.Scheme == "socks4a" {
+			socksProxy = append(socksProxy, p)
+		} else {
+			log.Warnf("unsupported proxy scheme: %s", i.Scheme)
+		}
+	}
+	proxy := append(httpProxy, socksProxy...)
+	forceProxy := len(proxy) > 0
+	proxy = utils.StringArrayFilterEmpty(proxy)
+	legacyProxy := httpProxy
+	//if option.ForceLegacyProxy { // LegacyProxy protocol is socks?
+	//	proxy = socksProxy
+	//}
+	if option.ForceLegacyProxy { // LegacyProxy protocol is socks?
+		proxy = httpProxy
+	}
 	var (
 		https                = option.Https
 		forceHttp2           = option.Http2
@@ -168,7 +200,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		retryWaitTime        = option.RetryWaitTime
 		retryMaxWaitTime     = option.RetryMaxWaitTime
 		noFixContentLength   = option.NoFixContentLength
-		proxy                = option.Proxy
 		saveHTTPFlow         = option.SaveHTTPFlow
 		session              = option.Session
 		ctx                  = option.Ctx
@@ -227,32 +258,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		case <-saveCtx.Done():
 		}
 	}()
-	var newProxy []string
-	for _, p := range proxy {
-		i, err := url.Parse(p)
-		if err != nil {
-			continue
-		}
-		if i.Hostname() == "" {
-			continue
-		}
-		newProxy = append(newProxy, p)
-	}
-	proxy = newProxy
-
-	forceProxy := len(proxy) > 0
-	var legacyProxy []string
-	if option.ForceLegacyProxy {
-		var ordinaryProxy []string
-		lo.ForEach(proxy, func(i string, idx int) {
-			if utils.IsHttpOrHttpsUrl(i) {
-				legacyProxy = append(legacyProxy, i)
-			} else {
-				ordinaryProxy = append(ordinaryProxy, i)
-			}
-		})
-		proxy = ordinaryProxy
-	}
 
 	if gmTLS {
 		https = true
