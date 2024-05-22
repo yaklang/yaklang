@@ -38,7 +38,7 @@ func ReducerCompile(base string, opts ...Option) error {
 			if c.stopAtCompileError {
 				return err
 			}
-			if errors.As(err, &SkippedError) {
+			if errors.Is(err, SkippedError) {
 				return nil
 			}
 			log.Warnf("Compile error: %v", err)
