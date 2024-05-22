@@ -157,6 +157,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	// forceProxy := len(proxy) > 0
 	var httpProxy []string
 	var socksProxy []string
+	var validProxy []string
 	for _, p := range option.Proxy {
 		i, err := url.Parse(p)
 		if err != nil {
@@ -169,14 +170,15 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 		if i.Scheme == "http" || i.Scheme == "https" {
 			httpProxy = append(httpProxy, p)
-		} else if i.Scheme == "socks5" || i.Scheme == "socks5h" || i.Scheme == "socks4" || i.Scheme == "socks4a" {
+			validProxy = append(validProxy, p)
+		} else if i.Scheme == "socks" || i.Scheme == "socks5" || i.Scheme == "s5" || i.Scheme == "socks4" || i.Scheme == "s4" || i.Scheme == "socks4a" || i.Scheme == "s4a" { // same as dialx_force_proxy.go#connectForceProxy
 			socksProxy = append(socksProxy, p)
+			validProxy = append(validProxy, p)
 		} else {
 			log.Warnf("unsupported proxy scheme: %s", i.Scheme)
 		}
 	}
-	proxy := append(httpProxy, socksProxy...)
-	forceProxy := len(proxy) > 0
+	proxy := validProxy
 	proxy = utils.StringArrayFilterEmpty(proxy)
 	legacyProxy := httpProxy
 	//if option.ForceLegacyProxy { // LegacyProxy protocol is socks?
@@ -430,9 +432,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		conn       net.Conn
 		retryTimes int
 	)
-	if len(proxy) == 1 && proxy[0] == "" {
-		proxy = proxy[1:]
-	}
 
 	totalTimeStart := time.Now()
 	defer func() {
@@ -480,11 +479,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 	}
 
-	if forceProxy {
-		dialopts = append(dialopts, netx.DialX_WithForceProxy(forceProxy))
-	}
-
 	if len(proxy) > 0 {
+		dialopts = append(dialopts, netx.DialX_WithForceProxy(true))
 		dialopts = append(dialopts, netx.DialX_WithProxy(proxy...))
 	}
 

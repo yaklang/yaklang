@@ -26,7 +26,7 @@ TestProxy
 1. test http proxy
 2. test socks proxy
 3. test auto switch valid proxy
-4. test force proxy
+4. test force http proxy
 */
 func TestProxy(t *testing.T) {
 	// test http proxy and auto switch valid proxy
@@ -84,6 +84,64 @@ Proxy-Connection: keep-alive
 	}
 	HTTPWithoutRedirect(WithPacketBytes(reqRaw), WithProxy("socks5://127.0.0.1:"+spew.Sprint(port)), WithContext(ctx))
 	assert.Equal(t, []byte{5, 1, 0}, contentBytes)
+
+	// test socks proxy
+	port = utils.GetRandomAvailableTCPPort()
+	l, err = net.Listen("tcp", spew.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content = ""
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() {
+		conn, err := l.Accept()
+		conn, err = l.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		content = string(utils.StableReader(conn, time.Second, 1024))
+		cancel()
+		conn.Close()
+	}()
+	err = utils.WaitConnect(spew.Sprintf("127.0.0.1:%d", port), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	HTTPWithoutRedirect(WithPacketBytes(reqRaw), WithProxy("socks5://127.0.0.1:"+spew.Sprint(port), "http://127.0.0.1:"+spew.Sprint(port)), WithContext(ctx), WithForceLegacyProxy(true))
+	assert.Equal(t, `CONNECT www.example.com:80 HTTP/1.1
+Host: www.example.com:80
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36
+Connection: keep-alive
+Proxy-Connection: keep-alive
+
+`, strings.Replace(content, "\r", "", -1))
+
+	content = ""
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() {
+		conn, err := l.Accept()
+		conn, err = l.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		content = string(utils.StableReader(conn, time.Second, 1024))
+		cancel()
+		conn.Close()
+	}()
+	err = utils.WaitConnect(spew.Sprintf("127.0.0.1:%d", port), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// lowhttp and Dialx both support automatically switching to a valid proxy, but the ForceLegacyProxy option only applies to Dialx
+	//	HTTPWithoutRedirect(WithPacketBytes(reqRaw), WithProxy("http://127.0.0.1:65510", "socks5://127.0.0.1:"+spew.Sprint(port)), WithContext(ctx), WithForceLegacyProxy(true))
+	//	assert.Equal(t, `CONNECT www.example.com:80 HTTP/1.1
+	//Host: www.example.com:80
+	//User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36
+	//Connection: keep-alive
+	//Proxy-Connection: keep-alive
+	//
+	//`, strings.Replace(content, "\r", "", -1))
+
 }
 
 func TestLowhttp_Pipeline_AutoFix(t *testing.T) {
