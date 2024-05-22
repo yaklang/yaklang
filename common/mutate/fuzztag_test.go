@@ -361,3 +361,9 @@ func TestUnicodeTag(t *testing.T) {
 		MutateQuick(`{{unicode:decode(\u0031\u0032\u0033\u0034)}}`),
 	)
 }
+
+func TestBigInt(t *testing.T) {
+	test := assert.New(t)
+	results := MutateQuick(`{{int(100000000000001-100000000000020)}}`)
+	test.Equal(20, len(results))
+}
