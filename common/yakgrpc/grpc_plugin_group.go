@@ -3,6 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -12,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptGroupRequest) (*ypb.QueryYakScriptGroupResponse, error) {
@@ -154,25 +156,25 @@ func (s *Server) RenameYakScriptGroup(ctx context.Context, req *ypb.RenameYakScr
 	if err != nil {
 		return nil, utils.Errorf("yakScript is empty")
 	}
-	sw := s.GetProfileDatabase().Begin()
-	for _, ret := range rets {
-		saveData := &schema.PluginGroup{
-			YakScriptName: ret.YakScriptName,
-			Group:         req.NewGroup,
+	utils.GormTransaction(s.GetProfileDatabase(), func(tx *gorm.DB) error {
+		for _, ret := range rets {
+			saveData := &schema.PluginGroup{
+				YakScriptName: ret.YakScriptName,
+				Group:         req.NewGroup,
+			}
+			saveData.Hash = saveData.CalcHash()
+			err = yakit.CreateOrUpdatePluginGroup(tx, saveData.Hash, saveData)
+			if err != nil {
+				return utils.Errorf("rename YakScriptGroup err %s", err.Error())
+			}
+			err = yakit.DeletePluginGroupByHash(tx, ret.Hash)
+			if err != nil {
+				return utils.Errorf("rename YakScriptGroup err %s", err.Error())
+			}
 		}
-		saveData.Hash = saveData.CalcHash()
-		err = yakit.CreateOrUpdatePluginGroup(sw, saveData.Hash, saveData)
-		if err != nil {
-			sw.Rollback()
-			return nil, utils.Errorf("rename YakScriptGroup err %s", err.Error())
-		}
-		err = yakit.DeletePluginGroupByHash(sw, ret.Hash)
-		if err != nil {
-			sw.Rollback()
-			return nil, utils.Errorf("rename YakScriptGroup err %s", err.Error())
-		}
-	}
-	sw.Commit()
+		return nil
+	})
+
 	return &ypb.Empty{}, nil
 }
 
