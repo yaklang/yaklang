@@ -1,6 +1,7 @@
 package antlr4util
 
 import (
+	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
@@ -15,7 +16,7 @@ func (el *ErrorListener) GetErrors() []string {
 }
 
 func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
-	el.err = append(el.err, msg)
+	el.err = append(el.err, fmt.Sprintf("%v:%v %v", line, column, msg))
 }
 
 func NewErrorListener() *ErrorListener {

@@ -1,6 +1,7 @@
 package ssareducer
 
 import (
+	"errors"
 	"io/fs"
 
 	"github.com/yaklang/yaklang/common/filter"
@@ -8,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
+
+var SkippedError error = utils.Error("compiling skipped")
 
 func ReducerCompile(base string, opts ...Option) error {
 	c := NewConfig(opts...)
@@ -34,6 +37,9 @@ func ReducerCompile(base string, opts ...Option) error {
 		if err != nil {
 			if c.stopAtCompileError {
 				return err
+			}
+			if errors.As(err, &SkippedError) {
+				return nil
 			}
 			log.Warnf("Compile error: %v", err)
 		}

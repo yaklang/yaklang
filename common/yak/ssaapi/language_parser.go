@@ -56,15 +56,15 @@ func (c *config) parseProject() ([]*Program, error) {
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
-			log.Infof("start to compile from: %v", path)
+			log.Debugf("start to compile from: %v", path)
 			startTime := time.Now()
 			prog, err := c.parseSimple(path, f)
 			endTime := time.Now()
-			log.Infof("compile %s cost: %v", path, endTime.Sub(startTime))
 			if err != nil {
-				log.Warnf("parse %#v failed: %v", path, err)
-				return nil, utils.Errorf("parse file %s error : %v", path, err)
+				log.Debugf("parse %#v failed: %v", path, err)
+				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
+			log.Infof("compile %s cost: %v", path, endTime.Sub(startTime))
 			ret = append(ret, NewProgram(prog, c))
 			exclude := prog.GetIncludeFiles()
 			if len(exclude) > 0 {
@@ -103,6 +103,7 @@ func (c *config) parseSimple(path string, r io.Reader) (ret *ssa.Program, err er
 			ret = nil
 			err = utils.Errorf("parse error with panic : %v", r)
 			log.Errorf("parse error with panic : %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
@@ -132,7 +133,7 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// auto select language by path filter, if not set language
 		if LanguageBuilder != nil {
 			if !LanguageBuilder.FilterFile(path) {
-				return nil, nil, utils.Errorf("file[%s] is filtered by language [%s], skip this file", path, language)
+				return nil, nil, utils.Wrapf(ssareducer.SkippedError, "file[%s] is filtered by language [%s], skip this file", path, language)
 			}
 		} else {
 			for lang, languageBuilder := range LanguageBuilders {

@@ -520,6 +520,10 @@ expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
+    | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
+    | expression OpenCurlyBracket indexMemberCallKey CloseCurlyBracket    # IndexLegacyCallExpression
+    | expression arguments                                        # FunctionCallExpression
+    | expression '->' memberCallKey                               # MemberCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | staticClassExpr                                             # StaticClassAccessExpression
     | variable                                                    # VariableExpression
@@ -547,9 +551,6 @@ expression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
     | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
     | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
-    | expression arguments                                        # FunctionCallExpression
-    | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
-    | expression '->' memberCallKey                               # MemberCallExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
     | expression InstanceOf typeRef                               # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
@@ -568,6 +569,7 @@ expression
     //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
     | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
+    | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
     | expression '->' memberCallKey assignmentOperator expression    # FieldMemberCallAssignmentExpression
     | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
     | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
