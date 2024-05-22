@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -1199,9 +1200,9 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 	}()
 
 	feedback(0)
-	gen := yakit.YieldPayloads(s.GetProfileDatabase().Model(&schema.Payload{}), ctx)
-	db := s.GetProfileDatabase()
+	db := s.GetProfileDatabase().Model(&schema.Payload{})
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
+		gen := yakit.YieldPayloads(tx, ctx)
 		for p := range gen {
 			size++
 			if p.Content == nil || (p.IsFile != nil && *p.IsFile) {
