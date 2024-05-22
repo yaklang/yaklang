@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/netx"
 
@@ -1569,48 +1570,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					GoColor = true
 				}
 
-				tx := s.GetProjectDatabase().Begin()
-				defer func() {
-					if err != nil {
-						tx.Rollback()
-					}
-				}()
-
-				if err = yakit.InsertHTTPFlow(tx, flow); err != nil {
-					return err
-				}
-
-				// for color hook
-				if !GoColor {
-					if len(extracted) != 0 {
-						for _, e := range extracted {
-							if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
-								return err
-							}
-						}
-					}
-					if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
+				return utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
+					if err = yakit.InsertHTTPFlow(tx, flow); err != nil {
 						return err
 					}
-				}
 
-				return tx.Commit().Error
-			}); err != nil {
-				log.Errorf("create / save httpflow from mirror error: %s", err)
-				flow.HiddenIndex = uuid.New().String() + "_" + flow.HiddenIndex
-			}
-
-			if GoColor {
-				go func() {
-					<-colorOK
-					if err := utils.RetryWithExpBackOff(func() (err error) {
-						tx := consts.GetGormProjectDatabase().Begin()
-						defer func() {
-							if err != nil {
-								tx.Rollback()
-							}
-						}()
-
+					// for color hook
+					if !GoColor {
 						if len(extracted) != 0 {
 							for _, e := range extracted {
 								if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
@@ -1621,8 +1587,31 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
 							return err
 						}
+					}
+					return nil
+				})
+			}); err != nil {
+				log.Errorf("create / save httpflow from mirror error: %s", err)
+				flow.HiddenIndex = uuid.New().String() + "_" + flow.HiddenIndex
+			}
 
-						return tx.Commit().Error
+			if GoColor {
+				go func() {
+					<-colorOK
+					if err := utils.RetryWithExpBackOff(func() (err error) {
+						return utils.GormTransaction(consts.GetGormProjectDatabase(), func(tx *gorm.DB) error {
+							if len(extracted) != 0 {
+								for _, e := range extracted {
+									if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
+										return err
+									}
+								}
+							}
+							if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
+								return err
+							}
+							return nil
+						})
 					}); err != nil {
 						log.Errorf("hookcolor error: %s", err)
 					}
