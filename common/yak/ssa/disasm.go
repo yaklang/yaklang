@@ -189,6 +189,9 @@ func (c Const) String() string {
 
 // ----------- const instruction
 func (c *ConstInst) String() string {
+	if c.Const == nil {
+		return ""
+	}
 	return c.Const.String()
 }
 
