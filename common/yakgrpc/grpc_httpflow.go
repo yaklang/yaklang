@@ -3,12 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -279,9 +280,7 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 	if req.GetIds() == nil || req.Module == "" || req.ExpiredTime == 0 {
 		return nil, utils.Error("params empty")
 	}
-	var (
-		data []HTTPFlowShare
-	)
+	var data []HTTPFlowShare
 
 	if len(req.GetIds()) > 50 {
 		return nil, utils.Error("exceed the limit")
@@ -323,100 +322,96 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 	if err != nil {
 		return nil, utils.Errorf("HTTPFlowsExtract failed: %s", err)
 	}
-	sw := s.GetProjectDatabase().Begin()
-	for _, data := range shareData {
-		shareHttpFlow := &schema.HTTPFlow{
-			HiddenIndex:        data.HiddenIndex,
-			NoFixContentLength: data.NoFixContentLength,
-			Hash:               data.Hash,
-			IsHTTPS:            data.IsHTTPS,
-			Url:                data.Url,
-			Path:               data.Path,
-			Method:             data.Method,
-			BodyLength:         data.BodyLength,
-			ContentType:        data.ContentType,
-			StatusCode:         data.StatusCode,
-			SourceType:         data.SourceType,
-			Request:            data.Request,
-			Response:           data.Response,
-			GetParamsTotal:     data.GetParamsTotal,
-			PostParamsTotal:    data.PostParamsTotal,
-			CookieParamsTotal:  data.CookieParamsTotal,
-			IPAddress:          data.IPAddress,
-			RemoteAddr:         data.RemoteAddr,
-			IPInteger:          data.IPInteger,
-			Tags:               data.Tags,
-			IsWebsocket:        data.IsWebsocket,
-			WebsocketHash:      data.WebsocketHash,
-			RuntimeId:          data.RuntimeId,
-			FromPlugin:         data.FromPlugin,
-			//IsRequestOversize:          data.IsRequestOversize,
-			//IsResponseOversize:         data.IsResponseOversize,
-			IsTooLargeResponse:         data.IsTooLargeResponse,
-			TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
-			TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
-		}
-		var httpFlowId int64
-		if shareHttpFlow != nil {
+	err = utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
+		for _, data := range shareData {
+			shareHttpFlow := &schema.HTTPFlow{
+				HiddenIndex:        data.HiddenIndex,
+				NoFixContentLength: data.NoFixContentLength,
+				Hash:               data.Hash,
+				IsHTTPS:            data.IsHTTPS,
+				Url:                data.Url,
+				Path:               data.Path,
+				Method:             data.Method,
+				BodyLength:         data.BodyLength,
+				ContentType:        data.ContentType,
+				StatusCode:         data.StatusCode,
+				SourceType:         data.SourceType,
+				Request:            data.Request,
+				Response:           data.Response,
+				GetParamsTotal:     data.GetParamsTotal,
+				PostParamsTotal:    data.PostParamsTotal,
+				CookieParamsTotal:  data.CookieParamsTotal,
+				IPAddress:          data.IPAddress,
+				RemoteAddr:         data.RemoteAddr,
+				IPInteger:          data.IPInteger,
+				Tags:               data.Tags,
+				IsWebsocket:        data.IsWebsocket,
+				WebsocketHash:      data.WebsocketHash,
+				RuntimeId:          data.RuntimeId,
+				FromPlugin:         data.FromPlugin,
+				// IsRequestOversize:          data.IsRequestOversize,
+				// IsResponseOversize:         data.IsResponseOversize,
+				IsTooLargeResponse:         data.IsTooLargeResponse,
+				TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
+				TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
+			}
+			var httpFlowId int64
 			var httpFlow schema.HTTPFlow
-			db := s.GetProjectDatabase().Where("hash = ?", shareHttpFlow.Hash).Assign(shareHttpFlow).FirstOrCreate(&httpFlow)
-			if db.Error != nil {
-				sw.Rollback()
-				return nil, utils.Errorf("HTTPFlowsExtract CreateOrUpdateHTTPFlow failed: %s", err)
+
+			if db := tx.Where("hash = ?", shareHttpFlow.Hash).Assign(shareHttpFlow).FirstOrCreate(&httpFlow); db.Error != nil {
+				return utils.Errorf("HTTPFlowsExtract CreateOrUpdateHTTPFlow failed: %s", err)
 			}
 			httpFlowId = int64(httpFlow.ID)
-		}
-		for _, v := range data.ExtractedList {
-			err = yakit.CreateOrUpdateExtractedData(s.GetProjectDatabase(), -1, &schema.ExtractedData{
-				SourceType:  v.SourceType,
-				TraceId:     v.TraceId,
-				Regexp:      v.Regexp,
-				RuleVerbose: v.RuleVerbose,
-				Data:        v.Data,
-			})
-			if err != nil {
-				sw.Rollback()
-				return nil, utils.Errorf("HTTPFlowsExtract CreateOrUpdateExtractedData failed: %s", err.Error())
-			}
-		}
 
-		for _, v := range data.WebsocketFlowsList {
-			if db1 := s.GetProjectDatabase().Create(&schema.WebsocketFlow{
-				WebsocketRequestHash: v.WebsocketRequestHash,
-				FrameIndex:           v.FrameIndex,
-				FromServer:           v.FromServer,
-				QuotedData:           string(v.QuotedData),
-				MessageType:          v.MessageType,
-				Hash:                 v.Hash,
-			}); db1.Error != nil {
-				sw.Rollback()
-				return nil, utils.Errorf("WebsocketFlow failed: %s", db1.Error)
+			for _, v := range data.ExtractedList {
+				err = yakit.CreateOrUpdateExtractedData(tx, -1, &schema.ExtractedData{
+					SourceType:  v.SourceType,
+					TraceId:     v.TraceId,
+					Regexp:      v.Regexp,
+					RuleVerbose: v.RuleVerbose,
+					Data:        v.Data,
+				})
+				if err != nil {
+					return utils.Errorf("HTTPFlowsExtract CreateOrUpdateExtractedData failed: %s", err.Error())
+				}
 			}
-		}
 
-		for _, v := range data.ProjectGeneralStorage {
-			if strings.Contains(v.Key, "_request") {
-				v.Key = "_request"
-			} else if strings.Contains(v.Key, "_response") {
-				v.Key = "_response"
+			for _, v := range data.WebsocketFlowsList {
+				if db1 := tx.Create(&schema.WebsocketFlow{
+					WebsocketRequestHash: v.WebsocketRequestHash,
+					FrameIndex:           v.FrameIndex,
+					FromServer:           v.FromServer,
+					QuotedData:           string(v.QuotedData),
+					MessageType:          v.MessageType,
+					Hash:                 v.Hash,
+				}); db1.Error != nil {
+					return utils.Errorf("WebsocketFlow failed: %s", db1.Error)
+				}
 			}
-			shareProjectGeneralStorage := &schema.ProjectGeneralStorage{
-				Key:        strconv.Quote(strconv.FormatInt(httpFlowId, 10) + v.Key),
-				Value:      v.Value,
-				ExpiredAt:  v.ExpiredAt,
-				ProcessEnv: v.ProcessEnv,
-				Verbose:    v.Verbose,
-				Group:      v.Group,
-			}
-			if httpFlowId > 0 {
-				if db2 := s.GetProjectDatabase().Where("key = ?", strconv.FormatInt(httpFlowId, 10)+v.Key).Assign(shareProjectGeneralStorage).FirstOrCreate(&schema.ProjectGeneralStorage{}); db2.Error != nil {
-					sw.Rollback()
-					return nil, utils.Errorf("SetProjectKey failed: %s", db2.Error)
+
+			for _, v := range data.ProjectGeneralStorage {
+				if strings.Contains(v.Key, "_request") {
+					v.Key = "_request"
+				} else if strings.Contains(v.Key, "_response") {
+					v.Key = "_response"
+				}
+				shareProjectGeneralStorage := &schema.ProjectGeneralStorage{
+					Key:        strconv.Quote(strconv.FormatInt(httpFlowId, 10) + v.Key),
+					Value:      v.Value,
+					ExpiredAt:  v.ExpiredAt,
+					ProcessEnv: v.ProcessEnv,
+					Verbose:    v.Verbose,
+					Group:      v.Group,
+				}
+				if httpFlowId > 0 {
+					if db2 := tx.Where("key = ?", strconv.FormatInt(httpFlowId, 10)+v.Key).Assign(shareProjectGeneralStorage).FirstOrCreate(&schema.ProjectGeneralStorage{}); db2.Error != nil {
+						return utils.Errorf("SetProjectKey failed: %s", db2.Error)
+					}
 				}
 			}
 		}
-	}
-	sw.Commit()
+		return nil
+	})
 
 	return &ypb.Empty{}, nil
 }
@@ -543,8 +538,8 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		// 新加字段
 		RuntimeId:  httpFlow.RuntimeId,
 		FromPlugin: httpFlow.FromPlugin,
-		//IsRequestOversize:          httpFlow.IsRequestOversize,
-		//IsResponseOversize:         httpFlow.IsResponseOversize,
+		// IsRequestOversize:          httpFlow.IsRequestOversize,
+		// IsResponseOversize:         httpFlow.IsResponseOversize,
 		IsTooLargeResponse:         httpFlow.IsTooLargeResponse,
 		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
 		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
@@ -615,7 +610,6 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 				defer mu.Unlock()
 				successHash = append(successHash, httpFlow.Hash)
 			}
-
 		}(httpFlow)
 
 		count++
