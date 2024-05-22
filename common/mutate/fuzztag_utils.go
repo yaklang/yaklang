@@ -2,10 +2,11 @@ package mutate
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
@@ -30,7 +31,7 @@ func fuzzLowerNUpper(i string) []string {
 	}
 
 	var res []string
-	var bytes = []byte(strings.ToLower(i))
+	bytes := []byte(strings.ToLower(i))
 	res = append(res, strings.ToLower(i))
 	res = append(res, strings.ToUpper(i))
 	// one upper
@@ -191,4 +192,18 @@ func sepToEnd(s string, sep string) (string, string) {
 		return s, ""
 	}
 	return s[:strings.LastIndex(s, sep)], s[strings.LastIndex(s, sep)+1:]
+}
+
+func paddingString(r string, paddingLength int, paddingRight bool) string {
+	if len(r) >= paddingLength {
+		return r
+	}
+
+	repeatedPaddingCount := paddingLength - len(r)
+	if paddingRight {
+		r = r + strings.Repeat("0", repeatedPaddingCount)
+	} else {
+		r = strings.Repeat("0", repeatedPaddingCount) + r
+	}
+	return r
 }

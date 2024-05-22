@@ -1,10 +1,12 @@
 package mutate
 
 import (
+	cryptoRand "crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -793,33 +795,43 @@ func init() {
 			if len(parts) > 2 {
 				step, _ = strconv.Atoi(parts[2])
 			}
-
-			ints := utils.ParseStringToPorts(s)
-			if len(ints) <= 0 {
-				return []string{""}
+			minInt, maxInt, ok := strings.Cut(parts[0], "-")
+			if !ok {
+				return lo.Map(strings.Split(parts[0], ","), func(s string, _ int) string {
+					return strings.TrimSpace(s)
+				})
 			}
 
-			if step > 1 {
-				// 按步长生成结果
-				var filteredResults []int
-				for i := 0; i < len(ints); i += step {
-					filteredResults = append(filteredResults, ints[i])
-				}
-				ints = filteredResults
+			minB, maxB, capB, stepB := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+			minB.SetString(minInt, 10)
+			maxB.SetString(maxInt, 10)
+			stepB.SetInt64(int64(step))
+			if minB.Cmp(maxB) > 0 {
+				return []string{}
+			}
+			capB = capB.Sub(maxB, minB)
+			capB = capB.Add(capB, big.NewInt(1))
+			capB = capB.Div(capB, stepB)
+			if !capB.IsUint64() {
+				// too large
+				log.Error("int fuzztag: too large int range")
+				return []string{}
 			}
 
-			var results []string
-			for _, i := range ints {
-				r := fmt.Sprint(i)
-				if enablePadding && paddingLength > len(r) {
-					repeatedPaddingCount := paddingLength - len(r)
-					if paddingRight {
-						r = r + strings.Repeat("0", repeatedPaddingCount)
-					} else {
-						r = strings.Repeat("0", repeatedPaddingCount) + r
-					}
+			results := make([]string, 0, capB.Int64())
+			for {
+				if minB.Cmp(maxB) > 0 {
+					break
 				}
+
+				r := minB.String()
+				// padding
+				if enablePadding {
+					paddingString(r, paddingLength, paddingRight)
+				}
+
 				results = append(results, r)
+				minB.Add(minB, big.NewInt(int64(step)))
 			}
 			return results
 		},
@@ -836,8 +848,9 @@ func init() {
 		},
 		Handler: func(s string) []string {
 			var (
-				min, max, count uint
-				err             error
+				minB, maxB      = new(big.Int), new(big.Int)
+				count      uint = 1
+				err        error
 
 				enablePadding = false
 				paddingRight  bool
@@ -854,67 +867,103 @@ func init() {
 				paddingLength, _ = strconv.Atoi(rawLen)
 			}
 
-			count = 1
-			fuzztagfallback := []string{fmt.Sprint(rand.Intn(10))}
 			raw := utils.PrettifyListFromStringSplited(s, ",")
 			switch len(raw) {
 			case 3:
 				count, err = parseUint(raw[2])
 				if err != nil {
-					return fuzztagfallback
-				}
-
-				if count <= 0 {
-					count = 1
+					return []string{fmt.Sprint(rand.Intn(10))}
 				}
 				fallthrough
 			case 2:
-				min, err = parseUint(raw[0])
-				if err != nil {
-					return fuzztagfallback
-				}
-				max, err = parseUint(raw[1])
-				if err != nil {
-					return fuzztagfallback
-				}
-
-				min = uint(utils.Min(int(min), int(max)))
-				max = uint(utils.Max(int(min), int(max)))
-				break
+				minB.SetString(raw[0], 10)
+				maxB.SetString(raw[1], 10)
 			case 1:
-				min = 0
-				max, err = parseUint(raw[0])
-				if err != nil {
-					return fuzztagfallback
-				}
-				if max <= 0 {
-					max = 10
-				}
-				break
-			default:
-				return fuzztagfallback
+				minB.SetInt64(0)
+				maxB.SetString(raw[0], 10)
 			}
 
-			var results []string
-			RepeatFunc(count, func() bool {
-				res := int(max - min)
-				if res <= 0 {
-					res = 10
-				}
-				i := min + uint(rand.Intn(res))
-				c := fmt.Sprint(i)
-				if enablePadding && paddingLength > len(c) {
-					repeatedPaddingCount := paddingLength - len(c)
-					if paddingRight {
-						c = c + strings.Repeat("0", repeatedPaddingCount)
-					} else {
-						c = strings.Repeat("0", repeatedPaddingCount) + c
-					}
-				}
+			if cmpB := minB.Cmp(maxB); cmpB > 0 {
+				return []string{}
+			} else if cmpB == 0 {
+				return []string{paddingString(minB.String(), paddingLength, paddingRight)}
+			}
 
-				results = append(results, fmt.Sprint(c))
-				return true
-			})
+			subB := new(big.Int).Sub(maxB, minB)
+
+			results := make([]string, 0, count)
+			for i := uint(0); i < count; i++ {
+				addB, err := cryptoRand.Int(cryptoRand.Reader, subB)
+				if err != nil {
+					return []string{fmt.Sprint(rand.Intn(10))}
+				}
+				addB = addB.Add(addB, minB)
+				r := addB.String()
+
+				if enablePadding {
+					r = paddingString(r, paddingLength, paddingRight)
+				}
+				results = append(results, r)
+			}
+
+			// raw := utils.PrettifyListFromStringSplited(s, ",")
+			// switch len(raw) {
+			// case 3:
+			// 	count, err = parseUint(raw[2])
+			// 	if err != nil {
+			// 		return fuzztagfallback
+			// 	}
+
+			// 	if count <= 0 {
+			// 		count = 1
+			// 	}
+			// 	fallthrough
+			// case 2:
+			// 	min, err = parseUint(raw[0])
+			// 	if err != nil {
+			// 		return fuzztagfallback
+			// 	}
+			// 	max, err = parseUint(raw[1])
+			// 	if err != nil {
+			// 		return fuzztagfallback
+			// 	}
+
+			// 	min = uint(utils.Min(int(min), int(max)))
+			// 	max = uint(utils.Max(int(min), int(max)))
+			// 	break
+			// case 1:
+			// 	min = 0
+			// 	max, err = parseUint(raw[0])
+			// 	if err != nil {
+			// 		return fuzztagfallback
+			// 	}
+			// 	if max <= 0 {
+			// 		max = 10
+			// 	}
+			// 	break
+			// default:
+			// 	return fuzztagfallback
+			// }
+
+			// RepeatFunc(count, func() bool {
+			// 	res := int(max - min)
+			// 	if res <= 0 {
+			// 		res = 10
+			// 	}
+			// 	i := min + uint(rand.Intn(res))
+			// 	c := fmt.Sprint(i)
+			// 	if enablePadding && paddingLength > len(c) {
+			// 		repeatedPaddingCount := paddingLength - len(c)
+			// 		if paddingRight {
+			// 			c = c + strings.Repeat("0", repeatedPaddingCount)
+			// 		} else {
+			// 			c = strings.Repeat("0", repeatedPaddingCount) + c
+			// 		}
+			// 	}
+
+			// 	results = append(results, fmt.Sprint(c))
+			// 	return true
+			// })
 			return results
 		},
 		Alias:       []string{"ri", "rand:int", "randi"},

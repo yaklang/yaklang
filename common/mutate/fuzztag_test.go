@@ -333,6 +333,21 @@ func TestDateRangeFuzzTag(t *testing.T) {
 	)
 }
 
+func TestBigIntFuzztag(t *testing.T) {
+	// int
+	require.Equal(
+		t,
+		[]string{`20120301210`, `20120301211`},
+		MutateQuick(`{{int(20120301210-20120301211)}}`),
+	)
+
+	// randint
+	randIntResult := MutateQuick(`{{randint(20120301210,20120301211)}}`)[0]
+	if randIntResult != `20120301210` && randIntResult != `20120301211` {
+		t.Fatal("randint error")
+	}
+}
+
 func TestUnicodeTag(t *testing.T) {
 	require.Equal(
 		t,
