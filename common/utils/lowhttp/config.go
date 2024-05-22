@@ -1,10 +1,13 @@
 package lowhttp
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -75,6 +78,87 @@ type LowhttpExecConfig struct {
 	// payloads (web fuzzer)
 	Payloads []string
 }
+type Header struct {
+	caseInsensitive bool
+	headers         [][2]string
+}
+
+func NewHttpHeaders(caseInsensitive ...bool) *Header {
+	if len(caseInsensitive) > 0 && caseInsensitive[0] {
+		return &Header{
+			caseInsensitive: true,
+		}
+	}
+	return &Header{
+		caseInsensitive: false,
+	}
+}
+
+func (h *Header) GetHeaderItems() [][2]string {
+	return h.headers
+}
+func (h *Header) Add(k, v string) string {
+	h.headers = append(h.headers, [2]string{k, v})
+	return k
+}
+func (h *Header) Has(s string) bool {
+	return len(h.GetAll(s)) > 0
+}
+func (h *Header) Get(k string) string {
+	if !h.caseInsensitive {
+		k = strings.ToLower(k)
+	}
+	for _, header := range h.headers {
+		key := header[0]
+		if !h.caseInsensitive {
+			key = strings.ToLower(key)
+		}
+		if key == k {
+			return header[1]
+		}
+	}
+	return ""
+}
+func (h *Header) GetAll(k string) []string {
+	if !h.caseInsensitive {
+		k = strings.ToLower(k)
+	}
+	var vs []string
+	for _, header := range h.headers {
+		key := header[0]
+		if !h.caseInsensitive {
+			key = strings.ToLower(key)
+		}
+		if key == k {
+			vs = append(vs, header[1])
+		}
+	}
+	return vs
+}
+
+type LowhttpCookies struct {
+}
+type LowhttpRequest struct {
+	IsProxyProtocol  bool
+	IsProxyHttpsReq  bool
+	Origin           []byte
+	Method           string
+	URI              string
+	Proto            string
+	Url              *url.URL
+	Host             string
+	Headers          *Header
+	TransferEncoding []string
+	Chunked          bool
+	Body             []byte
+	ContentLength    uint64
+	HasContentLength bool
+	ConnectHost      string
+	ConnectPort      int
+	PacketHost       string
+	PacketPort       int
+	Cookies          *LowhttpCookies
+}
 
 type LowhttpResponse struct {
 	RawPacket              []byte
@@ -105,6 +189,35 @@ type LowhttpResponse struct {
 
 	// payloads (web fuzzer)
 	Payloads []string
+}
+
+func (l *LowhttpRequest) ConnectAddr() string {
+	return spew.Sprintf("%s:%d", l.ConnectHost, l.ConnectPort)
+}
+func (l *LowhttpRequest) PacketAddr() string {
+	return spew.Sprintf("%s:%d", l.PacketHost, l.PacketPort)
+}
+func (l *LowhttpRequest) IsHttp2() bool {
+	return strings.HasPrefix(l.Proto, "HTTP/2.")
+}
+func (l *LowhttpRequest) String() string {
+	buf := bytes.Buffer{}
+	buf.WriteString(l.Method)
+	buf.WriteString(" ")
+	buf.WriteString(l.URI)
+	buf.WriteString(" ")
+	buf.WriteString(l.Proto)
+	buf.WriteString("\r\n")
+	for _, pair := range l.Headers.GetHeaderItems() {
+		buf.WriteString(pair[0])
+		buf.WriteString(": ")
+		buf.WriteString(pair[1])
+		buf.WriteString("\r\n")
+	}
+	buf.WriteString("\r\n")
+	buf.Write(l.Body)
+	buf.WriteString("\r\n")
+	return buf.String()
 }
 
 func (l *LowhttpResponse) GetBody() []byte {

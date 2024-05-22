@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/zlib"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -817,4 +819,169 @@ func IGetHTTPInsHeader(headers http.Header, headerKey string) []string {
 		}
 	}
 	return headerValue
+}
+
+func ParseHttpRequestPacket(requestPacket []byte) (*LowhttpRequest, error) {
+	if len(requestPacket) == 0 {
+		return nil, utils.Errorf("empty request packet")
+	}
+	//http.Request{}
+	headers := NewHttpHeaders()
+	reqIns := &LowhttpRequest{
+		Headers: headers,
+		Cookies: &LowhttpCookies{},
+	}
+	_, originBody := SplitHTTPHeadersAndBodyFromPacketEx(requestPacket, func(method string, uri string, proto string) error {
+		reqIns.Method = method
+		reqIns.URI = uri
+		reqIns.Proto = proto
+		return nil
+	}, func(line string) {
+		key, value := SplitHTTPHeader(line)
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		savedKey := headers.Add(key, value)
+		if savedKey == "transfer-encoding" {
+			for _, value := range strings.Split(value, ",") {
+				value = strings.TrimSpace(value)
+				if value == "chunked" {
+					reqIns.Chunked = true
+				}
+				reqIns.TransferEncoding = append(reqIns.TransferEncoding, value)
+			}
+		}
+		if savedKey == "content-length" {
+			reqIns.HasContentLength = true
+			n, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				log.Warnf("parse content-length failed: %s", err)
+			}
+			reqIns.ContentLength = n
+		}
+	})
+	reqIns.Body = originBody
+	packetHost := headers.Get("Host")
+	var connectAddr, packetAddr string
+
+	if utils.IsHttpOrHttpsUrl(reqIns.URI) {
+		reqIns.IsProxyProtocol = true
+		connectAddr = packetHost
+		urlIns, err := url.Parse(reqIns.URI)
+		if err != nil {
+			return reqIns, utils.Errorf("parse url `%s` failed: %s", reqIns.URI, err)
+		} else {
+			packetAddr = urlIns.Host
+		}
+		if urlIns.Scheme == "https" {
+			reqIns.IsProxyHttpsReq = true
+		} else if urlIns.Scheme != "http" {
+			return reqIns, utils.Errorf("invalid scheme `%s` in url `%s`", urlIns.Scheme, reqIns.URI)
+		}
+	} else {
+		connectAddr = packetHost
+		packetAddr = packetHost
+	}
+	var defaultPort = 80
+	if reqIns.IsProxyHttpsReq {
+		defaultPort = 443
+	}
+	splitHostPort := func(addr string) (string, int, error) {
+		host, rest, ok := strings.Cut(packetAddr, ":")
+		if !ok { // no port
+			return packetAddr, defaultPort, nil
+		} else {
+			port, err := strconv.Atoi(rest)
+			if err != nil {
+				return "", 0, err
+			}
+			return host, port, nil
+		}
+	}
+	var err error
+	reqIns.PacketHost, reqIns.PacketPort, err = splitHostPort(packetAddr)
+	if err != nil {
+		return nil, err
+	}
+	reqIns.ConnectHost, reqIns.ConnectPort, err = splitHostPort(connectAddr)
+	if err != nil {
+		return nil, err
+	}
+	return reqIns, nil
+}
+
+func RebuildRequest(requestIns *LowhttpRequest, cfg *LowhttpExecConfig) (*LowhttpRequest, error) {
+	var errs []error
+	pushError := func(err error) {
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	/*
+		checking pipeline or smuggle
+	*/
+	if requestIns.Chunked && requestIns.HasContentLength {
+		if !cfg.NoFixContentLength {
+			log.Warnf("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, please enable noFixContentLength", spew.Sdump(requestIns.String()))
+		}
+		// noFixContentLength = true
+	} else if requestIns.HasContentLength && !requestIns.Chunked && uint64(len(requestIns.Body)) > requestIns.ContentLength {
+		_, err := ParseHttpRequestPacket(requestIns.Body[requestIns.ContentLength:])
+		if err == nil { // if is a valid http packet, guess it is pipeline request
+			log.Infof("pipeline detected, auto enable noFixContentLength")
+		}
+	} else if requestIns.Chunked && !requestIns.HasContentLength {
+		// have transfer-encoding and no cl!
+		_, nextPacket := codec.HTTPChunkedDecodeWithRestBytes(requestIns.Body)
+		_, err := ParseHttpRequestPacket(nextPacket)
+		if err == nil { // if is a valid http packet, guess it is pipeline request
+			log.Infof("pipeline or smuggle detected, auto enable noFixContentLength")
+		}
+	}
+
+	var schema string
+	if cfg.Https {
+		schema = "https"
+	} else {
+		schema = "http"
+	}
+	// 逐个记录 response 中的内容
+	packetUrl := spew.Sprintf("%s://%s%s", schema, requestIns.PacketAddr(), requestIns.URI)
+	urlIns, err := url.Parse(packetUrl)
+	if err != nil {
+		log.Errorf("parse url failed: %s", err)
+	}
+	// 获取cookiejar
+	cookiejar := GetCookiejar(cfg.Session)
+	if cfg.Session != nil {
+		cookies := cookiejar.Cookies(urlIns)
+
+		if cookies != nil {
+			// 复用session中的cookie
+			//requestIns.cookies
+		}
+	}
+
+	// rebuild host poert
+	if requestIns.IsProxyProtocol {
+		if cfg.Port > 0 {
+			requestIns.ConnectPort = cfg.Port
+		}
+		if cfg.Host != "" {
+			requestIns.ConnectHost = cfg.Host
+		}
+	} else {
+		if cfg.Port > 0 {
+			requestIns.ConnectPort = cfg.Port
+			requestIns.PacketHost = cfg.Host
+		}
+		if cfg.Host != "" {
+			requestIns.ConnectHost = cfg.Host
+			requestIns.PacketPort = cfg.Port
+		}
+	}
+	if cfg.Http2 {
+		requestIns.Proto = "HTTP/2.0"
+	}
+	_ = pushError
+	return requestIns, utils.JoinErrors(errs...)
 }
