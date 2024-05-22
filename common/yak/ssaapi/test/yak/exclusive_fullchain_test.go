@@ -308,9 +308,27 @@ f = b(2,3,4)`
 		t.Fatal(err)
 	}
 
-	results := ssaapi.FindFlexibleCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
+	results := ssaapi.FindFlexibleCommonDepends(append(prog.Ref("c"), prog.Ref("d")...)).Show()
+	if len(results) > 0 {
+		t.Fatal("common depends (flexible) check failed")
+	}
+}
+
+func TestPathTrace_Flexible_Positive(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	c = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := ssaapi.Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := ssaapi.FindFlexibleCommonDepends(append(prog.Ref("c"), prog.Ref("d")...)).Show()
 	if len(results) <= 0 {
-		t.Fatal("common depends (flexible)")
+		t.Fatal("common depends (flexible) check failed")
 	}
 }
 
