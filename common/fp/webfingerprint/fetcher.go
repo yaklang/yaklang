@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, proxy ...string) (bool, []*HTTPResponseInfo, error) {
+func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, runtimeId string, proxy ...string) (bool, []*HTTPResponseInfo, error) {
 	ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
 	defer cancel()
 
@@ -51,6 +51,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 	originUrl, _ := lowhttp.ExtractURLFromHTTPRequestRaw(packet, isTls)
 
 	rspDetail, err := lowhttp.HTTP(
+		lowhttp.WithRuntimeId(runtimeId),
 		lowhttp.WithHttps(isTls),
 		lowhttp.WithHost(host),
 		lowhttp.WithPort(portInt),

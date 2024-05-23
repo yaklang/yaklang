@@ -30,7 +30,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	if h == "" {
 		h = ip.String()
 	}
-	isOpen, httpBanners, err := FetchBannerFromHostPortEx(iotDetectCtx, nil, h, port, int64(config.FingerprintDataSize), config.Proxies...)
+	isOpen, httpBanners, err := FetchBannerFromHostPortEx(iotDetectCtx, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 	if err != nil {
 		if !isOpen {
 			return &MatchResult{
