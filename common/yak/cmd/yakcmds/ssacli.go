@@ -1,11 +1,13 @@
 package yakcmds
 
 import (
+	"fmt"
+
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -42,26 +44,72 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "syntaxflow,sf",
 				Usage: "syntax flow query language",
 			},
+			cli.StringFlag{
+				Name:  "database,db",
+				Usage: "database path",
+			},
 			cli.BoolFlag{
 				Name:  "database-debug,dbdebug",
 				Usage: "enable database debug mode",
 			},
 		},
 		Action: func(c *cli.Context) error {
-			db := ssadb.GetDB()
-			_ = db
-
 			programName := c.String("program")
 			entry := c.String("entry")
 			language := c.String("language")
 			inMemory := c.Bool("memory")
 			rawFile := c.String("target")
-			file := utils.GetFirstExistedPath(rawFile)
-
+			target := utils.GetFirstExistedPath(rawFile)
+			syntaxFlow := c.String("syntaxflow")
+			databaseFileRaw := c.String("database")
 			dbDebug := c.Bool("database-debug")
 
+			// set database
+			if databaseFileRaw != "" {
+				// set database path
+				if target == "" &&
+					utils.GetFirstExistedFile(databaseFileRaw) == "" {
+					// no compile ,database not existed
+					log.Errorf("database file not found: %v", databaseFileRaw)
+					return nil
+				}
+			}
+			consts.SetSSADataBaseName(databaseFileRaw)
+
+			// compile
+			if target != "" {
+				opt := make([]ssaapi.Option, 0, 3)
+				log.Infof("start to compile file: %v ", target)
+				if language != "" {
+					log.Infof("start to use language: %v", language)
+					opt = append(opt, ssaapi.WithLanguage(ssaapi.Language(language)))
+				}
+				if entry != "" {
+					log.Infof("start to use entry file: %v", entry)
+					opt = append(opt, ssaapi.WithFileSystemEntry(entry))
+				}
+
+				if inMemory {
+					log.Infof("compile in memory mode, program-name will be ignored")
+				} else {
+					if programName == "" {
+						programName = "default-" + ksuid.New().String()
+					}
+					log.Infof("compile save to database with program name: %v", programName)
+					opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
+				}
+
+				proj, err := ssaapi.ParseProjectFromPath(target, opt...)
+				if err != nil {
+					log.Errorf("parse project [%v] failed: %v", target, err)
+					return nil
+				}
+
+				log.Infof("finished compiling..., results: %v", len(proj))
+			}
+
 			// syntax flow query
-			if sf := c.String("syntaxflow"); sf != "" {
+			if syntaxFlow != "" {
 				if programName == "" {
 					log.Errorf("program name is required when using syntax flow query language")
 					return nil
@@ -75,52 +123,33 @@ var SSACompilerCommands = []*cli.Command{
 				if prog.DBCache != nil && dbDebug {
 					prog.DBCache.DB = prog.DBCache.DB.Debug()
 				}
-				result, err := prog.SyntaxFlowWithError(sf)
+				result, err := prog.SyntaxFlowWithError(syntaxFlow)
 				if err != nil {
-					log.Errorf("syntax flow [%s] query failed: %v", sf, err)
+					log.Errorf("syntax flow [%s] query failed: %v", syntaxFlow, err)
 					return nil
 				}
 				log.Infof("syntax flow query result:")
 				for k, r := range result {
 					log.Infof("\nkey:%v", k)
-					r.Show()
+					for _, v := range r {
+						codeRange := v.GetRange()
+						editor := codeRange.GetEditor()
+						ctxText, _ := editor.GetContextAroundRange(
+							codeRange.GetStart(),
+							codeRange.GetEnd(),
+							3,
+							func(i int) string {
+								return fmt.Sprintf("%5s| ", fmt.Sprint(i))
+							},
+						)
+						log.Infof("%s:%d \nIR: %s\n%s\n",
+							editor.GetUrl(), codeRange.GetStart().GetLine(),
+							v.String(),
+							ctxText,
+						)
+					}
 				}
-				return nil
 			}
-
-			// parse project
-			if file == "" {
-				log.Warnf("file or dir not found: %v", c.String("target"))
-				return nil
-			}
-
-			opt := make([]ssaapi.Option, 0, 3)
-			log.Infof("start to compile file: %v ", file)
-			if language != "" {
-				log.Infof("start to use language: %v", language)
-				opt = append(opt, ssaapi.WithLanguage(ssaapi.Language(language)))
-			}
-			if entry != "" {
-				log.Infof("start to use entry file: %v", entry)
-				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
-			}
-
-			if inMemory {
-				log.Infof("compile in memory mode, program-name will be ignored")
-			} else {
-				if programName == "" {
-					programName = "default-" + ksuid.New().String()
-				}
-				log.Infof("compile save to database with program name: %v", programName)
-				opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
-			}
-
-			proj, err := ssaapi.ParseProjectFromPath(file, opt...)
-			if err != nil {
-				return utils.Wrapf(err, "parse project [%v] failed", file)
-			}
-
-			log.Infof("finished compiling..., results: %v", len(proj))
 			return nil
 		},
 	},
