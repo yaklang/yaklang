@@ -189,6 +189,13 @@ func MITM_SetGMOnly(b bool) MITMConfig {
 	}
 }
 
+func MITM_SetHTTPForceClose(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.httpForceClose = b
+		return nil
+	}
+}
+
 func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 	return func(server *MITMServer) error {
 		for _, c := range b {
