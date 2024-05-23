@@ -153,10 +153,10 @@ type LowhttpRequest struct {
 	Body             []byte
 	ContentLength    uint64
 	HasContentLength bool
-	ConnectHost      string
+	ConnectHostName  string
 	ConnectPort      int
-	PacketHost       string
-	PacketPort       int
+	PacketHostName string
+	PacketPort     int
 	Cookies          *LowhttpCookies
 }
 
@@ -192,10 +192,10 @@ type LowhttpResponse struct {
 }
 
 func (l *LowhttpRequest) ConnectAddr() string {
-	return spew.Sprintf("%s:%d", l.ConnectHost, l.ConnectPort)
+	return spew.Sprintf("%s:%d", l.ConnectHostName, l.ConnectPort)
 }
 func (l *LowhttpRequest) PacketAddr() string {
-	return spew.Sprintf("%s:%d", l.PacketHost, l.PacketPort)
+	return spew.Sprintf("%s:%d", l.PacketHostName, l.PacketPort)
 }
 func (l *LowhttpRequest) IsHttp2() bool {
 	return strings.HasPrefix(l.Proto, "HTTP/2.")

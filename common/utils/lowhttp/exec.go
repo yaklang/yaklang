@@ -275,37 +275,17 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	} else {
 		urlBuf.WriteString("http://")
 	}
-	var requestURI string
-	var hostInPacket string
-	var haveTE bool
-	var haveCL bool
-	var clInt int
-	enableHttp2 := false
-	_, originBody := SplitHTTPHeadersAndBodyFromPacketEx(requestPacket, func(method string, uri string, proto string) error {
-		requestURI = uri
-		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
-			enableHttp2 = true
-		}
-		if utils.IsHttpOrHttpsUrl(requestURI) {
-			forceOverrideURL = requestURI
-		}
-		return nil
-	}, func(line string) {
-		key, value := SplitHTTPHeader(line)
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if strings.ToLower(key) == "host" {
-			hostInPacket = value
-		}
-		if !haveTE && strings.ToLower(key) == "transfer-encoding" {
-			haveTE = true
-		}
-		if !haveCL && strings.ToLower(key) == "content-length" {
-			haveCL = true
-			clInt = codec.Atoi(value)
-		}
-	})
-
+	requestIns, err := ParseHttpRequestPacket(requestPacket)
+	if err != nil {
+		log.Errorf("parse http request packet failed: %v", err)
+	}
+	requestURI := requestIns.URI
+	hostInPacket := requestIns.Host
+	haveTE := len(requestIns.TransferEncoding) > 0
+	haveCL := requestIns.HasContentLength
+	clInt := int(requestIns.ContentLength)
+	enableHttp2 := requestIns.IsHttp2() || forceHttp2
+	originBody := requestIns.Body
 	connPool = DefaultLowHttpConnPool
 	if hostInPacket == "" && host == "" {
 		return response, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")

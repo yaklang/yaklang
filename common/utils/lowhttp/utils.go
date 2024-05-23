@@ -898,11 +898,11 @@ func ParseHttpRequestPacket(requestPacket []byte) (*LowhttpRequest, error) {
 		}
 	}
 	var err error
-	reqIns.PacketHost, reqIns.PacketPort, err = splitHostPort(packetAddr)
+	reqIns.PacketHostName, reqIns.PacketPort, err = splitHostPort(packetAddr)
 	if err != nil {
 		return nil, err
 	}
-	reqIns.ConnectHost, reqIns.ConnectPort, err = splitHostPort(connectAddr)
+	reqIns.ConnectHostName, reqIns.ConnectPort, err = splitHostPort(connectAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -967,15 +967,15 @@ func RebuildRequest(requestIns *LowhttpRequest, cfg *LowhttpExecConfig) (*Lowhtt
 			requestIns.ConnectPort = cfg.Port
 		}
 		if cfg.Host != "" {
-			requestIns.ConnectHost = cfg.Host
+			requestIns.ConnectHostName = cfg.Host
 		}
 	} else {
 		if cfg.Port > 0 {
 			requestIns.ConnectPort = cfg.Port
-			requestIns.PacketHost = cfg.Host
+			requestIns.PacketHostName = cfg.Host
 		}
 		if cfg.Host != "" {
-			requestIns.ConnectHost = cfg.Host
+			requestIns.ConnectHostName = cfg.Host
 			requestIns.PacketPort = cfg.Port
 		}
 	}
