@@ -829,19 +829,24 @@ func ParseHttpRequestPacket(requestPacket []byte) (*LowhttpRequest, error) {
 	headers := NewHttpHeaders()
 	reqIns := &LowhttpRequest{
 		Headers: headers,
-		Cookies: &LowhttpCookies{},
 	}
 	_, originBody := SplitHTTPHeadersAndBodyFromPacketEx(requestPacket, func(method string, uri string, proto string) error {
 		reqIns.Method = method
-		reqIns.URI = uri
+		uriIns, err := url.Parse(uri)
+		if err != nil {
+			log.Errorf("parse uri failed: %s", err)
+		}
+		reqIns.Uri = uriIns
 		reqIns.Proto = proto
 		return nil
 	}, func(line string) {
 		key, value := SplitHTTPHeader(line)
 		key = strings.TrimSpace(key)
 		value = strings.TrimSpace(value)
-		savedKey := headers.Add(key, value)
-		if savedKey == "transfer-encoding" {
+		headers.Add(key, value)
+		lowerKey := strings.ToLower(key)
+		switch lowerKey {
+		case "transfer-encoding":
 			for _, value := range strings.Split(value, ",") {
 				value = strings.TrimSpace(value)
 				if value == "chunked" {
@@ -849,63 +854,23 @@ func ParseHttpRequestPacket(requestPacket []byte) (*LowhttpRequest, error) {
 				}
 				reqIns.TransferEncoding = append(reqIns.TransferEncoding, value)
 			}
-		}
-		if savedKey == "content-length" {
+		case "content-length":
 			reqIns.HasContentLength = true
 			n, err := strconv.ParseUint(value, 10, 64)
 			if err != nil {
 				log.Warnf("parse content-length failed: %s", err)
 			}
 			reqIns.ContentLength = n
+		case "host":
+			reqIns.Host = value
+		case "cookie":
+			reqIns.Cookies = ParseCookie("cookie", value)
 		}
 	})
+	if reqIns.HasContentLength && uint64(len(originBody)) > reqIns.ContentLength {
+		originBody = originBody[:reqIns.ContentLength]
+	}
 	reqIns.Body = originBody
-	packetHost := headers.Get("Host")
-	var connectAddr, packetAddr string
-
-	if utils.IsHttpOrHttpsUrl(reqIns.URI) {
-		reqIns.IsProxyProtocol = true
-		connectAddr = packetHost
-		urlIns, err := url.Parse(reqIns.URI)
-		if err != nil {
-			return reqIns, utils.Errorf("parse url `%s` failed: %s", reqIns.URI, err)
-		} else {
-			packetAddr = urlIns.Host
-		}
-		if urlIns.Scheme == "https" {
-			reqIns.IsProxyHttpsReq = true
-		} else if urlIns.Scheme != "http" {
-			return reqIns, utils.Errorf("invalid scheme `%s` in url `%s`", urlIns.Scheme, reqIns.URI)
-		}
-	} else {
-		connectAddr = packetHost
-		packetAddr = packetHost
-	}
-	var defaultPort = 80
-	if reqIns.IsProxyHttpsReq {
-		defaultPort = 443
-	}
-	splitHostPort := func(addr string) (string, int, error) {
-		host, rest, ok := strings.Cut(packetAddr, ":")
-		if !ok { // no port
-			return packetAddr, defaultPort, nil
-		} else {
-			port, err := strconv.Atoi(rest)
-			if err != nil {
-				return "", 0, err
-			}
-			return host, port, nil
-		}
-	}
-	var err error
-	reqIns.PacketHostName, reqIns.PacketPort, err = splitHostPort(packetAddr)
-	if err != nil {
-		return nil, err
-	}
-	reqIns.ConnectHostName, reqIns.ConnectPort, err = splitHostPort(connectAddr)
-	if err != nil {
-		return nil, err
-	}
 	return reqIns, nil
 }
 
@@ -921,7 +886,7 @@ func RebuildRequest(requestIns *LowhttpRequest, cfg *LowhttpExecConfig) (*Lowhtt
 	*/
 	if requestIns.Chunked && requestIns.HasContentLength {
 		if !cfg.NoFixContentLength {
-			log.Warnf("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, please enable noFixContentLength", spew.Sdump(requestIns.String()))
+			log.Warnf("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, please enable noFixContentLength", spew.Sdump(requestIns.Dump()))
 		}
 		// noFixContentLength = true
 	} else if requestIns.HasContentLength && !requestIns.Chunked && uint64(len(requestIns.Body)) > requestIns.ContentLength {
@@ -938,47 +903,24 @@ func RebuildRequest(requestIns *LowhttpRequest, cfg *LowhttpExecConfig) (*Lowhtt
 		}
 	}
 
-	var schema string
-	if cfg.Https {
-		schema = "https"
-	} else {
-		schema = "http"
-	}
-	// 逐个记录 response 中的内容
-	packetUrl := spew.Sprintf("%s://%s%s", schema, requestIns.PacketAddr(), requestIns.URI)
-	urlIns, err := url.Parse(packetUrl)
-	if err != nil {
-		log.Errorf("parse url failed: %s", err)
-	}
 	// 获取cookiejar
 	cookiejar := GetCookiejar(cfg.Session)
 	if cfg.Session != nil {
+		urlStr := requestIns.Url(cfg.Https)
+		urlIns, err := url.Parse(urlStr)
+		if err != nil {
+			pushError(utils.Errorf("load session failed, parse url failed: %s", err))
+		}
 		cookies := cookiejar.Cookies(urlIns)
-
 		if cookies != nil {
 			// 复用session中的cookie
-			//requestIns.cookies
+			if cookies != nil {
+				// 复用session中的cookie
+				requestIns.Cookies = append(requestIns.Cookies, cookies...)
+			}
 		}
 	}
 
-	// rebuild host poert
-	if requestIns.IsProxyProtocol {
-		if cfg.Port > 0 {
-			requestIns.ConnectPort = cfg.Port
-		}
-		if cfg.Host != "" {
-			requestIns.ConnectHostName = cfg.Host
-		}
-	} else {
-		if cfg.Port > 0 {
-			requestIns.ConnectPort = cfg.Port
-			requestIns.PacketHostName = cfg.Host
-		}
-		if cfg.Host != "" {
-			requestIns.ConnectHostName = cfg.Host
-			requestIns.PacketPort = cfg.Port
-		}
-	}
 	if cfg.Http2 {
 		requestIns.Proto = "HTTP/2.0"
 	}

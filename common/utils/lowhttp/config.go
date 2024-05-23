@@ -97,9 +97,8 @@ func NewHttpHeaders(caseInsensitive ...bool) *Header {
 func (h *Header) GetHeaderItems() [][2]string {
 	return h.headers
 }
-func (h *Header) Add(k, v string) string {
+func (h *Header) Add(k, v string) {
 	h.headers = append(h.headers, [2]string{k, v})
-	return k
 }
 func (h *Header) Has(s string) bool {
 	return len(h.GetAll(s)) > 0
@@ -139,25 +138,18 @@ func (h *Header) GetAll(k string) []string {
 type LowhttpCookies struct {
 }
 type LowhttpRequest struct {
-	IsProxyProtocol  bool
-	IsProxyHttpsReq  bool
 	Origin           []byte
 	Method           string
-	URI              string
+	Uri              *url.URL
 	Proto            string
-	Url              *url.URL
-	Host             string
 	Headers          *Header
 	TransferEncoding []string
 	Chunked          bool
+	Host             string
 	Body             []byte
 	ContentLength    uint64
 	HasContentLength bool
-	ConnectHostName  string
-	ConnectPort      int
-	PacketHostName string
-	PacketPort     int
-	Cookies          *LowhttpCookies
+	Cookies          []*http.Cookie
 }
 
 type LowhttpResponse struct {
@@ -191,33 +183,50 @@ type LowhttpResponse struct {
 	Payloads []string
 }
 
-func (l *LowhttpRequest) ConnectAddr() string {
-	return spew.Sprintf("%s:%d", l.ConnectHostName, l.ConnectPort)
-}
-func (l *LowhttpRequest) PacketAddr() string {
-	return spew.Sprintf("%s:%d", l.PacketHostName, l.PacketPort)
+func (l *LowhttpRequest) Url(ishttps bool) string {
+	buf := strings.Builder{}
+	if ishttps {
+		buf.WriteString("https://")
+	} else {
+		buf.WriteString("http://")
+	}
+	buf.WriteString(l.Host)
+	buf.WriteString(l.Uri.RequestURI())
+	return buf.String()
 }
 func (l *LowhttpRequest) IsHttp2() bool {
 	return strings.HasPrefix(l.Proto, "HTTP/2.")
 }
-func (l *LowhttpRequest) String() string {
+func (l *LowhttpRequest) Dump() []byte {
 	buf := bytes.Buffer{}
 	buf.WriteString(l.Method)
 	buf.WriteString(" ")
-	buf.WriteString(l.URI)
+	buf.WriteString(l.Uri.String())
 	buf.WriteString(" ")
 	buf.WriteString(l.Proto)
 	buf.WriteString("\r\n")
 	for _, pair := range l.Headers.GetHeaderItems() {
-		buf.WriteString(pair[0])
-		buf.WriteString(": ")
-		buf.WriteString(pair[1])
-		buf.WriteString("\r\n")
+		if strings.ToLower(pair[0]) == "host" {
+			buf.WriteString(pair[0])
+			buf.WriteString(": ")
+			buf.WriteString(l.Host)
+			buf.WriteString("\r\n")
+		} else if strings.ToLower(pair[0]) == "cookie" {
+			buf.WriteString(pair[0])
+			buf.WriteString(": ")
+			buf.WriteString(CookiesToString(l.Cookies))
+			buf.WriteString("\r\n")
+		} else {
+			buf.WriteString(pair[0])
+			buf.WriteString(": ")
+			buf.WriteString(pair[1])
+			buf.WriteString("\r\n")
+		}
 	}
 	buf.WriteString("\r\n")
 	buf.Write(l.Body)
 	buf.WriteString("\r\n")
-	return buf.String()
+	return buf.Bytes()
 }
 
 func (l *LowhttpResponse) GetBody() []byte {

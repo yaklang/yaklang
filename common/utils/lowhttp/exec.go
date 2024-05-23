@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -265,10 +264,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		https = true
 	}
 
-	/*
-	   extract url
-	*/
-	var forceOverrideURL string
 	var urlBuf bytes.Buffer
 	if https {
 		urlBuf.WriteString("https://")
@@ -277,9 +272,14 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	requestIns, err := ParseHttpRequestPacket(requestPacket)
 	if err != nil {
-		log.Errorf("parse http request packet failed: %v", err)
+		return nil, utils.Errorf("parse request packet failed: %v", err)
 	}
-	requestURI := requestIns.URI
+	newRequestIns, err := RebuildRequest(requestIns, option)
+	if err != nil {
+		log.Errorf("rebuild request failed: %v", err)
+	} else { // if rebuild success, use new request
+		requestIns = newRequestIns
+	}
 	hostInPacket := requestIns.Host
 	haveTE := len(requestIns.TransferEncoding) > 0
 	haveCL := requestIns.HasContentLength
@@ -291,34 +291,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		return response, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
 	}
 
-	urlStr := forceOverrideURL
-	var noURI string
-	if urlStr == "" {
-		if hostInPacket != "" {
-			urlBuf.WriteString(hostInPacket)
-		} else {
-			urlBuf.WriteString(host)
-			if (https && port != 443) || (!https && port != 80) {
-				urlBuf.WriteString(fmt.Sprintf(":%d", port))
-			}
-		}
-		noURI = urlBuf.String()
-		if requestURI == "" {
-			urlBuf.WriteString("/")
-		} else {
-			if !strings.HasPrefix(requestURI, "/") {
-				urlBuf.WriteString("/")
-			}
-			urlBuf.WriteString(utils.EscapeInvalidUTF8Byte([]byte(requestURI)))
-		}
-		urlStr = urlBuf.String()
-	}
-
+	urlStr := requestIns.Url(option.Https)
 	urlIns, err := url.Parse(urlStr)
 	if err != nil {
-		urlIns = utils.ParseStringToUrl(noURI)
+		log.Errorf("parse url failed: %v", err)
 	}
-
 	/*
 		checking pipeline or smuggle
 	*/

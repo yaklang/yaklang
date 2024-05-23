@@ -11,6 +11,28 @@ import (
 	"testing"
 )
 
+func TestParseHttpRequestPacket(t *testing.T) {
+	for _, packet := range []string{
+		`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{"key": "value"}`,
+		`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example1.com
+Host: www.example2.com
+
+{"key": "value"}`,
+	} {
+		packetIns, err := ParseHttpRequestPacket([]byte(packet))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, packet, strings.Replace(string(packetIns.Dump()), "\r", "", -1))
+	}
+}
+
 func TestExtractURLFromHTTPRequest(t *testing.T) {
 	const packet = `GET / HTTP/1.1
 Host: asdfasd:123
