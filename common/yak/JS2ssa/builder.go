@@ -54,7 +54,7 @@ func Frontend(src string, must bool) (*JS.ProgramContext, error) {
 	if must || len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
+	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 }
 
 func (b *astbuilder) AddToCmap(key string) {

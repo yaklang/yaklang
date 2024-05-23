@@ -55,7 +55,7 @@ func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 	if force || len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
+	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 }
 
 func (b *builder) AssignConst(name string, value ssa.Value) bool {
