@@ -28,7 +28,7 @@ import (
 var (
 	defaultWaitTime    = time.Duration(100) * time.Millisecond
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
-	defaultTimeout     = time.Duration(1500) * time.Millisecond
+	defaultTimeout     = time.Duration(15000) * time.Millisecond
 )
 
 type PocConfig struct {
