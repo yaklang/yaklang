@@ -180,7 +180,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	proxy := validProxy
 	proxy = utils.StringArrayFilterEmpty(proxy)
-	legacyProxy := httpProxy
+	//legacyProxy := httpProxy
 	//if option.ForceLegacyProxy { // LegacyProxy protocol is socks?
 	//	proxy = socksProxy
 	//}
@@ -532,17 +532,14 @@ RECONNECT:
 	// checking old proxy
 	oldVersionProxyChecking := false
 	var tryOldVersionProxy []string
-	if err != nil {
+	if err != nil { // if connect proxy failed, try to connect http proxy directly(OldVersionProxy)
 		errMsg := err.Error()
 		if strings.Contains(errMsg, `no proxy available`) {
 			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
 			copy(noProxyDial, dialopts)
 			noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
 			tried := make(map[string]struct{})
-			merged := make([]string, len(legacyProxy)+len(proxy))
-			copy(merged, legacyProxy)
-			copy(merged[len(legacyProxy):], proxy)
-			for _, basicProxy := range lo.Filter(merged, func(item string, index int) bool {
+			for _, basicProxy := range lo.Filter(httpProxy, func(item string, index int) bool {
 				return utils.IsHttpOrHttpsUrl(item)
 			}) {
 				if _, ok := tried[basicProxy]; ok {
