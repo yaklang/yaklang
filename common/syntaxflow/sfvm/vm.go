@@ -73,7 +73,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	flow := astParser.Flow()
 	// fmt.Printf("%v\n", flow.ToStringTree(nil, astParser))
 	if len(errLis.GetErrors()) > 0 {
-		return utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrors())
+		return utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrorString())
 	}
 
 	result.text = text
