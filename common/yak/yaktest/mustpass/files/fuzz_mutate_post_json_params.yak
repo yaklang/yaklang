@@ -1,15 +1,27 @@
-host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 var checkKey = false
 var checkDollarKey = false
 var checkb0c = false
 var checkb = false
 
-for result in fuzz.HTTPRequest(f`GET / HTTP/1.1
-Host: ${host}:${port}
 
-` + `{"key":"a","$key":"$", "b":[{"c":"ckey"}]}`)~.GetPostJsonParams() {
+packet = `GET / HTTP/1.1
+Host: www.baidu.com
+Test: 111111
+Content-Type: application/json
+content-type: application/text
+Content-type: application/octet-stream
+a: bbbbb
 
+{"key":"a","$key":"$", "b":[{"c":"ckey"}]}`
 
+freq = fuzz.HTTPRequest(packet)~
+assert freq.GetHeaderParamByName("Content-Type").GetFirstValue() == "application/json"
+assert freq.GetHeaderParamByName("content-type").GetFirstValue() == "application/text"
+assert freq.GetHeaderParamByName("Content-type").GetFirstValue() == "application/octet-stream"
+assert freq.GetHeaderParamByName("a").GetFirstValue() == "bbbbb"
+assert freq.GetHeaderParamByName("Host").GetFirstValue() == "www.baidu.com"
+
+for result in freq.GetPostJsonParams() {
 
     body = result.Fuzz(f`${result.Value()}` + "__PLACEHOLDER").FirstFuzzHTTPRequest().Show().GetBody()
     if body.Contains("a__PLACEHOLDER") {
@@ -34,7 +46,6 @@ if !checkKey {
 if !checkDollarKey {
     die(`BASIC $["$key"] failed`)
 }
-
 
 if !checkb {
     die(`BASIC $.b failed`)
