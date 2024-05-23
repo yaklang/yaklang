@@ -54,6 +54,7 @@ array(1, "2", "key" => "value");
 			ssa.ValueUndefined("$ancasdfasdfasdf"),
 			ssa.ValueUndefined("$b"),
 			ssa.ValueUndefined("$b"),
+			ssa.ValueUndefined("a"),
 		},
 	})
 }
@@ -150,7 +151,7 @@ func TestParseSSA_RightValue(t *testing.T) {
 	test.CheckError(t, test.TestCase{
 		Code: `<?php
 a($b[0]); `,
-		Want: []string{ssa.ValueUndefined("$b")},
+		Want: []string{ssa.ValueUndefined("$b"), ssa.ValueUndefined("a")},
 	})
 }
 

@@ -63,7 +63,7 @@ func (f *Function) SetType(t Type) {
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.Type = funTyp
 	} else {
-		log.Errorf("Function type is not FunctionType")
+		log.Errorf("ssa.Function type cannot covnert to FunctionType: %v", t)
 	}
 }
 
