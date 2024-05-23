@@ -4759,7 +4759,7 @@ message MITMRequest {
   bool updateFilterWebsocket = 58;
 
   // force close
-  bool ForceClose = 59;
+  bool ForceDisableKeepAlive = 59;
 }
 
 message Certificate {

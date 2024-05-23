@@ -191,7 +191,7 @@ func MITM_SetGMOnly(b bool) MITMConfig {
 
 func MITM_SetHTTPForceClose(b bool) MITMConfig {
 	return func(server *MITMServer) error {
-		server.httpForceClose = b
+		server.forceDisableKeepAlive = b
 		return nil
 	}
 }

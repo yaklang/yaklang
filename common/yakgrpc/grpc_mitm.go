@@ -170,15 +170,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return downstreamProxy, nil
 	}
 	var (
-		host           string = "127.0.0.1"
-		port           int    = 8089
-		enableGMTLS           = firstReq.GetEnableGMTLS()
-		preferGMTLS           = firstReq.GetPreferGMTLS()
-		onlyGMTLS             = firstReq.GetOnlyEnableGMTLS()
-		proxyUsername         = firstReq.GetProxyUsername()
-		proxyPassword         = firstReq.GetProxyPassword()
-		dnsServers            = firstReq.GetDnsServers()
-		httpForceClose        = firstReq.GetForceClose()
+		host                  string = "127.0.0.1"
+		port                  int    = 8089
+		enableGMTLS                  = firstReq.GetEnableGMTLS()
+		preferGMTLS                  = firstReq.GetPreferGMTLS()
+		onlyGMTLS                    = firstReq.GetOnlyEnableGMTLS()
+		proxyUsername                = firstReq.GetProxyUsername()
+		proxyPassword                = firstReq.GetProxyPassword()
+		dnsServers                   = firstReq.GetDnsServers()
+		forceDisableKeepAlive        = firstReq.GetForceDisableKeepAlive()
 	)
 	downstreamProxy, err := getDownstreamProxy(firstReq)
 	if err != nil {
@@ -1672,7 +1672,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetGMOnly(onlyGMTLS),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
-		crep.MITM_SetHTTPForceClose(httpForceClose),
+		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive),
 		crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()),
 	)
 	if err != nil {
