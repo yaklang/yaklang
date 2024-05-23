@@ -2,8 +2,9 @@ package yaklib
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -37,7 +38,7 @@ func saveYakitPlugin(scriptName string, typeStr string, content interface{}) err
 	})
 }
 
-func saveHTTPFlowFromRaw(url string, req, rsp []byte, typeStr string) error {
+func saveHTTPFlowFromRaw(url string, req, rsp []byte) error {
 	return saveHTTPFlowFromRawWithType(url, req, rsp, "basic-crawler")
 }
 
@@ -46,7 +47,7 @@ func saveHTTPFlowFromRawWithType(url string, req, rsp []byte, typeStr string) er
 	if db == nil {
 		return utils.Error("empty database")
 	}
-	var https = false
+	https := false
 	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
 		https = true
 	}
@@ -178,12 +179,12 @@ func queryYakitPluginByName(name string) (*schema.YakScript, error) {
 func YakitNewAliveHost(target string, opts ...yakit.AliveHostParamsOpt) {
 	risk, _ := yakit.NewAliveHost(target, opts...)
 	if risk != nil {
-		//yakitStatusCard("存活主机", fmt.Sprint(addCounter()))
+		// yakitStatusCard("存活主机", fmt.Sprint(addCounter()))
 		yakitOutputHelper(risk)
 	}
 }
 
 func init() {
-	//YakitExports["QueryPortAssetByPort"] = queryPortAssetByNetwork
-	//YakitExports["QueryPortAssetByKeyword"] = queryPortAssetByNetwork
+	// YakitExports["QueryPortAssetByPort"] = queryPortAssetByNetwork
+	// YakitExports["QueryPortAssetByKeyword"] = queryPortAssetByNetwork
 }
