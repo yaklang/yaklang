@@ -87,7 +87,7 @@ type Proxy struct {
 
 	h2Cache sync.Map
 
-	httpForceClose bool
+	forceDisableKeepAlive bool
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -188,7 +188,7 @@ func (p *Proxy) SetGMOnly(enable bool) {
 
 // SetHTTPForceClose sets proxy no-keepalive
 func (p *Proxy) SetHTTPForceClose(enable bool) {
-	p.httpForceClose = enable
+	p.forceDisableKeepAlive = enable
 }
 
 // SetDial sets the dial func used to establish a connection.

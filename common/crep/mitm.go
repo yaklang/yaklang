@@ -217,17 +217,17 @@ type ProxyAuth struct {
 }
 
 type MITMServer struct {
-	proxy          *minimartian.Proxy
-	mitmConfig     *mitm.Config
-	caCert         []byte
-	caKey          []byte
-	dnsCache       *sync.Map
-	lowerHeaders   []string
-	http2          bool
-	gmtls          bool
-	gmPrefer       bool
-	gmOnly         bool
-	httpForceClose bool
+	proxy                 *minimartian.Proxy
+	mitmConfig            *mitm.Config
+	caCert                []byte
+	caKey                 []byte
+	dnsCache              *sync.Map
+	lowerHeaders          []string
+	http2                 bool
+	gmtls                 bool
+	gmPrefer              bool
+	gmOnly                bool
+	forceDisableKeepAlive bool
 
 	clientCerts []*ClientCertificationPair
 
@@ -320,7 +320,7 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	m.proxy.SetGMTLS(m.gmtls)
 	m.proxy.SetGMPrefer(m.gmPrefer)
 	m.proxy.SetGMOnly(m.gmOnly)
-	m.proxy.SetHTTPForceClose(m.httpForceClose)
+	m.proxy.SetHTTPForceClose(m.forceDisableKeepAlive)
 
 	m.proxy.SetMITM(m.mitmConfig)
 	m.proxy.SetMaxContentLength(m.GetMaxContentLength())
