@@ -375,7 +375,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 		buf.WriteString(ret)
 	}
 	buf.WriteString(CRLF)
-	shrinkHeader(header, "content-type")
+	//shrinkHeader(header, "content-type")
 
 	for k := range header {
 		switch strings.ToLower(k) {
@@ -393,19 +393,19 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 			buf.WriteString(CRLF)
 		}
 
-		cKey := http.CanonicalHeaderKey(k)
-		if cKey != k {
-			vals, ok = header[cKey]
-			if !ok {
-				continue
-			}
-			for _, v := range vals {
-				buf.WriteString(k)
-				buf.WriteString(": ")
-				buf.WriteString(v)
-				buf.WriteString(CRLF)
-			}
-		}
+		//cKey := http.CanonicalHeaderKey(k)
+		//if cKey != k {
+		//	vals, ok = header[cKey]
+		//	if !ok {
+		//		continue
+		//	}
+		//	for _, v := range vals {
+		//		buf.WriteString(k)
+		//		buf.WriteString(": ")
+		//		buf.WriteString(v)
+		//		buf.WriteString(CRLF)
+		//	}
+		//}
 	}
 
 	if req.Body == nil {

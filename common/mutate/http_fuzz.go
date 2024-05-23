@@ -774,7 +774,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 					origin:     f,
 				})
 			}
-			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
+			walk(gjson.Parse(raw), "", "$", call)
 		}
 
 		if bs64Raw, ok := isStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
@@ -792,7 +792,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 						origin:     f,
 					})
 				}
-				walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
+				walk(gjson.Parse(raw), "", "$", call)
 			}
 			fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 				position:   lowhttp.PosPostQueryBase64,
@@ -991,20 +991,21 @@ func (f *FuzzHTTPRequest) GetHeaderParams() []*FuzzHTTPRequestParam {
 		value := f.GetHeader(k)
 		params[i] = &FuzzHTTPRequestParam{
 			position: lowhttp.PosHeader,
-			param:    k,
-			raw:      value,
-			origin:   f,
+			param:      k,
+			paramValue: value,
+			origin:     f,
 		}
 	}
 	return params
 }
 
 func (f *FuzzHTTPRequest) GetHeaderParamByName(k string) *FuzzHTTPRequestParam {
+	value := f.GetHeader(k)
 	return &FuzzHTTPRequestParam{
 		position: lowhttp.PosHeader,
-		param:    k,
-		raw:      "",
-		origin:   f,
+		param:      k,
+		paramValue: value,
+		origin:     f,
 	}
 }
 
