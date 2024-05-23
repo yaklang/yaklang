@@ -98,7 +98,7 @@ jobs:
               go test -timeout 10s -run TestFuzzNucleiVar ./common/mutate
               go test -timeout 20s -run 'Test(New)?FuzzHTTPRequest' ./common/mutate
 
-          - name: Test SSA / SSARule / StaticAnalyze
+          - name: Test SSA / SSARule / StaticAnalyze / Multilingual Frontend
             run: |
               # SSA
               go test -timeout 20s ./common/yak/ssaapi/... 
@@ -110,9 +110,6 @@ jobs:
               go test -timeout 20s ./common/yak/ssa/...
               # yak ssa
               go test -timeout 20s ./common/yak/yak2ssa/test/...
-
-          - name: Test (Java/PHP/JS/Go) Frontend Language
-            run: |
               # Test Java Syntax
               go test -timeout 10s ./common/yak/java/...
               # Test php syntax
