@@ -11,34 +11,31 @@ import (
 )
 
 var (
-	YAK_SSA_PROJECT_DB_NAME = "default-yakssa.db"
-
-	ssaDatabase         *gorm.DB
-	initSSADatabaseOnce = new(sync.Once)
+	YAK_SSA_PROJECT_DB_NAME = ""
+	ssaDatabase             *gorm.DB
+	initSSADatabaseOnce     = new(sync.Once)
 )
 
-const (
-	YAK_SSA_PROJECT_DB_NAME_DEFAULT = "default-yakssa.db"
-)
+func GetSSAProjectDBNameDefault() string {
+	filename := "default-yakssa.db"
+	return filepath.Join(GetDefaultYakitBaseDir(), filename)
+}
 
 func SetSSADataBaseName(name string) {
-	if name == "" {
-		YAK_SSA_PROJECT_DB_NAME = YAK_SSA_PROJECT_DB_NAME_DEFAULT
-		return
-	}
 	YAK_SSA_PROJECT_DB_NAME = name
 }
 
 func GetDefaultSSADataBase() string {
-	if filepath.IsAbs(YAK_SSA_PROJECT_DB_NAME) {
-		return YAK_SSA_PROJECT_DB_NAME
+	if YAK_SSA_PROJECT_DB_NAME == "" {
+		return GetSSAProjectDBNameDefault()
 	}
-	return filepath.Join(GetDefaultYakitBaseDir(), YAK_SSA_PROJECT_DB_NAME)
+	return YAK_SSA_PROJECT_DB_NAME
 }
 
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
 		var err error
+		log.Infof("init ssa database: %s", GetDefaultSSADataBase())
 		ssaDatabase, err = createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
 		if err != nil {
 			log.Errorf("create ssa database err: %v", err)
