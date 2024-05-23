@@ -1350,9 +1350,9 @@ func TestGRPCMUSTPASS_MITM_ForceHTTPClose(t *testing.T) {
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	stream.Send(&ypb.MITMRequest{
-		Host:       "127.0.0.1",
-		Port:       uint32(mitmPort),
-		ForceClose: true,
+		Host:                  "127.0.0.1",
+		Port:                  uint32(mitmPort),
+		ForceDisableKeepAlive: true,
 	})
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
