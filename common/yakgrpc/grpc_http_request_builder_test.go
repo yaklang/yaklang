@@ -3,11 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -657,4 +659,57 @@ func TestBuild_Http_Request_Packet(t *testing.T) {
 	if count != 3 {
 		t.Fatal("build packet error")
 	}
+}
+
+func TestGRPCMUSTPASS_DebugPlugin_ServiceScan_RuntimeId(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
+Content-Length: 12
+
+aaacccaaabbb`))
+	var host, port = utils.DebugMockHTTP(rspRaw)
+	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
+
+	testCode := fmt.Sprintf(`yakit.AutoInitYakit()
+res =  servicescan.Scan("%s", "%d")~
+for i in res {
+}
+`, host, port)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code:       testCode,
+		PluginType: "yak",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id string
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if rsp.RuntimeID != "" {
+			id = rsp.RuntimeID
+		}
+		spew.Dump(rsp)
+	}
+
+	if id == "" {
+		t.Fatal("runtime id is empty")
+	}
+	_, flow, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{RuntimeId: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	require.Condition(t, func() (success bool) {
+		return len(flow) > 0
+	}, "flow set runtime error")
 }
