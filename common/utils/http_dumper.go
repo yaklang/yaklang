@@ -201,10 +201,22 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		buf.Flush()
 	}
 
+	if rsp.Close {
+		header.Set("connection", "close")
+	}
+	shrinkHeader(header, "connection") // just one connection header
+	if ret := header.Get("connection"); ret != "" {
+		header.Set("connection", ret)
+		buf.WriteString("Connection: ")
+		buf.WriteString(ret)
+		buf.WriteString(CRLF)
+		buf.Flush()
+	}
+
 	shrinkHeader(header, "content-length")
 	for k := range header {
 		switch strings.ToLower(k) {
-		case "transfer-encoding", "content-length", "server":
+		case "transfer-encoding", "content-length", "server", "connection":
 			continue
 		}
 

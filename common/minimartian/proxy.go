@@ -86,6 +86,8 @@ type Proxy struct {
 	maxContentLength int
 
 	h2Cache sync.Map
+
+	httpForceClose bool
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -182,6 +184,11 @@ func (p *Proxy) SetGMPrefer(enable bool) {
 // SetGMOnly sets the switch to use ONLY GM TLS
 func (p *Proxy) SetGMOnly(enable bool) {
 	p.gmTLSOnly = enable
+}
+
+// SetHTTPForceClose sets proxy no-keepalive
+func (p *Proxy) SetHTTPForceClose(enable bool) {
+	p.httpForceClose = enable
 }
 
 // SetDial sets the dial func used to establish a connection.

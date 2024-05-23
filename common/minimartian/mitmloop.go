@@ -481,6 +481,9 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 				timer.Stop()
 			}
 		})
+		if p.httpForceClose {
+			r.Close = true
+		}
 		if err != nil {
 			errc <- err
 			return
@@ -658,7 +661,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 
 	var closing error
-	if req.Close || res.Close || p.Closing() {
+	if req.Close || res.Close || p.Closing() || p.httpForceClose {
 		log.Debugf("mitm: received close request: %v", req.RemoteAddr)
 		res.Close = true
 		closing = errClose
@@ -698,6 +701,9 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		closing = errClose
+	}
+	if p.httpForceClose { //if http force close ,  just use only once
+		conn.Close()
 	}
 
 	return closing
