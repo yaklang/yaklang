@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/big"
 )
 
 // 空内容
@@ -802,16 +802,16 @@ func init() {
 				})
 			}
 
-			minB, maxB, capB, stepB := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
-			minB.SetString(minInt, 10)
-			maxB.SetString(maxInt, 10)
-			stepB.SetInt64(int64(step))
+			var minB, maxB, capB, stepB *big.BigInt
+
+			minB = big.NewDecFromString(minInt)
+			maxB = big.NewDecFromString(maxInt)
+			stepB = big.NewInt(int64(step))
 			if minB.Cmp(maxB) > 0 {
 				return []string{}
 			}
-			capB = capB.Sub(maxB, minB)
-			capB = capB.Add(capB, big.NewInt(1))
-			capB = capB.Div(capB, stepB)
+			capB = maxB.Sub(minB).AddInt(1).Div(stepB)
+
 			if !capB.IsUint64() {
 				// too large
 				log.Error("int fuzztag: too large int range")
@@ -831,7 +831,7 @@ func init() {
 				}
 
 				results = append(results, r)
-				minB.Add(minB, big.NewInt(int64(step)))
+				minB = minB.Add(stepB)
 			}
 			return results
 		},
@@ -848,7 +848,7 @@ func init() {
 		},
 		Handler: func(s string) []string {
 			var (
-				minB, maxB      = new(big.Int), new(big.Int)
+				minB, maxB *big.BigInt
 				count      uint = 1
 				err        error
 
@@ -876,11 +876,11 @@ func init() {
 				}
 				fallthrough
 			case 2:
-				minB.SetString(raw[0], 10)
-				maxB.SetString(raw[1], 10)
+				minB = big.NewDecFromString(raw[0])
+				maxB = big.NewDecFromString(raw[1])
 			case 1:
-				minB.SetInt64(0)
-				maxB.SetString(raw[0], 10)
+				minB = big.NewInt(0)
+				maxB = big.NewDecFromString(raw[0])
 			}
 
 			if cmpB := minB.Cmp(maxB); cmpB > 0 {
@@ -889,15 +889,13 @@ func init() {
 				return []string{paddingString(minB.String(), paddingLength, paddingRight)}
 			}
 
-			subB := new(big.Int).Sub(maxB, minB)
-
 			results := make([]string, 0, count)
 			for i := uint(0); i < count; i++ {
-				addB, err := cryptoRand.Int(cryptoRand.Reader, subB)
+				addB, err := cryptoRand.Int(cryptoRand.Reader, maxB.Sub(minB).Int)
 				if err != nil {
 					return []string{fmt.Sprint(rand.Intn(10))}
 				}
-				addB = addB.Add(addB, minB)
+				addB = addB.Add(addB, minB.Int)
 				r := addB.String()
 
 				if enablePadding {
@@ -905,65 +903,6 @@ func init() {
 				}
 				results = append(results, r)
 			}
-
-			// raw := utils.PrettifyListFromStringSplited(s, ",")
-			// switch len(raw) {
-			// case 3:
-			// 	count, err = parseUint(raw[2])
-			// 	if err != nil {
-			// 		return fuzztagfallback
-			// 	}
-
-			// 	if count <= 0 {
-			// 		count = 1
-			// 	}
-			// 	fallthrough
-			// case 2:
-			// 	min, err = parseUint(raw[0])
-			// 	if err != nil {
-			// 		return fuzztagfallback
-			// 	}
-			// 	max, err = parseUint(raw[1])
-			// 	if err != nil {
-			// 		return fuzztagfallback
-			// 	}
-
-			// 	min = uint(utils.Min(int(min), int(max)))
-			// 	max = uint(utils.Max(int(min), int(max)))
-			// 	break
-			// case 1:
-			// 	min = 0
-			// 	max, err = parseUint(raw[0])
-			// 	if err != nil {
-			// 		return fuzztagfallback
-			// 	}
-			// 	if max <= 0 {
-			// 		max = 10
-			// 	}
-			// 	break
-			// default:
-			// 	return fuzztagfallback
-			// }
-
-			// RepeatFunc(count, func() bool {
-			// 	res := int(max - min)
-			// 	if res <= 0 {
-			// 		res = 10
-			// 	}
-			// 	i := min + uint(rand.Intn(res))
-			// 	c := fmt.Sprint(i)
-			// 	if enablePadding && paddingLength > len(c) {
-			// 		repeatedPaddingCount := paddingLength - len(c)
-			// 		if paddingRight {
-			// 			c = c + strings.Repeat("0", repeatedPaddingCount)
-			// 		} else {
-			// 			c = strings.Repeat("0", repeatedPaddingCount) + c
-			// 		}
-			// 	}
-
-			// 	results = append(results, fmt.Sprint(c))
-			// 	return true
-			// })
 			return results
 		},
 		Alias:       []string{"ri", "rand:int", "randi"},
