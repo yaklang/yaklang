@@ -1335,3 +1335,56 @@ Host: example.com
 		t.Fatal("not pass")
 	}
 }
+
+func TestGRPCMUSTPASS_MITM_ForceHTTPClose(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host:       "127.0.0.1",
+		Port:       uint32(mitmPort),
+		ForceClose: true,
+	})
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("ok"))
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		msg := string(rsp.GetMessage().GetMessage())
+		fmt.Println(msg)
+		if strings.Contains(msg, `starting mitm server`) {
+			packet := lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /abc HTTP/1.1
+Host: example.com
+
+`), "Host", utils.HostPort(host, port))
+			rsp, err := lowhttp.HTTP(
+				lowhttp.WithPacketBytes(packet),
+				lowhttp.WithProxy("http://"+utils.HostPort("127.0.0.1", mitmPort)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var raw = rsp.RawPacket
+			if !bytes.Contains(raw, []byte("Connection: close")) {
+				t.Fatal("connection not close")
+			}
+			cancel()
+			break
+		}
+	}
+}
