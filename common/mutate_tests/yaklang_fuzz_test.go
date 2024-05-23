@@ -757,6 +757,30 @@ Host: www.baidu.com
 				debug: true,
 			},
 		},
+		{
+			name: "Header Single Key",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+host: 1.2.4.5
+content-type: application/text
+Content-type: application/json
+Content-Type: application/octet-stream
+A: aaa
+
+123456
+`,
+				code: `.FuzzHTTPHeader("a", "bbb")`,
+				expectKeywordInOutputPacket: []string{
+					`content-type: application/text`,
+					`Content-type: application/json`,
+					`Content-Type: application/octet-stream`,
+					`A: aaa`,
+					`a: bbb`,
+				},
+				debug: true,
+			},
+		},
 	}
 
 	for _, tc := range tests {

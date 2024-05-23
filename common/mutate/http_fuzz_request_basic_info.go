@@ -18,7 +18,12 @@ func (f *FuzzHTTPRequest) GetHeader(key string) string {
 	if err != nil {
 		return ""
 	}
-	return req.Header.Get(key)
+	values, ok := req.Header[key]
+	if !ok || len(values) == 0 {
+		return ""
+	}
+
+	return values[0]
 }
 
 func (f *FuzzHTTPRequest) GetHeaderKeys() []string {
