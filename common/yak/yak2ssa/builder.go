@@ -49,5 +49,5 @@ func FrontEnd(src string, must bool) (*yak.ProgramContext, error) {
 	if must || len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
+	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 }

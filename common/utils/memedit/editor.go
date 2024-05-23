@@ -455,7 +455,7 @@ func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
 	return minOffset, maxOffset
 }
 
-func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int) (string, error) {
+func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int, prefix ...func(i int) string) (string, error) {
 	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
 	if start < 0 || end > len(ve.sourceCode) || start > end {
 		return "", errors.New("invalid range")
@@ -470,6 +470,13 @@ func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int) (
 	var contextBuilder strings.Builder
 	for i := startContextLine; i <= endContextLine; i++ {
 		lineText, _ := ve.GetLine(i)
+		if len(prefix) > 0 {
+			var pres []string
+			for _, p := range prefix {
+				pres = append(pres, p(i))
+			}
+			contextBuilder.WriteString(strings.Join(pres, " "))
+		}
 		contextBuilder.WriteString(lineText)
 		contextBuilder.WriteString("\n")
 	}

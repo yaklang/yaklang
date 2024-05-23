@@ -17,7 +17,7 @@ var syntaxFs embed.FS
 func validateSource(t *testing.T, filename string, src string) {
 	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
 		_, err := php2ssa.FrondEnd(src, false)
-		require.Nil(t, err, "parse AST FrontEnd error : %v", err)
+		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
 	})
 }
 
