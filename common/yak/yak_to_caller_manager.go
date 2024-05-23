@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"reflect"
@@ -1040,6 +1041,33 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			cancel()
 		})
 	})
+
+	// hook webservice runtime id
+	hookServiceScanFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			serviceScanOpt := []fp.ConfigOption{fp.WithRuntimeId(runtimeId), fp.WithCtx(streamContext)}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			serviceScanExtraOpts, ok := interfaceValue.([]fp.ConfigOption)
+			if ok {
+				serviceScanExtraOpts = append(serviceScanOpt, serviceScanExtraOpts...)
+			}
+			for _, p := range serviceScanExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+
+	ServiceScanFuncList := []string{"Scan", "ScanOne", "ScanFromSynResult", "ScanFromSpaceEngine", "ScanFromPing"}
+	for _, funcName := range ServiceScanFuncList {
+		nIns.GetVM().RegisterMapMemberCallHandler("servicescan", funcName, hookServiceScanFunc)
+	}
 }
 
 func (y *YakToCallerManager) AddForYakit(
