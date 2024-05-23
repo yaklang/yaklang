@@ -8,6 +8,10 @@ import (
 
 func TestParseSSA_Eval1(t *testing.T) {
 	code := `<?php
+function base64_decode($undefined) {
+	return $undefined;
+}
+
 $key = "password";
 $fun = base64_decode($_GET['func']);
 for($i=0;$i<strlen($fun);$i++){
