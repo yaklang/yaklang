@@ -671,9 +671,9 @@ func javaparserParserInit() {
 		0, 0, 1044, 155, 1, 0, 0, 0, 1045, 1047, 5, 80, 0, 0, 1046, 1048, 3, 162,
 		81, 0, 1047, 1046, 1, 0, 0, 0, 1047, 1048, 1, 0, 0, 0, 1048, 1049, 1, 0,
 		0, 0, 1049, 1050, 5, 81, 0, 0, 1050, 157, 1, 0, 0, 0, 1051, 1052, 5, 15,
-		0, 0, 1052, 1053, 3, 156, 78, 0, 1053, 159, 1, 0, 0, 0, 1054, 1055, 5,
+		0, 0, 1052, 1053, 3, 174, 87, 0, 1053, 159, 1, 0, 0, 0, 1054, 1055, 5,
 		15, 0, 0, 1055, 1056, 5, 22, 0, 0, 1056, 1057, 3, 198, 99, 0, 1057, 1058,
-		3, 156, 78, 0, 1058, 161, 1, 0, 0, 0, 1059, 1061, 3, 164, 82, 0, 1060,
+		3, 174, 87, 0, 1058, 161, 1, 0, 0, 0, 1059, 1061, 3, 164, 82, 0, 1060,
 		1059, 1, 0, 0, 0, 1061, 1062, 1, 0, 0, 0, 1062, 1060, 1, 0, 0, 0, 1062,
 		1063, 1, 0, 0, 0, 1063, 163, 1, 0, 0, 0, 1064, 1065, 3, 166, 83, 0, 1065,
 		1066, 5, 84, 0, 0, 1066, 1070, 1, 0, 0, 0, 1067, 1070, 3, 172, 86, 0, 1068,
@@ -745,7 +745,7 @@ func javaparserParserInit() {
 		1211, 1, 0, 0, 0, 1219, 1215, 1, 0, 0, 0, 1220, 175, 1, 0, 0, 0, 1221,
 		1223, 3, 174, 87, 0, 1222, 1221, 1, 0, 0, 0, 1223, 1224, 1, 0, 0, 0, 1224,
 		1222, 1, 0, 0, 0, 1224, 1225, 1, 0, 0, 0, 1225, 177, 1, 0, 0, 0, 1226,
-		1227, 5, 22, 0, 0, 1227, 1229, 3, 198, 99, 0, 1228, 1230, 3, 156, 78, 0,
+		1227, 5, 22, 0, 0, 1227, 1229, 3, 198, 99, 0, 1228, 1230, 3, 174, 87, 0,
 		1229, 1228, 1, 0, 0, 0, 1229, 1230, 1, 0, 0, 0, 1230, 1234, 1, 0, 0, 0,
 		1231, 1233, 3, 160, 80, 0, 1232, 1231, 1, 0, 0, 0, 1233, 1236, 1, 0, 0,
 		0, 1234, 1232, 1, 0, 0, 0, 1234, 1235, 1, 0, 0, 0, 1235, 1238, 1, 0, 0,
@@ -15534,10 +15534,10 @@ func (s *ElseBlockContext) ELSE() antlr.TerminalNode {
 	return s.GetToken(JavaParserELSE, 0)
 }
 
-func (s *ElseBlockContext) Block() IBlockContext {
+func (s *ElseBlockContext) Statement() IStatementContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IBlockContext); ok {
+		if _, ok := ctx.(IStatementContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -15547,7 +15547,7 @@ func (s *ElseBlockContext) Block() IBlockContext {
 		return nil
 	}
 
-	return t.(IBlockContext)
+	return t.(IStatementContext)
 }
 
 func (s *ElseBlockContext) GetRuleContext() antlr.RuleContext {
@@ -15598,7 +15598,7 @@ func (p *JavaParser) ElseBlock() (localctx IElseBlockContext) {
 	}
 	{
 		p.SetState(1052)
-		p.Block()
+		p.Statement()
 	}
 
 	return localctx
@@ -15666,10 +15666,10 @@ func (s *ElseIfBlockContext) ParExpression() IParExpressionContext {
 	return t.(IParExpressionContext)
 }
 
-func (s *ElseIfBlockContext) Block() IBlockContext {
+func (s *ElseIfBlockContext) Statement() IStatementContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IBlockContext); ok {
+		if _, ok := ctx.(IStatementContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -15679,7 +15679,7 @@ func (s *ElseIfBlockContext) Block() IBlockContext {
 		return nil
 	}
 
-	return t.(IBlockContext)
+	return t.(IStatementContext)
 }
 
 func (s *ElseIfBlockContext) GetRuleContext() antlr.RuleContext {
@@ -15738,7 +15738,7 @@ func (p *JavaParser) ElseIfBlock() (localctx IElseIfBlockContext) {
 	}
 	{
 		p.SetState(1057)
-		p.Block()
+		p.Statement()
 	}
 
 	return localctx
@@ -18889,10 +18889,10 @@ func (s *IfstmtContext) ParExpression() IParExpressionContext {
 	return t.(IParExpressionContext)
 }
 
-func (s *IfstmtContext) Block() IBlockContext {
+func (s *IfstmtContext) Statement() IStatementContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IBlockContext); ok {
+		if _, ok := ctx.(IStatementContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -18902,7 +18902,7 @@ func (s *IfstmtContext) Block() IBlockContext {
 		return nil
 	}
 
-	return t.(IBlockContext)
+	return t.(IStatementContext)
 }
 
 func (s *IfstmtContext) AllElseIfBlock() []IElseIfBlockContext {
@@ -18986,7 +18986,6 @@ func (p *JavaParser) Ifstmt() (localctx IIfstmtContext) {
 
 	localctx = NewIfstmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 178, JavaParserRULE_ifstmt)
-	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -19021,7 +19020,7 @@ func (p *JavaParser) Ifstmt() (localctx IIfstmtContext) {
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 143, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1228)
-			p.Block()
+			p.Statement()
 		}
 
 	}
@@ -19043,9 +19042,8 @@ func (p *JavaParser) Ifstmt() (localctx IIfstmtContext) {
 	}
 	p.SetState(1238)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
 
-	if _la == JavaParserELSE {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 145, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1237)
 			p.ElseBlock()

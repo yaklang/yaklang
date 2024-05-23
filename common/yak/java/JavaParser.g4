@@ -456,10 +456,10 @@ block
     ;
 
 elseBlock
-    :ELSE block
+    :ELSE statement
     ;
 elseIfBlock
-    :ELSE IF parExpression block
+    :ELSE IF parExpression statement
     ;
 
 blockStatementList
@@ -541,7 +541,7 @@ statement
 statementList: (statement  )+;
 
 ifstmt
-    :IF parExpression block? elseIfBlock* elseBlock?
+    :IF parExpression statement? elseIfBlock* elseBlock?
     ;
 catchClause
     : CATCH '(' variableModifier* catchType identifier ')' block

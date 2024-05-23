@@ -822,7 +822,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			})
 			// todo: 多catch case的情况
 			// 处理第一个catch
-			if catchClause := ret.CatchClause(0).(*javaparser.CatchClauseContext); catchClause != nil {
+			if catchClause, ok := ret.CatchClause(0).(*javaparser.CatchClauseContext); ok {
 				tryBuilder.BuildError(func() string {
 					id := catchClause.Identifier().GetText()
 					return id
@@ -835,7 +835,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 						y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
 					})
 				}
-			} else if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
+			}
+			if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
 				tryBuilder.BuildFinally(func() {
 					y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
 				})
@@ -1220,11 +1221,11 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 
 		if parExpr := i.ParExpression(); parExpr != nil {
 			expr := parExpr.(*javaparser.ParExpressionContext).Expression()
-			if block := i.Block(); block != nil {
+			if state := i.Statement(); state != nil {
 				builder.AppendItem(
 					func() ssa.Value { return y.VisitExpression(expr) },
 					func() {
-						y.VisitBlock(i.Block())
+						y.VisitStatement(state)
 					})
 			} else {
 				// 没有block的情况
@@ -1238,7 +1239,7 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 		for _, elseIfBlock := range i.AllElseIfBlock() {
 			if elseIfBlock != nil {
 				elseIfStmt := elseIfBlock.(*javaparser.ElseIfBlockContext)
-				block := elseIfStmt.Block()
+				state := elseIfStmt.Statement()
 				parExpr := elseIfStmt.ParExpression()
 				expr := parExpr.(*javaparser.ParExpressionContext).Expression()
 				builder.AppendItem(
@@ -1246,15 +1247,15 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 						return (y.VisitExpression(expr))
 					},
 					func() {
-						y.VisitBlock(block)
+						y.VisitStatement(state)
 					},
 				)
 			}
 		}
 		elseStmt := i.ElseBlock()
 		if elseStmt != nil {
-			if elseBlock := elseStmt.(*javaparser.ElseBlockContext).Block(); elseBlock != nil {
-				return func() { y.VisitBlock(elseBlock) }
+			if elseState := elseStmt.(*javaparser.ElseBlockContext).Statement(); elseState != nil {
+				return func() { y.VisitStatement(elseState) }
 			}
 		}
 		return nil

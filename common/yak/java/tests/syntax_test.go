@@ -3,11 +3,12 @@ package tests
 import (
 	"embed"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 )
 
 //go:embed code
@@ -29,8 +30,8 @@ func TestAllSyntaxForJava_G4(t *testing.T) {
 		if f.IsDir() {
 			continue
 		}
-		path := filepath.Join("syntax", f.Name())
-		if !strings.HasSuffix(path, ".php") {
+		path := filepath.Join("code", f.Name())
+		if !strings.HasSuffix(path, ".java") {
 			continue
 		}
 		raw, err := codeFs.ReadFile(path)
