@@ -35,7 +35,7 @@ import (
 // ```
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	config := fp.NewConfig(opts...)
-	return _scanFingerprint(context.Background(), config, 50, target, port)
+	return _scanFingerprint(config.Ctx, config, 50, target, port)
 }
 
 // ScanOne servicescan 单体扫描，同步扫描一个目标，主机+端口
@@ -282,8 +282,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 					continue
 				}
 				synResults <- &synscan.SynScanResult{
-					Host: host,
-					Port: port,
+					Host: host, Port: port,
 				}
 			}
 		case []string:
@@ -305,7 +304,10 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	// 扫描
 	config := fp.NewConfig(opts...)
 	concurrent := config.PoolSize
-	ctx := context.Background()
+	ctx := config.Ctx
+	if config.Ctx == nil {
+		ctx = context.Background()
+	}
 
 	matcher, err := fp.NewDefaultFingerprintMatcher(config)
 	if err != nil {

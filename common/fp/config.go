@@ -84,6 +84,12 @@ type Config struct {
 	// Exclude
 	ExcludeHostsFilter *hostsparser.HostsParser
 	ExcludePortsFilter *utils.PortsFilter
+
+	// Runtime id
+	RuntimeId string
+
+	//ctx
+	Ctx context.Context
 }
 
 func (c *Config) IsFiltered(host string, port int) bool {
@@ -221,6 +227,18 @@ func WithExcludePorts(ports string) ConfigOption {
 	}
 }
 
+func WithRuntimeId(id string) ConfigOption {
+	return func(config *Config) {
+		config.RuntimeId = id
+	}
+}
+
+func WithCtx(ctx context.Context) ConfigOption {
+	return func(config *Config) {
+		config.Ctx = ctx
+	}
+}
+
 func (f *Config) GenerateWebFingerprintConfigOptions() []webfingerprint.ConfigOption {
 	return []webfingerprint.ConfigOption{
 		webfingerprint.WithActiveMode(f.ActiveMode),
@@ -229,6 +247,7 @@ func (f *Config) GenerateWebFingerprintConfigOptions() []webfingerprint.ConfigOp
 		webfingerprint.WithWebFingerprintRules(f.WebFingerprintRules),
 		webfingerprint.WithWebFingerprintDataSize(f.FingerprintDataSize),
 		webfingerprint.WithWebProxy(f.Proxies...),
+		webfingerprint.WithRuntimeId(f.RuntimeId),
 	}
 }
 
@@ -265,6 +284,7 @@ func (c *Config) init() {
 	c.PoolSize = 20
 
 	c.FingerprintDataSize = 20480
+	c.Ctx = context.Background()
 }
 
 func (c *Config) lazyInit() {

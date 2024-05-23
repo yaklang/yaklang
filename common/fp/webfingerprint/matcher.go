@@ -165,7 +165,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 		} else {
 			if _, ok := failedFaviconCache.Load(r.URL.Host); !ok {
 				log.Debugf("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
-				rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithTimeout(3), poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithNoRedirect(false), poc.WithForceHTTPS(r.IsHttps))
+				rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithTimeout(3), poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithNoRedirect(false), poc.WithForceHTTPS(r.IsHttps), poc.WithRuntimeId(config.RuntimeId))
 				if err != nil {
 					log.Errorf("poc.HTTP failed: %s", err)
 					failedFaviconCache.Store(r.URL.Host, true)

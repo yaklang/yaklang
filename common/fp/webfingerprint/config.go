@@ -28,6 +28,9 @@ type Config struct {
 
 	// Proxies
 	Proxies []string
+
+	// runtime Id
+	RuntimeId string
 }
 
 func (c *Config) init() {
@@ -84,6 +87,12 @@ func WithForceAllRuleMatching(b bool) ConfigOption {
 func WithProbeTimeout(timeout time.Duration) ConfigOption {
 	return func(config *Config) {
 		config.ProbeTimeout = timeout
+	}
+}
+
+func WithRuntimeId(id string) ConfigOption {
+	return func(config *Config) {
+		config.RuntimeId = id
 	}
 }
 
