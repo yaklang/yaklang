@@ -22,7 +22,7 @@ func FilterProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) *gorm.DB {
 	db = bizhelper.FuzzQueryLike(db, "task_name", filter.GetTaskName())
 	db = bizhelper.FuzzQueryLike(db, "target", filter.GetTarget())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "progress_source", filter.GetProgressSource())
-	db = bizhelper.ExactQueryString(db, "runtime_id", filter.GetRuntimeId())
+	db = bizhelper.ExactQueryStringArrayOr(db, "runtime_id", filter.GetRuntimeId())
 	return db
 }
 
