@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"mime"
+	"net/textproto"
 	"net/url"
 	"strings"
 )
@@ -13,10 +14,17 @@ func (f *FuzzHTTPRequest) GetBytes() []byte {
 	return f.originRequest
 }
 
-func (f *FuzzHTTPRequest) GetHeader(key string) string {
+func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return ""
+	}
+	canonical := false
+	if len(canonicals) > 0 {
+		canonical = canonicals[0]
+	}
+	if canonical {
+		key = textproto.CanonicalMIMEHeaderKey(key)
 	}
 	values, ok := req.Header[key]
 	if !ok || len(values) == 0 {
