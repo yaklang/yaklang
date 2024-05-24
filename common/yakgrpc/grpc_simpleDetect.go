@@ -406,5 +406,5 @@ func (s *Server) DeleteSimpleDetectUnfinishedTask(ctx context.Context, req *ypb.
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return &ypb.Empty{}, nil
 }
