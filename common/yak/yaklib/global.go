@@ -12,7 +12,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/yaklang/spec"
 	"github.com/yaklang/yaklang/common/yakdocument"
 
@@ -544,5 +543,4 @@ var GlobalExport = map[string]interface{}{
 	"ord":     ord,
 	"type":    typeof,
 	"typeof":  typeof,
-	"omap":    orderedmap.New,
 }
