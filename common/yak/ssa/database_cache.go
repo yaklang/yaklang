@@ -199,7 +199,13 @@ func (c *Cache) saveVariable(variable string, insts []Instruction) bool {
 		return false
 	}
 	if err := ssadb.SaveVariable(c.DB, c.ProgramName, variable,
-		lo.Map(insts, func(inst Instruction, _ int) int64 { return inst.GetId() }),
+		lo.Map(insts, func(inst Instruction, _ int) int64 {
+			if inst == nil {
+				log.Errorf("BUG: saveVariable called with nil instruction %v", variable)
+				return -1
+			}
+			return inst.GetId()
+		}),
 	); err != nil {
 		log.Errorf("SaveVariable error: %v", err)
 		return false

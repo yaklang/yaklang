@@ -118,6 +118,10 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// value
 	for _, def := range value.GetValues() {
+		if def == nil {
+			log.Infof("BUG: value[%s: %s] def is nil", value, value.GetRange())
+			continue
+		}
 		ir.Defs = append(ir.Defs, int64(def.GetId()))
 	}
 

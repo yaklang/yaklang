@@ -60,6 +60,10 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	marshalValues := func(vs []Value) []int64 {
 		ids := make([]int64, len(vs))
 		for index, v := range vs {
+			if v == nil {
+				log.Errorf("BUG: marshalValues[%s: %s]: nil value in slice", raw, raw.GetRange())
+				continue
+			}
 			ids[index] = v.GetId()
 		}
 		return ids
@@ -85,8 +89,12 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_phis"] = fetchIds(ret.Phis)
 	case *BinOp:
 		params["binop_op"] = ret.Op
-		params["binop_x"] = ret.X.GetId()
-		params["binop_y"] = ret.Y.GetId()
+		if ret.X != nil {
+			params["binop_x"] = ret.X.GetId()
+		}
+		if ret.Y != nil {
+			params["binop_y"] = ret.Y.GetId()
+		}
 	case *Call:
 		params["call_method"] = ret.Method.GetId()
 		params["call_args"] = marshalValues(ret.Args)
@@ -113,7 +121,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *ExternLib:
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
 	case *If:
-		params["if_cond"] = ret.Cond.GetId()
+		if ret.Cond != nil {
+			params["if_cond"] = ret.Cond.GetId()
+		}
 		if ret.True != nil {
 			params["if_true"] = ret.True.GetId()
 		}

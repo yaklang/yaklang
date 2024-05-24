@@ -69,6 +69,7 @@ func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value,
 
 // AddNormalMember is used to add a normal member to the class,
 func (c *ClassBluePrint) AddNormalMember(name string, value Value) {
+	value.GetProgram().SetInstructionWithName(name, value)
 	c.NormalMember[name] = BluePrintMember{
 		Value: value,
 		Type:  value.GetType(),

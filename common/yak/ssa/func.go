@@ -133,10 +133,16 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 }
 
 func (f *Function) IsMethod() bool {
+	if f.Type == nil {
+		f.Type = NewFunctionType(f.GetName(), nil, nil, false)
+	}
 	return f.Type.IsMethod
 }
 
 func (f *Function) SetMethod(is bool, objType Type) {
+	if f.Type == nil {
+		f.Type = NewFunctionType(f.GetName(), nil, nil, false)
+	}
 	f.Type.IsMethod = is
 	f.Type.ObjectType = objType
 }
