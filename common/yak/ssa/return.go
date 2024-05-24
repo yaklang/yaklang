@@ -2,11 +2,16 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (r *Return) calcType() Type {
 	handleType := func(v Value) Type {
+		if v == nil {
+			log.Errorf("Return[%s: %s] value is nil", r.String(), r.GetRange())
+			return BasicTypes[NullTypeKind]
+		}
 		t := v.GetType()
 		if objTyp, ok := ToObjectType(t); ok {
 			t = ParseClassBluePrint(v, objTyp)

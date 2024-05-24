@@ -9,6 +9,10 @@ import (
 func fixupUseChain(node Instruction) {
 	if u, ok := ToUser(node); ok {
 		for _, v := range u.GetValues() {
+			if v == nil {
+				log.Infof("BUG: value[%s: %s] def is nil", u, u.GetRange())
+				continue
+			}
 			v.AddUser(u)
 		}
 	}
@@ -21,6 +25,10 @@ func DeleteInst(i Instruction) {
 	}
 
 	b := i.GetBlock()
+	if b == nil {
+		log.Infof("void block!! %s:%s", i, i.GetRange())
+		return
+	}
 	if phi, ok := ToPhi(i); ok {
 		b.Phis = utils.RemoveSliceItem(b.Phis, phi)
 	} else {

@@ -276,8 +276,14 @@ func (r *Recover) HasValues() bool   { return false }
 func (r *Recover) GetValues() Values { return nil }
 
 // ----------- IF
-func (i *If) HasValues() bool   { return true }
-func (i *If) GetValues() Values { return lo.Filter([]Value{i.Cond}, filterNilValue) }
+func (i *If) HasValues() bool { return true }
+func (i *If) GetValues() Values {
+	// return lo.Filter([]Value{i.Cond}, filterNilValue)
+	if i.Cond == nil {
+		return []Value{}
+	}
+	return []Value{i.Cond}
+}
 func (i *If) ReplaceValue(v Value, to Value) {
 	if i.Cond == v {
 		i.Cond = to
