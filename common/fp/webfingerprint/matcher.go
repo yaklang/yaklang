@@ -1,43 +1,68 @@
 package webfingerprint
 
 import (
-	"fmt"
+	"bytes"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	log "github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
+)
+
+const (
+	CRLF = "\r\n"
 )
 
 type HTTPResponseInfo struct {
-	StatusCode int
-	Status     string
 	Header     *http.Header
-	Body       []byte
 	URL        *url.URL
+	Status     string
+	Body       []byte
 	RequestRaw []byte
+	StatusCode int
 	IsHttps    bool
 }
 
 func (h *HTTPResponseInfo) Bytes() []byte {
-	var lines []string
-	lines = append(lines, fmt.Sprintf("HTTP/1.1 %v %v", h.StatusCode, h.Status))
+	var builder bytes.Buffer
+	n := 15 + len(h.Status) // first line  "HTTP/1.1 200 OK\r\n"
 	if h.Header != nil {
 		for k, v := range *h.Header {
 			for _, value := range v {
-				lines = append(lines, fmt.Sprintf("%v: %v", k, value))
+				n += len(k) + len(value) + 4
 			}
 		}
 	}
-	lines = append(lines, "")
-	lines = append(lines, "")
-	lines = append(lines, string(h.Body))
-	return []byte(strings.Join(lines, "\r\n"))
+	n += len(h.Body) + 2 // \r\n + body
+
+	builder.Grow(n)
+
+	builder.WriteString("HTTP/1.1 ")
+	builder.WriteString(strconv.Itoa(h.StatusCode))
+	builder.WriteString(" ")
+	builder.WriteString(h.Status)
+	builder.WriteString(CRLF)
+
+	if h.Header != nil {
+		for k, v := range *h.Header {
+			for _, value := range v {
+				builder.WriteString(k)
+				builder.WriteString(": ")
+				builder.WriteString(value)
+				builder.WriteString(CRLF)
+			}
+		}
+	}
+	builder.WriteString(CRLF)
+	builder.Write(h.Body)
+	return builder.Bytes()
 }
 
 func (h *HTTPResponseInfo) ResponseHeaderBytes() []byte {
@@ -51,7 +76,7 @@ func ExtractHTTPResponseInfoFromHTTPResponse(res *http.Response) *HTTPResponseIn
 }
 
 func ExtractHTTPResponseInfoFromHTTPResponseWithBodySize(res *http.Response, size int) *HTTPResponseInfo {
-	//body, _ := utils.ReadWithLen(res.Body, 1024*1024*10)
+	// body, _ := utils.ReadWithLen(res.Body, 1024*1024*10)
 	body, _ := utils2.ReadWithLen(res.Body, size)
 
 	return &HTTPResponseInfo{
@@ -90,7 +115,7 @@ func foreachHTTPHeaders(h *http.Header, f func(string, string) bool) {
 }
 
 func (f *Matcher) match(r *HTTPResponseInfo, options ...ConfigOption) ([]*CPE, error) {
-	var config = NewWebFingerprintConfig()
+	config := NewWebFingerprintConfig()
 	err := copier.Copy(config, f.config)
 	if err != nil {
 		return nil, errors.Errorf("create new temporary config failed: %s", err)
@@ -107,10 +132,12 @@ func (f *Matcher) match(r *HTTPResponseInfo, options ...ConfigOption) ([]*CPE, e
 	return nil, errors.Errorf("failed to recognize web fingerprint: %s", "no rules matched")
 }
 
-var faviconCache sync.Map
-var failedFaviconCache sync.Map
-var currentTarget = ""
-var previousTarget = ""
+var (
+	faviconCache       sync.Map
+	failedFaviconCache sync.Map
+	currentTarget      = ""
+	previousTarget     = ""
+)
 
 func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *Config) []*CPE {
 	defer func() {
@@ -213,7 +240,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 			for _, k := range m.Keywords {
 				cpe, err := k.Match(string(r.Bytes()))
 				if err != nil {
-					//log.Debugf("keyword match[%s] failed: %s", k.regexp.String(), err)
+					// log.Debugf("keyword match[%s] failed: %s", k.regexp.String(), err)
 					continue
 				}
 				cpes = append(cpes, cpe)
@@ -225,7 +252,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 			foreachHTTPHeaders(r.Header, func(s string, s2 string) bool {
 				cpe, err := h.Match(s, s2)
 				if err != nil {
-					//log.Debugf("compare header[%s] failed: %s", h, err)
+					// log.Debugf("compare header[%s] failed: %s", h, err)
 					return true
 				}
 
@@ -238,7 +265,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 		for _, m := range m.MD5s {
 			cpe, err := m.Match(r.Body)
 			if err != nil {
-				//log.Debugf("match body md5[%s] failed: %s", m.MD5, err)
+				// log.Debugf("match body md5[%s] failed: %s", m.MD5, err)
 				continue
 			}
 
