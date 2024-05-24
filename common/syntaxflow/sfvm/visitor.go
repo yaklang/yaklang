@@ -10,13 +10,22 @@ import (
 )
 
 type SyntaxFlowVisitor struct {
-	text  string
-	codes []*SFI
+	text       string
+	filterExpr bool
+	codes      []*SFI
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 	sfv := &SyntaxFlowVisitor{}
 	return sfv
+}
+
+func (y *SyntaxFlowVisitor) EnterFilterExpr() func() {
+	origin := y.filterExpr
+	y.filterExpr = true
+	return func() {
+		y.filterExpr = origin
+	}
 }
 
 func (y *SyntaxFlowVisitor) VisitFlow(raw sf.IFlowContext) interface{} {
@@ -43,7 +52,7 @@ func (y *SyntaxFlowVisitor) VisitFilters(raw sf.IFiltersContext) interface{} {
 	}
 
 	for _, stmt := range i.AllFilterStatement() {
-		y.EmitPushInput()
+		// y.EmitPushInput()
 		y.VisitFilterStatement(stmt)
 	}
 	return nil
@@ -59,16 +68,24 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		return nil
 	}
 
-	err := y.VisitFilterExpr(i.FilterExpr())
+	expr := i.FilterExpr()
+	if expr == nil {
+		return nil
+	}
+
+	y.EmitEnterStatement()
+	err := y.VisitFilterExpr(expr)
 	if err != nil {
 		msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
 		panic(msg)
 	}
-
 	if i.RefVariable() != nil {
 		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
 		y.EmitUpdate(varName)
+	} else {
+		y.EmitPop()
 	}
+	y.EmitExitStatement()
 
 	return nil
 }

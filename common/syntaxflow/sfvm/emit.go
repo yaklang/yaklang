@@ -6,6 +6,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+func (y *SyntaxFlowVisitor) EmitExitStatement() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpExitStatement,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitEnterStatement() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpEnterStatement,
+	})
+}
+
 func (y *SyntaxFlowVisitor) EmitNewRef(i string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpNewRef,

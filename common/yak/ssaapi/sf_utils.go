@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,7 +15,8 @@ func _SearchValues(values Values, isMember bool, handler func(string) bool) Valu
 		newValue = append(newValue, result...)
 	}
 
-	return newValue
+	return lo.UniqBy(newValue, func(v *Value) int { return int(v.GetId()) })
+	// return newValue
 }
 
 func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values {
@@ -39,12 +41,11 @@ func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values
 
 	if isMember {
 		if value.IsObject() {
-			// value.GetMembersByString()
-			for k, v := range value.node.GetAllMember() {
+			allMember := value.node.GetAllMember()
+			for k, v := range allMember {
 				if check(NewValue(k)) {
 					newValue = append(newValue, NewValue(v))
 				}
-
 			}
 			// return _SearchValue(value.GetKey(), false, handler)
 		}

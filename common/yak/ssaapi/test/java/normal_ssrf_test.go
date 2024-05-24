@@ -30,11 +30,13 @@ func Test_HTTP_SSRF(t *testing.T) {
                 }
                 `,
 			Contain: true,
-			Expect: []string{
-				"Parameter-path",
-				"Parameter-param",
-				"Parameter-url",
-				`"/api/test.json"`,
+			Expect: map[string][]string{
+				"target": []string{
+					"Parameter-path",
+					"Parameter-param",
+					"Parameter-url",
+					`"/api/test.json"`,
+				},
 			},
 		},
 
@@ -55,11 +57,12 @@ func Test_HTTP_SSRF(t *testing.T) {
                 }
                 `,
 			Contain: true,
-			Expect: []string{
-				"Parameter-param",
-				"Parameter-url",
-				`"/api/test.json"`,
-			},
+			Expect: map[string][]string{
+				"target": []string{
+					"Parameter-param",
+					"Parameter-url",
+					`"/api/test.json"`,
+				}},
 		},
 	}
 	for _, tt := range data {

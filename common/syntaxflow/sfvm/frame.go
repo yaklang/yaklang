@@ -17,6 +17,8 @@ type SFFrame struct {
 	Codes       []*SFI
 	toLeft      bool
 	debug       bool
+
+	StatementStack *utils.Stack[int]
 }
 
 type Glob interface {
@@ -47,6 +49,8 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 		stack:       utils.NewStack[ValueOperator](),
 		Text:        text,
 		Codes:       codes,
+
+		StatementStack: utils.NewStack[int](),
 	}
 }
 
@@ -78,15 +82,23 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 	}()
 
+	s.stack.Push(input)
 	idx := 0
 	for {
 		if idx >= len(s.Codes) {
 			break
 		}
 		i := s.Codes[idx]
-
 		s.debugLog(i.String())
 		switch i.OpCode {
+		case OpEnterStatement:
+			s.StatementStack.Push(s.stack.Len())
+		case OpExitStatement:
+			checkLen := s.StatementStack.Pop()
+			if s.stack.Len() != checkLen {
+				log.Errorf("stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+				s.stack.PopN(s.stack.Len() - checkLen)
+			}
 		case OpDuplicate:
 			if s.stack.Len() == 0 {
 				return utils.Errorf("stack top is empty")

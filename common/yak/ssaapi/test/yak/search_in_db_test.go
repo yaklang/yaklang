@@ -2,8 +2,9 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -21,9 +22,12 @@ handler = (request, response) => {
 register("/route1", handler)
 `
 	ssatest.CheckSyntaxFlow(t, code,
-		`req* as $target`,
+		//TODO:
+		// `req*.GetParams() -{utilCall: System}-> * as $target`,
+		// `os.System(*) -{util: request}-> * as $target`,
+		`req*.GetParams() --> * as $target`,
 		map[string][]string{
-			"target": {"Parameter-request"},
+			"target": {`ParameterMember-parameter[0].GetParams("cmd")`},
 		})
 }
 

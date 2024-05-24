@@ -14,24 +14,30 @@ flow: filters EOF;
 filters: filterStatement+;
 
 filterStatement
-    : filterExpr (As refVariable)?
+    : filterExpr  (As refVariable)?
     ;
 
 refVariable
     :  '$' (identifier | ('(' identifier ')'));
 
-filterExpr
-    : '$'    identifier?                                    # CurrentRootFilter
+startFilter
+    // use variable
+    : '$'    identifier                                    # CurrentRootFilter
+    // use input 
     | nameFilter                                            # PrimaryFilter
     | '.' nameFilter                                        # FieldFilter
-    | filterExpr '.' nameFilter                             # FieldCallFilter
-    | filterExpr '(' actualParam? ')'                 # FunctionCallFilter
-    | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
-    | filterExpr '?{' conditionExpression '}'               # OptionalFilter
-    | filterExpr '->' filterExpr                            # NextFilter
-    | filterExpr '#>' filterExpr                            # DefFilter
-    | filterExpr '-->' filterExpr                           # DeepNextFilter
-    | filterExpr '#->' filterExpr                           # TopDefFilter
+    ;
+
+filterExpr
+    : startFilter                                             # StartFilterExpr
+    | filterExpr '.' nameFilter                               # FieldCallFilter
+    | filterExpr '(' actualParam? ')'                         # FunctionCallFilter
+    | filterExpr '[' sliceCallItem ']'                        # FieldIndexFilter
+    | filterExpr '?{' conditionExpression '}'                 # OptionalFilter
+    | filterExpr '->' filterExpr                              # NextFilter
+    | filterExpr '#>' filterExpr                              # DefFilter
+    | filterExpr '-->' filterExpr                             # DeepNextFilter
+    | filterExpr '#->' filterExpr                             # TopDefFilter
     | filterExpr '-{' (recursiveConfig)? '}->' filterExpr     # ConfiggedDeepNextFilter
     | filterExpr '#{' (recursiveConfig)? '}->' filterExpr     # ConfiggedTopDefFilter
     ;
@@ -56,7 +62,7 @@ recursiveConfigItemValue
 
 sliceCallItem: nameFilter | numberLiteral;
 
-nameFilter: '*' | identifier | regexpLiteral;
+nameFilter: '*' | '$' | identifier | regexpLiteral;
 
 chainFilter
     : '[' ((filters (',' filters)*) | '...') ']'          # Flat

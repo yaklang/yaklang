@@ -757,8 +757,10 @@ func Test_Simple_Exec_Case(t *testing.T) {
             }`, tt.code)
 		t.Run(tt.name, func(t *testing.T) {
 			testExecTopDef(t, &TestCase{
-				Code:    allCode,
-				Expect:  tt.expect,
+				Code: allCode,
+				Expect: map[string][]string{
+					"target": tt.expect,
+				},
 				Contain: !tt.equal,
 			})
 		})
@@ -1373,7 +1375,9 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 			testExecTopDef(t, &TestCase{
 				Code:    tt.code,
 				Contain: !tt.equal,
-				Expect:  tt.expect,
+				Expect: map[string][]string{
+					"target": tt.expect,
+				},
 			})
 		})
 	}
@@ -1432,7 +1436,9 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
 			testExecTopDef(t, &TestCase{
 				Code:    tt.code,
 				Contain: !tt.equal,
-				Expect:  tt.expect,
+				Expect: map[string][]string{
+					"target": tt.expect,
+				},
 			})
 		})
 	}
