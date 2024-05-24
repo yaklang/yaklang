@@ -176,6 +176,8 @@ BITOR    : '|';
 CARET    : '^';
 MOD      : '%';
 
+Dollar             : '$';
+
 ADD_ASSIGN     : '+=';
 SUB_ASSIGN     : '-=';
 MUL_ASSIGN     : '*=';

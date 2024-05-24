@@ -2,11 +2,13 @@ package java2ssa
 
 import (
 	"fmt"
-	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
@@ -34,7 +36,7 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 			lit = strings.ReplaceAll(lit, `"`, `\"`)
 			s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
 			if err != nil {
-				y.NewError(ssa.Error, "javaast", "unquote error %s", err)
+				log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
 				return nil
 			}
 		}
@@ -52,14 +54,14 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 		}
 		val, err := strconv.Unquote(text)
 		if err != nil {
-			y.NewError(ssa.Error, "javaast", "unquote error %s", err)
+			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
 			return nil
 		}
 		return y.EmitConstInst(val)
 	} else if ret := i.BOOL_LITERAL(); ret != nil {
 		boolLit, err := strconv.ParseBool(ret.GetText())
 		if err != nil {
-			y.NewError(ssa.Error, "javaast", "parse bool error %s", err)
+			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("parse bool error %s", err))
 			return nil
 		}
 		return y.EmitConstInst(boolLit)
@@ -104,8 +106,12 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 		resultInt64, err = strconv.ParseInt(intStr, 10, 64)
 	}
 	if err != nil {
-		y.NewError(ssa.Error, "javaast", "const parse %s as integer literal... is to large for int64: %v", originIntStr, err)
-		return nil
+		log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("const parse %s as integer literal... is to large for int64: %v", originIntStr, err))
+		// big.NewInt(0).SetString()
+		// return nil
+		v := y.EmitConstInst(intStr)
+		v.SetType(ssa.GetNumberType())
+		return v
 	}
 	if resultInt64 > math.MaxInt {
 		return y.EmitConstInst(int64(resultInt64))
