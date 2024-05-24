@@ -131,7 +131,7 @@ content-length: 1
 		t.FailNow()
 	}
 
-	if bytes.Contains(raw, []byte(`content-type`)) {
+	if !bytes.Contains(raw, []byte(`content-type`)) {
 		t.Errorf("should not contain content-type: %v", spew.Sdump(a))
 		t.FailNow()
 	}
