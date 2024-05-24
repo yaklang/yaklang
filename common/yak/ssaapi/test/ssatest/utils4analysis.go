@@ -18,7 +18,11 @@ import (
 
 type checkFunction func(*ssaapi.Program) error
 
-func Check(t *testing.T, code string, handler checkFunction, opt ...ssaapi.Option) {
+func Check(
+	t *testing.T, code string,
+	handler func(prog *ssaapi.Program) error,
+	opt ...ssaapi.Option,
+) {
 	// only in memory
 	{
 		prog, err := ssaapi.Parse(code, opt...)

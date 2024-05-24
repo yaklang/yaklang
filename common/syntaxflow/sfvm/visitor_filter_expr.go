@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"regexp"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -15,15 +16,25 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	}
 
 	switch ret := raw.(type) {
+	// variable
 	case *sf.CurrentRootFilterContext:
 		if id := ret.Identifier(); id != nil {
 			y.EmitNewRef(id.GetText())
 			return nil
 		}
+		log.Infof("current root filter identifier is nil")
 		return nil
+	// filter name  from input
 	case *sf.PrimaryFilterContext:
+		if !y.filterExpr {
+			y.EmitDuplicate()
+		}
 		return y.VisitNameFilter(false, ret.NameFilter())
+	// filter field from input
 	case *sf.FieldFilterContext:
+		if !y.filterExpr {
+			y.EmitDuplicate()
+		}
 		return y.VisitNameFilter(true, ret.NameFilter())
 	case *sf.FieldCallFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())
@@ -67,7 +78,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			return err
 		}
 		y.EmitGetUsers()
+		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
 		if err != nil {
 			return err
 		}
@@ -77,7 +90,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			return err
 		}
 		y.EmitGetDefs()
+		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
 		if err != nil {
 			return err
 		}
@@ -87,7 +102,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			return err
 		}
 		y.EmitGetBottomUsers()
+		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
 		if err != nil {
 			return err
 		}
@@ -97,7 +114,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			return err
 		}
 		y.EmitGetTopDefs()
+		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
 		if err != nil {
 			return err
 		}
@@ -111,7 +130,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		} else {
 			y.EmitGetBottomUsers()
 		}
+		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
 		if err != nil {
 			return err
 		}
@@ -125,7 +146,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		} else {
 			y.EmitGetBottomUsers()
 		}
+		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
 		if err != nil {
 			return err
 		}
@@ -153,6 +176,9 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		}
 		// skip
 		return nil
+	} else if id := ret.DollarOutput(); id != nil {
+		y.EmitSearchExact(isMember, id.GetText())
+		return nil
 	} else if id := ret.Identifier(); id != nil {
 		text := ret.Identifier().GetText()
 		filter, isGlob := y.FormatStringOrGlob(text) // emit field
@@ -173,7 +199,7 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		y.EmitSearchRegexp(isMember, reIns.String())
 		return nil
 	}
-	return utils.Errorf("BUG: in nameFilter, unknown type: %s", reflect.TypeOf(ret))
+	return utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
@@ -206,11 +232,13 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 			y.EmitDuplicate()
 			y.EmitPushCallArgs(i)
 			handlerItem(single)
+			y.EmitPop()
 		}
 		if ret.SingleParam() != nil {
 			y.EmitDuplicate()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()))
 			handlerItem(ret.SingleParam())
+			y.EmitPop()
 		}
 	default:
 		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))

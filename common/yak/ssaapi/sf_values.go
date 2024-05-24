@@ -12,15 +12,19 @@ import (
 var _ sfvm.ValueOperator = new(Values)
 
 func (value Values) GetCalled() (sfvm.ValueOperator, error) {
-	var vv []sfvm.ValueOperator
+	var vv Values
 	for _, i := range value {
 		i, err := i.GetCalled()
 		if err != nil {
 			continue
 		}
-		vv = append(vv, i)
+		if vs, ok := i.(Values); ok {
+			vv = append(vv, vs...)
+		} else if v, ok := i.(*Value); ok {
+			vv = append(vv, v)
+		}
 	}
-	return sfvm.NewValues(vv), nil
+	return vv, nil
 }
 
 func (value Values) IsMap() bool {
