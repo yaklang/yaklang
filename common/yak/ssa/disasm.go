@@ -212,10 +212,10 @@ func (p *Phi) String() string {
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
 	for i := range p.Edge {
 		v := p.Edge[i]
-		b := p.GetBlock().Preds[i]
 		if utils.IsNil(v) {
 			continue
 		}
+		b := v.GetBlock()
 		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetVerboseName())
 	}
 	return ret

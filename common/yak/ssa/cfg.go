@@ -399,15 +399,19 @@ func (t *TryBuilder) Finish() {
 	catch.ScopeTable = tryBuilder.CreateCatch().(*Scope)
 	builder.CurrentBlock = catch
 
-	if id := t.buildError(); id != "" {
-		p := NewParam(id, false, builder)
-		p.SetType(BasicTypes[ErrorTypeKind])
-		variable := builder.CreateLocalVariable(id)
-		builder.AssignVariable(variable, p)
+	if t.buildError != nil {
+		if id := t.buildError(); id != "" {
+			p := NewParam(id, false, builder)
+			p.SetType(BasicTypes[ErrorTypeKind])
+			variable := builder.CreateLocalVariable(id)
+			builder.AssignVariable(variable, p)
+		}
 	}
 
 	tryBuilder.SetCache(func() ssautil.ScopedVersionedTableIF[Value] {
-		t.buildCatch()
+		if t.buildCatch != nil {
+			t.buildCatch()
+		}
 		catch = builder.CurrentBlock
 		return catch.ScopeTable
 	})

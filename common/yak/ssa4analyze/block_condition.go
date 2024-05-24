@@ -46,7 +46,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleIfEdge := func(i *ssa.If) {
 		from := i.GetBlock()
-		if cond := i.Cond; cond.GetOpcode() == ssa.SSAOpcodeConstInst {
+		if cond := i.Cond; cond != nil && cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("if"))
 		}
 		newEdge(i.True, from, i.Cond)
