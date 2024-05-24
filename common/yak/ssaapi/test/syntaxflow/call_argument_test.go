@@ -79,7 +79,7 @@ func TestCall_SideEffect(t *testing.T) {
 	f(12)
 	print(a)
 	`,
-			`print(*) #-> * as $target`,
+			`print(* #-> * as $target)`,
 			map[string][]string{
 				"target": {"12"},
 			},
@@ -106,7 +106,7 @@ func TestCall_SideEffect(t *testing.T) {
 			}
 		}
 		`,
-			`print(*) #-> * as $target`,
+			`print(* #-> * as $target)`,
 			map[string][]string{
 				"target": {"12"},
 			},
