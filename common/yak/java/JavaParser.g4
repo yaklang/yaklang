@@ -44,7 +44,11 @@ compilationUnit
     ;
 
 packageDeclaration
-    : annotation* PACKAGE qualifiedName ';'
+    : annotation* PACKAGE packageName ';'
+    ;
+packageName
+    : qualifiedName
+    | Dollar '{' (PACKAGE | identifier) '}' ('.' identifier)*
     ;
 
 importDeclaration
@@ -520,8 +524,8 @@ statement
     : blockLabel = block                                                        # BlockLabelStatement
     | ASSERT expression (':' expression)? ';'                                   # AssertStatement
     | ifstmt                                                                    # IfStatement
-    | FOR '(' forControl ')' block                                              # ForStatement
-    | WHILE parExpression block                                                 # WhileStatement
+    | FOR '(' forControl ')' statement                                              # ForStatement
+    | WHILE parExpression statement                                                 # WhileStatement
     | DO block WHILE parExpressionList ';'                                          # DoWhileStatement
     | TRY block (catchClause+ finallyBlock? | finallyBlock)                     # TryStatement
     | TRY resourceSpecification block catchClause* finallyBlock?                # TryWithResourcesStatement

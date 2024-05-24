@@ -236,4 +236,11 @@ func TestJava_Literal(t *testing.T) {
 				println(FILE_MAX_SIZE);`,
 			[]string{"67108864"}, t)
 	})
+
+	t.Run("big number ", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+	long uid = -94044809860988047L;
+	println(uid);
+		`, []string{`neg("94044809860988047l")`}, t)
+	})
 }
