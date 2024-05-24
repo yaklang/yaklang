@@ -72,6 +72,10 @@ func TestSyntaxInOne(t *testing.T) {
 		`*.mem as $a
 		$a.exec() as $exec
 		`,
+		`
+		a -{
+			until: %b
+		}-> *`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		err := vm.Compile(i)

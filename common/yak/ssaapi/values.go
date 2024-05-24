@@ -622,7 +622,7 @@ func (v Values) StringEx(flag int) string {
 	for i, v := range v {
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, ssa.SSAOpcode2Name[v.GetOpcode()], v)
+			ret += fmt.Sprintf("\t%d: %s\n", i, v)
 		case 1:
 			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithSource())
 		}

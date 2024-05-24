@@ -10,6 +10,10 @@ type SFVMOpCode int
 const (
 	OpPass SFVMOpCode = iota
 
+	// enter/exit statement
+	OpEnterStatement
+	OpExitStatement
+
 	OpPushInput
 	OpDuplicate
 
@@ -80,6 +84,10 @@ const verboseLen = "%-12s"
 
 func (s *SFI) String() string {
 	switch s.OpCode {
+	case OpEnterStatement:
+		return "- enter -"
+	case OpExitStatement:
+		return "- exit -"
 	case OpPass:
 		return "- pass -"
 	case OpPushBool:

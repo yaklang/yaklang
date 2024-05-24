@@ -56,7 +56,7 @@ recursiveConfigItemValue
 
 sliceCallItem: nameFilter | numberLiteral;
 
-nameFilter: '*' | identifier | regexpLiteral;
+nameFilter: '*' | '$' | identifier | regexpLiteral;
 
 chainFilter
     : '[' ((filters (',' filters)*) | '...') ']'          # Flat
