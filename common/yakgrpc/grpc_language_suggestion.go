@@ -41,14 +41,23 @@ var (
 		"string", "try", "catch", "finally", "in",
 	}
 
+	yakTypes = []string{
+		"uint", "uint8", "byte", "uint16", "uint32", "uint64",
+		"int", "int8", "int16", "int32", "int64",
+		"bool", "float", "float64", "double", "string", "omap", "var",
+		"any",
+	}
+
 	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.DefaultDocumentHelper.Libs))
 	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
+	yakTypeSuggestions         = make([]*ypb.SuggestionDescription, 0)
 	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
 	// 懒加载
 	if len(yakKeywordSuggestions) == 0 {
+		yakKeywordSuggestions = make([]*ypb.SuggestionDescription, 0, len(yakKeywords))
 		for _, keyword := range yakKeywords {
 			yakKeywordSuggestions = append(yakKeywordSuggestions, &ypb.SuggestionDescription{
 				Label:       keyword,
@@ -60,6 +69,23 @@ func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
 	}
 
 	return yakKeywordSuggestions
+}
+
+func getLanguageBasicTypeSuggestions() []*ypb.SuggestionDescription {
+	// 懒加载
+	if len(yakTypeSuggestions) == 0 {
+		yakTypeSuggestions = make([]*ypb.SuggestionDescription, 0, len(yakTypes))
+		for _, typ := range yakTypes {
+			yakTypeSuggestions = append(yakTypeSuggestions, &ypb.SuggestionDescription{
+				Label:       typ,
+				InsertText:  typ,
+				Description: "Basic Type",
+				Kind:        "Class",
+			})
+		}
+	}
+
+	return yakTypeSuggestions
 }
 
 func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
@@ -690,6 +716,11 @@ func completionYakLanguageKeyword() (ret []*ypb.SuggestionDescription) {
 	return getLanguageKeywordSuggestions()
 }
 
+func completionYakLanguageBasicType() (ret []*ypb.SuggestionDescription) {
+	// 基础类型补全
+	return getLanguageBasicTypeSuggestions()
+}
+
 func completionUserDefinedVariable(prog *ssaapi.Program, rng *ssa.Range) (ret []*ypb.SuggestionDescription) {
 	if prog == nil || prog.Program == nil {
 		return
@@ -866,6 +897,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 	if !containPoint {
 		ret = append(ret, completionYakStandardLibrary()...)
 		ret = append(ret, completionYakLanguageKeyword()...)
+		ret = append(ret, completionYakLanguageBasicType()...)
 		ret = append(ret, completionUserDefinedVariable(prog, rng)...)
 		ret = append(ret, completionYakGlobalFunctions()...)
 	} else {
