@@ -73,8 +73,21 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 		log.Warnf("package annotation is not finished yet: %v", pkgAnnotation.GetText())
 	}
 
-	packagePath := y.VisitPackageQualifiedName(i.QualifiedName())
+	packagePath := y.VisitPackageName(i.PackageName())
 	return packagePath
+}
+
+func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.PackageNameContext)
+	if name := i.QualifiedName(); name != nil {
+		return y.VisitPackageQualifiedName(name)
+	} else {
+		// TODO: handler `package ${package}.action` this code use with maven
+		return nil
+	}
 }
 
 func (y *builder) VisitPackageQualifiedName(raw javaparser.IQualifiedNameContext) []string {

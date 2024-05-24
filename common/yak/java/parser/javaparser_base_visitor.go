@@ -15,6 +15,10 @@ func (v *BaseJavaParserVisitor) VisitPackageDeclaration(ctx *PackageDeclarationC
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitPackageName(ctx *PackageNameContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

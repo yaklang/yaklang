@@ -13,6 +13,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#packageDeclaration.
 	VisitPackageDeclaration(ctx *PackageDeclarationContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#packageName.
+	VisitPackageName(ctx *PackageNameContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#importDeclaration.
 	VisitImportDeclaration(ctx *ImportDeclarationContext) interface{}
 
