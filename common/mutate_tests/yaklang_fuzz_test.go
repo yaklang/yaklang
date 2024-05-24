@@ -763,18 +763,20 @@ Host: www.baidu.com
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 host: 1.2.4.5
-content-type: application/text
-Content-type: application/json
-Content-Type: application/octet-stream
+content-type: a/1
+content-type: a/2
+Content-type: a/3
+Content-Type: a/4
 A: aaa
 
 123456
 `,
 				code: `.FuzzHTTPHeader("a", "bbb")`,
 				expectKeywordInOutputPacket: []string{
-					`content-type: application/text`,
-					`Content-type: application/json`,
-					`Content-Type: application/octet-stream`,
+					`content-type: a/1`,
+					`content-type: a/2`,
+					`Content-type: a/3`,
+					`Content-Type: a/4`,
 					`A: aaa`,
 					`a: bbb`,
 				},

@@ -2,7 +2,10 @@ package lowhttp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/multipart"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -294,13 +297,35 @@ Content-Disposition: form-data; name="stream.body"
 --------------------------aceb88c2159f--`
 	r := FixHTTPPacketCRLF([]byte(packet), false)
 	if !bytes.Contains(r, []byte(`boundary=------------------------aceb88c2159f`)) {
-		panic(1)
+		t.FailNow()
 	}
 	req, _ := ParseBytesToHttpRequest(r)
 	println(string(r))
 	println(req.ContentLength)
-	if reader, _ := req.MultipartReader(); reader == nil {
-		panic(1)
+	mutlipartReader := multipart.NewReader(req.Body)
+	for {
+		part, err := mutlipartReader.NextPart()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			t.Fatal(err)
+		}
+		if !strings.Contains(part.GetHeader("Content-Disposition"), "stream.body") {
+			t.Fatal("multipart error")
+		}
+		var body = make([]byte, 100)
+		_, err = part.Read(body)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(body), `<?xml version="1.0" encoding="UTF-8"?>`) {
+			t.Fatal("multipart error")
+		}
+
 	}
 }
 

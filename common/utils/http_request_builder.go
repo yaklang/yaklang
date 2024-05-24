@@ -351,7 +351,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 			useContentLength = true
 			contentLengthInt = codec.Atoi(valStr)
 			if contentLengthInt != 0 || !ShouldRemoveZeroContentLengthHeader(method) {
-				header[keyStr] = []string{valStr}
+				header[keyStr] = append(header[keyStr], valStr)
 				req.ContentLength = int64(contentLengthInt)
 			}
 		case "host":
@@ -376,7 +376,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 			continue
 		}
 		if isSingletonHeader {
-			header[keyStr] = []string{valStr}
+			header[keyStr] = append(header[keyStr], valStr)
 			continue
 		}
 		header[keyStr] = append(header[keyStr], valStr)
