@@ -74,7 +74,6 @@ type SFI struct {
 	OpCode           SFVMOpCode
 	UnaryInt         int
 	UnaryStr         string
-	UnaryBool        bool
 	Desc             string
 	Values           []string
 	SyntaxFlowConfig []*RecursiveConfigItem
@@ -106,11 +105,11 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "push$input", s.UnaryStr)
 
 	case OpPushSearchGlob:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, s.UnaryBool)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, s.UnaryInt)
 	case OpPushSearchExact:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, s.UnaryBool)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, s.UnaryInt)
 	case OpPushSearchRegexp:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, s.UnaryBool)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, s.UnaryInt)
 	case opGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
 	case OpGetAllCallArgs:

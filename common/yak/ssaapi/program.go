@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 type Program struct {
@@ -75,7 +76,7 @@ func (p *Program) GetInstructionById(id int64) ssa.Instruction {
 
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
-		p.DBCache.GetByVariableExact(false, name),
+		p.DBCache.GetByVariableExact(ssadb.NameMatch, name),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
