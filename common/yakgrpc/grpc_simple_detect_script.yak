@@ -3,7 +3,7 @@ yakit.AutoInitYakit()
 loglevel("info")
 
 runtimeID = getParams("RUNTIME_ID")
-yakit.StatusCard("RuntimeIDFromRisks", runtimeID, "not display")
+yakit.StatusCard("RuntimeIDFromRisks", runtimeID, "no display")
 
 # Input your code!
 updateStatus = s => yakit.StatusCard("当前状态", s)
@@ -743,6 +743,7 @@ if recordPtr > 0 {
         die(err)
     }
 }
+
 
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
