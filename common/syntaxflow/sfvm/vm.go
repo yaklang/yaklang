@@ -13,6 +13,8 @@ import (
 )
 
 type SyntaxFlowVirtualMachine struct {
+	config *Config
+
 	vars *omap.OrderedMap[string, ValueOperator]
 
 	debug      bool
@@ -20,10 +22,18 @@ type SyntaxFlowVirtualMachine struct {
 	frames     []*SFFrame
 }
 
-func NewSyntaxFlowVirtualMachine() *SyntaxFlowVirtualMachine {
+func NewSyntaxFlowVirtualMachine(opts ...Option) *SyntaxFlowVirtualMachine {
+	config := NewConfig(opts...)
+	var vars *omap.OrderedMap[string, ValueOperator]
+	if config.initialContextVars != nil {
+		vars = config.initialContextVars
+	} else {
+		vars = omap.NewEmptyOrderedMap[string, ValueOperator]()
+	}
 	sfv := &SyntaxFlowVirtualMachine{
-		vars:       omap.NewEmptyOrderedMap[string, ValueOperator](),
+		vars:       vars,
 		frameMutex: new(sync.Mutex),
+		config:     config,
 	}
 	return sfv
 }
@@ -79,6 +89,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	result.text = text
 	result.VisitFlow(flow)
 	var frame = result.CreateFrame(s.vars)
+	frame.config = s.config
 	s.frames = append(s.frames, frame)
 
 	return nil

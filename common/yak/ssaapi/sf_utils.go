@@ -58,8 +58,8 @@ func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values
 	return newValue
 }
 
-func (p *Program) SyntaxFlow(i string, opts ...any) map[string]Values {
-	vals, err := p.SyntaxFlowWithError(i)
+func (p *Program) SyntaxFlow(i string, opts ...sfvm.Option) map[string]Values {
+	vals, err := p.SyntaxFlowWithError(i, opts...)
 	if err != nil {
 		log.Warnf("exec syntaxflow: %#v failed: %v", i, err)
 		return nil
@@ -67,9 +67,12 @@ func (p *Program) SyntaxFlow(i string, opts ...any) map[string]Values {
 	return vals
 }
 
-func (p *Program) SyntaxFlowChain(i string, opts ...any) Values {
+func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 	var results Values
-	vals, _ := p.SyntaxFlowWithError(i)
+	vals, err := p.SyntaxFlowWithError(i, opts...)
+	if err != nil {
+		log.Warnf("syntax_flow_chain_failed: %s", err)
+	}
 	if vals == nil {
 		return results
 	}
@@ -79,9 +82,8 @@ func (p *Program) SyntaxFlowChain(i string, opts ...any) Values {
 	return results
 }
 
-func (p *Program) SyntaxFlowWithError(i string, opts ...any) (map[string]Values, error) {
-	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	vm.Debug()
+func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string]Values, error) {
+	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
 	err := vm.Compile(i)
 	if err != nil {
 		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", i, err)
