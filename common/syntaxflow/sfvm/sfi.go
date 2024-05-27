@@ -77,7 +77,7 @@ type SFI struct {
 	UnaryBool        bool
 	Desc             string
 	Values           []string
-	SyntaxFlowConfig []*ConfigItem
+	SyntaxFlowConfig []*RecursiveConfigItem
 }
 
 const verboseLen = "%-12s"

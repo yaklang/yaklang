@@ -106,7 +106,7 @@ func (v *ValueList) GetSyntaxFlowUse() (ValueOperator, error) {
 	}
 	return NewValues(res), nil
 }
-func (v *ValueList) GetSyntaxFlowTopDef(config ...*ConfigItem) (ValueOperator, error) {
+func (v *ValueList) GetSyntaxFlowTopDef(config ...*RecursiveConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
 		topDef, err := v.GetSyntaxFlowTopDef(config...)
@@ -118,7 +118,7 @@ func (v *ValueList) GetSyntaxFlowTopDef(config ...*ConfigItem) (ValueOperator, e
 	return NewValues(res), nil
 }
 
-func (v *ValueList) GetSyntaxFlowBottomUse(config ...*ConfigItem) (ValueOperator, error) {
+func (v *ValueList) GetSyntaxFlowBottomUse(config ...*RecursiveConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
 		bottomUse, err := v.GetSyntaxFlowBottomUse()

@@ -97,10 +97,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	// hook everynode
-	if actx.config.HookEveryNode != nil {
-		if err := actx.config.HookEveryNode(i); err != nil {
-			log.Errorf("hook-every-node error: %v", err)
-			return Values{}
+	if len(actx.config.HookEveryNode) > 0 {
+		for _, hook := range actx.config.HookEveryNode {
+			if err := hook(i); err != nil {
+				log.Errorf("hook-every-node error: %v", err)
+				return Values{}
+			}
 		}
 	}
 
