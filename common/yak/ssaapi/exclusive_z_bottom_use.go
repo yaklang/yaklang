@@ -106,7 +106,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx)
 		}
 
-		funcValue := NewValue(f).AppendDependOn(v)
+		funcValue := v.NewValue(f).AppendDependOn(v)
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx)
 		}
@@ -152,7 +152,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		var vals Values
 		if params.Len() > 0 {
 			for _, formalParam := range params.Values() {
-				rets := NewValue(formalParam).AppendDependOn(funcValue).getBottomUses(actx, opt...)
+				rets := v.NewValue(formalParam).AppendDependOn(funcValue).getBottomUses(actx, opt...)
 				vals = append(vals, rets...)
 			}
 			return vals
@@ -161,7 +161,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		// no formal parameters found!
 		// enter return
 		for _, retStmt := range f.Return {
-			retVals := NewValue(retStmt).AppendDependOn(funcValue)
+			retVals := v.NewValue(retStmt).AppendDependOn(funcValue)
 			vals = append(vals, retVals)
 		}
 		return vals
@@ -171,7 +171,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// var results Values
 			results := make(Values, 0)
 			if f := ins.GetFunc(); f != nil {
-				NewValue(f).GetCalledBy().ForEach(func(value *Value) {
+				v.NewValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
 					err := actx.PushCall(dep)
 
@@ -187,7 +187,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				return results
 			}
 			for _, result := range ins.Results {
-				results = append(results, NewValue(result).AppendDependOn(v))
+				results = append(results, v.NewValue(result).AppendDependOn(v))
 			}
 			return results
 		}
@@ -218,7 +218,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 
 			var vals Values
 			if !call.IsObject() || len(indexes) <= 0 {
-				NewValue(call).GetUsers().ForEach(func(user *Value) {
+				v.NewValue(call).GetUsers().ForEach(func(user *Value) {
 					if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
@@ -227,7 +227,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				if len(vals) > 0 {
 					return vals
 				}
-				return NewValue(call).AppendDependOn(v).getBottomUses(actx)
+				return v.NewValue(call).AppendDependOn(v).getBottomUses(actx)
 			}
 
 			// handle indexed return to call return
@@ -238,7 +238,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				if !ok {
 					continue
 				}
-				returnReceiver := NewValue(indexedReturn)
+				returnReceiver := v.NewValue(indexedReturn)
 				actx.PushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
 				if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
 					vals = append(vals, newVals...)
@@ -248,7 +248,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if len(vals) > 0 {
 				return vals
 			}
-			return NewValue(call).AppendDependOn(v).getBottomUses(actx)
+			return v.NewValue(call).AppendDependOn(v).getBottomUses(actx)
 		}
 		return fallback()
 	}

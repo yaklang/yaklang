@@ -11,9 +11,10 @@ import (
 )
 
 type Value struct {
-	runtimeCtx *omap.OrderedMap[ContextID, *Value]
-	EffectOn   Values
-	DependOn   Values
+	runtimeCtx    *omap.OrderedMap[ContextID, *Value]
+	ParentProgram *Program
+	EffectOn      Values
+	DependOn      Values
 
 	node ssa.Value
 	// cache
@@ -32,13 +33,14 @@ func ValueCompare(v1, v2 *Value) bool {
 	return v1.GetId() == v2.GetId()
 }
 
-func NewValue(n ssa.Value) *Value {
+func (p *Program) NewValue(n ssa.Value) *Value {
 	if utils.IsNil(n) {
 		return nil
 	}
 	return &Value{
-		runtimeCtx: omap.NewEmptyOrderedMap[ContextID, *Value](),
-		node:       n,
+		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
+		node:          n,
+		ParentProgram: p,
 	}
 }
 
@@ -158,9 +160,13 @@ func (v *Value) GetOperands() Values {
 		return nil
 	}
 	if v.operands == nil {
-		v.operands = lo.Map(v.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+		v.operands = lo.Map(v.node.GetValues(), func(ssaVal ssa.Value, _ int) *Value { return v.NewValue(ssaVal) })
 	}
 	return v.operands
+}
+
+func (v *Value) NewValue(value ssa.Value) *Value {
+	return v.ParentProgram.NewValue(value)
 }
 
 func (v *Value) GetOperand(index int) *Value {
@@ -189,9 +195,9 @@ func (v *Value) GetUsers() Values {
 
 	if v.users == nil {
 		v.users = lo.FilterMap(v.node.GetUsers(),
-			func(v ssa.User, _ int) (*Value, bool) {
-				if value, ok := ssa.ToValue(v); ok {
-					return NewValue(value), true
+			func(ssaVal ssa.User, _ int) (*Value, bool) {
+				if value, ok := ssa.ToValue(ssaVal); ok {
+					return v.NewValue(value), true
 				}
 				return nil, false
 			},
@@ -245,7 +251,7 @@ func (v *Value) GetReturn() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
 		for _, r := range f.Return {
-			ret = append(ret, NewValue(r))
+			ret = append(ret, v.NewValue(r))
 		}
 	}
 	return ret
@@ -258,7 +264,7 @@ func (v *Value) GetParameter(i int) *Value {
 
 	if f, ok := ssa.ToFunction(v.node); ok {
 		if i < len(f.Param) {
-			return NewValue(f.Param[i])
+			return v.NewValue(f.Param[i])
 		}
 	}
 	return nil
@@ -271,8 +277,8 @@ func (v *Value) GetParameters() Values {
 
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
-		for _, v := range f.Param {
-			ret = append(ret, NewValue(v))
+		for _, param := range f.Param {
+			ret = append(ret, v.NewValue(param))
 		}
 	}
 	return ret
@@ -285,7 +291,7 @@ func (v *Value) GetCallArgs() Values {
 
 	if f, ok := ssa.ToCall(v.node); ok {
 		return lo.Map(f.Args, func(item ssa.Value, index int) *Value {
-			return NewValue(item)
+			return v.NewValue(item)
 		})
 	}
 	return nil
@@ -441,7 +447,7 @@ func (v *Value) GetMember(value *Value) *Value {
 	node := v.node
 	for name, member := range node.GetAllMember() {
 		if name.String() == key {
-			return NewValue(member)
+			return v.NewValue(member)
 		}
 	}
 	return nil
@@ -456,7 +462,7 @@ func (v *Value) GetAllMember() Values {
 	all := v.node.GetAllMember()
 	ret := make(Values, 0, len(all))
 	for _, value := range all {
-		ret = append(ret, NewValue(value))
+		ret = append(ret, v.NewValue(value))
 	}
 	return ret
 }
@@ -501,7 +507,7 @@ func (v *Value) GetObject() *Value {
 		return nil
 	}
 
-	return NewValue(v.node.GetObject())
+	return v.NewValue(v.node.GetObject())
 }
 
 // GetKey get key of member
@@ -510,7 +516,7 @@ func (v *Value) GetKey() *Value {
 		return nil
 	}
 
-	return NewValue(v.node.GetKey())
+	return v.NewValue(v.node.GetKey())
 }
 
 // GetBareNode get ssa.Value from ssaapi.Value
@@ -528,7 +534,7 @@ func GetValues(v *Value) Values {
 		return nil
 	}
 
-	return lo.Map(v.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+	return lo.Map(v.node.GetValues(), func(item ssa.Value, _ int) *Value { return v.NewValue(item) })
 }
 
 func GetFreeValue(v *Value) *ssa.Parameter {
@@ -651,7 +657,17 @@ func (v Values) Get(i int) *Value {
 	if i < len(v) {
 		return v[i]
 	}
-	return NewValue(ssa.NewUndefined(""))
+	return v.NewValue(ssa.NewUndefined(""))
+}
+
+func (v Values) NewValue(ssaVal ssa.Value) *Value {
+	if len(v) > 0 {
+		return v[0].ParentProgram.NewValue(ssaVal)
+	}
+	return &Value{
+		runtimeCtx: omap.NewEmptyOrderedMap[ContextID, *Value](),
+		node:       ssa.NewUndefined(""),
+	}
 }
 
 func (v Values) ForEach(f func(*Value)) Values {

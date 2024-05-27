@@ -112,7 +112,7 @@ func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.
 		// free value def is default value variable
 		defValue := freeValue.GetDefault()
 		if defValue != nil {
-			variables := findVariable(ssaapi.NewValue(defValue), word, containPoint)
+			variables := findVariable(prog.NewValue(defValue), word, containPoint)
 			if len(variables) > 0 && variables[0].DefRange != nil {
 				ranges = append(ranges, editor.ExpandWordTextRange(variables[0].DefRange))
 			}

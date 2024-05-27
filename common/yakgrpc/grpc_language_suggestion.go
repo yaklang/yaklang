@@ -160,7 +160,7 @@ func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng 
 	offset := rng.GetEndOffset()
 	value := prog.Program.GetFrontValueByOffset(offset)
 	if !utils.IsNil(value) {
-		return ssaapi.NewValue(value)
+		return prog.NewValue(value)
 	}
 	return nil
 }
@@ -707,7 +707,7 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng *ssa.Range) (ret []
 		}
 		uniqMap[varName] = struct{}{}
 		bareValue := item.GetValue()
-		v := ssaapi.NewValue(bareValue)
+		v := prog.NewValue(bareValue)
 
 		// 不应该再补全标准库函数和标准库
 		if _, ok := doc.DefaultDocumentHelper.Functions[varName]; ok {

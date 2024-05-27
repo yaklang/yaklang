@@ -31,7 +31,7 @@ func (p *Program) ExactMatch(isMember bool, s string) (bool, sfvm.ValueOperator,
 		p.DBCache.GetByVariableExact(isMember, s),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
-				return NewValue(v), true
+				return p.NewValue(v), true
 			} else {
 				return nil, false
 			}
@@ -45,7 +45,7 @@ func (p *Program) GlobMatch(isMember bool, g sfvm.Glob) (bool, sfvm.ValueOperato
 		p.DBCache.GetByVariableGlob(isMember, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
-				return NewValue(v), true
+				return p.NewValue(v), true
 			}
 			return nil, false
 		},
@@ -58,7 +58,7 @@ func (p *Program) RegexpMatch(isMember bool, re *regexp.Regexp) (bool, sfvm.Valu
 		p.DBCache.GetByVariableRegexp(isMember, re),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
-				return NewValue(v), true
+				return p.NewValue(v), true
 			} else {
 				return nil, false
 			}

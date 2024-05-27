@@ -35,7 +35,7 @@ func (v *Value) SetContextValue(i ContextID, values *Value) *Value {
 }
 
 func (v *Value) SetDepth(i int) {
-	v.runtimeCtx.Set("depth", NewValue(ssa.NewConst(i)))
+	v.runtimeCtx.Set("depth", v.NewValue(ssa.NewConst(i)))
 }
 
 func (v *Value) GetDepth() int {

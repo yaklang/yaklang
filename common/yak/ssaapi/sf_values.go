@@ -70,7 +70,7 @@ func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
 	for _, i := range value {
 		if c, ok := ssa.ToCall(i.node); ok {
 			if len(c.Args) > index {
-				ret = append(ret, NewValue(c.Args[index]))
+				ret = append(ret, value.NewValue(c.Args[index]))
 			}
 		}
 	}
@@ -98,7 +98,7 @@ func (value Values) GetMembersByString(key string) (sfvm.ValueOperator, error) {
 			continue
 		}
 		if v.IsMap() || v.IsList() || v.IsObject() {
-			res := v.GetMember(NewValue(ssa.NewConst(key)))
+			res := v.GetMember(v.NewValue(ssa.NewConst(key)))
 			vals = append(vals, res)
 		}
 	}
