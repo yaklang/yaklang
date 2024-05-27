@@ -11,6 +11,8 @@ import (
 )
 
 type SFFrame struct {
+	config *Config
+
 	symbolTable *omap.OrderedMap[string, ValueOperator]
 	stack       *utils.Stack[ValueOperator]
 	Text        string
@@ -199,7 +201,12 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Error("E: stack is empty, cannot pop")
 			}
 			i := s.stack.Pop()
-			s.debugSubLog(">> pop %v", i.String())
+			s.debugSubLog(">> pop %v to $_", i.String())
+			err := s.output("_", i)
+			if err != nil {
+				s.debugSubLog("ERROR: %v", err)
+				return err
+			}
 		case opGetCall:
 			s.debugSubLog(">> pop")
 			value := s.stack.Pop()
@@ -320,7 +327,12 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if value == nil {
 				return utils.Error("BUG: get top defs failed, empty stack")
 			}
-			s.symbolTable.Set(i.UnaryStr, value)
+			err := s.output(i.UnaryStr, value)
+			if err != nil {
+				s.debugSubLog("ERROR: %v", err)
+				return err
+			}
+			s.debugSubLog(" -> save $" + i.UnaryStr)
 		default:
 			msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 			panic(msg)
@@ -329,6 +341,16 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		idx++
 	}
 
+	return nil
+}
+
+func (s *SFFrame) output(resultName string, operator ValueOperator) error {
+	s.symbolTable.Set(resultName, operator)
+	if s.config != nil {
+		if err := s.config.onResultCaptured(resultName, []ValueOperator{}); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
