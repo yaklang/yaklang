@@ -25,16 +25,22 @@ filterExpr
     | nameFilter                                            # PrimaryFilter
     | '.' nameFilter                                        # FieldFilter
     | filterExpr '.' nameFilter                             # FieldCallFilter
-    | filterExpr '(' actualParam? ')'                 # FunctionCallFilter
+    | filterExpr '(' actualParam? ')'                       # FunctionCallFilter
     | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
     | filterExpr '?{' conditionExpression '}'               # OptionalFilter
     | filterExpr '->' filterExpr                            # NextFilter
+    | filterExpr '->'                                       # NextSingleFilter
     | filterExpr '#>' filterExpr                            # DefFilter
+    | filterExpr '#>'                                       # DefSingleFilter
     | filterExpr '-->' filterExpr                           # DeepNextFilter
+    | filterExpr '-->'                                      # DeepNextSingleFilter
     | filterExpr '#->' filterExpr                           # TopDefFilter
-    | filterExpr '-{' (recursiveConfig)? '}->' filterExpr     # ConfiggedDeepNextFilter
-    | filterExpr '#{' (recursiveConfig)? '}->' filterExpr     # ConfiggedTopDefFilter
-    | filterExpr '-<' useDefCalcDescription '>-' filterExpr   # UseDefCalcFilter
+    | filterExpr '#->'                                      # TopDefSingleFilter
+    | filterExpr '-{' (recursiveConfig)? '}->' filterExpr   # ConfiggedDeepNextFilter
+    | filterExpr '-{' (recursiveConfig)? '}->'              # ConfiggedDeepNextSingleFilter
+    | filterExpr '#{' (recursiveConfig)? '}->' filterExpr   # ConfiggedTopDefFilter
+    | filterExpr '#{' (recursiveConfig)? '}->'              # ConfiggedTopDefSingleFilter
+    | filterExpr '-<' useDefCalcDescription '>-' filterExpr # UseDefCalcFilter
     ;
 
 useDefCalcDescription

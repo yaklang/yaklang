@@ -84,6 +84,15 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.NextSingleFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr())
+		if err != nil {
+			return err
+		}
+		y.EmitGetUsers()
+		recoverFilterExpr := y.EnterFilterExpr()
+		y.EmitSearchGlob(false, "*")
+		recoverFilterExpr()
 	case *sf.DefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
@@ -96,6 +105,15 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.DefSingleFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr())
+		if err != nil {
+			return err
+		}
+		y.EmitGetDefs()
+		recoverFilterExpr := y.EnterFilterExpr()
+		y.EmitSearchGlob(false, "*")
+		recoverFilterExpr()
 	case *sf.DeepNextFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
@@ -108,6 +126,15 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.DeepNextSingleFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr())
+		if err != nil {
+			return err
+		}
+		y.EmitGetBottomUsers()
+		recoverFilterExpr := y.EnterFilterExpr()
+		y.EmitSearchGlob(false, "*")
+		recoverFilterExpr()
 	case *sf.TopDefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
@@ -116,6 +143,18 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		y.EmitGetTopDefs()
 		recoverFilterExpr := y.EnterFilterExpr()
 		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		recoverFilterExpr()
+		if err != nil {
+			return err
+		}
+	case *sf.TopDefSingleFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr())
+		if err != nil {
+			return err
+		}
+		y.EmitGetTopDefs()
+		recoverFilterExpr := y.EnterFilterExpr()
+		y.EmitSearchGlob(false, "*")
 		recoverFilterExpr()
 		if err != nil {
 			return err
@@ -136,6 +175,19 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.ConfiggedDeepNextSingleFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr())
+		if err != nil {
+			return err
+		}
+		if i := ret.RecursiveConfig(); i != nil {
+			y.EmitGetBottomUsersWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
+		} else {
+			y.EmitGetBottomUsers()
+		}
+		recoverFilterExpr := y.EnterFilterExpr()
+		y.EmitSearchGlob(false, "*")
+		recoverFilterExpr()
 	case *sf.ConfiggedTopDefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
@@ -152,6 +204,19 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.ConfiggedTopDefSingleFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr())
+		if err != nil {
+			return err
+		}
+		if i := ret.RecursiveConfig(); i != nil {
+			y.EmitGetTopDefsWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
+		} else {
+			y.EmitGetBottomUsers()
+		}
+		recoverFilterExpr := y.EnterFilterExpr()
+		y.EmitSearchGlob(false, "*")
+		recoverFilterExpr()
 	case *sf.UseDefCalcFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {
