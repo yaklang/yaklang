@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/domainextractor"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -79,7 +79,6 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		CreatedAt:                  f.CreatedAt.Unix(),
 		HostPort:                   utf8safe(f.RemoteAddr),
 		IPAddress:                  utf8safe(f.IPAddress),
-		HtmlTitle:                  "",
 		Tags:                       f.Tags,
 		NoFixContentLength:         f.NoFixContentLength,
 		IsWebsocket:                f.IsWebsocket,
@@ -87,7 +86,9 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		TooLargeResponseBodyFile:   f.TooLargeResponseBodyFile,
 		TooLargeResponseHeaderFile: f.TooLargeResponseHeaderFile,
-		Payloads:                   strings.Split(f.Payload, ","),
+		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
+			return utf8safe(i)
+		}),
 	}
 	// 设置 title
 	var (
@@ -135,7 +136,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	requireResponse := full || !f.IsResponseOversize
 	isStandardRequest := !flow.NoFixContentLength
 
-	haveRequest := funk.NotEmpty(unquotedRequest)
+	haveRequest := lo.IsNotEmpty(unquotedRequest)
 	var requestBody []byte
 	if requireRequest {
 		// return request:
@@ -179,7 +180,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 						// 详情模式，这个很耗时。
 						fParam = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
 					}
-					fParam.ParamName = utils.EscapeInvalidUTF8Byte([]byte(fParam.ParamName))
+					fParam.ParamName = utf8safe(fParam.ParamName)
 					if r.IsGetParams() {
 						flow.GetParams = append(flow.GetParams, fParam)
 					}
@@ -199,7 +200,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		}
 	}
 
-	haveResponse := funk.NotEmpty(unquotedResponse)
+	haveResponse := lo.IsNotEmpty(unquotedResponse)
 	var responseBody []byte
 	if requireResponse {
 		flow.Response = []byte(unquotedResponse)
@@ -223,7 +224,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 			flow.RawRequestBodyBase64 = codec.EncodeBase64(requestBody)
 			// 这里需要修复请求，这是为了解决Content-Type与body中boundary不一致的问题
 			fixReq := lowhttp.FixHTTPRequest(flow.Request)
-			flow.SafeHTTPRequest = codec.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(fixReq))
+			flow.SafeHTTPRequest = utils.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(fixReq))
 		}
 	}
 
@@ -247,11 +248,11 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		}
 		flow.Domains = make([]string, len(domains))
 		for i, d := range domains {
-			flow.Domains[i] = utils.EscapeInvalidUTF8Byte([]byte(d))
+			flow.Domains[i] = utf8safe(d)
 		}
 		flow.RootDomains = make([]string, len(rootDomains))
 		for i, d := range rootDomains {
-			flow.RootDomains[i] = utils.EscapeInvalidUTF8Byte([]byte(d))
+			flow.RootDomains[i] = utf8safe(d)
 		}
 		for _, j := range jsonObjects {
 			if j == "" || j == "&&" || j == "{}" {
@@ -274,7 +275,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool) *ypb.FuzzableParam {
 	p := &ypb.FuzzableParam{
 		Position:  r.PositionVerbose(),
-		ParamName: r.Name(),
+		ParamName: utf8safe(r.Name()),
 		IsHTTPS:   isHttps,
 	}
 
@@ -283,10 +284,10 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 		if len(ret) == 1 {
 			p.OriginValue = []byte(ret[0])
 		} else {
-			p.OriginValue = utils.InterfaceToBytes(r.Value())
+			p.OriginValue = utils.InterfaceToBytes(ret)
 		}
 	default:
-		p.OriginValue = utils.InterfaceToBytes(r.Value())
+		p.OriginValue = utils.InterfaceToBytes(ret)
 	}
 
 	flag := utils.RandNumberStringBytes(6)
