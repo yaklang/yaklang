@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -33,8 +34,8 @@ func PrettifyListFromStringSplited(Raw string, sep string) (targets []string) {
 
 func PrettifyShrinkJoin(sep string, s ...string) string {
 	var buf bytes.Buffer
-	var count = 0
-	var existedHashMap = make(map[string]struct{})
+	count := 0
+	existedHashMap := make(map[string]struct{})
 	for _, element := range s {
 		for _, i := range PrettifyListFromStringSplited(element, sep) {
 			if i == "" {
@@ -59,7 +60,7 @@ func PrettifyShrinkJoin(sep string, s ...string) string {
 
 func PrettifyJoin(sep string, s ...string) string {
 	var buf bytes.Buffer
-	var count = 0
+	count := 0
 	for _, i := range s {
 		if i == "" {
 			continue
@@ -192,9 +193,7 @@ func ChanStringToSlice(c chan string) (result []string) {
 	return
 }
 
-var (
-	cStyleCharPRegexp, _ = regexp.Compile(`\\((x[0-9abcdef]{2})|([0-9]{1,3}))`)
-)
+var cStyleCharPRegexp, _ = regexp.Compile(`\\((x[0-9abcdef]{2})|([0-9]{1,3}))`)
 
 func ParseCStyleBinaryRawToBytes(raw []byte) []byte {
 	// like "\\x12" => "\x12"
@@ -226,20 +225,22 @@ func ParseCStyleBinaryRawToBytes(raw []byte) []byte {
 	})
 }
 
-var GbkToUtf8 = codec.GbkToUtf8
-var Utf8ToGbk = codec.Utf8ToGbk
+var (
+	GbkToUtf8 = codec.GbkToUtf8
+	Utf8ToGbk = codec.Utf8ToGbk
+)
 
 func ParseStringToVisible(raw interface{}) string {
-	var s = InterfaceToString(raw)
+	s := InterfaceToString(raw)
 	s = EscapeInvalidUTF8Byte([]byte(s))
-	//s = strings.ReplaceAll(s, "\x20", "\\x20")
+	// s = strings.ReplaceAll(s, "\x20", "\\x20")
 	s = strings.ReplaceAll(s, "\x0b", "\\v")
 	r, err := regexp.Compile(`\s`)
 	if err != nil {
 		return s
 	}
 	return r.ReplaceAllStringFunc(s, func(s string) string {
-		var result = strconv.Quote(s)
+		result := strconv.Quote(s)
 		for strings.HasPrefix(result, "\"") {
 			result = result[1:]
 		}
@@ -252,7 +253,8 @@ func ParseStringToVisible(raw interface{}) string {
 
 func EscapeInvalidUTF8Byte(s []byte) string {
 	// 这个操作返回的结果和原始字符串是非等价的
-	ret := make([]rune, 0, len(s)+20)
+	var builder strings.Builder
+	builder.Grow(len(s) + 20)
 	start := 0
 	for {
 		r, size := utf8.DecodeRune(s[start:])
@@ -262,20 +264,22 @@ func EscapeInvalidUTF8Byte(s []byte) string {
 				break
 			} else {
 				// 不是 rune
-				ret = append(ret, []rune(fmt.Sprintf("\\x%02x", s[start]))...)
+				builder.WriteString("\\x")
+				builder.WriteString(hex.EncodeToString([]byte{s[start]}))
 			}
 		} else {
 			// 不是换行之类的控制字符
 			if unicode.IsControl(r) && !unicode.IsSpace(r) {
-				ret = append(ret, []rune(fmt.Sprintf("\\x%02x", r))...)
+				builder.WriteString("\\x")
+				builder.WriteString(hex.EncodeToString([]byte{byte(r)}))
 			} else {
 				// 正常字符
-				ret = append(ret, r)
+				builder.WriteRune(r)
 			}
 		}
 		start += size
 	}
-	return string(ret)
+	return builder.String()
 }
 
 var GBKSafeString = codec.GBKSafeString
@@ -285,7 +289,7 @@ func LastLine(s []byte) []byte {
 	scanner := bufio.NewScanner(bytes.NewReader(s))
 	scanner.Split(bufio.ScanLines)
 
-	var lastLine = s
+	lastLine := s
 	for scanner.Scan() {
 		lastLine = scanner.Bytes()
 	}
@@ -297,7 +301,7 @@ func RemoveUnprintableChars(raw string) string {
 	scanner := bufio.NewScanner(bytes.NewBufferString(raw))
 	scanner.Split(bufio.ScanBytes)
 
-	var buf = bytes.NewBufferString("")
+	buf := bytes.NewBufferString("")
 	for scanner.Scan() {
 		c := scanner.Bytes()[0]
 
@@ -342,15 +346,13 @@ func RemoveRepeatedWithStringSlice(slice []string) []string {
 	}
 
 	var r2 []string
-	for k, _ := range r {
+	for k := range r {
 		r2 = append(r2, k)
 	}
 	return r2
 }
 
-var (
-	titleRegexp = regexp.MustCompile(`(?is)\<title\>(.*?)\</?title\>`)
-)
+var titleRegexp = regexp.MustCompile(`(?is)\<title\>(.*?)\</?title\>`)
 
 func ExtractTitleFromHTMLTitle(s string, defaultValue string) string {
 	var title string
