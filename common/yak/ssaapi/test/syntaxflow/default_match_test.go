@@ -1,11 +1,12 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"testing"
 )
 
 func WithSyntaxFlowResult(expected string, handler func(*ssaapi.Value) error) sfvm.Option {

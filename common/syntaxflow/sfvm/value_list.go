@@ -145,10 +145,10 @@ func (v *ValueList) IsList() bool {
 	return true
 }
 
-func (v *ValueList) ExactMatch(isMember bool, s string) (bool, ValueOperator, error) {
+func (v *ValueList) ExactMatch(mod int, s string) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
-		match, next, err := value.ExactMatch(isMember, s)
+		match, next, err := value.ExactMatch(mod, s)
 		if err != nil {
 			return false, nil, err
 		}
@@ -161,10 +161,10 @@ func (v *ValueList) ExactMatch(isMember bool, s string) (bool, ValueOperator, er
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) GlobMatch(isMember bool, s Glob) (bool, ValueOperator, error) {
+func (v *ValueList) GlobMatch(mod int, s Glob) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
-		match, next, err := value.GlobMatch(isMember, s)
+		match, next, err := value.GlobMatch(mod, s)
 		if err != nil {
 			return false, nil, err
 		}
@@ -177,10 +177,10 @@ func (v *ValueList) GlobMatch(isMember bool, s Glob) (bool, ValueOperator, error
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) RegexpMatch(isMember bool, regexp *regexp.Regexp) (bool, ValueOperator, error) {
+func (v *ValueList) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
-		match, next, err := value.RegexpMatch(isMember, regexp)
+		match, next, err := value.RegexpMatch(mod, regexp)
 		if err != nil {
 			return false, nil, err
 		}

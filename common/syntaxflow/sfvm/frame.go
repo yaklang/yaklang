@@ -121,8 +121,11 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if value == nil {
 				return utils.Errorf("search exact failed: stack top is empty")
 			}
-
-			result, next, err := value.ExactMatch(i.UnaryBool, i.UnaryStr)
+			mod := i.UnaryInt
+			if !s.config.StrictMatch {
+				mod |= KeyMatch
+			}
+			result, next, err := value.ExactMatch(mod, i.UnaryStr)
 			if err != nil {
 				return utils.Wrapf(err, "search exact failed")
 			}
@@ -150,7 +153,11 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Wrap(err, "compile glob failed")
 			}
 
-			result, next, err := value.GlobMatch(i.UnaryBool, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
+			mod := i.UnaryInt
+			if !s.config.StrictMatch {
+				mod |= KeyMatch
+			}
+			result, next, err := value.GlobMatch(mod, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
 			if err != nil {
 				return utils.Wrap(err, "search glob failed")
 			}
@@ -177,7 +184,11 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if err != nil {
 				return utils.Wrap(err, "compile regexp failed")
 			}
-			result, next, err := value.RegexpMatch(i.UnaryBool, regexpIns)
+			mod := i.UnaryInt
+			if !s.config.StrictMatch {
+				mod |= KeyMatch
+			}
+			result, next, err := value.RegexpMatch(mod, regexpIns)
 			if err != nil {
 				return utils.Wrap(err, "search regexp failed")
 			}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -27,7 +28,7 @@ func Check(
 	{
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
-		// prog.Show()
+		prog.Show()
 
 		log.Infof("only in memory ")
 		err = handler(prog)
@@ -60,14 +61,20 @@ func Check(
 }
 
 func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
-	CheckSyntaxFlowEx(t, code, sf, true, wants, opt...)
+	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
-	CheckSyntaxFlowEx(t, code, sf, false, wants, opt...)
+	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }
 func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, opt ...ssaapi.Option) {
+	checkSyntaxFlowEx(t, code, sf, contain, wants, opt, nil)
+}
+func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map[string][]string, opt ...sfvm.Option) {
+	checkSyntaxFlowEx(t, code, sf, false, wants, nil, opt)
+}
+func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []sfvm.Option) {
 	Check(t, code, func(prog *ssaapi.Program) error {
-		results, err := prog.SyntaxFlowWithError(sf)
+		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
 		for key, value := range results {
 			log.Infof("\nkey: %s", key)
@@ -90,7 +97,7 @@ func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 			}
 		}
 		return nil
-	}, opt...)
+	}, ssaOpt...)
 }
 
 func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {

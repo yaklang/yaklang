@@ -91,7 +91,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		}
 		y.EmitGetUsers()
 		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(false, "*")
+		y.EmitSearchGlob(NameMatch, "*")
 		recoverFilterExpr()
 	case *sf.DefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
@@ -112,7 +112,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		}
 		y.EmitGetDefs()
 		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(false, "*")
+		y.EmitSearchGlob(NameMatch, "*")
 		recoverFilterExpr()
 	case *sf.DeepNextFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
@@ -133,7 +133,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		}
 		y.EmitGetBottomUsers()
 		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(false, "*")
+		y.EmitSearchGlob(NameMatch, "*")
 		recoverFilterExpr()
 	case *sf.TopDefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
@@ -154,7 +154,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		}
 		y.EmitGetTopDefs()
 		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(false, "*")
+		y.EmitSearchGlob(NameMatch, "*")
 		recoverFilterExpr()
 		if err != nil {
 			return err
@@ -186,7 +186,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			y.EmitGetBottomUsers()
 		}
 		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(false, "*")
+		y.EmitSearchGlob(NameMatch, "*")
 		recoverFilterExpr()
 	case *sf.ConfiggedTopDefFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
@@ -215,7 +215,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			y.EmitGetBottomUsers()
 		}
 		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(false, "*")
+		y.EmitSearchGlob(NameMatch, "*")
 		recoverFilterExpr()
 	case *sf.UseDefCalcFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
@@ -244,23 +244,28 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		return utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
 	}
 
+	mod := NameMatch
+	if isMember {
+		mod = KeyMatch
+	}
+
 	if s := ret.Star(); s != nil {
 		if isMember {
 			// get all member
-			y.EmitSearchGlob(true, "*")
+			y.EmitSearchGlob(mod, "*")
 		}
 		// skip
 		return nil
 	} else if id := ret.DollarOutput(); id != nil {
-		y.EmitSearchExact(isMember, id.GetText())
+		y.EmitSearchExact(mod, id.GetText())
 		return nil
 	} else if id := ret.Identifier(); id != nil {
 		text := ret.Identifier().GetText()
 		filter, isGlob := y.FormatStringOrGlob(text) // emit field
 		if isGlob {
-			y.EmitSearchGlob(isMember, filter)
+			y.EmitSearchGlob(mod, filter)
 		} else {
-			y.EmitSearchExact(isMember, filter)
+			y.EmitSearchExact(mod, filter)
 		}
 		return nil
 	} else if re, ok := ret.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
@@ -271,7 +276,7 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		if err != nil {
 			return err
 		}
-		y.EmitSearchRegexp(isMember, reIns.String())
+		y.EmitSearchRegexp(mod, reIns.String())
 		return nil
 	}
 	return utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
