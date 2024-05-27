@@ -187,6 +187,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 				//debug(fmt.Sprintf("use cached frames in WaitGroup[%v]", count))
 				t.waitGroup = t.waitGroup[count:]
 			}
+
 			return
 		}
 

@@ -3,6 +3,9 @@ package yakit
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -11,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 // Deprecated
@@ -117,24 +118,47 @@ func SaveWebFuzzerTask(db *gorm.DB, req *ypb.FuzzerRequest, total int, ok bool, 
 }
 
 func DeleteWebFuzzerTaskAll(db *gorm.DB) error {
-	if db := db.Model(&schema.WebFuzzerTask{}).Where("true").Unscoped().Delete(&schema.WebFuzzerTask{}); db.Error != nil {
-		return utils.Errorf("delete web fuzzer all failed: %s", db.Error)
-	}
-	return nil
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if db := tx.Unscoped().Delete(&schema.WebFuzzerTask{}); db.Error != nil {
+			return utils.Errorf("delete all web fuzzer tasks error: %v", db.Error)
+		}
+		if db := tx.Unscoped().Delete(&schema.WebFuzzerResponse{}); db.Error != nil {
+			return utils.Errorf("delete all web fuzzer history error: %v", db.Error)
+		}
+		return nil
+	})
 }
 
 func DeleteWebFuzzerTask(db *gorm.DB, id int64) error {
-	if db := db.Model(&schema.WebFuzzerTask{}).Where("id = ?", id).Unscoped().Delete(&schema.WebFuzzerTask{}); db.Error != nil {
-		return utils.Errorf("delete web fuzzer by id failed: %s", db.Error)
-	}
-	return nil
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if db := tx.Unscoped().Delete(&schema.WebFuzzerTask{}, "id = ?", id); db.Error != nil {
+			return utils.Errorf("delete web fuzzer task by id error: %v", db.Error)
+		}
+		if db := tx.Unscoped().Delete(&schema.WebFuzzerResponse{}, "web_fuzzer_task_id = ?", id); db.Error != nil {
+			return utils.Errorf("delete web fuzzer history by id error: %v", db.Error)
+		}
+		return nil
+	})
 }
 
 func DeleteWebFuzzerTaskByWebFuzzerIndex(db *gorm.DB, index string) error {
-	if db := db.Model(&schema.WebFuzzerTask{}).Where("fuzzer_tab_index = ?", index).Unscoped().Delete(&schema.WebFuzzerTask{}); db.Error != nil {
-		return utils.Errorf("delete web fuzzer by fuzzer_tab_index failed: %s", db.Error)
-	}
-	return nil
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var taskIDs []int64
+		if db := tx.Model(&schema.WebFuzzerTask{}).Where("fuzzer_tab_index = ?", index).Pluck("id", &taskIDs); db.Error != nil {
+			return utils.Errorf("select web fuzzer by fuzzer_tab_index error: %v", db.Error)
+		}
+		if db := tx.Unscoped().Delete(&schema.WebFuzzerTask{}, "fuzzer_tab_index = ?", index); db.Error != nil {
+			return utils.Errorf("delete web fuzzer by fuzzer_tab_index error: %v", db.Error)
+		}
+		if len(taskIDs) == 0 {
+			return nil
+		}
+		if db := bizhelper.ExactQueryInt64ArrayOr(tx, "web_fuzzer_task_id", taskIDs).Unscoped().Delete(&schema.WebFuzzerResponse{}); db.Error != nil {
+			return utils.Errorf("delete web fuzzer history error: %v", db.Error)
+		}
+
+		return nil
+	})
 }
 
 func GetWebFuzzerTaskById(db *gorm.DB, id int) (*schema.WebFuzzerTask, error) {
