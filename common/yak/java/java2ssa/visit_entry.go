@@ -3,6 +3,7 @@ package java2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
+	"strings"
 )
 
 func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) interface{} {
@@ -28,7 +29,14 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 
 	for _, pkgImport := range i.AllImportDeclaration() {
 		paths, static, all := y.VisitImportDeclaration(pkgImport)
-		log.Infof("import %v (static: %v) (all: %v)", paths, static, all)
+		_, _, _ = paths, static, all
+		var verbose string
+		if !static {
+			verbose = strings.Join(paths, ".")
+		} else {
+			verbose = strings.Join(append(paths, "*"), "")
+		}
+		log.Warnf("TBD: ImportDeclaration %v", verbose)
 	}
 
 	for _, inst := range i.AllTypeDeclaration() {

@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -31,6 +32,18 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	return func() {
 		b.CurrentRange = backup
 	}
+}
+
+func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *Range {
+	if b.CurrentRange != nil {
+		return b.CurrentRange
+	}
+	if fallback != nil {
+		log.Warn("use fallback for GetCurrentRange, unhealthy operation")
+		return GetRange(b.GetEditor(), fallback)
+	}
+	log.Error("fallback for GetCurrentRange is nil..., use (1:1, 1000,1) fallback, bad operation")
+	return NewRange(b.GetEditor(), NewPosition(1, 1), NewPosition(1000, 1))
 }
 
 // / ============================== Token ==============================
