@@ -23,7 +23,15 @@ func (v *BaseSyntaxFlowVisitor) VisitRefVariable(ctx *RefVariableContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitTopDefSingleFilter(ctx *TopDefSingleFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNextSingleFilter(ctx *NextSingleFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -43,7 +51,15 @@ func (v *BaseSyntaxFlowVisitor) VisitPrimaryFilter(ctx *PrimaryFilterContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitConfiggedDeepNextSingleFilter(ctx *ConfiggedDeepNextSingleFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitTopDefFilter(ctx *TopDefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitConfiggedTopDefSingleFilter(ctx *ConfiggedTopDefSingleFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -63,11 +79,19 @@ func (v *BaseSyntaxFlowVisitor) VisitFieldFilter(ctx *FieldFilterContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitDeepNextSingleFilter(ctx *DeepNextSingleFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitDefSingleFilter(ctx *DefSingleFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
