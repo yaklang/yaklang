@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/gopacket"
 	"github.com/google/uuid"
 	"github.com/yaklang/pcap"
@@ -44,7 +45,7 @@ func Start(opt ...CaptureOption) error {
 			return utils.Errorf("set option failed: %s", err)
 		}
 	}
-	var handlers = omap.NewOrderedMap(map[string]PcapHandleOperation{})
+	handlers := omap.NewOrderedMap(map[string]PcapHandleOperation{})
 	if conf.Filename != "" {
 		handler, err := OpenFile(conf.Filename)
 		if err != nil {
@@ -57,7 +58,7 @@ func Start(opt ...CaptureOption) error {
 			return utils.Errorf("no device found")
 		}
 
-		var ifs, err = pcap.FindAllDevs()
+		ifs, err := pcap.FindAllDevs()
 		if err != nil {
 			return utils.Errorf("(pcap) find all devs failed: %s", err)
 		}
@@ -103,11 +104,7 @@ func Start(opt ...CaptureOption) error {
 	defer func() {
 		log.Info("pcapx.utils.capture context done")
 		cancel()
-		conf.trafficPool.pool.Range(func(key, value any) bool {
-			flow, ok := value.(*TrafficFlow)
-			if !ok {
-				return true
-			}
+		conf.trafficPool.flowCache.ForEach(func(key string, flow *TrafficFlow) {
 			flow.ForceShutdownConnection()
 			if flow.requestQueue.Len() > 0 || flow.responseQueue.Len() > 0 {
 				if conf.trafficPool._onHTTPFlow == nil {
@@ -119,7 +116,6 @@ func Start(opt ...CaptureOption) error {
 					}
 				}
 			}
-			return true
 		})
 	}()
 

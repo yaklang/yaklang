@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,32 +17,23 @@ import (
 )
 
 type TrafficPool struct {
-	// map<string, *TrafficConnection>
-	pool               *sync.Map
-	ctx                context.Context
-	currentStreamIndex uint64
-	captureConf        *CaptureConfig
-
-	flowCache *utils.Cache[*TrafficFlow]
-
-	onFlowCreated                   func(flow *TrafficFlow)
-	onFlowClosed                    func(reason TrafficFlowCloseReason, flow *TrafficFlow)
+	ctx           context.Context
+	captureConf   *CaptureConfig
+	flowCache     *utils.Cache[*TrafficFlow]
+	onFlowCreated func(flow *TrafficFlow)
+	onFlowClosed  func(reason TrafficFlowCloseReason, flow *TrafficFlow)
+	// internal field, not for user
+	_onHTTPFlow                     func(flow *TrafficFlow, r *http.Request, response *http.Response)
 	onFlowFrameDataFrameArrived     []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
 	onFlowFrameDataFrameReassembled []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
-
-	// internal field, not for user
-	_onHTTPFlow func(flow *TrafficFlow, r *http.Request, response *http.Response)
+	currentStreamIndex              uint64
 }
 
 func NewTrafficPool(ctx context.Context) *TrafficPool {
-	pool := &TrafficPool{pool: new(sync.Map), ctx: ctx}
+	pool := &TrafficPool{ctx: ctx}
 	fCache := utils.NewTTLCache[*TrafficFlow](30 * time.Second)
 	fCache.SetExpirationCallback(func(key string, flow *TrafficFlow) {
-		pool.pool.Delete(key)
-		flow.triggerCloseEvent(TrafficFlowCloseReason_INACTIVE)
-		flow.cancel()
-		flow.ServerConn.Close()
-		flow.ClientConn.Close()
+		flow.Close()
 	})
 	pool.flowCache = fCache
 	return pool
@@ -70,7 +60,7 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 	isIpv4 := false
 	isIpv6 := false
 
-	var ts = time.Now()
+	ts := time.Now()
 	if len(tss) > 0 {
 		ts = tss[0]
 	}
@@ -93,11 +83,13 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 	srcAddrString := utils.HostPort(srcIP.String(), srcPort)
 	dstAddrString := utils.HostPort(dstIP.String(), dstPort)
 	hash := p.flowhash(networkStr, srcAddrString, dstAddrString)
-	var flow *TrafficFlow
+	var (
+		flow *TrafficFlow
+		ok   bool
+	)
 
-	if ret, ok := p.pool.Load(hash); !ok {
+	if flow, ok = p.flowCache.Get(hash); !ok {
 		fitFlow := func(flow *TrafficFlow) {
-			flow.Hash = hash
 			flow.IsIpv4 = isIpv4
 			flow.IsIpv6 = isIpv6
 			flow.ClientConn.localPort = srcPort
@@ -121,7 +113,6 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 			fitFlow(flow)
 			flow.feed(transportLayer, ts)
 			flow.IsHalfOpen = true
-			p.pool.Store(hash, flow)
 			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
 			return
 		}
@@ -134,14 +125,12 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 				return
 			}
 			fitFlow(flow)
-			p.pool.Store(hash, flow)
 			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
 			return
 		}
 		return
-	} else {
-		flow = ret.(*TrafficFlow)
 	}
+
 	if flow == nil {
 		return
 	}

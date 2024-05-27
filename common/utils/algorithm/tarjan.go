@@ -1,4 +1,4 @@
-package alogrithm
+package algorithm
 
 import "fmt"
 
@@ -103,7 +103,7 @@ func Run(rootNode Node) []SccResultItem {
 
 func (scc *TrSCC) finish() {
 	// 添加入度出度
-	for k, _ := range scc.edges {
+	for k := range scc.edges {
 		id_f, ok1 := scc.id[k.from]
 		id_t, ok2 := scc.id[k.to]
 		if !ok1 || !ok2 {
