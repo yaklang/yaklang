@@ -15,7 +15,8 @@ type ValueOperator interface {
 	IsMap() bool
 	IsList() bool
 
-	// first argument bool type: isMatchMember
+	// Recursive will execute with handler for every list or map
+	Recursive(func(ValueOperator) error) error
 
 	// ExactMatch return ops, for OpPushSearchExact
 	ExactMatch(bool, string) (bool, ValueOperator, error)
