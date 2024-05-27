@@ -67,6 +67,25 @@ func (p *Program) SyntaxFlow(i string, opts ...sfvm.Option) map[string]Values {
 	return vals
 }
 
+func WithSyntaxFlowResult(expected string, handler func(*Value) error) sfvm.Option {
+	return sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
+		if name != expected {
+			return nil
+		}
+		return results.Recursive(func(operator sfvm.ValueOperator) error {
+			result, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			err := handler(result)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	})
+}
+
 func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 	var results Values
 	vals, err := p.SyntaxFlowWithError(i, opts...)

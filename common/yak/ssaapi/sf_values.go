@@ -27,6 +27,16 @@ func (value Values) GetCalled() (sfvm.ValueOperator, error) {
 	return vv, nil
 }
 
+func (value Values) Recursive(f func(operator sfvm.ValueOperator) error) error {
+	for _, v := range value {
+		err := f(v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (value Values) IsMap() bool {
 	return false
 }

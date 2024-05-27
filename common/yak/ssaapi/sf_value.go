@@ -15,6 +15,10 @@ func (v *Value) IsMap() bool {
 	return kind == ssa.MapTypeKind || kind == ssa.ObjectTypeKind
 }
 
+func (v *Value) Recursive(f func(operator sfvm.ValueOperator) error) error {
+	return f(v)
+}
+
 func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }

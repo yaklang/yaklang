@@ -35,6 +35,9 @@ func NewSyntaxFlowVirtualMachine(opts ...Option) *SyntaxFlowVirtualMachine {
 		frameMutex: new(sync.Mutex),
 		config:     config,
 	}
+	if config.debug {
+		sfv.Debug(true)
+	}
 	return sfv
 }
 
