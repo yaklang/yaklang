@@ -79,13 +79,13 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		CreatedAt:                  f.CreatedAt.Unix(),
 		HostPort:                   utf8safe(f.RemoteAddr),
 		IPAddress:                  utf8safe(f.IPAddress),
-		Tags:                       f.Tags,
+		Tags:                       utf8safe(f.Tags),
 		NoFixContentLength:         f.NoFixContentLength,
 		IsWebsocket:                f.IsWebsocket,
 		WebsocketHash:              f.WebsocketHash,
 		IsTooLargeResponse:         f.IsTooLargeResponse,
-		TooLargeResponseBodyFile:   f.TooLargeResponseBodyFile,
-		TooLargeResponseHeaderFile: f.TooLargeResponseHeaderFile,
+		TooLargeResponseBodyFile:   utf8safe(f.TooLargeResponseBodyFile),
+		TooLargeResponseHeaderFile: utf8safe(f.TooLargeResponseHeaderFile),
 		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
 			return utf8safe(i)
 		}),
@@ -116,7 +116,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		flow.Hash = f.Hash
 	}
 	host, port, _ := utils.ParseStringToHostPort(flow.Url)
-	flow.HostPort = utils.HostPort(host, port)
+	flow.HostPort = utf8safe(utils.HostPort(host, port))
 
 	flow.BodySizeVerbose = utils.ByteSize(uint64(flow.BodyLength))
 
