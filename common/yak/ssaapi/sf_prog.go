@@ -22,6 +22,10 @@ func (p *Program) IsList() bool {
 	return false
 }
 
+func (p *Program) Recursive(func(operator sfvm.ValueOperator) error) error {
+	return nil
+}
+
 func (p *Program) ExactMatch(isMember bool, s string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
 		p.DBCache.GetByVariableExact(isMember, s),

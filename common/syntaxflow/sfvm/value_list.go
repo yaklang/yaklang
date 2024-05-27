@@ -22,7 +22,19 @@ type ValueList struct {
 	values []ValueOperator
 }
 
-func (v ValueList) GetCalled() (ValueOperator, error) {
+func (v *ValueList) Recursive(f func(operator ValueOperator) error) error {
+	if len(v.values) > 0 {
+		for _, sub := range v.values {
+			err := sub.Recursive(f)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (v *ValueList) GetCalled() (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
 		called, err := v.GetCalled()
@@ -34,7 +46,7 @@ func (v ValueList) GetCalled() (ValueOperator, error) {
 	return NewValues(res), nil
 }
 
-func (v ValueList) ForEach(h func(i any)) {
+func (v *ValueList) ForEach(h func(i any)) {
 	funk.ForEach(v.values, func(i any) {
 		h(i)
 	})

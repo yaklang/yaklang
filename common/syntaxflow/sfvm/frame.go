@@ -201,7 +201,8 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Error("E: stack is empty, cannot pop")
 			}
 			i := s.stack.Pop()
-			s.debugSubLog(">> pop %v to $_", i.String())
+			s.debugSubLog(">> pop %v", i.String())
+			s.debugSubLog("save-to $_")
 			err := s.output("_", i)
 			if err != nil {
 				s.debugSubLog("ERROR: %v", err)
@@ -345,10 +346,36 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 }
 
 func (s *SFFrame) output(resultName string, operator ValueOperator) error {
-	s.symbolTable.Set(resultName, operator)
+	var value = operator
+	originValue, existed := s.symbolTable.Get(resultName)
+	if existed {
+		if originList, ok := originValue.(*ValueList); ok {
+			newList, isListToo := operator.(*ValueList)
+			if isListToo {
+				value = NewValues(append(originList.values, newList.values...))
+			} else {
+				value = NewValues(append(originList.values, operator))
+			}
+		} else {
+			newList, isListToo := operator.(*ValueList)
+			if isListToo {
+				value = NewValues(append([]ValueOperator{
+					operator,
+				}, newList.values...))
+			} else {
+				value = NewValues([]ValueOperator{
+					originValue, operator,
+				})
+			}
+		}
+	}
+
+	s.symbolTable.Set(resultName, value)
 	if s.config != nil {
-		if err := s.config.onResultCaptured(resultName, []ValueOperator{}); err != nil {
-			return err
+		for _, callback := range s.config.onResultCapturedCallbacks {
+			if err := callback(resultName, operator); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

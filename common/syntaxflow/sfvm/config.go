@@ -10,10 +10,12 @@ func NewConfig(opts ...Option) *Config {
 	return c
 }
 
+type ResultCapturedCallback func(name string, results ValueOperator) error
+
 type Config struct {
-	debug              bool
-	initialContextVars *omap.OrderedMap[string, ValueOperator]
-	onResultCaptured   func(name string, results []ValueOperator, reason ...string) error
+	debug                     bool
+	initialContextVars        *omap.OrderedMap[string, ValueOperator]
+	onResultCapturedCallbacks []ResultCapturedCallback
 }
 
 type Option func(*Config)
@@ -34,8 +36,8 @@ func WithEnableDebug(b ...bool) Option {
 	}
 }
 
-func WithResultCaptured(c func(name string, opts []ValueOperator, reason ...string) error) Option {
+func WithResultCaptured(c ResultCapturedCallback) Option {
 	return func(config *Config) {
-		config.onResultCaptured = c
+		config.onResultCapturedCallbacks = append(config.onResultCapturedCallbacks, c)
 	}
 }
