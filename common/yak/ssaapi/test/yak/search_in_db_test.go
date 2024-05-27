@@ -44,14 +44,17 @@ os.System(cmd)
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Println("----------PARAMS------------")
 	params := prog.SyntaxFlowChain(`req*.Get*() as $params`).Show()
+	fmt.Println("-----------SINK-----------")
 	upSource := prog.SyntaxFlowChain("os.System(* as $sink)").Show()
+	fmt.Println("-----------Intersection---------------")
 	r := ssaapi.FindFlexibleDependsIntersection(upSource, params).Show().Len()
 	if r <= 0 {
 		t.Fatal("cannot find flexible depends intersection")
 	}
 
-	fmt.Println("-------------------------------------------------------")
+	fmt.Println("-------------CommonDepends---------------------------------")
 
 	r = ssaapi.FindFlexibleCommonDepends(append(upSource, params...)).Show().Len()
 	if r != 1 {
