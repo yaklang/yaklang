@@ -152,6 +152,16 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
+	case *sf.UseDefCalcFilterContext:
+		err := y.VisitFilterExpr(ret.FilterExpr(0))
+		if err != nil {
+			return err
+		}
+		err = y.VisitFilterExpr(ret.FilterExpr(1))
+		if err != nil {
+			return err
+		}
+		log.Warn("TBD: UseDefCalcFilterContext")
 	default:
 		panic("BUG: in filterExpr")
 	}

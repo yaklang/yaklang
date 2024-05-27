@@ -63,6 +63,10 @@ func (v *BaseSyntaxFlowVisitor) VisitFieldFilter(ctx *FieldFilterContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -72,6 +76,14 @@ func (v *BaseSyntaxFlowVisitor) VisitDeepNextFilter(ctx *DeepNextFilterContext) 
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcDescription(ctx *UseDefCalcDescriptionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcParams(ctx *UseDefCalcParamsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

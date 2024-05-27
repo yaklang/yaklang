@@ -34,9 +34,17 @@ filterExpr
     | filterExpr '#->' filterExpr                           # TopDefFilter
     | filterExpr '-{' (recursiveConfig)? '}->' filterExpr     # ConfiggedDeepNextFilter
     | filterExpr '#{' (recursiveConfig)? '}->' filterExpr     # ConfiggedTopDefFilter
+    | filterExpr '-<' useDefCalcDescription '>-' filterExpr   # UseDefCalcFilter
     ;
 
+useDefCalcDescription
+    : identifier useDefCalcParams?
+    ;
 
+useDefCalcParams
+    : '{' recursiveConfig? '}'
+    | '(' recursiveConfig? ')'
+    ;
 
 actualParam
     : singleParam                      # AllParam
@@ -51,7 +59,7 @@ recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','? ;
 recursiveConfigItem: identifier ':' recursiveConfigItemValue;
 recursiveConfigItemValue
     : (identifier | numberLiteral)
-    | '%' filterStatement
+    | '`' filterStatement '`'
     ;
 
 sliceCallItem: nameFilter | numberLiteral;
@@ -129,13 +137,14 @@ Bang: '!';
 Star: '*';
 Minus: '-';
 As: 'as';
+Backtick: '`';
 
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
 OctalNumber: '0o' OctalDigit+;
 BinaryNumber: '0b' ('0' | '1')+;
 HexNumber: '0x' HexDigit+;
-StringLiteral: '`' (~[`])* '`';
+//StringLiteral: '`' (~[`])* '`';
 StringType: 'str';
 ListType: 'list';
 DictType: 'dict';

@@ -49,6 +49,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FieldFilter.
 	VisitFieldFilter(ctx *FieldFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#UseDefCalcFilter.
+	VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#FieldCallFilter.
 	VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{}
 
@@ -57,6 +60,12 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedDeepNextFilter.
 	VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#useDefCalcDescription.
+	VisitUseDefCalcDescription(ctx *UseDefCalcDescriptionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#useDefCalcParams.
+	VisitUseDefCalcParams(ctx *UseDefCalcParamsContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#AllParam.
 	VisitAllParam(ctx *AllParamContext) interface{}
