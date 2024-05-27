@@ -3,53 +3,54 @@ package pcaputil
 import (
 	"context"
 	"fmt"
-	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net"
-	"net/http"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/algorithm"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+var connectionPool = &sync.Pool{ // TrafficConnection
+	New: func() any {
+		return &TrafficConnection{
+			frames: algorithm.NewQueue[*TrafficFrame](),
+		}
+	},
+}
+
 type futureFrame struct {
-	Seq     uint32
-	Len     int
 	Payload []byte
+	Len     int
+	Seq     uint32
 	FIN     bool
 }
 
 // TrafficConnection is a tcp connection
 type TrafficConnection struct {
-	isn        uint32
-	currentSeq uint32
-	nextSeq    uint32
-	initialed  bool
-	waitACK    bool
-
-	ctx    context.Context
-	cancel context.CancelFunc
-	reader *utils.PipeReader
-	writer *utils.PipeWriter
-
-	// frames
-	frames *omap.OrderedMap[int64, *TrafficFrame]
-
-	remoteIP   net.IP
-	remoteAddr net.Addr
-	remotePort int
-	localIP    net.IP
-	localAddr  net.Addr
-	localPort  int
-
-	waitGroup []*futureFrame
-
-	Flow *TrafficFlow
-
+	localAddr            net.Addr
+	remoteAddr           net.Addr
+	ctx                  context.Context
+	writer               *utils.PipeWriter
+	Flow                 *TrafficFlow
+	frames               *algorithm.Queue[*TrafficFrame]
+	cancel               context.CancelFunc
+	reader               *utils.PipeReader
+	remoteIP             net.IP
+	localIP              net.IP
+	waitGroup            []*futureFrame
+	remotePort           int
+	localPort            int
+	isn                  uint32
+	nextSeq              uint32
+	currentSeq           uint32
+	waitACK              bool
+	initialed            bool
 	initHttpPacketDirect bool
 	isHttpRequestConn    bool
 }
@@ -129,10 +130,26 @@ func (t *TrafficConnection) Close() bool {
 func (t *TrafficConnection) CloseFlow() bool {
 	t.cancel()
 	if t.Flow != nil {
-		t.Flow.triggerCloseEvent(TrafficFlowCloseReason_RST)
-		t.Flow.cancel()
+		t.Flow.Close()
 	}
 	return t.IsClosed()
+}
+
+func (t *TrafficConnection) Release() {
+	t.localAddr = nil
+	t.remoteAddr = nil
+	t.ctx = nil
+	t.reader, t.writer = nil, nil
+	t.Flow = nil
+	t.frames.Clear()
+	t.cancel = nil
+	t.localIP, t.remoteIP = nil, nil
+	t.waitGroup = make([]*futureFrame, 0)
+	t.localPort, t.remotePort = 0, 0
+	t.isn, t.nextSeq, t.currentSeq = 0, 0, 0
+	t.waitACK, t.initialed, t.initHttpPacketDirect, t.isHttpRequestConn = false, false, false, false
+
+	connectionPool.Put(t)
 }
 
 func (t *TrafficConnection) Write(b []byte, seq int64, ts time.Time) (int, error) {
@@ -147,7 +164,7 @@ func (t *TrafficConnection) Write(b []byte, seq int64, ts time.Time) (int, error
 		Timestamp:  ts,
 		Connection: t,
 	}
-	t.frames.Set(ts.UnixNano(), frame)
+	t.frames.Enqueue(frame)
 	t.Flow.onFrame(frame)
 
 	n, err := t.writer.Write(b)
@@ -166,11 +183,11 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 			t.Write(tcp.Payload, int64(tcp.Seq), ts)
 			t.currentSeq = tcp.Seq
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
-			var count = 0
+			count := 0
 			for _, frame := range t.waitGroup {
 				if frame.Seq == t.nextSeq {
 					if frame.FIN {
-						//debug("close by fin(cached)")
+						// debug("close by fin(cached)")
 						t.nextSeq = tcp.Seq + 1
 						t.Close()
 						break
@@ -184,7 +201,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 				break
 			}
 			if count > 0 {
-				//debug(fmt.Sprintf("use cached frames in WaitGroup[%v]", count))
+				// debug(fmt.Sprintf("use cached frames in WaitGroup[%v]", count))
 				t.waitGroup = t.waitGroup[count:]
 			}
 
@@ -193,7 +210,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 
 		if tcp.FIN {
 			t.currentSeq = tcp.Seq
-			//debug("close by fin")
+			// debug("close by fin")
 			t.nextSeq = tcp.Seq + 1
 			t.Close()
 
@@ -217,7 +234,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 			sort.SliceStable(t.waitGroup, func(i, j int) bool {
 				return t.waitGroup[i].Seq < t.waitGroup[j].Seq
 			})
-			//debug(fmt.Sprintf("future packet cached[%v]", len(t.waitGroup)))
+			// debug(fmt.Sprintf("future packet cached[%v]", len(t.waitGroup)))
 			return
 		}
 
@@ -266,7 +283,7 @@ func (t *TrafficConnection) FeedServer(tcp *layers.TCP, ts time.Time) {
 	}
 
 	if tcp.RST {
-		//debug("close(rst)")
+		// debug("close(rst)")
 		t.CloseFlow()
 		return
 	}
@@ -338,7 +355,6 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 }
 
 func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*TrafficFlow, error) {
-
 	flowCtx, cancel := context.WithCancel(p.ctx)
 	_ = cancel
 
@@ -350,39 +366,39 @@ func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 	if err != nil {
 		return nil, utils.Errorf("parse [%v] to addr failed: %s", srcAddr, err)
 	}
+
 	clientReader, clientWriter := utils.NewBufPipe(make([]byte, 0))
 	serverReader, serverWriter := utils.NewBufPipe(make([]byte, 0))
-	c2sConn := &TrafficConnection{
-		reader:     clientReader,
-		writer:     clientWriter,
-		remoteAddr: dst,
-		localAddr:  src,
-		frames:     omap.NewOrderedMap(make(map[int64]*TrafficFrame)),
+
+	c2sConn := connectionPool.Get().(*TrafficConnection)
+	{
+		c2sConn.reader = clientReader
+		c2sConn.writer = clientWriter
+		c2sConn.localAddr = src
+		c2sConn.remoteAddr = dst
+		c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
 	}
-	c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
-	s2cConn := &TrafficConnection{
-		reader:     serverReader,
-		writer:     serverWriter,
-		remoteAddr: src,
-		localAddr:  dst,
-		frames:     omap.NewOrderedMap(make(map[int64]*TrafficFrame)),
+
+	s2cConn := connectionPool.Get().(*TrafficConnection)
+	{
+		s2cConn.reader = serverReader
+		s2cConn.writer = serverWriter
+		s2cConn.localAddr = dst
+		s2cConn.remoteAddr = src
+		s2cConn.ctx, s2cConn.cancel = context.WithCancel(flowCtx)
+
 	}
-	s2cConn.ctx, s2cConn.cancel = context.WithCancel(flowCtx)
 
 	// bind flow
-	flow := &TrafficFlow{
-		ClientConn:    c2sConn,
-		ServerConn:    s2cConn,
-		Index:         p.nextStream(),
-		ctx:           flowCtx,
-		cancel:        cancel,
-		pool:          p,
-		createdOnce:   new(sync.Once),
-		closedOnce:    new(sync.Once),
-		httpflowMutex: new(sync.Mutex),
-		httpflowWg:    new(sync.WaitGroup),
-		requestQueue:  omap.NewOrderedMap(make(map[string]*http.Request)),
-		responseQueue: omap.NewOrderedMap(make(map[string]*http.Response)),
+	flow := flowPool.Get().(*TrafficFlow)
+	{
+		flow.ClientConn = c2sConn
+		flow.ServerConn = s2cConn
+		flow.Index = p.nextStream()
+		flow.ctx = flowCtx
+		flow.cancel = cancel
+		flow.pool = p
+		flow.Hash = p.flowhash(netType, srcAddr, dstAddr)
 	}
 	c2sConn.Flow = flow
 	s2cConn.Flow = flow
