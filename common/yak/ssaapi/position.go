@@ -1,7 +1,7 @@
 package ssaapi
 
 func (v *Value) GetFunction() *Value {
-	return NewValue(v.node.GetFunc())
+	return v.NewValue(v.node.GetFunc())
 }
 
 func (v *Value) InMainFunction() bool {
@@ -9,7 +9,7 @@ func (v *Value) InMainFunction() bool {
 }
 
 func (v *Value) GetBlock() *Value {
-	return NewValue(v.node.GetBlock())
+	return v.NewValue(v.node.GetBlock())
 }
 
 /*
@@ -22,5 +22,5 @@ func (v *Value) IsReachable() int {
 }
 
 func (v *Value) GetReachable() *Value {
-	return NewValue(v.node.GetBlock().Condition)
+	return v.NewValue(v.node.GetBlock().Condition)
 }
