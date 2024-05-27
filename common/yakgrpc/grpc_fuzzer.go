@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
@@ -1348,7 +1349,7 @@ func (s *Server) GetHistoryHTTPFuzzerTask(ctx context.Context, req *ypb.GetHisto
 	}, nil
 }
 
-func (s *Server) QueryHTTPFuzzerResponseByTaskIdRequest(ctx context.Context, req *ypb.QueryHTTPFuzzerResponseByTaskIdRequest) (*ypb.QueryHTTPFuzzerResponseByTaskIdResponse, error) {
+func (s *Server) QueryHTTPFuzzerResponseByTaskId(ctx context.Context, req *ypb.QueryHTTPFuzzerResponseByTaskIdRequest) (*ypb.QueryHTTPFuzzerResponseByTaskIdResponse, error) {
 	p, rets, err := yakit.QueryWebFuzzerResponse(s.GetProjectDatabase(), req)
 	if err != nil {
 		return nil, err
