@@ -120,7 +120,6 @@ func FindFlexibleCommonDepends(val Values) Values {
 		return nil
 	}
 	var common Values
-	var visited = make(map[int64]struct{})
 	for _, fromTo := range results {
 		from := fromTo[0]
 		to := fromTo[1]
@@ -132,11 +131,6 @@ func FindFlexibleCommonDepends(val Values) Values {
 		// rebuild the top defs
 		from.GetTopDefs()
 		from.RecursiveDepends(func(value *Value) error {
-			_, ok := visited[value.GetId()]
-			if ok {
-				return nil
-			}
-			visited[value.GetId()] = struct{}{}
 
 			if value.GetId() == to.GetId() {
 				common = append(common, value)
@@ -144,7 +138,19 @@ func FindFlexibleCommonDepends(val Values) Values {
 			return nil
 		})
 	}
-	return common
+
+	var retValues = make(Values, 0, len(common))
+	var r = map[int64]struct{}{}
+	for _, i := range common {
+		if _, ok := r[i.GetId()]; ok {
+			continue
+		}
+		r[i.GetId()] = struct{}{}
+		if i != nil {
+			retValues = append(retValues, i)
+		}
+	}
+	return retValues
 }
 
 func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
