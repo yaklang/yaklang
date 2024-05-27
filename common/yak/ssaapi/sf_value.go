@@ -23,18 +23,18 @@ func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
-func (v *Value) ExactMatch(isMember bool, want string) (bool, sfvm.ValueOperator, error) {
-	value := _SearchValue(v, isMember, func(s string) bool { return s == want })
+func (v *Value) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, mod, func(s string) bool { return s == want })
 	return value != nil, value, nil
 }
 
-func (v *Value) GlobMatch(isMember bool, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
-	value := _SearchValue(v, isMember, g.Match)
+func (v *Value) GlobMatch(mod int, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, mod, g.Match)
 	return value != nil, value, nil
 }
 
-func (v *Value) RegexpMatch(isMember bool, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	value := _SearchValue(v, isMember, regexp.MatchString)
+func (v *Value) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, mod, regexp.MatchString)
 	return value != nil, value, nil
 }
 

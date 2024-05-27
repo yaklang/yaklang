@@ -3,6 +3,7 @@ package syntaxflow
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -96,9 +97,46 @@ func TestGetMemberAndVariable(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`a* as $target`,
 			map[string][]string{
-				"target": {"4", "5"},
+				"target": {"1", "2", "4", "5", "Undefined-obj.a1(valid)", "Undefined-obj.a2(valid)"},
 			})
 	})
+
+	t.Run("test from variable name with default", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`a1 as $target`,
+			map[string][]string{
+				"target": {"1", "4", "Undefined-obj.a1(valid)"},
+			})
+	})
+
+	t.Run("test from variable name with strict", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithSFOption(t, code,
+			`a1 as $target`,
+			map[string][]string{
+				"target": {"4"},
+			},
+			ssaapi.WithSyntaxFlowStrictMatch(),
+		)
+	})
+
+	t.Run("test from variable key with default", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`.a1 as $target`,
+			map[string][]string{
+				"target": {"1", "Undefined-obj.a1(valid)"},
+			})
+	})
+
+	t.Run("test from variable key with strict", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithSFOption(t, code,
+			`.a1 as $target`,
+			map[string][]string{
+				"target": {"1", "Undefined-obj.a1(valid)"},
+			},
+			ssaapi.WithSyntaxFlowStrictMatch(),
+		)
+	})
+
 }
 
 func TestGetMember(t *testing.T) {

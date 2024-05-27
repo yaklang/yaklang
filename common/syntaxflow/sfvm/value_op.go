@@ -1,9 +1,10 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type RecursiveConfigKey string
@@ -37,6 +38,13 @@ type RecursiveConfigItem struct {
 	SyntaxFlowRule bool
 }
 
+// type MatchMode int
+const (
+	NameMatch int = 1
+	KeyMatch      = 1 << 1
+	BothMatch     = NameMatch | KeyMatch
+)
+
 type ValueOperator interface {
 	String() string
 	IsMap() bool
@@ -46,11 +54,11 @@ type ValueOperator interface {
 	Recursive(func(ValueOperator) error) error
 
 	// ExactMatch return ops, for OpPushSearchExact
-	ExactMatch(bool, string) (bool, ValueOperator, error)
+	ExactMatch(int, string) (bool, ValueOperator, error)
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(bool, Glob) (bool, ValueOperator, error)
+	GlobMatch(int, Glob) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
-	RegexpMatch(bool, *regexp.Regexp) (bool, ValueOperator, error)
+	RegexpMatch(int, *regexp.Regexp) (bool, ValueOperator, error)
 
 	// GetCallActualParams for OpGetCallArgs
 	GetCalled() (ValueOperator, error)

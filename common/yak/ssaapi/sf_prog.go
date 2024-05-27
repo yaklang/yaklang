@@ -26,9 +26,9 @@ func (p *Program) Recursive(func(operator sfvm.ValueOperator) error) error {
 	return nil
 }
 
-func (p *Program) ExactMatch(isMember bool, s string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		p.DBCache.GetByVariableExact(isMember, s),
+		p.DBCache.GetByVariableExact(mod, s),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
@@ -40,9 +40,9 @@ func (p *Program) ExactMatch(isMember bool, s string) (bool, sfvm.ValueOperator,
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) GlobMatch(isMember bool, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(mod int, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		p.DBCache.GetByVariableGlob(isMember, g),
+		p.DBCache.GetByVariableGlob(mod, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
@@ -53,9 +53,9 @@ func (p *Program) GlobMatch(isMember bool, g sfvm.Glob) (bool, sfvm.ValueOperato
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) RegexpMatch(isMember bool, re *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(mod int, re *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		p.DBCache.GetByVariableRegexp(isMember, re),
+		p.DBCache.GetByVariableRegexp(mod, re),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true

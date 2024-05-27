@@ -5,13 +5,14 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func _SearchValues(values Values, isMember bool, handler func(string) bool) Values {
+func _SearchValues(values Values, mod int, handler func(string) bool) Values {
 	var newValue Values
 	for _, value := range values {
-		result := _SearchValue(value, isMember, handler)
+		result := _SearchValue(value, mod, handler)
 		newValue = append(newValue, result...)
 	}
 
@@ -19,7 +20,7 @@ func _SearchValues(values Values, isMember bool, handler func(string) bool) Valu
 	// return newValue
 }
 
-func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values {
+func _SearchValue(value *Value, mod int, handler func(string) bool) Values {
 	var newValue Values
 	check := func(value *Value) bool {
 		log.Infof("handler: %s(%v)  %s(%v)", value.GetName(), handler(value.GetName()), value.String(), handler(value.String()))
@@ -39,7 +40,13 @@ func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values
 		return false
 	}
 
-	if isMember {
+	if mod&ssadb.NameMatch != 0 {
+		// handler self
+		if check(value) {
+			newValue = append(newValue, value)
+		}
+	}
+	if mod&ssadb.KeyMatch != 0 {
 		if value.IsObject() {
 			allMember := value.node.GetAllMember()
 			for k, v := range allMember {
@@ -47,12 +54,6 @@ func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values
 					newValue = append(newValue, value.NewValue(v))
 				}
 			}
-			// return _SearchValue(value.GetKey(), false, handler)
-		}
-	} else {
-		// handler self
-		if check(value) {
-			newValue = append(newValue, value)
 		}
 	}
 	return newValue
@@ -84,6 +85,14 @@ func WithSyntaxFlowResult(expected string, handler func(*Value) error) sfvm.Opti
 			return nil
 		})
 	})
+}
+
+func WithSyntaxFlowStrictMatch(stricts ...bool) sfvm.Option {
+	strict := true
+	if len(stricts) > 0 {
+		strict = stricts[0]
+	}
+	return sfvm.WithStrictMatch(strict)
 }
 
 func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {

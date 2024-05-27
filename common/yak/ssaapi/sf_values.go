@@ -49,19 +49,19 @@ func (value Values) Len() int {
 	return len(value)
 }
 
-func (values Values) ExactMatch(isMember bool, want string) (bool, sfvm.ValueOperator, error) {
-	log.Infof("ExactMatch: %v %v", isMember, want)
-	newValue := _SearchValues(values, isMember, func(s string) bool { return s == want })
+func (values Values) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, error) {
+	log.Infof("ExactMatch: %v %v", mod, want)
+	newValue := _SearchValues(values, mod, func(s string) bool { return s == want })
 	return len(newValue) > 0, newValue, nil
 }
 
-func (values Values) GlobMatch(isMember bool, glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
-	newValue := _SearchValues(values, isMember, glob.Match)
+func (values Values) GlobMatch(mod int, glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+	newValue := _SearchValues(values, mod, glob.Match)
 	return len(newValue) > 0, newValue, nil
 }
 
-func (values Values) RegexpMatch(isMember bool, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	newValue := _SearchValues(values, isMember, regexp.MatchString)
+func (values Values) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+	newValue := _SearchValues(values, mod, regexp.MatchString)
 	return len(newValue) > 0, newValue, nil
 }
 

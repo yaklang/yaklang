@@ -3,7 +3,9 @@ package sfvm
 import "github.com/yaklang/yaklang/common/utils/omap"
 
 func NewConfig(opts ...Option) *Config {
-	c := &Config{}
+	c := &Config{
+		debug: true,
+	}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -14,6 +16,7 @@ type ResultCapturedCallback func(name string, results ValueOperator) error
 
 type Config struct {
 	debug                     bool
+	StrictMatch               bool
 	initialContextVars        *omap.OrderedMap[string, ValueOperator]
 	onResultCapturedCallbacks []ResultCapturedCallback
 }
@@ -33,6 +36,12 @@ func WithEnableDebug(b ...bool) Option {
 			return
 		}
 		config.debug = b[0]
+	}
+}
+
+func WithStrictMatch(b bool) Option {
+	return func(config *Config) {
+		config.StrictMatch = b
 	}
 }
 

@@ -84,40 +84,47 @@ func yieldIrVariables(db *gorm.DB, ctx context.Context) chan int64 {
 	return outC
 }
 
-func ExactSearchVariable(DB *gorm.DB, isMatchMember bool, value string) chan int64 {
+// type MatchMode int
+const (
+	NameMatch int = 1
+	KeyMatch      = 1 << 1
+	BothMatch     = NameMatch | KeyMatch
+)
+
+func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrVariable{})
-	if isMatchMember {
-		db = db.Where("("+
-			"slice_member_name = ? "+
-			"OR field_member_name = ?"+
-			")", value, value)
-	} else {
-		db = db.Where("( variable_name = ? )", value)
+	switch mod {
+	case NameMatch:
+		db = db.Where("variable_name = ?", value)
+	case KeyMatch:
+		db = db.Where("slice_member_name = ? OR field_member_name = ?", value, value)
+	case BothMatch:
+		db = db.Where("variable_name = ? OR slice_member_name = ? OR field_member_name = ?", value, value, value)
 	}
 	return yieldIrVariables(db, context.Background())
 }
 
-func GlobSearchVariable(DB *gorm.DB, isMatchMember bool, value string) chan int64 {
-	db := DB.Model(&IrVariable{})
-	if isMatchMember {
-		db = db.Where("("+
-			"slice_member_name GLOB ? "+
-			"OR field_member_name GLOB ?"+
-			")", value, value)
-	} else {
-		db = db.Where("( variable_name GLOB ? )", value)
+func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
+	db := DB.Model(&IrVariable{}).Debug()
+	switch mod {
+	case NameMatch:
+		db = db.Where("variable_name GLOB ?", value)
+	case KeyMatch:
+		db = db.Where("slice_member_name GLOB ? OR field_member_name GLOB ?", value, value)
+	case BothMatch:
+		db = db.Where("variable_name GLOB ? OR slice_member_name GLOB ? OR field_member_name GLOB ?", value, value, value)
 	}
 	return yieldIrVariables(db, context.Background())
 }
-func RegexpSearchVariable(DB *gorm.DB, isMatchMember bool, value string) chan int64 {
+func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrVariable{})
-	if isMatchMember {
-		db = db.Where("("+
-			"slice_member_name REGEXP ? "+
-			"OR field_member_name REGEXP ?"+
-			")", value, value)
-	} else {
-		db = db.Where("( variable_name REGEXP ? )", value)
+	switch mod {
+	case NameMatch:
+		db = db.Where("variable_name REGEXP ?", value)
+	case KeyMatch:
+		db = db.Where("slice_member_name REGEXP ? OR field_member_name REGEXP ?", value, value)
+	case BothMatch:
+		db = db.Where("variable_name REGEXP ? OR slice_member_name REGEXP ? OR field_member_name REGEXP ?", value, value, value)
 	}
 	return yieldIrVariables(db, context.Background())
 }
