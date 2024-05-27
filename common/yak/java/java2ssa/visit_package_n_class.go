@@ -211,9 +211,11 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		}
 		field := ret.(*javaparser.FieldDeclarationContext)
 
+		var fieldType ssa.Type
 		if field.TypeType() == nil {
-			y.VisitTypeType(field.TypeType())
+			fieldType = y.VisitTypeType(field.TypeType())
 		}
+		_ = fieldType
 
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
 		for _, variableDeclarator := range variableDeclarators {
@@ -245,6 +247,38 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	return func() {}
 }
 
+type AnnotationDescription struct {
+	Name string
+}
+
+func (v *builder) VisitAnnotation(
+	raw []javaparser.IAnnotationContext,
+	callback func(name string, pairs ...any),
+) {
+	log.Warn("TBD: AnnotationContext in TypeType")
+	log.Warn("TBD: AnnotationContext in TypeType")
+	log.Warn("TBD: AnnotationContext in TypeType")
+	log.Warn("TBD: AnnotationContext in TypeType")
+	for _, annotation := range raw {
+		ins, ok := annotation.(*javaparser.AnnotationContext)
+		if !ok {
+			continue
+		}
+		var raw string
+		if ret := ins.AltAnnotationQualifiedName(); ret != nil {
+			raw = ret.GetText()
+			if !strings.HasPrefix(raw, "@") {
+				log.Warnf("bad syntax... why altAnnotation name %#v is not prefix with @? use str after @", raw)
+				_, raw, _ = strings.Cut(raw, "@")
+			} else {
+				raw = strings.TrimLeft(raw, "@")
+			}
+		} else {
+			raw = ins.QualifiedName().GetText()
+		}
+	}
+}
+
 func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
@@ -255,7 +289,9 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if i == nil {
 		return nil
 	}
-	// todo annotation
+
+	y.VisitAnnotation(i.AllAnnotation(), nil)
+
 	var t ssa.Type
 	if ret := i.ClassOrInterfaceType(); ret != nil {
 		t = y.VisitClassOrInterfaceType(ret)
@@ -544,7 +580,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 	build := func() {
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		y.MarkedThisClassBlueprint = class
-		this := y.NewParam("this")
+		this := y.NewParam("this", raw)
 		_ = this
 		y.VisitFormalParameters(i.FormalParameters())
 		y.VisitMethodBody(i.MethodBody())
@@ -694,6 +730,11 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 
 	for _, annotation := range i.AllAnnotation() {
 		//todo annotation
+		log.Warn("TBD: Annotation in VisitLastFormalParameter")
+		log.Warn("TBD: Annotation in VisitLastFormalParameter")
+		log.Warn("TBD: Annotation in VisitLastFormalParameter")
+		log.Warn("TBD: Annotation in VisitLastFormalParameter")
+		log.Warn("TBD: Annotation in VisitLastFormalParameter")
 		_ = annotation
 		//y.VisitAnnotation(annotation)
 	}
