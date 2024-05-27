@@ -51,7 +51,7 @@ func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
 	}
 	if c, ok := ssa.ToCall(v.node); ok {
 		if len(c.Args) < i {
-			return NewValue(c.Args[i]), nil
+			return v.NewValue(c.Args[i]), nil
 		} else {
 			return nil, utils.Errorf("ssa.Value %v has %d argument,but index %v", v.String(), len(c.Args), i)
 		}
@@ -70,7 +70,7 @@ func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, error) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
-		return v.GetMember(NewValue(ssa.NewConst(key))), nil
+		return v.GetMember(v.NewValue(ssa.NewConst(key))), nil
 	}
 	// return v.GetUsers(), nil
 	return nil, nil
@@ -94,7 +94,7 @@ func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
 	if !v.IsList() {
 		return nil, utils.Error("ssa.Value is not a list")
 	}
-	member := v.GetMember(NewValue(ssa.NewConst(i)))
+	member := v.GetMember(v.NewValue(ssa.NewConst(i)))
 	if member != nil {
 		return member, nil
 	}

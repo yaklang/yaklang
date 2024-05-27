@@ -57,7 +57,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 		return vals
 	}
 	for _, def := range i.node.GetValues() {
-		if ret := NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
+		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	}
@@ -67,7 +67,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	}
 	if maskable, ok := i.node.(ssa.Maskable); ok {
 		for _, def := range maskable.GetMask() {
-			if ret := NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
+			if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
@@ -124,8 +124,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
 		if !value.HasValues() && value.IsMember() {
-			obj := NewValue(value.GetObject())
-			key := NewValue(value.GetKey())
+			obj := i.NewValue(value.GetObject())
+			key := i.NewValue(value.GetKey())
 			actx.PushObject(obj, key, i)
 
 			ret := obj.getTopDefs(actx, opt...)
@@ -158,18 +158,18 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		// TODO: trace the specific return-values
-		callerValue := NewValue(caller)
+		callerValue := i.NewValue(caller)
 		callerFunc, isFunc := ssa.ToFunction(caller)
 		if !isFunc {
 			i.AppendDependOn(callerValue)
 			var nodes = Values{callerValue}
 			for _, val := range inst.Args {
-				arg := NewValue(val)
+				arg := i.NewValue(val)
 				i.AppendDependOn(arg)
 				nodes = append(nodes, arg)
 			}
 			for _, value := range inst.Binding {
-				arg := NewValue(value)
+				arg := i.NewValue(value)
 				i.AppendDependOn(arg)
 				nodes = append(nodes, arg)
 			}
@@ -211,7 +211,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				for _, retIns := range inst.Return {
 					for idx, traceVal := range retIns.Results {
 						if idx == targetIdx {
-							traceRets = append(traceRets, NewValue(traceVal).AppendEffectOn(i))
+							traceRets = append(traceRets, i.NewValue(traceVal).AppendEffectOn(i))
 						}
 					}
 				}
@@ -225,7 +225,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					for _, traceVal := range retIns.Results {
 						val, ok := traceVal.GetStringMember(retIndexRawStr)
 						if ok {
-							traceRets = append(traceRets, NewValue(val).AppendEffectOn(i))
+							traceRets = append(traceRets, i.NewValue(val).AppendEffectOn(i))
 							// trace mask ?
 							if len(inst.Blocks) > 0 {
 								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
@@ -246,7 +246,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		for _, r := range inst.Return {
 			for _, subVal := range r.GetValues() {
-				if ret := NewValue(subVal).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
+				if ret := i.NewValue(subVal).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
 				}
 			}
@@ -266,12 +266,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			obj := inst.GetObject()
 			if obj != nil {
 				if inst.MemberCallKind == ssa.ParameterMemberCall {
-					objValue := NewValue(obj)
+					objValue := i.NewValue(obj)
 					val := objValue.GetFunction().GetParameter(inst.MemberCallObjectIndex)
 					vals = append(vals, val)
 				} else if inst.MemberCallKind == ssa.FreeValueMemberCall {
 					param := inst.GetFunc().FreeValues[obj.GetName()]
-					val := NewValue(param)
+					val := i.NewValue(param)
 					vals = append(vals, val)
 				}
 			}
@@ -289,7 +289,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return getMemberCall(i.node, actx)
 		}
 		actualParam := calledInstance.ArgMember[inst.FormalParameterIndex]
-		traced := NewValue(actualParam).AppendEffectOn(called)
+		traced := i.NewValue(actualParam).AppendEffectOn(called)
 		if ret := traced.getTopDefs(actx); len(ret) > 0 {
 			return ret
 		} else {
@@ -322,7 +322,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
-			traced := NewValue(actualParam).AppendEffectOn(called)
+			traced := i.NewValue(actualParam).AppendEffectOn(called)
 			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
 			call := actx.PopCall()
 
@@ -338,7 +338,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		if inst.GetDefault() != nil {
-			return Values{NewValue(inst.GetDefault())}
+			return Values{i.NewValue(inst.GetDefault())}
 		}
 		var vals Values
 		called := actx.GetCurrentCall()
@@ -377,19 +377,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		if len(vals) == 0 {
-			return Values{NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
+			return Values{i.NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
 		if callIns != nil {
-			err := actx.PushCall(NewValue(callIns).AppendEffectOn(i))
+			err := actx.PushCall(i.NewValue(callIns).AppendEffectOn(i))
 			if err != nil {
 				log.Errorf("push call error: %v", err)
 			} else {
 				defer actx.PopCall()
 
-				v := NewValue(inst.Value).AppendEffectOn(i)
+				v := i.NewValue(inst.Value).AppendEffectOn(i)
 				return v.getTopDefs(actx)
 			}
 		} else {
@@ -414,7 +414,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		var values Values
 		values = append(values, i)
 		for _, member := range inst.GetAllMember() {
-			value := NewValue(member)
+			value := i.NewValue(member)
 			values = append(values, value.getTopDefs(actx, opt...)...)
 		}
 		paramVals := getMakeParamTopDef()

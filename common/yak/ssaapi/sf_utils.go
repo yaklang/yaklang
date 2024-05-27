@@ -43,8 +43,8 @@ func _SearchValue(value *Value, isMember bool, handler func(string) bool) Values
 		if value.IsObject() {
 			allMember := value.node.GetAllMember()
 			for k, v := range allMember {
-				if check(NewValue(k)) {
-					newValue = append(newValue, NewValue(v))
+				if check(value.NewValue(k)) {
+					newValue = append(newValue, value.NewValue(v))
 				}
 			}
 			// return _SearchValue(value.GetKey(), false, handler)

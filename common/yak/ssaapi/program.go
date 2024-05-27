@@ -58,7 +58,7 @@ func (p *Program) GetValueById(id int64) (*Value, error) {
 		return nil, utils.Errorf("[%T] not an instruction node", val)
 	}
 
-	return NewValue(val), nil
+	return p.NewValue(val), nil
 }
 
 func (p *Program) GetValueByIdMust(id int64) *Value {
@@ -78,7 +78,7 @@ func (p *Program) Ref(name string) Values {
 		p.DBCache.GetByVariableExact(false, name),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
-				return NewValue(v), true
+				return p.NewValue(v), true
 			} else {
 				return nil, false
 			}
@@ -89,13 +89,13 @@ func (p *Program) Ref(name string) Values {
 func (p *Program) GetClassMember(className string, key string) *Value {
 	if class, ok := p.Program.ClassBluePrint[className]; ok {
 		if method, ok := class.Method[key]; ok {
-			return NewValue(method)
+			return p.NewValue(method)
 		}
 		if member, ok := class.NormalMember[key]; ok {
-			return NewValue(member.Value)
+			return p.NewValue(member.Value)
 		}
 		if member, ok := class.StaticMember[key]; ok {
-			return NewValue(member)
+			return p.NewValue(member)
 		}
 	}
 

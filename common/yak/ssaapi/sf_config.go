@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -32,31 +33,42 @@ func WithSyntaxFlowConfig(opts ...sf.RecursiveConfigItem) OperationOption {
 			}
 		case sf.RecursiveConfig_Exclude:
 			if op.Value != "" {
+				vm := sf.NewSyntaxFlowVirtualMachine()
+				err := vm.Compile(op.Value)
+				if err != nil {
+					log.Warnf("SyntaxFlow compile %#v failed: %v", op.Value, err)
+					continue
+				}
 				results = append(results, WithHookEveryNode(func(value *Value) error {
 					if !op.SyntaxFlowRule {
 						return utils.Error("exclude value must be a syntaxflow rule")
 					}
-					var vals = Values{value}
-					vm := sf.NewSyntaxFlowVirtualMachine()
-					err := vm.Compile(op.Value)
-					if err != nil {
-						return err
-					}
 					find := false
-					vm.Feed(vals).ForEach(func(s string, operator sf.ValueOperator) bool {
-						operator.Recursive(func(o sf.ValueOperator) error {
-							raw, ok := o.(*Value)
-							if !ok {
-								return nil
-							}
-							if raw.GetId() == value.GetId() {
-								find = true
-								return utils.Error("abort")
-							}
-							return nil
-						})
-						return true
-					})
+					//vm.Feed(value).ForEach(func(s string, operator sf.ValueOperator) bool {
+					//	err := operator.Recursive(func(o sf.ValueOperator) error {
+					//		raw, ok := o.(*Value)
+					//		if !ok {
+					//			return nil
+					//		}
+					//		if raw.GetId() == value.GetId() {
+					//			find = true
+					//			return utils.Error("abort")
+					//		}
+					//		return nil
+					//	})
+					//	if err != nil {
+					//		return false
+					//	}
+					//	return true
+					//})
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
+					log.Warn("TBD for RecursiveConfig_Exclude")
 					if find {
 						return utils.Error("abort")
 					}
