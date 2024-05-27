@@ -79,6 +79,18 @@ func TestSyntaxInOne(t *testing.T) {
 		"a -<abc>- b",
 		"a -<abc{depth: 1}>- b",
 		"a -<abc(depth: 1, asdf: `a -{}-> *`)>- b",
+		"a ->",
+		"a #>",
+		"a #->",
+		"a #{}->",
+		"a #{depth: 1}->",
+		"a -->",
+		"a -{depth: 1}->",
+		"a -{}->",
+		"a -> as $b",
+		"a #> as $b",
+		"a #-> as $b",
+		"a --> as $b",
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		err := vm.Compile(i)
