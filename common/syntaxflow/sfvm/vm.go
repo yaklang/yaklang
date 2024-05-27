@@ -108,9 +108,6 @@ func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) *omap.OrderedMap[string
 		if err != nil {
 			log.Errorf("exec frame[%v]: %v\n\t\tCODE: %v", err, index, frame.Text)
 		}
-		// if frame.stack.Len() > 0 {
-		// 	log.Infof("stack unbalanced: %v", frame.stack.Len())
-		// }
 	}
 	s.vars.Map(func(s string, a ValueOperator) (string, ValueOperator, error) {
 		result.Set(s, a)

@@ -1,10 +1,37 @@
 package sfvm
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"regexp"
+	"strings"
 )
 
-type ConfigItem struct {
+type RecursiveConfigKey string
+
+const (
+	RecursiveConfig_Depth    RecursiveConfigKey = "depth"
+	RecursiveConfig_DepthMin RecursiveConfigKey = "depth_min"
+	RecursiveConfig_DepthMax RecursiveConfigKey = "depth_max"
+	RecursiveConfig_Exclude  RecursiveConfigKey = "exclude"
+)
+
+func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
+	switch strings.TrimSpace(strings.ToLower(i)) {
+	case "depth":
+		return RecursiveConfig_Depth
+	case "depth_min", "depth-min", "min_depth", "min-depth", "mindepth", "depthmin":
+		return RecursiveConfig_DepthMin
+	case "depth_max", "depth-max", "max_depth", "max-depth", "maxdepth", "depthmax":
+		return RecursiveConfig_DepthMax
+	case "exclude":
+		return RecursiveConfig_Exclude
+	default:
+		log.Warnf("unknown recursive config key: %s", i)
+	}
+	return ""
+}
+
+type RecursiveConfigItem struct {
 	Key            string
 	Value          string
 	SyntaxFlowRule bool
@@ -35,8 +62,8 @@ type ValueOperator interface {
 	GetSyntaxFlowUse() (ValueOperator, error)
 	GetSyntaxFlowDef() (ValueOperator, error)
 	// top and bottom
-	GetSyntaxFlowTopDef(...*ConfigItem) (ValueOperator, error)
-	GetSyntaxFlowBottomUse(...*ConfigItem) (ValueOperator, error)
+	GetSyntaxFlowTopDef(...*RecursiveConfigItem) (ValueOperator, error)
+	GetSyntaxFlowBottomUse(...*RecursiveConfigItem) (ValueOperator, error)
 
 	// ListIndex for OpListIndex, like a[1] a must be list...
 	ListIndex(i int) (ValueOperator, error)
