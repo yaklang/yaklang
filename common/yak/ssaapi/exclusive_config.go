@@ -7,7 +7,7 @@ type OperationConfig struct {
 	MinDepth int
 
 	// Hook
-	HookEveryNode        func(*Value) error
+	HookEveryNode        []func(*Value) error
 	AllowIgnoreCallStack bool
 }
 
@@ -45,7 +45,7 @@ func WithDepthLimit(depth int) OperationOption {
 
 func WithHookEveryNode(hookNode func(*Value) error) OperationOption {
 	return func(operationConfig *OperationConfig) {
-		operationConfig.HookEveryNode = hookNode
+		operationConfig.HookEveryNode = append(operationConfig.HookEveryNode, hookNode)
 	}
 }
 

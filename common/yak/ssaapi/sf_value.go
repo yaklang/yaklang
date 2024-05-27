@@ -82,11 +82,11 @@ func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
 func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 	return v.GetOperands(), nil
 }
-func (v *Value) GetSyntaxFlowTopDef(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
+func (v *Value) GetSyntaxFlowTopDef(config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
 	return v.GetTopDefs(), nil
 }
 
-func (v *Value) GetSyntaxFlowBottomUse(config ...*sfvm.ConfigItem) (sfvm.ValueOperator, error) {
+func (v *Value) GetSyntaxFlowBottomUse(config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
 	return v.GetBottomUses(), nil
 }
 
