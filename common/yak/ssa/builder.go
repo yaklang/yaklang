@@ -128,6 +128,9 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 		// update parent  scope
 		build.parentScope.scope = newParentScopeLevel
 	}
+	if build.CurrentRange == nil {
+		build.CurrentRange = newFunc.R
+	}
 	return build
 }
 

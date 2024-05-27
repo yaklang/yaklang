@@ -174,14 +174,18 @@ func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
 	return b.createVariableEx(name, true)
 }
 
-func (b *FunctionBuilder) CreateVariable(name string) *Variable {
-	return b.createVariableEx(name, false)
+func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
+	return b.createVariableEx(name, false, pos...)
 }
 
-func (b *FunctionBuilder) createVariableEx(name string, isLocal bool) *Variable {
+func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	ret := scope.CreateVariable(name, isLocal).(*Variable)
-	ret.SetDefRange(b.CurrentRange)
+	r := b.CurrentRange
+	if r == nil && len(pos) > 0 {
+		r = b.GetCurrentRange(pos[0])
+	}
+	ret.SetDefRange(r)
 	// set offset variable for program
 	program := b.GetProgram()
 	if program != nil {

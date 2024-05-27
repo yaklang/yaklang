@@ -75,7 +75,7 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 
 func (v *Variable) SetDefRange(r *Range) {
 	if r == nil {
-		log.Error("SetDefRange: range is nil")
+		log.Error("SetDefRange: range is nil use fallback")
 		return
 	}
 	v.DefRange = r

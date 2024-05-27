@@ -87,9 +87,9 @@ func (f *Function) addAnonymous(anon *Function) {
 	anon.parent = f
 }
 
-func (f *FunctionBuilder) NewParam(name string) *Parameter {
+func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Parameter {
 	p := NewParam(name, false, f)
-	f.appendParam(p)
+	f.appendParam(p, pos...)
 	return p
 }
 
@@ -107,11 +107,11 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 	return paraMember
 }
 
-func (f *FunctionBuilder) appendParam(p *Parameter) {
+func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
 	f.Param = append(f.Param, p)
 	p.FormalParameterIndex = len(f.Param) - 1
 	p.IsFreeValue = false
-	variable := f.CreateVariable(p.GetName())
+	variable := f.CreateVariable(p.GetName(), token...)
 	f.AssignVariable(variable, p)
 }
 
