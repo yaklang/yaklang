@@ -1,4 +1,4 @@
-package alogrithm
+package algorithm
 
 import (
 	"fmt"
@@ -14,6 +14,7 @@ type anNode struct {
 func (an *anNode) String() string {
 	return fmt.Sprintf("anNode{%v}", an.data)
 }
+
 func NewAnNode(v any) *anNode {
 	return &anNode{
 		next: nil,
@@ -80,5 +81,4 @@ func TestTarjan(t *testing.T) {
 	if !(scc2.InNodes(rootNode) && scc2.InNodes(seNode)) {
 		t.Error("scc count err")
 	}
-
 }
