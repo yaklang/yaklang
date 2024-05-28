@@ -52,18 +52,17 @@ func UpdateDatabase(p string) {
 			log.Errorf("Error load script %s: not a nasl file", path)
 			return
 		}
-		engine := New()
-		engine.SetDescription(true)
-		engine.InitBuildInLib()
-		err := engine.SafeRunFile(path)
+		engine := NewScriptEngine()
+		engine.AddScriptLoadedHook(func(scriptIns *NaslScriptInfo) {
+			err := scriptIns.Save()
+			if err != nil {
+				log.Errorf("Error save script %s: %s", path, err.Error())
+			}
+		})
+		err := engine.LoadScript(path)
 		if err != nil {
 			log.Errorf("Error load script %s: %s", path, err.Error())
 			return
-		}
-		scriptIns := engine.GetScriptObject()
-		err = scriptIns.Save()
-		if err != nil {
-			log.Errorf("Error save script %s: %s", path, err.Error())
 		}
 	}
 	if utils.IsDir(p) {
@@ -105,5 +104,4 @@ var Exports = map[string]any{
 	"riskHandle":      WithRiskHandle,
 	"proxy":           WithProxy,
 	"conditions":      WithConditions,
-	"preference":      WithPreference,
 }

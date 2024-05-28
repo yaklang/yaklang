@@ -325,14 +325,22 @@ func (c *Compiler) VisitBitShiftExpression(i *nasl.BitShiftExpressionContext) {
 		c.VisitSingleExpression(i.SingleExpression(1))
 		c.pushCall(2)
 		return
+	} else if i.LeftShiftLogical() != nil {
+		c.pushRef("LeftShiftLogical")
+		c.VisitSingleExpression(i.SingleExpression(0))
+		c.VisitSingleExpression(i.SingleExpression(1))
+		c.pushCall(2)
+		return
+	} else {
+		c.VisitSingleExpression(i.SingleExpression(0))
+		c.VisitSingleExpression(i.SingleExpression(1))
+		if i.RightShiftArithmetic() != nil {
+			c.pushOpcodeFlag(yakvm.OpShr)
+		} else if i.LeftShiftArithmetic() != nil {
+			c.pushOpcodeFlag(yakvm.OpShl)
+		}
 	}
-	c.VisitSingleExpression(i.SingleExpression(0))
-	c.VisitSingleExpression(i.SingleExpression(1))
-	if i.RightShiftArithmetic() != nil {
-		c.pushOpcodeFlag(yakvm.OpShr)
-	} else if i.LeftShiftArithmetic() != nil {
-		c.pushOpcodeFlag(yakvm.OpShl)
-	}
+
 }
 func (c *Compiler) VisitRelationalExpression(i *nasl.RelationalExpressionContext) {
 	if i == nil {
@@ -411,6 +419,8 @@ func (c *Compiler) VisitBitXOrExpression(i *nasl.BitXOrExpressionContext) {
 	}
 	c.visitHook(c, i)
 
+	c.VisitSingleExpression(i.SingleExpression(0))
+	c.VisitSingleExpression(i.SingleExpression(1))
 	c.pushOpcodeFlag(yakvm.OpXor)
 }
 func (c *Compiler) VisitBitOrExpression(i *nasl.BitOrExpressionContext) {
@@ -675,6 +685,22 @@ func (c *Compiler) VisitAssignmentExpression(i *nasl.AssignmentExpressionContext
 		}
 
 	}
+	pushLeftRef := func() {
+		id := i.Identifier(0).(*nasl.IdentifierContext)
+		if i.OpenBracket() != nil {
+			c.VisitIdentifier(id)
+			c.VisitSingleExpression(i.SingleExpression(0))
+			c.pushGenList(2)
+		} else if i.Dot() != nil {
+			c.VisitIdentifier(id)
+			c.pushString(i.Identifier(1).GetText())
+			c.pushGenList(2)
+		} else {
+			c.pushRef(id.GetText())
+		}
+
+	}
+	_ = pushLeftRef
 	pushRight := func() {
 		if i.OpenBracket() != nil {
 			c.VisitSingleExpression(i.SingleExpression(1))
@@ -691,19 +717,49 @@ func (c *Compiler) VisitAssignmentExpression(i *nasl.AssignmentExpressionContext
 		c.pushAssigin()
 		return
 	}
-	pushRight()
-	pushLeft()
 	switch i.AssignmentOperator().GetText() {
 	case "+=":
+		pushRight()
+		pushLeft()
 		c.pushOpcodeFlag(yakvm.OpPlusEq)
 	case "-=":
+		pushRight()
+		pushLeft()
 		c.pushOpcodeFlag(yakvm.OpMinusEq)
 	case "*=":
+		pushRight()
+		pushLeft()
 		c.pushOpcodeFlag(yakvm.OpMulEq)
 	case "/=":
+		pushRight()
+		pushLeft()
 		c.pushOpcodeFlag(yakvm.OpDivEq)
 	case "%=":
+		pushRight()
+		pushLeft()
 		c.pushOpcodeFlag(yakvm.OpModEq)
+	case ">>=":
+		pushRight()
+		pushLeft()
+		c.pushOpcodeFlag(yakvm.OpShrEq)
+	case "<<=":
+		pushRight()
+		pushLeft()
+		c.pushOpcodeFlag(yakvm.OpShlEq)
+	case ">>>=":
+		pushLeft()
+		c.pushRef("RightShiftLogical")
+		pushLeftRef()
+		pushRight()
+		c.pushCall(2)
+		c.pushAssigin()
+	case "<<<=":
+		pushLeft()
+		c.pushRef("LeftShiftLogical")
+		pushLeftRef()
+		pushRight()
+		c.pushCall(2)
+		c.pushAssigin()
 	}
 
 }

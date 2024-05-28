@@ -18,6 +18,14 @@ type ExitSignal struct {
 	Flag interface{}
 }
 
+func convertBoolToInt(b bool) int {
+	if b {
+		return 1
+	} else {
+		return 0
+	}
+}
+
 var NaslBuildInNativeMethod = map[string]interface{}{
 	"get_array_elem": func(icaller interface{}, index interface{}) interface{} {
 		switch caller := icaller.(type) {
@@ -93,20 +101,23 @@ var NaslBuildInNativeMethod = map[string]interface{}{
 		println(s)
 	},
 
-	"isnull": func(i interface{}) bool {
-		return i == nil
+	"isnull": func(i interface{}) int {
+		return convertBoolToInt(i == nil)
 	},
 	"__split": func(s string, sep string, keep bool) []string {
 		return strings.Split(s, sep)
 	},
-	"reEqual": func(s1, s2 interface{}) bool { // 内置=~运算符号
-		return utils.MatchAllOfRegexp(utils.InterfaceToString(s1), utils.InterfaceToString(s2))
+	"reEqual": func(s1, s2 interface{}) int { // 内置=~运算符号
+		return convertBoolToInt(utils.MatchAllOfRegexp(utils.InterfaceToString(s1), utils.InterfaceToString(s2)))
 	},
-	"strIn": func(s1, s2 string) bool { // 内置><运算符号
-		return strings.Contains(s1, s2)
+	"strIn": func(s1, s2 string) int { // 内置><运算符号
+		return convertBoolToInt(strings.Contains(s1, s2))
 	},
-	"RightShiftLogical": func(s1, s2 int64) uint64 { // 内置>>>运算符号
-		return uint64(s1) >> s2
+	"RightShiftLogical": func(s1, s2 int32) uint32 { // 内置>>>运算符号
+		return uint32(s1) >> s2
+	},
+	"LeftShiftLogical": func(s1, s2 int32) uint32 { // 内置<<<运算符号
+		return uint32(s1) << s2
 	},
 	"BitNot": func(a int64) int64 { // 内置>>>运算符号
 		return ^a
