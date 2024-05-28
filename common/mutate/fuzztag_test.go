@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -213,15 +212,15 @@ func TestIntWithAutoZeroPadding(t *testing.T) {
 func TestFuzzTagExec(t *testing.T) {
 	expect := []string{
 		"a", "a,1,1",
-		"a", "a,strconv.Atoi: parsing \\\"a\\\": invalid syntax,a",
+		"a", "a,[__YakHotPatchErr@strconv.Atoi: parsing \"a\": invalid syntax],a",
 		"a", "a,2,2",
 	}
 	i := 0
 	_, err := FuzzTagExec("{{a({{int({{array(1|a|2)}})}})}}", Fuzz_WithResultHandler(func(s string, payloads []string) bool {
-		if fmt.Sprintf("result: %s, payloads: %v\n", s, strings.Join(payloads, ",")) != expect[i] {
+		if s+strings.Join(payloads, ",") != expect[i]+expect[i+1] {
 			t.Fatal("test verbose info failed")
 		}
-		i++
+		i += 2
 		return true
 	}), Fuzz_WithExtraFuzzTagHandler("int", func(s string) []string {
 		_, err := strconv.Atoi(s)
