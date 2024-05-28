@@ -3,6 +3,7 @@ package fuzztagx
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -366,4 +367,18 @@ func TestDynTag(t *testing.T) {
 	if n != 2 {
 		t.Fatal("test dyn tag failed")
 	}
+}
+func TestTagArgument(t *testing.T) {
+	res, err := ExecuteWithStringHandler("{{array({{int(1-2)}},a)}}", map[string]func(string2 string) []string{
+		"array": func(s string) []string {
+			return strings.Split(s, ",")
+		},
+		"int": func(s string) []string {
+			return []string{"1", "2"}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "1a2a", strings.Join(res, ""))
 }
