@@ -852,7 +852,7 @@ func init() {
 				r := minB.String()
 				// padding
 				if enablePadding {
-					paddingString(r, paddingLength, paddingRight)
+					r = paddingString(r, paddingLength, paddingRight)
 				}
 
 				results = append(results, r)

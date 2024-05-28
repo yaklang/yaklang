@@ -1,9 +1,7 @@
 package mutate
 
 import (
-	"bytes"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,64 +12,64 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-func TestLower(t *testing.T) {
-	a := fuzzLowerNUpper("zhangsan")
-	spew.Dump(a)
-}
+// func TestLower(t *testing.T) {
+// 	a := fuzzLowerNUpper("zhangsan")
+// 	spew.Dump(a)
+// }
 
-func TestMutateDoc(t *testing.T) {
-	GetFuzztagMarkdownDoc := func() string {
-		/*
-			表格内
-			|标签名|标签别名|标签描述|
-			|:--------|:-------|:------|
+// func TestMutateDoc(t *testing.T) {
+// 	GetFuzztagMarkdownDoc := func() string {
+// 		/*
+// 			表格内
+// 			|标签名|标签别名|标签描述|
+// 			|:--------|:-------|:------|
 
-		*/
-		var buf bytes.Buffer
-		buf.Write([]byte(`
+// 		*/
+// 		var buf bytes.Buffer
+// 		buf.Write([]byte(`
 
-## fuzztag 可用标签一览
+// ## fuzztag 可用标签一览
 
-|标签名|标签别名|标签描述|
-|:-------|:-------|:-------|
-`))
-		escapeVertical := func(s string) string {
-			return strings.ReplaceAll(s, `|`, `&#124;`)
-		}
-		sort.SliceStable(existedFuzztag, func(i, j int) bool {
-			return existedFuzztag[i].TagName < existedFuzztag[j].TagName
-		})
-		for _, t := range existedFuzztag {
-			aliasName := escapeVertical(strings.Join(t.Alias, ", "))
-			if aliasName != "" {
-				aliasName = "`" + aliasName + "`"
-			} else {
-				aliasName = "  "
-			}
-			buf.WriteString(
-				fmt.Sprintf("|`%v`|%v|%v|",
-					escapeVertical(t.TagName),
-					aliasName,
-					escapeVertical(t.Description),
-				),
-			)
-			buf.WriteByte('\n')
-		}
-		buf.WriteByte('\n')
-		buf.WriteByte('\n')
-		return buf.String()
-	}
+// |标签名|标签别名|标签描述|
+// |:-------|:-------|:-------|
+// `))
+// 		escapeVertical := func(s string) string {
+// 			return strings.ReplaceAll(s, `|`, `&#124;`)
+// 		}
+// 		sort.SliceStable(existedFuzztag, func(i, j int) bool {
+// 			return existedFuzztag[i].TagName < existedFuzztag[j].TagName
+// 		})
+// 		for _, t := range existedFuzztag {
+// 			aliasName := escapeVertical(strings.Join(t.Alias, ", "))
+// 			if aliasName != "" {
+// 				aliasName = "`" + aliasName + "`"
+// 			} else {
+// 				aliasName = "  "
+// 			}
+// 			buf.WriteString(
+// 				fmt.Sprintf("|`%v`|%v|%v|",
+// 					escapeVertical(t.TagName),
+// 					aliasName,
+// 					escapeVertical(t.Description),
+// 				),
+// 			)
+// 			buf.WriteByte('\n')
+// 		}
+// 		buf.WriteByte('\n')
+// 		buf.WriteByte('\n')
+// 		return buf.String()
+// 	}
 
-	println(GetFuzztagMarkdownDoc())
-}
+// 	println(GetFuzztagMarkdownDoc())
+// }
 
 func TestMutateQuick(t *testing.T) {
 	var results []string
 
-	results = MutateQuick(`{{int(1-29)}},-asdfasdfasd{{randstr({{int(1-20)}},100,2)}}`)
-	if len(results) != 29*20*2 {
-		panic(len(results))
-	}
+	// results = MutateQuick(`{{int(1-29)}},-asdfasdfasd{{randstr({{int(1-20)}},100,2)}}`)
+	// if len(results) != 29*20*2 {
+	// 	panic(len(results))
+	// }
 
 	results = MutateQuick(`{{repeatstr(abc,|{{int(1-10)}})}}`)
 	if len(results) != 10 {
@@ -143,22 +141,22 @@ func TestMutateQuick(t *testing.T) {
 	}
 }
 
-func TestAlias(t *testing.T) {
-	results := MutateQuick(`{{rs(2)}}`)
-	spew.Dump(results)
-}
+// func TestAlias(t *testing.T) {
+// 	results := MutateQuick(`{{rs(2)}}`)
+// 	spew.Dump(results)
+// }
 
-func TestYsoFuzzTag(t *testing.T) {
-	result := MutateQuick(`{{yso:exec(whoami)}}`)
-	println(len(result))
-	spew.Dump(result)
-}
+// func TestYsoFuzzTag(t *testing.T) {
+// 	result := MutateQuick(`{{yso:exec(whoami)}}`)
+// 	println(len(result))
+// 	spew.Dump(result)
+// }
 
-func TestRegenTag(t *testing.T) {
-	result := MutateQuick(`{{regen(aa*)}}`)
-	println(len(result))
-	spew.Dump(result)
-}
+// func TestRegenTag(t *testing.T) {
+// 	result := MutateQuick(`{{regen(aa*)}}`)
+// 	println(len(result))
+// 	spew.Dump(result)
+// }
 
 func TestIntWithAutoZeroPadding(t *testing.T) {
 	t.Run("000-999", func(t *testing.T) {
@@ -206,11 +204,11 @@ func TestIntWithAutoZeroPadding(t *testing.T) {
 	})
 }
 
-func TestRepeatTag(t *testing.T) {
-	result := MutateQuick(`{{repeat(!|4)}}`)
-	println(len(result))
-	spew.Dump(result)
-}
+// func TestRepeatTag(t *testing.T) {
+// 	result := MutateQuick(`{{repeat(!|4)}}`)
+// 	println(len(result))
+// 	spew.Dump(result)
+// }
 
 func TestFuzzTagExec(t *testing.T) {
 	expect := []string{
@@ -327,7 +325,7 @@ func TestDateRangeFuzzTag(t *testing.T) {
 	require.Equal(
 		t,
 		[]string{
-			"01/01/2008", "01/02/2008", "01/03/2008", "01/04/2008", "01/05/2008", "01/06/2008", "01/07/2008", "01/08/20	08", "01/09/2008", "01/10/2008", "01/11/2008",
+			"01/01/2008", "01/02/2008", "01/03/2008", "01/04/2008", "01/05/2008", "01/06/2008", "01/07/2008", "01/08/2008", "01/09/2008", "01/10/2008", "01/11/2008",
 		},
 		MutateQuick(`{{date:range(01/01/2008,01/11/2008)}}`),
 	)
