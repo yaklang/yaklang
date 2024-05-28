@@ -367,7 +367,7 @@ func (s *Server) SaveCancelSimpleDetect(ctx context.Context, req *ypb.RecordPort
 func (s *Server) QuerySimpleDetectUnfinishedTask(ctx context.Context, req *ypb.QueryUnfinishedTaskRequest) (*ypb.QueryUnfinishedTaskResponse, error) {
 	filter := req.GetFilter()
 	filter.ProgressSource = []string{KEY_SimpleDetectManager}
-	_, progressList, err := yakit.QueryProgress(s.GetProjectDatabase(), req.GetPagination(), filter)
+	p, progressList, err := yakit.QueryProgress(s.GetProjectDatabase(), req.GetPagination(), filter)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func (s *Server) QuerySimpleDetectUnfinishedTask(ctx context.Context, req *ypb.Q
 			Target:               progress.Target,
 		})
 	}
-	return &ypb.QueryUnfinishedTaskResponse{Tasks: tasks}, nil
+	return &ypb.QueryUnfinishedTaskResponse{Tasks: tasks, Pagination: req.GetPagination(), Total: int64(p.TotalRecord)}, nil
 }
 
 func (s *Server) GetSimpleDetectRecordRequestById(ctx context.Context, req *ypb.GetUnfinishedTaskDetailByIdRequest) (*ypb.RecordPortScanRequest, error) {
