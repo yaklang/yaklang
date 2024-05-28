@@ -1,18 +1,20 @@
 package mutate
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestQuickMutate(t *testing.T) {
 	results, err := QuickMutate("{{params(target)}}", nil, MutateWithExtraParams(map[string][]string{
-		"target": []string{"123", "abc"},
+		"target": {"123", "abc"},
 	}))
 	if err != nil {
 		panic(err)
@@ -43,14 +45,8 @@ func TestQuickMutateEx_1(t *testing.T) {
 			},
 		},
 	)
-	if err != nil {
-		return
-	}
-	_ = res
-	if len(res) != 888 {
-		panic(1)
-	}
-	println(len(res))
+	require.NoError(t, err)
+	require.Len(t, res, 888)
 }
 
 func TestQuickMutateEx_Repeated(t *testing.T) {
@@ -64,14 +60,8 @@ func TestQuickMutateEx_Repeated(t *testing.T) {
 			},
 		},
 	)
-	if err != nil {
-		return
-	}
-	_ = res
-	if len(res) != 888 {
-		panic(1)
-	}
-	println(len(res))
+	require.NoError(t, err)
+	require.Len(t, res, 40)
 }
 
 func TestFuzzQuickMutate(t *testing.T) {
