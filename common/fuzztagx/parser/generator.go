@@ -170,6 +170,7 @@ func (f *TagExecNode) Exec() (bool, error) {
 			f.submitResult(NewFuzzResultWithData(""))
 			return false, nil
 		} else {
+			f.index = 0
 			return true, f.backpropagation()
 		}
 	}
