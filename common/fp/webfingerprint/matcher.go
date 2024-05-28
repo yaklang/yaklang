@@ -11,6 +11,7 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	log "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -21,17 +22,19 @@ const (
 )
 
 type HTTPResponseInfo struct {
-	Header     *http.Header
-	URL        *url.URL
-	Status     string
-	Body       []byte
-	RequestRaw []byte
-	StatusCode int
-	IsHttps    bool
+	Header            *http.Header
+	URL               *url.URL
+	Status            string
+	Body              []byte
+	RequestRaw        []byte
+	ResponseHeaderRaw []byte
+	ResponseRaw       []byte
+	cacheLock         sync.Mutex
+	StatusCode        int
+	IsHttps           bool
 }
 
-func (h *HTTPResponseInfo) Bytes() []byte {
-	var builder bytes.Buffer
+func (h *HTTPResponseInfo) writeHeaderBytes(builder *bytes.Buffer) {
 	n := 15 + len(h.Status) // first line  "HTTP/1.1 200 OK\r\n"
 	if h.Header != nil {
 		for k, v := range *h.Header {
@@ -40,10 +43,6 @@ func (h *HTTPResponseInfo) Bytes() []byte {
 			}
 		}
 	}
-	n += len(h.Body) + 2 // \r\n + body
-
-	builder.Grow(n)
-
 	builder.WriteString("HTTP/1.1 ")
 	builder.WriteString(strconv.Itoa(h.StatusCode))
 	builder.WriteString(" ")
@@ -60,14 +59,41 @@ func (h *HTTPResponseInfo) Bytes() []byte {
 			}
 		}
 	}
+}
+
+func (h *HTTPResponseInfo) writeBodyBytes(builder *bytes.Buffer) {
+	builder.Grow(len(h.Body) + 2)
 	builder.WriteString(CRLF)
 	builder.Write(h.Body)
-	return builder.Bytes()
+}
+
+func (h *HTTPResponseInfo) Bytes() []byte {
+	h.cacheLock.Lock()
+	defer h.cacheLock.Unlock()
+	if h.ResponseRaw == nil {
+		var builder bytes.Buffer
+		// header
+		h.writeHeaderBytes(&builder)
+
+		// body
+		h.writeBodyBytes(&builder)
+
+		h.ResponseRaw = builder.Bytes()
+	}
+
+	return h.ResponseRaw
 }
 
 func (h *HTTPResponseInfo) ResponseHeaderBytes() []byte {
-	header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(h.Bytes())
-	return []byte(header)
+	h.cacheLock.Lock()
+	defer h.cacheLock.Unlock()
+	if h.ResponseHeaderRaw == nil {
+		var builder bytes.Buffer
+		h.writeHeaderBytes(&builder)
+		h.ResponseHeaderRaw = builder.Bytes()
+	}
+
+	return h.ResponseHeaderRaw
 }
 
 func ExtractHTTPResponseInfoFromHTTPResponse(res *http.Response) *HTTPResponseInfo {
@@ -226,7 +252,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 			allMatched := true
 			var tempCpes []*CPE
 			for _, k := range m.Keywords {
-				cpe, err := k.Match(string(r.Bytes()))
+				cpe, err := k.Match(utils.UnsafeBytesToString(r.Bytes()))
 				if err != nil {
 					allMatched = false
 					break
@@ -238,7 +264,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 			}
 		} else {
 			for _, k := range m.Keywords {
-				cpe, err := k.Match(string(r.Bytes()))
+				cpe, err := k.Match(utils.UnsafeBytesToString(r.Bytes()))
 				if err != nil {
 					// log.Debugf("keyword match[%s] failed: %s", k.regexp.String(), err)
 					continue

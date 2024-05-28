@@ -80,7 +80,6 @@ type DigestAuthorization struct {
 }
 
 func newAuthorization(dr *DigestRequest) (*DigestAuthorization, error) {
-
 	ah := DigestAuthorization{
 		Algorithm: dr.Wa.Algorithm,
 		Cnonce:    "",
@@ -107,7 +106,6 @@ const (
 )
 
 func (ah *DigestAuthorization) RefreshAuthorization(dr *DigestRequest) (*DigestAuthorization, error) {
-
 	ah.Username = dr.Username
 
 	if ah.Userhash {
@@ -135,7 +133,6 @@ func (ah *DigestAuthorization) RefreshAuthorization(dr *DigestRequest) (*DigestA
 }
 
 func (ah *DigestAuthorization) RefreshAuthorizationWithoutConce(dr *DigestRequest) (*DigestAuthorization, error) {
-
 	ah.Username = dr.Username
 
 	if ah.Userhash {
@@ -172,7 +169,6 @@ func (ah *DigestAuthorization) computeResponse(dr *DigestRequest) (s string) {
 }
 
 func (ah *DigestAuthorization) computeA1(dr *DigestRequest) string {
-
 	algorithm := strings.ToUpper(ah.Algorithm)
 
 	if algorithm == "" || algorithm == algorithmMD5 || algorithm == algorithmSHA256 {
@@ -188,7 +184,6 @@ func (ah *DigestAuthorization) computeA1(dr *DigestRequest) string {
 }
 
 func (ah *DigestAuthorization) computeA2(dr *DigestRequest) string {
-
 	if strings.Contains(dr.Wa.Qop, "auth-int") {
 		ah.Qop = "auth-int"
 		return fmt.Sprintf("%s:%s:%s", dr.Method, ah.URI, ah.hash(dr.Body))
@@ -286,8 +281,7 @@ type wwwAuthenticate struct {
 }
 
 func newWWWAuthenticate(s string) *wwwAuthenticate {
-
-	var wa = wwwAuthenticate{}
+	wa := wwwAuthenticate{}
 
 	algorithmMatch := algorithmRegex.FindStringSubmatch(s)
 	if algorithmMatch != nil {
@@ -363,14 +357,14 @@ func GetDigestAuthorizationFromRequest(raw []byte, authorization, username, pass
 		return "", err
 	}
 
-	splited := strings.Split(utils.UnsafeBytesToString(FixHTTPPacketCRLF(raw, true)), "\r\n")
+	splited := strings.Split(string(FixHTTPPacketCRLF(raw, true)), "\r\n")
 	_, uri, _, _ := utils.ParseHTTPRequestLine(splited[0])
 	useCompleteURL := false
 	if strings.Contains(uri, "://") {
 		useCompleteURL = true
 	}
 
-	_, ah, err := GetDigestAuthorizationFromRequestEx(req.Method, req.URL.String(), utils.UnsafeBytesToString(body), authorization, username, password, useCompleteURL)
+	_, ah, err := GetDigestAuthorizationFromRequestEx(req.Method, req.URL.String(), string(body), authorization, username, password, useCompleteURL)
 	if err != nil {
 		return "", err
 	}

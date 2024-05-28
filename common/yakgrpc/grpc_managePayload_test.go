@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -320,7 +319,7 @@ func exportPayloadFromFile(local ypb.YakClient, t *testing.T, group, folder, sav
 	if err != nil {
 		t.Fatal(err)
 	}
-	return utils.UnsafeBytesToString(content)
+	return string(content)
 }
 
 func exportPayload(local ypb.YakClient, t *testing.T, group, folder string, savePath string) string {
@@ -347,7 +346,7 @@ func exportPayload(local ypb.YakClient, t *testing.T, group, folder string, save
 	if err != nil {
 		t.Fatal(err)
 	}
-	return utils.UnsafeBytesToString(content)
+	return string(content)
 }
 
 func updateToFile(local ypb.YakClient, t *testing.T, group, data string) {
@@ -497,7 +496,7 @@ func TestPayload(t *testing.T) {
 		rsp := queryFromFile(local, t, group, "")
 
 		// compare payload
-		got := utils.UnsafeBytesToString(rsp.Data)
+		got := string(rsp.Data)
 		comparePayload(got, want, t)
 
 		// update(append) file
@@ -508,7 +507,7 @@ func TestPayload(t *testing.T) {
 		rsp = queryFromFile(local, t, group, "")
 
 		// compare payload
-		got = utils.UnsafeBytesToString(rsp.Data)
+		got = string(rsp.Data)
 		comparePayload(got, want, t)
 
 		// remove duplicate
@@ -519,7 +518,7 @@ func TestPayload(t *testing.T) {
 		rsp = queryFromFile(local, t, group, "")
 
 		// compare payload
-		got = utils.UnsafeBytesToString(rsp.Data)
+		got = string(rsp.Data)
 		comparePayload(got, want, t)
 
 		// remove duplicate big
@@ -530,7 +529,7 @@ func TestPayload(t *testing.T) {
 		rsp = queryFromFile(local, t, group, "")
 
 		// compare payload
-		got = utils.UnsafeBytesToString(rsp.Data)
+		got = string(rsp.Data)
 		comparePayload(got, want, t)
 	})
 

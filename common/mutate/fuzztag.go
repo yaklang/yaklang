@@ -578,7 +578,7 @@ func init() {
 						continue
 					}
 					for line := range ch {
-						lineStr := utils.UnsafeBytesToString(line)
+						lineStr := string(line)
 						raw, err := strconv.Unquote(lineStr)
 						if err == nil {
 							lineStr = raw

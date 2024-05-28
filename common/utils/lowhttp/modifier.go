@@ -437,12 +437,12 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode bool, callback func(*
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
-	bodyString := utils.UnsafeBytesToString(bodyRaw)
+	bodyString := string(bodyRaw)
 	u := ParseQueryParams(bodyString).DisableAutoEncode(noAutoEncode)
 	callback(u)
 	newBody := u.Encode()
 
-	return ReplaceHTTPPacketBody(utils.UnsafeStringToBytes(headersRaw), utils.UnsafeStringToBytes(newBody), isChunked)
+	return ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
 }
 
 // ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
@@ -1087,7 +1087,7 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 
 			switch r := fileContent.(type) {
 			case string:
-				content = utils.UnsafeStringToBytes(r)
+				content = []byte(r)
 			case []byte:
 				content = r
 			case io.Reader:

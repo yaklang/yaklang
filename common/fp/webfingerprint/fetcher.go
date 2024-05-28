@@ -5,15 +5,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, runtimeId string, proxy ...string) (bool, []*HTTPResponseInfo, error) {
@@ -87,7 +89,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 	}{{Url: originUrl, Raw: rsp, Request: packet, IsHttps: isTls}}, redirectResponse...) {
 		rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rspRaw.Raw)), nil)
 		if err != nil {
-			//log.Errorf("read response failed: %s", err)
+			// log.Errorf("read response failed: %s", err)
 			continue
 		}
 		info := &HTTPResponseInfo{
@@ -97,6 +99,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 			URL:        rspRaw.Url,
 			RequestRaw: rspRaw.Request,
 			IsHttps:    rspRaw.IsHttps,
+			cacheLock:  sync.Mutex{},
 		}
 		if info.URL == nil {
 			urlFinal, err := lowhttp.ExtractURLFromHTTPRequestRaw(rspRaw.Request, rspRaw.IsHttps)

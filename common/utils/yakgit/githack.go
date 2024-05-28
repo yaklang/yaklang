@@ -3,7 +3,6 @@ package yakgit
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-git/go-git/v5"
@@ -342,7 +343,7 @@ func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository) {
 
 func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *git.Repository, packsContent []byte, repoPath string) {
 	remoteRepoURL := o.remoteRepoURL
-	packHashes := PACK_REGEX.FindAllString(utils.UnsafeBytesToString(packsContent), -1)
+	packHashes := PACK_REGEX.FindAllString(string(packsContent), -1)
 	taskURLs := make([]string, 0, len(packHashes)*2)
 	// 下载pack和idx文件
 	for _, hash := range packHashes {
@@ -420,7 +421,7 @@ func (o *GitHackObject) addBasicTask(ch chan string, defaultGitFiles []string) {
 
 func (o *GitHackObject) addHeadTask(ch chan string, content []byte) {
 	tempDirPath := o.tempDirPath
-	contentString := utils.UnsafeBytesToString(content)
+	contentString := string(content)
 	for _, line := range strings.Split(strings.ReplaceAll(contentString, "\r", ""), "\n") {
 		// 解析HEAD中每个ref
 		if strings.HasPrefix(line, "ref: ") {
@@ -442,7 +443,7 @@ func (o *GitHackObject) addHeadTask(ch chan string, content []byte) {
 
 func (o *GitHackObject) addHashParsedTask(ch chan string, tag string, content []byte) int {
 	remoteRepoURL := o.remoteRepoURL
-	hashes := HASH_REGEX.FindAllString(utils.UnsafeBytesToString(content), -1)
+	hashes := HASH_REGEX.FindAllString(string(content), -1)
 	if len(hashes) == 0 {
 		return 0
 	}
@@ -643,14 +644,14 @@ func (o *GitHackObject) getHashTask(hash string, remoteRepoURL string) (string, 
 }
 
 func (o *GitHackObject) parseHeadBranch(content []byte) []string {
-	matched := HEAD_REGEX.FindAllStringSubmatch(utils.UnsafeBytesToString(content), -1)
+	matched := HEAD_REGEX.FindAllStringSubmatch(string(content), -1)
 	return lo.Map(matched, func(item []string, _ int) string {
 		return item[1]
 	})
 }
 
 func (o *GitHackObject) parseLogsHeadBranch(content []byte) []string {
-	matched := LOGs_HEAD_REGEX.FindAllStringSubmatch(utils.UnsafeBytesToString(content), -1)
+	matched := LOGs_HEAD_REGEX.FindAllStringSubmatch(string(content), -1)
 	result := lo.Map(matched, func(item []string, _ int) string {
 		return item[1]
 	})

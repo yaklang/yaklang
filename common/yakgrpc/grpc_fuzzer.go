@@ -678,7 +678,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		iInput = lo.Map(failedResponses, func(i *schema.WebFuzzerResponse, _ int) []byte {
-			return utils.UnsafeStringToBytes(i.Request)
+			return []byte(i.Request)
 		})
 	}
 
@@ -795,7 +795,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					payloads[i] = utils.ParseStringToVisible(payload)
 				}
 			} else {
-				payloads, _ = retryPayloadsMap[utils.UnsafeBytesToString(result.RequestRaw)]
+				payloads, _ = retryPayloadsMap[string(result.RequestRaw)]
 			}
 
 			var extractorResults []*ypb.KVPair

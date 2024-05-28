@@ -303,7 +303,7 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 	}
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	shareRes, err := client.HttpFlowShareWithToken(ctx, req.Token, req.ExpiredTime, req.Module, utils.UnsafeBytesToString(shareContent), req.Pwd, req.LimitNum)
+	shareRes, err := client.HttpFlowShareWithToken(ctx, req.Token, req.ExpiredTime, req.Module, string(shareContent), req.Pwd, req.LimitNum)
 	if err != nil {
 		return nil, utils.Errorf("HTTPFlowsShare failed: %s", err)
 	}
@@ -429,7 +429,7 @@ func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareReque
 	} else {
 		return &ypb.HTTPFlowBareResponse{
 			Id:   id,
-			Data: utils.UnsafeStringToBytes(data),
+			Data: []byte(data),
 		}, nil
 	}
 }

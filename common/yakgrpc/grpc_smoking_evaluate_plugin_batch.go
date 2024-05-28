@@ -91,7 +91,7 @@ func (s *Server) SmokingEvaluatePluginBatch(req *ypb.SmokingEvaluatePluginBatchR
 	if err != nil {
 		return err
 	}
-	send(2, utils.UnsafeBytesToString(msg), "success-again")
+	send(2, string(msg), "success-again")
 	// send(2, strings.Join(names, ","), "success-again")
 	return nil
 }
