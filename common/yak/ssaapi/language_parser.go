@@ -31,14 +31,12 @@ type Builder interface {
 	FilterFile(string) bool
 }
 
-var (
-	LanguageBuilders = map[Language]Builder{
-		Yak:  yak2ssa.Builder,
-		JS:   js2ssa.Builder,
-		PHP:  php2ssa.Builder,
-		JAVA: java2ssa.Builder,
-	}
-)
+var LanguageBuilders = map[Language]Builder{
+	Yak:  yak2ssa.Builder,
+	JS:   js2ssa.Builder,
+	PHP:  php2ssa.Builder,
+	JAVA: java2ssa.Builder,
+}
 
 func (c *config) parseProject() ([]*Program, error) {
 	ret := make([]*Program, 0)
@@ -172,7 +170,7 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 		if err != nil {
 			return err
 		}
-		code := utils.UnsafeBytesToString(raw)
+		code := string(raw)
 
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()

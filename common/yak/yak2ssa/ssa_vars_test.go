@@ -23,7 +23,7 @@ package yak2ssa
 // 	for _, final := range printlnFunc.GetUsers() {
 // 		line := ssa.LineDisasm(final)
 // 		fmt.Println(line)
-// 		if !re.Match(utils.UnsafeStringToBytes(line)) {
+// 		if !re.Match([]byte(line)) {
 // 			t.Fatal(line)
 // 		}
 // 	}

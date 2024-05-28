@@ -17,9 +17,7 @@ import (
 )
 
 var completionJsonCd = utils.NewCoolDown(5 * time.Second)
-var (
-	completionJsonRaw []byte
-)
+var completionJsonRaw []byte
 
 func (s *Server) GetYakVMBuildInMethodCompletion(
 	ctx context.Context,
@@ -31,8 +29,8 @@ func (s *Server) GetYakVMBuildInMethodCompletion(
 	var sug []*ypb.MethodSuggestion
 	stringBuildin := yakvm.GetStringBuildInMethod()
 	if stringBuildin != nil && len(stringBuildin) > 0 {
-		var suggestion = make([]*ypb.SuggestionDescription, len(stringBuildin))
-		var index = 0
+		suggestion := make([]*ypb.SuggestionDescription, len(stringBuildin))
+		index := 0
 		for methodName, method := range stringBuildin {
 			if ret, _ := method.VSCodeSnippets(); ret == "" {
 				spew.Dump(method)
@@ -130,7 +128,7 @@ func (s *Server) GetYakitCompletionRaw(ctx context.Context, _ *ypb.Empty) (*ypb.
 }
 
 func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErrorRequest) (*ypb.StaticAnalyzeErrorResponse, error) {
-	tmpRes := yak.StaticAnalyzeYaklang(utils.UnsafeBytesToString(r.GetCode()), r.GetPluginType())
+	tmpRes := yak.StaticAnalyzeYaklang(string(r.GetCode()), r.GetPluginType())
 	es := lo.Map(tmpRes, func(i *result.StaticAnalyzeResult, _ int) *ypb.StaticAnalyzeErrorResult {
 		return &ypb.StaticAnalyzeErrorResult{
 			Message:         []byte(i.Message),

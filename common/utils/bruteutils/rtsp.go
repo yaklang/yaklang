@@ -31,7 +31,6 @@ func genDESCRIBLE(url string, seq int) string {
 }
 
 func genDESCRIBLEWithAuth(url string, seq int, username, password string, authMethod RTSPAuthMethod, authHeader string) string {
-
 	switch authMethod {
 	case RTSPAuthMethod_Digest, RTSPAuthMethod_Origin:
 		msgRet := "DESCRIBE " + url + " RTSP/1.0\r\n"
@@ -92,7 +91,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		}
 		defer conn.Close()
 
-		_, err = conn.Write(utils.UnsafeStringToBytes(genDESCRIBLE(u, 2)))
+		_, err = conn.Write([]byte(genDESCRIBLE(u, 2)))
 		if err != nil {
 			log.Errorf("rtsp: %v write failed: %s", i.Target, err)
 			res.Finished = true
@@ -132,7 +131,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		}
 		defer conn.Close()
 
-		_, err = conn.Write(utils.UnsafeStringToBytes(genDESCRIBLE(u, 2)))
+		_, err = conn.Write([]byte(genDESCRIBLE(u, 2)))
 		if err != nil {
 			log.Errorf("rtsp: %v write failed: %s", i.Target, err)
 			res.Finished = true
@@ -163,7 +162,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 			}
 		}
 
-		_, err = conn.Write(utils.UnsafeStringToBytes(genDESCRIBLEWithAuth(u, 2, i.Username, i.Password, authMethod, authResponseHeader)))
+		_, err = conn.Write([]byte(genDESCRIBLEWithAuth(u, 2, i.Username, i.Password, authMethod, authResponseHeader)))
 		if err != nil {
 			log.Errorf("rtsp: %v write failed: %s", i.Target, err)
 			res.Finished = true

@@ -115,7 +115,7 @@ func ReadPayloadFileLineWithCallBack(fileName string, handler func(string, int64
 	firstLine := true
 	isCSV := strings.HasSuffix(fileName, ".csv")
 	for lineRaw := range ch {
-		line := utils.UnsafeBytesToString(lineRaw)
+		line := string(lineRaw)
 		var hitCount int64 = 0
 		if isCSV {
 			if firstLine {
@@ -173,7 +173,7 @@ func ReadQuotedLinesWithCallBack(data string, handler func(string) error) error 
 		if err != nil {
 			break
 		}
-		line := strconv.Quote(strings.TrimRightFunc(utils.UnsafeBytesToString(lineRaw), TrimWhitespaceExceptSpace))
+		line := strconv.Quote(strings.TrimRightFunc(string(lineRaw), TrimWhitespaceExceptSpace))
 		if err := handler(line); err != nil {
 			return err
 		}

@@ -38,7 +38,7 @@ func TryGetSimilarityKey(table []string, name string) string {
 			// if strings.ToLower(libKey) == strings.ToLower(name) {
 			return libKey
 		}
-		s := utils.CalcSimilarity(utils.UnsafeStringToBytes(name), utils.UnsafeStringToBytes(libKey))
+		s := utils.CalcSimilarity([]byte(name), []byte(libKey))
 		if score < s {
 			score = s
 			ret = libKey

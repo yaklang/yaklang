@@ -110,7 +110,7 @@ func isHtmlResponse(i interface{}) bool {
 func isServerError(i interface{}) bool {
 	switch ret := i.(type) {
 	case string:
-		return HaveServerError(utils.UnsafeStringToBytes(ret))
+		return HaveServerError([]byte(ret))
 	case []byte:
 		return HaveServerError(ret)
 	default:
@@ -126,7 +126,7 @@ func isServerError(i interface{}) bool {
 func extractChineseIDCards(i interface{}) []string {
 	switch ret := i.(type) {
 	case string:
-		return SearchChineseIDCards(utils.UnsafeStringToBytes(ret))
+		return SearchChineseIDCards([]byte(ret))
 	case []byte:
 		return SearchChineseIDCards(ret)
 	default:
@@ -143,7 +143,7 @@ func extractChineseIDCards(i interface{}) []string {
 func isJsonResponse(i interface{}) bool {
 	switch ret := i.(type) {
 	case string:
-		rsp, err := lowhttp.ParseBytesToHTTPResponse(utils.UnsafeStringToBytes(ret))
+		rsp, err := lowhttp.ParseBytesToHTTPResponse([]byte(ret))
 		if err != nil {
 			log.Error(err)
 			return false
@@ -217,7 +217,7 @@ func isXMLParam(key, value string) bool {
 func isSensitiveJson(i interface{}) bool {
 	switch ret := i.(type) {
 	case string:
-		return IsSensitiveJSON(utils.UnsafeStringToBytes(ret))
+		return IsSensitiveJSON([]byte(ret))
 	case []byte:
 		return IsSensitiveJSON(ret)
 	default:
@@ -237,7 +237,7 @@ func isSensitiveTokenField(i interface{}) bool {
 	case string:
 		return IsTokenParam(ret)
 	case []byte:
-		return IsTokenParam(utils.UnsafeBytesToString(ret))
+		return IsTokenParam(string(ret))
 	default:
 		return IsTokenParam(utils.InterfaceToString(ret))
 	}
@@ -255,7 +255,7 @@ func isPasswordField(i interface{}) bool {
 	case string:
 		return IsPasswordKey(ret)
 	case []byte:
-		return IsPasswordKey(utils.UnsafeBytesToString(ret))
+		return IsPasswordKey(string(ret))
 	default:
 		return IsPasswordKey(utils.InterfaceToString(ret))
 	}
@@ -273,7 +273,7 @@ func isUsernameField(i interface{}) bool {
 	case string:
 		return IsUsernameKey(ret)
 	case []byte:
-		return IsUsernameKey(utils.UnsafeBytesToString(ret))
+		return IsUsernameKey(string(ret))
 	default:
 		return IsUsernameKey(utils.InterfaceToString(ret))
 	}
@@ -291,7 +291,7 @@ func isSQLColumnField(i interface{}) bool {
 	case string:
 		return IsSQLColumnName(ret)
 	case []byte:
-		return IsSQLColumnName(utils.UnsafeBytesToString(ret))
+		return IsSQLColumnName(string(ret))
 	default:
 		return IsSQLColumnName(utils.InterfaceToString(ret))
 	}
@@ -309,7 +309,7 @@ func isCaptchaField(i interface{}) bool {
 	case string:
 		return IsCaptchaKey(ret)
 	case []byte:
-		return IsCaptchaKey(utils.UnsafeBytesToString(ret))
+		return IsCaptchaKey(string(ret))
 	default:
 		return IsCaptchaKey(utils.InterfaceToString(ret))
 	}
@@ -326,7 +326,7 @@ func isBase64Value(i interface{}) bool {
 	case string:
 		return IsBase64(ret)
 	case []byte:
-		return IsBase64(utils.UnsafeBytesToString(ret))
+		return IsBase64(string(ret))
 	default:
 		return IsBase64(utils.InterfaceToString(ret))
 	}
@@ -343,7 +343,7 @@ func isPlainBase64Value(i interface{}) bool {
 	case string:
 		return IsBase64Password(ret)
 	case []byte:
-		return IsBase64Password(utils.UnsafeBytesToString(ret))
+		return IsBase64Password(string(ret))
 	default:
 		return IsBase64Password(utils.InterfaceToString(ret))
 	}
@@ -360,7 +360,7 @@ func isMD5Value(i interface{}) bool {
 	case string:
 		return IsMD5Data(ret)
 	case []byte:
-		return IsMD5Data(utils.UnsafeBytesToString(ret))
+		return IsMD5Data(string(ret))
 	default:
 		return IsMD5Data(utils.InterfaceToString(ret))
 	}
@@ -377,7 +377,7 @@ func isSha256Value(i interface{}) bool {
 	case string:
 		return IsSHA256Data(ret)
 	case []byte:
-		return IsSHA256Data(utils.UnsafeBytesToString(ret))
+		return IsSHA256Data(string(ret))
 	default:
 		return IsSHA256Data(utils.InterfaceToString(ret))
 	}
