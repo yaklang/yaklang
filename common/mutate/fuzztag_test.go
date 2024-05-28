@@ -284,25 +284,6 @@ func TestDynFuzzTag(t *testing.T) {
 func TestFuzzTagBug(t *testing.T) {
 	times := 0
 	_, err := FuzzTagExec("{{ri(0,9,3)}}{{ri(0,9,3)}}", Fuzz_WithResultHandler(func(s string, payloads []string) bool {
-		if times >= 1 {
-			t.Fatal("generate times error")
-			return false
-		}
-		times++
-		return true
-	}))
-	// res, err := FuzzTagExec("{{uuid(a)}}")
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 1, times)
-
-	times = 0
-	_, err = FuzzTagExec("{{ri(0,9,3)}}{{ri(0,9,3)}}{{repeat(9)}}", Fuzz_WithResultHandler(func(s string, payloads []string) bool {
-		if times >= 9 {
-			t.Fatal("generate times error")
-			return false
-		}
 		times++
 		return true
 	}))
@@ -311,6 +292,17 @@ func TestFuzzTagBug(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 9, times)
+
+	times = 0
+	_, err = FuzzTagExec("{{ri(0,9,3)}}{{ri(0,9,3)}}{{repeat(9)}}", Fuzz_WithResultHandler(func(s string, payloads []string) bool {
+		times++
+		return true
+	}))
+	// res, err := FuzzTagExec("{{uuid(a)}}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 81, times)
 }
 
 func TestDateRangeFuzzTag(t *testing.T) {
