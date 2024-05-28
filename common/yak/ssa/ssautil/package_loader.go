@@ -36,6 +36,10 @@ type PackageLoader struct {
 	packagePath  []string
 }
 
+func (p *PackageLoader) GetFilesysFileSystem() filesys.FileSystem {
+	return p.fs
+}
+
 func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 	loader := &PackageLoader{
 		currentPath:  "",
