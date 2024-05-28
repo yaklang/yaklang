@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
+	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,6 +17,9 @@ import (
 )
 
 type ScriptEngine struct {
+	*log.Logger
+	scriptPatch                    map[string]func(code string) string
+	dbCache                        bool
 	proxies                        []string
 	Kbs                            *NaslKBs
 	naslLibsPath, dependenciesPath string
@@ -25,7 +30,9 @@ type ScriptEngine struct {
 	excludeScripts                 map[string]struct{}        // 排除一些脚本
 	goroutineNum                   int
 	debug                          bool
-	engineHooks                    []func(engine *Engine)
+	engineHooks                    []func(engine *Executor)
+	onScriptLoaded                 []func(info *NaslScriptInfo)
+	MethodHook                     map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *NaslBuildInMethodParam) (interface{}, error)
 	//loadedScriptsLock              *sync.Mutex
 	//scriptExecMutexs               map[string]*sync.Mutex
 	//scriptExecMutexsLock           *sync.Mutex
@@ -34,11 +41,14 @@ type ScriptEngine struct {
 
 func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
 	engine := &ScriptEngine{
+		Logger:         log.GetLogger("NASL Logger"),
+		dbCache:        true,
 		scripts:        make(map[string]*NaslScriptInfo),
 		scriptCache:    make(map[string]*NaslScriptInfo),
 		excludeScripts: make(map[string]struct{}),
 		goroutineNum:   10,
 		Kbs:            NewNaslKBs(),
+		scriptPatch:    map[string]func(code string) string{},
 		//loadedScripts:  make(map[string]struct{}),
 		//loadedScriptsLock: &sync.Mutex{},
 		scriptFilter: func(script *NaslScriptInfo) bool {
@@ -48,6 +58,9 @@ func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
 		//scriptExecMutexs:     make(map[string]*sync.Mutex),
 		config:            NewNaslScriptConfig(),
 		dependencyScripts: make(map[string]struct{}),
+	}
+	if engine.debug {
+		engine.Logger.SetLevel("debug")
 	}
 	engine.config = cfg
 	engine.LoadScript(cfg.plugins)
@@ -82,8 +95,14 @@ func (engine *ScriptEngine) SetNaslLibsPath(path string) {
 func (engine *ScriptEngine) SetGoroutineNum(num int) {
 	engine.goroutineNum = num
 }
-func (engine *ScriptEngine) AddEngineHooks(hooks func(engine *Engine)) {
+func (engine *ScriptEngine) AddEngineHooks(hooks func(engine *Executor)) {
 	engine.engineHooks = append(engine.engineHooks, hooks)
+}
+func (engine *ScriptEngine) AddScriptLoadedHook(hook func(info *NaslScriptInfo)) {
+	engine.onScriptLoaded = append(engine.onScriptLoaded, hook)
+}
+func (engine *ScriptEngine) SetCache(b bool) {
+	engine.dbCache = b
 }
 func (engine *ScriptEngine) Debug(debug ...bool) {
 	if len(debug) > 0 {
@@ -91,7 +110,11 @@ func (engine *ScriptEngine) Debug(debug ...bool) {
 	} else {
 		engine.debug = true
 	}
+	if engine.debug {
+		engine.Logger.SetLevel("debug")
+	}
 }
+
 func (engine *ScriptEngine) AddExcludeScripts(names ...string) {
 	for _, name := range names {
 		engine.excludeScripts[name] = struct{}{}
@@ -177,7 +200,8 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 					return engine.tryLoadScript(raw, cache, loadedScript)
 				}
 			} else if utils.IsFile(fileName) {
-				script, err := NewNaslScriptObjectFromFile(fileName)
+
+				script, err := engine.loadScriptFromSource(false, fileName)
 				if err != nil {
 					return nil, fmt.Errorf("Load script from file `%s` failed: %v", fileName, err)
 				} else {
@@ -190,7 +214,7 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 		} else { // 优先从本地文件加载
 			loadOk := false
 			if utils.IsFile(fileName) {
-				script, err := NewNaslScriptObjectFromFile(fileName)
+				script, err := engine.loadScriptFromSource(false, fileName)
 				if err != nil {
 					return nil, fmt.Errorf("Load script from file `%s` failed: %v", fileName, err)
 				} else {
@@ -200,7 +224,7 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 				}
 			}
 			if !loadOk {
-				script, err := NewNaslScriptObjectFromDb(fileName)
+				script, err := engine.loadScriptFromSource(true, fileName)
 				if err != nil {
 					return nil, fmt.Errorf("Load script `%s` from db and file failed", fileName)
 				} else {
@@ -245,7 +269,7 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 				}
 			}
 			for _, scriptModel := range scriptsModel {
-				script, err := NewNaslScriptObjectFromDb(scriptModel.OriginFileName)
+				script, err := engine.loadScriptFromSource(true, scriptModel.OriginFileName)
 				if err != nil {
 					return nil, fmt.Errorf("load script `%s` from db failed: %v", scriptModel.OriginFileName, err)
 				}
@@ -272,16 +296,158 @@ func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScri
 	}
 	return loadedScripts.List(), nil
 }
-func (engine *ScriptEngine) LoadScript(script any) bool {
+func (e *ScriptEngine) loadScriptFromSource(fromDb bool, name string) (*NaslScriptInfo, error) {
+	hookCode := func(name, code string) (string, error, bool) {
+		fileName := path.Base(name)
+		if v, ok := e.scriptPatch[fileName]; ok {
+			return v(code), nil, true
+		}
+		return "", nil, false
+	}
+
+	if fromDb {
+		originName := name
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil, utils.Errorf("gorm database is nil")
+		}
+		var scripts []*schema.NaslScript
+		if err := db.Where("origin_file_name = ?", originName).First(&scripts).Error; err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		if len(scripts) == 0 {
+			return nil, utils.Errorf("script %s not found", originName)
+		}
+		if len(scripts) > 1 {
+			return nil, utils.Errorf("script %s found more than one", originName)
+		}
+		scirptIns := NewNaslScriptObjectFromNaslScript(scripts[0])
+		newCode, err, ok := hookCode(name, scirptIns.Script)
+		if err != nil {
+			return nil, err
+		}
+		code := scirptIns.Script
+		if ok {
+			code = newCode
+		}
+		if !e.dbCache || ok {
+			script, err := e.DescriptionExec(code, name)
+			if err != nil {
+				return nil, err
+			}
+			return script, nil
+		} else {
+			return scirptIns, nil
+		}
+	} else {
+		content, err := os.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		code := string(content)
+		newCode, err, ok := hookCode(name, code)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			code = newCode
+		}
+		script, err := e.DescriptionExec(code, name)
+		if err != nil {
+			return nil, err
+		}
+		return script, nil
+	}
+}
+
+func (engine *ScriptEngine) AddMethodHook(name string, f func(origin NaslBuildInMethod, engine *ExecContext, params *NaslBuildInMethodParam) (interface{}, error)) {
+	engine.MethodHook[name] = f
+}
+func (engine *ScriptEngine) DescriptionExec(code, name string) (*NaslScriptInfo, error) {
+	ctx := NewExecContext()
+	ctx.Host = ""
+	ctx.Proxies = engine.proxies
+	ctx.Kbs = engine.Kbs
+	ctx.scriptObj.OriginFileName = name
+	ctx.scriptObj.Script = code
+	e := engine.NewExecEngine(ctx)
+	e.vm.SetVar("description", true)
+	err := e.Exec(code, name)
+	if err != nil {
+		return nil, err
+	}
+	return ctx.scriptObj, nil
+}
+func (engine *ScriptEngine) LoadScript(script any) error {
 	scriptIns, err := engine.tryLoadScript(script, engine.scriptCache, map[string]struct{}{})
 	if err != nil {
-		log.Error(err)
-		return false
+		return err
 	}
 	for _, script := range scriptIns {
+		engine.Debugf("loaded script: %s", script.OriginFileName)
+		for _, f := range engine.onScriptLoaded {
+			f(script)
+		}
 		engine.scripts[script.OriginFileName] = script
 	}
-	return true
+	return nil
+}
+func (e *ScriptEngine) SetPreferenceByScriptName(script string, k string, v any) {
+	if scriptInfo, ok := e.scripts[script]; ok {
+		if scriptInfo.Preferences == nil {
+			scriptInfo.Preferences = make(map[string]interface{})
+		}
+		iv := scriptInfo.Preferences[k]
+		if pre, ok := iv.(map[string]any); ok {
+			pre["value"] = v
+		}
+	}
+}
+func (e *ScriptEngine) SetPreference(oid string, k string, v any) {
+	for _, scriptInfo := range e.scripts {
+		if scriptInfo.OID == oid {
+			if scriptInfo.Preferences == nil {
+				scriptInfo.Preferences = make(map[string]interface{})
+			}
+			iv := scriptInfo.Preferences[k]
+			if pre, ok := iv.(map[string]any); ok {
+				pre["value"] = v
+			}
+			break
+		}
+	}
+}
+func (e *ScriptEngine) GetAllPreference() map[string][]*Preference {
+	res := map[string][]*Preference{}
+	for _, scriptInfo := range e.scripts {
+		preference := LoadPreferenceFromMap(scriptInfo.Preferences)
+		res[scriptInfo.OriginFileName] = append(res[scriptInfo.OriginFileName], preference...)
+	}
+	return res
+}
+func (e *ScriptEngine) ShowScriptTree() {
+	scripts := e.GetRootScripts()
+	var dumpTree func(script *NaslScriptInfo, deep int)
+	dumpTree = func(script *NaslScriptInfo, deep int) {
+		fmt.Printf("%s- %s\n", strings.Repeat("  ", deep), script.OriginFileName)
+		for _, dependency := range script.Dependencies {
+			if dep, ok := e.scripts[dependency]; ok {
+				dumpTree(dep, deep+1)
+			}
+		}
+	}
+	for _, root := range scripts {
+		dumpTree(root, 0)
+	}
+}
+func (e *ScriptEngine) LoadCategory(category string) {
+	if category == "" {
+		return
+	}
+	e.LoadWithConditions(map[string]any{
+		"category": category,
+	})
 }
 func (e *ScriptEngine) LoadFamilys(family string) {
 	if family == "" {
@@ -324,13 +490,13 @@ func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
 		if _, ok := e.excludeScripts[script.OID]; ok {
 			continue
 		}
-		e.LoadScript(NewNaslScriptObjectFromNaslScript(script))
+		e.LoadScript(script.OriginFileName)
 	}
 }
-func (e *ScriptEngine) ScanTarget(target string) error {
+func (e *ScriptEngine) ScanTarget(target string) (*ExecContext, error) {
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return e.Scan(host, fmt.Sprint(port))
 }
@@ -353,10 +519,14 @@ func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 	}
 	return rootScripts
 }
-func (e *ScriptEngine) Scan(host string, ports string) error {
+func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
+	ctx := NewExecContext()
+	ctx.Host = host
+	ctx.Proxies = e.proxies
+	ctx.Kbs = e.Kbs
 	rootScripts := e.GetRootScripts()
 	if len(rootScripts) == 0 {
-		return utils.Errorf("no scripts to scan")
+		return nil, utils.Errorf("no scripts to scan")
 	}
 	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxies...)
 	if res.Ok {
@@ -370,7 +540,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	log.Infof("start syn scan host: %s, ports: %s", host, ports)
 	servicesInfo, err := ServiceScan(host, ports, e.proxies...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	e.Kbs.SetKB("Host/scanned", 1)
 	openPorts := []int{}
@@ -404,26 +574,12 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	//swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	//errorsMux := sync.Mutex{}
 	// 创建执行引擎
-	newEngineByConfig := func() *Engine {
-		engine := NewWithKbs(e.Kbs)
-		engine.preferences = e.config.preference
-		engine.host = host
-		engine.SetProxies(e.proxies...)
-		engine.SetIncludePath(e.naslLibsPath)
-		engine.SetDependenciesPath(e.dependenciesPath)
-		engine.InitBuildInLib()
-		engine.Debug(e.debug)
-		for _, hook := range e.engineHooks {
-			hook(engine)
-		}
-		return engine
-	}
 
 	executedScripts := map[string]struct{}{}
 	var allErrors error = nil
 
-	var runScriptWithDep func(script *NaslScriptInfo) error
-	runScriptWithDep = func(script *NaslScriptInfo) error {
+	var runScriptWithDep func(script *NaslScriptInfo, ctx *ExecContext) error
+	runScriptWithDep = func(script *NaslScriptInfo, ctx *ExecContext) error {
 		if _, ok := executedScripts[script.OriginFileName]; ok {
 			return nil
 		}
@@ -440,29 +596,45 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 				if !ok {
 					return fmt.Errorf("script %s dependency %s not found", script.OriginFileName, dependency)
 				}
-				err := runScriptWithDep(dependencyScript)
+				err := runScriptWithDep(dependencyScript, ctx)
 				if err != nil {
 					return err
 				}
 			}
 		}
-		return newEngineByConfig().RunScript(script)
+		ctx.scriptObj = script
+		return e.NewExecEngine(ctx).RunScript(script)
 	}
 	for _, script := range rootScripts {
-		err := runScriptWithDep(script)
+		err := runScriptWithDep(script, ctx)
 		if err != nil {
 			log.Errorf("run script %s met error: %s", script.OriginFileName, err)
 			allErrors = utils.JoinErrors(allErrors, err)
 		}
 	}
 	if !errors.Is(allErrors, nil) {
-		return allErrors
+		return nil, allErrors
 	}
-	return nil
+	return ctx, nil
 }
+func (e *ScriptEngine) NewExecEngine(ctx *ExecContext) *Executor {
+	engine := NewWithContext(ctx)
+	engine.SetIncludePath(e.naslLibsPath)
+	engine.SetDependenciesPath(e.dependenciesPath)
+	engine.Debug(e.debug)
+	engine.SetLib(GetExtLib(ctx))
+	for _, hook := range e.engineHooks {
+		hook(engine)
+	}
+	return engine
+}
+
 func (e *ScriptEngine) SetIncludePath(p string) {
 	e.naslLibsPath = p
 }
 func (e *ScriptEngine) SetDependencies(p string) {
 	e.dependenciesPath = p
+}
+func (e *ScriptEngine) AddScriptPatch(lib string, handle func(string2 string) string) {
+	e.scriptPatch[lib] = handle
 }
