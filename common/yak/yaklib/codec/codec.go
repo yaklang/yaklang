@@ -399,13 +399,13 @@ func PKCS5UnPadding(origData []byte) []byte {
 
 	unpadding := int(origData[length-1])
 	if unpadding > length {
-		log.Error("invalid padding")
+		log.Debug("invalid padding")
 		return origData
 	}
 
 	for i := length - unpadding; i < length; i++ {
 		if int(origData[i]) != unpadding {
-			log.Error("invalid padding")
+			log.Debug("invalid padding")
 			return origData
 		}
 	}
