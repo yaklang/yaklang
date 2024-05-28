@@ -53,8 +53,8 @@ func Payload2Grpc(payload *schema.Payload) *ypb.Payload {
 	p := &ypb.Payload{
 		Id:           int64(payload.ID),
 		Group:        payload.Group,
-		ContentBytes: utils.UnsafeStringToBytes(content),
-		Content:      utils.EscapeInvalidUTF8Byte(utils.UnsafeStringToBytes(content)),
+		ContentBytes: []byte(content),
+		Content:      utils.EscapeInvalidUTF8Byte([]byte(content)),
 		// Folder:       *r.Folder,
 		// HitCount:     *r.HitCount,
 		// IsFile:       *r.IsFile,
@@ -145,7 +145,7 @@ func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayload
 
 	buf := bytes.NewBuffer(make([]byte, 0, size))
 	for line := range lineCh {
-		lineStr := utils.UnsafeBytesToString(line)
+		lineStr := string(line)
 		handlerSize += int64(len(line))
 		if unquoted, err := strconv.Unquote(lineStr); err == nil {
 			lineStr = unquoted
@@ -621,7 +621,7 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 
 	feedback(0, "正在处理数据")
 	for lineB := range lineCh {
-		line := utils.UnsafeBytesToString(lineB)
+		line := string(lineB)
 		handledSize += int64(len(line))
 		if total < handledSize {
 			total = handledSize + 1
@@ -1053,7 +1053,7 @@ func (s *Server) ExportAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream 
 			line = utils.RemoveBOM(line)
 			bomHandled = true
 		}
-		lineStr := utils.UnsafeBytesToString(line)
+		lineStr := string(line)
 		unquoted, err := strconv.Unquote(lineStr)
 		if err == nil {
 			lineStr = unquoted
@@ -1148,7 +1148,7 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 	db := s.GetProfileDatabase()
 	err = utils.GormTransaction(db, func(tx *gorm.DB) error {
 		for lineB := range lineCh {
-			line := utils.UnsafeBytesToString(lineB)
+			line := string(lineB)
 			size += int64(len(line))
 			err = yakit.CreateOrUpdatePayload(tx, line, payload.Group, folder, 0, false)
 			if err != nil {

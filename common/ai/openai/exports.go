@@ -2,11 +2,11 @@ package openai
 
 import (
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // Chat 使用 OpenAI 的大语言模型进行对话，返回对话结果
@@ -89,7 +89,7 @@ func functionCall(data, funcName, funcDesc string, opts ...ConfigOption) map[str
 		log.Errorf("OpenAI function call failed: %s", err)
 		return result
 	}
-	err = json.Unmarshal(utils.UnsafeStringToBytes(msg), &result)
+	err = json.Unmarshal([]byte(msg), &result)
 	if err != nil {
 		log.Errorf("OpenAI function call failed: %s", err)
 		return result

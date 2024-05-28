@@ -1,12 +1,13 @@
 package codegrpc
 
 import (
+	"reflect"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"reflect"
-	"strconv"
 )
 
 func CodecFlowExec(req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err error) {
@@ -28,7 +29,7 @@ func CodecFlowExec(req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err erro
 			return codec.Atob(param), nil
 		case reflect.Slice:
 			if fieldType.Elem().Kind() == reflect.Uint8 {
-				return utils.UnsafeStringToBytes(param), nil
+				return []byte(param), nil
 			}
 		}
 		return nil, utils.Errorf("not support type %v", fieldType.Kind())

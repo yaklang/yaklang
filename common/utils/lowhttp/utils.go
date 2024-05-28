@@ -762,7 +762,7 @@ func IsResp(raw any) (isHTTPResponse bool) {
 		_, err := ParseBytesToHTTPResponse(data)
 		return err == nil
 	case string:
-		_, err := ParseBytesToHTTPResponse(utils.UnsafeStringToBytes(data))
+		_, err := ParseBytesToHTTPResponse([]byte(data))
 		return err == nil
 	case http.Response, *http.Response:
 		return true
@@ -789,7 +789,7 @@ func IGetHeader(packet interface{}, headerKey string) []string {
 	case []byte:
 		headers = GetHTTPPacketHeadersFull(data)
 	case string:
-		headers = GetHTTPPacketHeadersFull(utils.UnsafeStringToBytes(data))
+		headers = GetHTTPPacketHeadersFull([]byte(data))
 	case http.Response:
 		return IGetHTTPInsHeader(data.Header, headerKey)
 	case *http.Response:

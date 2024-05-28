@@ -233,8 +233,8 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb
 	r := &schema.WebFuzzerResponse{
 		WebFuzzerTaskId: taskId,
 		OK:              rsp.Ok,
-		Request:         utils.UnsafeBytesToString(rsp.RequestRaw),
-		Content:         utils.UnsafeBytesToString(raw),
+		Request:         string(rsp.RequestRaw),
+		Content:         string(raw),
 		Payload:         strings.Join(rsp.Payloads, ","),
 		Url:             rsp.Url,
 		StatusCode:      int(rsp.StatusCode),

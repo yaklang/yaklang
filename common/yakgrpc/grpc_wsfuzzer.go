@@ -100,11 +100,11 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 			fuzzResult := mutate.MutateQuick(raw)
 			// fallback
 			if len(fuzzResult) == 0 {
-				fuzzResult = append(fuzzResult, utils.UnsafeBytesToString(raw))
+				fuzzResult = append(fuzzResult, string(raw))
 			}
 
 			for _, message := range fuzzResult {
-				messageBytes := utils.UnsafeStringToBytes(message)
+				messageBytes := []byte(message)
 				dataVerbose := ""
 				_, isJson := utils.IsJSON(message)
 				if isJson {

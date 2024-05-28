@@ -4,9 +4,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/pkg/errors"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////////
@@ -123,6 +124,7 @@ func (k *KeywordMatcher) Match(raw string) (*CPE, error) {
 		}
 		*dst = list[index]
 	}
+
 	for _, r := range k.regexp.FindAllStringSubmatch(raw, 1) {
 		saveToCPE(&k.Vendor, r, k.VendorIndex)
 		saveToCPE(&k.Product, r, k.ProductIndex)
@@ -247,7 +249,7 @@ func ParseToCPE(cpe string) (*CPE, error) {
 	var cpeArgs [7]string
 	s := strings.Split(cpe, ":")
 	for i := 1; i <= len(s)-1; i++ {
-		var ret = strings.ReplaceAll(s[i], "%", "")
+		ret := strings.ReplaceAll(s[i], "%", "")
 		cpeArgs[i-1] = ret
 		if i == 7 {
 			break
