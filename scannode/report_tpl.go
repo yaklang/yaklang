@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
@@ -15,8 +16,8 @@ var embedGenReport []byte
 const GENREPORT_KEY = "JznQXuFDSepeNWHbiLGEwONiaBxhvj_SERVER_SCAN_MANAGER"
 
 func genReportFromKey(ctx context.Context, node string, helper *scanrpc.SCANServerHelper, broker *mq.Broker, req *scanrpc.SCAN_InvokeScriptRequest) error {
-	if value := yakit.GetKey(consts.GetGormProjectDatabase(), GENREPORT_KEY); value != "" {
-		yakit.DelKey(consts.GetGormProjectDatabase(), GENREPORT_KEY)
+	if value := yakit.GetKey(consts.GetGormProfileDatabase(), GENREPORT_KEY); value != "" {
+		yakit.DelKey(consts.GetGormProfileDatabase(), GENREPORT_KEY)
 		genGeport := &scanrpc.SCAN_InvokeScriptRequest{
 			TaskId:          req.TaskId,
 			RuntimeId:       req.RuntimeId,
@@ -32,6 +33,7 @@ func genReportFromKey(ctx context.Context, node string, helper *scanrpc.SCANServ
 		if err != nil {
 			return err
 		}
+		log.Info("genReportFromKey success")
 	}
 	return nil
 }
