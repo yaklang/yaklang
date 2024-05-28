@@ -5,6 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -16,41 +22,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"net/http"
-	"os"
-	"strings"
-	"sync"
-	"time"
 )
 
 var tsconst = uuid.New().String()
 
 type CaptureConfig struct {
-	Device    []string
-	Filename  string
-	Output    *pcapgo.Writer
-	BPFFilter string
-	Context   context.Context
-
-	EmptyDeviceStop bool
-
-	/* cache for handler cache */
-	EnableCache     bool
-	OverrideCacheId string
-
-	trafficPool *TrafficPool
-
-	wg *sync.WaitGroup
-
-	// TEST MOCK
-	mock PcapHandleOperation
-
-	// output debug info
-	Debug                 bool
-	onPoolCreated         []func(*TrafficPool)
-	onFlowCreated         func(*TrafficFlow)
-	onEveryPacket         []func(packet gopacket.Packet)
+	Context               context.Context
+	mock                  PcapHandleOperation // TEST MOCK
+	trafficPool           *TrafficPool
+	Output                *pcapgo.Writer // output debug info
 	onNetInterfaceCreated func(handle *pcap.Handle)
+	onFlowCreated         func(*TrafficFlow)
+	wg                    *sync.WaitGroup
+	Filename              string
+	OverrideCacheId       string
+	BPFFilter             string
+	onPoolCreated         []func(*TrafficPool)
+	Device                []string
+	onEveryPacket         []func(packet gopacket.Packet)
+	Debug                 bool // output debug info
+	EnableCache           bool //  cache for handler cache
+	EmptyDeviceStop       bool
+	DisableAssembly       bool
 }
 
 type CaptureOption func(*CaptureConfig) error
@@ -86,6 +79,13 @@ func WithEmptyDeviceStop(b bool) CaptureOption {
 func WithEnableCache(b bool) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.EnableCache = b
+		return nil
+	}
+}
+
+func WithDisableAssembly(b bool) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.DisableAssembly = b
 		return nil
 	}
 }
@@ -177,7 +177,7 @@ func WithDevice(devs ...string) CaptureOption {
 
 func WithOutput(filename string) CaptureOption {
 	return func(c *CaptureConfig) error {
-		file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			return errors.New("open file failed")
 		}
@@ -291,12 +291,15 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 					}()
 				})
 			}
-
 		})
 	})
 }
 
 func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time) {
+	if c.DisableAssembly {
+		return
+	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("assembly panic with: %s\n    FLOW: %v\n    TCP: \n%v\n    Payload:\n%v", err, flow.String(), spew.Sdump(tcp.LayerContents()), spew.Sdump(tcp.Payload))
