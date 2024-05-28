@@ -22,6 +22,7 @@ BitXOr:                         '^';
 BitOr:                          '|';
 RightShiftArithmetic:           '>>';
 LeftShiftArithmetic:            '<<';
+LeftShiftLogical:              '<<<';
 RightShiftLogical:              '>>>';
 
 Not:                            '!';
@@ -48,7 +49,9 @@ PlusAssign:                     '+=';
 MinusAssign:                    '-=';
 X: 'x';
 RightShiftLogicalAssign:        '>>>=';
+LeftShiftLogicalAssign:         '<<<=';
 RightShiftArithmeticAssign:     '>>=';
+LeftShiftArithmeticAssign:     '<<=';
 
 Break:                          'break';
 LocalVar:                       'local_var';

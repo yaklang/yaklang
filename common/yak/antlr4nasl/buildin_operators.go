@@ -12,6 +12,16 @@ import (
 	"strings"
 )
 
+func convertBoolToInt(f func(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value) func(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
+	return func(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
+		res := f(value, value2)
+		if res.Bool() {
+			return yakvm.NewIntValue(1)
+		} else {
+			return yakvm.NewIntValue(0)
+		}
+	}
+}
 func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 	if value.IsInt() && value2.IsInt() {
 		return yakvm.NewBoolValue(value.Int() == value2.Int())
@@ -38,21 +48,34 @@ func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 	return yakvm.NewBoolValue(_eq(value, value2).False())
 }
-
+func convertBoolValueToInt(b bool) int {
+	if b {
+		return 1
+	} else {
+		return 0
+	}
+}
 func init() {
 	yakvm.ImportNaslUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
 		if v, ok := op.Value.(*vm.NaslArray); ok {
 			b := len(v.Num_elt) != 0 || len(v.Hash_elt) != 0
 			return &yakvm.Value{
 				TypeVerbose: "bool",
-				Value:       !b,
+				Value:       convertBoolValueToInt(!b),
 				Literal:     fmt.Sprint(!b),
 			}
 		}
-		b := op.True()
+		var b bool
+		if op.IsString() {
+			b = op.String() != ""
+		} else if op.IsInt() {
+			b = op.Int() != 0
+		} else {
+			b = op.Value != nil
+		}
 		return &yakvm.Value{
 			TypeVerbose: "bool",
-			Value:       !b,
+			Value:       convertBoolValueToInt(!b),
 			Literal:     fmt.Sprint(!b),
 		}
 	})
@@ -96,9 +119,9 @@ func init() {
 	})
 
 	// binary
-	yakvm.ImportNaslBinaryOperator(yakvm.OpEq, _eq)
-	yakvm.ImportNaslBinaryOperator(yakvm.OpNotEq, _neq)
-	yakvm.ImportNaslBinaryOperator(yakvm.OpGt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpEq, convertBoolToInt(_eq))
+	yakvm.ImportNaslBinaryOperator(yakvm.OpNotEq, convertBoolToInt(_neq))
+	yakvm.ImportNaslBinaryOperator(yakvm.OpGt, convertBoolToInt(func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -129,9 +152,9 @@ func init() {
 		}
 
 		panic(fmt.Sprintf("cannot support op1[%v] > op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
-	})
+	}))
 
-	yakvm.ImportNaslBinaryOperator(yakvm.OpGtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpGtEq, convertBoolToInt(func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -162,9 +185,9 @@ func init() {
 		}
 
 		panic(fmt.Sprintf("cannot support op1[%v] >= op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
-	})
+	}))
 
-	yakvm.ImportNaslBinaryOperator(yakvm.OpLt, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpLt, convertBoolToInt(func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -195,9 +218,9 @@ func init() {
 		}
 
 		panic(fmt.Sprintf("cannot support op1[%v] < op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
-	})
+	}))
 
-	yakvm.ImportNaslBinaryOperator(yakvm.OpLtEq, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
+	yakvm.ImportNaslBinaryOperator(yakvm.OpLtEq, convertBoolToInt(func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsUndefined() {
 			op1 = yakvm.NewAutoValue(0)
 		}
@@ -228,7 +251,7 @@ func init() {
 		}
 
 		panic(fmt.Sprintf("cannot support op1[%v] <= op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
-	})
+	}))
 
 	yakvm.ImportNaslBinaryOperator(yakvm.OpAnd, func(op1 *yakvm.Value, op2 *yakvm.Value) *yakvm.Value {
 		if op1.IsInt64() && op2.IsInt64() {

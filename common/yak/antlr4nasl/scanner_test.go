@@ -20,38 +20,6 @@ import (
 func init() {
 	yak.SetNaslExports(Exports)
 }
-func PatchEngine(engine *Engine) {
-	engine.AddNaslLibPatch("http_func", func(s string) string {
-		s += `
-
-function http_get_port( default_list, host, ignore_broken, ignore_unscanned, ignore_cgi_disabled, dont_use_vhosts ) {
- local_var final_port_list;
-
-  final_port_list = http_get_ports(default_list:default_list,host:host,ignore_broken:ignore_broken,ignore_unscanned:ignore_unscanned,ignore_cgi_disabled:ignore_cgi_disabled,dont_use_vhosts:dont_use_vhosts);
-  foreach port( final_port_list ) {
-	return port;
-  }
-  return -1;
-}
-`
-		return s
-	})
-	engine.AddNaslLibPatch("smtp_func", func(s string) string {
-		s += `
-function smtp_get_port( default_list, ignore_broken, ignore_unscanned ) {
-
-  local_var final_port_list;
-
-  final_port_list = smtp_get_ports(default_list:default_list,ignore_broken:ignore_broken,ignore_unscanned:ignore_unscanned);
-	foreach port( final_port_list ) {
-		return port;
-	}
-	return -1;
-}
-`
-		return s
-	})
-}
 
 //func BuildInMethodCheck(engine *ScriptEngine) {
 //	includeLibCodes := []string{}
@@ -100,7 +68,7 @@ function smtp_get_port( default_list, ignore_broken, ignore_unscanned ) {
 //}
 
 //	func TestScriptLib(t *testing.T) {
-//		engine := New()
+//		engine := NewNaslEngine()
 //		engine.Debug()                                       // 开启调试模式，脚本退出时会打印调试信息
 //		engine.Init()                                        // 导入内置原生库
 //		InitPluginGroup(engine)                              // 初始化插件组
@@ -202,7 +170,38 @@ func TestPocScanner(t *testing.T) {
 	//engine.LoadScriptFromDb("gb_cisco_asa_detect.nasl")
 	//engine.LoadScriptFromDb("gb_apache_hadoop_detect.nasl")
 	engine.SetGoroutineNum(10)
-	engine.AddEngineHooks(func(engine *Engine) {
+	// 需要把ACT_SCAN的脚本都patch一遍
+	engine.AddScriptPatch("ping_host.nasl", func(code string) string {
+		codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
+		if err != nil {
+			return code
+		}
+		return string(codeBytes)
+	})
+	engine.AddScriptPatch("http_keepalive.inc", func(code string) string {
+		codeLines := strings.Split(code, "\n")
+		if len(codeLines) > 341 {
+			codeLines[341] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
+			code = strings.Join(codeLines, "\n")
+		}
+		return code
+	})
+	engine.AddScriptPatch("gb_altn_mdaemon_http_detect.nasl", func(code string) string {
+		codeLines := strings.Split(code, "\n")
+		if len(codeLines) > 55 {
+			codeLines[55] = "if ((res =~ \"MDaemon[- ]Webmail\" || res =~ \"Server\\s*:\\s*WDaemon\") && \"WorldClient.dll\" >< res) {"
+			code = strings.Join(codeLines, "\n")
+		}
+		return code
+	})
+	engine.AddScriptPatch("gb_apache_tomcat_open_redirect_vuln_lin.nasl", func(code string) string {
+		codeBytes, err := os.ReadFile("/Users/z3/nasl/nasl-plugins/2018/apache/gb_apache_tomcat_open_redirect_vuln_lin.nasl")
+		if err != nil {
+			return code
+		}
+		return string(codeBytes)
+	})
+	engine.AddEngineHooks(func(engine *Executor) {
 		inFun := false
 		engine.vm.AddBreakPoint(func(v *yakvm.VirtualMachine) bool {
 			defer func() {
@@ -228,15 +227,15 @@ func TestPocScanner(t *testing.T) {
 			}
 			return false
 		})
-		engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *Engine, params *NaslBuildInMethodParam) (interface{}, error) {
-			scriptObj := engine.scriptObj
+		engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *Executor, params *NaslBuildInMethodParam) (interface{}, error) {
+			scriptObj := engine.ctx.scriptObj
 			app := params.getParamByName("app", "").String()
 			version := params.getParamByName("version", "").String()
 			install := params.getParamByName("install", "").String()
 			cpe := params.getParamByName("cpe", "").String()
 			concluded := params.getParamByName("concluded", "").String()
 			if strings.TrimSpace(concluded) == "" || concluded == "Concluded from:" || concluded == "unknown" {
-				return origin(engine, params)
+				return origin(engine.ctx, params)
 			}
 			riskType := ""
 			if v, ok := utils2.ActToChinese[scriptObj.Category]; ok {
@@ -244,10 +243,10 @@ func TestPocScanner(t *testing.T) {
 			} else {
 				riskType = scriptObj.Category
 			}
-			source := "[NaslScript] " + engine.scriptObj.ScriptName
+			source := "[NaslScript] " + scriptObj.ScriptName
 			concludedUrl := params.getParamByName("concludedUrl", "").String()
-			solution := utils.MapGetString(engine.scriptObj.Tags, "solution")
-			summary := utils.MapGetString(engine.scriptObj.Tags, "summary")
+			solution := utils.MapGetString(scriptObj.Tags, "solution")
+			summary := utils.MapGetString(scriptObj.Tags, "summary")
 			cve := strings.Join(scriptObj.CVE, ", ")
 			//xrefStr := ""
 			//for k, v := range engine.scriptObj.Xrefs {
@@ -274,42 +273,11 @@ func TestPocScanner(t *testing.T) {
 					"cve":       cve,
 				}),
 			)
-			return origin(engine, params)
-		})
-		// 需要把ACT_SCAN的脚本都patch一遍
-		engine.AddNaslLibPatch("ping_host.nasl", func(code string) string {
-			codeBytes, err := os.ReadFile("/Users/z3/Downloads/ping_host_patch.nasl")
-			if err != nil {
-				return code
-			}
-			return string(codeBytes)
-		})
-		engine.AddNaslLibPatch("http_keepalive.inc", func(code string) string {
-			codeLines := strings.Split(code, "\n")
-			if len(codeLines) > 341 {
-				codeLines[341] = "if( \" HTTP/1.1\" >< data && ! egrep( pattern:\"User-Agent:.+\", string:data, icase:TRUE ) ) {"
-				code = strings.Join(codeLines, "\n")
-			}
-			return code
-		})
-		engine.AddNaslLibPatch("gb_altn_mdaemon_http_detect.nasl", func(code string) string {
-			codeLines := strings.Split(code, "\n")
-			if len(codeLines) > 55 {
-				codeLines[55] = "if ((res =~ \"MDaemon[- ]Webmail\" || res =~ \"Server\\s*:\\s*WDaemon\") && \"WorldClient.dll\" >< res) {"
-				code = strings.Join(codeLines, "\n")
-			}
-			return code
-		})
-		engine.AddNaslLibPatch("gb_apache_tomcat_open_redirect_vuln_lin.nasl", func(code string) string {
-			codeBytes, err := os.ReadFile("/Users/z3/nasl/nasl-plugins/2018/apache/gb_apache_tomcat_open_redirect_vuln_lin.nasl")
-			if err != nil {
-				return code
-			}
-			return string(codeBytes)
+			return origin(engine.ctx, params)
 		})
 	})
 	start := time.Now()
-	err := engine.ScanTarget("https://uat.sdeweb.hkcsl.com")
+	_, err := engine.ScanTarget("https://uat.sdeweb.hkcsl.com")
 	if err != nil {
 		log.Error(err)
 	}

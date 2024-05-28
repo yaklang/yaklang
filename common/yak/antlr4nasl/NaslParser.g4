@@ -101,7 +101,7 @@ singleExpression
     | singleExpression  '--'                                                 # PostDecreaseExpression
     | singleExpression ( '**' | '*' | '/' | '%') singleExpression                    # MultiplicativeExpression
     | singleExpression ('+' | '-') singleExpression                          # AdditiveExpression
-    | singleExpression ('<<' | '>>' | '>>>' | '>>=' | '>>>=' ) singleExpression                # BitShiftExpression
+    | singleExpression ('<<' | '>>'  | '<<<' | '>>>' ) singleExpression                # BitShiftExpression
     | singleExpression ('<' | '>' | '<=' | '>=') singleExpression            # RelationalExpression
     | singleExpression X singleExpression                                      # XExpression
     | singleExpression ('==' | '>!<' | '><' | '!=' | '!~' | '=~') singleExpression        # EqualityExpression
@@ -141,6 +141,10 @@ assignmentOperator
     | '+='
     | '-='
     | '='
+    | '<<='
+    | '>>='
+    | '<<<='
+    | '>>>='
     ;
 eos
     : SemiColon+

@@ -135,3 +135,16 @@ manager.Wait()
 		t.Fatal(err)
 	}
 }
+
+func TestGetAll(t *testing.T) {
+	scanCode := `
+all = nasl.QueryAllScripts({"category":"ACT_SETTINGS"})~
+for i in all{
+	println(i.OriginFileName)
+}
+`
+	err := yaklang.New().SafeEval(context.Background(), scanCode)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

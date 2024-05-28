@@ -3,7 +3,6 @@ package antlr4nasl
 import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -66,6 +65,28 @@ type NaslVhost struct {
 	Hostname string
 	Source   string
 }
+type Preference struct {
+	Name    string
+	Type    string
+	Default string
+}
+
+func LoadPreferenceFromMap(prefs map[string]any) (res []*Preference) {
+	for _, ipref := range prefs {
+		pref, ok := ipref.(map[string]any)
+		if !ok {
+			continue
+		}
+		prefIns := &Preference{
+			Name:    utils.MapGetString(pref, "name"),
+			Type:    utils.MapGetString(pref, "type"),
+			Default: utils.MapGetString(pref, "value"),
+		}
+		res = append(res, prefIns)
+	}
+	return
+}
+
 type NaslScriptInfo struct {
 	naslScript     *schema.NaslScript
 	OriginFileName string
@@ -103,31 +124,7 @@ func NewNaslScriptObject() *NaslScriptInfo {
 		Preferences: make(map[string]interface{}),
 	}
 }
-func NewNaslScriptObjectFromDb(originName string) (*NaslScriptInfo, error) {
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
-		return nil, utils.Errorf("gorm database is nil")
-	}
-	var scripts []*schema.NaslScript
-	if err := db.Where("origin_file_name = ?", originName).First(&scripts).Error; err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	if len(scripts) > 0 {
-		return NewNaslScriptObjectFromNaslScript(scripts[0]), nil
-	}
-	return nil, utils.Errorf("script %s not found", originName)
-}
-func NewNaslScriptObjectFromFile(path string) (*NaslScriptInfo, error) {
-	e := New()
-	e.InitBuildInLib()
-	e.SetDescription(true)
-	err := e.RunFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return e.GetScriptObject(), nil
-}
+
 func NewNaslScriptObjectFromNaslScript(s *schema.NaslScript) *NaslScriptInfo {
 	info := NewNaslScriptObject()
 	n := func() error {
