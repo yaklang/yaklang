@@ -205,7 +205,6 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	defer func() {
-		log.Infof("auto gen report %v start...", f.Name())
 		// 不管 Run 成功与否，都执行生成报告的操作
 		err = genReportFromKey(ctx, node, s.helper, broker, req)
 		if err != nil {
