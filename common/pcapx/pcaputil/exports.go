@@ -18,6 +18,7 @@ var Exports = map[string]any{
 	"pcap_onHTTPFlow":                   WithHTTPFlow,
 	"pcap_everyPacket":                  WithEveryPacket,
 	"pcap_debug":                        WithDebug,
+	"pcap_disableAssembly":              WithDisableAssembly,
 }
 
 func Sniff(iface string, opts ...CaptureOption) error {

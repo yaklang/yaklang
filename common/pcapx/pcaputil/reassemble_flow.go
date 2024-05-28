@@ -218,7 +218,6 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 		if t.onCloseHandler != nil {
 			t.onCloseHandler(reason, t)
 		}
-		t.Release()
 	})
 }
 
