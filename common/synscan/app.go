@@ -2,16 +2,17 @@ package synscan
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/pcapx/arpx"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -27,10 +28,10 @@ type Scanner struct {
 
 	handlerWriteChan chan []byte
 	handlerIsAlive   *utils.AtomicBool
-	//handler               *pcap.Handle
+	// handler               *pcap.Handle
 	localHandlerWriteChan chan []byte
 	localHandlerIsAlive   *utils.AtomicBool
-	//localHandler          *pcap.Handle
+	// localHandler          *pcap.Handle
 
 	opts gopacket.SerializeOptions
 
@@ -74,9 +75,7 @@ func (s *Scanner) getLoopbackLinkLayer() gopacket.SerializableLayer {
 	return s.getLoopbackLinkLayer()
 }
 
-var (
-	cacheEthernetLock = new(sync.Mutex)
-)
+var cacheEthernetLock = new(sync.Mutex)
 
 // 以进行一次连接的代价让操作系统帮我们src mac和dst mac的获取
 // 实际上不需要等包发出去，也无所谓这个端口是否开放
@@ -236,8 +235,8 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		localHandlerWriteChan: make(chan []byte, 100000),
 		handlerIsAlive:        utils.NewBool(true),
 		localHandlerIsAlive:   utils.NewBool(true),
-		//handler:               handler,
-		//localHandler:          localHandler,
+		// handler:               handler,
+		// localHandler:          localHandler,
 
 		defaultSrcIp:     srcIp,
 		defaultGatewayIp: gatewayIp,
@@ -316,6 +315,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 			err := pcaputil.Start(
 				pcaputil.WithDevice(iface.Name),
 				pcaputil.WithEnableCache(true),
+				pcaputil.WithDisableAssembly(true),
 				pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
 				pcaputil.WithContext(ctx),
 				pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
@@ -326,7 +326,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 							if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
 								if counter > scanner.delayGapCount {
 									counter = 0
-									//fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
+									// fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
 									scanner.sleepRateLimit()
 								}
 							}
@@ -383,6 +383,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		err := pcaputil.Start(
 			pcaputil.WithDevice(localIfaceName),
 			pcaputil.WithEnableCache(true),
+			pcaputil.WithDisableAssembly(true),
 			pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
 			pcaputil.WithContext(ctx),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
@@ -393,7 +394,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 						if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
 							if counter > scanner.delayGapCount {
 								counter = 0
-								//fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
+								// fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
 								scanner.sleepRateLimit()
 							}
 						}
@@ -409,7 +410,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 							counter++
 
 							if err != nil {
-								//log.Errorf("loopback handler write failed: %s", err)
+								// log.Errorf("loopback handler write failed: %s", err)
 							}
 						case <-scanner.ctx.Done():
 							return
@@ -424,7 +425,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		}
 	}()
 
-	//scanner.daemon()
+	// scanner.daemon()
 
 	//scanner.defaultDstHw, err = netutil.RouteAndArp(gatewayIp.String())
 	//if err == utils.TargetIsLoopback {
