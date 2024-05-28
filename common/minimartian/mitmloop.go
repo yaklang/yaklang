@@ -481,12 +481,14 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 				timer.Stop()
 			}
 		})
-		if p.forceDisableKeepAlive {
-			r.Close = true
-		}
+
 		if err != nil {
 			errc <- err
 			return
+		}
+
+		if p.forceDisableKeepAlive && r != nil {
+			r.Close = true
 		}
 		if timer != nil {
 			timer.Stop()
