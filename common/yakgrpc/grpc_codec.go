@@ -91,6 +91,14 @@ func (s *Server) PacketPrettifyHelper(ctx context.Context, req *ypb.PacketPretti
 	}
 
 	contentType := lowhttp.GetHTTPPacketContentType([]byte(header))
+
+	if !isImage && !strings.Contains(contentType, "json") {
+		_, ok := utils.IsJSON(string(body))
+		if ok {
+			contentType = "application/json"
+		}
+	}
+
 	return &ypb.PacketPrettifyHelperResponse{
 		Packet:       ret,
 		ContentType:  utils.EscapeInvalidUTF8Byte([]byte(contentType)),
