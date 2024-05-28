@@ -3,6 +3,9 @@ package java2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"io"
 	"strings"
 )
 
@@ -27,6 +30,9 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		}
 	}
 
+	prog := y.GetProgram()
+	loader := prog.Loader
+	fs := loader.GetFilesysFileSystem()
 	for _, pkgImport := range i.AllImportDeclaration() {
 		paths, static, all := y.VisitImportDeclaration(pkgImport)
 		_, _, _ = paths, static, all
@@ -37,6 +43,30 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 			verbose = strings.Join(append(paths, "*"), "")
 		}
 		log.Warnf("TBD: ImportDeclaration %v", verbose)
+		if all {
+			packetDir := strings.Join(paths, string([]rune{fs.GetSeparators()}))
+			fdChan, err := loader.LoadDirectoryPackage(packetDir, true)
+			if err != nil {
+				log.Warnf("package loader handle package directory failed: %v")
+				continue
+			}
+			if fdChan != nil {
+				for fd := range fdChan {
+					y.LoadPackageByPath(prog, loader, fd.FileName, fd.Data)
+				}
+			}
+		} else {
+			fileName := strings.Join(paths, string([]rune{fs.GetSeparators()}))
+			if strings.HasSuffix(fileName, ".java") {
+				fileName += ".java"
+			}
+			filePathName, data, err := loader.LoadFilePackage(fileName, true)
+			if err != nil {
+				log.Warnf("package laoder handle file package failed: %v", err)
+				continue
+			}
+			y.LoadPackageByPath(prog, loader, filePathName, data)
+		}
 	}
 
 	for _, inst := range i.AllTypeDeclaration() {
@@ -48,6 +78,18 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 	}
 
 	return nil
+}
+
+func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageLoader, fileName string, data io.Reader) {
+	originPath := loader.GetCurrentPath()
+	defer func() {
+		loader.SetCurrentPath(originPath)
+	}()
+	err := prog.Build(fileName, data, y.FunctionBuilder)
+	if err != nil {
+		log.Warnf("TBD: Build via LoadPackageByPath failed: %v", err)
+		return
+	}
 }
 
 func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContext) (packagePath []string, static bool, importAll bool) {
