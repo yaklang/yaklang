@@ -75,9 +75,9 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 		if err != nil {
 			return utils.Errorf("execute file %s code failed: %s", scriptName, err.Error())
 		}
-		result, err := subEngine.CallYakFunction(streamCtx, "handle", []interface{}{input})
+		result, err := subEngine.SafeCallYakFunction(streamCtx, "handle", []interface{}{input})
 		if err != nil {
-			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
+			return utils.Errorf("call %v' s handle function failed: %s", scriptName, err)
 		}
 
 		feedbackClient.SetYakLog(yaklib.CreateYakLogger()) // 重置log避免获取不到行号的问题

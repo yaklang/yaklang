@@ -146,6 +146,19 @@ func (n *Engine) CallYakFunctionNative(ctx context.Context, function *yakvm.Func
 	return n.vm.ExecYakFunction(ctx, function, yakvm.YakVMValuesToFunctionMap(function, paramsValue, n.vm.GetConfig().GetFunctionNumberCheck()), yakvm.None)
 }
 
+func (n *Engine) SafeCallYakFunction(ctx context.Context, funcName string, params []interface{}) (result interface{}, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			if v, ok := e.(error); ok {
+				err = v
+			} else {
+				err = utils.Error(e)
+			}
+		}
+	}()
+	return n.CallYakFunction(ctx, funcName, params)
+}
+
 // 函数调用时如果不加锁，并发会有问题
 func (n *Engine) CallYakFunction(ctx context.Context, funcName string, params []interface{}) (interface{}, error) {
 	i, ok := n.GetVar(funcName)
