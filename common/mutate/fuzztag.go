@@ -421,7 +421,6 @@ func init() {
 		Alias:       []string{"zeropadding", "zp"},
 		Description: "使用0来填充补偿字符串长度不足的问题，{{zeropadding(abc|5)}} 表示将 abc 填充到长度为 5 的字符串（00abc），{{zeropadding(abc|-5)}} 表示将 abc 填充到长度为 5 的字符串，并且在右边填充 (abc00)",
 	})
-
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "padding:null",
 		Handler: func(s string) []string {
@@ -610,6 +609,32 @@ func init() {
 		Description: "设置一个数组，使用 `|` 分割，例如：`{{array(1|2|3)}}`，结果为：[1,2,3]，",
 		Handler: func(s string) []string {
 			return strings.Split(s, "|")
+		},
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "array:comma",
+		Alias:       []string{"list:comma"},
+		Description: "设置一个数组，使用 `,` 分割，例如：`{{array(1,2,3)}}`，结果为：[1,2,3]，",
+		Handler: func(s string) []string {
+			return utils.PrettifyListFromStringSplited(s, ",")
+		},
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "array:auto",
+		Alias:       []string{"list:auto"},
+		Description: "设置一个数组，使用 `,` 分割，例如：`{{array(1,2,3)}}`，结果为：[1,2,3]，",
+		Handler: func(s string) []string {
+			return utils.PrettifyListFromStringSplitEx(s, ",", "|")
+		},
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "trim",
+		Description: "去除字符串两边的空格，一般配合其他 tag 使用，如：{{trim({{x(dict)}})}}",
+		Handler: func(s string) []string {
+			return []string{strings.TrimSpace(s)}
 		},
 	})
 
