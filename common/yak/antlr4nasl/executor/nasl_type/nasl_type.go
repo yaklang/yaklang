@@ -1,4 +1,4 @@
-package vm
+package nasl_type
 
 import (
 	"github.com/yaklang/yaklang/common/log"

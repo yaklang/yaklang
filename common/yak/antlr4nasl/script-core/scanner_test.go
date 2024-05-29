@@ -1,4 +1,4 @@
-package antlr4nasl
+package script_core
 
 import (
 	"fmt"
@@ -6,20 +6,16 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
-	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
-
-func init() {
-	yak.SetNaslExports(Exports)
-}
 
 //func BuildInMethodCheck(engine *ScriptEngine) {
 //	includeLibCodes := []string{}
@@ -68,7 +64,7 @@ func init() {
 //}
 
 //	func TestScriptLib(t *testing.T) {
-//		engine := NewNaslEngine()
+//		engine := NewNaslExecutor()
 //		engine.Debug()                                       // 开启调试模式，脚本退出时会打印调试信息
 //		engine.Init()                                        // 导入内置原生库
 //		InitPluginGroup(engine)                              // 初始化插件组
@@ -201,9 +197,9 @@ func TestPocScanner(t *testing.T) {
 		}
 		return string(codeBytes)
 	})
-	engine.AddEngineHooks(func(engine *Executor) {
+	engine.AddEngineHooks(func(engine *executor.Executor) {
 		inFun := false
-		engine.vm.AddBreakPoint(func(v *yakvm.VirtualMachine) bool {
+		engine.AddBreakPoint(func(v *yakvm.VirtualMachine) bool {
 			defer func() {
 				if err := recover(); err != nil {
 					fmt.Println(err)
@@ -227,54 +223,54 @@ func TestPocScanner(t *testing.T) {
 			}
 			return false
 		})
-		engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *Executor, params *NaslBuildInMethodParam) (interface{}, error) {
-			scriptObj := engine.ctx.scriptObj
-			app := params.getParamByName("app", "").String()
-			version := params.getParamByName("version", "").String()
-			install := params.getParamByName("install", "").String()
-			cpe := params.getParamByName("cpe", "").String()
-			concluded := params.getParamByName("concluded", "").String()
-			if strings.TrimSpace(concluded) == "" || concluded == "Concluded from:" || concluded == "unknown" {
-				return origin(engine.ctx, params)
-			}
-			riskType := ""
-			if v, ok := utils2.ActToChinese[scriptObj.Category]; ok {
-				riskType = v
-			} else {
-				riskType = scriptObj.Category
-			}
-			source := "[NaslScript] " + scriptObj.ScriptName
-			concludedUrl := params.getParamByName("concludedUrl", "").String()
-			solution := utils.MapGetString(scriptObj.Tags, "solution")
-			summary := utils.MapGetString(scriptObj.Tags, "summary")
-			cve := strings.Join(scriptObj.CVE, ", ")
-			//xrefStr := ""
-			//for k, v := range engine.scriptObj.Xrefs {
-			//	xrefStr += fmt.Sprintf("\n Reference: %s(%s)", v, k)
-			//}
-			title := fmt.Sprintf("检测目标存在 [%s] 应用，版本号为 [%s]", app, version)
-			if cve != "" {
-				title += fmt.Sprintf(", CVE: %s", summary)
-			}
-			yakit.NewRisk(concludedUrl,
-				yakit.WithRiskParam_Title(title),
-				yakit.WithRiskParam_RiskType(riskType),
-				yakit.WithRiskParam_Severity("low"),
-				yakit.WithRiskParam_YakitPluginName(source),
-				yakit.WithRiskParam_Description(summary),
-				yakit.WithRiskParam_Solution(solution),
-				yakit.WithRiskParam_Details(map[string]interface{}{
-					"app":       app,
-					"version":   version,
-					"install":   install,
-					"cpe":       cpe,
-					"concluded": concluded,
-					"source":    source,
-					"cve":       cve,
-				}),
-			)
-			return origin(engine.ctx, params)
-		})
+		//	engine.RegisterBuildInMethodHook("build_detection_report", func(origin NaslBuildInMethod, engine *executor.Executor, params *executor.NaslBuildInMethodParam) (interface{}, error) {
+		//		scriptObj := engine.Ctx.ScriptObj
+		//		app := params.GetParamByName("app", "").String()
+		//		version := params.GetParamByName("version", "").String()
+		//		install := params.GetParamByName("install", "").String()
+		//		cpe := params.GetParamByName("cpe", "").String()
+		//		concluded := params.GetParamByName("concluded", "").String()
+		//		if strings.TrimSpace(concluded) == "" || concluded == "Concluded from:" || concluded == "unknown" {
+		//			return origin(engine.Ctx, params)
+		//		}
+		//		riskType := ""
+		//		if v, ok := utils2.ActToChinese[scriptObj.Category]; ok {
+		//			riskType = v
+		//		} else {
+		//			riskType = scriptObj.Category
+		//		}
+		//		source := "[NaslScript] " + scriptObj.ScriptName
+		//		concludedUrl := params.GetParamByName("concludedUrl", "").String()
+		//		solution := utils.MapGetString(scriptObj.Tags, "solution")
+		//		summary := utils.MapGetString(scriptObj.Tags, "summary")
+		//		cve := strings.Join(scriptObj.CVE, ", ")
+		//		//xrefStr := ""
+		//		//for k, v := range engine.scriptObj.Xrefs {
+		//		//	xrefStr += fmt.Sprintf("\n Reference: %s(%s)", v, k)
+		//		//}
+		//		title := fmt.Sprintf("检测目标存在 [%s] 应用，版本号为 [%s]", app, version)
+		//		if cve != "" {
+		//			title += fmt.Sprintf(", CVE: %s", summary)
+		//		}
+		//		yakit.NewRisk(concludedUrl,
+		//			yakit.WithRiskParam_Title(title),
+		//			yakit.WithRiskParam_RiskType(riskType),
+		//			yakit.WithRiskParam_Severity("low"),
+		//			yakit.WithRiskParam_YakitPluginName(source),
+		//			yakit.WithRiskParam_Description(summary),
+		//			yakit.WithRiskParam_Solution(solution),
+		//			yakit.WithRiskParam_Details(map[string]interface{}{
+		//				"app":       app,
+		//				"version":   version,
+		//				"install":   install,
+		//				"cpe":       cpe,
+		//				"concluded": concluded,
+		//				"source":    source,
+		//				"cve":       cve,
+		//			}),
+		//		)
+		//		return origin(engine.Ctx, params)
+		//	})
 	})
 	start := time.Now()
 	_, err := engine.ScanTarget("https://uat.sdeweb.hkcsl.com")
@@ -285,4 +281,46 @@ func TestPocScanner(t *testing.T) {
 	data := engine.GetKBData()
 	data["Host/port_infos"] = nil
 	spew.Dump(data)
+}
+func TestLoadSetting(t *testing.T) {
+	port := utils.GetRandomAvailableTCPPort()
+	l, err := net.Listen("tcp", spew.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				break
+			}
+			conn.Close()
+		}
+	}()
+	engine := NewScriptEngine()
+	engine.Debug()
+	engine.SetCache(false)
+	PatchEngine(engine)
+	engine.LoadCategory("ACT_SETTINGS")
+	//engine.LoadScript("snmp_default_communities.nasl")
+	//engine.LoadScript("ids_evasion.nasl")
+	//engine.LoadScript("compliance_tests.nasl")
+	engine.ShowScriptTree()
+	engine.SetPreferenceByScriptName("ids_evasion.nasl", "TCP evasion technique", "split")
+	_, err = engine.Scan("127.0.0.1", strconv.Itoa(port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	preferences := engine.GetAllPreference()
+	for scirptName, preference := range preferences {
+		if scirptName == "ids_evasion.nasl" {
+			for _, p := range preference {
+				if p.Name == "TCP evasion technique" {
+					spew.Dump(p)
+				}
+			}
+		}
+	}
+	spew.Dump(engine.Kbs.GetKB("NIDS/TCP/split"))
 }

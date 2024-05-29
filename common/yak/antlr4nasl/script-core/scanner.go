@@ -1,4 +1,4 @@
-package antlr4nasl
+package script_core
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
 	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -25,13 +26,13 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 	riskHandle := config.riskHandle
 	PatchEngine(engine)
 
-	engine.AddMethodHook("build_detection_report", func(origin NaslBuildInMethod, ctx *ExecContext, params *NaslBuildInMethodParam) (any, error) {
-		scriptObj := ctx.scriptObj
-		app := params.getParamByName("app", "").String()
-		version := params.getParamByName("version", "").String()
-		install := params.getParamByName("install", "").String()
-		cpe := params.getParamByName("cpe", "").String()
-		concluded := params.getParamByName("concluded", "__empty__").String()
+	engine.AddMethodHook("build_detection_report", func(origin NaslBuildInMethod, ctx *ExecContext, params *executor.NaslBuildInMethodParam) (any, error) {
+		scriptObj := ctx.ScriptObj
+		app := params.GetParamByName("app", "").String()
+		version := params.GetParamByName("version", "").String()
+		install := params.GetParamByName("install", "").String()
+		cpe := params.GetParamByName("cpe", "").String()
+		concluded := params.GetParamByName("concluded", "__empty__").String()
 		if strings.TrimSpace(concluded) == "" || concluded == "Concluded from:" || concluded == "unknown" {
 			return origin(ctx, params)
 		}
@@ -42,7 +43,7 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 			riskType = scriptObj.Category
 		}
 		source := "[NaslScript] " + scriptObj.ScriptName
-		concludedUrl := params.getParamByName("concludedUrl", "").String()
+		concludedUrl := params.GetParamByName("concludedUrl", "").String()
 		solution := utils.MapGetString(scriptObj.Tags, "solution")
 		summary := utils.MapGetString(scriptObj.Tags, "summary")
 		cve := strings.Join(scriptObj.CVE, ", ")

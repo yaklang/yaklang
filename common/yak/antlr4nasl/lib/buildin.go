@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	"math"
 	"net"
 	"strings"
@@ -29,7 +29,7 @@ func convertBoolToInt(b bool) int {
 var NaslBuildInNativeMethod = map[string]interface{}{
 	"get_array_elem": func(icaller interface{}, index interface{}) interface{} {
 		switch caller := icaller.(type) {
-		case *vm.NaslArray: // array类型
+		case *nasl_type.NaslArray: // array类型
 			if caller == nil {
 				panic("iterableValue.Value is nil")
 			}

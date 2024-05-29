@@ -3,6 +3,7 @@ package yakvm
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	"reflect"
 	"strconv"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
 )
@@ -383,13 +383,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					if len(v1) == 2 {
 						val := GetNaslValueBySymbolId(v1[0].SymbolId, v)
 						if val.Value == nil {
-							array := NewAutoValue(vm.NewEmptyNaslArray())
+							array := NewAutoValue(nasl_type.NewEmptyNaslArray())
 							table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
 							table[v1[0].SymbolId] = array
 							//v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
 							val = array
 						}
-						if v2, ok := val.Value.(*vm.NaslArray); ok {
+						if v2, ok := val.Value.(*nasl_type.NaslArray); ok {
 							if v1[1].IsInt() {
 								v2.AddEleToList(v1[1].Int(), arg2.Value)
 								assignOk = true
@@ -1230,7 +1230,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						}
 					}
 				}
-				naslArray, err := vm.NewNaslArray([]any{})
+				naslArray, err := nasl_type.NewNaslArray([]any{})
 				if err != nil {
 					panic(utils.Errorf("NewNaslArray error: %s", err.Error()))
 				}
@@ -1247,7 +1247,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						} else {
 							val = -1
 						}
-					} else if array, ok := val.(*vm.NaslArray); ok {
+					} else if array, ok := val.(*nasl_type.NaslArray); ok {
 						ok1 := false
 						for i := 0; i < array.GetMaxIdx(); i++ {
 							if array.GetElementByNum(i) != nil {
@@ -1327,7 +1327,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 	case OpNewSlice:
 		vals := v.popArgN(c.Unary)
 		if v.vm.GetConfig().vmMode == NASL {
-			array := vm.NewEmptyNaslArray()
+			array := nasl_type.NewEmptyNaslArray()
 			for i, val := range vals {
 				array.AddEleToList(i, val.Value)
 			}
@@ -1565,7 +1565,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 	case OpNewMap:
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
-			array := vm.NewEmptyNaslArray()
+			array := nasl_type.NewEmptyNaslArray()
 			for i := 0; i < c.Unary; i++ {
 				val := v.pop()
 				k := v.pop()

@@ -1,4 +1,4 @@
-package antlr4nasl
+package script_core
 
 import (
 	"github.com/yaklang/yaklang/common/log"
@@ -6,20 +6,22 @@ import (
 )
 
 type NaslScriptConfig struct {
-	plugins              []string
-	family               string
-	proxies              []string
-	riskHandle           func(risk any)
-	conditions           map[string]any
-	preference           map[string]any
-	autoLoadDependencies bool
+	plugins                 []string
+	family                  string
+	proxies                 []string
+	riskHandle              func(risk any)
+	conditions              map[string]any
+	preference              map[string]any
+	autoLoadDependencies    bool
+	ignoreRequirementsError bool
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
 	return &NaslScriptConfig{
-		autoLoadDependencies: true,
-		preference:           make(map[string]any),
-		conditions:           make(map[string]any),
+		ignoreRequirementsError: true,
+		autoLoadDependencies:    true,
+		preference:              make(map[string]any),
+		conditions:              make(map[string]any),
 	}
 }
 
@@ -29,6 +31,11 @@ func WithPreference(p interface{}) NaslScriptConfigOptFunc {
 	preference := utils.InterfaceToMapInterface(p)
 	return func(c *NaslScriptConfig) {
 		c.preference = preference
+	}
+}
+func WithIgnoreRequirementsError(b bool) NaslScriptConfigOptFunc {
+	return func(c *NaslScriptConfig) {
+		c.ignoreRequirementsError = b
 	}
 }
 func WithConditions(script ...any) NaslScriptConfigOptFunc {

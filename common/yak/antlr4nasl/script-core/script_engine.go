@@ -1,9 +1,11 @@
-package antlr4nasl
+package script_core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
 	"os"
 	"path"
 	"strings"
@@ -15,6 +17,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 )
+
+type ExecContext struct {
+	ctx        *context.Context
+	Host       string
+	Kbs        *NaslKBs
+	Proxies    []string
+	MethodHook map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error)
+	ScriptObj  *NaslScriptInfo
+	Debug      bool
+}
+
+func NewExecContext() *ExecContext {
+	return &ExecContext{
+		Kbs:       NewNaslKBs(),
+		ScriptObj: NewNaslScriptObject(),
+	}
+}
 
 type ScriptEngine struct {
 	*log.Logger
@@ -30,9 +49,9 @@ type ScriptEngine struct {
 	excludeScripts                 map[string]struct{}        // 排除一些脚本
 	goroutineNum                   int
 	debug                          bool
-	engineHooks                    []func(engine *Executor)
+	engineHooks                    []func(engine *executor.Executor)
 	onScriptLoaded                 []func(info *NaslScriptInfo)
-	MethodHook                     map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *NaslBuildInMethodParam) (interface{}, error)
+	MethodHook                     map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error)
 	//loadedScriptsLock              *sync.Mutex
 	//scriptExecMutexs               map[string]*sync.Mutex
 	//scriptExecMutexsLock           *sync.Mutex
@@ -95,7 +114,7 @@ func (engine *ScriptEngine) SetNaslLibsPath(path string) {
 func (engine *ScriptEngine) SetGoroutineNum(num int) {
 	engine.goroutineNum = num
 }
-func (engine *ScriptEngine) AddEngineHooks(hooks func(engine *Executor)) {
+func (engine *ScriptEngine) AddEngineHooks(hooks func(engine *executor.Executor)) {
 	engine.engineHooks = append(engine.engineHooks, hooks)
 }
 func (engine *ScriptEngine) AddScriptLoadedHook(hook func(info *NaslScriptInfo)) {
@@ -361,7 +380,7 @@ func (e *ScriptEngine) loadScriptFromSource(fromDb bool, name string) (*NaslScri
 	}
 }
 
-func (engine *ScriptEngine) AddMethodHook(name string, f func(origin NaslBuildInMethod, engine *ExecContext, params *NaslBuildInMethodParam) (interface{}, error)) {
+func (engine *ScriptEngine) AddMethodHook(name string, f func(origin NaslBuildInMethod, engine *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error)) {
 	engine.MethodHook[name] = f
 }
 func (engine *ScriptEngine) DescriptionExec(code, name string) (*NaslScriptInfo, error) {
@@ -369,15 +388,15 @@ func (engine *ScriptEngine) DescriptionExec(code, name string) (*NaslScriptInfo,
 	ctx.Host = ""
 	ctx.Proxies = engine.proxies
 	ctx.Kbs = engine.Kbs
-	ctx.scriptObj.OriginFileName = name
-	ctx.scriptObj.Script = code
+	ctx.ScriptObj.OriginFileName = name
+	ctx.ScriptObj.Script = code
 	e := engine.NewExecEngine(ctx)
-	e.vm.SetVar("description", true)
+	e.SetVar("description", true)
 	err := e.Exec(code, name)
 	if err != nil {
 		return nil, err
 	}
-	return ctx.scriptObj, nil
+	return ctx.ScriptObj, nil
 }
 func (engine *ScriptEngine) LoadScript(script any) error {
 	scriptIns, err := engine.tryLoadScript(script, engine.scriptCache, map[string]struct{}{})
@@ -580,13 +599,16 @@ func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
 
 	var runScriptWithDep func(script *NaslScriptInfo, ctx *ExecContext) error
 	runScriptWithDep = func(script *NaslScriptInfo, ctx *ExecContext) error {
+		// check cached
 		if _, ok := executedScripts[script.OriginFileName]; ok {
 			return nil
 		}
 		executedScripts[script.OriginFileName] = struct{}{}
+		// check exclude script
 		if _, ok := e.excludeScripts[script.OID]; ok {
 			return fmt.Errorf("script %s is excluded", script.OriginFileName)
 		}
+		// load depended script
 		if len(script.Dependencies) > 0 {
 			for _, dependency := range script.Dependencies {
 				if dependency == "toolcheck.nasl" {
@@ -602,12 +624,65 @@ func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
 				}
 			}
 		}
-		ctx.scriptObj = script
-		return e.NewExecEngine(ctx).RunScript(script)
+		// check condition
+		for _, key := range script.MandatoryKeys {
+			var re string
+			if strings.Contains(key, "=") {
+				splits := strings.Split(key, "=")
+				if len(splits) == 2 {
+					re = splits[1]
+					key = splits[0]
+				}
+			}
+			if ctx.Kbs.GetKB(key) == nil {
+				return utils.Errorf("%w: because the key %s is missing", requirements_error, key)
+			}
+			if re != "" {
+				v := ctx.Kbs.GetKB(key)
+				if !utils.MatchAllOfRegexp(utils.InterfaceToString(v), re) {
+					return utils.Errorf("%w: because the key %s is not match the regexp %s", requirements_error, key, re)
+				}
+			}
+		}
+		for _, key := range script.RequireKeys {
+			if ctx.Kbs.GetKB(key) == nil {
+				return utils.Errorf("%w: because the key %s is missing", requirements_error, key)
+			}
+		}
+		udpPortOk := false
+		for _, port := range script.RequireUdpPorts {
+			if e.Kbs.GetKB(fmt.Sprintf("Ports/udp/%s", port)) == 1 {
+				udpPortOk = true
+				break
+			}
+		}
+		if !udpPortOk {
+			return utils.Errorf("%w: none of the required udp ports are open", requirements_error)
+		}
+		tcpPortOk := false
+		for _, port := range script.RequirePorts {
+			if e.Kbs.GetKB(fmt.Sprintf("Ports/tcp/%s", port)) != 1 {
+				tcpPortOk = true
+				break
+			}
+		}
+		if !tcpPortOk {
+			return utils.Errorf("%w: none of the required udp ports are open", requirements_error)
+		}
+		for _, key := range script.ExcludeKeys {
+			if ctx.Kbs.GetKB(key) != nil {
+				return utils.Errorf("%w: because the key %s is present", requirements_error, key)
+			}
+		}
+		ctx.ScriptObj = script
+		return e.NewExecEngine(ctx).Exec(script.Script, script.OriginFileName)
 	}
 	for _, script := range rootScripts {
 		err := runScriptWithDep(script, ctx)
 		if err != nil {
+			if errors.Is(err, requirements_error) && e.config.ignoreRequirementsError {
+				continue
+			}
 			log.Errorf("run script %s met error: %s", script.OriginFileName, err)
 			allErrors = utils.JoinErrors(allErrors, err)
 		}
@@ -617,12 +692,13 @@ func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
 	}
 	return ctx, nil
 }
-func (e *ScriptEngine) NewExecEngine(ctx *ExecContext) *Executor {
-	engine := NewWithContext(ctx)
+func (e *ScriptEngine) NewExecEngine(ctx *ExecContext) *executor.Executor {
+	engine := executor.NewWithContext()
 	engine.SetIncludePath(e.naslLibsPath)
 	engine.SetDependenciesPath(e.dependenciesPath)
 	engine.Debug(e.debug)
 	engine.SetLib(GetExtLib(ctx))
+	engine.Compiler.SetNaslLib(GetNaslLibKeys())
 	for _, hook := range e.engineHooks {
 		hook(engine)
 	}
