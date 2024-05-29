@@ -129,6 +129,12 @@ func (c *Compiler) pushJustAssigin() {
 		Opcode: yakvm.OpAssign,
 	})
 }
+func (c *Compiler) pushAutoMapAssigin() {
+	c.pushOpcode(&yakvm.Code{
+		Opcode: yakvm.OpAssign,
+		Op1:    yakvm.NewAutoValue("auto_created"),
+	})
+}
 func (c *Compiler) pushAssigin() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAssign,

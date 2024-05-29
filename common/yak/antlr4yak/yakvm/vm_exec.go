@@ -381,12 +381,15 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				assignOk := false
 				if v1, ok := arg1.Value.([]*Value); ok {
 					if len(v1) == 2 {
-						if v1[0].Value == nil {
+						val := GetNaslValueBySymbolId(v1[0].SymbolId, v)
+						if val.Value == nil {
 							array := NewAutoValue(vm.NewEmptyNaslArray())
-							v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
-							v1[0] = array
+							table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+							table[v1[0].SymbolId] = array
+							//v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
+							val = array
 						}
-						if v2, ok := v1[0].Value.(*vm.NaslArray); ok {
+						if v2, ok := val.Value.(*vm.NaslArray); ok {
 							if v1[1].IsInt() {
 								v2.AddEleToList(v1[1].Int(), arg2.Value)
 								assignOk = true
@@ -680,58 +683,10 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 	case OpPushRef:
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
-			id := c.Unary
-			table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
-			if val, ok := table[id]; ok {
-				v.push(val)
-				return
-			}
-			name, ok := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
-			if ok && name == "_FCT_ANON_ARGS" {
-				if val, ok := v.contextData["argument"]; ok {
-					v.push(NewAutoValue(val.(*vm.NaslArray)))
-					return
-				}
-			}
-			// 尝试在作用域获取值
-			val, ok := v.CurrentScope().GetValueByID(id)
-			if id == 118 && strings.Contains(val.String(), "html") && c.StartLineNumber == 629 {
-				println()
-			}
-			if !ok {
-				name, ok1 := v.CurrentScope().GetSymTable().GetNameByVariableId(id)
-				if ok1 {
-					// 使用名字在全局变量中查找
-					if v1, ok1 := v.GlobalVariables[name]; ok1 {
-						val = NewValue("function", v1, name)
-						ok = true
-					} else if v1, ok2 := v.CurrentScope().GetValueByName(name + "s"); ok2 && v1.IsYakFunction() {
-						v1.AddExtraInfo("getOne", true)
-						val = v1
-						ok = true
-					} else {
-						if v.CurrentScope().GetSymTable().IdIsInited(id) {
-							val = GetUndefined()
-							ok = true
-						}
-
-						// panic("BUG: cannot found value by name:[" + name + "]")
-					}
-				}
-				if !ok {
-					panic("cannot found value by variable name:[" + name + "]")
-				}
-			} else {
-				val1 := *val // nasl里函数参数和形参名是绑定的，这里需要拷贝一份
-				val = &val1
-			}
-			if !ok {
-				panic("BUG: cannot found value by symbol:[" + fmt.Sprint(id) + "]")
-			}
-			if val.Value == nil {
-				val = NewUndefined(id)
-			}
-			val.SymbolId = id
+			val := GetNaslValueBySymbolId(c.Unary, v)
+			//if val == nil {
+			//	panic("BUG: cannot found value by symbol:[" + fmt.Sprint(c.Unary) + "]")
+			//}
 			v.push(val)
 			return
 		default:
@@ -1612,12 +1567,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		case NASL:
 			array := vm.NewEmptyNaslArray()
 			for i := 0; i < c.Unary; i++ {
+				val := v.pop()
 				k := v.pop()
-				v := v.pop()
 				if k.IsString() {
-					array.AddEleToArray(k.String(), v.Value)
+					array.AddEleToArray(k.String(), val.Value)
 				} else if k.IsInt() {
-					array.AddEleToList(k.Int(), v.Value)
+					array.AddEleToList(k.Int(), val.Value)
 				} else {
 					panic("nasl array index must be int or string, but got " + k.Type().String())
 				}

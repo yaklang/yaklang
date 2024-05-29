@@ -45,7 +45,7 @@ if(description)
 
   exit(0);
 }
-mac = this_host_mac();
+mac = host_mac();
 register_host_detail( name:"MAC", value:mac, desc:"Nmap MAC Scan" );
 replace_kb_item( name:"Host/mac_address", value:mac);
 exit( 0 );
