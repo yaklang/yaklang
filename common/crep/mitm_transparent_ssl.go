@@ -6,15 +6,15 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
@@ -77,7 +77,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 
 	log.Infof("peek one char[%#v] for %v", raw, conn.RemoteAddr().String())
 
-	var isHttps = utils.NewAtomicBool()
+	isHttps := utils.NewAtomicBool()
 	var httpConn net.Conn
 	var sni string
 	switch raw[0] {
@@ -98,7 +98,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		isHttps.UnSet()
 	}
 
-	//log.Infof("parse req http finished: %v", spew.Sdump(req))
+	// log.Infof("parse req http finished: %v", spew.Sdump(req))
 	if httpConn == nil {
 		return nil
 	}
@@ -109,7 +109,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 
 	log.Infof("start to handle http request for %s", conn.RemoteAddr().String())
 	var readerBuffer bytes.Buffer
-	var reqReader = io.TeeReader(httpConn, &readerBuffer)
+	reqReader := io.TeeReader(httpConn, &readerBuffer)
 	firstRequest, err := utils.ReadHTTPRequestFromBufioReader(bufio.NewReader(reqReader))
 	if err != nil {
 		return utils.Errorf("read request failed: %s for %s", err, conn.RemoteAddr().String())
@@ -146,7 +146,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		if !ok {
 			target := netx.LookupFirst(host, netx.WithTimeout(timeout), netx.WithDNSServers(m.DNSServers...))
 			if target == "" {
-				//httpConn.Write(fallbackHttpFrame)
+				// httpConn.Write(fallbackHttpFrame)
 				return utils.Errorf("cannot query dns host[%s]", host)
 			}
 			log.Infof("dns query finished for %v: results: [%#v]", host, target)
@@ -168,7 +168,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 	}
 
 	log.Infof("start to connect remote addr: %v", target)
-	var dialer = &net.Dialer{
+	dialer := &net.Dialer{
 		Timeout:  timeout,
 		Deadline: ctxDDL,
 	}
@@ -206,7 +206,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 			log.Errorf("request have body len: %v", n)
 		}
 
-		var wg = new(sync.WaitGroup)
+		wg := new(sync.WaitGroup)
 		wg.Add(2)
 		log.Infof("start to do transparent traffic")
 		go func() {
@@ -227,7 +227,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		// 透明模式，劫持开启之后回调才会生效
 
 		// 劫持第一个 request
-		var reqBytes = readerBuffer.Bytes()
+		reqBytes := readerBuffer.Bytes()
 		if m.transparentHijackRequest == nil && m.transparentHijackRequestManager == nil {
 			// 不劫持请求的时候，直接写，不要等待全部读完
 			log.Infof("write first request for %v", remoteConn.RemoteAddr().String())
@@ -261,7 +261,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 
 		var rspRaw bytes.Buffer
 		// 解析 response
-		var responseReader = io.TeeReader(remoteConn, &rspRaw)
+		responseReader := io.TeeReader(remoteConn, &rspRaw)
 
 		// 不劫持响应的话，读多少写多少保证速度
 		if m.transparentHijackResponse == nil {
@@ -269,7 +269,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		}
 
 		// 构建响应，这个响应很关键
-		rsp, err := http.ReadResponse(bufio.NewReader(responseReader), firstRequest)
+		rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(responseReader), firstRequest)
 		if err != nil {
 			return utils.Errorf("read response for req[%v]->%v failed: %s", firstRequest.URL.String(), remoteConn.RemoteAddr(), err)
 		}
@@ -285,7 +285,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 		}
 		log.Info("first req and rsp recv finished!")
 
-		var rspBytes = rspRaw.Bytes()
+		rspBytes := rspRaw.Bytes()
 		// 劫持响应的话，要手动写 httpConn, 但是必须读完才能劫持，所以这里可能会影响速度
 		if m.transparentHijackResponse != nil {
 			rspBytes = m.transparentHijackResponse(isHttps.IsSet(), rspBytes)
@@ -314,7 +314,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 			var reqRaw bytes.Buffer
 
 			// 这里是移除一些没有用的不符合 HTTP 协议前缀请求的字符
-			var buf = make([]byte, 1)
+			buf := make([]byte, 1)
 			for {
 				_, err := httpConn.Read(buf)
 				if err != nil {
@@ -330,7 +330,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 				}
 			}
 
-			var reqReader = io.TeeReader( // 从本地读 http.Request 出来
+			reqReader := io.TeeReader( // 从本地读 http.Request 出来
 				io.MultiReader(bytes.NewReader(buf), httpConn),
 				&reqRaw,
 			)
@@ -351,7 +351,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 			}
 
 			// 劫持请求，这个 reqRaw 一定是包含 body 的了（如果可能）
-			var reqBytes = reqRaw.Bytes()
+			reqBytes := reqRaw.Bytes()
 			switch true {
 			case m.transparentHijackRequest != nil:
 				reqBytes = m.transparentHijackRequest(isHttps.IsSet(), reqBytes)
@@ -369,11 +369,11 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 
 			// 读取 response
 			var rspRaw bytes.Buffer
-			var remoteResponseReader = io.TeeReader(remoteConn, &rspRaw)
+			remoteResponseReader := io.TeeReader(remoteConn, &rspRaw)
 			if m.transparentHijackResponse == nil {
 				remoteResponseReader = io.TeeReader(remoteResponseReader, httpConn)
 			}
-			rsp, err := http.ReadResponse(bufio.NewReader(remoteResponseReader), req)
+			rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(remoteResponseReader), req)
 			if err != nil {
 				return utils.Errorf("read http response from: %s failed: %s", remoteConn.RemoteAddr().String(), err)
 			}
@@ -390,7 +390,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 
 			// 劫持返回结果
 			// 这里的劫持，并没有自动写入 httpConn，所以需要手动写入，这里是同步操作，性能瓶颈在这里
-			var rspBytes = rspRaw.Bytes()
+			rspBytes := rspRaw.Bytes()
 			if m.transparentHijackResponse != nil {
 				rspBytes = m.transparentHijackResponse(isHttps.IsSet(), rspBytes)
 				_, err = httpConn.Write(rspBytes)

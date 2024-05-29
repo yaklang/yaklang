@@ -839,7 +839,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							ret.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
 						}
 						if ret.Response == nil && rsp != nil && !config.NoFixContentLength {
-							ret.Response, err = http.ReadResponse(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
+							ret.Response, err = utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
 							if err != nil {
 								log.Errorf("parse bytes to response failed: %s", err)
 							}

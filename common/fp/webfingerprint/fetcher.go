@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strconv"
 	"sync"
@@ -87,7 +86,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 		Request []byte
 		IsHttps bool
 	}{{Url: originUrl, Raw: rsp, Request: packet, IsHttps: isTls}}, redirectResponse...) {
-		rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rspRaw.Raw)), nil)
+		rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(rspRaw.Raw)), nil)
 		if err != nil {
 			// log.Errorf("read response failed: %s", err)
 			continue
