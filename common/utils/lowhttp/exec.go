@@ -182,19 +182,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		sni                  = option.SNI
 		payloads             = option.Payloads
 		firstAuth            = true
+		reqIns               = option.NativeHTTPRequestInstance
 	)
-
-	if option.WithConnPool && option.ConnPool == nil {
-		option.ConnPool = DefaultLowHttpConnPool
-		connPool = DefaultLowHttpConnPool
-	}
-
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	if response.Source == "" {
-		response.Source = source
+	if reqIns == nil {
+		// create new request instance for httpctx
+		reqIns, _ = utils.ReadHTTPRequestFromBytes(requestPacket)
 	}
 
 	defer func() {
@@ -216,17 +208,38 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			if option.ResponseCallback != nil {
 				option.ResponseCallback(response)
 			}
-			if option.EnableMaxContentLength && option.MaxContentLength > 0 && response.ResponseBodySize > int64(option.MaxContentLength) {
+			if httpctx.GetResponseTooLarge(reqIns) {
 				response.TooLarge = true
 				response.TooLargeLimit = int64(option.MaxContentLength)
 			}
-			response.Payloads = payloads
-			SaveResponse(response)
+			// response.TooLarge = true
+			SaveLowHTTPResponse(response)
 		}()
 		select {
 		case <-saveCtx.Done():
 		}
 	}()
+
+	// connection pool
+	if option.WithConnPool && option.ConnPool == nil {
+		option.ConnPool = DefaultLowHttpConnPool
+		connPool = DefaultLowHttpConnPool
+	}
+	// ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// fix some field
+	if response.Source == "" {
+		response.Source = source
+	}
+	response.Payloads = payloads
+
+	if option.EnableMaxContentLength && option.MaxContentLength > 0 {
+		httpctx.SetResponseMaxContentLength(reqIns, option.MaxContentLength)
+	}
+
+	// proxy
 	var newProxy []string
 	for _, p := range proxy {
 		i, err := url.Parse(p)
@@ -515,10 +528,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		https:  option.Https,
 		gmTls:  option.GmTLS,
 	}
-	haveNativeHTTPRequestInstance := option.NativeHTTPRequestInstance != nil
+	haveNativeHTTPRequestInstance := reqIns != nil
 RECONNECT:
 	if haveNativeHTTPRequestInstance {
-		httpctx.SetRequestHTTPS(option.NativeHTTPRequestInstance, https)
+		httpctx.SetRequestHTTPS(reqIns, https)
 	}
 	if withConnPool || enableHttp2 {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
@@ -572,7 +585,7 @@ RECONNECT:
 	}
 	response.RemoteAddr = conn.RemoteAddr().String()
 	if haveNativeHTTPRequestInstance {
-		httpctx.SetRemoteAddr(option.NativeHTTPRequestInstance, response.RemoteAddr)
+		httpctx.SetRemoteAddr(reqIns, response.RemoteAddr)
 	}
 	response.PortIsOpen = true
 
@@ -604,7 +617,7 @@ RECONNECT:
 			return nil, utils.Error("conn h2 Processor is nil")
 		}
 
-		h2Stream := h2Conn.newStream(option.NativeHTTPRequestInstance, requestPacket)
+		h2Stream := h2Conn.newStream(reqIns, requestPacket)
 
 		if err := h2Stream.doRequest(); err != nil {
 			if h2Stream.ID == 1 { // first stream
@@ -616,7 +629,7 @@ RECONNECT:
 		}
 		resp, responsePacket := h2Stream.waitResponse(timeout)
 		_ = resp
-		httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, responsePacket)
+		httpctx.SetBareResponseBytes(reqIns, responsePacket)
 		response.RawPacket = responsePacket
 		return response, nil
 	}
@@ -636,7 +649,7 @@ RECONNECT:
 		}
 
 		//if haveNativeHTTPRequestInstance {
-		//	httpctx.SetBareRequestBytes(option.NativeHTTPRequestInstance, requestPacket)
+		//	httpctx.SetBareRequestBytes(reqIns, requestPacket)
 		//}
 
 		if oldVersionProxyChecking {
@@ -645,12 +658,12 @@ RECONNECT:
 				return nil, err
 			}
 		}
-		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: option.NativeHTTPRequestInstance}
+		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns}
 		resc := make(chan responseInfo)
 		pc.reqCh <- requestAndResponseCh{
 			reqPacket:   requestPacket,
 			ch:          resc,
-			reqInstance: option.NativeHTTPRequestInstance,
+			reqInstance: reqIns,
 			option:      option,
 			writeErrCh:  writeErrCh,
 		}
@@ -705,7 +718,7 @@ RECONNECT:
 		}
 
 		if haveNativeHTTPRequestInstance {
-			httpctx.SetBareRequestBytes(option.NativeHTTPRequestInstance, requestPacket)
+			httpctx.SetBareRequestBytes(reqIns, requestPacket)
 		}
 		if oldVersionProxyChecking {
 			var legacyRequest []byte
@@ -795,11 +808,8 @@ RECONNECT:
 		}
 
 		traceInfo.ServerTime = time.Since(serverTimeStart)
-		stashedRequest := option.NativeHTTPRequestInstance
-		if stashedRequest == nil {
-			stashedRequest = new(http.Request)
-		}
-		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, stashedRequest)
+
+		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
 		if err != nil {
 			log.Warnf("[lowhttp] read response failed: %s", err)
 		}
@@ -821,7 +831,7 @@ RECONNECT:
 			}
 		}
 
-		response.ResponseBodySize = httpctx.GetResponseBodySize(stashedRequest)
+		response.ResponseBodySize = httpctx.GetResponseBodySize(reqIns)
 		respClose := false
 		if firstResponse != nil {
 			respClose = firstResponse.Close
@@ -843,7 +853,7 @@ RECONNECT:
 				}
 			}
 		} else {
-			firstResponse.Request = option.NativeHTTPRequestInstance
+			firstResponse.Request = reqIns
 			multiResponses = append(multiResponses, firstResponse)
 
 			// handle response
@@ -884,7 +894,7 @@ RECONNECT:
 
 		rawBytes = responseRaw.Bytes()
 		if haveNativeHTTPRequestInstance {
-			httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, rawBytes)
+			httpctx.SetBareResponseBytes(reqIns, rawBytes)
 		}
 	}
 
