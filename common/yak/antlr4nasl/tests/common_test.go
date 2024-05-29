@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script-core"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"testing"
 )
@@ -220,7 +220,7 @@ func DebugExec(code string, init ...bool) {
 }
 
 func _Exec(debug bool, code string, init ...bool) {
-	engine := antlr4nasl.NewScriptEngine()
+	engine := script_core.NewScriptEngine()
 	//engine.vm.GetConfig().SetStopRecover(true)
 	//if len(init) == 0 {
 	//	engine.InitBuildInLib()

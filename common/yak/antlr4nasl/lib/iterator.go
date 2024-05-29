@@ -2,7 +2,7 @@ package lib
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	"reflect"
 )
 
@@ -14,7 +14,7 @@ type Iterator struct {
 	index int
 }
 type NaslIterator struct {
-	data  *vm.NaslArray
+	data  *nasl_type.NaslArray
 	index int
 }
 
@@ -22,7 +22,7 @@ func NewIterator(v interface{}) (IteratorInterface, error) {
 	if v == nil {
 		return nil, utils.Error("not support iterator nil")
 	}
-	if val, ok := v.(*vm.NaslArray); ok {
+	if val, ok := v.(*nasl_type.NaslArray); ok {
 		return &NaslIterator{
 			data:  val,
 			index: 0,
