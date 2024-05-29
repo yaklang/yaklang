@@ -64,6 +64,7 @@ func (c *Cache) _getByVariableEx(
 ) []Instruction {
 	var ins []Instruction
 	if mod&ssadb.KeyMatch != 0 {
+		// search all instruction
 		c.InstructionCache.ForEach(func(i int64, iic instructionIrCode) {
 			inst := iic.inst
 			value, ok := ToValue(inst)
@@ -80,11 +81,19 @@ func (c *Cache) _getByVariableEx(
 		})
 	}
 	if mod&ssadb.NameMatch != 0 {
+		// search in variable cache
 		c.VariableCache.ForEach(func(s string, instructions []Instruction) {
 			if checkValue(s) {
 				ins = append(ins, instructions...)
 			}
 		})
+
+		// search in class instance
+		for name, insts := range c.Class2InstIndex {
+			if checkValue(name) {
+				ins = append(ins, insts...)
+			}
+		}
 	}
 	return ins
 }

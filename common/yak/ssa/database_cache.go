@@ -40,6 +40,7 @@ type Cache struct {
 	id               *atomic.Int64
 	InstructionCache *utils.CacheWithKey[int64, instructionIrCode] // instructionID to instruction
 	VariableCache    *utils.CacheWithKey[string, []Instruction]    // variable(name:string) to []instruction
+	Class2InstIndex  map[string][]Instruction
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -57,6 +58,7 @@ func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 		ProgramName:      programName,
 		InstructionCache: instructionCache,
 		VariableCache:    variableCache,
+		Class2InstIndex:  make(map[string][]Instruction),
 	}
 
 	if databaseEnable {
@@ -160,6 +162,18 @@ func (c *Cache) ForEachVariable(handle func(string, []Instruction)) {
 	c.VariableCache.ForEach(handle)
 }
 
+func (c *Cache) AddClassInstance(name string, inst Instruction) {
+	log.Infof("AddClassInstance: %s : %v", name, inst)
+	// if _, ok := c.Class2InstIndex[name]; !ok {
+	// 	c.Class2InstIndex[name] = make([]Instruction, 0, 1)
+	// }
+	c.Class2InstIndex[name] = append(c.Class2InstIndex[name], inst)
+}
+
+func (c *Cache) GetClassInstance(name string) []Instruction {
+	return c.Class2InstIndex[name]
+}
+
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
 func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
@@ -212,6 +226,25 @@ func (c *Cache) saveVariable(variable string, insts []Instruction) bool {
 	}
 	return true
 }
+
+func (c *Cache) saveClassInstance(name string, insts []Instruction) {
+	if c.DB == nil {
+		log.Errorf("BUG: saveClassInstance called when DB is nil")
+		return
+	}
+	if err := ssadb.SaveClassInstance(c.DB, c.ProgramName, name,
+		lo.Map(insts, func(inst Instruction, _ int) int64 {
+			if inst == nil {
+				log.Errorf("BUG: saveClassInstance called with nil instruction %v", name)
+				return -1
+			}
+			return inst.GetId()
+		}),
+	); err != nil {
+		log.Errorf("SaveClassInstance error: %v", err)
+	}
+}
+
 func (c *Cache) SaveToDatabase() {
 	if c.DB == nil {
 		return
@@ -226,6 +259,9 @@ func (c *Cache) SaveToDatabase() {
 	c.VariableCache.Close()
 	for variable, insts := range variableCache {
 		c.saveVariable(variable, insts)
+	}
+	for name, insts := range c.Class2InstIndex {
+		c.saveClassInstance(name, insts)
 	}
 }
 
