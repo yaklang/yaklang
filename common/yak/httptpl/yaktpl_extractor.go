@@ -275,12 +275,15 @@ func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 					addResult(k, v)
 				}
 			} else {
-				httphead.ScanOptions([]byte("__yaktpl_placeholder__; "+v+"; "), func(index int, option, attribute, value []byte) httphead.Control {
+				httphead.ScanOptions([]byte("__yaktpl_placeholder__; "+v+"; "), func(index int, key, param, value []byte) httphead.Control {
+					if value == nil {
+						return httphead.ControlContinue
+					}
 					decoded, err := url.QueryUnescape(string(value))
 					if err != nil {
-						addResult(string(attribute), string(value))
+						addResult(string(param), string(value))
 					} else {
-						addResult(string(attribute), decoded)
+						addResult(string(param), decoded)
 					}
 					return httphead.ControlContinue
 				})

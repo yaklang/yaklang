@@ -431,15 +431,27 @@ func IsWebsocketUrl(raw string) bool {
 }
 
 func IsJSON(raw string) (string, bool) {
-	unescapeJson, err := codec.QueryUnescape(raw)
+	// 检查是否是有效的 JSON 对象或数组
+	if isValidJSON(raw) {
+		return raw, true
+	}
+
+	// 尝试对字符串进行 URL 解码
+	unescaped, err := codec.QueryUnescape(raw)
 	if err != nil {
 		return raw, false
 	}
-	// 检测是否是 json 对象
-	if gjson.Valid(unescapeJson) && (gjson.Parse(unescapeJson).IsObject() || gjson.Parse(unescapeJson).IsArray()) {
-		return unescapeJson, true
+
+	// 再次检查是否是有效的 JSON 对象或数组
+	if isValidJSON(unescaped) {
+		return unescaped, true
 	}
+
 	return "", false
+}
+
+func isValidJSON(s string) bool {
+	return gjson.Valid(s) && (gjson.Parse(s).IsObject() || gjson.Parse(s).IsArray())
 }
 
 func ContainsJSON(raw string) (string, bool) {
