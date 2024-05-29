@@ -248,6 +248,19 @@ assert(false, "empty string is true");
 
 func TestAutoCreateVar(t *testing.T) {
 	DebugExec(`
+function mkvar() {
+	for(i =0; i < 3;i++){
+		a[i] = 1;
+	}
+}
+mkvar();
+dump(a);
+assert(a[1]==1,"test auto create var scope failed");
+
+i = 0;
+m[i] = 1;
+dump(m);
+assert(m[0] == 1,"auto create failed");
 
 local_var a,b,c,d,e,f;
 a[1] = 1;
@@ -257,6 +270,7 @@ dump(a);
 assert(a[1]==1,"a[1]!=1");
 dump(NULL);
 
+dump(undefinedVar);
 `)
 }
 

@@ -650,10 +650,13 @@ func (c *Compiler) VisitAssignmentExpression(i *nasl.AssignmentExpressionContext
 			name := id.GetText()
 			if id, _ := c.symbolTable.GetSymbolByVariableName(name); !c.symbolTable.IdIsInited(id) {
 				c.pushLeftRef(name)
+				idValue, _ := c.symbolTable.GetSymbolByVariableName(name)
+				delete(c.symbolTable.InitedId, idValue)
 				c.VisitSingleExpression(i.SingleExpression(0))
+				c.pushGenList(2)
 				c.VisitSingleExpression(i.SingleExpression(1))
-				code := c.pushOpcodeFlag(yakvm.OpNewMap)
-				code.Unary = 1
+				//code := c.pushOpcodeFlag(yakvm.OpNewMap)
+				//code.Unary = 1
 				//c.pushGenList(1)
 
 				//c.pushGenList(1)
