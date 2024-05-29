@@ -54,29 +54,6 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			ReplaceAllValue(member, toMember)
 			DeleteInst(member)
 
-			if method, ok := ToMethod(toMember); ok {
-				_ = method
-				// fixup function call
-				toMember.GetUsers().RunOnCall(func(c *Call) {
-					// hand method
-					c.Method = method.Func
-					this := method.This
-
-					// hand argument
-					args := c.Args
-					if len(args) == 0 {
-						args = append(args, this)
-					} else {
-						args = utils.InsertSliceItem(args, this, 0)
-					}
-					c.Args = args
-
-					c.handleCalleeFunction()
-					c.handlerReturnType()
-				})
-				continue
-			}
-
 			ret[name] = toMember
 		}
 	}
@@ -320,8 +297,15 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	}
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
 		// set program offsetMap for method value
-		program.SetOffsetValue(fun, b.CurrentRange)
-		return NewClassMethod(fun, value)
+		// program.SetOffsetValue(fun, b.CurrentRange)
+		// return NewClassMethod(fun, value)
+		name, typ := checkCanMemberCall(value, key)
+		// if ret := b.PeekValueInThisFunction(name); ret != nil {
+		// 	return ret
+		// }
+		member := b.getOriginMember(name, typ, value, key)
+		fun.AddReference(member)
+		return member
 	}
 
 	// parameter or freeValue, this member-call mark as Parameter

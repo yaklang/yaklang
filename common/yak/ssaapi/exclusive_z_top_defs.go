@@ -112,7 +112,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		_ = key
 		_ = member
 		if obj != nil && i.IsObject() && i != obj {
-			if m := i.GetMember(key); m != nil {
+			if m := i.GetMember(key); m != nil && m != member {
 				actx.PopObject()
 				return m.getTopDefs(actx, opt...)
 			}
@@ -123,10 +123,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
-		if !value.HasValues() && value.IsMember() {
+		if value.HasValues() {
+			return i.visitedDefsDefault(actx)
+		}
+		if value.IsMember() {
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
-			actx.PushObject(obj, key, i)
+			if err := actx.PushObject(obj, key, i); err != nil {
+				log.Errorf("%v", err)
+				return i.visitedDefsDefault(actx)
+			}
 
 			ret := obj.getTopDefs(actx, opt...)
 			if !ValueCompare(i, actx.Self) {
@@ -159,8 +165,49 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		// TODO: trace the specific return-values
 		callerValue := i.NewValue(caller)
-		callerFunc, isFunc := ssa.ToFunction(caller)
-		if !isFunc {
+		_, isFunc := ssa.ToFunction(caller)
+		funcType, isFuncTyp := ssa.ToFunctionType(caller.GetType())
+		switch {
+		case isFunc:
+			callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
+			callerValue.AppendEffectOn(i)
+			err := actx.PushCall(i)
+			if err != nil {
+				log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
+				return Values{i}
+			}
+			defer actx.PopCall()
+			// inherit return index
+			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
+			if ok {
+				callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
+			}
+			return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
+		case isFuncTyp:
+			// funcType.ReturnType
+			// string literal member
+			err := actx.PushCall(i)
+			if err != nil {
+				log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
+				return Values{i}
+			}
+			defer actx.PopCall()
+
+			var res Values
+			res = append(res,
+				callerValue.AppendDependOn(i).getTopDefs(actx, opt...)...,
+			)
+			for _, retIns := range funcType.ReturnValue {
+				for _, traceVal := range retIns.Results {
+					// val, ok := traceVal.GetStringMember(retIndexRawStr)
+					// if ok {
+					res = append(res,
+						i.NewValue(traceVal).AppendEffectOn(i).getTopDefs(actx, opt...)...,
+					)
+				}
+			}
+			return res
+		default:
 			i.AppendDependOn(callerValue)
 			var nodes = Values{callerValue}
 			for _, val := range inst.Args {
@@ -182,22 +229,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return results
 		}
-		_ = callerFunc
-
-		callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-		callerValue.AppendEffectOn(i)
-		err := actx.PushCall(i)
-		if err != nil {
-			log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-			return Values{i}
-		}
-		defer actx.PopCall()
-		// inherit return index
-		val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
-		if ok {
-			callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
-		}
-		return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
 	case *ssa.Function:
 		var vals Values
 		// handle return
@@ -338,7 +369,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		if inst.GetDefault() != nil {
-			return Values{i.NewValue(inst.GetDefault())}
+			return i.NewValue(inst.GetDefault()).getTopDefs(actx, opt...)
 		}
 		var vals Values
 		called := actx.GetCurrentCall()

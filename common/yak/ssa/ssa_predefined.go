@@ -139,6 +139,8 @@ type anValue struct {
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
 	mask *omap.OrderedMap[string, Value]
+
+	reference Values
 }
 
 func NewValue() anValue {
@@ -293,4 +295,11 @@ func (i *anValue) GetMask() []Value {
 
 func (i *anValue) Masked() bool {
 	return i.mask.Len() != 0
+}
+
+func (i *anValue) AddReference(v Value) {
+	i.reference = append(i.reference, v)
+}
+func (i *anValue) Reference() Values {
+	return i.reference
 }

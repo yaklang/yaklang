@@ -113,6 +113,11 @@ type Value interface {
 	AssignAble
 	AddUser(User)
 	RemoveUser(User)
+
+	// reference, this value same as other value
+	// in use-def chain, this value use contain other value
+	AddReference(Value)
+	Reference() Values
 }
 
 type Maskable interface {

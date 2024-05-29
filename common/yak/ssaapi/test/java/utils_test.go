@@ -31,7 +31,7 @@ func test(t *testing.T, tc *TestCase) {
 }
 
 func testExecTopDef(t *testing.T, tc *TestCase) {
-	syntaxFlow := "Runtime.getRuntime().exec(*) #-> * as $target"
+	syntaxFlow := "Runtime.getRuntime().exec(* #-> * as $target)"
 	log.Infof("TestExecTopDef code : %s", tc.Code)
 	ssatest.CheckSyntaxFlowEx(t, tc.Code, syntaxFlow, tc.Contain,
 		tc.Expect,
@@ -40,7 +40,7 @@ func testExecTopDef(t *testing.T, tc *TestCase) {
 }
 
 func testRequestTopDef(t *testing.T, tc *TestCase) {
-	syntaxFlow := ".createDefault().execute(*) #-> * as $target"
+	syntaxFlow := ".createDefault().execute(* #-> * as $target)"
 	ssatest.CheckSyntaxFlowEx(t, tc.Code, syntaxFlow, tc.Contain,
 		tc.Expect,
 		ssaapi.WithLanguage(ssaapi.JAVA))

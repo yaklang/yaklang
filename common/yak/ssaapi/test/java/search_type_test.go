@@ -7,17 +7,19 @@ func TestSimpleSearchType(t *testing.T) {
 	code := `
 
 	class B {
-		void methodB() {}
+		void methodB(int i) {
+			println(i);
+		}
 	}
 
 	class A {
 		int a; 
 		void main() {
 			B b1  = new B();
-			b1.methodB();
+			b1.methodB(1);
 
 			B b2  = new B();
-			b2.methodB();
+			b2.methodB(2);
 		}
 	}
 	`
@@ -72,10 +74,22 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-b1.methodB(valid)(make(B))",
-					"Undefined-b2.methodB(valid)(make(B))",
+					"Undefined-b1.methodB(valid)(make(B),1)",
+					"Undefined-b2.methodB(valid)(make(B),2)",
 				},
 			},
 		})
 	})
+
+	t.Run("method function should has called", func(t *testing.T) {
+		test(t, &TestCase{
+			Code:    code,
+			SF:      `println(* #-> * as $target)`,
+			Contain: false,
+			Expect: map[string][]string{
+				"target": {"1", "2", "Parameter-i"},
+			},
+		})
+	})
+
 }

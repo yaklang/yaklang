@@ -164,6 +164,7 @@ func (f *Function) Finish() {
 		handlerReturnType(f.Return),
 		f.hasEllipsis,
 	)
+	funType.ReturnValue = f.Return
 	funType.ParameterLen = f.ParamLength
 	funType.ParameterValue = f.Param
 	funType.ParameterMember = f.ParameterMember

@@ -31,7 +31,7 @@ func Test_HTTP_SSRF(t *testing.T) {
                 `,
 			Contain: true,
 			Expect: map[string][]string{
-				"target": []string{
+				"target": {
 					"Parameter-path",
 					"Parameter-param",
 					"Parameter-url",
@@ -58,7 +58,7 @@ func Test_HTTP_SSRF(t *testing.T) {
                 `,
 			Contain: true,
 			Expect: map[string][]string{
-				"target": []string{
+				"target": {
 					"Parameter-param",
 					"Parameter-url",
 					`"/api/test.json"`,
