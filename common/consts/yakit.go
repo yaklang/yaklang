@@ -11,10 +11,20 @@ import (
 )
 
 var (
-	projectDataBase       *gorm.DB
 	initYakitDatabaseOnce = new(sync.Once)
+	projectDataBase       *gorm.DB
 	profileDatabase       *gorm.DB
+	debugProjectDatabase  = false
+	debugProfileDatabase  = false
 )
+
+func DebugProjectDatabase() {
+	debugProjectDatabase = true
+}
+
+func DebugProfileDatabase() {
+	debugProfileDatabase = true
+}
 
 func CreateProjectDatabase(path string) (*gorm.DB, error) {
 	db, err := createAndConfigDatabase(path)
@@ -44,11 +54,17 @@ func SetGormProjectDatabase(d *gorm.DB) {
 
 func GetGormProfileDatabase() *gorm.DB {
 	initYakitDatabase()
+	if debugProfileDatabase {
+		return profileDatabase.Debug()
+	}
 	return profileDatabase
 }
 
 func GetGormProjectDatabase() *gorm.DB {
 	initYakitDatabase()
+	if debugProjectDatabase {
+		return projectDataBase.Debug()
+	}
 	return projectDataBase
 }
 
@@ -70,10 +86,10 @@ func initYakitDatabase() {
 	initYakitDatabaseOnce.Do(func() {
 		log.Debug("start to loading gorm project/profile database")
 		var (
-			err                 error = nil
-			baseDir                   = GetDefaultYakitBaseDir()
-			projectDatabaseName       = GetDefaultYakitProjectDatabase(baseDir)
-			profileDatabaseName       = GetDefaultYakitPluginDatabase(baseDir)
+			err                 error
+			baseDir             = GetDefaultYakitBaseDir()
+			projectDatabaseName = GetDefaultYakitProjectDatabase(baseDir)
+			profileDatabaseName = GetDefaultYakitPluginDatabase(baseDir)
 		)
 
 		/* 先创建插件数据库 */
