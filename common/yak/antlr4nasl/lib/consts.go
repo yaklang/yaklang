@@ -2,11 +2,11 @@ package lib
 
 import (
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 )
 
 func init() {
-	v, err := vm.NewNaslArray([]interface{}{})
+	v, err := nasl_type.NewNaslArray([]interface{}{})
 	if err != nil {
 		log.Error(err)
 	}

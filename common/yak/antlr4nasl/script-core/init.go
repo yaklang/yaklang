@@ -1,4 +1,4 @@
-package antlr4nasl
+package script_core
 
 import (
 	"github.com/yaklang/yaklang/common/log"

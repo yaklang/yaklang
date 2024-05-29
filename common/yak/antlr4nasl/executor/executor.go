@@ -1,4 +1,4 @@
-package antlr4nasl
+package executor
 
 import (
 	"context"
@@ -15,16 +15,6 @@ import (
 	"strings"
 )
 
-type ExecContext struct {
-	ctx        *context.Context
-	Host       string
-	Kbs        *NaslKBs
-	Proxies    []string
-	MethodHook map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *NaslBuildInMethodParam) (interface{}, error)
-	scriptObj  *NaslScriptInfo
-	Debug      bool
-}
-
 //	func (e *ExecContext) CallNativeFunction(name string, mapParam map[string]interface{}, sliceParam []interface{}) (interface{}, error) {
 //		params := NewNaslBuildInMethodParam()
 //		for _, i1 := range sliceParam {
@@ -39,43 +29,33 @@ type ExecContext struct {
 //		return nil, utils.Errorf("not found build in method: %s", name)
 //
 // }
-func NewExecContext() *ExecContext {
-	return &ExecContext{
-		Kbs:       NewNaslKBs(),
-		scriptObj: NewNaslScriptObject(),
-	}
-}
 
 type Executor struct {
-	ctx                            *ExecContext
+	*yakvm.VirtualMachine
 	debug                          bool
 	dbcache                        bool
 	naslLibsPath, dependenciesPath string
-	compiler                       *visitors.Compiler
-	vm                             *yakvm.VirtualMachine
+	Compiler                       *visitors.Compiler
 	sourceCode                     string
-	buildInMethodHook              map[string]func(origin NaslBuildInMethod, engine *Executor, params *NaslBuildInMethodParam) (interface{}, error)
 	logger                         *log.Logger
 	buildinLib                     map[string]func(param *NaslBuildInMethodParam) any
 }
 
-func NewWithContext(ctx *ExecContext) *Executor {
+func NewWithContext() *Executor {
 	table := yakvm.NewSymbolTable()
 	vm := yakvm.NewWithSymbolTable(table)
 	vm.GetConfig().SetClosureSupport(false)
 	vm.GetConfig().SetFunctionNumberCheck(false)
 	vm.GetConfig().SetYVMMode(yakvm.NASL)
 	executor := &Executor{
-		compiler:   visitors.NewCompilerWithSymbolTable(table),
-		vm:         vm,
-		buildinLib: map[string]func(param *NaslBuildInMethodParam) any{},
-		logger:     log.GetLogger("NASL Logger"),
+		Compiler:       visitors.NewCompilerWithSymbolTable(table),
+		VirtualMachine: vm,
+		buildinLib:     map[string]func(param *NaslBuildInMethodParam) any{},
+		logger:         log.GetLogger("NASL Logger"),
 		//loadedScriptsLock: &sync.Mutex{},
-		buildInMethodHook: make(map[string]func(origin NaslBuildInMethod, engine *Executor, params *NaslBuildInMethodParam) (interface{}, error)),
 		//scriptExecMutexs:  make(map[string]*sync.Mutex),
 	}
-	executor.compiler.SetNaslLib(GetNaslLibKeys())
-	executor.compiler.RegisterVisitHook("__positions_hook", func(c *visitors.Compiler, ctx antlr.ParserRuleContext) {
+	executor.Compiler.RegisterVisitHook("__positions_hook", func(c *visitors.Compiler, ctx antlr.ParserRuleContext) {
 		if start := ctx.GetStart(); start != nil {
 			c.SetStartPosition(start.GetLine(), start.GetColumn())
 		}
@@ -87,21 +67,21 @@ func NewWithContext(ctx *ExecContext) *Executor {
 		var funName string
 		if params != nil && len(params) > 0 && len(params[0]) == 1 {
 			if v, ok := params[0][0].(int); ok {
-				name, ok := executor.compiler.GetSymbolTable().GetNameByVariableId(v)
+				name, ok := executor.Compiler.GetSymbolTable().GetNameByVariableId(v)
 				if ok {
 					funName = name
 				}
 			}
 		}
 		naslParams := &NaslBuildInMethodParam{
-			mapParams: make(map[string]*yakvm.Value),
+			MapParams: make(map[string]*yakvm.Value),
 		}
 		for _, p := range params[1:] {
-			name, ok := executor.compiler.GetSymbolTable().GetNameByVariableId(p[0].(int))
+			name, ok := executor.Compiler.GetSymbolTable().GetNameByVariableId(p[0].(int))
 			if ok {
-				naslParams.mapParams[name] = yakvm.NewAutoValue(p[1])
+				naslParams.MapParams[name] = yakvm.NewAutoValue(p[1])
 			}
-			naslParams.listParams = append(naslParams.listParams, yakvm.NewAutoValue(p[1]))
+			naslParams.ListParams = append(naslParams.ListParams, yakvm.NewAutoValue(p[1]))
 		}
 		fn, ok := executor.buildinLib[funName]
 		if !ok {
@@ -131,12 +111,12 @@ func NewWithContext(ctx *ExecContext) *Executor {
 		return nil, nil
 	})
 	vm.ImportLibs(lib.NaslBuildInNativeMethod)
-	executor.vm.ImportLibs(lib.NaslBuildInNativeMethod)
-	executor.vm.ImportLibs(lib.BuildInVars)
+	executor.ImportLibs(lib.NaslBuildInNativeMethod)
+	executor.ImportLibs(lib.BuildInVars)
 	return executor
 }
-func NewNaslEngine() *Executor {
-	return NewWithContext(NewExecContext())
+func NewNaslExecutor() *Executor {
+	return NewWithContext()
 }
 
 //	func (engine *Executor) GetScriptMuxByName(name string) *sync.Mutex {
@@ -148,12 +128,12 @@ func NewNaslEngine() *Executor {
 //		engine.scriptExecMutexs[name] = &sync.Mutex{}
 //		return engine.scriptExecMutexs[name]
 //	}
-func (engine *Executor) RegisterBuildInMethodHook(name string, hook func(origin NaslBuildInMethod, engine *Executor, params *NaslBuildInMethodParam) (interface{}, error)) {
-	engine.buildInMethodHook[name] = hook
-}
-func (engine *Executor) UnRegisterBuildInMethodHook(name string) {
-	delete(engine.buildInMethodHook, name)
-}
+//func (engine *Executor) RegisterBuildInMethodHook(name string, hook func(origin script_core.NaslBuildInMethod, engine *Executor, params *NaslBuildInMethodParam) (interface{}, error)) {
+//	engine.buildInMethodHook[name] = hook
+//}
+//func (engine *Executor) UnRegisterBuildInMethodHook(name string) {
+//	delete(engine.buildInMethodHook, name)
+//}
 
 func (e *Executor) SetLib(lib map[string]func(param *NaslBuildInMethodParam) any) {
 	e.buildinLib = lib
@@ -181,11 +161,11 @@ func (engine *Executor) Debug(bool2 ...bool) {
 }
 
 func (e *Executor) Compile(code string) error {
-	e.compiler.SetExternalVariableNames(e.vm.GetExternalVariableNames())
-	e.compiler.Debug(e.debug)
-	ok := e.compiler.Compile(code)
+	e.Compiler.SetExternalVariableNames(e.GetExternalVariableNames())
+	e.Compiler.Debug(e.debug)
+	ok := e.Compiler.Compile(code)
 	if !ok {
-		return e.compiler.GetMergeError()
+		return e.Compiler.GetMergeError()
 	}
 	return nil
 }
@@ -200,11 +180,12 @@ func (e *Executor) SafeRunFile(path string) (err error) {
 	}()
 	return e.RunFile(path)
 }
-func (e *Executor) RunScript(script *NaslScriptInfo) error {
-	e.logger.Debugf("Running script %s", script.OriginFileName)
-	//e.ctx.scriptObj = script
-	return e.safeEvalWithFileName(script.Script, script.OriginFileName)
-}
+
+//func (e *Executor) RunScript(script *script_core.NaslScriptInfo) error {
+//	e.logger.Debugf("Running script %s", script.OriginFileName)
+//	//e.ctx.scriptObj = script
+//	return e.safeEvalWithFileName(script.Script, script.OriginFileName)
+//}
 
 func (e *Executor) EvalInclude(name string) error {
 	// 优先从本地文件中查找，否则从内置的文件中查找
@@ -254,7 +235,7 @@ func (e *Executor) RunFile(path string) error {
 	if err != nil {
 		return err
 	}
-	recoverSource := e.compiler.SetSourceCodeFilePath(path)
+	recoverSource := e.Compiler.SetSourceCodeFilePath(path)
 	defer recoverSource()
 	return e.safeEvalWithFileName(string(code), path)
 }
@@ -272,7 +253,7 @@ func (e *Executor) Exec(code, fileName string) error {
 			}
 		}
 	}()
-	recoverCode := e.compiler.SetSourceCode(code)
+	recoverCode := e.Compiler.SetSourceCode(code)
 	defer func() { recoverCode() }()
 	e.sourceCode = code
 	//e.ctx.scriptObj.Script = code
@@ -280,12 +261,12 @@ func (e *Executor) Exec(code, fileName string) error {
 	if err != nil {
 		return err
 	}
-	cfg := e.vm.GetConfig()
+	cfg := e.GetConfig()
 	//if e.debug {
 	//	cfg.SetStopRecover(true)
 	//}
-	e.vm.SetConfig(cfg)
-	err = e.vm.ExecYakCode(context.Background(), code, e.compiler.GetCodes(), yakvm.None)
+	e.SetConfig(cfg)
+	err = e.ExecYakCode(context.Background(), code, e.Compiler.GetCodes(), yakvm.None)
 	if err != nil {
 		return err
 	}
@@ -301,7 +282,7 @@ func (e *Executor) safeEvalWithFileName(code string, fileName string) (err error
 			}
 		}
 	}()
-	recoverFunc := e.compiler.SetSourceCodeFilePath(fileName)
+	recoverFunc := e.Compiler.SetSourceCodeFilePath(fileName)
 	defer recoverFunc()
 	err = e.Exec(code, fileName)
 	return
@@ -310,9 +291,6 @@ func (e *Executor) SafeEval(code string) (err error) {
 	return e.safeEvalWithFileName(code, "")
 }
 
-func (e *Executor) GetVirtualMachine() *yakvm.VirtualMachine {
-	return e.vm
-}
 func (e *Executor) GetCompiler() *visitors.Compiler {
-	return e.compiler
+	return e.Compiler
 }

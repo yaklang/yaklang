@@ -6,10 +6,15 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script-core"
 	"strings"
 )
 
-func QueryAllScripts(script ...any) []*NaslScriptInfo {
+func init() {
+	yak.SetNaslExports(Exports)
+}
+func QueryAllScripts(script ...any) []*script_core.NaslScriptInfo {
 	queryCondition := map[string]any{}
 	if len(script) > 0 {
 		for k, v := range utils.InterfaceToMapInterface(script[0]) {
@@ -30,9 +35,9 @@ func QueryAllScripts(script ...any) []*NaslScriptInfo {
 		log.Errorf("cannot query script: %s", db.Error.Error())
 		return nil
 	}
-	var ret []*NaslScriptInfo
+	var ret []*script_core.NaslScriptInfo
 	for _, s := range scripts {
-		ret = append(ret, NewNaslScriptObjectFromNaslScript(s))
+		ret = append(ret, script_core.NewNaslScriptObjectFromNaslScript(s))
 	}
 	return ret
 }
@@ -52,8 +57,8 @@ func UpdateDatabase(p string) {
 			log.Errorf("Error load script %s: not a nasl file", path)
 			return
 		}
-		engine := NewScriptEngine()
-		engine.AddScriptLoadedHook(func(scriptIns *NaslScriptInfo) {
+		engine := script_core.NewScriptEngine()
+		engine.AddScriptLoadedHook(func(scriptIns *script_core.NaslScriptInfo) {
 			err := scriptIns.Save()
 			if err != nil {
 				log.Errorf("Error save script %s: %s", path, err.Error())
@@ -85,12 +90,12 @@ func UpdateDatabase(p string) {
 		saveScript(p)
 	}
 }
-func ScanTarget(target string, opts ...NaslScriptConfigOptFunc) (map[string]any, error) {
+func ScanTarget(target string, opts ...script_core.NaslScriptConfigOptFunc) (map[string]any, error) {
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {
 		return nil, err
 	}
-	return NaslScan(host, fmt.Sprint(port), opts...)
+	return script_core.NaslScan(host, fmt.Sprint(port), opts...)
 }
 
 var Exports = map[string]any{
@@ -98,10 +103,10 @@ var Exports = map[string]any{
 	"RemoveDatabase":  RemoveDatabase,
 	"QueryAllScripts": QueryAllScripts,
 	"ScanTarget":      ScanTarget,
-	"Scan":            NaslScan,
-	"plugin":          WithPlugins,
-	"family":          WithFamily,
-	"riskHandle":      WithRiskHandle,
-	"proxy":           WithProxy,
-	"conditions":      WithConditions,
+	"Scan":            script_core.NaslScan,
+	"plugin":          script_core.WithPlugins,
+	"family":          script_core.WithFamily,
+	"riskHandle":      script_core.WithRiskHandle,
+	"proxy":           script_core.WithProxy,
+	"conditions":      script_core.WithConditions,
 }

@@ -1,7 +1,7 @@
 package yakvm
 
 import (
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/vm"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 )
 
 func GetNaslValueBySymbolId(symbol int, frame *Frame) *Value {
@@ -14,7 +14,7 @@ func GetNaslValueBySymbolId(symbol int, frame *Frame) *Value {
 	name, ok := frame.CurrentScope().GetSymTable().GetNameByVariableId(id)
 	if ok && name == "_FCT_ANON_ARGS" {
 		if val, ok := frame.contextData["argument"]; ok {
-			return NewAutoValue(val.(*vm.NaslArray))
+			return NewAutoValue(val.(*nasl_type.NaslArray))
 		}
 	}
 	// 尝试在作用域获取值
