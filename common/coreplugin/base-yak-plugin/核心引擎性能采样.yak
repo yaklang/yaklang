@@ -1,0 +1,78 @@
+log.setLevel("info")// 设置日志级别
+yakit.AutoInitYakit()
+
+memProfile = cli.String(
+    "memProfile",
+    cli.setHelp("设置默认内存的profile文件路径"),
+    cli.setVerboseName("内存文件路径"),
+)
+timeout = cli.Float("timeout", cli.setHelp("检测 timeout 时间"), cli.setVerboseName("检测时间"),
+                    cli.setDefault(10), cli.setRequired(true))
+cpuProfileFile = cli.String(
+    "cpuProfileFile",
+    cli.setHelp("设置默认cpu的profile文件路径"),
+    cli.setVerboseName("cpu文件路径"),
+)
+
+checkMemory = cli.Bool("startMemory", cli.setHelp("开始检测内存"), cli.setVerboseName("是否检测内存"),
+                       cli.setDefault(true), cli.setRequired(true))
+checkCpu = cli.Bool("startCpu", cli.setHelp("开始检测cpu"), cli.setVerboseName("是否检测cpu"),
+                    cli.setDefault(true), cli.setRequired(true))
+cli.check()
+
+if !(checkMemory || checkCpu) {
+    log.error("设置内存或cpu检测")
+    return
+}
+
+
+defer func() {
+    yakit.SetProgress(1.0)
+}()
+
+
+count = 0
+go fn() {
+    for {
+        sleep(1)
+        count++
+        if count == timeout {
+            return
+        }
+
+
+        yakit.SetProgress(count / timeout)
+    }
+
+}()
+
+
+sampleHandler = i => {
+    _, fileName := file.Split(i)
+    if fileName.HasPrefix("cpu-") {
+        yakit.File(i, "CPU采样", "性能优化采样")
+    } else if fileName.HasPrefix("mem-") {
+        yakit.File(i, "内存采样", "性能优化采样")
+    }
+
+}
+
+if checkMemory && checkCpu {
+    pprof.StartCPUAndMemoryProfile(pprof.memProfilePath(memProfile), pprof.cpuProfilePath(cpuProfileFile),
+                                   pprof.timeout(timeout), pprof.callback(sampleHandler))
+} else if checkMemory {
+    pprof.StartMemoryProfile(pprof.memProfilePath(memProfile), pprof.cpuProfilePath(cpuProfileFile),
+                             pprof.timeout(timeout), pprof.callback(sampleHandler))
+} else {
+    pprof.StartCPUProfile(pprof.memProfilePath(memProfile), pprof.cpuProfilePath(cpuProfileFile), pprof.timeout(timeout),
+                          pprof.callback(sampleHandler))
+}
+
+
+if cpuProfileFile != "" && file.IsExisted(cpuProfileFile) {
+    yakit.File(cpuProfileFile, "CPU采样", "性能优化采样")
+}
+
+if memProfile != "" && file.IsExisted(memProfile) {
+    yakit.File(memProfile, "内存采样", "性能优化采样")
+}

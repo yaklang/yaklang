@@ -135,6 +135,11 @@ func init() {
 			withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
 			withPluginAuthors("V1ll4n"),
 		)
+		registerBuildInPlugin(
+			"yak", "核心引擎性能采样",
+			withPluginHelp("动态开启PPROF采样，用于性能调优"),
+			withPluginAuthors("V1ll4n,Q16G"),
+		)
 		return nil
 	})
 }
