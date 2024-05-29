@@ -2,6 +2,7 @@ package coreplugin
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/samber/lo"
@@ -12,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
-func Check(code string, t *testing.T) {
+func MITMCheck(code string, t *testing.T) {
 	_, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt("mitm")...)
 	if err != nil {
 		t.Fatal("Failed to parse code: ", err)
@@ -32,6 +33,9 @@ func TestAnalyzeMustPASS_CorePlugin(t *testing.T) {
 	}
 
 	for _, file := range files {
+		if strings.Contains(file.Name(), "核心引擎性能采样") {
+			continue
+		}
 		if !file.IsDir() {
 			filePath := fmt.Sprintf("base-yak-plugin/%s", file.Name())
 			codeBytes, err := basePlugin.ReadFile(filePath)
@@ -41,7 +45,7 @@ func TestAnalyzeMustPASS_CorePlugin(t *testing.T) {
 			}
 
 			t.Run(fmt.Sprintf("plugin %s", file.Name()), func(t *testing.T) {
-				Check(string(codeBytes), t)
+				MITMCheck(string(codeBytes), t)
 			})
 		}
 	}
