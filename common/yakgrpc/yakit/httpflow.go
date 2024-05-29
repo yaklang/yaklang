@@ -32,12 +32,37 @@ func init() {
 }
 
 func RegisterLowHTTPSaveCallback() {
-	lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string, payloads []string) {
+	lowhttp.RegisterSaveHTTPFlowHandler(func(r *lowhttp.LowhttpResponse) {
+		var (
+			https       = r.Https
+			req         = r.RawRequest
+			rsp         = r.RawPacket
+			url         = r.Url
+			remoteAddr  = r.RemoteAddr
+			reqSource   = r.Source
+			runtimeId   = r.RuntimeId
+			fromPlugin  = r.FromPlugin
+			hiddenIndex = r.HiddenIndex
+			payloads    = r.Payloads
+			reqIns      *http.Request
+		)
+		// fix some field
+		if r.HiddenIndex == "" {
+			r.HiddenIndex = uuid.NewString()
+			hiddenIndex = r.HiddenIndex
+		}
+		if r.TooLarge {
+			rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, []byte(`[[response too large(`+utils.ByteSize(uint64(r.TooLargeLimit))+`), truncated]] find more in web fuzzer history!`))
+		}
 		if rsp == nil || len(rsp) == 0 {
 			return
 		}
+		if len(r.MultiResponseInstances) > 0 {
+			reqIns = r.MultiResponseInstances[0].Request
+		}
+
 		db := consts.GetGormProjectDatabase()
-		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr)
+		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
 			return
@@ -233,12 +258,6 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		}
 	})
 	responseRaw := strconv.Quote(string(rspRaw))
-	// 如果设置了 reqIns，则不会再解析 reqRaw
-	if reqIns != nil {
-		fReq, _ = mutate.NewFuzzHTTPRequest(reqIns)
-	} else {
-		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
-	}
 
 	flow := &schema.HTTPFlow{
 		IsHTTPS:     isHttps,
@@ -254,6 +273,22 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		RemoteAddr:  remoteAddr,
 		HiddenIndex: uuid.NewString(),
 	}
+
+	// 如果设置了 reqIns，则不会再解析 reqRaw
+	if reqIns != nil {
+		fReq, _ = mutate.NewFuzzHTTPRequest(reqIns)
+
+		// 修复 TooLargeFile
+		if httpctx.GetResponseTooLarge(reqIns) {
+			flow.IsTooLargeResponse = true
+			flow.TooLargeResponseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(reqIns)
+			flow.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
+			flow.BodyLength = httpctx.GetResponseTooLargeSize(reqIns)
+		}
+	} else {
+		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
+	}
+
 	ip, _, _ := utils.ParseStringToHostPort(remoteAddr)
 	if ip != "" {
 		flow.IPAddress = ip
@@ -295,6 +330,8 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 }
 
 func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
+	opts = append(opts, CreateHTTPFlowWithRequestIns(req))
+
 	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)

@@ -1494,7 +1494,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
 
-		flow.FixHTTPRequest(req)
 
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
