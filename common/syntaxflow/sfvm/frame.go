@@ -314,7 +314,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if err != nil {
 				return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 			}
-			s.debugSubLog("<< push top defs")
+			s.debugSubLog("<< push top defs %s", vals.String())
 			s.stack.Push(vals)
 		case OpNewRef:
 			if i.UnaryStr == "" {

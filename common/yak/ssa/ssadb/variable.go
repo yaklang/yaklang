@@ -14,6 +14,8 @@ type IrVariable struct {
 	ProgramName  string `json:"program_name" gorm:"index"`
 	VariableName string `json:"variable_name" gorm:"index"`
 
+	IsClassInstance bool `json:"is_class_instance"`
+
 	// OOP Index
 	ObjectID        int64  `json:"object_id" gorm:"index"`
 	SliceMemberName string `json:"slice_member_name" gorm:"index"`
@@ -43,6 +45,16 @@ func SaveVariable(db *gorm.DB, program, variable string, instIDs []int64) error 
 		}
 	}
 
+	return db.Save(irVariable).Error
+}
+
+func SaveClassInstance(db *gorm.DB, program, class string, instIDs []int64) error {
+	db = db.Model(&IrVariable{})
+	irVariable := &IrVariable{}
+	irVariable.IsClassInstance = true
+	irVariable.ProgramName = program
+	irVariable.VariableName = class
+	irVariable.InstructionID = instIDs
 	return db.Save(irVariable).Error
 }
 

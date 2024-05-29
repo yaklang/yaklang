@@ -1530,7 +1530,7 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 
 }
 
-func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
+func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value) {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -1554,6 +1554,9 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 	var className string
 	if ret := i.ClassCreatorRest(); ret != nil {
 		className = i.CreatedName().GetText()
+		defer func() {
+			y.GetProgram().Cache.AddClassInstance(className, obj)
+		}()
 		// todo 泛型
 		class := y.GetClassBluePrint(className)
 		obj := y.EmitMakeWithoutType(nil, nil)
@@ -1590,7 +1593,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 		return y.VisitArrayCreatorRest(ret, p)
 	}
 	log.Errorf("array  init failed.")
-	obj := y.EmitMakeWithoutType(nil, nil)
+	obj = y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(ssa.GetAnyType())
 	return obj
 
