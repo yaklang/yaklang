@@ -76,7 +76,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 			"/fastjson/json-in-query?auth=" + codec.EncodeUrlCode(`{"user":"admin","password":"password"}`) + "&action=login",
 		},
 		ExpectedResult: map[string]int{
-			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
+			"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog MITMCheck)": 1,
 		},
 		StrictMode: true,
 		Id:         "json in query test",
@@ -95,7 +95,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//	},
 	//	Body: []byte(`auth={"user":"admin","password":"password"}`),
 	//	ExpectedResult: map[string]int{
-	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
+	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog MITMCheck)": 1,
 	//	},
 	//	StrictMode: true,
 	//	Id: "json in form",
@@ -113,7 +113,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//		},
 	//	},
 	//	ExpectedResult: map[string]int{
-	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
+	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog MITMCheck)": 1,
 	//	},
 	//	StrictMode: true,
 	//	Id: "json in body",
@@ -138,7 +138,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//		"/fastjson/get-in-query-intranet?auth=" + codec.EncodeUrlCode(`{"user":"admin","password":"password"}`) + "&action=login",
 	//	},
 	//	ExpectedResult: map[string]int{
-	//		"目标 fastjson 框架可能存在 RCE 漏洞 (Delay Check)": 1,
+	//		"目标 fastjson 框架可能存在 RCE 漏洞 (Delay MITMCheck)": 1,
 	//	},
 	//	StrictMode: true,
 	//}
@@ -156,7 +156,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//		},
 	//	},
 	//	ExpectedResult: map[string]int{
-	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
+	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog MITMCheck)": 1,
 	//	},
 	//	StrictMode: true,
 	//}
@@ -174,7 +174,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	//		},
 	//	},
 	//	ExpectedResult: map[string]int{
-	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog Check)": 1,
+	//		"目标 fastjson 框架可能存在 RCE 漏洞 (DNSLog MITMCheck)": 1,
 	//	},
 	//	StrictMode: true,
 	//}
@@ -195,7 +195,7 @@ func TestFastjson(t *testing.T) {
 			"/fastjson/get-in-query-intranet?auth=" + codec.EncodeUrlCode(`{"user":"admin","password":"password"}`) + "&action=login",
 		},
 		ExpectedResult: map[string]int{
-			"目标 fastjson 框架可能存在 RCE 漏洞 (Delay Check)": 1,
+			"目标 fastjson 框架可能存在 RCE 漏洞 (Delay MITMCheck)": 1,
 		},
 		StrictMode: true,
 	}
