@@ -1705,9 +1705,9 @@ func init() {
 			naslLibCall("set_kb_item", ctx, map[string]interface{}{"name": fmt.Sprintf("HostDetails/NVT/%s/%s", ctx.scriptObj.OID, name), "value": value}, nil)
 			return nil, nil
 		},
-		"this_host_mac": func(ctx *ExecContext, params *NaslBuildInMethodParam) (interface{}, error) {
-			target := params.getParamByNumber(0, "")
-			iface, _, _, err := netutil.Route(5*time.Second, target.String())
+		"host_mac": func(ctx *ExecContext, params *NaslBuildInMethodParam) (interface{}, error) {
+			target := ctx.Host
+			iface, _, _, err := netutil.Route(5*time.Second, target)
 			if err != nil {
 				return nil, err
 			}
