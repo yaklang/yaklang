@@ -23,6 +23,15 @@ type Value struct {
 	operands   Values
 }
 
+func ValueContain(v1 *Value, v2 ...*Value) bool {
+	for _, v := range v2 {
+		if ValueCompare(v1, v) {
+			return true
+		}
+	}
+	return false
+}
+
 func ValueCompare(v1, v2 *Value) bool {
 	v1IsNil, v2IsNil := v1.IsNil(), v2.IsNil()
 	if v1IsNil && v2IsNil {
@@ -193,8 +202,8 @@ func (v *Value) GetUsers() Values {
 		return nil
 	}
 
-	if v.users == nil {
-		v.users = lo.FilterMap(v.node.GetUsers(),
+	appendUser := func(node ssa.Value) {
+		v.users = lo.FilterMap(node.GetUsers(),
 			func(ssaVal ssa.User, _ int) (*Value, bool) {
 				if value, ok := ssa.ToValue(ssaVal); ok {
 					return v.NewValue(value), true
@@ -202,6 +211,13 @@ func (v *Value) GetUsers() Values {
 				return nil, false
 			},
 		)
+	}
+
+	if v.users == nil {
+		appendUser(v.node)
+		for _, reference := range v.node.Reference() {
+			appendUser(reference)
+		}
 	}
 	return v.users
 }
@@ -564,10 +580,21 @@ func (v *Value) GetCalledBy() Values {
 	if v.IsNil() {
 		return nil
 	}
+	vs := make(Values, 0)
+	add := func(node ssa.Value) {
+		for _, user := range node.GetUsers() {
+			if call, ok := ssa.ToCall(user); ok &&
+				call.Method.GetId() == node.GetId() {
+				vs = append(vs, v.NewValue(call))
+			}
+		}
 
-	return v.GetUsers().Filter(func(value *Value) bool {
-		return value.IsCall() && ValueCompare(value.GetCallee(), v)
-	})
+	}
+	add(v.node)
+	for _, ref := range v.node.Reference() {
+		add(ref)
+	}
+	return vs
 }
 
 // GetCallee desc any of 'Users' is Call

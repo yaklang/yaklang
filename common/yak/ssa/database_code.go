@@ -161,6 +161,10 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		ir.MaskedCodes = append(ir.MaskedCodes, m.GetId())
 	}
 	ir.String = value.String()
+	for _, r := range value.Reference() {
+		ir.Reference = append(ir.Reference, r.GetId())
+	}
+	ir.TypeId = SaveTypeToDB(value.GetType())
 }
 
 func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -210,6 +214,14 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	for _, m := range ir.MaskedCodes {
 		value.AddMask(getValue(m))
 	}
+
+	// reference
+	for _, r := range ir.Reference {
+		value.AddReference(getValue(r))
+	}
+
+	// type
+	value.SetType(GetTypeFromDB(ir.TypeId))
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {

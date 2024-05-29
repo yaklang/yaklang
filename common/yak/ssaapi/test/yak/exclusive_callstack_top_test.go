@@ -67,6 +67,20 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 		)
 	})
 
+	t.Run("test level2 simple", func(t *testing.T) {
+		ssatest.Check(t, `
+		f = (i) => {
+			return () => {
+				return i 
+			} 
+		}
+		f1 = f(333333)
+		a = f1()
+		`,
+			ssatest.CheckTopDef_Equal("a", []string{"333333"}),
+		)
+	})
+
 	t.Run("test level2", func(t *testing.T) {
 		ssatest.Check(t, `
 		f = (i) => {
@@ -272,6 +286,7 @@ func Test_CallStack_Normal_SideEffect(t *testing.T) {
 		)
 	})
 
+	// TODO: get top-def, will recursive by object
 	t.Run("test level1, object member", func(t *testing.T) {
 		code := `
 		a = {}

@@ -801,6 +801,7 @@ type FunctionType struct {
 	Name            string
 	pkgPath         string
 	ReturnType      Type
+	ReturnValue     []*Return
 	Parameter       Types
 	ParameterLen    int
 	ParameterValue  []*Parameter

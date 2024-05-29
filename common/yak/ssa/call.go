@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -14,17 +15,18 @@ func NewCall(target Value, args []Value, binding map[string]Value, block *BasicB
 				args = utils.InsertSliceItem(args, this, 0)
 			}
 		}
-		switch t := target.(type) {
-		case *ClassMethod: // for class instance
-			AddThis(t.This)
-			target = t.Func
-		case *Function: // for object inner function
-			if len(t.Param) > 0 {
-				if para := t.Param[0]; para != nil && para.IsObject() && para.GetDefault() != nil {
-					AddThis(para.GetDefault())
+		switch t := target.GetType().(type) {
+		case *FunctionType:
+			if t.IsMethod {
+				if obj := target.GetObject(); obj != nil {
+					AddThis(obj)
+				} else {
+					//  is method but not object
+					log.Errorf("method call, but object is nil")
 				}
 			}
 		default:
+			_ = t
 		}
 	}
 

@@ -19,7 +19,7 @@ func ToBasicBlock(n Instruction) (*BasicBlock, bool) {
 	u, ok := n.(*BasicBlock)
 	return u, ok
 }
-func ToMethod(n Node) (*ClassMethod, bool) { u, ok := n.(*ClassMethod); return u, ok }
+
 func ToFreeValue(n Node) (*Parameter, bool) {
 	u, ok := n.(*Parameter)
 	if ok && u.IsFreeValue {
