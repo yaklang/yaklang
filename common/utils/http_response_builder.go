@@ -3,11 +3,6 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net"
 	"net/http"
@@ -17,6 +12,12 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/pkg/errors"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // ParseHTTPResponseLine parses `HTTP/1.1 200 OK` into its ports
@@ -67,9 +68,9 @@ func OpenTempFile(s string) (*os.File, error) {
 	}
 
 	if !IsDir(constsTempFileDir) {
-		_ = os.MkdirAll(constsTempFileDir, 0755)
+		_ = os.MkdirAll(constsTempFileDir, 0o755)
 	}
-	return os.OpenFile(filepath.Join(constsTempFileDir, s), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	return os.OpenFile(filepath.Join(constsTempFileDir, s), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 }
 
 func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
@@ -91,7 +92,7 @@ func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, e
 }
 
 func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
-	var rawPacket = new(bytes.Buffer)
+	rawPacket := new(bytes.Buffer)
 	var nobodyReqMethod bool
 	if req != nil { // some request method will not have body
 		nobodyReqMethod = strings.EqualFold(req.Method, http.MethodHead) ||
@@ -99,8 +100,8 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			strings.EqualFold(req.Method, http.MethodConnect)
 	}
 
-	var headerReader = originReader
-	var rsp = new(http.Response)
+	headerReader := originReader
+	rsp := new(http.Response)
 	firstLine, err := ReadLine(headerReader)
 	if err != nil {
 		return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
@@ -138,12 +139,12 @@ HandleExpect100Continue:
 	}
 
 	// header
-	var header = make(http.Header)
-	var useContentLength = false
-	var hasEntityHeader = false
-	var contentLengthInt = 0
-	var useTransferEncodingChunked = false
-	var defaultClose = (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
+	header := make(http.Header)
+	useContentLength := false
+	hasEntityHeader := false
+	contentLengthInt := 0
+	useTransferEncodingChunked := false
+	defaultClose := (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
 	for {
 		lineBytes, err := ReadLine(headerReader)
@@ -222,7 +223,7 @@ HandleExpect100Continue:
 		}
 	}()
 
-	var bodyRawBuf = new(bytes.Buffer)
+	bodyRawBuf := new(bytes.Buffer)
 	if fixContentLength {
 		// just for bytes condition
 		// by reader
@@ -273,7 +274,7 @@ HandleExpect100Continue:
 					contentLengthInt = 100 * 1000 // no cl ,but maybe has body ,give 100k
 				}
 				if contentLengthInt > 0 {
-					var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					bodyRaw, err := io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
 					rawPacket.Write(bodyRaw)
 					if err != nil && err != io.EOF {
 						return nil, errors.Wrap(err, "read body error")
@@ -285,13 +286,20 @@ HandleExpect100Continue:
 			}
 		}
 	}
-	if ret := bodyRawBuf.Len(); ret == 0 {
+	bodySize := bodyRawBuf.Len()
+	if bodySize == 0 {
 		rsp.Body = http.NoBody
 	} else {
-		httpctx.SetResponseBodySize(req, int64(ret))
+		httpctx.SetResponseBodySize(req, int64(bodySize))
 		rsp.Body = io.NopCloser(bodyRawBuf)
 	}
 	if req != nil {
+		// set too large if greater than max content length
+		maxContentLength := httpctx.GetResponseMaxContentLength(req)
+		if maxContentLength > 0 && bodySize > maxContentLength {
+			httpctx.SetResponseTooLarge(req, true)
+		}
+
 		if httpctx.GetResponseTooLarge(req) {
 			httpctx.SetBareResponseBytes(req, headerBytes)
 			uid := ksuid.New().String()

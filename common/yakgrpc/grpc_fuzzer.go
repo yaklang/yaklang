@@ -27,6 +27,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
@@ -784,8 +785,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		// 可以用于计算相似度
 		var firstHeader, firstBody []byte
 		for result := range res {
-			task.HTTPFlowTotal++
 			var payloads []string
+			task.HTTPFlowTotal++
+
 			if !isRetry {
 				payloads = make([]string, len(result.Payloads))
 				for i, payload := range result.Payloads {
@@ -858,8 +860,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				)
 			}
 
-			var httpTPLmatchersResult bool
-			if haveHTTPTplMatcher && result.LowhttpResponse != nil {
+			httpTPLmatchersResult := false
+			lowhttpResponse := result.LowhttpResponse
+
+			if haveHTTPTplMatcher && lowhttpResponse != nil {
 				cond := "and"
 				switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
 				case "or", "and":
@@ -876,7 +880,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 				httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
 					RawPacket: result.ResponseRaw,
-					Duration:  result.LowhttpResponse.GetDurationFloat(),
+					Duration:  lowhttpResponse.GetDurationFloat(),
 				}, matcherParams)
 				if finalError != nil {
 					log.Errorf("httptpl.YakMatcher execute failed: %s", err)
@@ -884,47 +888,26 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
-			var tooLarge bool
-			var tooLargeBodyFile string
-			var tooLargeHeaderFile string
-			if bodyLength := len(body); bodyLength > maxBodySize {
-				tooLarge = true
-				uid := uuid.New().String()
-				suffix := fmt.Sprintf("%v_%v",
-					time.Now().Format(utils.DatetimePretty()),
-					uid,
-				)
-				bodyFp, _ := consts.TempFile(fmt.Sprintf("webfuzzer_large_body_%v.txt", suffix))
-				if bodyFp != nil {
-					bodyFp.Write(body)
-					bodyFp.Close()
-					tooLargeBodyFile = bodyFp.Name()
-				}
-
-				headerFp, _ := consts.TempFile(fmt.Sprintf("webfuzzer_large_header_%v.txt", suffix))
-				if headerFp != nil {
-					headerFp.Write(result.ResponseRaw)
-					headerFp.Close()
-					tooLargeHeaderFile = headerFp.Name()
-				}
-
-				if bodyLength > 5*1024*1024 {
-					var buf bytes.Buffer
-					buf.Write(body[:1024*1024])
-					buf.WriteString("...\n...\n...\n(response > 5M)\n...\n...\n...")
-					buf.Write(body[bodyLength-1024*1024:])
-					body = buf.Bytes()
-				}
-			}
 
 			if !req.GetNoFixContentLength() && (result.Request != nil && result.Request.ProtoMajor != 2) { // no fix for h2 rsp
 				result.ResponseRaw = lowhttp.ReplaceHTTPPacketBody(result.ResponseRaw, body, false)
 				result.Response, _ = lowhttp.ParseStringToHTTPResponse(string(result.ResponseRaw))
 			}
 
+			// too large request
 			if len(result.RequestRaw) > 1*1024*1024 {
 				result.RequestRaw = result.RequestRaw[:1*1024*1024]
 				result.RequestRaw = append(result.RequestRaw, []byte("...(request > 1M) chunked by yakit web fuzzer")...)
+			}
+			tooLarge := false
+			tooLargeHeaderFile, tooLargeBodyFile := "", ""
+			if lowhttpResponse != nil {
+				tooLarge = lowhttpResponse.TooLarge
+				if tooLarge && len(lowhttpResponse.MultiResponseInstances) > 0 {
+					reqIns := lowhttpResponse.MultiResponseInstances[0].Request
+					tooLargeHeaderFile = httpctx.GetResponseTooLargeHeaderFile(reqIns)
+					tooLargeBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
+				}
 			}
 
 			task.HTTPFlowSuccessCount++
@@ -939,7 +922,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				ExtractedResults:           extractorResults,
 				MatchedByMatcher:           httpTPLmatchersResult,
 				HitColor:                   req.GetHitColor(),
-				IsTooLargeResponse:         tooLarge,
+				IsTooLargeResponse:         lowhttpResponse.TooLarge,
 				TooLargeResponseBodyFile:   tooLargeBodyFile,
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,

@@ -3,7 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/segmentio/ksuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
@@ -12,14 +16,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strings"
-	"testing"
 )
 
 func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_NEGATIVE(t *testing.T) {
 	var port int
-	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
 	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
 	if err != nil {
@@ -92,19 +93,15 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 
 func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
 	var port int
-	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
 	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	vulinboxAddr := utils.HostPort(host, port)
 
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	token := ksuid.New().String()
 	expectedCL := 4 * 1000 * 1000
@@ -113,40 +110,41 @@ func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
 Host: ` + vulinboxAddr + "\r\n\r\n",
 		MaxBodySize: int64(expectedCL - 1),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	rsp, err := stream.Recv()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rsp.IsTooLargeResponse && rsp.TooLargeResponseHeaderFile != "" && rsp.TooLargeResponseBodyFile != "" {
-		raw, _ := os.ReadFile(rsp.TooLargeResponseBodyFile)
-		if len(raw) >= expectedCL {
-			dataResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(dataResponse.Data) != 1 {
-				t.Fatal("query taged flow failed(count is not right)")
-			}
-			if len(dataResponse.Data[0].Response) > expectedCL-10 {
-				t.Fatal("response is too large")
-			}
-			if !strings.Contains(string(dataResponse.Data[0].Response), `find more in web fuzzer history`) {
-				t.Fatal("response is not right")
-			}
+	require.NoError(t, err)
+	var httpflowID int64
+	defer func() {
+		if httpflowID == 0 {
 			return
-		} else {
-			t.Fatal("too-large-response body file not right")
 		}
-	}
-	t.Fatal("too-large-response not found(MaxBodySize is not right)")
+		client.DeleteHTTPFlows(ctx, &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{httpflowID},
+		})
+	}()
+	// check return
+	rsp, err := stream.Recv()
+	require.NoError(t, err)
+	require.True(t, rsp.IsTooLargeResponse)
+	require.NotEmpty(t, rsp.TooLargeResponseBodyFile)
+	require.NotEmpty(t, rsp.TooLargeResponseHeaderFile)
+
+	raw, _ := os.ReadFile(rsp.TooLargeResponseBodyFile)
+	require.GreaterOrEqual(t, len(raw), expectedCL, "too-large-response body file not right")
+
+	// check database
+	dataResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token})
+	require.NoError(t, err)
+	require.Len(t, dataResponse.Data, 1, "query flow failed(count is not right)")
+	httpflowID = int64(dataResponse.Data[0].Id)
+	require.LessOrEqual(t, len(dataResponse.Data[0].Response), expectedCL-10, "response is too large")
+	require.Contains(t, string(dataResponse.Data[0].Response), `[[response too large`)
+	require.True(t, dataResponse.Data[0].IsTooLargeResponse)
+	require.Equal(t, rsp.TooLargeResponseHeaderFile, dataResponse.Data[0].TooLargeResponseHeaderFile)
+	require.Equal(t, rsp.TooLargeResponseBodyFile, dataResponse.Data[0].TooLargeResponseBodyFile)
 }
 
 func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE_NEGATIVE(t *testing.T) {
 	var port int
-	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
 	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
 	if err != nil {
@@ -226,7 +224,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 
 func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 	var port int
-	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
 	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
 	if err != nil {
@@ -258,51 +256,33 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 				t.Fatal(err)
 			}
 			cancel()
+
 			_, data, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
 				Keyword: token,
 			})
-			if err != nil {
-				t.Fatal("query taged flow failed", err)
-			}
-			if len(data) != 1 {
-				t.Fatal("query taged flow failed(count is not right)")
-			}
-			if data[0].BodyLength < 111110000 {
-				t.Fatal("query taged flow failed")
-			}
-			if !data[0].IsTooLargeResponse {
-				t.Fatal("too-large-response tag not found")
-			}
+			require.NoError(t, err, "query taged flow failed")
+			require.Len(t, data, 1, "query taged flow failed(count is not right)")
+			require.GreaterOrEqual(t, data[0].BodyLength, int64(111110000), "query taged flow failed")
+			require.True(t, data[0].IsTooLargeResponse, "too-large-response tag not found")
+
 			bodyFile := data[0].TooLargeResponseBodyFile
-			if bodyFile == "" {
-				t.Fatal("too-large-response body file not found")
-			}
-			rawBody, _ := os.ReadFile(bodyFile)
-			if len(rawBody) < 111110000 {
-				t.Fatal("too-large-response body file not found")
-			}
 			headerFile := data[0].TooLargeResponseHeaderFile
+
+			require.NotEmpty(t, bodyFile, "too-large-response body file not found")
+			rawBody, _ := os.ReadFile(bodyFile)
+			require.GreaterOrEqual(t, len(rawBody), 111110000, "too-large-response body file not found")
 			if headerFile == "" {
 				t.Fatal("too-large-response header file not found")
 			}
 			rawHeader, _ := os.ReadFile(headerFile)
-			if len(rawHeader) < 100 {
-				t.Fatal("too-large-response header file not found")
-			}
-			raw, err := yakit.GetHTTPFlow(consts.GetGormProjectDatabase(), int64(data[0].ID))
-			if err != nil {
-				t.Fatal("query taged flow failed", err)
-			}
+			require.GreaterOrEqual(t, len(rawHeader), 100, "too-large-response header file not found")
+
+			raw := data[0]
 			ins, _ := model.ToHTTPFlowGRPCModel(raw, true)
-			if len(ins.Response) > 111110000 {
-				t.Fatal("query taged flow failed")
-			}
-			if len(ins.Response) == 0 {
-				t.Fatal("query taged flow failed")
-			}
-			if !(ins.TooLargeResponseBodyFile != "" && ins.TooLargeResponseHeaderFile != "" && ins.IsTooLargeResponse) {
-				t.Fatal("too-large-response is not effect")
-			}
+			require.LessOrEqual(t, len(ins.Response), 111110000, "ins.Response is too large")
+			require.Greater(t, len(ins.Response), 0, "ins.Response should not be empty")
+			require.NotEmpty(t, ins.TooLargeResponseHeaderFile, "ins.TooLargeResponseHeaderFile should not be empty")
+			require.NotEmpty(t, ins.TooLargeResponseBodyFile, "ins.TooLargeResponseBodyFile should not be empty")
 		}),
 	)
 }

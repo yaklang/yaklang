@@ -1,13 +1,11 @@
 package schema
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
@@ -60,18 +58,6 @@ type HTTPFlow struct {
 	TooLargeResponseBodyFile   string
 	// 同步到企业端
 	UploadOnline bool `json:"upload_online"`
-}
-
-func (f *HTTPFlow) FixHTTPRequest(req *http.Request) {
-	if req == nil {
-		return
-	}
-	if httpctx.GetResponseTooLarge(req) {
-		f.IsTooLargeResponse = true
-		f.TooLargeResponseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(req)
-		f.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(req)
-		f.BodyLength = httpctx.GetResponseTooLargeSize(req)
-	}
 }
 
 // 颜色与 Tag API
