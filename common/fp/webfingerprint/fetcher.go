@@ -5,15 +5,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func FetchBannerFromHostPortEx(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, runtimeId string, proxy ...string) (bool, []*HTTPResponseInfo, error) {
@@ -85,9 +85,9 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 		Request []byte
 		IsHttps bool
 	}{{Url: originUrl, Raw: rsp, Request: packet, IsHttps: isTls}}, redirectResponse...) {
-		rsp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rspRaw.Raw)), nil)
+		rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(rspRaw.Raw)), nil)
 		if err != nil {
-			//log.Errorf("read response failed: %s", err)
+			// log.Errorf("read response failed: %s", err)
 			continue
 		}
 		info := &HTTPResponseInfo{

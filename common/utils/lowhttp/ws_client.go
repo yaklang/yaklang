@@ -5,15 +5,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
-	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/pkg/errors"
 )
@@ -226,11 +226,11 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		p(config)
 	}
 
-	var port = config.Port
-	var host = config.Host
+	port := config.Port
+	host := config.Host
 
 	// 修正端口
-	var noFixPort = false
+	noFixPort := false
 	if config.Port <= 0 {
 		if config.TLS {
 			config.Port = 443
@@ -259,7 +259,7 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	}
 
 	// 获取连接
-	var addr = utils.HostPort(host, port)
+	addr := utils.HostPort(host, port)
 	var conn net.Conn
 	if config.TLS {
 		conn, err = netx.DialTLSTimeout(10*time.Second, addr, nil, config.Proxy)
@@ -292,11 +292,11 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 
 	// 接收响应并判断
 	var responseRaw bytes.Buffer
-	rsp, err := http.ReadResponse(bufio.NewReader(io.TeeReader(conn, &responseRaw)), nil)
+	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(io.TeeReader(conn, &responseRaw)), nil)
 	if err != nil {
 		return nil, utils.Errorf("read response failed: %s", err)
 	}
-	//if rsp.StatusCode != 101 {
+	// if rsp.StatusCode != 101 {
 	if rsp.StatusCode != 101 && rsp.StatusCode != 200 {
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
 	}
