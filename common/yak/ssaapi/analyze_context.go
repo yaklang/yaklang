@@ -85,6 +85,14 @@ func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
 	if !obj.IsObject() {
 		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
 	}
+	if g._objectStack.HaveLastStackValue() {
+		last := g._objectStack.LastStackValue()
+		if ValueCompare(last.object, obj) &&
+			ValueCompare(last.key, key) &&
+			ValueCompare(last.member, member) {
+			return utils.Errorf("BUG: This object-key recursive.")
+		}
+	}
 	g._objectStack.Push(objectItem{
 		object: obj,
 		key:    key,

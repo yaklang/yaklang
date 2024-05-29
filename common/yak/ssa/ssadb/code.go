@@ -84,6 +84,12 @@ type IrCode struct {
 	// compile hash means: hash[ (file-content)+(program-name)+(package-name)+(program-index) ]
 	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
 
+	// type
+	TypeId int `json:"type_id"`
+
+	// reference
+	Reference Int64Slice `json:"reference" gorm:"type:text"`
+
 	// not important information
 	ExtraInformation string `json:"extra_information"`
 }
