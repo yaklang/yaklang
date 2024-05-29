@@ -10,8 +10,9 @@ import (
 
 type CodecFlow struct {
 	gorm.Model
-	FlowName string
-	WorkFlow []byte
+	FlowName   string
+	WorkFlow   []byte
+	WorkFlowUI string
 }
 
 func (cf *CodecFlow) ToGRPC() *ypb.CustomizeCodecFlow {
@@ -21,7 +22,8 @@ func (cf *CodecFlow) ToGRPC() *ypb.CustomizeCodecFlow {
 		log.Errorf("unmarshal codec flow failed: %s", err)
 	}
 	return &ypb.CustomizeCodecFlow{
-		FlowName: cf.FlowName,
-		WorkFlow: workFlow,
+		FlowName:   cf.FlowName,
+		WorkFlow:   workFlow,
+		WorkFlowUI: cf.WorkFlowUI,
 	}
 }
