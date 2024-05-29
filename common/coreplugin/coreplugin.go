@@ -16,8 +16,9 @@ var (
 )
 
 type pluginConfig struct {
-	Help   string
-	Author []string
+	Help     string
+	Author   []string
+	ParamRaw string
 }
 
 type pluginOption func(*pluginConfig)
@@ -34,6 +35,12 @@ func withPluginAuthors(authors ...string) pluginOption {
 	}
 }
 
+func withPluginParamRaw(s string) pluginOption {
+	return func(config *pluginConfig) {
+		config.ParamRaw = s
+	}
+}
+
 func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) {
 	var codes = string(GetCorePluginData(name))
 	if len(codes) <= 0 {
@@ -44,13 +51,13 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 	for _, o := range opt {
 		o(config)
 	}
-
 	var plugin = &schema.YakScript{
 		ScriptName:         name,
 		Type:               pluginType,
 		Content:            codes,
 		Help:               config.Help,
 		Author:             "yaklang.io",
+		Params:             config.ParamRaw,
 		OnlineContributors: strings.Join(config.Author, ","),
 		Uuid:               uuid.New().String(),
 		OnlineOfficial:     true,
@@ -139,6 +146,7 @@ func init() {
 			"yak", "核心引擎性能采样",
 			withPluginHelp("动态开启PPROF采样，用于性能调优"),
 			withPluginAuthors("V1ll4n,Q16G"),
+			withPluginParamRaw(`"[{\"Field\":\"memProfile\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"内存文件路径\",\"Help\":\"设置默认内存的profile文件路径\",\"MethodType\":\"string\"},{\"Field\":\"cpuProfileFile\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"cpu文件路径\",\"Help\":\"设置默认cpu的profile文件路径\",\"MethodType\":\"string\"},{\"Field\":\"timeout\",\"DefaultValue\":\"10\",\"TypeVerbose\":\"float\",\"FieldVerbose\":\"检测时间\",\"Help\":\"检测 timeout 时间\",\"Required\":true,\"MethodType\":\"float\"},{\"Field\":\"startMemory\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否检测内存\",\"Help\":\"开始检测内存\",\"Required\":true,\"MethodType\":\"boolean\"},{\"Field\":\"startCpu\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否检测cpu\",\"Help\":\"开始检测cpu\",\"Required\":true,\"MethodType\":\"boolean\"}]"`),
 		)
 		return nil
 	})
@@ -156,7 +164,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript) {
 		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
-	backendSha1 := utils.CalcSha1(string(codeBytes), scriptData.HeadImg)
+	backendSha1 := utils.CalcSha1(string(codeBytes), scriptData.HeadImg, strings.Trim(scriptData.Params, `"`))
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
 		log.Infof("add core plugin %v to plugin database", name)
@@ -169,7 +177,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript) {
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content, databasePlugin.HeadImg) == backendSha1 && databasePlugin.IsCorePlugin {
+	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content, databasePlugin.HeadImg, strings.Trim(databasePlugin.Params, `"`)) == backendSha1 && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
@@ -177,6 +185,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript) {
 		databasePlugin.Content = string(codeBytes)
 		databasePlugin.IsCorePlugin = true
 		databasePlugin.HeadImg = scriptData.HeadImg
+		databasePlugin.Params = scriptData.Params
 		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, databasePlugin)
 		if err != nil {
 			log.Errorf("override %v failed: %s", name, err)
