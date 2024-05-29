@@ -521,12 +521,14 @@ func (c *YakitClient) YakitReport(i int) {
 func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
 	title := fileName
 	descStr := ""
-	if len(desc) > 1 {
+	if len(desc) > 0 {
 		title = utils.InterfaceToString(desc[0])
-		descStr = utils.InterfaceToString(funk.Reduce(funk.Tail(desc), func(i interface{}, s interface{}) string {
-			return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
-		}, ""))
-		descStr = strings.Trim(descStr, " \r\n,")
+		if len(desc) > 1 {
+			descStr = utils.InterfaceToString(funk.Reduce(desc[1:], func(i interface{}, s interface{}) string {
+				return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
+			}, ""))
+			descStr = strings.Trim(descStr, " \r\n,")
+		}
 	}
 
 	existed, _ := utils.PathExists(fileName)
