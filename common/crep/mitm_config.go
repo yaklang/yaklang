@@ -7,6 +7,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"net/http"
+	"net/url"
+	"time"
+
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
@@ -14,9 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"net/http"
-	"net/url"
-	"time"
 )
 
 // request modifier
@@ -120,7 +121,7 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 		// add default config for H2 support
 		defaultH2Config := new(h2.Config)
 		if log.GetLevel() == log.DebugLevel {
-			defaultH2Config.EnableDebugLogs = true //for DEBUG and DEV only
+			defaultH2Config.EnableDebugLogs = true // for DEBUG and DEV only
 		}
 
 		certPool, err := x509.SystemCertPool()
@@ -276,6 +277,7 @@ func MITM_SetHTTPRequestHijack(c func(isHttps bool, req *http.Request) *http.Req
 		return nil
 	}
 }
+
 func MITM_SetHTTPResponseMirrorInstance(f func(isHttps bool, req, rsp []byte, remoteAddr string, response *http.Response)) MITMConfig {
 	return func(server *MITMServer) error {
 		server.httpFlowMirror = func(isHttps bool, r *http.Request, rsp *http.Response, startTs int64) {
@@ -287,7 +289,7 @@ func MITM_SetHTTPResponseMirrorInstance(f func(isHttps bool, req, rsp []byte, re
 
 func MITM_SetHTTPResponseMirror(f func(bool, string, *http.Request, *http.Response, string)) MITMConfig {
 	return MITM_SetHTTPResponseMirrorInstance(func(isHttps bool, req, rsp []byte, remoteAddr string, response *http.Response) {
-		var urlStr = httpctx.GetRequestURL(response.Request)
+		urlStr := httpctx.GetRequestURL(response.Request)
 		if urlStr == "" {
 			u, _ := lowhttp.ExtractURLFromHTTPRequest(response.Request, isHttps)
 			if u != nil {
@@ -309,11 +311,13 @@ func MITM_SetTransparentHijackMode(t bool) MITMConfig {
 	}
 }
 
-type MITMTransparentHijackFunc func(isHttps bool, data []byte) []byte
-type MITMTransparentHijackHTTPRequestFunc func(isHttps bool, data *http.Request) *http.Request
-type MITMTransparentHijackHTTPResponseFunc func(isHttps bool, data *http.Response) *http.Response
-type MITMTransparentMirrorFunc func(isHttps bool, req []byte, rsp []byte)
-type MITMTransparentMirrorHTTPFunc func(isHttps bool, req *http.Request, rsp *http.Response)
+type (
+	MITMTransparentHijackFunc             func(isHttps bool, data []byte) []byte
+	MITMTransparentHijackHTTPRequestFunc  func(isHttps bool, data *http.Request) *http.Request
+	MITMTransparentHijackHTTPResponseFunc func(isHttps bool, data *http.Response) *http.Response
+	MITMTransparentMirrorFunc             func(isHttps bool, req []byte, rsp []byte)
+	MITMTransparentMirrorHTTPFunc         func(isHttps bool, req *http.Request, rsp *http.Response)
+)
 
 func MITM_SetTransparentHijackRequest(f MITMTransparentHijackFunc) MITMConfig {
 	return func(server *MITMServer) error {
@@ -357,7 +361,7 @@ func MITM_SetTransparentHijackResponse(f MITMTransparentHijackFunc) MITMConfig {
 
 func MITM_SetTransparentHijackHTTPResponse(f MITMTransparentHijackHTTPResponseFunc) MITMConfig {
 	return MITM_SetTransparentHijackResponse(func(isHttps bool, rsp []byte) []byte {
-		rp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rsp)), nil)
+		rp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(rsp)), nil)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse response to *http.Response failed: %s", err)
 			return nil
@@ -395,7 +399,7 @@ func MITM_SetTransparentHijackedMirrorHTTP(f MITMTransparentMirrorHTTPFunc) MITM
 			rq.URL.Scheme = "http"
 		}
 
-		rp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rsp)), rq)
+		rp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(rsp)), rq)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse response to *http.Response failed: %s", err)
 			return
@@ -424,7 +428,7 @@ func MITM_SetTransparentMirrorHTTP(f MITMTransparentMirrorHTTPFunc) MITMConfig {
 		} else {
 			rq.URL.Scheme = "http"
 		}
-		rp, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(rsp)), rq)
+		rp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(rsp)), rq)
 		if err != nil {
 			log.Errorf("[MITM-transparent CONFIG] parse response to *http.Response failed: %s", err)
 			return
@@ -440,6 +444,7 @@ func MITM_SetDNSServers(servers ...string) MITMConfig {
 		return nil
 	}
 }
+
 func MITM_SetHostMapping(m map[string]string) MITMConfig {
 	return func(server *MITMServer) error {
 		server.HostMapping = m
