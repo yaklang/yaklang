@@ -37,6 +37,16 @@ func TestEvaluateExpression(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedResult, resp.Result)
 		require.Equal(t, expectedBoolResult, resp.BoolResult)
+
+		multiResp, err := local.EvaluateMultiExpression(ctx, &ypb.EvaluateMultiExpressionRequest{
+			Expressions: []string{expression},
+			Variables:   variables,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, multiResp.Results, 1)
+		require.Equal(t, expectedResult, multiResp.Results[0].Result)
+		require.Equal(t, expectedBoolResult, multiResp.Results[0].BoolResult)
 	}
 
 	t.Run("bool", func(t *testing.T) {

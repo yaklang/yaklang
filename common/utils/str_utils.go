@@ -387,7 +387,7 @@ func StringLiteralToAny(s string) any {
 	if err != nil {
 		// fallback to string
 		log.Errorf("json unmarshal error: %v", err)
-		result = fmt.Sprintf("%v", s)
+		result = s
 	}
 	return result
 }
