@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/network"
@@ -164,7 +163,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 			Value: fmt.Sprintf("%.3f", reqRecord.GetPercent()),
 		})
 
-		runtimeId := gjson.Get(reqRecord.GetExtraInfo(), `Params.#(Key="runtime_id").Value`).String()
+		runtimeId := req.GetRuntimeId()
 		var targets []string
 		for ah := range yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId) {
 			targets = append(targets, ah.IP)
