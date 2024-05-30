@@ -130,42 +130,38 @@ func FixMultipartBody(i []byte) (boundary string, fixedBody []byte) {
 	buf := new(bytes.Buffer)
 	reader := multipart.NewReader(bytes.NewBuffer(i))
 	dashBoundary := ""
-
 	for {
 		part, err := reader.NextPart()
-		if err != nil || part == nil {
-			break
-		}
+
+		// next part will fill the boundary
+		// whatever, use boundary first
 		if dashBoundary == "" {
-			dashBoundary = string(reader.Boundary())
+			dashBoundary = reader.Boundary()
 		}
 
+		buf.WriteString("--")
 		buf.WriteString(dashBoundary)
+
+		if err != nil {
+			buf.WriteString("--\r\n")
+			break
+		}
 		buf.Write(multipart.CRLF)
 		rawHeader, err := part.ReadRawHeader()
 		if err != nil {
 			log.Errorf("FixMultipartBody: Part Read Header failed: %v", err)
 		}
 		buf.Write(rawHeader)
+		if !part.NoEmptyLineDivider() {
+			buf.WriteString(CRLF)
+		}
 
-		for i := uint8(1); i <= multipart.GetPartEmptyLineNum(part); i++ {
-			buf.Write(multipart.CRLF)
-		}
-		n, err := io.Copy(buf, part)
-		if err != nil {
-			log.Errorf("FixMultipartBody: Part Read Body failed: %v", err)
-		}
-		if n > 0 {
+		if !part.NoBody() {
+			_, err = io.Copy(buf, part)
 			buf.Write(multipart.CRLF)
 		}
 	}
-	if reader.PartsRead() > 0 {
-		buf.WriteString(dashBoundary)
-		buf.Write(multipart.BoundaryStartOrEnd)
-		buf.Write(multipart.CRLF)
-	}
-
-	return strings.TrimPrefix(dashBoundary, "--"), buf.Bytes()
+	return reader.Boundary(), buf.Bytes()
 }
 
 // 状态机

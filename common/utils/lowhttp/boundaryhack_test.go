@@ -8,6 +8,37 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+func TestFixMultipartBody2(t *testing.T) {
+	_, body := FixMultipartBody([]byte(`--a
+Content-Disposition: form-data; name="file"; filename="a.php"
+Content-Type: image/png
+
+<?php phpinfo(); ?>` + "\n" + `--a--
+`))
+	println(string(codec.EncodeBase64(body)))
+	println("--------------------")
+	spew.Dump(body)
+	if !strings.Contains(string(body), "phpinfo(); ?>\r\n--a--") {
+		panic("FAILED")
+	}
+}
+
+func TestFixMultipartBody3(t *testing.T) {
+	_, body := FixMultipartBody([]byte(`--a
+Content-Disposition: form-data; name="file"; filename="a.php"
+Content-Type: image/png
+
+<?php phpinfo(); ?>` + "\n" + `--aa--
+--a--
+`))
+	println(string(codec.EncodeBase64(body)))
+	println("--------------------")
+	spew.Dump(body)
+	if !strings.Contains(string(body), "phpinfo(); ?>\n--aa--\r\n--a--") {
+		panic("FAILED")
+	}
+}
+
 func TestFixMultipartBody(t *testing.T) {
 	_, body := FixMultipartBody([]byte(`------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7
 Content-Disposition: form-data; name="file"; filename="a.php"
@@ -17,6 +48,7 @@ Content-Type: image/png
 ------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7--
 `))
 	println(string(codec.EncodeBase64(body)))
+	println("--------------------")
 	spew.Dump(body)
 	if !strings.Contains(string(body), "phpinfo();") {
 		panic("FAILED")
@@ -51,7 +83,9 @@ Content-Type: image/png
 ------------Ef1KM7GI3Ef1ei4Ij5ae
 `))
 	println(string(codec.EncodeBase64(body)))
+	println("-------------------------")
 	spew.Dump(body)
+	println("-------------------------")
 	println(string(body))
 	if strings.Contains(string(body), `phpinfo();`+CRLF) {
 		panic("CRLF in Body")
@@ -109,11 +143,7 @@ Content-Disposition: form-data; name="file"; filename="a.php"
 Content-Type: image/png
 
 <?php phpinfo();` + "\n" + ` ?>
-------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7---
-
-
-
-`))
+------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7---` + "\n\n\n\r\n"))
 	println(string(codec.EncodeBase64(body)))
 	spew.Dump(body)
 	println(string(body))
@@ -124,7 +154,12 @@ Content-Type: image/png
 		panic("FAILED")
 	}
 
-	if !strings.HasSuffix(string(body), ` ?>`+CRLF+`------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7---`+"--"+CRLF) {
+	boundaryWithPrefix := `------------Ef1KM7GI3Ef1ei4Ij5ae0KM7cH2KM7---`
+	suffix := ` ?>` + CRLF + boundaryWithPrefix + "\r\n\r\n\n\r\n" + boundaryWithPrefix + "--\r\n"
+	if !strings.HasSuffix(string(body), suffix) {
+		spew.Dump(string(body))
+		println("---------------------------")
+		spew.Dump(suffix)
 		panic("Identify end failed")
 	}
 	// VerifyMultipart(b, body)
@@ -141,7 +176,7 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 	println(string(codec.EncodeBase64(body)))
 	spew.Dump(body)
 	println(string(body))
-	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+"---------") {
+	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+CRLF+"---------") {
 		panic("CRLF in Body")
 	}
 	// VerifyMultipart(b, body)
@@ -159,11 +194,12 @@ Content-Disposition: form-data; name="{\"key\": \"value\"}"
 	println(string(codec.EncodeBase64(body)))
 	spew.Dump(body)
 	println(string(body))
-	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+"---------") {
+	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+"--------------------------123\r\n") {
+		spew.Dump(string(body))
 		panic("CRLF in form1")
 	}
 
-	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+CRLF+"---------") {
+	if !strings.Contains(string(body), `Content-Disposition: form-data; name="{\"key\": \"value\"}"`+CRLF+CRLF+CRLF+"--------------------------123--") {
 		panic("CRLF in form2")
 	}
 	// VerifyMultipart(b, body)
@@ -178,5 +214,30 @@ func TestFixMultipartPacket(t *testing.T) {
 	spew.Dump(raw)
 	if flag != codec.EncodeBase64(raw) {
 		panic(1)
+	}
+}
+
+func TestFixMultipartSpecialCase(t *testing.T) {
+	for _, c := range []struct {
+		Expect string
+		Input  string
+	}{
+		{Input: "--a\nA: Bar  \n--a--", Expect: "--a\r\nA: Bar  \r\n--a--\r\n"},
+		{Input: "--a\nA:Bar  \n--a--", Expect: "--a\r\nA:Bar  \r\n--a--\r\n"},
+		{Input: "--a\nA:Bar  \n--a--\r", Expect: "--a\r\nA:Bar  \r\n--a--\r\r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n--a--\n", Expect: "--a\r\nA: Bar  \r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n\n--a--\n", Expect: "--a\r\nA: Bar  \r\n\r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n\n\n--a--\n", Expect: "--a\r\nA: Bar  \r\n\r\n\r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n\n\n\n--a--\n", Expect: "--a\r\nA: Bar  \r\n\r\n\n\r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n\n" + "\n" + "\n--a--\n", Expect: "--a\r\nA: Bar  \r\n\r\n" + "\n" + "\r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n\n" + "\n\v\v\v\v\r\r" + "\n--a--\n", Expect: "--a\r\nA: Bar  \r\n\r\n" + "\n\v\v\v\v\r" + "\r\n--a--\r\n"},
+		{Input: "--a\nA: Bar  \n\n" + "\n\r\n\r\r\r" + "\n--a--\n", Expect: "--a\r\nA: Bar  \r\n\r\n" + "\n\r\n\r\r" + "\r\n--a--\r\n"},
+	} {
+		_, raw := FixMultipartBody([]byte(c.Input))
+		if c.Expect != string(raw) {
+			spew.Dump(c.Expect)
+			spew.Dump(string(raw))
+			panic("FAILED")
+		}
 	}
 }

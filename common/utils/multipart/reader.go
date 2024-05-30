@@ -4,30 +4,28 @@ package multipart
 import (
 	"bufio"
 	"bytes"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"mime"
 	"net/textproto"
 	"path/filepath"
 	"strings"
-	"unicode"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
 	peekBufferSize = 4096
 
 	FINDING_BOUNDARY     = 0
+	BOUNDARY_MATCHED     = 1
 	PARSING_BLOCK_HEADER = iota
 	PARSING_BLOCK_BODY
+	PART_FINISHED
 	FINISHED
 )
 
 var (
-	COLON              = []byte(":")
-	CRLF               = []byte("\r\n")
-	LF                 = []byte("\n")
-	BoundaryStartOrEnd = []byte("--")
+	CRLF = []byte("\r\n")
+	LF   = []byte("\n")
 
 	ErrInvalidBoundary = utils.Error("multipart: invalid boundary")
 
@@ -35,9 +33,10 @@ var (
 )
 
 type Reader struct {
-	bufReader    *bufio.Reader
-	dashBoundary []byte
-	partsRead    int
+	bufReader *bufio.Reader
+	boundary  string
+	finished  bool
+	partsRead int
 }
 
 func NewReaderWithString(s string) *Reader {
@@ -50,8 +49,8 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
-func (r *Reader) Boundary() []byte {
-	return r.dashBoundary
+func (r *Reader) Boundary() string {
+	return r.boundary
 }
 
 func (r *Reader) PartsRead() int {
@@ -63,102 +62,150 @@ func (r *Reader) NextRawPart() (*Part, error) {
 }
 
 func (r *Reader) NextPart() (*Part, error) {
+	if r.finished {
+		return nil, io.EOF
+	}
 	var (
 		currentPart  *Part
-		dashBoundary []byte // "--boundary"
-		appendNL     []byte
 		state        = FINDING_BOUNDARY
 		headerBuffer = new(bytes.Buffer)
-		blockBuffer  = new(bytes.Buffer)
-		isFirstLine  = true
+		bodyBuffer   = new(bytes.Buffer)
+		bareBuffer   = new(bytes.Buffer)
 
-		emptyLineNum uint8 = 0
+		lastBodyDivider []byte
 	)
 
-	if r.partsRead > 0 {
-		state = PARSING_BLOCK_HEADER
-		dashBoundary = r.dashBoundary
+	if len(r.boundary) > 0 {
+		state = BOUNDARY_MATCHED
+		if r.partsRead > 0 {
+			state = PARSING_BLOCK_HEADER
+		}
+	} else {
+		state = FINDING_BOUNDARY
 	}
 
 	for {
 		line, err := r.bufReader.ReadBytes('\n')
-		trimed := bytes.TrimRightFunc(line, unicode.IsSpace)
-		isEmptyLine := len(trimed) == 0
-
-		if err != nil && isEmptyLine {
-			if err != io.EOF {
-				return nil, utils.Wrap(err, "multipart: NextPart")
+		var (
+			trimed             []byte
+			isEmptyLine        bool
+			splitCRLF, splitLF bool
+		)
+		if len(line) > 1 && line[len(line)-1] == '\n' {
+			lastIndex := len(line) - 1
+			splitCRLF = line[lastIndex-1] == '\r'
+			splitLF = !splitCRLF
+			isEmptyLine = len(line) == 2
+			if splitCRLF {
+				trimed = line[:lastIndex-1]
 			} else {
-				if currentPart == nil {
-					return nil, io.EOF
-				}
-				break
+				trimed = line[:lastIndex]
 			}
+		} else if len(line) > 1 && line[len(line)-1] != '\n' {
+			trimed = line
+			splitCRLF = false
+			splitLF = false
+		} else if len(line) == 1 {
+			splitLF = true
+			splitCRLF = false
+			isEmptyLine = true
+		} else {
+			isEmptyLine = true
 		}
 
-		// when FINDING_BOUNDARY skip empty line
-		// first line should not empty line
-		if isEmptyLine && (state == FINDING_BOUNDARY || isFirstLine) {
-			continue
-		}
-		isFirstLine = false
-		isEnd := bytes.Equal(trimed, dashBoundary) || bytes.Equal(trimed, BytesJoinSize(len(dashBoundary)+2, dashBoundary, BoundaryStartOrEnd))
-		if isEnd {
-			break
+		if isEmptyLine && err != nil {
+			if currentPart == nil {
+				return nil, err
+			}
+			r.finished = true
+			return currentPart, nil
 		}
 
+	StateTransfer:
 		switch state {
 		case FINDING_BOUNDARY:
-			if !bytes.HasPrefix(trimed, BoundaryStartOrEnd) {
-				return nil, ErrInvalidBoundary
+			lineBoundary := string(trimed)
+			if strings.HasPrefix(lineBoundary, "--") {
+				r.boundary = lineBoundary[2:]
+			} else {
+				return nil, utils.Error("invalid boundary, boundary should start with '--'")
 			}
-			dashBoundary = bytes.Clone(trimed)
-			r.dashBoundary = dashBoundary
-
 			state = PARSING_BLOCK_HEADER
+		case BOUNDARY_MATCHED:
+			lineBoundary := string(trimed)
+			if lineBoundary == "--"+r.boundary {
+				state = PARSING_BLOCK_HEADER
+				continue
+			}
 		case PARSING_BLOCK_HEADER:
 			if currentPart == nil {
-				currentPart = newPart(blockBuffer, headerBuffer)
-				currentPart.setEmptyLineNum(&emptyLineNum)
+				currentPart = newPart(bodyBuffer, headerBuffer, bareBuffer)
+				currentPart.SetNoEmptyLineDivider(true)
+				currentPart.SetNoBody(true)
 			}
-
 			if isEmptyLine {
 				state = PARSING_BLOCK_BODY
-				emptyLineNum++
+				currentPart.SetNoEmptyLineDivider(false)
+				lastBodyDivider = nil
 				continue
+			} else if ret := len(trimed); ret == len(r.boundary)+2 || ret == len(r.boundary)+4 {
+				mayBoundary := string(trimed)
+				if mayBoundary == "--"+r.boundary+"--" {
+					state = FINISHED
+					goto StateTransfer
+				} else if mayBoundary == "--"+r.boundary {
+					state = PART_FINISHED
+					goto StateTransfer
+				}
 			}
 
 			headerBuffer.Write(trimed)
 			headerBuffer.Write(CRLF)
-			if bytes.Contains(trimed, COLON) {
-				k, v, ok := strings.Cut(string(trimed), ":")
-				if ok {
-					currentPart.Header[textproto.CanonicalMIMEHeaderKey(k)] = append(currentPart.Header[textproto.CanonicalMIMEHeaderKey(k)], strings.TrimSpace(v))
+			bareBuffer.Write(line)
+
+			k, v, ok := strings.Cut(string(trimed), ":")
+			if ok {
+				if strings.HasPrefix(v, " ") {
+					v = v[1:]
 				}
+				currentPart.Header[textproto.CanonicalMIMEHeaderKey(k)] = append(currentPart.Header[textproto.CanonicalMIMEHeaderKey(k)], v)
 			}
 		case PARSING_BLOCK_BODY:
-			if appendNL != nil {
-				blockBuffer.Write(appendNL)
-				appendNL = nil
+			ret := len(trimed)
+			// check if it's boundary
+			if ret == len(r.boundary)+2 || ret == len(r.boundary)+4 {
+				mayBoundary := string(trimed)
+				if mayBoundary == "--"+r.boundary+"--" {
+					state = FINISHED
+					goto StateTransfer
+				} else if mayBoundary == "--"+r.boundary {
+					state = PART_FINISHED
+					goto StateTransfer
+				}
 			}
-
-			if emptyLineNum < 2 && isEmptyLine && len(line) > 0 {
-				emptyLineNum++
+			if currentPart != nil {
+				currentPart.SetNoBody(false)
 			}
-			blockBuffer.Write(trimed)
-			if bytes.HasSuffix(line, CRLF) {
-				appendNL = CRLF
-			} else if bytes.HasSuffix(line, LF) {
-				appendNL = LF
+			if lastBodyDivider != nil {
+				bodyBuffer.Write(lastBodyDivider)
 			}
-
-			// case FINISHED:
-			// 	break LOOP
+			bodyBuffer.Write(trimed)
+			if splitLF {
+				lastBodyDivider = LF
+			} else if splitCRLF {
+				lastBodyDivider = CRLF
+			}
+		case PART_FINISHED:
+			r.finished = false
+			r.partsRead++
+			return currentPart, nil
+		case FINISHED:
+			r.finished = true
+			return currentPart, nil
+		default:
+			return nil, utils.Error("invalid state")
 		}
 	}
-
-	r.partsRead++
-	return currentPart, nil
 }
 
 var _ = io.Reader((*Part)(nil))
@@ -166,20 +213,41 @@ var _ = io.Reader((*Part)(nil))
 // Part represents a single part of a multipart body.
 
 type Part struct {
-	Header       textproto.MIMEHeader
-	headerReader io.Reader
-	bodyReader   io.Reader
-	emptyLineNum *uint8
+	Header textproto.MIMEHeader
+
+	headerReader       io.Reader
+	bareHeaderReader   io.Reader
+	noEmptyLineDivider bool
+
+	noBody     bool
+	bodyReader io.Reader
 
 	disposition       string
 	dispositionParams map[string]string
 }
 
-func newPart(bodyReader, headerReader io.Reader) *Part {
+func (p *Part) SetNoEmptyLineDivider(b bool) {
+	p.noEmptyLineDivider = b
+}
+
+func (p *Part) NoEmptyLineDivider() bool {
+	return p.noEmptyLineDivider
+}
+
+func (p *Part) SetNoBody(noBody bool) {
+	p.noBody = noBody
+}
+
+func (p *Part) NoBody() bool {
+	return p.noBody
+}
+
+func newPart(bodyReader, headerReader, bareHeaderReader io.Reader) *Part {
 	p := &Part{
-		bodyReader:   bodyReader,
-		headerReader: headerReader,
-		Header:       make(textproto.MIMEHeader),
+		bodyReader:       bodyReader,
+		headerReader:     headerReader,
+		bareHeaderReader: bareHeaderReader,
+		Header:           make(textproto.MIMEHeader),
 	}
 	return p
 }
@@ -259,8 +327,4 @@ func (p *Part) parseContentDisposition() {
 	if err != nil {
 		p.dispositionParams = emptyParams
 	}
-}
-
-func (p *Part) setEmptyLineNum(num *uint8) {
-	p.emptyLineNum = num
 }

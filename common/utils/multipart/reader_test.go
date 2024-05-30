@@ -1,12 +1,39 @@
 package multipart
 
 import (
+	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
+
+func TestReader_UnhealthyBody(t *testing.T) {
+	body := "--a\r\nKey: Value\r\n--a--"
+	reader := NewReaderWithString(body)
+	part, err := reader.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyRaw, _ := io.ReadAll(part)
+	assert.True(t, part.NoBody())
+	assert.True(t, part.NoEmptyLineDivider())
+	assert.Equal(t, "", string(bodyRaw))
+}
+
+func TestReader_UnhealthyBody2(t *testing.T) {
+	body := "--a\r\nKey: Value\r\n\r\n--a--"
+	reader := NewReaderWithString(body)
+	part, err := reader.NextPart()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyRaw, _ := io.ReadAll(part)
+	assert.True(t, part.NoBody())
+	assert.False(t, part.NoEmptyLineDivider())
+	assert.Equal(t, "", string(bodyRaw))
+}
 
 func TestReader(t *testing.T) {
 	testWithCallBack := func(t *testing.T, body string, callback func(t *testing.T, index int, body string, part *Part)) {

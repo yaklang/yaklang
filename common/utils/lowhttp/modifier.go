@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"mime"
 	"net/http"
@@ -1091,7 +1092,11 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 			case []byte:
 				content = r
 			case io.Reader:
-				r.Read(content)
+				var err error
+				content, err = io.ReadAll(r)
+				if err != nil && err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
+					log.Warnf("read file content error: %v", err)
+				}
 			}
 			if !hasContentType {
 				guessContentType = http.DetectContentType(content)
