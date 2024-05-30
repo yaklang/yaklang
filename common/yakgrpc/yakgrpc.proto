@@ -664,6 +664,7 @@ service Yak {
 
   // 表达式执行
   rpc EvaluateExpression(EvaluateExpressionRequest) returns (EvaluateExpressionResponse);
+  rpc EvaluateMultiExpression(EvaluateMultiExpressionRequest) returns (EvaluateMultiExpressionResponse);
 
 }
 message GetSpaceEngineAccountStatusRequest {
@@ -5058,4 +5059,13 @@ message EvaluateExpressionRequest {
 message EvaluateExpressionResponse {
     string Result = 1; // json marshal
     bool BoolResult = 2;
+}
+
+message EvaluateMultiExpressionRequest {
+    repeated string Expressions = 1;
+    repeated KVPair Variables = 2;
+}
+
+message EvaluateMultiExpressionResponse {
+    repeated EvaluateExpressionResponse Results = 1;
 }
