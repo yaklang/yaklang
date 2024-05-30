@@ -133,7 +133,8 @@ func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string
 		default:
 			log.Warnf("cannot handle type(raw): %T", i)
 		}
-		ret[key] = vals
+		// uniq
+		ret[key] = lo.UniqBy(vals, func(v *Value) int { return int(v.GetId()) })
 	}
 	return ret, nil
 }
