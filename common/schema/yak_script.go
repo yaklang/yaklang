@@ -90,19 +90,19 @@ func (s *YakScript) BeforeSave() error {
 
 	resRaw, _ := strconv.Unquote(s.Params)
 	if resRaw != "" {
-		var res interface{}
-		_ = json.Unmarshal([]byte(resRaw), &res)
-		switch ret := res.(type) {
-		case []interface{}:
-			for _, rawIf := range ret {
-				i, ok := rawIf.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				if utils.MapGetString(i, "Field") == "target" && utils.MapGetBool(i, "Required") {
-					s.IsBatchScript = true
-					break
-				}
+		var res []any
+		err := json.Unmarshal([]byte(resRaw), &res)
+		if err != nil {
+			log.Warnf(`json.Unmarshal script.Params failed: %s data: %v`, err, s.Params)
+		}
+		for _, rawIf := range res {
+			i, ok := rawIf.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if utils.MapGetString(i, "Field") == "target" && utils.MapGetBool(i, "Required") {
+				s.IsBatchScript = true
+				break
 			}
 		}
 	}
