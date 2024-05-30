@@ -2329,18 +2329,20 @@ Content-Disposition: form-data; name="b"
 		},
 	}
 	for _, testcase := range testcases {
-		actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
+		t.Run(testcase.name, func(t *testing.T) {
+			actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
 
-		require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody failed:", testcase.name)
+			require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody failed:", testcase.name)
 
-		// if !mapEqual(testcase.expected.params, actualParams) {
-		// 	t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualParams, testcase.expected.params)
-		// }
-		if actualUseRaw != testcase.expected.useRaw {
-			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualUseRaw, testcase.expected.useRaw)
-		}
-		if !errors.Is(actualError, testcase.expected.err) {
-			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualError, testcase.expected.err)
-		}
+			// if !mapEqual(testcase.expected.params, actualParams) {
+			// 	t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualParams, testcase.expected.params)
+			// }
+			if actualUseRaw != testcase.expected.useRaw {
+				t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualUseRaw, testcase.expected.useRaw)
+			}
+			if !errors.Is(actualError, testcase.expected.err) {
+				t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualError, testcase.expected.err)
+			}
+		})
 	}
 }
