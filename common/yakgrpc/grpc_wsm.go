@@ -90,11 +90,11 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		Remark:           req.GetRemark(),
 		PayloadCodecName: req.GetPayloadCodecName(),
 		PacketCodecName:  req.GetPacketCodecName(),
-		IsSession:        req.GetShellOptions().IsSession,
-		Retry:            req.GetShellOptions().RetryCount,
-		BlockSize:        req.GetShellOptions().BlockSize,
-		Timeout:          req.GetShellOptions().Timeout,
-		MaxSize:          req.GetShellOptions().MaxSize,
+		IsSession:        req.GetShellOptions().GetIsSession(),
+		Retry:            req.GetShellOptions().GetRetryCount(),
+		BlockSize:        req.GetShellOptions().GetBlockSize(),
+		Timeout:          req.GetShellOptions().GetTimeout(),
+		MaxSize:          req.GetShellOptions().GetMaxSize(),
 	}
 	webShell, err := yakit.CreateOrUpdateWebShell(db, shell.CalcHash(), shell)
 	if err != nil {
@@ -160,11 +160,11 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		"remark":             req.GetRemark(),
 		"payload_codec_name": req.GetPayloadCodecName(),
 		"packet_codec_name":  req.GetPacketCodecName(),
-		"timeout":            req.GetShellOptions().Timeout,
-		"retry":              req.GetShellOptions().RetryCount,
-		"block_size":         req.GetShellOptions().BlockSize,
-		"max_size":           req.GetShellOptions().MaxSize,
-		"is_session":         req.GetShellOptions().IsSession,
+		"timeout":            req.GetShellOptions().GetTimeout(),
+		"retry":              req.GetShellOptions().GetRetryCount(),
+		"block_size":         req.GetShellOptions().GetBlockSize(),
+		"max_size":           req.GetShellOptions().GetMaxSize(),
+		"is_session":         req.GetShellOptions().GetIsSession(),
 	}
 	webShell, err := yakit.UpdateWebShellById(db, req.GetId(), shellMap)
 	if err != nil {
