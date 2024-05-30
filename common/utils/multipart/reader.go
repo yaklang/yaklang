@@ -128,7 +128,7 @@ func (r *Reader) NextPart() (*Part, error) {
 			if strings.HasPrefix(lineBoundary, "--") {
 				r.boundary = lineBoundary[2:]
 			} else {
-				return nil, utils.Error("invalid boundary, boundary should start with '--'")
+				return nil, utils.Wrap(ErrInvalidBoundary, "invalid boundary, boundary should start with '--'")
 			}
 			state = PARSING_BLOCK_HEADER
 		case BOUNDARY_MATCHED:
