@@ -109,6 +109,8 @@ func (lz *LazyInstruction) check() {
 			return
 		}
 		lz.Instruction = inst
+		// set range for instruction
+		lz.GetRange()
 	}
 	if lz.Value == nil {
 		if value, ok := ToValue(lz.Instruction); ok {
