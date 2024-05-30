@@ -130,16 +130,16 @@ func init() {
 				reName = splits[0]
 			}
 
-			for i := 1; key != ""; i++ {
-				key = params.GetParamByNumber(0).AsString()
+			for i := 1; key != "-"; i++ {
 				if key == reName {
 					ctx.ScriptObj.MandatoryKeys = append(ctx.ScriptObj.MandatoryKeys, reKey)
-					reKey = ""
+					reKey = "-"
 					continue
 				}
 				ctx.ScriptObj.MandatoryKeys = append(ctx.ScriptObj.MandatoryKeys, key)
+				key = params.GetParamByNumber(i).AsString()
 			}
-			if reKey != "" {
+			if reKey != "-" {
 				ctx.ScriptObj.MandatoryKeys = append(ctx.ScriptObj.MandatoryKeys, reKey)
 			}
 			return nil, nil
@@ -183,9 +183,6 @@ func init() {
 			value := params.GetParamByName("value")
 			if name.IsUndefined() || type_.IsUndefined() || value.IsUndefined() {
 				panic(genNotMatchedArgumentTypeError("script_add_preference"))
-			}
-			if strings.Contains(strings.ToLower(name.AsString()), "home directory") {
-				println()
 			}
 			addPreference(name.AsString(), type_.AsString(), value.AsString())
 			return nil, nil
@@ -860,9 +857,6 @@ func init() {
 			pattern := params.GetParamByName("pattern").String()
 			s := params.GetParamByName("string").String()
 			replace := params.GetParamByName("replace").String()
-			if s == "<nil>" {
-				println()
-			}
 			if icase {
 				pattern = "(?i)" + pattern
 			}
