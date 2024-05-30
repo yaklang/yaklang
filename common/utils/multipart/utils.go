@@ -7,7 +7,3 @@ func BytesJoinSize(size int, s ...[]byte) []byte {
 	}
 	return b
 }
-
-func GetPartEmptyLineNum(p *Part) uint8 {
-	return *p.emptyLineNum
-}
