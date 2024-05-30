@@ -275,87 +275,44 @@ Content-Type: text/html; charset=utf-8
 }
 
 func TestExtractKValFromResponse(t *testing.T) {
-	for index, extractor := range [][]any{
+	tests := []struct {
+		response string
+		key      string
+		expected string
+	}{
 		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 `,
-			"charset",
-			"utf-8",
+			key:      "charset",
+			expected: "utf-8",
 		},
 		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=11112
 `,
-			"JSE",
-			"1111",
+			key:      "JSE",
+			expected: "1111",
 		},
 		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 Cookie: JSE=%251; CCC=11112
 `,
-			"JSE",
-			"%1",
+			key:      "JSE",
+			expected: "%1",
 		},
 		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=A12
 `,
-			"CCC",
-			"A12",
+			key:      "CCC",
+			expected: "A12",
 		},
 		{
-			`HTTP/1.1 200 Ok
-Content-Type: text/html; charset=utf-8
-Cookie: JSE=1111; CCC=A12
-
-{
-   "store": {
-       "book": [
-           {
-               "category": "reference",
-               "author": "Nigel Rees",
-               "title": "Sayings of the Century",
-               "price": 8.95
-           },
-           {
-               "category": "fiction",
-               "author": "Evelyn Waugh",
-               "title": "Sword of Honour",
-               "price": 12.99
-           },
-           {
-               "category": "fiction",
-               "author": "Herman Melville",
-               "title": "Moby Dick",
-               "isbn": "0-553-21311-3",
-               "price": 8.99
-           },
-           {
-               "category": "fiction",
-               "author": "J. R. R. Tolkien",
-               "title": "The Lord of the Rings",
-               "isbn": "0-395-19395-8",
-               "price": 22.99
-           }
-       ],
-       "bicycle": {
-           "color": "red",
-           "price": 19.95
-       }
-   },
-   "expensive": 10,
-	"cc1": 111
-}
-`,
-			"cc1",
-			"111",
-		},
-		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=A12
 
@@ -398,11 +355,58 @@ Cookie: JSE=1111; CCC=A12
 	"cc1": 111
 }
 `,
-			"expensive",
-			"10",
+			key:      "cc1",
+			expected: "111",
 		},
 		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
+Content-Type: text/html; charset=utf-8
+Cookie: JSE=1111; CCC=A12
+
+{
+   "store": {
+       "book": [
+           {
+               "category": "reference",
+               "author": "Nigel Rees",
+               "title": "Sayings of the Century",
+               "price": 8.95
+           },
+           {
+               "category": "fiction",
+               "author": "Evelyn Waugh",
+               "title": "Sword of Honour",
+               "price": 12.99
+           },
+           {
+               "category": "fiction",
+               "author": "Herman Melville",
+               "title": "Moby Dick",
+               "isbn": "0-553-21311-3",
+               "price": 8.99
+           },
+           {
+               "category": "fiction",
+               "author": "J. R. R. Tolkien",
+               "title": "The Lord of the Rings",
+               "isbn": "0-395-19395-8",
+               "price": 22.99
+           }
+       ],
+       "bicycle": {
+           "color": "red",
+           "price": 19.95
+       }
+   },
+   "expensive": 10,
+	"cc1": 111
+}
+`,
+			key:      "expensive",
+			expected: "10",
+		},
+		{
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=A12
 
@@ -416,11 +420,11 @@ as
 
 
 `,
-			"expensive",
-			"10",
+			key:      "expensive",
+			expected: "10",
 		},
 		{
-			`HTTP/1.1 200 Ok
+			response: `HTTP/1.1 200 Ok
 Content-Type: text/html; charset=utf-8
 Cookie: JSE=1111; CCC=A12
 
@@ -435,17 +439,35 @@ as
 
 
 `,
-			"abcc",
-			"10",
+			key:      "abcc",
+			expected: "10",
 		},
-	} {
-		_ = index
-		results := ExtractKValFromResponse([]byte(extractor[0].(string)))
-		key, value := ExtractResultToString(extractor[1]), ExtractResultToString(extractor[2])
-		if ExtractResultToString(results[key]) != ExtractResultToString(value) {
-			log.Infof("INDEX: %v failed: %v", index, spew.Sdump(results))
-			t.FailNow()
-		}
+		{
+			response: `HTTP/1.1 200 Ok
+
+{"json":"1%201"}
+`,
+			key:      "json",
+			expected: "1%201",
+		},
+		{
+			response: `HTTP/1.1 200 Ok
+
+{"json":{"json_1":"1%201"}}
+`,
+			key:      "json_1",
+			expected: "1%201",
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			results := ExtractKValFromResponse([]byte(tt.response))
+			if ExtractResultToString(results[tt.key]) != tt.expected {
+				log.Printf("INDEX: %v failed: %v", i, spew.Sdump(results))
+				t.FailNow()
+			}
+		})
 	}
 }
 
