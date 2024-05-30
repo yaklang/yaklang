@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
@@ -14,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 //func BuildInMethodCheck(engine *ScriptEngine) {
@@ -272,15 +270,15 @@ func TestPocScanner(t *testing.T) {
 		//		return origin(engine.Ctx, params)
 		//	})
 	})
-	start := time.Now()
-	_, err := engine.ScanTarget("https://uat.sdeweb.hkcsl.com")
-	if err != nil {
-		log.Error(err)
-	}
-	log.Info("scan time: ", time.Since(start))
-	data := engine.GetKBData()
-	data["Host/port_infos"] = nil
-	spew.Dump(data)
+	//start := time.Now()
+	//_, err := engine.ScanTarget("https://uat.sdeweb.hkcsl.com")
+	//if err != nil {
+	//	log.Error(err)
+	//}
+	//log.Info("scan time: ", time.Since(start))
+	//data := engine.GetKBData()
+	//data["Host/port_infos"] = nil
+	//spew.Dump(data)
 }
 func TestLoadSetting(t *testing.T) {
 	port := utils.GetRandomAvailableTCPPort()
@@ -308,19 +306,8 @@ func TestLoadSetting(t *testing.T) {
 	//engine.LoadScript("compliance_tests.nasl")
 	engine.ShowScriptTree()
 	engine.SetPreferenceByScriptName("ids_evasion.nasl", "TCP evasion technique", "split")
-	_, err = engine.Scan("127.0.0.1", strconv.Itoa(port))
-	if err != nil {
-		t.Fatal(err)
+	resultCh := engine.Scan("127.0.0.1", strconv.Itoa(port))
+	for result := range resultCh {
+		spew.Dump(result.Kbs.GetKB("NIDS/TCP/split"))
 	}
-	preferences := engine.GetAllPreference()
-	for scirptName, preference := range preferences {
-		if scirptName == "ids_evasion.nasl" {
-			for _, p := range preference {
-				if p.Name == "TCP evasion technique" {
-					spew.Dump(p)
-				}
-			}
-		}
-	}
-	spew.Dump(engine.Kbs.GetKB("NIDS/TCP/split"))
 }

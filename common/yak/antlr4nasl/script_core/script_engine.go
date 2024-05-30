@@ -4,23 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
 	"os"
 	"path"
 	"strings"
-	"time"
-
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/pingutil"
 )
 
 type ExecContext struct {
 	ctx        *context.Context
 	Host       string
+	Ports      string
 	Kbs        *NaslKBs
 	Proxies    []string
 	MethodHook map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error)
@@ -66,7 +63,6 @@ func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
 		scriptCache:    make(map[string]*NaslScriptInfo),
 		excludeScripts: make(map[string]struct{}),
 		goroutineNum:   10,
-		Kbs:            NewNaslKBs(),
 		scriptPatch:    map[string]func(code string) string{},
 		//loadedScripts:  make(map[string]struct{}),
 		//loadedScriptsLock: &sync.Mutex{},
@@ -104,9 +100,6 @@ func NewScriptEngine() *ScriptEngine {
 //	}
 func (engine *ScriptEngine) SetScriptFilter(filter func(script *NaslScriptInfo) bool) {
 	engine.scriptFilter = filter
-}
-func (engine *ScriptEngine) GetKBData() map[string]interface{} {
-	return engine.Kbs.GetData()
 }
 func (engine *ScriptEngine) SetNaslLibsPath(path string) {
 	engine.naslLibsPath = path
@@ -387,7 +380,7 @@ func (engine *ScriptEngine) DescriptionExec(code, name string) (*NaslScriptInfo,
 	ctx := NewExecContext()
 	ctx.Host = ""
 	ctx.Proxies = engine.proxies
-	ctx.Kbs = engine.Kbs
+	ctx.Kbs = NewNaslKBs()
 	ctx.ScriptObj.OriginFileName = name
 	ctx.ScriptObj.Script = code
 	e := engine.NewExecEngine(ctx)
@@ -512,13 +505,7 @@ func (e *ScriptEngine) LoadWithConditions(conditions map[string]any) {
 		e.LoadScript(script.OriginFileName)
 	}
 }
-func (e *ScriptEngine) ScanTarget(target string) (*ExecContext, error) {
-	host, port, err := utils.ParseStringToHostPort(target)
-	if err != nil {
-		return nil, err
-	}
-	return e.Scan(host, fmt.Sprint(port))
-}
+
 func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 	//忽略了循环依赖
 	rootScripts := make(map[string]*NaslScriptInfo)
@@ -538,58 +525,44 @@ func (e *ScriptEngine) GetRootScripts() map[string]*NaslScriptInfo {
 	}
 	return rootScripts
 }
-func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
+func (e *ScriptEngine) Scan(hosts string, ports string) chan *ExecContext {
+	hostList := utils.ParseStringToHosts(hosts)
+	res := make(chan *ExecContext)
+	swg := utils.NewSizedWaitGroup(e.goroutineNum)
+	go func() {
+		for _, host := range hostList {
+			swg.Add()
+			go func() {
+				defer swg.Done()
+				ctx, err := e.ScanSingle(host, ports)
+				if err != nil {
+					log.Errorf("scan host %s met error: %s", host, err)
+					return
+				}
+				res <- ctx
+			}()
+		}
+		swg.Wait()
+		close(res)
+	}()
+	return res
+}
+func (e *ScriptEngine) ScanSingle(host string, ports string) (*ExecContext, error) {
 	ctx := NewExecContext()
 	ctx.Host = host
+	ctx.Ports = ports
 	ctx.Proxies = e.proxies
-	ctx.Kbs = e.Kbs
+	ctx.Kbs = NewNaslKBs()
 	rootScripts := e.GetRootScripts()
 	if len(rootScripts) == 0 {
 		return nil, utils.Errorf("no scripts to scan")
 	}
-	res := pingutil.PingAuto(host, "80,443,22", 3*time.Second, e.proxies...)
-	if res.Ok {
-		e.Kbs.SetKB("Host/dead", 0)
-		e.Kbs.SetKB("Host/State", "up")
-	} else {
-		//ping检测不存活 或排除打印机设备时会标注为dead
-		e.Kbs.SetKB("Host/dead", 1)
-		e.Kbs.SetKB("Host/State", "down")
-	}
+
+	log.Infof("start ping scan host: %s, ports: %s", host, ports)
+	Ping(ctx)
 	log.Infof("start syn scan host: %s, ports: %s", host, ports)
-	servicesInfo, err := ServiceScan(host, ports, e.proxies...)
-	if err != nil {
-		return nil, err
-	}
-	e.Kbs.SetKB("Host/scanned", 1)
-	openPorts := []int{}
-	portInfos := []*fp.MatchResult{}
-	for _, result := range servicesInfo {
-		if result.State == fp.OPEN {
-			fingerprint := result.Fingerprint
-			openPorts = append(openPorts, result.Port)
-			portInfos = append(portInfos, result)
-			e.Kbs.SetKB(fmt.Sprintf("Ports/%s/%d", result.GetProto(), result.Port), 1)
-			if fingerprint.ServiceName != "" {
-				var serverName string
-				if fingerprint.ServiceName == "http" {
-					serverName = "www"
-				} else {
-					serverName = fingerprint.ServiceName
-				}
-				e.Kbs.SetKB(fmt.Sprintf("Services/%s", serverName), fingerprint.Port)
-				e.Kbs.SetKB(fmt.Sprintf("Known/%s/%d", fingerprint.Proto, fingerprint.Port), fingerprint.ServiceName)
-			}
-			if fingerprint.Version != "" {
-				e.Kbs.SetKB(fmt.Sprintf("Version/%s/%d", fingerprint.Proto, fingerprint.Port), fingerprint.Version)
-			}
-			for _, cpe := range fingerprint.CPEs {
-				e.Kbs.SetKB(fmt.Sprintf("APP/%s/%d", fingerprint.Proto, fingerprint.Port), cpe)
-			}
-		}
-	}
-	// 缺少os finger_print、tcp_seq_index、ipidseq、Traceroute
-	e.Kbs.SetKB("Host/port_infos", portInfos)
+	ServiceScan(ctx)
+
 	//swg := utils.NewSizedWaitGroup(e.goroutineNum)
 	//errorsMux := sync.Mutex{}
 	// 创建执行引擎
@@ -651,7 +624,7 @@ func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
 		}
 		udpPortOk := false
 		for _, port := range script.RequireUdpPorts {
-			if e.Kbs.GetKB(fmt.Sprintf("Ports/udp/%s", port)) == 1 {
+			if ctx.Kbs.GetKB(fmt.Sprintf("Ports/udp/%s", port)) == 1 {
 				udpPortOk = true
 				break
 			}
@@ -661,7 +634,7 @@ func (e *ScriptEngine) Scan(host string, ports string) (*ExecContext, error) {
 		}
 		tcpPortOk := false
 		for _, port := range script.RequirePorts {
-			if e.Kbs.GetKB(fmt.Sprintf("Ports/tcp/%s", port)) != 1 {
+			if ctx.Kbs.GetKB(fmt.Sprintf("Ports/tcp/%s", port)) != 1 {
 				tcpPortOk = true
 				break
 			}

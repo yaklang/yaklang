@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]any, error) {
+func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) chan *NaslKBs {
 	config := NewNaslScriptConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -87,21 +87,18 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) (map[string]
 	//	}
 	//	return code
 	//})
-	hostsList := utils.ParseStringToHosts(hosts)
-	portsList := utils.ParseStringToPorts(ports)
-	for _, host := range hostsList {
-		for _, port := range portsList {
-			_, err := engine.ScanTarget(utils.HostPort(host, port))
-			if err != nil {
-				log.Errorf("scan target %s:%v error: %v", host, port, err)
-			}
-		}
+	resultCh := engine.Scan(hosts, ports)
+	res := make(chan *NaslKBs)
+	for r := range resultCh {
+		res <- r.Kbs
 	}
-	return engine.GetKBData(), nil
+	return res
 }
 
 // 临时的，用于测试
-func ServiceScan(hosts string, ports string, proxies ...string) ([]*fp.MatchResult, error) {
+func ServiceScan(ctx *ExecContext) {
+	hosts := ctx.Host
+	ports := ctx.Ports
 	result := []*fp.MatchResult{}
 	os.Setenv("YAKMODE", "vm")
 	yakEngine := yaklang.New()
@@ -132,7 +129,35 @@ for result = range res {
 
 `)
 	if err != nil {
-		return nil, err
+		log.Errorf("scan error: %v", err)
 	}
-	return result, nil
+	ctx.Kbs.SetKB("Host/scanned", 1)
+	openPorts := []int{}
+	portInfos := []*fp.MatchResult{}
+	for _, result := range result {
+		if result.State == fp.OPEN {
+			fingerprint := result.Fingerprint
+			openPorts = append(openPorts, result.Port)
+			portInfos = append(portInfos, result)
+			ctx.Kbs.SetKB(fmt.Sprintf("Ports/%s/%d", result.GetProto(), result.Port), 1)
+			if fingerprint.ServiceName != "" {
+				var serverName string
+				if fingerprint.ServiceName == "http" {
+					serverName = "www"
+				} else {
+					serverName = fingerprint.ServiceName
+				}
+				ctx.Kbs.SetKB(fmt.Sprintf("Services/%s", serverName), fingerprint.Port)
+				ctx.Kbs.SetKB(fmt.Sprintf("Known/%s/%d", fingerprint.Proto, fingerprint.Port), fingerprint.ServiceName)
+			}
+			if fingerprint.Version != "" {
+				ctx.Kbs.SetKB(fmt.Sprintf("Version/%s/%d", fingerprint.Proto, fingerprint.Port), fingerprint.Version)
+			}
+			for _, cpe := range fingerprint.CPEs {
+				ctx.Kbs.SetKB(fmt.Sprintf("APP/%s/%d", fingerprint.Proto, fingerprint.Port), cpe)
+			}
+		}
+	}
+	// 缺少os finger_print、tcp_seq_index、ipidseq、Traceroute
+	ctx.Kbs.SetKB("Host/port_infos", portInfos)
 }
