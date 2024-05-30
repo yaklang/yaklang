@@ -181,12 +181,12 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript) {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
+		err := yakit.DeleteYakScriptByID(consts.GetGormProfileDatabase(), int64(databasePlugin.ID))
+		if err != nil {
+			log.Warnf("delete legacy script reason: overrid")
+		}
 		log.Infof("start to override existed plugin: %v", name)
-		databasePlugin.Content = string(codeBytes)
-		databasePlugin.IsCorePlugin = true
-		databasePlugin.HeadImg = scriptData.HeadImg
-		databasePlugin.Params = scriptData.Params
-		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, databasePlugin)
+		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
 		if err != nil {
 			log.Errorf("override %v failed: %s", name, err)
 			return
