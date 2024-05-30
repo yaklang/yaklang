@@ -87,9 +87,6 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	inst.SetName(ir.Name)
 	inst.SetVerboseName(ir.VerboseName)
 
-	// TODO: range
-	// inst.SetRange(NewRange(ir.SourceCodeStartOffset, ir.SourceCodeEndOffset))
-
 	// not function
 	if !ir.IsFunction {
 		if fun, err := NewInstructionFromLazy(ir.CurrentFunction, ToFunction); err == nil {
