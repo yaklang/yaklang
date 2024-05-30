@@ -304,6 +304,10 @@ func TestFuzzTagBug(t *testing.T) {
 	assert.Equal(t, 81, times)
 }
 
+func TestDateFuzzTagLocation(t *testing.T) {
+	require.Contains(t, MutateQuick(`{{date(YYYY-MM-ddZ,UTC)}}`)[0], "+0000")
+}
+
 func TestDateRangeFuzzTag(t *testing.T) {
 	require.Equal(
 		t,

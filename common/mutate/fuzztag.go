@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	cryptoRand "crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -10,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
+
+	cryptoRand "crypto/rand"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -251,45 +253,71 @@ func init() {
 		Description: "根据所输入的操作随机生成可能的用户名（默认为 root/admin 生成）",
 	})
 
+	datetimeFuzzFuncGenerator := func(defaultFormat string) func(s string) []string {
+		return func(s string) []string {
+			if s == "" {
+				return []string{utils.JavaTimeFormatter(time.Now(), defaultFormat)}
+			}
+
+			now := time.Now()
+			splited := strings.Split(s, ",")
+			if len(splited) > 1 {
+				location, _ := time.LoadLocation(splited[1])
+				now = now.In(location)
+			}
+
+			return []string{utils.JavaTimeFormatter(now, splited[0])}
+		}
+	}
+	dateFuzzFunc := datetimeFuzzFuncGenerator("YYYY-MM-dd")
+
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "date",
 		Handler: func(s string) []string {
-			if s == "" {
-				return []string{utils.JavaTimeFormatter(time.Now(), "YYYY-MM-dd")}
-			}
-			return []string{utils.JavaTimeFormatter(time.Now(), s)}
+			return dateFuzzFunc(s)
 		},
-		Description: "生成一个时间，格式为YYYY-MM-dd，如果指定了格式，将按照指定的格式生成时间",
+		Description: "生成并格式化一个当前时间，默认格式为YYYY-MM-dd，如：{{date(YYYY-MM-dd)}}，还可以再加一个参数指定时区，如：{{date(YYYY-MM-dd,Asia/Shanghai)}}",
 	})
+
+	datetimeFuzzFunc := datetimeFuzzFuncGenerator("YYYY-MM-dd HH:mm:ss")
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "datetime",
 		Handler: func(s string) []string {
-			if s == "" {
-				return []string{utils.JavaTimeFormatter(time.Now(), "YYYY-MM-dd")}
-			}
-			return []string{utils.JavaTimeFormatter(time.Now(), s)}
+			return datetimeFuzzFunc(s)
 		},
 		Alias:       []string{"time"},
-		Description: "生成一个时间，格式为YYYY-MM-dd HH:mm:ss，如果指定了格式，将按照指定的格式生成时间",
+		Description: "生成并格式化一个当前时间，默认格式为YYYY-MM-dd HH:mm:ss，如：{{datetime(YYYY-MM-dd HH:mm:ss)}}，还可以再加一个参数指定时区，如：{{datetime(YYYY-MM-dd HH:mm:ss,Asia/Shanghai)}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "date:range",
 		Handler: func(s string) []string {
-			start, end := sepToEnd(s, ",")
+			splited := strings.Split(s, ",")
+			if len(splited) == 1 {
+				return []string{s}
+			}
+
+			start, end := splited[0], splited[1]
+			location := time.Local
+			if len(splited) == 3 {
+				location, _ = time.LoadLocation(splited[2])
+			}
+
 			layout, err := dateparse.ParseFormat(start)
 			if err != nil {
 				return []string{}
 			}
-			startTime, err := dateparse.ParseAny(start)
+
+			startTime, err := dateparse.ParseIn(start, location)
 			if err != nil {
 				return []string{}
 			}
-			endTime, err := dateparse.ParseAny(end)
+			endTime, err := dateparse.ParseIn(end, location)
 			if err != nil {
 				return []string{}
 			}
+
 			if startTime.After(endTime) {
 				return []string{}
 			}
@@ -301,7 +329,7 @@ func init() {
 			}
 			return results
 		},
-		Description: "以逗号为分隔，尝试根据输入的两个时间生成一个时间段，如：{{date:range(20080101,20090101)}}",
+		Description: "以逗号为分隔，尝试根据输入的两个时间生成一个时间段，如：{{date:range(20080101,20090101)}}。还可以再加一个参数指定时区，如：{{date:range(20080101,20090101,Asia/Shanghai)}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
