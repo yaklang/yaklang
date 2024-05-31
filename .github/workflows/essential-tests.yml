@@ -198,7 +198,9 @@ jobs:
             run: |
               # binary parser
               go test --timeout 1m ./common/bin-parser/...
-    
+          - name: Test Tar Gzip Embed
+            run: |
+              go test --timeout 30s ./common/utils/gzip_embed/test/...
 
     steps:
       - name: Cache YakLang Project
