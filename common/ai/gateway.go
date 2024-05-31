@@ -10,6 +10,7 @@ import (
 )
 
 import (
+	_ "github.com/gabriel-vasile/mimetype"
 	_ "github.com/yaklang/yaklang/common/ai/chatglm"
 	_ "github.com/yaklang/yaklang/common/ai/moonshot"
 	_ "github.com/yaklang/yaklang/common/ai/openai"
