@@ -629,7 +629,7 @@ func (e *ScriptEngine) ScanSingle(host string, ports string) (*ExecContext, erro
 				break
 			}
 		}
-		if !udpPortOk {
+		if len(script.RequireUdpPorts) > 0 && !udpPortOk {
 			return utils.Errorf("%w: none of the required udp ports are open", requirements_error)
 		}
 		tcpPortOk := false
@@ -639,7 +639,7 @@ func (e *ScriptEngine) ScanSingle(host string, ports string) (*ExecContext, erro
 				break
 			}
 		}
-		if !tcpPortOk {
+		if len(script.RequirePorts) > 0 && !tcpPortOk {
 			return utils.Errorf("%w: none of the required udp ports are open", requirements_error)
 		}
 		for _, key := range script.ExcludeKeys {
@@ -668,7 +668,6 @@ func (e *ScriptEngine) ScanSingle(host string, ports string) (*ExecContext, erro
 func (e *ScriptEngine) NewExecEngine(ctx *ExecContext) *executor.Executor {
 	engine := executor.NewWithContext()
 	engine.SetIncludePath(e.naslLibsPath)
-	engine.SetDependenciesPath(e.dependenciesPath)
 	engine.Debug(e.debug)
 	engine.SetLib(GetExtLib(ctx))
 	engine.Compiler.SetNaslLib(GetNaslLibKeys())

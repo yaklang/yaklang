@@ -6,10 +6,10 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/buildin_script"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"github.com/yaklang/yaklang/embed"
 	"os"
 	"path"
 	"strings"
@@ -32,13 +32,13 @@ import (
 
 type Executor struct {
 	*yakvm.VirtualMachine
-	debug                          bool
-	dbcache                        bool
-	naslLibsPath, dependenciesPath string
-	Compiler                       *visitors.Compiler
-	sourceCode                     string
-	logger                         *log.Logger
-	buildinLib                     map[string]func(param *NaslBuildInMethodParam) any
+	debug        bool
+	dbcache      bool
+	naslLibsPath string
+	Compiler     *visitors.Compiler
+	sourceCode   string
+	logger       *log.Logger
+	buildinLib   map[string]func(param *NaslBuildInMethodParam) any
 }
 
 func NewWithContext() *Executor {
@@ -149,9 +149,7 @@ func (e *Executor) SetLib(lib map[string]func(param *NaslBuildInMethodParam) any
 func (engine *Executor) SetIncludePath(path string) {
 	engine.naslLibsPath = path
 }
-func (engine *Executor) SetDependenciesPath(path string) {
-	engine.dependenciesPath = path
-}
+
 func (engine *Executor) Debug(bool2 ...bool) {
 	if len(bool2) == 0 {
 		engine.debug = true
@@ -197,7 +195,7 @@ func (e *Executor) EvalInclude(name string) error {
 	}
 	//本地文件加载失败，从内置文件中加载
 	if sourceBytes == nil {
-		data, err := embed.Asset("data/nasl-incs/" + name)
+		data, err := buildin_script.FS.ReadFile("nasl-incs/" + name)
 		if err != nil {
 			err = utils.Errorf("not found include file: %s", name)
 			e.logger.Error(err)

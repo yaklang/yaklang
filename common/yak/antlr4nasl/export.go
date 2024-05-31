@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script-core"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script_core"
 	"strings"
 )
 
@@ -90,12 +90,12 @@ func UpdateDatabase(p string) {
 		saveScript(p)
 	}
 }
-func ScanTarget(target string, opts ...script_core.NaslScriptConfigOptFunc) (map[string]any, error) {
+func ScanTarget(target string, opts ...script_core.NaslScriptConfigOptFunc) (chan *script_core.NaslKBs, error) {
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {
 		return nil, err
 	}
-	return script_core.NaslScan(host, fmt.Sprint(port), opts...)
+	return script_core.NaslScan(host, fmt.Sprint(port), opts...), nil
 }
 
 var Exports = map[string]any{
