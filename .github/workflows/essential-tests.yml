@@ -198,6 +198,11 @@ jobs:
             run: |
               # binary parser
               go test --timeout 1m ./common/bin-parser/...
+          - name: Test NASL
+            run: |
+              # nasl
+              go test --timeout 1m ./common/yak/antlr4nasl/tests/...
+
           - name: Test Tar Gzip Embed
             run: |
               go test --timeout 30s ./common/utils/gzip_embed/test/...
