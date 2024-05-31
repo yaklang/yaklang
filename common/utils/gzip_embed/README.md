@@ -12,7 +12,7 @@ go build -ldflags="-s -w" -o ~/.local/bin common/utils/gzip_embed/cmd/gzip-embed
 
 ## 2. 使用
 
-`gzip-embed`工具会自动读取工作目录下的static目录，将其中的文件进行压缩后生成static.tar.gz文件，然后将static.tar.gz文件，并生成embed.go文件。embed.go文件中定义了变量FS，可以读取并自动解压文件。
+`gzip-embed`工具会自动读取工作目录下的static目录，将其中的文件进行压缩后生成static.tar.gz和embed.go文件。embed.go文件中定义了变量FS，可以读取并自动解压文件。
 
 ### 2.1 编写init.go
 
@@ -22,6 +22,7 @@ package xxx
 
 //go:generate gzip-embed -cache
 ```
+***注意***：`-cache`参数表示生成的embed.go文件中会缓存文件内容，如果文件较大，可以不加此参数，每次读取文件时都会重新解压。
 ### 2.2 生成压缩文件
 
 在static目录的同级目录下执行以下命令：
