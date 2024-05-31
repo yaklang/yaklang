@@ -35,6 +35,7 @@ require (
 	github.com/emersion/go-sasl v0.0.0-20231106173351-e73c9f7bad43
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
+	github.com/gabriel-vasile/mimetype v1.4.4
 	github.com/gilliek/go-opml v1.0.0
 	github.com/glaslos/ssdeep v0.3.1
 	github.com/go-git/go-billy/v5 v5.5.0
