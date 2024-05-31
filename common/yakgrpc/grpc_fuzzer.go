@@ -151,7 +151,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		for _, value := range extractHTTPResponseResult.GetValues() {
 			extractResults = append(extractResults, &ypb.KVPair{
 				Key:   value.GetKey(),
-				Value: value.GetValue(),
+				Value: utils.EscapeInvalidUTF8Byte([]byte(value.GetValue())),
 			})
 		}
 	}

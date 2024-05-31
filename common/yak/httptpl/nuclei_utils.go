@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"net/http"
 	"sort"
@@ -58,7 +59,9 @@ func toBytes(i interface{}) []byte {
 	return utils.InterfaceToBytes(i)
 }
 func ExtractResultToString(i interface{}) string {
-	return strings.Join(utils.InterfaceToStringSlice(i), ",")
+	return strings.Join(lo.Map(utils.InterfaceToStringSlice(i), func(item string, index int) string {
+		return utils.EscapeInvalidUTF8Byte([]byte(item))
+	}), ",")
 }
 func parseTimeOrNow(arguments []interface{}) (time.Time, error) {
 	var currentTime time.Time
