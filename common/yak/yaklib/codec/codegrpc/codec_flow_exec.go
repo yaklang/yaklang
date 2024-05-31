@@ -71,7 +71,7 @@ func CodecFlowExec(req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err erro
 
 	result := codec.UTF8AndControlEscapeForEditorView(codecFlow.Text)
 	resultVerbose := codec.UTF8SafeEscape(codecFlow.Text)
-	isFalseAppearance := (codec.Md5(result) != codec.Md5(codecFlow.Text)) || (codec.Md5(req.GetText()) != codec.Md5(codecFlow.Text))
+	isFalseAppearance := (codec.Md5(result) != codec.Md5(codecFlow.Text)) || (codec.Md5(resultVerbose) != codec.Md5(codecFlow.Text))
 
 	return &ypb.CodecResponse{
 		IsFalseAppearance: isFalseAppearance,
