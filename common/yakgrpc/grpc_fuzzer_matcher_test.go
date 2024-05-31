@@ -2,10 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 	"net/http"
 	"sync"
 	"testing"
@@ -179,5 +181,38 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 	}
 	if matcherCheckCount != 9 {
 		t.Fatalf("matcher check failed: need [%v] got [%v]", 9, matcherCheckCount)
+	}
+}
+
+func TestFuzzerExtractorInvalidUTF8(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nTest: \xff\xff\r\n\r\nabc"))
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := utils.HostPort(host, port)
+
+	extractor := &ypb.HTTPResponseExtractor{Scope: "header", Groups: []string{"Test"}, Type: "kval", Name: "extractParam"}
+
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request:    "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		ForceFuzz:  true,
+		Extractors: []*ypb.HTTPResponseExtractor{extractor},
+	})
+	if err != nil {
+		panic(err)
+	}
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			} else {
+				t.Fatal(err)
+			}
+		}
+		spew.Dump(rsp)
 	}
 }
