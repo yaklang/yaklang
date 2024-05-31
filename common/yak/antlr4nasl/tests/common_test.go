@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script-core"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script_core"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"testing"
 )
