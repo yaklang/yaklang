@@ -367,4 +367,22 @@ func TestGRPCCodecFlow(t *testing.T) {
 	require.Equal(t, true, rsp.GetIsFalseAppearance(), "IsFalseAppearance check error")
 	require.Equal(t, expectViewData, rsp.GetResult(), "result check error")
 
+	// test is precise
+	codeData = `ABC`
+	rsp, err = client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       codec.EncodeBase64(codeData),
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil || rsp == nil {
+		t.Fatal(err)
+	}
+
+	require.Equal(t, codeData, string(rsp.GetRawResult()), "rawRes decode error")
+	require.Equal(t, false, rsp.GetIsFalseAppearance(), "IsFalseAppearance check error")
+	require.Equal(t, codeData, rsp.GetResult(), "result check error")
+
 }
