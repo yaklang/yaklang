@@ -92,6 +92,8 @@ type httpPoolConfig struct {
 
 	// withPayloads 是否查询 payloads
 	WithPayloads bool
+
+	LowhttpOpts []lowhttp.LowhttpOpt
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -726,6 +728,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if config.NoFollowRedirect {
 							redictTimes = 0
 						}
+						// 兼容
 						lowhttpOptions := []lowhttp.LowhttpOpt{
 							lowhttp.WithHttps(https),
 							lowhttp.WithRuntimeId(config.RuntimeId),
@@ -761,6 +764,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if config.WithPayloads {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithPayloads(payloads))
 						}
+
+						lowhttpOptions = append(lowhttpOptions, config.LowhttpOpts...)
 
 						rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 						var rsp []byte
@@ -972,24 +977,16 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 	}
 }
 
+//go:generate go run ../export_generator -p "common/mutate" -f "./lowhttp_exports.go" -pf "../utils/lowhttp/config.go" -pp "common/utils/lowhttp" -t "httpPoolConfig" -opt "HttpPoolConfigOption" -field "LowhttpOpts" -e "HttpPoolExports" --disable_host
 var HttpPoolExports = map[string]interface{}{
 	"Pool": _httpPool,
 
-	// 选项
-	"https":              _httpPool_IsHttps,
-	"size":               _httpPool_SetSize,
-	"host":               _httpPool_Host,
-	"port":               _httpPool_Port,
-	"proxy":              _httpPool_proxies,
-	"perRequestTimeout":  _httpPool_PerRequestTimeout,
-	"rawMode":            _httpPool_RawMode,
-	"redirectTimes":      _httpPool_redirectTimes,
-	"noRedirect":         _httpPool_noRedirects,
-	"context":            _httpPool_SetContext,
-	"fuzz":               _httpPool_SetForceFuzz,
-	"fuzzParams":         _httpPool_SetFuzzParams,
-	"noFixContentLength": _httpPool_noFixContentLength,
-	"connPool":           _httpPool_withConnPool,
+	"host":              _httpPool_Host,
+	"size":              _httpPool_SetSize,
+	"rawMode":           _httpPool_RawMode,
+	"perRequestTimeout": _httpPool_PerRequestTimeout,
+	"fuzz":              _httpPool_SetForceFuzz,
+	"fuzzParams":        _httpPool_SetFuzzParams,
 }
 
 var (
@@ -1031,7 +1028,7 @@ var (
 	WithPoolOpt_EtcHosts                   = _httpPool_EtcHosts
 	WithPoolOpt_NoSystemProxy              = _httpPool_NoSystemProxy
 	WithPoolOpt_RequestCountLimiter        = _httpPool_RequestCountLimiter
-	WithConnPool                           = _httpPool_withConnPool
+	WithPoolOpt_ConnPool                   = _httpPool_withConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 )

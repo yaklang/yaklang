@@ -83,6 +83,8 @@ type PocConfig struct {
 	DNSNoCache bool
 
 	BodyStreamHandler func([]byte, io.ReadCloser)
+
+	LowhttpOpts []lowhttp.LowhttpOpt
 }
 
 func (c *PocConfig) IsHTTPS() bool {
@@ -184,6 +186,7 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Password != nil {
 		opts = append(opts, lowhttp.WithPassword(*c.Password))
 	}
+	opts = append(opts, c.LowhttpOpts...)
 	return opts
 }
 
@@ -216,11 +219,13 @@ type PocConfigOption func(c *PocConfig)
 
 // params 是一个请求选项参数，用于在请求时使用传入的值，需要注意的是，它可以很方便地使用 `str.f()`或 f-string 代替
 // Example:
+// ```
 // rsp, req, err = poc.HTTP(x`POST /post HTTP/1.1
 // Content-Type: application/json
 // Host: pie.dev
 //
 // {"key": "{{params(a)}}"}`, poc.params({"a":"bbb"})) // 实际上发送的POST参数为{"key": "bbb"}
+// ```
 func WithParams(i interface{}) PocConfigOption {
 	return func(c *PocConfig) {
 		c.FuzzParams = utils.InterfaceToMap(i)
@@ -1584,6 +1589,7 @@ func ExtractPostParams(raw []byte) (map[string]string, error) {
 	return params, err
 }
 
+//go:generate go run ../../../export_generator -p "common/utils/lowhttp/poc" -f "./lowhttp_exports.go" -pf "../config.go" -pp "common/utils/lowhttp" -t "PocConfig" -opt "PocConfigOption" -field "LowhttpOpts" -e "PoCExports"
 var PoCExports = map[string]interface{}{
 	"HTTP":          HTTP,
 	"HTTPEx":        HTTPEx,
@@ -1599,38 +1605,14 @@ var PoCExports = map[string]interface{}{
 	// websocket，可以直接复用 HTTP 参数
 	"Websocket": DoWebSocket,
 
-	// options
-	"host":                 WithHost,
-	"port":                 WithPort,
-	"retryTimes":           WithRetryTimes,
-	"retryInStatusCode":    WithRetryInStatusCode,
-	"retryNotInStatusCode": WithRetryNotInStausCode,
-	"retryWaitTime":        WithRetryWaitTime,
-	"retryMaxWaitTime":     WithRetryMaxWaitTime,
-	"redirectTimes":        WithRedirectTimes,
-	"noRedirect":           WithNoRedirect,
-	"jsRedirect":           WithJSRedirect,
-	"redirectHandler":      WithRedirectHandler,
-	"https":                WithForceHTTPS,
-	"http2":                WithForceHTTP2,
-	"sni":                  WithSNI,
-	"params":               WithParams,
-	"proxy":                WithProxy,
-	"timeout":              WithTimeout,
-	"context":              WithContext,
-	"connPool":             WithConnPool,
-	"connectTimeout":       WithConnectTimeout,
-	"dnsServer":            WithDNSServers,
-	"dnsNoCache":           WithDNSNoCache,
-	"noFixContentLength":   WithNoFixContentLength,
-	"session":              WithSession,
-	"save":                 WithSave,
-	"source":               WithSource,
-	"websocket":            WithWebsocket,
-	"websocketFromServer":  WithWebsocketHandler,
-	"websocketOnClient":    WithWebsocketClientHandler,
-	"username":             WithUsername,
-	"password":             WithPassword,
+	// extra options
+	"noRedirect": WithNoRedirect,
+	"params":     WithParams,
+
+	// websocket options
+	"websocket":           WithWebsocket,
+	"websocketFromServer": WithWebsocketHandler,
+	"websocketOnClient":   WithWebsocketClientHandler,
 
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,
