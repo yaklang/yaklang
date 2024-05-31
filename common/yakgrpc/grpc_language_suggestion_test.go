@@ -752,7 +752,7 @@ rsp.Data()`
 			EndColumn:   9,
 		}
 		// 标准库函数
-		want := "```go\n" + `func Data() string` + "\n```"
+		want := "```go\n" + `func (http_struct.YakHttpResponse) Data() string` + "\n```"
 		check(t, code, "yak", ssaParseRange, want)
 	})
 }
@@ -838,6 +838,6 @@ d.Contains("c")
 			EndLine:     7,
 			EndColumn:   11,
 		}
-		check(t, code, "yak", ssaRange, "Contains", "判断字符串是否包含子串")
+		check(t, code, "yak", ssaRange, "func (string) Contains(r1 string) boolean", "判断字符串是否包含子串")
 	})
 }

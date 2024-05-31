@@ -67,6 +67,19 @@ func TestSimpleSearchType(t *testing.T) {
 		})
 	})
 
+	t.Run("get class instance method", func(t *testing.T) {
+		test(t, &TestCase{
+			Code:    code,
+			SF:      `b1.methodB() as $target`,
+			Contain: false,
+			Expect: map[string][]string{
+				"target": {
+					"Undefined-b1.methodB(valid)(make(B),1)",
+				},
+			},
+		})
+	})
+
 	t.Run("get class method call", func(t *testing.T) {
 		test(t, &TestCase{
 			Code:    code,
@@ -87,7 +100,7 @@ func TestSimpleSearchType(t *testing.T) {
 			SF:      `println(* #-> * as $target)`,
 			Contain: false,
 			Expect: map[string][]string{
-				"target": {"1", "2", "Parameter-i"},
+				"target": {"1", "2"},
 			},
 		})
 	})

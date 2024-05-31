@@ -246,21 +246,28 @@ func (n *anValue) SetType(typ Type) {
 	if typ == nil {
 		return
 	}
-	if typ.GetTypeKind() != ClassBluePrintTypeKind {
-		n.typ = typ
-		return
-	}
-	classBluePrint, ok := typ.(*ClassBluePrint)
-	if !ok {
-		log.Errorf("SetType: typ is not ClassBluePrint but is ClassBluePrintTypeKind")
-		return
+
+	getThis := func() Value {
+		value, ok := n.GetProgram().GetInstructionById(n.GetId()).(Value)
+		if !ok {
+			log.Errorf("SetType: value is not Value but is %d", n.GetId())
+		}
+		return value
 	}
 
-	value, ok := n.GetProgram().GetInstructionById(n.GetId()).(Value)
-	if !ok {
-		log.Errorf("SetType: value is not Value but is %d", n.GetId())
+	switch t := typ.(type) {
+	case *ClassBluePrint:
+		n.typ = t.Apply(getThis())
+	case *FunctionType:
+		n.typ = typ
+
+		if fun := t.This; fun != nil {
+			fun.AddReference(getThis())
+		}
+
+	default:
+		n.typ = typ
 	}
-	n.typ = classBluePrint.Apply(value)
 }
 
 func (a *anValue) GetVariable(name string) *Variable {

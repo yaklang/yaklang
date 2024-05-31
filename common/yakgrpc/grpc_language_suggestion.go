@@ -295,9 +295,18 @@ func getConstInstanceDesc(instance *yakdoc.LibInstance) string {
 }
 
 func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
+	// funcTyp.IsMethod
 	lenOfParams := len(funcTyp.Parameter)
-	desc := fmt.Sprintf("func %s(%s) %s", funcName, strings.Join(lo.Map(
-		funcTyp.Parameter, func(typ ssa.Type, i int) string {
+	params := funcTyp.Parameter
+	if funcTyp.IsMethod {
+		lenOfParams--
+		if len(params) > 0 {
+			params = params[1:]
+		}
+	}
+
+	paramsStr := strings.Join(lo.Map(
+		params, func(typ ssa.Type, i int) string {
 			if i == lenOfParams-1 && funcTyp.IsVariadic {
 				typStr := typ.String()
 				typStr = strings.TrimLeft(typStr, "[]")
@@ -305,7 +314,22 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 			}
 			return fmt.Sprintf("r%d %s", i+1, typ)
 		}),
-		", "), funcTyp.ReturnType)
+		", ",
+	)
+	var desc string
+
+	if funcTyp.IsMethod {
+		if len(funcTyp.Parameter) > 0 {
+			desc = fmt.Sprintf("func (%s) %s(%s) %s", funcTyp.Parameter[0], funcName, paramsStr, funcTyp.ReturnType)
+		} else {
+			desc = fmt.Sprintf("func %s(%s) %s", funcName, paramsStr, funcTyp.ReturnType)
+		}
+	} else {
+		desc = fmt.Sprintf("func %s(%s) %s", funcName,
+			paramsStr,
+			funcTyp.ReturnType,
+		)
+	}
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
@@ -435,9 +459,6 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 	// 类型内置方法
 	funcObjectType := v.GetFunctionObjectType()
 	desc, document = getBuiltinFuncDeclAndDoc(lastName, funcObjectType)
-	if desc != "" {
-		return
-	}
 
 	// 用户自定义函数
 	if bareTyp.GetTypeKind() == ssa.FunctionTypeKind {

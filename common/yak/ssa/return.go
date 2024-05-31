@@ -156,14 +156,18 @@ func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 
-	funType := NewFunctionType("",
-		lo.Map(f.Param, func(p *Parameter, _ int) Type {
-			t := p.GetType()
-			return t
-		}),
-		handlerReturnType(f.Return),
-		f.hasEllipsis,
-	)
+	if f.Type == nil {
+		f.Type = NewFunctionType("", nil, nil, false)
+	}
+	funType := f.Type
+
+	funType.Parameter = lo.Map(f.Param, func(p *Parameter, _ int) Type {
+		t := p.GetType()
+		return t
+	})
+	funType.ReturnType = handlerReturnType(f.Return)
+	funType.IsVariadic = f.hasEllipsis
+	funType.This = f
 	funType.ReturnValue = f.Return
 	funType.ParameterLen = f.ParamLength
 	funType.ParameterValue = f.Param

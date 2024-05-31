@@ -39,6 +39,11 @@ func ValueCompare(v1, v2 *Value) bool {
 	} else if v1IsNil || v2IsNil {
 		return false
 	}
+	for _, v := range v1.node.Reference() {
+		if v.GetId() == v2.GetId() {
+			return true
+		}
+	}
 	return v1.GetId() == v2.GetId()
 }
 
@@ -502,11 +507,11 @@ func (v *Value) GetFunctionObjectType() ssa.Type {
 		return nil
 	}
 
-	f, ok := ssa.ToFunction(v.node)
+	ft, ok := ssa.ToFunctionType(GetBareType(v.GetType()))
 	if !ok {
 		return nil
 	}
-	return f.Type.ObjectType
+	return ft.ObjectType
 }
 
 // IsMember desc if the value is member of some object

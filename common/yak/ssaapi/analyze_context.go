@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type objectItem struct {
@@ -25,6 +26,8 @@ type AnalyzeContext struct {
 	// in main function, no call stack, we need a global visitedPhi map
 	_visitedPhi *omap.OrderedMap[int64, *Value]
 
+	_visitedDefault map[int64]struct{}
+
 	config *OperationConfig
 
 	depth int
@@ -32,12 +35,13 @@ type AnalyzeContext struct {
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return &AnalyzeContext{
-		_callStack:   utils.NewStack[*Value](),
-		_objectStack: utils.NewStack[objectItem](),
-		_callTable:   omap.NewOrderedMap[int64, *omap.OrderedMap[int64, *Value]](map[int64]*omap.OrderedMap[int64, *Value]{}),
-		_visitedPhi:  omap.NewOrderedMap[int64, *Value](map[int64]*Value{}),
-		config:       NewOperations(opt...),
-		depth:        -1,
+		_callStack:      utils.NewStack[*Value](),
+		_objectStack:    utils.NewStack[objectItem](),
+		_callTable:      omap.NewOrderedMap[int64, *omap.OrderedMap[int64, *Value]](map[int64]*omap.OrderedMap[int64, *Value]{}),
+		_visitedPhi:     omap.NewOrderedMap[int64, *Value](map[int64]*Value{}),
+		_visitedDefault: make(map[int64]struct{}),
+		config:          NewOperations(opt...),
+		depth:           -1,
 	}
 }
 
@@ -59,7 +63,8 @@ func (a *AnalyzeContext) IsExistedInCallStack(i *Value) bool {
 	return a._callTable.Have(i.GetId())
 }
 
-func (a *AnalyzeContext) TheCallShouldBeVisited(i *Value) bool {
+func (a *AnalyzeContext) TheCallShouldBeVisited(i *ssa.Call) bool {
+	// return !a._callTable.Have(i.GetId()) && i.Method.GetId() != a.Self.GetId()
 	return !a._callTable.Have(i.GetId())
 }
 
@@ -128,6 +133,7 @@ func (g *AnalyzeContext) TheMemberShouldBeVisited(member *Value) bool {
 	return true
 }
 
+// ========================================== PHI STACK ==========================================
 // ThePhiShouldBeVisited is used to check whether the phi should be visited
 func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
 	if a._callStack.Len() <= 0 {
@@ -159,4 +165,14 @@ func (a *AnalyzeContext) VisitPhi(i *Value) {
 		return
 	}
 	visited.Set(i.GetId(), i)
+}
+
+// ========================================== DEFAULT STACK ==========================================
+
+func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
+	if _, ok := a._visitedDefault[i.GetId()]; ok {
+		return false
+	}
+	a._visitedDefault[i.GetId()] = struct{}{}
+	return true
 }

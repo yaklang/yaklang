@@ -64,7 +64,9 @@ func (f *Function) String() string {
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	ret := f.GetName() + " "
 	ret += strings.Join(
-		lo.Map(f.Param, func(item *Parameter, _ int) string { return GetTypeStr(item) + item.GetName() }),
+		lo.Map(f.Param, func(item *Parameter, _ int) string {
+			return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
+		}),
 		", ")
 	ret += "\n"
 
