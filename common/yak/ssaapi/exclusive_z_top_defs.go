@@ -56,6 +56,9 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	if i.node == nil {
 		return vals
 	}
+	if !actx.TheDefaultShouldBeVisited(i) {
+		return vals
+	}
 	for _, def := range i.node.GetValues() {
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
@@ -194,9 +197,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			defer actx.PopCall()
 
 			var res Values
-			res = append(res,
-				callerValue.AppendDependOn(i).getTopDefs(actx, opt...)...,
-			)
 			for _, retIns := range funcType.ReturnValue {
 				for _, traceVal := range retIns.Results {
 					// val, ok := traceVal.GetStringMember(retIndexRawStr)
@@ -205,6 +205,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 						i.NewValue(traceVal).AppendEffectOn(i).getTopDefs(actx, opt...)...,
 					)
 				}
+			}
+			if len(res) == 0 {
+				// the result from the return value is empty,
+				// get the topDef by the callee
+				res = append(res,
+					callerValue.AppendDependOn(i).getTopDefs(actx, opt...)...,
+				)
 			}
 			return res
 		default:
@@ -336,6 +343,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{}
 			}
 
+			// fun := i.GetFunction()
+			// if !ValueCompare(fun, i.NewValue(calledInstance.Method)) {
+			// 	return Values{}
+			// }
+
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
 				// free value
@@ -373,29 +385,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		var vals Values
 		called := actx.GetCurrentCall()
-		if called == nil {
-			// 允许跨类进行TopDef的查找
-			if actx.config.AllowIgnoreCallStack {
-				fun := i.GetFunction()
-				if fun != nil {
-					call2fun := fun.GetCalledBy()
-					call2fun.ForEach(func(call *Value) {
-						val := getCalledByValue(call)
-						vals = append(vals, val...)
-					})
-					return append(vals, i)
-				}
+		if called != nil {
+			if !called.IsCall() {
+				log.Infof("parent function is not called by any other function, skip (%T)", called)
+				return Values{i}
 			}
-			log.Error("parent function is not called by any other function, skip")
-			return Values{i}
-		}
-		if !called.IsCall() {
-			log.Infof("parent function is not called by any other function, skip (%T)", called)
-			return Values{i}
+			calledByValue := getCalledByValue(called)
+			vals = append(vals, calledByValue...)
 		}
 
-		calledByValue := getCalledByValue(called)
-		vals = append(vals, calledByValue...)
 		if actx.config.AllowIgnoreCallStack {
 			fun := i.GetFunction()
 			if fun != nil {
@@ -408,7 +406,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		if len(vals) == 0 {
-			return Values{i.NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
+			// return Values{i} // no return, use undefined
+			vals = append(vals, i)
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.SideEffect:

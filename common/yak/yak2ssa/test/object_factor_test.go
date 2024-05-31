@@ -281,7 +281,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-this.get(Function-f()) member[1]",
+				"Undefined-a.get(valid)(Function-f()) member[1]",
 			},
 		})
 	})
@@ -305,7 +305,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-this.get(Function-f()) member[1]",
+				"Undefined-b.get(valid)(Function-f()) member[1]",
 			},
 		})
 	})
@@ -328,7 +328,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-this.get(Function-f()) member[1]",
+				"Undefined-a.get(valid)(Function-f()) member[1]",
 			},
 		})
 	})
@@ -363,10 +363,10 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			println(b.get())
 			`,
 			Want: []string{
-				"Function-this.get(Function-f()) member[side-effect(Parameter-i, a.key)]",
-				"Function-this.get(Function-f()) member[side-effect(Parameter-i, b.key)]",
-				"Function-this.get(Function-f()) member[side-effect(Parameter-i, a.key)]",
-				"Function-this.get(Function-f()) member[side-effect(Parameter-i, this.key)]",
+				"Undefined-a.get(valid)(Function-f()) member[side-effect(Parameter-i, a.key)]",
+				"Undefined-b.get(valid)(Function-f()) member[side-effect(Parameter-i, b.key)]",
+				"Undefined-a.get(valid)(Function-f()) member[side-effect(Parameter-i, a.key)]",
+				"Undefined-b.get(valid)(Function-f()) member[side-effect(Parameter-i, this.key)]",
 			},
 		})
 	})

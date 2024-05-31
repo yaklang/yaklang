@@ -111,6 +111,7 @@ func (lz *LazyInstruction) check() {
 		lz.Instruction = inst
 		// set range for instruction
 		lz.GetRange()
+		lz.cache.IrCodeToInstruction(lz.Instruction, lz.ir)
 	}
 	if lz.Value == nil {
 		if value, ok := ToValue(lz.Instruction); ok {
@@ -122,7 +123,6 @@ func (lz *LazyInstruction) check() {
 			lz.User = user
 		}
 	}
-	lz.cache.IrCodeToInstruction(lz.Instruction, lz.ir)
 }
 
 func (lz *LazyInstruction) ShouldSave() bool {
@@ -534,4 +534,12 @@ func (lz *LazyInstruction) ReplaceValue(v1, v2 Value) {
 		return
 	}
 	lz.User.ReplaceValue(v1, v2)
+}
+
+func (lz *LazyInstruction) Reference() Values {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.Reference()
 }

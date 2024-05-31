@@ -800,6 +800,7 @@ func (s *ObjectType) Finish() {
 type FunctionType struct {
 	Name            string
 	pkgPath         string
+	This            *Function
 	ReturnType      Type
 	ReturnValue     []*Return
 	Parameter       Types
@@ -879,9 +880,9 @@ func (s *FunctionType) String() string {
 }
 
 func (s *FunctionType) RawString() string {
-	str := ""
+	variadic := ""
 	if s.IsVariadic {
-		str += "..."
+		variadic += "..."
 	}
 
 	paras := make([]string, 0, s.ParameterLen)
@@ -895,7 +896,7 @@ func (s *FunctionType) RawString() string {
 			paras,
 			",",
 		),
-		str,
+		variadic,
 		s.ReturnType,
 	)
 }
