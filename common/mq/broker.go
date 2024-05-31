@@ -2,17 +2,20 @@ package mq
 
 import (
 	"context"
-	"github.com/pkg/errors"
-	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/tevino/abool"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-type ChannelHandler func(broker *Broker, a *amqp.Channel) error
-type ConnectionHandler func(broker *Broker, a *amqp.Connection) error
+type (
+	ChannelHandler    func(broker *Broker, a *amqp.Channel) error
+	ConnectionHandler func(broker *Broker, a *amqp.Connection) error
+)
 
 type Broker struct {
 	ctx    context.Context
@@ -37,7 +40,7 @@ type Broker struct {
 
 	// 是否正在运行中
 	wg        *sync.WaitGroup
-	isServing *abool.AtomicBool
+	isServing *utils.AtomicBool
 
 	conn    *amqp.Connection
 	channel *amqp.Channel
@@ -58,7 +61,7 @@ func NewBroker(ctx context.Context, options ...BrokerConfigHandler) (*Broker, er
 		cancel:    cancel,
 		ctx:       rootCtx,
 		wg:        new(sync.WaitGroup),
-		isServing: abool.New(),
+		isServing: utils.NewAtomicBool(),
 	}
 	for _, option := range options {
 		option(broker)
@@ -100,7 +103,7 @@ func (b *Broker) Serve() {
 }
 
 func (b *Broker) serve() (err error) {
-	//log.Infof("ampqUrl: %s", b.amqpUrl)
+	// log.Infof("ampqUrl: %s", b.amqpUrl)
 	conn, err := amqp.DialConfig(b.amqpUrl, b.dialConfig)
 	if err != nil {
 		return errors.Errorf("dial failed: %s", err)

@@ -60,7 +60,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/tevino/abool"
 
 	_ "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin" // 导入 builtin 包
 )
@@ -472,8 +471,8 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	t := &Task{
 		TaskID:     id,
 		Code:       code,
-		isRunning:  abool.New(),
-		isFinished: abool.New(),
+		isRunning:  utils.NewAtomicBool(),
+		isFinished: utils.NewAtomicBool(),
 	}
 	err := e.SaveTask(t)
 	if err != nil {

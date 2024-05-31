@@ -100,7 +100,6 @@ require (
 	github.com/steambap/captcha v1.4.1
 	github.com/stretchr/testify v1.9.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
-	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
 	github.com/twmb/murmur3 v1.1.6
 	github.com/urfave/cli v1.22.15
@@ -109,6 +108,7 @@ require (
 	github.com/xdg-go/scram v1.1.2
 	github.com/yaklang/pcap v1.0.0-rc2
 	github.com/ysmood/gson v0.7.3
+	github.com/ysmood/leakless v0.8.0
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.17.0
@@ -205,7 +205,6 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/ysmood/fetchup v0.2.2 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
-	github.com/ysmood/leakless v0.8.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	go.opentelemetry.io/otel v1.22.0 // indirect

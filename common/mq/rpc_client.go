@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
-	"time"
 )
 
 const (
@@ -88,7 +88,7 @@ type rpcRequest struct {
 	RoutingKey string
 
 	// request sent
-	haveRequestSent         *abool.AtomicBool
+	haveRequestSent         *utils.AtomicBool
 	haveRequestSentCtx      context.Context
 	haveRequestSentFinished context.CancelFunc
 
@@ -134,7 +134,7 @@ func (r *RPCClient) request(rootCtx context.Context, f, node string, req interfa
 		Msg: &msg, RoutingKey: r.getRoutingKey(f, node),
 
 		// 用来标注 rpc 状态
-		haveRequestSent:         abool.NewBool(false),
+		haveRequestSent:         utils.NewBool(false),
 		haveRequestSentCtx:      ReqCtx,
 		haveRequestSentFinished: ReqCancel,
 
@@ -151,7 +151,7 @@ func (r *RPCClient) request(rootCtx context.Context, f, node string, req interfa
 	go func() {
 		select {
 		case <-rootCtx.Done():
-			//case <-time.After(ddl.Sub(time.Now())):
+			// case <-time.After(ddl.Sub(time.Now())):
 		}
 		r.cancel(uid.String())
 	}()
@@ -275,7 +275,6 @@ func (r *RPCClient) daemonCallback(requestId string, msg *amqp.Delivery) {
 		request.haveRspFunc()
 		return
 	}
-
 }
 
 func (r *RPCClient) Connect() error {

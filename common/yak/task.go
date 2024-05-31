@@ -1,13 +1,13 @@
 package yak
 
-import "github.com/tevino/abool"
+import "github.com/yaklang/yaklang/common/utils"
 
 type Task struct {
 	TaskID string
 	Code   string
 
-	isRunning  *abool.AtomicBool
-	isFinished *abool.AtomicBool
+	isRunning  *utils.AtomicBool
+	isFinished *utils.AtomicBool
 
 	Output   []string
 	Log      []string

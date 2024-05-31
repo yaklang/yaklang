@@ -3,16 +3,17 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/healthinfo"
 	"github.com/yaklang/yaklang/common/yak"
-	"sync"
-	"time"
 )
 
 type NodeBase struct {
@@ -37,7 +38,7 @@ type NodeBase struct {
 	tickerFuncs *sync.Map
 
 	// 表示是否注册成功
-	isRegistered *abool.AtomicBool
+	isRegistered *utils.AtomicBool
 
 	// []func()
 	//    当成功注册之后会执行这个函数
@@ -87,7 +88,7 @@ func NewNodeBase(nodeType spec.NodeType, exchange, id string, token string, conf
 		token:          token,
 		rpcExchange:    exchange,
 		tickerFuncs:    new(sync.Map),
-		isRegistered:   abool.NewBool(false),
+		isRegistered:   utils.NewBool(false),
 		ScriptExecutor: yak.NewScriptEngine(200),
 	}
 
@@ -198,7 +199,6 @@ func (n *NodeBase) startDaemon() {
 }
 
 func (n *NodeBase) register() error {
-
 	ctx, _ := context.WithTimeout(n.rootCtx, 5*time.Second)
 	body, err := n.rpcClient.Call(ctx, spec.API_RegisterNode, spec.ServerNodeId,
 		&spec.NodeRegisterRequest{

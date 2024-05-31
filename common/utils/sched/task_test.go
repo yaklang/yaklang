@@ -2,12 +2,12 @@ package sched
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
-	"github.com/tevino/abool"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestTask(t *testing.T) {
@@ -100,10 +100,10 @@ func TestTask_WithoutFirst(t *testing.T) {
 
 func TestTask_Hooks(t *testing.T) {
 	var (
-		executed        = abool.New()
-		worked          = abool.New()
-		finished        = abool.New()
-		beforeExecuting = abool.New()
+		executed        = utils.NewAtomicBool()
+		worked          = utils.NewAtomicBool()
+		finished        = utils.NewAtomicBool()
+		beforeExecuting = utils.NewAtomicBool()
 	)
 
 	task := NewTask(1*time.Second, "test", time.Now().Add(-1), time.Now().Add(4*time.Second), func() {
