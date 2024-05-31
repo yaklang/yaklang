@@ -6,29 +6,6 @@ import (
 )
 
 func NewCall(target Value, args []Value, binding map[string]Value, block *BasicBlock) *Call {
-	// handler "this" in parameter
-	{
-		AddThis := func(this Value) {
-			if len(args) == 0 {
-				args = append(args, this)
-			} else {
-				args = utils.InsertSliceItem(args, this, 0)
-			}
-		}
-		switch t := target.GetType().(type) {
-		case *FunctionType:
-			if t.IsMethod {
-				if obj := target.GetObject(); obj != nil {
-					AddThis(obj)
-				} else {
-					//  is method but not object
-					log.Errorf("method call, but object is nil")
-				}
-			}
-		default:
-			_ = t
-		}
-	}
 
 	if binding == nil {
 		binding = make(map[string]Value)
@@ -58,10 +35,38 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	}
 
 	f.emit(c)
+	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
 
 	return c
+}
+
+func (c *Call) handlerObjectMethod() {
+	args := c.Args
+	target := c.Method
+	// handler "this" in parameter
+	AddThis := func(this Value) {
+		if len(args) == 0 {
+			args = append(args, this)
+		} else {
+			args = utils.InsertSliceItem(args, this, 0)
+		}
+	}
+	switch t := target.GetType().(type) {
+	case *FunctionType:
+		if t.IsMethod {
+			if obj := target.GetObject(); obj != nil {
+				AddThis(obj)
+			} else {
+				//  is method but not object
+				log.Errorf("method call, but object is nil")
+			}
+		}
+	default:
+		_ = t
+	}
+	c.Args = args
 }
 
 // handler Return type, and handle drop error

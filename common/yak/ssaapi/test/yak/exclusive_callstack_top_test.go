@@ -123,8 +123,8 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 		}
 		f1 = f(333333)
 		f2 = f1(444444)
-		a = f2(444444)
-		`, ssatest.CheckTopDef_Equal("a", []string{"333333", "444444", "444444"}),
+		a = f2(555555)
+		`, ssatest.CheckTopDef_Equal("a", []string{"333333", "444444", "555555"}),
 		)
 	})
 
@@ -240,7 +240,7 @@ func Test_CallStack_Normal_FreeValue(t *testing.T) {
 			}
 		}
 		f1 = f()
-		f2 = f1() 
+		f2 = f1()
 		a = f2()
 		`, ssatest.CheckTopDef_Equal("a", []string{"333333", "444444", "555555"}),
 		)
@@ -261,7 +261,7 @@ func Test_CallStack_Normal_FreeValue(t *testing.T) {
 			}
 		}
 		f1 = f()
-		f2 = f1() 
+		f2 = f1()
 		obj = f2()
 		a = obj.i
 		`, ssatest.CheckTopDef_Equal("a", []string{"333333", "444444", "555555"}),

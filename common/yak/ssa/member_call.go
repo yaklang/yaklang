@@ -296,15 +296,8 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
-		// set program offsetMap for method value
-		// program.SetOffsetValue(fun, b.CurrentRange)
-		// return NewClassMethod(fun, value)
 		name, typ := checkCanMemberCall(value, key)
-		// if ret := b.PeekValueInThisFunction(name); ret != nil {
-		// 	return ret
-		// }
 		member := b.getOriginMember(name, typ, value, key)
-		fun.AddReference(member)
 		return member
 	}
 

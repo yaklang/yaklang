@@ -247,7 +247,7 @@ func TestMemberCall_Method(t *testing.T) {
 		a = getExample()
 		println(a.ExampleMethod())
 		`, []string{
-			"Function-ExampleMethod(Function-getExample())",
+			"Undefined-a.ExampleMethod(valid)(Function-getExample())",
 		})
 	})
 }

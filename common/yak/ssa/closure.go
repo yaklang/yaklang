@@ -41,7 +41,7 @@ func (f *Function) AddSideEffect(name *Variable, v Value) {
 	})
 }
 
-func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
+func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 	if variable.IsMemberCall() {
 		// if name is member call, it's modify parameter field
 		para, ok := ToParameter(variable.object)
@@ -57,6 +57,12 @@ func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
 			parameterMemberInner: newParameterMember(para, variable.key),
 		}
 		f.SideEffects = append(f.SideEffects, sideEffect)
+
+		if f.MarkedThisObject != nil &&
+			para.GetDefault() != nil &&
+			f.MarkedThisObject.GetId() == para.GetDefault().GetId() {
+			f.SetMethod(true, para.GetType())
+		}
 	}
 }
 

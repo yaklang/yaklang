@@ -21,6 +21,9 @@ func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 	var vals Values
+	if !actx.TheDefaultShouldBeVisited(v) {
+		return vals
+	}
 	v.GetUsers().ForEach(func(value *Value) {
 		if ret := value.AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
@@ -89,7 +92,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		actx.VisitPhi(v)
 		return v.visitUserFallback(actx)
 	case *ssa.Call:
-		if !actx.TheCallShouldBeVisited(v) {
+		if !actx.TheCallShouldBeVisited(ins) {
 			// call existed
 			return v.visitUserFallback(actx)
 		}
