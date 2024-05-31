@@ -297,6 +297,7 @@ func RuleCliCheck(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		"cli.Have",
 		"cli.YakCode",
 		"cli.Text",
+		"cli.UI",
 	}
 
 	var (
