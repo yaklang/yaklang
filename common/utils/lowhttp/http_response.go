@@ -23,14 +23,12 @@ import (
 var (
 	charsetRegexp         = regexp.MustCompile(`(?i)charset\s*=\s*"?\s*([^\s;\n\r"]+)`)
 	metaCharsetRegexp     = regexp.MustCompile(`(?i)meta[^<>]*?charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
-	mimeCharsetRegexp     = regexp.MustCompile(`(?i)content-type:\s*[^\n]*charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
 	contentTypeRegexp     = regexp.MustCompile(`(?i)content-type:\s*([^\r\n]*)`)
 	contentEncodingRegexp = regexp.MustCompile(`(?i)content-encoding:\s*\w*\r?\n`)
 
 	isChunkedBytes = []byte("\r\n0\r\n\r\n")
 )
 
-// var contentLengthRegexpCase = regexp.MustCompile(`(?i)(content-length:\s*\w*\d+\r?\n)`)
 func metaCharsetChanger(raw []byte) []byte {
 	if len(raw) <= 0 {
 		return raw
