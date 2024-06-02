@@ -107,7 +107,7 @@ func TestCharMatch(t *testing.T) {
 					t.Fatal("MIME matching error:", err)
 				}
 
-				res := result.TryUTF8Convertor([]byte(sample))
+				res, _ := result.TryUTF8Convertor([]byte(sample))
 				fmt.Println("Converted HTML:", string(res))
 
 				for _, a := range tc.have {
