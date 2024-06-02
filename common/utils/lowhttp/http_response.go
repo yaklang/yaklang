@@ -17,40 +17,24 @@ import (
 
 var (
 	charsetRegexp         = regexp.MustCompile(`(?i)charset\s*=\s*"?\s*([^\s;\n\r"]+)`)
-	metaCharsetRegexp     = regexp.MustCompile(`(?i)meta[^<>]*?charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
 	contentTypeRegexp     = regexp.MustCompile(`(?i)content-type:\s*([^\r\n]*)`)
 	contentEncodingRegexp = regexp.MustCompile(`(?i)content-encoding:\s*\w*\r?\n`)
 
 	isChunkedBytes = []byte("\r\n0\r\n\r\n")
 )
 
-func metaCharsetChanger(raw []byte) []byte {
-	if len(raw) <= 0 {
-		return raw
-	}
-	// 这里很关键，需要移除匹配到的内容
-	buf := bytes.NewBuffer(nil)
-	var slash [][2]int
-	lastEnd := 0
-	for _, va := range metaCharsetRegexp.FindAllSubmatchIndex(raw, -1) {
-		if len(va) > 3 {
-			slash = append(slash, [2]int{lastEnd, va[2]})
-			lastEnd = va[3]
-		}
-	}
-	slash = append(slash, [2]int{lastEnd, len(raw)})
-	for _, slashIndex := range slash {
-		buf.Write(raw[slashIndex[0]:slashIndex[1]])
-		if slashIndex[1] < len(raw) {
-			buf.WriteString("utf-8")
-		}
-	}
-	return buf.Bytes()
-}
-
 var expect100continue = []byte("HTTP/1.1 100 Continue\r\n\r\n")
 
 var (
+	textPlainMIMEGlob = []glob.Glob{
+		glob.MustCompile(`text/plain`),
+	}
+
+	jsonMIMEGlobs = []glob.Glob{
+		glob.MustCompile(`application/json`),
+		glob.MustCompile(`application/*json*`),
+		glob.MustCompile(`text/*json*`),
+	}
 	jsMIMEGlobs = []glob.Glob{
 		glob.MustCompile(`application/*javascript*`),
 		glob.MustCompile(`text/*javascript*`),
@@ -64,11 +48,44 @@ var (
 		glob.MustCompile(`application/html`),
 		glob.MustCompile(`text/x-html`),
 		glob.MustCompile(`application/xml`),
+		glob.MustCompile(`text/xml`),
 		glob.MustCompile(`application/xhtml`),
 		glob.MustCompile(`application/*html*`),
 		glob.MustCompile(`text/*html*`),
 	}
 )
+
+func IsTextPlainMIMEType(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	if strings.Contains(strings.ToLower(s), "charset=") {
+		lake, _, err := mime.ParseMediaType(s)
+		if err == nil {
+			s = lake
+		}
+	}
+
+	for _, g := range textPlainMIMEGlob {
+		if g.Match(s) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsJsonMIMEType(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, g := range jsonMIMEGlobs {
+		if g.Match(s) {
+			return true
+		}
+	}
+	return false
+}
 
 func IsJavaScriptMIMEType(s string) bool {
 	if s == "" {
@@ -86,6 +103,14 @@ func IsHtmlOrXmlMIMEType(s string) bool {
 	if s == "" {
 		return false
 	}
+
+	if strings.Contains(strings.ToLower(s), "charset=") {
+		lake, _, err := mime.ParseMediaType(s)
+		if err == nil {
+			s = lake
+		}
+	}
+
 	for _, g := range htmlMIMEGlob {
 		if g.Match(s) {
 			return true
@@ -114,9 +139,11 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	// 这两个用来处理编码特殊情况
 	var contentEncoding string
 	var contentType string
+	var noContentTypeSet = true
 	headers, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
 		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
 			_, contentType = SplitHTTPHeader(line)
+			noContentTypeSet = false
 		}
 		// 判断内容
 		line = strings.ToLower(line)
@@ -162,23 +189,48 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	}
 
+	// 记录原始 contentType
+	var originContentType = contentType
+
+	var bodyChanged bool
+RetryContentType:
 	switch {
+	case IsTextPlainMIMEType(contentType):
+		fallthrough
+	case IsJsonMIMEType(contentType):
+		fallthrough
 	case IsJavaScriptMIMEType(contentType):
-		bodyRaw = mimeResult.TryUTF8Convertor(bodyRaw)
+		bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
+		if bodyChanged {
+			log.Info("auto fix body via utf convertor auto")
+			newContentType := charsetRegexp.ReplaceAllString(originContentType, "charset=utf-8")
+			if newContentType != originContentType {
+				log.Infof("auto fix content-type via utf convertor auto, from %#v to %#v", originContentType, newContentType)
+				headerBytes = ReplaceMIMEType(headerBytes, newContentType)
+			}
+		}
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	case IsHtmlOrXmlMIMEType(contentType):
-		bodyRaw = mimeResult.TryUTF8Convertor(bodyRaw)
+		// body is not text, but content-type is ...
+		// fix content-type header
+		if !IsHtmlOrXmlMIMEType(mimeResult.MIMEType) && !IsTextPlainMIMEType(mimeResult.MIMEType) {
+			log.Warnf("origin content-type: %v, fix new content-type: %v, reason: the actually body is not text...", contentType, mimeResult.MIMEType)
+			contentType = mimeResult.MIMEType
+			goto RetryContentType
+		}
+
+		bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
+		if bodyChanged {
+			log.Info("auto fix body via utf convertor auto")
+		}
+
 		var newContentType string
 		origin, params, err := mime.ParseMediaType(contentType)
 		if err != nil {
 			newContentType = contentType
 		} else {
-			if params != nil && utils.MapGetFirstRaw(utils.InterfaceToGeneralMap(params), "charset", "Charset", "CHARSET") != "" {
-				newContentType = contentType
-			} else {
-				params["charset"] = "utf-8"
-				newContentType = mime.FormatMediaType(origin, params)
-			}
+			params = map[string]string{"charset": "utf-8"}
+			newContentType = mime.FormatMediaType(origin, params)
 		}
 		headerBytes = ReplaceMIMEType(headerBytes, newContentType)
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
@@ -186,6 +238,12 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 		if mimeResult == nil || mimeResult.MIMEType == "" {
 			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 		}
+
+		if contentType == "" && noContentTypeSet {
+			contentType = mimeResult.MIMEType
+			goto RetryContentType
+		}
+
 		headerBytes = ReplaceHTTPPacketHeader(headerBytes, "Content-Type", mimeResult.MIMEType)
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	}
