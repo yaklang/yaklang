@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
+	"golang.org/x/net/html/charset"
 	"strings"
 )
 
@@ -29,7 +31,7 @@ type MIMEResult struct {
 	Charset     string
 }
 
-func (t *MIMEResult) TryUTF8Convertor(raw []byte) []byte {
+func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 	if strings.Contains(t.MIMEType, "/html") || strings.Contains(t.MIMEType, "/xhtml+xml") {
 		result := raw
 		// <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -61,9 +63,9 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) []byte {
 		if len(encodings) == 1 {
 			decodedResult, err := enc.NewDecoder().Bytes(result)
 			if err != nil {
-				return result
+				return result, false
 			}
-			return decodedResult
+			return decodedResult, true
 		}
 		log.Warn("WARNING: ATTENTION multiple encodings, try the best")
 		for _, v := range encodings {
@@ -73,23 +75,36 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) []byte {
 					log.Infof("try encoding %#v failed: %v", v.Name, err)
 					continue
 				}
-				return decodeResult
+				return decodeResult, true
 			}
 		}
-		return result
+		return result, false
 	}
 
 	switch strings.ToLower(t.Charset) {
 	case "gb18030", "gb-18030", "gbk", "gb2312", "gb-2312":
 		result, err := GB18030ToUtf8(raw)
 		if err != nil {
-			return result
+			return raw, false
 		}
-		return result
+		return result, true
 	default:
-		log.Warnf("TBD: charset %#v not supported yet, use origin raw input", t.Charset)
+		if t.Charset != "" && t.Charset != "utf-8" {
+			log.Warnf("TBD: charset %#v not supported yet, use origin raw input", t.Charset)
+		}
+
+		if t.Charset == "" && t.IsText {
+			t.Charset = mimecharset.FromPlain(raw)
+			enc, _ := charset.Lookup(t.Charset)
+			if enc != nil {
+				fixed, err := enc.NewDecoder().Bytes(raw)
+				if err == nil {
+					return fixed, true
+				}
+			}
+		}
 	}
-	return raw
+	return raw, false
 }
 
 // MatchMIMEType will match via bytes
