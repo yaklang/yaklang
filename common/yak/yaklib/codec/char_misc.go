@@ -30,7 +30,7 @@ type MIMEResult struct {
 }
 
 func (t *MIMEResult) TryUTF8Convertor(raw []byte) []byte {
-	if strings.Contains(t.MIMEType, "/html") || strings.Contains(t.MIMEType, "/xhtml") {
+	if strings.Contains(t.MIMEType, "/html") || strings.Contains(t.MIMEType, "/xhtml+xml") {
 		result := raw
 		// <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 		// <meta charset="UTF-8">
