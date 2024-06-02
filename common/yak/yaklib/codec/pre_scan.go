@@ -168,6 +168,13 @@ func HtmlCharsetPrescan(content []byte, callback ...func(start, end int, matched
 				pRes := PrescanResult{
 					Encoding: e, Name: name,
 				}
+
+				// gbk -> gb18030
+				// gb2312 -> gb18030
+				if strings.EqualFold(name, "gbk") || strings.EqualFold(name, "gb2312") {
+					pRes.Encoding, pRes.Name = charset.Lookup("gb18030")
+				}
+
 				if endOffset > startOffset && startOffset >= 0 {
 					for _, cb := range callback {
 						result := metaCharset.FindSubmatchIndex(content[startOffset:endOffset])

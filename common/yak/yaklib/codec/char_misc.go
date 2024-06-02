@@ -3,6 +3,7 @@ package codec
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
@@ -55,7 +56,7 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 			newBuffer.WriteString("utf-8")
 			lastStart = end
 		})
-		if strings.ToLower(origin) != "utf-8" {
+		if strings.ToLower(origin) != "utf-8" && lastStart >= 0 {
 			newBuffer.Write(result[lastStart:])
 			result = newBuffer.Bytes()
 		}
@@ -67,7 +68,10 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 			}
 			return decodedResult, true
 		}
-		log.Warn("WARNING: ATTENTION multiple encodings, try the best")
+
+		if len(encodings) > 1 {
+			log.Warnf("WARNING: ATTENTION multiple encodings [%v], try the best", funk.Keys(set))
+		}
 		for _, v := range encodings {
 			if v.Encoding != nil {
 				decodeResult, err := v.Encoding.NewDecoder().Bytes(result)

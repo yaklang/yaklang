@@ -2,10 +2,58 @@ package lowhttp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestFixResponse_WithTextFallback(t *testing.T) {
+	response := `HTTP/1.1 200 OK
+Content-Type: text/aabc
+
+<html><head></head><body>你好，世界！</body></html>`
+	rsp, _, err := FixHTTPResponse([]byte(response))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Contains(t, string(rsp), "你好，世界！")
+	assert.Contains(t, string(rsp), "text/aabc")
+	assert.NotContains(t, string(rsp), "charset=utf-8")
+}
+
+func TestFixResponse_WithTextFallback2(t *testing.T) {
+	sample, _ := codec.Utf8ToGB18030([]byte("你好，世界！"))
+	response1 := `HTTP/1.1 200 OK
+Content-Type: text/aabc
+
+<html><head><meta charset="gbk"></head><body>` + string(sample) + `</body></html>`
+	rsp, _, err := FixHTTPResponse([]byte(response1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Contains(t, string(rsp), "你好，世界！")
+	assert.Contains(t, string(rsp), "text/aabc")
+	assert.Contains(t, string(rsp), "charset=utf-8")
+	assert.Contains(t, string(rsp), "charset=\"utf-8\"")
+}
+
+func TestFixResponse_WithTextFallback3(t *testing.T) {
+	sample, _ := codec.Utf8ToGB18030([]byte("你好，世界！"))
+	response1 := `HTTP/1.1 200 OK
+Content-Type: text/aabc; charset=gbk
+
+<html><head><meta charset="gbk"></head><body>` + string(sample) + `</body></html>`
+	rsp, _, err := FixHTTPResponse([]byte(response1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Contains(t, string(rsp), "你好，世界！")
+	assert.Contains(t, string(rsp), "text/aabc")
+	assert.Contains(t, string(rsp), "charset=utf-8")
+	assert.NotContains(t, string(rsp), "charset=gbk")
+	assert.Contains(t, string(rsp), "charset=\"utf-8\"")
+}
 
 func TestFixResponse_CharSet(t *testing.T) {
 	t.Run("no content-type charset,body utf-8", func(t *testing.T) {
