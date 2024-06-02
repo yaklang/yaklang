@@ -4,20 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/log"
+	utils "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"mime"
 	"net/http"
 	"regexp"
 	"strings"
-	"unicode/utf8"
-
-	"github.com/h2non/filetype"
-	"github.com/h2non/filetype/types"
-	"github.com/yaklang/yaklang/common/log"
-	utils "github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"golang.org/x/net/html/charset"
-	"golang.org/x/text/encoding"
 )
 
 var (
@@ -53,126 +48,51 @@ func metaCharsetChanger(raw []byte) []byte {
 	return buf.Bytes()
 }
 
-func CharsetToUTF8(bodyRaw []byte, mimeType string, originCharset string) ([]byte, string) {
-	if len(bodyRaw) <= 0 {
-		return bodyRaw, mimeType
-	}
-
-	originMT, kv, _ := mime.ParseMediaType(mimeType)
-	newKV := make(map[string]string)
-	for k, v := range kv {
-		newKV[k] = v
-	}
-
-	originMTLower := strings.ToLower(originMT)
-	var checkingGB18030 bool
-	if ret := strings.HasPrefix(originMTLower, "text/"); ret || strings.Contains(originMTLower, "script") {
-		newKV["charset"] = "utf-8"
-		checkingGB18030 = ret
-	}
-	fixedMIME := mime.FormatMediaType(originMT, newKV)
-	if fixedMIME != "" {
-		mimeType = fixedMIME
-	}
-
-	var handledChineseEncoding bool
-	parseFromMIME := func() ([]byte, error) {
-		if kv != nil && len(kv) > 0 {
-			if charsetStr, ok := kv["charset"]; ok && !handledChineseEncoding {
-				encodingIns, name := charset.Lookup(strings.ToLower(charsetStr))
-				if encodingIns != nil {
-					raw, err := encodingIns.NewDecoder().Bytes(bodyRaw)
-					if err != nil {
-						return nil, utils.Errorf("decode [%s] from mime type failed: %s", name, err)
-					}
-					if len(raw) > 0 {
-						return raw, nil
-					}
-				}
-			}
-		}
-		return nil, utils.Errorf("cannot detect charset from mime")
-	}
-	var encodeHandler encoding.Encoding
-	switch originCharset {
-	case "gbk", "gb18030":
-		// 如果无法检测编码，就看看18030是不是符合
-		replaced, _ := codec.GB18030ToUtf8(bodyRaw)
-		if replaced != nil {
-			handledChineseEncoding = true
-			bodyRaw = replaced
-		}
-	default:
-		encodeHandler, _ = charsetPrescan(bodyRaw)
-		if encodeHandler == nil && checkingGB18030 && !utf8.Valid(bodyRaw) {
-			//// 如果无法检测编码，就看看18030是不是符合
-			//replaced, err := codec.GB18030ToUtf8(bodyRaw)
-			//if err != nil {
-			//	log.Debugf("gb18030 to utf8 failed: %v", err)
-			//}
-			//if replaced != nil {
-			//	handledChineseEncoding = true
-			//	bodyRaw = replaced
-			//}
-		}
-	}
-
-	raw, _ := parseFromMIME()
-	if len(raw) > 0 {
-		idxs := charsetRegexp.FindStringSubmatchIndex(mimeType)
-		if len(idxs) > 3 {
-			start, end := idxs[2], idxs[3]
-			prefix, suffix := mimeType[:start], mimeType[end:]
-			if encodeHandler != nil {
-				raw = metaCharsetChanger(raw)
-			}
-			return raw, fmt.Sprintf("%v%v%v", prefix, "utf-8", suffix)
-		}
-		return raw, mimeType
-	}
-
-	if encodeHandler != nil {
-		raw, err := encodeHandler.NewDecoder().Bytes(bodyRaw)
-		if err != nil {
-			return bodyRaw, mimeType
-		}
-		if len(raw) <= 0 {
-			return bodyRaw, mimeType
-		}
-		return metaCharsetChanger(raw), mimeType
-	}
-
-	return bodyRaw, mimeType
-}
-
-func GetOverrideContentType(bodyPrescan []byte, contentType string) (overrideContentType string, originCharset string) {
-	defer func() {
-		if err := recover(); err != nil {
-		}
-	}()
-	if strings.Contains(strings.ToLower(contentType), "charset") {
-		if _, params, _ := mime.ParseMediaType(strings.ToLower(contentType)); params != nil {
-			var ok bool
-			originCharset, ok = params["charset"]
-			_ = ok
-			_ = originCharset
-		}
-	}
-	if bodyPrescan != nil && contentType != "" && !filetype.IsMIME(bodyPrescan, contentType) {
-		actuallyMIME, err := filetype.Match(bodyPrescan)
-		if err != nil {
-			log.Debugf("detect bodyPrescan type failed: %v", err)
-		}
-
-		if actuallyMIME.MIME.Value != "" {
-			log.Debugf("really content-type met: %s, origin: %v", actuallyMIME.MIME.Value, contentType)
-			overrideContentType = actuallyMIME.MIME.Value
-		}
-	}
-	return overrideContentType, originCharset
-}
-
 var expect100continue = []byte("HTTP/1.1 100 Continue\r\n\r\n")
+
+var (
+	jsMIMEGlobs = []glob.Glob{
+		glob.MustCompile(`application/*javascript*`),
+		glob.MustCompile(`text/*javascript*`),
+		glob.MustCompile(`application/*ecmascript*`),
+		glob.MustCompile(`text/*ecmascript*`),
+		glob.MustCompile(`text/jscript`),
+	}
+	htmlMIMEGlob = []glob.Glob{
+		glob.MustCompile(`text/html`),
+		glob.MustCompile(`application/xhtml+xml`),
+		glob.MustCompile(`application/html`),
+		glob.MustCompile(`text/x-html`),
+		glob.MustCompile(`application/xml`),
+		glob.MustCompile(`application/xhtml`),
+		glob.MustCompile(`application/*html*`),
+		glob.MustCompile(`text/*html*`),
+	}
+)
+
+func IsJavaScriptMIMEType(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, g := range jsMIMEGlobs {
+		if g.Match(s) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsHtmlOrXmlMIMEType(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, g := range htmlMIMEGlob {
+		if g.Match(s) {
+			return true
+		}
+	}
+	return false
+}
 
 // FixHTTPResponse 尝试对传入的响应进行修复，并返回修复后的响应，响应体和错误
 // Example:
@@ -232,136 +152,114 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 		}
 	}
 
-	// 如果 bodyRaw 是图片的话，则不处理，如何判断是图片？
-	// skipped := false
-	// _ = skipped
-	// if len(bodyRaw) > 0 {
-	// if utils.IsImage(bodyRaw) {
-	// 		skipped = true
-	// 	}
-	// }
-
 	if len(bodyRaw) == 0 {
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	}
-	// 取前几百个字节，来检测到底类型
-	var bodyPrescan []byte
-	if len(bodyRaw) > 200 {
-		bodyPrescan = bodyRaw[:200]
-	} else {
-		bodyPrescan = bodyRaw[:]
+
+	mimeResult, err := codec.MatchMIMEType([]byte(bodyRaw))
+	if err != nil {
+		log.Warnf("match mime type failed: %v", err)
+		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	}
 
-	mediaType, params, _ := mime.ParseMediaType(strings.ToLower(contentType))
-	mediaTypeLower := strings.ToLower(mediaType)
-	originCharSet, _ := params["charset"]
-	ctUTF8 := originCharSet == "utf-8" || originCharSet == "utf8"
-	isFile := false
-	isTextOrScript := strings.Contains(mediaTypeLower, "text/") || strings.Contains(mediaTypeLower, "script") || mediaType == ""
-	overrideContentType := ""
-	if contentType == "" || !filetype.IsMIME(bodyPrescan, contentType) {
-		typ, err := filetype.Match(bodyPrescan)
+	switch {
+	case IsJavaScriptMIMEType(contentType):
+		bodyRaw = mimeResult.TryUTF8Convertor(bodyRaw)
+		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+	case IsHtmlOrXmlMIMEType(contentType):
+		bodyRaw = mimeResult.TryUTF8Convertor(bodyRaw)
+		var newContentType string
+		origin, params, err := mime.ParseMediaType(contentType)
 		if err != nil {
-			log.Debugf("detect bodyPrescan file-type failed: %v", err)
-		} else if typ != types.Unknown {
-			isFile = true
-			if typ.MIME.Value != "" {
-				overrideContentType = typ.MIME.Value
-			}
-		}
-	}
-	// 修复编码问题
-	if !isFile && !ctUTF8 && isTextOrScript && !utf8.Valid(bodyRaw) {
-		var encodeHandler encoding.Encoding
-		// 如果已经有 charset，就直接获取handler，否则尝试从 HTML 中解析
-		if originCharSet != "" {
-			encodeHandler, _ = charset.Lookup(strings.ToLower(originCharSet))
+			newContentType = contentType
 		} else {
-			encodeHandler, originCharSet = charsetPrescan(bodyRaw)
-		}
-
-		// 尝试判断是否是 GBK 编码
-		if encodeHandler == nil && codec.IsGBK(bodyRaw) {
-			encodeHandler, originCharSet = charset.Lookup("gbk")
-		}
-
-		// 最后尝试使用基于 ICU 实现的算法与数据进行检测，返回置信度最高的编码
-		if encodeHandler == nil {
-			matchResult, err := codec.CharDetectBest(bodyRaw)
-			if err != nil {
-				log.Debugf("charset detect failed: %v", err)
-			} else if matchResult != nil {
-				encodeHandler, originCharSet = charset.Lookup(strings.ToLower(matchResult.Charset))
-			}
-		}
-
-		// 如果handler存在，就尝试解码
-		if encodeHandler != nil {
-			decoded, err := encodeHandler.NewDecoder().Bytes(bodyRaw)
-			if err == nil && len(decoded) > 0 {
-				bodyRaw = metaCharsetChanger(decoded)
-				if params == nil {
-					params = make(map[string]string)
-				}
+			if params != nil && utils.MapGetFirstRaw(utils.InterfaceToGeneralMap(params), "charset", "Charset", "CHARSET") != "" {
+				newContentType = contentType
+			} else {
 				params["charset"] = "utf-8"
-				overrideContentType = mime.FormatMediaType(mediaTypeLower, params)
+				newContentType = mime.FormatMediaType(origin, params)
 			}
 		}
+		headerBytes = ReplaceMIMEType(headerBytes, newContentType)
+		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+	default:
+		if mimeResult == nil || mimeResult.MIMEType == "" {
+			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		}
+		headerBytes = ReplaceHTTPPacketHeader(headerBytes, "Content-Type", mimeResult.MIMEType)
+		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	}
-	// 如果是文件，应该修复 content-type
-	if overrideContentType != "" {
-		headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
-	}
-	// overrideContentType, originCharset := GetOverrideContentType(bodyPrescan, contentType)
-	// /*originCharset is lower!!!*/
-	// _ = originCharset
-
-	// // 都解开了，来处理编码问题
-	// if bodyRaw != nil && !skipped {
-	// 	var mimeType string
-	// 	_, params, _ := mime.ParseMediaType(contentType)
-	// 	ctUTF8 := false
-	// 	if raw, ok := params["charset"]; ok {
-	// 		raw = strings.ToLower(raw)
-	// 		ctUTF8 = raw == "utf-8" || raw == "utf8"
-	// 	}
-
-	// 	if overrideContentType == "" {
-	// 		// 如果类型一致，不需要替换，那么还是只处理 content-type 和编码问题
-	// bodyRaw, mimeType = CharsetToUTF8(bodyRaw, contentType, originCharset)
-	// 		if mimeType != contentType {
-	// 			headerBytes = ReplaceMIMEType(headerBytes, mimeType)
-	// 		}
-	// 		// 是 Js，但是不包含 UTF8，按理说应该给他加成 UTF8
-	// 		if utils.IContains(mimeType, "javascript") && !ctUTF8 && len(bodyRaw) > 0 {
-	// 			// 这个顺序千万不要弄错了喔，一定要先判断是不是 UTF8，再去判断中文编码
-	// 			if !codec.IsUtf8(bodyRaw) {
-	// 				if codec.IsGBK(bodyRaw) {
-	// 					decoded, err := codec.GbkToUtf8(bodyRaw)
-	// 					if err == nil && len(decoded) > 0 {
-	// 						bodyRaw = decoded
-	// 					}
-	// 				} else {
-	// 					matchResult, _ := codec.CharDetectBest(bodyRaw)
-	// 					if matchResult != nil {
-	// 						switch strings.ToLower(matchResult.Charset) {
-	// 						case "gbk", "gb2312", "gb-2312", "gb18030", "windows-1252", "gb-18030", "windows1252":
-	// 							decoded, err := codec.GB18030ToUtf8(bodyRaw)
-	// 							if err == nil && len(decoded) > 0 {
-	// 								bodyRaw = decoded
-	// 							}
-	// 						}
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	} else {
-	// 		log.Infof("replace content-type to: %s", overrideContentType)
-	// 		headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
-	// 	}
-	// }
-
-	return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+	//
+	//// 取前几百个字节，来检测到底类型
+	//var bodyPrescan []byte
+	//if len(bodyRaw) > 200 {
+	//	bodyPrescan = bodyRaw[:200]
+	//} else {
+	//	bodyPrescan = bodyRaw[:]
+	//}
+	//
+	//mediaType, params, _ := mime.ParseMediaType(strings.ToLower(contentType))
+	//mediaTypeLower := strings.ToLower(mediaType)
+	//originCharSet, _ := params["charset"]
+	//ctUTF8 := originCharSet == "utf-8" || originCharSet == "utf8"
+	//isFile := false
+	//isTextOrScript := strings.Contains(mediaTypeLower, "text/") || strings.Contains(mediaTypeLower, "script") || mediaType == ""
+	//overrideContentType := ""
+	//if contentType == "" || !filetype.IsMIME(bodyPrescan, contentType) {
+	//	typ, err := filetype.Match(bodyPrescan)
+	//	if err != nil {
+	//		log.Debugf("detect bodyPrescan file-type failed: %v", err)
+	//	} else if typ != types.Unknown {
+	//		isFile = true
+	//		if typ.MIME.Value != "" {
+	//			overrideContentType = typ.MIME.Value
+	//		}
+	//	}
+	//}
+	//// 修复编码问题
+	//if !isFile && !ctUTF8 && isTextOrScript && !utf8.Valid(bodyRaw) {
+	//	var encodeHandler encoding.Encoding
+	//	// 如果已经有 charset，就直接获取handler，否则尝试从 HTML 中解析
+	//	if originCharSet != "" {
+	//		encodeHandler, _ = charset.Lookup(strings.ToLower(originCharSet))
+	//	} else {
+	//		encodeHandler, originCharSet = charsetPrescan(bodyRaw)
+	//	}
+	//
+	//	// 尝试判断是否是 GBK 编码
+	//	if encodeHandler == nil && codec.IsGBK(bodyRaw) {
+	//		encodeHandler, originCharSet = charset.Lookup("gbk")
+	//	}
+	//
+	//	// 最后尝试使用基于 ICU 实现的算法与数据进行检测，返回置信度最高的编码
+	//	if encodeHandler == nil {
+	//		matchResult, err := codec.CharDetectBest(bodyRaw)
+	//		if err != nil {
+	//			log.Debugf("charset detect failed: %v", err)
+	//		} else if matchResult != nil {
+	//			encodeHandler, originCharSet = charset.Lookup(strings.ToLower(matchResult.Charset))
+	//		}
+	//	}
+	//
+	//	// 如果handler存在，就尝试解码
+	//	if encodeHandler != nil {
+	//		decoded, err := encodeHandler.NewDecoder().Bytes(bodyRaw)
+	//		if err == nil && len(decoded) > 0 {
+	//			bodyRaw = metaCharsetChanger(decoded)
+	//			if params == nil {
+	//				params = make(map[string]string)
+	//			}
+	//			params["charset"] = "utf-8"
+	//			overrideContentType = mime.FormatMediaType(mediaTypeLower, params)
+	//		}
+	//	}
+	//}
+	//// 如果是文件，应该修复 content-type
+	//if overrideContentType != "" {
+	//	headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
+	//}
+	//
+	//return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 }
 
 func ReplaceMIMEType(headerBytes []byte, mimeType string) []byte {
