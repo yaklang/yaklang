@@ -202,7 +202,7 @@ RetryContentType:
 	case IsJavaScriptMIMEType(contentType):
 		bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
 		if bodyChanged {
-			log.Info("auto fix body via utf convertor auto")
+			log.Infof("auto fix body via utf convertor auto, origin content-type: %v origin: %v", contentType, originContentType)
 			newContentType := charsetRegexp.ReplaceAllString(originContentType, "charset=utf-8")
 			if newContentType != originContentType {
 				log.Infof("auto fix content-type via utf convertor auto, from %#v to %#v", originContentType, newContentType)
@@ -213,8 +213,8 @@ RetryContentType:
 	case IsHtmlOrXmlMIMEType(contentType):
 		// body is not text, but content-type is ...
 		// fix content-type header
-		if !IsHtmlOrXmlMIMEType(mimeResult.MIMEType) && !IsTextPlainMIMEType(mimeResult.MIMEType) {
-			log.Warnf("origin content-type: %v, fix new content-type: %v, reason: the actually body is not text...", contentType, mimeResult.MIMEType)
+		if !IsHtmlOrXmlMIMEType(mimeResult.MIMEType) && !IsTextPlainMIMEType(mimeResult.MIMEType) && !mimeResult.IsText {
+			log.Warnf("origin content-type: %v(%v), fix new content-type: %v, reason: the actually body is not text...", contentType, originContentType, mimeResult.MIMEType)
 			contentType = mimeResult.MIMEType
 			goto RetryContentType
 		}
@@ -244,8 +244,22 @@ RetryContentType:
 			goto RetryContentType
 		}
 
-		headerBytes = ReplaceHTTPPacketHeader(headerBytes, "Content-Type", mimeResult.MIMEType)
-		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		if mimeResult.IsText || strings.HasPrefix(strings.ToLower(contentType), "text/") {
+			bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
+			if bodyChanged {
+				withoutCharset, _, err := mime.ParseMediaType(contentType)
+				if err != nil {
+					withoutCharset = contentType
+				} else {
+					contentType = withoutCharset
+				}
+				headerBytes = ReplaceMIMEType(headerBytes, mime.FormatMediaType(contentType, map[string]string{"charset": "utf-8"}))
+			}
+			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		} else {
+			headerBytes = ReplaceMIMEType(headerBytes, mimeResult.MIMEType)
+			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		}
 	}
 	//
 	//// 取前几百个字节，来检测到底类型
