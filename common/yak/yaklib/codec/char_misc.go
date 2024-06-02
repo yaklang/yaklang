@@ -62,6 +62,10 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 		}
 
 		if len(encodings) == 1 {
+			if encodings[0].Name == "utf-8" {
+				return result, false
+			}
+
 			decodedResult, err := enc.NewDecoder().Bytes(result)
 			if err != nil {
 				return result, false
