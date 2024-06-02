@@ -202,11 +202,12 @@ RetryContentType:
 	case IsJavaScriptMIMEType(contentType):
 		bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
 		if bodyChanged {
-			log.Infof("auto fix body via utf convertor auto, origin content-type: %v origin: %v", contentType, originContentType)
-			newContentType := charsetRegexp.ReplaceAllString(originContentType, "charset=utf-8")
-			if newContentType != originContentType {
-				log.Infof("auto fix content-type via utf convertor auto, from %#v to %#v", originContentType, newContentType)
-				headerBytes = ReplaceMIMEType(headerBytes, newContentType)
+			if strings.Contains(strings.ToLower(originContentType), "charset=") {
+				newContentType := charsetRegexp.ReplaceAllString(originContentType, "charset=utf-8")
+				if strings.ToLower(newContentType) != strings.ToLower(originContentType) {
+					log.Infof("auto fix content-type via utf convertor auto, from %#v to %#v", originContentType, newContentType)
+					headerBytes = ReplaceMIMEType(headerBytes, newContentType)
+				}
 			}
 		}
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
@@ -219,9 +220,11 @@ RetryContentType:
 			goto RetryContentType
 		}
 
-		bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
+		var after []byte
+		after, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
 		if bodyChanged {
-			log.Info("auto fix body via utf convertor auto")
+			log.Infof("HtmlOrXmlMIMEType(%#v) auto fix body, origin: len(%v) -> len(%v)", originContentType, len(bodyRaw), len(after))
+			bodyRaw = after
 		}
 
 		var newContentType string
@@ -244,7 +247,7 @@ RetryContentType:
 			goto RetryContentType
 		}
 
-		if mimeResult.IsText || strings.HasPrefix(strings.ToLower(contentType), "text/") {
+		if strings.HasPrefix(strings.ToLower(contentType), "text/") {
 			bodyRaw, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
 			if bodyChanged {
 				withoutCharset, _, err := mime.ParseMediaType(contentType)
@@ -257,7 +260,10 @@ RetryContentType:
 			}
 			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 		} else {
-			headerBytes = ReplaceMIMEType(headerBytes, mimeResult.MIMEType)
+			if !mimeResult.IsText {
+				headerBytes = ReplaceMIMEType(headerBytes, mimeResult.MIMEType)
+				return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+			}
 			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 		}
 	}
