@@ -104,6 +104,20 @@ func TestFixResponse_CharSet(t *testing.T) {
 		test.Contains(string(rsp), sample)
 	})
 
+	t.Run("content-type charset gbk,body gbk", func(t *testing.T) {
+		test := assert.New(t)
+
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=gbk\r\nContent-Length: 18\r\n\r\n\xc4\xe3\xba\xc3\xa3\xac\xca\xc0\xbd\xe7\xa3\xa1")
+		rsp, _, err := FixHTTPResponse(packet)
+		fmt.Println(string(rsp))
+		test.Nil(err, "FixHTTPResponse error")
+		test.Contains(string(rsp), "Content-Type: text/html; charset=utf-8")
+		test.Contains(string(rsp), "Content-Length: 18")
+		sample := "你好，世界！"
+		fmt.Println(sample)
+		test.Contains(string(rsp), sample)
+	})
+
 	t.Run("no content-type charset,meta gbk", func(t *testing.T) {
 		test := assert.New(t)
 
@@ -150,6 +164,17 @@ func TestFixResponse_CharSet(t *testing.T) {
 		rsp, _, err := FixHTTPResponse(packet)
 		test.Nil(err, "FixHTTPResponse error")
 		test.Contains(string(rsp), "GI4\xe3\xba\xc3\xa3\xac\xca\xc0\xbd\xe7\xa3\xa1")
+		test.Contains(string(rsp), "Content-Type: text/html")
+	})
+
+	t.Run("content-type text_html,file body(Binary)", func(t *testing.T) {
+		test := assert.New(t)
+		hexBody := "2c5fc8a643ef334889238c26a41b360daa0156f71b0cca70b8bee7612de7fe4e"
+		body, _ := codec.DecodeHex(hexBody)
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 18\r\n\r\n" + string(body))
+		rsp, _, err := FixHTTPResponse(packet)
+		test.Nil(err, "FixHTTPResponse error")
+		test.Contains(string(rsp), string(body))
 		test.Contains(string(rsp), "Content-Type: text/html")
 	})
 }

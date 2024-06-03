@@ -182,8 +182,7 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	if len(bodyRaw) == 0 {
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 	}
-
-	mimeResult, err := codec.MatchMIMEType([]byte(bodyRaw))
+	mimeResult, err := codec.MatchMIMEType(bodyRaw)
 	if err != nil {
 		log.Warnf("match mime type failed: %v", err)
 		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
@@ -214,7 +213,7 @@ RetryContentType:
 	case IsHtmlOrXmlMIMEType(contentType):
 		// body is not text, but content-type is ...
 		// fix content-type header
-		if !IsHtmlOrXmlMIMEType(mimeResult.MIMEType) && !IsTextPlainMIMEType(mimeResult.MIMEType) && !mimeResult.IsText {
+		if !IsHtmlOrXmlMIMEType(mimeResult.MIMEType) && !IsTextPlainMIMEType(mimeResult.MIMEType) && !mimeResult.IsText && mimeResult.MIMEType != "application/octet-stream" {
 			log.Warnf("origin content-type: %v(%v), fix new content-type: %v, reason: the actually body is not text...", contentType, originContentType, mimeResult.MIMEType)
 			contentType = mimeResult.MIMEType
 			goto RetryContentType
@@ -234,7 +233,7 @@ RetryContentType:
 		if err != nil {
 			newContentType = contentType
 		} else {
-			params = map[string]string{}
+			// 如果服务端返回了 charset，并且转换utf-8成功，就直接覆盖设置 charset=utf-8，否则使用服务端设置的 charset
 			if containsUTF8 {
 				params["charset"] = "utf-8"
 			}
