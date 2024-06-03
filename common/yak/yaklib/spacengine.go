@@ -1,13 +1,14 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	spacengine2 "github.com/yaklang/yaklang/common/utils/spacengine"
+	"github.com/yaklang/yaklang/common/utils/spacengine"
 )
 
 var SpaceEngineExports = map[string]interface{}{
@@ -55,8 +56,19 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 			c.user = auth[0]
 			c.apiKey = auth[1]
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig(i).APIKey
-			c.user = consts.GetThirdPartyApplicationConfig(i).UserIdentifier
+			config := consts.GetThirdPartyApplicationConfig(i)
+			c.apiKey = config.APIKey
+			c.user = config.UserIdentifier
+		}
+		if len(auth) == 3 {
+			c.user = auth[0]
+			c.apiKey = auth[1]
+			c.domain = auth[2]
+		} else {
+			config := consts.GetThirdPartyApplicationConfig(i)
+			c.apiKey = config.APIKey
+			c.user = config.UserIdentifier
+			c.domain = config.GetExtraParam("domain")
 		}
 	}
 }
@@ -64,57 +76,67 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 func withUseZoomeye(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "zoomeye"
+		config := consts.GetThirdPartyApplicationConfig("zoomeye")
 		if len(api) > 0 {
 			c.apiKey = api[0]
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig("zoomeye").APIKey
+			c.apiKey = config.APIKey
 		}
+		c.domain = config.GetExtraParam("domain")
 	}
 }
 
 func withUseShodan(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "shodan"
+		config := consts.GetThirdPartyApplicationConfig("shodan")
 		if len(api) > 0 {
 			c.apiKey = api[0]
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig("shodan").APIKey
+			c.apiKey = config.APIKey
 		}
+		c.domain = config.GetExtraParam("domain")
 	}
 }
 
 func withUseQuake(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "quake"
+		config := consts.GetThirdPartyApplicationConfig("quake")
 		if len(api) > 0 {
 			c.apiKey = api[0]
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig("quake").APIKey
+			c.apiKey = config.APIKey
 		}
+		c.domain = config.GetExtraParam("domain")
 	}
 }
 
 func withUseHunter(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "hunter"
+		config := consts.GetThirdPartyApplicationConfig("hunter")
 		if len(auth) > 0 {
 			c.apiKey = auth[0]
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig("hunter").APIKey
+			c.apiKey = config.APIKey
 		}
+		c.domain = config.GetExtraParam("domain")
 	}
 }
 
 func withUseFofa(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "fofa"
+		config := consts.GetThirdPartyApplicationConfig("fofa")
 		if len(auth) > 1 {
 			c.user = auth[0]
 			c.apiKey = auth[1]
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig("fofa").APIKey
-			c.user = consts.GetThirdPartyApplicationConfig("fofa").UserIdentifier
+			c.apiKey = config.APIKey
+			c.user = config.UserIdentifier
 		}
+		c.domain = config.GetExtraParam("domain")
 	}
 }
 
@@ -144,13 +166,13 @@ func Query(filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEng
 }
 
 type _spaceEngineConfig struct {
-	maxRecord int
-	maxPage   int
-	pageSize  int
 	engine    string
 	apiKey    string
 	user      string
 	domain    string
+	maxRecord int
+	maxPage   int
+	pageSize  int
 }
 
 type _spaceEngineConfigOpt func(c *_spaceEngineConfig)
@@ -190,7 +212,7 @@ func _shodan(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *
 		opt(config)
 	}
 
-	return spacengine2.ShodanQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
+	return spacengine.ShodanQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
 }
 
 func _quake(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
@@ -204,7 +226,7 @@ func _quake(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *b
 		opt(config)
 	}
 
-	return spacengine2.QuakeQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
+	return spacengine.QuakeQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
 }
 
 func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
@@ -218,7 +240,7 @@ func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (ch
 		opt(config)
 	}
 
-	return spacengine2.HunterQuery(key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
+	return spacengine.HunterQuery(key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
 }
 
 func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
@@ -237,7 +259,7 @@ func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (cha
 		config.pageSize = 10000
 	}
 
-	return spacengine2.FofaQuery(email, key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
+	return spacengine.FofaQuery(email, key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
 }
 
 func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
@@ -251,5 +273,5 @@ func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *b
 		opt(config)
 	}
 
-	return spacengine2.ZoomeyeQuery(key, filter, config.maxPage, config.maxRecord, config.domain)
+	return spacengine.ZoomeyeQuery(key, filter, config.maxPage, config.maxRecord, config.domain)
 }
