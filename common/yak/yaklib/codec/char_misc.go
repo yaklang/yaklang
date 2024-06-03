@@ -3,6 +3,7 @@ package codec
 import (
 	"bytes"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
@@ -86,6 +87,16 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 			return result, false
 		} else {
 			// no meta encoding, treat like plain text
+			charsetFallback := mimecharset.FromPlain(result)
+			enc, charsetFallback := charset.Lookup(charsetFallback)
+			if !lo.Contains([]string{
+				"utf-8", "utf8", "windows-1252", "iso-8859-1",
+			}, charsetFallback) && enc != nil {
+				decodedResult, err := enc.NewDecoder().Bytes(result)
+				if err == nil {
+					return decodedResult, true
+				}
+			}
 		}
 	}
 
