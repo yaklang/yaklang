@@ -82,6 +82,11 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			consts.SetSSADataBaseName(databaseFileRaw)
 
+			if syntaxFlow != "" {
+				log.Info("using syntaxflow rule will skip compile")
+				target = ""
+			}
+
 			// compile
 			if target != "" {
 				opt := make([]ssaapi.Option, 0, 3)
