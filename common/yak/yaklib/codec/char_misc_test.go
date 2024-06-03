@@ -31,6 +31,18 @@ func TestCharMatch(t *testing.T) {
 		},
 
 		{
+			name: "Invalid UTF8",
+			input: func(t *testing.T) string {
+				raw, err := DecodeHex(`E228A1`)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(raw)
+			},
+			noHave: []string{"\xef\xbf\xbd"},
+		},
+
+		{
 			name: "Simple Chinese Dup Meat",
 			input: func(t *testing.T) string {
 				data, err := Utf8ToGB18030([]byte("你好，我有一个帽衫"))

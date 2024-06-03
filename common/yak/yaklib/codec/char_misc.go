@@ -34,6 +34,17 @@ type MIMEResult struct {
 }
 
 func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
+	result, ok := t._tryUTF8Convertor(raw)
+	if ok {
+		if bytes.Contains(result, []byte{'\xef', '\xbf', '\xbd'}) {
+			return raw, false
+		}
+		return result, true
+	}
+	return raw, false
+}
+
+func (t *MIMEResult) _tryUTF8Convertor(raw []byte) ([]byte, bool) {
 	if strings.Contains(t.MIMEType, "/html") || strings.Contains(t.MIMEType, "/xhtml+xml") {
 		result := raw
 		// <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -108,6 +119,11 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 		}
 		return result, true
 	default:
+		if t.MIMEType == "application/octet-stream" {
+			// application/octet-stream is not text, but binary
+			return raw, false
+		}
+
 		if t.Charset != "" && t.Charset != "utf-8" {
 			log.Warnf("TBD: charset %#v not supported yet, use origin raw input", t.Charset)
 		}
@@ -118,6 +134,9 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 			if enc != nil {
 				fixed, err := enc.NewDecoder().Bytes(raw)
 				if err == nil {
+					if bytes.Contains(fixed, []byte{'\xef', '\xbb', '\xbf'}) {
+						// ghost
+					}
 					return fixed, true
 				}
 			}
