@@ -142,4 +142,14 @@ func TestFixResponse_CharSet(t *testing.T) {
 		test.Nil(err, "FixHTTPResponse error")
 		test.Contains(string(rsp), "GIF89a\xc4\xe3\xba\xc3\xa3\xac\xca\xc0\xbd\xe7\xa3\xa1")
 	})
+
+	t.Run("content-type text_html,file body(GIF)", func(t *testing.T) {
+		test := assert.New(t)
+
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 18\r\n\r\nGI4\xe3\xba\xc3\xa3\xac\xca\xc0\xbd\xe7\xa3\xa1")
+		rsp, _, err := FixHTTPResponse(packet)
+		test.Nil(err, "FixHTTPResponse error")
+		test.Contains(string(rsp), "GI4\xe3\xba\xc3\xa3\xac\xca\xc0\xbd\xe7\xa3\xa1")
+		test.Contains(string(rsp), "Content-Type: text/html")
+	})
 }
