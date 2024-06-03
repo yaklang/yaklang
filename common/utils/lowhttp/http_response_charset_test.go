@@ -115,6 +115,16 @@ func TestFixResponse_CharSet(t *testing.T) {
 		test.Contains(string(rsp), "你好，世界！")
 	})
 
+	t.Run("no content-type charset, no meta, but gbk", func(t *testing.T) {
+		test := assert.New(t)
+
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Length: 18\r\n\r\n<html><header></header><body>\xc4\xe3\xba\xc3\xa3\xac\xca\xc0\xbd\xe7\xa3\xa1</body></html>")
+		rsp, _, err := FixHTTPResponse(packet)
+		fmt.Println(string(rsp))
+		test.Nil(err, "FixHTTPResponse error")
+		test.Contains(string(rsp), "你好，世界！")
+	})
+
 	t.Run("content-type file-type", func(t *testing.T) {
 		test := assert.New(t)
 
