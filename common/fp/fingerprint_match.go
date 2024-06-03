@@ -118,12 +118,12 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		//////////////////////////////////////////////////////////////////////////
 		////////////////////////////// 主机指纹识别 ///////////////////////////////
 		//////////////////////////////////////////////////////////////////////////
-		result2, _ := f.matchWithContext(ctx, ip, port, config)
+		result2, _ := f.matchWithContext(ctx, ip, port, host, config)
 		result.Merge(result2)
 		return result, nil
 	}
 	serviceFirst := func() (*MatchResult, error) {
-		result, err := f.matchWithContext(ctx, ip, port, config)
+		result, err := f.matchWithContext(ctx, ip, port, host, config)
 		if err != nil {
 			return nil, err
 		}
