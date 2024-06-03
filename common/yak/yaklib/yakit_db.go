@@ -3,6 +3,7 @@ package yaklib
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/spacengine"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -244,7 +244,7 @@ func interfaceToPort(t interface{}) (*schema.Port, error) {
 		r = NewPortFromMatchResult(ret)
 	case *synscan.SynScanResult:
 		r = NewPortFromSynScanResult(ret)
-	case *spacengine.NetSpaceEngineResult:
+	case *base.NetSpaceEngineResult:
 		r = NewPortFromSpaceEngineResult(ret)
 	case *schema.Port:
 		r = ret

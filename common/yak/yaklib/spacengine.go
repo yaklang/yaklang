@@ -1,11 +1,13 @@
 package yaklib
 
 import (
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	spacengine2 "github.com/yaklang/yaklang/common/utils/spacengine"
-	"strings"
 )
 
 var SpaceEngineExports = map[string]interface{}{
@@ -17,6 +19,7 @@ var SpaceEngineExports = map[string]interface{}{
 
 	"Query": Query,
 
+	"domain":    _spaceEngine_Domain,
 	"maxPage":   _spaceEngine_MaxPage,
 	"maxRecord": _spaceEngine_MaxRecord,
 	"pageSize":  _spaceEngine_PageSize,
@@ -115,7 +118,7 @@ func withUseFofa(auth ...string) _spaceEngineConfigOpt {
 	}
 }
 
-func Query(filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
+func Query(filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
@@ -147,9 +150,16 @@ type _spaceEngineConfig struct {
 	engine    string
 	apiKey    string
 	user      string
+	domain    string
 }
 
 type _spaceEngineConfigOpt func(c *_spaceEngineConfig)
+
+func _spaceEngine_Domain(domain string) _spaceEngineConfigOpt {
+	return func(c *_spaceEngineConfig) {
+		c.domain = domain
+	}
+}
 
 func _spaceEngine_MaxRecord(i int) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
@@ -169,7 +179,7 @@ func _spaceEngine_PageSize(i int) _spaceEngineConfigOpt {
 	}
 }
 
-func _shodan(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
+func _shodan(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
@@ -180,10 +190,10 @@ func _shodan(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *
 		opt(config)
 	}
 
-	return spacengine2.ShodanQuery(token, filter, config.maxPage, config.maxRecord)
+	return spacengine2.ShodanQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
 }
 
-func _quake(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
+func _quake(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
@@ -194,10 +204,10 @@ func _quake(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *s
 		opt(config)
 	}
 
-	return spacengine2.QuakeQuery(token, filter, config.maxPage, config.maxRecord)
+	return spacengine2.QuakeQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
 }
 
-func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
+func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
@@ -208,10 +218,10 @@ func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (ch
 		opt(config)
 	}
 
-	return spacengine2.HunterQuery(name, key, filter, config.maxPage, config.pageSize, config.maxRecord)
+	return spacengine2.HunterQuery(key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
 }
 
-func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
+func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
@@ -227,10 +237,10 @@ func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (cha
 		config.pageSize = 10000
 	}
 
-	return spacengine2.FofaQuery(email, key, filter, config.maxPage, config.pageSize, config.maxRecord)
+	return spacengine2.FofaQuery(email, key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
 }
 
-func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *spacengine2.NetSpaceEngineResult, error) {
+func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
 		maxPage:   10,
@@ -241,5 +251,5 @@ func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *s
 		opt(config)
 	}
 
-	return spacengine2.ZoomeyeQuery(key, filter, config.maxPage, config.maxRecord)
+	return spacengine2.ZoomeyeQuery(key, filter, config.maxPage, config.maxRecord, config.domain)
 }

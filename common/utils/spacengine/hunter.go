@@ -5,15 +5,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/spacengine/hunter"
 )
 
-func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngineResult {
+func resultToSpacengineList(filter string, result *gjson.Result) []*base.NetSpaceEngineResult {
 	rData := result.Get("data.arr").Array()
-	var results = make([]*NetSpaceEngineResult, len(rData))
+	results := make([]*base.NetSpaceEngineResult, len(rData))
 	for index, d := range rData {
 		isTls := false
 		dataMap := d.Map()
@@ -65,7 +67,7 @@ func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngi
 		}
 		fps = utils.RemoveRepeatStringSlice(fps)
 
-		results[index] = &NetSpaceEngineResult{
+		results[index] = &base.NetSpaceEngineResult{
 			Addr:            utils.HostPort(host, port),
 			FromEngine:      "hunter",
 			HtmlTitle:       webTitle,
@@ -87,8 +89,15 @@ func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngi
 	return results
 }
 
-func HunterQuery(name, key, query string, maxPage, pageSize, maxRecord int) (chan *NetSpaceEngineResult, error) {
-	ch := make(chan *NetSpaceEngineResult)
+func HunterQuery(key, query string, maxPage, pageSize, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	ch := make(chan *base.NetSpaceEngineResult)
+	var client *hunter.HunterClient
+	if len(domains) > 0 && domains[0] != "" {
+		client = hunter.NewClientEx(key, domains[0])
+	} else {
+		client = hunter.NewClient(key)
+	}
+
 	go func() {
 		defer close(ch)
 
@@ -100,7 +109,7 @@ func HunterQuery(name, key, query string, maxPage, pageSize, maxRecord int) (cha
 			}
 
 			log.Infof("Start to query hunter for %v", query)
-			result, err := hunter.HunterQuery(name, key, query, page, pageSize)
+			result, err := client.Query(query, page, pageSize)
 			if err != nil {
 				log.Errorf("hunter client query next failed: %s", err)
 				break

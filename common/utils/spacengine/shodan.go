@@ -1,9 +1,8 @@
 package spacengine
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -11,37 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/spacengine/go-shodan"
 )
 
-var defaultHttpClient = utils.NewDefaultHTTPClient()
-
-type ShodanUser struct {
-	Member      bool        `json:"member"`
-	Credits     int         `json:"credits"`
-	DisplayName interface{} `json:"display_name"`
-	Created     string      `json:"created"`
-}
-
-func ShodanUserProfile(key string) (*ShodanUser, error) {
-	profileApi := "https://api.shodan.io/account/profile?key="
-	profileApi = fmt.Sprintf("%s%s", profileApi, key)
-	rsp, err := defaultHttpClient.Get(profileApi)
-	if err != nil {
-		return nil, err
-	}
-	if rsp.StatusCode != 200 {
-		return nil, utils.Errorf("[%v]: invalid status code", rsp.StatusCode)
-	}
-	var user ShodanUser
-	body, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		return nil, err
-	}
-	defer rsp.Body.Close()
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
-}
 func interfaceArrayToString(rets []interface{}) string {
 	var r []string
 	for _, i := range rets {
@@ -73,15 +41,21 @@ func ServiceProviderToChineseName(i string) string {
 	}
 }
 
-func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
-	client := shodan.New(key)
+func ShodanQuery(key string, filter string, maxPage, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	var client *shodan.ShodanClient
+	if len(domains) > 0 && domains[0] != "" {
+		client = shodan.NewClientEx(key, domains[0])
+	} else {
+		client = shodan.NewClient(key)
+	}
+
 	info, err := client.APIInfo()
 	if err != nil {
 		return nil, utils.Errorf("get shodan info failed: %s", err)
 	}
 	_ = info
 
-	ch := make(chan *NetSpaceEngineResult)
+	ch := make(chan *base.NetSpaceEngineResult)
 	go func() {
 		defer close(ch)
 
@@ -95,7 +69,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 			}
 
 			if utils.IsIPv4(filter) || utils.IsIPv6(filter) {
-				hostResult, err := client.Host(filter, map[string][]string{})
+				hostResult, err := client.Host(filter, map[string]string{})
 				if err != nil {
 					log.Errorf("query host for op failed: %s", err)
 					return
@@ -108,7 +82,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 					if nextFinished {
 						break
 					}
-					tmpR := &NetSpaceEngineResult{
+					tmpR := &base.NetSpaceEngineResult{
 						Addr:            utils.HostPort(hostResult.IPStr, port),
 						FromEngine:      "shodan",
 						Latitude:        hostResult.Latitude,
@@ -126,9 +100,8 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 				return
 			}
 
-			match, err := client.HostSearch(filter, nil, map[string][]string{
-				"page": {fmt.Sprintf(`%v`, page)},
-				//"limit": {"20"},
+			match, err := client.HostSearch(filter, nil, map[string]string{
+				"page": fmt.Sprintf(`%v`, page),
 			})
 			if err != nil {
 				log.Errorf("shodan.HostSearch[%v] failed: %s", filter, err)
@@ -137,7 +110,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 
 			for _, d := range match.Matches {
 				ip, port := utils.Uint32ToIPv4(uint32(d.IP)), d.Port
-				log.Infof("shodan fetch: %s",
+				log.Debugf("shodan fetch: %s",
 					utils.HostPort(ip.String(), port),
 				)
 
@@ -154,7 +127,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 					fps = append(fps, fmt.Sprint(d.Os))
 				}
 				fps = utils.RemoveRepeatStringSlice(fps)
-				provider := &NetSpaceEngineResult{
+				provider := &base.NetSpaceEngineResult{
 					Addr:            utils.HostPort(ip.String(), port),
 					FromEngine:      "shodan",
 					Latitude:        d.Location.Latitude,

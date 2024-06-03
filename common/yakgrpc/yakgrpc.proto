@@ -671,6 +671,7 @@ message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
   string Key = 2;
   string Account = 3;
+  string Domain = 4;
 }
 
 message GetSpaceEngineStatusRequest {

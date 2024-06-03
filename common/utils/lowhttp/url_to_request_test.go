@@ -2,8 +2,10 @@ package lowhttp
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func CheckResponse(t *testing.T, raw []byte, wantReq string) {
@@ -48,7 +50,6 @@ func CheckResponse(t *testing.T, raw []byte, wantReq string) {
 			t.Errorf("body Error: got:\n%s\nwant:\n%s\n", buf1.String(), buf2.String())
 		}
 	}
-
 }
 
 func TestUrlToGetRequestPacket(t *testing.T) {
@@ -154,4 +155,22 @@ func TestUrlToHTTPRequest(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "UrlToHTTPRequest(%v)", tt.args.text)
 		})
 	}
+}
+
+func TestFixURL(t *testing.T) {
+	t.Run("no scheme 80 port", func(t *testing.T) {
+		require.Equal(t, "http://baidu.com", FixURLScheme("baidu.com:80"))
+	})
+	t.Run("no scheme 443 port", func(t *testing.T) {
+		require.Equal(t, "https://baidu.com", FixURLScheme("baidu.com:443"))
+	})
+	t.Run("no scheme not normal port", func(t *testing.T) {
+		require.Equal(t, "http://baidu.com:11111", FixURLScheme("baidu.com:11111"))
+	})
+	t.Run("normal http", func(t *testing.T) {
+		require.Equal(t, "http://baidu.com:80", FixURLScheme("http://baidu.com:80"))
+	})
+	t.Run("normal https", func(t *testing.T) {
+		require.Equal(t, "http://baidu.com:8443", FixURLScheme("http://baidu.com:8443"))
+	})
 }

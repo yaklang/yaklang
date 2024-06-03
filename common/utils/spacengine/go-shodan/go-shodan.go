@@ -4,26 +4,34 @@ package shodan
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 )
 
-// APIHost is the URL of the Shodan API.
-// Debug toggles debug information.
+var _ base.IUserProfile = (*ShodanClient)(nil)
+
 var (
-	APIHost        = "https://api.shodan.io"
-	ExploitAPIHost = "https://exploits.shodan.io"
+	defaultAPIHost        = "https://api.shodan.io"
+	defaultExploitAPIHost = "https://exploits.shodan.io"
+	sessionKey            = "__YAK_BUILTIN_SHODAN_CLIENT__"
 )
 
-// Client stores shared data that is used to interact with the API.
-// Key is our Shodan API Key.
-type Client struct {
-	Key string
+// ShodanClient stores shared data that is used to interact with the API.
+type ShodanClient struct {
+	*base.BaseSpaceEngineClient
+	exploitAPIHost string
+}
+
+type ShodanUser struct {
+	Member      bool        `json:"member"`
+	Credits     int         `json:"credits"`
+	DisplayName interface{} `json:"display_name"`
+	Created     string      `json:"created"`
 }
 
 // Exploit is used to unmarshal the JSON response from '/api/search'.
@@ -237,43 +245,55 @@ type Error struct {
 	Error string `json:"error"`
 }
 
-// New returns a new Client.
-func New(key string) *Client {
-	return &Client{
-		Key: key,
+// NewClient returns a new Client.
+func NewClient(key string) *ShodanClient {
+	return &ShodanClient{
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, defaultAPIHost),
+		exploitAPIHost:        defaultExploitAPIHost,
 	}
+}
+
+// NewClientEx returns a new Client with custom host.
+func NewClientEx(key string, apiHost string) *ShodanClient {
+	if apiHost == "" {
+		apiHost = defaultAPIHost
+	}
+	return &ShodanClient{
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, defaultAPIHost),
+		exploitAPIHost:        defaultExploitAPIHost,
+	}
+}
+
+func (c *ShodanClient) UserProfile() ([]byte, error) {
+	params := map[string]string{
+		"key": c.Key,
+	}
+	rsp, err := c.doRequest("/account/profile", poc.WithReplaceAllHttpPacketQueryParams(params))
+	return rsp.Body, err
 }
 
 // Host calls '/shodan/host/{ip}' and returns the unmarshalled response.
 // ip is the IP address to search for.
 // opts are all query paramters to pass in the request. You do not have to provide your API key.
-func (c *Client) Host(ip string, opts url.Values) (*Host, error) {
+func (c *ShodanClient) Host(ip string, params map[string]string) (*Host, error) {
 	h := &Host{}
-	opts.Set("key", c.Key)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/host/"+ip+"?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return h, err
-	}
-	err = doRequestAndUnmarshal(req, &h)
+	params["key"] = c.Key
+	err := c.doRequestAndUnmarshal("/shodan/host", &h, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return h, err
 }
 
 // HostCount calls '/shodan/host/count' and returns the unmarshalled response.
 // query is the search query to pass in the request.
 // facets are any facets to pass in the request.
-func (c *Client) HostCount(query string, facets []string) (*HostCount, error) {
+func (c *ShodanClient) HostCount(query string, facets []string) (*HostCount, error) {
 	h := &HostCount{}
-	opts := url.Values{}
-	opts.Set("key", c.Key)
-	opts.Set("facets", strings.Join(facets, ","))
-	opts.Set("query", query)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/host/count?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return h, err
+	params := map[string]string{
+		"key":    c.Key,
+		"facets": strings.Join(facets, ","),
+		"query":  query,
 	}
-	err = doRequestAndUnmarshal(req, &h)
+
+	err := c.doRequestAndUnmarshal("/shodan/host/count", &h, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return h, err
 }
 
@@ -281,132 +301,96 @@ func (c *Client) HostCount(query string, facets []string) (*HostCount, error) {
 // query is the search query to pass in the request.
 // facets are any facets to pass in the request.
 // opts are any additional query parameters to set, such as page and minify.
-func (c *Client) HostSearch(query string, facets []string, opts url.Values) (*HostSearch, error) {
+func (c *ShodanClient) HostSearch(query string, facets []string, params map[string]string) (*HostSearch, error) {
 	h := &HostSearch{}
-	opts.Set("key", c.Key)
-	opts.Set("facets", strings.Join(facets, ","))
-	opts.Set("query", query)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/host/search?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return h, err
-	}
-	err = doRequestAndUnmarshal(req, &h)
+	params["key"] = c.Key
+	params["facets"] = strings.Join(facets, ",")
+	params["query"] = query
+	err := c.doRequestAndUnmarshal("/shodan/host/search", &h, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return h, err
 }
 
 // HostSearchTokens calls '/shodan/host/search/tokens' and returns the unmarshalled response.
 // query is the search query to pass in the request.
-func (c *Client) HostSearchTokens(query string) (*HostSearchTokens, error) {
+func (c *ShodanClient) HostSearchTokens(query string) (*HostSearchTokens, error) {
 	h := &HostSearchTokens{}
-	opts := url.Values{}
-	opts.Set("key", c.Key)
-	opts.Set("query", query)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/host/search/tokens?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return h, err
+	params := map[string]string{
+		"key":   c.Key,
+		"query": query,
 	}
-	err = doRequestAndUnmarshal(req, &h)
+	err := c.doRequestAndUnmarshal("/shodan/host/search/tokens", &h, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return h, err
 }
 
 // Protocols calls '/shodan/protocols' and returns the unmarshalled response.
-func (c *Client) Protocols() (map[string]string, error) {
+func (c *ShodanClient) Protocols() (map[string]string, error) {
 	m := make(map[string]string)
-	opts := url.Values{}
-	opts.Set("key", c.Key)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/protocols?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return m, err
+	params := map[string]string{
+		"key": c.Key,
 	}
-	err = doRequestAndUnmarshal(req, &m)
+	err := c.doRequestAndUnmarshal("/shodan/protocols", &m, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return m, err
 }
 
 // Services calls '/shodan/services' and returns the unmarshalled response.
-func (c *Client) Services() (map[string]string, error) {
+func (c *ShodanClient) Services() (map[string]string, error) {
 	m := make(map[string]string)
-	opts := url.Values{}
-	opts.Set("key", c.Key)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/services?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return m, err
+	params := map[string]string{
+		"key": c.Key,
 	}
-	err = doRequestAndUnmarshal(req, &m)
+	err := c.doRequestAndUnmarshal("/shodan/services", &m, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return m, err
 }
 
 // Query calls '/shodan/query' and returns the unmarshalled response.
 // opts are additional query parameters. You do not need to provide your API key.
-func (c *Client) Query(opts url.Values) (*Query, error) {
+func (c *ShodanClient) Query(params map[string]string) (*Query, error) {
 	q := &Query{}
-	opts.Set("key", c.Key)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/query?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return q, err
-	}
-	err = doRequestAndUnmarshal(req, &q)
+	params["key"] = c.Key
+	err := c.doRequestAndUnmarshal("/shodan/query", &q, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return q, err
 }
 
 // QuerySearch calls '/shodan/query/search' and returns the unmarshalled response.
 // query is the search query to pass in the request.
 // opts are additional query parameters. You do not need to provide your API key.
-func (c *Client) QuerySearch(query string, opts url.Values) (*Query, error) {
+func (c *ShodanClient) QuerySearch(query string, params map[string]string) (*Query, error) {
 	q := &Query{}
-	opts.Set("key", c.Key)
-	opts.Set("query", query)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/query/search?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return q, err
-	}
-	err = doRequestAndUnmarshal(req, &q)
+	params["key"] = c.Key
+	params["query"] = query
+	err := c.doRequestAndUnmarshal("/shodan/query/search", &q, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return q, err
 }
 
 // QueryTags calls '/shodan/query/tags' and returns the unmarshalled response.
 // opts are additional query parameters. You do not need to provide your API key.
-func (c *Client) QueryTags(opts url.Values) (*QueryTags, error) {
+func (c *ShodanClient) QueryTags(params map[string]string) (*QueryTags, error) {
 	q := &QueryTags{}
-	opts.Set("key", c.Key)
-	req, err := http.NewRequest("GET", APIHost+"/shodan/query/tags?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return q, err
-	}
-	err = doRequestAndUnmarshal(req, &q)
+	params["key"] = c.Key
+
+	err := c.doRequestAndUnmarshal("/shodan/query/tags", &q, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return q, err
 }
 
 // APIInfo calls '/api-info' and returns the unmarshalled response.
-func (c *Client) APIInfo() (*APIInfo, error) {
+func (c *ShodanClient) APIInfo() (*APIInfo, error) {
 	i := &APIInfo{}
-	opts := url.Values{}
-	opts.Set("key", c.Key)
-	req, err := http.NewRequest("GET", APIHost+"/api-info?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return i, err
+	params := map[string]string{
+		"key": c.Key,
 	}
-	err = doRequestAndUnmarshal(req, &i)
+	err := c.doRequestAndUnmarshal("/api-info", &i, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return i, err
 }
 
 // DNSResolve calls '/dns/resolve' and returns the unmarshalled response.
-func (c *Client) DNSResolve(hostnames []string) ([]DNSResolve, error) {
+func (c *ShodanClient) DNSResolve(hostnames []string) ([]DNSResolve, error) {
 	d := []DNSResolve{}
-	req, err := http.NewRequest("GET", APIHost+"/dns/resolve?key="+c.Key+"&hostnames="+strings.Join(hostnames, ","), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return d, err
+	params := map[string]string{
+		"key":       c.Key,
+		"hostnames": strings.Join(hostnames, ","),
 	}
 	m := make(map[string]string)
-	if err := doRequestAndUnmarshal(req, &m); err != nil {
+	if err := c.doRequestAndUnmarshal("/dns/resolve", &m, poc.WithReplaceAllHttpPacketQueryParams(params)); err != nil {
 		return d, err
 	}
 	for k, v := range m {
@@ -419,15 +403,15 @@ func (c *Client) DNSResolve(hostnames []string) ([]DNSResolve, error) {
 }
 
 // DNSReverse calls '/dns/reverse' and returns the unmarshalled response.
-func (c *Client) DNSReverse(ips []string) ([]DNSReverse, error) {
+func (c *ShodanClient) DNSReverse(ips []string) ([]DNSReverse, error) {
 	d := []DNSReverse{}
-	req, err := http.NewRequest("GET", APIHost+"/dns/reverse?key="+c.Key+"&ips="+strings.Join(ips, ","), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return d, err
+	params := map[string]string{
+		"key": c.Key,
+		"ips": strings.Join(ips, ","),
 	}
+
 	m := make(map[string][]string)
-	if err := doRequestAndUnmarshal(req, &m); err != nil {
+	if err := c.doRequestAndUnmarshal("/dns/reverse", &m, poc.WithReplaceAllHttpPacketQueryParams(params)); err != nil {
 		return d, err
 	}
 	for k, v := range m {
@@ -444,54 +428,50 @@ func (c *Client) DNSReverse(ips []string) ([]DNSReverse, error) {
 // the unmarshalled response.
 // query is the search query string.
 // facets are any facets to add to the request.
-func (c *Client) Exploits(query string, facets []string) (*Exploit, error) {
+func (c *ShodanClient) Exploits(query string, facets []string) (*Exploit, error) {
 	e := &Exploit{}
-	opts := url.Values{}
-	opts.Set("key", c.Key)
-	opts.Set("facets", strings.Join(facets, ","))
-	opts.Set("query", query)
-	req, err := http.NewRequest("GET", ExploitAPIHost+"/api/search?"+opts.Encode(), nil)
-	debug("GET " + req.URL.String())
-	if err != nil {
-		return e, err
+	params := map[string]string{
+		"key":    c.Key,
+		"facets": strings.Join(facets, ","),
+		"query":  query,
 	}
-	err = doRequestAndUnmarshal(req, &e)
+	err := c.doRequestAndUnmarshal("/api/search", &e, poc.WithReplaceAllHttpPacketQueryParams(params))
 	return e, err
 }
 
-func doRequestAndUnmarshal(req *http.Request, thing interface{}) error {
-	client := &http.Client{}
-	resp, err := client.Do(req)
+func (c *ShodanClient) doRequest(path string, opts ...poc.PocConfigOption) (*base.SpaceEngineResponse, error) {
+	opts = append(opts, poc.WithSession(sessionKey), poc.WithDeleteHeader("User-Agent"))
+	rsp, err := c.Get(path, opts...)
+	if err != nil {
+		return nil, err
+	}
+	err = checkError(rsp.StatusCode, rsp.Body)
+	return rsp, err
+}
+
+func (c *ShodanClient) doRequestAndUnmarshal(path string, thing interface{}, opts ...poc.PocConfigOption) error {
+	opts = append(opts, poc.WithSession(sessionKey), poc.WithDeleteHeader("User-Agent"))
+	rsp, err := c.Get(path, opts...)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
+
+	if err := checkError(rsp.StatusCode, rsp.Body); err != nil {
 		return err
 	}
-	if err := checkError(resp, data); err != nil {
-		return err
-	}
-	err = json.Unmarshal(data, &thing)
+
+	err = json.Unmarshal(rsp.Body, &thing)
 	return err
 }
 
-func checkError(resp *http.Response, data []byte) error {
-	if resp.StatusCode >= 300 {
-		debug("Non 2XX response")
-		e := &Error{}
-		if err := json.Unmarshal(data, &e); err != nil {
-			debug("Error parsing JSON")
-			return err
+func checkError(statusCode int, data []byte) error {
+	if statusCode >= 300 {
+		return errors.New("invalid status code")
+	} else {
+		result := gjson.ParseBytes(data)
+		if errmsg := result.Get("error").String(); errmsg != "" {
+			return utils.Errorf("invalid response : %s", errmsg)
 		}
-		return errors.New(e.Error)
 	}
 	return nil
-}
-
-func debug(msg string) {
-	if os.Getenv("SHODAN_DEBUG") != "" {
-		log.Println(msg)
-	}
 }

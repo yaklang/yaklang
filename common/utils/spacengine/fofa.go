@@ -2,25 +2,28 @@ package spacengine
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
 
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/spacengine/fofa"
 	"github.com/yaklang/yaklang/common/utils/suspect"
 )
 
-func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, maxRecord int) (chan *NetSpaceEngineResult, error) {
-	// build fofa client
-	client := fofa.NewFofaClient(email, fofaKey)
-	userInfo, err := client.UserInfo()
+func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	var client *fofa.FofaClient
+	if len(domains) > 0 && domains[0] != "" {
+		client = fofa.NewClientEx(email, fofaKey, domains[0])
+	} else {
+		client = fofa.NewClient(email, fofaKey)
+	}
+	_, err := client.UserProfile()
 	if err != nil {
 		return nil, err
 	}
-	_ = userInfo
 
-	ch := make(chan *NetSpaceEngineResult)
+	ch := make(chan *base.NetSpaceEngineResult)
 	go func() {
 		defer close(ch)
 
@@ -32,7 +35,7 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 			if nextFinished {
 				break
 			}
-			content, err := client.QueryAsJSON(
+			result, err := client.Query(
 				page,
 				pageSize,
 				filter,
@@ -41,7 +44,6 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 				log.Error(err)
 				return
 			}
-			result := gjson.ParseBytes(content)
 			rResults := result.Get("results").Array()
 
 			for _, r := range rResults {
@@ -59,8 +61,8 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 					utils.HostPort(ip, port),
 				)
 
-				var finalHost = ip
-				var domains = []string{}
+				finalHost := ip
+				domains := []string{}
 				urlIns := rData[0].String()
 				if urlIns != "" {
 					host, _, _ := utils.ParseStringToHostPort(urlIns)
@@ -72,7 +74,7 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 					}
 				}
 
-				var confirmHttps = false
+				confirmHttps := false
 				if strings.HasPrefix(strings.ToLower(urlIns), "https://") {
 					confirmHttps = true
 				}
@@ -88,7 +90,7 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 					location = fmt.Sprintf("%s %s", country, city)
 				}
 
-				ch <- &NetSpaceEngineResult{
+				ch <- &base.NetSpaceEngineResult{
 					Addr:            utils.HostPort(ip, port),
 					FromEngine:      "fofa",
 					Latitude:        0,
@@ -112,7 +114,6 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 				}
 			}
 		}
-
 	}()
 	return ch, nil
 }
