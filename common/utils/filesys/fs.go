@@ -114,7 +114,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 					return nil
 				}
 				err = c.onFileStat(path, fn, info)
-				fn.Close()
+				// fn.Close()
 				if err != nil {
 					return err
 				}

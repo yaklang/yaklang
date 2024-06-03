@@ -154,9 +154,6 @@ type Program struct {
 	OffsetMap         map[int]*OffsetItem
 	OffsetSortedSlice []int
 
-	// class blue print
-	ClassBluePrint map[string]*ClassBluePrint
-
 	// package Loader
 	Loader *ssautil.PackageLoader
 	Build  Build
@@ -182,6 +179,9 @@ type Package struct {
 	Prog *Program
 	// function list
 	Funcs map[string]*Function
+
+	// class blue print
+	ClassBluePrint map[string]*ClassBluePrint
 }
 
 // implement Value
