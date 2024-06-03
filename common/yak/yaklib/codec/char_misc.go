@@ -134,9 +134,6 @@ func (t *MIMEResult) _tryUTF8Convertor(raw []byte) ([]byte, bool) {
 			if enc != nil {
 				fixed, err := enc.NewDecoder().Bytes(raw)
 				if err == nil {
-					if bytes.Contains(fixed, []byte{'\xef', '\xbb', '\xbf'}) {
-						// ghost
-					}
 					return fixed, true
 				}
 			}
