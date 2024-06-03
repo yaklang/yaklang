@@ -94,15 +94,17 @@ func (f *FunctionBuilder) NewParam(name string) *Parameter {
 }
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
-	new := NewParamMember(name, f, obj, key)
-	f.ParameterMember = append(f.ParameterMember, new)
-	new.FormalParameterIndex = len(f.ParameterMember) - 1
+	paraMember := NewParamMember(name, f, obj, key)
+	f.ParameterMember = append(f.ParameterMember, paraMember)
+	paraMember.FormalParameterIndex = len(f.ParameterMember) - 1
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
 		f.MarkedThisObject.GetId() == obj.GetDefault().GetId() {
 		f.SetMethod(true, obj.GetType())
 	}
-	return new
+	variable := f.CreateVariable(name)
+	f.AssignVariable(variable, paraMember)
+	return paraMember
 }
 
 func (f *FunctionBuilder) appendParam(p *Parameter) {
