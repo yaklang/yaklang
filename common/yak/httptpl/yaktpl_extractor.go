@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/gobwas/httphead"
 	"github.com/itchyny/gojq"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -275,18 +274,19 @@ func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 					addResult(k, v)
 				}
 			} else {
-				httphead.ScanOptions([]byte("__yaktpl_placeholder__; "+v+"; "), func(index int, key, param, value []byte) httphead.Control {
-					if value == nil {
-						return httphead.ControlContinue
+				kvs := strings.Split(v, ";")
+				for _, kv := range kvs {
+					kv = strings.TrimSpace(kv)
+					key, value, ok := strings.Cut(kv, "=")
+					if ok {
+						decoded, err := url.QueryUnescape(value)
+						if err != nil {
+							addResult(key, value)
+						} else {
+							addResult(key, decoded)
+						}
 					}
-					decoded, err := url.QueryUnescape(string(value))
-					if err != nil {
-						addResult(string(param), string(value))
-					} else {
-						addResult(string(param), decoded)
-					}
-					return httphead.ControlContinue
-				})
+				}
 			}
 			return line
 		})
