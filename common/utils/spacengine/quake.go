@@ -2,18 +2,24 @@ package spacengine
 
 import (
 	fmt "fmt"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/spacengine/quake"
 )
 
-func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
-	// build fofa client
-	quakeClient := utils.NewQuake360Client(key)
+func QuakeQuery(key string, filter string, maxPage, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	var client *quake.QuakeClient
+	if len(domains) > 0 && domains[0] != "" {
+		client = quake.NewClientEx(key, domains[0])
+	} else {
+		client = quake.NewClient(key)
+	}
 
-	ch := make(chan *NetSpaceEngineResult)
+	ch := make(chan *base.NetSpaceEngineResult)
 
 	go func() {
 		defer close(ch)
@@ -30,7 +36,7 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 			if maxRecord-count < 10 {
 				size = maxRecord - count
 			}
-			result, err := quakeClient.QueryNext(page*10, size, filter)
+			result, err := client.Query(filter, page*10, size)
 			if err != nil {
 				log.Errorf("quake client query next failed: %s", err)
 				break
@@ -61,7 +67,7 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 					lat, lng = gps[0].Float(), gps[1].Float()
 				}
 
-				var host = d.Get("hostname").String()
+				host := d.Get("hostname").String()
 				if host == "" {
 					host = d.Get("ip").String()
 				}
@@ -125,7 +131,7 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 				}
 				fps = utils.RemoveRepeatStringSlice(fps)
 				country, province, city := rLocation.Get("country_cn").String(), rLocation.Get("province_cn").String(), rLocation.Get("city_cn").String()
-				ch <- &NetSpaceEngineResult{
+				ch <- &base.NetSpaceEngineResult{
 					Addr:            utils.HostPort(ip, port),
 					FromEngine:      "quake",
 					Latitude:        lat,
@@ -151,7 +157,6 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 				}
 			}
 		}
-
 	}()
 	return ch, nil
 }

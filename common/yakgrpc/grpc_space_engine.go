@@ -3,20 +3,24 @@ package yakgrpc
 import (
 	"context"
 	_ "embed"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
 	uuid "github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/spacengine"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"github.com/yaklang/yaklang/common/utils/spacengine/fofa"
+	"github.com/yaklang/yaklang/common/utils/spacengine/go-shodan"
+	"github.com/yaklang/yaklang/common/utils/spacengine/hunter"
+	"github.com/yaklang/yaklang/common/utils/spacengine/quake"
 	"github.com/yaklang/yaklang/common/utils/spacengine/zoomeye"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strconv"
 )
 
 const (
@@ -33,182 +37,113 @@ const (
 	SPACE_ENGINE_STATUS_INVALID_TYPE    = "invalid_type"
 )
 
-func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSpaceEngineAccountStatusRequest) (*ypb.SpaceEngineStatus, error) {
-	//var status = SPACE_ENGINE_STATUS_NORMAL
-	//info := "ZoomEye额度按月刷新"
-	var status = SPACE_ENGINE_STATUS_INVALID_TYPE
-	var info = ""
-	var raw []byte
-	var remain int64
+func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSpaceEngineAccountStatusRequest) (result *ypb.SpaceEngineStatus, err error) {
+	key := req.GetKey()
+	domain := req.GetDomain()
+
+	result = &ypb.SpaceEngineStatus{
+		Type:   req.GetType(),
+		Status: SPACE_ENGINE_STATUS_NORMAL,
+	}
+	var client base.IUserProfile
 	switch req.GetType() {
 	case SPACE_ENGINE_ZOOMEYE:
-		status = SPACE_ENGINE_STATUS_NORMAL
-		info = "普通账户"
-		key := req.GetKey()
-		if key == "" {
-			status = SPACE_ENGINE_STATUS_EMPTY_KEY
-			info = "ZoomEye API Key为空"
-			break
-		}
-		result, err := zoomeye.ZoomeyeUserProfile(key)
-		if err != nil {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-			break
-		}
-		raw = []byte(result.Raw)
-		quota := result.Get("quota_info")
-		if !quota.Exists() {
-			info = "ZoomEye账户信息异常"
-			status = SPACE_ENGINE_STATUS_ERROR
-		} else {
-			remain = quota.Get("remain_free_quota").Int() + quota.Get("remain_pay_quota").Int()
-		}
-
+		client = zoomeye.NewClientEx(key, domain)
 	case SPACE_ENGINE_SHODAN:
-		status = SPACE_ENGINE_STATUS_NORMAL
-		info = "普通账户"
-		key := req.GetKey()
-		if key == "" {
-			status = SPACE_ENGINE_STATUS_EMPTY_KEY
-			info = "Shodan API Key为空"
-			break
-		}
-		result, err := spacengine.ShodanUserProfile(key)
-		if err != nil {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-			break
-		}
-		_ = result
-		remain = -1
+		client = shodan.NewClientEx(key, domain)
 	case SPACE_ENGINE_HUNTER:
-		status = SPACE_ENGINE_STATUS_NORMAL
-		info = "普通账户"
-		key := req.GetKey()
-		if key == "" {
-			status = SPACE_ENGINE_STATUS_EMPTY_KEY
-			info = "Hunter API Key为空"
-			break
+		client = hunter.NewClientEx(key, domain)
+	case SPACE_ENGINE_QUAKE:
+		client = quake.NewClientEx(key, domain)
+	case SPACE_ENGINE_FOFA:
+		client = fofa.NewClientEx(req.GetAccount(), key, domain)
+	default:
+		result.Status = SPACE_ENGINE_STATUS_INVALID_TYPE
+		return
+	}
+
+	result.Info = "普通账户"
+	if key == "" {
+		result.Status = SPACE_ENGINE_STATUS_EMPTY_KEY
+		result.Info = fmt.Sprintf("%s API Key为空", strings.ToUpper(req.GetType()))
+		return result, nil
+	}
+
+	bodyRaw, err := client.UserProfile()
+	if err != nil {
+		result.Status = SPACE_ENGINE_STATUS_ERROR
+		result.Info = err.Error()
+		return result, nil
+	}
+	gjsonResult := gjson.ParseBytes(bodyRaw)
+
+	switch req.GetType() {
+	case SPACE_ENGINE_ZOOMEYE:
+		quota := gjsonResult.Get("quota_info")
+		if !quota.Exists() {
+			result.Info = "ZoomEye账户信息异常"
+			result.Status = SPACE_ENGINE_STATUS_ERROR
+		} else {
+			result.Remain = quota.Get("remain_free_quota").Int() + quota.Get("remain_pay_quota").Int()
 		}
-		url := "https://hunter.qianxin.com/openApi/search?api-key=" + key + "&search=YXBhY2hl&page=1&page_size=1&is_web=1&start_time=2021-01-01&end_time=2021-03-01"
-		isHttps, reqRaw, err := lowhttp.ParseUrlToHttpRequestRaw("GET", url)
-		if err != nil {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-			break
-		}
-		resp, err := lowhttp.HTTP(lowhttp.WithHttps(isHttps), lowhttp.WithRequest(reqRaw))
-		if err != nil {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-		}
-		body := lowhttp.GetHTTPPacketBody(resp.RawPacket)
-		if gjson.ValidBytes(body) {
-			if gjson.GetBytes(body, "code").Int() == 401 {
-				status = SPACE_ENGINE_STATUS_ERROR
-				info = "Hunter API Key无效"
+	case SPACE_ENGINE_SHODAN:
+		result.Remain = -1
+	case SPACE_ENGINE_HUNTER:
+		if gjson.ValidBytes(bodyRaw) {
+			if gjsonResult.Get("code").Int() == 401 {
+				result.Status = SPACE_ENGINE_STATUS_ERROR
+				result.Info = "Hunter API Key无效"
 				break
 			}
-			remainStr := gjson.GetBytes(body, "data.rest_quota").String()
+			remainStr := gjsonResult.Get("data.rest_quota").String()
 			re := regexp.MustCompile(`\d+`)
 			match := re.FindStringSubmatch(remainStr)
 			if len(match) > 0 {
-				remain, err = strconv.ParseInt(match[0], 10, 64)
+				remain, err := strconv.ParseInt(match[0], 10, 64)
 				if err != nil {
 					// 处理转换失败的情况
-					status = SPACE_ENGINE_STATUS_ERROR
-					info = "解析剩余积分失败"
+					result.Status = SPACE_ENGINE_STATUS_ERROR
+					result.Info = "解析剩余积分失败"
 					break
+				} else {
+					result.Remain = remain
 				}
 			} else {
-				status = SPACE_ENGINE_STATUS_ERROR
-				info = "解析剩余积分失败"
+				result.Status = SPACE_ENGINE_STATUS_ERROR
+				result.Info = "解析剩余积分失败"
 				break
 			}
 		} else {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = "返回值不是有效的JSON"
+			result.Status = SPACE_ENGINE_STATUS_ERROR
+			result.Info = "返回值不是有效的JSON"
 			break
 		}
 	case SPACE_ENGINE_QUAKE:
-		status = SPACE_ENGINE_STATUS_NORMAL
-		info = "普通账户"
-		key := req.GetKey()
-		if key == "" {
-			status = SPACE_ENGINE_STATUS_EMPTY_KEY
-			info = "Quake API Key为空"
-			break
-		}
-		client := utils.NewQuake360Client(key)
-		userInfo, err := client.UserInfo()
-		if err != nil {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-			break
-		}
-		remain = int64(userInfo.MonthRemainingCredit)
+		data := gjsonResult.Get("data")
+		result.Remain = data.Get("credit").Int() + data.Get("persistent_credit").Int()
 	case SPACE_ENGINE_FOFA:
-		status = SPACE_ENGINE_STATUS_NORMAL
-		info = "普通账户"
-		key := req.GetKey()
-		if key == "" {
-			status = SPACE_ENGINE_STATUS_EMPTY_KEY
-			info = "FOFA API Key 为空"
-			break
-		}
 		email := req.GetAccount()
 		if email == "" {
-			status = SPACE_ENGINE_STATUS_EMPTY_KEY
-			info = "FOFA Email 为空"
+			result.Status = SPACE_ENGINE_STATUS_EMPTY_KEY
+			result.Info = "FOFA Email 为空"
 			break
 		}
-		client := fofa.NewFofaClient(email, key)
-		user, err := client.UserInfo()
-		if err != nil {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-			break
+		if gjsonResult.Get("isvip").Bool() {
+			result.Info = "VIP账户"
 		}
-		if user.Vip {
-			info = "VIP账户"
-		}
-		remain = user.RemainApiQuery
-	default:
-		status = SPACE_ENGINE_STATUS_INVALID_TYPE
+		result.Remain = gjsonResult.Get("fofa_point").Int() + gjsonResult.Get("remain_free_point").Int()
 	}
-	return &ypb.SpaceEngineStatus{
-		Type:   req.GetType(),
-		Status: status,
-		Info:   info,
-		Raw:    raw,
-		Remain: remain,
-	}, nil
+	return result, nil
 }
+
 func (s *Server) GetSpaceEngineStatus(ctx context.Context, req *ypb.GetSpaceEngineStatusRequest) (*ypb.SpaceEngineStatus, error) {
-	account := ""
-	key := ""
-	switch req.GetType() {
-	case SPACE_ENGINE_ZOOMEYE:
-		account = consts.GetThirdPartyApplicationConfig("zoomeye").UserIdentifier
-		key = consts.GetThirdPartyApplicationConfig("zoomeye").APIKey
-	case SPACE_ENGINE_SHODAN:
-		account = consts.GetThirdPartyApplicationConfig("shodan").UserIdentifier
-		key = consts.GetThirdPartyApplicationConfig("shodan").APIKey
-	case SPACE_ENGINE_HUNTER:
-		account = consts.GetThirdPartyApplicationConfig("hunter").UserIdentifier
-		key = consts.GetThirdPartyApplicationConfig("hunter").APIKey
-	case SPACE_ENGINE_QUAKE:
-		account = consts.GetThirdPartyApplicationConfig("quake").UserIdentifier
-		key = consts.GetThirdPartyApplicationConfig("quake").APIKey
-	case SPACE_ENGINE_FOFA:
-		account = consts.GetThirdPartyApplicationConfig("fofa").UserIdentifier
-		key = consts.GetThirdPartyApplicationConfig("fofa").APIKey
-	}
+	config := consts.GetThirdPartyApplicationConfig(req.GetType())
+	account, key, domain := config.UserIdentifier, config.APIKey, config.Domain
 	return s.GetSpaceEngineAccountStatus(ctx, &ypb.GetSpaceEngineAccountStatusRequest{
 		Type:    req.GetType(),
 		Account: account,
 		Key:     key,
+		Domain:  domain,
 	})
 }
 

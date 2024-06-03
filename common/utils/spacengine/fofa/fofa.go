@@ -1,39 +1,36 @@
 package fofa
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"net/url"
 
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-// Fofa a fofa client can be used to make queries
-type Fofa struct {
+var _ base.IUserProfile = (*FofaClient)(nil)
+
+// FofaClient a fofa client can be used to make queries
+type FofaClient struct {
+	*base.BaseSpaceEngineClient
 	email string
-	key   string
-	*http.Client
 }
 
 // User struct for fofa user
 type User struct {
 	Email          string `json:"email,omitempty"`
-	Fcoin          int    `json:"fcoin,omitempty"`
-	Vip            bool   `json:"bool,omitempty"`
-	RemainApiQuery int64    `json:"remain_api_query,omitempty"`
 	Avatar         string `json:"avatar,omitempty"`
 	Err            string `json:"errmsg,omitempty"`
+	Fcoin          int    `json:"fcoin,omitempty"`
+	RemainApiQuery int64  `json:"remain_api_query,omitempty"`
+	Vip            bool   `json:"bool,omitempty"`
 }
 
 const (
-	defaultAPIUrl      = "https://fofa.info/api/v1/search/all"
-	defaultUserInfoUrl = "https://fofa.info/api/v1/info/my"
+	defaultAPIHost = "https://fofa.info"
+	sessionKey     = "__YAK_BUILTIN_FOFA_CLIENT__"
 )
 
 var (
@@ -41,41 +38,25 @@ var (
 	errFofaReplyNoData      = errors.New("No Data In Fofa Reply")
 )
 
-func NewFofaClient(email, key string) *Fofa {
-
-	transCfg := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	return &Fofa{
-		email: email,
-		key:   key,
-		Client: &http.Client{
-			Transport: transCfg, // disable tls verify
-		},
+func NewClient(email, key string) *FofaClient {
+	return &FofaClient{
+		email:                 email,
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, defaultAPIHost),
 	}
 }
 
-func (ff *Fofa) Get(urlStr string, val url.Values) ([]byte, error) {
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, err
+func NewClientEx(email, key string, apiHost string) *FofaClient {
+	if apiHost == "" {
+		apiHost = defaultAPIHost
 	}
-	u.RawQuery = val.Encode()
 
-	body, err := ff.Client.Get(u.String())
-	if err != nil {
-		return nil, err
+	return &FofaClient{
+		email:                 email,
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, apiHost),
 	}
-	defer body.Body.Close()
-	content, err := ioutil.ReadAll(body.Body)
-	if err != nil {
-		return nil, err
-	}
-	return content, nil
 }
 
-func (ff *Fofa) QueryAsJSON(page, pageSize int, args ...string) ([]byte, error) {
+func (c *FofaClient) Query(page, pageSize int, args ...string) (*gjson.Result, error) {
 	var (
 		query  = ""
 		fields = "host,title,ip,domain,port,country,city"
@@ -87,52 +68,37 @@ func (ff *Fofa) QueryAsJSON(page, pageSize int, args ...string) ([]byte, error) 
 		query = args[0]
 		fields = args[1]
 	}
-	val := url.Values{}
-	val.Set("email", ff.email)
-	val.Set("key", ff.key)
-	val.Set("qbase64", codec.EncodeBase64(query))
-	val.Set("fields", fields)
-	val.Set("page", fmt.Sprint(page))
-	val.Set("size", fmt.Sprint(pageSize))
-	content, err := ff.Get(defaultAPIUrl, val)
+	params := map[string]string{
+		"email":   c.email,
+		"key":     c.Key,
+		"qbase64": codec.EncodeBase64(query),
+		"fields":  fields,
+		"page":    fmt.Sprint(page),
+		"size":    fmt.Sprint(pageSize),
+	}
+	rsp, err := c.Get("/api/v1/search/all", poc.WithReplaceAllHttpPacketQueryParams(params), poc.WithSession(sessionKey))
 	if err != nil {
 		return nil, err
 	}
-	errmsg := gjson.GetBytes(content, "errmsg").String()
+
+	errmsg := gjson.GetBytes(rsp.Body, "errmsg").String()
 	if errmsg != "" {
 		err = errors.New(errmsg)
 	}
-	return content, nil
+	result := gjson.ParseBytes(rsp.Body)
+	return &result, err
 }
 
-func (ff *Fofa) UserInfo() (user *User, err error) {
-	user = new(User)
-	val := url.Values{}
-	val.Set("email", ff.email)
-	val.Set("key", ff.key)
+func (c *FofaClient) UserProfile() (raw []byte, err error) {
+	params := map[string]string{
+		"email": c.email,
+		"key":   c.Key,
+	}
 
-	content, err := ff.Get(defaultUserInfoUrl, val)
-
+	rsp, err := c.Get("/api/v1/info/my", poc.WithReplaceAllHttpPacketQueryParams(params), poc.WithSession(sessionKey))
 	if err != nil {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(content, user); err != nil {
-		return nil, err
-	}
-
-	if len(user.Err) != 0 {
-		return nil, errors.New(user.Err)
-	}
-
-	return user, nil
-}
-
-func (u *User) String() string {
-	data, err := json.Marshal(u)
-	if err != nil {
-		log.Fatalf("json marshal failed. err: %s\n", err)
-		return ""
-	}
-	return string(data)
+	return rsp.Body, nil
 }

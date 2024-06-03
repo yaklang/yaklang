@@ -3,12 +3,13 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -199,4 +200,21 @@ func simpleDumpHTTPRequest(r *http.Request) []byte {
 
 	buf.WriteString(CRLF)
 	return buf.Bytes()
+}
+
+func FixURLScheme(u string) string {
+	if strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://") {
+		return u
+	}
+	ins := utils.ParseStringToUrl(u)
+	if port := ins.Port(); port == "443" {
+		ins.Scheme = "https"
+		ins.Host = ins.Hostname()
+	} else if port == "80" {
+		ins.Scheme = "http"
+		ins.Host = ins.Hostname()
+	} else {
+		ins.Scheme = "http"
+	}
+	return ins.String()
 }

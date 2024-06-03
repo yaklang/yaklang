@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"reflect"
 	"strings"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"github.com/yaklang/yaklang/common/utils/spacengine"
 )
 
 // Scan servicescan 库使用的端口扫描类型的方式为全连接扫描，用于对连接目标进行精准的扫描，相比 synscan 库的单纯扫描，servicescan 库会尝试获取精确指纹信息以及 CPE 信息
@@ -249,7 +249,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 						Host: host,
 						Port: port,
 					}
-				case *spacengine.NetSpaceEngineResult:
+				case *base.NetSpaceEngineResult:
 					host, port, err := utils.ParseStringToHostPort(subResult.Addr)
 					if err != nil {
 						continue
@@ -264,7 +264,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			for _, r := range ret {
 				synResults <- r
 			}
-		case chan *spacengine.NetSpaceEngineResult:
+		case chan *base.NetSpaceEngineResult:
 			for r := range ret {
 				host, port, err := utils.ParseStringToHostPort(r.Addr)
 				if err != nil {
@@ -275,7 +275,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 					Port: port,
 				}
 			}
-		case []*spacengine.NetSpaceEngineResult:
+		case []*base.NetSpaceEngineResult:
 			for _, r := range ret {
 				host, port, err := utils.ParseStringToHostPort(r.Addr)
 				if err != nil {

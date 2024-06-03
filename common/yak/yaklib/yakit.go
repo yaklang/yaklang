@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
-	"github.com/yaklang/yaklang/common/utils/spacengine"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -406,7 +406,7 @@ func NewPortFromMatchResult(f *fp.MatchResult) *schema.Port {
 	}
 }
 
-func NewPortFromSpaceEngineResult(f *spacengine.NetSpaceEngineResult) *schema.Port {
+func NewPortFromSpaceEngineResult(f *base.NetSpaceEngineResult) *schema.Port {
 	host, port, _ := utils.ParseStringToHostPort(f.Addr)
 	return &schema.Port{
 		Host:        host,

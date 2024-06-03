@@ -232,6 +232,7 @@ var (
 
 func ParseStringToVisible(raw interface{}) string {
 	s := InterfaceToString(raw)
+	s = strings.TrimSpace(s)
 	s = EscapeInvalidUTF8Byte([]byte(s))
 	// s = strings.ReplaceAll(s, "\x20", "\\x20")
 	s = strings.ReplaceAll(s, "\x0b", "\\v")
