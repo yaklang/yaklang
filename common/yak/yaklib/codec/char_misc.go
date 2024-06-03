@@ -71,22 +71,22 @@ func (t *MIMEResult) TryUTF8Convertor(raw []byte) ([]byte, bool) {
 				return result, false
 			}
 			return decodedResult, true
-		}
-
-		if len(encodings) > 1 {
+		} else if len(encodings) > 1 {
 			log.Warnf("WARNING: ATTENTION multiple encodings [%v], try the best", funk.Keys(set))
-		}
-		for _, v := range encodings {
-			if v.Encoding != nil {
-				decodeResult, err := v.Encoding.NewDecoder().Bytes(result)
-				if err != nil {
-					log.Infof("try encoding %#v failed: %v", v.Name, err)
-					continue
+			for _, v := range encodings {
+				if v.Encoding != nil {
+					decodeResult, err := v.Encoding.NewDecoder().Bytes(result)
+					if err != nil {
+						log.Infof("try encoding %#v failed: %v", v.Name, err)
+						continue
+					}
+					return decodeResult, true
 				}
-				return decodeResult, true
 			}
+			return result, false
+		} else {
+			// no meta encoding, treat like plain text
 		}
-		return result, false
 	}
 
 	switch strings.ToLower(t.Charset) {
