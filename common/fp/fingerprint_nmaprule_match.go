@@ -16,8 +16,10 @@ func tcpConnectionMaker(host string, port interface{}, proxy []string, timeout t
 	return netx.DialTCPTimeout(timeout, utils2.HostPort(host, port), proxy...)
 }
 
-func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, config *Config) (*MatchResult, error) {
-	host := ip.String()
+func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, host string, config *Config) (*MatchResult, error) {
+	if host == "" {
+		host = ip.String()
+	}
 
 	result := &MatchResult{
 		Target: host,
