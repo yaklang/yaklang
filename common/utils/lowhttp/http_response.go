@@ -221,8 +221,10 @@ RetryContentType:
 		}
 
 		var after []byte
+		var containsUTF8 bool
 		after, bodyChanged = mimeResult.TryUTF8Convertor(bodyRaw)
 		if bodyChanged {
+			containsUTF8 = true
 			log.Infof("HtmlOrXmlMIMEType(%#v) auto fix body, origin: len(%v) -> len(%v)", originContentType, len(bodyRaw), len(after))
 			bodyRaw = after
 		}
@@ -232,7 +234,10 @@ RetryContentType:
 		if err != nil {
 			newContentType = contentType
 		} else {
-			params = map[string]string{"charset": "utf-8"}
+			params = map[string]string{}
+			if containsUTF8 {
+				params["charset"] = "utf-8"
+			}
 			newContentType = mime.FormatMediaType(origin, params)
 		}
 		headerBytes = ReplaceMIMEType(headerBytes, newContentType)
