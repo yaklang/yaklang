@@ -46,8 +46,8 @@ func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 		includePath:  make([]string, 0),
 		includedPath: make(map[string]struct{}),
 	}
-	for _, i := range opts {
-		i(loader)
+	for _, f := range opts {
+		f(loader)
 	}
 	if loader.fs == nil {
 		loader.fs = filesys.NewLocalFs()
@@ -129,19 +129,18 @@ func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, 
 type FileDescriptor struct {
 	FileName string
 	Info     fs.FileInfo
-	Data     io.Reader
+	File     fs.File
 }
 
 func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (chan FileDescriptor, error) {
 	ch := make(chan FileDescriptor)
 
+	absDir, err := p.DirPath(packageName, once)
+	if err != nil {
+		return nil, err
+	}
 	go func() {
 		defer close(ch)
-		absDir, err := p.DirPath(packageName, once)
-		if err != nil {
-			log.Errorf("load directory package %s failed: %v", packageName, err)
-			return
-		}
 		err = filesys.Recursive(
 			absDir,
 			filesys.WithRecursiveDirectory(false),
@@ -149,11 +148,14 @@ func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (cha
 				ch <- FileDescriptor{
 					FileName: s,
 					Info:     info,
-					Data:     f,
+					File:     f,
 				}
 				return fs.SkipDir
 			}),
 		)
+		if err != nil {
+			log.Errorf("load directory package %s failed: %v", packageName, err)
+		}
 	}()
 	return ch, nil
 }

@@ -107,7 +107,7 @@ func TestFS_LocalFS(t *testing.T) {
 
 	t.Run("local fs with current dir .", func(t *testing.T) {
 		check(7,
-			WithFileSystem(NewLocalFsWithPath(".")),
+			WithFileSystem(NewLocalFs()),
 		)
 	})
 
@@ -116,8 +116,9 @@ func TestFS_LocalFS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		_ = currentDir
 		check(7,
-			WithFileSystem(NewLocalFsWithPath(currentDir)),
+			WithFileSystem(NewLocalFs()),
 		)
 	})
 

@@ -19,6 +19,4 @@ type FileSystem interface {
 	// Rel(targpath string) (string, error)
 
 	GetSeparators() rune
-
-	GetLocalFSPath() string
 }

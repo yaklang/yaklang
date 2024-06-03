@@ -19,9 +19,10 @@ type config struct {
 	// input, code or project path
 	code io.Reader
 	// project
-	fs        filesys.FileSystem
-	entryFile []string
-	// entryPath []string
+	fs          filesys.FileSystem
+	entryFile   []string
+	programPath string
+	includePath []string
 
 	externLib    map[string]map[string]any
 	externValue  map[string]any
@@ -40,6 +41,7 @@ func defaultConfig() *config {
 		Builder:                    nil,
 		code:                       nil,
 		fs:                         filesys.NewLocalFs(),
+		programPath:                ".",
 		entryFile:                  make([]string, 0),
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),
@@ -68,6 +70,18 @@ func WithLanguage(language Language) Option {
 func WithFileSystemEntry(files ...string) Option {
 	return func(c *config) {
 		c.entryFile = append(c.entryFile, files...)
+	}
+}
+
+func WithProgramPath(path string) Option {
+	return func(c *config) {
+		c.programPath = path
+	}
+}
+
+func WithIncludePath(path ...string) Option {
+	return func(c *config) {
+		c.includePath = append(c.includePath, path...)
 	}
 }
 
@@ -144,8 +158,8 @@ func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 }
 
 func ParseProjectFromPath(path string, opts ...Option) ([]*Program, error) {
-	fs := filesys.NewLocalFsWithPath(path)
-	return ParseProject(fs, opts...)
+	opts = append(opts, WithProgramPath(path))
+	return ParseProject(filesys.NewLocalFs(), opts...)
 }
 
 func ParseProject(fs filesys.FileSystem, opts ...Option) ([]*Program, error) {

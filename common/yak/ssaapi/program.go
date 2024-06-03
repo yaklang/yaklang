@@ -87,22 +87,6 @@ func (p *Program) Ref(name string) Values {
 	)
 }
 
-func (p *Program) GetClassMember(className string, key string) *Value {
-	if class, ok := p.Program.ClassBluePrint[className]; ok {
-		if method, ok := class.Method[key]; ok {
-			return p.NewValue(method)
-		}
-		if member, ok := class.NormalMember[key]; ok {
-			return p.NewValue(member.Value)
-		}
-		if member, ok := class.StaticMember[key]; ok {
-			return p.NewValue(member)
-		}
-	}
-
-	return nil
-}
-
 func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 	offsetSortedSlice := p.Program.OffsetSortedSlice
 	index := sort.SearchInts(offsetSortedSlice, offset)
