@@ -1,61 +1,86 @@
 package hunter
 
 import (
+	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/url"
 
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var defaultHttpClient = utils.NewDefaultHTTPClient()
+var _ base.IUserProfile = (*HunterClient)(nil)
 
-func HunterQuery(username, key, query string, page, pageSize int) (*gjson.Result, error) {
-	if key == "" {
-		return nil, utils.Error("empty api key")
+const (
+	defaultAPIHost = "https://hunter.qianxin.com"
+	sessionKey     = "__YAK_BUILTIN_HUNTER_CLIENT__"
+)
+
+type HunterClient struct {
+	*base.BaseSpaceEngineClient
+}
+
+func NewClient(key string) *HunterClient {
+	return &HunterClient{
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, defaultAPIHost),
 	}
-	values := make(url.Values)
-	values.Set("api-key", key)
-	values.Set("search", codec.EncodeBase64Url(query))
-	values.Set("page", fmt.Sprint(page))
-	values.Set("page_size", fmt.Sprint(pageSize))
+}
 
-	packet := []byte(`GET /openApi/search HTTP/1.1
-Host: hunter.qianxin.com
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0
-
-`)
-	for _, kv := range [][]string{
-		{"api-key", key},
-		{"search", codec.EncodeBase64Url(query)},
-		{"page", fmt.Sprint(page)},
-		{"page_size", fmt.Sprint(pageSize)},
-	} {
-		packet = lowhttp.ReplaceHTTPPacketQueryParam(packet, kv[0], kv[1])
+func NewClientEx(key string, apiHost string) *HunterClient {
+	if apiHost == "" {
+		apiHost = defaultAPIHost
 	}
-	rsp, err := lowhttp.HTTP(lowhttp.WithPacketBytes(packet), lowhttp.WithHttps(true))
+
+	return &HunterClient{
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, apiHost),
+	}
+}
+
+func (c *HunterClient) UserProfile() ([]byte, error) {
+	// can only search to get user info
+	params := map[string]string{
+		"api-key":   c.Key,
+		"search":    "YXBhY2hl",
+		"page":      "1",
+		"page_size": "1",
+	}
+
+	rsp, err := c.Get("/openApi/search", poc.WithReplaceAllHttpPacketQueryParams(params), poc.WithSession(sessionKey))
 	if err != nil {
-		spew.Dump(rsp.RawPacket)
-		spew.Dump(rsp.RawRequest)
 		return nil, err
 	}
-	_, raw := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
-	if lowhttp.GetStatusCodeFromResponse(rsp.RawPacket) != 200 {
-		spew.Dump(rsp.RawPacket)
-		return nil, utils.Errorf("invalid status code")
+
+	return rsp.Body, nil
+}
+
+func (c *HunterClient) Query(query string, page, pageSize int) (*gjson.Result, error) {
+	params := map[string]string{
+		"api-key":   c.Key,
+		"search":    codec.EncodeBase64Url(query),
+		"page":      fmt.Sprint(page),
+		"page_size": fmt.Sprint(pageSize),
 	}
 
-	result := gjson.ParseBytes(raw)
-	code, errmsg := result.Get("code").Int(), result.Get("message").String()
+	rsp, err := c.Get("/openApi/search", poc.WithReplaceAllHttpPacketQueryParams(params), poc.WithSession(sessionKey))
+	if err != nil {
+		return nil, err
+	}
 
-	if result.Get("code").Int() != 200 {
-		log.Warnf("met error! %v", string(raw))
-		fmt.Println(string(rsp.RawRequest))
-		return &result, utils.Errorf("[%v]: %v", code, errmsg)
+	return checkErrorAndResult(rsp.StatusCode, rsp.Body)
+}
+
+func checkErrorAndResult(statusCode int, data []byte) (*gjson.Result, error) {
+	if statusCode != 200 {
+		return nil, errors.New("invalid status code")
+	}
+
+	result := gjson.ParseBytes(data)
+	code, errmsg := result.Get("code").Int(), result.Get("message").String()
+	if code != 200 {
+		return nil, utils.Errorf("[%v]: %v", code, errmsg)
 	}
 
 	return &result, nil

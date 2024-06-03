@@ -1,4 +1,4 @@
-package spacengine
+package base
 
 type NetSpaceEngineResult struct {
 	Addr                string

@@ -2,6 +2,7 @@ package spacengine
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
 	"time"
 
@@ -12,10 +13,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/spacengine/zoomeye"
 )
 
-func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngineResult {
+func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*base.NetSpaceEngineResult {
 	rData := result.Get("matches").Array()
 
-	results := make([]*NetSpaceEngineResult, len(rData))
+	results := make([]*base.NetSpaceEngineResult, len(rData))
 	for index, d := range rData {
 		dataMap := d.Map()
 		rGeoInfo := dataMap["geoinfo"]
@@ -65,7 +66,7 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 		}
 		fps = utils.RemoveRepeatStringSlice(fps)
 
-		results[index] = &NetSpaceEngineResult{
+		results[index] = &base.NetSpaceEngineResult{
 			Addr:            utils.HostPort(host, port),
 			FromEngine:      "zoomeye",
 			Latitude:        latitule,
@@ -86,21 +87,29 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 	return results
 }
 
-func ZoomeyeQuery(key, query string, maxPage, maxRecord int) (chan *NetSpaceEngineResult, error) {
-	ch := make(chan *NetSpaceEngineResult)
+func ZoomeyeQuery(key, query string, maxPage, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	var client *zoomeye.ZoomEyeClient
+	if len(domains) > 0 && domains[0] != "" {
+		client = zoomeye.NewClientEx(key, domains[0])
+	} else {
+		client = zoomeye.NewClient(key)
+	}
+
+	ch := make(chan *base.NetSpaceEngineResult)
 
 	go func() {
 		defer close(ch)
 
 		var nextFinished bool
 		var count int
+
 		for page := 1; page <= maxPage; page++ {
 			if nextFinished {
 				break
 			}
 
 			log.Infof("Start to query zoomeye for %v", query)
-			result, err := zoomeye.ZoomeyeQuery(key, query, page)
+			result, err := client.Query(query, page)
 			if err != nil {
 				log.Errorf("zoomeye client query next failed: %s", err)
 				break
