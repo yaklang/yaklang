@@ -1,12 +1,36 @@
 package codec
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
+
+func TestZhEncoding(t *testing.T) {
+	results, err := strconv.Unquote(`"\xe2(\xa1"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultRune, size := utf8.DecodeRuneInString(results)
+	spew.Dump(resultRune, fmt.Sprintf("\\u%4x", resultRune), size)
+	assert.Equal(t, size, 1)
+	assert.Equal(t, int(resultRune), 65533)
+
+	parseFailed, err := GB18030ToUtf8([]byte(results))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(parseFailed, []byte("\ufffd(\ufffd")) {
+		t.Fatal("Failed to parse")
+	}
+	spew.Dump(parseFailed, string(parseFailed))
+}
 
 func TestCharMatch(t *testing.T) {
 	tests := []struct {

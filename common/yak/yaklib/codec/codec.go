@@ -13,6 +13,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/samber/lo"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
 	"html"
 	"io"
 	"io/ioutil"
@@ -22,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -470,31 +473,34 @@ func HTTPChunkedDecode(raw []byte) ([]byte, error) {
 	return nil, errors.Errorf("parse %v to http chunked failed", strconv.Quote(string(raw)))
 }
 
-func GbkToUtf8(s []byte) ([]byte, error) {
-	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
-	if e != nil {
-		return nil, e
-	}
-	return d, nil
-}
+var gb18030encoding encoding.Encoding
+var gb18030encodingMutex = new(sync.Mutex)
 
 func GB18030ToUtf8(s []byte) ([]byte, error) {
-	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GB18030.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
-	if e != nil {
-		return nil, e
+	if gb18030encoding != nil {
+		return gb18030encoding.NewDecoder().Bytes(s)
 	}
-	return d, nil
+
+	gb18030encodingMutex.Lock()
+	defer gb18030encodingMutex.Unlock()
+
+	if gb18030encoding != nil {
+		return gb18030encoding.NewDecoder().Bytes(s)
+	}
+	var name string
+	gb18030encoding, name = charset.Lookup("gb18030")
+	if gb18030encoding == nil {
+		return nil, fmt.Errorf("failed to lookup gb18030 encoding: %s", name)
+	}
+	return gb18030encoding.NewDecoder().Bytes(s)
 }
 
 func HZGB2312ToUtf8(s []byte) ([]byte, error) {
-	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.HZGB2312.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
-	if e != nil {
-		return nil, e
-	}
-	return d, nil
+	return GB18030ToUtf8(s)
+}
+
+func GbkToUtf8(s []byte) ([]byte, error) {
+	return GB18030ToUtf8(s)
 }
 
 func Utf8ToGbk(s []byte) ([]byte, error) {
