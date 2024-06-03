@@ -10,12 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
+func NewProgram(dbProgramName string, fs filesys.FileSystem, programPath string) *Program {
 	prog := &Program{
 		Name:                dbProgramName,
 		Packages:            make(map[string]*Package),
 		errors:              make([]*SSAError, 0),
-		ClassBluePrint:      make(map[string]*ClassBluePrint),
 		Cache:               NewDBCache(dbProgramName),
 		OffsetMap:           make(map[int]*OffsetItem),
 		OffsetSortedSlice:   make([]int, 0),
@@ -26,7 +25,10 @@ func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
 		ExternInstance:      make(map[string]any),
 		ExternLib:           make(map[string]map[string]any),
 	}
-	prog.Loader = ssautil.NewPackageLoader(ssautil.WithFileSystem(fs))
+	prog.Loader = ssautil.NewPackageLoader(
+		ssautil.WithFileSystem(fs),
+		ssautil.WithIncludePath(programPath),
+	)
 	return prog
 }
 
@@ -177,8 +179,9 @@ func (p *Program) PopEditor() {
 
 func NewPackage(name string) *Package {
 	pkg := &Package{
-		Name:  name,
-		Funcs: make(map[string]*Function, 0),
+		Name:           name,
+		Funcs:          make(map[string]*Function, 0),
+		ClassBluePrint: make(map[string]*ClassBluePrint),
 	}
 	return pkg
 }
@@ -189,4 +192,9 @@ func (pkg *Package) GetFunction(name string) *Function {
 	} else {
 		return nil
 	}
+}
+
+func (f *FunctionBuilder) GetPackage(name string) *Package {
+	prog := f.GetProgram()
+	return prog.GetPackage(name)
 }

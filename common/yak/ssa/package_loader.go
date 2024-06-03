@@ -37,7 +37,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 		_path := p.Loader.GetCurrentPath()
 		p.Loader.SetCurrentPath(path.Dir(v.FileName))
 
-		err := p.Build(v.FileName, v.Data, b)
+		err := p.Build(v.FileName, v.File, b)
 
 		p.Loader.SetCurrentPath(_path)
 

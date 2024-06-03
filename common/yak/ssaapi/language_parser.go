@@ -41,16 +41,13 @@ var LanguageBuilders = map[Language]Builder{
 func (c *config) parseProject() ([]*Program, error) {
 	ret := make([]*Program, 0)
 
-	localpath := c.fs.GetLocalFSPath()
-	if localpath == "" {
-		localpath = "."
-	}
+	programPath := c.programPath
 
-	log.Infof("parse project in fs: %T, localpath: %v", c.fs, localpath)
+	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
 
 	// parse project
 	err := ssareducer.ReducerCompile(
-		localpath, // base
+		programPath, // base
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
@@ -154,7 +151,7 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 	}
 
-	prog := ssa.NewProgram(programName, c.fs)
+	prog := ssa.NewProgram(programName, c.fs, c.programPath)
 
 	prog.Build = func(filePath string, src io.Reader, fb *ssa.FunctionBuilder) error {
 		// check builder

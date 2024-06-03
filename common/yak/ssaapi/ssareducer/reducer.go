@@ -50,13 +50,14 @@ func ReducerCompile(base string, opts ...Option) error {
 	}
 
 	for _, entryFile := range c.entryFiles {
-		info, err := c.fs.Stat(entryFile)
-		log.Infof("start to open entry file: %v", entryFile)
-		fd, err := c.fs.Open(entryFile)
+		path := c.fs.Join(base, entryFile)
+		info, err := c.fs.Stat(path)
+		log.Infof("start to open entry file: %v", path)
+		fd, err := c.fs.Open(path)
 		if err != nil {
-			return utils.Wrapf(err, "find entryfile failed: %v", entryFile)
+			return utils.Wrapf(err, "find entryfile failed: %v", path)
 		}
-		if err := handler(entryFile, fd, info); err != nil {
+		if err := handler(path, fd, info); err != nil {
 			return err
 		}
 	}

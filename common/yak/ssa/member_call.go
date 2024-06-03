@@ -344,11 +344,8 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	if b.SupportGetStaticMember {
 		if object.IsUndefined() {
-			program := b.GetProgram()
-			objectName := object.GetName()
-			keyName := key.String()
-			if bluePrint := program.ClassBluePrint[objectName]; bluePrint != nil {
-				if value, ok := bluePrint.StaticMember[keyName]; ok {
+			if blueprint := b.GetClassBluePrint(object.GetName()); blueprint != nil {
+				if value, ok := blueprint.StaticMember[key.String()]; ok {
 					object.SelfDelete()
 					return value
 				}

@@ -19,8 +19,25 @@ const (
 	Readonly
 )
 
+func (pkg *Package) GetClassBluePrint(name string) *ClassBluePrint {
+	if c, ok := pkg.ClassBluePrint[name]; ok {
+		return c
+	}
+	log.Errorf("GetClassBluePrint: not this class: %s", name)
+	return nil
+}
+
+func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {
+	p := b.Package
+	if _, ok := p.ClassBluePrint[name]; ok {
+		log.Errorf("SetClassBluePrint: this class redeclare")
+	}
+	p.ClassBluePrint[name] = class
+}
+
 func (b *FunctionBuilder) CreateClassBluePrint(name string) *ClassBluePrint {
-	p := b.GetProgram()
+	// p := b.GetProgram()
+	p := b.Package
 	c := NewClassBluePrint()
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("CreateClassBluePrint: this class redeclare")
@@ -31,12 +48,9 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string) *ClassBluePrint {
 }
 
 func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
-	p := b.GetProgram()
-	if c, ok := p.ClassBluePrint[name]; ok {
-		return c
-	}
-	log.Errorf("VisitClass: not this class: %s", name)
-	return nil
+	// p := b.GetProgram()
+	p := b.Package
+	return p.GetClassBluePrint(name)
 }
 
 func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
