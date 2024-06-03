@@ -44,7 +44,6 @@ require (
 	github.com/go-rod/rod v0.112.9
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobwas/glob v0.2.3
-	github.com/gobwas/httphead v0.1.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.3
 	github.com/golang/snappy v0.0.4
