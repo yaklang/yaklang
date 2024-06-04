@@ -5,8 +5,9 @@ import "testing"
 func TestSimpleSearchType(t *testing.T) {
 
 	code := `
+	class C extends D {}
 
-	class B {
+	class B  extends C {
 		void methodB(int i) {
 			println(i);
 		}
@@ -15,6 +16,7 @@ func TestSimpleSearchType(t *testing.T) {
 	class A {
 		int a; 
 		void main() {
+			int B = 1;
 			B b1  = new B();
 			b1.methodB(1);
 
@@ -25,10 +27,39 @@ func TestSimpleSearchType(t *testing.T) {
 	`
 
 	// just append Class Instance to cache and database, we can pass this test.
-	t.Run("get class instance", func(t *testing.T) {
+	t.Run("get class instance and variable", func(t *testing.T) {
 		test(t, &TestCase{
 			Code:    code,
 			SF:      `B as $target`,
+			Contain: false,
+			Expect: map[string][]string{
+				"target": {
+					"1",
+					"make(B)",
+					"make(B)",
+				},
+			},
+		})
+	})
+
+	t.Run("get extern class instance", func(t *testing.T) {
+		test(t, &TestCase{
+			Code:    code,
+			SF:      `C as $target`,
+			Contain: false,
+			Expect: map[string][]string{
+				"target": {
+					"make(B)",
+					"make(B)",
+				},
+			},
+		})
+	})
+
+	t.Run("get multiple level extern class instance", func(t *testing.T) {
+		test(t, &TestCase{
+			Code:    code,
+			SF:      `D as $target`,
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
