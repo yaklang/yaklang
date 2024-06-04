@@ -112,11 +112,11 @@ func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 				l.idleLRU.remove(oldPc)
 				connList = connList[:len(connList)-1]
 			}
-			if len(connList) > 0 {
-				l.idleConn[key.hash()] = connList
-			} else {
-				delete(l.idleConn, key.hash())
-			}
+		}
+		if len(connList) > 0 {
+			l.idleConn[key.hash()] = connList
+		} else {
+			delete(l.idleConn, key.hash())
 		}
 	}
 	return
@@ -606,7 +606,6 @@ func (pc *persistConn) markReused() {
 }
 
 func (pc *persistConn) shouldRetryRequest(err error) bool {
-	//todo H2处理
 	if !pc.reused {
 		//初次连接失败，则不重试
 		return false
@@ -619,6 +618,9 @@ func (pc *persistConn) shouldRetryRequest(err error) bool {
 	//todo 幂等性请求
 	if errors.Is(err, errServerClosedIdle) {
 		// peek 到 EOF 大可能是连接池中的连接已经被服务器关闭，所以尝试重试
+		return true
+	}
+	if errors.Is(err, errH2ConnClosed) {
 		return true
 	}
 	return false // 保守不重试
