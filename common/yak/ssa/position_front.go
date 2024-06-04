@@ -7,6 +7,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
+func (b *FunctionBuilder) AppendBlockRange() {
+	blockRange := b.CurrentBlock.GetRange()
+	if blockRange == nil {
+		blockRange = b.CurrentRange
+	} else {
+		blockRange.Add(b.CurrentRange)
+	}
+	b.CurrentBlock.SetRange(blockRange)
+}
+
 func (b *FunctionBuilder) SetRangeFromTerminalNode(node antlr.TerminalNode) func() {
 	return b.SetRange(NewToken(node))
 }

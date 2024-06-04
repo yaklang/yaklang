@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
-func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
+func (y *builder) VisitBlock(raw javaparser.IBlockContext, syntaxBlocks ...bool) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -21,12 +21,20 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	// block := i.GetText()
-	// log.Info("block", block)
-	if ret := i.BlockStatementList(); ret != nil {
-		y.BuildSyntaxBlock(func() {
+	syntaxBlock := false
+	if len(syntaxBlocks) > 0 {
+		syntaxBlock = syntaxBlocks[0]
+	}
+	if syntaxBlock {
+		if ret := i.BlockStatementList(); ret != nil {
+			y.BuildSyntaxBlock(func() {
+				y.VisitBlockStatementList(ret)
+			})
+		}
+	} else {
+		if ret := i.BlockStatementList(); ret != nil {
 			y.VisitBlockStatementList(ret)
-		})
+		}
 	}
 
 	return nil
@@ -716,6 +724,24 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa
 	return nil
 }
 
+func (y *builder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*javaparser.BlockOrStateContext)
+	if i == nil {
+		return
+	}
+	if ret := i.Block(); ret != nil {
+		y.VisitBlock(ret)
+	} else if ret := i.Statement(); ret != nil {
+		y.VisitStatement(ret)
+	}
+}
+
 func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 	if y.IsBlockFinish() {
 		return nil
@@ -723,6 +749,10 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
+
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	y.AppendBlockRange()
 
 	switch ret := raw.(type) {
 	case *javaparser.BlockLabelStatementContext:
@@ -757,8 +787,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			loop := y.VisitForControl(ret.ForControl())
 			//设置循环体
 			loop.SetBody(func() {
-				if state := ret.Statement(); state != nil {
-					y.VisitStatement(state)
+				if state := ret.BlockOrState(); state != nil {
+					y.VisitBlockOrState(state)
 				}
 			})
 			loop.Finish()
@@ -782,8 +812,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 			})
 		}
 		loop.SetBody(func() {
-			if state := ret.Statement(); state != nil {
-				y.VisitStatement(state)
+			if state := ret.BlockOrState(); state != nil {
+				y.VisitBlockOrState(state)
 			}
 		})
 		loop.Finish()
@@ -1223,11 +1253,11 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 
 		if parExpr := i.ParExpression(); parExpr != nil {
 			expr := parExpr.(*javaparser.ParExpressionContext).Expression()
-			if state := i.Statement(); state != nil {
+			if state := i.BlockOrState(); state != nil {
 				builder.AppendItem(
 					func() ssa.Value { return y.VisitExpression(expr) },
 					func() {
-						y.VisitStatement(state)
+						y.VisitBlockOrState(state)
 					})
 			} else {
 				// 没有block的情况
@@ -1241,7 +1271,7 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 		for _, elseIfBlock := range i.AllElseIfBlock() {
 			if elseIfBlock != nil {
 				elseIfStmt := elseIfBlock.(*javaparser.ElseIfBlockContext)
-				state := elseIfStmt.Statement()
+				state := elseIfStmt.BlockOrState()
 				parExpr := elseIfStmt.ParExpression()
 				expr := parExpr.(*javaparser.ParExpressionContext).Expression()
 				builder.AppendItem(
@@ -1249,15 +1279,15 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 						return (y.VisitExpression(expr))
 					},
 					func() {
-						y.VisitStatement(state)
+						y.VisitBlockOrState(state)
 					},
 				)
 			}
 		}
 		elseStmt := i.ElseBlock()
 		if elseStmt != nil {
-			if elseState := elseStmt.(*javaparser.ElseBlockContext).Statement(); elseState != nil {
-				return func() { y.VisitStatement(elseState) }
+			if elseState := elseStmt.(*javaparser.ElseBlockContext).BlockOrState(); elseState != nil {
+				return func() { y.VisitBlockOrState(elseState) }
 			}
 		}
 		return nil

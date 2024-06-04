@@ -683,11 +683,13 @@ func (itype *ObjectType) RawString() string {
 	ret := ""
 	switch itype.Kind {
 	case SliceTypeKind:
-		// map[int]T
-		if itype.Len == 0 {
-			ret += fmt.Sprintf("[]%s", itype.FieldType.String())
-		} else {
-			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
+		if itype.FieldType != nil {
+			// map[int]T
+			if itype.Len == 0 {
+				ret += fmt.Sprintf("[]%s", itype.FieldType.String())
+			} else {
+				ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
+			}
 		}
 	case MapTypeKind:
 		// map[T]U

@@ -244,6 +244,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#recordBody.
 	VisitRecordBody(ctx *RecordBodyContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#blockOrState.
+	VisitBlockOrState(ctx *BlockOrStateContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
 

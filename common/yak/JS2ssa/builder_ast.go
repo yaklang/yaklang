@@ -37,7 +37,7 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 	}
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-
+	b.AppendBlockRange()
 	// var
 	if s, ok := stmt.VariableStatement().(*JS.VariableStatementContext); ok {
 		b.buildVariableStatement(s)
@@ -1310,12 +1310,12 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 func (b *astbuilder) buildBlock(stmt *JS.BlockContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	b.CurrentBlock.SetRange(b.CurrentRange)
+	// b.CurrentBlock.SetRange(b.CurrentRange)
 
 	if s, ok := stmt.Statements().(*JS.StatementsContext); ok {
-		b.BuildSyntaxBlock(func() {
-			b.buildStatements(s)
-		})
+		// b.BuildSyntaxBlock(func() {
+		b.buildStatements(s)
+		// })
 	} else {
 		b.NewError(ssa.Warn, TAG, "empty block")
 	}

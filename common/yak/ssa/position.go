@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -36,6 +37,11 @@ func (r *Range) GetEnd() memedit.PositionIf {
 func (r *Range) Len() int {
 	start, end := r.GetOffsetRange()
 	return end - start + 1
+}
+
+func (r *Range) Add(end *Range) {
+	r.end = end.end
+	r.text = r.editor.GetTextFromOffset(r.GetOffset(), r.GetEndOffset())
 }
 
 func NewRange(editor *memedit.MemEditor, startIf, endIf memedit.PositionIf) *Range {

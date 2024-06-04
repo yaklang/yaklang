@@ -454,16 +454,20 @@ recordBody
     ;
 
 // STATEMENTS / BLOCKS
+blockOrState
+    : block 
+    | statement
+    ;
 
 block
     : '{' blockStatementList? '}'
     ;
 
 elseBlock
-    :ELSE statement
+    :ELSE blockOrState
     ;
 elseIfBlock
-    :ELSE IF parExpression statement
+    :ELSE IF parExpression blockOrState
     ;
 
 blockStatementList
@@ -524,9 +528,9 @@ statement
     : blockLabel = block                                                        # BlockLabelStatement
     | ASSERT expression (':' expression)? ';'                                   # AssertStatement
     | ifstmt                                                                    # IfStatement
-    | FOR '(' forControl ')' statement                                              # ForStatement
-    | WHILE parExpression statement                                                 # WhileStatement
-    | DO block WHILE parExpressionList ';'                                          # DoWhileStatement
+    | FOR '(' forControl ')' blockOrState                                       # ForStatement
+    | WHILE parExpression blockOrState                                          # WhileStatement
+    | DO block WHILE parExpressionList ';'                                      # DoWhileStatement
     | TRY block (catchClause+ finallyBlock? | finallyBlock)                     # TryStatement
     | TRY resourceSpecification block catchClause* finallyBlock?                # TryWithResourcesStatement
     | SWITCH parExpression '{' (CASE expressionList ':' statementList?)* ( DEFAULT ':' statementList?)?'}'*  # SwitchStatement
@@ -545,7 +549,7 @@ statement
 statementList: (statement  )+;
 
 ifstmt
-    :IF parExpression statement? elseIfBlock* elseBlock?
+    :IF parExpression blockOrState? elseIfBlock* elseBlock?
     ;
 catchClause
     : CATCH '(' variableModifier* catchType identifier ')' block
