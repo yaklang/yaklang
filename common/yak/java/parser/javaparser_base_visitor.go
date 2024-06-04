@@ -323,6 +323,10 @@ func (v *BaseJavaParserVisitor) VisitRecordBody(ctx *RecordBodyContext) interfac
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitBlockOrState(ctx *BlockOrStateContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitBlock(ctx *BlockContext) interface{} {
 	return v.VisitChildren(ctx)
 }

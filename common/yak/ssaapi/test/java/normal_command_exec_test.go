@@ -1369,12 +1369,9 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name != "aTaintCase013" {
-				return
-			}
-			tt.code = createCmdUtilCode(tt.code)
+			code := createCmdUtilCode(tt.code)
 			testExecTopDef(t, &TestCase{
-				Code:    tt.code,
+				Code:    code,
 				Contain: !tt.equal,
 				Expect: map[string][]string{
 					"target": tt.expect,

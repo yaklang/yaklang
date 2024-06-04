@@ -28,7 +28,8 @@ func Check(
 	{
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
-		prog.Show()
+		// prog.Program.ShowWithSource()
+		// prog.Show()
 
 		log.Infof("only in memory ")
 		err = handler(prog)
