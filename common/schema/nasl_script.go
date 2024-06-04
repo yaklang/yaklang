@@ -38,6 +38,9 @@ type NaslScript struct {
 	RequireKeys     string `json:"require_keys,omitempty"`
 }
 
+func (p *NaslScript) TableName() string {
+	return "nasl_scripts"
+}
 func (p *NaslScript) CalcHash() string {
 	return utils.CalcSha1(p.Script)
 }

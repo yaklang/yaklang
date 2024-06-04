@@ -666,6 +666,9 @@ service Yak {
   rpc EvaluateExpression(EvaluateExpressionRequest) returns (EvaluateExpressionResponse);
   rpc EvaluateMultiExpression(EvaluateMultiExpressionRequest) returns (EvaluateMultiExpressionResponse);
 
+  // NASL 插件相关
+  rpc GetNaslFamilies(GetNaslFamiliesRequest) returns(GetNaslFamiliesResponse);
+  rpc QueryNaslScript(QueryNaslScriptRequest) returns (QueryNaslScriptResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5069,3 +5072,55 @@ message EvaluateMultiExpressionRequest {
 message EvaluateMultiExpressionResponse {
     repeated EvaluateExpressionResponse Results = 1;
 }
+
+message NaslScript{
+  string OriginFileName = 4;
+  string Hash = 5;
+  string OID = 6;
+  string CVE = 7;
+  string ScriptName = 8;
+  string Script = 9;
+  string Tags = 10;
+  string Version = 11;
+  string Category = 12;
+  string Family = 13;
+  string Copyright = 14;
+  string Dependencies = 15;
+  string RequirePorts = 16;
+  string RequireUdpPorts = 17;
+  string ExcludeKeys = 18;
+  string Xref = 19;
+  string Preferences = 20;
+  string BugtraqID = 21;
+  string MandatoryKeys = 22;
+  int32 Timeout = 23;
+  string RequireKeys = 24;
+}
+message QueryNaslScriptRequest {
+  Paging Pagination = 1;
+  string Keyword = 3;
+  string OID = 4;
+  string ScriptName = 5;
+  string Category = 6;
+  string Family = 7;
+  string CVE = 8;
+}
+message QueryNaslScriptResponse {
+  Paging Pagination = 1;
+  int64 Total = 2;
+  repeated NaslScript Data = 3;
+}
+
+message GetNaslFamiliesRequest{
+  string Name = 1;
+}
+message NaslFamily {
+    string Name = 1;
+    string Desc = 2;
+    int32 ScriptCount = 3;
+}
+
+message GetNaslFamiliesResponse {
+  repeated NaslFamily Families = 1;
+}
+
