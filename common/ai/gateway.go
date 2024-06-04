@@ -10,10 +10,10 @@ import (
 )
 
 import (
-	_ "github.com/gabriel-vasile/mimetype"
 	_ "github.com/yaklang/yaklang/common/ai/chatglm"
 	_ "github.com/yaklang/yaklang/common/ai/moonshot"
 	_ "github.com/yaklang/yaklang/common/ai/openai"
+	_ "github.com/yaklang/yaklang/common/ai/tongyi"
 )
 
 func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error {
@@ -108,7 +108,7 @@ func GetPrimaryAgent() aispec.AIGateway {
 	t := consts.GetAIPrimaryType()
 	if t == "" {
 		for _, defaultType := range []string{
-			"openai", "chatglm",
+			"openai", "chatglm", "moonshot", "tongyi",
 		} {
 			agent = createAIGateway(defaultType)
 			if agent == nil {
