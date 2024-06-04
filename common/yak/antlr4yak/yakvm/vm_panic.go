@@ -2,6 +2,7 @@ package yakvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -46,6 +47,7 @@ func NewVMPanic(i interface{}) *VMPanic {
 	if err, ok := i.(error); ok {
 		i = err.Error()
 	}
+	utils.PrintCurrentGoroutineRuntimeStack()
 	p := &VMPanic{vmstack.New(), i}
 	return p
 }
