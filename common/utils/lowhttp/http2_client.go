@@ -524,27 +524,29 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 
 	fr := cs.h2Conn.fr
 
+	if f.StreamEnded() { // end stream flag
+		cs.setEndStream()
+	}
 	if dataLen := len(f.Data()); dataLen > 0 {
-		cs.h2Conn.frWriteMutex.Lock()
-		err := fr.WriteWindowUpdate(0, uint32(dataLen))
-		cs.h2Conn.frWriteMutex.Unlock()
-		if err != nil {
-			log.Errorf("h2 stream-id %v write window update(connect level) error: %v", f.StreamID, err)
-			return
-		}
-		cs.h2Conn.frWriteMutex.Lock()
-		err = fr.WriteWindowUpdate(f.StreamID, uint32(dataLen))
-		cs.h2Conn.frWriteMutex.Unlock()
-		if err != nil {
-			log.Errorf("h2 server write window update(stream level) error: %v", err)
-			return
+		if !cs.readEndStream {
+			cs.h2Conn.frWriteMutex.Lock()
+			err := fr.WriteWindowUpdate(0, uint32(dataLen))
+			cs.h2Conn.frWriteMutex.Unlock()
+			if err != nil {
+				log.Errorf("h2 stream-id %v write window update(connect level) error: %v", f.StreamID, err)
+				return
+			}
+			cs.h2Conn.frWriteMutex.Lock()
+			err = fr.WriteWindowUpdate(f.StreamID, uint32(dataLen))
+			cs.h2Conn.frWriteMutex.Unlock()
+			if err != nil {
+				log.Errorf("h2 server write window update(stream level) error: %v", err)
+				return
+			}
 		}
 		cs.bodyBuffer.Write(f.Data())
 	}
 
-	if f.StreamEnded() { // end stream flag
-		cs.setEndStream()
-	}
 	return
 }
 
