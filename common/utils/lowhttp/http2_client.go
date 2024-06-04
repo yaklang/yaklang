@@ -19,6 +19,8 @@ import (
 	"time"
 )
 
+var errH2ConnClosed = utils.Error("http2 client conn closed")
+
 type http2ClientConn struct {
 	conn net.Conn
 
@@ -200,7 +202,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 	readIdleTimeout := h2Conn.idleTimeout
 	var t *time.Timer
 
-	for !(h2Conn.readGoAway || h2Conn.closed) {
+	for !h2Conn.closed {
 		frame, err := h2Conn.fr.ReadFrame()
 		if t != nil {
 			t.Reset(readIdleTimeout)
@@ -239,7 +241,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 		case *http2.PingFrame:
 			rl.processPing(f)
 		default:
-			//log.Debugf("Transport: unhandled response frame type %T", f)
+			log.Warnf("Transport: unhandled response frame type %T", f)
 		}
 	}
 }
@@ -386,7 +388,7 @@ func (cs *http2ClientStream) doRequest() error {
 	return nil
 }
 
-func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte) {
+func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte, error) {
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
 	closeFlag := make(chan struct{}, 1) // get read frame err
 	go func() {
@@ -398,12 +400,13 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 		cs.h2Conn.closeCond.L.Unlock()
 	}()
 
+	var err error
 	select {
 	case <-time.After(timeout):
-		log.Errorf("h2 stream-id %v wait response timeout : %s", cs.ID, flow)
+		err = utils.Errorf("h2 stream-id %v wait response timeout : %s", cs.ID, flow)
 	case <-cs.readEndStreamSignal:
 	case <-closeFlag:
-		log.Errorf("h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
+		err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
 	}
 	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
 	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
@@ -411,7 +414,7 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	cs.h2Conn.streams[cs.ID] = nil
 	cs.h2Conn.mu.Unlock()
 	cs.h2Conn.http2StreamPool.Put(cs) // gc
-	return *cs.resp, cs.respPacket
+	return *cs.resp, cs.respPacket, err
 }
 
 func (cs *http2ClientStream) setEndStream() {
@@ -608,7 +611,7 @@ func (rl *http2ClientConnReadLoop) processResetStream(f *http2.RSTStreamFrame) {
 func (rl *http2ClientConnReadLoop) processGoAway(f *http2.GoAwayFrame) {
 	flow := fmt.Sprintf("%v->%v", rl.h2Conn.conn.LocalAddr(), rl.h2Conn.conn.RemoteAddr())
 	log.Infof("connection: %s is going away by %v", flow, f.ErrCode.String())
+	log.Infof("flow: %v last stream id: %v", flow, f.LastStreamID)
 	rl.h2Conn.readGoAway = true
-	rl.h2Conn.setClose()
 	return
 }
