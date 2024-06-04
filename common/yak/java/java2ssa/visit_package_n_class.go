@@ -550,9 +550,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 	}
 
 	key := i.Identifier().GetText()
-	pkgPath := y.GetCurrentPackagePath()
-	pkgName := strings.Join(pkgPath, "_")
-	funcName := fmt.Sprintf("%s_%s_%s", pkgName, class.Name, key)
+	funcName := fmt.Sprintf("%s_%s", class.Name, key)
 
 	if isStatic {
 		newFunction := y.NewFunc(funcName)

@@ -163,7 +163,7 @@ func (c *Cache) ForEachVariable(handle func(string, []Instruction)) {
 }
 
 func (c *Cache) AddClassInstance(name string, inst Instruction) {
-	log.Infof("AddClassInstance: %s : %v", name, inst)
+	// log.Infof("AddClassInstance: %s : %v", name, inst)
 	// if _, ok := c.Class2InstIndex[name]; !ok {
 	// 	c.Class2InstIndex[name] = make([]Instruction, 0, 1)
 	// }

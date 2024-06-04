@@ -46,6 +46,11 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	builder := obj.GetFunc().builder
 	_ = builder
 
+	prog := builder.GetProgram()
+	if prog != nil || prog.Cache != nil {
+		prog.Cache.AddClassInstance(c.Name, obj)
+	}
+
 	call, isCall := ToCall(obj)
 
 	objTyp := NewObjectType()

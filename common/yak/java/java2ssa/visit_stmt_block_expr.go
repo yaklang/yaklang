@@ -1584,9 +1584,6 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value) {
 	var className string
 	if ret := i.ClassCreatorRest(); ret != nil {
 		className = i.CreatedName().GetText()
-		defer func() {
-			y.GetProgram().Cache.AddClassInstance(className, obj)
-		}()
 		// todo 泛型
 		class := y.GetClassBluePrint(className)
 		obj := y.EmitMakeWithoutType(nil, nil)
