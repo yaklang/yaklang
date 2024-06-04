@@ -623,12 +623,18 @@ RECONNECT:
 			if h2Stream.ID == 1 { // first stream
 				return nil, err
 			} else {
-				h2Stream.h2Conn.setClose()
 				goto RECONNECT
 			}
 		}
-		resp, responsePacket := h2Stream.waitResponse(timeout)
+		resp, responsePacket, err := h2Stream.waitResponse(timeout)
 		_ = resp
+		if err != nil {
+			if conn.(*persistConn).shouldRetryRequest(err) {
+				goto RECONNECT
+			} else {
+				return nil, err
+			}
+		}
 		httpctx.SetBareResponseBytes(reqIns, responsePacket)
 		response.RawPacket = responsePacket
 		return response, nil
