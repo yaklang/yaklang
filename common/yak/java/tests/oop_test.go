@@ -428,7 +428,7 @@ class Main{
 			println(Hello());
 		}
 }
-		`, []string{"Function-_Main_Hello()"}, t)
+		`, []string{"Function-Main_Hello()"}, t)
 	})
 }
 
