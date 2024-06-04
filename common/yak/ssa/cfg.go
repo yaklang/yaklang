@@ -263,29 +263,64 @@ func (i *IfBuilder) SetElse(body func()) *IfBuilder {
 
 // Build if statement
 func (i *IfBuilder) Build() *IfBuilder {
+	/*
+		if-condition :
+			condition
+			if true -> if-true, false -> if-false
+		if-true:
+			body
+			if-true -> if-done
+		if-false:
+			// else or else-if
+			(else-body)
+			(
+				condition
+				if true -> if-true2, false-> if-false2
+			)
+			if-false -> if-done
+		if-done:
+			// next code
+	*/
 	// just use ssautil scope cfg ScopeBuilder
 	SSABuilder := i.builder
 	scope := i.enter.ScopeTable
 	ScopeBuilder := ssautil.NewIfStmt(ssautil.ScopedVersionedTableIF[Value](scope))
-	// done block
+
+	// if-done block
 	DoneBlock := SSABuilder.NewBasicBlockNotAddBlocks(IfDone)
 	// DoneBlock.ScopeTable = Scope
 
+	// create if-condition block and jump to it
 	conditionBlock := SSABuilder.NewBasicBlock("if-condition")
 	SSABuilder.EmitJump(conditionBlock)
 	SSABuilder.CurrentBlock = conditionBlock
 
-	CurrentBlock := conditionBlock
-	for _, item := range i.items {
+	IfStatementBlock := conditionBlock
+	createNewIfInst := func(condition Value, trueBlock, falseBlock *BasicBlock) {
+		// create if-false block
+		// falseBlock := SSABuilder.NewBasicBlock(IfFalse)
+		SSABuilder.CurrentBlock = IfStatementBlock
+		// create if-instruction in IfStatementBlock
+		ifStmt := SSABuilder.EmitIf()
+		ifStmt.AddTrue(trueBlock)
+		ifStmt.SetCondition(condition)
+		ifStmt.AddFalse(falseBlock)
+
+		// currentBlock and  IfStatementBlock is falseBlock
+		SSABuilder.CurrentBlock = falseBlock
+		IfStatementBlock = falseBlock
+	}
+
+	for index, item := range i.items {
 		trueBlock := SSABuilder.NewBasicBlock(IfTrue)
 		var condition Value
 		ScopeBuilder.BuildItem(
 			// ifStmt := builder
 			func(conditionScope ssautil.ScopedVersionedTableIF[Value]) {
-				SSABuilder.CurrentBlock = CurrentBlock
+				SSABuilder.CurrentBlock = IfStatementBlock
 				SSABuilder.CurrentBlock.ScopeTable = conditionScope.(*Scope)
 				condition = item.Condition()
-				CurrentBlock = SSABuilder.CurrentBlock
+				IfStatementBlock = SSABuilder.CurrentBlock
 			},
 			func(bodyScope ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 				SSABuilder.CurrentBlock = trueBlock
@@ -298,17 +333,22 @@ func (i *IfBuilder) Build() *IfBuilder {
 				return SSABuilder.CurrentBlock.ScopeTable
 			},
 		)
-		falseBlock := SSABuilder.NewBasicBlock(IfFalse)
-		SSABuilder.CurrentBlock = CurrentBlock
-		ifStmt := SSABuilder.EmitIf()
-		ifStmt.AddTrue(trueBlock)
-		ifStmt.SetCondition(condition)
-		ifStmt.AddFalse(falseBlock)
 
-		SSABuilder.CurrentBlock = falseBlock
-		CurrentBlock = falseBlock
+		if index != len(i.items)-1 {
+			falseBlock := SSABuilder.NewBasicBlock(IfFalse)
+			createNewIfInst(condition, trueBlock, falseBlock)
+		} else {
+			// last one
+			if i.elseBody != nil {
+				// has else
+				falseBlock := SSABuilder.NewBasicBlock(IfFalse)
+				createNewIfInst(condition, trueBlock, falseBlock)
+			} else {
+				createNewIfInst(condition, trueBlock, DoneBlock)
+			}
+		}
 	}
-
+	// last one
 	if i.elseBody != nil {
 		ScopeBuilder.BuildElse(func(sub ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 			SSABuilder.CurrentBlock.ScopeTable = sub.(*Scope)
@@ -318,8 +358,8 @@ func (i *IfBuilder) Build() *IfBuilder {
 			}
 			return SSABuilder.CurrentBlock.ScopeTable
 		})
+		SSABuilder.EmitJump(DoneBlock)
 	}
-	SSABuilder.EmitJump(DoneBlock)
 
 	if len(DoneBlock.Preds) != 0 {
 		addToBlocks(DoneBlock)

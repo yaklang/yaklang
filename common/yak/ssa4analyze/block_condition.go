@@ -155,12 +155,13 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		)
 		return r
 	}
+	_ = fixupBlockPos
 
 	deleteInst := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
 		// fix block position
-		b.SetRange(fixupBlockPos(b))
+		// b.SetRange(fixupBlockPos(b))
 
 		for _, inst := range b.Insts {
 			switch inst := inst.(type) {

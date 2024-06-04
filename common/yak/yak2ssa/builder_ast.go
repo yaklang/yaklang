@@ -71,6 +71,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	}
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	b.AppendBlockRange()
 	if s, ok := stmt.LineCommentStmt().(*yak.LineCommentStmtContext); ok {
 		b.buildLineComment(s)
 	}
@@ -97,7 +98,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 
 	// block
 	if s, ok := stmt.Block().(*yak.BlockContext); ok {
-		b.buildBlock(s)
+		b.buildBlock(s, true)
 		return
 	}
 
@@ -498,7 +499,17 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 		for index, expression := range stmt.AllExpression() {
 			builder.AppendItem(
 				func() ssa.Value {
-					return b.buildExpression(expression.(*yak.ExpressionContext))
+
+					expressionStmt, ok := expression.(*yak.ExpressionContext)
+					if !ok {
+						return nil
+					}
+
+					recoverRange := b.SetRange(expressionStmt.BaseParserRuleContext)
+					b.AppendBlockRange()
+					recoverRange()
+
+					return b.buildExpression(expressionStmt)
 				},
 				func() {
 					b.buildBlock(stmt.Block(index).(*yak.BlockContext))
@@ -530,16 +541,25 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 }
 
 // block
-func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
+func (b *astbuilder) buildBlock(stmt *yak.BlockContext, syntaxBlocks ...bool) {
+	syntaxBlock := false
+	if len(syntaxBlocks) > 0 {
+		syntaxBlock = syntaxBlocks[0]
+	}
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	b.CurrentBlock.SetRange(b.CurrentRange)
-	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
+	// b.CurrentBlock.SetRange(b.CurrentRange)
+	s, ok := stmt.StatementList().(*yak.StatementListContext)
+	if !ok {
+		b.NewError(ssa.Warn, TAG, "empty block")
+		return
+	}
+	if syntaxBlock {
 		b.BuildSyntaxBlock(func() {
 			b.buildStatementList(s)
 		})
 	} else {
-		b.NewError(ssa.Warn, TAG, "empty block")
+		b.buildStatementList(s)
 	}
 }
 
@@ -1394,8 +1414,11 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 				b.buildBlock(block)
 			} else if expression, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 				// handler expression
+				recoverRange := b.SetRange(expression)
+				b.AppendBlockRange()
 				v := b.buildExpression(expression)
 				b.EmitReturn([]ssa.Value{v})
+				recoverRange()
 			} else {
 				b.NewError(ssa.Error, TAG, ArrowFunctionNeedExpressionOrBlock())
 			}

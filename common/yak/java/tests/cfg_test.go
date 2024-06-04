@@ -102,6 +102,20 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 		   var a = 1;
 		println(a); // 1
 		if (c) {
+			return ;
+		}
+		println(a); // 1
+		`, []string{
+			"1",
+			"1",
+		}, t)
+	})
+
+	t.Run("test with return in branch, no DoneBlock", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		   var a = 1;
+		println(a); // 1
+		if (c) {
 			if (b) {
 				a = 2;
 				println(a); // 2

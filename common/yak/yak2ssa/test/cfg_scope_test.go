@@ -274,8 +274,20 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 				"phi(a)[2,3,1]",
 			}, t)
 	})
-
 	t.Run("test with return, no DoneBlock", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		if c {
+			return 
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"1",
+		}, t)
+	})
+	t.Run("test with return in branch, no DoneBlock", func(t *testing.T) {
 		test.CheckPrintlnValue(`
 		a = 1
 		println(a) // 1
