@@ -26,6 +26,7 @@ type WebsocketClientConfig struct {
 	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
 	Context             context.Context
 	cancel              func()
+	strictMode          bool
 
 	// Host Port
 	Host string
@@ -85,6 +86,12 @@ func WithWebsocketTLS(t bool) WebsocketClientOpt {
 	}
 }
 
+func WithWebsocketStrictMode(b bool) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.strictMode = b
+	}
+}
+
 type WebsocketClient struct {
 	conn                net.Conn
 	fr                  *FrameReader
@@ -96,6 +103,7 @@ type WebsocketClient struct {
 	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
 	Context             context.Context
 	cancel              func()
+	strictMode          bool
 
 	// websocket扩展
 	// isDeflate bool
@@ -154,6 +162,10 @@ func (c *WebsocketClient) StartFromServer() {
 
 					return
 				}
+
+				// strict mode
+				// rfc6455: 5.5
+				// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
 
 				if frame.Type() == CloseMessage {
 					log.Debugf("Websocket close status code: %d", frame.closeCode)
@@ -356,5 +368,6 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		FromServerHandlerEx: config.FromServerHandlerEx,
 		Context:             ctx,
 		cancel:              cancel,
+		strictMode:          config.strictMode,
 	}, nil
 }

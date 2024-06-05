@@ -71,6 +71,9 @@ type PocConfig struct {
 	// 获取 Websocket 客户端的手段，如果连接成功，Websocket 客户端在这里
 	// 可以直接 c.WriteText 即可写入数据
 	WebsocketClientHandler func(c *lowhttp.WebsocketClient)
+	// strict mode
+	// whether strictly follow RFC 6455
+	WebsocketStrictMode bool
 
 	FromPlugin string
 	RuntimeId  string
@@ -533,6 +536,27 @@ func WithWebsocketHandler(w func(i []byte, cancel func())) PocConfigOption {
 func WithWebsocketClientHandler(w func(c *lowhttp.WebsocketClient)) PocConfigOption {
 	return func(c *PocConfig) {
 		c.WebsocketClientHandler = w
+	}
+}
+
+// websocketStrictMode 是一个请求选项参数，它用于控制是否启用严格模式，如果启用严格模式，则会遵循 RFC 6455 规范
+// Example:
+// ```
+// rsp, req, err = poc.HTTP(`GET / HTTP/1.1
+// Connection: Upgrade
+// Upgrade: websocket
+// Sec-Websocket-Version: 13
+// Sec-Websocket-Extensions: permessage-deflate; client_max_window_bits
+// Host: echo.websocket.events
+// Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7
+// Sec-Websocket-Key: L31R1As+71fwuXqhwhABuA==`,
+// poc.proxy("http://127.0.0.1:7890"), poc.websocketStrictMode(true))
+//
+// time.Sleep(100)
+// ```
+func WithWebsocketStrictMode(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.WebsocketStrictMode = b
 	}
 }
 
@@ -1317,6 +1341,7 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 			}),
 			lowhttp.WithWebsocketHost(config.Host),
 			lowhttp.WithWebsocketPort(config.Port),
+			lowhttp.WithWebsocketStrictMode(config.WebsocketStrictMode),
 		)
 		c.StartFromServer()
 		if config.WebsocketClientHandler != nil {
@@ -1629,6 +1654,7 @@ var PoCExports = map[string]interface{}{
 	"websocket":            WithWebsocket,
 	"websocketFromServer":  WithWebsocketHandler,
 	"websocketOnClient":    WithWebsocketClientHandler,
+	"websocketStrictMode":  WithWebsocketStrictMode,
 	"username":             WithUsername,
 	"password":             WithPassword,
 
