@@ -188,6 +188,17 @@ func (c *WebsocketClient) Write(r []byte) error {
 	return c.WriteText(r)
 }
 
+func (c *WebsocketClient) WriteEx(r []byte, frameTyp int) error {
+	if err := c.fw.write(r, frameTyp, true); err != nil {
+		return errors.Wrap(err, "write text frame failed")
+	}
+
+	if err := c.fw.Flush(); err != nil {
+		return errors.Wrap(err, "flush failed")
+	}
+	return nil
+}
+
 func (c *WebsocketClient) WriteBinary(r []byte) error {
 	if err := c.fw.WriteBinary(r, true); err != nil {
 		return errors.Wrap(err, "write binary frame failed")
