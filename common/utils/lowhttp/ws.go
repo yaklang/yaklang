@@ -182,7 +182,7 @@ func (f *Frame) SetData(d []byte) {
 }
 
 func (f *Frame) IsControl() bool {
-	return f.messageType != TextMessage && f.messageType != BinaryMessage
+	return f.messageType == CloseMessage || f.messageType == PingMessage || f.messageType == PongMessage
 }
 
 type FrameReader struct {
