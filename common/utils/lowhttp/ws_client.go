@@ -139,10 +139,9 @@ func (c *WebsocketClient) StartFromServer() {
 	}
 	go func() {
 		var (
-			frame           *Frame
-			err             error
 			plainTextBuffer bytes.Buffer
-			frames          = make([]*Frame, 0, 1)
+			fragmentFrames  = make([]*Frame, 0, 1)
+			inFragment      = false
 		)
 		c.FromServerOnce.Do(func() {
 			defer func() {
@@ -157,20 +156,20 @@ func (c *WebsocketClient) StartFromServer() {
 				default:
 				}
 
-				frame, err = c.fr.ReadFrame()
+				frame, err := c.fr.ReadFrame()
 				if err != nil {
 					if !errors.Is(err, io.EOF) {
 						log.Errorf("[ws fr]read frame failed: %s", err)
 					}
-
 					return
 				}
+				frameType, isControl := frame.Type(), frame.IsControl()
 
 				// strict mode
 				if c.strictMode {
 					// rfc6455: 5.5
 					// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
-					if frame.IsControl() && (len(frame.payload) > 125 || !frame.FIN()) {
+					if isControl && (len(frame.payload) > 125 || !frame.FIN()) {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
@@ -194,44 +193,68 @@ func (c *WebsocketClient) StartFromServer() {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
-
 				}
 
-				if frame.Type() == CloseMessage {
-					log.Debugf("Websocket close status code: %d", frame.closeCode)
-					c.WriteClose()
+				// rfc6455: 5.4
+				// A fragmented message consists of a single frame
+				// with the FIN bit clear and an opcode other than 0, followed by zero or more frames  with the FIN bit clear and the opcode set to 0, and terminated by a single frame with the FIN bit set and an opcode of 0.
+				// 1.     FIN = 0 && opcode >  0
+				// 2-n:   FIN = 0 && opcode == 0
+				// final: FIN = 1 && opcode == 0
+				validFragmentFrame := false
+				if !inFragment {
+					// first frame of a fragmented message
+					validFragmentFrame = frameType != ContinueMessage
+					inFragment = !frame.FIN() && frameType != ContinueMessage
+				} else {
+					// Control frames MAY be injected in the middle of a fragmented message.  Control frames themselves MUST NOT be fragmented.
+					// So no control frame in the middle of a fragmented message is invalid
+					validFragmentFrame = isControl || frameType == ContinueMessage
+				}
+
+				if !validFragmentFrame {
+					c.WriteCloseEx(CloseProtocolError, "")
 					return
 				}
 
-				if frame.Type() == PingMessage {
+				// control frame handle first
+				switch frameType {
+				case CloseMessage:
+					log.Debugf("Websocket close status code: %d", frame.
+						closeCode)
+					// remind fragment
+					c.WriteClose()
+					return
+				case PingMessage:
 					c.WritePong(frame.data)
 					continue
 				}
 
-				currentPlain := WebsocketFrameToData(frame)
-
-				plainTextBuffer.Write(currentPlain)
-				frames = append(frames, frame)
-				if !frame.FIN() {
-					continue // continue to read next frame
+				plain := WebsocketFrameToData(frame)
+				fragmentFrames = append(fragmentFrames, frame)
+				if inFragment {
+					plainTextBuffer.Write(plain)
+					if !frame.FIN() { // continue to read next frame
+						continue
+					}
+					plain = plainTextBuffer.Bytes()
+					plainTextBuffer.Reset()
 				}
-
-				plain := plainTextBuffer.Bytes()
-				plainTextBuffer.Reset()
 
 				handler := c.FromServerHandler
 				handlerEx := c.FromServerHandlerEx
 				if handler != nil {
 					handler(plain)
 				} else if handlerEx != nil {
-					handlerEx(c, plain, frames)
+					handlerEx(c, plain, fragmentFrames)
 				} else {
 					raw, data := frame.Bytes()
 					fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
 				}
+
+				inFragment = false
 				if frame.FIN() {
-					// clear frames
-					frames = frames[:0]
+					fragmentFrames = fragmentFrames[:0]
 				}
 			}
 		})
