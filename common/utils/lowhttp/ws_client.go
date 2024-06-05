@@ -144,12 +144,12 @@ func (c *WebsocketClient) StartFromServer() {
 		c.FromServerOnce.Do(func() {
 			defer func() {
 				c.cancel()
+				c.conn.Close()
 			}()
 
 			for {
 				select {
 				case <-c.Context.Done():
-					_ = c.conn.Close()
 					return
 				default:
 				}
@@ -164,14 +164,19 @@ func (c *WebsocketClient) StartFromServer() {
 				}
 
 				// strict mode
-				// rfc6455: 5.5
-				// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
+				if c.strictMode {
+					// rfc6455: 5.5
+					// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
+					if frame.Type() == CloseMessage && len(frame.payload) > 125 {
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
+					}
+				}
 
 				if frame.Type() == CloseMessage {
 					log.Debugf("Websocket close status code: %d", frame.closeCode)
 					c.WriteClose()
-					c.conn.Close()
-					break
+					return
 				}
 
 				if frame.Type() == PingMessage {
@@ -244,6 +249,21 @@ func (c *WebsocketClient) WritePong(r []byte) error {
 
 func (c *WebsocketClient) WriteClose() error {
 	data := FormatCloseMessage(CloseNormalClosure, "")
+	if err := c.fw.write(data, CloseMessage, true); err != nil {
+		return errors.Wrap(err, "write close frame failed")
+	}
+	if err := c.fw.Flush(); err != nil {
+		return errors.Wrap(err, "flush failed")
+	}
+	return nil
+}
+
+func (c *WebsocketClient) WriteCloseEx(closeCode int, message string) error {
+	if c.strictMode && len(message) > 125 {
+		message = message[:125]
+	}
+
+	data := FormatCloseMessage(closeCode, message)
 	if err := c.fw.write(data, CloseMessage, true); err != nil {
 		return errors.Wrap(err, "write close frame failed")
 	}
