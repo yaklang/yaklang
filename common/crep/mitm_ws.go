@@ -4,6 +4,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	logger "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -12,11 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"io"
-	"net"
-	"net/http"
-	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -40,7 +41,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	var (
 		err error
 		got bool
-		//webSocketKey string
+		// webSocketKey string
 	)
 
 	// check if it is a websocket upgrade request
@@ -220,7 +221,7 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 		frame           *lowhttp.Frame
 		err             error
 		callbackHandler func([]byte, *http.Request, *http.Response, int64) []byte
-		//forceTextFrame  bool = !(w.forceTextFrame == nil || !w.forceTextFrame.IsSet())
+		// forceTextFrame  bool = !(w.forceTextFrame == nil || !w.forceTextFrame.IsSet())
 	)
 	_ = b
 	// hijack
@@ -235,7 +236,7 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 			return bytes
 		}
 	}
-	//isDeflate = false
+	// isDeflate = false
 	frameReader := lowhttp.NewFrameReaderFromBufio(reader, isDeflate)
 	frameWriter := lowhttp.NewFrameWriterFromBufio(writer, isDeflate)
 
