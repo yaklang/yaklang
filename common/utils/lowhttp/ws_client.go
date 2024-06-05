@@ -183,6 +183,15 @@ func (c *WebsocketClient) StartFromServer() {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
+
+					// rfc6455: 5.2
+					// %x3-7 are reserved for further non-control frames
+					// %xB-F are reserved for further control frames
+					if frame.IsReservedType() {
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
+					}
+
 				}
 
 				if frame.Type() == CloseMessage {

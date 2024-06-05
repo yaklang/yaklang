@@ -167,6 +167,10 @@ func (f *Frame) Type() int {
 	return f.messageType
 }
 
+func (f *Frame) IsReservedType() bool {
+	return f.messageType >= 3 && f.messageType <= 7 || f.messageType >= 11
+}
+
 func (f *Frame) GetRaw() []byte {
 	return f.raw
 }
@@ -296,7 +300,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		CloseMessage, ContinueMessage:
 		break
 	default:
-		return frame, utils.Errorf("unknown 0x%02x (FrameType)", frameType)
+		log.Errorf("unknown 0x%02x (FrameType)", frameType)
 	}
 
 	switch remaining {
