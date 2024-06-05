@@ -170,7 +170,7 @@ func (c *WebsocketClient) StartFromServer() {
 				if c.strictMode {
 					// rfc6455: 5.5
 					// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
-					if frame.Type() == CloseMessage && len(frame.payload) > 125 {
+					if frame.IsControl() && (len(frame.payload) > 125 || !frame.FIN()) {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
