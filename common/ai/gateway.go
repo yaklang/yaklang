@@ -11,6 +11,7 @@ import (
 
 import (
 	_ "github.com/yaklang/yaklang/common/ai/chatglm"
+	_ "github.com/yaklang/yaklang/common/ai/comate"
 	_ "github.com/yaklang/yaklang/common/ai/moonshot"
 	_ "github.com/yaklang/yaklang/common/ai/openai"
 	_ "github.com/yaklang/yaklang/common/ai/tongyi"
@@ -24,7 +25,9 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error 
 		}
 		return gw
 	}
-	if utils.StringArrayContains(aispec.RegisteredAIGateways(), t) {
+
+	total := aispec.RegisteredAIGateways()
+	if utils.StringArrayContains(total, t) {
 		gw := createAIGatewayByType(t)
 		if gw != nil {
 			if cb(t, gw) {
@@ -39,7 +42,10 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error 
 	if cfg == nil {
 		return nil
 	}
+
+	var haveBeenTry []string
 	for _, typ := range cfg.AiApiPriority {
+		haveBeenTry = append(haveBeenTry, typ)
 		agent := createAIGatewayByType(typ)
 		if agent != nil {
 			if cb(typ, agent) {
@@ -49,6 +55,21 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error 
 			log.Warnf("create ai agent by type %s failed", typ)
 		}
 	}
+
+	for _, typ := range total {
+		if utils.StringArrayContains(haveBeenTry, typ) {
+			continue
+		}
+		agent := createAIGatewayByType(typ)
+		if agent != nil {
+			if cb(typ, agent) {
+				return nil
+			}
+		} else {
+			log.Warnf("create ai agent by type %s failed", typ)
+		}
+	}
+
 	return errors.New("not found valid ai agent")
 }
 func createAIGateway(t string) aispec.AIGateway {
@@ -108,7 +129,7 @@ func GetPrimaryAgent() aispec.AIGateway {
 	t := consts.GetAIPrimaryType()
 	if t == "" {
 		for _, defaultType := range []string{
-			"openai", "chatglm", "moonshot", "tongyi",
+			"openai", "chatglm", "moonshot", "tongyi", "comate",
 		} {
 			agent = createAIGateway(defaultType)
 			if agent == nil {
