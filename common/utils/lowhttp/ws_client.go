@@ -23,7 +23,7 @@ type WebsocketClientConfig struct {
 	TotalTimeout        time.Duration
 	TLS                 bool
 	FromServerHandler   func([]byte)
-	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
+	FromServerHandlerEx func(*WebsocketClient, []byte, []*Frame)
 	Context             context.Context
 	cancel              func()
 	strictMode          bool
@@ -59,7 +59,7 @@ func WithWebsocketFromServerHandler(f func([]byte)) WebsocketClientOpt {
 	}
 }
 
-func WithWebsocketFromServerHandlerEx(f func(*WebsocketClient, []byte, *Frame)) WebsocketClientOpt {
+func WithWebsocketFromServerHandlerEx(f func(*WebsocketClient, []byte, []*Frame)) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.FromServerHandlerEx = f
 	}
@@ -100,7 +100,7 @@ type WebsocketClient struct {
 	Response            []byte
 	FromServerOnce      *sync.Once
 	FromServerHandler   func([]byte)
-	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
+	FromServerHandlerEx func(*WebsocketClient, []byte, []*Frame)
 	Extensions          []string
 	Context             context.Context
 	cancel              func()
@@ -139,8 +139,10 @@ func (c *WebsocketClient) StartFromServer() {
 	}
 	go func() {
 		var (
-			frame *Frame
-			err   error
+			frame           *Frame
+			err             error
+			plainTextBuffer bytes.Buffer
+			frames          = make([]*Frame, 0, 1)
 		)
 		c.FromServerOnce.Do(func() {
 			defer func() {
@@ -172,6 +174,7 @@ func (c *WebsocketClient) StartFromServer() {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
+
 					// rfc6455: 5.2
 					// RSV1, RSV2, RSV3:  1 bit each
 					// MUST be 0 unless an extension is negotiated that defines meanings
@@ -205,17 +208,30 @@ func (c *WebsocketClient) StartFromServer() {
 					continue
 				}
 
-				plain := WebsocketFrameToData(frame)
+				currentPlain := WebsocketFrameToData(frame)
+
+				plainTextBuffer.Write(currentPlain)
+				frames = append(frames, frame)
+				if !frame.FIN() {
+					continue // continue to read next frame
+				}
+
+				plain := plainTextBuffer.Bytes()
+				plainTextBuffer.Reset()
 
 				handler := c.FromServerHandler
 				handlerEx := c.FromServerHandlerEx
 				if handler != nil {
 					handler(plain)
 				} else if handlerEx != nil {
-					handlerEx(c, plain, frame)
+					handlerEx(c, plain, frames)
 				} else {
 					raw, data := frame.Bytes()
 					fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
+				}
+				if frame.FIN() {
+					// clear frames
+					frames = frames[:0]
 				}
 			}
 		})

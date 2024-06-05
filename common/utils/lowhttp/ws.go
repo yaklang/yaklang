@@ -147,6 +147,10 @@ func (f *Frame) Bytes() ([]byte, []byte) {
 	return rawBuf.Bytes(), f.data
 }
 
+func (f *Frame) FIN() bool {
+	return f.firstByte&FINALBIT != 0
+}
+
 func (f *Frame) RSV1() bool {
 	return f.firstByte&RSV1BIT != 0
 }
