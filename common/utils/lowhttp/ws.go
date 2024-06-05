@@ -8,12 +8,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/pkg/errors"
 )
@@ -73,26 +74,21 @@ func FormatCloseMessage(closeCode int, text string) []byte {
 	return buf
 }
 
-var (
-	keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
-)
+var keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
 
 type Frame struct {
-	raw []byte
-
+	raw           []byte
+	maskingKey    []byte
+	rawPayload    []byte // payload without mask
+	payload       []byte // masked payload
+	data          []byte // decoded text
+	closeCode     uint16 // Close codes defined in RFC 6455, section 11.7.
+	payloadLength uint64
+	messageType   int
 	firstByte     byte
 	secondByte    byte
 	mask          bool
-	payloadLength uint64
-	maskingKey    []byte
-	maskedPayload []byte
-	// 未与 maskingkey 异或的数据
-	payload []byte
-	// 明文
-	data      []byte
-	isDeflate bool
-
-	messageType int
+	isDeflate     bool
 }
 
 func (f *Frame) Bytes() ([]byte, []byte) {
@@ -209,7 +205,6 @@ func NewFrameReaderFromBufio(r *bufio.Reader, isDeflate bool) *FrameReader {
 }
 
 func (f *Frame) Show() {
-
 	raw := utils.BytesClone(f.data)
 	rawString := strings.Clone(string(raw))
 	if len(raw) > 30 {
@@ -323,12 +318,22 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	// todo: uint64 -> int64 maybe overflow
 	data, err := ioutil.ReadAll(io.LimitReader(fr.r, int64(dataLength)))
 
-	frame.maskedPayload = make([]byte, len(data))
-	copy(frame.maskedPayload, data)
-	rawBuf.Write(frame.maskedPayload)
+	// close frame
+	if frameType == CloseMessage && len(data) > 2 {
+		if len(data) > 2 {
+			frame.closeCode = binary.BigEndian.Uint16(data[:2])
+			data = data[2:]
+		} else {
+			return frame, utils.Errorf("invalid close frame: no status code")
+		}
+	}
 
+	frame.rawPayload = make([]byte, len(data))
+	copy(frame.rawPayload, data)
+
+	_, err = rawBuf.Write(frame.rawPayload)
 	if err != nil {
-		return frame, errors.Wrap(err, "ws frameReader.Reader io.LimitReader failed")
+		return frame, utils.Wrap(err, "ws frameReader.Reader io.LimitReader failed")
 	}
 
 	// 先对 masked payload 进行异或操作
@@ -419,18 +424,14 @@ func (fw *FrameWriter) WriteRaw(raw []byte) (err error) {
 
 // 客户端发送数据时需要设置mask为true
 func (fw *FrameWriter) write(data []byte, messageType int, mask bool, headerBytes ...byte) error {
-	headerBytesLength := len(headerBytes)
-	if headerBytesLength == 0 {
-		if messageType == TextMessage {
-			headerBytes = []byte{DEFAULT_TEXT_MESSAGE_FISRT_BYTE, 0}
-		} else if messageType == CloseMessage {
-			headerBytes = []byte{DEFAULT_CLOSE_MESSAGE_FIRST_BYTE, 0}
-		}
-	} else if headerBytesLength == 1 {
-		headerBytes = append(headerBytes, 0)
+	var firstByte byte
+	if len(headerBytes) == 0 {
+		firstByte = byte((messageType) | FINALBIT)
+	} else {
+		firstByte = headerBytes[0]
 	}
 
-	frame, err := DataToWebsocketFrame(data, headerBytes[0], mask)
+	frame, err := DataToWebsocketFrame(data, firstByte, mask)
 	if err != nil {
 		return err
 	}
@@ -447,7 +448,6 @@ func (fw *FrameWriter) writeControl(data []byte, messageType int, mask bool) err
 }
 
 func WebsocketFrameToData(frame *Frame) (data []byte) {
-
 	return frame.GetData()
 }
 
@@ -477,10 +477,8 @@ func DataToWebsocketFrame(data []byte, firstByte byte, mask bool) (frame *Frame,
 	frame.firstByte = firstByte
 	frame.mask = mask
 	frame.messageType = int(firstByte & FRAME_TYPE_BIT)
-	//frame.isDeflate = true
+
 	secondByte := byte(0)
-	//data, _ := inflate(data1)
-	// count payload length
 	dataLength := len(data)
 	if dataLength > TWO_BYTE_SIZE {
 		secondByte |= EIGHT_BYTE_BIT
@@ -507,7 +505,7 @@ func DataToWebsocketFrame(data []byte, firstByte byte, mask bool) (frame *Frame,
 		}
 		frame.maskingKey = maskKey
 	}
-	//frame.payload = data
+	// frame.payload = data
 	frame.payload = data
 	return frame, nil
 }
@@ -520,9 +518,7 @@ func ComputeWebsocketAcceptKey(websocketKey string) string {
 }
 
 func generateMaskKey() ([]byte, error) {
-	var (
-		key = make([]byte, 4)
-	)
+	key := make([]byte, 4)
 	_, err := rand.Read(key)
 
 	return key, err
