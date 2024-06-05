@@ -19,12 +19,13 @@ import (
 )
 
 type WebsocketClientConfig struct {
-	Proxy             string
-	TotalTimeout      time.Duration
-	TLS               bool
-	FromServerHandler func([]byte)
-	Context           context.Context
-	cancel            func()
+	Proxy               string
+	TotalTimeout        time.Duration
+	TLS                 bool
+	FromServerHandler   func([]byte)
+	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
+	Context             context.Context
+	cancel              func()
 
 	// Host Port
 	Host string
@@ -57,6 +58,12 @@ func WithWebsocketFromServerHandler(f func([]byte)) WebsocketClientOpt {
 	}
 }
 
+func WithWebsocketFromServerHandlerEx(f func(*WebsocketClient, []byte, *Frame)) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.FromServerHandlerEx = f
+	}
+}
+
 func WithWebsocketWithContext(ctx context.Context) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.Context, config.cancel = context.WithCancel(ctx)
@@ -79,15 +86,16 @@ func WithWebsocketTLS(t bool) WebsocketClientOpt {
 }
 
 type WebsocketClient struct {
-	conn              net.Conn
-	fr                *FrameReader
-	fw                *FrameWriter
-	Request           []byte
-	Response          []byte
-	FromServerOnce    *sync.Once
-	FromServerHandler func([]byte)
-	Context           context.Context
-	cancel            func()
+	conn                net.Conn
+	fr                  *FrameReader
+	fw                  *FrameWriter
+	Request             []byte
+	Response            []byte
+	FromServerOnce      *sync.Once
+	FromServerHandler   func([]byte)
+	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
+	Context             context.Context
+	cancel              func()
 
 	// websocket扩展
 	// isDeflate bool
@@ -140,8 +148,18 @@ func (c *WebsocketClient) StartFromServer() {
 
 				frame, err = c.fr.ReadFrame()
 				if err != nil {
-					log.Errorf("[ws fr]read frame failed: %s", err)
+					if !errors.Is(err, io.EOF) {
+						log.Errorf("[ws fr]read frame failed: %s", err)
+					}
+
 					return
+				}
+
+				if frame.Type() == CloseMessage {
+					log.Debugf("Websocket close status code: %d", frame.closeCode)
+					c.WriteClose()
+					c.conn.Close()
+					break
 				}
 
 				if frame.Type() == PingMessage {
@@ -150,9 +168,13 @@ func (c *WebsocketClient) StartFromServer() {
 				}
 
 				plain := WebsocketFrameToData(frame)
-				f := c.FromServerHandler
-				if f != nil {
-					f(plain)
+
+				handler := c.FromServerHandler
+				handlerEx := c.FromServerHandlerEx
+				if handler != nil {
+					handler(plain)
+				} else if handlerEx != nil {
+					handlerEx(c, plain, frame)
 				} else {
 					raw, data := frame.Bytes()
 					fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
@@ -167,12 +189,8 @@ func (c *WebsocketClient) Write(r []byte) error {
 }
 
 func (c *WebsocketClient) WriteBinary(r []byte) error {
-	if len(r) <= 0 {
-		return nil
-	}
-
 	if err := c.fw.WriteBinary(r, true); err != nil {
-		return errors.Wrap(err, "write pong frame failed")
+		return errors.Wrap(err, "write binary frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
 		return errors.Wrap(err, "flush failed")
@@ -181,12 +199,8 @@ func (c *WebsocketClient) WriteBinary(r []byte) error {
 }
 
 func (c *WebsocketClient) WriteText(r []byte) error {
-	if len(r) <= 0 {
-		return nil
-	}
-
 	if err := c.fw.WriteText(r, true); err != nil {
-		return errors.Wrap(err, "write pong frame failed")
+		return errors.Wrap(err, "write text frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
 		return errors.Wrap(err, "flush failed")
@@ -195,10 +209,6 @@ func (c *WebsocketClient) WriteText(r []byte) error {
 }
 
 func (c *WebsocketClient) WritePong(r []byte) error {
-	if len(r) <= 0 {
-		return nil
-	}
-
 	if err := c.fw.WritePong(r, true); err != nil {
 		return errors.Wrap(err, "write pong frame failed")
 	}
@@ -284,19 +294,25 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	isDeflate := IsPermessageDeflate(req.Header)
 
 	// 发送请求
-
 	_, err = conn.Write(requestRaw)
 	if err != nil {
 		return nil, utils.Errorf("write conn[ws] failed: %s", err)
 	}
 
 	// 接收响应并判断
-	var responseRaw bytes.Buffer
-	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(io.TeeReader(conn, &responseRaw)), nil)
+	var responseBuffer bytes.Buffer
+	bufioReader := bufio.NewReaderSize(io.TeeReader(conn, &responseBuffer), 4096)
+	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufioReader, req)
 	if err != nil {
 		return nil, utils.Errorf("read response failed: %s", err)
 	}
-	// if rsp.StatusCode != 101 {
+
+	responseRaw := responseBuffer.Bytes()
+
+	remindBytes := make([]byte, bufioReader.Buffered())
+	// write buffered data to remindBuffer
+	bufioReader.Read(remindBytes)
+
 	if rsp.StatusCode != 101 && rsp.StatusCode != 200 {
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
 	}
@@ -320,13 +336,14 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		ctx, cancel = context.WithCancel(ctx)
 	}
 	return &WebsocketClient{
-		conn:              conn,
-		fr:                NewFrameReader(conn, isDeflate),
-		fw:                NewFrameWriter(conn, isDeflate),
-		Request:           requestRaw,
-		Response:          responseRaw.Bytes(),
-		FromServerHandler: config.FromServerHandler,
-		Context:           ctx,
-		cancel:            cancel,
+		conn:                conn,
+		fr:                  NewFrameReader(io.MultiReader(bytes.NewBuffer(remindBytes), conn), isDeflate),
+		fw:                  NewFrameWriter(conn, isDeflate),
+		Request:             requestRaw,
+		Response:            responseRaw,
+		FromServerHandler:   config.FromServerHandler,
+		FromServerHandlerEx: config.FromServerHandlerEx,
+		Context:             ctx,
+		cancel:              cancel,
 	}, nil
 }
