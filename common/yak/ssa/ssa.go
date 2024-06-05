@@ -378,9 +378,6 @@ type ParameterMember struct {
 	*parameterMemberInner
 }
 
-func (p *ParameterMember) IsMember() bool { return true }
-func (p *ParameterMember) IsObject() bool { return false }
-
 var (
 	_ Node  = (*Parameter)(nil)
 	_ Value = (*Parameter)(nil)
