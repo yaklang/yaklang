@@ -699,26 +699,30 @@ func inflate(data []byte) ([]byte, error) {
 	return after, nil
 }
 
-func IsPermessageDeflate(headers http.Header) bool {
-	isDeflate := false
+func GetWebsocketExtensions(headers http.Header) []string {
 	websocketExtensions, ok := headers["Sec-WebSocket-Extensions"]
 	if !ok {
 		lowerHeaders := make(map[string][]string, len(headers))
 		for k, v := range headers {
 			lowerHeaders[strings.ToLower(k)] = v
 		}
-		websocketExtensions, ok = lowerHeaders["sec-websocket-extensions"]
+		websocketExtensions, _ = lowerHeaders["sec-websocket-extensions"]
+	}
+	return websocketExtensions
+}
+
+func IsPermessageDeflate(headers http.Header) bool {
+	isDeflate := false
+	websocketExtensions := GetWebsocketExtensions(headers)
+	if len(websocketExtensions) == 0 {
+		return false
 	}
 
-	websocketExtensionRaw := strings.Join(websocketExtensions, "; ")
-	if ok {
-		websocketExts := strings.Split(websocketExtensionRaw, ";")
-		for _, ext := range websocketExts {
-			ext = strings.TrimSpace(ext)
-			if ext == "permessage-deflate" || ext == "x-webkit-deflate-frame" {
-				isDeflate = true
-				break
-			}
+	for _, ext := range websocketExtensions {
+		ext = strings.TrimSpace(ext)
+		if ext == "permessage-deflate" || ext == "x-webkit-deflate-frame" {
+			isDeflate = true
+			break
 		}
 	}
 	return isDeflate
