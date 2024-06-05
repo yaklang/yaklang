@@ -28,7 +28,7 @@ type AIConfig struct {
 
 func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	c := &AIConfig{
-		Timeout:                30,
+		Timeout:                120,
 		FunctionCallRetryTimes: 5,
 	}
 	for _, p := range opts {
