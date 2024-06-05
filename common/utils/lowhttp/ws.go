@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strconv"
 	"strings"
 
@@ -342,7 +341,8 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 
 	// data
 	// todo: uint64 -> int64 maybe overflow
-	data, err := ioutil.ReadAll(io.LimitReader(fr.r, int64(dataLength)))
+	data := make([]byte, dataLength)
+	_, err = io.ReadFull(fr.r, data)
 
 	// close frame
 	if frameType == CloseMessage && len(data) > 2 {
