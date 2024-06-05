@@ -101,6 +101,7 @@ type WebsocketClient struct {
 	FromServerOnce      *sync.Once
 	FromServerHandler   func([]byte)
 	FromServerHandlerEx func(*WebsocketClient, []byte, *Frame)
+	Extensions          []string
 	Context             context.Context
 	cancel              func()
 	strictMode          bool
@@ -171,6 +172,17 @@ func (c *WebsocketClient) StartFromServer() {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
+					// rfc6455: 5.2
+					// RSV1, RSV2, RSV3:  1 bit each
+					// MUST be 0 unless an extension is negotiated that defines meanings
+					// for non-zero values.  If a nonzero value is received and none of
+					// the negotiated extensions defines the meaning of such a nonzero
+					// value, the receiving endpoint MUST _Fail the WebSocket
+					// Connection_.
+					if frame.HasRsv() && !c.HasExtensions() {
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
+					}
 				}
 
 				if frame.Type() == CloseMessage {
@@ -199,6 +211,10 @@ func (c *WebsocketClient) StartFromServer() {
 			}
 		})
 	}()
+}
+
+func (c *WebsocketClient) HasExtensions() bool {
+	return len(c.Extensions) > 0
 }
 
 func (c *WebsocketClient) Write(r []byte) error {
@@ -386,6 +402,7 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		Response:            responseRaw,
 		FromServerHandler:   config.FromServerHandler,
 		FromServerHandlerEx: config.FromServerHandlerEx,
+		Extensions:          GetWebsocketExtensions(rsp.Header),
 		Context:             ctx,
 		cancel:              cancel,
 		strictMode:          config.strictMode,

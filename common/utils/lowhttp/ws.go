@@ -22,6 +22,8 @@ import (
 const (
 	FINALBIT               = 1 << 7
 	RSV1BIT                = 1 << 6
+	RSV2BIT                = 1 << 5
+	RSV3BIT                = 1 << 4
 	MASKBIT                = 1 << 7
 	RESET_MESSAGE_TYPE_BIT = 0b11110000
 	FRAME_TYPE_BIT         = 0b00001111
@@ -143,6 +145,22 @@ func (f *Frame) Bytes() ([]byte, []byte) {
 
 	rawBuf.Write(data)
 	return rawBuf.Bytes(), f.data
+}
+
+func (f *Frame) RSV1() bool {
+	return f.firstByte&RSV1BIT != 0
+}
+
+func (f *Frame) RSV2() bool {
+	return f.firstByte&RSV2BIT != 0
+}
+
+func (f *Frame) RSV3() bool {
+	return f.firstByte&RSV3BIT != 0
+}
+
+func (f *Frame) HasRsv() bool {
+	return f.RSV1() || f.RSV2() || f.RSV3()
 }
 
 func (f *Frame) Type() int {
