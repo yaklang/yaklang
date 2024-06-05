@@ -2,6 +2,8 @@ package twofa
 
 import (
 	"encoding/base32"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/url"
 	"rsc.io/qr"
@@ -30,4 +32,31 @@ func GenerateQRCode(name, account string, token string) (*url.URL, []byte, error
 	}
 	b := code.PNG()
 	return urlBase, b, nil
+}
+
+// GetUTCCode in twofa lib will receive the secret and return the verify code with utc time
+func GetUTCCode(secret string) string {
+	return NewTOTPConfig(secret).GetToptUTCCodeString()
+}
+
+// VerifyUTCCode in twofa lib will receive the secret and code, then return the verify result
+func VerifyUTCCode(secret string, code any) bool {
+	result, err := NewTOTPConfig(secret).Authenticate(code)
+	if err != nil {
+		log.Warnf("error happened in verifying code: %v", err)
+		return false
+	}
+	return result
+}
+
+var Exports = map[string]any{
+	"GetUTCCode":    GetUTCCode,
+	"VerifyUTCCode": VerifyUTCCode,
+
+	"poc": WithTwoFa,
+}
+
+// poc 是一个请求选项，设置 Y-T-Verify-Code 的值为 secret 计算出的 UTC 时间验证码，适配于 poc 包
+func WithTwoFa(secret string) poc.PocConfigOption {
+	return poc.WithReplaceHttpPacketHeader("Y-T-Verify-Code", GetUTCCode(secret))
 }

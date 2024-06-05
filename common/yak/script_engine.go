@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/twofa"
 	"io"
 	"os"
 	"path/filepath"
@@ -307,6 +308,9 @@ func initYaklangLib() {
 
 	// orderedMap
 	yaklang.Import("orderedmap", yaklib.OrderedMapExports)
+
+	// twofa
+	yaklang.Import("twofa", twofa.Exports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {

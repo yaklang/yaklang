@@ -142,6 +142,11 @@ func (c *OTPConfig) GetToptUTCCode() int {
 	return ComputeCode(c.Secret, time.Now().UTC().Unix()/30)
 }
 
+func (c *OTPConfig) GetToptUTCCodeString() string {
+	code := ComputeCode(c.Secret, time.Now().UTC().Unix()/30)
+	return fmt.Sprintf("%06d", code)
+}
+
 func (c *OTPConfig) GetToptPNG(issuer, account string) ([]byte, error) {
 	code, err := qr.Encode(c.ProvisionURIWithIssuer(account, issuer), qr.Q)
 	if err != nil {
