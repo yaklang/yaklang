@@ -96,7 +96,10 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			}
 
 			if c.RecursiveDirectory {
-				walkDir(path)
+				err := walkDir(path)
+				if err != nil {
+					log.Warnf("walk dir %s failed: %v", path, err)
+				}
 			}
 
 		} else {
@@ -113,8 +116,10 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 					log.Errorf("open file %s failed: %v", path, err)
 					return nil
 				}
+				defer func() {
+					fn.Close()
+				}()
 				err = c.onFileStat(path, fn, info)
-				// fn.Close()
 				if err != nil {
 					return err
 				}
