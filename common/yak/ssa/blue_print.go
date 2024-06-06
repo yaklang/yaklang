@@ -24,6 +24,8 @@ type ClassBluePrint struct {
 	NormalMember map[string]BluePrintMember
 	StaticMember map[string]Value
 
+	CallBack []func()
+
 	// magic method
 	Copy        Value
 	Constructor Value

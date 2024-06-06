@@ -27,11 +27,23 @@ func (v *BaseJavaParserVisitor) VisitTypeDeclaration(ctx *TypeDeclarationContext
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitModifiers(ctx *ModifiersContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitModifier(ctx *ModifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitStaticModifier(ctx *StaticModifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitClassOrInterfaceModifier(ctx *ClassOrInterfaceModifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitStaticClassModifier(ctx *StaticClassModifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
