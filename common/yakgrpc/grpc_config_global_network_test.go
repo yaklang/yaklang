@@ -633,31 +633,59 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 //		panic(err)
 //	}
 
-//	config.AuthInfos = []*ypb.AuthInfo{{
-//		AuthType:     "any",
-//		AuthUsername: "test",
-//		AuthPassword: "test123",
-//		Host:         "47.120.44.219:8087",
-//	}, {
-//		AuthType:     "negotiate",
-//		AuthUsername: "test",
-//		AuthPassword: "test",
-//		Host:         "47.120.44.219:8087",
-//	}, {
-//		AuthType:     "ntlm",
-//		AuthUsername: "test",
-//		AuthPassword: "testfasdf",
-//		Host:         "47.120.44.219:8087",
-//	},
-//	}
-//	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
-//	if err != nil {
-//		panic(err)
-//	}
+//		config.AuthInfos = []*ypb.AuthInfo{{
+//			AuthType:     "any",
+//			AuthUsername: "test",
+//			AuthPassword: "test123",
+//			Host:         "47.120.44.219:8087",
+//		}, {
+//			AuthType:     "negotiate",
+//			AuthUsername: "test",
+//			AuthPassword: "test",
+//			Host:         "47.120.44.219:8087",
+//		}, {
+//			AuthType:     "ntlm",
+//			AuthUsername: "test",
+//			AuthPassword: "testfasdf",
+//			Host:         "47.120.44.219:8087",
+//		},
+//		}
+//		_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+//		if err != nil {
+//			panic(err)
+//		}
 //
-//	rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 47.120.44.219:8087\r\n\r\n")))
-//	if err != nil {
-//		t.Fatal(err)
+//		rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 47.120.44.219:8087\r\n\r\n")))
+//		if err != nil {
+//			t.Fatal(err)
+//		}
+//		spew.Dump(rsp)
 //	}
-//	spew.Dump(rsp)
-//}
+func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.GetThirdPartyAppConfigTemplate(context.Background(), &ypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiTmp := res.GetTemplates()[0]
+	for _, template := range apiTmp.GetItems() {
+		fmt.Printf("name: %s, required: %v\n", template.GetName(), template.GetRequired())
+	}
+	assert.Equal(t, apiTmp.Name, aispec.RegisteredAIGateways()[0])
+	assert.Equal(t, apiTmp.Items[0].Name, "ApiKey")
+	assert.Equal(t, apiTmp.Items[0].Required, true)
+	assert.Equal(t, apiTmp.Items[4].Name, "代理地址")
+
+	var comateTmp *ypb.GetThirdPartyAppConfigTemplate
+	for _, t := range res.GetTemplates() {
+		if t.GetName() == "comate" {
+			comateTmp = t
+			break
+		}
+	}
+	assert.NotNil(t, comateTmp)
+	assert.Equal(t, comateTmp.Items[0].GetRequired(), false)
+}

@@ -3,6 +3,7 @@ package yakit
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"sync"
@@ -332,6 +333,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	defaultConfig.DNSFallbackDoH = config.FallbackDoH
 	defaultConfig.DNSFallbackTCP = config.FallbackTCP
 	defaultConfig.DisableSystemDNS = config.DisableSystemResolver
+	defaultConfig.AiApiPriority = aispec.RegisteredAIGateways()
 	return defaultConfig
 }
 
