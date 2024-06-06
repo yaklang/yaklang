@@ -22,11 +22,20 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#typeDeclaration.
 	VisitTypeDeclaration(ctx *TypeDeclarationContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#modifiers.
+	VisitModifiers(ctx *ModifiersContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#modifier.
 	VisitModifier(ctx *ModifierContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#staticModifier.
+	VisitStaticModifier(ctx *StaticModifierContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#classOrInterfaceModifier.
 	VisitClassOrInterfaceModifier(ctx *ClassOrInterfaceModifierContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#staticClassModifier.
+	VisitStaticClassModifier(ctx *StaticClassModifierContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#variableModifier.
 	VisitVariableModifier(ctx *VariableModifierContext) interface{}

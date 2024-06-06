@@ -23,7 +23,7 @@ func (pkg *Package) GetClassBluePrint(name string) *ClassBluePrint {
 	if c, ok := pkg.ClassBluePrint[name]; ok {
 		return c
 	}
-	log.Errorf("GetClassBluePrint: not this class: %s", name)
+	// log.Errorf("GetClassBluePrint: not this class: %s", name)
 	return nil
 }
 
