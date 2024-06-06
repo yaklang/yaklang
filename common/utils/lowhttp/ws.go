@@ -63,9 +63,8 @@ const (
 )
 
 func FormatCloseMessage(closeCode int, text string) []byte {
-	if closeCode == CloseNoStatusReceived {
-		// Return empty message because it's illegal to send
-		// CloseNoStatusReceived. Return non-nil value in case application
+	if !isValidCloseCode(closeCode) {
+		// Return empty message because closCode is invalid. Return non-nil value in case application
 		// checks for nil.
 		return []byte{}
 	}
@@ -80,10 +79,10 @@ var keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
 type Frame struct {
 	raw           []byte
 	maskingKey    []byte
-	rawPayload    []byte // payload without mask
-	payload       []byte // masked payload
-	data          []byte // decoded text
-	closeCode     uint16 // Close codes defined in RFC 6455, section 11.7.
+	rawPayload    []byte  // payload without mask
+	payload       []byte  // masked payload
+	data          []byte  // decoded text
+	closeCode     *uint16 // Close codes defined in RFC 6455, section 11.7.
 	payloadLength uint64
 	messageType   int
 	firstByte     byte
@@ -172,6 +171,13 @@ func (f *Frame) Type() int {
 
 func (f *Frame) IsReservedType() bool {
 	return f.messageType >= 3 && f.messageType <= 7 || f.messageType >= 11
+}
+
+func (f *Frame) IsValidCloseCode() bool {
+	if f.closeCode == nil {
+		return true
+	}
+	return isValidCloseCode(int(*f.closeCode))
 }
 
 func (f *Frame) GetRaw() []byte {
@@ -388,16 +394,6 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		}
 	}
 
-	// close frame
-	if frameType == CloseMessage && len(data) > 2 {
-		if len(data) > 2 {
-			frame.closeCode = binary.BigEndian.Uint16(data[:2])
-			data = data[2:]
-		} else {
-			return frame, utils.Errorf("invalid close frame: no status code")
-		}
-	}
-
 	frame.rawPayload = make([]byte, len(data))
 	copy(frame.rawPayload, data)
 
@@ -413,6 +409,18 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	// 保存 mask key 异或后的 payload
 	frame.payload = make([]byte, len(data))
 	copy(frame.payload, data)
+
+	// close frame
+	if frameType == CloseMessage {
+		if dataLength >= 2 {
+			closeCode := binary.BigEndian.Uint16(data[:2])
+			frame.closeCode = &closeCode
+			data = data[2:]
+		} else if dataLength == 1 {
+			closeCode := uint16(0)
+			frame.closeCode = &closeCode
+		}
+	}
 
 	// websocket扩展：permessage-deflate，只有frameType为TextMessage和BinaryMessage时才需要解压缩
 	if fr.isDeflate && !frame.IsControl() {
@@ -605,4 +613,10 @@ func maskBytes(key []byte, b []byte, length int) {
 	for i := 0; i < length; i++ {
 		b[i] ^= key[i&3]
 	}
+}
+
+func isValidCloseCode(closeCode int) bool {
+	// rfc 6455, section 7.4.2
+
+	return closeCode == CloseNormalClosure || closeCode == CloseGoingAway || closeCode == CloseProtocolError || closeCode == CloseUnsupportedData || closeCode == CloseInvalidFramePayloadData || closeCode == ClosePolicyViolation || closeCode == CloseMessageTooBig || closeCode == CloseMandatoryExtension || closeCode == CloseInternalServerErr || closeCode == CloseTLSHandshake || (closeCode >= 3000 && closeCode <= 4999)
 }

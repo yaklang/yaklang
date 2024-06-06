@@ -170,12 +170,11 @@ func (c *WebsocketClient) StartFromServer() {
 
 				// strict mode
 				if c.strictMode {
-					invalidCloseCode := -1
-
 					// rfc6455: 5.5
 					// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
 					if isControl && (len(frame.payload) > 125 || !frame.FIN()) {
-						invalidCloseCode = CloseProtocolError
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
 					}
 
 					// rfc6455: 5.2
@@ -186,14 +185,29 @@ func (c *WebsocketClient) StartFromServer() {
 					// value, the receiving endpoint MUST _Fail the WebSocket
 					// Connection_.
 					if frame.HasRsv() && !c.HasExtensions() {
-						invalidCloseCode = CloseProtocolError
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
 					}
 
 					// rfc6455: 5.2
 					// %x3-7 are reserved for further non-control frames
 					// %xB-F are reserved for further control frames
 					if frame.IsReservedType() {
-						invalidCloseCode = CloseProtocolError
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
+					}
+
+					// rfc6455: 7.4
+					if frameType == CloseMessage && !frame.IsValidCloseCode() {
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
+					}
+
+					// rfc6455: 5.5.1
+					// Following the 2-byte integer, the body MAY contain UTF-8-encoded data with value /reason/, the interpretation of which is not defined by this specification.
+					if frameType == CloseMessage && !utf8.Valid(frame.data) {
+						c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+						return
 					}
 
 					// rfc6455: 5.6
@@ -208,7 +222,8 @@ func (c *WebsocketClient) StartFromServer() {
 						if frame.FIN() {
 							remindBytesBuffer.Reset()
 							if !utf8.Valid(frame.data) {
-								invalidCloseCode = CloseInvalidFramePayloadData
+								c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+								return
 							}
 						} else {
 							// fragmented message so maybe the payload is not complete, compatibility check
@@ -216,16 +231,12 @@ func (c *WebsocketClient) StartFromServer() {
 							bytes := remindBytesBuffer.Bytes()
 							valid, remindSize := IsValidUTF8WithRemind(bytes)
 							if !valid {
-								invalidCloseCode = CloseInvalidFramePayloadData
+								c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+								return
 							} else if remindSize != -1 {
 								remindBytesBuffer.Next(len(bytes) - remindSize)
 							}
 						}
-					}
-
-					if invalidCloseCode != -1 {
-						c.WriteCloseEx(invalidCloseCode, "")
-						return
 					}
 				}
 
@@ -254,8 +265,11 @@ func (c *WebsocketClient) StartFromServer() {
 				// control frame handle first
 				switch frameType {
 				case CloseMessage:
-					log.Debugf("Websocket close status code: %d", frame.
-						closeCode)
+					closeCode := CloseNormalClosure
+					if frame.closeCode != nil {
+						closeCode = int(*frame.closeCode)
+					}
+					log.Debugf("Websocket close status code: %d", closeCode)
 					c.WriteClose()
 					return
 				case PingMessage:
@@ -278,14 +292,17 @@ func (c *WebsocketClient) StartFromServer() {
 				if frame.FIN() {
 					handler := c.FromServerHandler
 					handlerEx := c.FromServerHandlerEx
-					if handler != nil {
-						handler(plain)
-					} else if handlerEx != nil {
-						handlerEx(c, plain, fragmentFrames)
-					} else {
-						raw, data := frame.Bytes()
-						fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
+					if !isControl {
+						if handler != nil {
+							handler(plain)
+						} else if handlerEx != nil {
+							handlerEx(c, plain, fragmentFrames)
+						} else {
+							raw, data := frame.Bytes()
+							fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
+						}
 					}
+
 					fragmentFrames = fragmentFrames[:0]
 				}
 
