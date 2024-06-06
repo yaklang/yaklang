@@ -153,7 +153,7 @@ func MakeOpenAITranslateCWE(cwe *cveresources.CWE, apiKey string, proxies ...str
 	return cwe, nil
 }
 
-func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
+func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIClient) error {
 	db := consts.GetGormCVEDescriptionDatabase()
 	if db == nil {
 		return utils.Error("no database (cve desc) found")
