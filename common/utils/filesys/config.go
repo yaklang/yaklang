@@ -49,7 +49,7 @@ func NewConfig() *Config {
 		fileLimit:          100000,
 		dirLimit:           100000,
 		totalLimit:         100000,
-		fileSystem:         LocalFs{},
+		fileSystem:         NewLocalFs(),
 	}
 }
 
