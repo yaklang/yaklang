@@ -3,12 +3,14 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestExtractURLFromHTTPRequest(t *testing.T) {
@@ -22,7 +24,7 @@ Host: asdfasd:123
 		panic(err)
 	}
 	spew.Dump(u.String())
-	var a = FixHTTPRequest([]byte(packet))
+	a := FixHTTPRequest([]byte(packet))
 	if !strings.Contains(string(a), "\r\n Cookie: 123\r\n  d: 1\r\n") {
 		panic(1)
 	}
@@ -128,7 +130,7 @@ Content-Length: 0
 }
 
 func TestConnectExtractedUrl(t *testing.T) {
-	var testcases = []struct {
+	testcases := []struct {
 		url    string
 		packet string
 	}{
@@ -232,7 +234,7 @@ Content-Encoding: gzip
 		panic("gzip must in request error")
 	}
 
-	var result = DeletePacketEncoding(packetResult)
+	result := DeletePacketEncoding(packetResult)
 	fmt.Println(string(result))
 	if !strings.Contains(string(result), "abc") || strings.Contains(string(result), `-Encoding: gzip`) {
 		panic("clear in request error")
@@ -306,7 +308,7 @@ func TestParseCookie(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cookies := ParseCookie(tt.args.key, tt.args.raw)
-			var result = ""
+			result := ""
 			for _, cookie := range cookies {
 				result += cookie.String() + "; "
 			}
@@ -333,8 +335,8 @@ Content-Type: image/jpeg
 
 11
 `)
-	//origin = FixHTTPRequest(origin)
-	//fmt.Println(string(origin))
+	// origin = FixHTTPRequest(origin)
+	// fmt.Println(string(origin))
 	origin = ConvertHTTPRequestToFuzzTag(origin)
 	fmt.Println(len(origin))
 	if len(origin) > 10000 {
@@ -346,6 +348,57 @@ Content-Type: image/jpeg
 		}
 	}
 	t.Fatal("bad packet")
-	//origin = FixHTTPRequest(origin)
-	//fmt.Println(string(origin))
+	// origin = FixHTTPRequest(origin)
+	// fmt.Println(string(origin))
+}
+
+func TestIsValidUTF8(t *testing.T) {
+	t.Run("valid utf8", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.True(t, valid)
+		require.Equal(t, 0, remindSize)
+	})
+
+	t.Run("remind utf8 1", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\xf4")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.True(t, valid)
+		require.Equal(t, 1, remindSize)
+	})
+
+	t.Run("remind utf8 2", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\xf4\x80")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.True(t, valid)
+		require.Equal(t, 2, remindSize)
+	})
+
+	t.Run("invalid utf8 2", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\xf4\x90")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.False(t, valid)
+		require.Equal(t, 2, remindSize)
+	})
+
+	t.Run("remind utf8 3", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\xf4\x80\x80")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.True(t, valid)
+		require.Equal(t, 3, remindSize)
+	})
+
+	t.Run("valid utf8 4", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\xf4\x80\x80\x80")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.True(t, valid)
+		require.Equal(t, 0, remindSize)
+	})
+
+	t.Run("remind utf8 6", func(t *testing.T) {
+		b := []byte("\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\xf4\x80\x80\x80\x80\x80")
+		valid, remindSize := IsValidUTF8WithRemind(b)
+		require.False(t, valid)
+		require.Equal(t, 6, remindSize)
+	})
 }
