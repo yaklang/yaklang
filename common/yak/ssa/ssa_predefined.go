@@ -260,9 +260,12 @@ func (n *anValue) SetType(typ Type) {
 		n.typ = t.Apply(getThis())
 	case *FunctionType:
 		n.typ = typ
-
+		this := getThis()
 		if fun := t.This; fun != nil {
-			fun.AddReference(getThis())
+			fun.AddReference(this)
+		}
+		for _, f := range t.AnnotationFunc {
+			f(this)
 		}
 
 	default:

@@ -65,9 +65,15 @@ typeDeclaration
     )
     ;
 
+modifiers: modifier*;
 modifier
-    : classOrInterfaceModifier
-    | NATIVE
+    : annotation
+    | staticClassModifier
+    | staticModifier
+    ;
+
+staticModifier
+    : NATIVE
     | SYNCHRONIZED
     | TRANSIENT
     | VOLATILE
@@ -75,7 +81,11 @@ modifier
 
 classOrInterfaceModifier
     : annotation
-    | PUBLIC
+    | staticClassModifier
+    ;
+
+staticClassModifier
+    : PUBLIC
     | PROTECTED
     | PRIVATE
     | STATIC
@@ -141,7 +151,7 @@ interfaceBody
 classBodyDeclaration
     : ';'
     | STATIC? block
-    | modifier* memberDeclaration
+    | modifiers memberDeclaration
     ;
 
 memberDeclaration
@@ -189,7 +199,7 @@ constructorDeclaration
     ;
 
 compactConstructorDeclaration
-    : modifier* identifier constructorBody = block
+    : modifiers identifier constructorBody = block
     ;
 
 fieldDeclaration
@@ -197,7 +207,7 @@ fieldDeclaration
     ;
 
 interfaceBodyDeclaration
-    : modifier* interfaceMemberDeclaration
+    : modifiers interfaceMemberDeclaration
     | ';'
     ;
 
@@ -378,7 +388,7 @@ annotationTypeBody
     ;
 
 annotationTypeElementDeclaration
-    : modifier* annotationTypeElementRest
+    : modifiers annotationTypeElementRest
     | ';' // this is not allowed by the grammar, but apparently allowed by the actual compiler
     ;
 

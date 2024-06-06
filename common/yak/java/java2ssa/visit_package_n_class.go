@@ -116,54 +116,6 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Cl
 	}
 	return nil
 }
-func (y *builder) VisitModifier(raw javaparser.IModifierContext) ssa.ClassModifier {
-	var m ssa.ClassModifier
-	if y == nil || raw == nil {
-		return m
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-	i, _ := raw.(*javaparser.ModifierContext)
-	if i == nil {
-		return m
-	}
-
-	if i.ClassOrInterfaceModifier() == nil {
-		return m
-	} else {
-		return y.VisitClassOrInterfaceModifier(i.ClassOrInterfaceModifier())
-	}
-
-}
-
-func (y *builder) VisitClassOrInterfaceModifier(raw javaparser.IClassOrInterfaceModifierContext) ssa.ClassModifier {
-	var m ssa.ClassModifier
-	if y == nil || raw == nil {
-		return m
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-	i, _ := raw.(*javaparser.ClassOrInterfaceModifierContext)
-	if i == nil {
-		return m
-	}
-
-	if i.PUBLIC() != nil {
-		return ssa.Public
-	} else if i.PROTECTED() != nil {
-		return ssa.Protected
-	} else if i.PRIVATE() != nil {
-		return ssa.Private
-	} else if i.STATIC() != nil {
-		return ssa.Static
-	} else if i.ABSTRACT() != nil {
-		return ssa.Abstract
-	} else if i.FINAL() != nil {
-		return ssa.Final
-	} else {
-		return ssa.NoneModifier
-	}
-}
 
 func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext) {
 	if y == nil || raw == nil {
@@ -187,7 +139,7 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) func() {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.ClassBluePrint) func() {
 	if y == nil || raw == nil {
 		return func() {}
 	}
@@ -197,11 +149,13 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if i == nil {
 		return func() {}
 	}
+	annotationFunc, isStatic := y.VisitModifiers(modifiers)
+	_ = annotationFunc
 
 	if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		return y.VisitMethodDeclaration(ret, class, isStatic)
+		return y.VisitMethodDeclaration(ret, class, isStatic, annotationFunc)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
@@ -246,39 +200,6 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 
 	return func() {}
 }
-
-type AnnotationDescription struct {
-	Name string
-}
-
-func (v *builder) VisitAnnotation(
-	raw []javaparser.IAnnotationContext,
-	callback func(name string, pairs ...any),
-) {
-	log.Warn("TBD: AnnotationContext in TypeType")
-	log.Warn("TBD: AnnotationContext in TypeType")
-	log.Warn("TBD: AnnotationContext in TypeType")
-	log.Warn("TBD: AnnotationContext in TypeType")
-	for _, annotation := range raw {
-		ins, ok := annotation.(*javaparser.AnnotationContext)
-		if !ok {
-			continue
-		}
-		var raw string
-		if ret := ins.AltAnnotationQualifiedName(); ret != nil {
-			raw = ret.GetText()
-			if !strings.HasPrefix(raw, "@") {
-				log.Warnf("bad syntax... why altAnnotation name %#v is not prefix with @? use str after @", raw)
-				_, raw, _ = strings.Cut(raw, "@")
-			} else {
-				raw = strings.TrimLeft(raw, "@")
-			}
-		} else {
-			raw = ins.QualifiedName().GetText()
-		}
-	}
-}
-
 func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
@@ -290,7 +211,9 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 		return nil
 	}
 
-	y.VisitAnnotation(i.AllAnnotation(), nil)
+	for _, annotation := range i.AllAnnotation() {
+		y.VisitAnnotation(annotation)
+	}
 
 	var t ssa.Type
 	if ret := i.ClassOrInterfaceType(); ret != nil {
@@ -467,7 +390,10 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 	}
 }
 
-func (y *builder) VisitClassBodyDeclaration(raw javaparser.IClassBodyDeclarationContext, class *ssa.ClassBluePrint) func() {
+func (y *builder) VisitClassBodyDeclaration(
+	raw javaparser.IClassBodyDeclarationContext,
+	class *ssa.ClassBluePrint,
+) func() {
 	if y == nil || raw == nil {
 		return func() {}
 	}
@@ -480,19 +406,9 @@ func (y *builder) VisitClassBodyDeclaration(raw javaparser.IClassBodyDeclaration
 	if ret := i.Block(); ret != nil {
 		y.VisitBlock(i.Block())
 	} else if ret := i.MemberDeclaration(); ret != nil {
-		var modifiers = make(map[ssa.ClassModifier]struct{})
-		for _, modifier := range i.AllModifier() {
-			m := y.VisitModifier(modifier)
-			modifiers[m] = struct{}{}
-		}
-		isStatic := false
-		if _, ok := modifiers[ssa.Static]; ok {
-			isStatic = true
-		}
 		if class != nil {
-			return y.VisitMemberDeclaration(ret, class, isStatic)
+			return y.VisitMemberDeclaration(ret, i.Modifiers(), class)
 		}
-
 	}
 	return func() {}
 }
@@ -538,7 +454,11 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	return nil
 }
 
-func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) func() {
+func (y *builder) VisitMethodDeclaration(
+	raw javaparser.IMethodDeclarationContext,
+	class *ssa.ClassBluePrint, isStatic bool,
+	annotationFunc []func(ssa.Value),
+) func() {
 	if y == nil || raw == nil {
 		return func() {}
 	}
@@ -563,6 +483,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
+			newFunction.Type.AddAnnotationFunc(annotationFunc...)
 			//y.AddToPackage(funcName)
 		}
 
@@ -584,6 +505,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
 		y.FunctionBuilder = y.PopFunction()
+		newFunction.Type.AddAnnotationFunc(annotationFunc...)
 		//y.AddToPackage(funcName)
 	}
 

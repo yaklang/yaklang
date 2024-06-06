@@ -1,9 +1,10 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestDefAnnotation(t *testing.T) {
@@ -46,7 +47,15 @@ public class MyClass {
     public void myMethod() {
         // method body
     }
-}`
+}
+class A{
+    public void AMethod() {
+        MyClass c = new MyClass();
+        c.myMethod();
+    }
+}
+`
+
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		if prog.SyntaxFlowChain(`*yAnno*`).Len() <= 0 {
 			t.Fatal("annotation is not right parsed")

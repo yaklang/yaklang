@@ -815,6 +815,8 @@ type FunctionType struct {
 	IsMethod        bool
 	ObjectType      Type
 	IsModifySelf    bool // if this is method function
+
+	AnnotationFunc []func(Value)
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -924,4 +926,8 @@ func (s *FunctionType) GetParamString() string {
 
 func (s *FunctionType) GetTypeKind() TypeKind {
 	return FunctionTypeKind
+}
+
+func (f *FunctionType) AddAnnotationFunc(handler ...func(Value)) {
+	f.AnnotationFunc = append(f.AnnotationFunc, handler...)
 }
