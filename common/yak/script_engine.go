@@ -582,9 +582,12 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 					return nil, utils.Errorf("build output stream failed: get runtime id failed: %s", err)
 				}
 				runtimeId := utils.InterfaceToString(iruntimeId)
-				opts = append([]aispec.AIConfigOption{aispec.WithStreamHandler(func(reader io.Reader) {
+				opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
 					engine.GetVar("yakit")
-					client.Stream("ai", runtimeId, reader)
+					client.Stream("ai", runtimeId, reader, map[string]any{
+						"ai-type":  cfg.Type,
+						"ai-model": cfg.Model,
+					})
 				})}, opts...)
 				return ai.FunctionCall(input, funcs, opts...)
 			}
@@ -594,9 +597,11 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 					return "", utils.Errorf("build output stream failed: get runtime id failed: %s", err)
 				}
 				runtimeId := utils.InterfaceToString(iruntimeId)
-				opts = append([]aispec.AIConfigOption{aispec.WithStreamHandler(func(reader io.Reader) {
-					engine.GetVar("yakit")
-					client.Stream("ai", runtimeId, reader)
+				opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
+					client.Stream("ai", runtimeId, reader, map[string]any{
+						"ai-type":  cfg.Type,
+						"ai-model": cfg.Model,
+					})
 				})}, opts...)
 				return ai.Chat(msg, opts...)
 			}

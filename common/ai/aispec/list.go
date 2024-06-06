@@ -2,16 +2,16 @@ package aispec
 
 import "github.com/yaklang/yaklang/common/utils/omap"
 
-var list = omap.NewOrderedMap(map[string]func() AIGateway{})
+var list = omap.NewOrderedMap(map[string]func() AIClient{})
 
-func Register(name string, gateway func() AIGateway) {
+func Register(name string, gateway func() AIClient) {
 	if gateway == nil {
 		return
 	}
 	list.Set(name, gateway)
 }
 
-func Lookup(name string) (AIGateway, bool) {
+func Lookup(name string) (AIClient, bool) {
 	creator, ok := list.Get(name)
 	if !ok {
 		return nil, false

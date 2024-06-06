@@ -193,10 +193,10 @@ func (c *Client) CheckValid() error {
 	return nil
 }
 
-var _ aispec.AIGateway = &Client{}
+var _ aispec.AIClient = &Client{}
 
 func init() {
-	aispec.Register("comate", func() aispec.AIGateway {
+	aispec.Register("comate", func() aispec.AIClient {
 		return &Client{}
 	})
 }

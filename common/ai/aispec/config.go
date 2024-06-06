@@ -61,6 +61,14 @@ func WithBaseURL(baseURL string) AIConfigOption {
 	}
 }
 
+func WithStreamAndConfigHandler(h func(reader io.Reader, cfg *AIConfig)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.StreamHandler = func(reader io.Reader) {
+			h(reader, c)
+		}
+	}
+}
+
 func WithStreamHandler(h func(io.Reader)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.StreamHandler = h
