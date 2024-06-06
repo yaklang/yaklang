@@ -129,7 +129,6 @@ func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, 
 type FileDescriptor struct {
 	FileName string
 	Info     fs.FileInfo
-	File     fs.File
 }
 
 func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (chan FileDescriptor, error) {
@@ -144,11 +143,10 @@ func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (cha
 		err = filesys.Recursive(
 			absDir,
 			filesys.WithRecursiveDirectory(false),
-			filesys.WithFileStat(func(s string, f fs.File, info fs.FileInfo) error {
+			filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				ch <- FileDescriptor{
 					FileName: s,
 					Info:     info,
-					File:     f,
 				}
 				return fs.SkipDir
 			}),

@@ -47,49 +47,49 @@ var UtilsCommands = []*cli.Command{
 			cli.BoolFlag{Name: "d,decode"},
 			cli.StringFlag{Name: "o,output"},
 		}, Action: func(c *cli.Context) error {
-		f := c.String("file")
-		if utils.GetFirstExistedFile(f) == "" {
-			return utils.Errorf("non-existed: %v", f)
-		}
-		originFp, err := os.Open(f)
-		if err != nil {
-			return err
-		}
-		defer originFp.Close()
+			f := c.String("file")
+			if utils.GetFirstExistedFile(f) == "" {
+				return utils.Errorf("non-existed: %v", f)
+			}
+			originFp, err := os.Open(f)
+			if err != nil {
+				return err
+			}
+			defer originFp.Close()
 
-		if c.Bool("decode") {
-			outFile := c.String("output")
-			if outFile == "" {
-				return utils.Error("decode need output not empty")
+			if c.Bool("decode") {
+				outFile := c.String("output")
+				if outFile == "" {
+					return utils.Error("decode need output not empty")
+				}
+				log.Infof("start to d-gzip to %v", outFile)
+				targetFp, err := os.OpenFile(outFile, os.O_CREATE|os.O_RDWR, 0o666)
+				if err != nil {
+					return err
+				}
+				defer targetFp.Close()
+				r, err := gzip.NewReader(originFp)
+				if err != nil {
+					return err
+				}
+				defer r.Close()
+				io.Copy(targetFp, r)
+				log.Infof("finished")
+				return nil
 			}
-			log.Infof("start to d-gzip to %v", outFile)
-			targetFp, err := os.OpenFile(outFile, os.O_CREATE|os.O_RDWR, 0o666)
+
+			gf := f + ".gzip"
+			fp, err := os.OpenFile(gf, os.O_CREATE|os.O_RDWR, 0o666)
 			if err != nil {
 				return err
 			}
-			defer targetFp.Close()
-			r, err := gzip.NewReader(originFp)
-			if err != nil {
-				return err
-			}
-			defer r.Close()
-			io.Copy(targetFp, r)
-			log.Infof("finished")
+			defer fp.Close()
+			gzipWriter := gzip.NewWriter(fp)
+			io.Copy(gzipWriter, originFp)
+			gzipWriter.Flush()
+			gzipWriter.Close()
 			return nil
-		}
-
-		gf := f + ".gzip"
-		fp, err := os.OpenFile(gf, os.O_CREATE|os.O_RDWR, 0o666)
-		if err != nil {
-			return err
-		}
-		defer fp.Close()
-		gzipWriter := gzip.NewWriter(fp)
-		io.Copy(gzipWriter, originFp)
-		gzipWriter.Flush()
-		gzipWriter.Close()
-		return nil
-	},
+		},
 	},
 	{
 		Name: "hex",
@@ -373,7 +373,7 @@ var UtilsCommands = []*cli.Command{
 		},
 		Action: func(c *cli.Context) error {
 			m := omap.NewOrderedMap(map[string]int64{})
-			err := filesys.Recursive(c.String("dir"), filesys.WithFileStat(func(pathname string, f fs.File, info fs.FileInfo) error {
+			err := filesys.Recursive(c.String("dir"), filesys.WithFileStat(func(pathname string, info fs.FileInfo) error {
 				if c.String("blacklist") != "" {
 					if utils.MatchAnyOfGlob(pathname, utils.PrettifyListFromStringSplitEx(c.String("blacklist"), "|")...) {
 						return nil

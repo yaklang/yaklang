@@ -25,7 +25,7 @@ func ReducerCompile(base string, opts ...Option) error {
 	var visited = filter.NewFilter()
 	defer visited.Close()
 
-	handler := func(pathname string, fd fs.File, info fs.FileInfo) error {
+	handler := func(pathname string, info fs.FileInfo) error {
 		if visited.Exist(pathname) {
 			return nil
 		}
@@ -33,6 +33,13 @@ func ReducerCompile(base string, opts ...Option) error {
 			return utils.Errorf("Compile method is nil for lib: %v", base)
 		}
 
+		fd, err := c.fs.Open(pathname)
+		if err != nil {
+			return utils.Wrapf(err, "c.fs.Open(%#v) failed", pathname)
+		}
+		defer func() {
+			fd.Close()
+		}()
 		results, err := c.compileMethod(pathname, fd)
 		if err != nil {
 			if c.stopAtCompileError {
@@ -52,12 +59,10 @@ func ReducerCompile(base string, opts ...Option) error {
 	for _, entryFile := range c.entryFiles {
 		path := c.fs.Join(base, entryFile)
 		info, err := c.fs.Stat(path)
-		log.Infof("start to open entry file: %v", path)
-		fd, err := c.fs.Open(path)
 		if err != nil {
 			return utils.Wrapf(err, "find entryfile failed: %v", path)
 		}
-		if err := handler(path, fd, info); err != nil {
+		if err := handler(path, info); err != nil {
 			return err
 		}
 	}
