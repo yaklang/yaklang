@@ -155,7 +155,11 @@ func (c *Client) ChatStream(s string) (io.Reader, error) {
 }
 
 func (c *Client) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	return nil, utils.Error("not implemented: comate is not supported data extraction")
+	result, err := c.Chat(data + desc)
+	if err != nil {
+		return nil, err
+	}
+	return aispec.ExtractFromResult(result, fields)
 }
 
 func (c *Client) LoadOption(opt ...aispec.AIConfigOption) {
