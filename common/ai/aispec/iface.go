@@ -21,7 +21,7 @@ type Configurable interface {
 	CheckValid() error
 }
 
-type AIGateway interface {
+type AIClient interface {
 	Chatter
 	FunctionCaller
 	Configurable

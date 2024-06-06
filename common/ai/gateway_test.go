@@ -3,7 +3,9 @@ package ai
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"io"
 	"testing"
 )
 
@@ -18,7 +20,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		yakit.ConfigureNetWork(cfg)
 	}()
 
-	aispec.Register("comate", func() aispec.AIGateway { // override the comate gateway, because it wast lots of time to fetch the token
+	aispec.Register("comate", func() aispec.AIClient { // override the comate gateway, because it wast lots of time to fetch the token
 		return nil
 	})
 
@@ -45,4 +47,70 @@ func TestAutoUpdateAiList(t *testing.T) {
 	Chat("你好", aispec.WithDomain("127.0.0.1"), aispec.WithTimeout(0.01))
 	cfg = yakit.GetNetworkConfig()
 	assert.Equal(t, []string{"moonshot", "chatglm", "comate", "openai", "tongyi"}, cfg.AiApiPriority)
+}
+
+type TestGateway struct {
+	config *aispec.AIConfig
+}
+
+func (t *TestGateway) Chat(s string, function ...aispec.Function) (string, error) {
+	t.config.StreamHandler(nil)
+	return "ok", nil
+}
+
+func (t *TestGateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestGateway) ChatStream(s string) (io.Reader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestGateway) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestGateway) LoadOption(opt ...aispec.AIConfigOption) {
+	t.config = aispec.NewDefaultAIConfig(opt...)
+}
+
+func (t *TestGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestGateway) CheckValid() error {
+	return nil
+}
+
+var _ aispec.AIClient = &TestGateway{}
+
+func TestClientStreamExtInfo(t *testing.T) {
+	cfg := yakit.GetNetworkConfig()
+	if cfg == nil {
+		t.Fail()
+	}
+	bak := cfg.AiApiPriority // backup the original value
+	defer func() {           // restore the original value
+		cfg.AiApiPriority = bak
+		yakit.ConfigureNetWork(cfg)
+	}()
+	cfg.AiApiPriority = []string{"test"} // old ai type
+	yakit.ConfigureNetWork(cfg)
+
+	aispec.Register("test", func() aispec.AIClient { // override the comate gateway, because it wast lots of time to fetch the token
+		return &TestGateway{}
+	})
+
+	// test auto append the new ai type
+
+	_, err := Chat("你好", aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
+		assert.Equal(t, "test", cfg.Type)
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
 }

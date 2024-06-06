@@ -81,15 +81,15 @@ func TestAiApiPriority(t *testing.T) {
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	config.AiApiPriority = []string{"test", "test1", "test2"}
 	var ok, test1, test2 bool
-	aispec.Register("test", func() aispec.AIGateway {
+	aispec.Register("test", func() aispec.AIClient {
 		ok = true
 		return nil
 	})
-	aispec.Register("test1", func() aispec.AIGateway {
+	aispec.Register("test1", func() aispec.AIClient {
 		test1 = true
 		return &GetawayClient{valid: false}
 	})
-	aispec.Register("test2", func() aispec.AIGateway {
+	aispec.Register("test2", func() aispec.AIClient {
 		test2 = true
 		return &GetawayClient{valid: true}
 	})
@@ -113,7 +113,7 @@ func TestAiApiPriority(t *testing.T) {
 	assert.Equal(t, "ok", msg)
 
 	// is set ai type, but not registered, use default config ai type
-	aispec.Register("ai", func() aispec.AIGateway {
+	aispec.Register("ai", func() aispec.AIClient {
 		return &GetawayClient{valid: false}
 	})
 	ok = false
@@ -125,7 +125,7 @@ func TestAiApiPriority(t *testing.T) {
 	// is set ai type, and registered, and is valid
 	ok = false
 	var ok1 bool
-	aispec.Register("ai", func() aispec.AIGateway {
+	aispec.Register("ai", func() aispec.AIClient {
 		ok1 = true
 		return &GetawayClient{valid: true}
 	})
@@ -136,7 +136,7 @@ func TestAiApiPriority(t *testing.T) {
 
 	// is set ai type, and registered, and is invalid
 	ok = false
-	aispec.Register("ai", func() aispec.AIGateway {
+	aispec.Register("ai", func() aispec.AIClient {
 		ok1 = true
 		return &GetawayClient{valid: false}
 	})
@@ -147,7 +147,7 @@ func TestAiApiPriority(t *testing.T) {
 
 	functionCallOk := false
 	times := 0
-	aispec.Register("functionCall", func() aispec.AIGateway {
+	aispec.Register("functionCall", func() aispec.AIClient {
 		functionCallOk = true
 		return &GetawayClient{valid: true, functionCallHandle: func(msg string) (map[string]any, error) {
 			defer func() {

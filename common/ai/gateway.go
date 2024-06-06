@@ -12,28 +12,54 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"io"
 )
 
 func init() {
-	aispec.Register("openai", func() aispec.AIGateway {
+	aispec.Register("openai", func() aispec.AIClient {
 		return &openai.GetawayClient{}
 	})
-	aispec.Register("chatglm", func() aispec.AIGateway {
+	aispec.Register("chatglm", func() aispec.AIClient {
 		return &chatglm.GLMClient{}
 	})
-	aispec.Register("moonshot", func() aispec.AIGateway {
+	aispec.Register("moonshot", func() aispec.AIClient {
 		return &moonshot.GatewayClient{}
 	})
-	aispec.Register("tongyi", func() aispec.AIGateway {
+	aispec.Register("tongyi", func() aispec.AIClient {
 		return &tongyi.GetawayClient{}
 	})
-	aispec.Register("comate", func() aispec.AIGateway {
+	aispec.Register("comate", func() aispec.AIClient {
 		return &comate.Client{}
 	})
 }
 
-func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error {
-	createAIGatewayByType := func(typ string) aispec.AIGateway {
+type Gateway struct {
+	Config    *aispec.AIConfig
+	TargetUrl string
+	aispec.AIClient
+}
+
+func (g *Gateway) Chat(s string, f ...aispec.Function) (string, error) {
+	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s, f, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
+}
+
+func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+	return aispec.ChatExBase(g.TargetUrl, g.Config.Model, details, function, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
+}
+
+func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
+	return aispec.ChatBasedExtractData(g.TargetUrl, g.Config.Model, msg, fields, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
+}
+
+func (g *Gateway) ChatStream(s string) (io.Reader, error) {
+	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.AIClient.BuildHTTPOptions)
+}
+func NewGateway() *Gateway {
+	return &Gateway{}
+}
+
+func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
+	createAIGatewayByType := func(typ string) aispec.AIClient {
 		gw, ok := aispec.Lookup(typ)
 		if !ok {
 			return nil
@@ -89,7 +115,7 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error 
 
 	return errors.New("not found valid ai agent")
 }
-func createAIGateway(t string) aispec.AIGateway {
+func createAIGateway(t string) aispec.AIClient {
 	gw, ok := aispec.Lookup(t)
 	if !ok {
 		return nil
@@ -103,7 +129,7 @@ ai mod
 client = ai.Client()
 */
 
-func OpenAI(opts ...aispec.AIConfigOption) aispec.AIGateway {
+func OpenAI(opts ...aispec.AIConfigOption) aispec.AIClient {
 	agent := createAIGateway("openai")
 	if agent != nil {
 		agent.LoadOption(opts...)
@@ -116,7 +142,7 @@ func HaveAI(t string) bool {
 	return ok
 }
 
-func GetAI(t string, opts ...aispec.AIConfigOption) aispec.AIGateway {
+func GetAI(t string, opts ...aispec.AIConfigOption) aispec.AIClient {
 	agent := createAIGateway(t)
 	if agent != nil {
 		agent.LoadOption(opts...)
@@ -124,7 +150,7 @@ func GetAI(t string, opts ...aispec.AIConfigOption) aispec.AIGateway {
 	return agent
 }
 
-func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIGateway {
+func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIClient {
 	agent := createAIGateway("chatglm")
 	if agent != nil {
 		agent.LoadOption(opts...)
@@ -132,7 +158,7 @@ func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIGateway {
 	return agent
 }
 
-func Moonshot(opts ...aispec.AIConfigOption) aispec.AIGateway {
+func Moonshot(opts ...aispec.AIConfigOption) aispec.AIClient {
 	agent := createAIGateway("moonshot")
 	if agent != nil {
 		agent.LoadOption(opts...)
@@ -140,8 +166,8 @@ func Moonshot(opts ...aispec.AIConfigOption) aispec.AIGateway {
 	return agent
 }
 
-func GetPrimaryAgent() aispec.AIGateway {
-	var agent aispec.AIGateway
+func GetPrimaryAgent() aispec.AIClient {
+	var agent aispec.AIClient
 
 	t := consts.GetAIPrimaryType()
 	if t == "" {
@@ -164,7 +190,7 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
 	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Warnf("check valid by %s failed: %s", typ, err)
@@ -187,7 +213,7 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp map[string]any
 	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIGateway) bool {
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Warnf("check valid by %s failed: %s", typ, err)
