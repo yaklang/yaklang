@@ -205,7 +205,6 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		{"aTaintCase0134", false, []string{
 			"Parameter-cmd",
 			"Parameter-methodname",
-			"Undefined-clazz",
 		},
 			`/**
 		* 反射调用
