@@ -5,6 +5,9 @@ import (
 )
 
 func (p *Program) DeleteInstruction(inst Instruction) {
+	if p == nil {
+		return
+	}
 	p.Cache.DeleteInstruction(inst)
 
 	if assignable, ok := inst.(AssignAble); ok {
@@ -16,14 +19,23 @@ func (p *Program) DeleteInstruction(inst Instruction) {
 
 // set virtual register, and this virtual-register will be instruction-id and set to the instruction
 func (p *Program) SetVirtualRegister(i Instruction) {
+	if p == nil {
+		return
+	}
 	p.Cache.SetInstruction(i)
 }
 
 func (p *Program) GetInstructionById(id int64) Instruction {
+	if p == nil {
+		return nil
+	}
 	return p.Cache.GetInstruction(id)
 }
 
 func (p *Program) SetInstructionWithName(name string, i Instruction) {
+	if p == nil {
+		return
+	}
 	p.Cache.AddVariable(name, i)
 	if !strings.Contains(name, ".") {
 		i.SetVerboseName(name)
@@ -31,5 +43,8 @@ func (p *Program) SetInstructionWithName(name string, i Instruction) {
 }
 
 func (p *Program) RemoveInstructionInVariable(name string, i Instruction) {
+	if p == nil {
+		return
+	}
 	p.Cache.RemoveVariable(name, i)
 }
