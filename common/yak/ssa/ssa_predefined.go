@@ -77,9 +77,15 @@ func NewInstruction() anInstruction {
 }
 
 // ssa function and block
-func (a *anInstruction) SetFunc(f *Function)        { a.fun = f }
-func (a *anInstruction) GetFunc() *Function         { return a.fun }
-func (a *anInstruction) GetProgram() *Program       { return a.fun.Package.Prog }
+func (a *anInstruction) SetFunc(f *Function) { a.fun = f }
+func (a *anInstruction) GetFunc() *Function  { return a.fun }
+func (a *anInstruction) GetProgram() *Program {
+	if a == nil || a.fun == nil || a.fun.Package == nil {
+		log.Errorf("this value program is nil")
+		return nil
+	}
+	return a.fun.Package.Prog
+}
 func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
 func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 
@@ -261,6 +267,9 @@ func (n *anValue) SetType(typ Type) {
 	case *FunctionType:
 		n.typ = typ
 		this := getThis()
+		if this == nil {
+			return
+		}
 		if fun := t.This; fun != nil {
 			fun.AddReference(this)
 		}
