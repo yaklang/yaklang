@@ -3,19 +3,34 @@ package ai
 import (
 	"errors"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/chatglm"
+	"github.com/yaklang/yaklang/common/ai/comate"
+	"github.com/yaklang/yaklang/common/ai/moonshot"
+	"github.com/yaklang/yaklang/common/ai/openai"
+	"github.com/yaklang/yaklang/common/ai/tongyi"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-import (
-	_ "github.com/yaklang/yaklang/common/ai/chatglm"
-	_ "github.com/yaklang/yaklang/common/ai/comate"
-	_ "github.com/yaklang/yaklang/common/ai/moonshot"
-	_ "github.com/yaklang/yaklang/common/ai/openai"
-	_ "github.com/yaklang/yaklang/common/ai/tongyi"
-)
+func init() {
+	aispec.Register("openai", func() aispec.AIGateway {
+		return &openai.GetawayClient{}
+	})
+	aispec.Register("chatglm", func() aispec.AIGateway {
+		return &chatglm.GLMClient{}
+	})
+	aispec.Register("moonshot", func() aispec.AIGateway {
+		return &moonshot.GatewayClient{}
+	})
+	aispec.Register("tongyi", func() aispec.AIGateway {
+		return &tongyi.GetawayClient{}
+	})
+	aispec.Register("comate", func() aispec.AIGateway {
+		return &comate.Client{}
+	})
+}
 
 func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error {
 	createAIGatewayByType := func(typ string) aispec.AIGateway {
@@ -43,23 +58,25 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIGateway) bool) error 
 		return nil
 	}
 
-	var haveBeenTry []string
-	for _, typ := range cfg.AiApiPriority {
-		haveBeenTry = append(haveBeenTry, typ)
-		agent := createAIGatewayByType(typ)
-		if agent != nil {
-			if cb(typ, agent) {
-				return nil
-			}
-		} else {
-			log.Warnf("create ai agent by type %s failed", typ)
+	// update database if registered ai type is not in config or configured ai type is not in registered
+	updateCfg := false
+	for i, s := range cfg.AiApiPriority {
+		if !utils.StringArrayContains(total, s) {
+			cfg.AiApiPriority = append(cfg.AiApiPriority[:i], cfg.AiApiPriority[i+1:]...)
+			updateCfg = true
 		}
 	}
-
-	for _, typ := range total {
-		if utils.StringArrayContains(haveBeenTry, typ) {
-			continue
+	for _, s := range total {
+		if !utils.StringArrayContains(cfg.AiApiPriority, s) {
+			cfg.AiApiPriority = append(cfg.AiApiPriority, s)
+			updateCfg = true
 		}
+	}
+	if updateCfg {
+		yakit.ConfigureNetWork(cfg)
+	}
+
+	for _, typ := range cfg.AiApiPriority {
 		agent := createAIGatewayByType(typ)
 		if agent != nil {
 			if cb(typ, agent) {

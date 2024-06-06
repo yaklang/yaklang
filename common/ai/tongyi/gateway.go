@@ -1,4 +1,4 @@
-package dashscopego
+package tongyi
 
 import (
 	"errors"
@@ -8,12 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 )
-
-func init() {
-	aispec.Register("tongyi", func() aispec.AIGateway {
-		return &GetawayClient{}
-	})
-}
 
 type GetawayClient struct {
 	config *aispec.AIConfig
