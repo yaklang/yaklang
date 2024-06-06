@@ -194,9 +194,3 @@ func (c *Client) CheckValid() error {
 }
 
 var _ aispec.AIClient = &Client{}
-
-func init() {
-	aispec.Register("comate", func() aispec.AIClient {
-		return &Client{}
-	})
-}

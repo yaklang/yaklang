@@ -666,6 +666,8 @@ service Yak {
   rpc EvaluateExpression(EvaluateExpressionRequest) returns (EvaluateExpressionResponse);
   rpc EvaluateMultiExpression(EvaluateMultiExpressionRequest) returns (EvaluateMultiExpressionResponse);
 
+  // 第三方应用配置模板
+  rpc GetThirdPartyAppConfigTemplate(Empty) returns (GetThirdPartyAppConfigTemplateResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5069,4 +5071,22 @@ message EvaluateMultiExpressionRequest {
 
 message EvaluateMultiExpressionResponse {
     repeated EvaluateExpressionResponse Results = 1;
+}
+
+message ThirdPartyAppConfigItemTemplate{
+  bool Required = 2;
+  string Name = 1;
+  string Type = 3;
+  string DefaultValue = 4;
+  string Desc = 5;
+  string Extra = 6;
+}
+message GetThirdPartyAppConfigTemplate {
+  string Name = 1;
+  string Verbose = 2;
+  string Type = 4;
+  repeated ThirdPartyAppConfigItemTemplate Items = 3;
+}
+message GetThirdPartyAppConfigTemplateResponse{
+  repeated GetThirdPartyAppConfigTemplate Templates = 2;
 }

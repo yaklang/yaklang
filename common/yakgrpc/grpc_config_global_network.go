@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -64,7 +64,7 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 	if err != nil {
 		return nil, err
 	}
-	if len(config.AiApiPriority) != 3 {
+	if len(config.AiApiPriority) == 0 {
 		config.AiApiPriority = aispec.RegisteredAIGateways()
 	}
 	return &config, nil
@@ -100,4 +100,59 @@ func (s *Server) ValidP12PassWord(ctx context.Context, req *ypb.ValidP12PassWord
 		}
 	}
 	return &ypb.ValidP12PassWordResponse{IsSetPassWord: data}, nil
+}
+
+func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empty) (*ypb.GetThirdPartyAppConfigTemplateResponse, error) {
+	newConfigTemplate := func(name, verbose string, hookOpt func(option *ypb.ThirdPartyAppConfigItemTemplate), opts ...*ypb.ThirdPartyAppConfigItemTemplate) *ypb.GetThirdPartyAppConfigTemplate {
+		var copyedOpts []*ypb.ThirdPartyAppConfigItemTemplate
+		for _, option := range opts {
+			newOpt := &ypb.ThirdPartyAppConfigItemTemplate{
+				Name:         option.Name,
+				Type:         option.Type,
+				Required:     option.Required,
+				DefaultValue: option.DefaultValue,
+				Desc:         option.Desc,
+				Extra:        option.Extra,
+			}
+			if hookOpt != nil {
+				hookOpt(newOpt)
+			}
+			copyedOpts = append(copyedOpts, newOpt)
+		}
+		return &ypb.GetThirdPartyAppConfigTemplate{
+			Name:    name,
+			Verbose: verbose,
+			Items:   opts,
+		}
+	}
+	opts := make([]*ypb.GetThirdPartyAppConfigTemplate, 0)
+
+	aiOptions, err := utils.LoadAppConfig(&aispec.AIConfig{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, name := range aispec.RegisteredAIGateways() {
+		hook := func(template *ypb.ThirdPartyAppConfigItemTemplate) {}
+		verbose := name
+		switch name {
+		case "openai":
+			verbose = "OpenAI"
+		case "chatglm":
+			verbose = "ChatGLM"
+		case "comate":
+			verbose = "Comate"
+			hook = func(option *ypb.ThirdPartyAppConfigItemTemplate) {
+				if option.Name == "ApiKey" {
+					option.Required = false
+				}
+			}
+		case "moonshot":
+			verbose = "Moonshot"
+		case "tongyi":
+			verbose = "Tongyi"
+		}
+		opts = append(opts, newConfigTemplate(name, verbose, hook, aiOptions...))
+	}
+	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: opts}, nil
 }
