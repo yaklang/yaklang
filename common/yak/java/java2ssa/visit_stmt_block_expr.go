@@ -678,14 +678,6 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	if ret := i.Expression(); ret != nil {
 		return y.VisitExpression(ret)
 	}
-	if ret := i.Literal(); ret != nil {
-		return y.VisitLiteral(ret)
-	}
-
-	if ret := i.Identifier(); ret != nil {
-		text := ret.GetText()
-		return y.VisitIdentifier(text)
-	}
 	if ret := i.THIS(); ret != nil {
 		//return y.ReadValue(ret.GetText())
 		text := ret.GetText()
@@ -704,6 +696,21 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 			return y.EmitConstInst(text)
 		}
 	}
+	if ret := i.Literal(); ret != nil {
+		return y.VisitLiteral(ret)
+	}
+
+	if ret := i.Identifier(); ret != nil {
+		text := ret.GetText()
+		return y.VisitIdentifier(text)
+	}
+
+	if ret := i.TypeTypeOrVoid(); ret != nil {
+		typ := y.VisitTypeTypeOrVoid(ret)
+		// TODO:  if not found class, not return any, create undefine class
+		return y.EmitTypeValue(typ)
+	}
+
 	return nil
 }
 
