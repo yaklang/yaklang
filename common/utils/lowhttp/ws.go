@@ -212,6 +212,7 @@ func (f *Frame) IsControl() bool {
 
 type FrameReader struct {
 	r         *bufio.Reader
+	c         *WebsocketClient
 	isDeflate bool
 }
 
@@ -252,6 +253,10 @@ func (f *Frame) Show() {
 	default:
 		log.Infof("unk-%02x:%v (%v)", f.Type(), rawString, raw)
 	}
+}
+
+func (fr *FrameReader) SetWebsocketClient(c *WebsocketClient) {
+	fr.c = c
 }
 
 func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
@@ -342,7 +347,46 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	// data
 	// todo: uint64 -> int64 maybe overflow
 	data := make([]byte, dataLength)
-	_, err = io.ReadFull(fr.r, data)
+	if dataLength > 0 {
+		// fast failed for invalid utf8
+		if frameType == TextMessage && fr.c != nil && fr.c.strictMode {
+			offset := uint64(0)
+			for {
+				// read all buffered
+				bufferLen := uint64(fr.r.Buffered())
+				if bufferLen > 0 {
+					if offset+bufferLen > dataLength {
+						bufferLen = dataLength - offset
+					}
+					n, err := fr.r.Read(data[offset : offset+bufferLen])
+					if err != nil {
+						return nil, errors.Wrap(err, "read payload data failed")
+					}
+					offset += uint64(n)
+					if offset >= dataLength {
+						break
+					}
+					if valid, _ := IsValidUTF8WithRemind(data[:offset]); !valid {
+						fr.c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+					}
+				}
+				// peek to wait for next read
+				_, err = fr.r.Peek(1)
+				if err != nil {
+					return nil, errors.Wrap(err, "read payload data failed")
+				}
+			}
+			// for i := uint64(0); i < dataLength; i++ {
+			// 	data[i], err = fr.r.ReadByte()
+			// 	if err != nil {
+			// 		return frame, errors.Wrap(err, "read payload data failed")
+			// 	}
+
+			// }
+		} else {
+			_, err = io.ReadFull(fr.r, data)
+		}
+	}
 
 	// close frame
 	if frameType == CloseMessage && len(data) > 2 {

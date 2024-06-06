@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -139,9 +140,10 @@ func (c *WebsocketClient) StartFromServer() {
 	}
 	go func() {
 		var (
-			plainTextBuffer bytes.Buffer
-			fragmentFrames  = make([]*Frame, 0, 1)
-			inFragment      = false
+			plainTextBuffer   bytes.Buffer
+			remindBytesBuffer bytes.Buffer // e.g. fragmented text message, utf8 remind buffer
+			fragmentFrames    = make([]*Frame, 0, 1)
+			inFragment        = false
 		)
 		c.FromServerOnce.Do(func() {
 			defer func() {
@@ -164,14 +166,16 @@ func (c *WebsocketClient) StartFromServer() {
 					return
 				}
 				frameType, isControl := frame.Type(), frame.IsControl()
+				// frame.Show()
 
 				// strict mode
 				if c.strictMode {
+					invalidCloseCode := -1
+
 					// rfc6455: 5.5
 					// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
 					if isControl && (len(frame.payload) > 125 || !frame.FIN()) {
-						c.WriteCloseEx(CloseProtocolError, "")
-						return
+						invalidCloseCode = CloseProtocolError
 					}
 
 					// rfc6455: 5.2
@@ -182,15 +186,45 @@ func (c *WebsocketClient) StartFromServer() {
 					// value, the receiving endpoint MUST _Fail the WebSocket
 					// Connection_.
 					if frame.HasRsv() && !c.HasExtensions() {
-						c.WriteCloseEx(CloseProtocolError, "")
-						return
+						invalidCloseCode = CloseProtocolError
 					}
 
 					// rfc6455: 5.2
 					// %x3-7 are reserved for further non-control frames
 					// %xB-F are reserved for further control frames
 					if frame.IsReservedType() {
-						c.WriteCloseEx(CloseProtocolError, "")
+						invalidCloseCode = CloseProtocolError
+					}
+
+					// rfc6455: 5.6
+					// The "Payload data" is text data encoded as UTF-8.  Note that a particular text frame might include a partial UTF-8 sequence; however, the whole message MUST contain valid UTF-8.  Invalid UTF-8 in reassembled messages is handled as described in Section 8.1.
+					// continue frame should be the same type as the first frame
+					firstFragmentFrame := frameType
+					if len(fragmentFrames) > 0 && frameType == ContinueMessage {
+						firstFragmentFrame = fragmentFrames[0].Type()
+					}
+					if firstFragmentFrame == TextMessage {
+						// fin message so check the whole message payload
+						if frame.FIN() {
+							remindBytesBuffer.Reset()
+							if !utf8.Valid(frame.data) {
+								invalidCloseCode = CloseInvalidFramePayloadData
+							}
+						} else {
+							// fragmented message so maybe the payload is not complete, compatibility check
+							remindBytesBuffer.Write(frame.data)
+							bytes := remindBytesBuffer.Bytes()
+							valid, remindSize := IsValidUTF8WithRemind(bytes)
+							if !valid {
+								invalidCloseCode = CloseInvalidFramePayloadData
+							} else if remindSize != -1 {
+								remindBytesBuffer.Next(len(bytes) - remindSize)
+							}
+						}
+					}
+
+					if invalidCloseCode != -1 {
+						c.WriteCloseEx(invalidCloseCode, "")
 						return
 					}
 				}
@@ -222,7 +256,6 @@ func (c *WebsocketClient) StartFromServer() {
 				case CloseMessage:
 					log.Debugf("Websocket close status code: %d", frame.
 						closeCode)
-					// remind fragment
 					c.WriteClose()
 					return
 				case PingMessage:
@@ -240,22 +273,22 @@ func (c *WebsocketClient) StartFromServer() {
 					plain = plainTextBuffer.Bytes()
 					plainTextBuffer.Reset()
 				}
-
-				handler := c.FromServerHandler
-				handlerEx := c.FromServerHandlerEx
-				if handler != nil {
-					handler(plain)
-				} else if handlerEx != nil {
-					handlerEx(c, plain, fragmentFrames)
-				} else {
-					raw, data := frame.Bytes()
-					fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
-				}
-
 				inFragment = false
+
 				if frame.FIN() {
+					handler := c.FromServerHandler
+					handlerEx := c.FromServerHandlerEx
+					if handler != nil {
+						handler(plain)
+					} else if handlerEx != nil {
+						handlerEx(c, plain, fragmentFrames)
+					} else {
+						raw, data := frame.Bytes()
+						fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
+					}
 					fragmentFrames = fragmentFrames[:0]
 				}
+
 			}
 		})
 	}()
@@ -442,9 +475,10 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	if cancel == nil {
 		ctx, cancel = context.WithCancel(ctx)
 	}
-	return &WebsocketClient{
+	fr := NewFrameReader(io.MultiReader(bytes.NewBuffer(remindBytes), conn), isDeflate)
+	client := &WebsocketClient{
 		conn:                conn,
-		fr:                  NewFrameReader(io.MultiReader(bytes.NewBuffer(remindBytes), conn), isDeflate),
+		fr:                  fr,
 		fw:                  NewFrameWriter(conn, isDeflate),
 		Request:             requestRaw,
 		Response:            responseRaw,
@@ -454,5 +488,8 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		Context:             ctx,
 		cancel:              cancel,
 		strictMode:          config.strictMode,
-	}, nil
+	}
+	fr.SetWebsocketClient(client)
+
+	return client, nil
 }
