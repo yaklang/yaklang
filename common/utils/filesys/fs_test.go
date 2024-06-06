@@ -19,7 +19,7 @@ func TestFS_EmbedFS_SingleLevel(t *testing.T) {
 		"testdata",
 		WithEmbedFS(testfs),
 		WithRecursiveDirectory(false),
-		WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+		WithFileStat(func(s string, fi fs.FileInfo) error {
 			log.Infof("read file: %s", fi.Name())
 			count++
 			return nil
@@ -41,7 +41,7 @@ func TestFS_EmbedFS_NotSingleLevel(t *testing.T) {
 	err := Recursive(
 		"testdata",
 		WithEmbedFS(testfs),
-		WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+		WithFileStat(func(s string, fi fs.FileInfo) error {
 			log.Infof("read file: %s", fi.Name())
 			count++
 			return nil
@@ -64,7 +64,7 @@ func TestFS_Chains(t *testing.T) {
 		WithEmbedFS(testfs),
 		WithDir(
 			"ta",
-			WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			WithFileStat(func(s string, fi fs.FileInfo) error {
 				count++
 				log.Infof("match: %v", s)
 				return nil
@@ -82,7 +82,7 @@ func TestFS_Chains(t *testing.T) {
 func TestFS_LocalFS(t *testing.T) {
 	check := func(want int, opts ...Option) {
 		count := 0
-		opts = append(opts, WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+		opts = append(opts, WithFileStat(func(s string, fi fs.FileInfo) error {
 			count++
 			log.Infof("match: %v", s)
 			return nil

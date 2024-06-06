@@ -23,7 +23,7 @@ func TestReducerCompiling_NORMAL(t *testing.T) {
 	err := filesys.Recursive(
 		"testlib",
 		filesys.WithEmbedFS(lib),
-		filesys.WithFileStat(func(pathname string, f fs.File, fi fs.FileInfo) error {
+		filesys.WithFileStat(func(pathname string, fi fs.FileInfo) error {
 			count++
 			if strings.HasSuffix(pathname, ".yak") {
 				existed = append(existed, pathname)
@@ -80,7 +80,7 @@ func TestReducerCompiling2_CompileFailed(t *testing.T) {
 	count := 0
 	err := filesys.Recursive("testlib",
 		filesys.WithEmbedFS(lib),
-		filesys.WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+		filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
 			count++
 			return nil
 		}))
@@ -112,7 +112,7 @@ func TestReducerCompiling2_NOLIMIT(t *testing.T) {
 	count := 0
 	err := filesys.Recursive("testlib",
 		filesys.WithEmbedFS(lib),
-		filesys.WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+		filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
 			count++
 			return nil
 		}),
