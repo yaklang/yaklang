@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"path"
 	"strings"
 )
@@ -37,7 +38,13 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 		_path := p.Loader.GetCurrentPath()
 		p.Loader.SetCurrentPath(path.Dir(v.FileName))
 
-		err := p.Build(v.FileName, v.File, b)
+		fp, err := p.Loader.GetFilesysFileSystem().Open(v.FileName)
+		if err != nil {
+			log.Errorf("Build with file loader failed: %s", err)
+			continue
+		}
+		err = p.Build(v.FileName, fp, b)
+		fp.Close()
 
 		p.Loader.SetCurrentPath(_path)
 

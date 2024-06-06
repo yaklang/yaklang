@@ -21,7 +21,7 @@ type dirMatch struct {
 	opts []Option
 }
 
-type FileStat func(string, fs.File, fs.FileInfo) error
+type FileStat func(string, fs.FileInfo) error
 type DirStat func(string, fs.FileInfo) error
 type Config struct {
 	onStart    func(base string, isDir bool) error
@@ -156,7 +156,7 @@ func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Opti
 
 // onFileStat will be called when the walker met one file.
 func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
-	return WithFileStat(func(pathname string, f fs.File, info fs.FileInfo) (err error) {
+	return WithFileStat(func(pathname string, info fs.FileInfo) (err error) {
 		defer func() {
 			if e := recover(); e != nil {
 				err = utils.Errorf("onFileStat failed: %v", e)

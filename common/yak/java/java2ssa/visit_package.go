@@ -40,7 +40,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		} else if class := pkg.GetClassBluePrint(className); class != nil {
 			y.SetClassBluePrint(className, class)
 		} else {
-			log.Warnf("BUG: Import  class %s but nod found in package %v", className, pkg.Name)
+			log.Warnf("BUG: Import  class %s but not found in package %v", className, pkg.Name)
 		}
 	}
 }
@@ -63,8 +63,13 @@ func (y *builder) BuildPackage(pkgNames []string) *ssa.Package {
 		return nil
 	}
 	for fd := range ch {
-		y.LoadPackageByPath(prog, loader, fd.FileName, fd.File)
-		fd.File.Close()
+		fp, err := loader.GetFilesysFileSystem().Open(fd.FileName)
+		if err != nil {
+			log.Errorf("Build with file loader failed: %s", err)
+			continue
+		}
+		y.LoadPackageByPath(prog, loader, fd.FileName, fp)
+		fp.Close()
 	}
 
 	pkgName := strings.Join(pkgNames, ".")

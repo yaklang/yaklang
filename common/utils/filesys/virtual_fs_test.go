@@ -141,7 +141,7 @@ func Test_virtual_fs(t *testing.T) {
 				dir = append(dir, s)
 				return nil
 			}),
-			WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			WithFileStat(func(s string, fi fs.FileInfo) error {
 				log.Infof("file: %s", s)
 				file = append(file, s)
 				return nil
@@ -157,7 +157,7 @@ func Test_virtual_fs(t *testing.T) {
 		err := Recursive(
 			".",
 			WithFileSystem(vs),
-			WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			WithFileStat(func(s string, fi fs.FileInfo) error {
 				log.Infof("read file: %s", fi.Name())
 				count++
 				return nil

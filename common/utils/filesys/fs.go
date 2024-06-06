@@ -111,15 +111,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			}
 
 			if c.onFileStat != nil {
-				fn, err := c.fileSystem.Open(path)
-				if err != nil {
-					log.Errorf("open file %s failed: %v", path, err)
-					return nil
-				}
-				defer func() {
-					fn.Close()
-				}()
-				err = c.onFileStat(path, fn, info)
+				err = c.onFileStat(path, info)
 				if err != nil {
 					return err
 				}
