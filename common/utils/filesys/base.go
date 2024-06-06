@@ -37,14 +37,14 @@ func NewEmbedFS(fs embed.FS) FileSystem {
 // local filesystem
 type LocalFs struct{}
 
-func NewLocalFs() LocalFs {
-	return LocalFs{}
+func NewLocalFs() *LocalFs {
+	return &LocalFs{}
 }
 
 var _ FileSystem = (*LocalFs)(nil)
 
-func (f LocalFs) Open(name string) (fs.File, error)             { return os.Open(name) }
-func (f LocalFs) Stat(name string) (fs.FileInfo, error)         { return os.Stat(name) }
-func (f LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return os.ReadDir(dirname) }
-func (f LocalFs) GetSeparators() rune                           { return filepath.Separator }
-func (f LocalFs) Join(name ...string) string                    { return filepath.Join(name...) }
+func (f *LocalFs) Open(name string) (fs.File, error)             { return os.Open(name) }
+func (f *LocalFs) Stat(name string) (fs.FileInfo, error)         { return os.Stat(name) }
+func (f *LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return os.ReadDir(dirname) }
+func (f *LocalFs) GetSeparators() rune                           { return filepath.Separator }
+func (f *LocalFs) Join(name ...string) string                    { return filepath.Join(name...) }
