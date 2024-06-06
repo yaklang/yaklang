@@ -70,9 +70,56 @@ func ChatBase(url string, model string, msg string, fs []Function, opt func() ([
 	return compl.Choices[0].Message.Content, nil
 }
 
+func ExtractFromResult(result string, fields map[string]any) (map[string]any, error) {
+	var keys []string
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	sampleField := keys[0]
+
+	stdjsons, raw := jsonextractor.ExtractJSONWithRaw(result)
+	for _, stdjson := range stdjsons {
+		var rawMap = make(map[string]any)
+		err := json.Unmarshal([]byte(stdjson), &rawMap)
+		if err != nil {
+			fmt.Println(string(stdjson))
+			log.Errorf("parse failed: %v", err)
+			continue
+		}
+		_, ok := rawMap[sampleField]
+		if ok {
+			return rawMap, nil
+		}
+	}
+
+	var err error
+	for _, rawJson := range raw {
+		stdjson := jsonextractor.FixJson([]byte(rawJson))
+		var rawMap = make(map[string]any)
+		err = json.Unmarshal([]byte(stdjson), &rawMap)
+		if err != nil {
+			fmt.Println(string(stdjson))
+			log.Errorf("parse failed: %v", err)
+			continue
+		}
+		_, ok := rawMap[sampleField]
+		if ok {
+			return rawMap, nil
+		}
+	}
+
+	return nil, utils.Errorf("cannot extractjson: \n%v\n", string(result))
+}
+
 func ChatBasedExtractData(url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (map[string]any, error) {
 	if len(fields) <= 0 {
 		return nil, utils.Error("no fields config for extract")
+	}
+
+	if fields == nil || len(fields) <= 0 {
+		fields = make(map[string]any)
+		fields["raw_data"] = "相关数据"
 	}
 
 	var buf = bytes.NewBufferString("")
@@ -85,8 +132,6 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 		buf.WriteString(fmt.Sprintf("%v. 字段名：%#v, 含义：%#v;\n",
 			i+1, keys[i], fields[keys[i]]))
 	}
-
-	sampleField := keys[0]
 
 	var text = `我在完成数据精炼和提取任务，数据源是
 -------------------------------------------------------
@@ -104,37 +149,7 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 		return nil, err
 	}
 	result = strings.ReplaceAll(result, "`", "")
-	stdjsons, raw := jsonextractor.ExtractJSONWithRaw(result)
-	for _, stdjson := range stdjsons {
-		var rawMap = make(map[string]any)
-		err := json.Unmarshal([]byte(stdjson), &rawMap)
-		if err != nil {
-			fmt.Println(string(stdjson))
-			log.Errorf("parse failed: %v", err)
-			continue
-		}
-		_, ok := rawMap[sampleField]
-		if ok {
-			return rawMap, nil
-		}
-	}
-
-	for _, rawJson := range raw {
-		stdjson := jsonextractor.FixJson([]byte(rawJson))
-		var rawMap = make(map[string]any)
-		err = json.Unmarshal([]byte(stdjson), &rawMap)
-		if err != nil {
-			fmt.Println(string(stdjson))
-			log.Errorf("parse failed: %v", err)
-			continue
-		}
-		_, ok := rawMap[sampleField]
-		if ok {
-			return rawMap, nil
-		}
-	}
-
-	return nil, utils.Errorf("cannot extractjson: \n%v\n", string(result))
+	return ExtractFromResult(result, fields)
 }
 
 func ChatExBase(url string, model string, details []ChatDetail, function []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
