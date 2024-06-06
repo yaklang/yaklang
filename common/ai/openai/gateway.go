@@ -7,12 +7,6 @@ import (
 	"io"
 )
 
-func init() {
-	aispec.Register("openai", func() aispec.AIGateway {
-		return &GetawayClient{}
-	})
-}
-
 type GetawayClient struct {
 	config *aispec.AIConfig
 

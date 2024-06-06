@@ -335,14 +335,20 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	return defaultConfig
 }
 
+// ConfigureNetWork configure network: update memory and database
 func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	if c == nil {
 		return
 	}
-
+	defer func() {
+		data, err := json.Marshal(c)
+		if err != nil {
+			log.Errorf("unmarshal global network config failed: %s", err)
+		}
+		Set(consts.GLOBAL_NETWORK_CONFIG, data)
+	}()
 	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
 	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
-	c.GetAppConfigs()
 	consts.ClearThirdPartyApplicationConfig()
 	for _, r := range c.GetAppConfigs() {
 		consts.UpdateThirdPartyApplicationConfig(r)
