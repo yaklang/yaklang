@@ -7,12 +7,6 @@ import (
 	"io"
 )
 
-func init() {
-	aispec.Register("moonshot", func() aispec.AIGateway {
-		return &GatewayClient{}
-	})
-}
-
 type GatewayClient struct {
 	config *aispec.AIConfig
 
