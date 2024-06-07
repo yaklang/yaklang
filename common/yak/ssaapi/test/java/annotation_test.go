@@ -22,6 +22,9 @@ func TestAnnotation_Negative(t *testing.T) {
 
 func TestAnnotation_Positive_Basic1(t *testing.T) {
 	ssatest.CheckWithName("annotation-basic-1", t, AnnotationBasic, func(prog *ssaapi.Program) error {
+		if prog.SyntaxFlowChain("Request*._ --> $ret", sf.WithEnableDebug(true)).Show().Len() <= 0 {
+			t.Fatal("Request*._ --> $ret not found")
+		}
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
