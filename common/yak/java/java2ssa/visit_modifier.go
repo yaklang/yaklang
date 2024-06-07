@@ -81,7 +81,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 	data := make(map[string]ssa.Value)
 	if ret := i.ElementValue(); ret != nil {
 		log.Infof("element value %s", ret.GetText())
-	} else if ret := i.ElementValuePairs().(*javaparser.ElementValuePairsContext); ret != nil {
+	} else if ret, _ := i.ElementValuePairs().(*javaparser.ElementValuePairsContext); ret != nil {
 		for _, elementPair := range ret.AllElementValuePair() {
 			name, v := y.VisitElementValuePair(elementPair)
 			data[name] = v
@@ -100,7 +100,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		for name, member := range data {
 			val := y.CreateMemberCallVariable(container, y.EmitConstInst(name))
 			val.AddRange(annotationRange, true)
-			log.Infof("create annotation-key: %v.%v -> %v", annotationName, name, member.String())
+			log.Infof("create annotation-key: %v.%v -> %v", annotationName, name, member)
 			y.AssignVariable(val, member)
 		}
 	}
