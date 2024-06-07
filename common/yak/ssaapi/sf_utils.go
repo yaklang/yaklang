@@ -111,6 +111,10 @@ func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 }
 
 func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string]Values, error) {
+	return SyntaxFlowWithError(p, i, opts...)
+}
+
+func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (map[string]Values, error) {
 	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
 	err := vm.Compile(i)
 	if err != nil {

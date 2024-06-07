@@ -16,10 +16,11 @@ func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.RecursiveConfigContext) [
 			continue
 		}
 		key := item.Identifier()
-		if FormatRecursiveConfigKey(key.GetText()) == "" {
+		configKey := FormatRecursiveConfigKey(key.GetText())
+		if configKey == RecursiveConfig_NULL {
 			log.Warnf("invalid recursive config key: %s", key.GetText())
 		}
-		configItem := &RecursiveConfigItem{Key: key.GetText()}
+		configItem := &RecursiveConfigItem{Key: configKey}
 		value := item.RecursiveConfigItemValue().(*sf.RecursiveConfigItemValueContext)
 		if rule := value.FilterStatement(); rule != nil {
 			configItem.SyntaxFlowRule = true

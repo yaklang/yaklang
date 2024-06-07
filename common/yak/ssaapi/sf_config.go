@@ -1,81 +1,84 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func WithSyntaxFlowConfig(opts ...sf.RecursiveConfigItem) OperationOption {
-	var results []OperationOption
-	var exec = func(newOpts ...OperationOption) OperationOption {
-		return func(operationConfig *OperationConfig) {
-			for _, p := range newOpts {
-				p(operationConfig)
-			}
+func WithSyntaxFlowConfig(
+	cb func(...OperationOption) Values,
+	opts ...*sf.RecursiveConfigItem,
+) Values {
+	var options []OperationOption
+	var result []*Value
+	useResult := false
+
+	runSyntaxFlow := func(
+		op *sf.RecursiveConfigItem,
+		cb func(map[string]Values, *Value) error,
+	) {
+		if op.Value == "" {
+			return
 		}
+		options = append(options, WithHookEveryNode(func(value *Value) error {
+			if !op.SyntaxFlowRule {
+				return utils.Error("exclude value must be a syntaxFlow rule")
+			}
+			res, err := SyntaxFlowWithError(value, op.Value)
+			if err != nil {
+				return err
+			}
+			return cb(res, value)
+		}))
 	}
+
 	for _, op := range opts {
-		key := sf.FormatRecursiveConfigKey(op.Key)
-		switch key {
+		// key := sf.FormatRecursiveConfigKey(op.Key)
+		switch op.Key {
 		case sf.RecursiveConfig_Depth:
 			if ret := codec.Atoi(op.Value); ret > 0 {
-				results = append(results, WithDepthLimit(ret))
+				options = append(options, WithDepthLimit(ret))
 			}
 		case sf.RecursiveConfig_DepthMin:
 			if ret := codec.Atoi(op.Value); ret > 0 {
-				results = append(results, WithMinDepth(ret))
+				options = append(options, WithMinDepth(ret))
 			}
 		case sf.RecursiveConfig_DepthMax:
 			if ret := codec.Atoi(op.Value); ret > 0 {
-				results = append(results, WithMaxDepth(ret))
+				options = append(options, WithMaxDepth(ret))
 			}
 		case sf.RecursiveConfig_Exclude:
-			if op.Value != "" {
-				vm := sf.NewSyntaxFlowVirtualMachine()
-				err := vm.Compile(op.Value)
-				if err != nil {
-					log.Warnf("SyntaxFlow compile %#v failed: %v", op.Value, err)
-					continue
+			runSyntaxFlow(op, func(m map[string]Values, v *Value) error {
+				for _, results := range m {
+					for _, result := range results {
+						if ValueCompare(result, v) {
+							return utils.Error("abort")
+						}
+					}
 				}
-				results = append(results, WithHookEveryNode(func(value *Value) error {
-					if !op.SyntaxFlowRule {
-						return utils.Error("exclude value must be a syntaxflow rule")
+				return nil
+			})
+
+		case sf.RecursiveConfig_Utils:
+			runSyntaxFlow(op, func(m map[string]Values, v *Value) error {
+				for _, sfDatas := range m {
+					for _, sfData := range sfDatas {
+						if ValueCompare(sfData, v) {
+							result = append(result, sfData)
+							return utils.Error("abort")
+						}
 					}
-					find := false
-					//vm.Feed(value).ForEach(func(s string, operator sf.ValueOperator) bool {
-					//	err := operator.Recursive(func(o sf.ValueOperator) error {
-					//		raw, ok := o.(*Value)
-					//		if !ok {
-					//			return nil
-					//		}
-					//		if raw.GetId() == value.GetId() {
-					//			find = true
-					//			return utils.Error("abort")
-					//		}
-					//		return nil
-					//	})
-					//	if err != nil {
-					//		return false
-					//	}
-					//	return true
-					//})
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					log.Warn("TBD for RecursiveConfig_Exclude")
-					if find {
-						return utils.Error("abort")
-					}
-					return nil
-				}))
-			}
+				}
+				return nil
+			})
+			useResult = true
 		}
 	}
-	return exec(results...)
+
+	if useResult {
+		cb(options...)
+		return result
+	}
+	return cb(options...)
 }

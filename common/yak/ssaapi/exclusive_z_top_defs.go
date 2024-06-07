@@ -29,10 +29,10 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 	return ret
 }
 
-func (v Values) GetBottomUses() Values {
+func (v Values) GetBottomUses(opts ...OperationOption) Values {
 	ret := make(Values, 0)
 	for _, sub := range v {
-		ret = append(ret, sub.GetBottomUses()...)
+		ret = append(ret, sub.GetBottomUses(opts...)...)
 	}
 	return ret
 }
