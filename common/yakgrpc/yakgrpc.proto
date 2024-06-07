@@ -5076,11 +5076,13 @@ message EvaluateMultiExpressionResponse {
 message ThirdPartyAppConfigItemTemplate{
   bool Required = 2;
   string Name = 1;
+  string Verbose = 7;
   string Type = 3;
   string DefaultValue = 4;
   string Desc = 5;
   string Extra = 6;
 }
+
 message GetThirdPartyAppConfigTemplate {
   string Name = 1;
   string Verbose = 2;
