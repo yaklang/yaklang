@@ -1,5 +1,7 @@
 package ssaapi
 
+import "github.com/yaklang/yaklang/common/utils/omap"
+
 // FindFlexibleDependsIntersection searches for intersections between flexible dependencies
 // of the root collection and elements from the target collection, returning matched elements.
 //
@@ -23,4 +25,28 @@ package ssaapi
 // commonly seen in computing or data analysis scenarios.
 func FindFlexibleDependsIntersection(root Values, element Values, opts ...OperationOption) Values {
 	return root.ExtractTopDefsIntersection(element, opts...)
+}
+
+// ExtractTopDefsIntersection explores the possibility of top-level definitions in the caller's elements
+// including elements from the target collection and returns them if found.
+//
+// ExtractTopDefsIntersection 寻找调用者中的顶级定义过程包含目标元素的可能性，如果找到则直接返回。
+//
+// 该函数通过遍历调用者集合中的每一个元素，检查其顶级定义是否与目标集合中的某个元素匹配。
+// This function iterates through each element in the caller's collection to check if its top-level
+// definitions match any of the elements in the target collection.
+func (value Values) ExtractTopDefsIntersection(targets Values, opts ...OperationOption) Values {
+	targetMap := omap.NewOrderedMap(map[int64]*Value{})
+	for _, t := range targets {
+		targetMap.Set(t.GetId(), t)
+	}
+	ret := omap.NewOrderedMap(map[int64]*Value{})
+	value.GetTopDefs(append(opts, WithHookEveryNode(func(everItem *Value) error {
+		result, ok := targetMap.Get(everItem.GetId())
+		if ok {
+			ret.Set(result.GetId(), result)
+		}
+		return nil
+	}))...)
+	return ret.Values()
 }

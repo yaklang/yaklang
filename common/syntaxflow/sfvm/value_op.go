@@ -10,10 +10,12 @@ import (
 type RecursiveConfigKey string
 
 const (
-	RecursiveConfig_Depth    RecursiveConfigKey = "depth"
-	RecursiveConfig_DepthMin RecursiveConfigKey = "depth_min"
-	RecursiveConfig_DepthMax RecursiveConfigKey = "depth_max"
-	RecursiveConfig_Exclude  RecursiveConfigKey = "exclude"
+	RecursiveConfig_NULL     RecursiveConfigKey = ""
+	RecursiveConfig_Depth                       = "depth"
+	RecursiveConfig_DepthMin                    = "depth_min"
+	RecursiveConfig_DepthMax                    = "depth_max"
+	RecursiveConfig_Exclude                     = "exclude"
+	RecursiveConfig_Utils                       = "utils"
 )
 
 func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
@@ -26,14 +28,16 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 		return RecursiveConfig_DepthMax
 	case "exclude":
 		return RecursiveConfig_Exclude
+	case "utils":
+		return RecursiveConfig_Utils
 	default:
 		log.Warnf("unknown recursive config key: %s", i)
 	}
-	return ""
+	return RecursiveConfig_NULL
 }
 
 type RecursiveConfigItem struct {
-	Key            string
+	Key            RecursiveConfigKey
 	Value          string
 	SyntaxFlowRule bool
 }
