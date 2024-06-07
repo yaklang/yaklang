@@ -19,7 +19,8 @@ type anInstruction struct {
 	verboseName string // verbose name for output or debug or tag
 	id          int64
 
-	isExtern bool
+	isAnnotation bool
+	isExtern     bool
 }
 
 func (v *anInstruction) GetSourceCode() string {
@@ -86,6 +87,14 @@ func (a *anInstruction) GetProgram() *Program {
 	}
 	return a.fun.Package.Prog
 }
+func (a *anInstruction) SetIsAnnotation(b bool) {
+	a.isAnnotation = b
+}
+
+func (a *anInstruction) IsAnnotation() bool {
+	return a.isAnnotation
+}
+
 func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
 func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 

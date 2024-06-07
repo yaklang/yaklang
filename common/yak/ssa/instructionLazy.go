@@ -272,6 +272,22 @@ func (lz *LazyInstruction) SetVerboseName(name string) {
 	lz.Instruction.SetVerboseName(name)
 }
 
+func (lz *LazyInstruction) SetIsAnnotation(b bool) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetIsAnnotation(b)
+}
+
+func (lz *LazyInstruction) IsAnnotation() bool {
+	lz.check()
+	if lz.Instruction == nil {
+		return false
+	}
+	return lz.Instruction.IsAnnotation()
+}
+
 func (lz *LazyInstruction) SetId(id int64) {
 	lz.check()
 	if lz.Instruction == nil {

@@ -57,18 +57,22 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 	if i == nil {
 		return
 	}
+
 	log.Warnf("TBD: AnnotationContext in TypeType %v", annotationContext.GetText())
-	var raw string
+
+	var annotationName string
+	var annotationRange = y.GetRangeByToken(annotationContext)
+
 	if ret := i.AltAnnotationQualifiedName(); ret != nil {
-		raw = ret.GetText()
-		if !strings.HasPrefix(raw, "@") {
-			log.Warnf("bad syntax... why altAnnotation name %#v is not prefix with @? use str after @", raw)
-			_, raw, _ = strings.Cut(raw, "@")
+		annotationName = ret.GetText()
+		if !strings.HasPrefix(annotationName, "@") {
+			log.Warnf("bad syntax... why altAnnotation name %#v is not prefix with @? use str after @", annotationName)
+			_, annotationName, _ = strings.Cut(annotationName, "@")
 		} else {
-			raw = strings.TrimLeft(raw, "@")
+			annotationName = strings.TrimLeft(annotationName, "@")
 		}
 	} else {
-		raw = i.QualifiedName().GetText()
+		annotationName = i.QualifiedName().GetText()
 	}
 
 	data := make(map[string]ssa.Value)
@@ -79,7 +83,19 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			name, v := y.VisitElementValuePair(elementPair)
 			data[name] = v
 		}
-	} else {
+	}
+
+	if annotationName != "" {
+		val := y.CreateVariable(annotationName, annotationContext)
+		container := y.EmitEmptyContainer()
+		log.Infof("create annotation container[%v]: %v", container.GetId(), annotationName)
+		y.AssignVariable(val, container)
+		for name, member := range data {
+			val := y.CreateMemberCallVariable(container, y.EmitConstInst(name))
+			val.AddRange(annotationRange, true)
+			log.Infof("create annotation-key: %v.%v -> %v", annotationName, name, member.String())
+			y.AssignVariable(val, member)
+		}
 	}
 
 	return func(v ssa.Value) {
@@ -87,7 +103,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		defer recoverRange()
 
 		annotation := y.ReadMemberCallVariable(v, y.EmitConstInst("annotation"))
-		thisAnnotation := y.ReadMemberCallVariable(annotation, y.EmitConstInst(raw))
+		thisAnnotation := y.ReadMemberCallVariable(annotation, y.EmitConstInst(annotationName))
 		for name, v := range data {
 			variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInst(name))
 			y.AssignVariable(variable, v)
