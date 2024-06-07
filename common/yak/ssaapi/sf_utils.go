@@ -115,6 +115,9 @@ func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string
 }
 
 func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (map[string]Values, error) {
+	if utils.IsNil(p) {
+		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
+	}
 	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
 	err := vm.Compile(i)
 	if err != nil {
