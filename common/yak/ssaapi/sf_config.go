@@ -60,7 +60,7 @@ func WithSyntaxFlowConfig(
 				return nil
 			})
 
-		case sf.RecursiveConfig_Utils:
+		case sf.RecursiveConfig_Until:
 			runSyntaxFlow(op, func(m map[string]Values, v *Value) error {
 				for _, sfDatas := range m {
 					for _, sfData := range sfDatas {

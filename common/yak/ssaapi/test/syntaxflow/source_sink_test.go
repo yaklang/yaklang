@@ -16,7 +16,7 @@ func Test_Source_Sink(t *testing.T) {
 		}
 		`,
 			fmt.Sprintf(`system(* #{
-				utils: %s
+				until: %s
 			}-> * as $target)`, "`para`"),
 			map[string][]string{
 				"target": {"Parameter-para"},
@@ -50,7 +50,7 @@ func Test_Source_Sink(t *testing.T) {
 			system(cmd)
 		}
 		`,
-			"system(* #{utils:`para`}-> * as $target)",
+			"system(* #{until:`para`}-> * as $target)",
 			map[string][]string{
 				"target": {"Parameter-para"},
 			},
