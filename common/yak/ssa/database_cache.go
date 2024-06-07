@@ -212,10 +212,7 @@ func (c *Cache) saveVariable(variable string, insts []Instruction) bool {
 		log.Errorf("BUG: saveVariable called when DB is nil")
 		return false
 	}
-	if err := ssadb.SaveVariable(c.DB, c.ProgramName, variable, lo.Map(insts, func(ins Instruction, _ int) interface {
-		IsAnnotation() bool
-		GetId() int64
-	} {
+	if err := ssadb.SaveVariable(c.DB, c.ProgramName, variable, lo.Map(insts, func(ins Instruction, _ int) ssadb.SSAValue {
 		return ins
 	})); err != nil {
 		log.Errorf("SaveVariable error: %v", err)

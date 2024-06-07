@@ -25,10 +25,12 @@ type IrVariable struct {
 	InstructionID Int64Slice `json:"instruction_id" gorm:"type:text"`
 }
 
-func SaveVariable(db *gorm.DB, program, variable string, insts []interface {
+type SSAValue interface {
 	IsAnnotation() bool
 	GetId() int64
-}) error {
+}
+
+func SaveVariable(db *gorm.DB, program, variable string, insts []SSAValue) error {
 	db = db.Model(&IrVariable{})
 	// save new ircode
 
@@ -36,13 +38,13 @@ func SaveVariable(db *gorm.DB, program, variable string, insts []interface {
 	irVariable.ProgramName = program
 	irVariable.VariableName = variable
 	instIDs := make([]int64, 0, len(insts))
-	irVariable.InstructionID = instIDs
 	for _, inst := range insts {
 		if !irVariable.IsAnnotationInstance && inst.IsAnnotation() {
 			irVariable.IsAnnotationInstance = true
 		}
 		instIDs = append(instIDs, inst.GetId())
 	}
+	irVariable.InstructionID = instIDs
 
 	if strings.HasPrefix(variable, "#") {
 		if before, member, ok := strings.Cut(variable, "."); ok {
