@@ -15,7 +15,7 @@ const (
 	RecursiveConfig_DepthMin                    = "depth_min"
 	RecursiveConfig_DepthMax                    = "depth_max"
 	RecursiveConfig_Exclude                     = "exclude"
-	RecursiveConfig_Utils                       = "utils"
+	RecursiveConfig_Until                       = "until"
 )
 
 func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
@@ -28,8 +28,8 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 		return RecursiveConfig_DepthMax
 	case "exclude":
 		return RecursiveConfig_Exclude
-	case "utils":
-		return RecursiveConfig_Utils
+	case "until":
+		return RecursiveConfig_Until
 	default:
 		log.Warnf("unknown recursive config key: %s", i)
 	}
