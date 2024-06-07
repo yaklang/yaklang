@@ -149,13 +149,14 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if i == nil {
 		return func() {}
 	}
-	annotationFunc, isStatic := y.VisitModifiers(modifiers)
+	annotationFunc, defCallbacks, isStatic := y.VisitModifiers(modifiers)
 	_ = annotationFunc
+	_ = defCallbacks
 
 	if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		return y.VisitMethodDeclaration(ret, class, isStatic, annotationFunc)
+		return y.VisitMethodDeclaration(ret, class, isStatic, annotationFunc, defCallbacks)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
@@ -458,6 +459,7 @@ func (y *builder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
 	class *ssa.ClassBluePrint, isStatic bool,
 	annotationFunc []func(ssa.Value),
+	defCallback []func(ssa.Value),
 ) func() {
 	if y == nil || raw == nil {
 		return func() {}
@@ -483,7 +485,13 @@ func (y *builder) VisitMethodDeclaration(
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
+			if len(annotationFunc) > 0 || len(defCallback) > 0 {
+				log.Infof("start to build annotation ref to def: %v", funcName)
+			}
 			newFunction.Type.AddAnnotationFunc(annotationFunc...)
+			for _, def := range defCallback {
+				def(newFunction)
+			}
 			//y.AddToPackage(funcName)
 		}
 
@@ -505,7 +513,13 @@ func (y *builder) VisitMethodDeclaration(
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
 		y.FunctionBuilder = y.PopFunction()
+		if len(annotationFunc) > 0 || len(defCallback) > 0 {
+			log.Infof("start to build annotation ref to def: %v", funcName)
+		}
 		newFunction.Type.AddAnnotationFunc(annotationFunc...)
+		for _, def := range defCallback {
+			def(newFunction)
+		}
 		//y.AddToPackage(funcName)
 	}
 
