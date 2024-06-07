@@ -32,6 +32,8 @@ type Instruction interface {
 	GetVerboseName() string
 	GetShortVerboseName() string
 	SetVerboseName(string)
+	SetIsAnnotation(bool)
+	IsAnnotation() bool
 
 	GetId() int64 // for identify
 	SetId(int64)
