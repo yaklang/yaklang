@@ -158,5 +158,32 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 		opts = append(opts, newConfigTemplate(name, verbose, "ai", hook, aiOptions...))
 	}
 
+	newSpaceEngineTmp := func(name string, verbose string, needEmail bool) *ypb.GetThirdPartyAppConfigTemplate {
+		seOpts := []*ypb.ThirdPartyAppConfigItemTemplate{
+			{
+				Name:     "ApiKey",
+				Verbose:  "ApiKey",
+				Type:     "string",
+				Desc:     "APIKey / Token",
+				Required: true,
+			},
+		}
+		if needEmail {
+			seOpts = append(seOpts, &ypb.ThirdPartyAppConfigItemTemplate{
+				Name:     "Email",
+				Verbose:  "用户信息",
+				Type:     "string",
+				Desc:     "email / username",
+				Required: true,
+			})
+		}
+		return newConfigTemplate(name, verbose, "spaceengine", nil, seOpts...)
+	}
+	opts = append(opts, newSpaceEngineTmp("shodan", "Shodan", false))
+	opts = append(opts, newSpaceEngineTmp("fofa", "Fofa", true))
+	opts = append(opts, newSpaceEngineTmp("quake", "Quake", false))
+	opts = append(opts, newSpaceEngineTmp("hunter", "Hunter", true))
+	opts = append(opts, newSpaceEngineTmp("zoomeye", "ZoomEye", false))
+
 	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: opts}, nil
 }
