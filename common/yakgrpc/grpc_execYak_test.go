@@ -59,6 +59,7 @@ func TestMitmInvokeAi(t *testing.T) {
 				conn.Write(headerStr)
 				conn.Write(genMsg("我是人工智障"))
 				conn.Write([]byte("\r\n"))
+				time.Sleep(time.Millisecond * 500)
 				conn.Close()
 				log.Info("close conn")
 			}()
@@ -77,9 +78,12 @@ yakit_output(res)
 }
 `)
 
-	caller.MirrorHTTPFlow(false, "aaa", []byte(""), []byte(""), []byte(""))
+	for i := 0; i < 10; i++ {
+		caller.MirrorHTTPFlow(false, "aaa", []byte(""), []byte(""), []byte(""))
+	}
 	caller.Wait()
-	if !strings.Contains(string(msgs), "我是人工智障") {
+	println(strings.Count(string(msgs), "我是人工智障"))
+	if strings.Count(string(msgs), "我是人工智障") != 10 {
 		t.Fatal("test mitm invoke ai failed")
 	}
 }
