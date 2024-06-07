@@ -8,8 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitModifiers(raw javaparser.IModifiersContext) (callback []func(ssa.Value), isStatic bool) {
-	callback = []func(ssa.Value){}
+func (y *builder) VisitModifiers(raw javaparser.IModifiersContext) (instanceCallback []func(ssa.Value), defCallback []func(ssa.Value), isStatic bool) {
 	isStatic = false
 	if y == nil || raw == nil {
 		return
@@ -26,7 +25,9 @@ func (y *builder) VisitModifiers(raw javaparser.IModifiersContext) (callback []f
 		}
 		_ = i
 		if annotation := i.Annotation(); annotation != nil {
-			callback = append(callback, y.VisitAnnotation(annotation))
+			insCallback, defCallbackHandler := y.VisitAnnotation(annotation)
+			instanceCallback = append(instanceCallback, insCallback)
+			defCallback = append(defCallback, defCallbackHandler)
 		} else if modifier := i.StaticClassModifier(); modifier != nil {
 			res := y.VisitStaticClassModifier(modifier)
 			if res == ssa.Static {
@@ -48,8 +49,10 @@ type AnnotationDescription struct {
 	Name string
 }
 
-func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (callBack func(ssa.Value)) {
-	callBack = func(ssa.Value) {}
+func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (instanceCallback func(ssa.Value), defCallback func(ssa.Value)) {
+	instanceCallback = func(ssa.Value) {}
+	defCallback = func(ssa.Value) {}
+
 	if y == nil || annotationContext == nil {
 		return
 	}
@@ -85,11 +88,15 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		}
 	}
 
+	var annotationContainerVariable *ssa.Variable
+	var annotationContainerInstance ssa.Value
 	if annotationName != "" {
 		val := y.CreateVariable(annotationName, annotationContext)
 		container := y.EmitEmptyContainer()
 		log.Infof("create annotation container[%v]: %v", container.GetId(), annotationName)
 		y.AssignVariable(val, container)
+		annotationContainerVariable = val
+		annotationContainerInstance = container
 		for name, member := range data {
 			val := y.CreateMemberCallVariable(container, y.EmitConstInst(name))
 			val.AddRange(annotationRange, true)
@@ -99,16 +106,36 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 	}
 
 	return func(v ssa.Value) {
-		recoverRange := y.SetCurrent(v)
-		defer recoverRange()
+			recoverRange := y.SetCurrent(v)
+			defer recoverRange()
 
-		annotation := y.ReadMemberCallVariable(v, y.EmitConstInst("annotation"))
-		thisAnnotation := y.ReadMemberCallVariable(annotation, y.EmitConstInst(annotationName))
-		for name, v := range data {
-			variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInst(name))
-			y.AssignVariable(variable, v)
+			annotation := y.ReadMemberCallVariable(v, y.EmitConstInst("annotation"))
+			thisAnnotation := y.ReadMemberCallVariable(annotation, y.EmitConstInst(annotationName))
+			for name, v := range data {
+				variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInst(name))
+				y.AssignVariable(variable, v)
+			}
+		}, func(value ssa.Value) {
+			// function instance
+			// parameter instance
+			if annotationContainerVariable == nil || annotationContainerInstance == nil {
+				return
+			}
+			// create @RequestMap.ref -> @RequestMap (ref or _)
+			refAlias := []string{
+				"_ref", "_",
+			}
+			log.Infof("start to build annotation ref to def: (%v)%v", value.GetId(), value.String())
+			for _, name := range refAlias {
+				ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(name))
+				y.AssignVariable(ref, value)
+			}
+			for _, v := range annotationContainerInstance.GetAllMember() {
+				for _, aliasName := range refAlias {
+					y.AssignVariable(y.CreateMemberCallVariable(v, y.EmitConstInst(aliasName)), value)
+				}
+			}
 		}
-	}
 }
 
 func (y *builder) VisitStaticModifier(raw javaparser.IStaticModifierContext) ssa.ClassModifier {
