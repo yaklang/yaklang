@@ -98,7 +98,7 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 	return configInfo, nil
 }
 
-func ApplyAppConfig(template any, opts []*ypb.ThirdPartyAppConfigItemTemplate) (err error) {
+func ApplyAppConfig(template any, data map[string]string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = Error(r)
@@ -113,51 +113,63 @@ func ApplyAppConfig(template any, opts []*ypb.ThirdPartyAppConfigItemTemplate) (
 	if typeRef.Kind() != reflect.Struct {
 		return errors.New("template struct must be a struct")
 	}
-	for _, opt := range opts {
-		for i := 0; i < typeRef.NumField(); i++ {
-			field := typeRef.Field(i)
-			tag := field.Tag
-			appTag := tag.Get("app")
-			if appTag != "" {
-				splits := strings.Split(appTag, ",")
-				for _, split := range splits {
-					if strings.Contains(split, ":") {
-						kv := strings.Split(split, ":")
-						if len(kv) == 2 {
-							if kv[0] == "name" && kv[1] == opt.Name {
-								value := reflect.ValueOf(template).Elem().Field(i)
-								if opt.DefaultValue != "" {
-									switch value.Kind() {
-									case reflect.String:
-										value.SetString(opt.DefaultValue)
-									case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-										v, err := strconv.ParseInt(opt.DefaultValue, 10, 64)
-										if err != nil {
-											return err
-										}
-										value.SetInt(v)
-									case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-										v, err := strconv.ParseUint(opt.DefaultValue, 10, 64)
-										if err != nil {
-											return err
-										}
-										value.SetUint(v)
-									case reflect.Float32, reflect.Float64:
-										v, err := strconv.ParseFloat(opt.DefaultValue, 64)
-										if err != nil {
-											return err
-										}
-										value.SetFloat(v)
-									case reflect.Bool:
-										value.SetBool(opt.DefaultValue == "true")
-									default:
-										return errors.New("unsupported field type")
-									}
-								}
-							}
-						}
+	for i := 0; i < typeRef.NumField(); i++ {
+		field := typeRef.Field(i)
+		tag := field.Tag
+		appTag := tag.Get("app")
+		if appTag != "" {
+			splits := strings.Split(appTag, ",")
+			tags := make(map[string]string)
+			for _, split := range splits {
+				if strings.Contains(split, ":") {
+					kv := strings.Split(split, ":")
+					if len(kv) != 2 {
+						return Errorf("invalid tag %s", split)
 					}
+					tags[kv[0]] = kv[1]
 				}
+			}
+			keyName, ok := tags["name"]
+			if !ok {
+				keyName = field.Name
+			}
+			v, ok := data[keyName]
+			if !ok {
+				v, ok = tags["default"]
+				if !ok {
+					continue
+				}
+			}
+			fieldValue := reflect.ValueOf(template).Elem().Field(i)
+			switch field.Type.Kind() {
+			case reflect.String:
+				fieldValue.SetString(v)
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				intV, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return Errorf("invalid int value %s", v)
+				}
+				fieldValue.SetInt(intV)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				uintV, err := strconv.ParseUint(v, 10, 64)
+				if err != nil {
+					return Errorf("invalid uint value %s", v)
+				}
+				fieldValue.SetUint(uintV)
+			case reflect.Float32, reflect.Float64:
+				floatV, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return Errorf("invalid float value %s", v)
+				}
+				fieldValue.SetFloat(floatV)
+			case reflect.Bool:
+				boolV, err := strconv.ParseBool(v)
+				if err != nil {
+					return Errorf("invalid bool value %s", v)
+				}
+				fieldValue.SetBool(boolV)
+			default:
+				return errors.New("unsupported field type")
 			}
 		}
 	}

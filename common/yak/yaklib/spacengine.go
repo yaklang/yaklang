@@ -46,29 +46,25 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 		return withUseFofa(auth...)
 	}
 	return func(c *_spaceEngineConfig) {
-		c.engine = i
-		if len(auth) == 1 {
-			c.apiKey = auth[0]
+		defaultConfig := &base.BaseSpaceEngineConfig{}
+		if err := consts.LoadThirdPartyApplicationConfig(i, defaultConfig); err != nil {
+			log.Warnf("load third party application config failed: %v", err)
 		} else {
-			c.apiKey = consts.GetThirdPartyApplicationConfig(i).APIKey
+			c.apiKey = defaultConfig.APIKey
+			c.user = defaultConfig.UserIdentifier
+			c.domain = defaultConfig.Domain
 		}
-		if len(auth) == 2 {
+		c.engine = i
+		switch len(auth) {
+		case 1:
+			c.apiKey = auth[0]
+		case 2:
 			c.user = auth[0]
 			c.apiKey = auth[1]
-		} else {
-			config := consts.GetThirdPartyApplicationConfig(i)
-			c.apiKey = config.APIKey
-			c.user = config.UserIdentifier
-		}
-		if len(auth) == 3 {
+		case 3:
 			c.user = auth[0]
 			c.apiKey = auth[1]
 			c.domain = auth[2]
-		} else {
-			config := consts.GetThirdPartyApplicationConfig(i)
-			c.apiKey = config.APIKey
-			c.user = config.UserIdentifier
-			c.domain = config.GetExtraParam("domain")
 		}
 	}
 }

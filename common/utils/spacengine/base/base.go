@@ -8,6 +8,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
+type BaseSpaceEngineConfig struct {
+	APIKey         string `app:"name:api_key,verbose:API Key,desc:APIKey / Token,id:1"`
+	UserIdentifier string `app:"name:user_identifier,verbose:用户信息,desc:email / username,id:2"`
+	Domain         string `app:"name:domain,verbose:域名,desc:域名,id:3"`
+}
 type BaseSpaceEngineClient struct {
 	Key     string
 	APIHost string
