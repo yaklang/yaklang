@@ -103,6 +103,17 @@ func (s *Server) ValidP12PassWord(ctx context.Context, req *ypb.ValidP12PassWord
 }
 
 func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empty) (*ypb.GetThirdPartyAppConfigTemplateResponse, error) {
+	//copyOpt := func(option *ypb.ThirdPartyAppConfigItemTemplate) *ypb.ThirdPartyAppConfigItemTemplate {
+	//	return &ypb.ThirdPartyAppConfigItemTemplate{
+	//		Name:         option.Name,
+	//		Type:         option.Type,
+	//		Verbose:      option.Verbose,
+	//		Required:     option.Required,
+	//		DefaultValue: option.DefaultValue,
+	//		Desc:         option.Desc,
+	//		Extra:        option.Extra,
+	//	}
+	//}
 	newConfigTemplate := func(name, verbose, typeName string, hookOpt func(option *ypb.ThirdPartyAppConfigItemTemplate), opts ...*ypb.ThirdPartyAppConfigItemTemplate) *ypb.GetThirdPartyAppConfigTemplate {
 		var copyedOpts []*ypb.ThirdPartyAppConfigItemTemplate
 		for _, option := range opts {
@@ -139,7 +150,6 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 		verbose := name
 		switch name {
 		case "openai":
-
 			verbose = "OpenAI"
 		case "chatglm":
 			verbose = "ChatGLM"
@@ -161,7 +171,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 	newSpaceEngineTmp := func(name string, verbose string, needEmail bool) *ypb.GetThirdPartyAppConfigTemplate {
 		seOpts := []*ypb.ThirdPartyAppConfigItemTemplate{
 			{
-				Name:     "ApiKey",
+				Name:     "key",
 				Verbose:  "ApiKey",
 				Type:     "string",
 				Desc:     "APIKey / Token",
@@ -170,7 +180,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 		}
 		if needEmail {
 			seOpts = append(seOpts, &ypb.ThirdPartyAppConfigItemTemplate{
-				Name:     "Email",
+				Name:     "username",
 				Verbose:  "用户信息",
 				Type:     "string",
 				Desc:     "email / username",
