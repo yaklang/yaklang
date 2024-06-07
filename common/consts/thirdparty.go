@@ -1,6 +1,8 @@
 package consts
 
 import (
+	"errors"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -28,6 +30,23 @@ func (c *thirdPartyApplicationConfig) GetExtraParam(name string) string {
 		return v
 	}
 	return ""
+}
+func LoadThirdPartyApplicationConfig(t string, cfg any) error {
+	if v, ok := thirdPartyConfig.Load(t); ok {
+		rawCfg := v.(*thirdPartyApplicationConfig)
+		params := map[string]string{}
+		params["api_key"] = rawCfg.APIKey
+		params["user_identifier"] = rawCfg.UserIdentifier
+		params["user_secret"] = rawCfg.UserSecret
+		params["domain"] = rawCfg.Domain
+		params["webhook_url"] = rawCfg.WebhookURL
+		params["namespace"] = rawCfg.Namespace
+		for k, v := range rawCfg.ExtraParams {
+			params[k] = v
+		}
+		return utils.ApplyAppConfig(cfg, params)
+	}
+	return errors.New("third party application config not found")
 }
 
 func GetThirdPartyApplicationConfig(t string) *thirdPartyApplicationConfig {
