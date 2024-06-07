@@ -46,6 +46,10 @@ func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *Range {
 	return NewRange(b.GetEditor(), NewPosition(1, 1), NewPosition(1000, 1))
 }
 
+func (b *FunctionBuilder) GetRangeByToken(r CanStartStopToken) *Range {
+	return GetRange(b.GetEditor(), r)
+}
+
 // / ============================== Token ==============================
 type CanStartStopToken interface {
 	GetStop() antlr.Token

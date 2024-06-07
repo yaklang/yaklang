@@ -14,7 +14,8 @@ type IrVariable struct {
 	ProgramName  string `json:"program_name" gorm:"index"`
 	VariableName string `json:"variable_name" gorm:"index"`
 
-	IsClassInstance bool `json:"is_class_instance"`
+	IsClassInstance      bool `json:"is_class_instance"`
+	IsAnnotationInstance bool `json:"is_annotation_instance"`
 
 	// OOP Index
 	ObjectID        int64  `json:"object_id" gorm:"index"`
@@ -24,14 +25,24 @@ type IrVariable struct {
 	InstructionID Int64Slice `json:"instruction_id" gorm:"type:text"`
 }
 
-func SaveVariable(db *gorm.DB, program, variable string, instIDs []int64) error {
+func SaveVariable(db *gorm.DB, program, variable string, insts []interface {
+	IsAnnotation() bool
+	GetId() int64
+}) error {
 	db = db.Model(&IrVariable{})
 	// save new ircode
 
 	irVariable := &IrVariable{}
 	irVariable.ProgramName = program
 	irVariable.VariableName = variable
+	instIDs := make([]int64, 0, len(insts))
 	irVariable.InstructionID = instIDs
+	for _, inst := range insts {
+		if !irVariable.IsAnnotationInstance && inst.IsAnnotation() {
+			irVariable.IsAnnotationInstance = true
+		}
+		instIDs = append(instIDs, inst.GetId())
+	}
 
 	if strings.HasPrefix(variable, "#") {
 		if before, member, ok := strings.Cut(variable, "."); ok {

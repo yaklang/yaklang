@@ -2,6 +2,7 @@ package ssatest
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"sort"
 	"strings"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/samber/lo"
@@ -19,7 +19,8 @@ import (
 
 type checkFunction func(*ssaapi.Program) error
 
-func Check(
+func CheckWithName(
+	name string,
 	t *testing.T, code string,
 	handler func(prog *ssaapi.Program) error,
 	opt ...ssaapi.Option,
@@ -37,11 +38,22 @@ func Check(
 	}
 
 	programID := uuid.NewString()
+	if name != "" {
+		programID = name
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}
+	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
+	log.Info("Program ID: ", programID)
+	fmt.Println("-----------------------------------------------------------------------------")
 	// parse with database
 	{
 		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
-		defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		defer func() {
+			if name == "" {
+				ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			}
+		}()
 		assert.Nil(t, err)
 		// prog.Show()
 
@@ -59,6 +71,14 @@ func Check(
 		err = handler(prog)
 		assert.Nil(t, err)
 	}
+}
+
+func Check(
+	t *testing.T, code string,
+	handler func(prog *ssaapi.Program) error,
+	opt ...ssaapi.Option,
+) {
+	CheckWithName("", t, code, handler, opt...)
 }
 
 func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
