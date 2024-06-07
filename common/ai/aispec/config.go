@@ -10,16 +10,16 @@ import (
 type AIConfig struct {
 	// gateway network config
 	BaseURL string
-	Domain  string `app:"name:第三方加速域名,id:4"`
-	NoHttps bool   `app:"name:IsHttps,desc:是否使用https请求api,id:3"`
+	Domain  string `app:"verbose:第三方加速域名,id:4"`
+	NoHttps bool   `app:"verbose:IsHttps,desc:是否使用https请求api,id:3"`
 
 	// basic model
-	Model    string  `app:"name:模型名称,id:2"`
+	Model    string  `app:"verbose:模型名称,id:2"`
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey        string `app:"name:ApiKey,desc:APIKey / Token,required:true,id:1"`
-	Proxy         string `app:"name:代理地址,id:5"`
+	APIKey        string `app:"verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	Proxy         string `app:"verbose:代理地址,id:5"`
 	StreamHandler func(io.Reader)
 	Type          string
 

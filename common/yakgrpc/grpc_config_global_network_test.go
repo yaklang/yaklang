@@ -675,9 +675,13 @@ func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
 		fmt.Printf("name: %s, required: %v\n", template.GetName(), template.GetRequired())
 	}
 	assert.Equal(t, apiTmp.Name, aispec.RegisteredAIGateways()[0])
-	assert.Equal(t, apiTmp.Items[0].Name, "ApiKey")
-	assert.Equal(t, apiTmp.Items[0].Required, true)
-	assert.Equal(t, apiTmp.Items[4].Name, "代理地址")
+	assert.Equal(t, "APIKey", apiTmp.Items[0].Name)
+	assert.Equal(t, true, apiTmp.Items[0].Required)
+	assert.Equal(t, "Proxy", apiTmp.Items[4].Name)
+	assert.Equal(t, "代理地址", apiTmp.Items[4].Verbose)
+
+	assert.Equal(t, "Model", apiTmp.Items[1].Name)
+	assert.Equal(t, "模型名称", apiTmp.Items[1].Verbose)
 
 	var comateTmp *ypb.GetThirdPartyAppConfigTemplate
 	for _, t := range res.GetTemplates() {
