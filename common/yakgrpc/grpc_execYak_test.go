@@ -25,6 +25,64 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestMitmInvokeAi(t *testing.T) {
+	consts.ClearThirdPartyApplicationConfig()
+	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
+		Type:   "chatglm",
+	})
+	caller, err := yak.NewMixPluginCaller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}`
+	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
+	port := utils.GetRandomAvailableTCPPort()
+	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			genMsg := func(s string) []byte {
+				msg := []byte(fmt.Sprintf(rspStrTmp, s))
+				return []byte(fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg))
+			}
+			log.Info("accept conn")
+			go func() {
+				utils.StableReader(conn, 1, 10240)
+				conn.Write(headerStr)
+				conn.Write(genMsg("我是人工智障"))
+				conn.Write([]byte("\r\n"))
+				conn.Close()
+				log.Info("close conn")
+			}()
+		}
+	}()
+	msgs := ""
+	caller.SetFeedback(func(i *ypb.ExecResult) error {
+		msgs += string(i.Message)
+		return nil
+	})
+	addr := fmt.Sprintf("%s:%d", "127.0.0.1", port)
+	caller.LoadHotPatch(context.Background(), `
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+ 	res = ai.Chat("你好",ai.domain("`+addr+`"),ai.type("chatglm"))~
+yakit_output(res)
+}
+`)
+
+	caller.MirrorHTTPFlow(false, "aaa", []byte(""), []byte(""), []byte(""))
+	caller.Wait()
+	if !strings.Contains(string(msgs), "我是人工智障") {
+		t.Fatal("test mitm invoke ai failed")
+	}
+}
 func TestOUTPUT_AiChat(t *testing.T) {
 	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
