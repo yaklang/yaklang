@@ -36,10 +36,9 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 				if strings.Contains(split, ":") {
 					kv := strings.Split(split, ":")
 					if len(kv) == 2 {
-
 						switch kv[0] {
 						case "id":
-							id,err := strconv.Atoi(kv[1])
+							id, err := strconv.Atoi(kv[1])
 							if err != nil {
 								return nil, Errorf("invalid id %s", kv[1])
 							}
@@ -52,6 +51,8 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 							item.Required = kv[1] == "true"
 						case "type":
 							item.Type = kv[1]
+						case "verbose":
+							item.Verbose = kv[1]
 						case "default":
 							item.DefaultValue = kv[1]
 						case "extra":
@@ -66,7 +67,10 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 			//	item.Name = field.Name
 			//}
 			if item.Name == "" {
-				return nil, errors.New("name is required")
+				item.Name = field.Name
+			}
+			if item.Verbose == "" {
+				item.Verbose = item.Name
 			}
 			if item.Type == "" {
 				typeName := ""
