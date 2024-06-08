@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type method struct {
@@ -31,7 +33,19 @@ type ClassBluePrint struct {
 	Constructor Value
 	Destructor  Value
 
+	// _container is an inner ssa.Value
+	// the container can ref to the class member
+	_container Value
+
 	ParentClass []*ClassBluePrint
+}
+
+func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
+	if b._container != nil {
+		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
+	}
+	b._container = con
+	return nil
 }
 
 func NewClassBluePrint() *ClassBluePrint {
@@ -67,6 +81,20 @@ func (c *ClassBluePrint) SetMethod(m map[string]*Function) {
 	c.Method = m
 }
 func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
+	if c._container != nil {
+		// set the container ref key to the method
+		log.Infof("bind %v.%v to function: %v", c.Name, key, fun.String())
+		funcContainsklass := c._container.GetFunc()
+		if funcContainsklass != nil && funcContainsklass.builder != nil {
+			builder := funcContainsklass.builder
+			variable := builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(key))
+			builder.AssignVariable(variable, fun)
+		} else {
+			log.Warnf("bind %v.%v failed, reason: class's builder (from source is missed)", c.Name, key)
+		}
+	} else {
+		log.Warnf("class %v's ref container is nil", c.Name)
+	}
 	c.Method[key] = fun
 }
 func (c *ClassBluePrint) GetMethod() map[string]*Function {
