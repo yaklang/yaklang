@@ -212,6 +212,8 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 		return nil
 	}
 
+	log.Infof("start to handle type type: %v", i.GetText())
+
 	for _, annotation := range i.AllAnnotation() {
 		y.VisitAnnotation(annotation)
 	}
@@ -607,7 +609,7 @@ func (y *builder) VisitReceiverParameter(raw javaparser.IReceiverParameterContex
 	// todo 接口的形参
 }
 
-func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) {
+func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (typeCallbacks, insCallbacks []func(ssa.Value)) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -618,7 +620,9 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) {
 		return
 	}
 	for _, modifier := range i.AllVariableModifier() {
-		y.VisitVariableModifier(modifier)
+		typeCallback, insCallback := y.VisitVariableModifier(modifier)
+		typeCallbacks = append(typeCallbacks, typeCallback)
+		insCallbacks = append(insCallbacks, insCallback)
 	}
 	typeType := y.VisitTypeType(i.TypeType())
 	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
@@ -627,6 +631,21 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) {
 		param.SetType(typeType)
 	}
 
+	if len(typeCallbacks) > 0 || len(insCallbacks) > 0 {
+		log.Infof("start to apply annotation to formal-param: %v", param.String())
+
+		if typeType != nil {
+			for _, callback := range typeCallbacks {
+				_ = callback
+				log.Warn("TBD: treat type callback plz")
+			}
+		}
+		for _, callback := range insCallbacks {
+			callback(param)
+		}
+	}
+
+	return
 }
 
 func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext) string {
@@ -682,7 +701,7 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 	}
 }
 
-func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext) {
+func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext) (typeCallback, insCallback func(ssa.Value)) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -692,6 +711,12 @@ func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext)
 	if i == nil {
 		return
 	}
+
+	if i.FINAL() != nil {
+		log.Info("VariableModifier: FINAL is ignored by ssa")
+		return
+	}
+	return y.VisitAnnotation(i.Annotation())
 }
 
 func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContext) {
