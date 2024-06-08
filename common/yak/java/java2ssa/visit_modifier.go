@@ -61,8 +61,6 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		return
 	}
 
-	log.Warnf("TBD: AnnotationContext in TypeType %v", annotationContext.GetText())
-
 	var annotationName string
 	var annotationRange = y.GetRangeByToken(annotationContext)
 
