@@ -35,7 +35,12 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) 
 	p.ClassBluePrint[name] = class
 }
 
-func (b *FunctionBuilder) CreateClassBluePrint(name string) *ClassBluePrint {
+// CreateClassBluePrint will create object template (maybe class)
+// in dynamic and classless language, we can create object without class
+// but because of the 'this/super', we will still keep the concept 'Class'
+// for ref the method/function, the blueprint is a container too,
+// saving the static variables and util methods.
+func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
 	// p := b.GetProgram()
 	p := b.Package
 	c := NewClassBluePrint()
@@ -44,6 +49,15 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string) *ClassBluePrint {
 	}
 	p.ClassBluePrint[name] = c
 	c.Name = name
+
+	log.Infof("start to create class container variable for saving static member: %s", name)
+	klassVar := b.CreateVariable(name, tokenizer...)
+	klassContainer := b.EmitEmptyContainer()
+	b.AssignVariable(klassVar, klassContainer)
+	err := c.InitializeWithContainer(klassContainer)
+	if err != nil {
+		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
+	}
 	return c
 }
 

@@ -529,6 +529,11 @@ func (y *builder) VisitMethodDeclaration(
 		}
 
 	}
+	var prefix = ""
+	if isStatic {
+		prefix = "static "
+	}
+	log.Infof("start to build %vmethod: %v to %v", prefix, funcName, class.Name)
 	class.AddMethod(key, newFunction)
 	return build
 }
