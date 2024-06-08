@@ -37,6 +37,7 @@ func TestSimpleSearchType(t *testing.T) {
 					"1",
 					"make(B)",
 					"make(B)",
+					"make(any)",
 				},
 			},
 		})
@@ -49,6 +50,7 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
+					"make(any)",
 					"make(B)",
 					"make(B)",
 				},
@@ -63,6 +65,7 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
+					"make(any)",
 					"make(B)",
 					"make(B)",
 				},
@@ -77,6 +80,7 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
+					"Function-B.methodB",
 					"Undefined-b1.methodB(valid)",
 					"Undefined-b2.methodB(valid)",
 				},
