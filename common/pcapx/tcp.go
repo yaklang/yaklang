@@ -88,7 +88,7 @@ func CreateTCPFlowFromPayload(src, dst string, payload []byte) ([][]byte, error)
 	ipTo := ip
 	synTCP.SetNetworkLayerForChecksum(ipTo)
 
-	buf, err := seriGopkt(link, ipTo, synTCP)
+	buf, err := AutoSerializeLayers(link, ipTo, synTCP)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot serialize gopacket")
 	}
@@ -128,7 +128,7 @@ func CreateTCPFlowFromPayload(src, dst string, payload []byte) ([][]byte, error)
 	}
 	synAckTCP.SetNetworkLayerForChecksum(ipFrom)
 
-	buf, err = seriGopkt(link, ipFrom, synAckTCP)
+	buf, err = AutoSerializeLayers(link, ipFrom, synAckTCP)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot serialize gopacket")
 	}
@@ -147,7 +147,7 @@ func CreateTCPFlowFromPayload(src, dst string, payload []byte) ([][]byte, error)
 	}
 	ackTCP.SetNetworkLayerForChecksum(ipTo)
 
-	buf, err = seriGopkt(link, ipTo, ackTCP)
+	buf, err = AutoSerializeLayers(link, ipTo, ackTCP)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func CreateTCPFlowFromPayload(src, dst string, payload []byte) ([][]byte, error)
 	}
 
 	for _, frame := range frames {
-		buf, err = seriGopkt(link, frame.IP, frame.TCP, gopacket.Payload(frame.TCP.Payload))
+		buf, err = AutoSerializeLayers(link, frame.IP, frame.TCP, gopacket.Payload(frame.TCP.Payload))
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +208,7 @@ func CreateTCPFlowFromPayload(src, dst string, payload []byte) ([][]byte, error)
 	}
 	finACK.SetNetworkLayerForChecksum(ipTo)
 
-	buf, err = seriGopkt(link, ipTo, finACK)
+	buf, err = AutoSerializeLayers(link, ipTo, finACK)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot serialize gopacket")
 	}
@@ -268,7 +268,7 @@ func CompleteTCPFlow(raw []byte) ([][]byte, error) {
 	}
 
 	_ = synTCP.SetNetworkLayerForChecksum(networkLy)
-	pkt, err := seriGopkt(linkLy, networkLy, synTCP)
+	pkt, err := AutoSerializeLayers(linkLy, networkLy, synTCP)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func CompleteTCPFlow(raw []byte) ([][]byte, error) {
 	}
 
 	_ = synAckTCP.SetNetworkLayerForChecksum(ipre)
-	pkt, err = seriGopkt(linkLy, ipre, synAckTCP)
+	pkt, err = AutoSerializeLayers(linkLy, ipre, synAckTCP)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func CompleteTCPFlow(raw []byte) ([][]byte, error) {
 	}
 
 	_ = ackTCP.SetNetworkLayerForChecksum(networkLy)
-	pkt, err = seriGopkt(linkLy, networkLy, ackTCP)
+	pkt, err = AutoSerializeLayers(linkLy, networkLy, ackTCP)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func CompleteTCPFlow(raw []byte) ([][]byte, error) {
 		Options: tcpLy.Options,
 	}
 	_ = syn2.SetNetworkLayerForChecksum(networkLy)
-	pkt, err = seriGopkt(linkLy, networkLy, syn2, gopacket.Payload(tcpLy.Payload))
+	pkt, err = AutoSerializeLayers(linkLy, networkLy, syn2, gopacket.Payload(tcpLy.Payload))
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ func CompleteTCPFlow(raw []byte) ([][]byte, error) {
 	}
 	finACK.SetNetworkLayerForChecksum(networkLy)
 
-	pkt, err = seriGopkt(linkLy, networkLy, finACK)
+	pkt, err = AutoSerializeLayers(linkLy, networkLy, finACK)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot serialize gopacket")
 	}
