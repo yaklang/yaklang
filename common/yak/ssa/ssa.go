@@ -302,7 +302,15 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 		// switch condition (label)
 		switch ret := last.(type) {
 		case *If:
-			return []Instruction{ret}, true
+			var ifs []*If
+			ifs = append(ifs, ret)
+			results := ret.GetSiblings()
+			if len(results) > 0 {
+				ifs = append(ifs, results...)
+			}
+			return lo.Map(ifs, func(a *If, i int) Instruction {
+				return a
+			}), true
 		case *Switch:
 			log.Warn("Swtich Statement (Condition/Label value should contains jmp) WARNING")
 			return lo.Map(ret.Label, func(label SwitchLabel, i int) Instruction {
@@ -736,6 +744,34 @@ type If struct {
 	Cond  Value
 	True  *BasicBlock
 	False *BasicBlock
+}
+
+func (i *If) GetSiblings() []*If {
+	return i.getSiblings(nil)
+}
+
+func (i *If) getSiblings(m map[int64]struct{}) []*If {
+	if m == nil {
+		m = make(map[int64]struct{})
+	}
+	_, visited := m[i.GetId()]
+	if visited {
+		return nil
+	}
+
+	var ifs []*If
+	if i.False == nil {
+		return ifs
+	}
+
+	raw := i.False.LastInst()
+	lastIf, ok := raw.(*If)
+	if ok {
+		m[lastIf.GetId()] = struct{}{}
+		ifs = append(ifs, lastIf)
+		ifs = append(ifs, lastIf.getSiblings(m)...)
+	}
+	return ifs
 }
 
 var (
