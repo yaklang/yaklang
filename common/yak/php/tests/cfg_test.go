@@ -355,3 +355,100 @@ println($a);`
 		ssatest.CheckPrintlnValue(code, []string{"phi($a)[0,add(phi($a)[1,0], 1)]"}, t)
 	})
 }
+
+func TestExpression_Try(t *testing.T) {
+	t.Run("simple, no final", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+		$a = 1;
+		try {
+			$a = 2;
+			println($a); // 2
+		} catch (Exception $e) {
+			println($a); // phi(2, 1)
+			$a = 3;
+			println($a); // 3
+		}
+		println($a); // phi(2, 3)
+		`, []string{
+			"2", "phi($a)[2,1]", "3", "phi($a)[2,3]",
+		}, t)
+	})
+
+	t.Run("simple, with final", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+		$a = 1;
+		try {
+			$a = 2;
+			println($a); // 2
+		} catch (ArrayIndexOutOfBoundsException $e) {
+			println($a); // phi(2, 1)
+			$a = 3;
+			println($a); // 3
+		} finally {
+			println($a); // phi(2, 3)
+			$a = 4;
+		}
+		println($a); // 4
+		`, []string{
+			"2", "phi($a)[2,1]", "3", "phi($a)[2,3]", "4",
+		}, t)
+	})
+
+	t.Run("simple, has error ", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+		$a = 1;
+		try {
+		} catch (Exception $e) {
+			println($e); 
+		}
+		println($e); 
+		`, []string{
+			"Parameter-$e", "Undefined-$e",
+		}, t)
+	})
+
+	t.Run("multiple catch, no final", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+		$a = 1;
+		try {
+			$a = 2;
+			println($a); // 2
+		} catch (ArrayIndexOutOfBoundsException $e) {
+			println($a); // phi(2, 1)
+			$a = 3;
+			println($a); // 3
+		} catch (Exception $e) {
+			println($a); // phi(2, 1)
+			$a = 4;
+			println($a); // 4
+		}
+		println($a); // phi(2, 3, 4)
+		`, []string{
+			"2", "phi($a)[2,1]", "3", "phi($a)[2,1]", "4", "phi($a)[2,3,4]",
+		}, t)
+	})
+
+	t.Run("multiple catch, with final", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+		$a = 1;
+		try {
+			$a = 2;
+			println($a); // 2
+		} catch (ArrayIndexOutOfBoundsException $e) {
+			println($a); // phi(2, 1)
+			$a = 3;
+			println($a); // 3
+		} catch (Exception $e) {
+			println($a); // phi(2, 1)
+			$a = 4;
+			println($a); // 4
+		} finally {
+			println($a); // phi(2, 3, 4)
+			$a = 5;
+		}
+		println($a); // 5
+		`, []string{
+			"2", "phi($a)[2,1]", "3", "phi($a)[2,1]", "4", "phi($a)[2,3,4]", "5",
+		}, t)
+	})
+}

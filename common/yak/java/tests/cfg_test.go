@@ -487,6 +487,52 @@ func TestJavaBasic_Variable_Try(t *testing.T) {
 	})
 }
 
+func TestJavaBasic_variable_Try_Multiple_cache(t *testing.T) {
+	// simple  multiple catch
+	t.Run("simple, multiple catch", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 1;
+		try {
+			a = 2;
+			println(a); // 2
+		} catch (ArrayIndexOutOfBoundsException e) {
+			println(a); // phi(1, 2)
+			a = 3;
+		} catch (Exception e) {
+			println(a); // phi(1, 2)
+			a = 4;
+		}
+		println(a); // phi(2, 3, 4)
+		`, []string{
+			"2", "phi(a)[2,1]", "phi(a)[2,1]", "phi(a)[2,3,4]",
+		}, t)
+	})
+
+	// simple with final
+	t.Run("simple, multiple catch, with final", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 1;
+		try {
+			a = 2;
+			println(a);
+		} catch (ArrayIndexOutOfBoundsException e) {
+			println(a); // phi(1, 2)
+			a = 3;
+		} catch (Exception e) {
+			println(a); // phi(1, 2)
+			a = 4;
+		} finally {
+			println(a); // phi(2, 3, 4)
+			a = 5;
+		}
+		println(a); // 5 
+		`, []string{
+			"2", "phi(a)[2,1]", "phi(a)[2,1]", "phi(a)[2,3,4]", "5",
+		}, t)
+	})
+
+}
+
 func TestJavaBasic_Variable_While(t *testing.T) {
 	t.Run("test simple while statement", func(t *testing.T) {
 		CheckJavaPrintlnValue(`

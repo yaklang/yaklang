@@ -234,7 +234,7 @@ func (l *LoopStmt[T]) Build(
 type TryStmt[T versionedValue] struct {
 	global       ScopedVersionedTableIF[T]
 	tryBody      ScopedVersionedTableIF[T]
-	cacheBody    ScopedVersionedTableIF[T]
+	mergeBody    []ScopedVersionedTableIF[T]
 	finalBody    ScopedVersionedTableIF[T]
 	ErrorName    string
 	mergeHandler MergeHandle[T]
@@ -254,26 +254,25 @@ func (t *TryStmt[T]) SetTryBody(body func(ScopedVersionedTableIF[T]) ScopedVersi
 	tryBody := t.global.CreateSubScope()
 	ret := body(tryBody)
 	t.tryBody = ret
-
+	t.mergeBody = append(t.mergeBody, ret)
 }
 
 func (t *TryStmt[T]) SetError(name string) {
 	t.ErrorName = name
 }
 
-func (t *TryStmt[T]) CreateCatch() ScopedVersionedTableIF[T] {
-	t.cacheBody = t.global.CreateSubScope()
-	return t.cacheBody
-}
-
-func (t *TryStmt[T]) SetCache(build func() ScopedVersionedTableIF[T]) {
-	t.cacheBody.Merge(
+func (t *TryStmt[T]) AddCache(build func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T]) {
+	catchBody := t.global.CreateSubScope()
+	catchBody.Merge(
 		true,
 		t.mergeHandler,
 		t.tryBody,
 	)
-	t.cacheBody.CreateVariable(t.ErrorName, true)
-	t.cacheBody = build()
+	catchBody.CreateVariable(t.ErrorName, true)
+	catchEndBody := build(catchBody)
+	_ = catchEndBody
+	// cacheBody = cacheEndBody
+	t.mergeBody = append(t.mergeBody, catchEndBody)
 }
 
 func (t *TryStmt[T]) CreateFinally() ScopedVersionedTableIF[T] {
@@ -284,7 +283,7 @@ func (t *TryStmt[T]) CreateFinally() ScopedVersionedTableIF[T] {
 func (t *TryStmt[T]) SetFinal(build func() ScopedVersionedTableIF[T]) {
 	t.finalBody.Merge(
 		false, t.mergeHandler,
-		t.tryBody, t.cacheBody,
+		t.mergeBody...,
 	)
 	ret := build()
 	t.finalBody = ret
@@ -307,7 +306,7 @@ func (t *TryStmt[T]) Build() ScopedVersionedTableIF[T] {
 	} else {
 		end.Merge(
 			false, t.mergeHandler,
-			t.tryBody, t.cacheBody,
+			t.mergeBody...,
 		)
 	}
 	return end
