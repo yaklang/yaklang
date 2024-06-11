@@ -12,6 +12,12 @@ func ReplaceAllValue(v Value, to Value) {
 }
 
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("=============================\n"+"replace value panic: %v", r)
+		}
+	}()
+
 	for _, variable := range v.GetAllVariables() {
 		// TODO: handler variable replace value
 		variable.Replace(v, to)
@@ -212,7 +218,9 @@ func (i *Make) ReplaceValue(v, to Value) {
 	} else if i.parentI == v {
 		i.parentI = v
 	} else {
-		panic("object not use this value")
+		log.Errorf("======================\n"+
+			"BUG or make not use this value: object not use this value: %v"+
+			"=========================", v)
 	}
 }
 
