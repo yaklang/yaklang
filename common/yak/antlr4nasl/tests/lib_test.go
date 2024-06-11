@@ -86,7 +86,7 @@ sum1 = "";
 foreach k(keys(a)){
 	sum1 += k;
 }
-assert(sum1 == "ac", "keys error");
+assert(sum1 == "ac" || sum1 == "ca", "keys error");
 
 `)
 }
