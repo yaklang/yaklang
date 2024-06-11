@@ -258,5 +258,15 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 	opts = append(opts, newSpaceEngineTmp("hunter", "Hunter", false))
 	opts = append(opts, newSpaceEngineTmp("zoomeye", "ZoomEye", false))
 
+	//githubOpt := &ypb.GetThirdPartyAppConfigTemplate{
+	//	Name:    "github",
+	//	Verbose: "Github",
+	//	Items: []*ypb.ThirdPartyAppConfigItemTemplate{
+	//		{},
+	//	},
+	//	Type: "",
+	//}
+	////APIKey UserIdentifier
+	//opts = append(opts, githubOpt)
 	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: opts}, nil
 }

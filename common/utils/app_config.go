@@ -161,6 +161,9 @@ func ApplyAppConfig(template any, data map[string]string) (err error) {
 					continue
 				}
 			}
+			if v == "" {
+				continue
+			}
 			fieldValue := reflect.ValueOf(template).Elem().Field(i)
 			switch field.Type.Kind() {
 			case reflect.String:
