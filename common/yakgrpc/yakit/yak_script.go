@@ -113,7 +113,7 @@ func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, 
 }
 
 func NewTemporaryYakScript(t string, code string, suffix ...string) (*schema.YakScript, error) {
-	name := fmt.Sprintf("tmp-%v", ksuid.New().String())
+	name := fmt.Sprintf("tmp-%v", ksuid.New().String()+strings.Join(suffix, ""))
 	if strings.TrimSpace(strings.ToLower(t)) == "nuclei" {
 		// nuclei
 		tempInfo := make(map[string]any)
