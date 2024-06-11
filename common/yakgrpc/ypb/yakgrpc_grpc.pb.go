@@ -478,6 +478,8 @@ type YakClient interface {
 	EvaluateMultiExpression(ctx context.Context, in *EvaluateMultiExpressionRequest, opts ...grpc.CallOption) (*EvaluateMultiExpressionResponse, error)
 	// 第三方应用配置模板
 	GetThirdPartyAppConfigTemplate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetThirdPartyAppConfigTemplateResponse, error)
+	// AI相关
+	CheckHahValidAiConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GeneralResponse, error)
 }
 
 type yakClient struct {
@@ -5155,6 +5157,15 @@ func (c *yakClient) GetThirdPartyAppConfigTemplate(ctx context.Context, in *Empt
 	return out, nil
 }
 
+func (c *yakClient) CheckHahValidAiConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/CheckHahValidAiConfig", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -5619,6 +5630,8 @@ type YakServer interface {
 	EvaluateMultiExpression(context.Context, *EvaluateMultiExpressionRequest) (*EvaluateMultiExpressionResponse, error)
 	// 第三方应用配置模板
 	GetThirdPartyAppConfigTemplate(context.Context, *Empty) (*GetThirdPartyAppConfigTemplateResponse, error)
+	// AI相关
+	CheckHahValidAiConfig(context.Context, *Empty) (*GeneralResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -6693,6 +6706,9 @@ func (UnimplementedYakServer) EvaluateMultiExpression(context.Context, *Evaluate
 }
 func (UnimplementedYakServer) GetThirdPartyAppConfigTemplate(context.Context, *Empty) (*GetThirdPartyAppConfigTemplateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThirdPartyAppConfigTemplate not implemented")
+}
+func (UnimplementedYakServer) CheckHahValidAiConfig(context.Context, *Empty) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckHahValidAiConfig not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -13352,6 +13368,24 @@ func _Yak_GetThirdPartyAppConfigTemplate_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CheckHahValidAiConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CheckHahValidAiConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/CheckHahValidAiConfig",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CheckHahValidAiConfig(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -14526,6 +14560,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetThirdPartyAppConfigTemplate",
 			Handler:    _Yak_GetThirdPartyAppConfigTemplate_Handler,
+		},
+		{
+			MethodName: "CheckHahValidAiConfig",
+			Handler:    _Yak_CheckHahValidAiConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
