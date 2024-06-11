@@ -21,6 +21,9 @@ type Value struct {
 	disasmLine string
 	users      Values
 	operands   Values
+
+	// for debug
+	syntaxFlowName []string
 }
 
 func ValueContain(v1 *Value, v2 ...*Value) bool {
@@ -67,6 +70,13 @@ func (v *Value) GetId() int64 {
 		return -1
 	}
 	return v.node.GetId()
+}
+
+func (v *Value) GetSSAValue() ssa.Value {
+	if v.IsNil() {
+		return nil
+	}
+	return v.node
 }
 
 func (v *Value) NewError(tag, msg string) {
@@ -666,6 +676,15 @@ func (v Values) Get(i int) *Value {
 		return v[i]
 	}
 	return v.NewValue(ssa.NewUndefined(""))
+}
+
+func (v Values) GetBySyntaxFlowName(name string) Values {
+	return lo.Filter(v, func(v *Value, i int) bool {
+		if utils.StringSliceContain(v.syntaxFlowName, name) {
+			return true
+		}
+		return false
+	})
 }
 
 func (v Values) NewValue(ssaVal ssa.Value) *Value {

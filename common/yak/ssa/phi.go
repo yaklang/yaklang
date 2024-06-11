@@ -80,7 +80,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 var _ ssautil.SpinHandle[Value] = SpinHandle
 
 // build phi
-func generalPhi(builder *FunctionBuilder, block *BasicBlock) func(name string, t []Value) Value {
+func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(name string, t []Value) Value {
 	return func(name string, t []Value) Value {
 		if block != nil {
 			recoverBlock := builder.CurrentBlock
@@ -97,8 +97,9 @@ func generalPhi(builder *FunctionBuilder, block *BasicBlock) func(name string, t
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(t[0].GetVerboseName())
+		phi.CFGEntryBasicBlock = cfgEntryBlock
 		return phi
 	}
 }
 
-var _ ssautil.MergeHandle[Value] = generalPhi(nil, nil)
+var _ ssautil.MergeHandle[Value] = generatePhi(nil, nil, nil)
