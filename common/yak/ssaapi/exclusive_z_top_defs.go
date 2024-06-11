@@ -148,7 +148,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	switch inst := i.node.(type) {
 	case *ssa.LazyInstruction:
-		i.node = inst.Self()
+		var ok bool
+		i.node, ok = inst.Self().(ssa.Value)
+		if !ok {
+			log.Errorf("BUG: %T is not ssa.Value", inst.Self())
+			return Values{}
+		}
 		return i.getTopDefs(actx, opt...)
 	case *ssa.Undefined:
 		// ret[n]
