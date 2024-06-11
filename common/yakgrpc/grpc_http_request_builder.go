@@ -5,6 +5,8 @@ import (
 	"context"
 	_ "embed"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"google.golang.org/grpc"
 	"net/url"
@@ -387,4 +389,31 @@ func (w *wrapperDebugPluginStream) registerSendHook(hookFunc func(r *ypb.ExecRes
 	w.sendMutex.Lock()
 	defer w.sendMutex.Unlock()
 	w.sendHook = hookFunc
+}
+
+func (s *Server) CheckHahValidAiConfig(context.Context, *ypb.Empty) (*ypb.GeneralResponse, error) {
+	tmps, err := s.GetThirdPartyAppConfigTemplate(context.Background(), &ypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	unnecessaryApiKeyAndOk := func(name string) bool {
+		for _, item := range tmps.GetTemplates() {
+			if item.GetName() == name {
+				for _, item := range item.Items {
+					if item.GetName() == "api_key" {
+						return item.Required
+					}
+				}
+			}
+		}
+		return false
+	}
+	for _, name := range aispec.RegisteredAIGateways() {
+		cfg := &aispec.AIConfig{}
+		consts.GetThirdPartyApplicationConfig(name, cfg)
+		if cfg.APIKey != "" || unnecessaryApiKeyAndOk(name) {
+			return &ypb.GeneralResponse{Ok: true}, nil
+		}
+	}
+	return &ypb.GeneralResponse{Ok: false}, nil
 }

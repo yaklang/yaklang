@@ -670,6 +670,9 @@ service Yak {
 
   // 第三方应用配置模板
   rpc GetThirdPartyAppConfigTemplate(Empty) returns (GetThirdPartyAppConfigTemplateResponse);
+
+  // AI相关
+  rpc CheckHahValidAiConfig(Empty) returns (GeneralResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;

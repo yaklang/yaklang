@@ -44,6 +44,10 @@ func (c *thirdPartyApplicationConfig) ToMap() map[string]string {
 	}
 	return params
 }
+
+// GetThirdPartyApplicationConfig
+// first argument is the type of third party application, second argument is the config struct pointer,
+// this function will fill the config struct with the third party application config
 func GetThirdPartyApplicationConfig(t string, cfg any) error {
 	if v, ok := thirdPartyConfig.Load(t); ok {
 		rawCfg := v.(*thirdPartyApplicationConfig)
