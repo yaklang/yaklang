@@ -20,6 +20,14 @@ func ToBasicBlock(n Instruction) (*BasicBlock, bool) {
 	return u, ok
 }
 
+func ToIfInstruction(n Instruction) (*If, bool) {
+	if lz, isLZ := ToLazyInstruction(n); isLZ {
+		return ToIfInstruction(lz.Self())
+	}
+	u, ok := n.(*If)
+	return u, ok
+}
+
 func ToFreeValue(n Node) (*Parameter, bool) {
 	u, ok := n.(*Parameter)
 	if ok && u.IsFreeValue {

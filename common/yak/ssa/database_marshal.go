@@ -364,6 +364,16 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 				log.Errorf("BUG: unmatched instruction create lazyInstruction: %v", err)
 			}
 		}
+	case *If:
+		if cond, ok := params["if_cond"]; ok {
+			ret.Cond = newLazyInstruction(cond)
+		}
+		if trueBlock, ok := params["if_true"]; ok {
+			ret.True = newLazyInstruction(trueBlock)
+		}
+		if falseBlock, ok := params["if_false"]; ok {
+			ret.False = newLazyInstruction(falseBlock)
+		}
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
 	}
