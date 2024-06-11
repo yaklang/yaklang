@@ -156,7 +156,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 		case "comate":
 			verbose = "Comate"
 			hook = func(option *ypb.ThirdPartyAppConfigItemTemplate) {
-				if option.Name == "APIKey" {
+				if option.Name == "api_key" {
 					option.Required = false
 				}
 			}
@@ -171,7 +171,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 	newSpaceEngineTmp := func(name string, verbose string, needEmail bool) *ypb.GetThirdPartyAppConfigTemplate {
 		seOpts := []*ypb.ThirdPartyAppConfigItemTemplate{
 			{
-				Name:     "key",
+				Name:     "api_key",
 				Verbose:  "ApiKey",
 				Type:     "string",
 				Desc:     "APIKey / Token",
@@ -180,7 +180,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 		}
 		if needEmail {
 			seOpts = append(seOpts, &ypb.ThirdPartyAppConfigItemTemplate{
-				Name:     "username",
+				Name:     "user_identifier",
 				Verbose:  "用户信息",
 				Type:     "string",
 				Desc:     "email / username",

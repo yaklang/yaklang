@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"io"
 	"net/http"
 	"os"
@@ -190,7 +192,7 @@ func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
 	}
 	client.SetGlobalNetworkConfig(context.Background(), config)
 	cfg := &aispec.AIConfig{}
-	consts.LoadThirdPartyApplicationConfig("github", cfg)
+	consts.GetThirdPartyApplicationConfig("github", cfg)
 	if cfg.APIKey != token {
 		t.Fatal("set thirdparty app config failed")
 	}
@@ -677,12 +679,12 @@ func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
 		fmt.Printf("name: %s, required: %v\n", template.GetName(), template.GetRequired())
 	}
 	assert.Equal(t, apiTmp.Name, aispec.RegisteredAIGateways()[0])
-	assert.Equal(t, "APIKey", apiTmp.Items[0].Name)
+	assert.Equal(t, "api_key", apiTmp.Items[0].Name)
 	assert.Equal(t, true, apiTmp.Items[0].Required)
-	assert.Equal(t, "Proxy", apiTmp.Items[4].Name)
+	assert.Equal(t, "proxy", apiTmp.Items[4].Name)
 	assert.Equal(t, "代理地址", apiTmp.Items[4].Verbose)
 
-	assert.Equal(t, "Model", apiTmp.Items[1].Name)
+	assert.Equal(t, "model", apiTmp.Items[1].Name)
 	assert.Equal(t, "模型名称", apiTmp.Items[1].Verbose)
 
 	var comateTmp *ypb.GetThirdPartyAppConfigTemplate
@@ -694,4 +696,96 @@ func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
 	}
 	assert.NotNil(t, comateTmp)
 	assert.Equal(t, comateTmp.Items[0].GetRequired(), false)
+}
+
+func TestGenThirdPartyConfigOption(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.GetThirdPartyAppConfigTemplate(context.Background(), &ypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(b bool) {
+		if !b {
+			t.Fatal("check failed")
+		}
+	}
+	pass := make([]bool, 2)
+	for _, tmp := range res.GetTemplates() {
+		if tmp.Name == "openai" {
+			pass[0] = true
+			check(tmp.Items[0].Name == "api_key")
+			check(tmp.Items[0].Verbose == "ApiKey")
+			check(tmp.Items[1].Name == "model")
+			check(tmp.Items[2].Name == "no_https")
+			check(tmp.Items[3].Name == "domain")
+			check(tmp.Items[4].Name == "proxy")
+		}
+		if tmp.Name == "fofa" {
+			pass[1] = true
+			check(tmp.Items[0].Name == "api_key")
+			check(tmp.Items[1].Name == "user_identifier")
+		}
+	}
+	if !funk.All(pass) {
+		t.Fatal("check failed")
+	}
+}
+func TestLoadThirdPartyConfig(t *testing.T) {
+	config := yakit.GetNetworkConfig()
+	bak := config.AppConfigs
+	defer func() {
+		config.AppConfigs = bak
+		yakit.ConfigureNetWork(config)
+	}()
+	config.AppConfigs = nil
+	yakit.ConfigureNetWork(config)
+
+	config.AppConfigs = []*ypb.ThirdPartyApplicationConfig{
+		{
+			Type:           "openai",
+			APIKey:         "APIKey",
+			UserIdentifier: "UserIdentifier",
+			UserSecret:     "UserSecret",
+			Namespace:      "Namespace",
+			Domain:         "Domain",
+			WebhookURL:     "WebhookURL",
+			ExtraParams: []*ypb.KVPair{
+				{
+					Key:   "no_https",
+					Value: "true",
+				},
+				{
+					Key:   "model",
+					Value: "Model",
+				},
+				{
+					Key:   "proxy",
+					Value: "Proxy",
+				},
+			},
+		},
+	}
+	yakit.ConfigureNetWork(config)
+	aiConfig := &aispec.AIConfig{}
+	err := consts.GetThirdPartyApplicationConfig("openai", aiConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spaceEngineConfig := &base.BaseSpaceEngineConfig{}
+	err = consts.GetThirdPartyApplicationConfig("openai", spaceEngineConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "APIKey", aiConfig.APIKey)
+	assert.Equal(t, "Domain", aiConfig.Domain)
+	assert.Equal(t, true, aiConfig.NoHttps)
+	assert.Equal(t, "Model", aiConfig.Model)
+	assert.Equal(t, "Proxy", aiConfig.Proxy)
+
+	assert.Equal(t, "APIKey", spaceEngineConfig.APIKey)
+	assert.Equal(t, "Domain", spaceEngineConfig.Domain)
+	assert.Equal(t, "UserIdentifier", spaceEngineConfig.UserIdentifier)
 }
