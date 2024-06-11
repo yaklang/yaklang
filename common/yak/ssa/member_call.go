@@ -23,7 +23,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 	builder := v.GetFunc().builder
 	recoverScope := builder.SetCurrent(v)
 	defer recoverScope()
-	createPhi := generalPhi(builder, nil)
+	createPhi := generatePhi(builder, nil, nil)
 
 	// replace object member-call
 	if v.IsObject() {
@@ -47,6 +47,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 				member.SetName(name)
 				member.SetType(typ)
 				SetMemberCall(to, key, member)
+				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
 				ret[name] = createPhi(name, []Value{toMember, member})
 				continue
 			}
