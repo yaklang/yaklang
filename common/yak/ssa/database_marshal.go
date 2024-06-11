@@ -113,8 +113,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if ret.try != nil {
 			params["errorhandler_try"] = ret.try.GetId()
 		}
-		if ret.try != nil {
-			params["errorhandler_catch"] = ret.catch.GetId()
+		if len(ret.catchs) != 0 {
+			params["errorhandler_catch"] = fetchIds(ret.catchs)
 		}
 		if ret.final != nil {
 			params["errorhandler_finally"] = ret.final.GetId()

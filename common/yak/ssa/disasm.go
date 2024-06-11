@@ -395,7 +395,8 @@ func (e *ErrorHandler) String() string {
 	}
 	return fmt.Sprintf(
 		"try %s; catch %s; final %s; rest %s",
-		e.try.GetName(), e.catch.GetName(), finalName, e.done.GetName(),
+		// e.try.GetName(), e.catchs.GetName(), finalName, e.done.GetName(),
+		e.try.GetName(), "", finalName, e.done.GetName(),
 	)
 }
 

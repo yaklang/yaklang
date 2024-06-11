@@ -423,15 +423,13 @@ func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value)
 	return
 }
 
-func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler {
+func (f *FunctionBuilder) EmitErrorHandler(try *BasicBlock) *ErrorHandler {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	e := NewErrorHandler(try, catch)
+	e := NewErrorHandler(try)
 	block := f.CurrentBlock
 	block.AddSucc(try)
-	try.AddSucc(catch)
-	block.AddSucc(catch)
 	f.emit(e)
 	return e
 }

@@ -1738,7 +1738,7 @@ func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
 			b.buildBlock(s)
 		}
 	})
-	try.BuildError(func() string {
+	try.BuildErrorCatch(func() string {
 		var id string
 		// TODO: Assignable could be wrong, need to fix
 		if s, ok := stmt.CatchProduction().(*JS.CatchProductionContext); ok {
@@ -1748,9 +1748,7 @@ func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
 			}
 		}
 		return id
-	})
-
-	try.BuildCatch(func() {
+	}, func() {
 		if _, ok := stmt.CatchProduction().(*JS.CatchProductionContext); ok {
 			if bl, ok := stmt.Block().(*JS.BlockContext); ok {
 				b.buildBlock(bl)
