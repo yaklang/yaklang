@@ -51,6 +51,9 @@ type Instruction interface {
 	SetExtern(bool)
 
 	SelfDelete()
+	IsBlock(string) bool
+
+	IsCFGEnterBlock() ([]Instruction, bool)
 }
 
 type (
@@ -259,7 +262,7 @@ type BasicBlock struct {
 
 	Index int
 	// BasicBlock graph
-	Preds, Succs []*BasicBlock
+	Preds, Succs []Value
 
 	/*
 		if Condition == true: this block reach
@@ -268,15 +271,14 @@ type BasicBlock struct {
 
 	// instruction list
 	Insts []Instruction
-	Phis  []*Phi
+	Phis  []Value
 
 	// error catch
 	Handler *ErrorHandler
 
 	// for build
-	symbolTable map[string]Values
-	ScopeTable  *Scope
-	finish      bool // if emitJump finish!
+	ScopeTable *Scope
+	finish     bool // if emitJump finish!
 }
 
 func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
