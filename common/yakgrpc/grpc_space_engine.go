@@ -139,7 +139,7 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 
 func (s *Server) GetSpaceEngineStatus(ctx context.Context, req *ypb.GetSpaceEngineStatusRequest) (*ypb.SpaceEngineStatus, error) {
 	config := base.BaseSpaceEngineConfig{}
-	err := consts.LoadThirdPartyApplicationConfig(req.GetType(), &config)
+	err := consts.GetThirdPartyApplicationConfig(req.GetType(), &config)
 	if err != nil {
 		log.Errorf("load third party application config failed: %v", err)
 	}

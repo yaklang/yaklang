@@ -44,7 +44,7 @@ func (c *thirdPartyApplicationConfig) ToMap() map[string]string {
 	}
 	return params
 }
-func LoadThirdPartyApplicationConfig(t string, cfg any) error {
+func GetThirdPartyApplicationConfig(t string, cfg any) error {
 	if v, ok := thirdPartyConfig.Load(t); ok {
 		rawCfg := v.(*thirdPartyApplicationConfig)
 		params := rawCfg.ToMap()
@@ -54,7 +54,7 @@ func LoadThirdPartyApplicationConfig(t string, cfg any) error {
 }
 
 // GetThirdPartyApplicationConfig has deprecated
-func GetThirdPartyApplicationConfig(t string) *thirdPartyApplicationConfig {
+func _GetThirdPartyApplicationConfig(t string) *thirdPartyApplicationConfig {
 	if v, ok := thirdPartyConfig.Load(t); ok {
 		return v.(*thirdPartyApplicationConfig)
 	}

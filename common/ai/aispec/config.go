@@ -35,7 +35,7 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	for _, p := range opts {
 		p(c)
 	}
-	err := consts.LoadThirdPartyApplicationConfig(c.Type, c)
+	err := consts.GetThirdPartyApplicationConfig(c.Type, c)
 	if err != nil {
 		log.Errorf("load third party application config failed: %v", err)
 	}

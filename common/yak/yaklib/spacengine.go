@@ -47,7 +47,7 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 	}
 	return func(c *_spaceEngineConfig) {
 		defaultConfig := &base.BaseSpaceEngineConfig{}
-		if err := consts.LoadThirdPartyApplicationConfig(i, defaultConfig); err != nil {
+		if err := consts.GetThirdPartyApplicationConfig(i, defaultConfig); err != nil {
 			log.Warnf("load third party application config failed: %v", err)
 		} else {
 			c.apiKey = defaultConfig.APIKey
@@ -73,7 +73,7 @@ func withUseZoomeye(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "zoomeye"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -90,7 +90,7 @@ func withUseShodan(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "shodan"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -107,7 +107,7 @@ func withUseQuake(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "quake"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -124,7 +124,7 @@ func withUseHunter(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "hunter"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -141,7 +141,7 @@ func withUseFofa(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "fofa"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
