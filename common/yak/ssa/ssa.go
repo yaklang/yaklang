@@ -1,10 +1,11 @@
 package ssa
 
 import (
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"sync"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -717,7 +718,8 @@ var (
 // ------------- ErrorHandler
 type ErrorHandler struct {
 	anInstruction
-	try, catch, final, done *BasicBlock
+	catchs           []*BasicBlock
+	try, final, done *BasicBlock
 }
 
 var _ Instruction = (*ErrorHandler)(nil)

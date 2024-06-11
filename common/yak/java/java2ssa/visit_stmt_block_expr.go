@@ -859,21 +859,15 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 					y.VisitBlock(ret)
 				}
 			})
-			// todo: 多catch case的情况
-			// 处理第一个catch
-			if catchClause, ok := ret.CatchClause(0).(*javaparser.CatchClauseContext); ok {
-				tryBuilder.BuildError(func() string {
-					id := catchClause.Identifier().GetText()
-					return id
+			for _, catch := range ret.AllCatchClause() {
+				catchClause := catch.(*javaparser.CatchClauseContext)
+				tryBuilder.BuildErrorCatch(func() string {
+					return catchClause.Identifier().GetText()
+				}, func() {
+					if block := catchClause.Block(); block != nil {
+						y.VisitBlock(block)
+					}
 				})
-				tryBuilder.BuildCatch(func() {
-					y.VisitBlock(catchClause.Block())
-				})
-				if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
-					tryBuilder.BuildFinally(func() {
-						y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
-					})
-				}
 			}
 			if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
 				tryBuilder.BuildFinally(func() {
@@ -881,7 +875,6 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 				})
 			}
 			tryBuilder.Finish()
-
 		}
 		return nil
 	case *javaparser.TryWithResourcesStatementContext:

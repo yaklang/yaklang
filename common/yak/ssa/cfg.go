@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
@@ -376,16 +377,20 @@ func (i *IfBuilder) Build() *IfBuilder {
 	return i
 }
 
+type tryCatchItem struct {
+	err       func() string
+	catchBody func()
+}
+
 type TryBuilder struct {
 	// b
 	b *FunctionBuilder
 
 	// block
-	enter        *BasicBlock
-	buildTry     func()
-	buildError   func() string
-	buildCatch   func()
-	buildFinally func()
+	enter          *BasicBlock
+	buildTry       func()
+	buildCatchItem []tryCatchItem
+	buildFinally   func()
 }
 
 func (b *FunctionBuilder) BuildTry() *TryBuilder {
@@ -401,12 +406,11 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 	t.buildTry = f
 }
 
-func (t *TryBuilder) BuildError(f func() string) {
-	t.buildError = f
-}
-
-func (t *TryBuilder) BuildCatch(f func()) {
-	t.buildCatch = f
+func (t *TryBuilder) BuildErrorCatch(err func() string, catch func()) {
+	t.buildCatchItem = append(t.buildCatchItem, tryCatchItem{
+		err:       err,
+		catchBody: catch,
+	})
 }
 
 func (t *TryBuilder) BuildFinally(f func()) {
@@ -420,53 +424,47 @@ func (t *TryBuilder) Finish() {
 
 	tryBuilder := ssautil.NewTryStmt(ssautil.ScopedVersionedTableIF[Value](scope), generatePhi(builder, nil, t.enter))
 
-	// var final *BasicBlock
-	// var id string
-	// builder := t.b
-
 	builder.CurrentBlock = t.enter
-	try := builder.NewBasicBlock(TryStart)
-	catch := builder.NewBasicBlockNotAddBlocks(TryCatch)
-	e := builder.EmitErrorHandler(try, catch)
+	tryBlock := builder.NewBasicBlock(TryStart)
+	errorHandler := builder.EmitErrorHandler(tryBlock)
 
-	// // build try
+	// build try
 	tryBuilder.SetTryBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-		try.ScopeTable = svt.(*Scope)
-		builder.CurrentBlock = try
+		tryBlock.ScopeTable = svt.(*Scope)
+		builder.CurrentBlock = tryBlock
 		t.buildTry()
-		try = builder.CurrentBlock
-		return try.ScopeTable
+		tryBlock = builder.CurrentBlock
+		return tryBlock.ScopeTable
 	})
 
-	// // build catch
-
-	addToBlocks(catch)
-
-	catch.ScopeTable = tryBuilder.CreateCatch().(*Scope)
-	builder.CurrentBlock = catch
-
-	if t.buildError != nil {
-		if id := t.buildError(); id != "" {
-			p := NewParam(id, false, builder)
-			p.SetType(BasicTypes[ErrorTypeKind])
-			variable := builder.CreateLocalVariable(id)
-			builder.AssignVariable(variable, p)
-		}
+	// build catch
+	for _, item := range t.buildCatchItem {
+		catchBody := builder.NewBasicBlock(TryCatch)
+		errorHandler.AddCatch(catchBody)
+		builder.CurrentBlock = catchBody
+		tryBuilder.AddCache(func(svti ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+			builder.CurrentBlock.ScopeTable = svti.(*Scope)
+			// error variable
+			if id := item.err(); id != "" {
+				p := NewParam(id, false, builder)
+				p.SetType(BasicTypes[ErrorTypeKind])
+				variable := builder.CreateLocalVariable(id)
+				builder.AssignVariable(variable, p)
+			}
+			// catch body
+			if item.catchBody != nil {
+				item.catchBody()
+			}
+			catch := builder.CurrentBlock
+			return catch.ScopeTable
+		})
 	}
-
-	tryBuilder.SetCache(func() ssautil.ScopedVersionedTableIF[Value] {
-		if t.buildCatch != nil {
-			t.buildCatch()
-		}
-		catch = builder.CurrentBlock
-		return catch.ScopeTable
-	})
 
 	// // build finally
 	var target *BasicBlock
 	if t.buildFinally != nil {
 		final := builder.NewBasicBlock(TryFinally)
-		e.AddFinal(final)
+		errorHandler.AddFinal(final)
 		target = final
 
 		final.ScopeTable = tryBuilder.CreateFinally().(*Scope)
@@ -482,7 +480,7 @@ func (t *TryBuilder) Finish() {
 	builder.CurrentBlock = done
 	end := tryBuilder.Build()
 	done.ScopeTable = end.(*Scope)
-	e.AddDone(done)
+	errorHandler.AddDone(done)
 	if target == nil {
 		target = done
 	} else {
@@ -490,10 +488,12 @@ func (t *TryBuilder) Finish() {
 		builder.EmitJump(done)
 	}
 
-	builder.CurrentBlock = try
+	builder.CurrentBlock = tryBlock
 	builder.EmitJump(target)
-	builder.CurrentBlock = catch
-	builder.EmitJump(target)
+	for _, catch := range errorHandler.catchs {
+		builder.CurrentBlock = catch
+		builder.EmitJump(target)
+	}
 
 	builder.CurrentBlock = done
 }

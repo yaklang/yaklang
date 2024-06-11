@@ -113,17 +113,16 @@ func NewNext(iter Value, isIn bool) *Next {
 	return n
 }
 
-func NewErrorHandler(try, catch *BasicBlock) *ErrorHandler {
+func NewErrorHandler(try *BasicBlock) *ErrorHandler {
 	e := &ErrorHandler{
 		anInstruction: NewInstruction(),
 		try:           try,
-		catch:         catch,
 	}
-	// block.AddSucc(try)
 	try.Handler = e
-	// block.AddSucc(catch)
-	catch.Handler = e
 	return e
+}
+func (e *ErrorHandler) AddCatch(c *BasicBlock) {
+	e.catchs = append(e.catchs, c)
 }
 
 func NewExternLib(variable string, builder *FunctionBuilder, table map[string]any) *ExternLib {

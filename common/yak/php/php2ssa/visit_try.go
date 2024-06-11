@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitTryCatchFinally(raw phpparser.ITryCatchFinallyContext) interface{} {
@@ -15,17 +16,20 @@ func (y *builder) VisitTryCatchFinally(raw phpparser.ITryCatchFinallyContext) in
 	if stmt == nil {
 		return nil
 	}
-	//todo: try-catch-finally不支持多catch情况
 	tryBuilder := y.BuildTry()
 	tryBuilder.BuildTryBlock(func() {
 		y.VisitBlockStatement(stmt.BlockStatement())
 	})
+	for _, catch := range stmt.AllCatchClause() {
+		y.VisitCatchClause(catch, tryBuilder)
+	}
 	tryBuilder.BuildFinally(func() {
 		y.VisitFinallyStatement(stmt.FinallyStatement())
 	})
+	tryBuilder.Finish()
 	return nil
 }
-func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext) interface{} {
+func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext, tryBuilder *ssa.TryBuilder) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -36,8 +40,11 @@ func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext) interface{
 	if i == nil {
 		return nil
 	}
-	//todo: 这里暂时无法做
-	//y.VisitQualifiedStaticTypeRef()
+	tryBuilder.BuildErrorCatch(func() string {
+		return i.VarName().GetText()
+	}, func() {
+		y.VisitBlockStatement(i.BlockStatement())
+	})
 	return nil
 }
 
