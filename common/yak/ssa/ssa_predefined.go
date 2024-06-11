@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -43,8 +44,19 @@ func (i *anInstruction) IsUndefined() bool {
 	return false
 }
 
+func (i *anInstruction) IsBlock(name string) bool {
+	if i.GetOpcode() == SSAOpcodeBasicBlock {
+		return strings.HasPrefix(i.GetName(), name)
+	}
+	return false
+}
+
 func (i *anInstruction) SelfDelete() {
 	DeleteInst(i)
+}
+
+func (i *anInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
+	return nil, false
 }
 
 func (i *anInstruction) ReplaceValue(Value, Value) {

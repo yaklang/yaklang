@@ -87,6 +87,10 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		}
 		params["block_insts"] = fetchIds(ret.Insts)
 		params["block_phis"] = fetchIds(ret.Phis)
+		params["block_finish"] = ret.finish
+		if ret.ScopeTable != nil {
+			params["block_scope_table"] = ret.ScopeTable.GetPersistentId()
+		}
 	case *BinOp:
 		params["binop_op"] = ret.Op
 		if ret.X != nil {
@@ -119,6 +123,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			params["errorhandler_done"] = ret.done.GetId()
 		}
 	case *ExternLib:
+		log.Warnf("TBD: marshal ExternLib: %v", ret)
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
 	case *If:
 		if ret.Cond != nil {
@@ -189,6 +194,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		// params["member_call_obj"] = ret.GetObject().GetId()
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
+		params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
 	case *Recover:
 		// nothing to do
 	case *Return:
@@ -246,6 +252,18 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 		return vs
 	}
+	unmarshalInstructions := func(p any) []Instruction {
+		vs := make([]Instruction, 0)
+		switch ret := p.(type) {
+		case []any:
+			for _, id := range ret {
+				vs = append(vs, newLazyInstruction(id))
+			}
+
+		default:
+		}
+		return vs
+	}
 	unmarshalMapValues := func(p any) map[string]Value {
 		vs := make(map[string]Value)
 		switch ret := p.(type) {
@@ -266,16 +284,20 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.MsgValue = newLazyInstruction(msg)
 		}
 		ret.Msg = params["assert_message_string"].(string)
-	// case *BasicBlock:
-	// 	log.Info("TODO: unmarshal BasicBlock: %v", params)
-	// ret.Preds = unmarshalValues(params["block_preds"])
-	// params["block_preds"] = fetchIds(ret.Preds)
-	// params["block_succs"] = fetchIds(ret.Succs)
-	// if ret.Condition != nil {
-	// 	params["block_condition"] = ret.Condition.GetId()
-	// }
-	// params["block_insts"] = fetchIds(ret.Insts)
-	// params["block_phis"] = fetchIds(ret.Phis)
+	case *BasicBlock:
+		ret.Preds = unmarshalValues(params["block_preds"])
+		ret.Succs = unmarshalValues(params["block_succs"])
+		if cond, ok := params["block_condition"]; ok {
+			ret.Condition = newLazyInstruction(cond)
+		}
+		ret.Insts = unmarshalInstructions(params["block_insts"])
+		ret.Phis = unmarshalValues(params["block_phis"])
+		ret.finish = params["block_finish"].(bool)
+		if scopeTable, ok := params["block_scope_table"]; ok {
+			log.Warnf("TODO(Unfinished BlockScopeTable): unmarshal BasicBlock : %v", scopeTable)
+			log.Warnf("TODO(Unfinished BlockScopeTable): unmarshal BasicBlock : %v", scopeTable)
+			log.Warnf("TODO(Unfinished BlockScopeTable): unmarshal BasicBlock : %v", scopeTable)
+		}
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))
 		ret.X = newLazyInstruction(params["binop_x"])
@@ -371,6 +393,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.MemberCallKey = newLazyInstruction(params["member_call_key"])
 	case *Phi:
 		ret.Edge = unmarshalValues(params["phi_edges"])
+		ret.CFGEntryBasicBlock = newLazyInstruction(params["cfg_entry"])
 	// case *Recover:
 	// nothing to do
 	case *Return:

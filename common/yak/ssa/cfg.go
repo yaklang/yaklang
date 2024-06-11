@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
@@ -39,7 +40,12 @@ func (b *BasicBlock) IsBlock(name string) bool {
 func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
 	for _, prev := range b.Preds {
 		if prev.IsBlock(name) {
-			return prev
+			result, ok := ToBasicBlock(prev)
+			if !ok {
+				log.Warnf("prev(%d): %T is not a *BasicBlock.", prev.GetId(), prev)
+				continue
+			}
+			return result
 		}
 	}
 	return nil

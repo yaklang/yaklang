@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
@@ -30,9 +31,14 @@ func DeleteInst(i Instruction) {
 		return
 	}
 	if phi, ok := ToPhi(i); ok {
-		b.Phis = utils.RemoveSliceItem(b.Phis, phi)
+		b.Phis = lo.Filter(b.Phis, func(item Value, index int) bool {
+			return item.GetId() != phi.GetId()
+		})
 	} else {
-		b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
+		//b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
+		b.Insts = lo.Filter(b.Insts, func(item Instruction, index int) bool {
+			return item.GetId() != i.GetId()
+		})
 	}
 	if user, ok := ToUser(i); ok {
 		for _, value := range user.GetValues() {

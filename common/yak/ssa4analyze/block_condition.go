@@ -210,7 +210,12 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		}
 
 		// dfs
-		for _, succ := range bb.Succs {
+		for _, succRaw := range bb.Succs {
+			succ, ok := succRaw.(*ssa.BasicBlock)
+			if !ok {
+				log.Warn("BUG: succ is not *ssa.BasicBlock")
+				continue
+			}
 			handlerBlock(succ)
 		}
 	}
@@ -245,7 +250,13 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 
 	// handler normal
 	var cond ssa.Value
-	for _, pre := range block.Preds {
+	for _, preRaw := range block.Preds {
+		pre, ok := preRaw.(*ssa.BasicBlock)
+		if !ok {
+			log.Warn("BUG: pre is not *ssa.BasicBlock")
+			continue
+		}
+
 		// skip
 		if _, ok := skipBlock[pre]; ok {
 			continue
