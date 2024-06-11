@@ -64,8 +64,65 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 	if err != nil {
 		return nil, err
 	}
-	if len(config.AiApiPriority) == 0 {
-		config.AiApiPriority = aispec.RegisteredAIGateways()
+	for i, appConfig := range config.AppConfigs {
+		newItem := []*ypb.KVPair{
+			{
+				Key:   "api_key",
+				Value: appConfig.APIKey,
+			},
+			{
+				Key:   "user_identifier",
+				Value: appConfig.UserIdentifier,
+			},
+			{
+				Key:   "user_secret",
+				Value: appConfig.UserSecret,
+			},
+			{
+				Key:   "domain",
+				Value: appConfig.Domain,
+			},
+			{
+				Key:   "webhook_url",
+				Value: appConfig.WebhookURL,
+			},
+			{
+				Key:   "namespace",
+				Value: appConfig.Namespace,
+			},
+		}
+		var newExtraParams []*ypb.KVPair
+		for _, item := range newItem {
+			pass := false
+			for index, param := range config.AppConfigs[i].ExtraParams {
+				if param != nil && item.Key == param.Key {
+					newExtraParams = append(newExtraParams, param)
+					config.AppConfigs[i].ExtraParams[index] = nil
+					pass = true
+					break
+				}
+			}
+			if !pass {
+				newExtraParams = append(newExtraParams, item)
+			}
+		}
+		for _, param := range config.AppConfigs[i].ExtraParams {
+			if param != nil {
+				newExtraParams = append(newExtraParams, param)
+			}
+		}
+		config.AppConfigs[i].ExtraParams = newExtraParams
+	}
+	total := aispec.RegisteredAIGateways()
+	for i, s := range config.AiApiPriority { // remove deprecated ai type
+		if !utils.StringArrayContains(total, s) {
+			config.AiApiPriority = append(config.AiApiPriority[:i], config.AiApiPriority[i+1:]...)
+		}
+	}
+	for _, s := range total { // add new ai type
+		if !utils.StringArrayContains(config.AiApiPriority, s) {
+			config.AiApiPriority = append(config.AiApiPriority, s)
+		}
 	}
 	return &config, nil
 }
@@ -140,30 +197,36 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 	}
 	opts := make([]*ypb.GetThirdPartyAppConfigTemplate, 0)
 
-	aiOptions, err := utils.LoadAppConfig(&aispec.AIConfig{})
-	if err != nil {
-		return nil, err
-	}
-
 	for _, name := range aispec.RegisteredAIGateways() {
+		extTag := map[string]string{}
 		hook := func(template *ypb.ThirdPartyAppConfigItemTemplate) {}
 		verbose := name
 		switch name {
 		case "openai":
 			verbose = "OpenAI"
+			extTag["model"] = "default:gpt-3.5-turbo"
+			extTag["domain"] = "default:api.openai.com"
 		case "chatglm":
 			verbose = "ChatGLM"
+			extTag["model"] = "default:glm-3-turbo"
+			extTag["domain"] = "default:open.bigmodel.cn"
 		case "comate":
 			verbose = "Comate"
-			hook = func(option *ypb.ThirdPartyAppConfigItemTemplate) {
-				if option.Name == "api_key" {
-					option.Required = false
-				}
-			}
+			extTag["api_key"] = "required:false"
+			extTag["model"] = "default:ernie-bot"
+			extTag["domain"] = "default:comate.baidu.com"
 		case "moonshot":
 			verbose = "Moonshot"
+			extTag["model"] = "default:moonshot-v1-8k"
+			extTag["domain"] = "default:api.moonshot.cn"
 		case "tongyi":
 			verbose = "Tongyi"
+			extTag["model"] = "default:qwen-turbo"
+			extTag["domain"] = "default:dashscope.aliyuncs.com"
+		}
+		aiOptions, err := utils.LoadAppConfig(&aispec.AIConfig{}, extTag)
+		if err != nil {
+			return nil, err
 		}
 		opts = append(opts, newConfigTemplate(name, verbose, "ai", hook, aiOptions...))
 	}
@@ -192,7 +255,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 	opts = append(opts, newSpaceEngineTmp("shodan", "Shodan", false))
 	opts = append(opts, newSpaceEngineTmp("fofa", "Fofa", true))
 	opts = append(opts, newSpaceEngineTmp("quake", "Quake", false))
-	opts = append(opts, newSpaceEngineTmp("hunter", "Hunter", true))
+	opts = append(opts, newSpaceEngineTmp("hunter", "Hunter", false))
 	opts = append(opts, newSpaceEngineTmp("zoomeye", "ZoomEye", false))
 
 	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: opts}, nil
