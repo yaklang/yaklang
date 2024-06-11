@@ -28,8 +28,7 @@ os.System(input)
 			t.Fatal("not phi")
 		}
 		if targetIns.CFGEntryBasicBlock != nil {
-			block := targetIns.CFGEntryBasicBlock.(*ssa.BasicBlock)
-			next, ok := block.IsCFGEnterBlock()
+			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}
@@ -62,8 +61,7 @@ os.System(input)
 			t.Fatal("not phi")
 		}
 		if targetIns.CFGEntryBasicBlock != nil {
-			block := targetIns.CFGEntryBasicBlock.(*ssa.BasicBlock)
-			next, ok := block.IsCFGEnterBlock()
+			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}

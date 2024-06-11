@@ -30,7 +30,7 @@ func NewNameDisasmLiner() *NameDisasmLiner {
 	}
 }
 
-func (n *NameDisasmLiner) DisasmValue(v Value) string {
+func (n *NameDisasmLiner) DisasmValue(v Instruction) string {
 	if v == nil {
 		return ""
 	}
@@ -60,7 +60,7 @@ func NewFullDisasmLiner(max int) *FullDisasmLiner {
 	}
 }
 
-func (f *FullDisasmLiner) DisasmValue(v Value) string {
+func (f *FullDisasmLiner) DisasmValue(v Instruction) string {
 	return lineDisasm(v, f)
 }
 
@@ -93,7 +93,7 @@ func (b *cacheDisasmLiner) DeleteName(i Instruction) {
 }
 
 type DisasmLiner interface {
-	DisasmValue(v Value) string
+	DisasmValue(v Instruction) string
 
 	// level += 1; and check should stop?
 	// if this method return true, should stop

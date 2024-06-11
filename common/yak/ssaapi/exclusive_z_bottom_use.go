@@ -78,10 +78,15 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	if ValueCompare(v, actx.Self) {
 		return v.visitUserFallback(actx)
 	}
+	var ok bool
 
 	switch ins := v.node.(type) {
 	case *ssa.LazyInstruction:
-		v.node = ins.Self()
+		v.node, ok = ins.Self().(ssa.Value)
+		if !ok {
+			log.Warnf("BUG: (lazy instruction) unknown instruction: %v", v.String())
+			return nil
+		}
 		return v.getBottomUses(actx, opt...)
 	case *ssa.Phi:
 		// enter function via phi

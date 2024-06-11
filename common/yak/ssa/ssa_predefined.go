@@ -59,6 +59,10 @@ func (i *anInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
 	return nil, false
 }
 
+func (i *anInstruction) Self() Instruction {
+	return i
+}
+
 func (i *anInstruction) ReplaceValue(Value, Value) {
 }
 

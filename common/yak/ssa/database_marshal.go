@@ -194,7 +194,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		// params["member_call_obj"] = ret.GetObject().GetId()
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
-		params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
+		if ret.CFGEntryBasicBlock != nil {
+			params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
+		}
 	case *Recover:
 		// nothing to do
 	case *Return:
@@ -227,6 +229,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if ret.Origin != nil {
 			params["const_origin"] = ret.Origin.GetId()
 		}
+	default:
+		log.Warnf("marshalExtraInformation: unknown type: %v", reflect.TypeOf(raw).String())
 	}
 	return params
 }
@@ -311,74 +315,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Unpack = params["call_unpack"].(bool)
 		ret.IsDropError = params["call_drop_error"].(bool)
 		ret.IsEllipsis = params["call_ellipsis"].(bool)
-	// case *ErrorHandler:
-	// 	log.Errorf("TODO: unmarshal ErrorHandler: %v", params)
-	// try-catch-finally-done
-	// if ret.try != nil {
-	// 	params["errorhandler_try"] = ret.try.GetId()
-	// }
-	// if ret.try != nil {
-	// 	params["errorhandler_catch"] = ret.catch.GetId()
-	// }
-	// if ret.final != nil {
-	// 	params["errorhandler_finally"] = ret.final.GetId()
-	// }
-	// if ret.done != nil {
-	// 	params["errorhandler_done"] = ret.done.GetId()
-	// }
-	// case *ExternLib:
-	// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
-	// case *If:
-	// 	ret.Cond = newLazyInstruction(params["if_cond"])
-	// params["if_cond"] = ret.Cond.GetId()
-	// if ret.True != nil {
-	// 	params["if_true"] = ret.True.GetId()
-	// }
-	// if ret.False != nil {
-	// 	params["if_false"] = ret.False.GetId()
-	// }
-	// case *Jump:
-	// params["jump_to"] = ret.To.GetId()
-	// case *Loop:
-	// params["loop_body"] = ret.Body.GetId()
-	// if ret.Exit != nil {
-	// 	params["loop_exit"] = ret.Exit.GetId()
-	// }
-	// if ret.Init != nil {
-	// 	params["loop_init"] = ret.Init.GetId()
-	// }
-	// if ret.Cond != nil {
-	// 	params["loop_cond"] = ret.Cond.GetId()
-	// }
-	// if ret.Step != nil {
-	// 	params["loop_step"] = ret.Step.GetId()
-	// }
-	// if ret.Key != nil {
-	// 	params["loop_key"] = ret.Key.GetId()
-	// }
-	// case *Make:
-	// if ret.low != nil {
-	// 	params["make_low"] = ret.low.GetId()
-	// }
-	// if ret.high != nil {
-	// 	params["make_high"] = ret.high.GetId()
-	// }
-	// if ret.step != nil {
-	// 	params["make_step"] = ret.step.GetId()
-	// }
-	// if ret.Len != nil {
-	// 	params["make_len"] = ret.Len.GetId()
-	// }
-	// if ret.Cap != nil {
-	// 	params["make_cap"] = ret.Cap.GetId()
-	// }
 	case *Next:
 		ret.InNext = params["next_in_next"].(bool)
 		ret.Iter = newLazyInstruction(params["next_iter"])
-	// case *Panic:
-	// if ret.Info != nil {
-	// 	params["panic_value"] = ret.Info.GetId()
-	// }
 	case *Parameter:
 		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
 		if defaultValue, ok := params["formalParam_default"]; ok {
@@ -393,32 +332,23 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.MemberCallKey = newLazyInstruction(params["member_call_key"])
 	case *Phi:
 		ret.Edge = unmarshalValues(params["phi_edges"])
-		ret.CFGEntryBasicBlock = newLazyInstruction(params["cfg_entry"])
-	// case *Recover:
-	// nothing to do
+		if cfgEntry, ok := params["cfg_entry"]; ok {
+			ret.CFGEntryBasicBlock = newLazyInstruction(cfgEntry)
+		}
 	case *Return:
 		ret.Results = unmarshalValues(params["return_results"])
 	case *SideEffect:
 		ret.CallSite = newLazyInstruction(params["sideEffect_call"])
 		ret.Value = newLazyInstruction(params["sideEffect_value"])
-	// case *Switch:
-	// 	if ret.Cond != nil {
-	// 		params["switch_cond"] = ret.Cond.GetId()
-	// 	}
-	// 	params["switch_label"] = fetchIds(ret.Label)
-	// case *TypeCast:
-	// 	if ret.Value != nil {
-	// 		params["typecast_value"] = ret.Value.GetId()
-	// 	}
-	case *TypeValue:
-		// nothing to do
 	case *UnOp:
 		ret.Op = UnaryOpcode(params["unop_op"].(string))
 		ret.X = newLazyInstruction(params["unop_x"])
 	case *Undefined:
 		ret.Kind = UndefinedKind(params["undefined_kind"].(float64))
-	case *Function:
-		// fill it later
+	case *Jump:
+		if to, ok := params["jump_to"]; ok {
+			ret.To = newLazyInstruction(to)
+		}
 	case *ConstInst:
 		i := params["const_value"]
 		c := newConstByMap(i)
