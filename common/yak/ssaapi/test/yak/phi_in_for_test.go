@@ -101,9 +101,11 @@ os.System(input)
 		if !ok {
 			t.Fatal("not phi")
 		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 2, len(conds))
+
 		if targetIns.CFGEntryBasicBlock != nil {
-			block := targetIns.CFGEntryBasicBlock.(*ssa.BasicBlock)
-			next, ok := block.IsCFGEnterBlock()
+			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
 			}

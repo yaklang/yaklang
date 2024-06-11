@@ -100,6 +100,16 @@ func (lz *LazyInstruction) Self() Value {
 	return lz.Value
 }
 
+func (lz *LazyInstruction) IsBlock(name string) bool {
+	if lz.Value == nil {
+		lz.check()
+	}
+	if lz.Value == nil {
+		return false
+	}
+	return lz.Value.IsBlock(name)
+}
+
 // create real-instruction from lazy-instruction
 func (lz *LazyInstruction) check() {
 	if lz.Instruction == nil {
@@ -358,6 +368,14 @@ func (lz *LazyInstruction) SelfDelete() {
 		return
 	}
 	lz.Instruction.SelfDelete()
+}
+
+func (lz *LazyInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
+	lz.check()
+	if lz.Instruction == nil {
+		return nil, false
+	}
+	return lz.Instruction.IsCFGEnterBlock()
 }
 
 func (lz *LazyInstruction) AddMask(v Value) {

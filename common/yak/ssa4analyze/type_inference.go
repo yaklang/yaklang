@@ -1,6 +1,7 @@
 package ssa4analyze
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -123,7 +124,12 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 		phi.Edge,
 		// // skip unreachable block
 		func(index int, value ssa.Value) bool {
-			block := phi.GetBlock().Preds[index]
+			blockRaw := phi.GetBlock().Preds[index]
+			block, ok := blockRaw.(*ssa.BasicBlock)
+			if !ok {
+				log.Warnf("BUG: block is not *ssa.BasicBlock")
+				return true
+			}
 			return block.Reachable() == -1
 		},
 	)

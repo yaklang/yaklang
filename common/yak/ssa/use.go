@@ -63,6 +63,35 @@ func (p *Phi) ReplaceValue(v Value, to Value) {
 	}
 }
 
+func (p *Phi) GetControlFlowConditions() []Value {
+	if p == nil {
+		return nil
+	}
+	if p.CFGEntryBasicBlock == nil {
+		return nil
+	}
+	block, ok := p.CFGEntryBasicBlock.(*BasicBlock)
+	if !ok {
+		return nil
+	}
+	relative, ok := block.IsCFGEnterBlock()
+	if !ok {
+		return nil
+	}
+	return lo.FilterMap(relative, func(ins Instruction, i int) (Value, bool) {
+		switch ret := ins.(type) {
+		case *If:
+			return ret.Cond, true
+		default:
+			result, ok := ret.(Value)
+			if ok {
+				return result, true
+			}
+			return nil, false
+		}
+	})
+}
+
 // / ---- extern lib
 func (e *ExternLib) HasValues() bool   { return true }
 func (e *ExternLib) GetValues() Values { return lo.Filter(e.Member, filterNilValue) }
