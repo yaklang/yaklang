@@ -72,67 +72,87 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 func withUseZoomeye(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "zoomeye"
-		config := consts.GetThirdPartyApplicationConfig("zoomeye")
+		cfg := &base.BaseSpaceEngineConfig{}
+		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		if err != nil {
+			log.Errorf("load third party application config failed: %v", err)
+		}
 		if len(api) > 0 {
 			c.apiKey = api[0]
 		} else {
-			c.apiKey = config.APIKey
+			c.apiKey = cfg.APIKey
 		}
-		c.domain = config.GetExtraParam("domain")
+		c.domain = cfg.Domain
 	}
 }
 
 func withUseShodan(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "shodan"
-		config := consts.GetThirdPartyApplicationConfig("shodan")
+		cfg := &base.BaseSpaceEngineConfig{}
+		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		if err != nil {
+			log.Errorf("load third party application config failed: %v", err)
+		}
 		if len(api) > 0 {
 			c.apiKey = api[0]
 		} else {
-			c.apiKey = config.APIKey
+			c.apiKey = cfg.APIKey
 		}
-		c.domain = config.GetExtraParam("domain")
+		c.domain = cfg.Domain
 	}
 }
 
 func withUseQuake(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "quake"
-		config := consts.GetThirdPartyApplicationConfig("quake")
+		cfg := &base.BaseSpaceEngineConfig{}
+		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		if err != nil {
+			log.Errorf("load third party application config failed: %v", err)
+		}
 		if len(api) > 0 {
 			c.apiKey = api[0]
 		} else {
-			c.apiKey = config.APIKey
+			c.apiKey = cfg.APIKey
 		}
-		c.domain = config.GetExtraParam("domain")
+		c.domain = cfg.Domain
 	}
 }
 
 func withUseHunter(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "hunter"
-		config := consts.GetThirdPartyApplicationConfig("hunter")
+		cfg := &base.BaseSpaceEngineConfig{}
+		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		if err != nil {
+			log.Errorf("load third party application config failed: %v", err)
+		}
 		if len(auth) > 0 {
 			c.apiKey = auth[0]
 		} else {
-			c.apiKey = config.APIKey
+			c.apiKey = cfg.APIKey
 		}
-		c.domain = config.GetExtraParam("domain")
+		c.domain = cfg.Domain
 	}
 }
 
 func withUseFofa(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "fofa"
-		config := consts.GetThirdPartyApplicationConfig("fofa")
+		cfg := &base.BaseSpaceEngineConfig{}
+		err := consts.LoadThirdPartyApplicationConfig("fofa", cfg)
+		if err != nil {
+			log.Errorf("load third party application config failed: %v", err)
+		}
 		if len(auth) > 1 {
 			c.user = auth[0]
 			c.apiKey = auth[1]
 		} else {
-			c.apiKey = config.APIKey
-			c.user = config.UserIdentifier
+			c.apiKey = cfg.APIKey
+			c.user = cfg.UserIdentifier
 		}
-		c.domain = config.GetExtraParam("domain")
+		c.domain = cfg.Domain
 	}
 }
 

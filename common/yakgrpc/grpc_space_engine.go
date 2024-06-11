@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -137,7 +138,11 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 }
 
 func (s *Server) GetSpaceEngineStatus(ctx context.Context, req *ypb.GetSpaceEngineStatusRequest) (*ypb.SpaceEngineStatus, error) {
-	config := consts.GetThirdPartyApplicationConfig(req.GetType())
+	config := base.BaseSpaceEngineConfig{}
+	err := consts.LoadThirdPartyApplicationConfig(req.GetType(), &config)
+	if err != nil {
+		log.Errorf("load third party application config failed: %v", err)
+	}
 	account, key, domain := config.UserIdentifier, config.APIKey, config.Domain
 	return s.GetSpaceEngineAccountStatus(ctx, &ypb.GetSpaceEngineAccountStatusRequest{
 		Type:    req.GetType(),
