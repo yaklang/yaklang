@@ -9,15 +9,23 @@ import (
 	"strings"
 )
 
-func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTemplate, err error) {
+func LoadAppConfig(template any, ext ...map[string]string) (configInfo []*ypb.ThirdPartyAppConfigItemTemplate, err error) {
+	extTag := make(map[string]string)
+	for _, m := range ext {
+		for k, v := range m {
+			extTag[k] = v
+		}
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			err = Error(r)
 		}
 	}()
 	typeRef := reflect.TypeOf(template)
+	varRef := reflect.ValueOf(template)
 	if typeRef.Kind() == reflect.Ptr {
 		typeRef = typeRef.Elem()
+		varRef = varRef.Elem()
 	} else {
 		return configInfo, errors.New("template struct must be a pointer")
 	}
@@ -29,9 +37,8 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 		field := typeRef.Field(i)
 		tag := field.Tag
 		appTag := tag.Get("app")
-		if appTag != "" {
-			item := &ypb.ThirdPartyAppConfigItemTemplate{}
-			splits := strings.Split(appTag, ",")
+		parseKv := func(item *ypb.ThirdPartyAppConfigItemTemplate, tag string) error {
+			splits := strings.Split(tag, ",")
 			for _, split := range splits {
 				if strings.Contains(split, ":") {
 					kv := strings.Split(split, ":")
@@ -40,7 +47,7 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 						case "id":
 							id, err := strconv.Atoi(kv[1])
 							if err != nil {
-								return nil, Errorf("invalid id %s", kv[1])
+								return Errorf("invalid id %s", kv[1])
 							}
 							idMap[item] = id
 						case "name":
@@ -51,17 +58,25 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 							item.Required = kv[1] == "true"
 						case "type":
 							item.Type = kv[1]
-						case "verbose":
-							item.Verbose = kv[1]
 						case "default":
 							item.DefaultValue = kv[1]
+						case "verbose":
+							item.Verbose = kv[1]
 						case "extra":
 							item.Extra = kv[1]
 						default:
-							return nil, Errorf("invalid tag %s", kv[0])
+							return Errorf("invalid tag %s", kv[0])
 						}
 					}
 				}
+			}
+			return nil
+		}
+		if appTag != "" {
+			item := &ypb.ThirdPartyAppConfigItemTemplate{}
+			err = parseKv(item, appTag)
+			if err != nil {
+				return nil, err
 			}
 			//if item.Name == "" {
 			//	item.Name = field.Name
@@ -88,6 +103,12 @@ func LoadAppConfig(template any) (configInfo []*ypb.ThirdPartyAppConfigItemTempl
 			}
 			if !StringArrayContains([]string{"string", "number", "bool"}, item.Type) {
 				return nil, Errorf("invalid type %s", item.Type)
+			}
+			if extTags, ok := extTag[item.Name]; ok {
+				err := parseKv(item, extTags)
+				if err != nil {
+					return nil, err
+				}
 			}
 			configInfo = append(configInfo, item)
 		}
