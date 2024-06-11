@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -101,13 +102,19 @@ func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 	if err != nil {
 		log.Warnf("syntax_flow_chain_failed: %s", err)
 	}
-	if vals == nil {
+	if vals == nil || len(vals) == 0 {
 		return results
 	}
-	for _, element := range vals {
-		results = append(results, element...)
+	var o = omap.NewOrderedMap(map[int64]*Value{})
+	for name, element := range vals {
+		for _, sub := range element {
+			if !o.Have(sub.GetId()) {
+				o.Set(sub.GetId(), sub)
+			}
+			sub.syntaxFlowName = append(sub.syntaxFlowName, name)
+		}
 	}
-	return results
+	return o.Values()
 }
 
 func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string]Values, error) {

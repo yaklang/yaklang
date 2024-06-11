@@ -201,7 +201,7 @@ func (lb *LoopBuilder) Finish() {
 		}
 		SSABuild.EmitJump(condition)
 	})
-	endScope := LoopBuilder.Build(SpinHandle, generalPhi(SSABuild, latch), generalPhi(SSABuild, exit))
+	endScope := LoopBuilder.Build(SpinHandle, generatePhi(SSABuild, latch, lb.enter), generatePhi(SSABuild, exit, lb.enter))
 
 	exit.ScopeTable = endScope.(*Scope)
 	SSABuild.CurrentBlock = exit
@@ -364,7 +364,7 @@ func (i *IfBuilder) Build() *IfBuilder {
 	if len(DoneBlock.Preds) != 0 {
 		addToBlocks(DoneBlock)
 		SSABuilder.CurrentBlock = DoneBlock
-		end := ScopeBuilder.BuildFinish(generalPhi(i.builder, DoneBlock))
+		end := ScopeBuilder.BuildFinish(generatePhi(i.builder, DoneBlock, i.enter))
 		DoneBlock.ScopeTable = end.(*Scope)
 	}
 	return i
@@ -412,7 +412,7 @@ func (t *TryBuilder) Finish() {
 	enter := t.enter
 	scope := enter.ScopeTable
 
-	tryBuilder := ssautil.NewTryStmt(ssautil.ScopedVersionedTableIF[Value](scope), generalPhi(builder, nil))
+	tryBuilder := ssautil.NewTryStmt(ssautil.ScopedVersionedTableIF[Value](scope), generatePhi(builder, nil, t.enter))
 
 	// var final *BasicBlock
 	// var id string
@@ -600,7 +600,7 @@ func (t *SwitchBuilder) Finish() {
 			builder.PopTarget()
 
 			return builder.CurrentBlock.ScopeTable
-		}, generalPhi(builder, handlers[i]))
+		}, generatePhi(builder, handlers[i], t.enter))
 
 		builder.EmitJump(NextBlock(i))
 
@@ -620,7 +620,7 @@ func (t *SwitchBuilder) Finish() {
 			builder.PopTarget()
 		}
 		return builder.CurrentBlock.ScopeTable
-	}, generalPhi(builder, defaultb))
+	}, generatePhi(builder, defaultb, t.enter))
 	// jump default -> done
 	builder.EmitJump(done)
 	// builder.PopTarget()
@@ -629,6 +629,6 @@ func (t *SwitchBuilder) Finish() {
 	builder.EmitSwitch(cond, defaultb, sLabels)
 	addToBlocks(done)
 	builder.CurrentBlock = done
-	end := switchBuilder.Build(generalPhi(builder, done))
+	end := switchBuilder.Build(generatePhi(builder, done, t.enter))
 	done.ScopeTable = end.(*Scope)
 }

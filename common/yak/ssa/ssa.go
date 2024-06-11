@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"sync"
 
@@ -277,6 +279,50 @@ type BasicBlock struct {
 	finish      bool // if emitJump finish!
 }
 
+func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
+	if len(b.Insts) <= 0 {
+		return nil, false
+	}
+	jmp, err := lo.Last(b.Insts)
+	if err != nil {
+		return nil, false
+	}
+	switch ret := jmp.(type) {
+	case *Jump:
+		if ret.To == nil {
+			return nil, false
+		}
+		last, err := lo.Last(ret.To.Insts)
+		if err != nil {
+			return nil, false
+		}
+		// fetch essential instructions via jump
+		// if else(elif) condition
+		// for loop condition
+		// switch condition (label)
+		switch ret := last.(type) {
+		case *If:
+			return []Instruction{ret}, true
+		case *Switch:
+			log.Warn("Swtich Statement (Condition/Label value should contains jmp) WARNING")
+			return lo.Map(ret.Label, func(label SwitchLabel, i int) Instruction {
+				var result Instruction = label.Value
+				return result
+			}), true
+		case *Loop:
+			log.Warn("Loop Statement (Condition/Label value should contains jmp) WARNING")
+			return []Instruction{
+				ret.Cond,
+			}, true
+		default:
+			log.Warnf("unsupoorted CFG Entry Instruction: %T", ret)
+		}
+		return nil, false
+	default:
+		return nil, false
+	}
+}
+
 func (b *BasicBlock) GetType() Type {
 	return nil
 }
@@ -295,6 +341,8 @@ var (
 // ----------- Phi
 type Phi struct {
 	anValue
+
+	CFGEntryBasicBlock Value
 
 	Edge []Value // edge[i] from phi.Block.Preds[i]
 	//	what instruction create this control-flow merge?
