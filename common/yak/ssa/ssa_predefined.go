@@ -59,6 +59,8 @@ func (i *anInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
 	return nil, false
 }
 
+func (i *anInstruction) IsLazy() bool { return false }
+
 func (i *anInstruction) Self() Instruction {
 	return i
 }

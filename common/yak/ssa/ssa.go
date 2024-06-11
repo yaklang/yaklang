@@ -58,6 +58,9 @@ type Instruction interface {
 	// Self means lazy instruction will check and return
 	// real instruction will return itself
 	Self() Instruction
+
+	// IsLazy means this instruction is lazy, not loaded all from db
+	IsLazy() bool
 }
 
 type (
@@ -320,6 +323,9 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 		// if else(elif) condition
 		// for loop condition
 		// switch condition (label)
+		if last.IsLazy() {
+			last = last.Self()
+		}
 		switch ret := last.(type) {
 		case *If:
 			var ifs []*If
@@ -762,8 +768,8 @@ type If struct {
 	anInstruction
 
 	Cond  Value
-	True  *BasicBlock
-	False *BasicBlock
+	True  Value
+	False Value
 }
 
 func (i *If) GetSiblings() []*If {
@@ -781,11 +787,15 @@ func (i *If) getSiblings(m map[int64]struct{}) []*If {
 
 	var ifs []*If
 	if i.False == nil {
-		return ifs
+		return nil
 	}
 
-	raw := i.False.LastInst()
-	lastIf, ok := raw.(*If)
+	falseBlock, ok := ToBasicBlock(i.False)
+	if !ok {
+		return nil
+	}
+	raw := falseBlock.LastInst()
+	lastIf, ok := ToIfInstruction(raw)
 	if ok {
 		m[lastIf.GetId()] = struct{}{}
 		ifs = append(ifs, lastIf)

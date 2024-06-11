@@ -70,8 +70,10 @@ func (p *Phi) GetControlFlowConditions() []Value {
 	if p.CFGEntryBasicBlock == nil {
 		return nil
 	}
-	block, ok := p.CFGEntryBasicBlock.(*BasicBlock)
+
+	block, ok := ToBasicBlock(p.CFGEntryBasicBlock)
 	if !ok {
+		log.Warnf("phi's cfg block enter is not a valid *BasicBlock")
 		return nil
 	}
 	relative, ok := block.IsCFGEnterBlock()

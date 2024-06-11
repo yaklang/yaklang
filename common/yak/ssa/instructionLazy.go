@@ -93,11 +93,16 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error)
 	return lz, nil
 }
 
+func (lz *LazyInstruction) IsLazy() bool { return true }
+
 func (lz *LazyInstruction) Self() Instruction {
 	if lz.Value == nil {
 		lz.check()
 	}
-	return lz.Value
+	if lz.Value != nil {
+		return lz.Value
+	}
+	return lz.Instruction
 }
 
 func (lz *LazyInstruction) IsBlock(name string) bool {

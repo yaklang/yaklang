@@ -11,7 +11,7 @@ const BCTag ssa.ErrorTag = "BlockCondition"
 // block condition
 type BlockCondition struct {
 	edge   Edge
-	Finish map[*ssa.BasicBlock]struct{}
+	Finish map[ssa.Value]struct{}
 }
 
 var _ Analyzer = (*BlockCondition)(nil)
@@ -19,12 +19,12 @@ var _ Analyzer = (*BlockCondition)(nil)
 func NewBlockCondition(config) Analyzer {
 	return &BlockCondition{
 		edge:   make(Edge),
-		Finish: make(map[*ssa.BasicBlock]struct{}),
+		Finish: make(map[ssa.Value]struct{}),
 	}
 }
 
 // map to -> from -> condition
-type Edge map[*ssa.BasicBlock]map[*ssa.BasicBlock]ssa.Value
+type Edge map[ssa.Value]map[ssa.Value]ssa.Value
 
 func (s *BlockCondition) Run(prog *ssa.Program) {
 	prog.EachFunction(func(f *ssa.Function) {
@@ -34,11 +34,11 @@ func (s *BlockCondition) Run(prog *ssa.Program) {
 
 func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	s.edge = make(Edge)
-	s.Finish = make(map[*ssa.BasicBlock]struct{})
-	newEdge := func(to, from *ssa.BasicBlock, condition ssa.Value) {
+	s.Finish = make(map[ssa.Value]struct{})
+	newEdge := func(to, from, condition ssa.Value) {
 		fromTable, ok := s.edge[to]
 		if !ok {
-			fromTable = make(map[*ssa.BasicBlock]ssa.Value)
+			fromTable = make(map[ssa.Value]ssa.Value)
 		}
 		fromTable[from] = condition
 		s.edge[to] = fromTable
