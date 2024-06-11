@@ -54,6 +54,10 @@ type Instruction interface {
 	IsBlock(string) bool
 
 	IsCFGEnterBlock() ([]Instruction, bool)
+
+	// Self means lazy instruction will check and return
+	// real instruction will return itself
+	Self() Instruction
 }
 
 type (
@@ -289,12 +293,26 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 	if err != nil {
 		return nil, false
 	}
+
+	_, ok := jmp.(*LazyInstruction)
+	if ok {
+		jmp = jmp.(*LazyInstruction).Self()
+	}
+
 	switch ret := jmp.(type) {
 	case *Jump:
 		if ret.To == nil {
+			log.Warnf("Jump To is nil: %T", ret)
 			return nil, false
 		}
-		last, err := lo.Last(ret.To.Insts)
+
+		toBlock, ok := ToBasicBlock(ret.To)
+		if !ok {
+			log.Warnf("Jump To is not *BasicBlock: %T", ret.To)
+			return nil, false
+		}
+
+		last, err := lo.Last(toBlock.Insts)
 		if err != nil {
 			return nil, false
 		}
@@ -731,7 +749,7 @@ var (
 // the block containing Jump instruction only have one successor block
 type Jump struct {
 	anInstruction
-	To *BasicBlock
+	To Value
 }
 
 var _ Instruction = (*Jump)(nil)

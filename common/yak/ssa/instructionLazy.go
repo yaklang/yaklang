@@ -93,7 +93,7 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error)
 	return lz, nil
 }
 
-func (lz *LazyInstruction) Self() Value {
+func (lz *LazyInstruction) Self() Instruction {
 	if lz.Value == nil {
 		lz.check()
 	}
