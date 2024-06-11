@@ -40,7 +40,11 @@ func (s *Server) ImportYakScriptStream(
 			return utils.Wrap(err, "create zip reader failed, do we need password maybe!")
 		}
 	} else {
-		results, err := codec.SM4DecryptCBCWithPKCSPadding([]byte(req.GetPassword()), data, []byte(req.GetPassword()))
+		results, err := codec.SM4DecryptCBCWithPKCSPadding(
+			codec.PKCS7Padding([]byte(req.GetPassword())),
+			data,
+			codec.PKCS7Padding([]byte(req.GetPassword())),
+		)
 		if err != nil {
 			return utils.Wrapf(err, "decrypt file failed: %v", req.GetFilename())
 		}
@@ -183,7 +187,10 @@ func (s *Server) ExportYakScriptStream(
 	var results []byte = buf.Bytes()
 	if req.Password != "" {
 		req.OutputFilename += ".enc"
-		results, err = codec.SM4EncryptCBCWithPKCSPadding([]byte(req.Password), results, []byte(req.Password))
+		results, err = codec.SM4EncryptCBCWithPKCSPadding(
+			codec.PKCS7Padding([]byte(req.Password)),
+			results, codec.PKCS7Padding([]byte(req.Password)),
+		)
 		if err != nil {
 			return err
 		}
