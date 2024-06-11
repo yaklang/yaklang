@@ -97,7 +97,7 @@ func NewOpenAIClient(opts ...ConfigOption) *Client {
 		o(c)
 	}
 	config := &aispec.AIConfig{}
-	err := consts.LoadThirdPartyApplicationConfig("openai", config)
+	err := consts.GetThirdPartyApplicationConfig("openai", config)
 	if err != nil {
 		log.Errorf("load third party application config failed: %v", err)
 	}
