@@ -96,7 +96,11 @@ func NewOpenAIClient(opts ...ConfigOption) *Client {
 	for _, o := range opts {
 		o(c)
 	}
-	config := consts.GetThirdPartyApplicationConfig("openai")
+	config := &aispec.AIConfig{}
+	err := consts.LoadThirdPartyApplicationConfig("openai", config)
+	if err != nil {
+		log.Errorf("load third party application config failed: %v", err)
+	}
 	if config.APIKey != "" && c.APIKey == "" {
 		verbose := "sk-...."
 		if len(config.APIKey) > 10 {
@@ -105,13 +109,13 @@ func NewOpenAIClient(opts ...ConfigOption) *Client {
 		log.OnceInfoLog("ai-config-apikey", "use openai apikey config: %v", verbose)
 		c.APIKey = config.APIKey
 	}
-	if model := config.GetExtraParam("model"); model != "" && c.ChatModel == "" {
+	if model := config.Model; model != "" && c.ChatModel == "" {
 		c.ChatModel = model
 	}
-	if domain := config.GetExtraParam("domain"); domain != "" && c.Domain == "" {
+	if domain := config.Domain; domain != "" && c.Domain == "" {
 		c.Domain = utils.ExtractHostPort(domain)
 	}
-	if proxy := config.GetExtraParam("proxy"); proxy != "" && c.Proxy == "" {
+	if proxy := config.Proxy; proxy != "" && c.Proxy == "" {
 		log.OnceInfoLog("ai-config-proxy", "use openai apikey config: %v", proxy)
 		c.Proxy = proxy
 	}

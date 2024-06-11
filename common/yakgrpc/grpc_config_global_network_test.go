@@ -189,7 +189,9 @@ func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
 		},
 	}
 	client.SetGlobalNetworkConfig(context.Background(), config)
-	if consts.GetThirdPartyApplicationConfig("github").APIKey != token {
+	cfg := &aispec.AIConfig{}
+	consts.LoadThirdPartyApplicationConfig("github", cfg)
+	if cfg.APIKey != token {
 		t.Fatal("set thirdparty app config failed")
 	}
 }

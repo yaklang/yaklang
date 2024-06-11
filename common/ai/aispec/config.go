@@ -2,6 +2,7 @@ package aispec
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"os"
 	"time"
@@ -10,16 +11,16 @@ import (
 type AIConfig struct {
 	// gateway network config
 	BaseURL string
-	Domain  string `app:"verbose:第三方加速域名,id:4"`
-	NoHttps bool   `app:"verbose:IsHttps,desc:是否使用https请求api,id:3"`
+	Domain  string `app:"name:domain,verbose:第三方加速域名,id:4"`
+	NoHttps bool   `app:"name:no_https,verbose:IsHttps,desc:是否使用https请求api,id:3"`
 
 	// basic model
-	Model    string  `app:"verbose:模型名称,id:2"`
+	Model    string  `app:"name:model,verbose:模型名称,id:2"`
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey        string `app:"verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
-	Proxy         string `app:"verbose:代理地址,id:5"`
+	APIKey        string `app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	Proxy         string `app:"name:proxy,verbose:代理地址,id:5"`
 	StreamHandler func(io.Reader)
 	Type          string
 
@@ -34,21 +35,9 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	for _, p := range opts {
 		p(c)
 	}
-	cfg := consts.GetThirdPartyApplicationConfig(c.Type)
-	if cfg.APIKey != "" {
-		c.APIKey = cfg.APIKey
-	}
-	if cfg.Domain != "" {
-		c.Domain = cfg.Domain
-	}
-	if cfg.GetExtraParam("model") != "" {
-		c.Model = cfg.GetExtraParam("model")
-	}
-	if cfg.GetExtraParam("domain") != "" {
-		c.Domain = cfg.GetExtraParam("domain")
-	}
-	if cfg.GetExtraParam("proxy") != "" {
-		c.Proxy = cfg.GetExtraParam("proxy")
+	err := consts.LoadThirdPartyApplicationConfig(c.Type, c)
+	if err != nil {
+		log.Errorf("load third party application config failed: %v", err)
 	}
 	return c
 }
