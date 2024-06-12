@@ -1,11 +1,12 @@
-package yakdocument
+package yakdocument_test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"gopkg.in/yaml.v2"
-	"testing"
 
 	_ "github.com/yaklang/yaklang/common/yak"
 )

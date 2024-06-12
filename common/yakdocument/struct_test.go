@@ -1,8 +1,10 @@
-package yakdocument
+package yakdocument_test
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakdocument"
 )
 
 type DemoStruct struct {
@@ -30,7 +32,7 @@ func (d *DemoStruct) test1() (string, error) {
 }
 
 func TestDir(t *testing.T) {
-	sh, err := Dir(&DemoStruct{
+	sh, err := yakdocument.Dir(&DemoStruct{
 		Name:  "tzas",
 		Func1: nil,
 		Func2: nil,
