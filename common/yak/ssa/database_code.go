@@ -234,7 +234,7 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.IsFunction = true
 	ir.IsVariadic = f.hasEllipsis
 
-	for _, formArg := range f.Param {
+	for _, formArg := range f.Params {
 		if formArg == nil {
 			continue
 		}
@@ -296,7 +296,7 @@ func functionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 			log.Errorf("BUG: function formal arg : %v", err)
 			continue
 		}
-		fun.Param = append(fun.Param, para)
+		fun.Params = append(fun.Params, para)
 	}
 
 	fun.FreeValues = make(map[string]*Parameter)

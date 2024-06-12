@@ -41,21 +41,21 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 	if b.MarkedThisObject == nil {
 		return
 	}
-	if len(b.Param) <= 0 {
+	if len(b.Params) <= 0 {
 		return
 	}
 	// if this value is not object, and not user, should remove it.
-	para := b.Param[0]
+	para := b.Params[0]
 	if para == nil || para.IsObject() || para.HasUsers() {
 		return
 	}
 
 	// remove from param
-	b.Param = utils.RemoveSliceItem(b.Param, para)
+	b.Params = utils.RemoveSliceItem(b.Params, para)
 	// fix other field in function
 	b.ParamLength--
 	// fix other parameter index
-	for i, p := range b.Param {
+	for i, p := range b.Params {
 		p.FormalParameterIndex = i
 	}
 	// fixup side effect,
@@ -161,7 +161,7 @@ func (f *Function) Finish() {
 	}
 	funType := f.Type
 
-	funType.Parameter = lo.Map(f.Param, func(p *Parameter, _ int) Type {
+	funType.Parameter = lo.Map(f.Params, func(p *Parameter, _ int) Type {
 		t := p.GetType()
 		return t
 	})
@@ -170,8 +170,8 @@ func (f *Function) Finish() {
 	funType.This = f
 	funType.ReturnValue = f.Return
 	funType.ParameterLen = f.ParamLength
-	funType.ParameterValue = f.Param
-	funType.ParameterMember = f.ParameterMember
+	funType.ParameterValue = f.Params
+	funType.ParameterMember = f.ParameterMembers
 	funType.SetFreeValue(f.FreeValues)
 	funType.SetSideEffect(f.SideEffects)
 	f.SetType(funType)

@@ -1365,16 +1365,16 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	// save Current function builder marked FunctionType
 	MarkedFunctionType := b.GetMarkedFunction()
 	handleFunctionType := func(fun *ssa.Function) {
-		fun.ParamLength = len(fun.Param)
+		fun.ParamLength = len(fun.Params)
 		// in this function, builder is sub-function builder
 		if MarkedFunctionType == nil {
 			return
 		}
-		if len(fun.Param) != len(MarkedFunctionType.Parameter) {
+		if len(fun.Params) != len(MarkedFunctionType.Parameter) {
 			return
 		}
 
-		for i, p := range fun.Param {
+		for i, p := range fun.Params {
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true

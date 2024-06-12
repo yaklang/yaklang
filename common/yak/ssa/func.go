@@ -26,7 +26,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	f := &Function{
 		anValue:        NewValue(),
 		Package:        p,
-		Param:          make([]*Parameter, 0),
+		Params:         make([]*Parameter, 0),
 		hasEllipsis:    false,
 		Blocks:         make([]*BasicBlock, 0),
 		EnterBlock:     nil,
@@ -95,8 +95,8 @@ func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Param
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
 	paraMember := NewParamMember(name, f, obj, key)
-	f.ParameterMember = append(f.ParameterMember, paraMember)
-	paraMember.FormalParameterIndex = len(f.ParameterMember) - 1
+	f.ParameterMembers = append(f.ParameterMembers, paraMember)
+	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
 		f.MarkedThisObject.GetId() == obj.GetDefault().GetId() {
@@ -108,8 +108,8 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 }
 
 func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
-	f.Param = append(f.Param, p)
-	p.FormalParameterIndex = len(f.Param) - 1
+	f.Params = append(f.Params, p)
+	p.FormalParameterIndex = len(f.Params) - 1
 	p.IsFreeValue = false
 	variable := f.CreateVariable(p.GetName(), token...)
 	f.AssignVariable(variable, p)

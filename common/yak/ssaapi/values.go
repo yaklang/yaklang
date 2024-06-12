@@ -294,8 +294,8 @@ func (v *Value) GetParameter(i int) *Value {
 	}
 
 	if f, ok := ssa.ToFunction(v.node); ok {
-		if i < len(f.Param) {
-			return v.NewValue(f.Param[i])
+		if i < len(f.Params) {
+			return v.NewValue(f.Params[i])
 		}
 	}
 	return nil
@@ -308,7 +308,7 @@ func (v *Value) GetParameters() Values {
 
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
-		for _, param := range f.Param {
+		for _, param := range f.Params {
 			ret = append(ret, v.NewValue(param))
 		}
 	}
