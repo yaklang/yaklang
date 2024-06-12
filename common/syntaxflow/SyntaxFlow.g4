@@ -15,7 +15,7 @@ filters: filterStatement+;
 
 filterStatement
     : filterExpr (As refVariable)? eos? # FilterExecution
-    | assertStatement eos?              # FilterAssert
+    | checkStatement eos?              # FilterParamCheck
     | descriptionStatement eos?         # Description
     | eos                               # EmptyStatement
     ;
@@ -32,9 +32,10 @@ descriptionItem
     | stringLiteral ':' stringLiteral
     ;
 
-// assertStatement will assert the filterExpr is true, if not, it will throw an error with stringLiteral
+// checkStatement will check the filterExpr($params) is true( .len > 0), if not,
+// it will record an error with stringLiteral
 // if thenExpr is provided, it will be executed(description) after the assertStatement
-assertStatement: Assert refVariable thenExpr? elseExpr?;
+checkStatement: Check refVariable thenExpr? elseExpr?;
 thenExpr: Then stringLiteral;
 elseExpr: Else stringLiteral;
 
@@ -118,7 +119,7 @@ conditionExpression
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier | '*';
 regexpLiteral: RegexpLiteral;
-identifier: Identifier | types | As | Assert | Then | Desc | QuotedStringLiteral;
+identifier: Identifier | types | As | Check | Then | Desc | QuotedStringLiteral;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -180,7 +181,7 @@ DictType: 'dict';
 NumberType: 'int' | 'float';
 BoolType: 'bool';
 BoolLiteral: 'true' | 'false';
-Assert: 'assert';
+Check: 'check';
 Then: 'then';
 Desc: 'desc' | 'note';
 Else: 'else';
@@ -191,7 +192,6 @@ IdentifierChar: [0-9] | IdentifierCharStart;
 QuotedStringLiteral
     : SingleQuote ( ~['\\\r\n] | ('\\\'') | '\\\\' | '\\')* SingleQuote
     | DoubleQuote ( ~["\\\r\n] | '\\"' | '\\\\' | '\\' )* DoubleQuote
-    | Backtick (~[`])* Backtick
     ;
 
 fragment IdentifierCharStart: '*' | '_' | [a-z] | [A-Z];

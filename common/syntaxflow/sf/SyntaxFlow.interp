@@ -59,7 +59,7 @@ null
 null
 'bool'
 null
-'assert'
+'check'
 'then'
 null
 'else'
@@ -130,7 +130,7 @@ DictType
 NumberType
 BoolType
 BoolLiteral
-Assert
+Check
 Then
 Desc
 Else
@@ -148,7 +148,7 @@ eos
 descriptionStatement
 descriptionItems
 descriptionItem
-assertStatement
+checkStatement
 thenExpr
 elseExpr
 refVariable

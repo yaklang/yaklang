@@ -19,7 +19,7 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExecution(ctx *FilterExecutionContext
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterAssert(ctx *FilterAssertContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFilterParamCheck(ctx *FilterParamCheckContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -47,7 +47,7 @@ func (v *BaseSyntaxFlowVisitor) VisitDescriptionItem(ctx *DescriptionItemContext
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitAssertStatement(ctx *AssertStatementContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitCheckStatement(ctx *CheckStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

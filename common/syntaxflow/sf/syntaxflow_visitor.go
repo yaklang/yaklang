@@ -16,8 +16,8 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExecution.
 	VisitFilterExecution(ctx *FilterExecutionContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterAssert.
-	VisitFilterAssert(ctx *FilterAssertContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#FilterParamCheck.
+	VisitFilterParamCheck(ctx *FilterParamCheckContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#Description.
 	VisitDescription(ctx *DescriptionContext) interface{}
@@ -37,8 +37,8 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#descriptionItem.
 	VisitDescriptionItem(ctx *DescriptionItemContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#assertStatement.
-	VisitAssertStatement(ctx *AssertStatementContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#checkStatement.
+	VisitCheckStatement(ctx *CheckStatementContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#thenExpr.
 	VisitThenExpr(ctx *ThenExprContext) interface{}

@@ -84,7 +84,7 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 			y.EmitPop()
 		}
 		y.EmitExitStatement()
-	case *sf.FilterAssertContext:
+	case *sf.FilterParamCheckContext:
 		log.Warn("assert not implemented")
 		log.Warn("assert not implemented")
 		log.Warn("assert not implemented")
