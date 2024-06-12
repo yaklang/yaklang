@@ -68,6 +68,11 @@ const (
 	OpNot
 
 	OpCheckStackTop
+
+	// OpCheckParams check the params in vm context
+	// if not match, record error
+	// matched, use 'then expr' (if exists)
+	OpCheckParams
 )
 
 type SFI struct {
