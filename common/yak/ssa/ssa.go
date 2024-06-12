@@ -210,12 +210,12 @@ type Function struct {
 	Type *FunctionType
 
 	// just function parameter
-	Param       []*Parameter
+	Params      []*Parameter
 	ParamLength int
 	// for closure function
 	FreeValues map[string]*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
-	ParameterMember []*ParameterMember
+	ParameterMembers []*ParameterMember
 	// function side effects
 	SideEffects []*FunctionSideEffect
 
