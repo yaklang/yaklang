@@ -64,54 +64,9 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 	if err != nil {
 		return nil, err
 	}
-	for i, appConfig := range config.AppConfigs {
-		newItem := []*ypb.KVPair{
-			{
-				Key:   "api_key",
-				Value: appConfig.APIKey,
-			},
-			{
-				Key:   "user_identifier",
-				Value: appConfig.UserIdentifier,
-			},
-			{
-				Key:   "user_secret",
-				Value: appConfig.UserSecret,
-			},
-			{
-				Key:   "domain",
-				Value: appConfig.Domain,
-			},
-			{
-				Key:   "webhook_url",
-				Value: appConfig.WebhookURL,
-			},
-			{
-				Key:   "namespace",
-				Value: appConfig.Namespace,
-			},
-		}
-		var newExtraParams []*ypb.KVPair
-		for _, item := range newItem {
-			pass := false
-			for index, param := range config.AppConfigs[i].ExtraParams {
-				if param != nil && item.Key == param.Key {
-					newExtraParams = append(newExtraParams, param)
-					config.AppConfigs[i].ExtraParams[index] = nil
-					pass = true
-					break
-				}
-			}
-			if !pass {
-				newExtraParams = append(newExtraParams, item)
-			}
-		}
-		for _, param := range config.AppConfigs[i].ExtraParams {
-			if param != nil {
-				newExtraParams = append(newExtraParams, param)
-			}
-		}
-		config.AppConfigs[i].ExtraParams = newExtraParams
+
+	for _, appConfig := range config.AppConfigs {
+		consts.ConvertCompatibleConfig(appConfig)
 	}
 	total := aispec.RegisteredAIGateways()
 	for i, s := range config.AiApiPriority { // remove deprecated ai type
@@ -224,7 +179,7 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			extTag["model"] = "default:qwen-turbo"
 			extTag["domain"] = "default:dashscope.aliyuncs.com"
 		}
-		aiOptions, err := utils.LoadAppConfig(&aispec.AIConfig{}, extTag)
+		aiOptions, err := utils.ParseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {
 			return nil, err
 		}

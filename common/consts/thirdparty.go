@@ -2,6 +2,7 @@ package consts
 
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 
@@ -13,15 +14,59 @@ var thirdPartyConfig = new(sync.Map)
 
 type thirdPartyApplicationConfig struct {
 	Type           string
-	APIKey         string
-	UserIdentifier string
-	UserSecret     string
-	Namespace      string
-	Domain         string
-	WebhookURL     string
+	APIKey         string `app:"name:api_key"`
+	UserIdentifier string `app:"name:user_identifier"`
+	UserSecret     string `app:"name:user_secret"`
+	Namespace      string `app:"name:namespace"`
+	Domain         string `app:"name:domain"`
+	WebhookURL     string `app:"name:webhook_url"`
 	ExtraParams    map[string]string
 }
 
+func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
+	c := &thirdPartyApplicationConfig{
+		Type:           config.Type,
+		APIKey:         config.APIKey,
+		UserIdentifier: config.UserIdentifier,
+		UserSecret:     config.UserSecret,
+		Namespace:      config.Namespace,
+		Domain:         config.Domain,
+		WebhookURL:     config.WebhookURL,
+		ExtraParams:    make(map[string]string, len(config.ExtraParams)),
+	}
+	for _, kv := range config.ExtraParams {
+		c.ExtraParams[kv.Key] = kv.Value
+	}
+
+	err := utils.ImportAppConfigToStruct(c, c.ExtraParams)
+	if err != nil {
+		log.Errorf("ImportAppConfigToStruct failed: %v", err)
+		return
+	}
+
+	data, err := utils.ExportAppConfigToMap(c)
+	if err != nil {
+		log.Errorf("ConvertCompatibleConfig failed: %v", err)
+		return
+	}
+
+	for k, v := range data {
+		c.ExtraParams[k] = v
+	}
+	config.APIKey = c.APIKey
+	config.UserIdentifier = c.UserIdentifier
+	config.UserSecret = c.UserSecret
+	config.Namespace = c.Namespace
+	config.Domain = c.Domain
+	config.WebhookURL = c.WebhookURL
+	config.ExtraParams = nil
+	for k, v := range c.ExtraParams { // ExtraParams will be disordered
+		config.ExtraParams = append(config.ExtraParams, &ypb.KVPair{
+			Key:   k,
+			Value: v,
+		})
+	}
+}
 func (c *thirdPartyApplicationConfig) GetExtraParam(name string) string {
 	if c.ExtraParams == nil {
 		return ""
@@ -32,13 +77,10 @@ func (c *thirdPartyApplicationConfig) GetExtraParam(name string) string {
 	return ""
 }
 func (c *thirdPartyApplicationConfig) ToMap() map[string]string {
-	params := map[string]string{}
-	params["api_key"] = c.APIKey
-	params["user_identifier"] = c.UserIdentifier
-	params["user_secret"] = c.UserSecret
-	params["domain"] = c.Domain
-	params["webhook_url"] = c.WebhookURL
-	params["namespace"] = c.Namespace
+	params, err := utils.ExportAppConfigToMap(c)
+	if err != nil {
+		log.Errorf("ExportAppConfigToMap failed: %v", err)
+	}
 	for k, v := range c.ExtraParams {
 		params[k] = v
 	}
@@ -52,7 +94,7 @@ func GetThirdPartyApplicationConfig(t string, cfg any) error {
 	if v, ok := thirdPartyConfig.Load(t); ok {
 		rawCfg := v.(*thirdPartyApplicationConfig)
 		params := rawCfg.ToMap()
-		return utils.ApplyAppConfig(cfg, params)
+		return utils.ImportAppConfigToStruct(cfg, params)
 	}
 	return errors.New("third party application config not found")
 }
@@ -101,7 +143,7 @@ func UpdateThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) 
 	if config.Type == "" {
 		return
 	}
-
+	ConvertCompatibleConfig(config)
 	c := &thirdPartyApplicationConfig{
 		Type:           config.Type,
 		APIKey:         config.APIKey,

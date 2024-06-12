@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func LoadAppConfig(template any, ext ...map[string]string) (configInfo []*ypb.ThirdPartyAppConfigItemTemplate, err error) {
+func ParseAppTagToOptions(template any, ext ...map[string]string) (configInfo []*ypb.ThirdPartyAppConfigItemTemplate, err error) {
 	extTag := make(map[string]string)
 	for _, m := range ext {
 		for k, v := range m {
@@ -119,7 +119,20 @@ func LoadAppConfig(template any, ext ...map[string]string) (configInfo []*ypb.Th
 	return configInfo, nil
 }
 
-func ApplyAppConfig(template any, data map[string]string) (err error) {
+func ExportAppConfigToMap(ins any) (map[string]string, error) {
+	res := map[string]string{}
+	err := walkField(ins, func(field reflect.Value, tags map[string]string) {
+		if v, ok := tags["name"]; ok {
+			res[v] = InterfaceToString(field.Interface())
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func ImportAppConfigToStruct(template any, data map[string]string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = Error(r)
@@ -196,6 +209,41 @@ func ApplyAppConfig(template any, data map[string]string) (err error) {
 				return errors.New("unsupported field type")
 			}
 		}
+	}
+	return nil
+}
+
+func ParseAppTag(tag string) map[string]string {
+	tagsMap := map[string]string{}
+	splits := strings.Split(tag, ",")
+	for _, split := range splits {
+		if strings.Contains(split, ":") {
+			kv := strings.Split(split, ":")
+			if len(kv) == 2 {
+				tagsMap[kv[0]] = kv[1]
+			}
+		}
+	}
+	return tagsMap
+}
+
+func walkField(template any, handle func(field reflect.Value, tags map[string]string)) error {
+	typeRef := reflect.TypeOf(template)
+	varRef := reflect.ValueOf(template)
+	if typeRef.Kind() == reflect.Ptr {
+		typeRef = typeRef.Elem()
+		varRef = varRef.Elem()
+	} else {
+		return errors.New("template struct must be a pointer")
+	}
+	if typeRef.Kind() != reflect.Struct {
+		return errors.New("template struct must be a struct")
+	}
+	for i := 0; i < typeRef.NumField(); i++ {
+		field := typeRef.Field(i)
+		tag := field.Tag
+		appTag := tag.Get("app")
+		handle(varRef.Field(i), ParseAppTag(appTag))
 	}
 	return nil
 }
