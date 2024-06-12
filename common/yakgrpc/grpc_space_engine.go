@@ -229,9 +229,19 @@ func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.Thi
 			break
 		}
 	case SPACE_ENGINE_QUAKE:
+		if string(bodyRaw) == "/quake/login" {
+			result.Info = "Quake账户信息异常"
+			result.Status = SPACE_ENGINE_STATUS_ERROR
+			break
+		}
 		data := gjsonResult.Get("data")
 		result.Remain = data.Get("credit").Int() + data.Get("persistent_credit").Int()
 	case SPACE_ENGINE_FOFA:
+		if msg := gjsonResult.Get("errmsg").String(); msg != "" {
+			result.Status = SPACE_ENGINE_STATUS_ERROR
+			result.Info = msg
+			break
+		}
 		email := cfg.UserIdentifier
 		if email == "" {
 			result.Status = SPACE_ENGINE_STATUS_EMPTY_KEY
@@ -247,18 +257,16 @@ func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.Thi
 }
 
 func (s *Server) GetSpaceEngineStatus(ctx context.Context, req *ypb.GetSpaceEngineStatusRequest) (*ypb.SpaceEngineStatus, error) {
-	config := base.BaseSpaceEngineConfig{}
-	err := consts.GetThirdPartyApplicationConfig(req.GetType(), &config)
+	config, err := consts.GetCommonThirdPartyApplicationConfig(req.GetType())
 	if err != nil {
 		log.Errorf("load third party application config failed: %v", err)
+		return &ypb.SpaceEngineStatus{
+			Type:   req.GetType(),
+			Status: SPACE_ENGINE_STATUS_ERROR,
+			Info:   "未找到配置",
+		}, nil
 	}
-	account, key, domain := config.UserIdentifier, config.APIKey, config.Domain
-	return s.GetSpaceEngineAccountStatus(ctx, &ypb.GetSpaceEngineAccountStatusRequest{
-		Type:    req.GetType(),
-		Account: account,
-		Key:     key,
-		Domain:  domain,
-	})
+	return s.GetSpaceEngineAccountStatusV2(ctx, config)
 }
 
 //go:embed grpc_space_engine.yak
