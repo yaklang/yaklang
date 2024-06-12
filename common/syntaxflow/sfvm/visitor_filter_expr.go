@@ -47,9 +47,10 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
-		y.EmitGetCall()
 		if ret.ActualParam() != nil {
 			y.VisitActualParam(ret.ActualParam())
+		} else {
+			y.EmitGetCall()
 		}
 	case *sf.FieldIndexFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr())

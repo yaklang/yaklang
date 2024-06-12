@@ -12,32 +12,30 @@ var (
 
 func ParseTags(prog *ssaapi.Program) []string {
 	ret := make([]string, 0)
-	// check ai
-	valueMap, err := prog.SyntaxFlowWithError("ai.Chat() as $target")
-	if err == nil {
-		if vs, ok := valueMap["target"]; ok && vs.Len() > 0 {
-			ret = append(ret, AI_PLUGIN)
-		}
-	}
-	checkParamHasCall := func(ref ssaapi.Values, index int, tag string) {
-		funcDel := GetLastRef(ref)
-		if !funcDel.IsNil() && funcDel.IsFunction() {
-			if funcDel.GetParameter(index).GetCalledBy().Len() > 0 {
-				ret = append(ret, tag)
+	{
+		// check ai
+		valueMap, err := prog.SyntaxFlowWithError("ai.Chat() as $target")
+		if err == nil {
+			if vs, ok := valueMap["target"]; ok && vs.Len() > 0 {
+				ret = append(ret, AI_PLUGIN)
 			}
 		}
 	}
 
-	// check mitm hijack
-	hijackHTTPRequest := prog.Ref("hijackHTTPRequest")
-	hijackHTTPResponse := prog.Ref("hijackHTTPResponse")
-	hijackHTTPResponseEx := prog.Ref("hijackHTTPResponseEx")
-	checkParamHasCall(hijackHTTPRequest, 3, FORWARD_HTTP_PACKET)
-	checkParamHasCall(hijackHTTPRequest, 4, DROP_HTTP_PACKET)
-	checkParamHasCall(hijackHTTPResponse, 3, FORWARD_HTTP_PACKET)
-	checkParamHasCall(hijackHTTPResponse, 4, DROP_HTTP_PACKET)
-	checkParamHasCall(hijackHTTPResponseEx, 4, FORWARD_HTTP_PACKET)
-	checkParamHasCall(hijackHTTPResponseEx, 5, DROP_HTTP_PACKET)
+	{
+		if valueMap, err := prog.SyntaxFlowWithError(`
+		hijackHTTPRequest(, , ,*() as $forward , *() as $drop)
+		hijackHTTPResponse(, , ,*() as $forward , *() as $drop)
+		hijackHTTPResponseEx(, , ,, *() as $forward , *() as $drop)
+		`); err == nil {
+			if vs, ok := valueMap["forward"]; ok && vs.Len() > 0 {
+				ret = append(ret, FORWARD_HTTP_PACKET)
+			}
+			if vs, ok := valueMap["drop"]; ok && vs.Len() > 0 {
+				ret = append(ret, DROP_HTTP_PACKET)
+			}
+		}
+	}
 	return ret
 }
 

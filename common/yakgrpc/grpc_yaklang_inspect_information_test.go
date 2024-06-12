@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
@@ -941,11 +942,13 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 		},
 	}
 
-	for _, check := range testcase {
-		prog, err := ssaapi.Parse(check.code, static_analyzer.GetPluginSSAOpt(check.pluginType)...)
-		if err != nil {
-			t.Fatal(err)
-		}
-		require.ElementsMatch(t, check.expectTag, information.ParseTags(prog))
+	for i, check := range testcase {
+		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
+			prog, err := ssaapi.Parse(check.code, static_analyzer.GetPluginSSAOpt(check.pluginType)...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			require.ElementsMatch(t, check.expectTag, information.ParseTags(prog))
+		})
 	}
 }
