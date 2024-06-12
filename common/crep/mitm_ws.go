@@ -62,8 +62,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		return nil
 	}
 
-	// 如果请求存在permessage-deflate扩展则设置isDeflate
-	isDeflate := lowhttp.IsPermessageDeflate(req.Header)
+	isDeflate := false
 
 	// hijack request
 	if err := w.RequestHijackCallback(req); err != nil {
@@ -175,12 +174,10 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		return utils.Errorf("101 switch protocol failed: now %v", rsp.StatusCode)
 	}
 
-	// 如果响应中不存在permessage-deflate扩展则要反设置isDeflate
-	serverSupportDeflate := lowhttp.IsPermessageDeflate(rsp.Header)
-
-	// 当服务端不支持permessage-deflate扩展时，客户端也不应该使用
-	if !serverSupportDeflate && isDeflate {
-		isDeflate = false
+	extensions := lowhttp.GetWebsocketExtensions(rsp.Header)
+	// 当服务端支持permessage-deflate扩展时，证明协商支持压缩
+	if extensions.IsDeflate {
+		isDeflate = true
 	}
 
 	if _, err = brw.Writer.Write(rspBytes); err != nil {

@@ -24,6 +24,7 @@ const (
 	RSV2BIT                = 1 << 5
 	RSV3BIT                = 1 << 4
 	MASKBIT                = 1 << 7
+	UNRSV1BIT              = 0b10111111
 	RESET_MESSAGE_TYPE_BIT = 0b11110000
 	FRAME_TYPE_BIT         = 0b00001111
 	TWO_BYTE_BIT           = 0b01111110
@@ -88,38 +89,16 @@ type Frame struct {
 	firstByte     byte
 	secondByte    byte
 	mask          bool
-	isDeflate     bool
 }
 
 func (f *Frame) Bytes() ([]byte, []byte) {
 	data := utils.BytesClone(f.payload)
-
-	dataLength := uint64(len(data))
 	firstByte, secondByte := f.firstByte, f.secondByte
 
-	// 直接转发浏览器的 payload ，不再重新还原压缩(todo)
-	//if f.isDeflate && !f.IsControl() {
-	//	//if f.isDeflate {
-	//	data, err := deflate(data)
-	//	if err != nil {
-	//		log.Errorf("frame deflate error: %v", err)
-	//		return nil, nil
-	//	}
-	//	dataLength = uint64(len(data))
-	//
-	//	// set rsv1
-	//	firstByte |= RSV1BIT
-	//
-	//	// reset secondByte payload length
-	//	secondByte &= MASKBIT
-	//	if dataLength > TWO_BYTE_SIZE {
-	//		secondByte |= EIGHT_BYTE_BIT
-	//	} else if dataLength > SEVEN_BIT_SIZE {
-	//		secondByte |= TWO_BYTE_BIT
-	//	} else {
-	//		secondByte |= byte(dataLength)
-	//	}
-	//}
+	dataLength := len(data)
+	if f.mask {
+		secondByte = secondByte | MASKBIT
+	}
 
 	rawBuf := bytes.NewBuffer(nil)
 	rawBuf.WriteByte(firstByte)
@@ -151,6 +130,14 @@ func (f *Frame) FIN() bool {
 
 func (f *Frame) RSV1() bool {
 	return f.firstByte&RSV1BIT != 0
+}
+
+func (f *Frame) SetRSV1() {
+	f.firstByte |= RSV1BIT
+}
+
+func (f *Frame) UnsetRSV1() {
+	f.firstByte &= UNRSV1BIT
 }
 
 func (f *Frame) RSV2() bool {
@@ -216,26 +203,6 @@ func (f *Frame) IsControl() bool {
 	return f.messageType == CloseMessage || f.messageType == PingMessage || f.messageType == PongMessage
 }
 
-type FrameReader struct {
-	r         *bufio.Reader
-	c         *WebsocketClient
-	isDeflate bool
-}
-
-func NewFrameReader(r io.Reader, isDeflate bool) *FrameReader {
-	return &FrameReader{
-		r:         bufio.NewReader(r),
-		isDeflate: isDeflate,
-	}
-}
-
-func NewFrameReaderFromBufio(r *bufio.Reader, isDeflate bool) *FrameReader {
-	return &FrameReader{
-		r:         r,
-		isDeflate: isDeflate,
-	}
-}
-
 func (f *Frame) Show() {
 	raw := utils.BytesClone(f.data)
 	rawString := strings.Clone(string(raw))
@@ -261,20 +228,43 @@ func (f *Frame) Show() {
 	}
 }
 
+type FrameReader struct {
+	r              *bufio.Reader     // raw reader
+	limitReader    *io.LimitedReader // io.LimitReader
+	flateTail      *bytes.Reader     // flate tail \x00\x00\xff\xff
+	flateReader    io.Reader         // flate reader
+	fragmentBuffer *bytes.Buffer     // fragment buffer
+	c              *WebsocketClient
+	dict           *slidingWindow
+	frame          *Frame
+	isDeflate      bool
+}
+
+func NewFrameReader(r io.Reader, isDeflate bool) *FrameReader {
+	return NewFrameReaderFromBufio(bufio.NewReader(r), isDeflate)
+}
+
+func NewFrameReaderFromBufio(r *bufio.Reader, isDeflate bool) *FrameReader {
+	fr := &FrameReader{
+		r:           r,
+		limitReader: &io.LimitedReader{R: r, N: 4096},
+		isDeflate:   isDeflate,
+	}
+	if isDeflate {
+		fr.flateTail = bytes.NewReader(compressionReadTail)
+	}
+
+	return fr
+}
+
 func (fr *FrameReader) SetWebsocketClient(c *WebsocketClient) {
 	fr.c = c
 }
 
 func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
-	frame = &Frame{
-		isDeflate: fr.isDeflate,
-	}
+	frame = &Frame{}
 	defer func() {
-		/*
-			这儿不用也没关系，但是保护性编程，还是留着
-		*/
 		if recoveredError := recover(); recoveredError != nil {
-			log.Errorf("read frame failed: %s", recoveredError)
 			err = utils.Errorf("read frame panic: %s", recoveredError)
 			return
 		}
@@ -349,49 +339,12 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		rawBuf.Write(tempBytes)
 		frame.maskingKey = tempBytes
 	}
+	fr.reset(frame)
 
 	// data
-	// todo: uint64 -> int64 maybe overflow
-	data := make([]byte, dataLength)
-	if dataLength > 0 {
-		// fast failed for invalid utf8
-		if frameType == TextMessage && fr.c != nil && fr.c.strictMode {
-			offset := uint64(0)
-			for {
-				// read all buffered
-				bufferLen := uint64(fr.r.Buffered())
-				if bufferLen > 0 {
-					if offset+bufferLen > dataLength {
-						bufferLen = dataLength - offset
-					}
-					n, err := fr.r.Read(data[offset : offset+bufferLen])
-					if err != nil {
-						return nil, errors.Wrap(err, "read payload data failed")
-					}
-					offset += uint64(n)
-					if offset >= dataLength {
-						break
-					}
-					if valid, _ := IsValidUTF8WithRemind(data[:offset]); !valid {
-						fr.c.WriteCloseEx(CloseInvalidFramePayloadData, "")
-					}
-				}
-				// peek to wait for next read
-				_, err = fr.r.Peek(1)
-				if err != nil {
-					return nil, errors.Wrap(err, "read payload data failed")
-				}
-			}
-			// for i := uint64(0); i < dataLength; i++ {
-			// 	data[i], err = fr.r.ReadByte()
-			// 	if err != nil {
-			// 		return frame, errors.Wrap(err, "read payload data failed")
-			// 	}
-
-			// }
-		} else {
-			_, err = io.ReadFull(fr.r, data)
-		}
+	data, err := fr.readFramePayload(dataLength)
+	if err != nil {
+		return frame, err
 	}
 
 	frame.rawPayload = make([]byte, len(data))
@@ -422,40 +375,82 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		}
 	}
 
-	// websocket扩展：permessage-deflate，只有frameType为TextMessage和BinaryMessage时才需要解压缩
-	if fr.isDeflate && !frame.IsControl() {
-		newData, errx := inflate(data)
-
-		if errx != nil {
-			log.Warn("permessage-deflate is set, but permessage-deflate failed!")
-			log.Warnf("ws frameReader.Reader inflate failed: %v", errx)
-		} else {
-			frame.data = newData
-		}
-	} else {
-		// 如果解压失败，那么就认为数据没有进行压缩
-		frame.data = data
-	}
+	frame.data = data
 	frame.raw = rawBuf.Bytes()
 	return
 }
 
+func (fr *FrameReader) readFramePayload(dataLength uint64) (data []byte, err error) {
+	frame := fr.frame
+	frameType := frame.messageType
+	data = make([]byte, dataLength)
+
+	// fast failed for invalid utf8
+	if !fr.isDeflate && !frame.RSV1() && frameType == TextMessage && fr.c != nil && fr.c.strictMode {
+		if dataLength == 0 {
+			return make([]byte, 0), nil
+		}
+		offset := uint64(0)
+		for {
+			// read all buffered
+			bufferLen := uint64(fr.r.Buffered())
+			if bufferLen > 0 {
+				if offset+bufferLen > dataLength {
+					bufferLen = dataLength - offset
+				}
+				n, err := fr.r.Read(data[offset : offset+bufferLen])
+				if err != nil {
+					return nil, errors.Wrap(err, "read payload data failed")
+				}
+				offset += uint64(n)
+				if offset >= dataLength {
+					break
+				}
+				if valid, _ := IsValidUTF8WithRemind(data[:offset]); !valid {
+					fr.c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+					return nil, errors.New("payload invalid utf8")
+				}
+			}
+			// peek to wait for next read
+			_, err = fr.r.Peek(1)
+			if err != nil {
+				return nil, errors.Wrap(err, "read payload data failed")
+			}
+		}
+	} else {
+		data, err = fr.readPayloadN(dataLength)
+	}
+	return data, err
+}
+
 type FrameWriter struct {
-	w         *bufio.Writer
-	isDeflate bool
+	frame          *Frame
+	w              *bufio.Writer
+	fw             *msgWriter
+	c              *WebsocketClient
+	opcode         int
+	flateThreshold int
+	isDeflate      bool
+	isClient       bool
 }
 
 func NewFrameWriter(w io.Writer, isDeflate bool) *FrameWriter {
-	return &FrameWriter{
-		w:         bufio.NewWriter(w),
-		isDeflate: isDeflate,
-	}
+	return NewFrameWriterFromBufio(bufio.NewWriter(w), isDeflate)
 }
 
 func NewFrameWriterFromBufio(w *bufio.Writer, isDeflate bool) *FrameWriter {
 	return &FrameWriter{
-		w:         w,
-		isDeflate: isDeflate,
+		w:              w,
+		isDeflate:      isDeflate,
+		flateThreshold: 128,
+		isClient:       true, // todo: do not set it to true by default
+	}
+}
+
+func (fw *FrameWriter) SetWebsocketClient(c *WebsocketClient) {
+	fw.c = c
+	if !c.Extensions.flateContextTakeover() {
+		fw.flateThreshold = 512
 	}
 }
 
@@ -464,35 +459,122 @@ func (fw *FrameWriter) Flush() error {
 }
 
 func (fw *FrameWriter) WriteText(data []byte, mask bool, headerBytes ...byte) (err error) {
-	return fw.write(data, TextMessage, mask, headerBytes...)
+	return fw.WriteEx(data, TextMessage, mask, headerBytes...)
 }
 
 func (fw *FrameWriter) WriteBinary(data []byte, mask bool, headerBytes ...byte) (err error) {
-	return fw.write(data, BinaryMessage, mask, headerBytes...)
+	return fw.WriteEx(data, BinaryMessage, mask, headerBytes...)
 }
 
 func (fw *FrameWriter) WritePong(data []byte, mask bool) (err error) {
 	return fw.writeControl(data, PongMessage, mask)
 }
 
-func (fw *FrameWriter) WriteFrame(frame *Frame, messageTypes ...int) (err error) {
-	frame.isDeflate = fw.isDeflate
+func (fw *FrameWriter) WriteFrame(f *Frame, opcodes ...int) (err error) {
 	// change opcode
-	if len(messageTypes) > 0 {
-		messageType := messageTypes[0]
-		if messageType != 0 {
-			firstByte := frame.firstByte
+	if len(opcodes) > 0 {
+		opcode := opcodes[0]
+		if opcode != 0 {
+			firstByte := f.firstByte
 			firstByte &= RESET_MESSAGE_TYPE_BIT
-			firstByte |= uint8(messageType)
-			frame.firstByte = firstByte
-			frame.messageType = messageType
+			firstByte |= uint8(opcode)
+			f.firstByte = firstByte
+			f.messageType = opcode
 		}
 	}
+	data := f.payload
 
-	raw, _ := frame.Bytes()
+	isDeflate := fw.isDeflate
 
-	_, err = fw.w.Write(raw)
+	// control message or continue message or small message should not deflate
+	if isDeflate && (f.messageType == ContinueMessage || f.IsControl() || len(f.payload) < fw.flateThreshold) {
+		isDeflate = false
+	}
+	if isDeflate {
+		f.SetRSV1()
+	}
+	fw.reset(f)
+
+	if isDeflate {
+		_, err = fw.writeDeflateFrame(data)
+	} else {
+		_, err = fw.writeFrame(f.FIN(), f.RSV1(), f.messageType, f.mask, data)
+	}
 	return err
+}
+
+func (fw *FrameWriter) writeFrame(fin bool, flate bool, opcode int, mask bool, data []byte) (n int, err error) {
+	var firstByte, secondByte byte
+	firstByte = byte(opcode)
+	if fin {
+		firstByte = firstByte | FINALBIT
+	}
+	if flate {
+		firstByte = firstByte | RSV1BIT
+	}
+
+	dataLength := len(data)
+
+	// reset secondByte
+	if dataLength > TWO_BYTE_SIZE {
+		secondByte = EIGHT_BYTE_BIT
+	} else if dataLength > SEVEN_BIT_SIZE {
+		secondByte = TWO_BYTE_BIT
+	} else {
+		secondByte = byte(dataLength)
+	}
+
+	if mask {
+		secondByte = secondByte | MASKBIT
+	}
+
+	w := fw.w
+	if err = w.WriteByte(firstByte); err != nil {
+		return
+	}
+	n += 1
+	if err = w.WriteByte(secondByte); err != nil {
+		return
+	}
+	n += 1
+
+	// extra payload length
+	var l []byte
+	if dataLength > TWO_BYTE_SIZE {
+		l = make([]byte, 8)
+		binary.BigEndian.PutUint64(l, uint64(dataLength))
+
+	} else if dataLength > SEVEN_BIT_SIZE {
+		l = make([]byte, 2)
+		binary.BigEndian.PutUint16(l, uint16(dataLength))
+	}
+	if len(l) > 0 {
+		nn, err := w.Write(l)
+		if err != nil {
+			return n + nn, err
+		}
+		n += nn
+	}
+
+	// masking key
+	if mask {
+		maskingKey, _ := generateMaskKey()
+
+		nn, err := w.Write(maskingKey)
+		if err != nil {
+			return n + nn, err
+		}
+		n += nn
+		maskBytes(maskingKey, data, int(dataLength))
+	}
+
+	// data
+	nn, err := w.Write(data)
+	if err != nil {
+		return n + nn, err
+	}
+	n += nn
+	return n, w.Flush()
 }
 
 func (fw *FrameWriter) WriteRaw(raw []byte) (err error) {
@@ -501,7 +583,7 @@ func (fw *FrameWriter) WriteRaw(raw []byte) (err error) {
 }
 
 // 客户端发送数据时需要设置mask为true
-func (fw *FrameWriter) write(data []byte, messageType int, mask bool, headerBytes ...byte) error {
+func (fw *FrameWriter) WriteEx(data []byte, messageType int, mask bool, headerBytes ...byte) error {
 	var firstByte byte
 	if len(headerBytes) == 0 {
 		firstByte = byte((messageType) | FINALBIT)
