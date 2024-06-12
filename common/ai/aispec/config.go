@@ -12,7 +12,7 @@ type AIConfig struct {
 	// gateway network config
 	BaseURL string
 	Domain  string `app:"name:domain,verbose:第三方加速域名,id:4"`
-	NoHttps bool   `app:"name:no_https,verbose:IsHttps,desc:是否使用https请求api,id:3"`
+	NoHttps bool   `app:"name:no_https,verbose:NoHttps,desc:是否禁用使用https请求api,id:3"`
 
 	// basic model
 	Model    string  `app:"name:model,verbose:模型名称,id:2"`
