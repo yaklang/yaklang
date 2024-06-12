@@ -13,8 +13,38 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#filters.
 	VisitFilters(ctx *FiltersContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#filterStatement.
-	VisitFilterStatement(ctx *FilterStatementContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExecution.
+	VisitFilterExecution(ctx *FilterExecutionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterAssert.
+	VisitFilterAssert(ctx *FilterAssertContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#Description.
+	VisitDescription(ctx *DescriptionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#EmptyStatement.
+	VisitEmptyStatement(ctx *EmptyStatementContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#eos.
+	VisitEos(ctx *EosContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#descriptionStatement.
+	VisitDescriptionStatement(ctx *DescriptionStatementContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#descriptionItems.
+	VisitDescriptionItems(ctx *DescriptionItemsContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#descriptionItem.
+	VisitDescriptionItem(ctx *DescriptionItemContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#assertStatement.
+	VisitAssertStatement(ctx *AssertStatementContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#thenExpr.
+	VisitThenExpr(ctx *ThenExprContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#elseExpr.
+	VisitElseExpr(ctx *ElseExprContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#refVariable.
 	VisitRefVariable(ctx *RefVariableContext) interface{}

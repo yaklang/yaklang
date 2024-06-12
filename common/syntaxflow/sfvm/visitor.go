@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -63,30 +64,41 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		return nil
 	}
 
-	i, _ := raw.(*sf.FilterStatementContext)
-	if i == nil {
-		return nil
-	}
+	switch i := raw.(type) {
+	case *sf.FilterExecutionContext:
+		expr := i.FilterExpr()
+		if expr == nil {
+			return nil
+		}
 
-	expr := i.FilterExpr()
-	if expr == nil {
-		return nil
+		y.EmitEnterStatement()
+		err := y.VisitFilterExpr(expr)
+		if err != nil {
+			msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
+			panic(msg)
+		}
+		if i.RefVariable() != nil {
+			varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
+			y.EmitUpdate(varName)
+		} else {
+			y.EmitPop()
+		}
+		y.EmitExitStatement()
+	case *sf.FilterAssertContext:
+		log.Warn("assert not implemented")
+		log.Warn("assert not implemented")
+		log.Warn("assert not implemented")
+		log.Warn("assert not implemented")
+	case *sf.DescriptionContext:
+		log.Warn("description not implemented")
+		log.Warn("description not implemented")
+		log.Warn("description not implemented")
+		log.Warn("description not implemented")
+	case *sf.EmptyStatementContext:
+		return nil // empty statement will do nothing
+	default:
+		log.Warnf("unexpected filter statement: %T", i)
 	}
-
-	y.EmitEnterStatement()
-	err := y.VisitFilterExpr(expr)
-	if err != nil {
-		msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
-		panic(msg)
-	}
-	if i.RefVariable() != nil {
-		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
-		y.EmitUpdate(varName)
-	} else {
-		y.EmitPop()
-	}
-	y.EmitExitStatement()
-
 	return nil
 }
 
