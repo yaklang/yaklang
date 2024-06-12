@@ -328,13 +328,8 @@ type FuncDecl struct {
 
 func (f *FuncDecl) String() string {
 	decl, doc := f.Decl, f.Document
-	if doc != "" {
-		doc = fmt.Sprintf(`: "%s"`, doc)
-	}
-
 	decl = fmt.Sprintf("%s.%s", f.LibName, decl)
-
-	return fmt.Sprintf("%s%s", decl, doc)
+	return fmt.Sprintf("`%s`\n\n%s", decl, doc)
 }
 
 type DeprecateFunction struct {
