@@ -39,26 +39,33 @@ func (v *Value) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.ValueOpe
 }
 
 func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
-	if !v.IsCall() {
-		return nil, utils.Error("ssa.Value is not a call instruction")
+	vs := make(Values, 0)
+	v.GetCalledBy().ForEach(func(c *Value) {
+		vs = append(vs, c.GetCallArgs()...)
+	})
+	if f, ok := ssa.ToFunction(v.node); ok {
+		for _, para := range f.Params {
+			vs = append(vs, v.NewValue(para))
+		}
 	}
-	return v.GetCallArgs(), nil
+	return vs, nil
 }
 
 func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
-	if !v.IsCall() {
-		return nil, utils.Error("ssa.Value is not a call instruction")
-	}
-	if c, ok := ssa.ToCall(v.node); ok {
-		if len(c.Args) < i {
-			return v.NewValue(c.Args[i]), nil
-		} else {
-			return nil, utils.Errorf("ssa.Value %v has %d argument,but index %v", v.String(), len(c.Args), i)
+	vs := make(Values, 0)
+	v.GetCalledBy().ForEach(func(c *Value) {
+		if c, ok := ssa.ToCall(c.node); ok {
+			if len(c.Args) > i {
+				vs = append(vs, v.NewValue(c.Args[i]))
+			}
 		}
-	} else {
-		return nil, utils.Errorf("ssa.Value %v cannot get call actual params %v", v.String(), i)
+	})
+	if f, ok := ssa.ToFunction(v.node); ok {
+		if len(f.Params) > i {
+			vs = append(vs, v.NewValue(f.Params[i]))
+		}
 	}
-	// return v.GetCallArgs(), nil
+	return vs, nil
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {

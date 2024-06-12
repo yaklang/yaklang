@@ -68,11 +68,11 @@ func (values Values) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.Val
 func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
 	var ret Values
 	for _, i := range value {
-		if c, ok := ssa.ToCall(i.node); ok {
-			if len(c.Args) > index {
-				ret = append(ret, value.NewValue(c.Args[index]))
-			}
+		vs, err := i.GetCallActualParams(index)
+		if err != nil {
+			continue
 		}
+		ret = append(ret, vs.(Values)...)
 	}
 	if len(ret) == 0 {
 		return nil, utils.Errorf("ssa.Values no this argument by index %d", index)
@@ -82,13 +82,15 @@ func (value Values) GetCallActualParams(index int) (sfvm.ValueOperator, error) {
 }
 
 func (value Values) GetAllCallActualParams() (sfvm.ValueOperator, error) {
-	var vv Values
+	var ret Values
 	for _, i := range value {
-		if i.IsCall() {
-			vv = append(vv, i.GetCallArgs()...)
+		vs, err := i.GetAllCallActualParams()
+		if err != nil {
+			continue
 		}
+		ret = append(ret, vs.(Values)...)
 	}
-	return vv, nil
+	return ret, nil
 }
 
 func (value Values) GetMembersByString(key string) (sfvm.ValueOperator, error) {
