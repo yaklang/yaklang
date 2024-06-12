@@ -38,7 +38,7 @@ func syntaxflowParserInit() {
 		"'.'", "'<'", "'='", "'?'", "'('", "','", "')'", "'['", "']'", "'{'",
 		"'}'", "'#'", "'$'", "':'", "'%'", "'!'", "'*'", "'-'", "'as'", "'`'",
 		"'''", "'\"'", "", "", "", "", "", "'str'", "'list'", "'dict'", "",
-		"'bool'", "", "'assert'", "'then'", "", "'else'",
+		"'bool'", "", "'check'", "'then'", "", "'else'",
 	}
 	staticData.symbolicNames = []string{
 		"", "", "", "", "", "", "DeepFilter", "Deep", "Percent", "DeepDot",
@@ -50,12 +50,12 @@ func syntaxflowParserInit() {
 		"Search", "Bang", "Star", "Minus", "As", "Backtick", "SingleQuote",
 		"DoubleQuote", "WhiteSpace", "Number", "OctalNumber", "BinaryNumber",
 		"HexNumber", "StringType", "ListType", "DictType", "NumberType", "BoolType",
-		"BoolLiteral", "Assert", "Then", "Desc", "Else", "Identifier", "IdentifierChar",
+		"BoolLiteral", "Check", "Then", "Desc", "Else", "Identifier", "IdentifierChar",
 		"QuotedStringLiteral", "RegexpLiteral", "WS",
 	}
 	staticData.ruleNames = []string{
 		"flow", "filters", "filterStatement", "eos", "descriptionStatement",
-		"descriptionItems", "descriptionItem", "assertStatement", "thenExpr",
+		"descriptionItems", "descriptionItem", "checkStatement", "thenExpr",
 		"elseExpr", "refVariable", "filterExpr", "useDefCalcDescription", "useDefCalcParams",
 		"actualParam", "actualParamFilter", "singleParam", "recursiveConfig",
 		"recursiveConfigItem", "recursiveConfigItemValue", "sliceCallItem",
@@ -347,7 +347,7 @@ const (
 	SyntaxFlowParserNumberType          = 57
 	SyntaxFlowParserBoolType            = 58
 	SyntaxFlowParserBoolLiteral         = 59
-	SyntaxFlowParserAssert              = 60
+	SyntaxFlowParserCheck               = 60
 	SyntaxFlowParserThen                = 61
 	SyntaxFlowParserDesc                = 62
 	SyntaxFlowParserElse                = 63
@@ -367,7 +367,7 @@ const (
 	SyntaxFlowParserRULE_descriptionStatement     = 4
 	SyntaxFlowParserRULE_descriptionItems         = 5
 	SyntaxFlowParserRULE_descriptionItem          = 6
-	SyntaxFlowParserRULE_assertStatement          = 7
+	SyntaxFlowParserRULE_checkStatement           = 7
 	SyntaxFlowParserRULE_thenExpr                 = 8
 	SyntaxFlowParserRULE_elseExpr                 = 9
 	SyntaxFlowParserRULE_refVariable              = 10
@@ -840,6 +840,66 @@ func (s *FilterExecutionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
+type FilterParamCheckContext struct {
+	*FilterStatementContext
+}
+
+func NewFilterParamCheckContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FilterParamCheckContext {
+	var p = new(FilterParamCheckContext)
+
+	p.FilterStatementContext = NewEmptyFilterStatementContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*FilterStatementContext))
+
+	return p
+}
+
+func (s *FilterParamCheckContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *FilterParamCheckContext) CheckStatement() ICheckStatementContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ICheckStatementContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ICheckStatementContext)
+}
+
+func (s *FilterParamCheckContext) Eos() IEosContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IEosContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IEosContext)
+}
+
+func (s *FilterParamCheckContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case SyntaxFlowVisitor:
+		return t.VisitFilterParamCheck(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 type EmptyStatementContext struct {
 	*FilterStatementContext
 }
@@ -878,66 +938,6 @@ func (s *EmptyStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	switch t := visitor.(type) {
 	case SyntaxFlowVisitor:
 		return t.VisitEmptyStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-type FilterAssertContext struct {
-	*FilterStatementContext
-}
-
-func NewFilterAssertContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FilterAssertContext {
-	var p = new(FilterAssertContext)
-
-	p.FilterStatementContext = NewEmptyFilterStatementContext()
-	p.parser = parser
-	p.CopyFrom(ctx.(*FilterStatementContext))
-
-	return p
-}
-
-func (s *FilterAssertContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *FilterAssertContext) AssertStatement() IAssertStatementContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IAssertStatementContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IAssertStatementContext)
-}
-
-func (s *FilterAssertContext) Eos() IEosContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IEosContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IEosContext)
-}
-
-func (s *FilterAssertContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowVisitor:
-		return t.VisitFilterAssert(s)
 
 	default:
 		return t.VisitChildren(s)
@@ -1003,11 +1003,11 @@ func (p *SyntaxFlowParser) FilterStatement() (localctx IFilterStatementContext) 
 		}
 
 	case 2:
-		localctx = NewFilterAssertContext(p, localctx)
+		localctx = NewFilterParamCheckContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(76)
-			p.AssertStatement()
+			p.CheckStatement()
 		}
 		p.SetState(78)
 		p.GetErrorHandler().Sync(p)
@@ -1624,49 +1624,49 @@ func (p *SyntaxFlowParser) DescriptionItem() (localctx IDescriptionItemContext) 
 	return localctx
 }
 
-// IAssertStatementContext is an interface to support dynamic dispatch.
-type IAssertStatementContext interface {
+// ICheckStatementContext is an interface to support dynamic dispatch.
+type ICheckStatementContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsAssertStatementContext differentiates from other interfaces.
-	IsAssertStatementContext()
+	// IsCheckStatementContext differentiates from other interfaces.
+	IsCheckStatementContext()
 }
 
-type AssertStatementContext struct {
+type CheckStatementContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyAssertStatementContext() *AssertStatementContext {
-	var p = new(AssertStatementContext)
+func NewEmptyCheckStatementContext() *CheckStatementContext {
+	var p = new(CheckStatementContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = SyntaxFlowParserRULE_assertStatement
+	p.RuleIndex = SyntaxFlowParserRULE_checkStatement
 	return p
 }
 
-func (*AssertStatementContext) IsAssertStatementContext() {}
+func (*CheckStatementContext) IsCheckStatementContext() {}
 
-func NewAssertStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssertStatementContext {
-	var p = new(AssertStatementContext)
+func NewCheckStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CheckStatementContext {
+	var p = new(CheckStatementContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = SyntaxFlowParserRULE_assertStatement
+	p.RuleIndex = SyntaxFlowParserRULE_checkStatement
 
 	return p
 }
 
-func (s *AssertStatementContext) GetParser() antlr.Parser { return s.parser }
+func (s *CheckStatementContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *AssertStatementContext) Assert() antlr.TerminalNode {
-	return s.GetToken(SyntaxFlowParserAssert, 0)
+func (s *CheckStatementContext) Check() antlr.TerminalNode {
+	return s.GetToken(SyntaxFlowParserCheck, 0)
 }
 
-func (s *AssertStatementContext) RefVariable() IRefVariableContext {
+func (s *CheckStatementContext) RefVariable() IRefVariableContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IRefVariableContext); ok {
@@ -1682,7 +1682,7 @@ func (s *AssertStatementContext) RefVariable() IRefVariableContext {
 	return t.(IRefVariableContext)
 }
 
-func (s *AssertStatementContext) ThenExpr() IThenExprContext {
+func (s *CheckStatementContext) ThenExpr() IThenExprContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IThenExprContext); ok {
@@ -1698,7 +1698,7 @@ func (s *AssertStatementContext) ThenExpr() IThenExprContext {
 	return t.(IThenExprContext)
 }
 
-func (s *AssertStatementContext) ElseExpr() IElseExprContext {
+func (s *CheckStatementContext) ElseExpr() IElseExprContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(IElseExprContext); ok {
@@ -1714,30 +1714,30 @@ func (s *AssertStatementContext) ElseExpr() IElseExprContext {
 	return t.(IElseExprContext)
 }
 
-func (s *AssertStatementContext) GetRuleContext() antlr.RuleContext {
+func (s *CheckStatementContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *AssertStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *CheckStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssertStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *CheckStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case SyntaxFlowVisitor:
-		return t.VisitAssertStatement(s)
+		return t.VisitCheckStatement(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *SyntaxFlowParser) AssertStatement() (localctx IAssertStatementContext) {
+func (p *SyntaxFlowParser) CheckStatement() (localctx ICheckStatementContext) {
 	this := p
 	_ = this
 
-	localctx = NewAssertStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 14, SyntaxFlowParserRULE_assertStatement)
+	localctx = NewCheckStatementContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 14, SyntaxFlowParserRULE_checkStatement)
 	var _la int
 
 	defer func() {
@@ -1759,7 +1759,7 @@ func (p *SyntaxFlowParser) AssertStatement() (localctx IAssertStatementContext) 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(117)
-		p.Match(SyntaxFlowParserAssert)
+		p.Match(SyntaxFlowParserCheck)
 	}
 	{
 		p.SetState(118)
@@ -2130,7 +2130,7 @@ func (p *SyntaxFlowParser) RefVariable() (localctx IRefVariableContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		{
 			p.SetState(132)
 			p.Identifier()
@@ -4606,7 +4606,7 @@ func (p *SyntaxFlowParser) ActualParamFilter() (localctx IActualParamFilterConte
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserT__0, SyntaxFlowParserTopDefStart, SyntaxFlowParserDefStart, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
+	case SyntaxFlowParserT__0, SyntaxFlowParserTopDefStart, SyntaxFlowParserDefStart, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(252)
@@ -4787,7 +4787,7 @@ func (p *SyntaxFlowParser) SingleParam() (localctx ISingleParamContext) {
 			p.Match(SyntaxFlowParserMapBuilderClose)
 		}
 
-	case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
+	case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 
 	default:
 	}
@@ -5241,13 +5241,13 @@ func (p *SyntaxFlowParser) RecursiveConfigItemValue() (localctx IRecursiveConfig
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserAs, SyntaxFlowParserNumber, SyntaxFlowParserOctalNumber, SyntaxFlowParserBinaryNumber, SyntaxFlowParserHexNumber, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+	case SyntaxFlowParserAs, SyntaxFlowParserNumber, SyntaxFlowParserOctalNumber, SyntaxFlowParserBinaryNumber, SyntaxFlowParserHexNumber, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(285)
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 			{
 				p.SetState(283)
 				p.Identifier()
@@ -5400,7 +5400,7 @@ func (p *SyntaxFlowParser) SliceCallItem() (localctx ISliceCallItemContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
+	case SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(293)
@@ -5558,7 +5558,7 @@ func (p *SyntaxFlowParser) NameFilter() (localctx INameFilterContext) {
 			p.Match(SyntaxFlowParserDollarOutput)
 		}
 
-	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(299)
@@ -5885,7 +5885,7 @@ func (p *SyntaxFlowParser) ChainFilter() (localctx IChainFilterContext) {
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
+		case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 			{
 				p.SetState(304)
 				p.Filters()
@@ -6663,7 +6663,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 			p.NumberLiteral()
 		}
 
-	case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+	case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		localctx = NewFilterExpressionStringContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
@@ -6743,7 +6743,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 				p.NumberLiteral()
 			}
 
-		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 			{
 				p.SetState(352)
 				p.Identifier()
@@ -6785,7 +6785,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+		case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 			{
 				p.SetState(357)
 				p.StringLiteral()
@@ -7078,7 +7078,7 @@ func (p *SyntaxFlowParser) StringLiteral() (localctx IStringLiteralContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
+	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserCheck, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(376)
@@ -7253,8 +7253,8 @@ func (s *IdentifierContext) As() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserAs, 0)
 }
 
-func (s *IdentifierContext) Assert() antlr.TerminalNode {
-	return s.GetToken(SyntaxFlowParserAssert, 0)
+func (s *IdentifierContext) Check() antlr.TerminalNode {
+	return s.GetToken(SyntaxFlowParserCheck, 0)
 }
 
 func (s *IdentifierContext) Then() antlr.TerminalNode {
@@ -7335,11 +7335,11 @@ func (p *SyntaxFlowParser) Identifier() (localctx IIdentifierContext) {
 			p.Match(SyntaxFlowParserAs)
 		}
 
-	case SyntaxFlowParserAssert:
+	case SyntaxFlowParserCheck:
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(385)
-			p.Match(SyntaxFlowParserAssert)
+			p.Match(SyntaxFlowParserCheck)
 		}
 
 	case SyntaxFlowParserThen:
