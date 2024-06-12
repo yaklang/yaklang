@@ -1,9 +1,12 @@
 package yakurl
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
+)
 
 func TestDocumentScheme(t *testing.T) {
-	t.Skip("temp non-implemented")
 
 	rsp, err := LoadGetResource(`yakdocument://str/`)
 	if err != nil {
@@ -29,8 +32,7 @@ func TestDocumentScheme(t *testing.T) {
 }
 
 func TestDocumentScheme2(t *testing.T) {
-	t.Skip("temp non-implemented")
-	
+
 	rsp, err := LoadGetResource(`yakdocument:///`)
 	if err != nil {
 		t.Fatal(err)
@@ -38,5 +40,28 @@ func TestDocumentScheme2(t *testing.T) {
 	max := rsp.GetResources()
 	if len(max) <= 0 {
 		t.Fatal("empty result for yakdocument")
+	}
+}
+
+func TestDocument_Description(t *testing.T) {
+	rsp, err := LoadGetResource(`yakdocument://str/calc`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib := rsp.GetResources()
+	log.Infof("lib: %v", lib)
+	if len(lib) <= 0 {
+		t.Fatal("empty result for yakdocument")
+	}
+
+	if len(lib[0].Extra) <= 0 {
+		t.Fatal("empty result for yakdocument")
+	}
+
+	if lib[0].Extra[0].Key != "Content" {
+		t.Fatal("unexpected result for yakdocument")
+	}
+	if len(lib[0].Extra[0].Value) <= 0 {
+		t.Fatal("empty ")
 	}
 }
