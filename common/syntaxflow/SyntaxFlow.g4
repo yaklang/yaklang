@@ -38,7 +38,6 @@ assertStatement: Assert refVariable thenExpr? elseExpr?;
 thenExpr: Then stringLiteral;
 elseExpr: Else stringLiteral;
 
-
 refVariable
     :  '$' (identifier | ('(' identifier ')'));
 
@@ -119,7 +118,7 @@ conditionExpression
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier | '*';
 regexpLiteral: RegexpLiteral;
-identifier: Identifier | types | As | Assert | Then | Desc;
+identifier: Identifier | types | As | Assert | Then | Desc | QuotedStringLiteral;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -166,6 +165,8 @@ Star: '*';
 Minus: '-';
 As: 'as';
 Backtick: '`';
+SingleQuote: '\'';
+DoubleQuote: '"';
 
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
@@ -186,6 +187,12 @@ Else: 'else';
 
 Identifier: IdentifierCharStart IdentifierChar*;
 IdentifierChar: [0-9] | IdentifierCharStart;
+
+QuotedStringLiteral
+    : SingleQuote ( ~['\\\r\n] | ('\\\'') | '\\\\' | '\\')* SingleQuote
+    | DoubleQuote ( ~["\\\r\n] | '\\"' | '\\\\' | '\\' )* DoubleQuote
+    | Backtick (~[`])* Backtick
+    ;
 
 fragment IdentifierCharStart: '*' | '_' | [a-z] | [A-Z];
 fragment HexDigit: [a-fA-F0-9];
