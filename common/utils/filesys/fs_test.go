@@ -1,9 +1,14 @@
 package filesys
 
 import (
+	"context"
 	"embed"
+	"github.com/fsnotify/fsnotify"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -133,4 +138,120 @@ func TestFS_LocalFS(t *testing.T) {
 			}),
 		)
 	})
+}
+
+func TestYakFileMonitor(t *testing.T) {
+	_, err := WatchPath(context.Background(), "test", func(eventSet EventSet) {
+
+		createEvents := eventSet.CreateEvents
+		deleteEvents := eventSet.DeleteEvents
+
+		//for _, event := range createEvents {
+		//	log.Infof("create: %s", event.Path)
+		//}
+
+		createEventsMap := make(map[string][]Event)
+		for _, event := range createEvents {
+			dir, _ := filepath.Split(event.Path)
+			findPath := false
+			for path, events := range createEventsMap {
+				if isSubDir(path, dir) {
+					createEventsMap[path] = append(events, event)
+					findPath = true
+					break
+				} else if isSubDir(dir, path) {
+					createEventsMap[dir] = append(events, event)
+					delete(createEventsMap, path)
+					findPath = true
+					break
+				}
+			}
+			if !findPath {
+				createEventsMap[dir] = []Event{event}
+			}
+		}
+
+		deleteEventsMap := make(map[string][]Event)
+		for _, event := range deleteEvents {
+			if event.IsDir {
+				deleteEventsMap[event.Path] = []Event{event}
+			}
+			dir, _ := filepath.Split(event.Path)
+			for path, events := range deleteEventsMap {
+				if isSubDir(path, dir) {
+					deleteEventsMap[path] = append(events, event)
+				} else if isSubDir(dir, path) {
+					deleteEventsMap[dir] = append(events, event)
+					delete(deleteEventsMap, path)
+				}
+			}
+
+		}
+
+		//for path, event := range deleteEvents {
+		//	if event.IsDir {
+		//		dir, _ := filepath.Split(event.Path)
+		//		if _, ok := createEventsMap[dir]; ok {
+		//
+		//		}
+		//	}
+		//}
+
+	})
+	if err != nil {
+		return
+	}
+	select {}
+}
+
+func isSubDir(basePath, targetPath string) bool {
+	// Clean the paths to remove any unnecessary components
+	basePath = filepath.Clean(basePath)
+	targetPath = filepath.Clean(targetPath)
+
+	// Get the relative path from basePath to targetPath
+	rel, err := filepath.Rel(basePath, targetPath)
+	if err != nil {
+		return false
+	}
+
+	// If the relative path starts with ".." or is ".", targetPath is not a subdir of basePath
+	return !filepath.IsAbs(rel) && rel != "." && !strings.HasPrefix(rel, "../")
+}
+
+func TestFileSame(t *testing.T) {
+	pathp, err := syscall.UTF16PtrFromString("test/ab")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	attrs := uint32(syscall.FILE_FLAG_BACKUP_SEMANTICS)
+	h, err := syscall.CreateFile(pathp, 0, 0, nil, syscall.OPEN_EXISTING, attrs, 0)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	var i1 syscall.ByHandleFileInformation
+	err = syscall.GetFileInformationByHandle(h, &i1)
+	err = os.Rename("test/ab", "test/ba")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	pathp, err = syscall.UTF16PtrFromString("test/abc")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	h, err = syscall.CreateFile(pathp, 0, 0, nil, syscall.OPEN_EXISTING, attrs, 0)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	var i2 syscall.ByHandleFileInformation
+	err = syscall.GetFileInformationByHandle(h, &i2)
+	if err != nil {
+		fsnotify.NewWatcher()
+	}
+
 }
