@@ -114,3 +114,65 @@ func TestCall_SideEffect(t *testing.T) {
 		)
 	})
 }
+
+func Test_Function_Parameter(t *testing.T) {
+	code := `
+	f = (i) => {
+		print(i)
+	}
+	f(12)
+	`
+
+	t.Run("simple test", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`f(* as $i, )`,
+			map[string][]string{
+				"i": {"12", "Parameter-i"},
+			},
+		)
+	})
+
+	t.Run("simple test top def", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`f(* #-> * as $i, )`,
+			map[string][]string{
+				"i": {"12"},
+			},
+		)
+	})
+
+	t.Run("simple test bottom user", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`f(* --> * as $i, )`,
+			map[string][]string{
+				"i": {"FreeValue-print(Parameter-i)"},
+			},
+		)
+	})
+
+	t.Run("only get call", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,
+			`f() as $call`,
+			map[string][]string{
+				"call": {"Function-f(12)"},
+			},
+		)
+	})
+}
+
+func Test_Function_Parameter_Call(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f = (i) => {
+			i()
+		}
+		f(()=>{print(1)})
+		`,
+
+			`f(*() as $i, )`,
+			map[string][]string{
+				"i": {"Parameter-i()"},
+			},
+		)
+	})
+}
