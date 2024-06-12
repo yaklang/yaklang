@@ -78,3 +78,20 @@ func TestCache(t *testing.T) {
 		t.Fatal("TTLCache SetCheckExpirationCallback failed, want callback SetCheckExpirationCallback but not")
 	}
 }
+
+func TestCacheKeepAlive(t *testing.T) {
+	c := NewTTLCache[int](5 * time.Second)
+
+	c.Set("one", 1)
+	c.Set("two", 2)
+	time.Sleep(3 * time.Second)
+	c.Get("one")
+
+	time.Sleep(4 * time.Second)
+	if _, ok := c.Get("one"); !ok {
+		t.Fatal("TTLCache keep alive failed")
+	}
+	if _, ok := c.Get("two"); ok {
+		t.Fatal("TTLCache keep alive failed")
+	}
+}

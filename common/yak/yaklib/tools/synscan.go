@@ -442,6 +442,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		err            error
 		stringFilter   *filter.StringFilter
 	)
+	//config.netInterface = "WLAN"
 	if config.netInterface != "" {
 		synScanOptions, err = synscan.CreateConfigOptionsByIfaceName(config.netInterface)
 	} else {
@@ -673,6 +674,14 @@ func _scan(target string, port string, opts ...scanOpt) (chan *synscan.SynScanRe
 	return _synScanDo(hostsToChan(target), port, config)
 }
 
+func _scanDo(targetChan chan string, ports string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
+	config := getDefaultPortScanConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	return _synScanDo(targetChan, ports, config)
+}
+
 func getDefaultPortScanConfig() *_yakPortScanConfig {
 	return &_yakPortScanConfig{
 		waiting:           5 * time.Second,
@@ -753,6 +762,7 @@ func _scanOptSubmitTaskCallback(i func(string)) scanOpt {
 //  2. timeout
 var SynPortScanExports = map[string]interface{}{
 	"FixPermission": pcapfix.Fix,
+	"ScanDo":        _scanDo,
 	"Scan":          _scan,
 	"ScanFromPing":  _synscanFromPingUtils,
 

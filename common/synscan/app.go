@@ -172,6 +172,107 @@ func (s *Scanner) getDefaultCacheEthernet(target string, dstPort int, gateway st
 	}
 }
 
+func (s *Scanner) handlePacket(packet gopacket.Packet) {
+	if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
+		switch arpLayer.LayerType() {
+		case layers.LayerTypeARP:
+			arp, ok := arpLayer.(*layers.ARP)
+			if !ok {
+				return
+			}
+			srcIP := net.IP(arp.SourceProtAddress)
+			srcHw := net.HardwareAddr(arp.SourceHwAddress)
+			s.onARP(srcIP, srcHw)
+		}
+	}
+
+	if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
+		l, ok := tcpSynLayer.(*layers.TCP)
+		if !ok {
+			return
+		}
+
+		if l.SYN && l.ACK {
+			if nl := packet.NetworkLayer(); nl != nil {
+				s.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+			}
+			return
+		}
+
+		if l.SYN && !l.ACK && s.tmpTargetForDetectMAC != "" {
+			nl := packet.NetworkLayer()
+			if nl == nil {
+				return
+			}
+
+			if nl.NetworkFlow().Dst().String() != s.tmpTargetForDetectMAC {
+				return
+			}
+			eth := packet.LinkLayer()
+			if eth == nil {
+				return
+			}
+			l, ok := eth.(*layers.Ethernet)
+			if !ok {
+				return
+			}
+			// 缓存地址 mac 地址
+			select {
+			case s.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
+			default:
+			}
+		}
+	}
+}
+
+func (s *Scanner) startHandler(deviceName string, handlerWriteChan chan []byte, handlerIsAlive *utils.AtomicBool) {
+	err := pcaputil.Start(
+		pcaputil.WithDevice(deviceName),
+		pcaputil.WithEnableCache(true),
+		pcaputil.WithDisableAssembly(true),
+		pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
+		pcaputil.WithContext(s.ctx),
+		pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+			go s.startWriting(handle, handlerWriteChan)
+		}),
+		pcaputil.WithEveryPacket(s.handlePacket),
+	)
+	if err != nil {
+		log.Errorf("start handler failed: %v", err)
+		handlerIsAlive.UnSet()
+	}
+}
+
+func (s *Scanner) startWriting(handle *pcap.Handle, packetsChan chan []byte) {
+	var counter int
+	var total int64
+	for {
+		if s.delayMs > 0 && s.delayGapCount > 0 {
+			if counter > s.delayGapCount {
+				counter = 0
+				s.sleepRateLimit()
+			}
+		}
+		select {
+		case packets, ok := <-packetsChan:
+			if !ok {
+				continue
+			}
+
+			err := handle.WritePacketData(packets)
+
+			total++
+			counter++
+
+			if err != nil {
+				log.Errorf("write to device failed: %v", err)
+			}
+		case <-s.ctx.Done():
+			return
+		}
+	}
+}
+
 func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 	// 初始化扫描网卡
 	iface, gatewayIp, srcIp := config.Iface, config.GatewayIP, config.SourceIP
@@ -235,8 +336,6 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		localHandlerWriteChan: make(chan []byte, 100000),
 		handlerIsAlive:        utils.NewBool(true),
 		localHandlerIsAlive:   utils.NewBool(true),
-		// handler:               handler,
-		// localHandler:          localHandler,
 
 		defaultSrcIp:     srcIp,
 		defaultGatewayIp: gatewayIp,
@@ -256,282 +355,15 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		macChan:            make(chan [2]net.HardwareAddr, 100),
 	}
 
-	packetHandle := func(packet gopacket.Packet) {
-		if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-			switch arpLayer.LayerType() {
-			case layers.LayerTypeARP:
-				arp, ok := arpLayer.(*layers.ARP)
-				if !ok {
-					return
-				}
-				srcIP := net.IP(arp.SourceProtAddress)
-				srcHw := net.HardwareAddr(arp.SourceHwAddress)
-				scanner.onARP(srcIP, srcHw)
-			}
-		}
-
-		if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
-			l, ok := tcpSynLayer.(*layers.TCP)
-			if !ok {
-				return
-			}
-
-			if l.SYN && l.ACK {
-				if nl := packet.NetworkLayer(); nl != nil {
-					scanner.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
-				}
-				return
-			}
-
-			if l.SYN && !l.ACK && scanner.tmpTargetForDetectMAC != "" {
-				nl := packet.NetworkLayer()
-				if nl == nil {
-					return
-				}
-
-				if nl.NetworkFlow().Dst().String() != scanner.tmpTargetForDetectMAC {
-					return
-				}
-				eth := packet.LinkLayer()
-				if eth == nil {
-					return
-				}
-				l, ok := eth.(*layers.Ethernet)
-				if !ok {
-					return
-				}
-				// 缓存地址 mac 地址
-				select {
-				case scanner.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
-				default:
-				}
-			}
-		}
-	}
-
 	if !isLoopback {
-		// handler
-		go func() {
-			err := pcaputil.Start(
-				pcaputil.WithDevice(iface.Name),
-				pcaputil.WithEnableCache(true),
-				pcaputil.WithDisableAssembly(true),
-				pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
-				pcaputil.WithContext(ctx),
-				pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-					go func() {
-						var counter int
-						var total int64
-						for {
-							if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
-								if counter > scanner.delayGapCount {
-									counter = 0
-									// fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
-									scanner.sleepRateLimit()
-								}
-							}
-							select {
-							case packets, ok := <-scanner.handlerWriteChan:
-								if !ok {
-									continue
-								}
-
-								failedCount := 0
-							RETRY_WRITE_IF:
-								// 5-15 us (每秒可以开到 1000 * 200 个包最快)
-								err := handle.WritePacketData(packets)
-
-								total++
-								counter++
-
-								if err != nil {
-									switch true {
-									case utils.IContains(err.Error(), "no buffer space available"):
-										if failedCount > 10 {
-											log.Errorf("write device failed: for %v", err.Error())
-											break
-										}
-										if scanner.delayMs > 0 {
-											scanner.sleepRateLimit()
-										} else {
-											time.Sleep(time.Millisecond * 10)
-										}
-										failedCount++
-										goto RETRY_WRITE_IF
-									default:
-										log.Errorf("iface: %v handler write failed: %s: retry", scanner.iface, err)
-									}
-								}
-							case <-scanner.ctx.Done():
-								return
-							}
-						}
-					}()
-				}),
-				pcaputil.WithEveryPacket(packetHandle),
-			)
-			if err != nil {
-				scanner.handlerIsAlive.UnSet()
-			}
-		}()
+		go scanner.startHandler(iface.Name, scanner.handlerWriteChan, scanner.handlerIsAlive)
 	} else {
 		scanner.handlerIsAlive.UnSet()
 	}
 
-	// local handler
-	go func() {
-		err := pcaputil.Start(
-			pcaputil.WithDevice(localIfaceName),
-			pcaputil.WithEnableCache(true),
-			pcaputil.WithDisableAssembly(true),
-			pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
-			pcaputil.WithContext(ctx),
-			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-				go func() {
-					var counter int
-					var total int64
-					for {
-						if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
-							if counter > scanner.delayGapCount {
-								counter = 0
-								// fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
-								scanner.sleepRateLimit()
-							}
-						}
-						select {
-						case localPackets, ok := <-scanner.localHandlerWriteChan:
-							if !ok {
-								continue
-							}
-
-							err := handle.WritePacketData(localPackets)
-
-							total++
-							counter++
-
-							if err != nil {
-								// log.Errorf("loopback handler write failed: %s", err)
-							}
-						case <-scanner.ctx.Done():
-							return
-						}
-					}
-				}()
-			}),
-			pcaputil.WithEveryPacket(packetHandle),
-		)
-		if err != nil {
-			scanner.localHandlerIsAlive.UnSet()
-		}
-	}()
-
-	// scanner.daemon()
-
-	//scanner.defaultDstHw, err = netutil.RouteAndArp(gatewayIp.String())
-	//if err == utils.TargetIsLoopback {
-	//	scanner.defaultDstHw = nil
-	//}
+	go scanner.startHandler(localIfaceName, scanner.localHandlerWriteChan, scanner.localHandlerIsAlive)
 
 	_ = scanner.getLoopbackLinkLayer()
 
 	return scanner, nil
 }
-
-//func (s *Scanner) daemon() {
-//	// handler
-//	err := s.handler.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
-//	if err != nil {
-//		log.Errorf("set bpf filter failed: %s", err)
-//	}
-//	source := gopacket.NewPacketSource(s.handler, s.handler.LinkType())
-//	packets := source.Packets()
-//
-//	// local handler
-//	err = s.localHandler.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
-//	if err != nil {
-//		log.Errorf("set bpf filter failed for loopback: %s", err)
-//	}
-//	localSource := gopacket.NewPacketSource(s.localHandler, s.localHandler.LinkType())
-//	localPackets := localSource.Packets()
-//
-//	handlePackets := func(packetStream chan gopacket.Packet) {
-//		for {
-//			select {
-//			case packet, ok := <-packetStream:
-//				if !ok {
-//					return
-//				}
-//
-//				if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-//					switch arpLayer.LayerType() {
-//					case layers.LayerTypeARP:
-//						arp, ok := arpLayer.(*layers.ARP)
-//						if !ok {
-//							continue
-//						}
-//						srcIP := net.IP(arp.SourceProtAddress)
-//						srcHw := net.HardwareAddr(arp.SourceHwAddress)
-//						s.onARP(srcIP, srcHw)
-//					}
-//				}
-//
-//				if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
-//					l, ok := tcpSynLayer.(*layers.TCP)
-//					if !ok {
-//						continue
-//					}
-//
-//					if l.SYN && l.ACK {
-//						if nl := packet.NetworkLayer(); nl != nil {
-//							s.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
-//						}
-//						continue
-//					}
-//
-//					if l.SYN && !l.ACK && s.tmpTargetForDetectMAC != "" {
-//						nl := packet.NetworkLayer()
-//						if nl == nil {
-//							continue
-//						}
-//
-//						if nl.NetworkFlow().Dst().String() != s.tmpTargetForDetectMAC {
-//							continue
-//						}
-//						eth := packet.LinkLayer()
-//						if eth == nil {
-//							continue
-//						}
-//						l, ok := eth.(*layers.Ethernet)
-//						if !ok {
-//							continue
-//						}
-//						// 缓存地址 mac 地址
-//						select {
-//						case s.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
-//						default:
-//						}
-//					}
-//				}
-//			case <-s.ctx.Done():
-//				return
-//			}
-//		}
-//	}
-//
-//	go func() {
-//		s.sendService()
-//	}()
-//
-//	go func() {
-//		handlePackets(packets)
-//	}()
-//
-//	go func() {
-//		handlePackets(localPackets)
-//	}()
-//}
-
-//func (s *Scanner) Close() {
-//	//s.handler.Close()
-//	//s.localHandler.Close()
-//}

@@ -215,7 +215,7 @@ func (s *Scanner) scan(host string, port string, random bool, noWait bool) error
 	}
 
 	if privateHosts != nil {
-		log.Infof("start to scan private hosts: %v", len(privateHosts))
+		log.Infof("start to scan private hosts: %v %s", len(privateHosts), privateHosts)
 		err = s.scanPrivate(privateHosts, ports, random)
 		if err != nil {
 			log.Errorf("scan private failed: %s", err)

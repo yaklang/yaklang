@@ -36,10 +36,11 @@ func syncKeepDaemonCache(key string, ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Warnf("keep daemon cache: %v is stop", key)
 			return
 		case <-time.After(3 * time.Second):
+			log.Infof("keep daemon cache: %v", key)
 			getDaemonCache(key)
-			//log.Infof("keep daemon cache: %v", key)
 		}
 	}
 }
@@ -67,15 +68,13 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			hashRaw.WriteString(conf.OverrideCacheId)
 		}
 		cacheId := codec.Sha256(hashRaw.String())
-		if handler, ok := getDaemonCache(cacheId); ok {
+		if daemon, ok := getDaemonCache(cacheId); ok {
 			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
-				if conf.onNetInterfaceCreated != nil {
-					if oldHandle, ok := handler.handler.(*pcap.Handle); ok {
-						conf.onNetInterfaceCreated(oldHandle)
-					}
+				if oldHandle, ok := daemon.handler.(*pcap.Handle); ok {
+					conf.onNetInterfaceCreated(oldHandle)
 				}
 			}
-			return cacheId, handler.handler, nil
+			return cacheId, daemon.handler, nil
 		}
 
 		var handler *pcap.Handle
@@ -136,6 +135,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 							daemon.registeredHandlers.ForEach(func(i string, v *pcapPacketHandlerContext) bool {
 								err := v.handler(v.ctx, packet)
 								if err != nil {
+									//defer daemon.handler.Close()
 									log.Errorf("%v handler error: %s", i, err)
 									failedTrigger = append(failedTrigger, i)
 								}
@@ -181,7 +181,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			})
 		}
 		registerDaemonCache(cacheId, daemon)
-		return cacheId, handler, err
+		return cacheId, daemon.handler, err
 	}
 	handler, err := OpenIfaceLive(ifaceName)
 	return "", handler, err
@@ -190,6 +190,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 func registerCallback(key string, callbackId string, originCtx context.Context, handler pcapPacketHandler) {
 	cache, ok := getDaemonCache(key)
 	if !ok {
+		log.Errorf("[xxxxxxxxxxx] registerCallback failed: %v", key)
 		return
 	}
 	cache.registeredHandlers.Set(callbackId, &pcapPacketHandlerContext{

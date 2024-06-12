@@ -2,8 +2,6 @@ package pcaputil
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/google/gopacket"
 	"github.com/google/uuid"
 	"github.com/yaklang/pcap"
@@ -12,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle, packetEntry func(context.Context, gopacket.Packet)) error {
+func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
@@ -29,11 +27,8 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle, packe
 			if packet == nil {
 				return nil
 			}
-			if packetEntry != nil {
-				packetEntry(innerCtx, packet)
-			} else {
-				fmt.Println(packet.String())
-			}
+			conf.packetHandler(innerCtx, packet)
+			//fmt.Println(packet.String())
 		}
 	}
 }
@@ -77,10 +72,11 @@ func Start(opt ...CaptureOption) error {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
 				continue
 			}
-			handlers.Set(cacheId, handler.(PcapHandleOperation))
+			handlers.Set(cacheId, handler)
 		}
 	} else {
 		for _, i := range conf.Device {
+			log.Infof("open device: %v", i)
 			pcapIface, err := IfaceNameToPcapIfaceName(i)
 			if err != nil {
 				log.Warnf("convert iface name (%v) failed: %s, use default", i, err)
@@ -131,9 +127,8 @@ func Start(opt ...CaptureOption) error {
 		// hack: use runtimeId to registerCallback
 		var cancels []func()
 		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
-			if conf.EnableCache {
-				cancels = append(cancels, keepDaemonCache(i, ctx))
-			}
+			c := keepDaemonCache(i, ctx)
+			cancels = append(cancels, c)
 			return true
 		})
 		defer func() {
@@ -143,6 +138,7 @@ func Start(opt ...CaptureOption) error {
 		}()
 
 		runtimeId := uuid.New().String()
+		log.Infof("runtimeId: %v", runtimeId)
 		for _, i := range handlers.Keys() {
 			registerCallback(i, runtimeId, ctx, func(ctx context.Context, packet gopacket.Packet) error {
 				conf.packetHandler(ctx, packet)
@@ -167,7 +163,7 @@ func Start(opt ...CaptureOption) error {
 			defer func() {
 				handler.Close()
 			}()
-			if err := _open(conf, ctx, handler, conf.packetHandler); err != nil {
+			if err := _open(conf, ctx, handler); err != nil {
 				log.Errorf("open device failed: %s", err)
 			}
 		})
