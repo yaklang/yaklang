@@ -15,7 +15,47 @@ func (v *BaseSyntaxFlowVisitor) VisitFilters(ctx *FiltersContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterStatement(ctx *FilterStatementContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFilterExecution(ctx *FilterExecutionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterAssert(ctx *FilterAssertContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitDescription(ctx *DescriptionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitEmptyStatement(ctx *EmptyStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitEos(ctx *EosContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitDescriptionStatement(ctx *DescriptionStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitDescriptionItems(ctx *DescriptionItemsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitDescriptionItem(ctx *DescriptionItemContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitAssertStatement(ctx *AssertStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitThenExpr(ctx *ThenExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitElseExpr(ctx *ElseExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

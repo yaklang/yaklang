@@ -14,8 +14,30 @@ flow: filters EOF;
 filters: filterStatement+;
 
 filterStatement
-    : filterExpr (As refVariable)?
+    : filterExpr (As refVariable)? eos? # FilterExecution
+    | assertStatement eos?              # FilterAssert
+    | descriptionStatement eos?         # Description
+    | eos                               # EmptyStatement
     ;
+
+// eos means end of statement
+// the ';' can be
+eos: ';';
+
+// descriptionStatement will describe the filterExpr with stringLiteral
+descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
+descriptionItems: descriptionItem (',' descriptionItem)*;
+descriptionItem
+    : stringLiteral
+    | stringLiteral ':' stringLiteral
+    ;
+
+// assertStatement will assert the filterExpr is true, if not, it will throw an error with stringLiteral
+// if thenExpr is provided, it will be executed(description) after the assertStatement
+assertStatement: Assert refVariable thenExpr? elseExpr?;
+thenExpr: Then stringLiteral;
+elseExpr: Else stringLiteral;
+
 
 refVariable
     :  '$' (identifier | ('(' identifier ')'));
@@ -97,7 +119,7 @@ conditionExpression
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier | '*';
 regexpLiteral: RegexpLiteral;
-identifier: Identifier | types | As;
+identifier: Identifier | types | As | Assert | Then | Desc;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -157,6 +179,10 @@ DictType: 'dict';
 NumberType: 'int' | 'float';
 BoolType: 'bool';
 BoolLiteral: 'true' | 'false';
+Assert: 'assert';
+Then: 'then';
+Desc: 'desc' | 'note';
+Else: 'else';
 
 Identifier: IdentifierCharStart IdentifierChar*;
 IdentifierChar: [0-9] | IdentifierCharStart;
