@@ -143,15 +143,15 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 		}
 		var params = omap.NewOrderedMap(map[int64]*ssa.Parameter{})
-		lo.ForEach(f.Param, func(param *ssa.Parameter, index int) {
+		lo.ForEach(f.Params, func(param *ssa.Parameter, index int) {
 			for _, i := range formalParamsIndex {
 				if index == i {
 					params.Set(param.GetId(), param)
 				}
 			}
 		})
-		if lo.Max(formalParamsIndex) >= len(f.Param) && len(f.Param) > 0 {
-			last, _ := lo.Last(f.Param)
+		if lo.Max(formalParamsIndex) >= len(f.Params) && len(f.Params) > 0 {
+			last, _ := lo.Last(f.Params)
 			if last != nil {
 				params.Set(last.GetId(), last)
 			}

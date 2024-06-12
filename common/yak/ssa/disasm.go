@@ -64,7 +64,7 @@ func (f *Function) String() string {
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	ret := f.GetName() + " "
 	ret += strings.Join(
-		lo.Map(f.Param, func(item *Parameter, _ int) string {
+		lo.Map(f.Params, func(item *Parameter, _ int) string {
 			return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
 		}),
 		", ")
@@ -82,9 +82,9 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			// f.FreeValue,
 			", ") + "\n"
 	}
-	if len(f.ParameterMember) > 0 {
+	if len(f.ParameterMembers) > 0 {
 		ret += "parameterMember: " + strings.Join(
-			lo.Map(f.ParameterMember, func(pm *ParameterMember, _ int) string {
+			lo.Map(f.ParameterMembers, func(pm *ParameterMember, _ int) string {
 				return pm.String()
 			}),
 			", ") + "\n"
