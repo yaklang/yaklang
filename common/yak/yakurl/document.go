@@ -1,15 +1,16 @@
 package yakurl
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yakdocument"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
+	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type documentAction struct{}
@@ -41,7 +42,7 @@ func (d *documentAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 
 var (
 	yakDocumentExistedCoolDown = utils.NewCoolDown(10 * time.Second)
-	yakDocumentExisted         = omap.NewOrderedMap(make(map[string]yakdocument.LibDoc))
+	yakDocumentExisted         = omap.NewOrderedMap(make(map[string]*yakdoc.ScriptLib))
 )
 
 func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -52,21 +53,18 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 
 	if yakDocumentExisted.Len() <= 0 {
 		yakDocumentExistedCoolDown.Do(func() {
-			results := yak.EngineToLibDocuments(yaklang.New())
-			sort.SliceStable(results, func(i, j int) bool {
-				return results[i].Name < results[j].Name
-			})
-			for _, i := range results {
+			result := doc.DefaultDocumentHelper
+			for _, i := range result.Libs {
 				yakDocumentExisted.Set(i.Name, i)
 			}
 		})
 	}
 
-	doc := yakDocumentExisted
+	docMap := yakDocumentExisted
 	libName := strings.TrimSpace(u.GetLocation())
 	if libName == "" {
 		var rsc []*ypb.YakURLResource
-		doc.ForEach(func(i string, v yakdocument.LibDoc) bool {
+		docMap.ForEach(func(i string, v *yakdoc.ScriptLib) bool {
 			rsc = append(rsc, &ypb.YakURLResource{
 				ResourceType:      "document",
 				VerboseType:       "Document",
@@ -83,7 +81,7 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 		})
 		return &ypb.RequestYakURLResponse{Resources: rsc}, nil
 	} else {
-		result, ok := doc.Get(libName)
+		result, ok := docMap.Get(libName)
 		if !ok {
 			return nil, utils.Errorf("lib[%v] is not existed", libName)
 		}
@@ -92,36 +90,39 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 	return &ypb.RequestYakURLResponse{}, nil
 }
 
-func getResponseFromPath(document yakdocument.LibDoc, u *ypb.YakURL) (*ypb.RequestYakURLResponse, error) {
+func getResponseFromPath(document *yakdoc.ScriptLib, u *ypb.YakURL) (*ypb.RequestYakURLResponse, error) {
 	ret := strings.ToLower(strings.Trim(u.GetPath(), "/"))
 	var rsc []*ypb.YakURLResource
 	for _, i := range document.Functions {
-		searchName, _ := strings.CutPrefix(i.Name, i.LibName+".")
-		if ret != "" && !utils.IContains(searchName, ret) {
+		name := fmt.Sprintf("%v.%v", i.LibName, i.MethodName)
+		if ret != "" && !utils.IContains(i.MethodName, ret) {
 			continue
 		}
 		rsc = append(rsc, &ypb.YakURLResource{
 			ResourceType: "function",
 			VerboseType:  "Function",
-			ResourceName: i.Name,
-			VerboseName:  i.Name,
-			Path:         "/" + i.Name,
-			Url:          &ypb.YakURL{Schema: "yakdocument", Location: document.Name, Path: i.Name},
+			ResourceName: name,
+			VerboseName:  name,
+			Path:         "/" + name,
+			Url:          &ypb.YakURL{Schema: "yakdocument", Location: document.Name, Path: name},
+			Extra: []*ypb.KVPair{
+				{Key: "Content", Value: i.String()},
+			},
 		})
 	}
-	for _, i := range document.Variables {
-		searchName, _ := strings.CutPrefix(i.Name, document.Name+".")
-		if ret != "" && !utils.IContains(searchName, ret) {
+	for _, i := range document.Instances {
+		name := fmt.Sprintf("%v.%v", i.LibName, i.InstanceName)
+		if ret != "" && !utils.IContains(i.InstanceName, ret) {
 			continue
 		}
 
 		rsc = append(rsc, &ypb.YakURLResource{
 			ResourceType: "variable",
 			VerboseType:  "variable",
-			ResourceName: i.Name,
-			VerboseName:  "func " + i.Name,
-			Path:         "/" + i.Name,
-			Url:          &ypb.YakURL{Schema: "yakdocument", Location: document.Name, Path: i.Name},
+			ResourceName: name,
+			VerboseName:  "func " + name,
+			Path:         "/" + name,
+			Url:          &ypb.YakURL{Schema: "yakdocument", Location: document.Name, Path: name},
 		})
 	}
 	sort.SliceStable(rsc, func(i, j int) bool {
