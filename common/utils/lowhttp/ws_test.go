@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -92,9 +93,16 @@ Upgrade: websocket
 
 func TestWEbsocket_AutobahnTestsuite(t *testing.T) {
 	if utils.InGithubActions() {
-		t.Skip()
+		t.SkipNow()
 	}
-	host, port := "172.24.179.200", 9001
+
+	testServerHostPort := os.Getenv("Autobahn_Server_HostPort")
+	if testServerHostPort == "" {
+		t.SkipNow()
+	}
+	host, port, err := utils.ParseStringToHostPort(testServerHostPort)
+	require.NoError(t, err)
+
 	generatePacket := func(casetuple string, compression bool) []byte {
 		compressionHeader := ""
 		if compression {
@@ -268,10 +276,24 @@ Upgrade: websocket
 
 		for i, j := range cases {
 			for k := 1; k <= j; k++ {
-				// if i != 1 || k != 12 {
-				// 	continue
-				// }
 				runTestCase(t, fmt.Sprintf("12.%d.%d", i, k), echoCallback, true)
+			}
+		}
+	})
+
+	// We skip tests related to requestMaxWindowBits as that is unimplemented due
+	// to limitations in compress/flate. See https://github.com/golang/go/issues/3155
+	// "13.3.*", "13.4.*", "13.5.*", "13.6.*"
+	// Reference: nhooyr.io/websocket/autobahn_test.go:37:1
+	t.Run("Case13", func(t *testing.T) {
+		cases := map[int]int{
+			1: 18, // 13.1 Large JSON data file (utf8, 194056 bytes) - client offers (requestNoContextTakeover, requestMaxWindowBits): [(False, 0)] / server accept (requestNoContextTakeover, requestMaxWindowBits): [(False, 0)]
+			2: 18, // 13.2 Large JSON data file (utf8, 194056 bytes) - client offers (requestNoContextTakeover, requestMaxWindowBits): [(True, 0)] / server accept (requestNoContextTakeover, requestMaxWindowBits): [(True, 0)]
+		}
+
+		for i, j := range cases {
+			for k := 1; k <= j; k++ {
+				runTestCase(t, fmt.Sprintf("13.%d.%d", i, k), echoCallback, true)
 			}
 		}
 	})
