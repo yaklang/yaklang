@@ -95,11 +95,18 @@ func TestSyntaxInOne(t *testing.T) {
 		"assert $abc",
 		"assert $abc;;;;;",
 		"assert $abc then Finished else BAD",
+		"assert $abc then 'asdfasdfasd' else `Hello\\n\n\n\nhhh`",
 		"assert $abc else BAD",
-		"assert $abc then Finished",
+		"assert $abc else 'Bad Boy~~~ asdfasd adsf asdfpouasdf jpoasdf '",
+		"assert $abc then 'Finished Hello?'",
 		"assert $abc then Finished else BAD;;;; desc{a: b};; desc{title: SprintChecking}",
 		"desc(a: b, c: eee, e,e,e,e)",
+		`desc(title: "你好,世界，你可以在这里输入任何内容")`,
 		"desc(a: b, c: eee, e,e,e,e);;;;assert $abc then GOOD else BAD",
+		`"abc";'abc';` + "`abcasdfasdf`",
+		`"a\"bc";'a\'bc';` + "`abcasdfasdf`",
+		`"\\";'\\'`,
+		`"\";'\'`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		err := vm.Compile(i)

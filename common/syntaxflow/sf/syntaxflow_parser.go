@@ -37,8 +37,8 @@ func syntaxflowParserInit() {
 		"'||'", "'!='", "'?{'", "'-{'", "'}->'", "'#{'", "'#>'", "'#->'", "'>'",
 		"'.'", "'<'", "'='", "'?'", "'('", "','", "')'", "'['", "']'", "'{'",
 		"'}'", "'#'", "'$'", "':'", "'%'", "'!'", "'*'", "'-'", "'as'", "'`'",
-		"", "", "", "", "", "'str'", "'list'", "'dict'", "", "'bool'", "", "'assert'",
-		"'then'", "", "'else'",
+		"'''", "'\"'", "", "", "", "", "", "'str'", "'list'", "'dict'", "",
+		"'bool'", "", "'assert'", "'then'", "", "'else'",
 	}
 	staticData.symbolicNames = []string{
 		"", "", "", "", "", "", "DeepFilter", "Deep", "Percent", "DeepDot",
@@ -47,10 +47,11 @@ func syntaxflowParserInit() {
 		"TopDefStart", "DefStart", "TopDef", "Gt", "Dot", "Lt", "Eq", "Question",
 		"OpenParen", "Comma", "CloseParen", "ListSelectOpen", "ListSelectClose",
 		"MapBuilderOpen", "MapBuilderClose", "ListStart", "DollarOutput", "Colon",
-		"Search", "Bang", "Star", "Minus", "As", "Backtick", "WhiteSpace", "Number",
-		"OctalNumber", "BinaryNumber", "HexNumber", "StringType", "ListType",
-		"DictType", "NumberType", "BoolType", "BoolLiteral", "Assert", "Then",
-		"Desc", "Else", "Identifier", "IdentifierChar", "RegexpLiteral", "WS",
+		"Search", "Bang", "Star", "Minus", "As", "Backtick", "SingleQuote",
+		"DoubleQuote", "WhiteSpace", "Number", "OctalNumber", "BinaryNumber",
+		"HexNumber", "StringType", "ListType", "DictType", "NumberType", "BoolType",
+		"BoolLiteral", "Assert", "Then", "Desc", "Else", "Identifier", "IdentifierChar",
+		"QuotedStringLiteral", "RegexpLiteral", "WS",
 	}
 	staticData.ruleNames = []string{
 		"flow", "filters", "filterStatement", "eos", "descriptionStatement",
@@ -63,7 +64,7 @@ func syntaxflowParserInit() {
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 65, 395, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 68, 396, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
 		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
 		2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20, 2,
@@ -103,19 +104,19 @@ func syntaxflowParserInit() {
 		1, 23, 1, 23, 1, 23, 3, 23, 360, 8, 23, 3, 23, 362, 8, 23, 1, 23, 1, 23,
 		1, 23, 1, 23, 1, 23, 1, 23, 5, 23, 370, 8, 23, 10, 23, 12, 23, 373, 9,
 		23, 1, 24, 1, 24, 1, 25, 1, 25, 3, 25, 379, 8, 25, 1, 26, 1, 26, 1, 27,
-		1, 27, 1, 27, 1, 27, 1, 27, 1, 27, 3, 27, 389, 8, 27, 1, 28, 1, 28, 1,
-		29, 1, 29, 1, 29, 0, 2, 22, 46, 30, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18,
-		20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54,
-		56, 58, 0, 4, 5, 0, 10, 11, 14, 14, 19, 19, 26, 26, 28, 29, 1, 0, 15, 16,
-		1, 0, 48, 51, 1, 0, 52, 56, 447, 0, 60, 1, 0, 0, 0, 2, 64, 1, 0, 0, 0,
-		4, 85, 1, 0, 0, 0, 6, 87, 1, 0, 0, 0, 8, 100, 1, 0, 0, 0, 10, 102, 1, 0,
-		0, 0, 12, 115, 1, 0, 0, 0, 14, 117, 1, 0, 0, 0, 16, 125, 1, 0, 0, 0, 18,
-		128, 1, 0, 0, 0, 20, 131, 1, 0, 0, 0, 22, 147, 1, 0, 0, 0, 24, 225, 1,
-		0, 0, 0, 26, 239, 1, 0, 0, 0, 28, 250, 1, 0, 0, 0, 30, 256, 1, 0, 0, 0,
-		32, 264, 1, 0, 0, 0, 34, 268, 1, 0, 0, 0, 36, 279, 1, 0, 0, 0, 38, 291,
+		1, 27, 1, 27, 1, 27, 1, 27, 1, 27, 1, 27, 3, 27, 390, 8, 27, 1, 28, 1,
+		28, 1, 29, 1, 29, 1, 29, 0, 2, 22, 46, 30, 0, 2, 4, 6, 8, 10, 12, 14, 16,
+		18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52,
+		54, 56, 58, 0, 4, 5, 0, 10, 11, 14, 14, 19, 19, 26, 26, 28, 29, 1, 0, 15,
+		16, 1, 0, 50, 53, 1, 0, 54, 58, 449, 0, 60, 1, 0, 0, 0, 2, 64, 1, 0, 0,
+		0, 4, 85, 1, 0, 0, 0, 6, 87, 1, 0, 0, 0, 8, 100, 1, 0, 0, 0, 10, 102, 1,
+		0, 0, 0, 12, 115, 1, 0, 0, 0, 14, 117, 1, 0, 0, 0, 16, 125, 1, 0, 0, 0,
+		18, 128, 1, 0, 0, 0, 20, 131, 1, 0, 0, 0, 22, 147, 1, 0, 0, 0, 24, 225,
+		1, 0, 0, 0, 26, 239, 1, 0, 0, 0, 28, 250, 1, 0, 0, 0, 30, 256, 1, 0, 0,
+		0, 32, 264, 1, 0, 0, 0, 34, 268, 1, 0, 0, 0, 36, 279, 1, 0, 0, 0, 38, 291,
 		1, 0, 0, 0, 40, 295, 1, 0, 0, 0, 42, 301, 1, 0, 0, 0, 44, 338, 1, 0, 0,
 		0, 46, 361, 1, 0, 0, 0, 48, 374, 1, 0, 0, 0, 50, 378, 1, 0, 0, 0, 52, 380,
-		1, 0, 0, 0, 54, 388, 1, 0, 0, 0, 56, 390, 1, 0, 0, 0, 58, 392, 1, 0, 0,
+		1, 0, 0, 0, 54, 389, 1, 0, 0, 0, 56, 391, 1, 0, 0, 0, 58, 393, 1, 0, 0,
 		0, 60, 61, 3, 2, 1, 0, 61, 62, 5, 0, 0, 1, 62, 1, 1, 0, 0, 0, 63, 65, 3,
 		4, 2, 0, 64, 63, 1, 0, 0, 0, 65, 66, 1, 0, 0, 0, 66, 64, 1, 0, 0, 0, 66,
 		67, 1, 0, 0, 0, 67, 3, 1, 0, 0, 0, 68, 71, 3, 22, 11, 0, 69, 70, 5, 45,
@@ -126,7 +127,7 @@ func syntaxflowParserInit() {
 		81, 83, 3, 6, 3, 0, 82, 81, 1, 0, 0, 0, 82, 83, 1, 0, 0, 0, 83, 86, 1,
 		0, 0, 0, 84, 86, 3, 6, 3, 0, 85, 68, 1, 0, 0, 0, 85, 76, 1, 0, 0, 0, 85,
 		80, 1, 0, 0, 0, 85, 84, 1, 0, 0, 0, 86, 5, 1, 0, 0, 0, 87, 88, 5, 1, 0,
-		0, 88, 7, 1, 0, 0, 0, 89, 90, 5, 60, 0, 0, 90, 92, 5, 31, 0, 0, 91, 93,
+		0, 88, 7, 1, 0, 0, 0, 89, 90, 5, 62, 0, 0, 90, 92, 5, 31, 0, 0, 91, 93,
 		3, 10, 5, 0, 92, 91, 1, 0, 0, 0, 92, 93, 1, 0, 0, 0, 93, 94, 1, 0, 0, 0,
 		94, 101, 5, 33, 0, 0, 95, 97, 5, 36, 0, 0, 96, 98, 3, 10, 5, 0, 97, 96,
 		1, 0, 0, 0, 97, 98, 1, 0, 0, 0, 98, 99, 1, 0, 0, 0, 99, 101, 5, 37, 0,
@@ -136,11 +137,11 @@ func syntaxflowParserInit() {
 		0, 108, 11, 1, 0, 0, 0, 109, 107, 1, 0, 0, 0, 110, 116, 3, 50, 25, 0, 111,
 		112, 3, 50, 25, 0, 112, 113, 5, 40, 0, 0, 113, 114, 3, 50, 25, 0, 114,
 		116, 1, 0, 0, 0, 115, 110, 1, 0, 0, 0, 115, 111, 1, 0, 0, 0, 116, 13, 1,
-		0, 0, 0, 117, 118, 5, 58, 0, 0, 118, 120, 3, 20, 10, 0, 119, 121, 3, 16,
+		0, 0, 0, 117, 118, 5, 60, 0, 0, 118, 120, 3, 20, 10, 0, 119, 121, 3, 16,
 		8, 0, 120, 119, 1, 0, 0, 0, 120, 121, 1, 0, 0, 0, 121, 123, 1, 0, 0, 0,
 		122, 124, 3, 18, 9, 0, 123, 122, 1, 0, 0, 0, 123, 124, 1, 0, 0, 0, 124,
-		15, 1, 0, 0, 0, 125, 126, 5, 59, 0, 0, 126, 127, 3, 50, 25, 0, 127, 17,
-		1, 0, 0, 0, 128, 129, 5, 61, 0, 0, 129, 130, 3, 50, 25, 0, 130, 19, 1,
+		15, 1, 0, 0, 0, 125, 126, 5, 61, 0, 0, 126, 127, 3, 50, 25, 0, 127, 17,
+		1, 0, 0, 0, 128, 129, 5, 63, 0, 0, 129, 130, 3, 50, 25, 0, 130, 19, 1,
 		0, 0, 0, 131, 137, 5, 39, 0, 0, 132, 138, 3, 54, 27, 0, 133, 134, 5, 31,
 		0, 0, 134, 135, 3, 54, 27, 0, 135, 136, 5, 33, 0, 0, 136, 138, 1, 0, 0,
 		0, 137, 132, 1, 0, 0, 0, 137, 133, 1, 0, 0, 0, 138, 21, 1, 0, 0, 0, 139,
@@ -238,16 +239,17 @@ func syntaxflowParserInit() {
 		0, 0, 371, 369, 1, 0, 0, 0, 371, 372, 1, 0, 0, 0, 372, 47, 1, 0, 0, 0,
 		373, 371, 1, 0, 0, 0, 374, 375, 7, 2, 0, 0, 375, 49, 1, 0, 0, 0, 376, 379,
 		3, 54, 27, 0, 377, 379, 5, 43, 0, 0, 378, 376, 1, 0, 0, 0, 378, 377, 1,
-		0, 0, 0, 379, 51, 1, 0, 0, 0, 380, 381, 5, 64, 0, 0, 381, 53, 1, 0, 0,
-		0, 382, 389, 5, 62, 0, 0, 383, 389, 3, 56, 28, 0, 384, 389, 5, 45, 0, 0,
-		385, 389, 5, 58, 0, 0, 386, 389, 5, 59, 0, 0, 387, 389, 5, 60, 0, 0, 388,
-		382, 1, 0, 0, 0, 388, 383, 1, 0, 0, 0, 388, 384, 1, 0, 0, 0, 388, 385,
-		1, 0, 0, 0, 388, 386, 1, 0, 0, 0, 388, 387, 1, 0, 0, 0, 389, 55, 1, 0,
-		0, 0, 390, 391, 7, 3, 0, 0, 391, 57, 1, 0, 0, 0, 392, 393, 5, 57, 0, 0,
-		393, 59, 1, 0, 0, 0, 52, 66, 71, 74, 78, 82, 85, 92, 97, 100, 107, 115,
-		120, 123, 137, 142, 147, 164, 171, 187, 211, 217, 220, 222, 227, 231, 236,
-		239, 245, 248, 250, 256, 261, 264, 273, 277, 285, 291, 295, 301, 309, 313,
-		329, 332, 335, 338, 354, 359, 361, 369, 371, 378, 388,
+		0, 0, 0, 379, 51, 1, 0, 0, 0, 380, 381, 5, 67, 0, 0, 381, 53, 1, 0, 0,
+		0, 382, 390, 5, 64, 0, 0, 383, 390, 3, 56, 28, 0, 384, 390, 5, 45, 0, 0,
+		385, 390, 5, 60, 0, 0, 386, 390, 5, 61, 0, 0, 387, 390, 5, 62, 0, 0, 388,
+		390, 5, 66, 0, 0, 389, 382, 1, 0, 0, 0, 389, 383, 1, 0, 0, 0, 389, 384,
+		1, 0, 0, 0, 389, 385, 1, 0, 0, 0, 389, 386, 1, 0, 0, 0, 389, 387, 1, 0,
+		0, 0, 389, 388, 1, 0, 0, 0, 390, 55, 1, 0, 0, 0, 391, 392, 7, 3, 0, 0,
+		392, 57, 1, 0, 0, 0, 393, 394, 5, 59, 0, 0, 394, 59, 1, 0, 0, 0, 52, 66,
+		71, 74, 78, 82, 85, 92, 97, 100, 107, 115, 120, 123, 137, 142, 147, 164,
+		171, 187, 211, 217, 220, 222, 227, 231, 236, 239, 245, 248, 250, 256, 261,
+		264, 273, 277, 285, 291, 295, 301, 309, 313, 329, 332, 335, 338, 354, 359,
+		361, 369, 371, 378, 389,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -285,72 +287,75 @@ func NewSyntaxFlowParser(input antlr.TokenStream) *SyntaxFlowParser {
 
 // SyntaxFlowParser tokens.
 const (
-	SyntaxFlowParserEOF             = antlr.TokenEOF
-	SyntaxFlowParserT__0            = 1
-	SyntaxFlowParserT__1            = 2
-	SyntaxFlowParserT__2            = 3
-	SyntaxFlowParserT__3            = 4
-	SyntaxFlowParserT__4            = 5
-	SyntaxFlowParserDeepFilter      = 6
-	SyntaxFlowParserDeep            = 7
-	SyntaxFlowParserPercent         = 8
-	SyntaxFlowParserDeepDot         = 9
-	SyntaxFlowParserLtEq            = 10
-	SyntaxFlowParserGtEq            = 11
-	SyntaxFlowParserDoubleGt        = 12
-	SyntaxFlowParserFilter          = 13
-	SyntaxFlowParserEqEq            = 14
-	SyntaxFlowParserRegexpMatch     = 15
-	SyntaxFlowParserNotRegexpMatch  = 16
-	SyntaxFlowParserAnd             = 17
-	SyntaxFlowParserOr              = 18
-	SyntaxFlowParserNotEq           = 19
-	SyntaxFlowParserConditionStart  = 20
-	SyntaxFlowParserDeepNextStart   = 21
-	SyntaxFlowParserDeepNextEnd     = 22
-	SyntaxFlowParserTopDefStart     = 23
-	SyntaxFlowParserDefStart        = 24
-	SyntaxFlowParserTopDef          = 25
-	SyntaxFlowParserGt              = 26
-	SyntaxFlowParserDot             = 27
-	SyntaxFlowParserLt              = 28
-	SyntaxFlowParserEq              = 29
-	SyntaxFlowParserQuestion        = 30
-	SyntaxFlowParserOpenParen       = 31
-	SyntaxFlowParserComma           = 32
-	SyntaxFlowParserCloseParen      = 33
-	SyntaxFlowParserListSelectOpen  = 34
-	SyntaxFlowParserListSelectClose = 35
-	SyntaxFlowParserMapBuilderOpen  = 36
-	SyntaxFlowParserMapBuilderClose = 37
-	SyntaxFlowParserListStart       = 38
-	SyntaxFlowParserDollarOutput    = 39
-	SyntaxFlowParserColon           = 40
-	SyntaxFlowParserSearch          = 41
-	SyntaxFlowParserBang            = 42
-	SyntaxFlowParserStar            = 43
-	SyntaxFlowParserMinus           = 44
-	SyntaxFlowParserAs              = 45
-	SyntaxFlowParserBacktick        = 46
-	SyntaxFlowParserWhiteSpace      = 47
-	SyntaxFlowParserNumber          = 48
-	SyntaxFlowParserOctalNumber     = 49
-	SyntaxFlowParserBinaryNumber    = 50
-	SyntaxFlowParserHexNumber       = 51
-	SyntaxFlowParserStringType      = 52
-	SyntaxFlowParserListType        = 53
-	SyntaxFlowParserDictType        = 54
-	SyntaxFlowParserNumberType      = 55
-	SyntaxFlowParserBoolType        = 56
-	SyntaxFlowParserBoolLiteral     = 57
-	SyntaxFlowParserAssert          = 58
-	SyntaxFlowParserThen            = 59
-	SyntaxFlowParserDesc            = 60
-	SyntaxFlowParserElse            = 61
-	SyntaxFlowParserIdentifier      = 62
-	SyntaxFlowParserIdentifierChar  = 63
-	SyntaxFlowParserRegexpLiteral   = 64
-	SyntaxFlowParserWS              = 65
+	SyntaxFlowParserEOF                 = antlr.TokenEOF
+	SyntaxFlowParserT__0                = 1
+	SyntaxFlowParserT__1                = 2
+	SyntaxFlowParserT__2                = 3
+	SyntaxFlowParserT__3                = 4
+	SyntaxFlowParserT__4                = 5
+	SyntaxFlowParserDeepFilter          = 6
+	SyntaxFlowParserDeep                = 7
+	SyntaxFlowParserPercent             = 8
+	SyntaxFlowParserDeepDot             = 9
+	SyntaxFlowParserLtEq                = 10
+	SyntaxFlowParserGtEq                = 11
+	SyntaxFlowParserDoubleGt            = 12
+	SyntaxFlowParserFilter              = 13
+	SyntaxFlowParserEqEq                = 14
+	SyntaxFlowParserRegexpMatch         = 15
+	SyntaxFlowParserNotRegexpMatch      = 16
+	SyntaxFlowParserAnd                 = 17
+	SyntaxFlowParserOr                  = 18
+	SyntaxFlowParserNotEq               = 19
+	SyntaxFlowParserConditionStart      = 20
+	SyntaxFlowParserDeepNextStart       = 21
+	SyntaxFlowParserDeepNextEnd         = 22
+	SyntaxFlowParserTopDefStart         = 23
+	SyntaxFlowParserDefStart            = 24
+	SyntaxFlowParserTopDef              = 25
+	SyntaxFlowParserGt                  = 26
+	SyntaxFlowParserDot                 = 27
+	SyntaxFlowParserLt                  = 28
+	SyntaxFlowParserEq                  = 29
+	SyntaxFlowParserQuestion            = 30
+	SyntaxFlowParserOpenParen           = 31
+	SyntaxFlowParserComma               = 32
+	SyntaxFlowParserCloseParen          = 33
+	SyntaxFlowParserListSelectOpen      = 34
+	SyntaxFlowParserListSelectClose     = 35
+	SyntaxFlowParserMapBuilderOpen      = 36
+	SyntaxFlowParserMapBuilderClose     = 37
+	SyntaxFlowParserListStart           = 38
+	SyntaxFlowParserDollarOutput        = 39
+	SyntaxFlowParserColon               = 40
+	SyntaxFlowParserSearch              = 41
+	SyntaxFlowParserBang                = 42
+	SyntaxFlowParserStar                = 43
+	SyntaxFlowParserMinus               = 44
+	SyntaxFlowParserAs                  = 45
+	SyntaxFlowParserBacktick            = 46
+	SyntaxFlowParserSingleQuote         = 47
+	SyntaxFlowParserDoubleQuote         = 48
+	SyntaxFlowParserWhiteSpace          = 49
+	SyntaxFlowParserNumber              = 50
+	SyntaxFlowParserOctalNumber         = 51
+	SyntaxFlowParserBinaryNumber        = 52
+	SyntaxFlowParserHexNumber           = 53
+	SyntaxFlowParserStringType          = 54
+	SyntaxFlowParserListType            = 55
+	SyntaxFlowParserDictType            = 56
+	SyntaxFlowParserNumberType          = 57
+	SyntaxFlowParserBoolType            = 58
+	SyntaxFlowParserBoolLiteral         = 59
+	SyntaxFlowParserAssert              = 60
+	SyntaxFlowParserThen                = 61
+	SyntaxFlowParserDesc                = 62
+	SyntaxFlowParserElse                = 63
+	SyntaxFlowParserIdentifier          = 64
+	SyntaxFlowParserIdentifierChar      = 65
+	SyntaxFlowParserQuotedStringLiteral = 66
+	SyntaxFlowParserRegexpLiteral       = 67
+	SyntaxFlowParserWS                  = 68
 )
 
 // SyntaxFlowParser rules.
@@ -1268,7 +1273,7 @@ func (p *SyntaxFlowParser) DescriptionStatement() (localctx IDescriptionStatemen
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768954220402966528) != 0 {
+		if (int64((_la-43)) & ^0x3f) == 0 && ((int64(1)<<(_la-43))&11466757) != 0 {
 			{
 				p.SetState(91)
 				p.DescriptionItems()
@@ -1290,7 +1295,7 @@ func (p *SyntaxFlowParser) DescriptionStatement() (localctx IDescriptionStatemen
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768954220402966528) != 0 {
+		if (int64((_la-43)) & ^0x3f) == 0 && ((int64(1)<<(_la-43))&11466757) != 0 {
 			{
 				p.SetState(96)
 				p.DescriptionItems()
@@ -2125,7 +2130,7 @@ func (p *SyntaxFlowParser) RefVariable() (localctx IRefVariableContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		{
 			p.SetState(132)
 			p.Identifier()
@@ -3665,7 +3670,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 					{
 						p.SetState(163)
 						p.RecursiveConfig()
@@ -3697,7 +3702,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 					{
 						p.SetState(170)
 						p.RecursiveConfig()
@@ -3771,7 +3776,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64((_la-1)) & ^0x3f) == 0 && ((int64(1)<<(_la-1))&-5838894615188471807) != 0 {
+				if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8628941489436622850) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&13) != 0 {
 					{
 						p.SetState(186)
 						p.ActualParam()
@@ -3893,7 +3898,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 					{
 						p.SetState(210)
 						p.RecursiveConfig()
@@ -3921,7 +3926,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				p.GetErrorHandler().Sync(p)
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 					{
 						p.SetState(216)
 						p.RecursiveConfig()
@@ -4202,7 +4207,7 @@ func (p *SyntaxFlowParser) UseDefCalcParams() (localctx IUseDefCalcParamsContext
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 			{
 				p.SetState(230)
 				p.RecursiveConfig()
@@ -4224,7 +4229,7 @@ func (p *SyntaxFlowParser) UseDefCalcParams() (localctx IUseDefCalcParamsContext
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 			{
 				p.SetState(235)
 				p.RecursiveConfig()
@@ -4485,7 +4490,7 @@ func (p *SyntaxFlowParser) ActualParam() (localctx IActualParamContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-1)) & ^0x3f) == 0 && ((int64(1)<<(_la-1))&-5838894617335955455) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8628941485141655554) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&13) != 0 {
 			{
 				p.SetState(247)
 				p.SingleParam()
@@ -4601,7 +4606,7 @@ func (p *SyntaxFlowParser) ActualParamFilter() (localctx IActualParamFilterConte
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserT__0, SyntaxFlowParserTopDefStart, SyntaxFlowParserDefStart, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserRegexpLiteral:
+	case SyntaxFlowParserT__0, SyntaxFlowParserTopDefStart, SyntaxFlowParserDefStart, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(252)
@@ -4770,7 +4775,7 @@ func (p *SyntaxFlowParser) SingleParam() (localctx ISingleParamContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 			{
 				p.SetState(260)
 				p.RecursiveConfig()
@@ -4782,7 +4787,7 @@ func (p *SyntaxFlowParser) SingleParam() (localctx ISingleParamContext) {
 			p.Match(SyntaxFlowParserMapBuilderClose)
 		}
 
-	case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserRegexpLiteral:
+	case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 
 	default:
 	}
@@ -5236,13 +5241,13 @@ func (p *SyntaxFlowParser) RecursiveConfigItemValue() (localctx IRecursiveConfig
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserAs, SyntaxFlowParserNumber, SyntaxFlowParserOctalNumber, SyntaxFlowParserBinaryNumber, SyntaxFlowParserHexNumber, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+	case SyntaxFlowParserAs, SyntaxFlowParserNumber, SyntaxFlowParserOctalNumber, SyntaxFlowParserBinaryNumber, SyntaxFlowParserHexNumber, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(285)
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 			{
 				p.SetState(283)
 				p.Identifier()
@@ -5395,7 +5400,7 @@ func (p *SyntaxFlowParser) SliceCallItem() (localctx ISliceCallItemContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserRegexpLiteral:
+	case SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(293)
@@ -5553,7 +5558,7 @@ func (p *SyntaxFlowParser) NameFilter() (localctx INameFilterContext) {
 			p.Match(SyntaxFlowParserDollarOutput)
 		}
 
-	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(299)
@@ -5880,7 +5885,7 @@ func (p *SyntaxFlowParser) ChainFilter() (localctx IChainFilterContext) {
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserRegexpLiteral:
+		case SyntaxFlowParserT__0, SyntaxFlowParserDot, SyntaxFlowParserMapBuilderOpen, SyntaxFlowParserDollarOutput, SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral, SyntaxFlowParserRegexpLiteral:
 			{
 				p.SetState(304)
 				p.Filters()
@@ -5929,7 +5934,7 @@ func (p *SyntaxFlowParser) ChainFilter() (localctx IChainFilterContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&6768945424309944320) != 0 {
+		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&2866689) != 0 {
 			{
 				p.SetState(317)
 				p.Identifier()
@@ -6658,7 +6663,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 			p.NumberLiteral()
 		}
 
-	case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+	case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		localctx = NewFilterExpressionStringContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
@@ -6738,7 +6743,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 				p.NumberLiteral()
 			}
 
-		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+		case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 			{
 				p.SetState(352)
 				p.Identifier()
@@ -6780,7 +6785,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 		p.GetErrorHandler().Sync(p)
 
 		switch p.GetTokenStream().LA(1) {
-		case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+		case SyntaxFlowParserStar, SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 			{
 				p.SetState(357)
 				p.StringLiteral()
@@ -6959,7 +6964,7 @@ func (p *SyntaxFlowParser) NumberLiteral() (localctx INumberLiteralContext) {
 		p.SetState(374)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4222124650659840) != 0) {
+		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&16888498602639360) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -7073,7 +7078,7 @@ func (p *SyntaxFlowParser) StringLiteral() (localctx IStringLiteralContext) {
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
-	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier:
+	case SyntaxFlowParserAs, SyntaxFlowParserStringType, SyntaxFlowParserListType, SyntaxFlowParserDictType, SyntaxFlowParserNumberType, SyntaxFlowParserBoolType, SyntaxFlowParserAssert, SyntaxFlowParserThen, SyntaxFlowParserDesc, SyntaxFlowParserIdentifier, SyntaxFlowParserQuotedStringLiteral:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(376)
@@ -7260,6 +7265,10 @@ func (s *IdentifierContext) Desc() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserDesc, 0)
 }
 
+func (s *IdentifierContext) QuotedStringLiteral() antlr.TerminalNode {
+	return s.GetToken(SyntaxFlowParserQuotedStringLiteral, 0)
+}
+
 func (s *IdentifierContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -7301,7 +7310,7 @@ func (p *SyntaxFlowParser) Identifier() (localctx IIdentifierContext) {
 		}
 	}()
 
-	p.SetState(388)
+	p.SetState(389)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
@@ -7345,6 +7354,13 @@ func (p *SyntaxFlowParser) Identifier() (localctx IIdentifierContext) {
 		{
 			p.SetState(387)
 			p.Match(SyntaxFlowParserDesc)
+		}
+
+	case SyntaxFlowParserQuotedStringLiteral:
+		p.EnterOuterAlt(localctx, 7)
+		{
+			p.SetState(388)
+			p.Match(SyntaxFlowParserQuotedStringLiteral)
 		}
 
 	default:
@@ -7456,10 +7472,10 @@ func (p *SyntaxFlowParser) Types() (localctx ITypesContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(390)
+		p.SetState(391)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&139611588448485376) != 0) {
+		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&558446353793941504) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -7555,7 +7571,7 @@ func (p *SyntaxFlowParser) BoolLiteral() (localctx IBoolLiteralContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(392)
+		p.SetState(393)
 		p.Match(SyntaxFlowParserBoolLiteral)
 	}
 
