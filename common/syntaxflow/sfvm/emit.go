@@ -57,6 +57,22 @@ func (y *SyntaxFlowVisitor) EmitOperator(i string) {
 	}
 }
 
+func (y *SyntaxFlowVisitor) EmitCheckParam(ref string, then string, elseString string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpCheckParams,
+		UnaryStr: ref,
+		Values:   []string{then, elseString},
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitAddDescription(key string, value string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpAddDescription,
+		UnaryStr: key,
+		Values:   []string{key, value},
+	})
+}
+
 func (v *SyntaxFlowVisitor) EmitPushGlob(i string) {
 	v.codes = append(v.codes, &SFI{
 		OpCode:   OpGlobMatch,
