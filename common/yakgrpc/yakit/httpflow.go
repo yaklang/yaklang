@@ -164,7 +164,7 @@ func CreateHTTPFlowWithRequestIns(reqIns *http.Request) CreateHTTPFlowOptions {
 }
 
 func FuzzerResponseToHTTPFlow(db *gorm.DB, rsp *ypb.FuzzerResponse) (*schema.HTTPFlow, error) {
-	return SaveFromHTTPFromRaw(db, rsp.IsHTTPS, rsp.RequestRaw, rsp.GetResponseRaw(), "fuzzer", rsp.GetUrl(), rsp.Host)
+	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(rsp.IsHTTPS, rsp.GetRequestRaw(), rsp.GetResponseRaw(), "fuzzer", rsp.GetUrl(), rsp.GetHost())
 }
 
 func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*schema.HTTPFlow, error) {
