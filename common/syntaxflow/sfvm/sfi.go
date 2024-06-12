@@ -73,6 +73,9 @@ const (
 	// if not match, record error
 	// matched, use 'then expr' (if exists)
 	OpCheckParams
+
+	// OpAddDescription add description to current context
+	OpAddDescription
 )
 
 type SFI struct {
@@ -82,6 +85,13 @@ type SFI struct {
 	Desc             string
 	Values           []string
 	SyntaxFlowConfig []*RecursiveConfigItem
+}
+
+func (s *SFI) ValueByIndex(i int) string {
+	if i < 0 || i >= len(s.Values) {
+		return ""
+	}
+	return s.Values[i]
 }
 
 const verboseLen = "%-12s"
@@ -161,6 +171,21 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpCheckStackTop:
 		return fmt.Sprint("check stack top")
+	case OpCheckParams:
+		var suffix string
+		if ret := s.ValueByIndex(0); ret != "" {
+			suffix += " then: " + ret
+		}
+		if ret := s.ValueByIndex(1); ret != "" {
+			suffix += ", else: " + ret
+		}
+		return fmt.Sprintf(verboseLen+" $%v"+suffix, "check", s.UnaryStr)
+	case OpAddDescription:
+		var suffix string
+		if ret := s.ValueByIndex(0); ret != "" {
+			suffix += " value: " + ret
+		}
+		return fmt.Sprintf(verboseLen+" %v"+suffix, "desc", s.UnaryStr)
 	default:
 		panic("unhandled default case")
 	}

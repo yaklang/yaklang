@@ -10,8 +10,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+type SFFrameInfo struct {
+	Description *omap.OrderedMap[string, string]
+	CheckParams []string
+	Errors      []string
+}
+
+func NewSFFrameInfo() *SFFrameInfo {
+	return &SFFrameInfo{
+		Description: omap.NewEmptyOrderedMap[string, string](),
+		CheckParams: make([]string, 0),
+	}
+}
+
 type SFFrame struct {
 	config *Config
+
+	info *SFFrameInfo
 
 	symbolTable *omap.OrderedMap[string, ValueOperator]
 	stack       *utils.Stack[ValueOperator]
@@ -47,6 +62,7 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
 	}
 	return &SFFrame{
+		info:        NewSFFrameInfo(),
 		symbolTable: v,
 		stack:       utils.NewStack[ValueOperator](),
 		Text:        text,
@@ -345,6 +361,39 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return err
 			}
 			s.debugSubLog(" -> save $" + i.UnaryStr)
+		case OpAddDescription:
+			if i.UnaryStr == "" {
+				return
+			}
+			ret := i.ValueByIndex(0)
+			s.info.Description.Set(i.UnaryStr, ret)
+			if ret != "" {
+				s.debugSubLog("- key: %v, value: %v", i.UnaryStr, ret)
+			} else {
+				s.debugSubLog("- key: %v", i.UnaryStr)
+			}
+		case OpCheckParams:
+			if i.UnaryStr == "" {
+				return
+			}
+
+			s.debugSubLog("- check: $%v", i.UnaryStr)
+
+			var thenStr = i.ValueByIndex(0)
+			var elseStr = i.ValueByIndex(1)
+			if elseStr == "" {
+				elseStr = "$" + i.UnaryStr + "is not found"
+			}
+			results, ok := s.GetSymbolTable().Get(i.UnaryStr)
+			if !ok || results == nil {
+				s.debugSubLog("-   error: " + elseStr)
+				s.info.Errors = append(s.info.Errors, elseStr)
+			} else {
+				s.info.CheckParams = append(s.info.CheckParams, i.UnaryStr)
+				if thenStr != "" {
+					s.info.Description.Set("$"+i.UnaryStr, thenStr)
+				}
+			}
 		default:
 			msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 			panic(msg)

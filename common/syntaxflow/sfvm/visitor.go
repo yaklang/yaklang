@@ -85,15 +85,9 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		}
 		y.EmitExitStatement()
 	case *sf.FilterParamCheckContext:
-		log.Warn("assert not implemented")
-		log.Warn("assert not implemented")
-		log.Warn("assert not implemented")
-		log.Warn("assert not implemented")
+		y.VisitCheckStatement(i.CheckStatement())
 	case *sf.DescriptionContext:
-		log.Warn("description not implemented")
-		log.Warn("description not implemented")
-		log.Warn("description not implemented")
-		log.Warn("description not implemented")
+		y.VisitDescriptionStatement(i.DescriptionStatement())
 	case *sf.EmptyStatementContext:
 		return nil // empty statement will do nothing
 	default:
