@@ -143,13 +143,13 @@ func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.Thi
 	for _, param := range req.ExtraParams {
 		params[param.Key] = param.Value
 	}
-	cfg := base.BaseSpaceEngineConfig{}
+	cfg := &base.BaseSpaceEngineConfig{}
 	err = utils.ImportAppConfigToStruct(cfg, params)
 	if err != nil {
 		log.Errorf("load spaceengine config failed %v", err)
 	}
 	key := cfg.APIKey
-	domain := cfg.APIKey
+	domain := cfg.Domain
 
 	result = &ypb.SpaceEngineStatus{
 		Type:   req.GetType(),
