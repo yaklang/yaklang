@@ -22,6 +22,8 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		},
 	})
 
+	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream)
+
 	startOnce := new(sync.Once)
 	startOnce.Do(func() {
 		var httpFlowsSeq int64

@@ -821,6 +821,14 @@ func CopyMapInterface(i map[string]interface{}) map[string]interface{} {
 	return m
 }
 
+func CopyMapShallow[K comparable, V any](originalMap map[K]V) map[K]V {
+	copiedMap := make(map[K]V)
+	for key, value := range originalMap {
+		copiedMap[key] = value
+	}
+	return copiedMap
+}
+
 func ByteCountDecimal(b int64) string {
 	const unit = 1000
 	if b < unit {
