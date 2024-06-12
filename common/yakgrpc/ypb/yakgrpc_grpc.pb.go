@@ -477,6 +477,7 @@ type YakClient interface {
 	DeleteHybridScanTask(ctx context.Context, in *DeleteHybridScanTaskRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetSpaceEngineStatus(ctx context.Context, in *GetSpaceEngineStatusRequest, opts ...grpc.CallOption) (*SpaceEngineStatus, error)
 	GetSpaceEngineAccountStatus(ctx context.Context, in *GetSpaceEngineAccountStatusRequest, opts ...grpc.CallOption) (*SpaceEngineStatus, error)
+	GetSpaceEngineAccountStatusV2(ctx context.Context, in *ThirdPartyApplicationConfig, opts ...grpc.CallOption) (*SpaceEngineStatus, error)
 	FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error)
 	// 表达式执行
 	EvaluateExpression(ctx context.Context, in *EvaluateExpressionRequest, opts ...grpc.CallOption) (*EvaluateExpressionResponse, error)
@@ -5103,6 +5104,15 @@ func (c *yakClient) GetSpaceEngineAccountStatus(ctx context.Context, in *GetSpac
 	return out, nil
 }
 
+func (c *yakClient) GetSpaceEngineAccountStatusV2(ctx context.Context, in *ThirdPartyApplicationConfig, opts ...grpc.CallOption) (*SpaceEngineStatus, error) {
+	out := new(SpaceEngineStatus)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetSpaceEngineAccountStatusV2", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
 	if err != nil {
@@ -5630,6 +5640,7 @@ type YakServer interface {
 	DeleteHybridScanTask(context.Context, *DeleteHybridScanTaskRequest) (*Empty, error)
 	GetSpaceEngineStatus(context.Context, *GetSpaceEngineStatusRequest) (*SpaceEngineStatus, error)
 	GetSpaceEngineAccountStatus(context.Context, *GetSpaceEngineAccountStatusRequest) (*SpaceEngineStatus, error)
+	GetSpaceEngineAccountStatusV2(context.Context, *ThirdPartyApplicationConfig) (*SpaceEngineStatus, error)
 	FetchPortAssetFromSpaceEngine(*FetchPortAssetFromSpaceEngineRequest, Yak_FetchPortAssetFromSpaceEngineServer) error
 	// 表达式执行
 	EvaluateExpression(context.Context, *EvaluateExpressionRequest) (*EvaluateExpressionResponse, error)
@@ -6700,6 +6711,9 @@ func (UnimplementedYakServer) GetSpaceEngineStatus(context.Context, *GetSpaceEng
 }
 func (UnimplementedYakServer) GetSpaceEngineAccountStatus(context.Context, *GetSpaceEngineAccountStatusRequest) (*SpaceEngineStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSpaceEngineAccountStatus not implemented")
+}
+func (UnimplementedYakServer) GetSpaceEngineAccountStatusV2(context.Context, *ThirdPartyApplicationConfig) (*SpaceEngineStatus, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSpaceEngineAccountStatusV2 not implemented")
 }
 func (UnimplementedYakServer) FetchPortAssetFromSpaceEngine(*FetchPortAssetFromSpaceEngineRequest, Yak_FetchPortAssetFromSpaceEngineServer) error {
 	return status.Errorf(codes.Unimplemented, "method FetchPortAssetFromSpaceEngine not implemented")
@@ -13299,6 +13313,24 @@ func _Yak_GetSpaceEngineAccountStatus_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetSpaceEngineAccountStatusV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ThirdPartyApplicationConfig)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSpaceEngineAccountStatusV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetSpaceEngineAccountStatusV2",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSpaceEngineAccountStatusV2(ctx, req.(*ThirdPartyApplicationConfig))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_FetchPortAssetFromSpaceEngine_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(FetchPortAssetFromSpaceEngineRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -14554,6 +14586,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSpaceEngineAccountStatus",
 			Handler:    _Yak_GetSpaceEngineAccountStatus_Handler,
+		},
+		{
+			MethodName: "GetSpaceEngineAccountStatusV2",
+			Handler:    _Yak_GetSpaceEngineAccountStatusV2_Handler,
 		},
 		{
 			MethodName: "EvaluateExpression",
