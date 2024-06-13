@@ -97,6 +97,7 @@ func GetCommonThirdPartyApplicationConfig(t string) (*ypb.ThirdPartyApplicationC
 		config.Namespace = rawCfg.Namespace
 		config.Domain = rawCfg.Domain
 		config.WebhookURL = rawCfg.WebhookURL
+		config.Type = t
 		return config, nil
 	}
 	return nil, errors.New("third party application config not found")
