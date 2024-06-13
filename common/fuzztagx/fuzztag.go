@@ -1,6 +1,7 @@
 package fuzztagx
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,7 +22,18 @@ type FuzzTag struct {
 }
 type stepDataGetter func() ([]byte, error)
 
-func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
+func (f *FuzzTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield func(result *parser.FuzzResult), methods ...map[string]*parser.TagMethod) error {
+	runFun := func(method *parser.TagMethod, data string) error {
+		if method.YieldFun != nil {
+			return method.YieldFun(ctx, data, yield)
+		} else {
+			res, err := method.Fun(data)
+			for _, re := range res {
+				yield(re)
+			}
+			return err
+		}
+	}
 	data := string(raw.GetData())
 	name := ""
 	params := ""
@@ -67,7 +79,8 @@ func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.Tag
 	}
 	if err := compile(); err != nil { // 对于编译错误，返回原文
 		escaper := parser.NewDefaultEscaper(`\`, "{{", "}}")
-		return []*parser.FuzzResult{parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
+		yield(parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data))))
+		return nil
 	}
 	var fun *parser.TagMethod
 	if f.Methods != nil {
@@ -79,7 +92,8 @@ func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.Tag
 		}
 	}
 	if fun == nil {
-		return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
+		yield(parser.NewFuzzResultWithData(""))
+		return nil
 		//return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
 	var isDynFunRes bool
@@ -93,7 +107,7 @@ func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.Tag
 	if fun.IsDyn || isDynFunRes {
 		f.Labels = append(f.Labels, "dyn")
 	}
-	return fun.Fun(params)
+	return runFun(fun, params)
 }
 
 type SimpleFuzzTag struct {
@@ -312,14 +326,13 @@ func (r *RawTag) Exec(result *parser.FuzzResult, m ...map[string]*parser.TagMeth
 
 func ParseFuzztag(code string, simple bool) ([]parser.Node, error) {
 	if simple {
-		return parser.Parse(code,
-			parser.NewTagDefine("fuzztag", "{{", "}}", &SimpleFuzzTag{}),
-			parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
-		)
+		return parser.Parse(code) //parser.NewTagDefine("fuzztag", "{{", "}}", &SimpleFuzzTag{}),
+		//parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
+
 	} else {
 		return parser.Parse(code,
 			parser.NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}),
-			parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
+			//parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
 		)
 	}
 
@@ -329,7 +342,7 @@ func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple, syn
 	if err != nil {
 		return nil, err
 	}
-	gener := parser.NewGenerator(nodes, table)
+	gener := parser.NewGenerator(nil, nodes, table)
 	gener.SetTagsSync(syncTag)
 	return gener, nil
 }
