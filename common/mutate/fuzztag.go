@@ -1,6 +1,7 @@
 package mutate
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -36,6 +37,7 @@ type FuzzTagDescription struct {
 	TagName          string
 	Handler          func(string) []string
 	HandlerEx        func(string) []*fuzztag.FuzzExecResult
+	HandlerAndYield  func(context.Context, string, func(res *parser.FuzzResult)) error
 	ErrorInfoHandler func(string) ([]string, error)
 	IsDyn            bool
 	IsDynFun         func(name, params string) bool
@@ -55,47 +57,60 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 			"IsDynFun": f.IsDynFun,
 		}
 	}
-	methodMap[name] = &parser.TagMethod{
-		Name:        name,
-		IsDyn:       f.IsDyn,
-		Expand:      expand,
-		Alias:       alias,
-		Description: f.Description,
-		Fun: func(s string) (result []*parser.FuzzResult, err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					if v, ok := r.(error); ok {
-						err = v
-					} else {
-						err = errors.New(utils.InterfaceToString(r))
+	if f.HandlerAndYield != nil {
+		methodMap[name] = &parser.TagMethod{
+			Name:        name,
+			IsDyn:       f.IsDyn,
+			Expand:      expand,
+			Alias:       alias,
+			Description: f.Description,
+			YieldFun: func(ctx context.Context, s string, recv func(*parser.FuzzResult)) error {
+				return f.HandlerAndYield(ctx, s, recv)
+			},
+		}
+	} else {
+		methodMap[name] = &parser.TagMethod{
+			Name:        name,
+			IsDyn:       f.IsDyn,
+			Expand:      expand,
+			Alias:       alias,
+			Description: f.Description,
+			Fun: func(s string) (result []*parser.FuzzResult, err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						if v, ok := r.(error); ok {
+							err = v
+						} else {
+							err = errors.New(utils.InterfaceToString(r))
+						}
 					}
-				}
-			}()
-			if f.Handler != nil {
-				for _, d := range f.Handler(s) {
-					result = append(result, parser.NewFuzzResultWithData(d))
-				}
-			} else if f.HandlerEx != nil {
-				for _, data := range f.HandlerEx(s) {
-					var verbose string
-					showInfo := data.ShowInfo()
-					if len(showInfo) != 0 {
-						verbose = utils.InterfaceToString(showInfo)
+				}()
+				if f.Handler != nil {
+					for _, d := range f.Handler(s) {
+						result = append(result, parser.NewFuzzResultWithData(d))
 					}
-					result = append(result, parser.NewFuzzResultWithDataVerbose(data.Data(), verbose))
+				} else if f.HandlerEx != nil {
+					for _, data := range f.HandlerEx(s) {
+						var verbose string
+						showInfo := data.ShowInfo()
+						if len(showInfo) != 0 {
+							verbose = utils.InterfaceToString(showInfo)
+						}
+						result = append(result, parser.NewFuzzResultWithDataVerbose(data.Data(), verbose))
+					}
+				} else if f.ErrorInfoHandler != nil {
+					res, err := f.ErrorInfoHandler(s)
+					fuzzRes := []*parser.FuzzResult{}
+					for _, r := range res {
+						fuzzRes = append(fuzzRes, parser.NewFuzzResultWithData(r))
+					}
+					return fuzzRes, err
+				} else {
+					return nil, errors.New("no handler")
 				}
-			} else if f.ErrorInfoHandler != nil {
-				res, err := f.ErrorInfoHandler(s)
-				fuzzRes := []*parser.FuzzResult{}
-				for _, r := range res {
-					fuzzRes = append(fuzzRes, parser.NewFuzzResultWithData(r))
-				}
-				return fuzzRes, err
-			} else {
-				return nil, errors.New("no handler")
-			}
-			return
-		},
+				return
+			},
+		}
 	}
 	for _, a := range alias {
 		methodMap[a] = methodMap[name]
@@ -814,9 +829,13 @@ func init() {
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "int",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(result *parser.FuzzResult)) error {
+			yieldString := func(s string) {
+				yield(parser.NewFuzzResultWithDataVerbose(s, s))
+			}
 			if s == "" {
-				return []string{fmt.Sprint(rand.Intn(10))}
+				yieldString(fmt.Sprint(rand.Intn(10)))
+				return nil
 			}
 
 			enablePadding := false
@@ -850,7 +869,8 @@ func init() {
 			}
 			minInt, maxInt, ok := strings.Cut(parts[0], "-")
 			if !ok {
-				return lo.Map(strings.Split(parts[0], ","), func(s string, _ int) string {
+				lo.Map(strings.Split(parts[0], ","), func(s string, _ int) string {
+					yieldString(strings.TrimSpace(s))
 					return strings.TrimSpace(s)
 				})
 			}
@@ -861,17 +881,17 @@ func init() {
 			maxB = big.NewDecFromString(maxInt)
 			stepB = big.NewInt(int64(step))
 			if minB.Cmp(maxB) > 0 {
-				return []string{}
+				return nil
 			}
 			capB = maxB.Sub(minB).AddInt(1).Div(stepB)
 
 			if !capB.IsUint64() {
 				// too large
 				log.Error("int fuzztag: too large int range")
-				return []string{}
+				return nil
 			}
 
-			results := make([]string, 0, capB.Int64())
+			//results := make([]string, 0, capB.Int64())
 			for {
 				if minB.Cmp(maxB) > 0 {
 					break
@@ -883,10 +903,10 @@ func init() {
 					r = paddingString(r, paddingLength, paddingRight)
 				}
 
-				results = append(results, r)
+				yieldString(r)
 				minB = minB.Add(stepB)
 			}
-			return results
+			return nil
 		},
 		Alias:       []string{"port", "ports", "integer", "i"},
 		Description: "生成一个整数以及范围，例如 {{int(1,2,3,4,5)}} 生成 1,2,3,4,5 中的一个整数，也可以使用 {{int(1-5)}} 生成 1-5 的整数，也可以使用 `{{int(1-5|4)}}` 生成 1-5 的整数，但是每个整数都是 4 位数，例如 0001, 0002, 0003, 0004, 0005，还可以使用 `{{int(1-10|2|3)}}` 来生成带有步长的整数列表。",

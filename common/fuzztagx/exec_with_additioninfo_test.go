@@ -49,7 +49,7 @@ func newGenerate(code string) (*parser.Generator, error) {
 	for _, method := range methods {
 		table[method.Name] = method
 	}
-	return parser.NewGenerator(nodes, table), nil
+	return parser.NewGenerator(nil, nodes, table), nil
 }
 func TestAdditionInfo(t *testing.T) {
 	regMethodWithVerbose("url", func(s string, yield func(any, string)) error {

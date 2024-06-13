@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"testing"
+	"time"
 )
 
 func TestFuzzNucleiVar(t *testing.T) {
@@ -98,4 +99,31 @@ Host: www.example.com
 			}
 		}
 	}
+}
+
+func TestSendAndRenderAsynchronously(t *testing.T) {
+	start := time.Now()
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if time.Now().Sub(start).Seconds() > 5 {
+			t.Fatal("test TestSendAndRenderAsynchronously failed")
+		}
+		return []byte(`HTTP/1.1 200 OK`)
+	})
+	fuzzOpt := Fuzz_WithExtraDynFuzzTagHandler("sleep", func(s string) []string {
+		time.Sleep(5 * time.Second)
+		return nil
+	})
+	addr := fmt.Sprintf("%s:%d", host, port)
+	res, err := _httpPool(`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{{rs(10,10,100)}}`, WithPoolOpt_Addr(addr, false), WithPoolOpt_ForceFuzzDangerous(true), WithPoolOpt_ExtraFuzzOptions(fuzzOpt), WithPoolOpt_RetryTimes(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range res {
+		_ = i
+	}
+
 }

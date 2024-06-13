@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sync"
@@ -61,6 +62,7 @@ type TagMethod struct {
 	Name        string
 	IsDyn       bool
 	Fun         func(string) ([]*FuzzResult, error)
+	YieldFun    func(ctx context.Context, params string, yield func(*FuzzResult)) error
 	Expand      map[string]any
 	Alias       []string
 	Description string
@@ -76,7 +78,8 @@ func (s StringNode) IsNode() {
 
 type TagNode interface {
 	IsNode()
-	Exec(*FuzzResult, ...map[string]*TagMethod) ([]*FuzzResult, error)
+	Exec(ctx context.Context, raw *FuzzResult, yield func(*FuzzResult), methodTable ...map[string]*TagMethod) error
+	//Exec(*FuzzResult, func(*FuzzResult), ...map[string]*TagMethod) error
 	AddData(node ...Node)
 	AddLabel(label string)
 
