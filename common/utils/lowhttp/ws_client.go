@@ -19,6 +19,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+type CompressionMode uint8
+
+const (
+	DisableCompression CompressionMode = 1 + iota
+	EnableCompression
+	CompressionContextTakeover
+	NoCompressionContextTakeover
+)
+
 type WebsocketClientConfig struct {
 	Proxy               string
 	TotalTimeout        time.Duration
@@ -28,6 +37,7 @@ type WebsocketClientConfig struct {
 	Context             context.Context
 	cancel              func()
 	strictMode          bool
+	compressionMode     CompressionMode
 
 	// Host Port
 	Host string
@@ -39,6 +49,26 @@ type WebsocketClientOpt func(config *WebsocketClientConfig)
 func WithWebsocketProxy(t string) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.Proxy = t
+	}
+}
+
+func WithWebsocketCompress(b bool) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		if b {
+			config.compressionMode = EnableCompression
+		} else {
+			config.compressionMode = DisableCompression
+		}
+	}
+}
+
+func WithWebsocketCompressionContextTakeover(b bool) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		if b {
+			config.compressionMode = CompressionContextTakeover
+		} else {
+			config.compressionMode = NoCompressionContextTakeover
+		}
 	}
 }
 
@@ -437,6 +467,24 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		}
 		if host == "" {
 			host = urlIns.String()
+		}
+	}
+
+	// 扩展压缩选项
+	if config.compressionMode > 0 {
+		value, valid := "", true
+		switch config.compressionMode {
+		case EnableCompression, NoCompressionContextTakeover:
+			value = "permessage-deflate"
+		case CompressionContextTakeover:
+			value = "permessage-deflate; server_no_context_takeover; client_no_context_takeover"
+		case DisableCompression:
+		default:
+			valid = false
+		}
+		// 修改websocket扩展选项请求头
+		if valid {
+			packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", value)
 		}
 	}
 
