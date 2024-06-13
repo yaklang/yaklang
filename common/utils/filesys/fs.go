@@ -116,6 +116,13 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 					return err
 				}
 			}
+
+			if c.onFileStatNotOpen != nil {
+				err = c.onFileStatNotOpen(path, info)
+				if err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}

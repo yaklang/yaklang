@@ -24,10 +24,11 @@ type dirMatch struct {
 type FileStat func(string, fs.FileInfo) error
 type DirStat func(string, fs.FileInfo) error
 type Config struct {
-	onStart    func(base string, isDir bool) error
-	onStat     func(isDir bool, pathname string, info os.FileInfo) error
-	onDirStat  DirStat
-	onFileStat FileStat
+	onStart           func(base string, isDir bool) error
+	onStat            func(isDir bool, pathname string, info os.FileInfo) error
+	onDirStat         DirStat
+	onFileStat        FileStat
+	onFileStatNotOpen func(string, fs.FileInfo) error
 
 	noStopWhenErr bool
 
@@ -76,6 +77,12 @@ func WithDirStat(f DirStat) Option {
 func WithFileStat(f FileStat) Option {
 	return func(c *Config) {
 		c.onFileStat = f
+	}
+}
+
+func WithFileStatNotOpen(f func(name string, info fs.FileInfo) error) Option {
+	return func(c *Config) {
+		c.onFileStatNotOpen = f
 	}
 }
 
