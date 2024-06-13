@@ -27,28 +27,29 @@ type sender interface {
 	Context() context.Context
 }
 
-func recoverRisk(db *gorm.DB, runtimeId string, stream sender) {
+func recoverRisk(db *gorm.DB, runtimeId string, stream sender) uint32 {
 	risks, err := yakit.GetRisksByRuntimeId(db, runtimeId)
 	if err != nil {
-		return
+		return 0
 	}
 	client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	})
+	count := uint32(len(risks))
 	err = client.Output(&yaklib.YakitStatusCard{ // card
 		Id: "漏洞/风险/指纹", Data: strconv.Itoa(len(risks)), Tags: nil,
 	})
 	if err != nil {
-		return
+		return count
 	}
 	for _, riskInfo := range risks { // risks table
 		err := client.Output(riskInfo)
 		if err != nil {
-			return
+			return count
 		}
 	}
-	return
+	return count
 }
 
 func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string) error {
@@ -64,13 +65,13 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	recoverRisk(s.GetProjectDatabase(), runtimeId, stream)
-	var count uint32 = 0
-	count, _ = yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
+
+	count := recoverRisk(s.GetProjectDatabase(), runtimeId, stream)
 	feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	}, &count) // set risk count
+
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
@@ -241,9 +242,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 			}
 		}
 	}
-	recoverRisk(s.GetProjectDatabase(), runtimeId, stream)
-	var count uint32 = 0
-	count, _ = yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
+	count := recoverRisk(s.GetProjectDatabase(), runtimeId, stream)
 	feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
