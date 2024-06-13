@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -167,6 +168,12 @@ func (c *YakitClient) YakitDraw(level string, data interface{}) {
 	}
 }
 func (c *YakitClient) Output(i interface{}) error {
+	_, ok := i.(*schema.Risk)
+	if ok {
+		c.Output(&YakitStatusCard{
+			Id: "漏洞/风险/指纹", Data: fmt.Sprint(c.AddCounter()), Tags: nil,
+		})
+	}
 	level, msg := MarshalYakitOutput(i)
 	return c.YakitLog(level, msg)
 }
