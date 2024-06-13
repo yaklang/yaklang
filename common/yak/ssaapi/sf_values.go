@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"regexp"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -50,7 +49,7 @@ func (value Values) Len() int {
 }
 
 func (values Values) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, error) {
-	log.Infof("ExactMatch: %v %v", mod, want)
+	// log.Infof("ExactMatch: %v %v", mod, want)
 	newValue := _SearchValues(values, mod, func(s string) bool { return s == want })
 	return len(newValue) > 0, newValue, nil
 }

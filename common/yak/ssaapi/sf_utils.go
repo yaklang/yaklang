@@ -24,7 +24,7 @@ func _SearchValues(values Values, mod int, handler func(string) bool) Values {
 func _SearchValue(value *Value, mod int, handler func(string) bool) Values {
 	var newValue Values
 	check := func(value *Value) bool {
-		log.Infof("handler: %s(%v)  %s(%v)", value.GetName(), handler(value.GetName()), value.String(), handler(value.String()))
+		// log.Infof("handler: %s(%v)  %s(%v)", value.GetName(), handler(value.GetName()), value.String(), handler(value.String()))
 		if handler(value.GetName()) || handler(value.String()) {
 			return true
 		}
@@ -130,7 +130,7 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (m
 	if err != nil {
 		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", i, err)
 	}
-	results := vm.Feed(p)
+	results, err := vm.Feed(p)
 	if err != nil {
 		return nil, utils.Errorf("SyntaxFlow feed %#v failed: %v", i, err)
 	}

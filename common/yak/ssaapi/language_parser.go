@@ -147,7 +147,7 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// path is empty, use language or YakLang as default
 		if LanguageBuilder == nil {
 			LanguageBuilder = LanguageBuilders[Yak]
-			log.Infof("use default language [%s] for empty path", Yak)
+			// log.Infof("use default language [%s] for empty path", Yak)
 		}
 	}
 

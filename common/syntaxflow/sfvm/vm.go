@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -98,20 +97,23 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	return nil
 }
 
-func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) *omap.OrderedMap[string, ValueOperator] {
+func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) (*omap.OrderedMap[string, ValueOperator], error) {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
+	var errs error
 	result := omap.NewOrderedMap(map[string]ValueOperator{})
 	for index, frame := range s.frames {
 		err := frame.Debug(s.debug).exec(i)
 		if err != nil {
-			log.Errorf("exec frame[%v]: %v\n\t\tCODE: %v", err, index, frame.Text)
+			errs = utils.JoinErrors(errs,
+				utils.Errorf("exec frame[%v]: %v CODE: %v", index, err, frame.Text),
+			)
 		}
 	}
 	s.vars.Map(func(s string, a ValueOperator) (string, ValueOperator, error) {
 		result.Set(s, a)
 		return s, a, nil
 	})
-	return result
+	return result, errs
 }
