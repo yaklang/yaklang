@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
 	"reflect"
@@ -936,4 +938,138 @@ cli.check()
 		spew.Dump(rsp)
 	}
 
+}
+
+func TestDebugPluginRiskCount(t *testing.T) {
+	t.Run("create risk count", func(t *testing.T) {
+		client, err := NewLocalClient()
+		if err != nil {
+			t.Fatal(err)
+		}
+		code := `
+for i in 10 {
+a = risk.CreateRisk("127.0.0.1")
+yakit.Output(a)
+}
+`
+		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+			Code:       code,
+			PluginType: "yak",
+			ExecParams: []*ypb.KVPair{},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var cardCount = 0
+		var riskMessageCount = 0
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Fatalf("check YakitPlugin param error:%s", err)
+				}
+				break
+			}
+
+			if rsp.GetIsMessage() {
+				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
+				if level == "feature-status-card-data" {
+					data := gjson.Get(string(rsp.GetMessage()), "content.data").String()
+					if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
+						cardCount = int(gjson.Get(data, "data").Int())
+					}
+				} else if level == "json-risk" {
+					riskMessageCount++
+				}
+			}
+		}
+
+		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
+	})
+
+	t.Run("poc risk count", func(t *testing.T) {
+		server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+
+aaa`))
+		target := utils.HostPort(server, port)
+		client, err := NewLocalClient()
+		if err != nil {
+			t.Fatal(err)
+		}
+		code := `
+id: WebFuzzer-Template-dwgZTlBz
+
+info:
+  name: WebFuzzer Template dwgZTlBz
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: bf1b38820525a92e811300bf655c8fe7
+
+http:
+- method: POST
+  path:
+  - '{{RootURL}}/'
+  headers:
+    Content-Type: application/json
+  body: '{"key": "value"}'
+
+  max-redirects: 3
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: status
+    words:
+    - "200"
+    condition: and
+
+
+# Generated From WebFuzzer on 2024-06-13 16:14:16
+`
+		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+			Code:       code,
+			PluginType: "nuclei",
+			ExecParams: []*ypb.KVPair{},
+			Input:      target,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var cardCount = 0
+		var riskMessageCount = 0
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Fatalf("check YakitPlugin param error:%s", err)
+				}
+				break
+			}
+
+			if rsp.GetIsMessage() {
+				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
+				if level == "feature-status-card-data" {
+					data := gjson.Get(string(rsp.GetMessage()), "content.data").String()
+					if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
+						cardCount = int(gjson.Get(data, "data").Int())
+					}
+				} else if level == "json-risk" {
+					riskMessageCount++
+				}
+			}
+		}
+
+		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
+	})
 }
