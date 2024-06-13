@@ -756,12 +756,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 		originRspRaw := rsp[:]
+		// plain -> bare -> rsp
 		plainResponse := httpctx.GetPlainResponseBytes(req)
 		if len(plainResponse) <= 0 {
 			plainResponse, _, _ = lowhttp.FixHTTPResponse(httpctx.GetBareResponseBytes(req))
-			httpctx.SetPlainResponseBytes(req, plainResponse)
 		}
-		rsp = plainResponse
+		if len(plainResponse) > 0 {
+			httpctx.SetPlainResponseBytes(req, plainResponse)
+			rsp = plainResponse
+		}
 
 		urlStr := httpctx.GetRequestURL(req)
 
