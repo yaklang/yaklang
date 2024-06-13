@@ -756,12 +756,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 		originRspRaw := rsp[:]
+		// plain -> bare -> rsp
 		plainResponse := httpctx.GetPlainResponseBytes(req)
 		if len(plainResponse) <= 0 {
 			plainResponse, _, _ = lowhttp.FixHTTPResponse(httpctx.GetBareResponseBytes(req))
-			httpctx.SetPlainResponseBytes(req, plainResponse)
 		}
-		rsp = plainResponse
+		if len(plainResponse) > 0 {
+			httpctx.SetPlainResponseBytes(req, plainResponse)
+			rsp = plainResponse
+		}
 
 		urlStr := httpctx.GetRequestURL(req)
 
@@ -1493,7 +1496,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
-
 
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
