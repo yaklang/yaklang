@@ -1,12 +1,15 @@
 package parser
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"unsafe"
 )
 
 type GenerateConfig struct {
+	ctx         context.Context
+	cancelCtx   func()
 	AssertError bool
 }
 type ExecNode interface {
@@ -79,7 +82,9 @@ func (s *StringExecNode) IsRep() bool {
 type TagExecNode struct {
 	config          *GenerateConfig
 	data            TagNode
-	cache           *[]*FuzzResult
+	cache           []*FuzzResult
+	getter          func() *FuzzResult
+	finished        bool
 	isRep           bool
 	isDyn           bool
 	params          []ExecNode
@@ -99,6 +104,17 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 	}
 }
 
+func (f *TagExecNode) GetCache(index int) (*FuzzResult, bool) {
+	for index >= len(f.cache) {
+		data := f.getter()
+		if data == nil {
+			return NewFuzzResultWithData(""), false
+		} else {
+			f.cache = append(f.cache, data)
+		}
+	}
+	return (f.cache)[index], true
+}
 func (f *TagExecNode) FirstExecWithBackpropagation(bp, exec, all bool) error {
 	f.FirstExec(bp, exec, all)
 	return f.backpropagation()
@@ -119,7 +135,8 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 		}
 	}
 	f.index = 1
-	f.submitResult((*f.cache)[0])
+	res, _ := f.GetCache(0)
+	f.submitResult(res)
 	if all {
 		for _, param := range f.params {
 			if v, ok := param.(*TagExecNode); ok {
@@ -130,15 +147,41 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 	return err
 }
 func (f *TagExecNode) exec(s *FuzzResult) error {
-	res, err := f.data.Exec(s, f.methodCtx.methodTable)
-	if len(res) == 0 {
-		res = []*FuzzResult{NewFuzzResultWithData("")}
+	ch := make(chan *FuzzResult)
+	receiver := func(result *FuzzResult) {
+		select {
+		case <-f.config.ctx.Done():
+		case ch <- result:
+		}
 	}
-	for _, r := range res {
+	getter := func() *FuzzResult {
+		return <-ch
+	}
+	var err error
+	go func() {
+		err = f.data.Exec(f.config.ctx, s, receiver, f.methodCtx.methodTable)
+		close(ch)
+	}()
+
+	newGetter := func() *FuzzResult {
+		r := getter()
+		if r == nil {
+			f.finished = true
+			return nil
+		}
+		f.methodCtx.UpdateLabels(f)
 		r.Source = append(r.Source, s)
 		r.ByTag = true
 		r.Error = err
+		return r
 	}
+	f.getter = newGetter
+	//if len(res) == 0 {
+	//	res = []*FuzzResult{NewFuzzResultWithData("")}
+	//}
+	//for _, r := range res {
+	//
+	//}
 
 	if !f.config.AssertError {
 		err = nil
@@ -146,20 +189,24 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 	if err != nil {
 		return err
 	}
-	f.methodCtx.UpdateLabels(f)
-	f.cache = &res
+	//f.methodCtx.UpdateLabels(f)
+	//f.cache = &res
 	return nil
 }
 func (f *TagExecNode) Exec() (bool, error) {
 	if f.isDyn && f.index >= 1 {
+		f.finished = true
+		f.cache = nil
 		return false, nil
 	}
 	defer func() {
 		f.index++
 	}()
-	if f.index >= len(*f.cache) {
+	data, ok := f.GetCache(f.index)
+	if !ok {
 		if f.isRep { // 当生成失败且存在rep标签时，使用最后一个元素
-			f.submitResult((*f.cache)[len(*f.cache)-1])
+			data1, _ := f.GetCache(f.index - 1)
+			f.submitResult(data1)
 			return false, f.backpropagation()
 		}
 		ok, err := f.childGenerator.generate()
@@ -174,17 +221,19 @@ func (f *TagExecNode) Exec() (bool, error) {
 			return true, f.backpropagation()
 		}
 	}
-	f.submitResult((*f.cache)[f.index])
+	f.submitResult(data)
 	return true, f.backpropagation()
 }
 func (s *TagExecNode) Reset() {
 	s.index = 0
+	s.finished = false
 	var bp func() error
 	for _, param := range s.params {
 		param.Reset()
 		v, ok := param.(*TagExecNode)
 		if ok {
-			v.submitResult((*v.cache)[v.index])
+			data, _ := s.GetCache(v.index)
+			v.submitResult(data)
 			bp = v.backpropagation
 		}
 	}
@@ -229,7 +278,8 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 			bp = func() error {
 				err := ret.exec(childGen.Result())
 				ret.index = 1
-				ret.submitResult((*ret.cache)[0])
+				data, _ := ret.GetCache(0)
+				ret.submitResult(data)
 				return err
 			}
 			ret.childGenerator = childGen
@@ -241,8 +291,15 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 	}
 	return g
 }
-func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
-	cfg := &GenerateConfig{}
+func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod) *Generator {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	cfg := &GenerateConfig{
+		ctx:       ctx,
+		cancelCtx: cancel,
+	}
 	methodCtx := &MethodContext{
 		dynTag:         map[*TagExecNode]struct{}{},
 		methodTable:    table,
@@ -276,6 +333,11 @@ func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 	return g
 }
 
+func (g *Generator) Cancel() {
+	if g.cancelCtx != nil {
+		g.cancelCtx()
+	}
+}
 func (g *Generator) RawResult() []*FuzzResult {
 	return g.container
 }
@@ -392,7 +454,7 @@ func (g *Generator) generate() (bool, error) {
 			}
 			var execAllFirst func(t ExecNode)
 			execAllFirst = func(t ExecNode) {
-				if v1, ok := t.(*TagExecNode); ok && v1.index >= len(*v1.cache) {
+				if v1, ok := t.(*TagExecNode); ok && v1.finished {
 					for _, param := range v1.params {
 						execAllFirst(param)
 					}

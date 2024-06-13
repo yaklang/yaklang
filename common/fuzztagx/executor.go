@@ -35,7 +35,7 @@ func executeWithStringHandler(code string, funcMap map[string]func(string2 strin
 			IsDyn: false,
 		}
 	}
-	generator := parser.NewGenerator(nodes, fMap)
+	generator := parser.NewGenerator(nil, nodes, fMap)
 	res := []string{}
 	for generator.Next() {
 		if generator.Error != nil {

@@ -65,7 +65,7 @@ func RenderNucleiTagWithVar(raw string, vars map[string]any) (result string, err
 			},
 		}),
 	)
-	gener := parser.NewGenerator(nodes, map[string]*parser.TagMethod{})
+	gener := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{})
 	gener.Next()
 	res := gener.Result()
 	return string(res.GetData()), nil
@@ -152,7 +152,7 @@ func execNucleiTag(raw string, payloads map[string][]string, getVar1 func(s stri
 		return nil, err
 	}
 	res := [][]byte{}
-	gener := parser.NewGenerator(nodes, map[string]*parser.TagMethod{})
+	gener := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{})
 	for gener.Next() {
 		result := gener.Result()
 		res = append(res, result.GetData())

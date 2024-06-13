@@ -1,6 +1,7 @@
 package fuzztagx
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
@@ -49,7 +50,8 @@ func TestPerformance(t *testing.T) {
 	} {
 		t, r := v[0].(string), v[1].(map[string]int)
 		invokeRecord = map[string]int{}
-		_, err := ExecuteWithStringHandler(t, methods)
+		res, err := ExecuteWithStringHandler(t, methods)
+		spew.Dump(res)
 		if err != nil {
 			panic(err)
 		}

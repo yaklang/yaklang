@@ -1,6 +1,7 @@
 package fuzztagx
 
 import (
+	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 var testMap = map[string]func(string) []string{
@@ -203,7 +205,7 @@ func TestMagicLabel(t *testing.T) {
 		return len(set.List()) == 1
 	}
 	_ = checkSameString
-	for _, v := range [][]any{
+	for i, v := range [][]any{
 		{"{{randstr()}}{{repeat(10)}}", func(s []string) bool {
 			return true
 		}},
@@ -214,57 +216,59 @@ func TestMagicLabel(t *testing.T) {
 		{"{{array::1::rep(a|b)}}{{array::1(a|b|c)}}", []string{"aa", "bb", "bc"}},
 		{"{{array::1(a|b|c)}}{{array::1::rep(a|b)}}", []string{"aa", "bb", "cb"}},
 	} {
-		t, r := v[0], v[1]
-		spew.Dump(t)
-		result, err := ExecuteWithStringHandler(t.(string), map[string]func(string) []string{
-			"array": func(s string) []string {
-				return strings.Split(s, "|")
-			},
-			"raw": func(s string) []string {
-				return []string{s}
-			},
-			"randstr": func(s string) []string {
-				return []string{utils.RandStringBytes(10)}
-			},
-			"repeat": func(s string) []string {
-				res := make([]string, 0)
-				n, err := strconv.Atoi(s)
-				if err != nil {
-					return res
-				}
+		t.Run(fmt.Sprintf("test: %d", i), func(t *testing.T) {
+			code, r := v[0], v[1]
+			spew.Dump(t)
+			result, err := ExecuteWithStringHandler(code.(string), map[string]func(string) []string{
+				"array": func(s string) []string {
+					return strings.Split(s, "|")
+				},
+				"raw": func(s string) []string {
+					return []string{s}
+				},
+				"randstr": func(s string) []string {
+					return []string{utils.RandStringBytes(10)}
+				},
+				"repeat": func(s string) []string {
+					res := make([]string, 0)
+					n, err := strconv.Atoi(s)
+					if err != nil {
+						return res
+					}
 
-				for range make([]int, n) {
-					res = append(res, "")
+					for range make([]int, n) {
+						res = append(res, "")
+					}
+					return res
+				},
+			})
+			if err != nil {
+				panic(err)
+			}
+			spew.Dump(result)
+			switch ret := r.(type) {
+			case string:
+				if result[0] != r {
+					m := fmt.Sprintf("got: %v expect: %v", strconv.Quote(result[0]), strconv.Quote(ret))
+					panic(m)
 				}
-				return res
-			},
-		})
-		if err != nil {
-			panic(err)
-		}
-		spew.Dump(result)
-		switch ret := r.(type) {
-		case string:
-			if result[0] != r {
-				m := fmt.Sprintf("got: %v expect: %v", strconv.Quote(result[0]), strconv.Quote(ret))
-				panic(m)
-			}
-		case []string:
-			if len(result) != len(ret) {
-				panic("check failed")
-			}
-			for i, v := range result {
-				if v != ret[i] {
+			case []string:
+				if len(result) != len(ret) {
 					panic("check failed")
 				}
+				for i, v := range result {
+					if v != ret[i] {
+						panic("check failed")
+					}
+				}
+			case func([]string) bool:
+				if !ret(result) {
+					panic("check failed")
+				}
+			default:
+				panic("unknown type")
 			}
-		case func([]string) bool:
-			if !ret(result) {
-				panic("check failed")
-			}
-		default:
-			panic("unknown type")
-		}
+		})
 	}
 }
 
@@ -334,7 +338,7 @@ func TestDynTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	generator := parser.NewGenerator(nodes, map[string]*parser.TagMethod{
+	generator := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{
 		"list": {
 			Fun: func(n string) ([]*parser.FuzzResult, error) {
 				return []*parser.FuzzResult{parser.NewFuzzResultWithData("1"), parser.NewFuzzResultWithData("2")}, nil
@@ -381,4 +385,33 @@ func TestTagArgument(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, "1a2a", strings.Join(res, ""))
+}
+
+func TestYieldFun(t *testing.T) {
+	code := `{{genStringList}}`
+	nodes, err := ParseFuzztag(code, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := 0
+	var finished bool
+	generator := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{
+		"genStringList": &parser.TagMethod{
+			YieldFun: func(ctx context.Context, params string, yield func(*parser.FuzzResult)) error {
+				for ; i < 10; i++ {
+					yield(parser.NewFuzzResultWithData(strconv.Itoa(i)))
+				}
+				finished = true
+				return nil
+			},
+		},
+	})
+	for i := 0; i < 3; i++ {
+		generator.Next()
+	}
+	assert.Equal(t, "2", string(generator.Result().GetData()))
+	assert.Equal(t, 3, i)
+	generator.Cancel()
+	time.Sleep(500 * time.Millisecond)
+	assert.Equal(t, true, finished)
 }
