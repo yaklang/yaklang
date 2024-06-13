@@ -2,10 +2,11 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
@@ -71,7 +72,7 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 			return nil
 		}
 
-		y.EmitEnterStatement()
+		enter := y.EmitEnterStatement()
 		err := y.VisitFilterExpr(expr)
 		if err != nil {
 			msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
@@ -83,6 +84,7 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		} else {
 			y.EmitPop()
 		}
+		enter.UnaryInt = len(y.codes)
 		y.EmitExitStatement()
 	case *sf.FilterParamCheckContext:
 		y.VisitCheckStatement(i.CheckStatement())
