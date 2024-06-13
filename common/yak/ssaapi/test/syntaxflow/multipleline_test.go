@@ -39,3 +39,35 @@ func TestMultipleLine(t *testing.T) {
 	})
 
 }
+
+func TestVariable(t *testing.T) {
+	t.Run("multiple assign variable", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a = 1
+		b = 2
+		c = 3
+		`,
+			`a as $res
+			b as $res
+			`,
+			map[string][]string{
+				"res": {"1", "2"},
+			})
+	})
+}
+
+func Test_Statement_Error(t *testing.T) {
+	t.Run("test not found error in multiple statement", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a = 1
+		b = 2
+		`,
+			`a as $res
+			unknown as $res 
+			b as $res
+			`,
+			map[string][]string{
+				"res": {"1", "2"},
+			})
+	})
+}
