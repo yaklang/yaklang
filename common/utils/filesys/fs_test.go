@@ -3,12 +3,10 @@ package filesys
 import (
 	"context"
 	"embed"
-	"github.com/fsnotify/fsnotify"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -146,10 +144,6 @@ func TestYakFileMonitor(t *testing.T) {
 		createEvents := eventSet.CreateEvents
 		deleteEvents := eventSet.DeleteEvents
 
-		//for _, event := range createEvents {
-		//	log.Infof("create: %s", event.Path)
-		//}
-
 		createEventsMap := make(map[string][]Event)
 		for _, event := range createEvents {
 			dir, _ := filepath.Split(event.Path)
@@ -217,41 +211,4 @@ func isSubDir(basePath, targetPath string) bool {
 
 	// If the relative path starts with ".." or is ".", targetPath is not a subdir of basePath
 	return !filepath.IsAbs(rel) && rel != "." && !strings.HasPrefix(rel, "../")
-}
-
-func TestFileSame(t *testing.T) {
-	pathp, err := syscall.UTF16PtrFromString("test/ab")
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	attrs := uint32(syscall.FILE_FLAG_BACKUP_SEMANTICS)
-	h, err := syscall.CreateFile(pathp, 0, 0, nil, syscall.OPEN_EXISTING, attrs, 0)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	var i1 syscall.ByHandleFileInformation
-	err = syscall.GetFileInformationByHandle(h, &i1)
-	err = os.Rename("test/ab", "test/ba")
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	pathp, err = syscall.UTF16PtrFromString("test/abc")
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	h, err = syscall.CreateFile(pathp, 0, 0, nil, syscall.OPEN_EXISTING, attrs, 0)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	var i2 syscall.ByHandleFileInformation
-	err = syscall.GetFileInformationByHandle(h, &i2)
-	if err != nil {
-		fsnotify.NewWatcher()
-	}
-
 }
