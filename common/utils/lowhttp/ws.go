@@ -207,7 +207,11 @@ func (f *Frame) Show() {
 	raw := utils.BytesClone(f.data)
 	rawString := strings.Clone(string(raw))
 	if len(raw) > 30 {
-		rawString = rawString[:30] + "..."
+		if len(raw) > 60 {
+			rawString = rawString[:30] + "..." + rawString[len(raw)-30:]
+		} else {
+			rawString = rawString[:15] + "..." + rawString[len(raw)-15:]
+		}
 	}
 	rawString = fmt.Sprintf("%d %s", len(raw), strconv.Quote(rawString))
 	switch f.Type() {
@@ -280,11 +284,11 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	p = make([]byte, 2)
 	p[0], err = fr.r.ReadByte()
 	if err != nil {
-		return nil, errors.Wrap(err, "read frameType byte failed")
+		return nil, errors.Wrap(err, "websocket: read first byte error")
 	}
 	p[1], err = fr.r.ReadByte()
 	if err != nil {
-		return nil, errors.Wrap(err, "read remaining flag failed")
+		return nil, errors.Wrap(err, "websocket: read second byte error")
 	}
 	rawBuf.Write(p)
 
@@ -312,7 +316,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		tempBytes = make([]byte, 2)
 		_, err = io.ReadFull(fr.r, tempBytes)
 		if err != nil {
-			return frame, errors.Wrap(err, "read payload-length 2 bytes failed")
+			return frame, errors.Wrap(err, "websocket: read payload-length 2 bytes error")
 		}
 		rawBuf.Write(tempBytes)
 		dataLength = uint64(binary.BigEndian.Uint16(tempBytes))
@@ -320,7 +324,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		tempBytes = make([]byte, 8)
 		_, err = io.ReadFull(fr.r, tempBytes)
 		if err != nil {
-			return frame, errors.Wrap(err, "read payload-length 8 bytes failed")
+			return frame, errors.Wrap(err, "websocket: read payload-length 8 bytes error")
 		}
 		rawBuf.Write(tempBytes)
 		dataLength = binary.BigEndian.Uint64(tempBytes)
@@ -334,7 +338,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		tempBytes = make([]byte, 4)
 		_, err = io.ReadFull(fr.r, tempBytes)
 		if err != nil {
-			return frame, errors.Wrap(err, "read masking-key 4 bytes failed")
+			return frame, errors.Wrap(err, "websocket: read masking-key 4 bytes failed")
 		}
 		rawBuf.Write(tempBytes)
 		frame.maskingKey = tempBytes
@@ -344,7 +348,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	// data
 	data, err := fr.readFramePayload(dataLength)
 	if err != nil {
-		return frame, err
+		return frame, errors.Wrap(err, "websocket: read frame payload failed")
 	}
 
 	frame.rawPayload = make([]byte, len(data))
@@ -352,7 +356,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 
 	_, err = rawBuf.Write(frame.rawPayload)
 	if err != nil {
-		return frame, utils.Wrap(err, "ws frameReader.Reader io.LimitReader failed")
+		return frame, utils.Wrap(err, "websocket: frameReader.Reader io.LimitReader failed")
 	}
 
 	// 先对 masked payload 进行异或操作

@@ -103,36 +103,29 @@ func TestWEbsocket_AutobahnTestsuite(t *testing.T) {
 	host, port, err := utils.ParseStringToHostPort(testServerHostPort)
 	require.NoError(t, err)
 
-	generatePacket := func(casetuple string, compression bool) []byte {
-		compressionHeader := ""
-		if compression {
-			compressionHeader = "\nSec-WebSocket-Extensions: permessage-deflate; client_max_window_bits"
-		}
-
+	generatePacket := func(casetuple string) []byte {
 		return []byte(fmt.Sprintf(`GET /runCase?casetuple=%s&agent=yaklang-webscoket-client HTTP/1.1
 Host: %s
 Sec-WebSocket-Version: 13
-Sec-WebSocket-Key: wDqumtseNBJdhkihL6PW7w==%s
+Sec-WebSocket-Key: wDqumtseNBJdhkihL6PW7w==
 Connection: keep-alive, Upgrade
 Upgrade: websocket
 
-`, casetuple, utils.HostPort(host, port), compressionHeader))
+`, casetuple, utils.HostPort(host, port)))
 	}
-	runTestCase := func(t *testing.T, casetuple string, callback func(c *WebsocketClient, bytes []byte, frame []*Frame), compressions ...bool) error {
+	runTestCase := func(t *testing.T, casetuple string, callback func(c *WebsocketClient, bytes []byte, frame []*Frame), opts ...WebsocketClientOpt) error {
 		log.Infof("running case %s", casetuple)
-		compression := false
-		if len(compressions) > 0 {
-			compression = compressions[0]
-		}
-
-		t.Helper()
-		c, err := NewWebsocketClient(
-			generatePacket(casetuple, compression),
+		opts = append(opts,
 			WithWebsocketFromServerHandlerEx(callback),
 			WithWebsocketTLS(false),
 			WithWebsocketHost(host),
 			WithWebsocketPort(port),
-			WithWebsocketStrictMode(true),
+			WithWebsocketStrictMode(true))
+
+		t.Helper()
+		c, err := NewWebsocketClient(
+			generatePacket(casetuple),
+			opts...,
 		)
 		require.NoError(t, err)
 
@@ -276,7 +269,7 @@ Upgrade: websocket
 
 		for i, j := range cases {
 			for k := 1; k <= j; k++ {
-				runTestCase(t, fmt.Sprintf("12.%d.%d", i, k), echoCallback, true)
+				runTestCase(t, fmt.Sprintf("12.%d.%d", i, k), echoCallback, WithWebsocketCompress(true))
 			}
 		}
 	})
@@ -289,11 +282,12 @@ Upgrade: websocket
 		cases := map[int]int{
 			1: 18, // 13.1 Large JSON data file (utf8, 194056 bytes) - client offers (requestNoContextTakeover, requestMaxWindowBits): [(False, 0)] / server accept (requestNoContextTakeover, requestMaxWindowBits): [(False, 0)]
 			2: 18, // 13.2 Large JSON data file (utf8, 194056 bytes) - client offers (requestNoContextTakeover, requestMaxWindowBits): [(True, 0)] / server accept (requestNoContextTakeover, requestMaxWindowBits): [(True, 0)]
+			7: 18, // 13.7 Large JSON data file (utf8, 194056 bytes) - client offers (requestNoContextTakeover, requestMaxWindowBits): [(True, 9), (True, 0), (False, 0)] / server accept (requestNoContextTakeover, requestMaxWindowBits): [(True, 9), (True, 0), (False, 0)]
 		}
 
 		for i, j := range cases {
 			for k := 1; k <= j; k++ {
-				runTestCase(t, fmt.Sprintf("13.%d.%d", i, k), echoCallback, true)
+				runTestCase(t, fmt.Sprintf("13.%d.%d", i, k), echoCallback, WithWebsocketCompressionContextTakeover(true))
 			}
 		}
 	})
