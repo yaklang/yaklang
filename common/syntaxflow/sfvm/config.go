@@ -3,9 +3,7 @@ package sfvm
 import "github.com/yaklang/yaklang/common/utils/omap"
 
 func NewConfig(opts ...Option) *Config {
-	c := &Config{
-		debug: true,
-	}
+	c := &Config{}
 	for _, opt := range opts {
 		opt(c)
 	}
