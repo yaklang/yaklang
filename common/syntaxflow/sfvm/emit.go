@@ -12,10 +12,12 @@ func (y *SyntaxFlowVisitor) EmitExitStatement() {
 	})
 }
 
-func (y *SyntaxFlowVisitor) EmitEnterStatement() {
-	y.codes = append(y.codes, &SFI{
+func (y *SyntaxFlowVisitor) EmitEnterStatement() *SFI {
+	enter := &SFI{
 		OpCode: OpEnterStatement,
-	})
+	}
+	y.codes = append(y.codes, enter)
+	return enter
 }
 
 func (y *SyntaxFlowVisitor) EmitNewRef(i string) {
