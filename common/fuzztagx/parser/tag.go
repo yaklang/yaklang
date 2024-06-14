@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sync"
@@ -69,34 +70,44 @@ type TagMethod struct {
 }
 type Node interface {
 	IsNode()
+	String() string
 }
 
 type StringNode string
 
 func (s StringNode) IsNode() {
 }
+func (s StringNode) String() string {
+	return string(s)
+}
 
 type TagNode interface {
 	IsNode()
-	Exec(ctx context.Context, raw *FuzzResult, yield func(*FuzzResult), methodTable ...map[string]*TagMethod) error
+	Exec(ctx context.Context, raw *FuzzResult, yield func(*FuzzResult), methodTable map[string]*TagMethod) error
 	//Exec(*FuzzResult, func(*FuzzResult), ...map[string]*TagMethod) error
 	AddData(node ...Node)
 	AddLabel(label string)
-
+	String() string
 	GetData() []Node
 	GetLabels() []string
 }
 
 type BaseTag struct {
-	Data    []Node
-	Labels  []string
-	Methods *map[string]*TagMethod
+	Data   []Node
+	Labels []string
 	// initOnce 用来对子结构体的初始化
 	initOnce sync.Once
 }
 
 func (*BaseTag) IsNode() {
 
+}
+func (b *BaseTag) String() string {
+	s := ""
+	for _, data := range b.Data {
+		s += data.String()
+	}
+	return fmt.Sprintf("{{%s}}", s)
 }
 
 // DoOnce 用来对子结构体的初始化，可以在Exec函数中调用
