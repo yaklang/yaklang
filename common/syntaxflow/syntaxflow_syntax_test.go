@@ -23,7 +23,6 @@ func TestSyntaxInOne(t *testing.T) {
 		"a.b",
 		"c.d",
 		"a[1]",
-		"b?{!1}",
 		"b?{>1}",
 		"b?{!/abc/}",
 		"f()",
@@ -107,6 +106,19 @@ func TestSyntaxInOne(t *testing.T) {
 		`"a\"bc";'a\'bc';` + "'abcasdfasdfaaa'",
 		`"\\";'\\'`,
 		`"\";'\'`,
+		"exec(* #-> ?{.(call,phi,)})",
+		"exec(* #-> ?{!.(call,phi,)})",
+		"exec(* #-> ?{!.(opcode: call,phi,)})",
+		"exec(* #-> ?{!.(in: 'example',runtime)})",
+		"exec(* #-> ?{!.(not in: 'example')})",
+		"exec(* #-> ?{.(!in: 'example')})",
+		"exec(* #-> ?{.(!have: 'example')})",
+		"exec(* #-> ?{.(have: 'example')})",
+		"exec(* #-> ?{.(not any: 'example')})",
+		"exec(* #-> ?{.(any: 'example',abc,)})",
+		"exec(* #-> ?{(.(any: 'example',abc,) && .(call,phi))})",
+		"exec(* #-> ?{.(any: 'example',abc,) && .(call,phi)})",
+		"exec(* #-> ?{(.(any: 'example',abc,) && .(phi))})",
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		err := vm.Compile(i)
