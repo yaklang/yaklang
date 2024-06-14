@@ -148,14 +148,29 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#BuildMap.
 	VisitBuildMap(ctx *BuildMapContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionString.
-	VisitFilterExpressionString(ctx *FilterExpressionStringContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#stringLiteralWithoutStarGroup.
+	VisitStringLiteralWithoutStarGroup(ctx *StringLiteralWithoutStarGroupContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#negativeCondition.
+	VisitNegativeCondition(ctx *NegativeConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#NotCondition.
+	VisitNotCondition(ctx *NotConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterCondition.
+	VisitFilterCondition(ctx *FilterConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#ParenCondition.
+	VisitParenCondition(ctx *ParenConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#OpcodeTypeCondition.
+	VisitOpcodeTypeCondition(ctx *OpcodeTypeConditionContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionOr.
 	VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionParen.
-	VisitFilterExpressionParen(ctx *FilterExpressionParenContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#StringInCondition.
+	VisitStringInCondition(ctx *StringInConditionContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionAnd.
 	VisitFilterExpressionAnd(ctx *FilterExpressionAndContext) interface{}
@@ -166,14 +181,8 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionRegexpMatch.
 	VisitFilterExpressionRegexpMatch(ctx *FilterExpressionRegexpMatchContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionNumber.
-	VisitFilterExpressionNumber(ctx *FilterExpressionNumberContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionRegexp.
-	VisitFilterExpressionRegexp(ctx *FilterExpressionRegexpContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionNot.
-	VisitFilterExpressionNot(ctx *FilterExpressionNotContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#StringContainAnyCondition.
+	VisitStringContainAnyCondition(ctx *StringContainAnyConditionContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#numberLiteral.
 	VisitNumberLiteral(ctx *NumberLiteralContext) interface{}
@@ -181,11 +190,20 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#stringLiteralWithoutStar.
+	VisitStringLiteralWithoutStar(ctx *StringLiteralWithoutStarContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#regexpLiteral.
 	VisitRegexpLiteral(ctx *RegexpLiteralContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#identifier.
 	VisitIdentifier(ctx *IdentifierContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#keywords.
+	VisitKeywords(ctx *KeywordsContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#opcodes.
+	VisitOpcodes(ctx *OpcodesContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#types.
 	VisitTypes(ctx *TypesContext) interface{}

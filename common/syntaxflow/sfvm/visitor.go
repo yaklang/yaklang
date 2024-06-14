@@ -2,7 +2,6 @@ package sfvm
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -155,91 +154,94 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		return nil
 	}
 
+	log.Warnf("TBD: VisitConditionExpression: %v", raw.GetText())
 	switch i := raw.(type) {
-	case *sf.FilterExpressionNumberContext:
-		y.EmitPushLiteral(y.VisitNumberLiteral(i.NumberLiteral()))
-		y.EmitOperator("==")
-	case *sf.FilterExpressionStringContext:
-		text, globMode := y.VisitStringLiteral(i.StringLiteral())
-		if !globMode {
-			y.EmitPushLiteral(text)
-			y.EmitOperator("==")
-		} else {
-			y.EmitPushGlob(text)
-		}
-	case *sf.FilterExpressionRegexpContext:
-		result := i.RegexpLiteral().GetText()
-		result = result[1 : len(result)-1]
-		result = strings.ReplaceAll(result, `\/`, `/`)
-		re, err := regexp.Compile(result)
-		if err != nil {
-			panic("golang regexp: regexp compile failed: " + err.Error())
-		}
-		y.EmitRegexpMatch(result)
-		return re
-	case *sf.FilterExpressionParenContext:
-		return y.VisitConditionExpression(i.ConditionExpression())
-	case *sf.FilterExpressionNotContext:
-		y.VisitConditionExpression(i.ConditionExpression())
-		y.EmitOperator("!")
-	case *sf.FilterExpressionCompareContext:
-		if i.NumberLiteral() != nil {
-			n := y.VisitNumberLiteral(i.NumberLiteral())
-			y.EmitPushLiteral(n)
-		} else if i.Identifier() != nil {
-			y.EmitPushLiteral(i.Identifier().GetText())
-		} else {
-			if i.GetText() == "true" {
-				y.EmitPushLiteral(true)
-			} else {
-				y.EmitPushLiteral(false)
-			}
-		}
-		y.EmitOperator(i.GetOp().GetText())
-	case *sf.FilterExpressionRegexpMatchContext:
-		if i.StringLiteral() != nil {
-			r, glob := y.VisitStringLiteral(i.StringLiteral())
-			if glob {
-				y.EmitPushGlob(r)
-				if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
-					y.EmitOperator("!")
-				}
-				return nil
-			} else {
-				r, err := regexp.Compile(regexp.QuoteMeta(r))
-				if err != nil {
-					panic("golang regexp: regexp compile failed: " + err.Error())
-				}
-				y.EmitRegexpMatch(r.String())
-				return nil
-			}
-		}
-
-		if i.RegexpLiteral() != nil {
-			result := i.RegexpLiteral().GetText()
-			result = result[1 : len(result)-1]
-			result = strings.ReplaceAll(result, `\/`, `/`)
-			re, err := regexp.Compile(result)
-			if err != nil {
-				panic("golang regexp: regexp compile failed: " + err.Error())
-			}
-			y.EmitRegexpMatch(result)
-			if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
-				y.EmitOperator("!")
-			}
-			return re
-		}
-		panic("BUG: in regexp match")
-	case *sf.FilterExpressionAndContext:
-		for _, exp := range i.AllConditionExpression() {
-			y.VisitConditionExpression(exp)
-		}
-		y.EmitOperator("&&")
-	case *sf.FilterExpressionOrContext:
-		for _, exp := range i.AllConditionExpression() {
-			y.VisitConditionExpression(exp)
-		}
-		y.EmitOperator("||")
+	default:
+		_ = i
+		//case *sf.FilterExpressionNumberContext:
+		//	y.EmitPushLiteral(y.VisitNumberLiteral(i.NumberLiteral()))
+		//	y.EmitOperator("==")
+		//case *sf.FilterExpressionStringContext:
+		//	text, globMode := y.VisitStringLiteral(i.StringLiteral())
+		//	if !globMode {
+		//		y.EmitPushLiteral(text)
+		//		y.EmitOperator("==")
+		//	} else {
+		//		y.EmitPushGlob(text)
+		//	}
+		//case *sf.FilterExpressionRegexpContext:
+		//	result := i.RegexpLiteral().GetText()
+		//	result = result[1 : len(result)-1]
+		//	result = strings.ReplaceAll(result, `\/`, `/`)
+		//	re, err := regexp.Compile(result)
+		//	if err != nil {
+		//		panic("golang regexp: regexp compile failed: " + err.Error())
+		//	}
+		//	y.EmitRegexpMatch(result)
+		//	return re
+		//case *sf.FilterExpressionParenContext:
+		//	return y.VisitConditionExpression(i.ConditionExpression())
+		//case *sf.FilterExpressionNotContext:
+		//	y.VisitConditionExpression(i.ConditionExpression())
+		//	y.EmitOperator("!")
+		//case *sf.FilterExpressionCompareContext:
+		//	if i.NumberLiteral() != nil {
+		//		n := y.VisitNumberLiteral(i.NumberLiteral())
+		//		y.EmitPushLiteral(n)
+		//	} else if i.Identifier() != nil {
+		//		y.EmitPushLiteral(i.Identifier().GetText())
+		//	} else {
+		//		if i.GetText() == "true" {
+		//			y.EmitPushLiteral(true)
+		//		} else {
+		//			y.EmitPushLiteral(false)
+		//		}
+		//	}
+		//	y.EmitOperator(i.GetOp().GetText())
+		//case *sf.FilterExpressionRegexpMatchContext:
+		//	if i.StringLiteral() != nil {
+		//		r, glob := y.VisitStringLiteral(i.StringLiteral())
+		//		if glob {
+		//			y.EmitPushGlob(r)
+		//			if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
+		//				y.EmitOperator("!")
+		//			}
+		//			return nil
+		//		} else {
+		//			r, err := regexp.Compile(regexp.QuoteMeta(r))
+		//			if err != nil {
+		//				panic("golang regexp: regexp compile failed: " + err.Error())
+		//			}
+		//			y.EmitRegexpMatch(r.String())
+		//			return nil
+		//		}
+		//	}
+		//
+		//	if i.RegexpLiteral() != nil {
+		//		result := i.RegexpLiteral().GetText()
+		//		result = result[1 : len(result)-1]
+		//		result = strings.ReplaceAll(result, `\/`, `/`)
+		//		re, err := regexp.Compile(result)
+		//		if err != nil {
+		//			panic("golang regexp: regexp compile failed: " + err.Error())
+		//		}
+		//		y.EmitRegexpMatch(result)
+		//		if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
+		//			y.EmitOperator("!")
+		//		}
+		//		return re
+		//	}
+		//	panic("BUG: in regexp match")
+		//case *sf.FilterExpressionAndContext:
+		//	for _, exp := range i.AllConditionExpression() {
+		//		y.VisitConditionExpression(exp)
+		//	}
+		//	y.EmitOperator("&&")
+		//case *sf.FilterExpressionOrContext:
+		//	for _, exp := range i.AllConditionExpression() {
+		//		y.VisitConditionExpression(exp)
+		//	}
+		//	y.EmitOperator("||")
 	}
 
 	return nil

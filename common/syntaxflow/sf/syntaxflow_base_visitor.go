@@ -195,7 +195,27 @@ func (v *BaseSyntaxFlowVisitor) VisitBuildMap(ctx *BuildMapContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionString(ctx *FilterExpressionStringContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(ctx *StringLiteralWithoutStarGroupContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNegativeCondition(ctx *NegativeConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNotCondition(ctx *NotConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterCondition(ctx *FilterConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitParenCondition(ctx *ParenConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitOpcodeTypeCondition(ctx *OpcodeTypeConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -203,7 +223,7 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionOr(ctx *FilterExpressionOrC
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionParen(ctx *FilterExpressionParenContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitStringInCondition(ctx *StringInConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -219,15 +239,7 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionRegexpMatch(ctx *FilterExpr
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionNumber(ctx *FilterExpressionNumberContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionRegexp(ctx *FilterExpressionRegexpContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionNot(ctx *FilterExpressionNotContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitStringContainAnyCondition(ctx *StringContainAnyConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -239,11 +251,23 @@ func (v *BaseSyntaxFlowVisitor) VisitStringLiteral(ctx *StringLiteralContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitStringLiteralWithoutStar(ctx *StringLiteralWithoutStarContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitRegexpLiteral(ctx *RegexpLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitKeywords(ctx *KeywordsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitOpcodes(ctx *OpcodesContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
