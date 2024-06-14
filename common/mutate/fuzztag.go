@@ -873,6 +873,7 @@ func init() {
 					yieldString(strings.TrimSpace(s))
 					return strings.TrimSpace(s)
 				})
+				return nil
 			}
 
 			var minB, maxB, capB, stepB *big.BigInt
