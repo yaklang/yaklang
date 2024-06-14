@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
@@ -20,19 +21,18 @@ func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	token := utils.RandStringBytes(60)
 
 	host, port := utils.DebugMockEchoWs("enPayload")
-	log.Infof("addr:  %s:%d", host, port)
+	log.Infof("addr: %s:%d", host, port)
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mitmPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	count := 0
 	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMClient) {
-
 		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
 		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload HTTP/1.1
 Host: %s
@@ -49,19 +49,20 @@ User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 F
 Accept: */*
 `, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy), lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
 			if string(bytes) == "server: "+token {
+				log.Infof("client recv: %s", bytes)
 				count++
 			}
 			if count == 3 {
 				cancel()
 			}
 		}))
-
 		if err != nil {
 			t.Fatalf("send websocket request err: %v", err)
 		}
 		wsClient.StartFromServer()
 		for i := 0; i < 3; i++ {
 			err = wsClient.WriteText([]byte(token))
+			log.Infof("client send: %s", token)
 			if err != nil {
 				t.Fatalf("send websocket request err: %v", err)
 			}
@@ -87,7 +88,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	}
 
 	rPort := utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", rPort)
+	proxy := "http://" + utils.HostPort("127.0.0.1", rPort)
 
 	// 启动MITM服务器
 	stream, err := client.MITM(ctx)
@@ -102,47 +103,60 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
 	hijackClientPayload := false
 	hijackServerPayload := false
+	state := 0
 	for {
-		rcpResponse, err := stream.Recv()
+		rpcResponse, err := stream.Recv()
 		if err != nil {
 			break
 		}
-		rspMsg := string(rcpResponse.GetMessage().GetMessage())
-		if len(rcpResponse.GetRequest()) > 0 {
-			if len(rcpResponse.GetResponse()) > 0 {
-				spew.Dump(rcpResponse.GetResponse())
+		rspMsg := string(rpcResponse.GetMessage().GetMessage())
+		if len(rpcResponse.GetRequest()) > 0 {
+			switch state {
+			case 0:
+				// hijack http response
 				stream.Send(&ypb.MITMRequest{
-					Response:   rcpResponse.GetResponse(),
-					Id:         rcpResponse.GetId(),
-					ResponseId: rcpResponse.GetResponseId(),
+					Id:             rpcResponse.GetId(),
+					HijackResponse: true,
 				})
-			}
-			if len(rcpResponse.GetPayload()) > 0 {
-				spew.Dump(rcpResponse.GetPayload())
-				if rcpResponse.GetRequest() == nil {
-					t.Fatalf("websocket rcpResponse.GetRequest() is nil")
+				// forward http request
+				stream.Send(&ypb.MITMRequest{
+					Id:      rpcResponse.GetId(),
+					Request: rpcResponse.GetRequest(),
+				})
+				state++
+			case 1:
+				// skip other request, like JustContentReplacer
+				if len(rpcResponse.GetResponse()) == 0 {
+					continue
 				}
-				if string(rcpResponse.GetPayload()) == token {
+
+				// forward http response
+				stream.Send(&ypb.MITMRequest{
+					Id:         rpcResponse.GetId(),
+					ResponseId: rpcResponse.GetResponseId(),
+					Response:   rpcResponse.GetResponse(),
+				})
+				state++
+			case 2:
+				payload := rpcResponse.GetPayload()
+				require.Greater(t, len(payload), 0, "payload is empty")
+				require.NotNil(t, rpcResponse.GetRequest(), "rcpResponse.GetRequest() is nil")
+
+				log.Infof("recv payload: %s", payload)
+				if string(payload) == token {
 					hijackClientPayload = true
-				}
-				if string(rcpResponse.GetPayload()) == "server: "+token {
+				} else if string(payload) == "server: "+token {
 					hijackServerPayload = true
 				}
 
+				// forward payload
 				stream.Send(&ypb.MITMRequest{
-					Id:         rcpResponse.GetId(),
-					ResponseId: rcpResponse.GetResponseId(),
+					Id:         rpcResponse.GetId(),
+					ResponseId: rpcResponse.GetResponseId(),
+					Request:    payload,
+					Response:   payload,
 				})
 			}
-
-			stream.Send(&ypb.MITMRequest{
-				Id:             rcpResponse.GetId(),
-				HijackResponse: true,
-			})
-			stream.Send(&ypb.MITMRequest{
-				Id:      rcpResponse.GetId(),
-				Request: rcpResponse.GetRequest(),
-			})
 		}
 		if strings.Contains(rspMsg, `starting mitm serve`) {
 			go func() {
@@ -164,14 +178,11 @@ Accept: */*
 						cancel()
 					}
 				}))
-				if err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, err)
 				wsClient.StartFromServer()
 				err = wsClient.Write([]byte(token))
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				defer wsClient.WriteClose()
 			}()
 		}
