@@ -343,11 +343,9 @@ func (fr *FrameReader) readPayloadN(n uint64) ([]byte, error) {
 	return p, err
 }
 
-func (fw *FrameWriter) reset(frame *Frame) {
-	fw.frame = frame
-	fw.opcode = frame.messageType
-
-	if fw.isDeflate && frame.RSV1() {
+func (fw *FrameWriter) reset(opcode int, resetFlate bool) {
+	fw.opcode = opcode
+	if resetFlate {
 		fw.resetFlate()
 	}
 }
@@ -372,7 +370,7 @@ func (fw *FrameWriter) putFlateWriter() {
 func (fw *FrameWriter) writeContinueDeflateFrame(data []byte) (int, error) {
 	// todo: mask: client or server?
 	// only first frame need to set rsv1
-	n, err := fw.writeFrame(false, fw.opcode != ContinueMessage, fw.opcode, true, data)
+	n, err := fw.WriteDirect(false, fw.opcode != ContinueMessage, fw.opcode, true, data)
 	if err != nil {
 		return n, err
 	}
@@ -380,7 +378,7 @@ func (fw *FrameWriter) writeContinueDeflateFrame(data []byte) (int, error) {
 	return n, nil
 }
 
-// FrameWriter.writeDeflateFrame -> msgWriter.Write(compress) -> tr.Write(trim last four bytes) -> FrameWriter.writeContinueDeflateFrame -> FrameWriter.writeFrame(continue) --> FrameWriter.writeFrame(fin)
+// FrameWriter.writeDeflateFrame -> msgWriter.Write(compress) -> tr.Write(trim last four bytes) -> FrameWriter.writeContinueDeflateFrame -> FrameWriter.directWrite(continue) --> FrameWriter.directWrite(fin)
 func (fw *FrameWriter) writeDeflateFrame(data []byte) (int, error) {
 	w := fw.fw
 
@@ -397,7 +395,7 @@ func (fw *FrameWriter) writeDeflateFrame(data []byte) (int, error) {
 		fw.putFlateWriter()
 	}
 	// write fin frame
-	fw.writeFrame(true, false, ContinueMessage, true, nil)
+	fw.WriteDirect(true, false, ContinueMessage, true, nil)
 
 	return n, nil
 }

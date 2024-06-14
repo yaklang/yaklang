@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -29,15 +30,19 @@ const (
 )
 
 type WebsocketClientConfig struct {
-	Proxy               string
-	TotalTimeout        time.Duration
-	TLS                 bool
-	FromServerHandler   func([]byte)
-	FromServerHandlerEx func(*WebsocketClient, []byte, []*Frame)
-	Context             context.Context
-	cancel              func()
-	strictMode          bool
-	compressionMode     CompressionMode
+	Proxy                  string
+	TotalTimeout           time.Duration
+	TLS                    bool
+	FromServerHandler      func([]byte)
+	UpgradeResponseHandler func(*http.Response, []byte, *WebsocketExtensions, error) []byte
+	FromServerHandlerEx    func(*WebsocketClient, []byte, []*Frame)
+	AllFrameHandler        func(*WebsocketClient, *Frame, []byte, func())
+	DisableReassembly      bool
+	Context                context.Context
+	cancel                 func()
+	strictMode             bool
+	serverMode             bool
+	compressionMode        CompressionMode
 
 	// Host Port
 	Host string
@@ -49,6 +54,18 @@ type WebsocketClientOpt func(config *WebsocketClientConfig)
 func WithWebsocketProxy(t string) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.Proxy = t
+	}
+}
+
+func WithWebsocketServerMode(b bool) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.serverMode = b
+	}
+}
+
+func WithWebsocketDisableReassembly(b bool) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.DisableReassembly = b
 	}
 }
 
@@ -84,6 +101,12 @@ func WithWebsocketPort(t int) WebsocketClientOpt {
 	}
 }
 
+func WithWebsocketUpgradeResponseHandler(f func(*http.Response, []byte, *WebsocketExtensions, error) []byte) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.UpgradeResponseHandler = f
+	}
+}
+
 func WithWebsocketFromServerHandler(f func([]byte)) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.FromServerHandler = f
@@ -93,6 +116,12 @@ func WithWebsocketFromServerHandler(f func([]byte)) WebsocketClientOpt {
 func WithWebsocketFromServerHandlerEx(f func(*WebsocketClient, []byte, []*Frame)) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.FromServerHandlerEx = f
+	}
+}
+
+func WithWebsocketAllFrameHandler(f func(*WebsocketClient, *Frame, []byte, func())) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.AllFrameHandler = f
 	}
 }
 
@@ -129,13 +158,17 @@ type WebsocketClient struct {
 	fw                  *FrameWriter
 	Request             []byte
 	Response            []byte
+	ResponseInstance    *http.Response
 	FromServerOnce      *sync.Once
 	FromServerHandler   func([]byte)
 	FromServerHandlerEx func(*WebsocketClient, []byte, []*Frame)
+	AllFrameHandler     func(*WebsocketClient, *Frame, []byte, func())
+	DisableReassembly   bool
 	Extensions          *WebsocketExtensions
 	Context             context.Context
 	cancel              func()
 	strictMode          bool
+	serverMode          bool
 
 	// websocket扩展
 	// isDeflate bool
@@ -168,6 +201,10 @@ func (c *WebsocketClient) StartFromServer() {
 	if c.FromServerOnce == nil {
 		c.FromServerOnce = new(sync.Once)
 	}
+	fromServerHandler := c.FromServerHandler
+	fromServerHandlerEx := c.FromServerHandlerEx
+	allFrameHandler := c.AllFrameHandler
+
 	go func() {
 		var (
 			plainTextBuffer             bytes.Buffer
@@ -308,49 +345,59 @@ func (c *WebsocketClient) StartFromServer() {
 					return
 				}
 
-				// control frame handle first
-				switch frameType {
-				case CloseMessage:
-
-					c.WriteClose()
-					return
-				case PingMessage:
-					c.WritePong(frame.data)
-					continue
-				}
-
+				// reassembly
 				plain := frame.data
 				fragmentFrames = append(fragmentFrames, frame)
-				// only for un-permessage-deflate frame
-				if inFragment && !inCompressState {
-					plainTextBuffer.Write(plain)
-					if !frame.FIN() { // continue to read next frame
+
+				if !c.DisableReassembly && !isControl {
+					// only for un-permessage-deflate frame
+					if inFragment && !inCompressState {
+						plainTextBuffer.Write(plain)
+						if !frame.FIN() { // continue to read next frame
+							continue
+						}
+						plain = plainTextBuffer.Bytes()
+						plainTextBuffer.Reset()
+					}
+				}
+				if allFrameHandler != nil {
+					shouldReturn := false
+					allFrameHandler(c, frame, plain, func() {
+						shouldReturn = true
+					})
+					if shouldReturn {
+						return
+					}
+				} else {
+					// control frame handle first
+					switch frameType {
+					case CloseMessage:
+						c.WriteClose()
+						return
+					case PingMessage:
+						c.WritePong(frame.data, !c.serverMode)
 						continue
 					}
-					plain = plainTextBuffer.Bytes()
-					plainTextBuffer.Reset()
-				}
-				if !frame.FIN() {
-					continue
-				}
 
-				inCompressState = false
-				inFragment = false
-				handler := c.FromServerHandler
-				handlerEx := c.FromServerHandlerEx
-				if !isControl {
-					if handler != nil {
-						handler(plain)
-					} else if handlerEx != nil {
-						handlerEx(c, plain, fragmentFrames)
-					} else {
-						raw, data := frame.Bytes()
-						fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
+					if !frame.FIN() {
+						continue
+					}
+					inCompressState = false
+					inFragment = false
+
+					if !isControl {
+						if fromServerHandler != nil {
+							fromServerHandler(plain)
+						} else if fromServerHandlerEx != nil {
+							fromServerHandlerEx(c, plain, fragmentFrames)
+						} else {
+							raw, data := frame.Bytes()
+							fmt.Printf("websocket receive: %s\n verbose: %v", strconv.Quote(string(raw)), strconv.Quote(string(data)))
+						}
 					}
 				}
 
 				fragmentFrames = fragmentFrames[:0]
-
 			}
 		})
 	}()
@@ -395,8 +442,13 @@ func (c *WebsocketClient) WriteText(r []byte) error {
 	return nil
 }
 
-func (c *WebsocketClient) WritePong(r []byte) error {
-	if err := c.fw.WritePong(r, true); err != nil {
+func (c *WebsocketClient) WriteDirect(fin, flate bool, opcode int, mask bool, data []byte) error {
+	_, err := c.fw.WriteDirect(fin, flate, opcode, mask, data)
+	return err
+}
+
+func (c *WebsocketClient) WritePong(r []byte, masked bool) error {
+	if err := c.fw.WritePong(r, masked); err != nil {
 		return errors.Wrap(err, "write pong frame failed")
 	}
 
@@ -407,8 +459,16 @@ func (c *WebsocketClient) WritePong(r []byte) error {
 }
 
 func (c *WebsocketClient) WriteClose() error {
-	data := FormatCloseMessage(CloseNormalClosure, "")
-	if err := c.fw.WriteEx(data, CloseMessage, true); err != nil {
+	return c.WriteCloseEx(CloseNormalClosure, "")
+}
+
+func (c *WebsocketClient) WriteCloseEx(closeCode int, message string) error {
+	// todo: handle close message
+
+	// if c.strictMode && len(message) > 125 {
+	// 	message = message[:125]
+	// }
+	if err := c.fw.WriteEx(GetClosePayloadFromCloseCode(closeCode), CloseMessage, true); err != nil {
 		return errors.Wrap(err, "write close frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
@@ -417,19 +477,9 @@ func (c *WebsocketClient) WriteClose() error {
 	return nil
 }
 
-func (c *WebsocketClient) WriteCloseEx(closeCode int, message string) error {
-	if c.strictMode && len(message) > 125 {
-		message = message[:125]
-	}
-
-	data := FormatCloseMessage(closeCode, message)
-	if err := c.fw.WriteEx(data, CloseMessage, true); err != nil {
-		return errors.Wrap(err, "write close frame failed")
-	}
-	if err := c.fw.Flush(); err != nil {
-		return errors.Wrap(err, "flush failed")
-	}
-	return nil
+func (c *WebsocketClient) Close() error {
+	c.cancel()
+	return c.conn.Close()
 }
 
 func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketClient, error) {
@@ -492,12 +542,12 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	addr := utils.HostPort(host, port)
 	var conn net.Conn
 	if config.TLS {
-		conn, err = netx.DialTLSTimeout(10*time.Second, addr, nil, config.Proxy)
+		conn, err = netx.DialTLSTimeout(30*time.Second, addr, nil, config.Proxy)
 		if err != nil {
 			return nil, utils.Errorf("dial tls-conn failed: %s", err)
 		}
 	} else {
-		conn, err = netx.DialTCPTimeout(10*time.Second, addr, config.Proxy)
+		conn, err = netx.DialTCPTimeout(30*time.Second, addr, config.Proxy)
 		if err != nil {
 			return nil, utils.Errorf("dial conn failed: %s", err)
 		}
@@ -518,13 +568,27 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 
 	// 接收响应并判断
 	var responseBuffer bytes.Buffer
+	upgradeResponseHandler := config.UpgradeResponseHandler
 	bufioReader := bufio.NewReaderSize(io.TeeReader(conn, &responseBuffer), 4096)
 	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufioReader, req)
 	if err != nil {
+		if upgradeResponseHandler != nil {
+			upgradeResponseHandler(nil, nil, nil, err)
+		}
 		return nil, utils.Errorf("read response failed: %s", err)
 	}
-
+	extensions := GetWebsocketExtensions(rsp.Header)
 	responseRaw := responseBuffer.Bytes()
+	if upgradeResponseHandler != nil {
+		newResponseRaw := upgradeResponseHandler(rsp, responseRaw, extensions, nil)
+		if !bytes.Equal(newResponseRaw, responseRaw) {
+			responseRaw = newResponseRaw
+			rsp, err = ParseBytesToHTTPResponse(responseRaw)
+			if err != nil {
+				return nil, utils.Errorf("parse fixed response failed: %s", err)
+			}
+		}
+	}
 
 	remindBytes := make([]byte, bufioReader.Buffered())
 	if len(remindBytes) > 0 {
@@ -532,7 +596,7 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		bufioReader.Read(remindBytes)
 	}
 
-	if rsp.StatusCode != 101 && rsp.StatusCode != 200 {
+	if rsp.StatusCode != 101 {
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
 	}
 
@@ -547,7 +611,6 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	if cancel == nil {
 		ctx, cancel = context.WithCancel(ctx)
 	}
-	extensions := GetWebsocketExtensions(rsp.Header)
 	fr := NewFrameReader(io.MultiReader(bytes.NewBuffer(remindBytes), conn), extensions.IsDeflate)
 	fw := NewFrameWriter(conn, extensions.IsDeflate)
 
@@ -557,15 +620,59 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		fw:                  fw,
 		Request:             requestRaw,
 		Response:            responseRaw,
+		ResponseInstance:    rsp,
 		FromServerHandler:   config.FromServerHandler,
 		FromServerHandlerEx: config.FromServerHandlerEx,
+		AllFrameHandler:     config.AllFrameHandler,
+		DisableReassembly:   config.DisableReassembly,
 		Extensions:          extensions,
 		Context:             ctx,
 		cancel:              cancel,
 		strictMode:          config.strictMode,
+		serverMode:          config.serverMode,
 	}
 	fr.SetWebsocketClient(client)
 	fw.SetWebsocketClient(client)
 
 	return client, nil
+}
+
+func NewWebsocketClientIns(conn net.Conn, fr *FrameReader, fw *FrameWriter, ext *WebsocketExtensions, opts ...WebsocketClientOpt) *WebsocketClient {
+	config := &WebsocketClientConfig{TotalTimeout: time.Hour}
+
+	for _, p := range opts {
+		p(config)
+	}
+
+	var ctx context.Context
+	var cancel func()
+	if config.Context == nil {
+		ctx, cancel = context.WithTimeout(context.Background(), config.TotalTimeout)
+	} else {
+		ctx, cancel = config.Context, config.cancel
+	}
+
+	if cancel == nil {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+
+	client := &WebsocketClient{
+		conn:                conn,
+		fr:                  fr,
+		fw:                  fw,
+		FromServerHandler:   config.FromServerHandler,
+		FromServerHandlerEx: config.FromServerHandlerEx,
+		AllFrameHandler:     config.AllFrameHandler,
+		DisableReassembly:   config.DisableReassembly,
+		Extensions:          ext,
+		Context:             ctx,
+		cancel:              cancel,
+		strictMode:          config.strictMode,
+		serverMode:          config.serverMode,
+	}
+
+	fr.SetWebsocketClient(client)
+	fw.SetWebsocketClient(client)
+
+	return client
 }
