@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"unsafe"
@@ -11,7 +12,13 @@ type GenerateConfig struct {
 	ctx         context.Context
 	cancelCtx   func()
 	AssertError bool
+	logger      *log.Logger
 }
+
+func (g *GenerateConfig) Debug() {
+	g.logger.SetLevel("debug")
+}
+
 type ExecNode interface {
 	Reset()              // 重置生成器
 	Exec() (bool, error) // 优先读取缓存，读完缓存后调用子生成器
@@ -147,8 +154,12 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 	return err
 }
 func (f *TagExecNode) exec(s *FuzzResult) error {
+	defer func() {
+		f.cache = nil
+	}()
 	ch := make(chan *FuzzResult)
 	receiver := func(result *FuzzResult) {
+		f.config.logger.Debugf("tag %s generate data: %s", f.data.String(), string(result.GetData()))
 		select {
 		case <-f.config.ctx.Done():
 		case ch <- result:
@@ -299,6 +310,7 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 	cfg := &GenerateConfig{
 		ctx:       ctx,
 		cancelCtx: cancel,
+		logger:    log.GetLogger("fuzztag"),
 	}
 	methodCtx := &MethodContext{
 		dynTag:         map[*TagExecNode]struct{}{},
@@ -317,9 +329,10 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 				gener.parentNode = parentNode
 				methodCtx.tagToLabelsMap[gener] = ret.GetLabels()
 				generatorNodes = append(generatorNodes, gener)
-				for _, label := range ret.GetLabels() {
-					methodCtx.labelTable[label][gener] = struct{}{}
-				}
+				methodCtx.UpdateLabels(gener)
+				//for _, label := range ret.GetLabels() {
+				//	methodCtx.labelTable[label][gener] = struct{}{}
+				//}
 			case StringNode:
 				generatorNodes = append(generatorNodes, &StringExecNode{data: string(ret)})
 			}
@@ -454,7 +467,7 @@ func (g *Generator) generate() (bool, error) {
 			}
 			var execAllFirst func(t ExecNode)
 			execAllFirst = func(t ExecNode) {
-				if v1, ok := t.(*TagExecNode); ok && v1.finished {
+				if v1, ok := t.(*TagExecNode); ok && (v1.isDyn || v1.finished) {
 					for _, param := range v1.params {
 						execAllFirst(param)
 					}
