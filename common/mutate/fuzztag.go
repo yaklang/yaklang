@@ -34,15 +34,16 @@ import (
 var fuzztagfallback = []string{""}
 
 type FuzzTagDescription struct {
-	TagName          string
-	Handler          func(string) []string
-	HandlerEx        func(string) []*fuzztag.FuzzExecResult
-	HandlerAndYield  func(context.Context, string, func(res *parser.FuzzResult)) error
-	ErrorInfoHandler func(string) ([]string, error)
-	IsDyn            bool
-	IsDynFun         func(name, params string) bool
-	Alias            []string
-	Description      string
+	TagName               string
+	Handler               func(string) []string
+	HandlerEx             func(string) []*fuzztag.FuzzExecResult
+	HandlerAndYield       func(context.Context, string, func(res *parser.FuzzResult)) error
+	HandlerAndYieldString func(s string, yield func(s string)) error
+	ErrorInfoHandler      func(string) ([]string, error)
+	IsDyn                 bool
+	IsDynFun              func(name, params string) bool
+	Alias                 []string
+	Description           string
 }
 
 func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzTagDescription) {
@@ -55,6 +56,13 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 	if f.IsDynFun != nil {
 		expand = map[string]any{
 			"IsDynFun": f.IsDynFun,
+		}
+	}
+	if f.HandlerAndYieldString != nil {
+		f.HandlerAndYield = func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			return f.HandlerAndYieldString(s, func(s string) {
+				yield(parser.NewFuzzResultWithData(s))
+			})
 		}
 	}
 	if f.HandlerAndYield != nil {
@@ -919,7 +927,7 @@ func init() {
 			}
 			return true
 		},
-		Handler: func(s string) []string {
+		HandlerAndYieldString: func(s string, yield func(s string)) error {
 			var (
 				minB, maxB *big.BigInt
 				count      uint = 1
@@ -945,7 +953,8 @@ func init() {
 			case 3:
 				count, err = parseUint(raw[2])
 				if err != nil {
-					return []string{fmt.Sprint(rand.Intn(10))}
+					yield(fmt.Sprint(rand.Intn(10)))
+					return nil
 				}
 				fallthrough
 			case 2:
@@ -957,16 +966,17 @@ func init() {
 			}
 
 			if cmpB := minB.Cmp(maxB); cmpB > 0 {
-				return []string{}
+				return nil
 			} else if cmpB == 0 {
-				return []string{paddingString(minB.String(), paddingLength, paddingRight)}
+				yield(paddingString(minB.String(), paddingLength, paddingRight))
+				return nil
 			}
 
-			results := make([]string, 0, count)
 			for i := uint(0); i < count; i++ {
 				addB, err := cryptoRand.Int(cryptoRand.Reader, maxB.Sub(minB).Int)
 				if err != nil {
-					return []string{fmt.Sprint(rand.Intn(10))}
+					yield(fmt.Sprint(rand.Intn(10)))
+					return nil
 				}
 				addB = addB.Add(addB, minB.Int)
 				r := addB.String()
@@ -974,9 +984,9 @@ func init() {
 				if enablePadding {
 					r = paddingString(r, paddingLength, paddingRight)
 				}
-				results = append(results, r)
+				yield(r)
 			}
-			return results
+			return nil
 		},
 		Alias:       []string{"ri", "rand:int", "randi"},
 		Description: "随机生成整数，定义为 {{randint(10)}} 生成0-10中任意一个随机数，{{randint(1,50)}} 生成 1-50 任意一个随机数，{{randint(1,50,10)}} 生成 1-50 任意一个随机数，重复 10 次",
@@ -989,12 +999,14 @@ func init() {
 			}
 			return true
 		},
-		ErrorInfoHandler: func(s string) ([]string, error) {
+		HandlerAndYieldString: func(s string, yield func(s string)) error {
 			var (
 				min, max, count uint
 				err             error
 			)
-			fuzztagfallback := []string{utils.RandStringBytes(8)}
+			fuzztagfallback := func() {
+				yield(utils.RandStringBytes(8))
+			}
 			count = 1
 			min = 1
 			raw := utils.PrettifyListFromStringSplited(s, ",")
@@ -1002,7 +1014,8 @@ func init() {
 			case 3:
 				count, err = parseUint(raw[2])
 				if err != nil {
-					return fuzztagfallback, err
+					fuzztagfallback()
+					return err
 				}
 
 				if count <= 0 {
@@ -1012,11 +1025,13 @@ func init() {
 			case 2:
 				min, err = parseUint(raw[0])
 				if err != nil {
-					return fuzztagfallback, err
+					fuzztagfallback()
+					return err
 				}
 				max, err = parseUint(raw[1])
 				if err != nil {
-					return fuzztagfallback, err
+					fuzztagfallback()
+					return err
 				}
 				min = uint(utils.Min(int(min), int(max)))
 				max = uint(utils.Max(int(min), int(max)))
@@ -1028,7 +1043,8 @@ func init() {
 			case 1:
 				max, err = parseUint(raw[0])
 				if err != nil {
-					return fuzztagfallback, err
+					fuzztagfallback()
+					return err
 				}
 				min = max
 				if max <= 0 {
@@ -1036,10 +1052,10 @@ func init() {
 				}
 				break
 			default:
-				return fuzztagfallback, err
+				fuzztagfallback()
+				return err
 			}
 
-			var r []string
 			RepeatFunc(count, func() bool {
 				result := int(max - min)
 				if result < 0 {
@@ -1051,10 +1067,10 @@ func init() {
 					offset = uint(rand.Intn(result))
 				}
 				c := min + offset
-				r = append(r, utils.RandStringBytes(int(c)))
+				yield(utils.RandStringBytes(int(c)))
 				return true
 			})
-			return r, err
+			return err
 		},
 		Alias:       []string{"rand:str", "rs", "rands"},
 		Description: "随机生成个字符串，定义为 {{randstr(10)}} 生成长度为 10 的随机字符串，{{randstr(1,30)}} 生成长度为 1-30 为随机字符串，{{randstr(1,30,10)}} 生成 10 个随机字符串，长度为 1-30",
