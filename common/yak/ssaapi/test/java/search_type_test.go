@@ -1,6 +1,11 @@
 package java
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+)
 
 func TestSimpleSearchType(t *testing.T) {
 
@@ -122,5 +127,39 @@ func TestSimpleSearchType(t *testing.T) {
 			},
 		})
 	})
+
+}
+
+func Test_SearchType_undefine_Class(t *testing.T) {
+	code := `
+	package com.example.utils;
+
+	class A {
+		void main() {
+			B b1  = new B();
+			b1.methodB(1);
+		}
+	}	
+		`
+	t.Run("simple", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(
+			t, code,
+			`B as $target`,
+			map[string][]string{
+				"target": {"Undefined-B"},
+			}, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	// TODO: con't get this method, because B class not found.
+	// t.Run("simple method", func(t *testing.T) {
+	// 	ssatest.CheckSyntaxFlowContain(
+	// 		t, code,
+	// 		`B.methodB as $target`,
+	// 		map[string][]string{
+	// 			"target": {"Undefined-b1.methodB(valid)"},
+	// 		}, ssaapi.WithLanguage(ssaapi.JAVA),
+	// 	)
+	// })
 
 }

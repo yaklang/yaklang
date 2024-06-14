@@ -2,7 +2,6 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -55,7 +54,6 @@ func (s *SyntaxFlowVirtualMachine) Show() {
 		f.Show()
 	}
 }
-
 func (f *SFFrame) Show() {
 	fmt.Println("--------------------------")
 	for idx, c := range f.Codes {
@@ -72,10 +70,12 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
+		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
 	}
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
+			frame = nil
 			frame = nil
 		}
 	}()
@@ -98,7 +98,9 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	result.text = text
 	result.VisitFlow(flow)
 	frame = result.CreateFrame(s.vars)
+	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
+	frame.debug = s.config.debug
 	frame.debug = s.config.debug
 	s.frames = append(s.frames, frame)
 
@@ -109,25 +111,6 @@ func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOper
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 	return s.vars.Copy()
-}
-
-func (s *SyntaxFlowVirtualMachine) Results() []*SFFrameResult {
-	var infos = make([]*SFFrameResult, 0, len(s.frames))
-	s.ForEachFrame(func(frame *SFFrame) {
-		if frame.result == nil {
-			log.Warn("frame result is nil")
-			return
-		}
-		infos = append(infos, frame.result)
-	})
-	return infos
-}
-
-func (s *SyntaxFlowVirtualMachine) FirstResult() (*SFFrameResult, error) {
-	if len(s.frames) == 0 {
-		return nil, utils.Error("no frame loaded, maybe the vm is not load any rules(SyntaxFlow)")
-	}
-	return s.frames[0].result, nil
 }
 
 func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) ([]*SFFrameResult, error) {
@@ -148,8 +131,5 @@ func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) ([]*SFFrameResult, erro
 
 func (frame *SFFrame) Feed(i ValueOperator) (*SFFrameResult, error) {
 	err := frame.exec(i)
-	if err != nil {
-		return nil, utils.Errorf("exec frame: %v CODE: %v", err, frame.Text)
-	}
-	return frame.result, nil
+	return frame.result, err
 }

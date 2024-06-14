@@ -15,6 +15,7 @@ type ResultCapturedCallback func(name string, results ValueOperator) error
 type Config struct {
 	debug                     bool
 	StrictMatch               bool
+	FailFast                  bool
 	initialContextVars        *omap.OrderedMap[string, ValueOperator]
 	onResultCapturedCallbacks []ResultCapturedCallback
 }
@@ -24,6 +25,16 @@ type Option func(*Config)
 func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
 	return func(config *Config) {
 		config.initialContextVars = o
+	}
+}
+
+func WithFailFast(b ...bool) Option {
+	return func(config *Config) {
+		if len(b) <= 0 {
+			config.FailFast = true
+			return
+		}
+		config.FailFast = b[0]
 	}
 }
 

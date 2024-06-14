@@ -49,7 +49,6 @@ func (p *Program) SyntaxFlow(i string, opts ...sfvm.Option) *SyntaxFlowResult {
 	res, err := p.SyntaxFlowWithError(i, opts...)
 	if err != nil {
 		log.Warnf("exec syntaxflow: %#v failed: %v", i, err)
-		return nil
 	}
 	return res
 }
@@ -83,5 +82,5 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Optio
 	return &SyntaxFlowResult{
 		SFFrameResult: res,
 		symbol:        make(map[string]Values),
-	}, nil
+	}, err
 }

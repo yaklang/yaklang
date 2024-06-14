@@ -249,6 +249,9 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 		s.idx++
 	}
+	if len(s.result.Errors) > 0 {
+		return utils.Errorf("check params failed: %v", s.result.Errors)
+	}
 	return nil
 }
 
@@ -552,6 +555,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		results, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if !ok || results == nil {
 			s.debugSubLog("-   error: " + elseStr)
+			if s.config.FailFast {
+				return utils.Wrapf(CriticalError, "check params failed: %v", elseStr)
+			}
 			s.result.Errors = append(s.result.Errors, elseStr)
 		} else {
 			s.result.CheckParams = append(s.result.CheckParams, i.UnaryStr)
