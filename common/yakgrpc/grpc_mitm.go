@@ -1137,7 +1137,22 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 	}
+
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) (hijackReq []byte) {
+		setModifiedRequest := func(id string, req []byte) {
+			httpctx.SetRequestModified(originReqIns, id)
+			httpctx.SetHijackedRequestBytes(originReqIns, req)
+			// url from plainRequest
+			var reqURL string
+			if isHttps {
+				reqURL = lowhttp.GetUrlFromHTTPRequest("https", req)
+			} else {
+				reqURL = lowhttp.GetUrlFromHTTPRequest("http", req)
+			}
+			httpctx.SetRequestURL(originReqIns, reqURL)
+
+		}
+
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
@@ -1152,8 +1167,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 			if beforeRequest != nil {
 				hijackReq = beforeRequest(isHttps, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
-				httpctx.SetRequestModified(originReqIns, "yaklang.hook beforeRequest")
-				httpctx.SetHijackedRequestBytes(originReqIns, hijackReq)
+				setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
 			}
 		}()
 
@@ -1189,8 +1203,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if handleRequestModified(req1) {
 			req = req1
 			modifiedByRule = true
-			httpctx.SetHijackedRequestBytes(originReqIns, req1)
-			httpctx.SetRequestModified(originReqIns, "yakit.mitm.replacer")
+			setModifiedRequest("yakit.mitm.replacer", req1)
 		}
 
 		/* 由 MITM Hooks 触发 */
@@ -1231,8 +1244,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 				if replaced != nil {
 					if ret := codec.AnyToBytes(replaced); handleRequestModified(ret) {
-						httpctx.SetRequestModified(originReqIns, "yaklang.hook")
-						httpctx.SetHijackedRequestBytes(originReqIns, lowhttp.FixHTTPRequest(ret))
+						setModifiedRequest("yaklang.hook", lowhttp.FixHTTPRequest(ret))
 					}
 				}
 			}),
@@ -1418,8 +1430,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					}
 				}
 				if handleRequestModified(current) {
-					httpctx.SetRequestModified(originReqIns, "user")
-					httpctx.SetHijackedRequestBytes(originReqIns, current)
+					setModifiedRequest("user", current)
 				}
 				return current
 			}
@@ -1493,7 +1504,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
-
 
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
