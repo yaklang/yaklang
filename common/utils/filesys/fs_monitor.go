@@ -4,9 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/fs"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -22,7 +20,7 @@ const (
 	FsMonitorDelete = "delete"
 )
 
-type MonitorEventHandler func(events EventSet)
+type MonitorEventHandler func(events *EventSet)
 
 // type MonitorErrorsHandler func(error)
 type Event struct {
@@ -38,42 +36,86 @@ type EventSet struct {
 }
 
 type YakFileMonitor struct {
-	Events          chan EventSet
+	Events          chan *EventSet
 	RecursiveFinish chan struct{} // recursive finish
 
-	FileInfoMutex sync.Mutex
-	FileInfos     map[string]os.FileInfo
+	FileTreeMutex sync.Mutex
+	FileTree      *FileNode
+
+	WatchPatch string
 
 	Ctx        context.Context
 	CancelFunc context.CancelFunc
 }
 
-func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandler) (*YakFileMonitor, error) {
-	ctx, cancelFunc := context.WithCancel(ctx)
-	m := &YakFileMonitor{
-		Events:          make(chan EventSet, 10),
-		FileInfos:       make(map[string]os.FileInfo),
-		Ctx:             ctx,
-		CancelFunc:      cancelFunc,
-		RecursiveFinish: make(chan struct{}, 10),
+func GetCurrentFileTree(path string) (*FileNode, error) {
+	initFileNode := func(path string, info os.FileInfo, parent *FileNode, isRoot bool) *FileNode {
+		return &FileNode{
+			Path:     path,
+			Children: make(map[string]*FileNode, 0),
+			Parent:   parent,
+			IsRoot:   isRoot,
+			Info:     info,
+		}
+	}
+	rootInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, utils.Errorf("failed to watch path: %s", err)
+	}
+	var currentFileTree = initFileNode(path, rootInfo, nil, true)
+
+	onStat := func(isDir bool, path string, info os.FileInfo) error {
+		newNode := initFileNode(path, info, currentFileTree, false)
+		currentFileTree.Children[path] = newNode
+		if isDir {
+			currentFileTree = newNode
+			return nil
+		} else {
+			return SkipAll
+		}
 	}
 
-	var currentFileInfo = make(map[string]os.FileInfo, 0)
-
-	watchStat := func(isDir bool, path string, info os.FileInfo) error {
-		currentFileInfo[path] = info
-		return nil
-	}
-
-	startOnStat := func(isDir bool, path string, info os.FileInfo) error {
-		m.FileInfoMutex.Lock()
-		defer m.FileInfoMutex.Unlock()
-		m.FileInfos[path] = info
+	onWalkEnd := func(path string) error {
+		if !currentFileTree.IsRoot {
+			currentFileTree = currentFileTree.Parent
+		}
 		return nil
 	}
 
 	// init file info map
-	err := Recursive(path, WithStat(startOnStat))
+	err = Recursive(path, WithStat(onStat), WithDirWalkEnd(onWalkEnd))
+	if err != nil {
+		return nil, utils.Errorf("failed to watch path: %s", err)
+	}
+	return currentFileTree, nil
+}
+
+func (m *YakFileMonitor) UpdateFileTree() error {
+	m.FileTreeMutex.Lock()
+	defer m.FileTreeMutex.Unlock()
+	var err error
+	m.FileTree, err = GetCurrentFileTree(m.WatchPatch)
+	return err
+}
+
+func (m *YakFileMonitor) SetFileTree(fileTree *FileNode) {
+	m.FileTreeMutex.Lock()
+	defer m.FileTreeMutex.Unlock()
+	m.FileTree = fileTree
+}
+
+func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandler) (*YakFileMonitor, error) {
+	ctx, cancelFunc := context.WithCancel(ctx)
+	m := &YakFileMonitor{
+		Events:          make(chan *EventSet, 10),
+		Ctx:             ctx,
+		CancelFunc:      cancelFunc,
+		RecursiveFinish: make(chan struct{}, 10),
+		WatchPatch:      path,
+	}
+
+	var err error
+	m.FileTree, err = GetCurrentFileTree(path)
 	if err != nil {
 		return nil, utils.Errorf("failed to watch path: %s", err)
 	}
@@ -81,21 +123,19 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 	// watch file
 	go func() {
 		for {
+			time.Sleep(1 * time.Second)
 			select {
 			case <-m.Ctx.Done():
 				return
 			default:
-				err = Recursive(path, WithStat(watchStat))
-				m.Events <- CalculateFileChange(m.FileInfos, currentFileInfo)
-				m.RecursiveFinish <- struct{}{}
-				m.FileInfoMutex.Lock()
-				m.FileInfos = currentFileInfo
-				m.FileInfoMutex.Unlock()
-				currentFileInfo = make(map[string]os.FileInfo)
+				currentFileTree, err := GetCurrentFileTree(path)
 				if err != nil {
 					log.Errorf("failed to watch path: %s", err)
+					continue
 				}
-				time.Sleep(2 * time.Second)
+				m.Events <- CompareFileTree(m.FileTree, currentFileTree)
+				m.RecursiveFinish <- struct{}{}
+				m.SetFileTree(currentFileTree)
 			}
 		}
 	}()
@@ -116,56 +156,52 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 	return m, nil
 }
 
-func CalculateFileChange(perv, current map[string]fs.FileInfo) EventSet {
-	var eventSet EventSet
-	prevCopy := utils.CopyMapShallow(perv)
-	currentCopy := utils.CopyMapShallow(current)
-	for k, v := range currentCopy {
-		if pervFileInfo, ok := prevCopy[k]; ok {
-			if !pervFileInfo.IsDir() && pervFileInfo.ModTime() != v.ModTime() {
-				eventSet.ChangeEvents = append(eventSet.ChangeEvents, Event{Path: k, Op: FsMonitorChange}) // file change
-			}
-			delete(prevCopy, k)
-			delete(currentCopy, k)
-		}
+func CompareFileTree(perv, current *FileNode) *EventSet {
+	var events = &EventSet{
+		CreateEvents: make([]Event, 0),
+		DeleteEvents: make([]Event, 0),
+		ChangeEvents: make([]Event, 0),
 	}
-	for k, _ := range currentCopy {
-		eventSet.CreateEvents = append(eventSet.CreateEvents, Event{Path: k, Op: FsMonitorCreate})
+	if perv == nil || current == nil {
+		return events
 	}
-	for k, _ := range prevCopy {
-		eventSet.DeleteEvents = append(eventSet.DeleteEvents, Event{Path: k, Op: FsMonitorDelete})
+	if !(perv.IsDir() && current.IsDir()) {
+		return events
 	}
-	return eventSet
-}
-
-// 提供给 yakurl 的不触发事件的修改接口
-func (m *YakFileMonitor) Delete(path string) {
-	m.FileInfoMutex.Lock()
-	defer m.FileInfoMutex.Unlock()
-	delete(m.FileInfos, path)
-}
-
-func (m *YakFileMonitor) Create(path string, info fs.FileInfo) {
-	m.FileInfoMutex.Lock()
-	defer m.FileInfoMutex.Unlock()
-	m.FileInfos[path] = info
-}
-
-func (m *YakFileMonitor) Rename(path string, newname string, info fs.FileInfo) {
-	m.FileInfoMutex.Lock()
-	defer m.FileInfoMutex.Unlock()
-	if !info.IsDir() {
-		delete(m.FileInfos, path)
-		m.FileInfos[newname] = info
-	}
-	for k, _ := range m.FileInfos {
-		if strings.HasPrefix(k, path) {
-			delete(m.FileInfos, k)
-			newPath := strings.Replace(k, path, newname, 1)
-			newInfo, err := os.Stat(newPath)
-			if err == nil {
-				m.FileInfos[newPath] = newInfo
+	pervNode := utils.CopyMapShallow(perv.Children)
+	currentNode := utils.CopyMapShallow(current.Children)
+	for {
+		nextDepthPervNode := make(map[string]*FileNode, 0)
+		nextDepthCurrentNode := make(map[string]*FileNode, 0)
+		for k, c := range currentNode {
+			if p, ok := pervNode[k]; ok && c.IsDir() == p.IsDir() {
+				delete(pervNode, k)
+				delete(currentNode, k)
+				if p.IsDir() {
+					for path, node := range p.Children {
+						nextDepthPervNode[path] = node
+					}
+					for path, node := range c.Children {
+						nextDepthCurrentNode[path] = node
+					}
+				}
 			}
 		}
+
+		for k, _ := range currentNode {
+			events.CreateEvents = append(events.CreateEvents, Event{Path: k, Op: FsMonitorCreate})
+		}
+
+		for k, _ := range pervNode {
+			events.DeleteEvents = append(events.DeleteEvents, Event{Path: k, Op: FsMonitorDelete})
+		}
+
+		if len(nextDepthPervNode) == 0 && len(nextDepthCurrentNode) == 0 {
+			break
+		} else {
+			pervNode = nextDepthPervNode
+			currentNode = nextDepthCurrentNode
+		}
 	}
+	return events
 }

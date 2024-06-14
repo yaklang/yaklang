@@ -2,6 +2,7 @@ package yakurl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -149,8 +150,11 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
 	}
-	if YakRunnerMonitor != nil {
-		YakRunnerMonitor.Rename(u.GetPath(), absPath, info)
+	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
+		err = YakRunnerMonitor.UpdateFileTree()
+		if err != nil {
+			log.Errorf("failed to update file tree: %s", err)
+		}
 	}
 	res := fileInfoToResource(params.GetUrl(), info, false)
 	return &ypb.RequestYakURLResponse{
@@ -198,8 +202,11 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err) // check file / dir
 	}
-	if YakRunnerMonitor != nil {
-		YakRunnerMonitor.Create(absPath, info)
+	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
+		err = YakRunnerMonitor.UpdateFileTree()
+		if err != nil {
+			log.Errorf("failed to update file tree: %s", err)
+		}
 	}
 	res := fileInfoToResource(params.GetUrl(), info, isDir)
 	return &ypb.RequestYakURLResponse{
@@ -225,8 +232,11 @@ func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestY
 	if err != nil {
 		return nil, err
 	}
-	if YakRunnerMonitor != nil {
-		YakRunnerMonitor.Delete(absPath)
+	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
+		err = YakRunnerMonitor.UpdateFileTree()
+		if err != nil {
+			log.Errorf("failed to update file tree: %s", err)
+		}
 	}
 	return &ypb.RequestYakURLResponse{
 		Page:      1,

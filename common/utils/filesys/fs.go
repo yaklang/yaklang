@@ -117,12 +117,6 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 				}
 			}
 
-			if c.onFileStatNotOpen != nil {
-				err = c.onFileStatNotOpen(path, info)
-				if err != nil {
-					return err
-				}
-			}
 		}
 		return nil
 	}
@@ -136,6 +130,11 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
 				log.Errorf("walk file %s failed: %v", targetFile, err)
+			}
+		}
+		if c.onDirWalkEnd != nil {
+			if err := c.onDirWalkEnd(path); err != nil {
+				return err
 			}
 		}
 		return nil
