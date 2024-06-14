@@ -63,15 +63,9 @@ const (
 	CloseTLSHandshake            = 1015
 )
 
-func FormatCloseMessage(closeCode int, text string) []byte {
-	if !isValidCloseCode(closeCode) {
-		// Return empty message because closCode is invalid. Return non-nil value in case application
-		// checks for nil.
-		return []byte{}
-	}
-	buf := make([]byte, 2+len(text))
+func GetClosePayloadFromCloseCode(closeCode int) []byte {
+	buf := make([]byte, 2)
 	binary.BigEndian.PutUint16(buf, uint16(closeCode))
-	copy(buf[2:], text)
 	return buf
 }
 
@@ -89,6 +83,14 @@ type Frame struct {
 	firstByte     byte
 	secondByte    byte
 	mask          bool
+}
+
+func (f *Frame) SetOpcode(opcode int) {
+	firstByte := f.firstByte
+	firstByte &= RESET_MESSAGE_TYPE_BIT
+	firstByte |= uint8(opcode)
+	f.firstByte = firstByte
+	f.messageType = opcode
 }
 
 func (f *Frame) Bytes() ([]byte, []byte) {
@@ -167,6 +169,13 @@ func (f *Frame) IsValidCloseCode() bool {
 	return isValidCloseCode(int(*f.closeCode))
 }
 
+func (f *Frame) GetCloseCode() int {
+	if f.closeCode == nil {
+		return 0
+	}
+	return int(*f.closeCode)
+}
+
 func (f *Frame) GetRaw() []byte {
 	return f.raw
 }
@@ -200,7 +209,7 @@ func (f *Frame) SetData(d []byte) {
 }
 
 func (f *Frame) IsControl() bool {
-	return f.messageType == CloseMessage || f.messageType == PingMessage || f.messageType == PongMessage
+	return IsControlMessage(f.messageType)
 }
 
 func (f *Frame) Show() {
@@ -230,6 +239,10 @@ func (f *Frame) Show() {
 	default:
 		log.Infof("unk-%02x:%v (%v)", f.Type(), rawString, raw)
 	}
+}
+
+func IsControlMessage(opcode int) bool {
+	return opcode == CloseMessage || opcode == PingMessage || opcode == PongMessage
 }
 
 type FrameReader struct {
@@ -428,14 +441,12 @@ func (fr *FrameReader) readFramePayload(dataLength uint64) (data []byte, err err
 }
 
 type FrameWriter struct {
-	frame          *Frame
 	w              *bufio.Writer
 	fw             *msgWriter
 	c              *WebsocketClient
 	opcode         int
 	flateThreshold int
 	isDeflate      bool
-	isClient       bool
 }
 
 func NewFrameWriter(w io.Writer, isDeflate bool) *FrameWriter {
@@ -447,7 +458,6 @@ func NewFrameWriterFromBufio(w *bufio.Writer, isDeflate bool) *FrameWriter {
 		w:              w,
 		isDeflate:      isDeflate,
 		flateThreshold: 128,
-		isClient:       true, // todo: do not set it to true by default
 	}
 }
 
@@ -462,53 +472,57 @@ func (fw *FrameWriter) Flush() error {
 	return fw.w.Flush()
 }
 
-func (fw *FrameWriter) WriteText(data []byte, mask bool, headerBytes ...byte) (err error) {
-	return fw.WriteEx(data, TextMessage, mask, headerBytes...)
+func (fw *FrameWriter) shouldDeflate(opcode int, data []byte) bool {
+	isDeflate := fw.isDeflate
+
+	// control message or continue message or small message should not deflate
+	if isDeflate && (opcode == ContinueMessage || IsControlMessage(opcode) || len(data) < fw.flateThreshold) {
+		isDeflate = false
+	}
+
+	return isDeflate
 }
 
-func (fw *FrameWriter) WriteBinary(data []byte, mask bool, headerBytes ...byte) (err error) {
-	return fw.WriteEx(data, BinaryMessage, mask, headerBytes...)
+func (fw *FrameWriter) WriteText(data []byte, mask bool) (err error) {
+	return fw.WriteEx(data, TextMessage, mask)
+}
+
+func (fw *FrameWriter) WriteBinary(data []byte, mask bool) (err error) {
+	return fw.WriteEx(data, BinaryMessage, mask)
 }
 
 func (fw *FrameWriter) WritePong(data []byte, mask bool) (err error) {
-	return fw.writeControl(data, PongMessage, mask)
+	return fw.WriteEx(data, PongMessage, mask)
 }
 
 func (fw *FrameWriter) WriteFrame(f *Frame, opcodes ...int) (err error) {
 	// change opcode
 	if len(opcodes) > 0 {
-		opcode := opcodes[0]
-		if opcode != 0 {
-			firstByte := f.firstByte
-			firstByte &= RESET_MESSAGE_TYPE_BIT
-			firstByte |= uint8(opcode)
-			f.firstByte = firstByte
-			f.messageType = opcode
-		}
+		f.SetOpcode(opcodes[0])
 	}
+
 	data := f.payload
-
-	isDeflate := fw.isDeflate
-
-	// control message or continue message or small message should not deflate
-	if isDeflate && (f.messageType == ContinueMessage || f.IsControl() || len(f.payload) < fw.flateThreshold) {
-		isDeflate = false
-	}
+	isDeflate := fw.shouldDeflate(f.messageType, data)
+	// reset
 	if isDeflate {
 		f.SetRSV1()
 	}
-	fw.reset(f)
+	fw.reset(f.messageType, f.RSV1() && isDeflate)
 
 	if isDeflate {
 		_, err = fw.writeDeflateFrame(data)
 	} else {
-		_, err = fw.writeFrame(f.FIN(), f.RSV1(), f.messageType, f.mask, data)
+		_, err = fw.WriteDirect(f.FIN(), f.RSV1(), f.messageType, f.mask, data)
 	}
+
 	return err
 }
 
-func (fw *FrameWriter) writeFrame(fin bool, flate bool, opcode int, mask bool, data []byte) (n int, err error) {
+func (fw *FrameWriter) WriteDirect(fin bool, flate bool, opcode int, mask bool, data []byte) (n int, err error) {
 	var firstByte, secondByte byte
+	dataLength := len(data)
+
+	// calc firstByte
 	firstByte = byte(opcode)
 	if fin {
 		firstByte = firstByte | FINALBIT
@@ -517,9 +531,7 @@ func (fw *FrameWriter) writeFrame(fin bool, flate bool, opcode int, mask bool, d
 		firstByte = firstByte | RSV1BIT
 	}
 
-	dataLength := len(data)
-
-	// reset secondByte
+	// calc secondByte
 	if dataLength > TWO_BYTE_SIZE {
 		secondByte = EIGHT_BYTE_BIT
 	} else if dataLength > SEVEN_BIT_SIZE {
@@ -527,7 +539,6 @@ func (fw *FrameWriter) writeFrame(fin bool, flate bool, opcode int, mask bool, d
 	} else {
 		secondByte = byte(dataLength)
 	}
-
 	if mask {
 		secondByte = secondByte | MASKBIT
 	}
@@ -587,91 +598,21 @@ func (fw *FrameWriter) WriteRaw(raw []byte) (err error) {
 }
 
 // 客户端发送数据时需要设置mask为true
-func (fw *FrameWriter) WriteEx(data []byte, messageType int, mask bool, headerBytes ...byte) error {
-	var firstByte byte
-	if len(headerBytes) == 0 {
-		firstByte = byte((messageType) | FINALBIT)
+func (fw *FrameWriter) WriteEx(data []byte, opcode int, mask bool) error {
+	if IsControlMessage(opcode) && len(data) > 125 {
+		return utils.Error("websocket: control message length must be less than 126 bytes")
+	}
+
+	isDeflate := fw.shouldDeflate(opcode, data)
+	fw.reset(opcode, isDeflate)
+
+	var err error
+	if isDeflate {
+		_, err = fw.writeDeflateFrame(data)
 	} else {
-		firstByte = headerBytes[0]
+		_, err = fw.WriteDirect(true, isDeflate, opcode, mask, data)
 	}
-
-	frame, err := DataToWebsocketFrame(data, firstByte, mask)
-	if err != nil {
-		return err
-	}
-
-	return fw.WriteFrame(frame, messageType)
-}
-
-func (fw *FrameWriter) writeControl(data []byte, messageType int, mask bool) error {
-	frame, err := DataToWebsocketControlFrame(messageType, data, mask)
-	if err != nil {
-		return err
-	}
-	return fw.WriteFrame(frame, messageType)
-}
-
-func WebsocketFrameToData(frame *Frame) (data []byte) {
-	return frame.GetData()
-}
-
-func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame *Frame, err error) {
-	dataLength := len(data)
-	frame = new(Frame)
-	frame.firstByte = byte(messageType) | FINALBIT
-	frame.secondByte = byte(dataLength) | MASKBIT
-	frame.payloadLength = uint64(dataLength)
-	frame.messageType = messageType
-	frame.payload = data
-
-	if mask {
-		maskKey, err := generateMaskKey()
-		if err != nil {
-			return nil, err
-		}
-		frame.mask = mask
-		frame.maskingKey = maskKey
-	}
-
-	return
-}
-
-func DataToWebsocketFrame(data []byte, firstByte byte, mask bool) (frame *Frame, err error) {
-	frame = new(Frame)
-	frame.firstByte = firstByte
-	frame.mask = mask
-	frame.messageType = int(firstByte & FRAME_TYPE_BIT)
-
-	secondByte := byte(0)
-	dataLength := len(data)
-	if dataLength > TWO_BYTE_SIZE {
-		secondByte |= EIGHT_BYTE_BIT
-	} else if dataLength > SEVEN_BIT_SIZE {
-		secondByte |= TWO_BYTE_BIT
-	} else {
-		secondByte |= byte(dataLength)
-	}
-	// mask bit
-	if mask {
-		// mask -> 1
-		secondByte |= MASKBIT // 10000000
-	}
-	frame.secondByte = secondByte
-
-	// payload length
-	frame.payloadLength = uint64(dataLength)
-
-	// masking key
-	if mask {
-		maskKey, err := generateMaskKey()
-		if err != nil {
-			return nil, err
-		}
-		frame.maskingKey = maskKey
-	}
-	// frame.payload = data
-	frame.payload = data
-	return frame, nil
+	return err
 }
 
 func ComputeWebsocketAcceptKey(websocketKey string) string {
