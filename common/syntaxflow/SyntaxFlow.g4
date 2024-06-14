@@ -99,12 +99,17 @@ chainFilter
     | '{' ((identifier ':') filters (';' (identifier ':') filters )*)? ';'? '}'  # BuildMap
     ;
 
+stringLiteralWithoutStarGroup: stringLiteralWithoutStar (',' stringLiteralWithoutStar)* ','?;
+negativeCondition: (Not | '!');
+
 conditionExpression
-    : numberLiteral                               # FilterExpressionNumber
-    | stringLiteral                               # FilterExpressionString
-    | regexpLiteral                               # FilterExpressionRegexp
-    | '(' conditionExpression ')'                 # FilterExpressionParen
-    | '!' conditionExpression                     # FilterExpressionNot
+    : filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
+    | '.' '(' (Opcode ':')? opcodes (',' opcodes) * ','? ')'                     # OpcodeTypeCondition    // something like .(call, phi)
+    | '.' '(' negativeCondition? In ':' stringLiteralWithoutStarGroup ')'        # StringInCondition      // something like .(in: 'a', 'b')
+    | '.' '(' negativeCondition? Have ':' stringLiteralWithoutStarGroup ')'      # StringContainAnyCondition // something like .(have: 'a', 'b')
+    | '.' '(' negativeCondition? HaveAny ':' stringLiteralWithoutStarGroup ')'   # StringContainAnyCondition // something like .(any: 'a', 'b')
+    | '(' conditionExpression ')'                                                # ParenCondition
+    | '!' conditionExpression                                                    # NotCondition
     | op = (
         '>' | '<' | '=' | '==' | '>='
          | '<=' | '!='
@@ -118,8 +123,26 @@ conditionExpression
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier | '*';
+stringLiteralWithoutStar: identifier;
 regexpLiteral: RegexpLiteral;
-identifier: Identifier | types | As | Check | Then | Desc | QuotedStringLiteral;
+identifier: Identifier | keywords | QuotedStringLiteral;
+
+keywords
+    : types
+    | opcodes
+    | Opcode
+    | As
+    | Check
+    | Then
+    | Desc
+    | Else
+    | Type
+    | In
+    | Have
+    | HaveAny
+    ;
+
+opcodes: Call | Constant | Phi | FormalParam | Return;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -185,6 +208,17 @@ Check: 'check';
 Then: 'then';
 Desc: 'desc' | 'note';
 Else: 'else';
+Type: 'type';
+In: 'in';
+Call: 'call';
+Constant: 'const' | 'constant';
+Phi: 'phi';
+FormalParam: 'param' | 'formal_param';
+Return: 'return' | 'ret';
+Opcode: 'opcode';
+Have: 'have';
+HaveAny: 'any';
+Not: 'not';
 
 Identifier: IdentifierCharStart IdentifierChar*;
 IdentifierChar: [0-9] | IdentifierCharStart;

@@ -227,7 +227,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		if err != nil {
 			return err
 		}
-		log.Warn("TBD: UseDefCalcFilterContext")
+		log.Warnf("TBD: UseDefCalcFilterContext: %v", raw.GetText())
 	default:
 		panic("BUG: in filterExpr")
 	}
