@@ -236,7 +236,11 @@ func (f *SimpleFuzzTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield 
 		if generator.Error != nil {
 			return generator.Error
 		}
-		yield(generator.Result())
+		res := generator.Result()
+		if len(res.Source) > 0 { // hide fuzztag source
+			res.Source = res.Source[:len(res.Source)-1]
+		}
+		yield(res)
 	}
 	return nil
 }
