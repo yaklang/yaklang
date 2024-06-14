@@ -1,6 +1,7 @@
 package httptpl
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/segmentio/ksuid"
@@ -16,13 +17,15 @@ type NucleiTag struct {
 	AttackMode string
 }
 
-func (n *NucleiTag) Exec(raw *parser.FuzzResult, params ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
+func (n *NucleiTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield func(result *parser.FuzzResult), params map[string]*parser.TagMethod) error {
 	// 变量渲染
 	if n.GetVar != nil {
 		if v, ok := n.GetVar(string(raw.GetData())); ok {
-			return []*parser.FuzzResult{parser.NewFuzzResultWithData(v)}, nil
+			yield(parser.NewFuzzResultWithData(v))
+			return nil
 		} else {
-			return []*parser.FuzzResult{parser.NewFuzzResultWithData("{{" + string(raw.GetData()) + "}}")}, nil
+			yield(parser.NewFuzzResultWithData("{{" + string(raw.GetData()) + "}}"))
+			return nil
 		}
 	}
 	s := string(raw.GetData())
@@ -31,21 +34,23 @@ func (n *NucleiTag) Exec(raw *parser.FuzzResult, params ...map[string]*parser.Ta
 		if n.AttackMode == "pitchfork" || n.AttackMode == "sync" {
 			n.Labels = []string{"1"}
 		}
-		result := []*parser.FuzzResult{}
 		for _, v1 := range v {
-			result = append(result, parser.NewFuzzResultWithData(v1))
+			yield(parser.NewFuzzResultWithData(v1))
 		}
-		return result, nil
+		return nil
 	}
 	// 沙箱执行
 	if n.ExecDSL != nil {
 		res, err := n.ExecDSL(s)
 		if err != nil {
-			return []*parser.FuzzResult{parser.NewFuzzResultWithData("{{" + string(raw.GetData()) + "}}")}, nil
+			yield(parser.NewFuzzResultWithData("{{" + string(raw.GetData()) + "}}"))
+			return nil
 		}
-		return []*parser.FuzzResult{parser.NewFuzzResultWithData(res)}, nil
+		yield(parser.NewFuzzResultWithData(res))
+		return nil
 	}
-	return []*parser.FuzzResult{parser.NewFuzzResultWithData("{{" + string(raw.GetData()) + "}}")}, nil
+	yield(parser.NewFuzzResultWithData("{{" + string(raw.GetData()) + "}}"))
+	return nil
 }
 
 // RenderNucleiTagWithVar 渲染变量 （只渲染变量不执行）
