@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -359,4 +360,19 @@ func TestBigInt(t *testing.T) {
 	test := assert.New(t)
 	results := MutateQuick(`{{int(100000000000001-100000000000020)}}`)
 	test.Equal(20, len(results))
+	dosCode := `{{int(0-100000000000020)}}`
+	n := 1
+	for i := 0; i < 10; i++ {
+		dosCode += dosCode
+		n *= 2
+	}
+	start := time.Now()
+	_, err := FuzzTagExec(dosCode, Fuzz_WithResultHandler(func(s string, i []string) bool {
+		assert.Equal(t, strings.Repeat("0", 1024), s)
+		assert.Equal(t, 0, int(time.Now().Sub(start).Seconds()))
+		return false
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
 }
