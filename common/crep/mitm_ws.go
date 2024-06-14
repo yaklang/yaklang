@@ -7,9 +7,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	logger "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -18,18 +20,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+)
 
-	"github.com/pkg/errors"
+type (
+	websocketHijackHandler = func(req []byte, r *http.Request, rspIns *http.Response, startTs int64) []byte
+	websocketMirrorHandler = func(rsp []byte)
 )
 
 type WebSocketModifier struct {
 	ProxyStr                       string
 	websocketHijackMode            *utils.AtomicBool
 	forceTextFrame                 *utils.AtomicBool
-	websocketRequestHijackHandler  func(req []byte, r *http.Request, rspIns *http.Response, startTs int64) []byte
-	websocketResponseHijackHandler func(rsp []byte, r *http.Request, rspIns *http.Response, startTs int64) []byte
-	websocketRequestMirror         func(req []byte)
-	websocketResponseMirror        func(rsp []byte)
+	websocketRequestHijackHandler  websocketHijackHandler
+	websocketResponseHijackHandler websocketHijackHandler
+	websocketRequestMirror         websocketMirrorHandler
+	websocketResponseMirror        websocketMirrorHandler
 	writeExcludeHeader             map[string]bool
 	wsCanonicalHeader              []string
 	ProxyGetter                    func() *minimartian.Proxy
@@ -38,6 +43,195 @@ type WebSocketModifier struct {
 }
 
 func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
+	var (
+		err error
+		got bool
+	)
+
+	// check if it is a websocket upgrade request
+	if req.Method != http.MethodGet {
+		return nil
+	}
+	for _, vs := range req.Header["Connection"] {
+		for _, v := range strings.Split(vs, ",") {
+			if strings.TrimSpace(strings.ToLower(v)) == "upgrade" {
+				got = true
+			}
+		}
+	}
+	if !got {
+		return nil
+	}
+	if req.Header.Get("Upgrade") != "websocket" {
+		return nil
+	}
+
+	isHijack := w.websocketHijackMode != nil && w.websocketHijackMode.IsSet()
+
+	// hijack request
+	if err := w.RequestHijackCallback(req); err != nil {
+		return err
+	}
+
+	ctx := minimartian.NewContext(req, w.ProxyGetter())
+	if ctx == nil {
+		return nil
+	}
+	ctx.SkipRoundTrip()
+
+	localConn, brw, err := ctx.Session().Hijack()
+	if err != nil {
+		logger.Error(err)
+		return err
+	}
+	if err = brw.Flush(); err != nil {
+		logger.Error(err)
+		return err
+	}
+	defer localConn.Close()
+
+	log.Infof("start to exec websocket hijack %v", localConn.RemoteAddr())
+
+	addr := ""
+	isTLS := false
+	hostname := req.URL.Hostname()
+	portStr := req.URL.Port()
+	scheme := req.URL.Scheme
+	if portStr == "" {
+		switch scheme {
+		case "http", "HTTP":
+			portStr = "80"
+			break
+		case "https", "HTTPS":
+			portStr = "443"
+			isTLS = true
+			break
+		default:
+			return utils.Errorf("unknown schema: %v", scheme)
+		}
+	}
+	if strings.Contains(hostname, ":") {
+		addr = fmt.Sprintf("[%s]:%s", hostname, portStr)
+	} else {
+		addr = fmt.Sprintf("%s:%s", hostname, portStr)
+	}
+	logger.Infof("building websocket tunnel to %s", addr)
+
+	// dump request
+	reqRaw, err := utils.DumpHTTPRequest(req, true)
+	if err != nil {
+		return utils.Wrap(err, "dump websocket first upgrade request error")
+	}
+	// parse port to int
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return utils.Wrap(err, "parse port to int error")
+	}
+
+	var toClient, toServer *lowhttp.WebsocketClient
+	var isClientClosed, isServerClosed bool
+	_, _ = isClientClosed, isServerClosed
+
+	serverAllFrameCallbackFactory := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
+		opcode := f.Type()
+		switch opcode {
+		case lowhttp.PingMessage:
+			c.WritePong(data, true)
+		case lowhttp.TextMessage, lowhttp.BinaryMessage:
+			if isHijack {
+				b := w.websocketResponseHijackHandler(data, req, nil, time.Now().UnixNano())
+				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
+			} else {
+				go w.websocketResponseMirror(data)
+				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			}
+		case lowhttp.CloseMessage:
+			toServer.WriteCloseEx(f.GetCloseCode(), "")
+			isServerClosed = true
+			fallthrough
+		default:
+			toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+		}
+		if isClientClosed && isServerClosed {
+			c.Close()
+			toClient.Close()
+		}
+	}
+
+	clientAllFrameCallbackFactory := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
+		opcode := f.Type()
+		switch opcode {
+		case lowhttp.PingMessage:
+			c.WritePong(data, true)
+		case lowhttp.TextMessage, lowhttp.BinaryMessage:
+			if isHijack {
+				b := w.websocketRequestHijackHandler(data, req, nil, time.Now().UnixNano())
+				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
+			} else {
+				go w.websocketRequestMirror(data)
+				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			}
+		case lowhttp.CloseMessage:
+			toServer.WriteCloseEx(f.GetCloseCode(), "")
+			isClientClosed = true
+		default:
+			toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+		}
+		if isClientClosed && isServerClosed {
+			c.Close()
+			toClient.Close()
+		}
+	}
+
+	toServer, err = lowhttp.NewWebsocketClient(reqRaw,
+		lowhttp.WithWebsocketCompressionContextTakeover(true),
+		lowhttp.WithWebsocketHost(hostname),
+		lowhttp.WithWebsocketPort(port),
+		lowhttp.WithWebsocketProxy(w.ProxyStr),
+		lowhttp.WithWebsocketTLS(isTLS),
+		lowhttp.WithWebsocketDisableReassembly(!isHijack), // if transparent mode, disable reassembly
+		lowhttp.WithWebsocketUpgradeResponseHandler(func(rsp *http.Response, rspRaw []byte, ext *lowhttp.WebsocketExtensions, err error) []byte {
+			if err != nil {
+				rsp = proxyutil.NewResponse(502, nil, req)
+				rspRaw, _ = utils.DumpHTTPResponse(rsp, true)
+			}
+			httpctx.SetBareResponseBytes(rsp.Request, rspRaw)
+			fixRspRaw := w.ResponseHijackCallback(req, rsp, rspRaw)
+
+			// write back to client
+			brw.Writer.Write(fixRspRaw)
+			brw.Flush()
+			return fixRspRaw
+		}),
+		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallbackFactory),
+	)
+	if err != nil {
+		return err
+	}
+
+	// init toClient
+	isDeflate := toServer.Extensions.IsDeflate
+	clientFrameReader := lowhttp.NewFrameReaderFromBufio(brw.Reader, isDeflate)
+	clientFrameWriter := lowhttp.NewFrameWriterFromBufio(brw.Writer, isDeflate)
+	toClient = lowhttp.NewWebsocketClientIns(
+		localConn,
+		clientFrameReader,
+		clientFrameWriter,
+		toServer.Extensions,
+		lowhttp.WithWebsocketDisableReassembly(!isHijack),
+		lowhttp.WithWebsocketAllFrameHandler(clientAllFrameCallbackFactory),
+	)
+
+	toServer.StartFromServer()
+	toClient.StartFromServer()
+	toClient.Wait()
+	toServer.Wait()
+	logger.Infof("websocket tunnel for %s closed", addr)
+	return nil
+}
+
+// deprecated
+func (w *WebSocketModifier) legacyModifyRequest(req *http.Request) error {
 	var (
 		err error
 		got bool
@@ -254,23 +448,11 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 
 		masked := frame.GetMask()
 
-		firstByte := frame.GetFirstByte()
 		showData := frame.GetData()
-		raw := frame.GetRaw()
-		payload := frame.GetPayload()
 		switch frame.Type() {
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			b = callbackHandler(showData, req, rsp, ts)
-			newFrame, err := lowhttp.DataToWebsocketFrame(payload, firstByte, masked)
-			if err != nil {
-				frameWriter.WriteRaw(raw)
-				frameWriter.Flush()
-				continue
-			}
-			newFrame.SetData(showData)
-			newFrame.SetMaskingKey(frame.GetMaskingKey())
-			newRaw, _ := newFrame.Bytes()
-			frameWriter.WriteRaw(newRaw)
+			frameWriter.WriteDirect(frame.FIN(), frame.RSV1(), frame.Type(), masked, b)
 		case lowhttp.PingMessage:
 			frameWriter.WritePong(showData, masked)
 		default:
@@ -331,9 +513,8 @@ func (w *WebSocketModifier) copySync(writer *lowhttp.FrameWriter, reader *lowhtt
 		}
 
 		// mirror
-
 		if callbackHandler != nil {
-			go callbackHandler(lowhttp.WebsocketFrameToData(frame))
+			go callbackHandler(frame.GetData())
 		}
 
 		if err = writer.WriteFrame(frame); err != nil {
