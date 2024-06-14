@@ -3,11 +3,13 @@ package filesys
 import (
 	"context"
 	"embed"
+	"fmt"
+	"github.com/stretchr/testify/require"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -139,76 +141,106 @@ func TestFS_LocalFS(t *testing.T) {
 }
 
 func TestYakFileMonitor(t *testing.T) {
-	_, err := WatchPath(context.Background(), "test", func(eventSet EventSet) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	tempDir, err := os.MkdirTemp("", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+	err = createTestFileStructure(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		createEvents := eventSet.CreateEvents
-		deleteEvents := eventSet.DeleteEvents
-
-		createEventsMap := make(map[string][]Event)
-		for _, event := range createEvents {
-			dir, _ := filepath.Split(event.Path)
-			findPath := false
-			for path, events := range createEventsMap {
-				if isSubDir(path, dir) {
-					createEventsMap[path] = append(events, event)
-					findPath = true
-					break
-				} else if isSubDir(dir, path) {
-					createEventsMap[dir] = append(events, event)
-					delete(createEventsMap, path)
-					findPath = true
-					break
-				}
-			}
-			if !findPath {
-				createEventsMap[dir] = []Event{event}
-			}
+	var currentEvent = make(chan *EventSet)
+	_, err = WatchPath(ctx, tempDir, func(eventSet *EventSet) {
+		if len(eventSet.ChangeEvents) == 0 && len(eventSet.CreateEvents) == 0 && len(eventSet.DeleteEvents) == 0 {
+			return
 		}
-
-		deleteEventsMap := make(map[string][]Event)
-		for _, event := range deleteEvents {
-			if event.IsDir {
-				deleteEventsMap[event.Path] = []Event{event}
-			}
-			dir, _ := filepath.Split(event.Path)
-			for path, events := range deleteEventsMap {
-				if isSubDir(path, dir) {
-					deleteEventsMap[path] = append(events, event)
-				} else if isSubDir(dir, path) {
-					deleteEventsMap[dir] = append(events, event)
-					delete(deleteEventsMap, path)
-				}
-			}
-
-		}
-
-		//for path, event := range deleteEvents {
-		//	if event.IsDir {
-		//		dir, _ := filepath.Split(event.Path)
-		//		if _, ok := createEventsMap[dir]; ok {
-		//
-		//		}
-		//	}
-		//}
-
+		currentEvent <- eventSet
 	})
 	if err != nil {
-		return
+		t.Fatalf("watch path err: %v", err)
 	}
-	select {}
+
+	// rename
+	pervPath := filepath.Join(tempDir, "dir1")
+	currentPath := filepath.Join(tempDir, "dir3")
+	err = os.Rename(pervPath, currentPath)
+	if err != nil {
+		t.Fatalf("rename err: %v", err)
+	}
+	select {
+	case eventSet := <-currentEvent:
+		require.Equal(t, 1, len(eventSet.DeleteEvents), "delete event count")
+		require.Equal(t, 1, len(eventSet.CreateEvents), "create event count")
+		require.Equal(t, pervPath, eventSet.DeleteEvents[0].Path, "delete event path")
+		require.Equal(t, currentPath, eventSet.CreateEvents[0].Path, "create event path")
+	case <-ctx.Done():
+		t.Fatal("timeout")
+	}
+
+	// delete
+	deletePath := filepath.Join(tempDir, "dir2")
+	err = os.RemoveAll(deletePath)
+	if err != nil {
+		t.Fatalf("remove err: %v", err)
+	}
+	select {
+	case eventSet := <-currentEvent:
+		require.Equal(t, 1, len(eventSet.DeleteEvents), "delete event count")
+		require.Equal(t, 0, len(eventSet.CreateEvents), "create event count")
+		require.Equal(t, deletePath, eventSet.DeleteEvents[0].Path, "delete event path")
+	case <-ctx.Done():
+		t.Fatal("timeout")
+	}
+
+	// create
+	createPath := filepath.Join(tempDir, "dir5")
+	err = os.MkdirAll(createPath, 0755)
+	if err != nil {
+		t.Fatalf("create err: %v", err)
+	}
+	select {
+	case eventSet := <-currentEvent:
+		require.Equal(t, 0, len(eventSet.DeleteEvents), "delete event count")
+		require.Equal(t, 1, len(eventSet.CreateEvents), "create event count")
+		require.Equal(t, createPath, eventSet.CreateEvents[0].Path, "create event path")
+	case <-ctx.Done():
+		t.Fatal("timeout")
+	}
+
 }
 
-func isSubDir(basePath, targetPath string) bool {
-	// Clean the paths to remove any unnecessary components
-	basePath = filepath.Clean(basePath)
-	targetPath = filepath.Clean(targetPath)
-
-	// Get the relative path from basePath to targetPath
-	rel, err := filepath.Rel(basePath, targetPath)
-	if err != nil {
-		return false
+func createTestFileStructure(basePath string) error {
+	dirs := []string{
+		"dir1",
+		"dir1/subdir1",
+		"dir2",
+	}
+	files := []string{
+		"dir1/file1.txt",
+		"dir1/subdir1/file2.txt",
+		"dir2/file3.txt",
 	}
 
-	// If the relative path starts with ".." or is ".", targetPath is not a subdir of basePath
-	return !filepath.IsAbs(rel) && rel != "." && !strings.HasPrefix(rel, "../")
+	for _, dir := range dirs {
+		path := filepath.Join(basePath, dir)
+		err := os.MkdirAll(path, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create directory %s: %v", path, err)
+		}
+	}
+
+	for _, file := range files {
+		path := filepath.Join(basePath, file)
+		f, err := os.Create(path)
+		if err != nil {
+			return fmt.Errorf("failed to create file %s: %v", path, err)
+		}
+		f.Close()
+	}
+
+	return nil
 }
