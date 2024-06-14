@@ -212,7 +212,7 @@ func TestIntWithAutoZeroPadding(t *testing.T) {
 func TestFuzzTagExec(t *testing.T) {
 	expect := []string{
 		"a", "a,1,1",
-		"a", "a,[__YakHotPatchErr@strconv.Atoi: parsing \"a\": invalid syntax],a",
+		"a", "a,[__YakHotPatchErr@strconv.Atoi: parsing \"a\": invalid syntax]",
 		"a", "a,2,2",
 	}
 	i := 0

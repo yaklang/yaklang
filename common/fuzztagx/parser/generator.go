@@ -90,7 +90,7 @@ type TagExecNode struct {
 	config          *GenerateConfig
 	data            TagNode
 	cache           []*FuzzResult
-	getter          func() *FuzzResult
+	getter          func() (*FuzzResult, error)
 	finished        bool
 	isRep           bool
 	isDyn           bool
@@ -111,16 +111,32 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 	}
 }
 
-func (f *TagExecNode) GetCache(index int) (*FuzzResult, bool) {
+func (f *TagExecNode) GetCache(index int) (*FuzzResult, bool, error) {
+	var err error
+	var data *FuzzResult
 	for index >= len(f.cache) {
-		data := f.getter()
+		data, err = f.getter()
 		if data == nil {
-			return NewFuzzResultWithData(""), false
+			if err != nil {
+				if f.config.AssertError {
+					return NewFuzzResultWithData(""), false, err
+				} else {
+					resData := NewFuzzResultWithData("")
+					resData.ByTag = true
+					resData.Error = err
+					return resData, false, nil
+				}
+			} else {
+				resData := NewFuzzResultWithData("")
+				resData.ByTag = true
+				resData.Error = err
+				return resData, false, err
+			}
 		} else {
 			f.cache = append(f.cache, data)
 		}
 	}
-	return (f.cache)[index], true
+	return (f.cache)[index], true, err
 }
 func (f *TagExecNode) FirstExecWithBackpropagation(bp, exec, all bool) error {
 	f.FirstExec(bp, exec, all)
@@ -142,7 +158,7 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 		}
 	}
 	f.index = 1
-	res, _ := f.GetCache(0)
+	res, _, err := f.GetCache(0)
 	f.submitResult(res)
 	if all {
 		for _, param := range f.params {
@@ -165,26 +181,32 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		case ch <- result:
 		}
 	}
-	getter := func() *FuzzResult {
-		return <-ch
-	}
 	var err error
+	getter := func() (*FuzzResult, error) {
+		return <-ch, err
+	}
+
 	go func() {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Error(e)
+			}
+		}()
 		err = f.data.Exec(f.config.ctx, s, receiver, f.methodCtx.methodTable)
 		close(ch)
 	}()
 
-	newGetter := func() *FuzzResult {
-		r := getter()
+	newGetter := func() (*FuzzResult, error) {
+		r, err := getter()
 		if r == nil {
 			f.finished = true
-			return nil
+			return nil, err
 		}
 		f.methodCtx.UpdateLabels(f)
 		r.Source = append(r.Source, s)
 		r.ByTag = true
 		r.Error = err
-		return r
+		return r, err
 	}
 	f.getter = newGetter
 	//if len(res) == 0 {
@@ -213,10 +235,10 @@ func (f *TagExecNode) Exec() (bool, error) {
 	defer func() {
 		f.index++
 	}()
-	data, ok := f.GetCache(f.index)
+	data, ok, _ := f.GetCache(f.index)
 	if !ok {
 		if f.isRep { // 当生成失败且存在rep标签时，使用最后一个元素
-			data1, _ := f.GetCache(f.index - 1)
+			data1, _, _ := f.GetCache(f.index - 1)
 			f.submitResult(data1)
 			return false, f.backpropagation()
 		}
@@ -243,7 +265,7 @@ func (s *TagExecNode) Reset() {
 		param.Reset()
 		v, ok := param.(*TagExecNode)
 		if ok {
-			data, _ := s.GetCache(v.index)
+			data, _, _ := s.GetCache(v.index)
 			v.submitResult(data)
 			bp = v.backpropagation
 		}
@@ -289,7 +311,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 			bp = func() error {
 				err := ret.exec(childGen.Result())
 				ret.index = 1
-				data, _ := ret.GetCache(0)
+				data, _, _ := ret.GetCache(0)
 				ret.submitResult(data)
 				return err
 			}
@@ -389,7 +411,7 @@ func (g *Generator) generate() (bool, error) {
 			case *TagExecNode:
 				err := ret.FirstExec(false, true, false)
 				if err != nil {
-					return true, err
+					return false, err
 				}
 			case *StringExecNode:
 				ret.submitResult(NewFuzzResultWithData(ret.data))
