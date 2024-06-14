@@ -1113,7 +1113,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzTag(t *testing.T) {
 		w.Write([]byte(""))
 	})
 	target := utils.HostPort(host, port)
-	for _, test := range []struct {
+	for i, test := range []struct {
 		tag       string
 		expect    []string
 		fuzzMode  string
@@ -1186,25 +1186,27 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzTag(t *testing.T) {
 			fuzzMode:  "",
 		},
 	} {
-		req := &ypb.FuzzerRequest{
-			Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n" + test.tag,
-		}
-		req.ForceFuzz = test.forceMode
-		req.FuzzTagMode = test.fuzzMode
-		recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rsp, err := recv.Recv()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(rsp.Payloads) != len(test.expect) {
-			t.Fatalf("expect length %v, got %v", len(test.expect), len(rsp.Payloads))
-		}
-		for i, payload := range test.expect {
-			assert.Equal(t, rsp.Payloads[i], payload)
-		}
+		t.Run(fmt.Sprintf("tets: %d", i), func(t *testing.T) {
+			req := &ypb.FuzzerRequest{
+				Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n" + test.tag,
+			}
+			req.ForceFuzz = test.forceMode
+			req.FuzzTagMode = test.fuzzMode
+			recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rsp, err := recv.Recv()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rsp.Payloads) != len(test.expect) {
+				t.Fatalf("expect length %v, got %v", len(test.expect), len(rsp.Payloads))
+			}
+			for i, payload := range test.expect {
+				assert.Equal(t, rsp.Payloads[i], payload)
+			}
+		})
 	}
 }
 
