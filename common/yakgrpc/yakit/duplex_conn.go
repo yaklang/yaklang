@@ -23,7 +23,7 @@ type serverPushDescription struct {
 
 var (
 	serverPushMutex    = new(sync.Mutex)
-	serverPushCallback map[string]serverPushDescription
+	serverPushCallback = make(map[string]serverPushDescription)
 
 	broadcastWithTypeMutex   = new(sync.Mutex)
 	broadcastTypeCallerTable = make(map[string]func(func()))
