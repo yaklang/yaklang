@@ -4,29 +4,52 @@ import (
 	"bytes"
 	"context"
 	"github.com/google/gopacket"
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"sync"
 	"time"
 )
 
-var captureDaemonCache = utils.NewTTLCache[*daemonCache](10 * time.Second)
+var captureDaemonCache *ttlcache.Cache[string, *daemonCache]
 
 func init() {
-	captureDaemonCache.SetExpirationCallback(func(key string, value *daemonCache) {
-		value.handler.Close()
+	captureDaemonCache = ttlcache.New[string, *daemonCache](
+		ttlcache.WithTTL[string, *daemonCache](10 * time.Second),
+	)
+
+	captureDaemonCache.OnInsertion(func(ctx context.Context, item *ttlcache.Item[string, *daemonCache]) {
+		log.Warnf("daemon cache: %v is insert %s", item.Key(), item.ExpiresAt())
+	})
+	captureDaemonCache.OnEviction(func(ctx context.Context, reason ttlcache.EvictionReason, item *ttlcache.Item[string, *daemonCache]) {
+		if reason == ttlcache.EvictionReasonExpired {
+			log.Warnf("xxxxxxxx: %v is expired", item.Key())
+			item.Value().handler.Close()
+		}
+
+		if reason == ttlcache.EvictionReasonDeleted {
+			log.Warnf("daemon cache: %v is deleted", item.Key())
+			item.Value().handler.Close()
+		}
 	})
 }
 
 func registerDaemonCache(key string, handler *daemonCache) {
-	captureDaemonCache.Set(key, handler)
+	captureDaemonCache.Set(key, handler, ttlcache.DefaultTTL)
 }
 
 func getDaemonCache(key string) (*daemonCache, bool) {
-	return captureDaemonCache.Get(key)
+	if captureDaemonCache.Has(key) {
+		item := captureDaemonCache.Get(key)
+		if item == nil {
+			log.Warnf("daemon cache: %v is nil", key)
+			return nil, false
+		}
+		return item.Value(), true
+	}
+	return nil, false
 }
 
 func syncKeepDaemonCache(key string, ctx context.Context) {
@@ -147,7 +170,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 						case <-time.After(3 * time.Second):
 							if handler.Error() != nil && handler.Error().Error() != "" {
 								log.Errorf("background iface: %v error: %s", ifaceName, handler.Error())
-								captureDaemonCache.Remove(cacheId)
+								captureDaemonCache.Delete(cacheId)
 								return
 							}
 						}

@@ -11,6 +11,7 @@ import (
 )
 
 type Config struct {
+	target net.IP
 	// 发包必须的几个字段
 	Iface     *net.Interface
 	GatewayIP net.IP
@@ -45,6 +46,12 @@ func NewConfig(options ...ConfigOption) (*Config, error) {
 }
 
 type ConfigOption func(config *Config)
+
+func WithTarget(target net.IP) ConfigOption {
+	return func(config *Config) {
+		config.target = target
+	}
+}
 
 func WithNetInterface(iface *net.Interface) ConfigOption {
 	return func(config *Config) {

@@ -451,7 +451,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	if err != nil {
 		return utils.Errorf("init syn scanner failed: %v", err)
 	}
-
+	synScanOptions = append(synScanOptions, synscan.WithTarget(net.ParseIP(sampleTarget)))
 	synScanConfig, err := synscan.NewConfig(synScanOptions...)
 	if err != nil {
 		return fmt.Errorf("create synscan config failed: %w", err)

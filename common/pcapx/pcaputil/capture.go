@@ -14,7 +14,9 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle) error
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-
+	packetSource.Lazy = true
+	packetSource.NoCopy = true
+	packetSource.DecodeStreamsAsDatagrams = true
 	if conf.onNetInterfaceCreated != nil {
 		conf.onNetInterfaceCreated(handler)
 	}
@@ -125,17 +127,17 @@ func Start(opt ...CaptureOption) error {
 		// keep cache
 		// add cancel func to defer
 		// hack: use runtimeId to registerCallback
-		var cancels []func()
-		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
-			c := keepDaemonCache(i, ctx)
-			cancels = append(cancels, c)
-			return true
-		})
-		defer func() {
-			for _, c := range cancels {
-				c()
-			}
-		}()
+		//var cancels []func()
+		//handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
+		//	c := keepDaemonCache(i, ctx)
+		//	cancels = append(cancels, c)
+		//	return true
+		//})
+		//defer func() {
+		//	for _, c := range cancels {
+		//		c()
+		//	}
+		//}()
 
 		runtimeId := uuid.New().String()
 		log.Infof("runtimeId: %v", runtimeId)

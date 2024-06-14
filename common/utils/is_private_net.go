@@ -42,3 +42,27 @@ func IsPrivateIP(ip net.IP) bool {
 	}
 	return false
 }
+
+func IsLocalInterface(iface *net.Interface, sourceIP net.IP) bool {
+	if sourceIP == nil {
+		return false
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		fmt.Println("Error getting addresses:", err)
+		return false
+	}
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip.Equal(sourceIP) {
+			return true
+		}
+	}
+	return false
+}

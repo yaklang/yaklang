@@ -258,7 +258,7 @@ func (s *Scanner) startWriting(handle *pcap.Handle, packetsChan chan []byte) {
 			if !ok {
 				continue
 			}
-
+			//spew.Dump(packets)
 			err := handle.WritePacketData(packets)
 
 			total++
@@ -279,9 +279,8 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 	if iface == nil {
 		return nil, errors.New("empty iface")
 	}
-	_ = gatewayIp
 	// 检测本地回环
-	isLoopback := srcIp.IsLoopback()
+	isLoopback := srcIp.IsLoopback() || utils.IsLocalInterface(iface, config.target)
 
 	log.Debugf("start to init network dev: %v", iface.Name)
 	// 初始化本地端口，用来扫描本地环回地址
@@ -334,8 +333,8 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		config:                config,
 		handlerWriteChan:      make(chan []byte, 100000),
 		localHandlerWriteChan: make(chan []byte, 100000),
-		handlerIsAlive:        utils.NewBool(true),
-		localHandlerIsAlive:   utils.NewBool(true),
+		handlerIsAlive:        utils.NewBool(false),
+		localHandlerIsAlive:   utils.NewBool(false),
 
 		defaultSrcIp:     srcIp,
 		defaultGatewayIp: gatewayIp,
@@ -356,12 +355,12 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 	}
 
 	if !isLoopback {
+		scanner.handlerIsAlive.Set()
 		go scanner.startHandler(iface.Name, scanner.handlerWriteChan, scanner.handlerIsAlive)
 	} else {
-		scanner.handlerIsAlive.UnSet()
+		scanner.localHandlerIsAlive.Set()
+		go scanner.startHandler(localIfaceName, scanner.localHandlerWriteChan, scanner.localHandlerIsAlive)
 	}
-
-	go scanner.startHandler(localIfaceName, scanner.localHandlerWriteChan, scanner.localHandlerIsAlive)
 
 	_ = scanner.getLoopbackLinkLayer()
 

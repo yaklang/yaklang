@@ -63,6 +63,7 @@ require (
 	github.com/icodeface/tls v0.0.0-20190904083142-17aec93c60e5
 	github.com/icza/bitio v1.1.0
 	github.com/itchyny/gojq v0.12.8
+	github.com/jellydator/ttlcache/v3 v3.2.0
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 	github.com/jinzhu/gorm v1.9.2
 	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067

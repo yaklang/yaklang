@@ -1,8 +1,6 @@
 package synscan
 
 import (
-	"github.com/google/gopacket"
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"time"
@@ -80,23 +78,23 @@ func (s *Scanner) sleepRateLimit() {
 //	}
 //}
 
-func (s *Scanner) inject(loopback bool, l ...gopacket.SerializableLayer) error {
+func (s *Scanner) inject(loopback bool, packet []byte) error {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("serialize layer or send to chan failed: %s", err)
 		}
 	}()
 
-	buf := gopacket.NewSerializeBuffer()
-	if err := gopacket.SerializeLayers(buf, s.opts, l...); err != nil {
-		return errors.Errorf("serialize failed: %s", err)
-	}
-	ret := buf.Bytes()
+	//buf := gopacket.NewSerializeBuffer()
+	//if err := gopacket.SerializeLayers(buf, s.opts, packet...); err != nil {
+	//	return errors.Errorf("serialize failed: %s", err)
+	//}
+	//ret := pac
 
 	if !loopback && s.handlerIsAlive.IsSet() {
-		s.handlerWriteChan <- ret
+		s.handlerWriteChan <- packet
 	} else if loopback && s.localHandlerIsAlive.IsSet() {
-		s.localHandlerWriteChan <- ret
+		s.localHandlerWriteChan <- packet
 	} else {
 		return utils.Error("no handler available")
 	}

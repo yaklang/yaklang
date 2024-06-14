@@ -78,7 +78,7 @@ func (s *Scanner) scanPublic(publicHosts []string, ports []int, random bool) err
 					log.Warnf("cannot create syn-tcp packet for %s:%v err: %v", dstIp.String(), i.port, err)
 					return
 				}
-				s.inject(loopback, layers...)
+				s.inject(loopback, layers)
 			}()
 
 		} else {
@@ -96,7 +96,7 @@ func (s *Scanner) scanPublic(publicHosts []string, ports []int, random bool) err
 							log.Warnf("cannot create syn-tcp packet for %s:%v: %v", dstIp.String(), i.port, err)
 							return
 						}
-						s.inject(loopback, layers...)
+						s.inject(loopback, layers)
 					}
 				} else {
 					log.Warnf("cannot query dns for %v", dstTarget)
@@ -153,7 +153,7 @@ func (s *Scanner) scanPrivate(privateHosts []string, ports []int, random bool) e
 				}
 
 				log.Debugf("start to inject %v with loopback: %v", hwAddr.String(), loopback)
-				err = s.inject(loopback, layers...)
+				err = s.inject(loopback, layers)
 				if err != nil {
 					log.Errorf("inject syn-tcp packet error: %s", err)
 				}

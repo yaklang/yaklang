@@ -147,7 +147,6 @@ if concurrent > 0 {
 
 if protos != "" {
     protoList = str.Split(protos, ",")
-    printf("PROTO: %#v\n", protos)
     tcpOps = append(tcpOps, servicescan.proto(protoList...))
 }
 

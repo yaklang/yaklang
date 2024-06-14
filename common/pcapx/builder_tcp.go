@@ -159,11 +159,15 @@ func WithTCP_Options(optionType any, data []byte) TCPOption {
 			log.Warnf("tcp option data length is too long, max length is 255, got %d, data: %v", len(data), spew.Sdump(data))
 			return nil
 		}
-		config.Options = append(config.Options, layers.TCPOption{
-			OptionType:   layers.TCPOptionKind(utils.InterfaceToInt(optionType)),
-			OptionLength: uint8(len(data)) + 2,
-			OptionData:   data,
-		})
+		if optionType == nil {
+			config.Options = nil
+		}else {
+			config.Options = append(config.Options, layers.TCPOption{
+				OptionType:   layers.TCPOptionKind(utils.InterfaceToInt(optionType)),
+				OptionLength: uint8(len(data)) + 2,
+				OptionData:   data,
+			})
+		}
 		return nil
 	}
 }
