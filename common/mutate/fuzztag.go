@@ -888,8 +888,7 @@ func init() {
 
 			if !capB.IsUint64() {
 				// too large
-				log.Error("int fuzztag: too large int range")
-				return nil
+				return utils.Error("int fuzztag: too large int range")
 			}
 
 			//results := make([]string, 0, capB.Int64())
