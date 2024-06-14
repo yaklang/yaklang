@@ -15,8 +15,8 @@ var YakRunnerMonitor *filesys.YakFileMonitor
 
 func init() {
 	yakit.YakitDuplexConnectionServer.RegisterHandler("file_monitor", func(ctx context.Context, request *ypb.DuplexConnectionRequest) error {
-		eventsHandler := func(eventSet filesys.EventSet) {
-
+		eventsHandler := func(eventSet *filesys.EventSet) {
+			yakit.BroadcastData("file_monitor", eventSet)
 		}
 		data := request.GetData()
 		op := gjson.Get(string(data), "operate").String()
