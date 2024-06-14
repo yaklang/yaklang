@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
@@ -298,5 +300,86 @@ assert rsp.RawPacket.Contains("`+rspToken+`")
 			})
 		}
 
+	}
+}
+
+func TestGRPCMUSTPASS_MITM_HotPatch_HijackAndMirrorURL(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
+	defer cancel()
+
+	hookURLCheck := false
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/notify" {
+			hookURLCheck = true
+		}
+		writer.Write([]byte("Hello"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	for {
+		data, err := stream.Recv()
+		log.Infof("data: %v", data)
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			log.Infof("msg: %v", msg)
+			if !strings.Contains(msg, "starting mitm server") {
+				continue
+			}
+			// load hot-patch mitm plugin
+			stream.Send(&ypb.MITMRequest{
+				SetYakScript: true,
+				YakScriptContent: `
+				hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
+					modified = str.ReplaceAll(string(req), "/origin", "/modify")
+					forward(poc.FixHTTPRequest(modified))
+				}
+				mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+					yakit.Output(url)
+					yakit.Output(req)
+
+					if str.Contains(url, "/modify") {
+						modified = str.ReplaceAll(string(req), "/modify", "/notify")
+						req := poc.FixHTTPRequest(modified)
+						poc.HTTPEx(req)
+					}
+				}
+				`,
+			})
+		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+			// send packet
+			packet := `GET /origin HTTP/1.1
+Host: ` + utils.HostPort(mockHost, mockPort) + `
+
+`
+			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
+			_, err := yak.Execute(`
+rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
+`, map[string]any{
+				"packet":    string(packetBytes),
+				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !hookURLCheck {
+				t.Fatalf("hook url check failed")
+			}
+			cancel()
+		}
 	}
 }
