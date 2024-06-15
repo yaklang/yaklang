@@ -73,6 +73,10 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 		return result, nil
 	}
 
+	if hash == "" {
+		return nil, utils.Error("source code hash is empty, contact developers to fix it")
+	}
+
 	var source IrSource
 	if err := db.Where("source_code_hash = ?", hash).First(&source).Error; err != nil {
 		return nil, utils.Wrapf(err, "query source via hash: %v failed", hash)
