@@ -89,7 +89,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			if id := ret.Condition.GetId(); id > 0 {
 				params["block_condition"] = id
 			} else {
-				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T) id: %v", ret.Condition, id)
+				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) id: %v", ret.Condition, ret.Condition.String(), id)
 			}
 		}
 		params["block_insts"] = fetchIds(ret.Insts)

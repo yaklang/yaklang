@@ -2,13 +2,13 @@ package yakcmds
 
 import (
 	"fmt"
-
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -18,6 +18,24 @@ type languageCtx struct {
 }
 
 var SSACompilerCommands = []*cli.Command{
+	{
+		Name:    "ssa-remove",
+		Aliases: []string{"ssa-rm"},
+		Usage:   "Remove SSA OpCodes from database",
+		Action: func(c *cli.Context) {
+			for _, name := range c.Args() {
+				if name == "*" {
+					for _, i := range ssadb.AllPrograms(ssadb.GetDB()) {
+						log.Infof("Start to delete program: %v", i)
+						ssadb.DeleteProgram(ssadb.GetDB(), i)
+					}
+					break
+				}
+				log.Infof("Start to delete program: %v", name)
+				ssadb.DeleteProgram(ssadb.GetDB(), name)
+			}
+		},
+	},
 	{
 		Name:    "ssa-compile",
 		Aliases: []string{"ssa"},
@@ -57,6 +75,12 @@ var SSACompilerCommands = []*cli.Command{
 				Name:  "syntaxflow-debug,sfdebug",
 				Usage: "enable syntax flow debug mode",
 			},
+			cli.BoolFlag{
+				Name: "no-override", Usage: "no override existed database program(no delete)",
+			},
+			cli.BoolFlag{
+				Name: "re-compile", Usage: "re-compile existed database program",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			programName := c.String("program")
@@ -82,7 +106,15 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			consts.SetSSADataBaseName(databaseFileRaw)
 
-			if syntaxFlow != "" {
+			if !c.Bool("no-override") {
+				ssadb.DeleteProgram(ssadb.GetDB(), programName)
+			} else {
+				log.Warnf("no-override flag is set, will not delete existed program")
+			}
+
+			forceCompile := c.Bool("re-compile")
+
+			if syntaxFlow != "" && !forceCompile {
 				log.Info("using syntaxflow rule will skip compile")
 				target = ""
 			}
