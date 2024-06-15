@@ -30,7 +30,6 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		anValue:    NewValue(),
 		Preds:      make([]Value, 0),
 		Succs:      make([]Value, 0),
-		Condition:  nil,
 		Insts:      make([]Instruction, 0),
 		Phis:       make([]Value, 0),
 		Handler:    nil,
@@ -71,6 +70,14 @@ func addToBlocks(block *BasicBlock) {
 */
 
 func (b *BasicBlock) Reachable() int {
+	if b.setReachable {
+		return b.canBeReached
+	}
+
+	if b.Condition == nil {
+		return 0
+	}
+
 	if c, ok := b.Condition.(*ConstInst); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {

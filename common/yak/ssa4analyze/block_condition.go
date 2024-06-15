@@ -187,7 +187,8 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	// handler
-	fun.EnterBlock.Condition = ssa.NewConst(true)
+	fun.EnterBlock.SetReachable(true)
+	//fun.EnterBlock.Condition = ssa.NewConst(true)
 	// deep first search
 	var handlerBlock func(*ssa.BasicBlock)
 	handlerBlock = func(bb *ssa.BasicBlock) {

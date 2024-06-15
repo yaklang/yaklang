@@ -275,7 +275,9 @@ type BasicBlock struct {
 	/*
 		if Condition == true: this block reach
 	*/
-	Condition Value
+	setReachable bool
+	canBeReached int
+	Condition    Value
 
 	// instruction list
 	Insts []Instruction
@@ -287,6 +289,15 @@ type BasicBlock struct {
 	// for build
 	ScopeTable *Scope
 	finish     bool // if emitJump finish!
+}
+
+func (b *BasicBlock) SetReachable(boolean bool) {
+	b.setReachable = true
+	if boolean {
+		b.canBeReached = 1
+	} else {
+		b.canBeReached = -1
+	}
 }
 
 func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
