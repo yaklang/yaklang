@@ -1,6 +1,9 @@
 package ssa
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -83,7 +86,11 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_preds"] = fetchIds(ret.Preds)
 		params["block_succs"] = fetchIds(ret.Succs)
 		if ret.Condition != nil {
-			params["block_condition"] = ret.Condition.GetId()
+			if id := ret.Condition.GetId(); id > 0 {
+				params["block_condition"] = id
+			} else {
+				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T) id: %v", ret.Condition, id)
+			}
 		}
 		params["block_insts"] = fetchIds(ret.Insts)
 		params["block_phis"] = fetchIds(ret.Phis)
@@ -197,8 +204,6 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if ret.CFGEntryBasicBlock != nil {
 			params["cfg_entry"] = ret.CFGEntryBasicBlock.GetId()
 		}
-	case *Recover:
-		// nothing to do
 	case *Return:
 		params["return_results"] = marshalValues(ret.Results)
 	case *SideEffect:
@@ -222,8 +227,6 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		}
 	case *Undefined:
 		params["undefined_kind"] = ret.Kind
-	case *Function:
-		// fill it later
 	case *ConstInst:
 		params["const_value"] = ret.Const.GetRawValue()
 		if ret.Origin != nil {
@@ -237,7 +240,24 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 
 func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	newLazyInstruction := func(input any) Value {
-		id := int64(input.(float64))
+		var id int64
+		switch result := input.(type) {
+		case int64:
+			id = result
+		case float64:
+			id = int64(result)
+		default:
+			id = codec.Atoi64(fmt.Sprint(input))
+		}
+
+		if id <= 0 {
+			log.Infof("unmarshalExtraInformation: invalid id: %v if u want to check why? enable DEBUG=1", id)
+			utils.Debug(func() {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			})
+			return nil
+		}
+
 		lz, err := NewLazyInstruction(id)
 		if err != nil {
 			log.Errorf("BUG: unmatched instruction create lazyInstruction: %v", err)
@@ -298,14 +318,18 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Phis = unmarshalValues(params["block_phis"])
 		ret.finish = params["block_finish"].(bool)
 		if scopeTable, ok := params["block_scope_table"]; ok {
-			log.Warnf("TODO(Unfinished BlockScopeTable): unmarshal BasicBlock : %v", scopeTable)
-			log.Warnf("TODO(Unfinished BlockScopeTable): unmarshal BasicBlock : %v", scopeTable)
-			log.Warnf("TODO(Unfinished BlockScopeTable): unmarshal BasicBlock : %v", scopeTable)
+			id := codec.Atoi64(fmt.Sprint(scopeTable))
+			ret.ScopeTable = GetScopeFromIrScopeId(id)
+			log.Infof("load scope from id: %v when loading basic block", id)
 		}
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))
-		ret.X = newLazyInstruction(params["binop_x"])
-		ret.Y = newLazyInstruction(params["binop_y"])
+		if x, ok := params["binop_x"]; ok {
+			ret.X = newLazyInstruction(x)
+		}
+		if y, ok := params["binop_y"]; ok {
+			ret.Y = newLazyInstruction(y)
+		}
 	case *Call:
 		ret.Method = newLazyInstruction(params["call_method"])
 		ret.Args = unmarshalValues(params["call_args"])
@@ -374,6 +398,24 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if falseBlock, ok := params["if_false"]; ok {
 			ret.False = newLazyInstruction(falseBlock)
 		}
+	case *Make:
+		if low, ok := params["make_low"]; ok {
+			ret.low = newLazyInstruction(low)
+		}
+		if high, ok := params["make_high"]; ok {
+			ret.high = newLazyInstruction(high)
+		}
+		if step, ok := params["make_step"]; ok {
+			ret.step = newLazyInstruction(step)
+		}
+		if l, ok := params["make_len"]; ok {
+			ret.Len = newLazyInstruction(l)
+		}
+		if c, ok := params["make_cap"]; ok {
+			ret.Cap = newLazyInstruction(c)
+		}
+	case *Function:
+
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
 	}

@@ -11,6 +11,11 @@ func Atoi(i string) int {
 	return raw
 }
 
+func Atoi64(i string) int64 {
+	raw, _ := strconv.Atoi(i)
+	return int64(raw)
+}
+
 func Itoa(i int) string {
 	return fmt.Sprint(i)
 }

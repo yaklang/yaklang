@@ -319,7 +319,7 @@ func (lz *LazyInstruction) GetRange() *Range {
 	if lz.Instruction.GetRange() == nil {
 		editor, start, end, err := lz.ir.GetStartAndEndPositions(lz.cache.DB)
 		if err != nil {
-			log.Warnf("LazyInstruction.GetRange failed: %v", err)
+			log.Warnf("LazyInstruction(%T).GetRange failed: %v", lz.Self(), err)
 			return nil
 		}
 		lz.Instruction.SetRange(NewRange(editor, start, end))
