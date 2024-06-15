@@ -30,3 +30,9 @@ func DeleteProgram(db *gorm.DB, program string) {
 	db.Model(&IrVariable{}).Where("program_name = ?", program).Unscoped().Delete(&IrVariable{})
 	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrScopeNode{})
 }
+
+func AllPrograms(db *gorm.DB) []string {
+	var programs []string
+	db.Model(&IrCode{}).Select("DISTINCT(program_name)").Pluck("program_name", &programs)
+	return programs
+}
