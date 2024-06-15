@@ -35,11 +35,11 @@ func GetDefaultSSADataBase() string {
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
 		var err error
-		log.Infof("init ssa database: %s", GetDefaultSSADataBase())
 		ssaDatabase, err = createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
 		if err != nil {
 			log.Errorf("create ssa database err: %v", err)
 		}
+		log.Infof("init ssa database: %s", GetDefaultSSADataBase())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
 	})
 }
