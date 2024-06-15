@@ -62,8 +62,8 @@ func (f *Function) GetType() Type {
 func (f *Function) SetType(t Type) {
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.Type = funTyp
-	} else {
-		log.Errorf("ssa.Function type cannot covnert to FunctionType: %v", t)
+	} else if t != nil {
+		log.Warnf("ssa.Function type cannot covnert to FunctionType: %v", t)
 	}
 }
 
