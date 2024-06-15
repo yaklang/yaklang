@@ -106,12 +106,6 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			consts.SetSSADataBaseName(databaseFileRaw)
 
-			if !c.Bool("no-override") {
-				ssadb.DeleteProgram(ssadb.GetDB(), programName)
-			} else {
-				log.Warnf("no-override flag is set, will not delete existed program")
-			}
-
 			forceCompile := c.Bool("re-compile")
 
 			if syntaxFlow != "" && !forceCompile {
@@ -140,6 +134,12 @@ var SSACompilerCommands = []*cli.Command{
 					}
 					log.Infof("compile save to database with program name: %v", programName)
 					opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
+				}
+
+				if !c.Bool("no-override") {
+					ssadb.DeleteProgram(ssadb.GetDB(), programName)
+				} else {
+					log.Warnf("no-override flag is set, will not delete existed program")
 				}
 
 				proj, err := ssaapi.ParseProjectFromPath(target, opt...)
