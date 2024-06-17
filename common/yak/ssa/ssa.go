@@ -214,7 +214,8 @@ type Function struct {
 	// for closure function
 	FreeValues map[string]Value // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
-	ParameterMembers []*ParameterMember
+	//ParameterMembers []*ParameterMember
+	ParameterMembers []Value
 	// function side effects
 	SideEffects []*FunctionSideEffect
 
@@ -222,7 +223,7 @@ type Function struct {
 	parent     Value   // parent function;  can be nil if there is no parent function
 	ChildFuncs []Value // child function within this function
 
-	Return []*Return
+	Return []Value
 
 	// BasicBlock list
 	Blocks []Instruction

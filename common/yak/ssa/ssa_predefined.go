@@ -127,6 +127,9 @@ func (a *anInstruction) IsAnnotation() bool {
 
 func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
 func (a *anInstruction) GetBlock() *BasicBlock {
+	if a.block == nil {
+		return nil
+	}
 	if block, ok := ToBasicBlock(a.block); ok {
 		return block
 	}

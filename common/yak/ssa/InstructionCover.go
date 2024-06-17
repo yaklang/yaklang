@@ -71,6 +71,15 @@ func ToParameter(v Instruction) (*Parameter, bool) {
 	p, ok := v.(*Parameter)
 	return p, ok
 }
+
+func ToParameterMember(v Instruction) (*ParameterMember, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToParameterMember(lz.Self())
+	}
+	p, ok := v.(*ParameterMember)
+	return p, ok
+}
+
 func ToReturn(v Instruction) (*Return, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
 		return ToReturn(lz.Self())
