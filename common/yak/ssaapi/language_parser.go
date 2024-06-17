@@ -53,7 +53,13 @@ func (c *config) parseProject() ([]*Program, error) {
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
 			log.Debugf("start to compile from: %v", path)
 			startTime := time.Now()
-			prog, err := c.parseSimple(path, f)
+
+			raw, err := io.ReadAll(f)
+			if err != nil {
+				return nil, err
+			}
+
+			prog, err := c.parseSimple(path, memedit.NewMemEditor(string(raw)))
 			endTime := time.Now()
 			if err != nil {
 				log.Debugf("parse %#v failed: %v", path, err)
@@ -75,14 +81,14 @@ func (c *config) parseProject() ([]*Program, error) {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	prog, err := c.parseSimple("", c.code)
+	prog, err := c.parseSimple("", c.originEditor)
 	if err != nil {
 		return nil, err
 	}
 	return NewProgram(prog, c), nil
 }
 
-func (c *config) feed(prog *ssa.Program, code io.Reader) error {
+func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	if err := prog.Build("", code, builder); err != nil {
 		return err
@@ -92,7 +98,7 @@ func (c *config) feed(prog *ssa.Program, code io.Reader) error {
 	return nil
 }
 
-func (c *config) parseSimple(path string, r io.Reader) (ret *ssa.Program, err error) {
+func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			ret = nil
@@ -153,7 +159,7 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 
 	prog := ssa.NewProgram(programName, c.fs, c.programPath)
 
-	prog.Build = func(filePath string, src io.Reader, fb *ssa.FunctionBuilder) error {
+	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
 		// check builder
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)
@@ -161,19 +167,13 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 
 		// get source code
 		if src == nil {
-			return fmt.Errorf("reader is nil")
+			return fmt.Errorf("origin source code (MemEditor) is nil")
 		}
-		raw, err := io.ReadAll(src)
-		if err != nil {
-			return err
-		}
-		code := string(raw)
-
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 
 		// include source code will change the context of the origin editor
-		newCodeEditor := memedit.NewMemEditor(code)
+		newCodeEditor := src
 		newCodeEditor.SetUrl(filePath)
 		fb.SetEditor(newCodeEditor) // set for current builder
 		if originEditor != nil {
@@ -199,7 +199,7 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
 
-		return LanguageBuilder.Build(code, c.ignoreSyntaxErr, fb)
+		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
 
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")

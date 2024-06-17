@@ -1,7 +1,7 @@
 package java2ssa
 
 import (
-	"io"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -28,7 +28,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			}
 		}
 		if pkg == nil {
-			log.Errorf("BUG: Import package %v but not found", pkgNames)
+			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
 			return
 		}
 
@@ -63,20 +63,19 @@ func (y *builder) BuildPackage(pkgNames []string) *ssa.Package {
 		return nil
 	}
 	for fd := range ch {
-		fp, err := loader.GetFilesysFileSystem().Open(fd.FileName)
+		raw, err := loader.GetFilesysFileSystem().ReadFile(fd.FileName)
 		if err != nil {
 			log.Errorf("Build with file loader failed: %s", err)
 			continue
 		}
-		y.LoadPackageByPath(prog, loader, fd.FileName, fp)
-		fp.Close()
+		y.LoadPackageByPath(prog, loader, fd.FileName, memedit.NewMemEditor(string(raw)))
 	}
 
 	pkgName := strings.Join(pkgNames, ".")
 	return y.GetPackage(pkgName)
 }
 
-func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageLoader, fileName string, data io.Reader) {
+func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageLoader, fileName string, data *memedit.MemEditor) {
 	originPath := loader.GetCurrentPath()
 	defer func() {
 		loader.SetCurrentPath(originPath)
