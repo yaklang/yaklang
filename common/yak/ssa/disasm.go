@@ -86,7 +86,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 	if len(f.ParameterMembers) > 0 {
 		ret += "parameterMember: " + strings.Join(
-			lo.Map(f.ParameterMembers, func(pm *ParameterMember, _ int) string {
+			lo.Map(f.ParameterMembers, func(pm Value, _ int) string {
 				return pm.String()
 			}),
 			", ") + "\n"
@@ -110,15 +110,16 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 
 	ShowBlock := func(rawBlock Instruction) {
+		if rawBlock == nil {
+			return
+		}
+
 		b, ok := ToBasicBlock(rawBlock)
 		if !ok {
 			log.Warnf("function %s has a non-block instruction: %T", f.GetName(), rawBlock)
 			return
 		}
 
-		if b == nil {
-			return
-		}
 		if flag&DisAsmWithSource == 0 {
 			ret += b.String() + "\n"
 			for _, p := range b.Phis {

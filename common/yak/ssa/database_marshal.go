@@ -2,7 +2,9 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"reflect"
 
@@ -74,6 +76,49 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 
 	params := make(map[string]any)
 	switch ret := raw.(type) {
+	case *Function:
+		params["params"] = fetchIds(ret.Params)
+		params["param_length"] = ret.ParamLength
+		freeValues := make(map[string]int64)
+		for k, v := range ret.FreeValues {
+			freeValues[k] = v.GetId()
+		}
+		params["free_values"] = freeValues
+		params["parameter_members"] = fetchIds(ret.ParameterMembers)
+		var sideEffects []map[string]any
+		for _, se := range ret.SideEffects {
+			element := map[string]any{
+				"name":         se.Name,
+				"verbose_name": se.VerboseName,
+				"modify":       se.Modify.GetId(),
+				"forceCreate":  se.forceCreate,
+			}
+			if se.parameterMemberInner != nil {
+				element["object_name"] = se.ObjectName
+				element["member_call_kind"] = se.MemberCallKind
+				element["member_call_object_index"] = se.MemberCallObjectIndex
+				element["member_call_name"] = se.MemberCallObjectName
+				element["member_call_key"] = se.MemberCallKey.GetId()
+			}
+			sideEffects = append(sideEffects, element)
+		}
+		params["side_effect"] = sideEffects
+		if p := ret.GetParent(); p != nil {
+			params["parent"] = p.GetId()
+		}
+		params["child_funcs"] = fetchIds(ret.ChildFuncs)
+		params["return"] = fetchIds(ret.Return)
+		params["blocks"] = fetchIds(ret.Blocks)
+		params["enter_block"] = ret.EnterBlock.GetId()
+		params["exit_block"] = ret.ExitBlock.GetId()
+		params["defer_block"] = ret.DeferBlock.GetId()
+		var files [][2]string
+		ret.referenceFiles.ForEach(func(i string, v string) bool {
+			files = append(files, [2]string{i, v})
+			return true
+		})
+		params["reference_files"] = files
+		params["has_ellipsis"] = ret.hasEllipsis
 	case *Assert:
 		params["assert_condition_id"] = ret.Cond.GetId()
 		if ret.MsgValue != nil {
@@ -302,6 +347,28 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		return vs
 	}
 
+	toInt := func(i any) int {
+		switch ret := i.(type) {
+		case float64:
+			return int(ret)
+		case int64:
+			return int(ret)
+		default:
+			return codec.Atoi(fmt.Sprint(i))
+		}
+	}
+
+	//toInt64 := func(i any) int64 {
+	//	switch ret := i.(type) {
+	//	case float64:
+	//		return int64(ret)
+	//	case int64:
+	//		return ret
+	//	default:
+	//		return codec.Atoi64(fmt.Sprint(i))
+	//	}
+	//}
+
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
 	case *Assert:
@@ -419,7 +486,47 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.Cap = newLazyInstruction(c)
 		}
 	case *Function:
-
+		ret.Params = unmarshalValues(params["params"])
+		ret.ParamLength = toInt(params["param_length"])
+		ret.FreeValues = unmarshalMapValues(params["free_values"])
+		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
+		var se []*FunctionSideEffect
+		funk.ForEach(params["side_effect"], func(a any) {
+			ins := &FunctionSideEffect{parameterMemberInner: &parameterMemberInner{}}
+			extra := utils.InterfaceToGeneralMap(a)
+			// name / verbose_name / modified / forcecreate
+			ins.Name = utils.MapGetString(extra, "name")
+			ins.VerboseName = utils.MapGetString(extra, "verbose_name")
+			ins.Modify = newLazyInstruction(extra["modify"])
+			ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
+			ins.ObjectName = utils.MapGetString(extra, "object_name")
+			ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
+			ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")
+			ins.MemberCallObjectName = utils.MapGetString(extra, "member_call_name")
+			ins.MemberCallKey = newLazyInstruction(extra["member_call_key"])
+			se = append(se, ins)
+		})
+		ret.SideEffects = se
+		if parent, ok := params["parent"]; ok {
+			ret.parent = newLazyInstruction(parent)
+		}
+		ret.ChildFuncs = unmarshalValues(params["child_funcs"])
+		ret.Return = unmarshalValues(params["return"])
+		ret.Blocks = unmarshalInstructions(params["blocks"])
+		ret.EnterBlock = newLazyInstruction(params["enter_block"])
+		ret.ExitBlock = newLazyInstruction(params["exit_block"])
+		ret.DeferBlock = newLazyInstruction(params["defer_block"])
+		ret.referenceFiles = omap.NewOrderedMap(map[string]string{})
+		funk.ForEach(params["reference_files"], func(a any) {
+			results, ok := a.([]string)
+			if !ok {
+				return
+			}
+			if len(results) > 1 {
+				ret.referenceFiles.Set(results[0], results[1])
+			}
+		})
+		ret.hasEllipsis = params["has_ellipsis"].(bool)
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
 	}
