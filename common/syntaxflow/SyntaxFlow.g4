@@ -50,18 +50,18 @@ filterExpr
     | filterExpr '(' actualParam? ')'                       # FunctionCallFilter
     | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
     | filterExpr '?{' conditionExpression '}'               # OptionalFilter
-    | filterExpr '->' filterExpr                            # NextFilter
     | filterExpr '->'                                       # NextSingleFilter
-    | filterExpr '#>' filterExpr                            # DefFilter
+    | filterExpr '->' filterExpr                            # NextFilter
     | filterExpr '#>'                                       # DefSingleFilter
-    | filterExpr '-->' filterExpr                           # DeepNextFilter
+    | filterExpr '#>' filterExpr                            # DefFilter
     | filterExpr '-->'                                      # DeepNextSingleFilter
-    | filterExpr '#->' filterExpr                           # TopDefFilter
+    | filterExpr '-->' filterExpr                           # DeepNextFilter
     | filterExpr '#->'                                      # TopDefSingleFilter
-    | filterExpr '-{' (recursiveConfig)? '}->' filterExpr   # ConfiggedDeepNextFilter
+    | filterExpr '#->' filterExpr                           # TopDefFilter
     | filterExpr '-{' (recursiveConfig)? '}->'              # ConfiggedDeepNextSingleFilter
-    | filterExpr '#{' (recursiveConfig)? '}->' filterExpr   # ConfiggedTopDefFilter
+    | filterExpr '-{' (recursiveConfig)? '}->' filterExpr   # ConfiggedDeepNextFilter
     | filterExpr '#{' (recursiveConfig)? '}->'              # ConfiggedTopDefSingleFilter
+    | filterExpr '#{' (recursiveConfig)? '}->' filterExpr   # ConfiggedTopDefFilter
     | filterExpr '-<' useDefCalcDescription '>-' filterExpr # UseDefCalcFilter
     ;
 
@@ -104,10 +104,10 @@ negativeCondition: (Not | '!');
 
 conditionExpression
     : filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
-    | '.' '(' (Opcode ':')? opcodes (',' opcodes) * ','? ')'                     # OpcodeTypeCondition    // something like .(call, phi)
-    | '.' '(' negativeCondition? In ':' stringLiteralWithoutStarGroup ')'        # StringInCondition      // something like .(in: 'a', 'b')
-    | '.' '(' negativeCondition? Have ':' stringLiteralWithoutStarGroup ')'      # StringContainAnyCondition // something like .(have: 'a', 'b')
-    | '.' '(' negativeCondition? HaveAny ':' stringLiteralWithoutStarGroup ')'   # StringContainAnyCondition // something like .(any: 'a', 'b')
+    |  Opcode ':' opcodes (',' opcodes) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
+    |  negativeCondition? In ':' stringLiteralWithoutStarGroup         # StringInCondition      // something like .(in: 'a', 'b')
+    |  negativeCondition? Have ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
+    |  negativeCondition? HaveAny ':' stringLiteralWithoutStarGroup    # StringContainAnyCondition // something like .(any: 'a', 'b')
     | '(' conditionExpression ')'                                                # ParenCondition
     | '!' conditionExpression                                                    # NotCondition
     | op = (

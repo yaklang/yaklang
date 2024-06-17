@@ -10,6 +10,10 @@ import (
 
 var _ sfvm.ValueOperator = new(Values)
 
+func (p Values) GetOpcode() string {
+	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
+}
+
 func (value Values) GetCalled() (sfvm.ValueOperator, error) {
 	var vv Values
 	for _, i := range value {
@@ -54,7 +58,7 @@ func (values Values) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator,
 	return len(newValue) > 0, newValue, nil
 }
 
-func (values Values) GlobMatch(mod int, glob sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+func (values Values) GlobMatch(mod int, glob ssa.Glob) (bool, sfvm.ValueOperator, error) {
 	newValue := _SearchValues(values, mod, glob.Match)
 	return len(newValue) > 0, newValue, nil
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type RecursiveConfigKey string
@@ -53,6 +54,8 @@ type ValueOperator interface {
 	String() string
 	IsMap() bool
 	IsList() bool
+	GetOpcode() string
+	// Len() int
 
 	// Recursive will execute with handler for every list or map
 	Recursive(func(ValueOperator) error) error
@@ -60,7 +63,7 @@ type ValueOperator interface {
 	// ExactMatch return ops, for OpPushSearchExact
 	ExactMatch(int, string) (bool, ValueOperator, error)
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(int, Glob) (bool, ValueOperator, error)
+	GlobMatch(int, ssa.Glob) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
 	RegexpMatch(int, *regexp.Regexp) (bool, ValueOperator, error)
 

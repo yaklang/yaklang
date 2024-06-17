@@ -22,6 +22,10 @@ func (p *Program) IsList() bool {
 	return false
 }
 
+func (p *Program) GetOpcode() string {
+	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
+}
+
 func (p *Program) Recursive(func(operator sfvm.ValueOperator) error) error {
 	return nil
 }
@@ -40,7 +44,7 @@ func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) GlobMatch(mod int, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(mod int, g ssa.Glob) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
 		p.DBCache.GetByVariableGlob(mod, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {

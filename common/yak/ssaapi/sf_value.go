@@ -15,6 +15,10 @@ func (v *Value) IsMap() bool {
 	return kind == ssa.MapTypeKind || kind == ssa.ObjectTypeKind
 }
 
+func (v *Value) GetOpcode() string {
+	return ssa.SSAOpcode2Name[v.getOpcode()]
+}
+
 func (v *Value) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(v)
 }
@@ -28,7 +32,7 @@ func (v *Value) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, erro
 	return value != nil, value, nil
 }
 
-func (v *Value) GlobMatch(mod int, g sfvm.Glob) (bool, sfvm.ValueOperator, error) {
+func (v *Value) GlobMatch(mod int, g ssa.Glob) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, g.Match)
 	return value != nil, value, nil
 }

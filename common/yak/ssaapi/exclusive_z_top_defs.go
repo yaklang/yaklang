@@ -357,7 +357,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		getCalledByValue := func(called *Value) Values {
 			calledInstance, ok := ssa.ToCall(called.node)
 			if !ok {
-				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", ssa.SSAOpcode2Name[called.GetOpcode()])
+				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
 

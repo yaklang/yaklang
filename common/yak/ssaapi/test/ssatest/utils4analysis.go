@@ -2,10 +2,11 @@ package ssatest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -95,6 +96,7 @@ func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map
 }
 func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []sfvm.Option) {
 	Check(t, code, func(prog *ssaapi.Program) error {
+		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
 		for key, value := range results {
