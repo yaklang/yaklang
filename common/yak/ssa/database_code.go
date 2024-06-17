@@ -299,7 +299,7 @@ func functionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 		fun.Params = append(fun.Params, para)
 	}
 
-	fun.FreeValues = make(map[string]*Parameter)
+	fun.FreeValues = make(map[string]Value)
 	for _, fv := range ir.FreeValues {
 		para, err := NewInstructionFromLazy(fv, ToParameter)
 		if err != nil {

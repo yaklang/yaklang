@@ -57,7 +57,9 @@ dump(c)
 	}
 	prog.Show()
 	funcIns := prog.Program.GetFunctionFast("main")
-	scope := funcIns.Blocks[len(funcIns.Blocks)-1].ScopeTable
+	br := funcIns.Blocks[len(funcIns.Blocks)-1]
+	block, _ := ssa.ToBasicBlock(br)
+	scope := block.ScopeTable
 	id := scope.GetPersistentId()
 	if id <= 0 {
 		t.Fatal("scope is not a persistent scope")

@@ -26,14 +26,14 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	f := &Function{
 		anValue:        NewValue(),
 		Package:        p,
-		Params:         make([]*Parameter, 0),
+		Params:         make([]Value, 0),
 		hasEllipsis:    false,
-		Blocks:         make([]*BasicBlock, 0),
+		Blocks:         make([]Instruction, 0),
 		EnterBlock:     nil,
 		ExitBlock:      nil,
-		ChildFuncs:     make([]*Function, 0),
+		ChildFuncs:     make([]Value, 0),
 		parent:         nil,
-		FreeValues:     make(map[string]*Parameter),
+		FreeValues:     make(map[string]Value),
 		SideEffects:    make([]*FunctionSideEffect, 0),
 		builder:        nil,
 		referenceFiles: omap.NewOrderedMap(map[string]string{}),
@@ -126,7 +126,12 @@ func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) 
 }
 
 func (f *Function) ReturnValue() []Value {
-	ret := f.ExitBlock.LastInst().(*Return)
+	exitBlock, ok := ToBasicBlock(f.ExitBlock)
+	if !ok {
+		log.Warnf("function exit block cannot convert to BasicBlock: %v", f.ExitBlock)
+		return nil
+	}
+	ret := exitBlock.LastInst().(*Return)
 	return ret.Results
 }
 
@@ -135,7 +140,16 @@ func (f *Function) IsMain() bool {
 }
 
 func (f *Function) GetParent() *Function {
-	return f.parent
+	if f.parent == nil {
+		return nil
+	}
+
+	fu, ok := ToFunction(f.parent)
+	if ok {
+		return fu
+	}
+	log.Warnf("function parent cannot convert to Function: %v", f.parent)
+	return nil
 }
 
 // just create a function define, only function parameter type \ return type \ ellipsis

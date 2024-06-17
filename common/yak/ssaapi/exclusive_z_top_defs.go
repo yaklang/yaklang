@@ -273,9 +273,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 							if len(inst.Blocks) > 0 {
 								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
 								if ok {
-									lastBlock, _ := lo.Last(inst.Blocks)
-									variableInstance := lastBlock.ScopeTable.ReadVariable(name)
-									_ = variableInstance.String()
+									lastBlockRaw, _ := lo.Last(inst.Blocks)
+									lastBlock, ok := ssa.ToBasicBlock(lastBlockRaw)
+									if ok {
+										variableInstance := lastBlock.ScopeTable.ReadVariable(name)
+										_ = variableInstance.String()
+									}
 								}
 							}
 						}

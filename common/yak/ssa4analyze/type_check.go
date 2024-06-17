@@ -23,7 +23,13 @@ func (t *TypeCheck) Run(prog *ssa.Program) {
 	}
 
 	analyzeOnFunction := func(f *ssa.Function) {
-		for _, b := range f.Blocks {
+		for _, bRaw := range f.Blocks {
+			b, ok := ssa.ToBasicBlock(bRaw)
+			if !ok {
+				log.Errorf("TypeCheck: %s is not a basic block", bRaw.GetName())
+				continue
+			}
+
 			for _, phi := range b.Phis {
 				check(phi)
 			}

@@ -56,7 +56,12 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 	b.ParamLength--
 	// fix other parameter index
 	for i, p := range b.Params {
-		p.FormalParameterIndex = i
+		param, ok := ToParameter(p)
+		if !ok {
+			log.Warnf("fixupParameterWithThis: parameter is not a Parameter, but is %s", p.GetName())
+			continue
+		}
+		param.FormalParameterIndex = i
 	}
 	// fixup side effect,
 	// if this side-effect is member call, the index just "--"
@@ -73,9 +78,16 @@ func (b *FunctionBuilder) Finish() {
 
 	for _, fun := range b.MarkedFunctions {
 		for name, fv := range fun.FreeValues {
-			if fv.GetDefault() != nil {
+			param, ok := ToParameter(fv)
+			if ok {
+				if param.GetDefault() != nil {
+					continue
+				}
+			} else {
+				log.Warnf("free value %s is not a parameter", name)
 				continue
 			}
+
 			if b.PeekValue(name) == nil {
 				fv.NewError(Error, SSATAG, ValueUndefined(name))
 			}
@@ -104,7 +116,13 @@ func (b *FunctionBuilder) Finish() {
 	// skip const
 	// skip no variable value
 	// skip return
-	for _, block := range b.Blocks {
+	for _, blockRaw := range b.Blocks {
+		block, ok := ToBasicBlock(blockRaw)
+		if !ok {
+			log.Warnf("function %s has a non-block instruction: %s", b.Function.GetName(), blockRaw.GetName())
+			continue
+		}
+
 		for _, inst := range block.Insts {
 			value, ok := ToValue(inst)
 			if !ok {
@@ -161,7 +179,7 @@ func (f *Function) Finish() {
 	}
 	funType := f.Type
 
-	funType.Parameter = lo.Map(f.Params, func(p *Parameter, _ int) Type {
+	funType.Parameter = lo.Map(f.Params, func(p Value, _ int) Type {
 		t := p.GetType()
 		return t
 	})
@@ -170,9 +188,19 @@ func (f *Function) Finish() {
 	funType.This = f
 	funType.ReturnValue = f.Return
 	funType.ParameterLen = f.ParamLength
-	funType.ParameterValue = f.Params
+	funType.ParameterValue = lo.FilterMap(f.Params, func(i Value, _ int) (*Parameter, bool) {
+		return ToParameter(i)
+	})
 	funType.ParameterMember = f.ParameterMembers
-	funType.SetFreeValue(f.FreeValues)
+	var result = make(map[string]*Parameter)
+	for n, p := range f.FreeValues {
+		if param, ok := ToParameter(p); ok {
+			result[n] = param
+		} else {
+			log.Warnf("free value %s is not a parameter", n)
+		}
+	}
+	funType.SetFreeValue(result)
 	funType.SetSideEffect(f.SideEffects)
 	f.SetType(funType)
 }

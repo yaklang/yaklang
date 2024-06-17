@@ -27,7 +27,12 @@ func (t *TypeInference) Run(prog *ssa.Program) {
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 	t.DeleteInst = make([]ssa.Instruction, 0)
-	for _, b := range fun.Blocks {
+	for _, bRaw := range fun.Blocks {
+		b, ok := ssa.ToBasicBlock(bRaw)
+		if !ok {
+			log.Errorf("TypeInference: %s is not a basic block", bRaw.GetName())
+			continue
+		}
 		for _, inst := range b.Insts {
 			t.InferenceOnInstruction(inst)
 		}
@@ -47,7 +52,12 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 		return
 	}
 	for name, fv := range fun.FreeValues {
-		if fv.GetDefault() != nil {
+		param, ok := ssa.ToParameter(fv)
+		if !ok {
+			log.Warnf("free value %s is not a parameter", name)
+			continue
+		}
+		if param.GetDefault() != nil {
 			continue
 		}
 		fv.NewError(ssa.Warn, TITAG, FreeValueUndefine(name))
