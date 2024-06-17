@@ -209,30 +209,30 @@ type Function struct {
 	Type *FunctionType
 
 	// just function parameter
-	Params      []*Parameter
+	Params      []Value
 	ParamLength int
 	// for closure function
-	FreeValues map[string]*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
+	FreeValues map[string]Value // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
 	ParameterMembers []*ParameterMember
 	// function side effects
 	SideEffects []*FunctionSideEffect
 
 	// closure function double link. parentFunc <-> childFuncs
-	parent     *Function   // parent function;  can be nil if there is no parent function
-	ChildFuncs []*Function // child function within this function
+	parent     Value   // parent function;  can be nil if there is no parent function
+	ChildFuncs []Value // child function within this function
 
 	Return []*Return
 
 	// BasicBlock list
-	Blocks []*BasicBlock
+	Blocks []Instruction
 	// First and End block
-	EnterBlock *BasicBlock
-	ExitBlock  *BasicBlock
+	EnterBlock Instruction
+	ExitBlock  Instruction
 	// For Defer  semantic
 	// this block will always execute when the function exits,
 	// regardless of whether the function returns normally or exits due to a panic.
-	DeferBlock *BasicBlock
+	DeferBlock Instruction
 
 	// include / require / eval-code / import packet
 	referenceFiles *omap.OrderedMap[string, string]
@@ -253,7 +253,12 @@ func (f *Function) PushReferenceFile(file, code string) {
 
 func (f *Function) FirstBlockInstruction() []Instruction {
 	if len(f.Blocks) > 0 {
-		return f.Blocks[0].Insts
+		firstBlock := f.Blocks[0]
+		if block, ok := ToBasicBlock(firstBlock); ok {
+			return block.Insts
+		} else {
+			log.Warnf("function %s first block is not a basic block", f.GetName())
+		}
 	}
 	return nil
 }

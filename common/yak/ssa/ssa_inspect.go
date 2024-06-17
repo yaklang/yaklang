@@ -1,6 +1,9 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+)
 
 func (p *Program) show(flag FunctionAsmFlag) {
 
@@ -17,7 +20,12 @@ func (p *Program) show(flag FunctionAsmFlag) {
 		// }
 
 		for _, f := range i.ChildFuncs {
-			showFunc(f)
+			child, ok := ToFunction(f)
+			if !ok {
+				log.Warnf("function %s is not a ssa.Function", f.GetName())
+				continue
+			}
+			showFunc(child)
 		}
 	}
 

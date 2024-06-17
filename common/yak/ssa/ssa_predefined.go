@@ -12,8 +12,8 @@ import (
 )
 
 type anInstruction struct {
-	fun   *Function
-	block *BasicBlock
+	fun   Value
+	block Instruction
 	R     *Range
 	// scope *Scope
 
@@ -98,13 +98,24 @@ func NewInstruction() anInstruction {
 
 // ssa function and block
 func (a *anInstruction) SetFunc(f *Function) { a.fun = f }
-func (a *anInstruction) GetFunc() *Function  { return a.fun }
+func (a *anInstruction) GetFunc() *Function {
+	f, ok := ToFunction(a.fun)
+	if ok {
+		return f
+	}
+	return nil
+}
 func (a *anInstruction) GetProgram() *Program {
-	if a == nil || a.fun == nil || a.fun.Package == nil {
-		log.Errorf("this value program is nil")
+	f := a.GetFunc()
+	if f == nil {
+		log.Errorf("this value function is nil")
 		return nil
 	}
-	return a.fun.Package.Prog
+	if f.Package == nil {
+		log.Warnf("this value function package is nil")
+		return nil
+	}
+	return f.Package.Prog
 }
 func (a *anInstruction) SetIsAnnotation(b bool) {
 	a.isAnnotation = b
@@ -115,7 +126,13 @@ func (a *anInstruction) IsAnnotation() bool {
 }
 
 func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
-func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
+func (a *anInstruction) GetBlock() *BasicBlock {
+	if block, ok := ToBasicBlock(a.block); ok {
+		return block
+	}
+	log.Warnf("GetBlock: block is not a BasicBlock but: %v", a.block)
+	return nil
+}
 
 // source code position
 func (c *anInstruction) GetRange() *Range { return c.R }

@@ -82,7 +82,11 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 
 	// b.ScopeStart()
 	// b.Function.SetScope(b.CurrentScope)
-	b.CurrentBlock = f.EnterBlock
+	var ok bool
+	b.CurrentBlock, ok = ToBasicBlock(f.EnterBlock)
+	if !ok {
+		log.Errorf("function (%v) enter block is not a basic block", f.name)
+	}
 	f.builder = b
 	return b
 }
@@ -142,7 +146,12 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	b.Params[len(b.Params)-1].SetType(NewSliceType(BasicTypes[AnyTypeKind]))
+	if ins, ok := b.Params[len(b.Params)-1].(*Parameter); ins != nil {
+		_ = ok
+		ins.SetType(NewSliceType(BasicTypes[AnyTypeKind]))
+	} else {
+		log.Warnf("param contains (%T) cannot be set type and ellipsis", ins)
+	}
 	b.hasEllipsis = true
 }
 

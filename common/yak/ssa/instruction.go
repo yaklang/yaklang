@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func NewJump(to *BasicBlock) *Jump {
@@ -135,7 +136,12 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 	}
 	e.SetName(variable)
 	e.SetFunc(builder.Function)
-	e.SetBlock(builder.EnterBlock)
+	block, ok := ToBasicBlock(builder.EnterBlock)
+	if ok {
+		e.SetBlock(block)
+	} else {
+		log.Warnf("ExternLib block cannot convert to BasicBlock: %v", builder.EnterBlock)
+	}
 	e.SetRange(builder.CurrentRange)
 	e.GetProgram().SetVirtualRegister(e)
 	e.GetProgram().SetInstructionWithName(variable, e)
@@ -150,7 +156,14 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
-	p.SetBlock(builder.EnterBlock)
+
+	block, ok := ToBasicBlock(builder.EnterBlock)
+	if ok {
+		p.SetBlock(block)
+	} else {
+		log.Warnf("Parameter block cannot convert to BasicBlock: %v", builder.EnterBlock)
+	}
+
 	p.SetRange(builder.CurrentRange)
 	p.GetProgram().SetVirtualRegister(p)
 	p.GetProgram().SetInstructionWithName(variable, p)
@@ -170,7 +183,14 @@ func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, k
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
-	p.SetBlock(builder.EnterBlock)
+
+	block, ok := ToBasicBlock(builder.EnterBlock)
+	if ok {
+		p.SetBlock(block)
+	} else {
+		log.Warnf("NewParamMember block cannot convert to BasicBlock: %v", builder.EnterBlock)
+	}
+
 	p.SetRange(builder.CurrentRange)
 	p.GetProgram().SetVirtualRegister(p)
 	return p

@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/samber/lo"
@@ -64,7 +65,7 @@ func (f *Function) String() string {
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	ret := f.GetName() + " "
 	ret += strings.Join(
-		lo.Map(f.Params, func(item *Parameter, _ int) string {
+		lo.Map(f.Params, func(item Value, _ int) string {
 			return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
 		}),
 		", ")
@@ -76,7 +77,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 	if len(f.FreeValues) > 0 {
 		ret += "freeValue: " + strings.Join(
-			lo.MapToSlice(f.FreeValues, func(_ string, key *Parameter) string {
+			lo.MapToSlice(f.FreeValues, func(_ string, key Value) string {
+
 				return getStr(key)
 			}),
 			// f.FreeValue,
@@ -107,7 +109,13 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		ret += "type: " + f.GetType().String() + "\n"
 	}
 
-	ShowBlock := func(b *BasicBlock) {
+	ShowBlock := func(rawBlock Instruction) {
+		b, ok := ToBasicBlock(rawBlock)
+		if !ok {
+			log.Warnf("function %s has a non-block instruction: %T", f.GetName(), rawBlock)
+			return
+		}
+
 		if b == nil {
 			return
 		}
