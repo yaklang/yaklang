@@ -142,8 +142,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				formalParamsIndex = append(formalParamsIndex, argIndex)
 			}
 		}
-		var params = omap.NewOrderedMap(map[int64]*ssa.Parameter{})
-		lo.ForEach(f.Params, func(param *ssa.Parameter, index int) {
+		var params = omap.NewOrderedMap(map[int64]ssa.Value{})
+		lo.ForEach(f.Params, func(param ssa.Value, index int) {
 			for _, i := range formalParamsIndex {
 				if index == i {
 					params.Set(param.GetId(), param)

@@ -159,9 +159,14 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	deleteInst := make([]ssa.Instruction, 0)
 	// handler instruction
-	for _, b := range fun.Blocks {
+	for _, bRaw := range fun.Blocks {
 		// fix block position
 		// b.SetRange(fixupBlockPos(b))
+		b, ok := ssa.ToBasicBlock(bRaw)
+		if !ok {
+			log.Warnf("function %s has a non-block instruction: %s", fun.GetName(), bRaw.GetName())
+			continue
+		}
 
 		for _, inst := range b.Insts {
 			switch inst := inst.(type) {
@@ -187,8 +192,13 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	// handler
-	fun.EnterBlock.SetReachable(true)
-	//fun.EnterBlock.Condition = ssa.NewConst(true)
+	enter, ok := ssa.ToBasicBlock(fun.EnterBlock)
+	if ok {
+		enter.SetReachable(true)
+	} else {
+		log.Warnf("BUG: function %s has a non-block instruction: %s", fun.GetName(), fun.EnterBlock.GetName())
+	}
+
 	// deep first search
 	var handlerBlock func(*ssa.BasicBlock)
 	handlerBlock = func(bb *ssa.BasicBlock) {
@@ -222,7 +232,12 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	for _, bb := range fun.Blocks {
-		handlerBlock(bb)
+		block, ok := ssa.ToBasicBlock(bb)
+		if !ok {
+			log.Warnf("function %s has a non-block instruction: %s", fun.GetName(), bb.GetName())
+			continue
+		}
+		handlerBlock(block)
 	}
 }
 

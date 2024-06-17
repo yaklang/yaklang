@@ -7,9 +7,18 @@ import (
 
 func (f *Function) GetDeferBlock() *BasicBlock {
 	if f.DeferBlock == nil {
-		f.DeferBlock = f.NewBasicBlockNotAddBlocks("defer")
+		block := f.NewBasicBlockNotAddBlocks("defer")
+		f.DeferBlock = block
+		return block
 	}
-	return f.DeferBlock
+	block, ok := f.DeferBlock.(*BasicBlock)
+	if !ok {
+		log.Warnf("defer block is not a basic block")
+		result := f.NewBasicBlockNotAddBlocks("defer")
+		f.DeferBlock = result
+		return result
+	}
+	return block
 }
 
 func (f *Function) NewBasicBlock(name string) *BasicBlock {
