@@ -109,9 +109,15 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["child_funcs"] = fetchIds(ret.ChildFuncs)
 		params["return"] = fetchIds(ret.Return)
 		params["blocks"] = fetchIds(ret.Blocks)
-		params["enter_block"] = ret.EnterBlock.GetId()
-		params["exit_block"] = ret.ExitBlock.GetId()
-		params["defer_block"] = ret.DeferBlock.GetId()
+		if ret.EnterBlock != nil {
+			params["enter_block"] = ret.EnterBlock.GetId()
+		}
+		if ret.ExitBlock != nil {
+			params["exit_block"] = ret.ExitBlock.GetId()
+		}
+		if ret.DeferBlock != nil {
+			params["defer_block"] = ret.DeferBlock.GetId()
+		}
 		var files [][2]string
 		ret.referenceFiles.ForEach(func(i string, v string) bool {
 			files = append(files, [2]string{i, v})
@@ -513,9 +519,16 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.ChildFuncs = unmarshalValues(params["child_funcs"])
 		ret.Return = unmarshalValues(params["return"])
 		ret.Blocks = unmarshalInstructions(params["blocks"])
-		ret.EnterBlock = newLazyInstruction(params["enter_block"])
-		ret.ExitBlock = newLazyInstruction(params["exit_block"])
-		ret.DeferBlock = newLazyInstruction(params["defer_block"])
+		if enter, ok := params["enter_block"]; ok {
+			ret.EnterBlock = newLazyInstruction(enter)
+		}
+		if exit, ok := params["exit_block"]; ok {
+			ret.ExitBlock = newLazyInstruction(exit)
+		}
+		if deferBlock, ok := params["defer_block"]; ok {
+			ret.DeferBlock = newLazyInstruction(deferBlock)
+		}
+		
 		ret.referenceFiles = omap.NewOrderedMap(map[string]string{})
 		funk.ForEach(params["reference_files"], func(a any) {
 			results, ok := a.([]string)
