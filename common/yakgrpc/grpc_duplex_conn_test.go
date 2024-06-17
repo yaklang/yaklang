@@ -8,7 +8,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -28,8 +27,7 @@ func TestDuplexConnection(t *testing.T) {
 			break
 		}
 		spew.Dump(rsp)
-		result := gjson.ParseBytes(rsp.Data)
-		typ := result.Get("type").String()
+		typ := rsp.GetMessageType()
 		if typ == "exit" {
 			break
 		}
