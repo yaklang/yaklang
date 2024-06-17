@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
+	"sync"
 	"unsafe"
 )
 
@@ -174,10 +175,21 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		f.cache = nil
 	}()
 	ch := make(chan *FuzzResult)
+	execCtx, execCtxCancel := context.WithCancel(f.config.ctx)
+	var execEnd bool
+	receiverLock := sync.Mutex{}
 	receiver := func(result *FuzzResult) {
+		receiverLock.Lock()
+		defer receiverLock.Unlock()
 		f.config.logger.Debugf("tag %s generate data: %s", f.data.String(), string(result.GetData()))
+		if execEnd {
+			return
+		}
 		select {
 		case <-f.config.ctx.Done():
+			execEnd = true
+		case <-execCtx.Done():
+			execEnd = true
 		case ch <- result:
 		}
 	}
@@ -191,9 +203,10 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 			if e := recover(); e != nil {
 				err = utils.Error(e)
 			}
+			close(ch)
+			execCtxCancel()
 		}()
-		err = f.data.Exec(f.config.ctx, s, receiver, f.methodCtx.methodTable)
-		close(ch)
+		err = f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
 	}()
 
 	newGetter := func() (*FuzzResult, error) {

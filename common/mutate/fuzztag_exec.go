@@ -126,6 +126,7 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	if err != nil {
 		return nil, err
 	}
+	defer generator.Cancel()
 	var res []string
 	for generator.Next() {
 		result := generator.Result()
@@ -134,7 +135,6 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 		if config.resultHandler != nil {
 			verbose := fuzztagx.GetResultVerbose(result)
 			if !config.resultHandler(string(data), verbose) {
-				generator.Cancel()
 				return res, nil
 			}
 		}
