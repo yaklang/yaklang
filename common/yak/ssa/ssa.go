@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"io"
 	"sync"
 
 	"github.com/samber/lo"
@@ -147,7 +146,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(string, io.Reader, *FunctionBuilder) error
+type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
 
 type (
 	packagePath     []string

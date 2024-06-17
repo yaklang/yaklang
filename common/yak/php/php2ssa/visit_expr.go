@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strconv"
 	"strings"
 
@@ -86,7 +87,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			}
 			// 应该考虑更多情况
 			code = `<?php ` + code + ";"
-			if err := y.GetProgram().Build("Exec-"+uuid.NewString(), strings.NewReader(code), y.FunctionBuilder); err != nil {
+			if err := y.GetProgram().Build("Exec-"+uuid.NewString(), memedit.NewMemEditor(code), y.FunctionBuilder); err != nil {
 				log.Errorf("execute code %v failed", code)
 			}
 		} else {

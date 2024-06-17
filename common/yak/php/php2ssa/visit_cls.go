@@ -32,7 +32,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	class := y.GetClassBluePrint(className)
 	obj := y.EmitMakeWithoutType(nil, nil)
 	if class == nil {
-		log.Errorf("class %v instantiation failed", className)
+		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", className)
 		obj.SetType(ssa.GetAnyType())
 		return obj
 	}

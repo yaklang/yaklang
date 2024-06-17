@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func (f *Function) GetDeferBlock() *BasicBlock {
@@ -42,7 +43,11 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 	if !nodAddToBlocks {
 		addToBlocks(b)
 	}
-	// b.SetRange(f.GetRange())
+	if functionRange := f.GetRange(); functionRange != nil {
+		b.SetRange(functionRange)
+	} else {
+		log.Infof("function$%v 's range is nil, set entry block range (%v) to nil", f.name, name)
+	}
 	return b
 }
 

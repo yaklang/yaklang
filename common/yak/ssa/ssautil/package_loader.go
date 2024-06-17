@@ -1,7 +1,7 @@
 package ssautil
 
 import (
-	"io"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"io/fs"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -114,7 +114,7 @@ func (p *PackageLoader) getPath(want string, once bool, f func(fs.FileInfo) bool
 	return "", utils.Errorf("file or directory %s not found in include path", want)
 }
 
-func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, io.Reader, error) {
+func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, *memedit.MemEditor, error) {
 	if p.fs == nil {
 		return "", nil, utils.Errorf("file system is nil")
 	}
@@ -122,8 +122,8 @@ func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, 
 	if err != nil {
 		return "", nil, err
 	}
-	data, err := p.fs.Open(path)
-	return path, data, err
+	data, err := p.fs.ReadFile(path)
+	return path, memedit.NewMemEditor(string(data)), err
 }
 
 type FileDescriptor struct {

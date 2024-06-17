@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"io"
 	"strings"
 	"time"
@@ -17,7 +19,7 @@ type config struct {
 	ignoreSyntaxErr bool
 
 	// input, code or project path
-	code io.Reader
+	originEditor *memedit.MemEditor
 	// project
 	fs          filesys.FileSystem
 	entryFile   []string
@@ -39,7 +41,7 @@ func defaultConfig() *config {
 	return &config{
 		language:                   "",
 		Builder:                    nil,
-		code:                       nil,
+		originEditor:               memedit.NewMemEditor(""),
 		fs:                         filesys.NewLocalFs(),
 		programPath:                ".",
 		entryFile:                  make([]string, 0),
@@ -51,7 +53,7 @@ func defaultConfig() *config {
 }
 
 func (c *config) CaclHash() string {
-	return utils.CalcSha1(c.code, c.language, c.ignoreSyntaxErr, c.externInfo)
+	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
 type Option func(*config)
@@ -193,7 +195,13 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	for _, opt := range opts {
 		opt(config)
 	}
-	config.code = input
+	if input != nil {
+		raw, err := io.ReadAll(input)
+		if err != nil {
+			log.Warnf("read input error: %v", err)
+		}
+		config.originEditor = memedit.NewMemEditor(string(raw))
+	}
 
 	hash := config.CaclHash()
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
@@ -211,7 +219,13 @@ func (p *Program) Feed(code io.Reader) error {
 	if p.config == nil || !p.config.feedCode || p.config.Builder == nil {
 		return utils.Errorf("not support language %s", p.config.language)
 	}
-	return p.config.feed(p.Program, code)
+
+	raw, err := io.ReadAll(code)
+	if err != nil {
+		return err
+	}
+
+	return p.config.feed(p.Program, memedit.NewMemEditor(string(raw)))
 }
 
 func FromDatabase(programName string, opts ...Option) (*Program, error) {
