@@ -901,6 +901,11 @@ func init() {
 
 			//results := make([]string, 0, capB.Int64())
 			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				if minB.Cmp(maxB) > 0 {
 					break
 				}
