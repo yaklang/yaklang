@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -116,4 +117,60 @@ func TestHTTPTrigger_Register(t *testing.T) {
 	if len(notifResponse.Notifications) > 0 {
 		t.Fatal("should be empty")
 	}
+}
+
+func TestCheckServerReachable(t *testing.T) {
+	reachableHttpServer := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")))
+	unreachableHttpServer := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n")))
+
+	reachableTcpServer := utils.HostPort(utils.DebugMockTCP([]byte(`abc`)))
+	unreachableTcpServer := utils.HostPort("127.0.0.1", utils.GetRandomAvailableTCPPort())
+
+	client, server := CreateCyberTunnelLocalClient("test")
+	_ = server
+
+	httpFlow := &tpb.HTTPSimpleFlow{
+		IsHttps:      false,
+		HttpRequest:  []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
+		HttpResponse: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"),
+	}
+
+	// check http server reachable
+	res, err := client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
+		Server:    reachableHttpServer,
+		HttpCheck: true,
+		HttpFlow:  httpFlow,
+	})
+
+	require.NoError(t, err)
+	require.True(t, res.Reachable)
+
+	// check http server unreachable
+	res, err = client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
+		Server:    unreachableHttpServer,
+		HttpCheck: true,
+		HttpFlow:  httpFlow,
+	})
+
+	require.NoError(t, err)
+	require.False(t, res.Reachable)
+
+	// check dial server reachable
+	res, err = client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
+		Server:    reachableTcpServer,
+		HttpCheck: false,
+	})
+
+	require.NoError(t, err)
+	require.True(t, res.Reachable)
+
+	// check dial server unreachable
+	res, err = client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
+		Server:    unreachableTcpServer,
+		HttpCheck: false,
+	})
+
+	require.NoError(t, err)
+	require.False(t, res.Reachable)
+
 }
