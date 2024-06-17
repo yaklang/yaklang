@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"strings"
 
@@ -369,7 +370,7 @@ func GetType(i any) Type {
 	if typ := GetTypeByStr(reflect.TypeOf(i).String()); typ != nil {
 		return typ
 	} else {
-		panic("undefined type")
+		panic("undefined type: " + spew.Sdump(i))
 	}
 }
 

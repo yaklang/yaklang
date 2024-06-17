@@ -41,6 +41,7 @@ var SSACompilerCommands = []*cli.Command{
 		Aliases: []string{"ssa"},
 		Usage:   "Compile to SSA OpCodes from source code",
 		Flags: []cli.Flag{
+			cli.StringFlag{Name: "log", Usage: "log level"},
 			cli.StringFlag{
 				Name: "language,l",
 			},
@@ -83,6 +84,10 @@ var SSACompilerCommands = []*cli.Command{
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if ret, err := log.ParseLevel(c.String("log")); err == nil {
+				log.SetLevel(ret)
+			}
+
 			programName := c.String("program")
 			entry := c.String("entry")
 			language := c.String("language")
