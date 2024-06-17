@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -39,6 +40,10 @@ func SaveVariable(db *gorm.DB, program, variable string, insts []SSAValue) error
 	irVariable.VariableName = variable
 	instIDs := make([]int64, 0, len(insts))
 	for _, inst := range insts {
+		if inst == nil {
+			log.Warnf("ssadb.SaveVariable failed: the inst %T is nil(recog)", inst)
+			continue
+		}
 		if !irVariable.IsAnnotationInstance && inst.IsAnnotation() {
 			irVariable.IsAnnotationInstance = true
 		}
