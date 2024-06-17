@@ -26,6 +26,8 @@ service Tunnel {
 
   rpc RequireHTTPRequestTrigger(RequireHTTPRequestTriggerParams) returns (RequireHTTPRequestTriggerResponse);
   rpc QueryExistedHTTPRequestTrigger(QueryExistedHTTPRequestTriggerRequest) returns (QueryExistedHTTPRequestTriggerResponse);
+
+  rpc CheckServerReachable(CheckServerReachableRequest) returns (CheckServerReachableResponse);
 }
 
 message HTTPRequestTriggerNotification {
@@ -119,6 +121,25 @@ message ICMPTriggerNotification {
 message QuerySpecificICMPLengthTriggerResponse {
   repeated ICMPTriggerNotification Notifications = 1;
 }
+
+message CheckServerReachableRequest {
+  string Server = 1;
+  bool HttpCheck = 2;
+  HTTPSimpleFlow HttpFlow = 3;
+}
+
+message HTTPSimpleFlow {
+  bool IsHttps = 1;
+  bytes HttpRequest = 2;
+  bytes HttpResponse = 3;
+}
+
+message CheckServerReachableResponse {
+  bool Reachable = 1;
+  HTTPSimpleFlow HttpFlow = 2;
+  string Verbose = 3;
+}
+
 
 service DNSLog {
   rpc RequireDomain(RequireDomainParams) returns (RequireDomainResponse);
