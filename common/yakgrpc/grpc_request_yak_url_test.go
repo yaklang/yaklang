@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -47,7 +48,7 @@ func TestRequestYakURLPut(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		fileName := utils.RandStringBytes(5)
+		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "PUT",
 			Url: &ypb.YakURL{
@@ -72,7 +73,7 @@ func TestRequestYakURLPut(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		dirName := utils.RandStringBytes(5)
+		dirName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "PUT",
 			Url: &ypb.YakURL{
@@ -99,7 +100,7 @@ func TestRequestYakURLPost(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		fileName := utils.RandStringBytes(5)
+		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		create, err := os.Create(fileName)
 		require.NoError(t, err)
 		create.Close()
@@ -130,10 +131,10 @@ func TestRequestYakURLPost(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		fileName := utils.RandStringBytes(5)
+		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		create, err := os.Create(fileName)
 		require.NoError(t, err)
-		newName := utils.RandStringBytes(5)
+		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		create.Close()
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
@@ -167,10 +168,10 @@ func TestRequestYakURLPost(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		dirName := utils.RandStringBytes(5)
+		dirName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		err = os.Mkdir(dirName, 0755)
 		require.NoError(t, err)
-		newName := utils.RandStringBytes(5)
+		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
@@ -205,7 +206,7 @@ func TestRequestYakURLDelete(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		fileName := utils.RandStringBytes(5)
+		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		create, err := os.Create(fileName)
 		require.NoError(t, err)
 		create.Close()
@@ -229,7 +230,7 @@ func TestRequestYakURLDelete(t *testing.T) {
 		defer cancel()
 		client, err := NewLocalClient()
 		require.NoError(t, err)
-		fileName := utils.RandStringBytes(5)
+		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		err = os.Mkdir(fileName, 0755)
 		require.NoError(t, err)
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
