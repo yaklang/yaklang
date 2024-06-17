@@ -1,4 +1,5 @@
-#!/bin/sh             
+#!/bin/sh -e
+
 
 echo "Start to Test SSAAPI"
 go test -timeout 20s ./common/yak/ssaapi/...
