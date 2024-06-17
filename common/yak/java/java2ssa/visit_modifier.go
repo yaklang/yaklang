@@ -123,7 +123,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			refAlias := []string{
 				"_ref", "_",
 			}
-			log.Infof("start to build annotation ref to def: (%v)%v", value.GetId(), value.String())
+			log.Infof("start to build annotation ref to def: (%v)%v", value.GetId(), value.GetName())
 			for _, name := range refAlias {
 				ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(name))
 				y.AssignVariable(ref, value)
