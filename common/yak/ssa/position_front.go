@@ -34,6 +34,20 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	}
 }
 
+func (b *FunctionBuilder) SetRangeInit(p *memedit.MemEditor) {
+	if b.CurrentRange != nil {
+		log.Warnf("init for set-range for function builder: %v, but the current range is not nil", b.name)
+		return
+	}
+
+	fullRange := p.GetFullRange()
+	if fullRange == nil {
+		log.Warnf("init for set-range for function builder: %v, but the full range is nil", b.name)
+		return
+	}
+	b.CurrentRange = NewRange(p, fullRange.GetStart(), fullRange.GetEnd())
+}
+
 func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *Range {
 	if b.CurrentRange != nil {
 		return b.CurrentRange
