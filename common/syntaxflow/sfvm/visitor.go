@@ -2,10 +2,12 @@ package sfvm
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
@@ -156,92 +158,89 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 
 	log.Warnf("TBD: VisitConditionExpression: %v", raw.GetText())
 	switch i := raw.(type) {
+	case *sf.FilterConditionContext:
+		// TODO
+		log.Infof("TODO: FilterConditionContext: %v", i.GetText())
+	case *sf.OpcodeTypeConditionContext:
+		ops := make([]string, 0, len(i.AllOpcodes()))
+		for _, opcode := range i.AllOpcodes() {
+			switch opcode.GetText() {
+			case "call":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeCall])
+			case "phi":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodePhi])
+			case "const", "constant":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst])
+			case "param", "formal_param":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeParameter])
+			case "return":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeReturn])
+			default:
+				log.Errorf("unknown opcode: %s", opcode.GetText())
+			}
+		}
+		y.EmitCompareOpcode(ops)
+	case *sf.StringInConditionContext:
+	case *sf.FilterExpressionCompareContext:
+		if i.NumberLiteral() != nil {
+			n := y.VisitNumberLiteral(i.NumberLiteral())
+			y.EmitPushLiteral(n)
+		} else if i.Identifier() != nil {
+			y.EmitPushLiteral(i.Identifier().GetText())
+		} else {
+			if i.GetText() == "true" {
+				y.EmitPushLiteral(true)
+			} else {
+				y.EmitPushLiteral(false)
+			}
+		}
+		y.EmitOperator(i.GetOp().GetText())
+	case *sf.FilterExpressionRegexpMatchContext:
+		if i.StringLiteral() != nil {
+			r, glob := y.VisitStringLiteral(i.StringLiteral())
+			if glob {
+				y.EmitPushGlob(r)
+				if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
+					y.EmitOperator("!")
+				}
+				return nil
+			} else {
+				r, err := regexp.Compile(regexp.QuoteMeta(r))
+				if err != nil {
+					panic("golang regexp: regexp compile failed: " + err.Error())
+				}
+				y.EmitRegexpMatch(r.String())
+				return nil
+			}
+		}
+
+		if i.RegexpLiteral() != nil {
+			result := i.RegexpLiteral().GetText()
+			result = result[1 : len(result)-1]
+			result = strings.ReplaceAll(result, `\/`, `/`)
+			re, err := regexp.Compile(result)
+			if err != nil {
+				panic("golang regexp: regexp compile failed: " + err.Error())
+			}
+			y.EmitRegexpMatch(result)
+			if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
+				y.EmitOperator("!")
+			}
+			return re
+		}
+		panic("BUG: in regexp match")
+	case *sf.FilterExpressionAndContext:
+		for _, exp := range i.AllConditionExpression() {
+			y.VisitConditionExpression(exp)
+		}
+		y.EmitOperator("&&")
+	case *sf.FilterExpressionOrContext:
+		for _, exp := range i.AllConditionExpression() {
+			y.VisitConditionExpression(exp)
+		}
+		y.EmitOperator("||")
 	default:
-		_ = i
-		//case *sf.FilterExpressionNumberContext:
-		//	y.EmitPushLiteral(y.VisitNumberLiteral(i.NumberLiteral()))
-		//	y.EmitOperator("==")
-		//case *sf.FilterExpressionStringContext:
-		//	text, globMode := y.VisitStringLiteral(i.StringLiteral())
-		//	if !globMode {
-		//		y.EmitPushLiteral(text)
-		//		y.EmitOperator("==")
-		//	} else {
-		//		y.EmitPushGlob(text)
-		//	}
-		//case *sf.FilterExpressionRegexpContext:
-		//	result := i.RegexpLiteral().GetText()
-		//	result = result[1 : len(result)-1]
-		//	result = strings.ReplaceAll(result, `\/`, `/`)
-		//	re, err := regexp.Compile(result)
-		//	if err != nil {
-		//		panic("golang regexp: regexp compile failed: " + err.Error())
-		//	}
-		//	y.EmitRegexpMatch(result)
-		//	return re
-		//case *sf.FilterExpressionParenContext:
-		//	return y.VisitConditionExpression(i.ConditionExpression())
-		//case *sf.FilterExpressionNotContext:
-		//	y.VisitConditionExpression(i.ConditionExpression())
-		//	y.EmitOperator("!")
-		//case *sf.FilterExpressionCompareContext:
-		//	if i.NumberLiteral() != nil {
-		//		n := y.VisitNumberLiteral(i.NumberLiteral())
-		//		y.EmitPushLiteral(n)
-		//	} else if i.Identifier() != nil {
-		//		y.EmitPushLiteral(i.Identifier().GetText())
-		//	} else {
-		//		if i.GetText() == "true" {
-		//			y.EmitPushLiteral(true)
-		//		} else {
-		//			y.EmitPushLiteral(false)
-		//		}
-		//	}
-		//	y.EmitOperator(i.GetOp().GetText())
-		//case *sf.FilterExpressionRegexpMatchContext:
-		//	if i.StringLiteral() != nil {
-		//		r, glob := y.VisitStringLiteral(i.StringLiteral())
-		//		if glob {
-		//			y.EmitPushGlob(r)
-		//			if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
-		//				y.EmitOperator("!")
-		//			}
-		//			return nil
-		//		} else {
-		//			r, err := regexp.Compile(regexp.QuoteMeta(r))
-		//			if err != nil {
-		//				panic("golang regexp: regexp compile failed: " + err.Error())
-		//			}
-		//			y.EmitRegexpMatch(r.String())
-		//			return nil
-		//		}
-		//	}
-		//
-		//	if i.RegexpLiteral() != nil {
-		//		result := i.RegexpLiteral().GetText()
-		//		result = result[1 : len(result)-1]
-		//		result = strings.ReplaceAll(result, `\/`, `/`)
-		//		re, err := regexp.Compile(result)
-		//		if err != nil {
-		//			panic("golang regexp: regexp compile failed: " + err.Error())
-		//		}
-		//		y.EmitRegexpMatch(result)
-		//		if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
-		//			y.EmitOperator("!")
-		//		}
-		//		return re
-		//	}
-		//	panic("BUG: in regexp match")
-		//case *sf.FilterExpressionAndContext:
-		//	for _, exp := range i.AllConditionExpression() {
-		//		y.VisitConditionExpression(exp)
-		//	}
-		//	y.EmitOperator("&&")
-		//case *sf.FilterExpressionOrContext:
-		//	for _, exp := range i.AllConditionExpression() {
-		//		y.VisitConditionExpression(exp)
-		//	}
-		//	y.EmitOperator("||")
+		log.Errorf("unexpected condition expression: %T", i)
 	}
 
 	return nil

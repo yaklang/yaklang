@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 var _ ValueOperator = &ValueList{}
@@ -20,6 +21,10 @@ func NewValues(values []ValueOperator) ValueOperator {
 
 type ValueList struct {
 	values []ValueOperator
+}
+
+func (v *ValueList) GetOpcode() string {
+	return ""
 }
 
 func (v *ValueList) Recursive(f func(operator ValueOperator) error) error {
@@ -161,7 +166,7 @@ func (v *ValueList) ExactMatch(mod int, s string) (bool, ValueOperator, error) {
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) GlobMatch(mod int, s Glob) (bool, ValueOperator, error) {
+func (v *ValueList) GlobMatch(mod int, s ssa.Glob) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
 		match, next, err := value.GlobMatch(mod, s)

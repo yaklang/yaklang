@@ -119,6 +119,13 @@ func (v *SyntaxFlowVisitor) EmitPushLiteral(i any) {
 
 }
 
+func (v *SyntaxFlowVisitor) EmitCompareOpcode(i []string) {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpCompareOpcode,
+		Values: i,
+	})
+}
+
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {
 	case string:
@@ -206,12 +213,6 @@ func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, ValueOpera
 func (y *SyntaxFlowVisitor) EmitPop() {
 	y.codes = append(y.codes, &SFI{
 		OpCode: OpPop,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpCheckStackTop,
 	})
 }
 

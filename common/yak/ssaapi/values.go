@@ -364,14 +364,6 @@ func (v *Value) GetConst() *ssa.Const {
 	}
 }
 
-func (v *Value) GetOpcode() ssa.Opcode {
-	if v.IsNil() {
-		return ssa.SSAOpcodeUnKnow
-	}
-
-	return v.node.GetOpcode()
-}
-
 func (v *Value) IsModifySelf() bool {
 	if v.IsNil() {
 		return false

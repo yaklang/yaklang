@@ -3,9 +3,13 @@ package ssa
 import (
 	"regexp"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
+
+type Glob interface {
+	Match(string) bool
+	String() string
+}
 
 func (c *Cache) GetByVariableExact(mod int, name string) []Instruction {
 	// return c._getByVariableEx(isMember,
@@ -26,7 +30,7 @@ func (c *Cache) GetByVariableExact(mod int, name string) []Instruction {
 }
 
 // GetByVariableGlob means get variable name(glob).
-func (c *Cache) GetByVariableGlob(mod int, g sfvm.Glob) []Instruction {
+func (c *Cache) GetByVariableGlob(mod int, g Glob) []Instruction {
 	if c.HaveDatabaseBackend() {
 		var insts []Instruction
 		ch := ssadb.GlobSearchVariable(c.DB, mod, g.String())
