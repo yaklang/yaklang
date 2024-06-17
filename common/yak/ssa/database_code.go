@@ -256,7 +256,6 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		if sideEffect == nil {
 			continue
 		}
-		log.Warnf("SideEffect is not supported yet: %v", sideEffect.Name)
 	}
 
 	for _, b := range f.Blocks {
