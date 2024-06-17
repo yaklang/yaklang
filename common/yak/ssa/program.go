@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
 
@@ -46,13 +47,20 @@ func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Func
 	if fun == nil {
 		fun = pkg.NewFunction(funcName)
 	}
+
+	if fun.GetRange() == nil {
+		if editor := prog.getCurrentEditor(); editor != nil {
+			fun.SetRangeInit(editor)
+		} else {
+			log.Warnf("the program must contains a editor to init function range: %v", prog.Name)
+		}
+	}
+
 	return fun
 }
 
 // create or get main function builder
 func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
-	editor := prog.getCurrentEditor()
-	_ = editor
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {

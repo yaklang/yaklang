@@ -208,6 +208,14 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 	return NewPosition(1, 0), errors.New("position not found")
 }
 
+func (ve *MemEditor) GetRangeOffset(start, end int) RangeIf {
+	return NewRange(ve.GetPositionByOffset(start), ve.GetPositionByOffset(end))
+}
+
+func (ve *MemEditor) GetFullRange() RangeIf {
+	return ve.GetRangeOffset(0, len(ve.sourceCode))
+}
+
 // GetTextFromRangeWithError 根据Range获取文本，优先使用Offset，其次使用Line和Column
 func (ve *MemEditor) GetTextFromRangeWithError(r RangeIf) (string, error) {
 	start := r.GetStart()

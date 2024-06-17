@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -123,6 +124,13 @@ func (c *anInstruction) SetRange(pos *Range) {
 	// if c.Pos == nil {
 	c.R = pos
 	// }
+}
+
+func (c *anInstruction) SetRangeInit(editor *memedit.MemEditor) {
+	if c.R == nil {
+		fullRange := editor.GetFullRange()
+		c.R = NewRange(editor, fullRange.GetStart(), fullRange.GetEnd())
+	}
 }
 
 func (c *anInstruction) IsExtern() bool   { return c.isExtern }

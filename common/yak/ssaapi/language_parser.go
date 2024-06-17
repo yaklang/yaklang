@@ -108,7 +108,7 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 		}
 	}()
 
-	prog, builder, err := c.init(path)
+	prog, builder, err := c.init(path, r)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 	return prog, nil
 }
 
-func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
+func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	LanguageBuilder := c.Builder
 	language := c.language
 	programName := c.DatabaseProgramName
@@ -202,11 +202,13 @@ func (c *config) init(path string) (*ssa.Program, *ssa.FunctionBuilder, error) {
 		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
 
+	prog.PushEditor(editor)
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	// TODO: this extern info should be set in program
 	builder.WithExternLib(c.externLib)
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithDefineFunction(c.defineFunc)
+	builder.SetRangeInit(editor)
 	return prog, builder, nil
 }

@@ -39,6 +39,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		referenceFiles: omap.NewOrderedMap(map[string]string{}),
 	}
 	f.SetName(name)
+
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,
@@ -47,6 +48,15 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		p.Funcs[name] = f
 	}
 	p.Prog.SetVirtualRegister(f)
+	// function 's Range is essential!
+	if f.GetRange() == nil {
+		if editor := p.Prog.getCurrentEditor(); editor != nil {
+			f.SetRangeInit(editor)
+		} else {
+			log.Warnf("the program must contains a editor to init function range: %v", p.Prog.Name)
+		}
+	}
+
 	f.EnterBlock = f.NewBasicBlock("entry")
 	return f
 }
