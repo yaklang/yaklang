@@ -122,6 +122,8 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 	return prog, nil
 }
 
+var SkippedError = ssareducer.SkippedError
+
 func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	LanguageBuilder := c.Builder
 	language := c.language

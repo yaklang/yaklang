@@ -1,7 +1,5 @@
 package ssautil
 
-import "github.com/yaklang/yaklang/common/log"
-
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
@@ -68,9 +66,9 @@ func (base *ScopedVersionedTable[T]) Merge(
 
 		// generate phi
 		// handler(name, m)
-		if len(m) > 1 {
-			log.Infof("merge phi %s: edges count: %v", name, len(m))
-		}
+		//if len(m) > 1 {
+		//	log.Infof("merge phi %s: edges count: %v", name, len(m))
+		//}
 		ret := merge(name, m)
 		v := base.CreateVariable(name, false)
 		base.AssignVariable(v, ret)
