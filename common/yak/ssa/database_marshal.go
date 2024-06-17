@@ -42,6 +42,12 @@ func fetchIds(origin any) any {
 			ids[i] = ret[i].GetId()
 		}
 		return ids
+	case []Value:
+		ids = make([]int64, len(ret))
+		for i := 0; i < len(ret); i++ {
+			ids[i] = ret[i].GetId()
+		}
+		return ids
 	default:
 		t := reflect.TypeOf(origin).Kind()
 		if t == reflect.Array || t == reflect.Slice {
@@ -98,7 +104,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 				element["member_call_kind"] = se.MemberCallKind
 				element["member_call_object_index"] = se.MemberCallObjectIndex
 				element["member_call_name"] = se.MemberCallObjectName
-				element["member_call_key"] = se.MemberCallKey.GetId()
+				if se.MemberCallKey != nil {
+					element["member_call_key"] = se.MemberCallKey.GetId()
+				}
 			}
 			sideEffects = append(sideEffects, element)
 		}
@@ -250,7 +258,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["member_call_kind"] = ret.MemberCallKind
 		params["member_call_index"] = ret.MemberCallObjectIndex
 		params["member_call_name"] = ret.MemberCallObjectName
-		params["member_call_key"] = ret.MemberCallKey.GetId()
+		if ret.MemberCallKey != nil {
+			params["member_call_key"] = ret.MemberCallKey.GetId()
+		}
 		// params["member_call_obj"] = ret.GetObject().GetId()
 	case *Phi:
 		params["phi_edges"] = marshalValues(ret.Edge)
@@ -430,7 +440,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.MemberCallKind = ParameterMemberCallKind(params["member_call_kind"].(float64))
 		ret.MemberCallObjectIndex = int(params["member_call_index"].(float64))
 		ret.MemberCallObjectName = params["member_call_name"].(string)
-		ret.MemberCallKey = newLazyInstruction(params["member_call_key"])
+		if key, ok := params["member_call_key"]; ok {
+			ret.MemberCallKey = newLazyInstruction(key)
+		}
 	case *Phi:
 		ret.Edge = unmarshalValues(params["phi_edges"])
 		if cfgEntry, ok := params["cfg_entry"]; ok {
@@ -496,23 +508,27 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.ParamLength = toInt(params["param_length"])
 		ret.FreeValues = unmarshalMapValues(params["free_values"])
 		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
-		var se []*FunctionSideEffect
-		funk.ForEach(params["side_effect"], func(a any) {
-			ins := &FunctionSideEffect{parameterMemberInner: &parameterMemberInner{}}
-			extra := utils.InterfaceToGeneralMap(a)
-			// name / verbose_name / modified / forcecreate
-			ins.Name = utils.MapGetString(extra, "name")
-			ins.VerboseName = utils.MapGetString(extra, "verbose_name")
-			ins.Modify = newLazyInstruction(extra["modify"])
-			ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
-			ins.ObjectName = utils.MapGetString(extra, "object_name")
-			ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
-			ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")
-			ins.MemberCallObjectName = utils.MapGetString(extra, "member_call_name")
-			ins.MemberCallKey = newLazyInstruction(extra["member_call_key"])
-			se = append(se, ins)
-		})
-		ret.SideEffects = se
+		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {
+			var se []*FunctionSideEffect
+			funk.ForEach(params["side_effect"], func(a any) {
+				ins := &FunctionSideEffect{parameterMemberInner: &parameterMemberInner{}}
+				extra := utils.InterfaceToGeneralMap(a)
+				// name / verbose_name / modified / forcecreate
+				ins.Name = utils.MapGetString(extra, "name")
+				ins.VerboseName = utils.MapGetString(extra, "verbose_name")
+				ins.Modify = newLazyInstruction(extra["modify"])
+				ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
+				ins.ObjectName = utils.MapGetString(extra, "object_name")
+				ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
+				ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")
+				ins.MemberCallObjectName = utils.MapGetString(extra, "member_call_name")
+				if extra["member_call_key"] != nil {
+					ins.MemberCallKey = newLazyInstruction(extra["member_call_key"])
+				}
+				se = append(se, ins)
+			})
+			ret.SideEffects = se
+		}
 		if parent, ok := params["parent"]; ok {
 			ret.parent = newLazyInstruction(parent)
 		}
@@ -528,17 +544,16 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if deferBlock, ok := params["defer_block"]; ok {
 			ret.DeferBlock = newLazyInstruction(deferBlock)
 		}
-		
+
 		ret.referenceFiles = omap.NewOrderedMap(map[string]string{})
-		funk.ForEach(params["reference_files"], func(a any) {
-			results, ok := a.([]string)
-			if !ok {
-				return
-			}
-			if len(results) > 1 {
-				ret.referenceFiles.Set(results[0], results[1])
-			}
-		})
+		if refs := params["reference_files"]; refs != nil && funk.IsIteratee(refs) {
+			funk.ForEach(params["reference_files"], func(a any) {
+				results := a.([]string)
+				if len(results) > 1 {
+					ret.referenceFiles.Set(results[0], results[1])
+				}
+			})
+		}
 		ret.hasEllipsis = params["has_ellipsis"].(bool)
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
