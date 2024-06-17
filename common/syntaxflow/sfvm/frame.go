@@ -3,6 +3,7 @@ package sfvm
 import (
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
@@ -37,12 +38,6 @@ type SFFrame struct {
 
 	StatementStack *utils.Stack[int]
 }
-
-type Glob interface {
-	Match(string) bool
-	String() string
-}
-
 type GlobEx struct {
 	Origin glob.Glob
 	Rule   string
@@ -153,10 +148,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog(">> duplicate ")
 		v := s.stack.Peek()
 		s.stack.Push(v)
-	case OpCheckStackTop:
-		// if s.stack.Len() == 0 {
-		// 	return utils.Errorf("stack top is empty")
-		// }
 	case OpPushSearchExact:
 		s.debugSubLog(">> pop match exactly: %v", i.UnaryStr)
 		value := s.stack.Pop()
@@ -420,6 +411,22 @@ func (s *SFFrame) execStatement(i *SFI) error {
 				s.info.Description.Set("$"+i.UnaryStr, thenStr)
 			}
 		}
+	case OpCompareOpcode:
+		s.debugSubLog(">> pop")
+		values := s.stack.Pop()
+		if values == nil {
+			return utils.Error("BUG: get top defs failed, empty stack")
+		}
+		res := make([]ValueOperator, 0)
+		values.Recursive(func(vo ValueOperator) error {
+			if slices.Contains(i.Values, vo.GetOpcode()) {
+				res = append(res, vo)
+			}
+			return nil
+		})
+		callLen := len(res)
+		s.debugSubLog("<< push arg len: %v", callLen)
+		s.stack.Push(NewValues(res))
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		panic(msg)

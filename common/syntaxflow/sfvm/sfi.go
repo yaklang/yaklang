@@ -14,14 +14,10 @@ const (
 	OpEnterStatement
 	OpExitStatement
 
+	// push input
 	OpPushInput
+	// duplicate the top of stack
 	OpDuplicate
-
-	// OpPushNumber and OpPushString and OpPushBool can push literal into stack
-	OpPushNumber
-	OpPushString
-	OpPushBool
-	OpPop
 
 	// OpPushSearchExact can push data from origin
 	OpPushSearchExact
@@ -46,6 +42,15 @@ const (
 	OpNewRef
 	OpUpdateRef
 
+	// OpPushNumber and OpPushString and OpPushBool can push literal into stack
+	OpPushNumber
+	OpPushString
+	OpPushBool
+	OpPop
+
+	// Condition
+	OpCompareOpcode
+
 	/*
 		Binary Operator
 		Fetch TWO in STACK, calc result, push result into stack
@@ -66,8 +71,6 @@ const (
 	OpReMatch
 	OpGlobMatch
 	OpNot
-
-	OpCheckStackTop
 
 	// OpCheckParams check the params in vm context
 	// if not match, record error
@@ -145,6 +148,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "new$ref", s.UnaryStr)
 	case OpUpdateRef:
 		return fmt.Sprintf(verboseLen+" %v", "update$ref", s.UnaryStr)
+	case OpCompareOpcode:
+		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
@@ -169,8 +174,6 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
-	case OpCheckStackTop:
-		return fmt.Sprint("check stack top")
 	case OpCheckParams:
 		var suffix string
 		if ret := s.ValueByIndex(0); ret != "" {
