@@ -1588,7 +1588,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value) {
 		class := y.GetClassBluePrint(className)
 		obj := y.EmitMakeWithoutType(nil, nil)
 		if class == nil {
-			log.Errorf("class  %v instantiation failed.", className)
+			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
 			obj.SetType(ssa.GetAnyType())
 
 			args := []ssa.Value{obj}

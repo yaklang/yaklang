@@ -4,6 +4,8 @@ import "io/fs"
 
 // FileSystem defines the methods of an abstract filesystem.
 type FileSystem interface {
+	ReadFile(name string) ([]byte, error)
+
 	Open(name string) (fs.File, error)
 	// RelOpen(name string) (fs.File, error)
 

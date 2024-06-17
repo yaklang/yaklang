@@ -51,6 +51,8 @@ func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Func
 
 // create or get main function builder
 func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
+	editor := prog.getCurrentEditor()
+	_ = editor
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {

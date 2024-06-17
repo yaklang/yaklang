@@ -28,6 +28,15 @@ func NewVirtualFs() *VirtualFS {
 	return vs
 }
 
+func (vs *VirtualFS) ReadFile(name string) ([]byte, error) {
+	raw, err := vs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer raw.Close()
+	return io.ReadAll(raw)
+}
+
 func (vs *VirtualFS) GetLocalFSPath() string {
 	return ""
 }

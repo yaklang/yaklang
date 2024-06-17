@@ -83,7 +83,7 @@ func (c *ClassBluePrint) SetMethod(m map[string]*Function) {
 func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 	if c._container != nil {
 		// set the container ref key to the method
-		log.Infof("bind %v.%v to function: %v", c.Name, key, fun.String())
+		log.Infof("bind %v.%v to function: %v", c.Name, key, fun.name)
 		funcContainsklass := c._container.GetFunc()
 		if funcContainsklass != nil && funcContainsklass.builder != nil {
 			builder := funcContainsklass.builder
