@@ -130,11 +130,14 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		if newName == "" {
 			return nil, utils.Errorf("newname is required")
 		}
-		err := os.Rename(absPath, filepath.Join(dirname, newName))
+		if !filepath.IsAbs(newName) { // Compatible abs path and relative path
+			newName = filepath.Join(dirname, newName)
+		}
+		err := os.Rename(absPath, newName)
 		if err != nil {
 			return nil, utils.Errorf("cannot rename file[%s]: %s", u.GetPath(), err)
 		}
-		absPath = filepath.Join(dirname, newName)
+		absPath = newName
 	case "content":
 		fallthrough
 	default:
