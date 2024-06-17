@@ -24,7 +24,7 @@ func Test_PackageLoader(t *testing.T) {
 		if _, data, err := loader.LoadFilePackage("index.txt", false); err != nil {
 			t.Fatal(err)
 		} else {
-			require.Equalf(t, "index", ToString(data), "LoadFilePackage failed for index.txt, got: %s", ToString(data))
+			require.Equalf(t, "index", data.GetSourceCode(), "LoadFilePackage failed for index.txt, got: %s", data.GetSourceCode())
 		}
 	})
 
@@ -33,7 +33,7 @@ func Test_PackageLoader(t *testing.T) {
 		if _, data, err := loader.LoadFilePackage("index.txt", true); err != nil {
 			t.Fatal(err)
 		} else {
-			require.Equalf(t, "index", ToString(data), "LoadFilePackage failed for index.txt, got: %s", ToString(data))
+			require.Equalf(t, "index", data.GetSourceCode(), "LoadFilePackage failed for index.txt, got: %s", data.GetSourceCode())
 		}
 		if _, _, err := loader.LoadFilePackage("index.txt", true); err == nil {
 			t.Fatalf("LoadFilePackage should failed for index.txt")
@@ -53,7 +53,7 @@ func Test_PackageLoader(t *testing.T) {
 		if _, data, err := loader.LoadFilePackage("c.txt", false); err != nil {
 			t.Fatal(err)
 		} else {
-			require.Equalf(t, "c", ToString(data), "LoadFilePackage failed for c.txt, got: %s", ToString(data))
+			require.Equalf(t, "c", data.GetSourceCode(), "LoadFilePackage failed for c.txt, got: %s", data.GetSourceCode())
 		}
 	})
 
