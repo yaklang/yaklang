@@ -183,15 +183,21 @@ func (f *Function) Finish() {
 		t := p.GetType()
 		return t
 	})
-	funType.ReturnType = handlerReturnType(f.Return)
+	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i Value, _ int) (*Return, bool) {
+		return ToReturn(i)
+	}))
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
-	funType.ReturnValue = f.Return
+	funType.ReturnValue = lo.FilterMap(f.Return, func(i Value, _ int) (*Return, bool) {
+		return ToReturn(i)
+	})
 	funType.ParameterLen = f.ParamLength
 	funType.ParameterValue = lo.FilterMap(f.Params, func(i Value, _ int) (*Parameter, bool) {
 		return ToParameter(i)
 	})
-	funType.ParameterMember = f.ParameterMembers
+	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i Value, _ int) (*ParameterMember, bool) {
+		return ToParameterMember(i)
+	})
 	var result = make(map[string]*Parameter)
 	for n, p := range f.FreeValues {
 		if param, ok := ToParameter(p); ok {

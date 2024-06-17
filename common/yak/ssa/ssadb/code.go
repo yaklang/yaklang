@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -40,10 +41,11 @@ type IrCode struct {
 	CurrentFunction int64 `json:"current_function"`
 
 	// FunctionDefs
-	IsFunction       bool       `json:"is_function"`
-	FormalArgs       Int64Slice `json:"formal_args" gorm:"type:text"`
-	FreeValues       Int64Slice `json:"free_values" gorm:"type:text"`
-	MemberCallArgs   Int64Slice `json:"formal_member_call_args" gorm:"type:text"`
+	IsFunction     bool       `json:"is_function"`
+	FormalArgs     Int64Slice `json:"formal_args" gorm:"type:text"`
+	FreeValues     Int64Slice `json:"free_values" gorm:"type:text"`
+	MemberCallArgs Int64Slice `json:"formal_member_call_args" gorm:"type:text"`
+
 	SideEffects      Int64Slice `json:"side_effects" gorm:"type:text"`
 	IsVariadic       bool       `json:"is_variadic"`
 	ReturnCodes      Int64Slice `json:"return_codes" gorm:"type:text"`
@@ -160,15 +162,18 @@ func (r *IrCode) GetIdInt() int {
 func (r *IrCode) SetExtraInfo(params map[string]any) {
 	results, err := json.Marshal(params)
 	if err != nil {
-		log.Warnf("BUG: cannot fetch instruction's extra info: %v", err)
+		log.Warnf("BUG: cannot fetch instruction's extra info: %v, origin: %s", err, spew.Sdump(params))
 	}
 	r.ExtraInformation = string(results)
 }
 
 func (r *IrCode) GetExtraInfo() map[string]any {
 	results := make(map[string]any)
+	if r.ExtraInformation == "" {
+		return results
+	}
 	if err := json.Unmarshal([]byte(r.ExtraInformation), &results); err != nil {
-		log.Warnf("BUG: cannot fetch instruction's extra info: %v", err)
+		log.Warnf("BUG: cannot fetch instruction's extra info: %v, origin: %v", err, r.ExtraInformation)
 	}
 	return results
 }

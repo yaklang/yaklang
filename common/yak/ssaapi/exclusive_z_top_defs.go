@@ -251,7 +251,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if utils.IsValidInteger(retIndexRawStr) {
 				targetIdx := codec.Atoi(retIndexRawStr)
 				var traceRets Values
-				for _, retIns := range inst.Return {
+				for _, retInsRaw := range inst.Return {
+					retIns, ok := ssa.ToReturn(retInsRaw)
+					if !ok {
+						log.Warnf("BUG: %T is not *Return", retInsRaw)
+						continue
+					}
 					for idx, traceVal := range retIns.Results {
 						if idx == targetIdx {
 							traceRets = append(traceRets, i.NewValue(traceVal).AppendEffectOn(i))
@@ -264,7 +269,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			} else {
 				// string literal member
 				var traceRets Values
-				for _, retIns := range inst.Return {
+				for _, retInsRaw := range inst.Return {
+					retIns, ok := ssa.ToReturn(retInsRaw)
+					if !ok {
+						log.Warnf("BUG: %T is not *Return", retInsRaw)
+						continue
+					}
 					for _, traceVal := range retIns.Results {
 						val, ok := traceVal.GetStringMember(retIndexRawStr)
 						if ok {
