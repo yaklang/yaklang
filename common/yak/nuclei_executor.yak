@@ -1,7 +1,7 @@
 nucleiPoC = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN"]
 execNuclei = func(target) {
     nucleiPocName = nucleiPoC.ScriptName
-	log.Info("start to execute: %s [%v]", nucleiPocName, target)
+	// log.Info("start to execute: %s [%v]", nucleiPocName, target)
 	res, err = nuclei.Scan(
         target,
         nuclei.exactTemplateIns(nucleiPoC),
@@ -11,7 +11,7 @@ execNuclei = func(target) {
 		yakit.Error("failed to scan[%v]: %s", target, err)
 		return
 	}
-    log.Info("waiting results for: %v to: %v", nucleiPocName, target)
+    // log.Info("waiting results for: %v to: %v", nucleiPocName, target)
 	for pocVul = range res {
 		yakit.Output(pocVul)
 		yakit.Output(nuclei.PocVulToRisk(pocVul))
