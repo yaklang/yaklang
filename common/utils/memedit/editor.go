@@ -365,20 +365,14 @@ func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
 
 	// 扩展起始偏移到前一个单词边界
 	startWordOffset := startOffset
-	raw := ve.safeSourceCode.Slice1(startWordOffset - 1)
-	if len(raw) > 0 {
-		for startWordOffset > 0 && !boundary(rune(raw[0])) {
-			startWordOffset--
-		}
+	for startWordOffset > 0 && !boundary(rune(ve.safeSourceCode.Slice1(startWordOffset-1))) {
+		startWordOffset--
 	}
 
 	// 扩展结束偏移到后一个单词边界
 	endWordOffset := endOffset
-	raw = ve.safeSourceCode.Slice1(endWordOffset)
-	if len(raw) > 0 {
-		for endWordOffset < ve.safeSourceCode.Len() && !boundary(rune(raw[0])) {
-			endWordOffset++
-		}
+	for endWordOffset < ve.safeSourceCode.Len() && !boundary(ve.safeSourceCode.Slice1(endWordOffset)) {
+		endWordOffset++
 	}
 
 	return NewRange(ve.GetPositionByOffset(startWordOffset), ve.GetPositionByOffset(endWordOffset))
