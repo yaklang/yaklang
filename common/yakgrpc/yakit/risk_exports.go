@@ -762,6 +762,18 @@ func CheckRandomTriggerByToken(t string) (*tpb.RandomPortTriggerEvent, error) {
 	return event, nil
 }
 
+func CheckServerReachable(ctx context.Context, target string, httpCheck bool) (*tpb.CheckServerReachableResponse, error) {
+	ctx, client, conn, err := cybertunnel.GetClient(ctx, consts.GetDefaultPublicReverseServer(), consts.GetDefaultPublicReverseServerPassword())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	return client.CheckServerReachable(ctx, &tpb.CheckServerReachableRequest{
+		Url:       target,
+		HttpCheck: httpCheck,
+	})
+}
+
 //
 //var (
 //	RiskExports = map[string]interface{}{

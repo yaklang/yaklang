@@ -123,21 +123,16 @@ message QuerySpecificICMPLengthTriggerResponse {
 }
 
 message CheckServerReachableRequest {
-  string Server = 1;
+  string Url = 1;
   bool HttpCheck = 2;
-  HTTPSimpleFlow HttpFlow = 3;
 }
 
-message HTTPSimpleFlow {
-  bool IsHttps = 1;
-  bytes HttpRequest = 2;
-  bytes HttpResponse = 3;
-}
+
 
 message CheckServerReachableResponse {
   bool Reachable = 1;
-  HTTPSimpleFlow HttpFlow = 2;
-  string Verbose = 3;
+  string Verbose = 2;
+  bytes HTTPResponse = 3;
 }
 
 
