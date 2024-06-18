@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/dlclark/regexp2"
 	tablewriter "github.com/olekukonko/tablewriter"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -31,7 +32,7 @@ type FingerprintInfo struct {
 	CPEs             []string                         `json:"cpes"`
 	Raw              string                           `json:"raw"`
 	Banner           string                           `json:"banner"`
-	CPEFromUrls      map[string][]*webfingerprint.CPE `json:"cpe_from_urls"`
+	CPEFromUrls      map[string][]*rule.CPE `json:"cpe_from_urls"`
 	HttpFlows        []*HTTPFlow                      `json:"http_flows"`
 
 	// tls info for fill...
@@ -39,13 +40,13 @@ type FingerprintInfo struct {
 }
 
 type HTTPFlow struct {
-	StatusCode     int                   `json:"status_code"`
-	IsHTTPS        bool                  `json:"is_https"`
-	RequestHeader  []byte                `json:"request_header"`
-	RequestBody    []byte                `json:"request_body"`
-	ResponseHeader []byte                `json:"response_header"`
-	ResponseBody   []byte                `json:"response_body"`
-	CPEs           []*webfingerprint.CPE `json:"cp_es"`
+	StatusCode     int         `json:"status_code"`
+	IsHTTPS        bool        `json:"is_https"`
+	RequestHeader  []byte      `json:"request_header"`
+	RequestBody    []byte      `json:"request_body"`
+	ResponseHeader []byte      `json:"response_header"`
+	ResponseBody   []byte      `json:"response_body"`
+	CPEs           []*rule.CPE `json:"cp_es"`
 }
 
 func (f *FingerprintInfo) FromRegexp2Match(match *regexp2.Match) {

@@ -206,6 +206,9 @@ jobs:
           - name: Test Tar Gzip Embed
             run: |
               go test --timeout 30s ./common/utils/gzip_embed/test/...
+          - name: Test FP Scan
+            run: |
+              go test --timeout 30s ./common/fp/...
 
     steps:
       - name: Cache YakLang Project

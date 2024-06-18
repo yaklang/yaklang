@@ -119,7 +119,7 @@ var SynScanCmd = cli.Command{
 
 		// 解析指纹配置
 		// web rule
-		webRules, _ := fp.GetDefaultWebFingerprintRules()
+		webRules, _ := fp.LoadDefaultFingerprintRules()
 		userRule := webfingerprint.FileOrDirToWebRules(c.String("rule-path"))
 
 		if c.Bool("only-rule") {
