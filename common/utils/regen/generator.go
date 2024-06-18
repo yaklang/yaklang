@@ -1,11 +1,13 @@
 package regen
 
 import (
+	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"math/rand"
 	"regexp/syntax"
 	"unicode"
+
+	"github.com/pkg/errors"
 )
 
 type generatorFactory func(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error)
@@ -100,9 +102,15 @@ func init() {
 }
 
 type internalGenerator struct {
-	Name         string
-	GenerateFunc func() []string
-	cache        []string
+	Name               string
+	GenerateFunc       func() []string
+	GenerateStreamFunc func(context.Context, chan string) error
+	cache              []string
+}
+
+func (gen *internalGenerator) GenerateStream(ctx context.Context, ch chan string) error {
+	// todo: cache
+	return gen.GenerateStreamFunc(ctx, ch)
 }
 
 func (gen *internalGenerator) Generate() []string {
@@ -123,6 +131,15 @@ func (gen *internalGenerator) Peek() []string {
 		gen.cache = gen.GenerateFunc()
 	}
 	return gen.cache
+}
+
+func (gen *internalGenerator) RealPeek() string {
+	ch := make(chan string)
+	ctx, cancel := context.WithCancel(context.Background())
+	go gen.GenerateStream(ctx, ch)
+	s := <-ch
+	cancel()
+	return s
 }
 
 func (gen *internalGenerator) CheckVisible(str string) bool {
@@ -212,38 +229,98 @@ func newGeneratorVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (generat
 		regexp, simplified)
 }
 
+func tryPutChannel(ctx context.Context, ch chan string, str string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case ch <- str:
+		return nil
+	}
+}
+
+func tryGetChannel(ctx context.Context, ch chan string) (string, error) {
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case str := <-ch:
+		return str, nil
+	}
+}
+
 func noop(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return []string{""}
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return []string{""}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			return tryPutChannel(ctx, c, "")
+		},
+	}, nil
 }
 
 func opEmptyMatch(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return []string{""}
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return []string{""}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			return tryPutChannel(ctx, c, "")
+		},
+	}, nil
 }
 
 func opLiteral(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return []string{runesToString(regexp.Rune...)}
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return []string{runesToString(regexp.Rune...)}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			return tryPutChannel(ctx, c, runesToString(regexp.Rune...))
+		},
+	}, nil
 }
 
 func opAnyChar(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return AllRunesAsString
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(), GenerateFunc: func() []string {
+			return AllRunesAsString
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			for _, s := range AllRunesAsString {
+				if err := tryPutChannel(ctx, c, s); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}, nil
 }
 
 func opAnyCharOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		if len(AllRunesAsString) > 0 {
-			return []string{AllRunesAsString[rand.Intn(len(AllRunesAsString))]}
-		}
-		return []string{""}
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			if len(AllRunesAsString) > 0 {
+				return []string{AllRunesAsString[rand.Intn(len(AllRunesAsString))]}
+			}
+			return []string{""}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+
+			if len(AllRunesAsString) > 0 {
+				return tryPutChannel(ctx, c, AllRunesAsString[rand.Intn(len(AllRunesAsString))])
+			}
+			return tryPutChannel(ctx, c, "")
+		},
+	}, nil
 }
 
 // opAnyCharVisibleOne 函数为 OpAnyChar 操作符返回一个 generator，该 generator 只生成一个可见字符。
@@ -252,6 +329,10 @@ func opAnyCharVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalG
 		Name: regexp.String(),
 		GenerateFunc: func() []string {
 			return []string{VisibleRunesAsString[rand.Intn(len(VisibleRunesAsString))]}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			return tryPutChannel(ctx, c, VisibleRunesAsString[rand.Intn(len(VisibleRunesAsString))])
 		},
 	}, nil
 }
@@ -289,24 +370,36 @@ func opAnyCharNotNlVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*inte
 }
 
 func opQuest(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	return createRepeatingGenerator(regexp, args, 0, 1)
 }
 
 func opQuestOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return []string{""}
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return []string{""}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			return tryPutChannel(ctx, c, "")
+		},
+	}, nil
 }
 
 func opQuestVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return []string{""}
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return []string{""}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			return tryPutChannel(ctx, c, "")
+		},
+	}, nil
 }
 
 func opStar(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	return createRepeatingGenerator(regexp, args, noBound, noBound)
 }
 
@@ -319,7 +412,6 @@ func opStarVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGene
 }
 
 func opPlus(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	return createRepeatingGenerator(regexp, args, 1, noBound)
 }
 
@@ -329,7 +421,6 @@ func opPlusOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, 
 
 func opPlusVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
 	return createRepeatingGeneratorVisibleOne(regexp, args, 1, noBound)
-
 }
 
 func opRepeat(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
@@ -339,12 +430,12 @@ func opRepeat(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, e
 func opRepeatOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
 	return createRepeatingGeneratorOne(regexp, args, regexp.Min, regexp.Min)
 }
+
 func opRepeatVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
 	return createRepeatingGeneratorVisibleOne(regexp, args, regexp.Min, noBound)
 }
 
 func opCharClass(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	charClass, err := parseCharClass(regexp.Rune)
 	if err != nil {
 		return nil, err
@@ -353,7 +444,6 @@ func opCharClass(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator
 }
 
 func opCharClassOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	charClass, err := parseCharClass(regexp.Rune)
 	if err != nil {
 		return nil, err
@@ -373,19 +463,40 @@ func opCharClassVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*interna
 }
 
 func opConcat(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenerator, error) {
-
 	generators, err := newGenerators(regexp.Sub, genArgs)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating generators for concat pattern /%s/", regexp)
 	}
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var sets [][]string
-		for _, generator := range generators {
-			sets = append(sets, generator.Generate())
-		}
-		return ProductString(sets...)
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var sets [][]string
+			for _, generator := range generators {
+				sets = append(sets, generator.Generate())
+			}
+			return ProductString(sets...)
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+
+			var multiSets [][]string
+			for _, generator := range generators {
+				sets := make([]string, 0)
+				newCh := make(chan string)
+				go generator.GenerateStreamFunc(ctx, newCh)
+
+				for s := range newCh {
+					sets = append(sets, s)
+				}
+				multiSets = append(multiSets, sets)
+			}
+
+			return ProductStringWithCallback(multiSets, func(s string) error {
+				return tryPutChannel(ctx, c, s)
+			})
+		},
+	}, nil
 }
 
 func opConcatOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenerator, error) {
@@ -394,18 +505,45 @@ func opConcatOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenera
 		return nil, errors.Wrapf(err, "error creating generators for concat pattern /%s/", regexp)
 	}
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var sets [][]string
-		for _, generator := range generators {
-			rets := generator.Generate()
-			if len(rets) > 0 {
-				sets = append(sets, []string{rets[rand.Intn(len(rets))]})
-			} else {
-				sets = append(sets, []string{""})
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var sets [][]string
+			for _, generator := range generators {
+				rets := generator.Generate()
+				if len(rets) > 0 {
+					sets = append(sets, []string{rets[rand.Intn(len(rets))]})
+				} else {
+					sets = append(sets, []string{""})
+				}
 			}
-		}
-		return ProductString(sets...)
-	}}, nil
+			return ProductString(sets...)
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+
+			var multiSets [][]string
+			for _, generator := range generators {
+				sets := make([]string, 0)
+				newCh := make(chan string)
+				go generator.GenerateStreamFunc(ctx, newCh)
+
+				for s := range newCh {
+					sets = append(sets, s)
+				}
+				if len(sets) > 0 {
+					sets = []string{sets[rand.Intn(len(sets))]}
+				} else {
+					sets = []string{""}
+				}
+				multiSets = append(multiSets, sets)
+			}
+
+			return ProductStringWithCallback(multiSets, func(s string) error {
+				return tryPutChannel(ctx, c, s)
+			})
+		},
+	}, nil
 }
 
 func opConcatVisibleOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenerator, error) {
@@ -416,31 +554,70 @@ func opConcatVisibleOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*interna
 	}
 
 	// 2. Concatenate the generated strings
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var sets [][]string
-		for i, generator := range generators {
-			if generator.Name == "\\b" && i > 0 && i < len(generators)-1 {
-				prevGenerated := sets[len(sets)-1][0]   // Last generated string for previous pattern
-				nextString := generators[i+1].Peek()[0] // Fetch a sample string from the next generator without actually generating it
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var sets [][]string
+			for i, generator := range generators {
+				if generator.Name == "\\b" && i > 0 && i < len(generators)-1 {
+					prevGenerated := sets[len(sets)-1][0]   // Last generated string for previous pattern
+					nextString := generators[i+1].Peek()[0] // Fetch a sample string from the next generator without actually generating it
 
-				if !isWordBoundaryCompatible(lastChar(prevGenerated), firstChar(nextString)) {
-					if isWordBoundaryCompatible('a', firstChar(nextString)) {
-						sets[len(sets)-1][0] += "a"
-					} else if isWordBoundaryCompatible(' ', firstChar(nextString)) {
-						// If "a" doesn't work, try with " "
-						sets[len(sets)-1][0] += " "
+					if !isWordBoundaryCompatible(lastChar(prevGenerated), firstChar(nextString)) {
+						if isWordBoundaryCompatible('a', firstChar(nextString)) {
+							sets[len(sets)-1][0] += "a"
+						} else if isWordBoundaryCompatible(' ', firstChar(nextString)) {
+							// If "a" doesn't work, try with " "
+							sets[len(sets)-1][0] += " "
+						}
 					}
 				}
+				rets := generator.Generate()
+				if len(rets) > 0 {
+					sets = append(sets, []string{rets[rand.Intn(len(rets))]})
+				} else {
+					sets = append(sets, []string{""})
+				}
 			}
-			rets := generator.Generate()
-			if len(rets) > 0 {
-				sets = append(sets, []string{rets[rand.Intn(len(rets))]})
-			} else {
-				sets = append(sets, []string{""})
+			return ProductString(sets...)
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			multiSets := make([][]string, 0)
+			for i, generator := range generators {
+				if generator.Name == "\\b" && i > 0 && i < len(generators)-1 {
+					prevGenerated := multiSets[len(multiSets)-1][0] // Last generated string for previous pattern
+					nextString := generators[i+1].RealPeek()        // Fetch a sample string from the next generator without actually generating it
+
+					if !isWordBoundaryCompatible(lastChar(prevGenerated), firstChar(nextString)) {
+						if isWordBoundaryCompatible('a', firstChar(nextString)) {
+							multiSets[len(multiSets)-1][0] += "a"
+						} else if isWordBoundaryCompatible(' ', firstChar(nextString)) {
+							// If "a" doesn't work, try with " "
+							multiSets[len(multiSets)-1][0] += " "
+						}
+					}
+				}
+
+				sets := make([]string, 0)
+				newCh := make(chan string)
+				go generator.GenerateStreamFunc(ctx, newCh)
+				for s := range newCh {
+					sets = append(sets, s)
+				}
+				if len(sets) > 0 {
+					sets = []string{sets[rand.Intn(len(sets))]}
+				} else {
+					sets = []string{""}
+				}
+				multiSets = append(multiSets, sets)
 			}
-		}
-		return ProductString(sets...)
-	}}, nil
+
+			return ProductStringWithCallback(multiSets, func(s string) error {
+				return tryPutChannel(ctx, c, s)
+			})
+		},
+	}, nil
 }
 
 func opAlternate(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenerator, error) {
@@ -449,13 +626,29 @@ func opAlternate(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenera
 		return nil, errors.Wrapf(err, "error creating generators for alternate pattern /%s/", regexp)
 	}
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var sets []string
-		for _, generator := range generators {
-			sets = append(sets, generator.Generate()...)
-		}
-		return sets
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var sets []string
+			for _, generator := range generators {
+				sets = append(sets, generator.Generate()...)
+			}
+			return sets
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			for _, generator := range generators {
+				newCh := make(chan string)
+				go generator.GenerateStreamFunc(ctx, newCh)
+				for s := range newCh {
+					if err := tryPutChannel(ctx, c, s); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	}, nil
 }
 
 func opAlternateOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenerator, error) {
@@ -464,17 +657,31 @@ func opAlternateOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGen
 		return nil, errors.Wrapf(err, "error creating generators for alternate pattern /%s/", regexp)
 	}
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var sets []string
-		if len(generators) > 0 {
-			generator := generators[rand.Intn(len(generators))]
-			return generator.Generate()
-		}
-		for _, generator := range generators {
-			sets = append(sets, generator.Generate()...)
-		}
-		return sets
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var sets []string
+			if len(generators) > 0 {
+				generator := generators[rand.Intn(len(generators))]
+				return generator.Generate()
+			}
+			return sets
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			if len(generators) > 0 {
+				newCh := make(chan string)
+				generator := generators[rand.Intn(len(generators))]
+				go generator.GenerateStreamFunc(ctx, c)
+				for s := range newCh {
+					if err := tryPutChannel(ctx, c, s); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	}, nil
 }
 
 func opAlternateVisibleOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*internalGenerator, error) {
@@ -483,21 +690,34 @@ func opAlternateVisibleOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*inte
 		return nil, errors.Wrapf(err, "error creating generators for alternate pattern /%s/", regexp)
 	}
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var sets []string
-		if len(generators) > 0 {
-			generator := generators[rand.Intn(len(generators))]
-			return generator.Generate()
-		}
-		for _, generator := range generators {
-			sets = append(sets, generator.Generate()...)
-		}
-		return sets
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var sets []string
+			if len(generators) > 0 {
+				generator := generators[rand.Intn(len(generators))]
+				return generator.Generate()
+			}
+			return sets
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+			if len(generators) > 0 {
+				newCh := make(chan string)
+				generator := generators[rand.Intn(len(generators))]
+				go generator.GenerateStreamFunc(ctx, c)
+				for s := range newCh {
+					if err := tryPutChannel(ctx, c, s); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	}, nil
 }
 
 func opCapture(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	if err := enforceSingleSub(regexp); err != nil {
 		return nil, err
 	}
@@ -510,13 +730,19 @@ func opCapture(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, 
 
 	index := regexp.Cap - 1
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return args.CaptureGroupHandler(index, regexp.Name, groupRegexp, generator, args)
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return args.CaptureGroupHandler(index, regexp.Name, groupRegexp, generator, args)
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			// todo: impl capture group with channel handler, use default for now
+			return generator.GenerateStream(ctx, c)
+		},
+	}, nil
 }
 
 func opCaptureOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	if err := enforceSingleSub(regexp); err != nil {
 		return nil, err
 	}
@@ -529,13 +755,19 @@ func opCaptureOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerato
 
 	index := regexp.Cap - 1
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return args.CaptureGroupHandler(index, regexp.Name, groupRegexp, generator, args)
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return args.CaptureGroupHandler(index, regexp.Name, groupRegexp, generator, args)
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			// todo: impl capture group with channel handler, use default for now
+			return generator.GenerateStream(ctx, c)
+		},
+	}, nil
 }
 
 func opCaptureVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
-
 	if err := enforceSingleSub(regexp); err != nil {
 		return nil, err
 	}
@@ -548,9 +780,16 @@ func opCaptureVisibleOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalG
 
 	index := regexp.Cap - 1
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		return args.CaptureGroupHandler(index, regexp.Name, groupRegexp, generator, args)
-	}}, nil
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			return args.CaptureGroupHandler(index, regexp.Name, groupRegexp, generator, args)
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			// todo: impl capture group with channel handler, use default for now
+			return generator.GenerateStream(ctx, c)
+		},
+	}, nil
 }
 
 func defaultCaptureGroupHandler(index int, name string, group *syntax.Regexp, generator Generator, args *GeneratorArgs) []string {
@@ -566,9 +805,22 @@ func enforceSingleSub(regexp *syntax.Regexp) error {
 }
 
 func createCharClassGenerator(name string, charClass *tCharClass, args *GeneratorArgs) (*internalGenerator, error) {
-	return &internalGenerator{Name: name, GenerateFunc: func() []string {
-		return charClass.GetAllRuneAsString()
-	}}, nil
+	return &internalGenerator{
+		Name: name,
+		GenerateFunc: func() []string {
+			return charClass.GetAllRuneAsString()
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+
+			for _, s := range charClass.GetAllRuneAsString() {
+				if err := tryPutChannel(ctx, c, s); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}, nil
 }
 
 func createRepeatingGenerator(regexp *syntax.Regexp, genArgs *GeneratorArgs, min, max int) (*internalGenerator, error) {
@@ -589,21 +841,51 @@ func createRepeatingGenerator(regexp *syntax.Regexp, genArgs *GeneratorArgs, min
 		max = min + 1
 	}
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		var results []string
-		gengerated := generator.Generate()
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			var results []string
+			generated := generator.Generate()
 
-		sets := make([][]string, 0, min)
-		for i := 0; i < min; i++ {
-			sets = append(sets, gengerated)
-		}
-		for i := min; i <= max; i++ {
-			results = append(results, ProductString(sets...)...)
-			sets = append(sets, gengerated)
-		}
+			sets := make([][]string, 0, min)
+			for i := 0; i < min; i++ {
+				sets = append(sets, generated)
+			}
+			for i := min; i <= max; i++ {
+				results = append(results, ProductString(sets...)...)
+				sets = append(sets, generated)
+			}
 
-		return results
-	}}, nil
+			return results
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
+
+			newCh := make(chan string)
+			go generator.GenerateStream(ctx, newCh)
+
+			var err error
+			generated := make([]string, 0)
+			for s := range newCh {
+				generated = append(generated, s)
+			}
+			sets := make([][]string, 0, min)
+			for i := 0; i < min; i++ {
+				sets = append(sets, generated)
+			}
+			for i := min; i <= max; i++ {
+				ProductStringWithCallback(sets, func(s string) error {
+					if err = tryPutChannel(ctx, c, s); err != nil {
+						return err
+					}
+					return nil
+				})
+				sets = append(sets, generated)
+			}
+
+			return err
+		},
+	}, nil
 }
 
 func createRepeatingGeneratorOne(regexp *syntax.Regexp, genArgs *GeneratorArgs, min, max int) (*internalGenerator, error) {
@@ -616,18 +898,26 @@ func createRepeatingGeneratorOne(regexp *syntax.Regexp, genArgs *GeneratorArgs, 
 		return nil, errors.Wrapf(err, "failed to create generator for subexpression: /%s/", regexp)
 	}
 
-	if min == noBound {
-		min = 0
-	}
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			generated := generator.Generate()
+			return []string{generated[rand.Intn(len(generated))]}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
 
-	if max == noBound {
-		max = min + 1
-	}
+			newCh := make(chan string)
+			go generator.GenerateStream(ctx, newCh)
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		genegerated := generator.Generate()
-		return []string{genegerated[rand.Intn(len(genegerated))]}
-	}}, nil
+			generated := make([]string, 0)
+			for s := range newCh {
+				generated = append(generated, s)
+			}
+
+			return tryPutChannel(ctx, c, generated[rand.Intn(len(generated))])
+		},
+	}, nil
 }
 
 func createRepeatingGeneratorVisibleOne(regexp *syntax.Regexp, genArgs *GeneratorArgs, min, max int) (*internalGenerator, error) {
@@ -640,16 +930,24 @@ func createRepeatingGeneratorVisibleOne(regexp *syntax.Regexp, genArgs *Generato
 		return nil, errors.Wrapf(err, "failed to create generator for subexpression: /%s/", regexp)
 	}
 
-	if min == noBound {
-		min = 0
-	}
+	return &internalGenerator{
+		Name: regexp.String(),
+		GenerateFunc: func() []string {
+			generated := generator.Generate()
+			return []string{generated[rand.Intn(len(generated))]}
+		},
+		GenerateStreamFunc: func(ctx context.Context, c chan string) error {
+			defer close(c)
 
-	if max == noBound {
-		max = min + 1
-	}
+			newCh := make(chan string)
+			go generator.GenerateStream(ctx, newCh)
 
-	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
-		genegerated := generator.Generate()
-		return []string{genegerated[rand.Intn(len(genegerated))]}
-	}}, nil
+			generated := make([]string, 0)
+			for s := range newCh {
+				generated = append(generated, s)
+			}
+
+			return tryPutChannel(ctx, c, generated[rand.Intn(len(generated))])
+		},
+	}, nil
 }

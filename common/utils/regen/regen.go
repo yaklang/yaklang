@@ -1,6 +1,7 @@
 package regen
 
 import (
+	"context"
 	"regexp/syntax"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -29,8 +30,52 @@ func (a *GeneratorArgs) initialize() error {
 
 type Generator interface {
 	Generate() []string
+	GenerateStream(context.Context, chan string) error
 	String() string
 	CheckVisible(str string) bool
+}
+
+func GenerateStream(pattern string) (chan string, context.CancelFunc, error) {
+	generator, err := NewGenerator(pattern, &GeneratorArgs{
+		Flags: syntax.Perl,
+	})
+	ch := make(chan string)
+	if err != nil {
+		return nil, nil, err
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateStream(ctx, ch)
+	return ch, cancel, nil
+}
+
+func GenerateOneStream(pattern string) (string, error) {
+	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
+		Flags: syntax.Perl,
+	})
+	ch := make(chan string)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateStream(ctx, ch)
+	defer cancel()
+
+	return <-ch, nil
+}
+
+func GenerateVisibleOneStream(pattern string) (string, error) {
+	generator, err := NewGeneratorVisibleOne(pattern, &GeneratorArgs{
+		Flags: syntax.Perl,
+	})
+	ch := make(chan string)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go generator.GenerateStream(ctx, ch)
+	defer cancel()
+
+	return <-ch, nil
 }
 
 // Generate 根据正则表达式生成所有匹配的字符串，返回生成的字符串切片和错误

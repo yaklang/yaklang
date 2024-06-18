@@ -14,6 +14,23 @@ func runesToString(runes ...rune) string {
 	return buffer.String()
 }
 
+func ProductStringWithCallback(sets [][]string, callback func(string) error) error {
+	if len(sets) == 0 {
+		return callback("")
+	}
+	lens := func(i int) int { return len(sets[i]) }
+	for ix := make([]int, len(sets)); ix[0] < lens(0); nextIndex(ix, lens) {
+		var r string
+		for j, k := range ix {
+			r += sets[j][k]
+		}
+		if err := callback(r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ProductString(sets ...[]string) []string {
 	if len(sets) == 0 {
 		return []string{""}

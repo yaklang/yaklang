@@ -5,23 +5,100 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 )
 
-func Test_ExampleGenerate(t *testing.T) {
-	pattern := `(abc|bcd){2}`
-	results, _ := Generate(pattern)
+func testAllAndStream(t *testing.T, pattern string) {
+	t.Helper()
 
-	fmt.Printf("%#v\n", results)
+	results, err := Generate(pattern)
+	require.NoError(t, err)
+
+	ch, cancel, err := GenerateStream(pattern)
+	require.NoError(t, err)
+	defer cancel()
+
+	results2 := make([]string, 0, len(results))
+	for result := range ch {
+		results2 = append(results2, result)
+	}
+
+	require.ElementsMatch(t, results, results2)
 }
 
-func Test_GenerateOne(t *testing.T) {
-	pattern := `(?:ATGPlatform/([\d.]+))?`
-	result, _ := GenerateOne(pattern)
-	spew.Dump(result)
-	result, _ = GenerateVisibleOne(pattern)
-	spew.Dump(result)
+func testOneAndStream(t *testing.T, pattern string) {
+	t.Helper()
+
+	re := regexp.MustCompile(pattern)
+	result, err := GenerateOne(pattern)
+	require.NoError(t, err)
+
+	result2, err := GenerateOneStream(pattern)
+	require.NoError(t, err)
+
+	// we can't use require.Equal here because the order of the runes in the string is not guaranteed
+	// require.Equal(t, result, result2)
+	require.True(t, re.MatchString(result))
+	require.True(t, re.MatchString(result2))
 }
+
+func testVisibleOneAndStream(t *testing.T, pattern string) {
+	t.Helper()
+
+	re := regexp.MustCompile(pattern)
+	result, err := GenerateVisibleOne(pattern)
+	require.NoError(t, err)
+
+	result2, err := GenerateVisibleOneStream(pattern)
+	require.NoError(t, err)
+
+	// we can't use require.Equal here because the order of the runes in the string is not guaranteed
+	// require.Equal(t, result, result2)
+	require.True(t, re.MatchString(result))
+	require.True(t, re.MatchString(result2))
+}
+
+func Test_Smoke_Generate(t *testing.T) {
+	testAllAndStream(t, `aab`)
+	testAllAndStream(t, `.?1*2+3{1}`)
+	testAllAndStream(t, `22|33`)
+	testAllAndStream(t, `(1|2){2,3}`)
+}
+
+func Test_Smoke_GenerateOne(t *testing.T) {
+	testOneAndStream(t, `aab`)
+	testOneAndStream(t, `.?1*2+3{1}`)
+	testOneAndStream(t, `22|33`)
+	testOneAndStream(t, `(1|2){2,3}`)
+	testOneAndStream(t, `(?:ATGPlatform/([\d.]+))?`)
+}
+
+func Test_Smoke_GenerateVisibleOne(t *testing.T) {
+	testVisibleOneAndStream(t, `aab`)
+	testVisibleOneAndStream(t, `.?1*2+3{1}`)
+	testVisibleOneAndStream(t, `22|33`)
+	testVisibleOneAndStream(t, `(1|2){2,3}`)
+	testVisibleOneAndStream(t, `(?:ATGPlatform/([\d.]+))?`)
+}
+
+func Test_ExampleGenerateStream(t *testing.T) {
+	pattern := `(1|2){2,3}`
+	ch, cancel, err := GenerateStream(pattern)
+	defer cancel()
+	require.NoError(t, err)
+
+	for result := range ch {
+		fmt.Printf("%s\n", result)
+	}
+}
+
+// func Test_GenerateOne(t *testing.T) {
+// 	pattern := `(?:ATGPlatform/([\d.]+))?`
+// 	result, _ := GenerateOne(pattern)
+// 	spew.Dump(result)
+// 	result, _ = GenerateVisibleOne(pattern)
+// 	spew.Dump(result)
+// }
 
 func BenchmarkGenerate(b *testing.B) {
 	pattern := `\w{3}`
@@ -30,7 +107,7 @@ func BenchmarkGenerate(b *testing.B) {
 	}
 }
 
-func TestGenerateVisibleOne(t *testing.T) {
+func Test_GenerateVisibleOne(t *testing.T) {
 	type args struct {
 		patterns []string
 	}
@@ -123,7 +200,9 @@ func TestGenerateVisibleOne(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var gotAll []string
+			var gotStreamAll []string
 			var err error
+
 			for _, pattern := range tt.args.patterns {
 				got, e := GenerateVisibleOne(pattern)
 				t.Logf("pattern: %s, got: [%s]", pattern, got)
@@ -131,16 +210,26 @@ func TestGenerateVisibleOne(t *testing.T) {
 					err = e
 				}
 				gotAll = append(gotAll, got)
+
+				got2, e := GenerateVisibleOneStream(pattern)
+				t.Logf("pattern: %s, got: [%s]", pattern, got)
+				if e != nil {
+					err = e
+				}
+				gotStreamAll = append(gotStreamAll, got2)
 			}
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateVisibleOne() error = %v, wantErr %v", err, tt.wantErr)
-				return
+
+			if tt.wantErr {
+				require.Error(t, err)
 			}
+
 			for i, g := range gotAll {
 				re := regexp.MustCompile(tt.wantRes[i])
-				if !re.MatchString(g) {
-					t.Errorf("GenerateVisibleOne() got = %v, which doesn't match the pattern %v", g, tt.wantRes[i])
-				}
+				require.Truef(t, re.MatchString(g), "GenerateVisibleOne() got = %v, which doesn't match the pattern %v", g, tt.wantRes[i])
+			}
+			for i, g := range gotStreamAll {
+				re := regexp.MustCompile(tt.wantRes[i])
+				require.Truef(t, re.MatchString(g), "GenerateVisibleOneStream() got = %v, which doesn't match the pattern %v", g, tt.wantRes[i])
 			}
 		})
 	}
