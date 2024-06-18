@@ -106,8 +106,7 @@ conditionExpression
     : filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
     |  Opcode ':' opcodes (',' opcodes) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
     |  negativeCondition? In ':' stringLiteralWithoutStarGroup         # StringInCondition      // something like .(in: 'a', 'b')
-    |  negativeCondition? Have ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
-    |  negativeCondition? HaveAny ':' stringLiteralWithoutStarGroup    # StringContainAnyCondition // something like .(any: 'a', 'b')
+    |  negativeCondition? (Have | HaveAny) ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
     | '(' conditionExpression ')'                                                # ParenCondition
     | '!' conditionExpression                                                    # NotCondition
     | op = (

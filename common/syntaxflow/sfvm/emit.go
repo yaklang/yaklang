@@ -126,6 +126,14 @@ func (v *SyntaxFlowVisitor) EmitCompareOpcode(i []string) {
 	})
 }
 
+func (v *SyntaxFlowVisitor) EmitCompareString(i []string) {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpCompareString,
+		Values: i,
+	})
+}
+
+
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {
 	case string:
