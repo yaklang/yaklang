@@ -7,7 +7,7 @@ import (
 )
 
 func TestSimple(t *testing.T) {
-	t.Run("TestSimple", func(t *testing.T) {
+	t.Run("Test opcode", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		aa = 1 // constant
 		ab = b // undefined
@@ -54,6 +54,44 @@ func TestSimple(t *testing.T) {
 			map[string][]string{
 				"target1": {`"araaa"`, `"abcccc"`},
 				"target2": {`"abcccc"`},
+			},
+		)
+	})
+
+	t.Run("negative condition", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = "araaa"
+		ab = "abcccc"
+		ac = b // undefined
+		`,
+			`
+		a* as $target1
+		$target1?{not have: abc} as $target2
+		$target1?{! opcode: const} as $target3
+		`,
+			map[string][]string{
+				"target1": {`"araaa"`, `"abcccc"`, "Undefined-ac"},
+				"target2": {`"araaa"`, "Undefined-ac"},
+				"target3": {"Undefined-ac"},
+			},
+		)
+	})
+
+	t.Run("logical condition", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = "araaa"
+		ab = abcccc()
+		ac = "abcccc"
+		`,
+			`
+		a* as $target1
+		$target1?{(have: abc) && (opcode: const)} as $target2
+		$target1?{(! have: ara) && ((have: abc) || (opcode: const))} as $target3
+		`,
+			map[string][]string{
+				"target1": {`"araaa"`, `"abcccc"`, "Undefined-abcccc", "Undefined-abcccc()"},
+				"target2": {`"abcccc"`},
+				"target3": {"Undefined-abcccc()", "Undefined-abcccc", `"abcccc"`},
 			},
 		)
 	})

@@ -49,6 +49,8 @@ const (
 	OpPop
 
 	// Condition
+	// use the []bool  && []Value of stack top, push result into stack
+	OpCondition
 	OpCompareOpcode
 	OpCompareString
 
@@ -153,6 +155,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
 	case OpCompareString:
 		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
+	case OpCondition:
+		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
@@ -175,6 +179,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) &&", s.UnaryStr)
 	case OpLogicOr:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
+	case OpLogicBang:
+		return fmt.Sprintf(verboseLen+" %v", "(operator) !", s.UnaryStr)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpCheckParams:

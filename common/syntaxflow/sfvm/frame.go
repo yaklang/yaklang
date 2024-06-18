@@ -29,12 +29,13 @@ type SFFrame struct {
 
 	info *SFFrameInfo
 
-	symbolTable *omap.OrderedMap[string, ValueOperator]
-	stack       *utils.Stack[ValueOperator]
-	Text        string
-	Codes       []*SFI
-	toLeft      bool
-	debug       bool
+	symbolTable    *omap.OrderedMap[string, ValueOperator]
+	stack          *utils.Stack[ValueOperator]
+	conditionStack *utils.Stack[[]bool]
+	Text           string
+	Codes          []*SFI
+	toLeft         bool
+	debug          bool
 
 	StatementStack *utils.Stack[int]
 }
@@ -57,11 +58,12 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
 	}
 	return &SFFrame{
-		info:        NewSFFrameInfo(),
-		symbolTable: v,
-		stack:       utils.NewStack[ValueOperator](),
-		Text:        text,
-		Codes:       codes,
+		info:           NewSFFrameInfo(),
+		symbolTable:    v,
+		stack:          utils.NewStack[ValueOperator](),
+		conditionStack: utils.NewStack[[]bool](),
+		Text:           text,
+		Codes:          codes,
 
 		StatementStack: utils.NewStack[int](),
 	}
@@ -417,31 +419,78 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if values == nil {
 			return utils.Error("BUG: get top defs failed, empty stack")
 		}
-		res := make([]ValueOperator, 0)
+		res := make([]bool, 0, valuesLen(values))
 		values.Recursive(func(vo ValueOperator) error {
 			if slices.Contains(i.Values, vo.GetOpcode()) {
-				res = append(res, vo)
+				res = append(res, true)
+			} else {
+				res = append(res, false)
 			}
 			return nil
 		})
-		callLen := len(res)
-		s.debugSubLog("<< push arg len: %v", callLen)
-		s.stack.Push(NewValues(res))
+		s.conditionStack.Push(res)
 	case OpCompareString:
 		s.debugSubLog(">> pop")
 		values := s.stack.Pop()
 		if values == nil {
 			return utils.Error("BUG: get top defs failed, empty stack")
 		}
-		res := make([]ValueOperator, 0)
+		res := make([]bool, 0, valuesLen(values))
 		values.Recursive(func(vo ValueOperator) error {
 			if utils.StringContainsAnyOfSubString(vo.String(), i.Values) {
-				res = append(res, vo)
+				res = append(res, true)
+			} else {
+				res = append(res, false)
 			}
 			return nil
 		})
-		callLen := len(res)
-		s.debugSubLog("<< push arg len: %v", callLen)
+		s.conditionStack.Push(res)
+	case OpLogicBang:
+		conds := s.conditionStack.Pop()
+		for i := 0; i < len(conds); i++ {
+			conds[i] = !conds[i]
+		}
+		s.conditionStack.Push(conds)
+	case OpLogicAnd:
+		conds1 := s.conditionStack.Pop()
+		conds2 := s.conditionStack.Pop()
+		if len(conds1) != len(conds2) {
+			return utils.Errorf("condition failed: stack top(%v) vs conds(%v)", len(conds1), len(conds2))
+		}
+		res := make([]bool, 0, len(conds1))
+		for i := 0; i < len(conds1); i++ {
+			res = append(res, conds1[i] && conds2[i])
+		}
+		s.conditionStack.Push(res)
+	case OpLogicOr:
+		conds1 := s.conditionStack.Pop()
+		conds2 := s.conditionStack.Pop()
+		if len(conds1) != len(conds2) {
+			return utils.Errorf("condition failed: stack top(%v) vs conds(%v)", len(conds1), len(conds2))
+		}
+		res := make([]bool, 0, len(conds1))
+		for i := 0; i < len(conds1); i++ {
+			res = append(res, conds1[i] || conds2[i])
+		}
+		s.conditionStack.Push(res)
+	case OpCondition:
+		s.debugSubLog(">> pop")
+		vs := s.stack.Pop()
+		if vs == nil {
+			return utils.Error("BUG: get top defs failed, empty stack")
+		}
+		conds := s.conditionStack.Pop()
+		if len(conds) != valuesLen(vs) {
+			return utils.Errorf("condition failed: stack top(%v) vs conds(%v)", valuesLen(vs), len(conds))
+		}
+		res := make([]ValueOperator, 0, valuesLen(vs))
+		for i := 0; i < len(conds); i++ {
+			if conds[i] {
+				if v, err := vs.ListIndex(i); err == nil {
+					res = append(res, v)
+				}
+			}
+		}
 		s.stack.Push(NewValues(res))
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
