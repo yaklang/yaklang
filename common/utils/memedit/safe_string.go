@@ -45,11 +45,19 @@ func (s *SafeString) SliceBeforeStart(end int) string {
 	return string(s.bytes[:end])
 }
 
-func (s *SafeString) Slice1(idx int) string {
-	if s.utf8Valid {
-		return string(s.runes[idx])
+func (s *SafeString) Slice1(idx int) rune {
+	if idx < 0 {
+		return 0
 	}
-	return string([]byte{s.bytes[idx]})
+
+	if idx >= s.Len() {
+		return 0
+	}
+
+	if s.utf8Valid {
+		return s.runes[idx]
+	}
+	return rune(s.bytes[idx])
 }
 
 func (s *SafeString) String() string {
