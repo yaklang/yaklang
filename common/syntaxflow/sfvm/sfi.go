@@ -50,6 +50,7 @@ const (
 
 	// Condition
 	OpCompareOpcode
+	OpCompareString
 
 	/*
 		Binary Operator
@@ -149,6 +150,8 @@ func (s *SFI) String() string {
 	case OpUpdateRef:
 		return fmt.Sprintf(verboseLen+" %v", "update$ref", s.UnaryStr)
 	case OpCompareOpcode:
+		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
+	case OpCompareString:
 		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)

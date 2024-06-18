@@ -42,4 +42,20 @@ func TestSimple(t *testing.T) {
 		)
 	})
 
+	t.Run("string condition", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = "araaa"
+		ab = "abcccc"
+		`,
+			`
+		a* as $target1
+		$target1?{have: abc} as $target2
+		`,
+			map[string][]string{
+				"target1": {`"araaa"`, `"abcccc"`},
+				"target2": {`"abcccc"`},
+			},
+		)
+	})
+
 }

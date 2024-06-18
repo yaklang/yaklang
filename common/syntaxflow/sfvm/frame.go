@@ -427,6 +427,22 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		callLen := len(res)
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.stack.Push(NewValues(res))
+	case OpCompareString:
+		s.debugSubLog(">> pop")
+		values := s.stack.Pop()
+		if values == nil {
+			return utils.Error("BUG: get top defs failed, empty stack")
+		}
+		res := make([]ValueOperator, 0)
+		values.Recursive(func(vo ValueOperator) error {
+			if utils.StringContainsAnyOfSubString(vo.String(), i.Values) {
+				res = append(res, vo)
+			}
+			return nil
+		})
+		callLen := len(res)
+		s.debugSubLog("<< push arg len: %v", callLen)
+		s.stack.Push(NewValues(res))
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		panic(msg)
