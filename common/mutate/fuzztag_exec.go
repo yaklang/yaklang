@@ -22,12 +22,17 @@ func NewFuzzTagConfig() *FuzzTagConfig {
 	}
 }
 
+func (f *FuzzTagConfig) AddFuzzTag(name string, t *FuzzTagDescription) {
+	AddFuzzTagDescriptionToMap(f.tagMethodMap, t)
+}
+
 func (f *FuzzTagConfig) AddFuzzTagHandler(name string, handler func(string) []string) {
 	AddFuzzTagDescriptionToMap(f.tagMethodMap, &FuzzTagDescription{
 		TagName: name,
 		Handler: handler,
 	})
 }
+
 func (f *FuzzTagConfig) AddFuzzTagHandlerEx(name string, handler func(string) []*fuzztag.FuzzExecResult) {
 	AddFuzzTagDescriptionToMap(f.tagMethodMap, &FuzzTagDescription{
 		TagName:   name,
@@ -42,16 +47,25 @@ func Fuzz_WithSimple(b bool) FuzzConfigOpt {
 		config.isSimple = b
 	}
 }
+
 func Fuzz_SyncTag(b bool) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		config.syncRootNodeIndex = b
 	}
 }
+
+func Fuzz_WithExtraFuzzTag(tag string, t *FuzzTagDescription) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.AddFuzzTag(tag, t)
+	}
+}
+
 func Fuzz_WithExtraFuzzTagHandler(tag string, handler func(string) []string) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		config.AddFuzzTagHandler(tag, handler)
 	}
 }
+
 func Fuzz_WithExtraDynFuzzTagHandler(tag string, handler func(string) []string) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		config.tagMethodMap[tag] = &parser.TagMethod{
@@ -141,6 +155,7 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	}
 	return res, nil
 }
+
 func MutateQuick(i interface{}) (finalResult []string) {
 	defer func() {
 		if err := recover(); err != nil {
