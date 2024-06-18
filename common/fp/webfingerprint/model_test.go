@@ -22,8 +22,8 @@ func TestParseToCPE(t *testing.T) {
 			likeSearch: "%cpe:/a:%:aaaaa:1.1%",
 		},
 		"cpe:2.3:h:*:hikvision:*:*": {
-			origin:     "cpe:2.3:h:*:hikvision:*:*",
-			likeSearch: "%cpe:2.3:h:%:hikvision:%",
+			origin:     "cpe:/h:*:hikvision:*:*:*:*",
+			likeSearch: "%cpe:/h:%:hikvision%",
 		},
 	}
 

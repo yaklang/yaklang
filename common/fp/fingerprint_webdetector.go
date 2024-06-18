@@ -2,6 +2,9 @@ package fp
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/fp/fingerprint"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net"
 	"strconv"
@@ -81,7 +84,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	var (
 		//wg                      = new(sync.WaitGroup)
 		results     = new(sync.Map)
-		cpeAnalyzer = webfingerprint.NewCPEAnalyzer()
+		cpeAnalyzer = utils.NewCPEAnalyzer()
 		httpflows   []*HTTPFlow
 	)
 	if httpBanners != nil {
@@ -114,12 +117,13 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 
 			}
 
-			var currentCPE []*webfingerprint.CPE
+			var currentCPE []*rule.CPE
 			for _, iotdevResult := range iotdevResults {
 				result.Fingerprint.CPEs = append(result.Fingerprint.CPEs, iotdevResult.GetCPE())
 				cpeIns, _ := webfingerprint.ParseToCPE(iotdevResult.GetCPE())
+
 				if cpeIns != nil {
-					currentCPE = append(currentCPE, cpeIns)
+					currentCPE = append(currentCPE, fingerprint.LoadCPEFromWebfingerrintCPE(cpeIns))
 				}
 			}
 
@@ -135,15 +139,20 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				CPEs:           currentCPE,
 			}
 			httpflows = append(httpflows, flow)
-			cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
-			if err != nil {
-				if !strings.Contains(err.Error(), "no rules matched") {
-					continue
-				}
-			}
+			fpInfos := f.matcher.Match(info.ResponseRaw, f.rules)
+			//cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
+			//if err != nil {
+			//	if !strings.Contains(err.Error(), "no rules matched") {
+			//		continue
+			//	}
+			//}
 
+			var cpes []*rule.CPE
+			for _, fpInfo := range fpInfos {
+				cpes = append(cpes, fpInfo.CPE)
+			}
 			// 如果检测到指纹信息
-			if len(cpes) > 0 {
+			if len(fpInfos) > 0 {
 				currentCPE = append(currentCPE, cpes...)
 				urlStr := info.URL.String()
 				cpeAnalyzer.Feed(urlStr, cpes...)
@@ -155,11 +164,11 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			}
 		}
 	}
-	urlCpe := map[string][]*webfingerprint.CPE{}
+	urlCpe := map[string][]*rule.CPE{}
 	results.Range(func(key, value interface{}) bool {
 		log.Debugf("url: %s cpes: %#v", key, value)
 		_url := key.(string)
-		cpes := value.([]*webfingerprint.CPE)
+		cpes := value.([]*rule.CPE)
 		urlCpe[_url] = cpes
 		return true
 	})

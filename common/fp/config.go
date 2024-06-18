@@ -3,7 +3,7 @@ package fp
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"io/ioutil"
@@ -67,7 +67,7 @@ type Config struct {
 	CrawlerMaxUrlCount int
 
 	// 使用指定的 WebRule 来测试 Web 指纹，默认为使用默认指纹
-	WebFingerprintRules []*webfingerprint.WebRule
+	WebFingerprintRules []*rule.FingerPrintRule
 
 	// 并发池的大小配置（单体不生效）
 	PoolSize int
@@ -239,17 +239,17 @@ func WithCtx(ctx context.Context) ConfigOption {
 	}
 }
 
-func (f *Config) GenerateWebFingerprintConfigOptions() []webfingerprint.ConfigOption {
-	return []webfingerprint.ConfigOption{
-		webfingerprint.WithActiveMode(f.ActiveMode),
-		webfingerprint.WithForceAllRuleMatching(f.WebFingerprintUseAllRules),
-		webfingerprint.WithProbeTimeout(f.ProbeTimeout),
-		webfingerprint.WithWebFingerprintRules(f.WebFingerprintRules),
-		webfingerprint.WithWebFingerprintDataSize(f.FingerprintDataSize),
-		webfingerprint.WithWebProxy(f.Proxies...),
-		webfingerprint.WithRuntimeId(f.RuntimeId),
-	}
-}
+//func (f *Config) GenerateWebFingerprintConfigOptions() []webfingerprint.ConfigOption {
+//	return []webfingerprint.ConfigOption{
+//		webfingerprint.WithActiveMode(f.ActiveMode),
+//		webfingerprint.WithForceAllRuleMatching(f.WebFingerprintUseAllRules),
+//		webfingerprint.WithProbeTimeout(f.ProbeTimeout),
+//		//webfingerprint.WithWebFingerprintRules(f.WebFingerprintRules),
+//		webfingerprint.WithWebFingerprintDataSize(f.FingerprintDataSize),
+//		webfingerprint.WithWebProxy(f.Proxies...),
+//		webfingerprint.WithRuntimeId(f.RuntimeId),
+//	}
+//}
 
 func NewConfig(options ...ConfigOption) *Config {
 	config := &Config{}
@@ -289,7 +289,7 @@ func (c *Config) init() {
 
 func (c *Config) lazyInit() {
 	if len(c.WebFingerprintRules) <= 0 {
-		c.WebFingerprintRules, _ = GetDefaultWebFingerprintRules()
+		c.WebFingerprintRules, _ = LoadDefaultFingerprintRules()
 	}
 
 	if len(c.FingerprintRules) <= 0 {
@@ -484,22 +484,22 @@ func WithWebFingerprintUseAllRules(b bool) ConfigOption {
 
 // webRule servicescan 的配置选项，设置本次扫描使用的 Web 指纹规则
 // @param {interface{}} i Web 指纹规则
-func WithWebFingerprintRule(i interface{}) ConfigOption {
-	var rules []*webfingerprint.WebRule
-	switch ret := i.(type) {
-	case []byte:
-		rules, _ = webfingerprint.ParseWebFingerprintRules(ret)
-	case string:
-		e := utils.GetFirstExistedPath(ret)
-		if e != "" {
-			raw, _ := ioutil.ReadFile(e)
-			rules, _ = webfingerprint.ParseWebFingerprintRules(raw)
-		} else {
-			rules, _ = webfingerprint.ParseWebFingerprintRules([]byte(ret))
-		}
-	case []*webfingerprint.WebRule:
-		rules = ret
-	}
+func WithWebFingerprintRule(rules []*rule.FingerPrintRule) ConfigOption {
+	//var rules []*webfingerprint.WebRule
+	//switch ret := i.(type) {
+	//case []byte:
+	//	rules, _ = webfingerprint.ParseWebFingerprintRules(ret)
+	//case string:
+	//	e := utils.GetFirstExistedPath(ret)
+	//	if e != "" {
+	//		raw, _ := ioutil.ReadFile(e)
+	//		rules, _ = webfingerprint.ParseWebFingerprintRules(raw)
+	//	} else {
+	//		rules, _ = webfingerprint.ParseWebFingerprintRules([]byte(ret))
+	//	}
+	//case []*webfingerprint.WebRule:
+	//	rules = ret
+	//}
 
 	return func(config *Config) {
 		if rules == nil {
