@@ -105,10 +105,10 @@ negativeCondition: (Not | '!');
 conditionExpression
     : filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
     |  Opcode ':' opcodes (',' opcodes) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
-    |  negativeCondition? In ':' stringLiteralWithoutStarGroup         # StringInCondition      // something like .(in: 'a', 'b')
-    |  negativeCondition? (Have | HaveAny) ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
+    |  In ':' stringLiteralWithoutStarGroup         # StringInCondition      // something like .(in: 'a', 'b')
+    |  (Have | HaveAny) ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
     | '(' conditionExpression ')'                                                # ParenCondition
-    | '!' conditionExpression                                                    # NotCondition
+    | negativeCondition conditionExpression                                                    # NotCondition
     | op = (
         '>' | '<' | '=' | '==' | '>='
          | '<=' | '!='

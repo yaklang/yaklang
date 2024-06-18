@@ -156,12 +156,12 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		return nil
 	}
 
-	log.Warnf("TBD: VisitConditionExpression: %v", raw.GetText())
 	switch i := raw.(type) {
 	case *sf.FilterConditionContext:
 		// TODO
 		log.Infof("TODO: FilterConditionContext: %v", i.GetText())
 	case *sf.OpcodeTypeConditionContext:
+		y.EmitDuplicate()
 		ops := make([]string, 0, len(i.AllOpcodes()))
 		for _, opcode := range i.AllOpcodes() {
 			switch opcode.GetText() {
@@ -182,6 +182,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		y.EmitCompareOpcode(ops)
 	case *sf.StringInConditionContext:
 	case *sf.StringContainAnyConditionContext:
+		y.EmitDuplicate()
 		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
 		y.EmitCompareString(res)
 	case *sf.FilterExpressionCompareContext:
@@ -242,6 +243,11 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			y.VisitConditionExpression(exp)
 		}
 		y.EmitOperator("||")
+	case *sf.NotConditionContext:
+		y.VisitConditionExpression(i.ConditionExpression())
+		y.EmitOperator("!")
+	case *sf.ParenConditionContext:
+		y.VisitConditionExpression(i.ConditionExpression())
 	default:
 		log.Errorf("unexpected condition expression: %T", i)
 	}
