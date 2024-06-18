@@ -169,9 +169,6 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionOr.
 	VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#StringInCondition.
-	VisitStringInCondition(ctx *StringInConditionContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionAnd.
 	VisitFilterExpressionAnd(ctx *FilterExpressionAndContext) interface{}
 
@@ -183,6 +180,9 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#StringContainAnyCondition.
 	VisitStringContainAnyCondition(ctx *StringContainAnyConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#StringContainHaveCondition.
+	VisitStringContainHaveCondition(ctx *StringContainHaveConditionContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#numberLiteral.
 	VisitNumberLiteral(ctx *NumberLiteralContext) interface{}
