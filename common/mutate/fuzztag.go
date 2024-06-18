@@ -824,16 +824,17 @@ func init() {
 					n = ret
 				}
 			}
-			ch, _, err := regen.GenerateStream(pattern, ctx)
+			ch, cancel, err := regen.GenerateStream(pattern, ctx)
 			if err != nil {
 				return err
 			}
-			for i := 0; i < n; i++ {
-				select {
-				case <-ctx.Done():
-					return nil
-				case data := <-ch:
-					yield(parser.NewFuzzResultWithData(data))
+			i := 0
+			for data := range ch {
+				i++
+				yield(parser.NewFuzzResultWithData(data))
+				if i >= n {
+					cancel()
+					break
 				}
 			}
 
@@ -841,7 +842,6 @@ func init() {
 		},
 		Alias:       []string{"re:n", "regex:n", "regexp:n"},
 		Description: "使用正则生成所有可能的字符中的随机n个",
-		IsDyn:       true,
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "rangechar",
