@@ -73,7 +73,8 @@ for req in reqs {
 
                 u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
                 header, body = poc.Split(rsp)~
-                caller.MirrorHTTPFlowEx(!isSmoking, isHttps, u.String(), reqRaw, rsp, body)
+                caller.MirrorHTTPFlowExSync(!isSmoking, isHttps, u.String(), reqRaw, rsp, body)
+                sleep(float(randn(40,100))/float(1000))
             }
         } catch err {
             println("===================packet=================== \n%v" % string(req.RawHTTPRequest))
