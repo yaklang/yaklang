@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
@@ -119,8 +118,8 @@ var SynScanCmd = cli.Command{
 
 		// 解析指纹配置
 		// web rule
-		webRules, _ := fp.LoadDefaultFingerprintRules()
-		userRule := webfingerprint.FileOrDirToWebRules(c.String("rule-path"))
+		webRules, _ := fp.GetDefaultWebFingerprintRules()
+		userRule := fp.FileOrDirToWebRules(c.String("rule-path"))
 
 		if c.Bool("only-rule") {
 			webRules = userRule
@@ -151,7 +150,7 @@ var SynScanCmd = cli.Command{
 
 		scanCenterConfig, err := hybridscan.NewDefaultConfigWithSynScanConfig(synScanConfig)
 		if err != nil {
-			log.Error("default config failed: %s", err)
+			log.Errorf("default config failed: %v", err)
 			return
 		}
 
@@ -196,7 +195,7 @@ var SynScanCmd = cli.Command{
 		if c.String("output") != "" {
 			outputFile, err = os.OpenFile(c.String("output"), os.O_RDWR|os.O_CREATE, os.ModePerm)
 			if err != nil {
-				log.Error("open file %v failed; %s", c.String("output"), err)
+				log.Errorf("open file %v failed; %v", c.String("output"), err)
 			}
 			if outputFile != nil {
 				defer outputFile.Close()
@@ -253,7 +252,7 @@ var SynScanCmd = cli.Command{
 			}()
 			pool, err := fp.NewExecutingPool(context.Background(), c.Int("fingerprint-concurrent"), fpTargetChan, fpConfig)
 			if err != nil {
-				log.Error("create fingerprint execute pool failed: %s", err)
+				log.Errorf("create fingerprint execute pool failed: %v", err)
 				return
 			}
 			pool.AddCallback(func(matcherResult *fp.MatchResult, err error) {
@@ -267,7 +266,7 @@ var SynScanCmd = cli.Command{
 			})
 			err = pool.Run()
 			if err != nil {
-				log.Error("fingerprint execute pool run failed: %v", err)
+				log.Errorf("fingerprint execute pool run failed: %v", err)
 				return
 			}
 		}

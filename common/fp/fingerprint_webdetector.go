@@ -2,14 +2,17 @@ package fp
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/utils"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/fp/iotdevfp"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
@@ -33,7 +36,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	if h == "" {
 		h = ip.String()
 	}
-	isOpen, httpBanners, err := FetchBannerFromHostPortEx(iotDetectCtx, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+	isOpen, redirectInfos, err := FetchBannerFromHostPort(iotDetectCtx, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 	if err != nil {
 		if !isOpen {
 			return &MatchResult{
@@ -58,8 +61,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			},
 		}, nil
 	}
-
-	if httpBanners == nil {
+	if redirectInfos == nil {
 		// 设置初始化匹配结果
 		return &MatchResult{
 			Target: host,
@@ -87,19 +89,19 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		cpeAnalyzer = utils.NewCPEAnalyzer()
 		httpflows   []*HTTPFlow
 	)
-	if httpBanners != nil {
-		log.Debugf("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(httpBanners))
+	if redirectInfos != nil {
+		log.Debugf("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(redirectInfos))
 		result.State = OPEN
 		result.Fingerprint.ServiceName = "http"
-		for _, i := range httpBanners {
-			var iotdevResults = iotdevfp.MatchAll(i.Bytes())
+		for _, i := range redirectInfos {
+			var iotdevResults = iotdevfp.MatchAll(i.Response)
 			if result.Fingerprint == nil {
 				result.Fingerprint = &FingerprintInfo{
 					IP:          ip.String(),
 					Port:        port,
 					Proto:       TCP,
 					ServiceName: "http",
-					Banner:      strconv.Quote(string(i.Bytes())),
+					Banner:      strconv.Quote(string(i.Response)),
 				}
 			}
 
@@ -128,18 +130,19 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			}
 
 			info := i
-			requestHeader, requestBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(info.RequestRaw)
+			requestHeader, requestBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(info.Request)
+			responseHeader, responseBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(info.Response)
 			flow := &HTTPFlow{
-				StatusCode:     info.StatusCode,
+				StatusCode:     lowhttp.GetStatusCodeFromResponse(info.Response),
 				IsHTTPS:        info.IsHttps,
 				RequestHeader:  []byte(requestHeader),
 				RequestBody:    requestBody,
-				ResponseHeader: info.ResponseHeaderBytes(),
-				ResponseBody:   info.Body,
+				ResponseHeader: []byte(responseHeader),
+				ResponseBody:   responseBody,
 				CPEs:           currentCPE,
 			}
 			httpflows = append(httpflows, flow)
-			fpInfos := f.matcher.Match(info.ResponseRaw, f.rules)
+			fpInfos := f.matcher.Match(info.Response, f.rules)
 			//cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
 			//if err != nil {
 			//	if !strings.Contains(err.Error(), "no rules matched") {
@@ -154,7 +157,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			// 如果检测到指纹信息
 			if len(fpInfos) > 0 {
 				currentCPE = append(currentCPE, cpes...)
-				urlStr := info.URL.String()
+				urlStr := info.RespRecord.Url
 				cpeAnalyzer.Feed(urlStr, cpes...)
 				results.Store(urlStr, cpes)
 			}
@@ -192,11 +195,11 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		result.Fingerprint.ServiceName = strings.ToLower(string(result.Fingerprint.Proto))
 	}
 
-	if httpBanners != nil {
+	if redirectInfos != nil {
 		result.State = OPEN
 		result.Fingerprint.Proto = TCP
 		if result.Fingerprint.ServiceName == "" {
-			if httpBanners[0].IsHttps {
+			if redirectInfos[0].IsHttps {
 				result.Fingerprint.ServiceName = "https"
 			} else {
 				result.Fingerprint.ServiceName = "http"
@@ -210,4 +213,45 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		result.Fingerprint.Proto = TCP
 	}
 	return result, nil
+}
+
+func FetchBannerFromHostPort(baseCtx context.Context, packet2 []byte, host string, port interface{}, bufferSize int64, runtimeId string, proxy ...string) (bool, []*lowhttp.RedirectFlow, error) {
+	ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+	defer cancel()
+
+	timeout := 10 * time.Second
+	if ddl, ok := ctx.Deadline(); ok {
+		timeout = ddl.Sub(time.Now())
+		if timeout <= 0 {
+			timeout = 10 * time.Second
+		}
+	}
+
+	portInt, _ := strconv.Atoi(fmt.Sprint(port))
+	target := utils2.HostPort(host, port)
+	isTls := netx.IsTLSService(target)
+	packet := []byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %v
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+`, target))
+	if packet2 != nil {
+		packet = packet2
+	}
+
+	rspDetail, err := lowhttp.HTTP(
+		lowhttp.WithRuntimeId(runtimeId),
+		lowhttp.WithHttps(isTls),
+		lowhttp.WithHost(host),
+		lowhttp.WithPort(portInt),
+		lowhttp.WithRequest(packet),
+		lowhttp.WithRedirectTimes(5),
+		lowhttp.WithJsRedirect(true),
+		lowhttp.WithProxy(proxy...),
+	)
+	isOpen := rspDetail.PortIsOpen
+	if err != nil {
+		return isOpen, nil, utils2.Errorf("lowhttp.HTTP failed: %s", err)
+	}
+	return isOpen, rspDetail.RedirectRawPackets, nil
 }

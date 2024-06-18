@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/embed"
 )
@@ -15,8 +14,6 @@ import (
 var (
 	DefaultNmapServiceProbeRules     map[*NmapProbe][]*NmapMatch
 	DefaultNmapServiceProbeRulesOnce sync.Once
-	DefaultWebFingerprintRules       []*webfingerprint.WebRule
-	DefaultWebFingerprintRulesOnce   sync.Once
 )
 
 func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
@@ -88,13 +85,10 @@ func GetDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
 	return DefaultNmapServiceProbeRules, err
 }
 
-func GetDefaultWebFingerprintRules() ([]*webfingerprint.WebRule, error) {
-	var err error
-	DefaultWebFingerprintRulesOnce.Do(func() {
-		DefaultWebFingerprintRules, err = webfingerprint.LoadDefaultDataSource()
-	})
-	return DefaultWebFingerprintRules, err
-}
-func LoadDefaultFingerprintRules() ([]*rule.FingerPrintRule, error) {
-	return parsers.ParseYamlRule("")
+func GetDefaultWebFingerprintRules() ([]*rule.FingerPrintRule, error) {
+	content, err := embed.Asset("data/fingerprint-rules.yml.gz")
+	if err != nil {
+		return nil, errors.Errorf("get local web fingerprint rules failed: %s", err)
+	}
+	return parsers.ParseYamlRule(string(content))
 }

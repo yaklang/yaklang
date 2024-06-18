@@ -1,12 +1,16 @@
 package parsers
 
 import (
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 )
 
 func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
-	rules, err := webfingerprint.LoadDefaultDataSource()
+	rules, err := webfingerprint.ParseWebFingerprintRules([]byte(ruleContent))
+	if err != nil {
+		return nil, errors.Errorf("parse wappalyzer rules failed: %s", err)
+	}
 	if err != nil {
 		return nil, err
 	}
