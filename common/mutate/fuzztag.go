@@ -1710,9 +1710,9 @@ func Fuzz_WithEnableDangerousTag() FuzzConfigOpt {
 func FuzzCodecOptions() []FuzzConfigOpt {
 	var opt []FuzzConfigOpt
 	for _, t := range CodecTag() {
-		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
+		opt = append(opt, Fuzz_WithExtraFuzzTag(t.TagName, t))
 		for _, a := range t.Alias {
-			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
+			opt = append(opt, Fuzz_WithExtraFuzzTag(a, t))
 		}
 	}
 	return opt
@@ -1729,9 +1729,9 @@ func Fuzz_WithEnableCodectag() FuzzConfigOpt {
 func FuzzFileOptions() []FuzzConfigOpt {
 	var opt []FuzzConfigOpt
 	for _, t := range FileTag() {
-		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
+		opt = append(opt, Fuzz_WithExtraFuzzTag(t.TagName, t))
 		for _, a := range t.Alias {
-			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
+			opt = append(opt, Fuzz_WithExtraFuzzTag(a, t))
 		}
 	}
 	return opt
