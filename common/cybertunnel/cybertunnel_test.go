@@ -129,17 +129,10 @@ func TestCheckServerReachable(t *testing.T) {
 	client, server := CreateCyberTunnelLocalClient("test")
 	_ = server
 
-	httpFlow := &tpb.HTTPSimpleFlow{
-		IsHttps:      false,
-		HttpRequest:  []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),
-		HttpResponse: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"),
-	}
-
 	// check http server reachable
 	res, err := client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
-		Server:    reachableHttpServer,
+		Url:       reachableHttpServer,
 		HttpCheck: true,
-		HttpFlow:  httpFlow,
 	})
 
 	require.NoError(t, err)
@@ -147,9 +140,8 @@ func TestCheckServerReachable(t *testing.T) {
 
 	// check http server unreachable
 	res, err = client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
-		Server:    unreachableHttpServer,
+		Url:       unreachableHttpServer,
 		HttpCheck: true,
-		HttpFlow:  httpFlow,
 	})
 
 	require.NoError(t, err)
@@ -157,7 +149,7 @@ func TestCheckServerReachable(t *testing.T) {
 
 	// check dial server reachable
 	res, err = client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
-		Server:    reachableTcpServer,
+		Url:       reachableTcpServer,
 		HttpCheck: false,
 	})
 
@@ -166,7 +158,7 @@ func TestCheckServerReachable(t *testing.T) {
 
 	// check dial server unreachable
 	res, err = client.CheckServerReachable(context.Background(), &tpb.CheckServerReachableRequest{
-		Server:    unreachableTcpServer,
+		Url:       unreachableTcpServer,
 		HttpCheck: false,
 	})
 

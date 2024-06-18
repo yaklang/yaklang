@@ -82,6 +82,7 @@ var (
 		"CheckHTTPLogByToken":       yakit.CheckHTTPLogByToken,
 		"CheckRandomTriggerByToken": yakit.CheckRandomTriggerByToken,
 		"CheckICMPTriggerByLength":  yakit.CheckICMPTriggerByLength,
+		"CheckServerReachable":      yakit.CheckServerReachable,
 		"ExtractTokenFromUrl":       yakit.ExtractTokenFromUrl,
 		"payload":                   yakit.WithRiskParam_Payload,
 		"title":                     yakit.WithRiskParam_Title,
