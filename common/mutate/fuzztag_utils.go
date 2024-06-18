@@ -78,7 +78,7 @@ func fuzzLowerNUpper(i string) []string {
 	return res
 }
 
-func fuzzuser(i string, level int) []string {
+func fuzzuserWithCallback(i string, level int, callback func(string) bool) {
 	if i == "" {
 		i = "admin,root"
 	}
@@ -86,8 +86,16 @@ func fuzzuser(i string, level int) []string {
 	var res []string
 	splited := utils.PrettifyListFromStringSplitEx(i, ",", "|")
 	if len(splited) <= 2 {
-		res = append(res, i)
+		callback(i)
+		return
 	}
+
+	for _, item := range splited {
+		if stop := callback(item); stop {
+			return
+		}
+	}
+
 	res = append(res, splited...)
 	passSuffix2 := passSuffix2
 	switch level {
@@ -105,24 +113,31 @@ func fuzzuser(i string, level int) []string {
 		}
 	}
 
-	handleItem := func(item string) {
+	handleItem := func(item string) bool {
 		for _, prefix := range passPrefix {
 			item2 := prefix + item
 			for _, suffix2 := range passSuffix2 {
 				res = append(res, item2+suffix2)
+				if stop := callback(item2 + suffix2); stop {
+					return stop
+				}
 			}
 		}
+		return false
 	}
 
 	for _, r := range res {
 		for _, item := range fuzzLowerNUpper(r) {
-			handleItem(item)
+			if stop := handleItem(item); stop {
+				return
+			}
 		}
 	}
-	return res
 }
 
-func fuzzpass(i string, level int) []string {
+func fuzzpassWithCallback(i string, level int, callback func(string) bool) {
+	// callback return true to stop
+
 	if i == "" {
 		i = "admin,root"
 	}
@@ -130,8 +145,15 @@ func fuzzpass(i string, level int) []string {
 	var res []string
 	splited := utils.PrettifyListFromStringSplitEx(i, ",", "|")
 	if len(splited) <= 2 {
-		res = append(res, i)
+		callback(i)
+		return
 	}
+	for _, item := range splited {
+		if stop := callback(item); stop {
+			return
+		}
+	}
+
 	res = append(res, splited...)
 
 	passSuffix2 := passSuffix2
@@ -150,34 +172,45 @@ func fuzzpass(i string, level int) []string {
 		}
 	}
 
-	handleItem := func(item string) {
+	handleItem := func(item string) bool {
 		for _, prefix := range passPrefix {
 			item2 := prefix + item
 			for _, suffix := range passSuffix1 {
-				res = append(res, item2+suffix)
+				if stop := callback(item2 + suffix); stop {
+					return stop
+				}
 			}
 			for _, suffix2 := range passSuffix2 {
-				res = append(res, item2+suffix2)
+				if stop := callback(item2 + suffix2); stop {
+					return stop
+				}
 			}
 			for _, suffix1 := range passSuffix1 {
 				for _, suffix2 := range passSuffix2 {
-					res = append(res, item2+suffix1+suffix2)
+					if stop := callback(item2 + suffix1 + suffix2); stop {
+						return stop
+					}
 				}
 			}
-			for _, suffix2 := range passSuffix2 {
-				for _, suffix1 := range passSuffix1 {
-					res = append(res, item2+suffix1+suffix2)
+			for _, suffix1 := range passSuffix2 {
+				for _, suffix2 := range passSuffix1 {
+					if stop := callback(item2 + suffix1 + suffix2); stop {
+						return stop
+					}
 				}
 			}
 		}
+		return false
 	}
 
 	for _, r := range res {
 		for _, item := range fuzzLowerNUpper(r) {
-			handleItem(item)
+			if stop := handleItem(item); stop {
+				return
+			}
 		}
 	}
-	return res
+	return
 }
 
 // 解析失败会panic，只能在fuzztagx中使用

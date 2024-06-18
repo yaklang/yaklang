@@ -15,10 +15,13 @@ import (
 	cryptoRand "crypto/rand"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/dateparse"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -29,6 +32,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/big"
 )
+
+const puncSet = `<>?,./:";'{}[]|\_+-=)(*&^%$#@!'"` + "`"
 
 // 空内容
 var fuzztagfallback = []string{""}
@@ -141,14 +146,17 @@ func AddFuzzTagToGlobal(f *FuzzTagDescription) {
 	AddFuzzTagDescriptionToMap(tagMethodMap, f)
 }
 
+func tryYield(ctx context.Context, yield func(res *parser.FuzzResult), data string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		yield(parser.NewFuzzResultWithData(data))
+		return nil
+	}
+}
+
 func init() {
-	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "trim",
-		Handler: func(s string) []string {
-			return []string{strings.TrimSpace(s)}
-		},
-		Description: "移除前后多余的空格，例如：`{{trim( abc )}}`，结果为：`abc`",
-	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "substr",
 		Handler: func(s string) []string {
@@ -183,11 +191,30 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "fuzz:password",
-		Handler: func(s string) []string {
+		TagName: "fuzz:username",
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			origin, level := sepToEnd(s, "|")
 			levelInt := atoi(level)
-			return fuzzpass(origin, levelInt)
+			fuzzuserWithCallback(origin, levelInt, func(s string) bool {
+				err := tryYield(ctx, yield, s)
+				return err != nil
+			})
+			return nil
+		},
+		Alias:       []string{"fuzz:user"},
+		Description: "根据所输入的操作随机生成可能的用户名（默认为 root/admin 生成）",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "fuzz:password",
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			origin, level := sepToEnd(s, "|")
+			levelInt := atoi(level)
+			fuzzpassWithCallback(origin, levelInt, func(s string) bool {
+				err := tryYield(ctx, yield, s)
+				return err != nil
+			})
+			return nil
 		},
 		Alias:       []string{"fuzz:pass"},
 		Description: "根据所输入的操作随机生成可能的密码（默认为 root/admin 生成）",
@@ -265,17 +292,6 @@ func init() {
 		Description: "Gzip 解码，把标签内的内容进行 gzip 解码",
 	})
 
-	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "fuzz:username",
-		Handler: func(s string) []string {
-			origin, level := sepToEnd(s, "|")
-			levelInt := atoi(level)
-			return fuzzuser(origin, levelInt)
-		},
-		Alias:       []string{"fuzz:user"},
-		Description: "根据所输入的操作随机生成可能的用户名（默认为 root/admin 生成）",
-	})
-
 	datetimeFuzzFuncGenerator := func(defaultFormat string) func(s string) []string {
 		return func(s string) []string {
 			if s == "" {
@@ -315,10 +331,11 @@ func init() {
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "date:range",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			splited := strings.Split(s, ",")
 			if len(splited) == 1 {
-				return []string{s}
+				yield(parser.NewFuzzResultWithData(s))
+				return nil
 			}
 
 			start, end := splited[0], splited[1]
@@ -329,28 +346,31 @@ func init() {
 
 			layout, err := dateparse.ParseFormat(start)
 			if err != nil {
-				return []string{}
+				return nil
 			}
 
 			startTime, err := dateparse.ParseIn(start, location)
 			if err != nil {
-				return []string{}
+				return nil
 			}
 			endTime, err := dateparse.ParseIn(end, location)
 			if err != nil {
-				return []string{}
+				return nil
 			}
 
 			if startTime.After(endTime) {
-				return []string{}
+				return nil
 			}
 
-			var results []string
 			for startTime.Compare(endTime) <= 0 {
-				results = append(results, startTime.Format(layout))
+				err := tryYield(ctx, yield, startTime.Format(layout))
+				if err != nil {
+					return err
+				}
+
 				startTime = startTime.AddDate(0, 0, 1)
 			}
-			return results
+			return nil
 		},
 		Description: "以逗号为分隔，尝试根据输入的两个时间生成一个时间段，如：{{date:range(20080101,20090101)}}。还可以再加一个参数指定时区，如：{{date:range(20080101,20090101,Asia/Shanghai)}}",
 	})
@@ -388,26 +408,19 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "trim",
-		Handler: func(s string) []string {
-			return []string{
-				strings.TrimSpace(s),
-			}
-		},
-		Description: "去除字符串两边的空格，一般配合其他 tag 使用，如：{{trim({{x(dict)}})}}",
-	})
-
-	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "null",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			n := 1
 			if ret := atoi(s); ret > 0 {
-				return []string{
-					strings.Repeat("\x00", ret),
+				n = ret
+			}
+			for i := 0; i < n; i++ {
+				err := tryYield(ctx, yield, "\x00")
+				if err != nil {
+					return err
 				}
 			}
-			return []string{
-				"\x00",
-			}
+			return nil
 		},
 		Alias:       []string{"nullbyte"},
 		Description: "生成一个空字节，如果指定了数量，将生成指定数量的空字节 {{null(5)}} 表示生成 5 个空字节",
@@ -415,15 +428,18 @@ func init() {
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "crlf",
-		Handler: func(s string) []string {
-			if ret := codec.Atoi(s); ret > 0 {
-				return []string{
-					strings.Repeat("\r\n", ret),
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			n := 1
+			if ret := atoi(s); ret > 0 {
+				n = ret
+			}
+			for i := 0; i < n; i++ {
+				err := tryYield(ctx, yield, "\r\n")
+				if err != nil {
+					return err
 				}
 			}
-			return []string{
-				"\r\n",
-			}
+			return nil
 		},
 		Description: "生成一个 CRLF，如果指定了数量，将生成指定数量的 CRLF {{crlf(5)}} 表示生成 5 个 CRLF",
 	})
@@ -496,14 +512,13 @@ func init() {
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "char",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			if s == "" {
-				return []string{""}
+				return tryYield(ctx, yield, "")
 			}
 
 			if !strings.Contains(s, "-") {
-				log.Errorf("bad char params: %v, eg.: %v", s, "a-z")
-				return []string{""}
+				return tryYield(ctx, yield, "")
 			}
 
 			ret := strings.Split(s, "-")
@@ -512,7 +527,7 @@ func init() {
 				p1, p2 := ret[0], ret[1]
 				if !(len(p1) == 1 && len(p2) == 1) {
 					log.Errorf("start char or end char is not char(1 byte): %v eg.: %v", s, "a-z")
-					return []string{""}
+					return tryYield(ctx, yield, "")
 				}
 
 				p1Byte := []byte(p1)[0]
@@ -521,39 +536,51 @@ func init() {
 				min, max := utils.MinByte(p1Byte, p2Byte), utils.MaxByte(p1Byte, p2Byte)
 				for i := min; i <= max; i++ {
 					rets = append(rets, string(i))
+					if err := tryYield(ctx, yield, string(i)); err != nil {
+						return err
+					}
 				}
-				return rets
 			default:
 				log.Errorf("bad params[%s], eg.: %v", s, "a-z")
+				return tryYield(ctx, yield, "")
 			}
-			return []string{""}
+
+			return nil
 		},
 		Alias:       []string{"c", "ch"},
-		Description: "生成一个字符，例如：`{{char(a-z)}}`, 结果为 [a b c ... x y z]",
+		Description: "生成字符，例如：`{{char(a-z)}}`, 结果为 [a b c ... x y z]",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "repeat",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			i := atoi(s)
 			if i == 0 {
 				chr, right := sepToEnd(s, "|")
 				if repeatTimes := atoi(right); repeatTimes > 0 {
-					return lo.Times(repeatTimes, func(index int) string {
-						return chr
-					})
+					for j := 0; j < repeatTimes; j++ {
+						if err := tryYield(ctx, yield, chr); err != nil {
+							return err
+						}
+					}
+				} else {
+					return tryYield(ctx, yield, "")
 				}
 			} else {
-				return make([]string, i)
+				for j := 0; j < i; j++ {
+					if err := tryYield(ctx, yield, ""); err != nil {
+						return err
+					}
+				}
 			}
-			return []string{""}
+			return nil
 		},
 		Description: "重复一个字符串或者一个次数，例如：`{{repeat(abc|3)}}`，结果为：abcabcabc，或者`{{repeat(3)}}`，结果是重复三次",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "repeat:range",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			origin, times := sepToEnd(s, "|")
 			if ret := atoi(times); ret > 0 {
 				results := make([]string, ret+1)
@@ -562,21 +589,23 @@ func init() {
 						results[i] = ""
 						continue
 					}
-					results[i] = strings.Repeat(origin, i)
+					if err := tryYield(ctx, yield, strings.Repeat(origin, i)); err != nil {
+						return err
+					}
 				}
-				return results
+				return nil
 			}
-			return []string{s}
+			return tryYield(ctx, yield, s)
 		},
 		Description: "重复一个字符串，并把重复步骤全都输出出来，例如：`{{repeat(abc|3)}}`，结果为：['' abc abcabc abcabcabc]",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "payload",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			db := consts.GetGormProfileDatabase()
 			if db == nil {
-				return []string{s}
+				return tryYield(ctx, yield, s)
 			}
 			for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
 				group, folder := "", ""
@@ -600,23 +629,47 @@ func init() {
 				}
 			}
 
-			var payloads []string
-			rows, err := db.Table("payloads").Select("content, is_file").Order("hit_count desc").Rows()
-			if err != nil {
-				return []string{s}
+			yieldPayloads := func(db *gorm.DB, ctx context.Context) chan *schema.Payload {
+				outC := make(chan *schema.Payload)
+				go func() {
+					defer close(outC)
+					page := 1
+					for {
+						var items []*schema.Payload
+						if _, b := bizhelper.NewPagination(&bizhelper.Param{
+							DB:    db,
+							Page:  page,
+							Limit: 1000,
+						}, &items); b.Error != nil {
+							log.Errorf("paging failed: %s", b.Error)
+							return
+						}
+						page++
+						for _, d := range items {
+							select {
+							case <-ctx.Done():
+								return
+							case outC <- d:
+							}
+						}
+						if len(items) < 1000 {
+							return
+						}
+					}
+				}()
+				return outC
 			}
-			var (
-				payloadRaw string
-				isFile     bool
-			)
+			ch := yieldPayloads(db.Table("payloads").Select("content, is_file").Order("hit_count desc"), ctx)
+
 			f := filter.NewFilter()
 			defer f.Close()
-			for rows.Next() {
-				err := rows.Scan(&payloadRaw, &isFile)
-				if err != nil {
-					log.Errorf("sql scan error: %v", err)
-					return payloads
+			for payload := range ch {
+				if payload.Content == nil || payload.IsFile == nil {
+					continue
 				}
+
+				payloadRaw, isFile := *payload.Content, *payload.IsFile
+
 				unquoted, err := strconv.Unquote(payloadRaw)
 				if err == nil {
 					payloadRaw = unquoted
@@ -638,17 +691,21 @@ func init() {
 							continue
 						}
 						f.Insert(lineStr)
-						payloads = append(payloads, lineStr)
+						if err := tryYield(ctx, yield, lineStr); err != nil {
+							return err
+						}
 					}
 				} else {
 					if f.Exist(payloadRaw) {
 						continue
 					}
 					f.Insert(payloadRaw)
-					payloads = append(payloads, payloadRaw)
+					if err := tryYield(ctx, yield, payloadRaw); err != nil {
+						return err
+					}
 				}
 			}
-			return payloads
+			return nil
 		},
 		Alias:       []string{"x"},
 		Description: "从数据库加载 Payload, 可以指定payload组或文件夹, `{{payload(groupName)}}`, `{{payload(folder/*)}}`",
@@ -658,8 +715,13 @@ func init() {
 		TagName:     "array",
 		Alias:       []string{"list"},
 		Description: "设置一个数组，使用 `|` 分割，例如：`{{array(1|2|3)}}`，结果为：[1,2,3]，",
-		Handler: func(s string) []string {
-			return strings.Split(s, "|")
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			for _, s := range utils.PrettifyListFromStringSplited(s, "|") {
+				if err := tryYield(ctx, yield, s); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	})
 
@@ -667,8 +729,13 @@ func init() {
 		TagName:     "array:comma",
 		Alias:       []string{"list:comma"},
 		Description: "设置一个数组，使用 `,` 分割，例如：`{{array(1,2,3)}}`，结果为：[1,2,3]，",
-		Handler: func(s string) []string {
-			return utils.PrettifyListFromStringSplited(s, ",")
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
+				if err := tryYield(ctx, yield, s); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	})
 
@@ -676,8 +743,13 @@ func init() {
 		TagName:     "array:auto",
 		Alias:       []string{"list:auto"},
 		Description: "设置一个数组，使用 `,` 分割，例如：`{{array(1,2,3)}}`，结果为：[1,2,3]，",
-		Handler: func(s string) []string {
-			return utils.PrettifyListFromStringSplitEx(s, ",", "|")
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			for _, s := range utils.PrettifyListFromStringSplitEx(s, ",", "|") {
+				if err := tryYield(ctx, yield, s); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	})
 
@@ -737,15 +809,15 @@ func init() {
 		Description: "生成 jpeg / jpg 文件头",
 	})
 
-	const puncSet = `<>?,./:";'{}[]|\_+-=)(*&^%$#@!'"` + "`"
-	var puncArr []string
-	for _, s := range puncSet {
-		puncArr = append(puncArr, string(s))
-	}
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "punctuation",
-		Handler: func(s string) []string {
-			return puncArr
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			for _, s := range puncSet {
+				if err := tryYield(ctx, yield, string(s)); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 		Alias:       []string{"punc"},
 		Description: "生成所有标点符号",
@@ -845,7 +917,7 @@ func init() {
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "rangechar",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			var min byte = 0
 			var max byte = 0xff
 
@@ -868,25 +940,32 @@ func init() {
 				}
 			}
 
-			var res []string
 			if min > max {
 				min = 0
 			}
 
 			for i := min; true; i++ {
-				res = append(res, string(i))
+				// res = append(res, string(i))
+				if err := tryYield(ctx, yield, string(i)); err != nil {
+					return err
+				}
 				if i >= max {
 					break
 				}
 			}
-			return res
+			return nil
 		},
 		Alias:       []string{"range:char", "range"},
 		Description: "按顺序生成一个 range 字符集，例如 `{{rangechar(20,7e)}}` 生成 0x20 - 0x7e 的字符集",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName:     "network",
-		Handler:     utils.ParseStringToHosts,
+		TagName: "network",
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			utils.ParseStringToHostsWithCallback(s, func(host string) bool {
+				return tryYield(ctx, yield, host) != nil
+			})
+			return nil
+		},
 		Alias:       []string{"host", "hosts", "cidr", "ip", "net"},
 		Description: "生成一个网络地址，例如 `{{network(192.168.1.1/24)}}` 对应 cidr 192.168.1.1/24 所有地址，可以逗号分隔，例如 `{{network(8.8.8.8,192.168.1.1/25,example.com)}}`",
 	})
@@ -1383,17 +1462,19 @@ func init() {
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "repeatstr",
-		Handler: func(s string) []string {
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			if !strings.Contains(s, "|") {
-				return []string{s + s}
+				return tryYield(ctx, yield, s)
 			}
-			index := strings.LastIndex(s, "|")
-			if index <= 0 {
-				return []string{s}
+			s, number := sepToEnd(s, "|")
+			n, err := strconv.Atoi(number)
+			if err != nil {
+				return tryYield(ctx, yield, s)
 			}
-			n, _ := strconv.Atoi(s[index+1:])
-			s = s[:index]
-			return []string{strings.Repeat(s, n)}
+			if err := tryYield(ctx, yield, strings.Repeat(s, n)); err != nil {
+				return err
+			}
+			return nil
 		},
 		Alias:       []string{"repeat:str"},
 		Description: "重复字符串，`{{repeatstr(abc|3)}}` => abcabcabc",
@@ -1729,9 +1810,9 @@ func FileTag() []*FuzzTagDescription {
 	return []*FuzzTagDescription{
 		{
 			TagName: "file:line",
-			Handler: func(s string) []string {
+			HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 				s = strings.Trim(s, " ()")
-				var result []string
+				empty := true
 				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
 					lineChan, err := utils.FileLineReader(lineFile)
 					if err != nil {
@@ -1739,22 +1820,26 @@ func FileTag() []*FuzzTagDescription {
 						continue
 					}
 					for line := range lineChan {
-						result = append(result, string(line))
+						if err := tryYield(ctx, yield, string(line)); err != nil {
+							return err
+						} else {
+							empty = false
+						}
 					}
 				}
-				if len(result) <= 0 {
-					return fuzztagfallback
+				if empty {
+					return tryYield(ctx, yield, "")
 				}
-				return result
+				return nil
 			},
 			Alias:       []string{"fileline", "file:lines"},
 			Description: "解析文件名（可以用 `|` 分割），把文件中的内容按行反回成数组，定义为 `{{file:line(/tmp/test.txt)}}` 或 `{{file:line(/tmp/test.txt|/tmp/1.txt)}}`",
 		},
 		{
 			TagName: "file:dir",
-			Handler: func(s string) []string {
+			HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 				s = strings.Trim(s, " ()")
-				var result []string
+				empty := true
 				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
 					fileRaw, err := ioutil.ReadDir(lineFile)
 					if err != nil {
@@ -1769,34 +1854,42 @@ func FileTag() []*FuzzTagDescription {
 						if err != nil {
 							continue
 						}
-						result = append(result, string(fileContent))
+						if err := tryYield(ctx, yield, string(fileContent)); err != nil {
+							return err
+						} else {
+							empty = false
+						}
 					}
 				}
-				if len(result) <= 0 {
-					return fuzztagfallback
+				if empty {
+					return tryYield(ctx, yield, "")
 				}
-				return result
+				return nil
 			},
 			Alias:       []string{"filedir"},
 			Description: "解析文件夹，把文件夹中文件的内容读取出来，读取成数组返回，定义为 `{{file:dir(/tmp/test)}}` 或 `{{file:dir(/tmp/test|/tmp/1)}}`",
 		},
 		{
 			TagName: "file",
-			Handler: func(s string) []string {
+			HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 				s = strings.Trim(s, " ()")
-				var result []string
+				empty := true
 				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
 					fileRaw, err := ioutil.ReadFile(lineFile)
 					if err != nil {
 						log.Errorf("fuzz.files read file failed: %s", err)
 						continue
 					}
-					result = append(result, string(fileRaw))
+					if err := tryYield(ctx, yield, string(fileRaw)); err != nil {
+						return err
+					} else {
+						empty = false
+					}
 				}
-				if len(result) <= 0 {
-					return fuzztagfallback
+				if empty {
+					return tryYield(ctx, yield, "")
 				}
-				return result
+				return nil
 			},
 			Description: "读取文件内容，可以支持多个文件，用竖线分割，`{{file(/tmp/1.txt)}}` 或 `{{file(/tmp/1.txt|/tmp/test.txt)}}`",
 		},
