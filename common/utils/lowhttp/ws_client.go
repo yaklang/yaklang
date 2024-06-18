@@ -9,10 +9,12 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -534,9 +536,23 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 		}
 		// 修改websocket扩展选项请求头
 		if valid {
-			packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", value)
+			if value == "" {
+				packet = DeleteHTTPPacketHeader(packet, "Sec-WebSocket-Extensions")
+			} else {
+				packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", value)
+			}
 		}
 	}
+	// 过滤client_max_window_bits，因为这个选项不支持
+	websocketExtensions := GetHTTPPacketHeader(packet, "Sec-WebSocket-Extensions")
+	filtered := lo.FilterMap(strings.Split(websocketExtensions, ";"), func(s string, _ int) (string, bool) {
+		trimed := strings.TrimSpace(s)
+		if trimed == "" || strings.Contains(trimed, "client_max_window_bits") {
+			return "", false
+		}
+		return trimed, true
+	})
+	packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", strings.Join(filtered, "; "))
 
 	// 获取连接
 	addr := utils.HostPort(host, port)
