@@ -3,12 +3,15 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
@@ -554,4 +557,48 @@ Host: %s
 		}),
 		[][]string{{"1"}, {"2"}},
 	)
+}
+
+func TestGRPCMUSTPASS_HTTP_ConvertFuzzerResponseToHTTPFlow(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	token := utils.RandStringBytes(20)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		fmt.Fprint(writer, token)
+	})
+	target := utils.HostPort(host, port)
+
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
+	defer cancel()
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET /?a HTTP/1.1
+Host: %s
+`, target),
+		ForceFuzz: true,
+	})
+	require.NoError(t, err)
+	var gotFlow *ypb.HTTPFlow
+	// wait until webfuzzer done
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		gotFlow, err = client.ConvertFuzzerResponseToHTTPFlow(context.Background(), resp)
+		require.NoError(t, err)
+	}
+	require.NotEmpty(t, gotFlow)
+
+	reQueryFlow, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{
+		Id: int64(gotFlow.GetId()),
+	})
+	_ = reQueryFlow
+	require.NoError(t, err)
+	require.NotEmpty(t, reQueryFlow)
+
+	log.Infof("gotFlow: %v", gotFlow)
+	log.Infof("reQueryFlow: %v", reQueryFlow)
+	// require.Equal(t, gotFlow.GetId(), reQueryFlow.GetId())
 }

@@ -4503,6 +4503,7 @@ message QueryHTTPFlowRequest {
   repeated string RuntimeIDs = 40;
 
   repeated string IncludeHash = 41;
+  repeated string HiddenIndex = 42;
 }
 
 message HTTPFlowsToOnlineRequest {
