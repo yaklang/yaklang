@@ -280,7 +280,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 			} else {
 				if strings.Contains(sub, "{{") && strings.Contains(sub, "}}") {
 					results, err := ExecNucleiTag(sub, vars)
-					if err != nil {
+					if err == nil {
 						return strings.Contains(s, results)
 					}
 				}
