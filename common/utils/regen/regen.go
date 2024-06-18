@@ -35,7 +35,7 @@ type Generator interface {
 	CheckVisible(str string) bool
 }
 
-func GenerateStream(pattern string) (chan string, context.CancelFunc, error) {
+func GenerateStream(pattern string, ctxs ...context.Context) (chan string, context.CancelFunc, error) {
 	generator, err := NewGenerator(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
 	})
@@ -43,12 +43,17 @@ func GenerateStream(pattern string) (chan string, context.CancelFunc, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	var rawCtx context.Context = context.Background()
+	if len(ctxs) > 0 {
+		rawCtx = ctxs[0]
+	}
+
+	ctx, cancel := context.WithCancel(rawCtx)
 	go generator.GenerateStream(ctx, ch)
 	return ch, cancel, nil
 }
 
-func GenerateOneStream(pattern string) (string, error) {
+func GenerateOneStream(pattern string, ctxs ...context.Context) (string, error) {
 	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
 	})
@@ -56,14 +61,19 @@ func GenerateOneStream(pattern string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	var rawCtx context.Context = context.Background()
+	if len(ctxs) > 0 {
+		rawCtx = ctxs[0]
+	}
+
+	ctx, cancel := context.WithCancel(rawCtx)
 	go generator.GenerateStream(ctx, ch)
 	defer cancel()
 
 	return <-ch, nil
 }
 
-func GenerateVisibleOneStream(pattern string) (string, error) {
+func GenerateVisibleOneStream(pattern string, ctxs ...context.Context) (string, error) {
 	generator, err := NewGeneratorVisibleOne(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
 	})
@@ -71,7 +81,12 @@ func GenerateVisibleOneStream(pattern string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	var rawCtx context.Context = context.Background()
+	if len(ctxs) > 0 {
+		rawCtx = ctxs[0]
+	}
+
+	ctx, cancel := context.WithCancel(rawCtx)
 	go generator.GenerateStream(ctx, ch)
 	defer cancel()
 
