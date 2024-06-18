@@ -1,11 +1,12 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -52,7 +53,7 @@ func defaultConfig() *config {
 	}
 }
 
-func (c *config) CaclHash() string {
+func (c *config) CalcHash() string {
 	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
@@ -203,12 +204,12 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 		config.originEditor = memedit.NewMemEditor(string(raw))
 	}
 
-	hash := config.CaclHash()
+	hash := config.CalcHash()
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
 		return prog, nil
 	} else {
 		ret, err := config.parseFile()
-		if err != nil {
+		if err == nil {
 			ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
 		}
 		return ret, err
