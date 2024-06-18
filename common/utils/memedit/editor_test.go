@@ -1,6 +1,8 @@
 package memedit
 
 import (
+	"github.com/stretchr/testify/assert"
+	"strconv"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -58,8 +60,8 @@ func TestUpdateTextByRange(t *testing.T) {
 	}
 
 	expected := "Hi\nWorld\nThis is a test"
-	if editor.sourceCode != expected {
-		t.Errorf("UpdateTextByRange() got = %v, want %v", editor.sourceCode, expected)
+	if editor.GetSourceCode() != expected {
+		t.Errorf("UpdateTextByRange() got = %v, want %v", editor.GetSourceCode(), expected)
 	}
 
 	// Test out of bounds
@@ -155,7 +157,7 @@ func TestMoveCursor_Errors(t *testing.T) {
 		t.Error("MoveCursor() should fail for negative position")
 	}
 
-	err = editor.MoveCursor(len(editor.sourceCode) + 1) // 超过文本长度的光标位置
+	err = editor.MoveCursor(len(editor.GetSourceCode()) + 1) // 超过文本长度的光标位置
 	if err == nil {
 		t.Error("MoveCursor() should fail for position out of bounds")
 	}
@@ -270,4 +272,23 @@ func TestSourceCodeContext(t *testing.T) {
 		t.Fatal("SourceCode MD5 is not updated after PushSourceCodeContext()")
 	}
 	spew.Dump(e.SourceCodeMd5())
+}
+
+func TestRunesSupporting(t *testing.T) {
+	e := NewMemEditor("\n\n\n" + `你好？世界,OOO` + "\n" + `Hello,World`)
+	var result string
+	result = e.GetTextFromRange(e.GetRangeOffset(4, 5))
+	assert.Equal(t, "好", result)
+	result = e.GetTextFromRange(e.GetRangeOffset(5, 7))
+	assert.Equal(t, "？世", result)
+
+	result = e.GetTextFromPositionInt(4, 2, 4, 5)
+	assert.Equal(t, "？世界", result)
+
+	result = e.GetTextFromPositionInt(4, 5, 4, 7)
+	assert.Equal(t, ",O", result)
+
+	result = e.GetTextFromPositionInt(4, 5, 5, 2)
+	assert.Equal(t, ",OOO\nHe", result)
+	println(strconv.Quote(result))
 }
