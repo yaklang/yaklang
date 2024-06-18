@@ -7,47 +7,56 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"time"
 )
 
 func (s *TunnelServer) CheckServerReachable(ctx context.Context, req *tpb.CheckServerReachableRequest) (*tpb.CheckServerReachableResponse, error) {
-	host, port, err := utils.ParseStringToHostPort(req.GetServer()) // check server string is valid
-	if err != nil {
-		return nil, err
+	urlIns := utils.ParseStringToUrl(req.GetUrl())
+	if !utils.IsValidHost(urlIns.Host) {
+		return nil, fmt.Errorf("invalid host")
 	}
 
+	httpCheck := req.GetHttpCheck()
+	if urlIns.Port() == "" {
+		if urlIns.Scheme == "" || urlIns.Scheme == "http" {
+			httpCheck = true
+			urlIns.Host += ":80"
+		} else if urlIns.Scheme == "https" {
+			httpCheck = true
+			urlIns.Host += ":443"
+		}
+	}
 	var result = &tpb.CheckServerReachableResponse{}
-	if req.GetHttpCheck() {
-		httpFlow := req.GetHttpFlow()
-		lowhttpRsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(httpFlow.GetHttpRequest()), lowhttp.WithHost(host), lowhttp.WithPort(port), lowhttp.WithHttps(httpFlow.GetIsHttps()))
+	if httpCheck {
+		if urlIns.Scheme == "" {
+			if urlIns.Port() == "443" {
+				urlIns.Scheme = "https"
+			} else {
+				urlIns.Scheme = "http"
+			}
+		}
+		rsp, _, err := poc.DoGET(urlIns.String(), poc.WithForceHTTPS(urlIns.Scheme == "https"))
 		if err != nil {
 			result.Reachable = false
-			result.Verbose = fmt.Sprintf("Try HTTP request %s fail: %s", req.GetServer(), err.Error())
+			result.Verbose = fmt.Sprintf("Try HTTP request %s fail: %s", req.GetUrl(), err.Error())
 		} else {
-			statusCode := lowhttp.GetStatusCodeFromResponse(lowhttpRsp.RawPacket)
+			statusCode := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
 			if statusCode != 200 {
 				result.Reachable = false
-				result.Verbose = fmt.Sprintf("HTTP request %s return status code %d, not 200 ok", req.GetServer(), statusCode)
-				result.HttpFlow = &tpb.HTTPSimpleFlow{
-					HttpResponse: lowhttpRsp.RawPacket,
-					HttpRequest:  lowhttpRsp.RawRequest,
-					IsHttps:      httpFlow.GetIsHttps(),
-				}
+				result.Verbose = fmt.Sprintf("HTTP request %s return status code %d, not 200 ok", req.GetUrl(), statusCode)
+				result.HTTPResponse = rsp.RawPacket
 			} else {
 				result.Reachable = true
 				result.Verbose = "HTTP check ok"
-				result.HttpFlow = &tpb.HTTPSimpleFlow{
-					HttpResponse: lowhttpRsp.RawPacket,
-					HttpRequest:  lowhttpRsp.RawRequest,
-					IsHttps:      httpFlow.GetIsHttps(),
-				}
+				result.HTTPResponse = rsp.RawPacket
 			}
 		}
 	} else {
-		conn, err := netx.DialX(req.GetServer(), netx.DialX_WithTimeout(3*time.Second), netx.DialX_WithDisableProxy(true))
+		conn, err := netx.DialX(urlIns.Host, netx.DialX_WithTimeout(3*time.Second), netx.DialX_WithDisableProxy(true))
 		if err != nil {
 			result.Reachable = false
-			result.Verbose = fmt.Sprintf("Try dial %s fail: %s", req.GetServer(), err.Error())
+			result.Verbose = fmt.Sprintf("Try dial %s fail: %s", req.GetUrl(), err.Error())
 		} else {
 			defer conn.Close()
 			result.Reachable = true
