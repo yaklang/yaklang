@@ -164,7 +164,12 @@ func CreateHTTPFlowWithRequestIns(reqIns *http.Request) CreateHTTPFlowOptions {
 }
 
 func FuzzerResponseToHTTPFlow(db *gorm.DB, rsp *ypb.FuzzerResponse) (*schema.HTTPFlow, error) {
-	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(rsp.IsHTTPS, rsp.GetRequestRaw(), rsp.GetResponseRaw(), "fuzzer", rsp.GetUrl(), rsp.GetHost())
+	index := rsp.GetUUID()
+	_, flows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{HiddenIndex: []string{index}})
+	if err != nil || len(flows) < 1 {
+		return SaveFromHTTPFromRaw(db, rsp.GetIsHTTPS(), rsp.GetRequestRaw(), rsp.GetResponseRaw(), "scan", rsp.GetUrl(), rsp.GetHost())
+	}
+	return flows[0], nil
 }
 
 func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*schema.HTTPFlow, error) {
@@ -656,6 +661,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 
 	if len(params.GetIncludeHash()) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "hash", params.GetIncludeHash())
+	}
+	if len(params.GetHiddenIndex()) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "hidden_index", params.GetHiddenIndex())
 	}
 
 	if params.AfterBodyLength > 0 {
