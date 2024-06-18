@@ -181,6 +181,9 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		}
 		y.EmitCompareOpcode(ops)
 	case *sf.StringInConditionContext:
+	case *sf.StringContainAnyConditionContext:
+		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
+		y.EmitCompareString(res)
 	case *sf.FilterExpressionCompareContext:
 		if i.NumberLiteral() != nil {
 			n := y.VisitNumberLiteral(i.NumberLiteral())
@@ -309,4 +312,21 @@ func (y *SyntaxFlowVisitor) VisitNumberLiteral(raw sf.INumberLiteralContext) int
 	}
 
 	return -1
+}
+
+func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []string {
+	if y == nil || raw == nil {
+		return []string{}
+	}
+
+	i, _ := raw.(*sf.StringLiteralWithoutStarGroupContext)
+	if i == nil {
+		return []string{}
+	}
+
+	res := make([]string, 0, len(i.AllStringLiteralWithoutStar()))
+	for _, s := range i.AllStringLiteralWithoutStar() {
+		res = append(res, s.GetText())
+	}
+	return res
 }
