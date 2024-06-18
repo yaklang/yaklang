@@ -3,6 +3,7 @@ package httptpl
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/facades"
@@ -1724,5 +1725,39 @@ Post Meta Setting Deleted Successfully
 		if check {
 			t.Fatal("check stop-at-first error")
 		}
+	}
+}
+
+func TestMatcherContainsTag(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(request.Header["A"][0]))
+	})
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	tmpl := `
+variables:
+    flag: "{{md5('{{unix_time(10)}}')}}"
+http:
+- method: POST
+  path:
+  - '{{RootURL}}'
+  headers:
+    a: "{{flag}}"
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "{{flag}}"
+`
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	if err != nil {
+		panic(err)
+	}
+	var ok bool
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		ok = result
+	}))
+	_, err = ytpl.ExecWithUrl(addr, config)
+	if !ok {
+		t.FailNow()
 	}
 }
