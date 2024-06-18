@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"math/big"
 	"math/rand"
 	"net"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -248,6 +249,118 @@ func ExtractHostPort(raw string) string {
 		return HostPort(host, port)
 	}
 	return raw
+}
+
+func ParseStringToHostsWithCallback(raw string, callback func(string) bool) {
+	for _, h := range PrettifyListFromStringSplitEx(raw, ",", "\n") {
+		// 解析 IP
+		if ret := net.ParseIP(FixForParseIP(h)); ret != nil {
+			if stop := callback(ret.String()); stop {
+				return
+			}
+			continue
+		}
+
+		// 解析 CIDR 网段
+		_ip, netBlock, err := net.ParseCIDR(h)
+		if err != nil {
+			if strings.Count(h, "-") == 1 {
+				// 这里开始解析 1.1.1.1-3 的情况
+				rets := strings.Split(h, "-")
+
+				// 检查第一部分是不是 IP 地址
+				var startIP net.IP
+				if startIP = net.ParseIP(rets[0]); startIP == nil {
+					if stop := callback(h); stop {
+						return
+					}
+					continue
+				}
+
+				if strings.Count(rets[0], ".") == 3 {
+					ipBlocks := strings.Split(rets[0], ".")
+					startInt, err := strconv.ParseInt(ipBlocks[3], 10, 64)
+					if err != nil {
+						if stop := callback(h); stop {
+							return
+						}
+						continue
+					}
+
+					endInt, err := strconv.ParseInt(rets[1], 10, 64)
+					if err != nil {
+						if stop := callback(h); stop {
+							return
+						}
+						continue
+					}
+
+					if (endInt > 256) || endInt < startInt {
+						if stop := callback(h); stop {
+							return
+						}
+						continue
+					}
+
+					additiveRange := endInt - startInt
+					low, err := IPv4ToUint32(startIP.To4())
+					if err != nil {
+						if stop := callback(h); stop {
+							return
+						}
+						continue
+					}
+
+					for i := 0; i <= int(additiveRange); i++ {
+						_ip := Uint32ToIPv4(uint32(i) + low)
+						if _ip != nil {
+							if stop := callback(_ip.String()); stop {
+								return
+							}
+						}
+					}
+				} else {
+					if stop := callback(h); stop {
+						return
+					}
+					continue
+				}
+			} else {
+				if stop := callback(h); stop {
+					return
+				}
+			}
+			continue
+		}
+
+		// 如果是 IPv6 的网段，暂不处理
+		if _ip.To4() == nil {
+			if stop := callback(h); stop {
+				return
+			}
+			continue
+		}
+
+		// 把 IPv4 专成 int
+		low, err := IPv4ToUint32(netBlock.IP)
+		if err != nil {
+			if stop := callback(h); stop {
+				return
+			}
+			continue
+		}
+
+		for i := low; true; i++ {
+			_ip := Uint32ToIPv4(i)
+			if netBlock.Contains(_ip) {
+				if stop := callback(_ip.String()); stop {
+					return
+				}
+			} else {
+				break
+			}
+		}
+	}
 }
 
 // ParseStringToHosts 将字符串解析成 Host 列表， Host 可以以逗号、换行分隔，并且会解析 CIDR 网段
