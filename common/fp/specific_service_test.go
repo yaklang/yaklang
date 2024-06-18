@@ -12,7 +12,7 @@ func TestFingerprintRule(t *testing.T) {
 	//resp, _ := ioutil.ReadFile("./webfingerprint/fingerprint-rules.yml")
 	//
 	//rules, _ := webfingerprint.ParseWebFingerprintRules(resp)
-	rules, _ := webfingerprint.LoadDefaultDataSource()
+	rules, _ := LoadDefaultFingerprintRules()
 
 	config := NewConfig(WithWebFingerprintRule(rules), WithOnlyEnableWebFingerprint(true))
 	matcher, err := NewFingerprintMatcher(nil, config)
@@ -37,7 +37,7 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 	//
 	//rules, _ := webfingerprint.ParseWebFingerprintRules(resp)
 
-	rules, _ := webfingerprint.LoadDefaultDataSource()
+	rules, _ := LoadDefaultFingerprintRules()
 
 	config := NewConfig(WithWebFingerprintRule(
 		rules),

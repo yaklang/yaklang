@@ -223,11 +223,12 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	rules, _ := LoadDefaultDataSource()
 	src := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(src)
-
+	_ = r
 	// Generate a list of 10 random rules from the rules slice
 	randomRules := make([]*WebRule, 100)
 	for i := range randomRules {
-		randomRules[i] = rules[r.Intn(len(rules))]
+		//randomRules[i] = rules[r.Intn(len(rules))]
+		randomRules[i] = rules[i]
 	}
 	// debug
 	// randomRules = rules

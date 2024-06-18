@@ -1,6 +1,8 @@
 package fp
 
 import (
+	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"path"
 	"sync"
 
@@ -92,4 +94,7 @@ func GetDefaultWebFingerprintRules() ([]*webfingerprint.WebRule, error) {
 		DefaultWebFingerprintRules, err = webfingerprint.LoadDefaultDataSource()
 	})
 	return DefaultWebFingerprintRules, err
+}
+func LoadDefaultFingerprintRules() ([]*rule.FingerPrintRule, error) {
+	return parsers.ParseYamlRule("")
 }
