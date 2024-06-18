@@ -3,12 +3,13 @@ package sfvm
 import (
 	"fmt"
 	"regexp"
-	"slices"
+	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"golang.org/x/exp/slices"
 )
 
 type SFFrameInfo struct {
@@ -435,12 +436,32 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if values == nil {
 			return utils.Error("BUG: get top defs failed, empty stack")
 		}
+		mode := i.UnaryInt
+		if mode != CompareStringAnyMode && mode != CompareStringHaveMode {
+			return utils.Errorf("compare string failed: invalid mode %v", mode)
+		}
 		res := make([]bool, 0, valuesLen(values))
 		values.Recursive(func(vo ValueOperator) error {
-			if utils.StringContainsAnyOfSubString(vo.String(), i.Values) {
-				res = append(res, true)
-			} else {
-				res = append(res, false)
+			raw := vo.String()
+			if mode == CompareStringAnyMode {
+				match := false
+				for _, v := range i.Values {
+					if strings.Contains(raw, v) {
+						match = true
+						break
+					}
+				}
+				res = append(res, match)
+			}
+			if mode == CompareStringHaveMode {
+				match := true
+				for _, v := range i.Values {
+					if !strings.Contains(raw, v) {
+						match = false
+						break
+					}
+				}
+				res = append(res, match)
 			}
 			return nil
 		})

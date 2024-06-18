@@ -126,10 +126,16 @@ func (v *SyntaxFlowVisitor) EmitCompareOpcode(i []string) {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitCompareString(i []string) {
+const (
+	CompareStringAnyMode  int = 0
+	CompareStringHaveMode     = 1
+)
+
+func (v *SyntaxFlowVisitor) EmitCompareString(i []string, mode int) {
 	v.codes = append(v.codes, &SFI{
-		OpCode: OpCompareString,
-		Values: i,
+		OpCode:   OpCompareString,
+		Values:   i,
+		UnaryInt: mode,
 	})
 }
 
