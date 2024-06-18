@@ -755,6 +755,17 @@ func init() {
 		Handler: func(s string) []string {
 			return regen.MustGenerate(s)
 		},
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			ch, _, err := regen.GenerateStream(s, ctx)
+			if err != nil {
+				return err
+			}
+
+			for data := range ch {
+				yield(parser.NewFuzzResultWithData(data))
+			}
+			return nil
+		},
 		Alias:       []string{"re", "regex", "regexp"},
 		Description: "使用正则生成所有可能的字符",
 	})
@@ -763,6 +774,14 @@ func init() {
 		Handler: func(s string) []string {
 			return []string{regen.MustGenerateOne(s)}
 		},
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			data, err := regen.GenerateOneStream(s, ctx)
+			if err != nil {
+				return err
+			}
+			yield(parser.NewFuzzResultWithData(data))
+			return nil
+		},
 		Alias:       []string{"re:one", "regex:one", "regexp:one"},
 		Description: "使用正则生成所有可能的字符中的随机一个",
 		IsDyn:       true,
@@ -770,19 +789,55 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "regen:n",
 		Handler: func(s string) []string {
+			n := 1
+			pattern := s
 			lastIndex := strings.LastIndexByte(s, '|')
+
 			if lastIndex > 0 && lastIndex+1 < len(s) {
-				regex := s[:lastIndex]
-				n := s[lastIndex+1:]
-				if ret := codec.Atoi(n); ret > 0 {
-					results := make([]string, ret)
-					for i := 0; i < ret; i++ {
-						results[i] = regen.MustGenerateOne(regex)
-					}
-					return results
+				pattern = s[:lastIndex]
+				number := s[lastIndex+1:]
+				if ret := codec.Atoi(number); ret > 0 {
+					n = ret
 				}
 			}
-			return []string{regen.MustGenerateOne(s)}
+			results, err := regen.Generate(pattern)
+			if err != nil {
+				return []string{pattern}
+			}
+			rand.Shuffle(len(results), func(i, j int) {
+				results[i], results[j] = results[j], results[i]
+			})
+			if n >= len(results) {
+				return results
+			} else {
+				return results[:n]
+			}
+		},
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			n := 1
+			pattern := s
+			lastIndex := strings.LastIndexByte(s, '|')
+			if lastIndex > 0 && lastIndex+1 < len(s) {
+				pattern = s[:lastIndex]
+				number := s[lastIndex+1:]
+				if ret := codec.Atoi(number); ret > 0 {
+					n = ret
+				}
+			}
+			ch, _, err := regen.GenerateStream(pattern, ctx)
+			if err != nil {
+				return err
+			}
+			for i := 0; i < n; i++ {
+				select {
+				case <-ctx.Done():
+					return nil
+				case data := <-ch:
+					yield(parser.NewFuzzResultWithData(data))
+				}
+			}
+
+			return nil
 		},
 		Alias:       []string{"re:n", "regex:n", "regexp:n"},
 		Description: "使用正则生成所有可能的字符中的随机n个",
@@ -899,7 +954,7 @@ func init() {
 				return utils.Error("int fuzztag: too large int range")
 			}
 
-			//results := make([]string, 0, capB.Int64())
+			// results := make([]string, 0, capB.Int64())
 			for {
 				select {
 				case <-ctx.Done():
