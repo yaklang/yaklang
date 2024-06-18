@@ -97,3 +97,39 @@ func TestSimple(t *testing.T) {
 	})
 
 }
+
+func Test_String_Contain(t *testing.T) {
+	t.Run("test string contain have", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = "araaa"
+		ab = "abcccc"
+		ac = "ccc"
+		`,
+			`
+		a* as $target1
+		$target1?{have: abc, ccc} as $target2
+		`,
+			map[string][]string{
+				"target1": {`"araaa"`, `"abcccc"`, `"ccc"`},
+				"target2": {`"abcccc"`},
+			},
+		)
+	})
+
+	t.Run("test string contain any", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		aa = "araaa"
+		ab = "abcccc"
+		ac = "ccc"
+		`,
+			`
+		a* as $target1
+		$target1?{any: abc, ccc} as $target2
+		`,
+			map[string][]string{
+				"target1": {`"araaa"`, `"abcccc"`, `"ccc"`},
+				"target2": {`"abcccc"`, `"ccc"`},
+			},
+		)
+	})
+}

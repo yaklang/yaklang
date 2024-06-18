@@ -223,10 +223,6 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionOr(ctx *FilterExpressionOrC
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitStringInCondition(ctx *StringInConditionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionAnd(ctx *FilterExpressionAndContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -240,6 +236,10 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionRegexpMatch(ctx *FilterExpr
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitStringContainAnyCondition(ctx *StringContainAnyConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitStringContainHaveCondition(ctx *StringContainHaveConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

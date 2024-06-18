@@ -180,11 +180,14 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			}
 		}
 		y.EmitCompareOpcode(ops)
-	case *sf.StringInConditionContext:
 	case *sf.StringContainAnyConditionContext:
 		y.EmitDuplicate()
 		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
-		y.EmitCompareString(res)
+		y.EmitCompareString(res, CompareStringAnyMode)
+	case *sf.StringContainHaveConditionContext:
+		y.EmitDuplicate()
+		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
+		y.EmitCompareString(res, CompareStringHaveMode)
 	case *sf.FilterExpressionCompareContext:
 		if i.NumberLiteral() != nil {
 			n := y.VisitNumberLiteral(i.NumberLiteral())
