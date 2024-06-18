@@ -4,6 +4,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -18,8 +19,8 @@ type MemEditor struct {
 	sourceCodeSha256 string
 
 	// fileUrl and source
-	fileUrl    string
-	sourceCode string
+	fileUrl        string
+	safeSourceCode *SafeString
 
 	// editor
 	lineLensMap        map[int]int
@@ -29,7 +30,7 @@ type MemEditor struct {
 
 func NewMemEditor(sourceCode string) *MemEditor {
 	editor := &MemEditor{
-		sourceCode:         sourceCode,
+		safeSourceCode:     NewSafeString(sourceCode),
 		lineLensMap:        make(map[int]int),
 		lineStartOffsetMap: make(map[int]int),
 	}
@@ -66,7 +67,7 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 
 	// 检查行号是否超出范围
 	if adjustedLine >= len(ve.lineStartOffsetMap) {
-		return len(ve.sourceCode), errors.New("line number out of range")
+		return ve.safeSourceCode.Len(), errors.New("line number out of range")
 	}
 
 	// 检查列号是否超出当前行的长度
@@ -79,8 +80,8 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 		return lineStartOffset + col, nil
 	} else {
 		// For the last line, we need to ensure we do not exceed the length of the source code
-		if lineStartOffset+col >= len(ve.sourceCode) {
-			return len(ve.sourceCode), nil
+		if lineStartOffset+col >= ve.safeSourceCode.Len() {
+			return ve.safeSourceCode.Len(), nil
 		} else {
 			return lineStartOffset + col, nil
 		}
@@ -123,15 +124,16 @@ func (ve *MemEditor) GetLine(x int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return ve.sourceCode[start:end], nil
+	//return ve.sourceCode[start:end], nil
+	return ve.safeSourceCode.Slice2(start, end), nil
 }
 
 // Select 返回指定范围的文本
 func (ve *MemEditor) Select(start, end int) (string, error) {
-	if start < 0 || end > len(ve.sourceCode) || start > end {
+	if start < 0 || end > ve.safeSourceCode.Len() || start > end {
 		return "", errors.New("invalid range for select")
 	}
-	return ve.sourceCode[start:end], nil
+	return ve.safeSourceCode.Slice2(start, end), nil
 }
 
 // 比较指定范围的文本是否与给定字符串相同
@@ -145,7 +147,7 @@ func (ve *MemEditor) CompareRangeWithString(start, end int, compareTo string) (b
 
 // MoveCursor 移动模拟光标位置
 func (ve *MemEditor) MoveCursor(position int) error {
-	if position < 0 || position > len(ve.sourceCode) {
+	if position < 0 || position > ve.safeSourceCode.Len() {
 		return errors.New("position out of bounds")
 	}
 	ve.cursor = position
@@ -172,13 +174,13 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 		// 偏移量为负，返回最初位置
 		return NewPosition(1, 0), errors.New("offset is negative")
 	}
-	if offset >= len(ve.sourceCode) {
+	if offset >= ve.safeSourceCode.Len() {
 		// 偏移量超出最大范围，返回最后位置
 		lastLine := len(ve.lineStartOffsetMap) - 1 // 最后一行的索引（从0开始）
 		lastLineStart := ve.lineStartOffsetMap[lastLine]
 		lastLineLen := ve.lineLensMap[lastLine]
 		outOfRange := utils.Errorf("offset %d is out of range", offset)
-		if offset == len(ve.sourceCode) && lastLineLen == 0 {
+		if offset == ve.safeSourceCode.Len() && lastLineLen == 0 {
 			// 特殊情况，最后一行无内容
 			return NewPosition(lastLine+1, 0), outOfRange
 		}
@@ -213,7 +215,7 @@ func (ve *MemEditor) GetRangeOffset(start, end int) RangeIf {
 }
 
 func (ve *MemEditor) GetFullRange() RangeIf {
-	return ve.GetRangeOffset(0, len(ve.sourceCode))
+	return ve.GetRangeOffset(0, ve.safeSourceCode.Len())
 }
 
 // GetTextFromRangeWithError 根据Range获取文本，优先使用Offset，其次使用Line和Column
@@ -260,18 +262,18 @@ func (ve *MemEditor) UpdateTextByRange(r RangeIf, newText string) error {
 	if startOffset > endOffset {
 		return errors.New("start position is after end position")
 	}
-	if endOffset > len(ve.sourceCode) {
+	if endOffset > ve.safeSourceCode.Len() {
 		return errors.New("end offset is out of bounds")
 	}
 
 	// 使用安全的字符串分割方式防止越界
-	before := ve.sourceCode[:startOffset] // 取起始偏移之前的文本
-	after := ""                           // 默认后续文本为空
-	if endOffset < len(ve.sourceCode) {
-		after = ve.sourceCode[endOffset:] // 取结束偏移之后的文本
+	before := ve.safeSourceCode.SliceBeforeStart(startOffset) // 取起始偏移之前的文本
+	after := ""                                               // 默认后续文本为空
+	if endOffset < ve.safeSourceCode.Len() {
+		after = ve.safeSourceCode.Slice2(endOffset, ve.safeSourceCode.Len()) // 取结束偏移之后的文本
 	}
 
-	ve.sourceCode = before + newText + after // 构造新的源代码
+	ve.safeSourceCode = NewSafeString(before + newText + after) // 构造新的源代码
 
 	// 更新行信息映射
 	ve.recalculateLineMappings()
@@ -297,10 +299,15 @@ func (ve *MemEditor) recalculateLineMappings() {
 	ve.lineLensMap = make(map[int]int)
 	ve.lineStartOffsetMap = make(map[int]int)
 	currentOffset := 0
-	lines := strings.Split(ve.sourceCode, "\n")
+	lines := strings.Split(ve.safeSourceCode.String(), "\n")
 	ve.lineStartOffsetMap[0] = 0
 	for lineNumber, line := range lines {
-		lineLen := len(line)
+		lineLen := 0
+		if utf8.ValidString(line) {
+			lineLen = len([]rune(line))
+		} else {
+			lineLen = len(line)
+		}
 		ve.lineLensMap[lineNumber] = lineLen
 		if lineNumber+1 < len(lines) {
 			ve.lineStartOffsetMap[lineNumber+1] = currentOffset + lineLen + 1
@@ -314,13 +321,14 @@ func (ve *MemEditor) GetTextFromOffset(offset1, offset2 int) string {
 	if start < 0 {
 		start = 0
 	}
-	if end > len(ve.sourceCode) {
-		end = len(ve.sourceCode)
+	if end > ve.safeSourceCode.Len() {
+		end = ve.safeSourceCode.Len()
 	}
 	if end <= 0 {
 		end = 0
 	}
-	return ve.sourceCode[start:end]
+	//return ve.sourceCode[start:end]
+	return ve.safeSourceCode.Slice2(start, end)
 }
 
 func (ve *MemEditor) GetOffsetByPosition(p PositionIf) int {
@@ -329,6 +337,10 @@ func (ve *MemEditor) GetOffsetByPosition(p PositionIf) int {
 
 func (ve *MemEditor) GetTextFromPosition(p1, p2 PositionIf) string {
 	return ve.GetTextFromOffset(ve.GetOffsetByPositionRaw(p1.GetLine(), p1.GetColumn()), ve.GetOffsetByPositionRaw(p2.GetLine(), p2.GetColumn()))
+}
+
+func (ve *MemEditor) GetTextFromPositionInt(startLine, startCol, endLine, endCol int) string {
+	return ve.GetTextFromOffset(ve.GetOffsetByPositionRaw(startLine, startCol), ve.GetOffsetByPositionRaw(endLine, endCol))
 }
 
 func (ve *MemEditor) GetTextFromRange(i RangeIf) string {
@@ -353,15 +365,22 @@ func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
 
 	// 扩展起始偏移到前一个单词边界
 	startWordOffset := startOffset
-	for startWordOffset > 0 && !boundary(rune(ve.sourceCode[startWordOffset-1])) {
-		startWordOffset--
+	raw := ve.safeSourceCode.Slice1(startWordOffset - 1)
+	if len(raw) > 0 {
+		for startWordOffset > 0 && !boundary(rune(raw[0])) {
+			startWordOffset--
+		}
 	}
 
 	// 扩展结束偏移到后一个单词边界
 	endWordOffset := endOffset
-	for endWordOffset < len(ve.sourceCode) && !boundary(rune(ve.sourceCode[endWordOffset])) {
-		endWordOffset++
+	raw = ve.safeSourceCode.Slice1(endWordOffset)
+	if len(raw) > 0 {
+		for endWordOffset < ve.safeSourceCode.Len() && !boundary(rune(raw[0])) {
+			endWordOffset++
+		}
 	}
+
 	return NewRange(ve.GetPositionByOffset(startWordOffset), ve.GetPositionByOffset(endWordOffset))
 }
 
@@ -372,7 +391,7 @@ func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
 }
 
 func (ve *MemEditor) IsOffsetValid(offset int) bool {
-	return offset >= 0 && offset <= len(ve.sourceCode)
+	return offset >= 0 && offset <= ve.safeSourceCode.Len()
 }
 
 func (ve *MemEditor) IsValidPosition(line, col int) bool {
@@ -389,7 +408,10 @@ func (ve *MemEditor) IsValidPosition(line, col int) bool {
 func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) error) error {
 	startIndex := 0
 	for {
-		index := strings.Index(ve.sourceCode[startIndex:], feature)
+		index := strings.Index(
+			ve.safeSourceCode.SliceToEnd(startIndex),
+			feature,
+		)
 		if index == -1 {
 			break // No more matches found
 		}
@@ -408,7 +430,7 @@ func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) erro
 }
 
 func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, callback func(RangeIf)) (end int, ok bool) {
-	index := strings.Index(ve.sourceCode[startIndex:], feature)
+	index := strings.Index(ve.safeSourceCode.SliceToEnd(startIndex), feature)
 	if index == -1 {
 		return startIndex, false
 	}
@@ -426,7 +448,7 @@ func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) e
 		return err // 处理正则表达式编译错误
 	}
 
-	text := ve.sourceCode
+	text := ve.safeSourceCode.String()
 	offset := 0 // 维护当前的搜索起点，逐步推进
 
 	for {
@@ -453,7 +475,7 @@ func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) e
 }
 
 func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
-	minOffset := len(ve.sourceCode)
+	minOffset := ve.safeSourceCode.Len()
 	maxOffset := 0
 	for _, p := range pos {
 		offset := ve.GetOffsetByPosition(p)
@@ -465,7 +487,7 @@ func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
 
 func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int, prefix ...func(i int) string) (string, error) {
 	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
-	if start < 0 || end > len(ve.sourceCode) || start > end {
+	if start < 0 || end > ve.safeSourceCode.Len() || start > end {
 		return "", errors.New("invalid range")
 	}
 
@@ -500,7 +522,7 @@ func (ve *MemEditor) GetTextFromRangeContext(i RangeIf, lineNum int) string {
 }
 
 func (ve *MemEditor) getCurrentSourceCodeContextText() string {
-	salt := ve.sourceCode
+	salt := ve.safeSourceCode.String()
 	if len(ve.sourceCodeCtxStack) > 0 {
 		salt += strings.Join(ve.sourceCodeCtxStack, "\n")
 	}
@@ -529,5 +551,5 @@ func (ve *MemEditor) SourceCodeSha256() string {
 }
 
 func (ve *MemEditor) GetSourceCode() string {
-	return ve.sourceCode
+	return ve.safeSourceCode.String()
 }
