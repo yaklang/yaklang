@@ -133,6 +133,11 @@ func (v *SyntaxFlowVisitor) EmitCompareString(i []string) {
 	})
 }
 
+func (v *SyntaxFlowVisitor) EmitCondition() {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpCondition,
+	})
+}
 
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {

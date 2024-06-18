@@ -73,6 +73,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			return err
 		}
 		y.VisitConditionExpression(ret.ConditionExpression())
+		y.EmitCondition()
 	case *sf.NextFilterContext:
 		err := y.VisitFilterExpr(ret.FilterExpr(0))
 		if err != nil {

@@ -1,9 +1,10 @@
 package sfvm
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"strings"
 )
 
 func mustUnquoteSyntaxFlowString(text string) string {
