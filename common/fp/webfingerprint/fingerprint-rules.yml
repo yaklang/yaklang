@@ -1,4 +1,0 @@
-- methods:
-    - keywords:
-        - product: fastweb
-          regexp: '(?i)(fw-via: )'

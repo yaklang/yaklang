@@ -200,7 +200,7 @@ func main() {
 
 		// web rule
 		webRules, _ := fp.GetDefaultWebFingerprintRules()
-		userRule := webfingerprint.FileOrDirToWebRules(c.String("rule-path"))
+		userRule := fp.FileOrDirToWebRules(c.String("rule-path"))
 
 		if c.Bool("only-rule") {
 			webRules = userRule
@@ -251,7 +251,7 @@ func main() {
 				opts...,
 			)
 			if err != nil {
-				log.Errorf("scan %v failed: %s", utils.HostPort(tHost, tPort))
+				log.Errorf("scan %v failed: %s", utils.HostPort(tHost, tPort), err)
 				return
 			}
 			resultLock.Lock()
