@@ -35,6 +35,19 @@ type Generator interface {
 	CheckVisible(str string) bool
 }
 
+// GenerateStream 根据正则表达式流式生成所有匹配的字符串，返回生成的字符串通道和生成取消函数和错误
+// 对于一些可能匹配多次的元字符:
+// *     : 则只会生成匹配 0 次或 1 次的字符串
+// +     : 则只会生成匹配 1 次或 2 次的字符串
+// {n,m} : 则会生成匹配 n 次到 m 次的字符串
+// {n,}  : 则只会生成匹配 n 次或 n+1 次的字符串
+// Example:
+// ```
+// ch, cancel, err = regen.GenerateStream("[a-z]+")
+// for s = range ch {
+// println(s)
+// }
+// ```
 func GenerateStream(pattern string, ctxs ...context.Context) (chan string, context.CancelFunc, error) {
 	generator, err := NewGenerator(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
@@ -53,6 +66,17 @@ func GenerateStream(pattern string, ctxs ...context.Context) (chan string, conte
 	return ch, cancel, nil
 }
 
+// GenerateStream 根据正则表达式流式生成一个匹配的字符串，返回生成的字符串和错误
+// 对于一些可能匹配多次的元字符:
+// *     : 则只会生成匹配 0 次或 1 次的字符串
+// +     : 则只会生成匹配 1 次或 2 次的字符串
+// {n,m} : 则会生成匹配 n 次到 m 次的字符串
+// {n,}  : 则只会生成匹配 n 次或 n+1 次的字符串
+// Example:
+// ```
+// regen.GenerateOneStream("[a-z]+") // a-z 中随机一个字母
+// regen.GenerateOneStream("^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$") // 生成一个手机号
+// ```
 func GenerateOneStream(pattern string, ctxs ...context.Context) (string, error) {
 	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
@@ -73,6 +97,17 @@ func GenerateOneStream(pattern string, ctxs ...context.Context) (string, error) 
 	return <-ch, nil
 }
 
+// GenerateVisibleOneStream 根据正则表达式流式生成一个匹配的字符串(都是可见字符)，返回生成的字符串和错误
+// 对于一些可能匹配多次的元字符:
+// *     : 则只会生成匹配 0 次或 1 次的字符串
+// +     : 则只会生成匹配 1 次或 2 次的字符串
+// {n,m} : 则会生成匹配 n 次到 m 次的字符串
+// {n,}  : 则只会生成匹配 n 次或 n+1 次的字符串
+// Example:
+// ```
+// regen.GenerateVisibleOneStream("[a-z]") // a-z 中随机一个字母
+// regen.GenerateVisibleOneStream("^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$") // 生成一个手机号
+// ```
 func GenerateVisibleOneStream(pattern string, ctxs ...context.Context) (string, error) {
 	generator, err := NewGeneratorVisibleOne(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
