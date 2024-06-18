@@ -421,7 +421,7 @@ func NewFingerprintMatcher(rules map[*NmapProbe][]*NmapMatch, config *Config) (*
 
 	var webfingerprintRules []*rule.FingerPrintRule
 	if len(config.WebFingerprintRules) <= 0 {
-		webfingerprintRules, err = LoadDefaultFingerprintRules()
+		webfingerprintRules, err = GetDefaultWebFingerprintRules()
 		if err != nil {
 			return nil, errors.Errorf("get default web fingerprint rules failed: %s", err)
 		}

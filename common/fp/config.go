@@ -289,7 +289,7 @@ func (c *Config) init() {
 
 func (c *Config) lazyInit() {
 	if len(c.WebFingerprintRules) <= 0 {
-		c.WebFingerprintRules, _ = LoadDefaultFingerprintRules()
+		c.WebFingerprintRules, _ = GetDefaultWebFingerprintRules()
 	}
 
 	if len(c.FingerprintRules) <= 0 {
