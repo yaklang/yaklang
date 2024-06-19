@@ -127,7 +127,7 @@ func (k *KeywordMatcher) Match(raw string) (*CPE, error) {
 
 	for _, r := range k.regexp.FindAllStringSubmatch(raw, 1) {
 		saveToCPE(&k.Vendor, r, k.VendorIndex)
-		saveToCPE(&k.Product, r, k.ProductIndex)
+		saveToCPE(&k.Product, r, k.ProductIndex) 
 		saveToCPE(&k.Version, r, k.VersionIndex)
 		saveToCPE(&k.Edition, r, k.EditionIndex)
 		saveToCPE(&k.Update, r, k.UpdateIndex)

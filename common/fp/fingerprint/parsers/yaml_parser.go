@@ -32,8 +32,9 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 		r.Method = "regexp"
 		r.MatchParam = &rule.MatchMethodParam{
 			RegexpPattern: keyword.Regexp,
+			Keyword:       keyword,
+			Info:          convertToMap(&keyword.CPE),
 		}
-		r.Info = convertToMap(&keyword.CPE)
 		return r
 	}
 	var res []*rule.FingerPrintRule
@@ -53,8 +54,6 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 						HeaderKey:       header.HeaderName,
 						HeaderMatchRule: convertRegexpRule(&header.HeaderValue),
 					}
-					r.Info = r.MatchParam.HeaderMatchRule.Info
-					r.MatchParam.HeaderMatchRule.Info = nil
 					methodRules = append(methodRules, r)
 				}
 				for _, md5 := range method.MD5s {
@@ -62,8 +61,8 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 					r.Method = "md5"
 					r.MatchParam = &rule.MatchMethodParam{
 						HeaderKey: md5.MD5,
+						Info:      convertToMap(&md5.CPE),
 					}
-					r.Info = convertToMap(&md5.CPE)
 					methodRules = append(methodRules, r)
 				}
 				if method.Condition != "" {
@@ -73,10 +72,6 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 						r.MatchParam = &rule.MatchMethodParam{
 							SubRules:  methodRules,
 							Condition: method.Condition,
-						}
-						r.Info = methodRules[0].Info
-						for _, methodRule := range methodRules {
-							methodRule.Info = nil
 						}
 					}
 				} else {

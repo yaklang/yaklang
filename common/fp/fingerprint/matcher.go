@@ -11,7 +11,8 @@ var (
 	invalidParamError = errors.New("invalid param")
 )
 
-type MatchFun func(data []byte) (bool, error)
+type MatchFun func(data []byte) (*rule.FingerprintInfo, error)
+type SimpleMatchFun func(data []byte) (bool, error)
 type Matcher struct {
 	regexpCache map[string]*regexp.Regexp
 	ErrorHandle func(error)
@@ -38,13 +39,13 @@ func (m *Matcher) Match(data []byte) []*rule.FingerprintInfo {
 			m.ErrorHandle(err)
 			continue
 		}
-		ok, err := f(data)
+		info, err := f(data)
 		if err != nil {
 			m.ErrorHandle(err)
 			continue
 		}
-		if ok {
-			result = append(result, r.Info)
+		if info != nil {
+			result = append(result, info)
 		}
 	}
 	return result
