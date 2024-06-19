@@ -17,11 +17,11 @@ func TestMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := []byte("")
-	matcher := NewMatcher()
+	matcher := NewMatcher(rules...)
 	matcher.ErrorHandle = func(err error) {
 		log.Error(err)
 	}
-	matchRes := matcher.Match(raw, rules)
+	matchRes := matcher.Match(raw)
 	println()
 	_ = matchRes
 }

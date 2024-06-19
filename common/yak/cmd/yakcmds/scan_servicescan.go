@@ -3,7 +3,6 @@ package yakcmds
 import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
@@ -64,7 +63,7 @@ var servicescanCommand = cli.Command{
 
 		// web rule
 		webRules, _ := fp.GetDefaultWebFingerprintRules()
-		userRule := webfingerprint.FileOrDirToWebRules(c.String("rule-path"))
+		userRule := fp.FileOrDirToWebRules(c.String("rule-path"))
 
 		if c.Bool("only-rule") {
 			webRules = userRule

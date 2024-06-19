@@ -3,7 +3,10 @@ package tools
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
+	"os"
 	"reflect"
 	"strings"
 
@@ -420,6 +423,26 @@ func _allOption() fp.ConfigOption {
 	}
 }
 
+func _fingerprintFile(fs ...string) fp.ConfigOption {
+	return func(config *fp.Config) {
+		rules := []*rule.FingerPrintRule{}
+		for _, f := range fs {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				log.Errorf("read fingerprint file %s error: %v", f, err)
+				continue
+			}
+			rs, err := parsers.ParseYamlRule(string(content))
+			if err != nil {
+				log.Errorf("parse fingerprint file %s error: %v", f, err)
+				continue
+			}
+			rules = append(rules, rs...)
+		}
+		config.WebFingerprintRules = rules
+	}
+}
+
 var FingerprintScanExports = map[string]interface{}{
 	"Scan":                scanFingerprint,
 	"ScanOne":             scanOneFingerprint,
@@ -471,4 +494,6 @@ var FingerprintScanExports = map[string]interface{}{
 
 	// 全部服务扫描
 	"all": _allOption,
+
+	"fingerprintFile": _fingerprintFile,
 }

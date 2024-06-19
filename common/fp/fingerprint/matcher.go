@@ -15,21 +15,24 @@ type MatchFun func(data []byte) (bool, error)
 type Matcher struct {
 	regexpCache map[string]*regexp.Regexp
 	ErrorHandle func(error)
+	rules       []*rule.FingerPrintRule
 }
 
-func NewMatcher() *Matcher {
-	return &Matcher{
-		ErrorHandle: func(err error) {
-
-		},
+func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
+	matcher := &Matcher{
+		ErrorHandle: func(err error) {},
 		regexpCache: map[string]*regexp.Regexp{},
-		//matchers: map[string]FingerPrintMatcher{},
 	}
+	matcher.AddRules(rules)
+	return matcher
 }
 
-func (m *Matcher) Match(data []byte, rules []*rule.FingerPrintRule) []*rule.FingerprintInfo {
+func (m *Matcher) AddRules(rules []*rule.FingerPrintRule) {
+	m.rules = append(m.rules, rules...)
+}
+func (m *Matcher) Match(data []byte) []*rule.FingerprintInfo {
 	var result []*rule.FingerprintInfo
-	for _, r := range rules {
+	for _, r := range m.rules {
 		f, err := m.LoadMethod(r.Method, r.MatchParam)
 		if err != nil {
 			m.ErrorHandle(err)

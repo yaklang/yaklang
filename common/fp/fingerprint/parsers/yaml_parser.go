@@ -11,9 +11,9 @@ func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
 	if err != nil {
 		return nil, errors.Errorf("parse wappalyzer rules failed: %s", err)
 	}
-	if err != nil {
-		return nil, err
-	}
+	return ConvertOldYamlWebRuleToGeneralRule(rules)
+}
+func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rule.FingerPrintRule, error) {
 	convertToMap := func(o *webfingerprint.CPE) *rule.FingerprintInfo {
 		return &rule.FingerprintInfo{
 			CPE: &rule.CPE{
@@ -85,5 +85,5 @@ func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
 			}
 		}
 	}
-	return res, err
+	return res, nil
 }
