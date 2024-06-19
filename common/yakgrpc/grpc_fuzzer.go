@@ -1277,7 +1277,11 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
 		if len(totalParams) > 0 {
 			for k, v := range totalParams {
-				opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+				value := ""
+				if len(v) > 0 {
+					value = v[0]
+				}
+				opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", value, ""))
 			}
 		} else {
 			opts = append(opts, poc.WithAppendHttpPacketUploadFile("key", "", "[value]", ""))
