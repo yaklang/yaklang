@@ -15,6 +15,11 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 		return nil
 	}
 
+	enter := y.EmitFilterExprEnter()
+	defer func() {
+		y.EmitFilterExprExit(enter)
+	}()
+
 	switch ret := raw.(type) {
 	// variable
 	case *sf.CurrentRootFilterContext:

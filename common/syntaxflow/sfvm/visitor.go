@@ -77,6 +77,7 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		err := y.VisitFilterExpr(expr)
 		if err != nil {
 			msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
+			log.Error(msg)
 			panic(msg)
 		}
 		if i.RefVariable() != nil {
@@ -158,7 +159,6 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 
 	switch i := raw.(type) {
 	case *sf.FilterConditionContext:
-		// TODO
 		ctx := y.EmitCreateIterator()
 		y.EmitNextIterator(ctx)
 		err := y.VisitFilterExpr(i.FilterExpr())

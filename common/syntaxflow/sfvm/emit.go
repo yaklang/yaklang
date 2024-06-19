@@ -260,12 +260,27 @@ func (v *SyntaxFlowVisitor) EmitCreateIterator() *IterContext {
 
 func (v *SyntaxFlowVisitor) EmitNextIterator(i *IterContext) {
 	i.next = len(v.codes)
-	v.codes = append(v.codes, &SFI{OpCode: OpIterValueNext, iter: i})
+	v.codes = append(v.codes, &SFI{OpCode: OpIterNext, iter: i})
 }
 
 func (v *SyntaxFlowVisitor) EmitIterEnd(i *IterContext) {
 	idx := len(v.codes)
-	code := &SFI{OpCode: OpEndIter}
+	code := &SFI{OpCode: OpIterEnd, iter: i}
 	i.end = idx
 	v.codes = append(v.codes, code)
+}
+
+func (y *SyntaxFlowVisitor) EmitFilterExprEnter() *SFI {
+	code := &SFI{OpCode: OpFilterExprEnter}
+	y.codes = append(y.codes, code)
+	return code
+}
+
+func (y *SyntaxFlowVisitor) EmitFilterExprExit(c *SFI) {
+	idx := len(y.codes)
+	c.UnaryInt = idx
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpFilterExprExit,
+		UnaryInt: idx,
+	})
 }
