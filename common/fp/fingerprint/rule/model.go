@@ -2,13 +2,17 @@ package rule
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"strings"
 )
 
 type MatchMethodParam struct {
 	ExtParams map[string]any
+	Info      *FingerprintInfo
+
 	// regexp
 	RegexpPattern string
+	Keyword       *webfingerprint.KeywordMatcher
 
 	// complex
 	Condition string
@@ -29,7 +33,6 @@ type Pair struct {
 type FingerPrintRule struct {
 	ActiveMode bool
 	Method     string
-	Info       *FingerprintInfo
 	MatchParam *MatchMethodParam
 }
 

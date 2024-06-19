@@ -19,21 +19,21 @@ import (
 )
 
 type FingerprintInfo struct {
-	IP               string                           `json:"ip"`
-	Port             int                              `json:"port"`
-	Proto            TransportProto                   `json:"proto"`
-	ServiceName      string                           `json:"service_name"`
-	ProductVerbose   string                           `json:"product_verbose"`
-	Info             string                           `json:"info"`
-	Version          string                           `json:"version"`
-	Hostname         string                           `json:"hostname"`
-	OperationVerbose string                           `json:"operation_verbose"`
-	DeviceType       string                           `json:"device_type"`
-	CPEs             []string                         `json:"cpes"`
-	Raw              string                           `json:"raw"`
-	Banner           string                           `json:"banner"`
+	IP               string                 `json:"ip"`
+	Port             int                    `json:"port"`
+	Proto            TransportProto         `json:"proto"`
+	ServiceName      string                 `json:"service_name"`
+	ProductVerbose   string                 `json:"product_verbose"`
+	Info             string                 `json:"info"`
+	Version          string                 `json:"version"`
+	Hostname         string                 `json:"hostname"`
+	OperationVerbose string                 `json:"operation_verbose"`
+	DeviceType       string                 `json:"device_type"`
+	CPEs             []string               `json:"cpes"`
+	Raw              string                 `json:"raw"`
+	Banner           string                 `json:"banner"`
 	CPEFromUrls      map[string][]*rule.CPE `json:"cpe_from_urls"`
-	HttpFlows        []*HTTPFlow                      `json:"http_flows"`
+	HttpFlows        []*HTTPFlow            `json:"http_flows"`
 
 	// tls info for fill...
 	TLSInspectResults []*netx.TLSInspectResult
