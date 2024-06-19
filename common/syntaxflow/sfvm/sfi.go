@@ -86,11 +86,15 @@ const (
 	// OpCreateIter will create iterator for current context
 	// the context contains origin values(list) and channel for elements
 	OpCreateIter
-	// OpIterValueNext will get next value from iterator
+	// OpIterNext will get next value from iterator
 	// if the channel from iter context has a next element, push into stack and execute filter
 	// if not, exit
-	OpIterValueNext
-	OpEndIter
+	OpIterNext
+	OpIterEnd
+
+	// OpFilterExprEnter will assert the top of stack, make sure a input
+	OpFilterExprEnter
+	OpFilterExprExit
 )
 
 type SFI struct {
@@ -107,7 +111,7 @@ type SFI struct {
 
 func (s *SFI) IsIterOpcode() bool {
 	switch s.OpCode {
-	case OpCreateIter, OpIterValueNext, OpEndIter:
+	case OpCreateIter, OpIterNext, OpIterEnd:
 		return true
 	default:
 		return false
@@ -116,7 +120,7 @@ func (s *SFI) IsIterOpcode() bool {
 
 type IterContext struct {
 	originValues chan ValueOperator
-	results      []ValueOperator
+	results      []bool
 	start        int
 	next         int
 	end          int
@@ -230,10 +234,14 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v"+suffix, "desc", s.UnaryStr)
 	case OpCreateIter:
 		return fmt.Sprintf(verboseLen+" %v", "iter-start", s.UnaryStr)
-	case OpEndIter:
+	case OpIterEnd:
 		return fmt.Sprintf(verboseLen+" %v", "iter-end", s.UnaryStr)
-	case OpIterValueNext:
+	case OpIterNext:
 		return fmt.Sprintf(verboseLen+" start: %v end: %v", "iter-next", s.iter.start, s.iter.end)
+	case OpFilterExprEnter:
+		return fmt.Sprintf(verboseLen, "\\_")
+	case OpFilterExprExit:
+		return fmt.Sprintf(verboseLen, "_/")
 	default:
 		panic("unhandled default case")
 	}
