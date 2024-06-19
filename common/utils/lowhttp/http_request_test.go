@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -55,6 +56,30 @@ Content-Type: text/html
 
 -----------------------------9051914041544843365972754266--
 `
+
+func TestFixHTTPPacketCRLFKeepOtherParams(t *testing.T) {
+	postPacket := `POST / HTTP/1.1
+Content-Type: multipart/form-data; charset=utf-16le; boundary=317f9668d26388b5cf93fb07be5ea390b366616e303d2b73c6ee4c53a8b5
+Host: www.example.com
+Content-Length: 178
+
+--317f9668d26388b5cf93fb07be5ea390b366616e303d2b73c6ee4c53a8b5
+Content-Disposition: form-data; name="key"
+
+123
+--317f9668d26388b5cf93fb07be5ea390b366616e303d2b73c6ee4c53a8b5--
+`
+	raw := FixHTTPPacketCRLF([]byte(postPacket), false)
+	spew.Dump(raw)
+	for _, line := range strings.Split(string(raw), "\r\n") {
+		if !strings.HasPrefix(line, "Content-Type") {
+			continue
+		}
+		require.Contains(t, line, "multipart/form-data", "mime-type should be kept")
+		require.Contains(t, line, "charset=utf-16le", "charset should be kept")
+		require.Contains(t, line, "boundary=317f9668d26388b5cf93fb07be5ea390b366616e303d2b73c6ee4c53a8b5", "boundary should be kept")
+	}
+}
 
 func TestFixHTTPPacketCRLF6(t *testing.T) {
 	postPacket := `POST / HTTP/1.1
