@@ -3,13 +3,14 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"reflect"
 	"regexp"
 	"strings"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -20,7 +21,7 @@ import (
 
 var _codeMutateRegexp = regexp.MustCompile(`(?s){{yak\d*(\(.*\))}}`)
 
-func MutateHookCaller(raw string) (func(https bool, originReq []byte, req []byte) []byte, func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
+func MutateHookCaller(raw string, caller YakitCallerIf) (func(https bool, originReq []byte, req []byte) []byte, func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
 	// 发送数据包之前的 hook
 	entry := NewScriptEngine(2)
 	entry.HookOsExit()
@@ -30,6 +31,20 @@ func MutateHookCaller(raw string) (func(https bool, originReq []byte, req []byte
 	if err != nil {
 		log.Errorf("eval hookCode failed: %s", err)
 		return nil, nil, nil
+	}
+
+	if caller != nil { // hook yakit lib.
+		client := yaklib.NewVirtualYakitClient(caller)
+		db := consts.GetGormProjectDatabase()
+		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))
+		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, "default"))
+		engine.SetVar("yakit_status", func(id string, i interface{}) {
+			FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
+				Id:   id,
+				Data: fmt.Sprint(i),
+			})
+		})
+		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(client))
 	}
 
 	before, beforeRequestOk := engine.GetVar("beforeRequest")

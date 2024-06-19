@@ -518,7 +518,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				if script == nil && reqInstance.GetYakScriptContent() != "" {
 					hotPatchScript := reqInstance.GetYakScriptContent()
-					beforeRequest, afterRequest, _ = yak.MutateHookCaller(hotPatchScript)
+					beforeRequest, afterRequest, _ = yak.MutateHookCaller(hotPatchScript, feedbacker)
 
 					log.Info("start to load yakScriptContent content")
 					err = mitmPluginCaller.LoadHotPatch(stream.Context(), hotPatchScript)
