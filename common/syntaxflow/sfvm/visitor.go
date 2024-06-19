@@ -151,7 +151,7 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpressionContext) interface{} {
+func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpressionContext) any {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -159,7 +159,14 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 	switch i := raw.(type) {
 	case *sf.FilterConditionContext:
 		// TODO
-		log.Infof("TODO: FilterConditionContext: %v", i.GetText())
+		ctx := y.EmitCreateIterator()
+		y.EmitNextIterator(ctx)
+		err := y.VisitFilterExpr(i.FilterExpr())
+		if err != nil {
+			log.Warnf("compile filter-expr in condition expression failed: %v", err)
+			return err
+		}
+		y.EmitIterEnd(ctx)
 	case *sf.OpcodeTypeConditionContext:
 		y.EmitDuplicate()
 		ops := make([]string, 0, len(i.AllOpcodes()))

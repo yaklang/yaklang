@@ -104,7 +104,9 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		if idx >= len(s.Codes) {
 			break
 		}
+
 		i := s.Codes[idx]
+
 		s.debugLog(i.String())
 		switch i.OpCode {
 		case OpEnterStatement:
@@ -120,6 +122,61 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		case OpPushInput:
 			s.debugSubLog(">> push input")
 			s.stack.Push(input)
+		case OpIterValueNext:
+			if i.iter == nil {
+				return utils.Error("BUG: iterContext is nil")
+			}
+			c := i.iter.originValues
+			if c == nil {
+				return utils.Error("BUG: iterContext.originValues is nil")
+			}
+
+			val, ok := <-c
+			if !ok {
+				idx = i.iter.end
+				s.debugLog("no nex data, to %v", idx)
+				i.iter.originValues = nil
+				s.stack.Push(NewValues(nil))
+				continue
+			}
+			s.debugLog("next value: %v", val.String())
+			s.debugLog(">> push")
+			s.stack.Push(val)
+		case OpEndIter:
+			if i.iter == nil {
+				return utils.Error("BUG: iterContext is nil")
+			}
+
+			i.iter._counter++
+			s.debugLog(">> pop")
+			if s.stack.Len() <= 0 {
+				return utils.Error("BUG: stack is empty (next/iter should keep stack balanced)")
+			}
+			val := s.stack.Pop()
+			if val.IsList() {
+				ele, _ := val.ListIndex(0)
+				if ele != nil {
+					s.debugLog("   peeked idx: %v", i.iter._counter)
+					i.iter.results = append(i.iter.results, val)
+				}
+			} else {
+				if val != nil {
+					i.iter.results = append(i.iter.results, val)
+				}
+			}
+
+			if i.iter.originValues != nil {
+				idx = i.iter.next
+				s.debugLog("jmp to %v", idx)
+				continue
+			}
+
+			results := i.iter.results
+			if len(results) == 0 {
+				return utils.Errorf("iter results is empty")
+			}
+			s.debugLog("<< push iter results[len: %v]", results)
+			s.stack.Push(NewValues(results))
 		default:
 			if err := s.execStatement(i); err != nil {
 				if statementEnd == 0 {
@@ -148,7 +205,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if s.stack.Len() == 0 {
 			return utils.Errorf("stack top is empty")
 		}
-		s.debugSubLog(">> duplicate ")
+		s.debugSubLog(">> duplicate (stack grow)")
 		v := s.stack.Peek()
 		s.stack.Push(v)
 	case OpPushSearchExact:
@@ -513,6 +570,18 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 		}
 		s.stack.Push(NewValues(res))
+	case OpCreateIter:
+		s.debugSubLog(">> pop")
+		vs := s.stack.Pop()
+		channel := make(chan ValueOperator)
+		go func() {
+			defer close(channel)
+			_ = vs.Recursive(func(vo ValueOperator) error {
+				channel <- vo
+				return nil
+			})
+		}()
+		i.iter.originValues = channel
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		panic(msg)

@@ -82,6 +82,15 @@ const (
 
 	// OpAddDescription add description to current context
 	OpAddDescription
+
+	// OpCreateIter will create iterator for current context
+	// the context contains origin values(list) and channel for elements
+	OpCreateIter
+	// OpIterValueNext will get next value from iterator
+	// if the channel from iter context has a next element, push into stack and execute filter
+	// if not, exit
+	OpIterValueNext
+	OpEndIter
 )
 
 type SFI struct {
@@ -91,6 +100,27 @@ type SFI struct {
 	Desc             string
 	Values           []string
 	SyntaxFlowConfig []*RecursiveConfigItem
+
+	// iter
+	iter *IterContext
+}
+
+func (s *SFI) IsIterOpcode() bool {
+	switch s.OpCode {
+	case OpCreateIter, OpIterValueNext, OpEndIter:
+		return true
+	default:
+		return false
+	}
+}
+
+type IterContext struct {
+	originValues chan ValueOperator
+	results      []ValueOperator
+	start        int
+	next         int
+	end          int
+	_counter     int
 }
 
 func (s *SFI) ValueByIndex(i int) string {
@@ -126,11 +156,11 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "push$input", s.UnaryStr)
 
 	case OpPushSearchGlob:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, s.UnaryInt)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpPushSearchExact:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, s.UnaryInt)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpPushSearchRegexp:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, s.UnaryInt)
+		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case opGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
 	case OpGetAllCallArgs:
@@ -198,6 +228,12 @@ func (s *SFI) String() string {
 			suffix += " value: " + ret
 		}
 		return fmt.Sprintf(verboseLen+" %v"+suffix, "desc", s.UnaryStr)
+	case OpCreateIter:
+		return fmt.Sprintf(verboseLen+" %v", "iter-start", s.UnaryStr)
+	case OpEndIter:
+		return fmt.Sprintf(verboseLen+" %v", "iter-end", s.UnaryStr)
+	case OpIterValueNext:
+		return fmt.Sprintf(verboseLen+" start: %v end: %v", "iter-next", s.iter.start, s.iter.end)
 	default:
 		panic("unhandled default case")
 	}

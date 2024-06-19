@@ -50,6 +50,18 @@ const (
 	BothMatch     = NameMatch | KeyMatch
 )
 
+func MatchModeString(mode int) string {
+	switch mode {
+	case NameMatch:
+		return "name"
+	case KeyMatch:
+		return "key"
+	case BothMatch:
+		return "name+key"
+	}
+	return "Unknown"
+}
+
 type ValueOperator interface {
 	String() string
 	IsMap() bool
