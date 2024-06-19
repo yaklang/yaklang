@@ -852,6 +852,39 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 		return i
 	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewMixPluginCallerWithFilter", func(i interface{}) interface{} {
+		origin, ok := i.(func(*filter.StringFilter) (*MixPluginCaller, error))
+		if ok {
+			return func(webFilter *filter.StringFilter) (*MixPluginCaller, error) {
+				manager, err := origin(webFilter)
+				if err != nil {
+					return nil, err
+				}
+				log.Debugf("bind hook.NewMixPluginCallerWithFilter to runtime: %v", runtimeId)
+				manager.SetRuntimeId(runtimeId)
+				manager.SetProxy(proxy)
+				manager.SetCtx(streamContext)
+				manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
+					yakitLib, ok := nIns.GetVar("yakit")
+					if ok && yakitLib != nil {
+						if v, ok := yakitLib.(map[string]interface{}); ok {
+							if v2, ok := v["Output"]; ok {
+								if v3, ok := v2.(func(i interface{}) error); ok {
+									return v3(result)
+								} else {
+									return fmt.Errorf("yakit.Output is not func(i interface{}) error")
+								}
+							}
+						}
+					}
+					return fmt.Errorf("not found current engine yakit.Output")
+				})
+				return manager, nil
+			}
+		}
+		return i
+	})
 	// context hook
 
 	// new context
