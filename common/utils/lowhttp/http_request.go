@@ -71,6 +71,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 
 	plrand := fmt.Sprintf("[[REPLACE_CONTENT_LENGTH:%v]]", utils.RandStringBytes(20))
 	plrandHandled := false
+	contentTypeRawValue := ""
 	header, body := SplitHTTPPacket(
 		raw,
 		func(m, u, proto string) error {
@@ -87,6 +88,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 			keyLower := strings.ToLower(key)
 			valLower := strings.ToLower(value)
 			if !isMultipart && keyLower == "content-type" && strings.HasPrefix(valLower, "multipart/form-data") {
+				contentTypeRawValue = value
 				isMultipart = true
 			}
 			if !haveContentLength && strings.ToLower(key) == "content-length" {
@@ -142,7 +144,13 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	if isRequest && isMultipart {
 		boundary, fixed := FixMultipartBody(body)
 		if boundary != "" {
-			header = string(ReplaceMIMEType([]byte(header), "multipart/form-data; boundary="+boundary))
+			newContentType := "multipart/form-data; boundary=" + boundary
+			origin, params, err := mime.ParseMediaType(contentTypeRawValue)
+			if err == nil {
+				params["boundary"] = boundary
+				newContentType = mime.FormatMediaType(origin, params)
+			}
+			header = string(ReplaceMIMEType([]byte(header), newContentType))
 			body = fixed
 		}
 	}
