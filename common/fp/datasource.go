@@ -3,6 +3,7 @@ package fp
 import (
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"path"
 	"sync"
 
@@ -90,5 +91,13 @@ func GetDefaultWebFingerprintRules() ([]*rule.FingerPrintRule, error) {
 	if err != nil {
 		return nil, errors.Errorf("get local web fingerprint rules failed: %s", err)
 	}
-	return parsers.ParseYamlRule(string(content))
+	buildinYamlRules, err := parsers.ParseYamlRule(string(content))
+	if err != nil {
+		return nil, err
+	}
+	buildinRules, err := parsers.ConvertOldYamlWebRuleToGeneralRule(webfingerprint.DefaultWebFingerprintRules)
+	if err != nil {
+		return nil, err
+	}
+	return append(buildinRules, buildinYamlRules...), nil
 }

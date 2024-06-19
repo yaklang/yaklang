@@ -31,7 +31,6 @@ type RuleBlock struct {
 
 type Matcher struct {
 	Config  *Config
-	rules   []*rule.FingerPrintRule
 	matcher *fingerprint.Matcher
 }
 
@@ -440,9 +439,8 @@ func NewFingerprintMatcher(rules map[*NmapProbe][]*NmapMatch, config *Config) (*
 	//}
 
 	matcher := &Matcher{
-		rules:   webfingerprintRules,
 		Config:  config,
-		matcher: fingerprint.NewMatcher(),
+		matcher: fingerprint.NewMatcher(webfingerprintRules...),
 	}
 
 	return matcher, nil

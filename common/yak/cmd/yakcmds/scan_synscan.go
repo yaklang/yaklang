@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
@@ -113,7 +112,7 @@ var synscanCommand = cli.Command{
 		// 解析指纹配置
 		// web rule
 		webRules, _ := fp.GetDefaultWebFingerprintRules()
-		userRule := webfingerprint.FileOrDirToWebRules(c.String("rule-path"))
+		userRule := fp.FileOrDirToWebRules(c.String("rule-path"))
 
 		if c.Bool("only-rule") {
 			webRules = userRule

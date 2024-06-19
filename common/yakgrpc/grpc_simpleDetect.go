@@ -236,6 +236,10 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "syn-concurrent", Value: "1000"})
 	}
 
+	if len(reqPortScan.GetUserFingerprintFiles()) > 0 {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "user-fingerprint", Value: strings.Join(reqPortScan.GetUserFingerprintFiles(), "\n")})
+	}
+
 	if len(reqPortScan.GetProto()) > 0 {
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "proto",
