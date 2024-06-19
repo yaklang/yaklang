@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
@@ -382,4 +383,73 @@ rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
 			cancel()
 		}
 	}
+}
+
+func TestGRPCMUSTPASS_MITM_HotPatch_Output(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100))
+	defer cancel()
+
+	token1 := utils.RandStringBytes(16)
+	token2 := utils.RandStringBytes(16)
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	var mirrorCheck bool        // load hotpatch hook
+	var beforeRequestCheck bool // MutateHookCaller
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			if !strings.Contains(msg, "starting mitm server") {
+				if strings.Contains(msg, token1) {
+					mirrorCheck = true
+				}
+				if strings.Contains(msg, token2) {
+					beforeRequestCheck = true
+				}
+				continue
+			}
+
+			// load hot-patch mitm plugin
+			stream.Send(&ypb.MITMRequest{
+				SetYakScript: true,
+				YakScriptContent: fmt.Sprintf(`mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    yakit.Output("%s")
+}
+beforeRequest = func(ishttps, oreq, req){
+    yakit_output("%s")
+}`, token1, token2),
+			})
+		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+			// send packet
+			packet := `GET / HTTP/1.1
+Host: ` + utils.HostPort(mockHost, mockPort) + `
+
+`
+			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
+			_, err = lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packetBytes), lowhttp.WithProxy(`http://`+utils.HostPort("127.0.0.1", mitmPort)))
+			require.NoError(t, err)
+			cancel()
+		}
+	}
+
+	require.True(t, mirrorCheck, "mirrorHttpFlow hook yakit.output fail")
+	require.True(t, beforeRequestCheck, "beforeRequest hook yakit.output fail")
 }
