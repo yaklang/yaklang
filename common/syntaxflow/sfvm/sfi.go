@@ -154,7 +154,7 @@ func (s *SFI) String() string {
 	case OpCompareOpcode:
 		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
 	case OpCompareString:
-		return fmt.Sprintf(verboseLen+" %v", "compare opcode", s.Values)
+		return fmt.Sprintf(verboseLen+" %v", "compare string", s.Values)
 	case OpCondition:
 		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
 	case OpEq:
