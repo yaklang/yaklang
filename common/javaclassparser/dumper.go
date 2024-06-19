@@ -1,33 +1,57 @@
 package javaclassparser
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
 )
 
-const classTemplate = "\n//Class Declaration\n%s class %s{%s}"
-const attrTemplate = `%s %s %s;`
+const classTemplate = "%s class %s {%s}"
+const attrTemplate = `%s %s %s {%s}`
 
 type ClassObjectDumper struct {
-	imports map[string]struct{}
-	obj     *ClassObject
+	imports   map[string]struct{}
+	obj       *ClassObject
+	ClassName string
+	deepStack *utils.Stack[int]
 }
 
 func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
-	return &ClassObjectDumper{obj: obj, imports: make(map[string]struct{})}
+	return &ClassObjectDumper{
+		obj:       obj,
+		imports:   make(map[string]struct{}),
+		deepStack: utils.NewStack[int](),
+	}
+}
+func (c *ClassObjectDumper) TabNumber() int {
+	return c.deepStack.Peek()
+}
+func (c *ClassObjectDumper) Tab() {
+	pre := c.deepStack.Peek()
+	if pre == 0 {
+		c.deepStack.Push(1)
+	} else {
+		c.deepStack.Push(pre + 1)
+	}
+}
+func (c *ClassObjectDumper) UnTab() {
+	c.deepStack.Pop()
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	result := classTemplate
-
 	accessFlagsVerbose := c.obj.AccessFlagsVerbose
 	if len(accessFlagsVerbose) < 1 {
 		return "", utils.Error("accessFlagsVerbose is empty")
 	}
 	accessFlags := strings.Join(accessFlagsVerbose, " ")
-
-	className := c.obj.GetClassName()
+	name := c.obj.GetClassName()
+	splits := strings.Split(name, "/")
+	packageName := strings.Join(splits[:len(splits)-1], ".")
+	className := splits[len(splits)-1]
+	c.ClassName = className
+	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {
 		return "", utils.Error("className is empty")
 	}
@@ -48,7 +72,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		return "", err
 	}
 	if len(methods) > 0 {
-		attrs += "\t// Methods\n"
+		attrs += "\n"
 		for _, method := range methods {
 			attrs += fmt.Sprintf("\t%s\n", method)
 		}
@@ -67,7 +91,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	//}
 	//constantPoolStr := strings.Join(constantPool, "\n// ")
 	//constantPoolStr = "\n// Constant Pool\n// " + constantPoolStr
-	return importsStr + result, nil
+	return packageSource + importsStr + result, nil
 }
 func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 	result := []string{}
@@ -86,11 +110,13 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 			return nil, err
 		}
 		lastPacket := c.parseImportCLass(descriptor)
-		result = append(result, fmt.Sprintf(attrTemplate, accessFlags, lastPacket, name))
+		result = append(result, fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name))
 	}
 	return result, nil
 }
 func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
+	c.Tab()
+	defer c.UnTab()
 	result := []string{}
 	for _, method := range c.obj.Methods {
 		accessFlagsVerbose := getAccessFlagsVerbose(method.AccessFlags)
@@ -135,9 +161,53 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 			paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s%s var%d", lastPacket, array, i))
 		}
 		paramsNewStr := strings.Join(paramsNewStrList, ", ")
-		name = fmt.Sprintf("%s(%s)", name, paramsNewStr)
-		result = append(result, fmt.Sprintf(attrTemplate, accessFlags, returnType, name))
-
+		code := ""
+		c.Tab()
+		for _, attribute := range method.Attributes {
+			if codeAttr, ok := attribute.(*CodeAttribute); ok {
+				code += "\n"
+				instrNameList := []string{}
+				reader := bytes.NewReader(codeAttr.Code)
+				for {
+					b, err := reader.ReadByte()
+					if err != nil {
+						break
+					}
+					instr, ok := allInstr[b]
+					if !ok {
+						instrNameList = append(instrNameList, "-")
+					} else {
+						instrNameList = append(instrNameList, instr.name)
+					}
+					n := instr.length - 1
+					if n > 0 {
+						reader.Read(make([]byte, n))
+					}
+				}
+				for i, s := range instrNameList {
+					code += strings.Repeat("\t", c.TabNumber()) + s
+					if i != len(instrNameList)-1 {
+						code += "\n"
+					}
+				}
+				//code += strings.Join(instrNameList, "\n")
+				code += "\n"
+			}
+		}
+		c.UnTab()
+		methodSource := ""
+		switch name {
+		case "<init>":
+			name = fmt.Sprintf("%s(%s)", c.ClassName, paramsNewStr)
+			methodSource = fmt.Sprintf("%s %s {%s", accessFlags, name, code)
+		case "<clinit>":
+			methodSource = fmt.Sprintf("%s {%s", accessFlags, code)
+		default:
+			name = fmt.Sprintf("%s(%s)", name, paramsNewStr)
+			methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnType, name, code)
+		}
+		methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
+		result = append(result, methodSource)
 	}
 	return result, nil
 }
