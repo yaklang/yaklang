@@ -142,7 +142,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				CPEs:           currentCPE,
 			}
 			httpflows = append(httpflows, flow)
-			fpInfos := f.matcher.Match(info.Response, f.rules)
+			fpInfos := f.matcher.Match(info.Response)
 			//cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
 			//if err != nil {
 			//	if !strings.Contains(err.Error(), "no rules matched") {

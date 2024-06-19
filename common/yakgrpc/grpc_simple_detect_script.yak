@@ -57,6 +57,7 @@ if proxies == "no" {
 
 
 active = cli.Bool("active")
+userfpFile = cli.String("user-fingerprint")
 concurrent = cli.Int("concurrent", cli.setDefault(50))
 synConcurrent = cli.Int("syn-concurrent", cli.setDefault(800))
 protos = cli.String("proto", cli.setDefault("tcp,udp"))
@@ -139,6 +140,11 @@ cli.check()
 
 tcpOps = []
 tcpOps = append(tcpOps, servicescan.active(active))
+
+if userfpFile != ""{
+    fs = str.Split(userfpFile,"\n")
+    tcpOps = append(tcpOps, servicescan.fingerprintFile(fs...))
+}
 
 if concurrent > 0 {
     tcpOps = append(tcpOps, servicescan.concurrent(concurrent))
