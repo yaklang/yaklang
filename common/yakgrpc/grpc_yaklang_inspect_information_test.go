@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -87,13 +88,13 @@ func CompareScriptParams(got, want []*ypb.YakScriptParam) error {
 		}
 		// sort extra*.Data by label
 		sort.Slice(extraWant.Data, func(i, j int) bool {
-			return extraWant.Data[i].Label < extraWant.Data[j].Label
+			return extraWant.Data[i].Key < extraWant.Data[j].Key
 		})
 		sort.Slice(extraGot.Data, func(i, j int) bool {
-			return extraGot.Data[i].Label < extraGot.Data[j].Label
+			return extraGot.Data[i].Key < extraGot.Data[j].Key
 		})
 		for j := range extraWant.Data {
-			if extraWant.Data[j].Label != extraGot.Data[j].Label {
+			if extraWant.Data[j].Key != extraGot.Data[j].Key {
 				return utils.Errorf("cli parameter %d extra setting data %d label not match", i, j)
 			}
 			if extraWant.Data[j].Value != extraGot.Data[j].Value {
@@ -202,7 +203,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 					Help:         "help information",
 					Required:     false,
 					Group:        "",
-					ExtraSetting: "{\"double\":true,\"data\":[{\"label\":\"c\",\"value\":\"c\"},{\"label\":\"a\",\"value\":\"A\"},{\"label\":\"b\",\"value\":\"B\"}]}",
+					ExtraSetting: "{\"double\":true,\"data\":[{\"key\":\"c\",\"value\":\"c\"},{\"key\":\"a\",\"value\":\"A\"},{\"key\":\"b\",\"value\":\"B\"}]}",
 				},
 			},
 			t,
@@ -352,7 +353,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 					Help:         "help information",
 					Required:     false,
 					Group:        "",
-					ExtraSetting: "{\"double\":true,\"data\":[{\"label\":\"c\",\"value\":\"c\"},{\"label\":\"a\",\"value\":\"A\"},{\"label\":\"b\",\"value\":\"B\"}]}",
+					ExtraSetting: "{\"double\":true,\"data\":[{\"key\":\"c\",\"value\":\"c\"},{\"key\":\"a\",\"value\":\"A\"},{\"key\":\"b\",\"value\":\"B\"}]}",
 					MethodType:   "select",
 				},
 			},
@@ -951,4 +952,45 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 			require.ElementsMatch(t, check.expectTag, information.ParseTags(prog))
 		})
 	}
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_CLI_SelectOption(t *testing.T) {
+	t.Run("code gen", func(t *testing.T) {
+		json := `"[{\"Field\":\"types\",\"DefaultValue\":\"admin,backup,robots-100\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"检查项目\",\"Help\":\"选择内置的字典来完成测试\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":true,\\\"data\\\":[{\\\"key\\\":\\\"爆破备份文件\\\",\\\"value\\\":\\\"backup\\\"},{\\\"key\\\":\\\"爆破后台\\\",\\\"value\\\":\\\"admin\\\"},{\\\"key\\\":\\\"爆破 API 接口\\\",\\\"value\\\":\\\"apipath\\\"},{\\\"key\\\":\\\"PHP 路径字典\\\",\\\"value\\\":\\\"php\\\"},{\\\"key\\\":\\\"JSP 路径字典\\\",\\\"value\\\":\\\"jsp\\\"},{\\\"key\\\":\\\"ASPX 路径字典\\\",\\\"value\\\":\\\"aspx\\\"},{\\\"key\\\":\\\"MDB 数据库字典\\\",\\\"value\\\":\\\"mdb-download\\\"},{\\\"key\\\":\\\"综合字典3000+\\\",\\\"value\\\":\\\"misc-gt-3000\\\"},{\\\"key\\\":\\\"robots.txt top100\\\",\\\"value\\\":\\\"robots-100\\\"},{\\\"key\\\":\\\"禁用内置字典\\\",\\\"value\\\":\\\"disable-buildin-dict\\\"}]}\"}]"`
+		params, err := getParameterFromParamJson(json)
+		assert.NoError(t, err)
+		log.Infof("params: %v", params)
+
+		code := getCliCodeFromParam(params)
+		log.Infof("code: %s", code)
+		if !strings.Contains(code, `cli.setSelectOption("爆破备份文件", "backup"),cli.setSelectOption("爆破后台", "admin"),cli.setSelectOption("爆破 API 接口", "apipath"),cli.setSelectOption("PHP 路径字典", "php"),cli.setSelectOption("JSP 路径字典", "jsp"),cli.setSelectOption("ASPX 路径字典", "aspx"),cli.setSelectOption("MDB 数据库字典", "mdb-download"),cli.setSelectOption("综合字典3000+", "misc-gt-3000"),cli.setSelectOption("robots.txt top100", "robots-100"),cli.setSelectOption("禁用内置字典", "disable-buildin-dict"),cli.setHelp("选择内置的字典来完成测试"),cli.setVerboseName("检查项目")`) {
+			t.Fatalf("code not match")
+		}
+	})
+
+	t.Run("code parse", func(t *testing.T) {
+		code := `
+		cli.StringSlice(
+			"types", 
+			cli.setSelectOption("", "backup"), 
+		)
+		`
+
+		client, err := NewLocalClient()
+		assert.NoError(t, err)
+
+		rsp := yaklangInspectInformationSend(client, "yak", code, nil)
+		got := rsp.CliParameter
+		log.Infof("got: %v", got)
+
+		want := []*ypb.YakScriptParam{
+			{
+				Field: "types", TypeVerbose: "select",
+				FieldVerbose: "types",
+				ExtraSetting: "{\"double\":false,\"data\":[{\"key\":\"backup\",\"value\":\"backup\"}]}",
+				MethodType:   "select",
+			},
+		}
+		assert.NoError(t, CompareScriptParams(got, want))
+	})
 }

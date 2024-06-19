@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -28,7 +29,7 @@ type PluginParamSelect struct {
 }
 
 type PluginParamSelectData struct {
-	Label string `json:"label"`
+	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
@@ -60,7 +61,7 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			}
 			for k, v := range param.SelectOption {
 				paramSelect.Data = append(paramSelect.Data, PluginParamSelectData{
-					Label: k,
+					Key:   k,
 					Value: v,
 				})
 			}
@@ -214,7 +215,7 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 				json.Unmarshal([]byte(para.ExtraSetting), &dataSelect)
 				Option = append(Option, fmt.Sprintf(`cli.setMultipleSelect(%t)`, dataSelect.Double))
 				for _, v := range dataSelect.Data {
-					Option = append(Option, fmt.Sprintf(`cli.setSelectOption(%#v, %#v)`, v.Label, v.Value))
+					Option = append(Option, fmt.Sprintf(`cli.setSelectOption(%#v, %#v)`, v.Key, v.Value))
 				}
 			}
 		case "yak":

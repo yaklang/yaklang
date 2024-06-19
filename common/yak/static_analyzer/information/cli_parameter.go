@@ -145,7 +145,11 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 			if cli.SelectOption == nil {
 				cli.SelectOption = make(map[string]string)
 			}
-			cli.SelectOption[arg1] = arg2
+			if arg1 == "" {
+				cli.SelectOption[arg2] = arg2
+			} else {
+				cli.SelectOption[arg1] = arg2
+			}
 		}
 	}
 	parseUiFunc := func(v *ssaapi.Value) {
