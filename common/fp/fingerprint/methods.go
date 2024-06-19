@@ -12,31 +12,68 @@ import (
 
 var MethodGetterMap = map[string]func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error){}
 
-func RegisterMethod(name string, getter func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error)) {
+func RegisterSimpleMatchMethod(name string, getter func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error)) {
+	MethodGetterMap[name] = func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
+		match, err := getter(matcher, params)
+		if err != nil {
+			return nil, err
+		}
+		return func(data []byte) (*rule.FingerprintInfo, error) {
+			ok, err := match(data)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				return params.Info, nil
+			}
+			return nil, nil
+		}, nil
+	}
+}
+func RegisterMatchMethod(name string, getter func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error)) {
 	MethodGetterMap[name] = getter
 }
 func init() {
-	RegisterMethod("regexp", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
+	RegisterMatchMethod("regexp", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
 		pattern := params.RegexpPattern
 		if pattern == "" {
-			return func(data []byte) (bool, error) {
-				return true, nil
+			return func(data []byte) (*rule.FingerprintInfo, error) {
+				return params.Info, nil
 			}, nil
 		}
-		return func(data []byte) (bool, error) {
+		return func(data []byte) (*rule.FingerprintInfo, error) {
 			rePattern, ok := matcher.regexpCache[pattern]
 			if !ok {
 				var err error
 				rePattern, err = regexp.Compile(pattern)
 				if err != nil {
-					return false, err
+					return nil, err
 				}
 				matcher.regexpCache[pattern] = rePattern
 			}
-			return rePattern.Match(data), nil
+			if rePattern.Match(data) {
+				if params.Info == nil {
+					params.Info = &rule.FingerprintInfo{}
+				}
+				setByGroup := func(field *string, group []string, index int) {
+					if index != 0 && index < len(group) {
+						*field = group[index]
+					}
+				}
+				for _, matchedStringGroup := range rePattern.FindAllStringSubmatch(string(data), 1) {
+					setByGroup(&params.Info.CPE.Vendor, matchedStringGroup, params.Keyword.VendorIndex)
+					setByGroup(&params.Info.CPE.Product, matchedStringGroup, params.Keyword.ProductIndex)
+					setByGroup(&params.Info.CPE.Version, matchedStringGroup, params.Keyword.VersionIndex)
+					setByGroup(&params.Info.CPE.Update, matchedStringGroup, params.Keyword.UpdateIndex)
+					setByGroup(&params.Info.CPE.Edition, matchedStringGroup, params.Keyword.EditionIndex)
+					setByGroup(&params.Info.CPE.Language, matchedStringGroup, params.Keyword.LanguageIndex)
+				}
+				return params.Info, nil
+			}
+			return nil, nil
 		}, nil
 	})
-	RegisterMethod("complex", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
+	RegisterSimpleMatchMethod("complex", func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error) {
 		if !utils.StringArrayContains([]string{"and", "or"}, params.Condition) {
 			return nil, errors.New("invalid condition")
 		}
@@ -51,22 +88,23 @@ func init() {
 		return func(data []byte) (bool, error) {
 			var preOk bool
 			for _, f := range subMethods {
-				ok, err := f(data)
+				res, err := f(data)
 				if err != nil {
 					return false, err
 				}
-				if params.Condition == "or" && ok {
+				if params.Condition == "or" && res != nil {
 					return true, nil
 				}
-				if params.Condition == "and" && !ok {
+				if params.Condition == "and" && res == nil {
 					return false, nil
 				}
-				preOk = ok
+				params.Info = res
+				preOk = res != nil
 			}
 			return preOk, nil
 		}, nil
 	})
-	RegisterMethod("http_header", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
+	RegisterSimpleMatchMethod("http_header", func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error) {
 		headerMatchMethod, err := matcher.LoadMethod(params.HeaderMatchRule.Method, params.HeaderMatchRule.MatchParam)
 		if err != nil {
 			return nil, err
@@ -86,14 +124,15 @@ func init() {
 				if err != nil {
 					return false, err
 				}
-				if ok {
+				if ok != nil {
+					params.Info = ok
 					return true, nil
 				}
 			}
 			return false, nil
 		}, nil
 	})
-	RegisterMethod("md5", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
+	RegisterSimpleMatchMethod("md5", func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error) {
 		return func(data []byte) (bool, error) {
 			return params.Md5 == codec.Md5(data), nil
 		}, nil
