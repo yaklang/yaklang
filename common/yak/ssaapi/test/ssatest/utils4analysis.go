@@ -28,6 +28,7 @@ func CheckWithName(
 ) {
 	// only in memory
 	{
+		opt = append(opt, ssaapi.WithDisableCache(true))
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
 		// prog.Program.ShowWithSource()
@@ -48,7 +49,7 @@ func CheckWithName(
 	fmt.Println("-----------------------------------------------------------------------------")
 	// parse with database
 	{
-		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID), ssaapi.WithDisableCache(true))
 		prog, err := ssaapi.Parse(code, opt...)
 		defer func() {
 			if name == "" {
@@ -85,15 +86,19 @@ func Check(
 func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
+
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }
+
 func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, contain, wants, opt, nil)
 }
+
 func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map[string][]string, opt ...sfvm.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, nil, opt)
 }
+
 func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []sfvm.Option) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
@@ -238,5 +243,4 @@ func checkFunctionEx(
 		}
 	}
 	return nil
-
 }

@@ -34,6 +34,7 @@ type config struct {
 
 	DatabaseProgramName        string
 	DatabaseProgramCacheHitter func(any)
+	DisableCache               bool
 	// for hash
 	externInfo string
 }
@@ -160,6 +161,12 @@ func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 	}
 }
 
+func WithDisableCache(b bool) Option {
+	return func(c *config) {
+		c.DisableCache = b
+	}
+}
+
 func ParseProjectFromPath(path string, opts ...Option) ([]*Program, error) {
 	opts = append(opts, WithProgramPath(path))
 	return ParseProject(filesys.NewLocalFs(), opts...)
@@ -205,15 +212,17 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	}
 
 	hash := config.CalcHash()
-	if prog, ok := ttlSSAParseCache.Get(hash); ok {
-		return prog, nil
-	} else {
-		ret, err := config.parseFile()
-		if err == nil {
-			ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+	if !config.DisableCache {
+		if prog, ok := ttlSSAParseCache.Get(hash); ok {
+			return prog, nil
 		}
-		return ret, err
 	}
+
+	ret, err := config.parseFile()
+	if err == nil && !config.DisableCache {
+		ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+	}
+	return ret, err
 }
 
 func (p *Program) Feed(code io.Reader) error {
