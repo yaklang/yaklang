@@ -51,8 +51,9 @@ func (s *SyntaxFlowVirtualMachine) Debug(i ...bool) *SyntaxFlowVirtualMachine {
 
 func (s *SyntaxFlowVirtualMachine) Show() {
 	for _, i := range s.frames {
-		for _, c := range i.Codes {
-			fmt.Println(c.String())
+		fmt.Println("--------------------------")
+		for idx, c := range i.Codes {
+			fmt.Printf(" %4d| %v\n", idx, c.String())
 		}
 	}
 }

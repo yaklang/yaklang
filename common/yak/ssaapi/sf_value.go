@@ -102,6 +102,9 @@ func (v *Value) GetSyntaxFlowBottomUse(config ...*sfvm.RecursiveConfigItem) (sfv
 }
 
 func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
+	if i == 0 {
+		return v, nil
+	}
 	if !v.IsList() {
 		return nil, utils.Error("ssa.Value is not a list")
 	}
