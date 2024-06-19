@@ -47,10 +47,10 @@ type ClassObject struct {
 //		return json.MarshalIndent(js, "", " ")
 //	}
 func (this *ClassObject) Bytes() []byte {
-	return _MarshalJavaClass(this,1)
+	return _MarshalJavaClass(this, 1)
 }
 func (this *ClassObject) ToBytesByCustomStringChar(charLength int) []byte {
-	return _MarshalJavaClass(this,charLength)
+	return _MarshalJavaClass(this, charLength)
 }
 func (this *ClassObject) Json() (string, error) {
 	s, err := _MarshalToJson(this)
@@ -211,7 +211,7 @@ func (this *ClassObject) getUtf8(index uint16) (string, error) {
 	case *ConstantMethodHandleInfo:
 	case *ConstantInvokeDynamicInfo:
 	}
-	return "", utils.Errorf("index %d is not utf8")
+	return "", utils.Errorf("index %d is not utf8", index)
 }
 func (this *ClassObject) getConstantInfo(index uint16) (ConstantInfo, error) {
 	index -= 1
