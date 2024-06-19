@@ -250,3 +250,22 @@ func (v *SyntaxFlowVisitor) EmitPass() {
 		OpCode: OpPass,
 	})
 }
+
+func (v *SyntaxFlowVisitor) EmitCreateIterator() *IterContext {
+	idx := len(v.codes)
+	it := &IterContext{start: idx}
+	v.codes = append(v.codes, &SFI{OpCode: OpCreateIter, iter: it})
+	return it
+}
+
+func (v *SyntaxFlowVisitor) EmitNextIterator(i *IterContext) {
+	i.next = len(v.codes)
+	v.codes = append(v.codes, &SFI{OpCode: OpIterValueNext, iter: i})
+}
+
+func (v *SyntaxFlowVisitor) EmitIterEnd(i *IterContext) {
+	idx := len(v.codes)
+	code := &SFI{OpCode: OpEndIter}
+	i.end = idx
+	v.codes = append(v.codes, code)
+}
