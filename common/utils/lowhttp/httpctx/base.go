@@ -278,6 +278,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseHeaderCallback       = "responseHeaderCallback"
 	REQUEST_CONTEXT_KEY_ResponseHeaderWriter         = "responseHeaderWriter"
 	REQUEST_CONTEXT_KEY_ResponseMaxContentLength     = "responseMaxContentLength"
+	REQUEST_CONTEXT_KEY_ResponseTraceInfo            = "responseTraceInfo"
 	REQUEST_CONTEXT_KEY_ResponseTooLarge             = "responseTooLarge"
 	REQUEST_CONTEXT_KEY_RequestTooLarge              = "requestTooLarge"
 	REQUEST_CONTEXT_KEY_ResponseHeaderParsed         = "responseHeaderParsed"
@@ -626,4 +627,13 @@ func SetRequestReaderOffset(r *http.Request, offset int) {
 
 func GetRequestReaderOffset(r *http.Request) int {
 	return GetContextIntInfoFromRequest(r, REQUEST_CONTEXT_KEY_ReaderOffset)
+}
+
+func SetResponseTraceInfo(req *http.Request, info any) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTraceInfo, info)
+}
+
+func GetResponseTraceInfo(req *http.Request) any {
+	// could not assert to *lowhttp.LowhttpTraceInfo, because of circular import
+	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTraceInfo)
 }

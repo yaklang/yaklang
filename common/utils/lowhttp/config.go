@@ -134,6 +134,7 @@ type LowhttpTraceInfo struct {
 	TotalTime time.Duration
 }
 
+
 func (l *LowhttpTraceInfo) GetServerDurationMS() int64 {
 	if l == nil {
 		return 0
