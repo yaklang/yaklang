@@ -773,13 +773,13 @@ too_large_response_header_file, too_large_response_body_file
 
 	if params.GetOnlyWebsocket() {
 		// log.Info("query websocket request flow")
-		db = db.Where("(is_websocket = ?) AND (url LIKE 'ws%')", params.OnlyWebsocket)
+		db = db.Where("is_websocket = ?", params.OnlyWebsocket)
 	}
 	switch params.GetIsWebsocket() {
 	case "http/https":
 		db = db.Where("is_websocket = false")
 	case "websocket":
-		db = db.Where("(is_websocket = true) AND (url LIKE 'ws%')")
+		db = db.Where("is_websocket = true")
 	}
 
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
