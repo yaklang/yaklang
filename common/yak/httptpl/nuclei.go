@@ -406,7 +406,7 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 		m := utils.InterfaceToMapInterface(i)
 		match.Negative = utils.MapGetBool(m, "negative")
 		match.Condition = utils.MapGetString(m, "condition")
-		match.Id = utils.MapGetIntOr(m, "id", 1)
+		match.Id = utils.MapGetInt(m, "id")
 
 		switch utils.MapGetString(m, "part") {
 		case "body":
