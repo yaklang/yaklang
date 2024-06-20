@@ -24,16 +24,25 @@ import (
 )
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
-	var websocketHash []string
+	var (
+		websocketHash []string
+		httpFlowsHash []string
+	)
 	db := yakit.QueryWebsocketFlowsByHTTPFlowHash(s.GetProjectDatabase(), r)
 	res := yakit.YieldHTTPFlows(db, ctx)
 	for v := range res {
 		if v.WebsocketHash != "" {
 			websocketHash = append(websocketHash, v.WebsocketHash)
 		}
+		httpFlowsHash = append(httpFlowsHash, v.Hash)
 	}
 	for _, v := range funk.ChunkStrings(websocketHash, 100) {
 		err := yakit.DeleteWebsocketFlowsByHTTPFlowHash(s.GetProjectDatabase(), v)
+		log.Error(err)
+	}
+
+	for _, v := range funk.ChunkStrings(httpFlowsHash, 100) {
+		err := yakit.DeleteExtractedDataByTraceId(s.GetProjectDatabase(), v)
 		log.Error(err)
 	}
 
