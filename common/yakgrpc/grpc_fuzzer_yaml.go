@@ -555,7 +555,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 					"part":      "raw",
 					"condition": "or",
 				})
-				if packagesNum > 0 {
+				if packagesNum > 1 {
 					matcherItem.Set("id", subMatcher.Id)
 				}
 				switch subMatcher.MatcherType {

@@ -1101,3 +1101,71 @@ http:
 	}
 
 }
+
+func TestMatcherId(t *testing.T) {
+	raw := `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and`
+	raw1 := `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle1'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and`
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	rsp, err := client.ImportHTTPFuzzerTaskFromYaml(ctx, &ypb.ImportHTTPFuzzerTaskFromYamlRequest{YamlContent: raw})
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlRsp, err := client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
+		Requests:     rsp.Requests,
+		TemplateType: "raw",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(yamlRsp.YamlContent, "- id:") {
+		t.Fatal("hide id test failed")
+	}
+
+	rsp, err = client.ImportHTTPFuzzerTaskFromYaml(ctx, &ypb.ImportHTTPFuzzerTaskFromYamlRequest{YamlContent: raw1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlRsp, err = client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
+		Requests:     rsp.Requests,
+		TemplateType: "raw",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(yamlRsp.YamlContent, "- id:") {
+		t.Fatal("hide id test failed")
+	}
+}
