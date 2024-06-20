@@ -234,6 +234,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			var results Values
 			for _, subNode := range nodes {
+				if subNode == nil {
+					continue
+				}
 				//getTopDefs(nil,opt...)第一个参数指定为nil
 				//提供一个新的上下文，避免指向新的actx.self导致多余的结果
 				vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)

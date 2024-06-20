@@ -82,6 +82,9 @@ var SSACompilerCommands = []*cli.Command{
 			cli.BoolFlag{
 				Name: "re-compile", Usage: "re-compile existed database program",
 			},
+			cli.BoolFlag{
+				Name: "dot", Usage: "dot graph text for result",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -181,9 +184,18 @@ var SSACompilerCommands = []*cli.Command{
 					return nil
 				}
 				log.Infof("syntax flow query result:")
+				if len(result) > 1 {
+					delete(result, "_")
+				}
 				for k, r := range result {
 					log.Infof("===================== Variable:%v =================== ", k)
 					show(r)
+
+					if c.Bool("dot") {
+						log.Infof("===================== DOT =================== ")
+						r.ShowDot()
+					}
+
 				}
 			}
 			return nil
