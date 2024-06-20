@@ -451,6 +451,8 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) error {
 	return nil
 }
 
+//var HTTPFlowInsertMutex sync.Mutex
+
 func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -458,6 +460,8 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 			debug.PrintStack()
 		}
 	}()
+	//HTTPFlowInsertMutex.Lock()
+	//defer HTTPFlowInsertMutex.Unlock()
 
 	i.ID = 0
 	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {

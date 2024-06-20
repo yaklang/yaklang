@@ -196,14 +196,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 		// 保存 http flow
 		log.Debugf("should save url: %v", response.Url)
-		saveCtx, cancel := context.WithCancel(ctx)
 
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("save response panic! reason: %v", err)
 				}
-				cancel()
 			}()
 			if option.ResponseCallback != nil {
 				option.ResponseCallback(response)
@@ -215,9 +213,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			// response.TooLarge = true
 			SaveLowHTTPResponse(response)
 		}()
-		select {
-		case <-saveCtx.Done():
-		}
 	}()
 
 	// connection pool
