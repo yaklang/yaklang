@@ -29,22 +29,6 @@ func init() {
 		return nil
 	})
 
-	//var HTTPFlowThrottleSlice = make([]DbExecFunc, 0)
-	//HTTPFlowThrottleUpdate := func() {
-	//	defer func() {
-	//		HTTPFlowThrottleSlice = make([]DbExecFunc, 0)
-	//	}()
-	//	err := utils.GormTransaction(consts.GetGormProjectDatabase(),func(tx *gorm.DB) error {
-	//		for _, f := range HTTPFlowThrottleSlice {
-	//			f(tx)
-	//		}
-	//		return nil
-	//	})
-	//	if err != nil {
-	//		log.Errorf("insert http flow failed: %s", err)
-	//	}
-	//}
-
 }
 
 func RegisterLowHTTPSaveCallback() {
