@@ -248,6 +248,13 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb
 	}
 }
 
+func SaveWebFuzzerResponseThrottling(taskId int, hiddenIndex string, rsp *ypb.FuzzerResponse) {
+	DbThrottleChannel <- func(db *gorm.DB) error {
+		SaveWebFuzzerResponse(db, taskId, hiddenIndex, rsp)
+		return nil
+	}
+}
+
 func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *schema.WebFuzzerResponse {
 	db = db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id)
 	outC := make(chan *schema.WebFuzzerResponse)
