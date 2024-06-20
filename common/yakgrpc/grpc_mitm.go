@@ -33,6 +33,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -891,12 +892,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			controller.finishHijack(taskID)
 		}()
 
+		var traceInfo *lowhttp.LowhttpTraceInfo
+		if i, ok := httpctx.GetResponseTraceInfo(req).(*lowhttp.LowhttpTraceInfo); ok {
+			traceInfo = i
+		}
+
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
 			Response:    rsp,
 			Request:     plainRequest,
 			ResponseId:  responseCounter,
 			RemoteAddr:  remoteAddr,
+			TraceInfo:   model.ToLowhttpTraceInfoGRPCModel(traceInfo),
 		}
 		err = send(feedbackRspIns)
 		if err != nil {
@@ -1153,7 +1160,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				reqURL = lowhttp.GetUrlFromHTTPRequest("http", req)
 			}
 			httpctx.SetRequestURL(originReqIns, reqURL)
-
 		}
 
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
