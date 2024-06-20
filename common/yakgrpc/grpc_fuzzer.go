@@ -836,7 +836,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 
 				task.HTTPFlowFailedCount++
-				yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), hiddenIndex, rsp)
+				//yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), hiddenIndex, rsp)
+				yakit.SaveWebFuzzerResponseThrottling(int(task.ID), hiddenIndex, rsp)
 				_ = feedbackResponse(rsp, false)
 				continue
 			}
@@ -1103,7 +1104,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
+					//yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
+					yakit.SaveWebFuzzerResponseThrottling(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					redirectRsp.TaskId = int64(taskID)
 					err := feedbackResponse(redirectRsp, false)
 					if err != nil {
@@ -1116,7 +1118,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
 			}
-			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
+			//yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
+			yakit.SaveWebFuzzerResponseThrottling(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
 			err := feedbackResponse(rsp, false)
 			if err != nil {
