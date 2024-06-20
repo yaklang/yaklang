@@ -184,6 +184,11 @@ func (s *Server) ExportYakScriptStream(
 	if req.OutputFilename == "" {
 		req.OutputFilename = "yakit_plugins_" + utils.DatetimePretty2() + ".zip"
 	}
+
+	if filepath.Ext(req.OutputFilename) != ".zip" { // try fix extension
+		req.OutputFilename += ".zip"
+	}
+
 	var results []byte = buf.Bytes()
 	if req.Password != "" {
 		req.OutputFilename += ".enc"
