@@ -28,6 +28,23 @@ func init() {
 		RegisterLowHTTPSaveCallback()
 		return nil
 	})
+
+	//var HTTPFlowThrottleSlice = make([]DbExecFunc, 0)
+	//HTTPFlowThrottleUpdate := func() {
+	//	defer func() {
+	//		HTTPFlowThrottleSlice = make([]DbExecFunc, 0)
+	//	}()
+	//	err := utils.GormTransaction(consts.GetGormProjectDatabase(),func(tx *gorm.DB) error {
+	//		for _, f := range HTTPFlowThrottleSlice {
+	//			f(tx)
+	//		}
+	//		return nil
+	//	})
+	//	if err != nil {
+	//		log.Errorf("insert http flow failed: %s", err)
+	//	}
+	//}
+
 }
 
 func RegisterLowHTTPSaveCallback() {
@@ -60,7 +77,7 @@ func RegisterLowHTTPSaveCallback() {
 			reqIns = r.MultiResponseInstances[0].Request
 		}
 
-		db := consts.GetGormProjectDatabase()
+		//db := consts.GetGormProjectDatabase()
 		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
@@ -86,10 +103,7 @@ func RegisterLowHTTPSaveCallback() {
 		flow.RuntimeId = runtimeId
 		flow.HiddenIndex = hiddenIndex
 		flow.Payload = strings.Join(payloads, ",")
-		err = InsertHTTPFlow(db, flow)
-		if err != nil {
-			log.Errorf("save httpflow failed: %s", err)
-		}
+		InsertHTTPFlowThrottling(flow)
 	})
 }
 
@@ -451,8 +465,6 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) error {
 	return nil
 }
 
-//var HTTPFlowInsertMutex sync.Mutex
-
 func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -460,8 +472,6 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 			debug.PrintStack()
 		}
 	}()
-	//HTTPFlowInsertMutex.Lock()
-	//defer HTTPFlowInsertMutex.Unlock()
 
 	i.ID = 0
 	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
@@ -484,6 +494,25 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
 	}
 	return nil
+}
+
+// Throttling HTTPFlow
+func UpdateHTTPFlowTagsThrottling(i *schema.HTTPFlow) {
+	DbThrottleChannel <- func(db *gorm.DB) error {
+		return UpdateHTTPFlowTags(db, i)
+	}
+}
+
+func InsertHTTPFlowThrottling(i *schema.HTTPFlow) {
+	DbThrottleChannel <- func(db *gorm.DB) error {
+		return InsertHTTPFlow(db, i)
+	}
+}
+
+func CreateOrUpdateHTTPFlowThrottling(hash string, i *schema.HTTPFlow) {
+	DbThrottleChannel <- func(db *gorm.DB) error {
+		return CreateOrUpdateHTTPFlow(db, hash, i)
+	}
 }
 
 func GetHTTPFlow(db *gorm.DB, id int64) (*schema.HTTPFlow, error) {

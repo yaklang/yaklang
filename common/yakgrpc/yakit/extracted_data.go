@@ -53,6 +53,12 @@ func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error
 	return nil
 }
 
+func CreateOrUpdateExtractedDataThrottling(mainId int64, i interface{}) {
+	DbThrottleChannel <- func(db *gorm.DB) error {
+		return CreateOrUpdateExtractedData(db, mainId, i)
+	}
+}
+
 func GetExtractedData(db *gorm.DB, id int64) (*schema.ExtractedData, error) {
 	var req schema.ExtractedData
 	if db := db.Model(&schema.ExtractedData{}).Where("id = ?", id).First(&req); db.Error != nil {
