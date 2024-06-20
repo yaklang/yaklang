@@ -11,7 +11,7 @@ import (
 )
 
 type Config struct {
-	target net.IP
+	isLoopback bool
 	// 发包必须的几个字段
 	Iface     *net.Interface
 	GatewayIP net.IP
@@ -47,9 +47,9 @@ func NewConfig(options ...ConfigOption) (*Config, error) {
 
 type ConfigOption func(config *Config)
 
-func WithTarget(target net.IP) ConfigOption {
+func WithLoopback(b bool) ConfigOption {
 	return func(config *Config) {
-		config.target = target
+		config.isLoopback = b
 	}
 }
 

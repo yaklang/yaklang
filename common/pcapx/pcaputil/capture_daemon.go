@@ -25,26 +25,34 @@ func init() {
 	})
 	captureDaemonCache.OnEviction(func(ctx context.Context, reason ttlcache.EvictionReason, item *ttlcache.Item[string, *daemonCache]) {
 		if reason == ttlcache.EvictionReasonExpired {
-			log.Warnf("xxxxxxxx: %v is expired", item.Key())
+			log.Debugf("daemon cache: %v is expired", item.Key())
 			item.Value().handler.Close()
 		}
 
 		if reason == ttlcache.EvictionReasonDeleted {
-			log.Warnf("daemon cache: %v is deleted", item.Key())
+			log.Debugf("daemon cache: %v is deleted", item.Key())
 			item.Value().handler.Close()
 		}
 	})
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			captureDaemonCache.DeleteExpired()
+		}
+	}()
 }
 
 func registerDaemonCache(key string, handler *daemonCache) {
-	captureDaemonCache.Set(key, handler, ttlcache.DefaultTTL)
+	if !captureDaemonCache.Has(key) {
+		captureDaemonCache.Set(key, handler, ttlcache.DefaultTTL)
+	}
 }
 
 func getDaemonCache(key string) (*daemonCache, bool) {
 	if captureDaemonCache.Has(key) {
 		item := captureDaemonCache.Get(key)
 		if item == nil {
-			log.Warnf("daemon cache: %v is nil", key)
+			log.Debugf("daemon cache: %v is nil", key)
 			return nil, false
 		}
 		return item.Value(), true
@@ -59,10 +67,10 @@ func syncKeepDaemonCache(key string, ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Warnf("keep daemon cache: %v is stop", key)
+			log.Debugf("keep daemon cache: %v is stop", key)
 			return
-		case <-time.After(3 * time.Second):
-			log.Infof("keep daemon cache: %v", key)
+		case <-time.After(5 * time.Second):
+			log.Debugf("keep daemon cache: %v", key)
 			getDaemonCache(key)
 		}
 	}
@@ -213,7 +221,6 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 func registerCallback(key string, callbackId string, originCtx context.Context, handler pcapPacketHandler) {
 	cache, ok := getDaemonCache(key)
 	if !ok {
-		log.Errorf("[xxxxxxxxxxx] registerCallback failed: %v", key)
 		return
 	}
 	cache.registeredHandlers.Set(callbackId, &pcapPacketHandlerContext{

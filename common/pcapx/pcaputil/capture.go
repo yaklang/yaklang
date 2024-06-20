@@ -78,7 +78,6 @@ func Start(opt ...CaptureOption) error {
 		}
 	} else {
 		for _, i := range conf.Device {
-			log.Infof("open device: %v", i)
 			pcapIface, err := IfaceNameToPcapIfaceName(i)
 			if err != nil {
 				log.Warnf("convert iface name (%v) failed: %s, use default", i, err)
@@ -127,20 +126,19 @@ func Start(opt ...CaptureOption) error {
 		// keep cache
 		// add cancel func to defer
 		// hack: use runtimeId to registerCallback
-		//var cancels []func()
-		//handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
-		//	c := keepDaemonCache(i, ctx)
-		//	cancels = append(cancels, c)
-		//	return true
-		//})
-		//defer func() {
-		//	for _, c := range cancels {
-		//		c()
-		//	}
-		//}()
+		var cancels []func()
+		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
+			c := keepDaemonCache(i, ctx)
+			cancels = append(cancels, c)
+			return true
+		})
+		defer func() {
+			for _, c := range cancels {
+				c()
+			}
+		}()
 
 		runtimeId := uuid.New().String()
-		log.Infof("runtimeId: %v", runtimeId)
 		for _, i := range handlers.Keys() {
 			registerCallback(i, runtimeId, ctx, func(ctx context.Context, packet gopacket.Packet) error {
 				conf.packetHandler(ctx, packet)
