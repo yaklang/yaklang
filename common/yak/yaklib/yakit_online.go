@@ -551,6 +551,18 @@ func (s *OnlineClient) DownloadOnlinePluginByPluginName(
 	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "other", nil, nil, scriptName)
 }
 
+func (s *OnlineClient) DownloadOnlinePluginByUUID(token, uuid string) (*OnlinePlugin, error) {
+	plugins, _, err := s.downloadNewOnlinePlugins(token, []bool{}, "", nil, nil, "", 0, "", nil, "other", nil, []string{uuid}, nil, 1, 1)
+	if err != nil {
+		log.Errorf("download yakit plugin failed: %s", err)
+		return nil, utils.Errorf("download yakit plugin failed: %s", err)
+	}
+	if len(plugins) > 0 {
+		return plugins[0], nil
+	}
+	return nil, utils.Error("empty result for download yakit plugin...")
+}
+
 func (s *OnlineClient) DownloadNewOnlinePlugins(
 	ctx context.Context,
 	token string,

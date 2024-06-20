@@ -1,5 +1,11 @@
 package yakgrpc
 
+import (
+	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"testing"
+)
+
 //func TestServer_DownloadOnlinePluginAll(t *testing.T) {
 //	client, err := NewLocalClient()
 //	if err != nil {
@@ -83,3 +89,19 @@ package yakgrpc
 //		panic(err)
 //	}
 //}
+
+func TestDownloadOnlinePluginByUUID(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("DownloadOnlinePluginByUUID", func(t *testing.T) {
+		_, err = client.DownloadOnlinePluginByUUID(context.Background(), &ypb.DownloadOnlinePluginByUUIDRequest{
+			UUID:  "72c29790-2783-4b04-b597-8c54ce20bed2",
+			Token: "",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}

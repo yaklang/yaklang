@@ -140,3 +140,13 @@ func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *schema.Extracted
 	}()
 	return outC
 }
+
+func DeleteExtractedDataByTraceId(db *gorm.DB, httpFlowHash []string) error {
+	db = db.Model(&schema.ExtractedData{}).Where("source_type == 'httpflow' ")
+	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", httpFlowHash)
+	db = db.Unscoped().Delete(&schema.ExtractedData{})
+	if db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
