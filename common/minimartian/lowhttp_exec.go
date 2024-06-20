@@ -143,6 +143,8 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	// set trace info
+	httpctx.SetResponseTraceInfo(req, lowHttpResp.TraceInfo)
 
 	if lowHttpResp.RemoteAddr != "" {
 		httpctx.SetRemoteAddr(req, lowHttpResp.RemoteAddr)
