@@ -248,6 +248,12 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 		}
 	case AnyTypeKind:
 		return name, BasicTypes[AnyTypeKind]
+	case ClassBluePrintTypeKind:
+		class := value.GetType().(*ClassBluePrint)
+		if member := class.GetMember(key.String()); member != nil {
+			return name, member.Type
+		}
+		// TODO: handler static member
 	default:
 	}
 	return name, nil

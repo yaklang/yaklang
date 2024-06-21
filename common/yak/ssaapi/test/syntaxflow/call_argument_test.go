@@ -102,6 +102,7 @@ func TestCall_SideEffect(t *testing.T) {
 			void main() {
 				a = new A();
 				a.set(12);
+				a.get();
 				print(a.get());
 			}
 		}
