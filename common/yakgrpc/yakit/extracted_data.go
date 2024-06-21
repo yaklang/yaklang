@@ -55,13 +55,13 @@ func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error
 }
 
 func CreateOrUpdateExtractedDataEx(mainId int64, i interface{}) error {
-	if consts.GLOBAL_DB_THROTTLE.IsSet() {
-		DbThrottleChannel <- func(db *gorm.DB) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return CreateOrUpdateExtractedData(consts.GetGormProjectDatabase(), mainId, i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
 			return CreateOrUpdateExtractedData(db, mainId, i)
 		}
 		return nil
-	} else {
-		return CreateOrUpdateExtractedData(consts.GetGormProjectDatabase(), mainId, i)
 	}
 }
 

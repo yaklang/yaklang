@@ -250,13 +250,13 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb
 }
 
 func SaveWebFuzzerResponseEx(taskId int, hiddenIndex string, rsp *ypb.FuzzerResponse) {
-	if consts.GLOBAL_DB_THROTTLE.IsSet() {
-		DbThrottleChannel <- func(db *gorm.DB) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		SaveWebFuzzerResponse(consts.GetGormProjectDatabase(), taskId, hiddenIndex, rsp)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
 			SaveWebFuzzerResponse(db, taskId, hiddenIndex, rsp)
 			return nil
 		}
-	} else {
-		SaveWebFuzzerResponse(consts.GetGormProjectDatabase(), taskId, hiddenIndex, rsp)
 	}
 }
 

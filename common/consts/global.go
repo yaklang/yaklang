@@ -42,7 +42,7 @@ var (
 
 	OnceYakitHome = new(sync.Once)
 
-	GLOBAL_DB_THROTTLE = utils.NewBool(false)
+	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
 )
 
 const (
