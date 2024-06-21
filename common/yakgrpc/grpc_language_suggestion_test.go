@@ -775,6 +775,28 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_FunctionReturns(t *testing.T) {
 	)
 }
 
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ForPhi(t *testing.T) {
+	t.Parallel()
+
+	check := CheckHover(t)
+	check(t,
+		`for user in ["user", "admin"] {
+    for pass in ["pass", "123456"] {
+        print(user, pass)
+	}
+}`,
+		"yak",
+		&ypb.Range{
+			Code:        "user",
+			StartLine:   3,
+			StartColumn: 15,
+			EndLine:     3,
+			EndColumn:   19,
+		},
+		"```go\ntype user string\n```",
+	)
+}
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature(t *testing.T) {
 	check := CheckSignature(t)
 	code := `a = func(b, c...) {}
