@@ -131,33 +131,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if id := ret.Identifier(); id != nil {
 			key = y.EmitConstInst(id.GetText())
 		} else if method := ret.MethodCall(); method != nil {
-
-			callIns := y.VisitMethodCall(method, obj)
-			if callIns != nil && obj.GetName() == "this" {
-				log.Infof("start to handle this")
-				bp := y.PeekCurrentBluePrint()
-				if bp != nil && bp.GetMethod() != nil {
-					methods := bp.GetMethod()
-					if methods != nil {
-						var methodName string
-						switch callMethod := callIns.Method.(type) {
-						case *ssa.ParameterMember:
-							methodName = callMethod.MemberCallKey.String()
-						default:
-							if callIns != nil {
-								methodName = callIns.Method.GetName()
-							}
-						}
-						if methodIns, ok := methods[methodName]; ok {
-							callIns.Method.SetType(methodIns.GetType())
-						}
-					}
-				}
-
-			} else if obj.GetName() == "super" {
-				log.Warn("TBD: super call is not supported")
-			}
-			return callIns
+			return y.VisitMethodCall(method, obj)
 		} else if this := ret.THIS(); this != nil {
 			key = y.EmitConstInst(this.GetText())
 		} else if super := ret.SUPER(); super != nil {
