@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -374,6 +375,7 @@ rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
 				"packet":    string(packetBytes),
 				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
 			})
+			time.Sleep(1 * time.Second)
 			if err != nil {
 				t.Fatal(err)
 			}
