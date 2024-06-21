@@ -350,8 +350,8 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	if b.SupportGetStaticMember {
-		if object.IsUndefined() {
-			if blueprint := b.GetClassBluePrint(object.GetName()); blueprint != nil {
+		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
+			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
 				if value, ok := blueprint.StaticMember[key.String()]; ok {
 					object.SelfDelete()
 					return value

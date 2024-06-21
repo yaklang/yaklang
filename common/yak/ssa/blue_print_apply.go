@@ -70,10 +70,6 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		parent.Apply(obj)
 	}
 
-	for name, f := range c.GetMethod() {
-		objTyp.AddMethod(name, f)
-	}
-
 	for rawKey, member := range c.NormalMember {
 		typ := member.Type
 		value := member.Value
