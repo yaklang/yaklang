@@ -67,14 +67,22 @@ func (prog *Program) SetOffsetVariable(v *Variable, r *Range) {
 	}
 }
 
+func (prog *Program) ForceSetOffsetValue(v Value, r *Range) {
+	prog.SetOffsetValueEx(v, r, true)
+}
+
 func (prog *Program) SetOffsetValue(v Value, r *Range) {
+	prog.SetOffsetValueEx(v, r, false)
+}
+
+func (prog *Program) SetOffsetValueEx(v Value, r *Range, force bool) {
 	if r == nil {
 		return
 	}
 	endOffset := r.GetEndOffset()
 
 	// If it already exists, then the trust range is smaller
-	if item, ok := prog.OffsetMap[endOffset]; ok && item.rangeLength <= r.Len() {
+	if item, ok := prog.OffsetMap[endOffset]; !force && ok && item.rangeLength <= r.Len() {
 		return
 	}
 
