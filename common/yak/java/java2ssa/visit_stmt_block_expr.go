@@ -62,7 +62,7 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 	return nil
 }
 
-func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
+func (y *builder) VisitExpression(raw javaparser.IExpressionContext, alias ...func(value ssa.Value)) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -288,7 +288,11 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.VisitExpression(ret.Expression())
 	case *javaparser.NewCreatorExpressionContext:
 		// 处理创建对象的表达式
-		return y.VisitCreator(ret.Creator())
+		obj, call := y.VisitCreator(ret.Creator())
+		if call != nil {
+			return call
+		}
+		return obj
 	case *javaparser.MultiplicativeExpressionContext:
 		// 处理乘法、除法、模运算表达式
 		op1 := y.VisitExpression(ret.Expression(0))
@@ -1560,16 +1564,16 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 
 }
 
-func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value) {
+func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, constructorCall ssa.Value) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*javaparser.CreatorContext)
 	if i == nil {
-		return nil
+		return nil, nil
 	}
 
 	// todo 类声明的泛型
@@ -1586,43 +1590,47 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value) {
 		className = i.CreatedName().GetText()
 		// todo 泛型
 		class := y.GetClassBluePrint(className)
-		obj := y.EmitMakeWithoutType(nil, nil)
+		obj := y.EmitUndefined(className)
 		if class == nil {
 			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
 			obj.SetType(ssa.GetAnyType())
+
+			// create variable now, and auto create function
+			variable := y.CreateVariable(className)
+			defaultClassFullback := y.EmitUndefined(className)
+			y.AssignVariable(variable, defaultClassFullback)
 
 			args := []ssa.Value{obj}
 			arguments := y.VisitClassCreatorRest(ret, className)
 			args = append(args, arguments...)
 			// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
-			a := y.EmitUndefined(className)
-			c := y.NewCall(a, args)
-			y.EmitCall(c)
-
-			return obj
+			return obj, y.EmitCall(y.NewCall(defaultClassFullback, args))
 		}
 		obj.SetType(class)
 		constructor := class.Constructor
 		if constructor == nil {
-			return obj
+			log.Warnf("class %v is not found constructor, "+
+				"maybe it's a abstract class or interface, just make a default one", className)
+			variable := y.CreateVariable(className)
+			undefinedConstructor := y.EmitUndefined(className)
+			y.AssignVariable(variable, undefinedConstructor)
+			arguments := y.VisitClassCreatorRest(ret, className)
+			return obj, y.NewCall(undefinedConstructor, append([]ssa.Value{obj}, arguments...))
 		}
 
 		args := []ssa.Value{obj}
 		arguments := y.VisitClassCreatorRest(ret, className)
 		args = append(args, arguments...)
-		c := y.NewCall(constructor, args)
-		y.EmitCall(c)
-
-		return obj
+		return obj, y.EmitCall(y.NewCall(constructor, args))
 	}
 	//array init
 	if ret := i.ArrayCreatorRest(); ret != nil {
-		return y.VisitArrayCreatorRest(ret, p)
+		return y.VisitArrayCreatorRest(ret, p), nil
 	}
 	log.Errorf("array  init failed.")
 	obj = y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(ssa.GetAnyType())
-	return obj
+	return obj, nil
 
 }
 
