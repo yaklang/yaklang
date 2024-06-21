@@ -221,6 +221,7 @@ Host: www.baidu.com
 					"b=%2525%2525",
 					"c=%24",
 				},
+				debug: true,
 			},
 		},
 		{
@@ -237,6 +238,7 @@ Host: www.baidu.com
 					"c={{urlescape($)}}",
 				},
 				friendlyDisplay: true,
+				debug:           true,
 			},
 		},
 		{
@@ -767,6 +769,23 @@ func TestFuzzPath(t *testing.T) {
 		name string
 		base base
 	}{
+		{
+			name: "URL路径 默认",
+			base: base{
+				inputPacket: `GET /a/b/c/?a=ab&b=aa== HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/1").FuzzPath("/2").FuzzPath("/3").FuzzPathAppend("/4/")`,
+				expectKeywordInOutputPacket: []string{
+					`/3/4/?a=ab`,
+					`b=aa==`,
+					`123456`,
+				},
+				debug: true,
+			},
+		},
 		{
 			name: "URL路径 禁止编码",
 			base: base{
@@ -1658,6 +1677,7 @@ a=MTIzNA==`,
 					"c=$",
 				},
 				disableEncode: true,
+				debug:         true,
 			},
 		},
 		{
@@ -1846,6 +1866,7 @@ a=MTIzNA==&b=2`,
 					`a=OTk5OTk=&b=2&c=OTk5OTk=`,
 				},
 				disableEncode: true,
+				debug:         true,
 			},
 		},
 		{
@@ -2200,4 +2221,64 @@ Host: www.baidu.com
 	fmt.Println("HeapAlloc:", (m2.HeapAlloc-m1.HeapAlloc)/1024/1024, "m")
 	fmt.Println("Mallocs:", (m2.Mallocs-m1.Mallocs)/1024/1024, "m")
 
+}
+
+func TestMultiple(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "GET/POST参数 默认",
+			base: base{
+				inputPacket: `POST /zzz?a=1 HTTP/1.1
+Host: www.example.com
+
+c=1`,
+				code: `.FuzzGetParams("a", "").FuzzPostParams("c", "")`,
+				expectKeywordInOutputPacket: []string{
+					"zzz?a=",
+					"\r\nc=",
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "GET/POST参数 禁止编码",
+			base: base{
+				inputPacket: `POST /zzz?a=1 HTTP/1.1
+Host: www.example.com
+
+c=1`,
+				code: `.FuzzGetParams("a", "").FuzzPostParams("c", "")`,
+				expectKeywordInOutputPacket: []string{
+					"zzz?a=",
+					"\r\nc=",
+				},
+				disableEncode: true,
+				debug:         true,
+			},
+		},
+		{
+			name: "GET/POST/PATH/APPEND 禁止编码",
+			base: base{
+				inputPacket: `POST /zzz?a=1 HTTP/1.1
+Host: www.example.com
+
+c=1`,
+				code: `.FuzzGetParams("a", "").FuzzPostParams("c", "").FuzzPath("/1").FuzzPathAppend("/2/").FuzzPathAppend("/3")`,
+				expectKeywordInOutputPacket: []string{
+					"/1/2//3?a=",
+					"\r\nc=",
+				},
+				disableEncode: true,
+				debug:         true,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+
+	}
 }
