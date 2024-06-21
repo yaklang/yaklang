@@ -1018,7 +1018,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				//if err != nil {
 				//	log.Errorf("create / save httpflow(websocket) error: %s", err)
 				//}
-				yakit.InsertHTTPFlowThrottling(flow)
+				err := yakit.InsertHTTPFlowEx(flow)
+				if err != nil {
+					log.Errorf("create / save httpflow(websocket) error: %s", err)
+				}
 			}
 		}
 
@@ -1542,7 +1545,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
 					close(colorOK)
 					for _, e := range extracted {
-						yakit.CreateOrUpdateExtractedDataThrottling(-1, e)
+						err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
 						if err != nil {
 							log.Errorf("save hookcolor error: %s", err)
 						}
@@ -1560,11 +1563,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				needUpdate = true
 			}
 
-			yakit.InsertHTTPFlowThrottling(flow)
-			if needUpdate {
+			err := yakit.InsertHTTPFlowEx(flow)
+			if err != nil {
+				log.Errorf("create / save httpflow from mirror error: %s", err)
+			} else if needUpdate {
 				go func() {
 					<-colorOK
-					yakit.UpdateHTTPFlowTagsThrottling(flow)
+					err := yakit.UpdateHTTPFlowTagsEx(flow)
+					if err != nil {
+						log.Errorf("update http flow tags error: %s", err)
+					}
 				}()
 			}
 
