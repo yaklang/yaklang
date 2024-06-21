@@ -231,9 +231,16 @@ jobs:
 
       - name: GRPC
         run: |
-          nohup ./yak grpc & 
+          nohup ./yak grpc > /tmp/grpc.log 2&>1 &
           sleep 1
 
       - name: ${{ matrix.name }}
         run: |
           ${{ matrix.run }}
+
+      - name: Upload failure grpc log
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: grpc.log
+          path: /tmp/grpc.log
