@@ -62,7 +62,7 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 	return nil
 }
 
-func (y *builder) VisitExpression(raw javaparser.IExpressionContext, alias ...func(value ssa.Value)) ssa.Value {
+func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -131,7 +131,33 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext, alias ...fu
 		if id := ret.Identifier(); id != nil {
 			key = y.EmitConstInst(id.GetText())
 		} else if method := ret.MethodCall(); method != nil {
-			return y.VisitMethodCall(method, obj)
+
+			callIns := y.VisitMethodCall(method, obj)
+			if callIns != nil && obj.GetName() == "this" {
+				log.Infof("start to handle this")
+				bp := y.PeekCurrentBluePrint()
+				if bp != nil && bp.GetMethod() != nil {
+					methods := bp.GetMethod()
+					if methods != nil {
+						var methodName string
+						switch callMethod := callIns.Method.(type) {
+						case *ssa.ParameterMember:
+							methodName = callMethod.MemberCallKey.String()
+						default:
+							if callIns != nil {
+								methodName = callIns.Method.GetName()
+							}
+						}
+						if methodIns, ok := methods[methodName]; ok {
+							callIns.Method.SetType(methodIns.GetType())
+						}
+					}
+				}
+
+			} else if obj.GetName() == "super" {
+				log.Warn("TBD: super call is not supported")
+			}
+			return callIns
 		} else if this := ret.THIS(); this != nil {
 			key = y.EmitConstInst(this.GetText())
 		} else if super := ret.SUPER(); super != nil {
@@ -618,7 +644,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext, alias ...fu
 	return y.EmitUndefined("_")
 }
 
-func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) ssa.Value {
+func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) *ssa.Call {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -652,8 +678,10 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			memberKey = y.EmitConstInst(ret.GetText())
 		} else if ret := i.THIS(); ret != nil {
 			memberKey = y.EmitConstInst(ret.GetText())
+			// get clazz
 		} else if ret = i.SUPER(); ret != nil {
 			memberKey = y.EmitConstInst(ret.GetText())
+			// get parent class
 		}
 		methodCall := y.ReadMemberCallVariable(object, memberKey)
 		var args []ssa.Value

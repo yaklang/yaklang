@@ -89,7 +89,8 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		if parent := y.GetClassBluePrint(parentClass); parent != nil {
 			class.AddParentClass(parent)
 		} else {
-			class.AddParentClass(y.CreateClassBluePrint(parentClass))
+			parentBP := y.CreateClassBluePrint(parentClass)
+			class.AddParentClass(parentBP)
 		}
 	}
 	y.VisitClassBody(i.ClassBody(), class)
@@ -106,6 +107,9 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Cl
 	if i == nil {
 		return nil
 	}
+
+	y.PushBluePrint(class)
+	defer y.PopBluePrint()
 
 	builders := make([]func(), len(i.AllClassBodyDeclaration()))
 	for i, ret := range i.AllClassBodyDeclaration() {

@@ -2,8 +2,10 @@ package java
 
 import (
 	_ "embed"
+	"fmt"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +53,38 @@ func TestTraceConstructor(t *testing.T) {
 		})
 		if !checkGBK {
 			t.Fatal("GBK not found")
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestCrossMethod(t *testing.T) {
+	var check = false
+	ssatest.Check(t, `public class RuntimeExecCrossFunction {
+    public String crossFunction(String cmd) {
+        return "echo 'Hello World'";
+    }
+
+    @RequestMapping("/runtime")
+    public String RuntimeExecCross(String cmd, Model model) {
+		Process finalCmd = this.crossFunction(cmd);
+    }
+}`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		var results ssaapi.Values
+		results = prog.SyntaxFlowChain(`finalCmd as $sink`).Show()
+		if results.Len() <= 0 {
+			t.Fatal("finalCmd not found")
+		}
+
+		check = false
+		prog.SyntaxFlowChain(`finalCmd #-> * as $source`).Show().ForEach(func(value *ssaapi.Value) {
+			if ret := value.GetConstValue(); strings.Contains(fmt.Sprint(ret), "Hello World") {
+				check = true
+			}
+		})
+		if !check {
+			t.Fatal("Cross Method failed not found")
 		}
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))

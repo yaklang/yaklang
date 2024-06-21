@@ -305,11 +305,11 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	// parameter or freeValue, this member-call mark as Parameter
 	if para, ok := ToParameter(value); ok {
 		name, typ := checkCanMemberCall(para, key)
-		new := b.NewParameterMember(name, para, key)
-		new.SetType(typ)
-		SetMemberCall(para, key, new)
-		setMemberVerboseName(new)
-		return new
+		newParamterMember := b.NewParameterMember(name, para, key)
+		newParamterMember.SetType(typ)
+		SetMemberCall(para, key, newParamterMember)
+		setMemberVerboseName(newParamterMember)
+		return newParamterMember
 	}
 
 	return b.getFieldValue(value, key)
