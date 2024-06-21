@@ -214,7 +214,7 @@ type Function struct {
 	// for closure function
 	FreeValues map[string]Value // store the captured variable form parent-function, just contain name, and type is Parameter
 	// parameter member call
-	//ParameterMembers []*ParameterMember
+	// ParameterMembers []*ParameterMember
 	ParameterMembers []Value
 	// function side effects
 	SideEffects []*FunctionSideEffect
@@ -235,9 +235,6 @@ type Function struct {
 	// regardless of whether the function returns normally or exits due to a panic.
 	DeferBlock Instruction
 
-	// include / require / eval-code / import packet
-	referenceFiles *omap.OrderedMap[string, string]
-
 	// ssa error
 	errComment ErrorComment
 
@@ -246,10 +243,6 @@ type Function struct {
 	builder *FunctionBuilder
 	// this function is variadic parameter, for function type create
 	hasEllipsis bool
-}
-
-func (f *Function) PushReferenceFile(file, code string) {
-	f.referenceFiles.Set(file, code)
 }
 
 func (f *Function) FirstBlockInstruction() []Instruction {

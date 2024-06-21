@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func (p *Package) NewFunction(name string) *Function {
@@ -24,19 +23,18 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		anValue:        NewValue(),
-		Package:        p,
-		Params:         make([]Value, 0),
-		hasEllipsis:    false,
-		Blocks:         make([]Instruction, 0),
-		EnterBlock:     nil,
-		ExitBlock:      nil,
-		ChildFuncs:     make([]Value, 0),
-		parent:         nil,
-		FreeValues:     make(map[string]Value),
-		SideEffects:    make([]*FunctionSideEffect, 0),
-		builder:        nil,
-		referenceFiles: omap.NewOrderedMap(map[string]string{}),
+		anValue:     NewValue(),
+		Package:     p,
+		Params:      make([]Value, 0),
+		hasEllipsis: false,
+		Blocks:      make([]Instruction, 0),
+		EnterBlock:  nil,
+		ExitBlock:   nil,
+		ChildFuncs:  make([]Value, 0),
+		parent:      nil,
+		FreeValues:  make(map[string]Value),
+		SideEffects: make([]*FunctionSideEffect, 0),
+		builder:     nil,
 	}
 	f.SetName(name)
 
@@ -86,10 +84,6 @@ func (f *Function) GetProgram() *Program {
 
 func (f *Function) GetFunc() *Function {
 	return f
-}
-
-func (f *Function) GetReferenceFiles() []string {
-	return f.referenceFiles.Keys()
 }
 
 func (f *Function) addAnonymous(anon *Function) {
@@ -156,7 +150,6 @@ func (f *Function) GetParent() *Function {
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f := &Function{
 		anValue:        NewValue(),
-		referenceFiles: omap.NewOrderedMap(map[string]string{}),
 	}
 	f.SetType(typ)
 	f.SetName(name)
