@@ -135,4 +135,7 @@ func (c *ClassBluePrint) AddStaticMethod(name string, value *Function) {
 // AddParentClass is used to add a parent class to the class,
 func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
 	c.ParentClass = append(c.ParentClass, parent)
+	for name, f := range parent.Method {
+		c.Method[name] = f
+	}
 }
