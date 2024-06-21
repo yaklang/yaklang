@@ -28,6 +28,21 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	return ret
 }
 
+func (variable *Variable) Replace(val, to Value) {
+	if variable.IsNil() {
+		return
+	}
+	prog := variable.GetProgram()
+	if prog != nil {
+		prog.ForceSetOffsetValue(to, variable.DefRange)
+		for r := range variable.UseRange {
+			prog.ForceSetOffsetValue(to, r)
+		}
+	}
+
+	variable.Versioned.Replace(val, to)
+}
+
 func (variable *Variable) Assign(value Value) error {
 	if utils.IsNil(value) {
 		return utils.Error("assign empty")
