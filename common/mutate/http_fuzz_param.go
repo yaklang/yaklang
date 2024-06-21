@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -9,72 +10,49 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type httpParamPositionType string
 
-var (
-	posMethod              httpParamPositionType = "method"
-	posBody                httpParamPositionType = "body"
-	posGetQuery            httpParamPositionType = "get-query"
-	posGetQueryBase64      httpParamPositionType = "get-query-base64"
-	posGetQueryJson        httpParamPositionType = "get-query-json"
-	posGetQueryBase64Json  httpParamPositionType = "get-query-base64-json"
-	posPath                httpParamPositionType = "path"
-	posHeader              httpParamPositionType = "header"
-	posPostQuery           httpParamPositionType = "post-query"
-	posPostXML             httpParamPositionType = "post-xml"
-	posPostQueryBase64     httpParamPositionType = "post-query-base64"
-	posPostQueryJson       httpParamPositionType = "post-query-json"
-	posPostQueryBase64Json httpParamPositionType = "post-query-base64-json"
-	posPostJson            httpParamPositionType = "post-json"
-	posCookie              httpParamPositionType = "cookie"
-	posCookieBase64        httpParamPositionType = "cookie-base64"
-	posCookieJson          httpParamPositionType = "cookie-json"
-	posCookieBase64Json    httpParamPositionType = "cookie-base64-json"
-	posPathAppend          httpParamPositionType = "path-append"
-	posPathBlock           httpParamPositionType = "path-block"
-)
 
-func PositionTypeVerbose(pos httpParamPositionType) string {
+func PositionTypeVerbose(pos lowhttp.HttpParamPositionType) string {
 	switch pos {
-	case posMethod:
+	case lowhttp.PosMethod:
 		return "HTTP方法"
-	case posBody:
+	case lowhttp.PosBody:
 		return "Body"
-	case posGetQuery:
+	case lowhttp.PosGetQuery:
 		return "GET参数"
-	case posGetQueryBase64:
+	case lowhttp.PosGetQueryBase64:
 		return "GET参数(Base64)"
-	case posGetQueryJson:
+	case lowhttp.PosGetQueryJson:
 		return "GET参数(JSON)"
-	case posGetQueryBase64Json:
+	case lowhttp.PosGetQueryBase64Json:
 		return "GET参数(Base64+JSON)"
-	case posPathAppend:
+	case lowhttp.PosPathAppend:
 		return "URL路径(追加)"
-	case posPathBlock:
+	case lowhttp.PosPathBlock:
 		return "URL路径(分块)"
-	case posPath:
+	case lowhttp.PosPath:
 		return "URL路径"
-	case posHeader:
+	case lowhttp.PosHeader:
 		return "Header"
-	case posPostQuery:
+	case lowhttp.PosPostQuery:
 		return "POST参数"
-	case posPostXML:
+	case lowhttp.PosPostXML:
 		return "POST参数(XML)"
-	case posPostQueryBase64:
+	case lowhttp.PosPostQueryBase64:
 		return "POST参数(Base64)"
-	case posPostQueryJson:
+	case lowhttp.PosPostQueryJson:
 		return "POST参数(JSON)"
-	case posPostQueryBase64Json:
+	case lowhttp.PosPostQueryBase64Json:
 		return "POST参数(Base64+JSON)"
-	case posPostJson:
+	case lowhttp.PosPostJson:
 		return "JSON-Body参数"
-	case posCookie:
+	case lowhttp.PosCookie:
 		return "Cookie参数"
-	case posCookieBase64:
+	case lowhttp.PosCookieBase64:
 		return "Cookie参数(Base64)"
-	case posCookieJson:
+	case lowhttp.PosCookieJson:
 		return "Cookie参数(JSON)"
-	case posCookieBase64Json:
+	case lowhttp.PosCookieBase64Json:
 		return "Cookie参数(Base64+JSON)"
 	default:
 		return string(pos)
@@ -82,7 +60,7 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 }
 
 type FuzzHTTPRequestParam struct {
-	position httpParamPositionType
+	position lowhttp.HttpParamPositionType
 	param    interface{}
 	param2nd interface{}
 	// key 值对应的 value 值
@@ -95,7 +73,8 @@ type FuzzHTTPRequestParam struct {
 
 func (p *FuzzHTTPRequestParam) IsPostParams() bool {
 	switch p.position {
-	case posPostJson, posPostQuery, posPostQueryBase64, posPostQueryJson, posPostQueryBase64Json, posPostXML:
+	case lowhttp.PosPostJson, lowhttp.PosPostQuery, lowhttp.PosPostQueryBase64,
+		lowhttp.PosPostQueryJson, lowhttp.PosPostQueryBase64Json, lowhttp.PosPostXML:
 		return true
 	}
 	return false
@@ -103,7 +82,8 @@ func (p *FuzzHTTPRequestParam) IsPostParams() bool {
 
 func (p *FuzzHTTPRequestParam) IsGetParams() bool {
 	switch p.position {
-	case posGetQuery, posGetQueryBase64, posGetQueryJson, posGetQueryBase64Json:
+	case lowhttp.PosGetQuery, lowhttp.PosGetQueryBase64, lowhttp.PosGetQueryJson,
+		lowhttp.PosGetQueryBase64Json:
 		return true
 	}
 	return false
@@ -115,7 +95,7 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 	}
 
 	switch p.position {
-	case posGetQueryJson, posGetQueryBase64Json:
+	case lowhttp.PosGetQueryJson, lowhttp.PosGetQueryBase64Json:
 		return true
 	}
 	return false
@@ -123,7 +103,8 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 
 func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
 	switch p.position {
-	case posCookie, posCookieJson, posCookieBase64, posCookieBase64Json:
+	case lowhttp.PosCookie, lowhttp.PosCookieJson, lowhttp.PosCookieBase64,
+	lowhttp.PosCookieBase64Json:
 		return true
 	}
 	return false
@@ -164,7 +145,7 @@ func (p *FuzzHTTPRequestParam) GetFirstValue() any {
 }
 
 func (p *FuzzHTTPRequestParam) GetPostJsonPath() string {
-	if p.Position() == string(posPostJson) {
+	if p.Position() == string(lowhttp.PosPostJson) {
 		return p.path
 	}
 	return ""
@@ -181,7 +162,7 @@ func (p *FuzzHTTPRequestParam) OriginValue() interface{} {
 
 func (p *FuzzHTTPRequestParam) Value() interface{} {
 	//switch p.position {
-	//case posGetQueryBase64, posPostQueryBase64, posCookieBase64:
+	//case PosGetQueryBase64, PosPostQueryBase64, PosCookieBase64:
 	//	switch paramOriginValue := p.raw.(type) {
 	//	case []string:
 	//		if len(paramOriginValue) > 0 {
@@ -203,7 +184,7 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 	//		log.Error("unrecognized param value type")
 	//		return p.raw
 	//	}
-	//case posGetQueryJson, posPostJson, posCookieJson:
+	//case PosGetQueryJson, PosPostJson, PosCookieJson:
 	//	var path string
 	//	if p.gpath == "" {
 	//		path = p.path
@@ -224,7 +205,7 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 	//		return p.raw
 	//	}
 	//
-	//case posGetQueryBase64Json, posPostQueryBase64Json, posCookieBase64Json:
+	//case PosGetQueryBase64Json, PosPostQueryBase64Json, PosCookieBase64Json:
 	//	switch paramOriginValue := p.raw.(type) {
 	//	case []string:
 	//		if len(paramOriginValue) > 0 {
@@ -269,50 +250,50 @@ func (p *FuzzHTTPRequestParam) FriendlyDisplay() *FuzzHTTPRequestParam {
 func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 	p.origin.mode = paramsFuzz
 	switch p.position {
-	case posMethod:
+	case lowhttp.PosMethod:
 		return p.origin.FuzzMethod(InterfaceToFuzzResults(i)...)
-	case posGetQuery:
+	case lowhttp.PosGetQuery:
 		return p.origin.FuzzGetParams(p.param, i)
-	case posGetQueryJson:
+	case lowhttp.PosGetQueryJson:
 		return p.origin.FuzzGetJsonPathParams(p.param, p.path, i)
-	case posGetQueryBase64:
+	case lowhttp.PosGetQueryBase64:
 		return p.origin.FuzzGetBase64Params(p.param, i)
-	case posGetQueryBase64Json:
+	case lowhttp.PosGetQueryBase64Json:
 		return p.origin.FuzzGetBase64JsonPath(p.param, p.path, i)
-	case posHeader:
+	case lowhttp.PosHeader:
 		return p.origin.FuzzHTTPHeader(p.param, i)
-	case posPath:
+	case lowhttp.PosPath:
 		return p.origin.FuzzPath(InterfaceToFuzzResults(i)...)
-	case posCookie:
+	case lowhttp.PosCookie:
 		return p.origin.FuzzCookie(p.param, InterfaceToFuzzResults(i))
-	case posCookieBase64:
+	case lowhttp.PosCookieBase64:
 		return p.origin.FuzzCookieBase64(p.param, InterfaceToFuzzResults(i))
-	case posCookieJson:
+	case lowhttp.PosCookieJson:
 		return p.origin.FuzzCookieJsonPath(p.param, p.path, i)
-	case posCookieBase64Json:
+	case lowhttp.PosCookieBase64Json:
 		return p.origin.FuzzCookieBase64JsonPath(p.param, p.path, i)
-	case posPostJson:
+	case lowhttp.PosPostJson:
 		return p.origin.FuzzPostJsonParams(p, i)
-	case posPostQuery:
+	case lowhttp.PosPostQuery:
 		return p.origin.FuzzPostParams(p.param, i)
-	case posPostXML:
+	case lowhttp.PosPostXML:
 		return p.origin.FuzzPostXMLParams(p.path, i)
-	case posPostQueryBase64:
+	case lowhttp.PosPostQueryBase64:
 		return p.origin.FuzzPostBase64Params(p.param, i)
-	case posPostQueryJson:
+	case lowhttp.PosPostQueryJson:
 		return p.origin.FuzzPostJsonPathParams(p.param, p.path, i)
-	case posPostQueryBase64Json:
+	case lowhttp.PosPostQueryBase64Json:
 		return p.origin.FuzzPostBase64JsonPath(p.param, p.path, i)
-	case posPathAppend:
+	case lowhttp.PosPathAppend:
 		return p.origin.FuzzPath(funk.Map(InterfaceToFuzzResults(i), func(s string) string {
 			if !strings.HasPrefix(s, "/") {
 				s = "/" + s
 			}
 			return p.origin.GetPath() + s
 		}).([]string)...)
-	case posBody:
+	case lowhttp.PosBody:
 		return p.origin.FuzzPostRaw(InterfaceToFuzzResults(i)...)
-	case posPathBlock:
+	case lowhttp.PosPathBlock:
 		result := strings.Split(p.origin.GetPath(), "/")
 		if len(result) <= 0 {
 			return p.origin.FuzzPath(InterfaceToFuzzResults(i)...)
@@ -333,7 +314,7 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 		}
 		return p.origin.FuzzPath(finalResults...)
 	default:
-		log.Warnf("cannot found fuzz params method identify: %v", posGetQueryJson)
+		log.Warnf("cannot found fuzz params method identify: %v", lowhttp.PosGetQueryJson)
 		return p.origin
 	}
 }
@@ -341,7 +322,7 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 func (p *FuzzHTTPRequestParam) String() string {
 	if p.path != "" {
 		pathName := "JsonPath"
-		if p.position == posPostXML {
+		if p.position == lowhttp.PosPostXML {
 			pathName = "XPath"
 		}
 		return fmt.Sprintf("Name:%-20s %s: %-12s Position:[%v(%v)]\n", p.Name(), pathName, p.path, p.PositionVerbose(), p.Position())
