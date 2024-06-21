@@ -27,8 +27,9 @@ func NewSFFrameInfo() *SFFrameInfo {
 }
 
 type filterExprContext struct {
-	start int
-	end   int
+	start      int
+	end        int
+	stackDepth int
 }
 
 type SFFrame struct {
@@ -45,8 +46,6 @@ type SFFrame struct {
 	Codes           []*SFI
 	toLeft          bool
 	debug           bool
-
-	StatementStack *utils.Stack[int]
 }
 type GlobEx struct {
 	Origin glob.Glob
@@ -74,8 +73,6 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 		conditionStack:  utils.NewStack[[]bool](),
 		Text:            text,
 		Codes:           codes,
-
-		StatementStack: utils.NewStack[int](),
 	}
 }
 
@@ -99,14 +96,13 @@ func (s *SFFrame) ToRight() bool {
 }
 
 func (s *SFFrame) exec(input ValueOperator) (ret error) {
-	// s.stack.Push(input)
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)
 			log.Infof("%+v", ret)
 		}
 	}()
-	s.stack.Push(input)
+	statementStackDeepth := utils.NewStack[int]()
 	for {
 		if s.idx >= len(s.Codes) {
 			break
@@ -117,26 +113,53 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		s.debugLog(i.String())
 		switch i.OpCode {
 		case OpFilterExprEnter:
-			if s.stack.Len() == 0 {
-				return utils.Errorf("(BUG) stack top is empty")
-			}
+			// if s.stack.Len() == 0 {
+			// 	return utils.Errorf("(BUG) stack top is empty")
+			// }
 			s.filterExprStack.Push(&filterExprContext{
-				start: s.idx,
-				end:   i.UnaryInt,
+				start:      s.idx,
+				end:        i.UnaryInt,
+				stackDepth: s.stack.Len(),
 			})
 		case OpFilterExprExit:
-			s.filterExprStack.Pop()
-		case OpEnterStatement:
-			s.StatementStack.Push(s.stack.Len())
-		case OpExitStatement:
-			checkLen := s.StatementStack.Pop()
+			checkLen := s.filterExprStack.Pop().stackDepth
 			if s.stack.Len() != checkLen {
-				log.Errorf("stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+				err := utils.Errorf("filter expr stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+				log.Errorf("%v", err)
+				if s.debug {
+					return err
+				}
 				s.stack.PopN(s.stack.Len() - checkLen)
 			}
-		case OpPushInput:
-			s.debugSubLog(">> push input")
-			s.stack.Push(input)
+		case OpCheckStackTop:
+			if s.stack.Len() == 0 {
+				s.debugSubLog(">> stack top is nil (push input)")
+				s.stack.Push(input)
+			}
+		case OpEnterStatement:
+			statementStackDeepth.Push(s.stack.Len())
+		case OpExitStatement:
+			checkLen := statementStackDeepth.Pop()
+			if s.stack.Len() != checkLen {
+				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+				log.Errorf("%v", err)
+				if s.debug {
+					return err
+				}
+				s.stack.PopN(s.stack.Len() - checkLen)
+			}
+		case OpCreateIter:
+			s.debugSubLog(">> pop")
+			vs := s.stack.Peek()
+			channel := make(chan ValueOperator)
+			go func() {
+				defer close(channel)
+				_ = vs.Recursive(func(vo ValueOperator) error {
+					channel <- vo
+					return nil
+				})
+			}()
+			i.iter.originValues = channel
 		case OpIterNext:
 			if i.iter == nil {
 				return utils.Error("BUG: iterContext is nil")
@@ -148,14 +171,15 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 
 			val, ok := <-c
 			if !ok {
+				// finish this iter
 				next := i.iter.end
 				s.debugLog("no next data, to %v", next)
+				// jump to end
 				s.idx = next
 				i.iter.originValues = nil
-				s.stack.Push(NewValues(nil))
 				continue
 			}
-			s.debugLog("next value: %v", val.String())
+			s.debugLog("next value: %v", valuesLen(val))
 			s.debugLog(">> push")
 			s.stack.Push(val)
 		case OpIterEnd:
@@ -167,8 +191,8 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				return utils.Error("BUG: stack is empty (next/iter should keep stack balanced)")
 			}
 			finished := false
-			val := s.stack.Pop()
 			if i.iter.originValues != nil {
+				val := s.stack.Pop()
 				s.debugSubLog("iter index: %d", i.iter._counter)
 				i.iter._counter++
 
@@ -210,12 +234,12 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				if errors.Is(err, CriticalError) {
 					return err
 				}
-				s.stack.Push(NewValues(nil))
+				// go to expression end
 				result := s.filterExprStack.Peek()
 				if result == nil {
 					return utils.Wrap(CriticalError, "filter expr stack is empty")
 				}
-				s.idx = result.end + 1
+				s.idx = result.end
 				continue
 			}
 		}
@@ -228,14 +252,6 @@ var CriticalError = utils.Error("CriticalError(BUG)")
 
 func (s *SFFrame) execStatement(i *SFI) error {
 	switch i.OpCode {
-	case OpEnterStatement:
-		s.StatementStack.Push(s.stack.Len())
-	case OpExitStatement:
-		checkLen := s.StatementStack.Pop()
-		if s.stack.Len() != checkLen {
-			log.Errorf("stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
-			s.stack.PopN(s.stack.Len() - checkLen)
-		}
 	case OpDuplicate:
 		if s.stack.Len() == 0 {
 			return utils.Wrap(CriticalError, "stack top is empty")
@@ -255,20 +271,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		result, next, err := value.ExactMatch(mod, i.UnaryStr)
 		if err != nil {
-			return utils.Wrapf(err, "search exact failed")
+			err = utils.Wrapf(err, "search exact failed")
 		}
 		if !result {
-			s.debugSubLog("result: %v, not found(exactly), got: %s", i.UnaryStr, value.String())
-			return utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
+			err = utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 		}
-		if next != nil {
-			s.debugSubLog("result next: %v", next.String())
-			s.stack.Push(next)
-			s.debugSubLog("<< push next")
-		} else {
-			s.debugSubLog("result: %v", value.String())
-			s.stack.Push(value)
-			s.debugSubLog("<< push")
+		s.debugSubLog("result next: %v", next.String())
+		s.stack.Push(next)
+		s.debugSubLog("<< push next")
+		if next == nil || err != nil {
+			s.debugSubLog("error: %v", err)
+			return err
 		}
 	case OpPushSearchGlob:
 		s.debugSubLog(">> pop search glob: %v", i.UnaryStr)
@@ -278,7 +291,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		globIns, err := glob.Compile(i.UnaryStr)
 		if err != nil {
-			return utils.Wrap(CriticalError, "compile glob failed")
+			err = utils.Wrap(CriticalError, "compile glob failed")
 		}
 
 		mod := i.UnaryInt
@@ -287,20 +300,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		result, next, err := value.GlobMatch(mod, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
 		if err != nil {
-			return utils.Wrapf(err, "search glob failed")
+			err = utils.Wrapf(err, "search glob failed")
 		}
 		if !result {
-			s.debugSubLog("result: %v, not found(glob search)", i.UnaryStr)
-			return utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
+			err = utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 		}
-		if next != nil {
-			s.debugSubLog("result: %v", next.String())
-			s.stack.Push(next)
-			s.debugSubLog("<< push")
-		} else {
-			s.debugSubLog("result: %v", value.String())
-			s.stack.Push(value)
-			s.debugSubLog("<< push")
+		s.debugSubLog("result next: %v", next.String())
+		s.stack.Push(next)
+		s.debugSubLog("<< push next")
+		if next == nil || err != nil {
+			s.debugSubLog("error: %v", err)
+			return err
 		}
 	case OpPushSearchRegexp:
 		s.debugSubLog(">> pop search regexp: %v", i.UnaryStr)
@@ -310,7 +320,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		regexpIns, err := regexp.Compile(i.UnaryStr)
 		if err != nil {
-			return utils.Wrapf(CriticalError, "compile regexp[%v] failed: %v", i.UnaryStr, err)
+			err = utils.Wrapf(CriticalError, "compile regexp[%v] failed: %v", i.UnaryStr, err)
 		}
 		mod := i.UnaryInt
 		if !s.config.StrictMatch {
@@ -318,21 +328,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		result, next, err := value.RegexpMatch(mod, regexpIns)
 		if err != nil {
-			return utils.Wrap(err, "search regexp failed")
+			err = utils.Wrap(err, "search regexp failed")
 		}
 		if !result {
-			s.debugSubLog("result: %v, not found(regexp search)", i.UnaryStr)
-			return utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
+			err = utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 		}
-		if next != nil {
-			s.debugSubLog("result: %v", next.String())
-			s.stack.Push(next)
-			s.debugSubLog("<< push")
-			// return nil
-		} else {
-			s.debugSubLog("result: %v", value.String())
-			s.stack.Push(value)
-			s.debugSubLog("<< push")
+		s.debugSubLog("result next: %v", next.String())
+		s.stack.Push(next)
+		s.debugSubLog("<< push next")
+		if next == nil || err != nil {
+			s.debugSubLog("error: %v", err)
+			return err
 		}
 	case OpPop:
 		if s.stack.Len() == 0 {
@@ -347,7 +353,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("ERROR: %v", err)
 			return utils.Wrapf(CriticalError, "output '_' error: %v", err)
 		}
-	case opGetCall:
+	case OpGetCall:
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
 		if value == nil {
@@ -355,7 +361,14 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		results, err := value.GetCalled()
 		if err != nil {
-			return utils.Errorf("get calling instruction failed: %s", err)
+			err = utils.Errorf("get calling instruction failed: %s", err)
+		}
+		if err != nil {
+			s.debugSubLog("error: %v", err)
+			s.debugSubLog("recover origin value")
+			s.stack.Push(NewValues(nil))
+			s.debugSubLog("<< push")
+			return err
 		}
 		callLen := valuesLen(results)
 		s.debugSubLog("- call Called: %v", results.String())
@@ -363,23 +376,24 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(results)
 
 	case OpGetCallArgs:
-		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
+		s.debugSubLog("-- peek")
+		value := s.stack.Peek()
 		if value == nil {
 			return utils.Wrap(CriticalError, "get call args failed: stack top is empty")
 		}
 		results, err := value.GetCallActualParams(i.UnaryInt)
 		if err != nil {
-			return utils.Errorf("get calling argument failed: %s", err)
+			err = utils.Errorf("get calling argument failed: %s", err)
 		}
 		callLen := valuesLen(results)
 		s.debugSubLog("- get argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
+		s.debugSubLog("<< stack grow")
 		s.stack.Push(results)
 
 	case OpGetAllCallArgs:
-		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
+		s.debugSubLog("-- peek")
+		value := s.stack.Peek()
 		if value == nil {
 			return utils.Wrap(CriticalError, "get call args failed: stack top is empty")
 		}
@@ -390,6 +404,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		callLen := valuesLen(results)
 		s.debugSubLog("- get all argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
+		s.debugSubLog("<< stack grow")
 		s.stack.Push(results)
 
 	case OpGetUsers:
@@ -590,12 +605,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog(">> pop")
 		vs := s.stack.Pop()
 		if vs == nil {
-			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
 		}
 		conds := s.conditionStack.Pop()
 		if len(conds) != valuesLen(vs) {
 			return utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", valuesLen(vs), len(conds))
 		}
+		log.Infof("condition: %v", conds)
 		res := make([]ValueOperator, 0, valuesLen(vs))
 		for i := 0; i < len(conds); i++ {
 			if conds[i] {
@@ -605,18 +621,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 		}
 		s.stack.Push(NewValues(res))
-	case OpCreateIter:
-		s.debugSubLog(">> pop")
-		vs := s.stack.Pop()
-		channel := make(chan ValueOperator)
-		go func() {
-			defer close(channel)
-			_ = vs.Recursive(func(vo ValueOperator) error {
-				channel <- vo
-				return nil
-			})
-		}()
-		i.iter.originValues = channel
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

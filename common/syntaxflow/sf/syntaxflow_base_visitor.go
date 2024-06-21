@@ -11,15 +11,15 @@ func (v *BaseSyntaxFlowVisitor) VisitFlow(ctx *FlowContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilters(ctx *FiltersContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitStatements(ctx *StatementsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterExecution(ctx *FilterExecutionContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFilter(ctx *FilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterParamCheck(ctx *FilterParamCheckContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitCheck(ctx *CheckContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -27,11 +27,23 @@ func (v *BaseSyntaxFlowVisitor) VisitDescription(ctx *DescriptionContext) interf
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitEmptyStatement(ctx *EmptyStatementContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitEmpty(ctx *EmptyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitRefFilterExpr(ctx *RefFilterExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitPureFilterExpr(ctx *PureFilterExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitEos(ctx *EosContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitLine(ctx *LineContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -63,67 +75,7 @@ func (v *BaseSyntaxFlowVisitor) VisitRefVariable(ctx *RefVariableContext) interf
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitTopDefSingleFilter(ctx *TopDefSingleFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitNextSingleFilter(ctx *NextSingleFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitCurrentRootFilter(ctx *CurrentRootFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitNextFilter(ctx *NextFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitOptionalFilter(ctx *OptionalFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitConfiggedDeepNextSingleFilter(ctx *ConfiggedDeepNextSingleFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitTopDefFilter(ctx *TopDefFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitConfiggedTopDefSingleFilter(ctx *ConfiggedTopDefSingleFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitConfiggedTopDefFilter(ctx *ConfiggedTopDefFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitDefFilter(ctx *DefFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFieldFilter(ctx *FieldFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitDeepNextSingleFilter(ctx *DeepNextSingleFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitNamedFilter(ctx *NamedFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -131,7 +83,27 @@ func (v *BaseSyntaxFlowVisitor) VisitFieldCallFilter(ctx *FieldCallFilterContext
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitDefSingleFilter(ctx *DefSingleFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFirst(ctx *FirstContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitOptionalFilter(ctx *OptionalFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNextFilter(ctx *NextFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitDefFilter(ctx *DefFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -139,7 +111,23 @@ func (v *BaseSyntaxFlowVisitor) VisitDeepNextFilter(ctx *DeepNextFilterContext) 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitDeepNextConfigFilter(ctx *DeepNextConfigFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitTopDefFilter(ctx *TopDefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitTopDefConfigFilter(ctx *TopDefConfigFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpr(ctx *FilterExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -207,11 +195,11 @@ func (v *BaseSyntaxFlowVisitor) VisitNotCondition(ctx *NotConditionContext) inte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterCondition(ctx *FilterConditionContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitParenCondition(ctx *ParenConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitParenCondition(ctx *ParenConditionContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFilterCondition(ctx *FilterConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

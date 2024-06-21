@@ -17,7 +17,7 @@ func TestParameterMember(t *testing.T) {
 	}
 	`
 	ssatest.CheckSyntaxFlowContain(t, code,
-		`print(*) #-> * as $target`,
+		`print(* #-> * as $target)`,
 		map[string][]string{
 			"target": {
 				"Parameter-a",
