@@ -2,11 +2,11 @@ package ssa
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -127,10 +127,6 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			params["defer_block"] = ret.DeferBlock.GetId()
 		}
 		var files [][2]string
-		ret.referenceFiles.ForEach(func(i string, v string) bool {
-			files = append(files, [2]string{i, v})
-			return true
-		})
 		params["reference_files"] = files
 		params["has_ellipsis"] = ret.hasEllipsis
 	case *Assert:
@@ -545,15 +541,6 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.DeferBlock = newLazyInstruction(deferBlock)
 		}
 
-		ret.referenceFiles = omap.NewOrderedMap(map[string]string{})
-		if refs := params["reference_files"]; refs != nil && funk.IsIteratee(refs) {
-			funk.ForEach(params["reference_files"], func(a any) {
-				results := a.([]string)
-				if len(results) > 1 {
-					ret.referenceFiles.Set(results[0], results[1])
-				}
-			})
-		}
 		ret.hasEllipsis = params["has_ellipsis"].(bool)
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
