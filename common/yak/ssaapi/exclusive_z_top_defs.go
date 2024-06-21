@@ -171,10 +171,17 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{i} // return self
 		}
 
+		if raw, isParamMember := ssa.ToParameterMember(caller); isParamMember {
+			pmType := raw.GetType()
+			funcType, isFuncType := ssa.ToFunctionType(pmType)
+			_, _ = funcType, isFuncType
+		}
+
 		// TODO: trace the specific return-values
 		callerValue := i.NewValue(caller)
 		_, isFunc := ssa.ToFunction(caller)
 		funcType, isFuncTyp := ssa.ToFunctionType(caller.GetType())
+
 		switch {
 		case isFunc:
 			callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)

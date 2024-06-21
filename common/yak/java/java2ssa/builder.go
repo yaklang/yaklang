@@ -42,6 +42,29 @@ type builder struct {
 	*ssa.FunctionBuilder
 	ast      javaparser.ICompilationUnitContext
 	constMap map[string]ssa.Value
+
+	bluePrintStack *utils.Stack[*ssa.ClassBluePrint]
+}
+
+func (b *builder) PushBluePrint(bp *ssa.ClassBluePrint) {
+	if b.bluePrintStack == nil {
+		b.bluePrintStack = utils.NewStack[*ssa.ClassBluePrint]()
+	}
+	b.bluePrintStack.Push(bp)
+}
+
+func (b *builder) PeekCurrentBluePrint() *ssa.ClassBluePrint {
+	if b.bluePrintStack == nil {
+		return nil
+	}
+	return b.bluePrintStack.Peek()
+}
+
+func (b *builder) PopBluePrint() *ssa.ClassBluePrint {
+	if b.bluePrintStack == nil {
+		return nil
+	}
+	return b.bluePrintStack.Pop()
 }
 
 func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
