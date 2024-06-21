@@ -71,17 +71,28 @@ func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
 	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
 }
 
-func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value, bool)) Value {
-	if v, ok := get(c); ok {
-		return v
+func (c *ClassBluePrint) GetMember(key string) *BluePrintMember {
+	var member *BluePrintMember
+	c.GetMemberEx(key, func(c *ClassBluePrint) bool {
+		if m, ok := c.NormalMember[key]; ok {
+			member = m
+			return true
+		}
+		return false
+	})
+	return member
+}
+func (c *ClassBluePrint) GetMemberEx(key string, get func(*ClassBluePrint) bool) bool {
+	if ok := get(c); ok {
+		return true
 	}
 	for _, p := range c.ParentClass {
-		if v := p.GetMember(key, get); v != nil {
-			return v
+		if ok := p.GetMemberEx(key, get); ok {
+			return true
 		}
 	}
 	log.Errorf("VisitClassMember: this class: %s no this member %s", c.String(), key)
-	return nil
+	return false
 }
 
 //======================= class blue print
@@ -98,14 +109,14 @@ func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value,
 // AddNormalMember is used to add a normal member to the class,
 func (c *ClassBluePrint) AddNormalMember(name string, value Value) {
 	value.GetProgram().SetInstructionWithName(name, value)
-	c.NormalMember[name] = BluePrintMember{
+	c.NormalMember[name] = &BluePrintMember{
 		Value: value,
 		Type:  value.GetType(),
 	}
 }
 
 func (c *ClassBluePrint) AddNormalMemberOnlyType(name string, typ Type) {
-	c.NormalMember[name] = BluePrintMember{
+	c.NormalMember[name] = &BluePrintMember{
 		Value: nil,
 		Type:  typ,
 	}

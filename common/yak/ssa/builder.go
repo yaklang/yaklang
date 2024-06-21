@@ -32,6 +32,7 @@ type FunctionBuilder struct {
 	// Support obtaining static members from the StaticMember of the class's blueprint,
 	// even if the class is not instantiated
 	SupportGetStaticMember bool
+	SupportClass           bool
 
 	RefParameter map[string]struct{}
 
@@ -77,6 +78,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		// b.parentScope = parent.CurrentBlock.ScopeTable
 		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
 		b.SupportClosure = parent.SupportClosure
+		b.SupportClass = parent.SupportClass
 		b.MarkedThisObject = parent.MarkedThisObject
 	}
 

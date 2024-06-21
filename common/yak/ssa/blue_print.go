@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -23,7 +24,7 @@ type ClassBluePrint struct {
 	Method       map[string]*Function
 	StaticMethod map[string]*Function
 
-	NormalMember map[string]BluePrintMember
+	NormalMember map[string]*BluePrintMember
 	StaticMember map[string]Value
 
 	CallBack []func()
@@ -50,7 +51,7 @@ func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
 
 func NewClassBluePrint() *ClassBluePrint {
 	class := &ClassBluePrint{
-		NormalMember: make(map[string]BluePrintMember),
+		NormalMember: make(map[string]*BluePrintMember),
 		StaticMember: make(map[string]Value),
 
 		Method:       make(map[string]*Function),

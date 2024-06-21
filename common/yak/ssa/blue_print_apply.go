@@ -43,12 +43,22 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 }
 
 func (c *ClassBluePrint) Apply(obj Value) Type {
+
 	builder := obj.GetFunc().builder
 	_ = builder
 
 	prog := builder.GetProgram()
+
+	for _, parent := range c.ParentClass {
+		parent.Apply(obj)
+	}
+
 	if prog != nil || prog.Cache != nil {
 		prog.Cache.AddClassInstance(c.Name, obj)
+	}
+
+	if builder.SupportClass {
+		return c
 	}
 
 	call, isCall := ToCall(obj)
@@ -57,10 +67,11 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	objTyp.SetName(c.Name)
 	objTyp.SetMethod(c.GetMethod())
 	for _, parent := range c.ParentClass {
-		parentObjectType := parent.Apply(obj)
-		for key, f := range parentObjectType.GetMethod() {
-			objTyp.AddMethod(key, f)
-		}
+		parent.Apply(obj)
+	}
+
+	for name, f := range c.GetMethod() {
+		objTyp.AddMethod(name, f)
 	}
 
 	for rawKey, member := range c.NormalMember {
