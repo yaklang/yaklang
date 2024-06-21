@@ -413,3 +413,83 @@ func HostContains(rule string, target string) bool {
 	}
 	return globRuler.Match(targetHost)
 }
+
+type trieNode struct {
+	children   map[rune]*trieNode
+	failure    *trieNode
+	patternLen int
+	id         int
+	flag       int // 对节点的标记，可以用来标记结束节点
+}
+
+
+func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
+	// 构建trie树
+	root := &trieNode{
+		children:   make(map[rune]*trieNode),
+		failure:    nil,
+		flag:       0,
+		patternLen: 0,
+	}
+
+	for patternIndex, pattern := range patterns {
+		node := root
+		for _, char := range pattern {
+			if _, ok := node.children[char]; !ok {
+				node.children[char] = &trieNode{
+					children:   make(map[rune]*trieNode),
+					failure:    nil,
+					flag:       0,
+					patternLen: 0,
+					id:         patternIndex,
+				}
+			}
+			node = node.children[char]
+		}
+		node.flag = 1
+		node.patternLen = len(pattern)
+	}
+	// 构建Failure
+	queue := make([]*trieNode, 0)
+	root.failure = root
+
+	for _, child := range root.children {
+		child.failure = root
+		queue = append(queue, child)
+	}
+
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		for char, child := range node.children {
+			queue = append(queue, child)
+			failure := node.failure
+
+			for failure != root && failure.children[char] == nil {
+				failure = failure.failure
+			}
+			if next := failure.children[char]; next != nil {
+				child.failure = next
+				child.flag = child.flag | next.flag
+			} else {
+				child.failure = root
+			}
+		}
+	}
+
+	// 查找
+	node := root
+	for i, char := range s {
+		for node != root && node.children[char] == nil {
+			node = node.failure
+		}
+
+		if next := node.children[char]; next != nil {
+			node = next
+			if node.flag == 1 {
+				result = append(result, [2]int{node.id, i - node.patternLen + 1})
+			}
+		}
+	}
+	return
+}
