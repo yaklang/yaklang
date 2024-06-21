@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -11,7 +12,8 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
-	c, err := NewLocalClient()
+	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
+	c, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
 	}

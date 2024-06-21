@@ -109,7 +109,8 @@ Host: www.example.com
 }
 
 func TestGRPCMUSTPASS_HTTP_HijackedFlow_Request(t *testing.T) {
-	client, err := NewLocalClient()
+	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
+	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,8 @@ assert string(poc.Split(rsp)[1]) == token2
 }
 
 func TestGRPCMUSTPASS_HTTP_HijackedFlow_Response(t *testing.T) {
-	client, err := NewLocalClient()
+	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
+	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
 	}

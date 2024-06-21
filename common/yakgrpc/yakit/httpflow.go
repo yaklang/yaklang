@@ -486,35 +486,35 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 
 // choose db save mode by const
 func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
-	if consts.GLOBAL_DB_THROTTLE.IsSet() {
-		DbThrottleChannel <- func(db *gorm.DB) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
 			return UpdateHTTPFlowTags(db, i)
 		}
 		return nil
-	} else {
-		return UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), i)
 	}
 }
 
 func InsertHTTPFlowEx(i *schema.HTTPFlow) error {
-	if consts.GLOBAL_DB_THROTTLE.IsSet() {
-		DbThrottleChannel <- func(db *gorm.DB) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
 			return InsertHTTPFlow(db, i)
 		}
 		return nil
-	} else {
-		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
 	}
 }
 
 func CreateOrUpdateHTTPFlowExg(hash string, i *schema.HTTPFlow) error {
-	if consts.GLOBAL_DB_THROTTLE.IsSet() {
-		DbThrottleChannel <- func(db *gorm.DB) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase(), hash, i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
 			return CreateOrUpdateHTTPFlow(db, hash, i)
 		}
 		return nil
-	} else {
-		return CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase(), hash, i)
 	}
 }
 

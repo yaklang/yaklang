@@ -440,15 +440,18 @@ beforeRequest = func(ishttps, oreq, req){
 }`, token1, token2),
 			})
 		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
-			// send packet
-			packet := `GET / HTTP/1.1
+			go func() {
+				// send packet
+				packet := `GET / HTTP/1.1
 Host: ` + utils.HostPort(mockHost, mockPort) + `
 
 `
-			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
-			_, err = lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packetBytes), lowhttp.WithProxy(`http://`+utils.HostPort("127.0.0.1", mitmPort)))
-			require.NoError(t, err)
-			cancel()
+				packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
+				_, err = lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packetBytes), lowhttp.WithProxy(`http://`+utils.HostPort("127.0.0.1", mitmPort)))
+				require.NoError(t, err)
+				time.Sleep(1 * time.Second)
+				cancel()
+			}()
 		}
 	}
 
