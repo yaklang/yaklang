@@ -37,48 +37,70 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 		}
 		return r
 	}
-	var res []*rule.FingerPrintRule
-	for _, webRule := range rules {
-		if webRule.Path != "" {
-
-		} else {
-			for _, method := range webRule.Methods {
-				var methodRules []*rule.FingerPrintRule
-				for _, keyword := range method.Keywords {
-					methodRules = append(methodRules, convertRegexpRule(keyword))
+	//var res []*rule.FingerPrintRule
+	newComplexRule := func(rules []*rule.FingerPrintRule, condition string) *rule.FingerPrintRule {
+		r := rule.NewEmptyFingerPrintRule()
+		r.Method = "complex"
+		r.MatchParam = &rule.MatchMethodParam{
+			SubRules:  rules,
+			Condition: "and",
+		}
+		return r
+	}
+	var convertRule func(webRule *webfingerprint.WebRule) *rule.FingerPrintRule
+	convertRule = func(webRule *webfingerprint.WebRule) *rule.FingerPrintRule {
+		var convertedWebRules []*rule.FingerPrintRule
+		for _, method := range webRule.Methods {
+			var methodRules []*rule.FingerPrintRule
+			for _, keyword := range method.Keywords {
+				r := convertRegexpRule(keyword)
+				methodRules = append(methodRules, r)
+			}
+			for _, header := range method.HTTPHeaders {
+				r := rule.NewEmptyFingerPrintRule()
+				r.Method = "http_header"
+				r.MatchParam = &rule.MatchMethodParam{
+					HeaderKey:       header.HeaderName,
+					HeaderMatchRule: convertRegexpRule(&header.HeaderValue),
 				}
-				for _, header := range method.HTTPHeaders {
-					r := rule.NewEmptyFingerPrintRule()
-					r.Method = "http_header"
-					r.MatchParam = &rule.MatchMethodParam{
-						HeaderKey:       header.HeaderName,
-						HeaderMatchRule: convertRegexpRule(&header.HeaderValue),
-					}
-					methodRules = append(methodRules, r)
+				methodRules = append(methodRules, r)
+			}
+			for _, md5 := range method.MD5s {
+				r := rule.NewEmptyFingerPrintRule()
+				r.Method = "md5"
+				r.MatchParam = &rule.MatchMethodParam{
+					HeaderKey: md5.MD5,
+					Info:      convertToMap(&md5.CPE),
 				}
-				for _, md5 := range method.MD5s {
-					r := rule.NewEmptyFingerPrintRule()
-					r.Method = "md5"
-					r.MatchParam = &rule.MatchMethodParam{
-						HeaderKey: md5.MD5,
-						Info:      convertToMap(&md5.CPE),
-					}
-					methodRules = append(methodRules, r)
+				methodRules = append(methodRules, r)
+			}
+			if method.Condition != "" {
+				if len(methodRules) != 0 {
+					r := newComplexRule(methodRules, method.Condition)
+					methodRules = []*rule.FingerPrintRule{r}
 				}
-				if method.Condition != "" {
-					if len(methodRules) != 0 {
-						r := rule.NewEmptyFingerPrintRule()
-						r.Method = "complex"
-						r.MatchParam = &rule.MatchMethodParam{
-							SubRules:  methodRules,
-							Condition: method.Condition,
-						}
-					}
-				} else {
-					res = append(res, methodRules...)
-				}
+			} else {
+				convertedWebRules = append(convertedWebRules, methodRules...)
 			}
 		}
+		var generalWebRule *rule.FingerPrintRule
+		if len(convertedWebRules) > 1 {
+			generalWebRule = newComplexRule(convertedWebRules, "or")
+		} else {
+			if len(convertedWebRules) == 1 {
+				generalWebRule = convertedWebRules[0]
+			}
+		}
+		if webRule.NextStep != nil {
+			nextRule := convertRule(webRule.NextStep)
+			generalWebRule = newComplexRule([]*rule.FingerPrintRule{generalWebRule, nextRule}, "and")
+		}
+		generalWebRule.WebPath = webRule.Path
+		return generalWebRule
 	}
-	return res, nil
+	generalRules := []*rule.FingerPrintRule{}
+	for _, webRule := range rules {
+		generalRules = append(generalRules, convertRule(webRule))
+	}
+	return generalRules, nil
 }

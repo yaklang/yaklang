@@ -24,6 +24,10 @@ type MatchMethodParam struct {
 
 	//md5
 	Md5 string
+
+	// exp
+	Params []any
+	Op     string
 }
 
 type Pair struct {
@@ -33,6 +37,7 @@ type Pair struct {
 type FingerPrintRule struct {
 	ActiveMode bool
 	Method     string
+	WebPath    string
 	MatchParam *MatchMethodParam
 }
 
