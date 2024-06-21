@@ -1155,6 +1155,9 @@ message GlobalNetworkConfig {
   string PrimaryAIType = 17;
 
   repeated string AiApiPriority = 18;
+
+  // 开启数据库节流 可能导致数据存储偏后
+  bool EnableDbThrottle = 19;
 }
 
 message AuthInfo {
