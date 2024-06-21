@@ -222,6 +222,7 @@ func (f *FuzzHTTPRequest) toFuzzHTTPRequestBatch() *FuzzHTTPRequestBatch {
 }
 
 func (f *FuzzHTTPRequest) FuzzGetBase64Params(key, val any) FuzzHTTPRequestIf {
+	f.position = lowhttp.PosGetQueryBase64
 	encode := func(v any) string {
 		if f.friendlyDisplay {
 			return fmt.Sprintf("{{base64(%s)}}", v)

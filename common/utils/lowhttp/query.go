@@ -11,6 +11,31 @@ import (
 	"strings"
 )
 
+type HttpParamPositionType string
+
+var (
+	PosMethod              HttpParamPositionType = "method"
+	PosBody                HttpParamPositionType = "body"
+	PosGetQuery            HttpParamPositionType = "get-query"
+	PosGetQueryBase64      HttpParamPositionType = "get-query-base64"
+	PosGetQueryJson        HttpParamPositionType = "get-query-json"
+	PosGetQueryBase64Json  HttpParamPositionType = "get-query-base64-json"
+	PosPath                HttpParamPositionType = "path"
+	PosHeader              HttpParamPositionType = "header"
+	PosPostQuery           HttpParamPositionType = "post-query"
+	PosPostXML             HttpParamPositionType = "post-xml"
+	PosPostQueryBase64     HttpParamPositionType = "post-query-base64"
+	PosPostQueryJson       HttpParamPositionType = "post-query-json"
+	PosPostQueryBase64Json HttpParamPositionType = "post-query-base64-json"
+	PosPostJson            HttpParamPositionType = "post-json"
+	PosCookie              HttpParamPositionType = "cookie"
+	PosCookieBase64        HttpParamPositionType = "cookie-base64"
+	PosCookieJson          HttpParamPositionType = "cookie-json"
+	PosCookieBase64Json    HttpParamPositionType = "cookie-base64-json"
+	PosPathAppend          HttpParamPositionType = "path-append"
+	PosPathBlock           HttpParamPositionType = "path-block"
+)
+
 func ForceStringToUrl(i string) *url.URL {
 	ins, err := url.Parse(i)
 	if err != nil {
@@ -28,6 +53,7 @@ type QueryParamItem struct {
 	Raw             string
 	Key             string
 	Value, ValueRaw string
+	Position        HttpParamPositionType
 }
 
 func (item *QueryParamItem) Encode() string {
@@ -96,6 +122,7 @@ func (item *QueryParamItem) fuzzEncode() string {
 type QueryParams struct {
 	NoAutoEncode    bool
 	friendlyDisplay bool
+	Position        HttpParamPositionType
 	Items           []*QueryParamItem
 }
 
@@ -103,10 +130,23 @@ func NewQueryParams() *QueryParams {
 	return new(QueryParams)
 }
 
-func ParseQueryParams(s string) *QueryParams {
+type QueryOption func(q *QueryParams)
+
+func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
+	query := &QueryParams{}
+
+	for _, option := range options {
+		option(query)
+	}
+
 	scanner := bufio.NewReaderSize(bytes.NewBufferString(s), len(s))
 	var items []*QueryParamItem
+	var position HttpParamPositionType
 
+	// 获取 position，如果有的话
+	if len(query.Items) > 0 {
+		position = query.Items[0].Position
+	}
 	handle := func(pair string) {
 		if len(pair) <= 0 {
 			return
@@ -127,10 +167,12 @@ func ParseQueryParams(s string) *QueryParams {
 				Key:      codec.ForceQueryUnescape(key),
 				Value:    codec.ForceQueryUnescape(val),
 				ValueRaw: val,
+				Position: position,
 			})
 		} else {
 			items = append(items, &QueryParamItem{
-				Raw: codec.ForceQueryUnescape(pair),
+				Raw:      codec.ForceQueryUnescape(pair),
+				Position: position,
 			})
 		}
 	}
@@ -143,7 +185,30 @@ func ParseQueryParams(s string) *QueryParams {
 		}
 		handle(pair)
 	}
-	return &QueryParams{Items: items}
+	query.Items = items
+	return query
+}
+
+func WithPosition(p HttpParamPositionType) QueryOption {
+	return func(q *QueryParams) {
+		if q.Items == nil {
+			q.Items = make([]*QueryParamItem, 0)
+		}
+		q.Position = p
+		q.Items = append(q.Items, &QueryParamItem{Position: p})
+	}
+}
+
+func WithDisableAutoEncode(b bool) QueryOption {
+	return func(q *QueryParams) {
+		q.NoAutoEncode = b
+	}
+}
+
+func WithFriendlyDisplay(b bool) QueryOption {
+	return func(q *QueryParams) {
+		q.friendlyDisplay = b
+	}
 }
 
 func (q *QueryParams) DisableAutoEncode(b bool) *QueryParams {
@@ -160,6 +225,13 @@ func (q *QueryParams) SetFriendlyDisplay(b bool) *QueryParams {
 	return q
 }
 
+func (q *QueryParams) SetPosition(p HttpParamPositionType) *QueryParams {
+	if q != nil {
+		q.Position = p
+	}
+	return q
+}
+
 func (q *QueryParams) Add(key, val string) {
 	q.Items = append(q.Items, &QueryParamItem{Key: key, Value: val, NoAutoEncode: q.NoAutoEncode})
 }
@@ -169,10 +241,18 @@ func (q *QueryParams) Set(key, val string) {
 		if q.Items[i].Key == key {
 			q.Items[i].Value = val
 			q.Items[i].NoAutoEncode = q.NoAutoEncode
+			q.Items[i].Position = q.Position
 			return
 		}
 	}
-	q.Items = append(q.Items, &QueryParamItem{Key: key, Value: val, NoAutoEncode: q.NoAutoEncode})
+	q.Items = append(q.Items,
+		&QueryParamItem{
+			Key:          key,
+			Value:        val,
+			NoAutoEncode: q.NoAutoEncode,
+			Position:     q.Position,
+		},
+	)
 }
 
 func (q *QueryParams) Have(key string) bool {
@@ -239,6 +319,23 @@ func (q *QueryParams) Encode() string {
 			buf.WriteString(item.fuzzEncode())
 		} else {
 			buf.WriteString(item.Encode())
+		}
+	}
+	return buf.String()
+}
+
+func (q *QueryParams) EncodeByPos(pos HttpParamPositionType) string {
+	var buf bytes.Buffer
+	for _, item := range q.Items {
+		if item.Position == pos {
+			if buf.Len() > 0 {
+				buf.WriteByte('&')
+			}
+			if q.friendlyDisplay {
+				buf.WriteString(item.fuzzEncode())
+			} else {
+				buf.WriteString(item.Encode())
+			}
 		}
 	}
 	return buf.String()
