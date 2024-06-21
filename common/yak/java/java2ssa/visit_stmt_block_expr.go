@@ -1615,9 +1615,11 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 				"maybe it's a abstract class or interface, just make a default one", className)
 			variable := y.CreateVariable(className)
 			undefinedConstructor := y.EmitUndefined(className)
+			undefinedConstructor.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.GetAnyType()}, class, true))
+			class.Constructor = undefinedConstructor
 			y.AssignVariable(variable, undefinedConstructor)
 			arguments := y.VisitClassCreatorRest(ret, className)
-			return obj, y.NewCall(undefinedConstructor, append([]ssa.Value{obj}, arguments...))
+			return obj, y.EmitCall(y.NewCall(undefinedConstructor, append([]ssa.Value{obj}, arguments...)))
 		}
 
 		args := []ssa.Value{obj}
