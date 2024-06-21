@@ -514,7 +514,7 @@ func (y *builder) VisitMethodDeclaration(
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		y.MarkedThisClassBlueprint = class
 		this := y.NewParam("this", raw)
-		_ = this
+		this.SetType(class)
 		y.VisitFormalParameters(i.FormalParameters())
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
@@ -762,7 +762,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		{
 			this := y.NewParam("this")
-			_ = this
+			this.SetType(class)
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
 			y.Finish()
