@@ -59,6 +59,7 @@ func TestGRPCMUSTPASS_MITM_AUTH(t *testing.T) {
 				t.Fatal(err)
 			}
 			conn.Close()
+			cancel()
 		}
 	}
 

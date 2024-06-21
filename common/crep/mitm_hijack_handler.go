@@ -273,15 +273,13 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 
 		reqRawBytes := httpctx.GetRequestBytes(requestOrigin)
 		if reqRawBytes != nil {
-			go func() {
-				start := time.Now()
-				m.httpFlowMirror(httpctx.GetRequestHTTPS(requestOrigin), requestOrigin, rsp, start.Unix())
-				end := time.Now()
-				cost := end.Sub(start)
-				if cost.Milliseconds() > 600 {
-					log.Infof(`m.httpFlowMirror cost: %v`, cost)
-				}
-			}()
+			start := time.Now()
+			m.httpFlowMirror(httpctx.GetRequestHTTPS(requestOrigin), requestOrigin, rsp, start.Unix())
+			end := time.Now()
+			cost := end.Sub(start)
+			if cost.Milliseconds() > 600 {
+				log.Infof(`m.httpFlowMirror cost: %v`, cost)
+			}
 		} else {
 			log.Errorf("request raw bytes is nil")
 		}
