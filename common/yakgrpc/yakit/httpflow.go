@@ -87,7 +87,10 @@ func RegisterLowHTTPSaveCallback() {
 		flow.RuntimeId = runtimeId
 		flow.HiddenIndex = hiddenIndex
 		flow.Payload = strings.Join(payloads, ",")
-		InsertHTTPFlowThrottling(flow)
+		err = InsertHTTPFlowEx(flow)
+		if err != nil {
+			log.Errorf("insert httpflow failed: %s", err)
+		}
 	})
 }
 
@@ -424,6 +427,7 @@ func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *h
 	return createHTTPFlowFromHTTP(isHttps, req, rsp, source, url, remoteAddr, opts...)
 }
 
+// direct save
 func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) error {
 	if i == nil {
 		return nil
@@ -480,22 +484,37 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 	return nil
 }
 
-// Throttling HTTPFlow
-func UpdateHTTPFlowTagsThrottling(i *schema.HTTPFlow) {
-	DbThrottleChannel <- func(db *gorm.DB) error {
-		return UpdateHTTPFlowTags(db, i)
+// choose db save mode by const
+func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
+	if consts.GLOBAL_DB_THROTTLE.IsSet() {
+		DbThrottleChannel <- func(db *gorm.DB) error {
+			return UpdateHTTPFlowTags(db, i)
+		}
+		return nil
+	} else {
+		return UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), i)
 	}
 }
 
-func InsertHTTPFlowThrottling(i *schema.HTTPFlow) {
-	DbThrottleChannel <- func(db *gorm.DB) error {
-		return InsertHTTPFlow(db, i)
+func InsertHTTPFlowEx(i *schema.HTTPFlow) error {
+	if consts.GLOBAL_DB_THROTTLE.IsSet() {
+		DbThrottleChannel <- func(db *gorm.DB) error {
+			return InsertHTTPFlow(db, i)
+		}
+		return nil
+	} else {
+		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
 	}
 }
 
-func CreateOrUpdateHTTPFlowThrottling(hash string, i *schema.HTTPFlow) {
-	DbThrottleChannel <- func(db *gorm.DB) error {
-		return CreateOrUpdateHTTPFlow(db, hash, i)
+func CreateOrUpdateHTTPFlowExg(hash string, i *schema.HTTPFlow) error {
+	if consts.GLOBAL_DB_THROTTLE.IsSet() {
+		DbThrottleChannel <- func(db *gorm.DB) error {
+			return CreateOrUpdateHTTPFlow(db, hash, i)
+		}
+		return nil
+	} else {
+		return CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase(), hash, i)
 	}
 }
 
