@@ -133,3 +133,42 @@ func Test_String_Contain(t *testing.T) {
 		)
 	})
 }
+
+func Test_Condition_FilterExpr(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f = (a1, a2) => {
+			a1.b = 1
+		}
+		`,
+			`
+			a* as $target1
+			$target1?{.b} as $target2
+			a*?{.b} as $target3
+			`,
+			map[string][]string{
+				"target1": {"Parameter-a1", "Parameter-a2"},
+				"target2": {"Parameter-a1"},
+				"target3": {"Parameter-a1"},
+			})
+	})
+
+	t.Run("logical", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f = (a1, a2, a3) => {
+			a1.b = 1
+			a2.c = 2
+		}
+		`,
+			`
+			a* as $target1
+			$target1?{(.b) || (.c)} as $target2
+			a*?{(.b) || (.c)} as $target3
+			`,
+			map[string][]string{
+				"target1": {"Parameter-a1", "Parameter-a2", "Parameter-a3"},
+				"target2": {"Parameter-a1", "Parameter-a2"},
+				"target3": {"Parameter-a1", "Parameter-a2"},
+			})
+	})
+}

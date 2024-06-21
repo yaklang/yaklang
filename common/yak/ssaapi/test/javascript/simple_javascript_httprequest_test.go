@@ -95,7 +95,7 @@ func TestJs_JQuery(t *testing.T) {
 	});`
 
 		ssatest.CheckSyntaxFlow(t, code,
-			`$.ajax(* as $obj)
+			`.ajax(* as $obj)
 			$obj.type as $method 
 			$obj.url as $url
 			$obj.data as $data
@@ -136,7 +136,7 @@ func TestJs_JQuery(t *testing.T) {
 	});
 	`
 		ssatest.CheckSyntaxFlow(t, code,
-			`$.post(* as $obj)
+			`.post(* as $obj)
 			$obj.url as $url
 			$obj.contentType as $contentType
 			$obj.data as $data

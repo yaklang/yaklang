@@ -14,8 +14,6 @@ const (
 	OpEnterStatement
 	OpExitStatement
 
-	// push input
-	OpPushInput
 	// duplicate the top of stack
 	OpDuplicate
 
@@ -25,7 +23,7 @@ const (
 	OpPushSearchRegexp
 
 	// handle function call
-	opGetCall
+	OpGetCall
 	OpGetCallArgs
 	OpGetAllCallArgs
 
@@ -92,6 +90,8 @@ const (
 	OpIterNext
 	OpIterEnd
 
+	OpCheckStackTop // check the top of stack, if empty, push input into stack
+
 	// OpFilterExprEnter will assert the top of stack, make sure a input
 	OpFilterExprEnter
 	OpFilterExprExit
@@ -156,16 +156,13 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "push", s.UnaryInt)
 	case OpDuplicate:
 		return fmt.Sprintf(verboseLen+" %v", "duplicate", s.UnaryStr)
-	case OpPushInput:
-		return fmt.Sprintf(verboseLen+" %v", "push$input", s.UnaryStr)
-
 	case OpPushSearchGlob:
 		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpPushSearchExact:
 		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpPushSearchRegexp:
 		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, MatchModeString(s.UnaryInt))
-	case opGetCall:
+	case OpGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
 	case OpGetAllCallArgs:
 		return fmt.Sprintf(verboseLen+" %v", "getAllCallArgs", s.UnaryStr)
@@ -239,9 +236,11 @@ func (s *SFI) String() string {
 	case OpIterNext:
 		return fmt.Sprintf(verboseLen+" start: %v end: %v", "iter-next", s.iter.start, s.iter.end)
 	case OpFilterExprEnter:
-		return fmt.Sprintf(verboseLen, "\\_")
+		return fmt.Sprintf(verboseLen, "-\\")
 	case OpFilterExprExit:
-		return fmt.Sprintf(verboseLen, "_/")
+		return fmt.Sprintf(verboseLen, "-/")
+	case OpCheckStackTop:
+		return fmt.Sprintf(verboseLen+" %v", "check top", s.UnaryStr)
 	default:
 		panic("unhandled default case")
 	}
