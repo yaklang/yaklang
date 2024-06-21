@@ -89,3 +89,67 @@ func TestCrossMethod(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestCrossMethod_UseMethodBeforeDecl(t *testing.T) {
+	var check = false
+	ssatest.Check(t, `public class RuntimeExecCrossFunction {
+    @RequestMapping("/runtime")
+    public String RuntimeExecCross(String cmd, Model model) {
+		Process finalCmd = this.crossFunction(cmd);
+    }
+
+	public String crossFunction(String cmd) {
+        return "echo 'Hello World'";
+    }
+}`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		var results ssaapi.Values
+		results = prog.SyntaxFlowChain(`finalCmd as $sink`).Show()
+		if results.Len() <= 0 {
+			t.Fatal("finalCmd not found")
+		}
+
+		check = false
+		prog.SyntaxFlowChain(`finalCmd #-> * as $source`).Show().ForEach(func(value *ssaapi.Value) {
+			if ret := value.GetConstValue(); strings.Contains(fmt.Sprint(ret), "Hello World") {
+				check = true
+			}
+		})
+		if !check {
+			t.Fatal("Cross Method failed not found")
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestCrossMethod_UseMethodBeforeDecl_NoThis(t *testing.T) {
+	var check = false
+	ssatest.Check(t, `public class RuntimeExecCrossFunction {
+    @RequestMapping("/runtime")
+    public String RuntimeExecCross(String cmd, Model model) {
+		Process finalCmd = crossFunction(cmd);
+    }
+
+	public String crossFunction(String cmd) {
+        return "echo 'Hello World'";
+    }
+}`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		var results ssaapi.Values
+		results = prog.SyntaxFlowChain(`finalCmd as $sink`).Show()
+		if results.Len() <= 0 {
+			t.Fatal("finalCmd not found")
+		}
+
+		check = false
+		prog.SyntaxFlowChain(`finalCmd #-> * as $source`).Show().ForEach(func(value *ssaapi.Value) {
+			if ret := value.GetConstValue(); strings.Contains(fmt.Sprint(ret), "Hello World") {
+				check = true
+			}
+		})
+		if !check {
+			t.Fatal("Cross Method failed not found")
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}

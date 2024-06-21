@@ -1761,6 +1761,11 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 				return member.Value
 			}
 		}
+
+		haveMethod, ok := class.Method[name]
+		if ok {
+			return haveMethod
+		}
 	}
 	if value, ok := y.ReadConst(name); ok {
 		return value
