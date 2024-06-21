@@ -9,20 +9,26 @@ build with `antlr -Dlanguage=Go ./SyntaxFlow.g4 -o sf -package sf -no-listener -
 SyntaxFlow is a search expr can handle some structured data
 */
 
-flow: filters EOF;
+flow: statements EOF;
 
-filters: filterStatement+;
+statements: statement+;
 
-filterStatement
-    : filterExpr (As refVariable)? eos? # FilterExecution
-    | checkStatement eos?              # FilterParamCheck
+statement
+    : filterStatement eos?              # Filter
+    | checkStatement eos?               # Check
     | descriptionStatement eos?         # Description
-    | eos                               # EmptyStatement
+    | eos                               # Empty
     ;
+filterStatement
+    : refVariable filterItem*  (As refVariable)? # RefFilterExpr
+    | filterExpr  (As refVariable)?              # PureFilterExpr
+    ;
+
 
 // eos means end of statement
 // the ';' can be
-eos: ';';
+eos: ';' | line ;
+line: '\n';
 
 // descriptionStatement will describe the filterExpr with stringLiteral
 descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
@@ -42,28 +48,26 @@ elseExpr: Else stringLiteral;
 refVariable
     :  '$' (identifier | ('(' identifier ')'));
 
-filterExpr
-    : '$'    identifier?                                    # CurrentRootFilter
-    | nameFilter                                            # PrimaryFilter
-    | '.' nameFilter                                        # FieldFilter
-    | filterExpr '.' nameFilter                             # FieldCallFilter
-    | filterExpr '(' actualParam? ')'                       # FunctionCallFilter
-    | filterExpr '[' sliceCallItem ']'                      # FieldIndexFilter
-    | filterExpr '?{' conditionExpression '}'               # OptionalFilter
-    | filterExpr '->'                                       # NextSingleFilter
-    | filterExpr '->' filterExpr                            # NextFilter
-    | filterExpr '#>'                                       # DefSingleFilter
-    | filterExpr '#>' filterExpr                            # DefFilter
-    | filterExpr '-->'                                      # DeepNextSingleFilter
-    | filterExpr '-->' filterExpr                           # DeepNextFilter
-    | filterExpr '#->'                                      # TopDefSingleFilter
-    | filterExpr '#->' filterExpr                           # TopDefFilter
-    | filterExpr '-{' (recursiveConfig)? '}->'              # ConfiggedDeepNextSingleFilter
-    | filterExpr '-{' (recursiveConfig)? '}->' filterExpr   # ConfiggedDeepNextFilter
-    | filterExpr '#{' (recursiveConfig)? '}->'              # ConfiggedTopDefSingleFilter
-    | filterExpr '#{' (recursiveConfig)? '}->' filterExpr   # ConfiggedTopDefFilter
-    | filterExpr '-<' useDefCalcDescription '>-' filterExpr # UseDefCalcFilter
+
+filterItemFirst
+    : nameFilter                                 # NamedFilter
+    | '.' nameFilter                             # FieldCallFilter
     ;
+filterItem
+    : filterItemFirst                            #First
+    | '(' actualParam? ')'                       # FunctionCallFilter
+    | '[' sliceCallItem ']'                      # FieldIndexFilter
+    | '?{' conditionExpression '}'               # OptionalFilter
+    | '->'                                       # NextFilter
+    | '#>'                                       # DefFilter
+    | '-->'                                      # DeepNextFilter
+    | '-{' (recursiveConfig)? '}->'              # DeepNextConfigFilter
+    | '#->'                                      # TopDefFilter
+    | '#{' (recursiveConfig)? '}->'              # TopDefConfigFilter
+    | '-<' useDefCalcDescription '>-'            # UseDefCalcFilter
+    ;
+
+filterExpr: filterItemFirst filterItem* ;
 
 useDefCalcDescription
     : identifier useDefCalcParams?
@@ -83,8 +87,8 @@ actualParamFilter: singleParam ',' | ',';
 
 singleParam: ( '#>' | '#{' (recursiveConfig)? '}' )? filterStatement ;
 
-recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','? ;
-recursiveConfigItem: identifier ':' recursiveConfigItemValue;
+recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','? line?;
+recursiveConfigItem: line? identifier ':' recursiveConfigItemValue ;
 recursiveConfigItemValue
     : (identifier | numberLiteral)
     | '`' filterStatement '`'
@@ -92,22 +96,22 @@ recursiveConfigItemValue
 
 sliceCallItem: nameFilter | numberLiteral;
 
-nameFilter: '*' | '$' | identifier | regexpLiteral;
+nameFilter: '*' | identifier | regexpLiteral;
 
 chainFilter
-    : '[' ((filters (',' filters)*) | '...') ']'          # Flat
-    | '{' ((identifier ':') filters (';' (identifier ':') filters )*)? ';'? '}'  # BuildMap
+    : '[' ((statements (',' statements)*) | '...') ']'          # Flat
+    | '{' ((identifier ':') statements (';' (identifier ':') statements )*)? ';'? '}'  # BuildMap
     ;
 
 stringLiteralWithoutStarGroup: stringLiteralWithoutStar (',' stringLiteralWithoutStar)* ','?;
 negativeCondition: (Not | '!');
 
 conditionExpression
-    : filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
+    : '(' conditionExpression ')'                                                # ParenCondition
+    | filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
     |  Opcode ':' opcodes (',' opcodes) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
     |  Have  ':' stringLiteralWithoutStarGroup       # StringContainHaveCondition // something like .(have: 'a', 'b')
     |  HaveAny ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
-    | '(' conditionExpression ')'                                                # ParenCondition
     | negativeCondition conditionExpression                                                    # NotCondition
     | op = (
         '>' | '<' | '=' | '==' | '>='
@@ -122,7 +126,7 @@ conditionExpression
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier | '*';
-stringLiteralWithoutStar: identifier;
+stringLiteralWithoutStar: identifier | regexpLiteral ;
 regexpLiteral: RegexpLiteral;
 identifier: Identifier | keywords | QuotedStringLiteral;
 
@@ -130,8 +134,8 @@ keywords
     : types
     | opcodes
     | Opcode
-    | As
-    | Check
+    // | As
+    // | Check
     | Then
     | Desc
     | Else

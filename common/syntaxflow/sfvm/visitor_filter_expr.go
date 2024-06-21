@@ -14,55 +14,37 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	if y == nil || raw == nil {
 		return nil
 	}
+	i, ok := raw.(*sf.FilterExprContext)
+	if !ok {
+		return utils.Errorf("BUG: in filterExpr: %s", reflect.TypeOf(raw))
+	}
 
 	enter := y.EmitFilterExprEnter()
 	defer func() {
 		y.EmitFilterExprExit(enter)
 	}()
+	if raw := i.FilterItemFirst(); raw != nil {
+		y.VisitFilterItemFirst(raw)
+	}
 
-	switch ret := raw.(type) {
-	// variable
-	case *sf.CurrentRootFilterContext:
-		if id := ret.Identifier(); id != nil {
-			y.EmitNewRef(id.GetText())
-			return nil
-		}
-		log.Infof("current root filter identifier is nil")
-		return nil
-	// filter name  from input
-	case *sf.PrimaryFilterContext:
-		if !y.filterExpr {
-			y.EmitDuplicate()
-		}
-		return y.VisitNameFilter(false, ret.NameFilter())
-	// filter field from input
-	case *sf.FieldFilterContext:
-		if !y.filterExpr {
-			y.EmitDuplicate()
-		}
-		return y.VisitNameFilter(true, ret.NameFilter())
-	case *sf.FieldCallFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		return y.VisitNameFilter(true, ret.NameFilter())
+	for _, raw := range i.AllFilterItem() {
+		y.VisitFilterItem(raw)
+	}
+	return nil
+}
+
+func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
+	switch filter := raw.(type) {
+	case *sf.FirstContext:
+		y.VisitFilterItemFirst(filter.FilterItemFirst())
 	case *sf.FunctionCallFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		if ret.ActualParam() != nil {
-			y.VisitActualParam(ret.ActualParam())
+		if filter.ActualParam() != nil {
+			y.VisitActualParam(filter.ActualParam())
 		} else {
 			y.EmitGetCall()
 		}
 	case *sf.FieldIndexFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		memberRaw := ret.SliceCallItem()
+		memberRaw := filter.SliceCallItem()
 		member, ok := memberRaw.(*sf.SliceCallItemContext)
 		if !ok {
 			panic("BUG: in fieldIndexFilter")
@@ -73,169 +55,48 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 			y.VisitNameFilter(true, member.NameFilter())
 		}
 	case *sf.OptionalFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		y.VisitConditionExpression(ret.ConditionExpression())
+		y.VisitConditionExpression(filter.ConditionExpression())
 		y.EmitCondition()
 	case *sf.NextFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
 		y.EmitGetUsers()
-		recoverFilterExpr := y.EnterFilterExpr()
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		recoverFilterExpr()
-		if err != nil {
-			return err
-		}
-	case *sf.NextSingleFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		y.EmitGetUsers()
-		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(NameMatch, "*")
-		recoverFilterExpr()
 	case *sf.DefFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
 		y.EmitGetDefs()
-		recoverFilterExpr := y.EnterFilterExpr()
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		recoverFilterExpr()
-		if err != nil {
-			return err
-		}
-	case *sf.DefSingleFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		y.EmitGetDefs()
-		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(NameMatch, "*")
-		recoverFilterExpr()
 	case *sf.DeepNextFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
 		y.EmitGetBottomUsers()
-		recoverFilterExpr := y.EnterFilterExpr()
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		recoverFilterExpr()
-		if err != nil {
-			return err
+	case *sf.DeepNextConfigFilterContext:
+		config := []*RecursiveConfigItem{}
+		if i := filter.RecursiveConfig(); i != nil {
+			config = y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext))
 		}
-	case *sf.DeepNextSingleFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		y.EmitGetBottomUsers()
-		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(NameMatch, "*")
-		recoverFilterExpr()
+		y.EmitGetBottomUsers(config...)
 	case *sf.TopDefFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
 		y.EmitGetTopDefs()
-		recoverFilterExpr := y.EnterFilterExpr()
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		recoverFilterExpr()
-		if err != nil {
-			return err
+	case *sf.TopDefConfigFilterContext:
+		config := []*RecursiveConfigItem{}
+		if i := filter.RecursiveConfig(); i != nil {
+			config = y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext))
 		}
-	case *sf.TopDefSingleFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		y.EmitGetTopDefs()
-		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(NameMatch, "*")
-		recoverFilterExpr()
-		if err != nil {
-			return err
-		}
-	case *sf.ConfiggedDeepNextFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
-		if i := ret.RecursiveConfig(); i != nil {
-			y.EmitGetBottomUsersWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
-		} else {
-			y.EmitGetBottomUsers()
-		}
-		recoverFilterExpr := y.EnterFilterExpr()
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		recoverFilterExpr()
-		if err != nil {
-			return err
-		}
-	case *sf.ConfiggedDeepNextSingleFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		if i := ret.RecursiveConfig(); i != nil {
-			y.EmitGetBottomUsersWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
-		} else {
-			y.EmitGetBottomUsers()
-		}
-		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(NameMatch, "*")
-		recoverFilterExpr()
-	case *sf.ConfiggedTopDefFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
-		if i := ret.RecursiveConfig(); i != nil {
-			y.EmitGetTopDefsWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
-		} else {
-			y.EmitGetBottomUsers()
-		}
-		recoverFilterExpr := y.EnterFilterExpr()
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		recoverFilterExpr()
-		if err != nil {
-			return err
-		}
-	case *sf.ConfiggedTopDefSingleFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr())
-		if err != nil {
-			return err
-		}
-		if i := ret.RecursiveConfig(); i != nil {
-			y.EmitGetTopDefsWithConfig(y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext)))
-		} else {
-			y.EmitGetBottomUsers()
-		}
-		recoverFilterExpr := y.EnterFilterExpr()
-		y.EmitSearchGlob(NameMatch, "*")
-		recoverFilterExpr()
+		y.EmitGetTopDefs(config...)
 	case *sf.UseDefCalcFilterContext:
-		err := y.VisitFilterExpr(ret.FilterExpr(0))
-		if err != nil {
-			return err
-		}
-		err = y.VisitFilterExpr(ret.FilterExpr(1))
-		if err != nil {
-			return err
-		}
 		log.Warnf("TBD: UseDefCalcFilterContext: %v", raw.GetText())
 	default:
 		panic("BUG: in filterExpr")
+	}
+	return nil
+}
+
+func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext) error {
+
+	if y == nil || raw == nil {
+		return nil
+	}
+	switch i := raw.(type) {
+	case *sf.NamedFilterContext:
+		y.VisitNameFilter(false, i.NameFilter())
+	case *sf.FieldCallFilterContext:
+		y.VisitNameFilter(true, i.NameFilter())
+	default:
+		panic("BUG: in filter first")
 	}
 
 	return nil
@@ -263,9 +124,9 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		}
 		// skip
 		return nil
-	} else if id := ret.DollarOutput(); id != nil {
-		y.EmitSearchExact(mod, id.GetText())
-		return nil
+		// } else if id := ret.DollarOutput(); id != nil {
+		// 	y.EmitSearchExact(mod, id.GetText())
+		// 	return nil
 	} else if id := ret.Identifier(); id != nil {
 		text := ret.Identifier().GetText()
 		filter, isGlob := y.FormatStringOrGlob(text) // emit field
@@ -290,7 +151,7 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
-	handlerItem := func(i sf.ISingleParamContext) {
+	handlerStatement := func(i sf.ISingleParamContext) {
 		ret, ok := (i).(*sf.SingleParamContext)
 		if !ok {
 			return
@@ -304,8 +165,10 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
+		y.EmitEnterStatement()
 		y.EmitPushAllCallArgs()
-		handlerItem(ret.SingleParam())
+		handlerStatement(ret.SingleParam())
+		y.EmitExitStatement()
 	case *sf.EveryParamContext:
 		for i, paraI := range ret.AllActualParamFilter() {
 			para, ok := paraI.(*sf.ActualParamFilterContext)
@@ -316,16 +179,16 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 			if single == nil {
 				continue
 			}
-			y.EmitDuplicate()
+			y.EmitEnterStatement()
 			y.EmitPushCallArgs(i)
-			handlerItem(single)
-			y.EmitPop()
+			handlerStatement(single)
+			y.EmitExitStatement()
 		}
 		if ret.SingleParam() != nil {
-			y.EmitDuplicate()
+			y.EmitEnterStatement()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()))
-			handlerItem(ret.SingleParam())
-			y.EmitPop()
+			handlerStatement(ret.SingleParam())
+			y.EmitExitStatement()
 		}
 	default:
 		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))

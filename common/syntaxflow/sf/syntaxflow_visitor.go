@@ -10,23 +10,32 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#flow.
 	VisitFlow(ctx *FlowContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#filters.
-	VisitFilters(ctx *FiltersContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#statements.
+	VisitStatements(ctx *StatementsContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExecution.
-	VisitFilterExecution(ctx *FilterExecutionContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#Filter.
+	VisitFilter(ctx *FilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterParamCheck.
-	VisitFilterParamCheck(ctx *FilterParamCheckContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#Check.
+	VisitCheck(ctx *CheckContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#Description.
 	VisitDescription(ctx *DescriptionContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#EmptyStatement.
-	VisitEmptyStatement(ctx *EmptyStatementContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#Empty.
+	VisitEmpty(ctx *EmptyContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#RefFilterExpr.
+	VisitRefFilterExpr(ctx *RefFilterExprContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#PureFilterExpr.
+	VisitPureFilterExpr(ctx *PureFilterExprContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#eos.
 	VisitEos(ctx *EosContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#line.
+	VisitLine(ctx *LineContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#descriptionStatement.
 	VisitDescriptionStatement(ctx *DescriptionStatementContext) interface{}
@@ -49,65 +58,47 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#refVariable.
 	VisitRefVariable(ctx *RefVariableContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#TopDefSingleFilter.
-	VisitTopDefSingleFilter(ctx *TopDefSingleFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#FunctionCallFilter.
-	VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#NextSingleFilter.
-	VisitNextSingleFilter(ctx *NextSingleFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#CurrentRootFilter.
-	VisitCurrentRootFilter(ctx *CurrentRootFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#NextFilter.
-	VisitNextFilter(ctx *NextFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#OptionalFilter.
-	VisitOptionalFilter(ctx *OptionalFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#PrimaryFilter.
-	VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedDeepNextSingleFilter.
-	VisitConfiggedDeepNextSingleFilter(ctx *ConfiggedDeepNextSingleFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#TopDefFilter.
-	VisitTopDefFilter(ctx *TopDefFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedTopDefSingleFilter.
-	VisitConfiggedTopDefSingleFilter(ctx *ConfiggedTopDefSingleFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedTopDefFilter.
-	VisitConfiggedTopDefFilter(ctx *ConfiggedTopDefFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#FieldIndexFilter.
-	VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#DefFilter.
-	VisitDefFilter(ctx *DefFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#FieldFilter.
-	VisitFieldFilter(ctx *FieldFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#DeepNextSingleFilter.
-	VisitDeepNextSingleFilter(ctx *DeepNextSingleFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#UseDefCalcFilter.
-	VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#NamedFilter.
+	VisitNamedFilter(ctx *NamedFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FieldCallFilter.
 	VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#DefSingleFilter.
-	VisitDefSingleFilter(ctx *DefSingleFilterContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#First.
+	VisitFirst(ctx *FirstContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FunctionCallFilter.
+	VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FieldIndexFilter.
+	VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#OptionalFilter.
+	VisitOptionalFilter(ctx *OptionalFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#NextFilter.
+	VisitNextFilter(ctx *NextFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#DefFilter.
+	VisitDefFilter(ctx *DefFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#DeepNextFilter.
 	VisitDeepNextFilter(ctx *DeepNextFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#ConfiggedDeepNextFilter.
-	VisitConfiggedDeepNextFilter(ctx *ConfiggedDeepNextFilterContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#DeepNextConfigFilter.
+	VisitDeepNextConfigFilter(ctx *DeepNextConfigFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#TopDefFilter.
+	VisitTopDefFilter(ctx *TopDefFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#TopDefConfigFilter.
+	VisitTopDefConfigFilter(ctx *TopDefConfigFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#UseDefCalcFilter.
+	VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#filterExpr.
+	VisitFilterExpr(ctx *FilterExprContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#useDefCalcDescription.
 	VisitUseDefCalcDescription(ctx *UseDefCalcDescriptionContext) interface{}
@@ -157,11 +148,11 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#NotCondition.
 	VisitNotCondition(ctx *NotConditionContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterCondition.
-	VisitFilterCondition(ctx *FilterConditionContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#ParenCondition.
 	VisitParenCondition(ctx *ParenConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterCondition.
+	VisitFilterCondition(ctx *FilterConditionContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#OpcodeTypeCondition.
 	VisitOpcodeTypeCondition(ctx *OpcodeTypeConditionContext) interface{}

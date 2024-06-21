@@ -12,12 +12,10 @@ func (y *SyntaxFlowVisitor) EmitExitStatement() {
 	})
 }
 
-func (y *SyntaxFlowVisitor) EmitEnterStatement() *SFI {
-	enter := &SFI{
+func (y *SyntaxFlowVisitor) EmitEnterStatement() {
+	y.codes = append(y.codes, &SFI{
 		OpCode: OpEnterStatement,
-	}
-	y.codes = append(y.codes, enter)
-	return enter
+	})
 }
 
 func (y *SyntaxFlowVisitor) EmitNewRef(i string) {
@@ -184,19 +182,14 @@ func (v *SyntaxFlowVisitor) EmitGetDefs() {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetDefs})
 }
 
-func (v *SyntaxFlowVisitor) EmitGetBottomUsers() {
-	v.codes = append(v.codes, &SFI{OpCode: OpGetBottomUsers})
+func (v *SyntaxFlowVisitor) EmitGetBottomUsers(config ...*RecursiveConfigItem) {
+	v.codes = append(v.codes, &SFI{
+		OpCode:           OpGetBottomUsers,
+		SyntaxFlowConfig: config,
+	})
 }
 
-func (v *SyntaxFlowVisitor) EmitGetBottomUsersWithConfig(config []*RecursiveConfigItem) {
-	v.codes = append(v.codes, &SFI{OpCode: OpGetBottomUsers, SyntaxFlowConfig: config})
-}
-
-func (v *SyntaxFlowVisitor) EmitGetTopDefs() {
-	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs})
-}
-
-func (v *SyntaxFlowVisitor) EmitGetTopDefsWithConfig(config []*RecursiveConfigItem) {
+func (v *SyntaxFlowVisitor) EmitGetTopDefs(config ...*RecursiveConfigItem) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs, SyntaxFlowConfig: config})
 }
 
@@ -204,15 +197,12 @@ func (v *SyntaxFlowVisitor) EmitPushCallArgs(i int) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetCallArgs, UnaryInt: i})
 }
 
-func (v *SyntaxFlowVisitor) EmitPushInput() {
-	v.codes = append(v.codes, &SFI{OpCode: OpPushInput})
-}
 func (v *SyntaxFlowVisitor) EmitDuplicate() {
 	v.codes = append(v.codes, &SFI{OpCode: OpDuplicate})
 }
 
 func (v *SyntaxFlowVisitor) EmitGetCall() {
-	v.codes = append(v.codes, &SFI{OpCode: opGetCall})
+	v.codes = append(v.codes, &SFI{OpCode: OpGetCall})
 }
 
 func (v *SyntaxFlowVisitor) EmitPushAllCallArgs() {
@@ -232,12 +222,6 @@ func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, ValueOpera
 func (y *SyntaxFlowVisitor) EmitPop() {
 	y.codes = append(y.codes, &SFI{
 		OpCode: OpPop,
-	})
-}
-
-func (y *SyntaxFlowVisitor) EmitGetTopDef() {
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpGetTopDefs,
 	})
 }
 
@@ -282,5 +266,10 @@ func (y *SyntaxFlowVisitor) EmitFilterExprExit(c *SFI) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpFilterExprExit,
 		UnaryInt: idx,
+	})
+}
+func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpCheckStackTop,
 	})
 }

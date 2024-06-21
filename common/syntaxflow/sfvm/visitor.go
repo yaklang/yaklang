@@ -13,9 +13,8 @@ import (
 )
 
 type SyntaxFlowVisitor struct {
-	text       string
-	filterExpr bool
-	codes      []*SFI
+	text  string
+	codes []*SFI
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
@@ -23,81 +22,97 @@ func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 	return sfv
 }
 
-func (y *SyntaxFlowVisitor) EnterFilterExpr() func() {
-	origin := y.filterExpr
-	y.filterExpr = true
-	return func() {
-		y.filterExpr = origin
-	}
-}
-
-func (y *SyntaxFlowVisitor) VisitFlow(raw sf.IFlowContext) interface{} {
+func (y *SyntaxFlowVisitor) VisitFlow(raw sf.IFlowContext) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 
 	i, _ := raw.(*sf.FlowContext)
 	if i == nil {
-		return nil
+		return
 	}
 
-	return y.VisitFilters(i.Filters())
+	statements, _ := i.Statements().(*sf.StatementsContext)
+	if statements == nil {
+		return
+	}
+
+	for _, stmt := range statements.AllStatement() {
+		y.VisitStatement(stmt)
+	}
+	return
 }
 
-func (y *SyntaxFlowVisitor) VisitFilters(raw sf.IFiltersContext) interface{} {
+func (y *SyntaxFlowVisitor) VisitStatement(raw sf.IStatementContext) {
 	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*sf.FiltersContext)
-	if i == nil {
-		return nil
-	}
-
-	for _, stmt := range i.AllFilterStatement() {
-		// y.EmitPushInput()
-		y.VisitFilterStatement(stmt)
-	}
-	return nil
-}
-
-func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
+		return
 	}
 
 	switch i := raw.(type) {
-	case *sf.FilterExecutionContext:
+	case *sf.FilterContext:
+		y.EmitEnterStatement()
+		y.VisitFilterStatement(i.FilterStatement())
+		y.EmitExitStatement()
+	case *sf.CheckContext:
+		y.VisitCheckStatement(i.CheckStatement())
+	case *sf.DescriptionContext:
+		y.VisitDescriptionStatement(i.DescriptionStatement())
+	case *sf.EmptyContext:
+		return
+	default:
+		log.Warnf("unexpected filter statement: %T", i)
+	}
+	return
+}
+
+func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	switch i := raw.(type) {
+	case *sf.PureFilterExprContext:
+		y.EmitCheckStackTop()
 		expr := i.FilterExpr()
 		if expr == nil {
-			return nil
+			return
 		}
-
-		enter := y.EmitEnterStatement()
 		err := y.VisitFilterExpr(expr)
 		if err != nil {
 			msg := fmt.Sprintf("parse expr: %v failed: %s", i.FilterExpr().GetText(), err)
 			log.Error(msg)
 			panic(msg)
 		}
-		if i.RefVariable() != nil {
-			varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
+		// collect result for variable or save to '_' variable
+		if up := i.RefVariable(); up != nil {
+			varName := y.VisitRefVariable(up) // create symbol and pop stack
 			y.EmitUpdate(varName)
 		} else {
 			y.EmitPop()
 		}
-		enter.UnaryInt = len(y.codes)
-		y.EmitExitStatement()
-	case *sf.FilterParamCheckContext:
-		y.VisitCheckStatement(i.CheckStatement())
-	case *sf.DescriptionContext:
-		y.VisitDescriptionStatement(i.DescriptionStatement())
-	case *sf.EmptyStatementContext:
-		return nil // empty statement will do nothing
-	default:
-		log.Warnf("unexpected filter statement: %T", i)
+	case *sf.RefFilterExprContext:
+		if ref := i.RefVariable(0); ref != nil {
+			variable := y.VisitRefVariable(ref)
+			y.EmitNewRef(variable)
+		} else {
+			panic("BUG: ref filter expr1 is nil")
+		}
+
+		for _, filter := range i.AllFilterItem() {
+			y.VisitFilterItem(filter)
+		}
+
+		// collect result for variable or save to '_' variable
+		if up := i.RefVariable(1); up != nil {
+			varName := y.VisitRefVariable(up) // create symbol and pop stack
+			y.EmitUpdate(varName)
+		} else {
+			y.EmitPop()
+		}
 	}
-	return nil
+
+	// for filter expression
+
 }
 
 func (y *SyntaxFlowVisitor) VisitRefVariable(raw sf.IRefVariableContext) string {
