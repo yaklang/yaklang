@@ -11,7 +11,7 @@ func fixupUseChain(node Instruction) {
 	if u, ok := ToUser(node); ok {
 		for _, v := range u.GetValues() {
 			if v == nil {
-				log.Infof("BUG: value[%s: %s] def is nil", u, u.GetRange())
+				log.Warnf("BUG: value[%s: %s] def is nil", u, u.GetRange())
 				continue
 			}
 			v.AddUser(u)
