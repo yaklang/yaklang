@@ -41,6 +41,8 @@ var (
 	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 
 	OnceYakitHome = new(sync.Once)
+
+	GLOBAL_DB_THROTTLE = utils.NewBool(false)
 )
 
 const (
