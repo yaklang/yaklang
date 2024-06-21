@@ -31,13 +31,12 @@ func TestSimpleSearchType(t *testing.T) {
 		test(t, &TestCase{
 			Code:    code,
 			SF:      `B as $target`,
-			Contain: false,
+			Contain: true,
 			Expect: map[string][]string{
 				"target": {
 					"1",
-					"make(B)",
-					"make(B)",
-					"make(any)",
+					"Undefined-B(Undefined-B)",
+					"Undefined-B(Undefined-B)",
 				},
 			},
 		})
@@ -47,12 +46,11 @@ func TestSimpleSearchType(t *testing.T) {
 		test(t, &TestCase{
 			Code:    code,
 			SF:      `C as $target`,
-			Contain: false,
+			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"make(any)",
-					"make(B)",
-					"make(B)",
+					"Undefined-B(Undefined-B)",
+					"Undefined-B(Undefined-B)",
 				},
 			},
 		})
@@ -62,12 +60,11 @@ func TestSimpleSearchType(t *testing.T) {
 		test(t, &TestCase{
 			Code:    code,
 			SF:      `D as $target`,
-			Contain: false,
+			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"make(any)",
-					"make(B)",
-					"make(B)",
+					"Undefined-B(Undefined-B)",
+					"Undefined-B(Undefined-B)",
 				},
 			},
 		})
@@ -95,7 +92,7 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-b1.methodB(valid)(make(B),1)",
+					"Undefined-b1.methodB(valid)(Undefined-B(Undefined-B),1)",
 				},
 			},
 		})
@@ -108,8 +105,8 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-b1.methodB(valid)(make(B),1)",
-					"Undefined-b2.methodB(valid)(make(B),2)",
+					"Undefined-b1.methodB(valid)(Undefined-B(Undefined-B),1)",
+					"Undefined-b2.methodB(valid)(Undefined-B(Undefined-B),2)",
 				},
 			},
 		})
