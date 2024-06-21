@@ -350,7 +350,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		Set(consts.GLOBAL_NETWORK_CONFIG, data)
 	}()
 	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
-	consts.GLOBAL_DB_THROTTLE.SetTo(c.GetEnableDbThrottle())
+	consts.GLOBAL_DB_SAVE_SYNC.SetTo(c.GetDbSaveSync())
 	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
 	consts.ClearThirdPartyApplicationConfig()
 	for _, r := range c.GetAppConfigs() {

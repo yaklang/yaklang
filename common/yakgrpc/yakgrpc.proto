@@ -1156,8 +1156,8 @@ message GlobalNetworkConfig {
 
   repeated string AiApiPriority = 18;
 
-  // 开启数据库节流 可能导致数据存储偏后
-  bool EnableDbThrottle = 19;
+  // 开启数据库同步存储
+  bool DbSaveSync = 19;
 }
 
 message AuthInfo {

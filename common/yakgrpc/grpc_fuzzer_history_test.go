@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"net/http"
 	"testing"
 
@@ -10,7 +11,8 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_History_Detail(t *testing.T) {
-	c, err := NewLocalClient()
+	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
+	c, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
 	}

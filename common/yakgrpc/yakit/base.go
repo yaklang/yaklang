@@ -12,13 +12,13 @@ var __mutexForInit = new(sync.Mutex)
 
 type DbExecFunc func(db *gorm.DB) error
 
-var DbThrottleChannel = make(chan DbExecFunc, 500)
+var DBSaveAsyncChannel = make(chan DbExecFunc, 500)
 
 func init() {
 	go func() {
 		for {
 			select {
-			case f := <-DbThrottleChannel:
+			case f := <-DBSaveAsyncChannel:
 				err := f(consts.GetGormProjectDatabase())
 				if err != nil {
 					log.Errorf("Throttle sql exec failed: %s", err)
