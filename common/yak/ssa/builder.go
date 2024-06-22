@@ -9,11 +9,11 @@ import (
 )
 
 type ParentScope struct {
-	scope *Scope
+	scope ScopeIF
 	next  *ParentScope
 }
 
-func (p *ParentScope) Create(scope *Scope) *ParentScope {
+func (p *ParentScope) Create(scope ScopeIF) *ParentScope {
 	return &ParentScope{
 		scope: scope,
 		next:  p,
@@ -127,7 +127,7 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	// build.MarkedThisObject = b.MarkedThisObject
 	if this := b.MarkedThisObject; this != nil {
 		newParentScopeLevel := build.parentScope.scope
-		newParentScopeLevel = newParentScopeLevel.CreateSubScope().(*Scope)
+		newParentScopeLevel = newParentScopeLevel.CreateSubScope()
 		// create this object and assign
 		v := newParentScopeLevel.CreateVariable(this.GetName(), false)
 		newParentScopeLevel.AssignVariable(v, this)

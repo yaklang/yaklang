@@ -69,6 +69,19 @@ func (p *Program) SyntaxFlow(i string, opts ...sfvm.Option) map[string]Values {
 	return vals
 }
 
+func (p *Program) SyntaxFlowEx(i string, opts ...sfvm.Option) (*sfvm.SyntaxFlowVirtualMachine, map[string]Values, error) {
+	return SyntaxFlowWithError(p, i, opts...)
+}
+
+func (p *Program) SytanxFlowFile(i string, opts ...sfvm.Option) map[string]Values {
+	vals, err := p.SyntaxFlowWithError(i, opts...)
+	if err != nil {
+		log.Warnf("exec syntaxflow: %#v failed: %v", i, err)
+		return nil
+	}
+	return vals
+}
+
 func WithSyntaxFlowResult(expected string, handler func(*Value) error) sfvm.Option {
 	return sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
 		if name != expected {
@@ -118,21 +131,26 @@ func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 }
 
 func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string]Values, error) {
-	return SyntaxFlowWithError(p, i, opts...)
+	vm, results, err := SyntaxFlowWithError(p, i, opts...)
+	if err != nil {
+		return nil, err
+	}
+	_ = vm
+	return results, nil
 }
 
-func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (map[string]Values, error) {
+func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (*sfvm.SyntaxFlowVirtualMachine, map[string]Values, error) {
 	if utils.IsNil(p) {
-		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
+		return nil, nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
 	}
 	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
 	err := vm.Compile(i)
 	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", i, err)
+		return nil, nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", i, err)
 	}
 	results, err := vm.Feed(p)
 	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow feed %#v failed: %v", i, err)
+		return nil, nil, utils.Errorf("SyntaxFlow feed %#v failed: %v", i, err)
 	}
 
 	// var vals ake([]*Value
@@ -159,7 +177,7 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (m
 		// uniq
 		ret[key] = lo.UniqBy(vals, func(v *Value) int { return int(v.GetId()) })
 	}
-	return ret, nil
+	return vm, ret, nil
 }
 
 func SFValueListToValues(list *sfvm.ValueList) (Values, error) {

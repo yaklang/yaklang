@@ -1,0 +1,6 @@
+desc("Description": 'checking setFeature/setXIncludeAware/setExpandEntityReferences in DocumentBuilderFactory.newInstance()')
+
+DocumentBuilderFactory.newInstance()?{(.setFeature) || (.setXIncludeAware) || (.setExpandEntityReferences)} as $entry;
+$entry.*Builder().parse() as $result;
+
+check $result then "dangerous xml doc builder" else "safe xml doc builder";
