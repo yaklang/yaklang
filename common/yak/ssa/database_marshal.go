@@ -401,9 +401,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Phis = unmarshalValues(params["block_phis"])
 		ret.finish = params["block_finish"].(bool)
 		if scopeTable, ok := params["block_scope_table"]; ok {
-			id := codec.Atoi64(fmt.Sprint(scopeTable))
-			ret.ScopeTable = GetScopeFromIrScopeId(id)
-			log.Infof("load scope from id: %v when loading basic block", id)
+			ret.ScopeTable = GetLazyScopeFromIrScopeId(int64(toInt(scopeTable)))
 		}
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))

@@ -285,7 +285,7 @@ type BasicBlock struct {
 	Handler *ErrorHandler
 
 	// for build
-	ScopeTable *Scope
+	ScopeTable ScopeIF
 	finish     bool // if emitJump finish!
 }
 

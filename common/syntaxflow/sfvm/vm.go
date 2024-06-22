@@ -98,6 +98,12 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	return nil
 }
 
+func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOperator] {
+	s.frameMutex.Lock()
+	defer s.frameMutex.Unlock()
+	return s.vars.Copy()
+}
+
 func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) (*omap.OrderedMap[string, ValueOperator], error) {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()

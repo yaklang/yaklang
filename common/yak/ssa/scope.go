@@ -6,31 +6,37 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-type Scope struct {
+type ScopeInstance struct {
 	*ssautil.ScopedVersionedTable[Value]
 }
 
 type ScopeIF ssautil.ScopedVersionedTableIF[Value]
 
-var _ ssautil.ScopedVersionedTableIF[Value] = (*Scope)(nil)
+var _ ssautil.ScopedVersionedTableIF[Value] = (*ScopeInstance)(nil)
 
-func NewScope(name string) *Scope {
-	s := &Scope{
+func NewScope(name string) *ScopeInstance {
+	s := &ScopeInstance{
 		ScopedVersionedTable: ssautil.NewRootVersionedTable[Value](name, NewVariable),
 	}
 	s.SetThis(s)
 	return s
 }
 
-func (s *Scope) CreateSubScope() ssautil.ScopedVersionedTableIF[Value] {
-	scope := &Scope{
+func (s *ScopeInstance) CreateSubScope() ssautil.ScopedVersionedTableIF[Value] {
+	scope := &ScopeInstance{
 		ScopedVersionedTable: s.ScopedVersionedTable.CreateSubScope().(*ssautil.ScopedVersionedTable[Value]),
 	}
 	scope.SetThis(scope)
 	return scope
 }
 
-func GetScopeFromIrScopeId(i int64) *Scope {
+func GetLazyScopeFromIrScopeId(i int64) ScopeIF {
+	return &LazyScope{
+		id: i,
+	}
+}
+
+func GetScopeFromIrScopeId(i int64) *ScopeInstance {
 	node, err := ssadb.GetIrScope(i)
 	if err != nil {
 		log.Warnf("failed to get ir scope: %v", err)

@@ -25,7 +25,8 @@ func WithSyntaxFlowConfig(
 			if !op.SyntaxFlowRule {
 				return utils.Error("exclude value must be a syntaxFlow rule")
 			}
-			res, err := SyntaxFlowWithError(value, op.Value)
+			vm, res, err := SyntaxFlowWithError(value, op.Value)
+			_ = vm
 			if err != nil {
 				return err
 			}
