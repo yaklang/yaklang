@@ -30,6 +30,22 @@ func (l *LazyScope) ReadVariable(name string) ssautil.VersionedIF[Value] {
 	return l.self.ReadVariable(name)
 }
 
+func (l *LazyScope) GetPersistentProgramName() string {
+	if l.notFound {
+		log.Warnf("scope[%v] is not found in db", l.id)
+		return ""
+	}
+	if l.self == nil {
+		l.self = GetScopeFromIrScopeId(l.id)
+		if l.self == nil {
+			l.notFound = true
+			log.Warnf("failed to get scope from ir scope id: %v", l.id)
+			return ""
+		}
+	}
+	return l.self.GetPersistentProgramName()
+}
+
 func (l *LazyScope) ReadValue(name string) Value {
 	if l.notFound {
 		log.Warnf("scope[%v] is not found in db", l.id)
