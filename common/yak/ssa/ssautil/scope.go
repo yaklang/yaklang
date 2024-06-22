@@ -68,6 +68,8 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	GetPersistentId() int64
 	SetPersistentId(i int64)
 	SetPersistentNode(*ssadb.IrScopeNode)
+
+	GetPersistentProgramName() string
 }
 
 func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
