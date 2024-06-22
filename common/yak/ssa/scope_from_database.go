@@ -13,7 +13,7 @@ import (
 	"strconv"
 )
 
-func SyncFromDatabase(s *Scope) error {
+func SyncFromDatabase(s *ScopeInstance) error {
 	if !s.ShouldSaveToDatabase() {
 		return nil
 	}

@@ -121,7 +121,7 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	}
 }
 
-func ReadVariableFromScope(scope *Scope, name string) *Variable {
+func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 	if ret := scope.ReadVariable(name); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable
