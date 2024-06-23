@@ -104,6 +104,21 @@ func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOper
 	return s.vars.Copy()
 }
 
+func (s *SyntaxFlowVirtualMachine) Results() []*SFFrameResult {
+	var infos = make([]*SFFrameResult, len(s.frames))
+	s.ForEachFrame(func(frame *SFFrame) {
+		infos = append(infos, frame.result)
+	})
+	return infos
+}
+
+func (s *SyntaxFlowVirtualMachine) FirstResult() (*SFFrameResult, error) {
+	if len(s.frames) == 0 {
+		return nil, utils.Error("no frame loaded, maybe the vm is not load any rules(SyntaxFlow)")
+	}
+	return s.frames[0].result, nil
+}
+
 func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) (*omap.OrderedMap[string, ValueOperator], error) {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
@@ -117,6 +132,7 @@ func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) (*omap.OrderedMap[strin
 				utils.Errorf("exec frame[%v]: %v CODE: %v", index, err, frame.Text),
 			)
 		}
+		frame.result.Vars = s.vars.Copy()
 	}
 	s.vars.Map(func(s string, a ValueOperator) (string, ValueOperator, error) {
 		result.Set(s, a)
