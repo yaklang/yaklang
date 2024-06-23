@@ -52,7 +52,7 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 	}
 }
 
-func (v *Value) Dot() string {
+func (v *Value) DotGraph() string {
 	g := dot.New()
 	g.MakeDirected()
 	g.GraphAttribute("rankdir", "BT")
@@ -66,7 +66,7 @@ func (v *Value) Dot() string {
 }
 
 func (v *Value) ShowDot() *Value {
-	dotGraph := v.Dot()
+	dotGraph := v.DotGraph()
 	fmt.Println(dotGraph)
 	return v
 }

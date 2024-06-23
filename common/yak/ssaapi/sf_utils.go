@@ -139,6 +139,32 @@ func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (map[string
 	return results, nil
 }
 
+func SyntaxFlowVariableToValues(v sfvm.ValueOperator) Values {
+	var vals Values
+	err := v.Recursive(func(operator sfvm.ValueOperator) error {
+		switch ret := operator.(type) {
+		case *Value:
+			vals = append(vals, ret)
+		case Values:
+			vals = append(vals, ret...)
+		case *sfvm.ValueList:
+			values, err := SFValueListToValues(ret)
+			if err != nil {
+				log.Warnf("cannot handle type: %T error: %v", operator, err)
+			} else {
+				vals = append(vals, values...)
+			}
+		default:
+			log.Warnf("cannot handle type: %T", operator)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Warnf("SyntaxFlowToValues: %v", err)
+	}
+	return vals
+}
+
 func SyntaxFlowWithError(p sfvm.ValueOperator, i string, opts ...sfvm.Option) (*sfvm.SyntaxFlowVirtualMachine, map[string]Values, error) {
 	if utils.IsNil(p) {
 		return nil, nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")

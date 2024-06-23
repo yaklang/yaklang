@@ -2,6 +2,8 @@ package java
 
 import (
 	"embed"
+	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -76,6 +78,14 @@ func TestMustPass_Debug(t *testing.T) {
 			t.Fatal(err)
 		}
 		result.Show()
+		fmt.Println("\n--------------------------------------")
+		result.Vars.ForEach(func(i string, v sfvm.ValueOperator) bool {
+			for _, raw := range ssaapi.SyntaxFlowVariableToValues(v).DotGraph() {
+				fmt.Println(raw)
+				fmt.Println()
+			}
+			return true
+		})
 		return nil
 	}))
 	if err != nil {
