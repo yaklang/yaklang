@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strings"
@@ -65,7 +67,29 @@ func (s *SFFrameResult) String() string {
 				if raw, ok := v.(interface{ GetId() int64 }); ok {
 					idx = fmt.Sprintf("t%v", raw.GetId())
 				}
-				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v", idx, utils.ShrinkString(v.String(), 64)))
+				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
+				if rangeIns, ok := v.(interface{ GetRange() *ssa.Range }); ok {
+					ssaRange := rangeIns.GetRange()
+					if ssaRange != nil {
+						start, end := ssaRange.GetStart(), ssaRange.GetEnd()
+						editor := ssaRange.GetEditor()
+						fileName := editor.GetUrl()
+						if fileName == "" {
+							var err error
+							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
+							if CriticalError != nil {
+								log.Warn(err)
+							}
+							if editor != nil {
+								fileName = editor.GetUrl()
+								if fileName == "" {
+									fileName = `[md5:` + editor.SourceCodeMd5() + `]`
+								}
+							}
+						}
+						buf.WriteString(fmt.Sprintf(prefixVariableResult+"    %v:%v:%v - %v:%v\n", fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn()))
+					}
+				}
 			}
 		}
 		return true
