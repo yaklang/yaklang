@@ -92,6 +92,7 @@ func CheckFSWithProgram(
 	if programName == "" {
 		programName = "test-" + uuid.New().String()
 	}
+	ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
 	_, err := ssaapi.ParseProject(codeFS, opt...)
 	if err != nil {
