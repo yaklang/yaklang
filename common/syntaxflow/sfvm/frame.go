@@ -13,6 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
+
+	_ "github.com/yaklang/yaklang/common/sarif"
 )
 
 type SFFrameResult struct {
