@@ -21,7 +21,7 @@ type IrCode struct {
 	// source code
 	SourceCodeStartOffset int64  `json:"source_code_start_offset"`
 	SourceCodeEndOffset   int64  `json:"source_code_end_offset"`
-	SourceCodeHash        string `json:"source_code_hash"`
+	SourceCodeHash        string `json:"source_code_hash"` // default md5
 
 	// opcode
 	Opcode     int64  `json:"opcode"`

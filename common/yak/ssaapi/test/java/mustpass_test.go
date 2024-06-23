@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"io/fs"
@@ -35,6 +36,9 @@ func TestMustPass_JAVA_Debug_Compile(t *testing.T) {
 		t.Skip()
 		return
 	}
+
+	ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+
 	_, err := ssaapi.ParseProject(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithDatabaseProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
@@ -53,7 +57,6 @@ func TestMustPass_Debug(t *testing.T) {
 	}
 
 	keyword := "xxe.sf"
-
 	prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
 	if err != nil {
 		t.Fatal(err)

@@ -1,21 +1,18 @@
 package ssadb
 
 import (
-	"net/url"
-	"path"
-	"strconv"
-	"sync"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"net/url"
+	"path"
+	"strconv"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
-var migrateIrSource = new(sync.Once)
 
 type IrSource struct {
-	SourceCodeHash string `json:"source_code_hash" gorm:"unique_index"`
+	SourceCodeHash string `json:"source_code_hash" gorm:"unique_index"` // default md5
 	QuotedCode     string `json:"quoted_code"`
 	FileUrl        string `json:"file_url"`
 	Filename       string `json:"filename"`
@@ -66,6 +63,7 @@ func SaveIrSource(editor *memedit.MemEditor, hash string) error {
 	return nil
 }
 
+// GetIrSourceFromHash fetch editor from cache by hash(md5)
 func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
