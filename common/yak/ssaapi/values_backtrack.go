@@ -232,3 +232,11 @@ func (V Values) ShowDot() Values {
 	}
 	return V
 }
+
+func (v Values) DotGraph() []string {
+	var ret []string
+	for _, val := range v {
+		ret = append(ret, val.DotGraph())
+	}
+	return ret
+}
