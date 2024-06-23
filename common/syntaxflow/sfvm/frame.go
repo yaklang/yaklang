@@ -1,8 +1,10 @@
 package sfvm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strings"
 
@@ -13,16 +15,75 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type SFFrameInfo struct {
+type SFFrameResult struct {
+	Rule        string
 	Description *omap.OrderedMap[string, string]
 	CheckParams []string
 	Errors      []string
+	Vars        *omap.OrderedMap[string, ValueOperator]
 }
 
-func NewSFFrameInfo() *SFFrameInfo {
-	return &SFFrameInfo{
+func (s *SFFrameResult) Show() {
+	fmt.Println(s.String())
+}
+
+func (s *SFFrameResult) String() string {
+	buf := bytes.NewBufferString("")
+	buf.WriteString(fmt.Sprintf("rule md5 hash: %v\n", codec.Md5(s.Rule)))
+	buf.WriteString(fmt.Sprintf("rule preview: %v\n", utils.ShrinkString(s.Rule, 64)))
+	buf.WriteString(fmt.Sprintf("description: %v\n", s.Description.String()))
+	if len(s.Errors) > 0 {
+		buf.WriteString("ERROR:\n")
+		prefix := "  "
+		for idx, e := range s.Errors {
+			buf.WriteString(prefix + fmt.Sprint(idx) + ". " + e + "\n")
+		}
+		return buf.String()
+	}
+
+	count := 0
+	if s.Vars.Len() > 0 {
+		buf.WriteString("Result Vars: \n")
+	}
+	s.Vars.ForEach(func(i string, v ValueOperator) bool {
+		count++
+		var all []ValueOperator
+		_ = v.Recursive(func(operator ValueOperator) error {
+			all = append(all, operator)
+			return nil
+		})
+		if len(all) >= 1 {
+			prefixVariable := "  "
+			varName := i
+			if !strings.HasPrefix(varName, "$") {
+				varName = "$" + varName
+			}
+			buf.WriteString(prefixVariable + i + ":\n")
+			prefixVariableResult := "    "
+			for idx, v := range all {
+				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v", idx, utils.ShrinkString(v.String(), 64)))
+			}
+		}
+		return true
+	})
+	return buf.String()
+}
+
+func (s *SFFrameResult) Copy() *SFFrameResult {
+	ret := NewSFFrameInfo()
+	ret.Rule = s.Rule
+	ret.Description = s.Description.Copy()
+	ret.CheckParams = append([]string{}, s.CheckParams...)
+	ret.Errors = append([]string{}, s.Errors...)
+	ret.Vars = ret.Vars.Copy()
+	return ret
+}
+
+func NewSFFrameInfo() *SFFrameResult {
+	return &SFFrameResult{
 		Description: omap.NewEmptyOrderedMap[string, string](),
 		CheckParams: make([]string, 0),
+		Vars:        omap.NewEmptyOrderedMap[string, ValueOperator](),
 	}
 }
 
@@ -35,7 +96,8 @@ type filterExprContext struct {
 type SFFrame struct {
 	config *Config
 
-	info *SFFrameInfo
+	// install meta info and result info
+	result *SFFrameResult
 
 	idx             int
 	symbolTable     *omap.OrderedMap[string, ValueOperator]
@@ -65,8 +127,11 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 	if v == nil {
 		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
 	}
+
+	result := NewSFFrameInfo()
+	result.Rule = text
 	return &SFFrame{
-		info:            NewSFFrameInfo(),
+		result:          result,
 		symbolTable:     v,
 		stack:           utils.NewStack[ValueOperator](),
 		filterExprStack: utils.NewStack[*filterExprContext](),
@@ -493,7 +558,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("add description failed: empty name")
 		}
 		ret := i.ValueByIndex(0)
-		s.info.Description.Set(i.UnaryStr, ret)
+		s.result.Description.Set(i.UnaryStr, ret)
 		if ret != "" {
 			s.debugSubLog("- key: %v, value: %v", i.UnaryStr, ret)
 		} else {
@@ -514,11 +579,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		results, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if !ok || results == nil {
 			s.debugSubLog("-   error: " + elseStr)
-			s.info.Errors = append(s.info.Errors, elseStr)
+			s.result.Errors = append(s.result.Errors, elseStr)
 		} else {
-			s.info.CheckParams = append(s.info.CheckParams, i.UnaryStr)
+			s.result.CheckParams = append(s.result.CheckParams, i.UnaryStr)
 			if thenStr != "" {
-				s.info.Description.Set("$"+i.UnaryStr, thenStr)
+				s.result.Description.Set("$"+i.UnaryStr, thenStr)
 			}
 		}
 	case OpCompareOpcode:

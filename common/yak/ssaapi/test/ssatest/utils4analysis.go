@@ -106,17 +106,22 @@ func CheckFSWithProgram(
 			log.Infof("skip file: %s", s)
 			return nil
 		}
-		log.Infof("start to check file: %s", s)
-		raw, err := ruleFS.ReadFile(s)
-		if err != nil {
-			t.Fatalf("read file[%s] failed: %v", s, err)
-		}
-		vm, vars, err := program.SyntaxFlowEx(string(raw))
-		if err != nil {
-			t.Fatalf("exec syntaxflow failed: %v", err)
-		}
-		_ = vars
-		_ = vm
+
+		t.Run(fmt.Sprintf("case in %v", s), func(t *testing.T) {
+			log.Infof("start to check file: %s", s)
+			raw, err := ruleFS.ReadFile(s)
+			if err != nil {
+				t.Fatalf("read file[%s] failed: %v", s, err)
+			}
+			vm, vars, err := program.SyntaxFlowEx(string(raw))
+			if err != nil {
+				t.Fatalf("exec syntaxflow failed: %v", err)
+			}
+			_ = vars
+			_ = vm
+			vm.Snapshot()
+		})
+
 		return nil
 	}))
 }
