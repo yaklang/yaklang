@@ -90,7 +90,7 @@ f = b(2,3,4)
 	noCheck4 := true
 	prog.Ref("f").Show().ForEach(func(value *ssaapi.Value) {
 		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
-			d := value.Dot()
+			d := value.DotGraph()
 			_ = d
 			value.ShowDot()
 			if value.IsConstInst() {
@@ -215,7 +215,7 @@ d = c + f;
 			checkAdef = true
 		}
 	}).FullUseDefChain(func(value *ssaapi.Value) {
-		dot.ShowDotGraphToAsciiArt(value.Dot())
+		dot.ShowDotGraphToAsciiArt(value.DotGraph())
 	})
 	if !checkAdef {
 		t.Fatal("checkAdef failed")
@@ -234,7 +234,7 @@ e = c + 3
 	var vals string
 	prog.Ref("a").GetBottomUses().ForEach(func(value *ssaapi.Value) {
 		value.ShowDot()
-		vals = value.Dot()
+		vals = value.DotGraph()
 	})
 	var count = 0
 	regexp.MustCompile(`n\d -> n\d `).ReplaceAllStringFunc(vals, func(s string) string {

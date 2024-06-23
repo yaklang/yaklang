@@ -60,7 +60,11 @@ func (s *SFFrameResult) String() string {
 			}
 			buf.WriteString(prefixVariable + i + ":\n")
 			prefixVariableResult := "    "
-			for idx, v := range all {
+			for idxRaw, v := range all {
+				var idx = fmt.Sprint(int64(idxRaw + 1))
+				if raw, ok := v.(interface{ GetId() int64 }); ok {
+					idx = fmt.Sprintf("t%v", raw.GetId())
+				}
 				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v", idx, utils.ShrinkString(v.String(), 64)))
 			}
 		}

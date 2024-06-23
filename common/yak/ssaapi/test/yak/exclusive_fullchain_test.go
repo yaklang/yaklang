@@ -98,10 +98,10 @@ g=d+a;`)
 				checkPhi = true
 			}
 		})
-		if strings.Contains(value.Dot(), `phi`) {
+		if strings.Contains(value.DotGraph(), `phi`) {
 			checkDotPhi = true
 		}
-		dot.ShowDotGraphToAsciiArt(value.Dot())
+		dot.ShowDotGraphToAsciiArt(value.DotGraph())
 	})
 	if !checkPhi {
 		t.Fatal("checkPhi failed")
@@ -148,11 +148,11 @@ g=d+a;`)
 				checkPhi = true
 			}
 		})
-		if strings.Contains(value.Dot(), `phi`) {
+		if strings.Contains(value.DotGraph(), `phi`) {
 			checkDotPhi = true
 		}
 		value.ShowDot()
-		dot.ShowDotGraphToAsciiArt(value.Dot())
+		dot.ShowDotGraphToAsciiArt(value.DotGraph())
 	})
 	if !checkPhi {
 		t.Fatal("checkPhi failed")
@@ -178,7 +178,7 @@ f = b(2,3,4)`
 	check3 := false
 	prog.Ref("f").FullUseDefChain(func(value *ssaapi.Value) {
 		value.ShowDot()
-		dot.ShowDotGraphToAsciiArt(value.Dot())
+		dot.ShowDotGraphToAsciiArt(value.DotGraph())
 		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			ret := value.GetConstValue()
 			if ret == 2 && len(value.EffectOn) == 3 {
@@ -366,7 +366,7 @@ y = x + z
 	vals := prog.Ref("d").FlexibleDepends().ShowDot()
 	var d string
 	vals.ForEach(func(value *ssaapi.Value) {
-		d = value.Dot()
+		d = value.DotGraph()
 	})
 	if !utils.MatchAllOfSubString(d, `label="c"`, `label="e"`, `label="h"`, `label="g"`, `label="x"`) {
 		t.Fatal("not flexible depends")
