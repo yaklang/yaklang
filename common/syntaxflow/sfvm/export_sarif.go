@@ -17,8 +17,20 @@ func (r *SFFrameResult) Sarif() (*sarif.Report, error) {
 			"java",
 		).WithDefaultEncoding(
 			"utf-8",
-		).WithAddresses([]*sarif.Address{
-			sarif.NewAddress(),
+		).WithArtifacts([]*sarif.Artifact{
+			sarif.NewArtifact(),
+		}).WithResults([]*sarif.Result{
+			sarif.NewRuleResult(
+				r.Rule,
+			).WithCodeFlows([]*sarif.CodeFlow{
+				sarif.NewCodeFlow(),
+			}).WithLocations([]*sarif.Location{
+				sarif.NewLocation().WithPhysicalLocation(
+					sarif.NewPhysicalLocation().WithArtifactLocation(
+						sarif.NewArtifactLocation(), // .WithIndex(),
+					),
+				),
+			}).WithRelatedLocations([]*sarif.Location{}),
 		}),
 	)
 	return report, nil
