@@ -43,6 +43,32 @@ type RecursiveConfigItem struct {
 	SyntaxFlowRule bool
 }
 
+type AnalysisContext struct {
+	Step  int
+	Label string
+}
+
+func NewDefaultAnalysisContext() *AnalysisContext {
+	return &AnalysisContext{
+		Step:  -1,
+		Label: "",
+	}
+}
+
+type AnalysisContextOption func(*AnalysisContext)
+
+func WithAnalysisContext_Step(step int) AnalysisContextOption {
+	return func(context *AnalysisContext) {
+		context.Step = step
+	}
+}
+
+func WithAnalysisContext_Label(label string) AnalysisContextOption {
+	return func(context *AnalysisContext) {
+		context.Label = label
+	}
+}
+
 // type MatchMode int
 const (
 	NameMatch int = 1
@@ -97,4 +123,6 @@ type ValueOperator interface {
 
 	Merge(...ValueOperator) (ValueOperator, error)
 	Remove(...ValueOperator) (ValueOperator, error)
+
+	AppendPredecessor(ValueOperator, ...AnalysisContextOption) error
 }

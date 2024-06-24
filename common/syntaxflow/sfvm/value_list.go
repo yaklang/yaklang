@@ -23,6 +23,12 @@ type ValueList struct {
 	values []ValueOperator
 }
 
+func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisContextOption) error {
+	return v.Recursive(func(operator ValueOperator) error {
+		return operator.AppendPredecessor(value, opts...)
+	})
+}
+
 func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
 	return MergeValues(append(v.values, values...)...), nil
 }

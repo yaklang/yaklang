@@ -138,6 +138,8 @@ type SFFrame struct {
 	Codes           []*SFI
 	toLeft          bool
 	debug           bool
+
+	predCounter int
 }
 type GlobEx struct {
 	Origin glob.Glob
@@ -190,7 +192,20 @@ func (s *SFFrame) ToRight() bool {
 	return !s.ToLeft()
 }
 
+func (s *SFFrame) withPredecessorContext(label string) AnalysisContextOption {
+	s.predCounter++
+	return func(context *AnalysisContext) {
+		context.Step = s.predCounter
+		context.Label = label
+	}
+}
+
 func (s *SFFrame) exec(input ValueOperator) (ret error) {
+	s.predCounter = 0
+	defer func() {
+		s.predCounter = 0
+	}()
+
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)
@@ -371,7 +386,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !result {
 			err = utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 		}
+
 		s.debugSubLog("result next: %v", next.String())
+		_ = next.AppendPredecessor(value, s.withPredecessorContext("search "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -401,6 +418,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 		}
 		s.debugSubLog("result next: %v", next.String())
+		_ = next.AppendPredecessor(value, s.withPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -429,6 +447,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 		}
 		s.debugSubLog("result next: %v", next.String())
+		_ = next.AppendPredecessor(value, s.withPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -468,6 +487,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		callLen := valuesLen(results)
 		s.debugSubLog("- call Called: %v", results.String())
 		s.debugSubLog("<< push len: %v", callLen)
+		_ = results.AppendPredecessor(value, s.withPredecessorContext("call"))
 		s.stack.Push(results)
 
 	case OpGetCallArgs:
@@ -484,6 +504,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("- get argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
+
+		_ = results.AppendPredecessor(value, s.withPredecessorContext("actual-args["+fmt.Sprint(i.UnaryInt)+"]"))
 		s.stack.Push(results)
 
 	case OpGetAllCallArgs:
@@ -500,6 +522,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("- get all argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
+		_ = results.AppendPredecessor(value, s.withPredecessorContext("all-actual-args"))
 		s.stack.Push(results)
 
 	case OpGetUsers:
@@ -514,6 +537,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
 		s.debugSubLog("<< push users")
+		_ = vals.AppendPredecessor(value, s.withPredecessorContext("effect"))
 		s.stack.Push(vals)
 	case OpGetBottomUsers:
 		s.debugSubLog(">> pop")
@@ -527,6 +551,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
 		s.debugSubLog("<< push bottom uses")
+		_ = vals.AppendPredecessor(value, s.withPredecessorContext("bottom-effect"))
 		s.stack.Push(vals)
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
@@ -540,6 +565,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push users")
+		_ = vals.AppendPredecessor(value, s.withPredecessorContext("definition"))
 		s.stack.Push(vals)
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
@@ -553,6 +579,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push top defs %s", vals.String())
+		_ = vals.AppendPredecessor(value, s.withPredecessorContext("top-definition"))
 		s.stack.Push(vals)
 	case OpNewRef:
 		if i.UnaryStr == "" {
