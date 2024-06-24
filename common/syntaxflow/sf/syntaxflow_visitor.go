@@ -22,6 +22,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#Description.
 	VisitDescription(ctx *DescriptionContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#Alert.
+	VisitAlert(ctx *AlertContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#Empty.
 	VisitEmpty(ctx *EmptyContext) interface{}
 
@@ -45,6 +48,9 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#descriptionItem.
 	VisitDescriptionItem(ctx *DescriptionItemContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#alertStatement.
+	VisitAlertStatement(ctx *AlertStatementContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#checkStatement.
 	VisitCheckStatement(ctx *CheckStatementContext) interface{}

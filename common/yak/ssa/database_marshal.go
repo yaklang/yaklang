@@ -539,7 +539,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 			ret.DeferBlock = newLazyInstruction(deferBlock)
 		}
 
-		ret.hasEllipsis = params["has_ellipsis"].(bool)
+		if hasEllipsis, ok := params["has_ellipsis"].(bool); ok {
+			ret.hasEllipsis = hasEllipsis
+		}
 	default:
 		log.Warnf("unmarshalExtraInformation: unknown type: %v", reflect.TypeOf(inst).String())
 	}

@@ -3,14 +3,15 @@ package java
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"io/fs"
-	"strings"
-	"testing"
 )
 
 //go:embed mustpass
@@ -71,11 +72,7 @@ func TestMustPass_Debug(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		vm, _, err := prog.SyntaxFlowEx(string(raw))
-		if err != nil {
-			t.Fatal(err)
-		}
-		result, err := vm.FirstResult()
+		result, err := prog.SyntaxFlowWithError(string(raw))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -87,7 +84,7 @@ func TestMustPass_Debug(t *testing.T) {
 		result.Show()
 
 		fmt.Println("\n--------------------------------------")
-		totalGraph, err := ssaapi.CreateDotGraph(result.Vars.Values()...)
+		totalGraph, err := ssaapi.CreateDotGraph(result.SymbolTable.Values()...)
 		if err != nil {
 			t.Fatalf("create dot graph failed: %v", err)
 		}

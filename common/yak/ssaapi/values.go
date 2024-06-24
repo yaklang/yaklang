@@ -599,6 +599,7 @@ func (v *Value) GetCalledBy() Values {
 	add := func(node ssa.Value) {
 		for _, user := range node.GetUsers() {
 			if call, ok := ssa.ToCall(user); ok &&
+				call != nil && call.Method != nil &&
 				call.Method.GetId() == node.GetId() {
 				vs = append(vs, v.NewValue(call))
 			}
