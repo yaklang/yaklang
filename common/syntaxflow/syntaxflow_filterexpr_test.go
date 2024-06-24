@@ -25,21 +25,19 @@ func TestSyntaxFlowFilter_Search(t *testing.T) {
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine()
 		vm.Debug()
-		err := vm.Compile(i["code"])
+		frame, err := vm.Compile(i["code"])
 		if err != nil {
 			t.Fatal(err)
 		}
 		vm.Show()
 		count := 0
 		checked := false
-		vm.ForEachFrame(func(frame *sfvm.SFFrame) {
-			count += len(frame.Codes)
-			for _, c := range frame.Codes {
-				if strings.Contains(c.String(), i["keyword"]) {
-					checked = true
-				}
+		count += len(frame.Codes)
+		for _, c := range frame.Codes {
+			if strings.Contains(c.String(), i["keyword"]) {
+				checked = true
 			}
-		})
+		}
 		if !checked {
 			t.Fatalf("SyntaxFlowVirtualMachine.Compile failed: %v", spew.Sdump(i))
 		}

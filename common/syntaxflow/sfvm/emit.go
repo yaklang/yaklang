@@ -57,6 +57,13 @@ func (y *SyntaxFlowVisitor) EmitOperator(i string) {
 	}
 }
 
+func (y *SyntaxFlowVisitor) EmitAlert(ref string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpAlert,
+		UnaryStr: ref,
+	})
+}
+
 func (y *SyntaxFlowVisitor) EmitCheckParam(ref string, then string, elseString string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpCheckParams,

@@ -21,19 +21,17 @@ func check(t *testing.T, code string, op sfvm.SFVMOpCode) {
 	}
 
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	err := vm.Compile(code)
+	frame, err := vm.Compile(code)
 	assert.NoError(t, err)
 
 	match := false
 	vm.Show()
-	vm.ForEachFrame(func(frame *sfvm.SFFrame) {
-		for _, c := range frame.Codes {
-			if op == c.OpCode {
-				match = true
-				return
-			}
+	for _, c := range frame.Codes {
+		if op == c.OpCode {
+			match = true
+			return
 		}
-	})
+	}
 	if !match {
 		t.Fatalf("opcode %v not found", op)
 	}
@@ -52,6 +50,25 @@ func TestOpcode(t *testing.T) {
 	})
 	t.Run("get ref", func(t *testing.T) {
 		check(t, `$a.f as $target`, sfvm.OpPushSearchExact)
+	})
+
+	// check
+
+	t.Run("check statement only", func(t *testing.T) {
+		check(t, `check $a`, sfvm.OpCheckParams)
+	})
+	t.Run("check statement with then", func(t *testing.T) {
+		check(t, `check $a then "pass"`, sfvm.OpCheckParams)
+	})
+	t.Run("check statement with else", func(t *testing.T) {
+		check(t, `check $a else "fail"`, sfvm.OpCheckParams)
+	})
+	t.Run("check statement full", func(t *testing.T) {
+		check(t, `check $a then "pass" else "fail"`, sfvm.OpCheckParams)
+	})
+	// alert
+	t.Run("echo statement", func(t *testing.T) {
+		check(t, `alert $a`, sfvm.OpAlert)
 	})
 
 	// variable

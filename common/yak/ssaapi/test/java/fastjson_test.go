@@ -2,7 +2,6 @@ package java
 
 import (
 	_ "embed"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,15 +19,12 @@ func TestFastjson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	matched, err := prog.SyntaxFlowWithError("deserializers.put(,* as $deserializer) as $call", sfvm.WithEnableDebug(false))
+	res, err := prog.SyntaxFlowWithError("deserializers.put(,* as $deserializer) as $call", sfvm.WithEnableDebug(false))
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Infof("result: %v", matched)
-	deserializerList, ok := matched["deserializer"]
-	if !ok {
-		t.Fatal(errors.New("deserializer not found"))
-	}
+	log.Infof("result: %v", res)
+	deserializerList := res.GetValues("deserializer")
 	//deserializerNames := []string{}
 	deserializerSet := utils.NewSet[string]()
 	for _, value := range deserializerList {

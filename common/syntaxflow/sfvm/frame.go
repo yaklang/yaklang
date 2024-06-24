@@ -1,12 +1,8 @@
 package sfvm
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strings"
 
@@ -14,108 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
 
 	_ "github.com/yaklang/yaklang/common/sarif"
 )
-
-type SFFrameResult struct {
-	Rule        string
-	Description *omap.OrderedMap[string, string]
-	CheckParams []string
-	Errors      []string
-	Vars        *omap.OrderedMap[string, ValueOperator]
-}
-
-func (s *SFFrameResult) Show() {
-	fmt.Println(s.String())
-}
-
-func (s *SFFrameResult) String() string {
-	buf := bytes.NewBufferString("")
-	buf.WriteString(fmt.Sprintf("rule md5 hash: %v\n", codec.Md5(s.Rule)))
-	buf.WriteString(fmt.Sprintf("rule preview: %v\n", utils.ShrinkString(s.Rule, 64)))
-	buf.WriteString(fmt.Sprintf("description: %v\n", s.Description.String()))
-	if len(s.Errors) > 0 {
-		buf.WriteString("ERROR:\n")
-		prefix := "  "
-		for idx, e := range s.Errors {
-			buf.WriteString(prefix + fmt.Sprint(idx) + ". " + e + "\n")
-		}
-		return buf.String()
-	}
-
-	count := 0
-	if s.Vars.Len() > 0 {
-		buf.WriteString("Result Vars: \n")
-	}
-	s.Vars.ForEach(func(i string, v ValueOperator) bool {
-		count++
-		var all []ValueOperator
-		_ = v.Recursive(func(operator ValueOperator) error {
-			all = append(all, operator)
-			return nil
-		})
-		if len(all) >= 1 {
-			prefixVariable := "  "
-			varName := i
-			if !strings.HasPrefix(varName, "$") {
-				varName = "$" + varName
-			}
-			buf.WriteString(prefixVariable + i + ":\n")
-			prefixVariableResult := "    "
-			for idxRaw, v := range all {
-				var idx = fmt.Sprint(int64(idxRaw + 1))
-				if raw, ok := v.(ssa.GetIdIF); ok {
-					idx = fmt.Sprintf("t%v", raw.GetId())
-				}
-				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
-				if rangeIns, ok := v.(interface{ GetRange() *ssa.Range }); ok {
-					ssaRange := rangeIns.GetRange()
-					if ssaRange != nil {
-						start, end := ssaRange.GetStart(), ssaRange.GetEnd()
-						editor := ssaRange.GetEditor()
-						fileName := editor.GetUrl()
-						if fileName == "" {
-							var err error
-							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
-							if err != nil {
-								log.Warn(err)
-							}
-							if editor != nil {
-								fileName = editor.GetUrl()
-								if fileName == "" {
-									fileName = `[md5:` + editor.SourceCodeMd5() + `]`
-								}
-							}
-						}
-						buf.WriteString(fmt.Sprintf(prefixVariableResult+"    %v:%v:%v - %v:%v\n", fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn()))
-					}
-				}
-			}
-		}
-		return true
-	})
-	return buf.String()
-}
-
-func (s *SFFrameResult) Copy() *SFFrameResult {
-	ret := NewSFFrameInfo()
-	ret.Rule = s.Rule
-	ret.Description = s.Description.Copy()
-	ret.CheckParams = append([]string{}, s.CheckParams...)
-	ret.Errors = append([]string{}, s.Errors...)
-	ret.Vars = ret.Vars.Copy()
-	return ret
-}
-
-func NewSFFrameInfo() *SFFrameResult {
-	return &SFFrameResult{
-		Description: omap.NewEmptyOrderedMap[string, string](),
-		CheckParams: make([]string, 0),
-		Vars:        omap.NewEmptyOrderedMap[string, ValueOperator](),
-	}
-}
 
 type filterExprContext struct {
 	start      int
@@ -130,7 +29,6 @@ type SFFrame struct {
 	result *SFFrameResult
 
 	idx             int
-	symbolTable     *omap.OrderedMap[string, ValueOperator]
 	stack           *utils.Stack[ValueOperator]
 	filterExprStack *utils.Stack[*filterExprContext]
 	conditionStack  *utils.Stack[[]bool]
@@ -160,28 +58,22 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
 	}
 
-	result := NewSFFrameInfo()
-	result.Rule = text
 	return &SFFrame{
-		result:          result,
-		symbolTable:     v,
-		stack:           utils.NewStack[ValueOperator](),
-		filterExprStack: utils.NewStack[*filterExprContext](),
-		conditionStack:  utils.NewStack[[]bool](),
-		Text:            text,
-		Codes:           codes,
+		Text:  text,
+		Codes: codes,
 	}
 }
 
-func (s *SFFrame) Debug(v ...bool) *SFFrame {
-	if len(v) > 0 {
-		s.debug = v[0]
-	}
-	return s
+func (s *SFFrame) Flush() {
+	s.result = NewSFResult(s.Text)
+	s.stack = utils.NewStack[ValueOperator]()
+	s.filterExprStack = utils.NewStack[*filterExprContext]()
+	s.conditionStack = utils.NewStack[[]bool]()
+	s.idx = 0
 }
 
 func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
-	return s.symbolTable
+	return s.result.SymbolTable
 }
 
 func (s *SFFrame) ToLeft() bool {
@@ -206,6 +98,8 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		s.predCounter = 0
 	}()
 
+	// clear
+	s.Flush()
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)
@@ -587,7 +481,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("new ref failed: empty name")
 		}
 		s.debugSubLog(">> from ref: %v ", i.UnaryStr)
-		vs, ok := s.symbolTable.Get(i.UnaryStr)
+		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if ok {
 			s.debugSubLog(">> get value: %v ", vs)
 			s.stack.Push(vs)
@@ -610,7 +504,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return err
 		}
 
-		result, ok := s.symbolTable.Get(i.UnaryStr)
+		result, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if ok {
 			om := omap.NewEmptyOrderedMap[int64, ValueOperator]()
 			_ = result.Recursive(func(operator ValueOperator) error {
@@ -619,7 +513,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 				}
 				return nil
 			})
-			s.symbolTable.Set(i.UnaryStr, NewValues(om.Values()))
+			s.GetSymbolTable().Set(i.UnaryStr, NewValues(om.Values()))
 		}
 
 		s.debugSubLog(" -> save $" + i.UnaryStr)
@@ -634,6 +528,15 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		} else {
 			s.debugSubLog("- key: %v", i.UnaryStr)
 		}
+	case OpAlert:
+		if i.UnaryStr == "" {
+			return utils.Errorf("echo failed: empty name")
+		}
+		value, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		if !ok || value == nil {
+			return utils.Errorf("alert failed: not found: %v", i.UnaryStr)
+		}
+		s.result.AlertSymbolTable[i.UnaryStr] = value
 	case OpCheckParams:
 		if i.UnaryStr == "" {
 			return utils.Errorf("check params failed: empty name")
@@ -758,7 +661,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(NewValues(res))
 	case OpMergeRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
-		vs, ok := s.symbolTable.Get(i.UnaryStr)
+		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if !ok || vs == nil {
 			s.debugLog("cannot find $%v", i.UnaryStr)
 			return nil
@@ -777,7 +680,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push")
 	case OpRemoveRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
-		vs, ok := s.symbolTable.Get(i.UnaryStr)
+		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if !ok || vs == nil {
 			s.debugLog("cannot find $%v", i.UnaryStr)
 			return nil
@@ -802,7 +705,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 	var value = operator
-	originValue, existed := s.symbolTable.Get(resultName)
+	originValue, existed := s.GetSymbolTable().Get(resultName)
 	if existed {
 		if originList, ok := originValue.(*ValueList); ok {
 			newList, isListToo := operator.(*ValueList)
@@ -825,7 +728,7 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 		}
 	}
 
-	s.symbolTable.Set(resultName, value)
+	s.GetSymbolTable().Set(resultName, value)
 	if s.config != nil {
 		for _, callback := range s.config.onResultCapturedCallbacks {
 			if err := callback(resultName, operator); err != nil {

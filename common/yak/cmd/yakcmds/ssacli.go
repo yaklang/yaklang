@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"fmt"
+
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
@@ -85,8 +86,11 @@ var SSACompilerCommands = []*cli.Command{
 			cli.BoolFlag{
 				Name: "dot", Usage: "dot graph text for result",
 			},
+			cli.BoolFlag{
+				Name: "with-code,code", Usage: "show code context",
+			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(c *cli.Context) {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
 				log.SetLevel(ret)
 			}
@@ -97,10 +101,15 @@ var SSACompilerCommands = []*cli.Command{
 			inMemory := c.Bool("memory")
 			rawFile := c.String("target")
 			target := utils.GetFirstExistedPath(rawFile)
-			syntaxFlow := c.String("syntaxflow")
 			databaseFileRaw := c.String("database")
+			noOverride := c.Bool("no-override")
+			syntaxFlow := c.String("syntaxflow")
 			dbDebug := c.Bool("database-debug")
 			sfDebug := c.Bool("syntaxflow-debug")
+			showDot := c.Bool("dot")
+			withCode := c.Bool("with-code")
+			// TODO: re-compile
+			// re-compile := c.Bool("re-compile")
 
 			// set database
 			if databaseFileRaw != "" {
@@ -109,100 +118,178 @@ var SSACompilerCommands = []*cli.Command{
 					utils.GetFirstExistedFile(databaseFileRaw) == "" {
 					// no compile ,database not existed
 					log.Errorf("database file not found: %v", databaseFileRaw)
-					return nil
 				}
 			}
 			consts.SetSSADataBaseName(databaseFileRaw)
 
-			forceCompile := c.Bool("re-compile")
-
-			if syntaxFlow != "" && !forceCompile {
-				log.Info("using syntaxflow rule will skip compile")
-				target = ""
-			}
-
 			// compile
-			if target != "" {
-				opt := make([]ssaapi.Option, 0, 3)
-				log.Infof("start to compile file: %v ", target)
-				if language != "" {
-					log.Infof("start to use language: %v", language)
-					opt = append(opt, ssaapi.WithLanguage(ssaapi.Language(language)))
-				}
-				if entry != "" {
-					log.Infof("start to use entry file: %v", entry)
-					opt = append(opt, ssaapi.WithFileSystemEntry(entry))
-				}
-
-				if inMemory {
-					log.Infof("compile in memory mode, program-name will be ignored")
-				} else {
-					if programName == "" {
-						programName = "default-" + ksuid.New().String()
-					}
-					log.Infof("compile save to database with program name: %v", programName)
-					opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
-				}
-
-				if !c.Bool("no-override") {
-					ssadb.DeleteProgram(ssadb.GetDB(), programName)
-				} else {
-					log.Warnf("no-override flag is set, will not delete existed program")
-				}
-
-				proj, err := ssaapi.ParseProjectFromPath(target, opt...)
-				if err != nil {
-					log.Errorf("parse project [%v] failed: %v", target, err)
-					return nil
-				}
-
-				log.Infof("finished compiling..., results: %v", len(proj))
+			if target == "" {
+				log.Errorf("target file not found: %v", rawFile)
+				return
+			}
+			opt := make([]ssaapi.Option, 0, 3)
+			log.Infof("start to compile file: %v ", target)
+			if language != "" {
+				log.Infof("start to use language: %v", language)
+				opt = append(opt, ssaapi.WithLanguage(ssaapi.Language(language)))
+			}
+			if entry != "" {
+				log.Infof("start to use entry file: %v", entry)
+				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
 			}
 
-			// syntax flow query
-			if syntaxFlow != "" {
+			if inMemory {
+				log.Infof("compile in memory mode, program-name will be ignored")
+			} else {
 				if programName == "" {
-					log.Errorf("program name is required when using syntax flow query language")
-					return nil
+					programName = "default-" + ksuid.New().String()
 				}
-				// program from database
-				prog, err := ssaapi.FromDatabase(programName)
-				if err != nil {
-					log.Errorf("load program [%v] from database failed: %v", programName, err)
-					return nil
-				}
-				if prog.DBCache != nil && dbDebug {
-					prog.DBCache.DB = prog.DBCache.DB.Debug()
-				}
-				opt := make([]sfvm.Option, 0)
-				if sfDebug {
-					opt = append(opt, sfvm.WithEnableDebug())
-				}
-				result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
-				if err != nil {
-					log.Errorf("syntax flow [%s] query failed: %v", syntaxFlow, err)
-					return nil
-				}
-				log.Infof("syntax flow query result:")
-				if len(result) > 1 {
-					delete(result, "_")
-				}
-				for k, r := range result {
-					log.Infof("===================== Variable:%v =================== ", k)
-					show(r)
-
-					if c.Bool("dot") {
-						log.Infof("===================== DOT =================== ")
-						r.ShowDot()
-					}
-
-				}
+				log.Infof("compile save to database with program name: %v", programName)
+				opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
 			}
-			return nil
+
+			if !noOverride {
+				ssadb.DeleteProgram(ssadb.GetDB(), programName)
+			} else {
+				log.Warnf("no-override flag is set, will not delete existed program")
+			}
+
+			proj, err := ssaapi.ParseProjectFromPath(target, opt...)
+			if err != nil {
+				log.Errorf("parse project [%v] failed: %v", target, err)
+			}
+
+			log.Infof("finished compiling..., results: %v", len(proj))
+			if syntaxFlow != "" {
+				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
+			}
+		},
+	},
+	{
+		Name:    "ssa-query",
+		Aliases: []string{"sf", "syntaxFlow"},
+		Usage:   "Use SyntaxFlow query SSA OpCodes from database",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "log", Usage: "log level"},
+			cli.StringFlag{
+				Name:  "program,p",
+				Usage: `program name to save in database`,
+			},
+			cli.StringFlag{
+				Name:  "syntaxflow,sf",
+				Usage: "syntax flow query language code",
+			},
+			cli.StringFlag{
+				Name:  "database,db",
+				Usage: "database path",
+			},
+			cli.BoolFlag{
+				Name:  "database-debug,dbdebug",
+				Usage: "enable database debug mode",
+			},
+			cli.BoolFlag{
+				Name:  "syntaxflow-debug,sfdebug",
+				Usage: "enable syntax flow debug mode",
+			},
+			cli.BoolFlag{
+				Name: "dot", Usage: "dot graph text for result",
+			},
+			cli.BoolFlag{
+				Name: "with-code,code", Usage: "show code context",
+			},
+		},
+		Action: func(c *cli.Context) {
+			if ret, err := log.ParseLevel(c.String("log")); err == nil {
+				log.SetLevel(ret)
+			}
+			programName := c.String("program")
+			databaseFileRaw := c.String("database")
+			dbDebug := c.Bool("database-debug")
+			sfDebug := c.Bool("syntaxflow-debug")
+			syntaxFlow := c.String("syntaxflow")
+			showDot := c.Bool("dot")
+			withCode := c.Bool("with-code")
+
+			// TODO: support multiple syntaxflow query, from file or directory
+			for _, name := range c.Args() {
+				_ = name
+			}
+
+			if syntaxFlow == "" {
+				log.Errorf("syntax flow query code is required")
+				return
+			}
+			SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 		},
 	},
 }
 
+func SyntaxFlowQuery(
+	programName, databaseFileRaw string,
+	syntaxFlow string,
+	dbDebug, sfDebug, showDot, withCode bool,
+) {
+
+	// set database
+	if databaseFileRaw != "" {
+		// set database path
+		if utils.GetFirstExistedFile(databaseFileRaw) == "" {
+			// no compile ,database not existed
+			log.Errorf("database file not found: %v use default database", databaseFileRaw)
+		}
+	}
+	consts.SetSSADataBaseName(databaseFileRaw)
+
+	if programName == "" {
+		log.Errorf("program name is required when using syntax flow query language")
+	}
+	// program from database
+	prog, err := ssaapi.FromDatabase(programName)
+	if err != nil {
+		log.Errorf("load program [%v] from database failed: %v", programName, err)
+	}
+	if prog.DBCache != nil && dbDebug {
+		prog.DBCache.DB = prog.DBCache.DB.Debug()
+	}
+	opt := make([]sfvm.Option, 0)
+	if sfDebug {
+		opt = append(opt, sfvm.WithEnableDebug())
+	}
+	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
+	if err != nil {
+		log.Errorf("syntax flow [%s] query failed: %v", syntaxFlow, err)
+		return
+	}
+	log.Infof("syntax flow query result:")
+	if withCode {
+		if len(result.AlertSymbolTable) != 0 {
+			for name := range result.AlertSymbolTable {
+				showValues(name, result.GetValues(name), showDot)
+			}
+		} else if result.SymbolTable.Len() != 0 {
+			for k, r := range result.GetAllValues() {
+				if k == "_" {
+					continue
+				}
+				showValues(k, r, showDot)
+			}
+		} else {
+			showValues("_", result.GetValues("_"), showDot)
+		}
+	} else {
+		result.Show()
+	}
+}
+
+func showValues(name string, vs ssaapi.Values, showDot bool) {
+	log.Infof("===================== Variable:%v =================== ", name)
+	show(vs)
+	if showDot {
+		log.Infof("===================== DOT =================== ")
+		vs.ShowDot()
+	}
+}
 func show(r ssaapi.Values) {
 	for _, v := range r {
 		codeRange := v.GetRange()
@@ -214,10 +301,14 @@ func show(r ssaapi.Values) {
 		editor := codeRange.GetEditor()
 		ctxText, _ := editor.GetContextAroundRange(
 			codeRange.GetStart(),
-			codeRange.GetEnd(),
+			codeRange.GetStart(),
+			// codeRange.GetEnd(),
 			3,
 			func(i int) string {
-				return fmt.Sprintf("%5s| ", fmt.Sprint(i))
+				if i == codeRange.GetStart().GetLine() {
+					return fmt.Sprintf(">>%5s| ", fmt.Sprint(i))
+				}
+				return fmt.Sprintf("%7s| ", fmt.Sprint(i))
 			},
 		)
 		log.Infof("%s:%s \nIR: %d: %s\n%s\n",

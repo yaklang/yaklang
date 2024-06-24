@@ -17,6 +17,7 @@ statement
     : filterStatement eos?              # Filter
     | checkStatement eos?               # Check
     | descriptionStatement eos?         # Description
+    | alertStatement eos?               # Alert
     | eos                               # Empty
     ;
 filterStatement
@@ -37,6 +38,9 @@ descriptionItem
     : stringLiteral
     | stringLiteral ':' stringLiteral
     ;
+
+// echo statement will echo the variable 
+alertStatement: Alert refVariable; 
 
 // checkStatement will check the filterExpr($params) is true( .len > 0), if not,
 // it will record an error with stringLiteral
@@ -210,6 +214,7 @@ DictType: 'dict';
 NumberType: 'int' | 'float';
 BoolType: 'bool';
 BoolLiteral: 'true' | 'false';
+Alert : 'alert';
 Check: 'check';
 Then: 'then';
 Desc: 'desc' | 'note';

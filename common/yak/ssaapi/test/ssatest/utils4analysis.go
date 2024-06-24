@@ -2,11 +2,12 @@ package ssatest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -114,16 +115,13 @@ func CheckFSWithProgram(
 			if err != nil {
 				t.Fatalf("read file[%s] failed: %v", s, err)
 			}
-			vm, vars, err := program.SyntaxFlowEx(string(raw))
-			_ = vars
+			i, err := program.SyntaxFlowWithError(string(raw))
 			if err != nil {
 				t.Fatalf("exec syntaxflow failed: %v", err)
 			}
-			for _, i := range vm.Results() {
-				if len(i.Errors) > 0 {
-					log.Infof("result: %s", i.String())
-					t.Fatalf("result has errors: %v", i.Errors)
-				}
+			if len(i.Errors) > 0 {
+				log.Infof("result: %s", i.String())
+				t.Fatalf("result has errors: %v", i.Errors)
 			}
 		})
 
@@ -152,14 +150,14 @@ func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
-		for key, value := range results {
+		for key, value := range results.GetAllValues() {
 			log.Infof("\nkey: %s", key)
 			value.Show()
 		}
 
 		for k, want := range wants {
-			gotVs, ok := results[k]
-			assert.Truef(t, ok, "key[%s] not found", k)
+			gotVs := results.GetValues(k)
+			assert.Greater(t, len(gotVs), 0, "key[%s] not found", k)
 			got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
 			sort.Strings(got)
 			sort.Strings(want)

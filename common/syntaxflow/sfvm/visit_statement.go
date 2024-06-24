@@ -78,3 +78,19 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 
 	return nil
 }
+
+func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*sf.AlertStatementContext)
+	if i == nil {
+		return
+	}
+
+	// i.RefVariable()
+	ref := i.RefVariable().GetText()
+	ref = strings.TrimLeft(ref, "$")
+	y.EmitAlert(ref)
+}

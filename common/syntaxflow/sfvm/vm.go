@@ -51,11 +51,15 @@ func (s *SyntaxFlowVirtualMachine) Debug(i ...bool) *SyntaxFlowVirtualMachine {
 }
 
 func (s *SyntaxFlowVirtualMachine) Show() {
-	for _, i := range s.frames {
-		fmt.Println("--------------------------")
-		for idx, c := range i.Codes {
-			fmt.Printf(" %4d| %v\n", idx, c.String())
-		}
+	for _, f := range s.frames {
+		f.Show()
+	}
+}
+
+func (f *SFFrame) Show() {
+	fmt.Println("--------------------------")
+	for idx, c := range f.Codes {
+		fmt.Printf(" %4d| %v\n", idx, c.String())
 	}
 }
 
@@ -65,13 +69,14 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 	}
 }
 
-func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
+func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
-		return utils.Errorf("SyntaxFlow compile error: text is nil")
+		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
 	}
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
+			frame = nil
 		}
 	}()
 	errLis := antlr4util.NewErrorListener()
@@ -87,16 +92,17 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	flow := astParser.Flow()
 	// fmt.Printf("%v\n", flow.ToStringTree(astParser.RuleNames, astParser))
 	if len(errLis.GetErrors()) > 0 {
-		return utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrorString())
+		return nil, utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrorString())
 	}
 
 	result.text = text
 	result.VisitFlow(flow)
-	var frame = result.CreateFrame(s.vars)
+	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
+	frame.debug = s.config.debug
 	s.frames = append(s.frames, frame)
 
-	return nil
+	return frame, nil
 }
 
 func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOperator] {
@@ -124,24 +130,26 @@ func (s *SyntaxFlowVirtualMachine) FirstResult() (*SFFrameResult, error) {
 	return s.frames[0].result, nil
 }
 
-func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) (*omap.OrderedMap[string, ValueOperator], error) {
+func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) ([]*SFFrameResult, error) {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
 	var errs error
-	result := omap.NewOrderedMap(map[string]ValueOperator{})
-	for index, frame := range s.frames {
-		err := frame.Debug(s.debug).exec(i)
-		if err != nil {
-			errs = utils.JoinErrors(errs,
-				utils.Errorf("exec frame[%v]: %v CODE: %v", index, err, frame.Text),
-			)
+	results := make([]*SFFrameResult, 0, len(s.frames))
+	for _, frame := range s.frames {
+		if res, err := frame.Feed(i); err != nil {
+			errs = utils.JoinErrors(errs, err)
+		} else {
+			results = append(results, res)
 		}
-		frame.result.Vars = s.vars.Copy()
 	}
-	s.vars.Map(func(s string, a ValueOperator) (string, ValueOperator, error) {
-		result.Set(s, a)
-		return s, a, nil
-	})
-	return result, errs
+	return results, errs
+}
+
+func (frame *SFFrame) Feed(i ValueOperator) (*SFFrameResult, error) {
+	err := frame.exec(i)
+	if err != nil {
+		return nil, utils.Errorf("exec frame: %v CODE: %v", err, frame.Text)
+	}
+	return frame.result, nil
 }
