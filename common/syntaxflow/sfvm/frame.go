@@ -66,7 +66,7 @@ func (s *SFFrameResult) String() string {
 			prefixVariableResult := "    "
 			for idxRaw, v := range all {
 				var idx = fmt.Sprint(int64(idxRaw + 1))
-				if raw, ok := v.(interface{ GetId() int64 }); ok {
+				if raw, ok := v.(ssa.GetIdIF); ok {
 					idx = fmt.Sprintf("t%v", raw.GetId())
 				}
 				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
@@ -79,7 +79,7 @@ func (s *SFFrameResult) String() string {
 						if fileName == "" {
 							var err error
 							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
-							if CriticalError != nil {
+							if err != nil {
 								log.Warn(err)
 							}
 							if editor != nil {
@@ -582,6 +582,19 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("ERROR: %v", err)
 			return err
 		}
+
+		result, ok := s.symbolTable.Get(i.UnaryStr)
+		if ok {
+			om := omap.NewEmptyOrderedMap[int64, ValueOperator]()
+			_ = result.Recursive(func(operator ValueOperator) error {
+				if i, ok := operator.(ssa.GetIdIF); ok {
+					om.Set(i.GetId(), operator)
+				}
+				return nil
+			})
+			s.symbolTable.Set(i.UnaryStr, NewValues(om.Values()))
+		}
+
 		s.debugSubLog(" -> save $" + i.UnaryStr)
 	case OpAddDescription:
 		if i.UnaryStr == "" {
@@ -716,6 +729,43 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 		}
 		s.stack.Push(NewValues(res))
+	case OpMergeRef:
+		s.debugSubLog("fetch: %v", i.UnaryStr)
+		vs, ok := s.symbolTable.Get(i.UnaryStr)
+		if !ok || vs == nil {
+			s.debugLog("cannot find $%v", i.UnaryStr)
+			return nil
+		}
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
+		value.IsList()
+		val, err := value.Merge(vs)
+		if err != nil {
+			return utils.Wrapf(CriticalError, "merge failed: %v", err)
+		}
+		s.stack.Push(val)
+		s.debugSubLog("<< push")
+	case OpRemoveRef:
+		s.debugSubLog("fetch: %v", i.UnaryStr)
+		vs, ok := s.symbolTable.Get(i.UnaryStr)
+		if !ok || vs == nil {
+			s.debugLog("cannot find $%v", i.UnaryStr)
+			return nil
+		}
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
+		newVal, err := value.Remove(vs)
+		if err != nil {
+			return utils.Wrapf(CriticalError, "remove failed: %v", err)
+		}
+		s.stack.Push(newVal)
+		s.debugSubLog("<< push")
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

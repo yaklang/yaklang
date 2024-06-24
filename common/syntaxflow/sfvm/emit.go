@@ -189,6 +189,20 @@ func (v *SyntaxFlowVisitor) EmitGetBottomUsers(config ...*RecursiveConfigItem) {
 	})
 }
 
+func (y *SyntaxFlowVisitor) EmitMergeRef(i string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpMergeRef,
+		UnaryStr: i,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitRemoveRef(i string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpRemoveRef,
+		UnaryStr: i,
+	})
+}
+
 func (v *SyntaxFlowVisitor) EmitGetTopDefs(config ...*RecursiveConfigItem) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs, SyntaxFlowConfig: config})
 }

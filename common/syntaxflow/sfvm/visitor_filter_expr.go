@@ -3,6 +3,7 @@ package sfvm
 import (
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
@@ -79,6 +80,10 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitGetTopDefs(config...)
 	case *sf.UseDefCalcFilterContext:
 		log.Warnf("TBD: UseDefCalcFilterContext: %v", raw.GetText())
+	case *sf.MergeRefFilterContext:
+		y.EmitMergeRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
+	case *sf.RemoveRefFilterContext:
+		y.EmitRemoveRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	default:
 		panic("BUG: in filterExpr")
 	}

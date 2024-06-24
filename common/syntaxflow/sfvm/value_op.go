@@ -94,4 +94,7 @@ type ValueOperator interface {
 
 	// ListIndex for OpListIndex, like a[1] a must be list...
 	ListIndex(i int) (ValueOperator, error)
+
+	Merge(...ValueOperator) (ValueOperator, error)
+	Remove(...ValueOperator) (ValueOperator, error)
 }

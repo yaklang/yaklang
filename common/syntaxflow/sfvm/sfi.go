@@ -95,6 +95,9 @@ const (
 	// OpFilterExprEnter will assert the top of stack, make sure a input
 	OpFilterExprEnter
 	OpFilterExprExit
+
+	OpMergeRef
+	OpRemoveRef
 )
 
 type SFI struct {
@@ -241,6 +244,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen, "-/")
 	case OpCheckStackTop:
 		return fmt.Sprintf(verboseLen+" %v", "check top", s.UnaryStr)
+	case OpMergeRef:
+		return fmt.Sprintf(verboseLen+" %v", "merge$ref", s.UnaryStr)
+	case OpRemoveRef:
+		return fmt.Sprintf(verboseLen+" %v", "remove$ref", s.UnaryStr)
 	default:
 		panic("unhandled default case")
 	}

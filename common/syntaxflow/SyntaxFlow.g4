@@ -53,6 +53,7 @@ filterItemFirst
     : nameFilter                                 # NamedFilter
     | '.' nameFilter                             # FieldCallFilter
     ;
+
 filterItem
     : filterItemFirst                            #First
     | '(' actualParam? ')'                       # FunctionCallFilter
@@ -65,6 +66,8 @@ filterItem
     | '#->'                                      # TopDefFilter
     | '#{' (recursiveConfig)? '}->'              # TopDefConfigFilter
     | '-<' useDefCalcDescription '>-'            # UseDefCalcFilter
+    | '+' refVariable                            # MergeRefFilter
+    | '-' refVariable                            # RemoveRefFilter
     ;
 
 filterExpr: filterItemFirst filterItem* ;
