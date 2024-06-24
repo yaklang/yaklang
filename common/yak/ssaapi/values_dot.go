@@ -52,6 +52,31 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 	for id, node := range effectsMap {
 		_marshal(m, g, id, node)
 	}
+
+	for _, predRaw := range t.Predecessors {
+		pred := predRaw.Node
+		predNode := g.GetOrCreateNode(pred.GetVerboseName())
+		edgs := g.GetEdges(predNode, self)
+		edgsR := g.GetEdges(self, predNode)
+		if len(edgs) <= 0 && len(edgsR) <= 0 {
+			label := predRaw.Info.Label
+			if predRaw.Info.Step >= 0 {
+				label = fmt.Sprintf(`%v:%v`, predRaw.Info.Step, label)
+			}
+			eid := g.AddEdge(predNode, self, label)
+			g.EdgeAttribute(eid, "color", "red")
+			g.EdgeAttribute(eid, "penwidth", "3.0")
+		} else {
+			for _, eid := range edgs {
+				g.EdgeAttribute(eid, "color", "red")
+				g.EdgeAttribute(eid, "penwidth", "3.0")
+			}
+			for _, eid := range edgsR {
+				g.EdgeAttribute(eid, "color", "red")
+				g.EdgeAttribute(eid, "penwidth", "3.0")
+			}
+		}
+	}
 }
 
 func (v *Value) DotGraph() string {
