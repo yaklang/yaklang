@@ -3,6 +3,8 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"sync"
 )
@@ -73,4 +75,22 @@ func (v *Value) ShowDot() *Value {
 
 func (v *Value) AnalyzeDepth() int {
 	return v.GetDepth()
+}
+
+func CreateDotGraph(i ...sfvm.ValueOperator) (string, error) {
+	om := make(map[int64]struct{})
+	var vals Values
+	_ = sfvm.MergeValues(i...).Recursive(func(operator sfvm.ValueOperator) error {
+		if v, ok := operator.(*Value); ok {
+			if _, existed := om[v.GetId()]; existed {
+				vals = append(vals, v)
+			}
+		}
+		return nil
+	})
+	if len(vals) <= 0 {
+		return "", utils.Error("no values found")
+	}
+	totalGraph := vals.DotGraph()
+	return totalGraph, nil
 }
