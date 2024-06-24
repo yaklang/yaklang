@@ -719,7 +719,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if len(conds) != valuesLen(vs) {
 			return utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", valuesLen(vs), len(conds))
 		}
-		log.Infof("condition: %v", conds)
+		//log.Infof("condition: %v", conds)
 		res := make([]ValueOperator, 0, valuesLen(vs))
 		for i := 0; i < len(conds); i++ {
 			if conds[i] {
