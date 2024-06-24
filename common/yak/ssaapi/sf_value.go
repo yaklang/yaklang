@@ -37,6 +37,28 @@ func (v *Value) GlobMatch(mod int, g ssa.Glob) (bool, sfvm.ValueOperator, error)
 	return value != nil, value, nil
 }
 
+func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+	var vals []sfvm.ValueOperator
+	vals = append(vals, v)
+	vals = append(vals, sf...)
+	return sfvm.NewValues(vals), nil
+}
+
+func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+	err := sfvm.NewValues(sf).Recursive(func(operator sfvm.ValueOperator) error {
+		if raw, ok := operator.(ssa.GetIdIF); ok {
+			if v.GetId() == raw.GetId() {
+				return utils.Error("abort")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return sfvm.NewValues(nil), nil
+	}
+	return v, nil
+}
+
 func (v *Value) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, regexp.MatchString)
 	return value != nil, value, nil

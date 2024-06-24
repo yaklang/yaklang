@@ -179,6 +179,41 @@ func (g *Graph) AddEdge(from, to int, label string) int {
 	return id
 }
 
+// AddDashEdge adds a new edge between the given nodes with the specified
+// label and returns an id for the new edge.
+// style
+func (g *Graph) AddDashEdge(from, to int, label string) int {
+	fromNode := g.registeredNodes[from]
+	toNode := g.registeredNodes[to]
+	id := g.idGetter()
+	edg := edge{from: fromNode, to: toNode, label: label}
+	edg.attributes.set("style", "dashed")
+	if g.edges == nil {
+		g.edges = make(map[int]*edge)
+	}
+	g.edges[id] = &edg
+	g.registeredEdges[id] = &edg
+	return id
+}
+
+// AddDashEdge adds a new edge between the given nodes with the specified
+// label and returns an id for the new edge.
+// style
+func (g *Graph) AddDashEdgeWithoutArrowHead(from, to int, label string) int {
+	fromNode := g.registeredNodes[from]
+	toNode := g.registeredNodes[to]
+	id := g.idGetter()
+	edg := edge{from: fromNode, to: toNode, label: label}
+	edg.attributes.set("style", "dashed")
+	edg.attributes.set("dir", "none")
+	if g.edges == nil {
+		g.edges = make(map[int]*edge)
+	}
+	g.edges[id] = &edg
+	g.registeredEdges[id] = &edg
+	return id
+}
+
 // MakeDirected makes the graph a directed graph. By default, a new
 // graph is undirected
 func (g *Graph) MakeDirected() {

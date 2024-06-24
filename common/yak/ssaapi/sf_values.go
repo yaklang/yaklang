@@ -130,3 +130,30 @@ func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {
 	}
 	return value[i], nil
 }
+
+func (value Values) Merge(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+	var results []sfvm.ValueOperator
+	if value != nil {
+		results = append(results, value)
+	}
+	results = append(results, values...)
+	return sfvm.NewValues(results), nil
+}
+
+func (value Values) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+	var results = make(map[int64]sfvm.ValueOperator)
+	for _, v := range value {
+		results[v.GetId()] = v
+	}
+	sfvm.NewValues(values).Recursive(func(v sfvm.ValueOperator) error {
+		if raw, ok := v.(ssa.GetIdIF); ok {
+			delete(results, raw.GetId())
+		}
+		return nil
+	})
+	var ret []sfvm.ValueOperator
+	for _, v := range results {
+		ret = append(ret, v)
+	}
+	return sfvm.NewValues(ret), nil
+}

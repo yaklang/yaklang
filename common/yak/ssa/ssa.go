@@ -15,6 +15,10 @@ type ErrorLogger interface {
 	NewError(ErrorKind, ErrorTag, string)
 }
 
+type GetIdIF interface {
+	GetId() int64
+}
+
 type Instruction interface {
 	ErrorLogger
 
@@ -37,7 +41,7 @@ type Instruction interface {
 	SetIsAnnotation(bool)
 	IsAnnotation() bool
 
-	GetId() int64 // for identify
+	GetIdIF
 	SetId(int64)
 
 	// position

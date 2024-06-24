@@ -3,7 +3,9 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/dot"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -233,10 +235,59 @@ func (V Values) ShowDot() Values {
 	return V
 }
 
-func (v Values) DotGraph() []string {
+func (v Values) DotGraphs() []string {
 	var ret []string
 	for _, val := range v {
 		ret = append(ret, val.DotGraph())
 	}
 	return ret
+}
+
+func (v Values) DotGraph() string {
+	g := dot.New()
+	g.MakeDirected()
+	g.GraphAttribute("rankdir", "BT")
+
+	visisted := new(sync.Map)
+	for _, subValue := range v {
+		n := g.AddNode(subValue.GetVerboseName())
+		_marshal(visisted, g, n, subValue)
+	}
+
+	cartResult, _ := cartesian.Product([][]*Value{v, v})
+	for _, result := range cartResult {
+		if len(result) <= 1 {
+			continue
+		}
+		a1, a2 := result[0], result[1]
+		if a1.GetId() == a2.GetId() {
+			continue
+		}
+
+		connected := false
+		a1.GetTopDefs(WithHookEveryNode(func(value *Value) error {
+			if value.GetId() == a2.GetId() {
+				n1, n2 := g.GetOrCreateNode(a1.GetVerboseName()), g.GetOrCreateNode(a2.GetVerboseName())
+				g.AddDashEdge(n1, n2, "")
+				connected = true
+				return nil
+			}
+			return nil
+		}))
+		if !connected {
+			a1.GetBottomUses(WithHookEveryNode(func(value *Value) error {
+				if value.GetId() == a2.GetId() {
+					n1, n2 := g.GetOrCreateNode(a1.GetVerboseName()), g.GetOrCreateNode(a2.GetVerboseName())
+					g.AddDashEdge(n2, n1, "")
+					connected = true
+					return nil
+				}
+				return nil
+			}))
+		}
+	}
+
+	var buf bytes.Buffer
+	g.GenerateDOT(&buf)
+	return buf.String()
 }
