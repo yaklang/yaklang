@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -82,13 +83,16 @@ func TestMustPass_Debug(t *testing.T) {
 		}
 		result.Show()
 		fmt.Println("\n--------------------------------------")
-		result.Vars.ForEach(func(i string, v sfvm.ValueOperator) bool {
-			for _, raw := range ssaapi.SyntaxFlowVariableToValues(v).DotGraph() {
-				fmt.Println(raw)
-				fmt.Println()
+		om := omap.NewOrderedMap(make(map[int64]*ssaapi.Value))
+		_ = sfvm.MergeValues(result.Vars.Values()...).Recursive(func(operator sfvm.ValueOperator) error {
+			if v, ok := operator.(*ssaapi.Value); ok {
+				om.Set(v.GetId(), v)
 			}
-			return true
+			return nil
 		})
+		results := ssaapi.Values(om.Values())
+		totalGraph := results.DotGraph()
+		fmt.Println(totalGraph)
 		return nil
 	}))
 	if err != nil {
