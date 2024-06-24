@@ -67,7 +67,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		Id:                         uint64(f.ID),
 		IsHTTPS:                    f.IsHTTPS,
 		Url:                        utf8safe(f.Url),
-		SourceType:                 f.SourceType,
+		SourceType:                 utf8safe(f.SourceType),
 		Path:                       utf8safe(f.Path),
 		Method:                     utf8safe(f.Method),
 		BodyLength:                 f.BodyLength,
@@ -111,26 +111,25 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		flow.CreatedAt = time.Now().Unix()
 	}
 	if f.Hash == "" {
-		flow.Hash = f.CalcHash()
+		flow.Hash = utf8safe(f.CalcHash())
 	} else {
 		flow.Hash = f.Hash
 	}
 	host, port, _ := utils.ParseStringToHostPort(flow.Url)
 	flow.HostPort = utf8safe(utils.HostPort(host, port))
 
-	flow.BodySizeVerbose = utils.ByteSize(uint64(flow.BodyLength))
+	flow.BodySizeVerbose = utf8safe(utils.ByteSize(uint64(flow.BodyLength)))
 
 	if f.Request != "" {
 		unquotedRequest, err = strconv.Unquote(f.Request)
 		if err != nil {
 			unquotedRequest = f.Request
-			log.Errorf("unquoted request failed: %s", err)
-			fmt.Println(f.Request)
+			log.Errorf("unquoted request failed: %s\n%s", err, f.Request)
 		}
 	}
 
 	flow.RequestLength = int64(len(unquotedRequest))
-	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedRequest)))
+	flow.RequestSizeVerbose = utf8safe(utils.ByteSize(uint64(len(unquotedRequest))))
 
 	requireRequest := full || !f.IsRequestOversize
 	requireResponse := full || !f.IsResponseOversize
@@ -171,7 +170,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 						break
 					}
 					fParam := &ypb.FuzzableParam{
-						Position:  r.PositionVerbose(),
+						Position:  utf8safe(r.PositionVerbose()),
 						ParamName: utf8safe(utils.ParseStringToVisible(r.Name())),
 						IsHTTPS:   flow.IsHTTPS,
 					}
@@ -274,7 +273,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 
 func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool) *ypb.FuzzableParam {
 	p := &ypb.FuzzableParam{
-		Position:  r.PositionVerbose(),
+		Position:  utf8safe(r.PositionVerbose()),
 		ParamName: utf8safe(r.Name()),
 		IsHTTPS:   isHttps,
 	}
