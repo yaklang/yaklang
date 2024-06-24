@@ -127,6 +127,14 @@ func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcFilter(ctx *UseDefCalcFilterConte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitMergeRefFilter(ctx *MergeRefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitRemoveRefFilter(ctx *RemoveRefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFilterExpr(ctx *FilterExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }

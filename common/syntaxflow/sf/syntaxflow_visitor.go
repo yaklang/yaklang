@@ -97,6 +97,12 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#UseDefCalcFilter.
 	VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#MergeRefFilter.
+	VisitMergeRefFilter(ctx *MergeRefFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#RemoveRefFilter.
+	VisitRemoveRefFilter(ctx *RemoveRefFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#filterExpr.
 	VisitFilterExpr(ctx *FilterExprContext) interface{}
 

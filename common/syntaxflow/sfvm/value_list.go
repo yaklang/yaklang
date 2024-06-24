@@ -23,6 +23,34 @@ type ValueList struct {
 	values []ValueOperator
 }
 
+func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
+	return MergeValues(append(v.values, values...)...), nil
+}
+
+func (v *ValueList) Remove(values ...ValueOperator) (ValueOperator, error) {
+	var filter = make(map[int64]ValueOperator)
+	_ = v.Recursive(func(operator ValueOperator) error {
+		if raw, ok := operator.(ssa.GetIdIF); ok {
+			_, existed := filter[raw.GetId()]
+			if !existed {
+				filter[raw.GetId()] = operator
+			}
+		}
+		return nil
+	})
+	NewValues(values).Recursive(func(operator ValueOperator) error {
+		if raw, ok := operator.(ssa.GetIdIF); ok {
+			delete(filter, raw.GetId())
+		}
+		return nil
+	})
+	var res []ValueOperator
+	for _, v := range filter {
+		res = append(res, v)
+	}
+	return NewValues(res), nil
+}
+
 func (v *ValueList) GetOpcode() string {
 	return ""
 }
