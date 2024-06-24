@@ -110,7 +110,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		// enter function via call
 		f, ok := ssa.ToFunction(ins.Method)
 		if !ok {
-			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
+			//log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx)
 		}
 

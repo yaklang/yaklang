@@ -3,7 +3,6 @@ package java
 import (
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -85,7 +84,7 @@ func TestMustPass_Debug(t *testing.T) {
 		fmt.Println("\n--------------------------------------")
 		totalGraph, err := ssaapi.CreateDotGraph(result.Vars.Values()...)
 		if err != nil {
-			log.Warnf("create dot graph failed: %v", err)
+			t.Fatalf("create dot graph failed: %v", err)
 		}
 		fmt.Println(totalGraph)
 		return nil

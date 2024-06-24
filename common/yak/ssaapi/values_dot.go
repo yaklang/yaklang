@@ -82,8 +82,9 @@ func CreateDotGraph(i ...sfvm.ValueOperator) (string, error) {
 	var vals Values
 	_ = sfvm.MergeValues(i...).Recursive(func(operator sfvm.ValueOperator) error {
 		if v, ok := operator.(*Value); ok {
-			if _, existed := om[v.GetId()]; existed {
+			if _, existed := om[v.GetId()]; !existed {
 				vals = append(vals, v)
+				om[v.GetId()] = struct{}{}
 			}
 		}
 		return nil

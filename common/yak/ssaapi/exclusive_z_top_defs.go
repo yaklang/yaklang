@@ -319,7 +319,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// log.Info("ParameterMember")
 		called := actx.GetCurrentCall()
 		if called == nil {
-			log.Error("parent function is not called by any other function, skip")
+			// log.Info("parent function is not called by any other function, skip")
 			var vals Values
 			vals = append(vals, i)
 			// 获取ParameterMember的形参定义
