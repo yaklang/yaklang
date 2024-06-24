@@ -1,0 +1,4 @@
+Files.write(, * #-> as $params) as $sink;
+$params?{.getBytes()} as $source;
+
+check $source then "Local Files Writer" else "No Files Written";

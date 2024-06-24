@@ -1,0 +1,7 @@
+DriverManager.getConnection().createStatement().executeQuery(* as $sql) as $sinkCall;
+
+$sql?{have: "add(", "select"} as $result;
+
+check $sinkCall then "SQL Execute" else "SQL Safe";
+check $result then "SQL Injection" else "SQL Safe";
+
