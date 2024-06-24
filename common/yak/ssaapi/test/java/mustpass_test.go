@@ -3,10 +3,9 @@ package java
 import (
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -82,16 +81,12 @@ func TestMustPass_Debug(t *testing.T) {
 			t.Fatal(err)
 		}
 		result.Show()
+
 		fmt.Println("\n--------------------------------------")
-		om := omap.NewOrderedMap(make(map[int64]*ssaapi.Value))
-		_ = sfvm.MergeValues(result.Vars.Values()...).Recursive(func(operator sfvm.ValueOperator) error {
-			if v, ok := operator.(*ssaapi.Value); ok {
-				om.Set(v.GetId(), v)
-			}
-			return nil
-		})
-		results := ssaapi.Values(om.Values())
-		totalGraph := results.DotGraph()
+		totalGraph, err := ssaapi.CreateDotGraph(result.Vars.Values()...)
+		if err != nil {
+			log.Warnf("create dot graph failed: %v", err)
+		}
 		fmt.Println(totalGraph)
 		return nil
 	}))
