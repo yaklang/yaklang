@@ -115,12 +115,16 @@ func CheckFSWithProgram(
 				t.Fatalf("read file[%s] failed: %v", s, err)
 			}
 			vm, vars, err := program.SyntaxFlowEx(string(raw))
+			_ = vars
 			if err != nil {
 				t.Fatalf("exec syntaxflow failed: %v", err)
 			}
-			_ = vars
-			_ = vm
-			vm.Snapshot()
+			for _, i := range vm.Results() {
+				if len(i.Errors) > 0 {
+					log.Infof("result: %s", i.String())
+					t.Fatalf("result has errors: %v", i.Errors)
+				}
+			}
 		})
 
 		return nil

@@ -1,0 +1,3 @@
+ScriptEngineManager().getEngineByExtension().eval(* #-> * as $source,) as $sink;
+
+check $sink then "Script Execution" else "No Script Executed";
