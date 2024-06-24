@@ -2,6 +2,7 @@ package fingerprint
 
 import (
 	"errors"
+	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -12,24 +13,6 @@ import (
 
 var MethodGetterMap = map[string]func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error){}
 
-func RegisterSimpleMatchMethod(name string, getter func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error)) {
-	MethodGetterMap[name] = func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
-		match, err := getter(matcher, params)
-		if err != nil {
-			return nil, err
-		}
-		return func(data []byte) (*rule.FingerprintInfo, error) {
-			ok, err := match(data)
-			if err != nil {
-				return nil, err
-			}
-			if ok {
-				return params.Info, nil
-			}
-			return nil, nil
-		}, nil
-	}
-}
 func RegisterMatchMethod(name string, getter func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error)) {
 	MethodGetterMap[name] = getter
 }
@@ -37,17 +20,17 @@ func init() {
 	RegisterMatchMethod("regexp", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
 		pattern := params.RegexpPattern
 		if pattern == "" {
-			return func(data []byte) (*rule.FingerprintInfo, error) {
-				return params.Info, nil
+			return func(data []byte) (bool, error) {
+				return true, nil
 			}, nil
 		}
-		return func(data []byte) (*rule.FingerprintInfo, error) {
+		return func(data []byte) (bool, error) {
 			rePattern, ok := matcher.regexpCache[pattern]
 			if !ok {
 				var err error
 				rePattern, err = regexp.Compile(pattern)
 				if err != nil {
-					return nil, err
+					return false, err
 				}
 				matcher.regexpCache[pattern] = rePattern
 			}
@@ -68,12 +51,12 @@ func init() {
 					setByGroup(&params.Info.CPE.Edition, matchedStringGroup, params.Keyword.EditionIndex)
 					setByGroup(&params.Info.CPE.Language, matchedStringGroup, params.Keyword.LanguageIndex)
 				}
-				return params.Info, nil
+				return true, nil
 			}
-			return nil, nil
+			return false, nil
 		}, nil
 	})
-	RegisterSimpleMatchMethod("complex", func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error) {
+	RegisterMatchMethod("complex", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
 		if !utils.StringArrayContains([]string{"and", "or"}, params.Condition) {
 			return nil, errors.New("invalid condition")
 		}
@@ -87,24 +70,24 @@ func init() {
 		}
 		return func(data []byte) (bool, error) {
 			var preOk bool
-			for _, f := range subMethods {
+			for i, f := range subMethods {
 				res, err := f(data)
 				if err != nil {
 					return false, err
 				}
-				if params.Condition == "or" && res != nil {
+				if params.Condition == "or" && res {
 					return true, nil
 				}
-				if params.Condition == "and" && res == nil {
+				if params.Condition == "and" && !res {
 					return false, nil
 				}
-				params.Info = res
-				preOk = res != nil
+				params.Info = params.SubRules[i].MatchParam.Info
+				preOk = res
 			}
 			return preOk, nil
 		}, nil
 	})
-	RegisterSimpleMatchMethod("http_header", func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error) {
+	RegisterMatchMethod("http_header", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
 		headerMatchMethod, err := matcher.LoadMethod(params.HeaderMatchRule.Method, params.HeaderMatchRule.MatchParam)
 		if err != nil {
 			return nil, err
@@ -124,17 +107,56 @@ func init() {
 				if err != nil {
 					return false, err
 				}
-				if ok != nil {
-					params.Info = ok
+				if ok {
+					params.Info = params.HeaderMatchRule.MatchParam.Info
 					return true, nil
 				}
 			}
 			return false, nil
 		}, nil
 	})
-	RegisterSimpleMatchMethod("md5", func(matcher *Matcher, params *rule.MatchMethodParam) (SimpleMatchFun, error) {
+	RegisterMatchMethod("md5", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
 		return func(data []byte) (bool, error) {
 			return params.Md5 == codec.Md5(data), nil
+		}, nil
+	})
+	RegisterMatchMethod("exp", func(matcher *Matcher, params *rule.MatchMethodParam) (MatchFun, error) {
+		return func(data []byte) (bool, error) {
+			switch params.Op {
+			case "=":
+				ps := params.Params
+				if len(ps) != 2 {
+					return false, errors.New("number of params must be 2")
+				}
+				strParams := []string{}
+				for _, p := range ps {
+					strParam, ok := p.(string)
+					if !ok {
+						return false, errors.New("op `=` param type must be string")
+					}
+					strParams = append(strParams, strParam)
+				}
+				varName := strParams[0]
+				varValue := ""
+				matchValue := strParams[1]
+				if strings.Contains(matchValue, "/AV732E/setup.exe") {
+					print()
+				}
+				header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
+				switch varName {
+				case "header":
+					varValue = header
+				case "title":
+					varValue = utils.ExtractTitleFromHTMLTitle(string(data), "")
+				case "body":
+					varValue = string(body)
+				default:
+					return false, errors.New("not support var: " + varName)
+				}
+				return strings.Contains(varValue, matchValue), nil
+			default:
+				return false, fmt.Errorf("unsupported op: %s", params.Op)
+			}
 		}, nil
 	})
 }

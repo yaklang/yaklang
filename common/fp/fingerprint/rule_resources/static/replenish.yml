@@ -1,0 +1,24 @@
+- methods:
+    - keywords:
+        - regexp: You Know, for Search
+          product: elasticsearch
+        - product: elasticsearch
+          regexp: '"number" ?: ?"([\d\.]+)",?.*'
+          version_index: 1
+- methods:
+    - keywords:
+        - product: jenkins
+          regexp: < *a href="http://jenkins-ci.org/">Jenkins ver. ([\d\.]+)</a>
+          version_index: 1
+- methods:
+    - keywords:
+        - product: mongodb
+          regexp: It looks like you are trying to access MongoDB over HTTP on the native driver port
+- methods:
+    - keywords:
+        - product: mongodb
+          regexp: It looks like you are trying to access MongoDB over HTTP on the native driver port
+- methods:
+    - keywords:
+        - product: rabbitmq
+          regexp: <title>RabbitMQ Management</title>

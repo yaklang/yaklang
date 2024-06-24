@@ -3,8 +3,11 @@ package fp
 import (
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule_resources"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -99,5 +102,15 @@ func GetDefaultWebFingerprintRules() ([]*rule.FingerPrintRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(buildinRules, buildinYamlRules...), nil
+	content, err = rule_resources.FS.ReadFile("exp_rule.txt")
+	if err != nil {
+		return nil, err
+	}
+	ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) [2]string {
+		splits := strings.Split(s, "\x00")
+		return [2]string{splits[1], splits[0]}
+	})
+	expRules, err := parsers.ParseExpRule(ruleInfos.([][2]string))
+
+	return append(append(buildinRules, buildinYamlRules...), expRules...), nil
 }

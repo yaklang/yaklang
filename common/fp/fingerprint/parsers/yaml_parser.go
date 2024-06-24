@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
@@ -45,6 +46,7 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 			SubRules:  rules,
 			Condition: "and",
 		}
+		r.MatchParam.Info = utils.GetLastElement(rules).MatchParam.Info
 		return r
 	}
 	var convertRule func(webRule *webfingerprint.WebRule) *rule.FingerPrintRule
@@ -63,6 +65,7 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 					HeaderKey:       header.HeaderName,
 					HeaderMatchRule: convertRegexpRule(&header.HeaderValue),
 				}
+				r.MatchParam.Info = r.MatchParam.HeaderMatchRule.MatchParam.Info
 				methodRules = append(methodRules, r)
 			}
 			for _, md5 := range method.MD5s {
@@ -79,9 +82,8 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 					r := newComplexRule(methodRules, method.Condition)
 					methodRules = []*rule.FingerPrintRule{r}
 				}
-			} else {
-				convertedWebRules = append(convertedWebRules, methodRules...)
 			}
+			convertedWebRules = append(convertedWebRules, methodRules...)
 		}
 		var generalWebRule *rule.FingerPrintRule
 		if len(convertedWebRules) > 1 {

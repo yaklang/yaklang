@@ -3,8 +3,10 @@ package parsers
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
+	"strings"
 )
 
 var buildinTokens = []string{"(", ")", "||", "&&", "=", "\"", "\\"}
@@ -14,9 +16,14 @@ func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 	for _, ruleInfo := range rules {
 		exp := ruleInfo[0]
 		info := ruleInfo[1]
+		if exp == "" || info == "" {
+			continue
+		}
 		r, err := compileExp(exp)
 		if err != nil {
-			return nil, err
+			log.Errorf("parse exp %s error: %v", exp, err)
+			continue
+			//return nil, err
 		}
 		r.MatchParam.Info = &rule.FingerprintInfo{
 			Info: info,
@@ -56,6 +63,12 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 			break
 		}
 		token := tokens[index]
+		originToken := token
+		token = strings.TrimSpace(token)
+		if token == "" && currentStatus != "stringValue" {
+			index++
+			continue
+		}
 		switch currentStatus {
 		case "exp":
 			switch token {
@@ -63,7 +76,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				tmpItems = append(tmpItems, token)
 			default:
 				data := token
-				currentRule = &rule.FingerPrintRule{}
+				currentRule = &rule.FingerPrintRule{MatchParam: &rule.MatchMethodParam{}}
 				tmpItems = append(tmpItems, currentRule)
 				r := currentRule
 				r.Method = "exp"
@@ -98,15 +111,17 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				} else {
 					v, err := strconv.Atoi(token)
 					if err != nil {
-						return nil, fmt.Errorf("invalid value: %s", token)
+						currentRule.MatchParam.Params = append(currentRule.MatchParam.Params, token)
+						//return nil, fmt.Errorf("invalid value: %s", token)
+					} else {
+						currentRule.MatchParam.Params = append(currentRule.MatchParam.Params, v)
 					}
-					currentRule.MatchParam.Params = append(currentRule.MatchParam.Params, v)
 				}
 				currentStatus = "exp"
 			}
 		case "stringValue":
 			if escape {
-				strBuf += token
+				strBuf += originToken
 				escape = false
 				continue
 			} else {
@@ -114,10 +129,11 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				case "\"":
 					currentRule.MatchParam.Params = append(currentRule.MatchParam.Params, strBuf)
 					strBuf = ""
+					currentStatus = "exp"
 				case "\\":
 					escape = true
 				default:
-					strBuf += token
+					strBuf += originToken
 				}
 			}
 		default:
