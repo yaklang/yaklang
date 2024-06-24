@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -156,4 +157,14 @@ func (value Values) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperator, er
 		ret = append(ret, v)
 	}
 	return sfvm.NewValues(ret), nil
+}
+
+func (value Values) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.AnalysisContextOption) error {
+	for _, element := range value {
+		err := element.AppendPredecessor(operator, opts...)
+		if err != nil {
+			log.Warnf("append predecessor failed: %v", err)
+		}
+	}
+	return nil
 }

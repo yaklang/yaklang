@@ -179,6 +179,17 @@ func (g *Graph) AddEdge(from, to int, label string) int {
 	return id
 }
 
+// GetEdges returns the ids of the edges between the given nodes.
+func (g *Graph) GetEdges(from, to int) []int {
+	var ret []int
+	for id, edge := range g.edges {
+		if edge.from.id == from && edge.to.id == to {
+			ret = append(ret, id)
+		}
+	}
+	return ret
+}
+
 // AddDashEdge adds a new edge between the given nodes with the specified
 // label and returns an id for the new edge.
 // style

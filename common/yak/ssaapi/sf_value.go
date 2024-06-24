@@ -136,3 +136,18 @@ func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
 	}
 	return nil, utils.Errorf("ssa.Value %v cannot call by slice, like v[%v]", v.String(), i)
 }
+
+func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.AnalysisContextOption) error {
+	return operator.Recursive(func(el sfvm.ValueOperator) error {
+		if result, ok := el.(*Value); ok {
+			ctx := sfvm.NewDefaultAnalysisContext()
+			for _, opt := range opts {
+				opt(ctx)
+			}
+			v.Predecessors = append(v.Predecessors, &PredecessorValue{
+				Node: result, Info: ctx,
+			})
+		}
+		return nil
+	})
+}

@@ -17,6 +17,10 @@ func (p *Program) String() string {
 
 func (p *Program) IsMap() bool { return false }
 
+func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error {
+	return utils.Error("ssa.Program is not supported append predecessor")
+}
+
 func (p *Program) IsList() bool {
 	//TODO implement me
 	return false

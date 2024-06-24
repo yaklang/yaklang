@@ -2,7 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
-
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
@@ -24,6 +24,14 @@ type Value struct {
 
 	// for debug
 	syntaxFlowName []string
+
+	// for syntaxflow vm
+	Predecessors []*PredecessorValue
+}
+
+type PredecessorValue struct {
+	Node *Value
+	Info *sfvm.AnalysisContext
 }
 
 func ValueContain(v1 *Value, v2 ...*Value) bool {
