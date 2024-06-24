@@ -73,6 +73,8 @@ const (
 	OpGlobMatch
 	OpNot
 
+	OpAlert // echo variable
+
 	// OpCheckParams check the params in vm context
 	// if not match, record error
 	// matched, use 'then expr' (if exists)
@@ -232,6 +234,8 @@ func (s *SFI) String() string {
 			suffix += " value: " + ret
 		}
 		return fmt.Sprintf(verboseLen+" %v"+suffix, "desc", s.UnaryStr)
+	case OpAlert:
+		return fmt.Sprintf(verboseLen+" %v", "alert", s.UnaryStr)
 	case OpCreateIter:
 		return fmt.Sprintf(verboseLen+" %v", "iter-start", s.UnaryStr)
 	case OpIterEnd:

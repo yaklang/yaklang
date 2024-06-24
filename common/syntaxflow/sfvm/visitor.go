@@ -57,6 +57,8 @@ func (y *SyntaxFlowVisitor) VisitStatement(raw sf.IStatementContext) {
 		y.VisitCheckStatement(i.CheckStatement())
 	case *sf.DescriptionContext:
 		y.VisitDescriptionStatement(i.DescriptionStatement())
+	case *sf.AlertContext:
+		y.VisitAlertStatement(i.AlertStatement())
 	case *sf.EmptyContext:
 		return
 	default:

@@ -27,6 +27,10 @@ func (v *BaseSyntaxFlowVisitor) VisitDescription(ctx *DescriptionContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitAlert(ctx *AlertContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitEmpty(ctx *EmptyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -56,6 +60,10 @@ func (v *BaseSyntaxFlowVisitor) VisitDescriptionItems(ctx *DescriptionItemsConte
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitDescriptionItem(ctx *DescriptionItemContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitAlertStatement(ctx *AlertStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

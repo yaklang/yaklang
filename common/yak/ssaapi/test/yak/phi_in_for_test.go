@@ -1,11 +1,12 @@
 package ssaapi
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestPhiInCFG_If(t *testing.T) {
@@ -20,7 +21,10 @@ os.System(input)
 `
 	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		phis := prog.SyntaxFlowChain("os.System(* as $param,)").GetBySyntaxFlowName("param")
+		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
+		if len(phis) == 0 {
+			t.Fatalf("no phi found")
+		}
 		phi := phis[0]
 		phi.GetId()
 		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
@@ -53,7 +57,7 @@ os.System(input)
 `
 	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		phis := prog.SyntaxFlowChain("os.System(* as $param,)").GetBySyntaxFlowName("param")
+		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		phi := phis[0]
 		phi.GetId()
 		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
@@ -92,7 +96,7 @@ os.System(input)
 `
 	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		phis := prog.SyntaxFlowChain("os.System(* as $param,)").GetBySyntaxFlowName("param")
+		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		phi := phis[0]
 		phi.GetId()
 		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())

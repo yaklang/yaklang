@@ -129,7 +129,7 @@ func TestSyntaxInOne(t *testing.T) {
 		"exec(* #-> ?{((any: 'example',abc,) && (opcode: phi))})",
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
-		err := vm.Compile(i)
+		_, err := vm.Compile(i)
 		if err != nil {
 			t.Fatalf("syntax failed: %#v, reason: %v", i, err)
 		}
