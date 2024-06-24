@@ -55,7 +55,7 @@ func TestMustPass_Debug(t *testing.T) {
 		return
 	}
 
-	keyword := "xxe.sf"
+	keyword := "jdbc.sf"
 	prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +79,11 @@ func TestMustPass_Debug(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		if len(result.Errors) > 0 {
+			t.Fatal("errors: ", strings.Join(result.Errors, "\n"))
+		}
+
 		result.Show()
 
 		fmt.Println("\n--------------------------------------")

@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -105,8 +106,12 @@ func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOper
 }
 
 func (s *SyntaxFlowVirtualMachine) Results() []*SFFrameResult {
-	var infos = make([]*SFFrameResult, len(s.frames))
+	var infos = make([]*SFFrameResult, 0, len(s.frames))
 	s.ForEachFrame(func(frame *SFFrame) {
+		if frame.result == nil {
+			log.Warn("frame result is nil")
+			return
+		}
 		infos = append(infos, frame.result)
 	})
 	return infos
