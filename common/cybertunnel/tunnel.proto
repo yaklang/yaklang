@@ -133,6 +133,7 @@ message CheckServerReachableResponse {
   bool Reachable = 1;
   string Verbose = 2;
   bytes HTTPResponse = 3;
+  bytes HTTPRequest = 4;
 }
 
 

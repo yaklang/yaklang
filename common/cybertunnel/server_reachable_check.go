@@ -36,20 +36,20 @@ func (s *TunnelServer) CheckServerReachable(ctx context.Context, req *tpb.CheckS
 				urlIns.Scheme = "http"
 			}
 		}
-		rsp, _, err := poc.DoGET(urlIns.String(), poc.WithForceHTTPS(urlIns.Scheme == "https"))
+		rsp, _, err := poc.DoGET(urlIns.String(), poc.WithForceHTTPS(urlIns.Scheme == "https"), poc.WithNoRedirect(true))
 		if err != nil {
 			result.Reachable = false
 			result.Verbose = fmt.Sprintf("Try HTTP request %s fail: %s", req.GetUrl(), err.Error())
 		} else {
+			result.HTTPRequest = rsp.RawRequest
+			result.HTTPResponse = rsp.RawPacket
 			statusCode := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
-			if statusCode != 200 {
-				result.Reachable = false
-				result.Verbose = fmt.Sprintf("HTTP request %s return status code %d, not 200 ok", req.GetUrl(), statusCode)
-				result.HTTPResponse = rsp.RawPacket
-			} else {
+			if statusCode >= 200 && statusCode < 400 {
 				result.Reachable = true
 				result.Verbose = "HTTP check ok"
-				result.HTTPResponse = rsp.RawPacket
+			} else {
+				result.Reachable = false
+				result.Verbose = fmt.Sprintf("HTTP request %s return status code %d", req.GetUrl(), statusCode)
 			}
 		}
 	} else {
