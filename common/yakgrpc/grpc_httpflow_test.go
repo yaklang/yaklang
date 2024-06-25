@@ -602,3 +602,32 @@ Host: %s
 	log.Infof("reQueryFlow: %v", reQueryFlow)
 	// require.Equal(t, gotFlow.GetId(), reQueryFlow.GetId())
 }
+
+func TestGRPCMUSTPASS_Delete_HTTPFlow(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1000*time.Second)
+	defer cancel()
+
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	db := consts.GetGormProjectDatabase()
+	token := utils.RandStringBytes(5)
+	for i := 0; i < 100; i++ {
+		flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithSource(token))
+		require.NoError(t, err)
+		err = yakit.InsertHTTPFlow(db, flow)
+		require.NoError(t, err)
+	}
+
+	_, err = client.DeleteHTTPFlows(ctx, &ypb.DeleteHTTPFlowRequest{
+		Filter: &ypb.QueryHTTPFlowRequest{
+			SourceType: token,
+		},
+	})
+	require.NoError(t, err)
+
+	var count int
+	db.Model(&schema.HTTPFlow{}).Where("source_type = ?", token).Count(&count)
+
+	require.Equal(t, 0, count, "delete fail")
+}
