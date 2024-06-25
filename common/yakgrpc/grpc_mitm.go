@@ -148,7 +148,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			plainResponse = httpctx.GetPlainResponseBytes(req)
 			if len(plainResponse) <= 0 {
 				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
-				httpctx.SetPlainResponseBytes(req, plainResponse)
 			}
 		}
 		return plainResponse
@@ -782,6 +781,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		originRspRaw := rsp[:]
 		plainResponse := getPlainResponseBytes(req)
 		if len(plainResponse) > 0 {
+			httpctx.SetPlainResponseBytes(req, plainResponse)
 			rsp = plainResponse
 		}
 

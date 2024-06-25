@@ -228,9 +228,13 @@ func DeletePacketEncoding(raw []byte) []byte {
 	buf.WriteString(CRLF)
 
 	if isChunked {
-		decBody, _ := codec.HTTPChunkedDecode(body)
-		if len(decBody) > 0 {
-			body = decBody
+		unchunked, chunkErr := codec.HTTPChunkedDecode(body)
+		if unchunked != nil {
+			body = unchunked
+		} else {
+			if chunkErr == nil {
+				body = []byte{}
+			}
 		}
 	}
 
