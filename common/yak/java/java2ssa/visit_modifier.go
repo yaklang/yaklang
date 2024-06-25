@@ -120,19 +120,21 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 				return
 			}
 			// create @RequestMap.ref -> @RequestMap (ref or _)
-			refAlias := []string{
-				"_ref", "_",
-			}
 			log.Infof("start to build annotation ref to def: (%v)%v", value.GetId(), value.GetName())
-			for _, name := range refAlias {
-				ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(name))
-				y.AssignVariable(ref, value)
-			}
+			annotationToRef := "__ref__"
+			ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(annotationToRef))
+			y.AssignVariable(ref, value)
 			for _, v := range annotationContainerInstance.GetAllMember() {
-				for _, aliasName := range refAlias {
-					y.AssignVariable(y.CreateMemberCallVariable(v, y.EmitConstInst(aliasName)), value)
-				}
+				y.AssignVariable(y.CreateMemberCallVariable(v, y.EmitConstInst(annotationToRef)), value)
 			}
+			annotationContainer := y.CreateMemberCallVariable(value, y.EmitConstInst("annotation"))
+			annotationCollector := y.EmitEmptyContainer()
+			y.AssignVariable(annotationContainer, annotationCollector)
+			var fieldAnnotationName = annotationName
+			if annotationName == "" {
+				fieldAnnotationName = annotationContainerInstance.GetName()
+			}
+			y.AssignVariable(y.CreateMemberCallVariable(value, y.EmitConstInst(fieldAnnotationName)), annotationContainerInstance)
 		}
 }
 
