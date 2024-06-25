@@ -141,7 +141,7 @@ func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *schema.Extracted
 	return outC
 }
 
-func DeleteExtractedDataByTraceId(db *gorm.DB, httpFlowHash []string) error {
+func DeleteExtractedDataByTraceIds(db *gorm.DB, httpFlowHash []string) error {
 	db = db.Model(&schema.ExtractedData{}).Where("source_type == 'httpflow' ")
 	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", httpFlowHash)
 	db = db.Unscoped().Delete(&schema.ExtractedData{})
@@ -149,4 +149,19 @@ func DeleteExtractedDataByTraceId(db *gorm.DB, httpFlowHash []string) error {
 		return db.Error
 	}
 	return nil
+}
+
+func DeleteExtractedDataByTraceId(db *gorm.DB, flowHash string) error {
+	if internalDb := db.Model(&schema.ExtractedData{}).Where("trace_id = ?", flowHash).Unscoped().Delete(&schema.ExtractedData{}); internalDb.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func DropExtractedDataTable(db *gorm.DB) {
+	db.DropTableIfExists(&schema.ExtractedData{})
+	if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='extracted_data';`); db.Error != nil {
+		log.Errorf("update sqlite sequence failed: %s", db.Error)
+	}
+	db.AutoMigrate(&schema.ExtractedData{})
 }
