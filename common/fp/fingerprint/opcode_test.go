@@ -1,7 +1,6 @@
 package fingerprint
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
@@ -11,7 +10,7 @@ import (
 
 var rsp = []byte(`HTTP/1.1 200 OK
 Tag: --- VIDEO WEB SERVER ---
-
+Tag1: ---aexeaaaa
 
 <!doctype html>
 <html>
@@ -60,8 +59,35 @@ func TestExpressionOpCode(t *testing.T) {
 		}
 	}
 }
+
+// TestYamlOpCode test regexp、condition、http_header、extract cpe by regexp
 func TestYamlOpCode(t *testing.T) {
-	testCases := [][]any{
+	for _, testCase := range []struct {
+		rule   string
+		expect bool
+	}{
+		{
+			`- methods:
+    - headers:
+        - key: Tag1
+          value:
+            product_index: 1
+            regexp: a(e.e)a`, true,
+		}, {
+			`- methods:
+    - headers:
+        - key: Tag
+          value:
+            product: exe
+            regexp: WEB`, true,
+		}, {
+			`- methods:
+    - headers:
+        - key: Tag
+          value:
+            product: exe
+            regexp: WEB1`, false,
+		},
 		{
 			`- methods:
     - keywords:
@@ -86,24 +112,21 @@ func TestYamlOpCode(t *testing.T) {
         - product: exe
           regexp: .*\.aexe`, true,
 		},
-	}
-	for i, testCase := range testCases {
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			yamlRule := testCase[0].(string)
-			expect := testCase[1].(bool)
-			r, err := parsers.ParseYamlRule(yamlRule)
-			if err != nil {
-				t.Fatal(err)
-			}
-			info, err := rule.Execute(rsp, r[0].ToOpCodes())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !expect {
-				assert.Nil(t, info)
-			} else {
-				assert.Equal(t, "exe", info.CPE.Product)
-			}
-		})
+	} {
+		yamlRule := testCase.rule
+		expect := testCase.expect
+		r, err := parsers.ParseYamlRule(yamlRule)
+		if err != nil {
+			t.Fatal(err)
+		}
+		info, err := rule.Execute(rsp, r[0].ToOpCodes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !expect {
+			assert.Nil(t, info)
+		} else {
+			assert.Equal(t, "exe", info.CPE.Product)
+		}
 	}
 }

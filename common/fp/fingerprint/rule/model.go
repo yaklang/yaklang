@@ -3,6 +3,7 @@ package rule
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"strings"
 )
 
@@ -91,51 +92,50 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 	case "regexp":
 		pushCode(&OpCode{Op: OpData})
 		pushCode(&OpCode{Op: OpPush, data: []any{f.MatchParam.RegexpPattern}})
-		pushCode(&OpCode{Op: OpRegexpMatch, data: []any{1}})
+		extGroup := []any{f.MatchParam.Keyword.VersionIndex, f.MatchParam.Keyword.ProductIndex, f.MatchParam.Keyword.VersionIndex, f.MatchParam.Keyword.UpdateIndex, f.MatchParam.Keyword.EditionIndex, f.MatchParam.Keyword.LanguageIndex}
+		if !funk.Any(extGroup...) {
+			extGroup = nil
+		}
+		pushCode(&OpCode{Op: OpRegexpMatch, data: extGroup})
 	case "md5":
 		pushCode(&OpCode{Op: OpExtractData, data: []any{"md5"}})
 		pushCode(&OpCode{Op: OpPush, data: []any{f.MatchParam.Md5}})
 		pushCode(&OpCode{Op: OpEqual})
 	case "http_header":
 		pushCode(&OpCode{Op: OpExtractData, data: []any{"header_item", f.MatchParam.HeaderKey}})
-		pushCode(&OpCode{Op: OpPush, data: []any{f.MatchParam.HeaderMatchRule.MatchParam.RegexpPattern}})
-		pushCode(&OpCode{Op: OpRegexpMatch, data: []any{1}})
+		subParam := f.MatchParam.HeaderMatchRule.MatchParam
+		pushCode(&OpCode{Op: OpPush, data: []any{subParam.RegexpPattern}})
+		extGroup := []any{subParam.Keyword.VersionIndex, subParam.Keyword.ProductIndex, subParam.Keyword.VersionIndex, subParam.Keyword.UpdateIndex, subParam.Keyword.EditionIndex, subParam.Keyword.LanguageIndex}
+		if !funk.Any(extGroup...) {
+			extGroup = nil
+		}
+		pushCode(&OpCode{Op: OpRegexpMatch, data: extGroup})
 	case "complex":
-		code := &OpCode{Op: OpJmpIfTrue}
+		code := &OpCode{Op: OpOr}
 		codes := []*OpCode{}
 		switch f.MatchParam.Condition {
 		case "or":
-			code = &OpCode{Op: OpJmpIfTrue}
-			for _, rule := range f.MatchParam.SubRules {
+			code = &OpCode{Op: OpOr}
+			for i, rule := range f.MatchParam.SubRules {
 				codes = append(codes, rule.preToOpCodes()...)
+				if i == len(f.MatchParam.SubRules)-1 {
+					continue
+				}
 				codes = append(codes, code)
 			}
 			res = append(res, codes...)
-			code2 := &OpCode{Op: OpJmp}
-			res = append(res, code2)
 			code.data = []any{len(res)}
-			res = append(res, &OpCode{Op: OpPush, data: []any{true}})
-			code3 := &OpCode{Op: OpJmp}
-			res = append(res, code3)
-			code2.data = []any{len(res)}
-			res = append(res, &OpCode{Op: OpPush, data: []any{false}})
-			code3.data = []any{len(res)}
 		case "and":
-			code = &OpCode{Op: OpJmpIfFalse}
-			for _, rule := range f.MatchParam.SubRules {
+			code = &OpCode{Op: OpAnd}
+			for i, rule := range f.MatchParam.SubRules {
 				codes = append(codes, rule.preToOpCodes()...)
+				if i == len(f.MatchParam.SubRules)-1 {
+					continue
+				}
 				codes = append(codes, code)
 			}
 			res = append(res, codes...)
-			code2 := &OpCode{Op: OpJmp}
-			res = append(res, code2)
 			code.data = []any{len(res)}
-			res = append(res, &OpCode{Op: OpPush, data: []any{false}})
-			code3 := &OpCode{Op: OpJmp}
-			res = append(res, code3)
-			code2.data = []any{len(res)}
-			res = append(res, &OpCode{Op: OpPush, data: []any{true}})
-			code3.data = []any{len(res)}
 		}
 	default:
 		return nil
@@ -182,6 +182,6 @@ type FingerprintInfo struct {
 	Info           string `json:"info"`
 	Version        string `json:"version"`
 	DeviceType     string `json:"device_type"`
-	CPE            *CPE   `json:"cpes"`
+	CPE            CPE    `json:"cpes"`
 	Raw            string `json:"raw"`
 }

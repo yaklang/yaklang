@@ -16,9 +16,11 @@ const (
 	OpData        OpFlag = "data"
 	OpExtractData OpFlag = "extract_data"
 	OpPush        OpFlag = "push"
-	OpJmpIfTrue   OpFlag = "jmp_true"
-	OpJmp         OpFlag = "jmp"
-	OpJmpIfFalse  OpFlag = "jmp_false"
+	OpOr          OpFlag = "or"
+	OpAnd         OpFlag = "and"
+	//OpJmpIfTrue   OpFlag = "jmp_true"
+	//OpJmp         OpFlag = "jmp"
+	//OpJmpIfFalse  OpFlag = "jmp_false"
 	OpEqual       OpFlag = "equal"
 	OpContains    OpFlag = "contains"
 	OpRegexpMatch OpFlag = "regexp_match"
@@ -29,14 +31,23 @@ type OpCode struct {
 	data []any
 }
 
+type matchedResult struct {
+	ok   bool
+	info *FingerprintInfo
+}
+
 func Execute(data []byte, codes []*OpCode) (*FingerprintInfo, error) {
 	stack := utils.NewStack[any]()
 	for i := 0; i < len(codes); i++ {
 		code := codes[i]
 		switch code.Op {
 		case OpInfo:
-			if stack.Pop().(bool) {
-				stack.Push(code.data[0].(*FingerprintInfo))
+			if v := stack.Pop().(*matchedResult); v.ok {
+				if v.info != nil {
+					stack.Push(v.info)
+				} else {
+					stack.Push(code.data[0].(*FingerprintInfo))
+				}
 			}
 		case OpData:
 			stack.Push(string(data))
@@ -57,30 +68,63 @@ func Execute(data []byte, codes []*OpCode) (*FingerprintInfo, error) {
 			}
 		case OpPush:
 			stack.Push(code.data[0])
-		case OpJmp:
-			i = code.data[0].(int) - 1
-		case OpJmpIfTrue:
-			if stack.Pop().(bool) {
+		case OpOr:
+			if v := stack.Pop().(*matchedResult); v.ok {
 				i = code.data[0].(int) - 1
+				stack.Push(v)
 			}
-		case OpJmpIfFalse:
-			if !stack.Pop().(bool) {
+		case OpAnd:
+			if v := stack.Pop().(*matchedResult); !v.ok {
 				i = code.data[0].(int) - 1
+				stack.Push(v)
 			}
+		//case OpJmp:
+		//	i = code.data[0].(int) - 1
+		//case OpJmpIfTrue:
+		//	if stack.Pop().(bool) {
+		//		i = code.data[0].(int) - 1
+		//	}
+		//case OpJmpIfFalse:
+		//	if !stack.Pop().(bool) {
+		//		i = code.data[0].(int) - 1
+		//	}
 		case OpEqual:
 			d1 := stack.Pop().(string)
 			d2 := stack.Pop().(string)
-			stack.Push(d1 == d2)
+			stack.Push(&matchedResult{ok: d1 == d2})
 		case OpContains:
 			d := stack.PopN(2)
 			d1 := d[1].(string)
 			d2 := d[0].(string)
-			stack.Push(strings.Contains(d1, d2))
+			stack.Push(&matchedResult{ok: strings.Contains(d1, d2)})
 		case OpRegexpMatch:
 			d := stack.PopN(2)
 			d1 := d[1].(string)
 			d2 := d[0].(string)
-			stack.Push(regexp.MustCompile(d2).MatchString(d1))
+			re := regexp.MustCompile(d2)
+			ok := re.MatchString(d1)
+			if !ok {
+				stack.Push(&matchedResult{ok: false})
+				break
+			}
+			if len(code.data) == 6 {
+				info := &FingerprintInfo{}
+				res := re.FindAllStringSubmatch(d1, 1)
+				getGroup := func(s *string, index int) {
+					if index != 0 && len(res) > 0 && index < len(res[0]) {
+						*s = res[0][index]
+					}
+				}
+				getGroup(&info.CPE.Vendor, code.data[0].(int))
+				getGroup(&info.CPE.Product, code.data[1].(int))
+				getGroup(&info.CPE.Version, code.data[2].(int))
+				getGroup(&info.CPE.Update, code.data[3].(int))
+				getGroup(&info.CPE.Edition, code.data[4].(int))
+				getGroup(&info.CPE.Language, code.data[5].(int))
+				stack.Push(&matchedResult{ok: true, info: info})
+			} else {
+				stack.Push(&matchedResult{ok: true})
+			}
 		}
 	}
 	if stack.Size() == 0 {
