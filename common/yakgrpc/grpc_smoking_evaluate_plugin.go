@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/google/uuid"
 	"sync"
+
+	"golang.org/x/exp/slices"
+
+	"github.com/google/uuid"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -89,13 +92,6 @@ func setupEachServe(ctx context.Context) (string, int) {
 
 // 只在评分中使用
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, host string, port int) (*ypb.SmokingEvaluatePluginResponse, error) {
-	if pluginType == "nuclei" {
-		return &ypb.SmokingEvaluatePluginResponse{
-			Score:   60,
-			Results: []*ypb.SmokingEvaluateResult{},
-		}, nil
-	}
-
 	var results []*ypb.SmokingEvaluateResult
 	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, i ...[]byte) {
 		var buf bytes.Buffer
@@ -119,36 +115,42 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	)
 
 	// static analyze
-	staticCheckingFailed := false
-	staticResults := yak.StaticAnalyzeYaklang(pluginCode, pluginType)
-	if len(staticResults) > 0 {
-		for _, sRes := range staticResults {
-			R := &ypb.Range{
-				StartLine:   int64(sRes.StartLineNumber),
-				StartColumn: int64(sRes.StartColumn),
-				EndLine:     int64(sRes.EndLineNumber),
-				EndColumn:   int64(sRes.EndColumn),
+	if slices.Contains([]string{
+		"mitm", "port-scan", "codec", "yak",
+	}, pluginType) {
+		staticCheckingFailed := false
+		staticResults := yak.StaticAnalyzeYaklang(pluginCode, pluginType)
+		if len(staticResults) > 0 {
+			for _, sRes := range staticResults {
+				R := &ypb.Range{
+					StartLine:   int64(sRes.StartLineNumber),
+					StartColumn: int64(sRes.StartColumn),
+					EndLine:     int64(sRes.EndLineNumber),
+					EndColumn:   int64(sRes.EndColumn),
+				}
+				switch sRes.Severity {
+				case result.Error:
+					staticCheckingFailed = true
+					pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, []byte(sRes.From))
+				case result.Warn:
+					pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
+					score = 60
+				}
 			}
-			switch sRes.Severity {
-			case result.Error:
-				staticCheckingFailed = true
-				pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, []byte(sRes.From))
-			case result.Warn:
-				pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
-				score = 60
-			}
+			log.Error("static analyze failed")
 		}
-		log.Error("static analyze failed")
+
+		if staticCheckingFailed {
+			return &ypb.SmokingEvaluatePluginResponse{
+				Score:   0,
+				Results: results,
+			}, nil
+		}
 	}
 
-	if staticCheckingFailed {
-		return &ypb.SmokingEvaluatePluginResponse{
-			Score:   0,
-			Results: results,
-		}, nil
-	}
-
-	if pluginType == "mitm" || pluginType == "port-scan" { // echo debug script
+	if slices.Contains([]string{
+		"mitm", "port-scan", "nuclei",
+	}, pluginType) { // echo debug script
 
 		if host == "" || port <= 0 {
 			return nil, utils.Error("debug echo server start failed")
@@ -164,6 +166,9 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				if err != nil {
 					return err
 				}
+				spew.Dump(m)
+				spew.Dump(m["request"])
+				spew.Dump(m["response"])
 				log.Info("debugScript recv: ", string(result.Message))
 				switch utils.MapGetString(utils.MapGetMapRaw(m, "content"), "level") {
 				case "json-risk":
@@ -173,14 +178,18 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			return nil
 		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}}, runtimeId)
 		if err != nil {
-			score -= 40
+			score -= 60
 			log.Errorf("debugScript failed: %v", err)
 			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error(), nil, Error)
 		}
 		if fetchRisk {
-			score -= 20
+			score -= 50
 			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error)
 		}
+	}
+
+	if score < 0 {
+		score = 0
 	}
 
 	return &ypb.SmokingEvaluatePluginResponse{
