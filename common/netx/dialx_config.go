@@ -175,7 +175,7 @@ func DialX_WithTimeout(timeout time.Duration) DialXOption {
 
 func DialX_WithProxy(proxy ...string) DialXOption {
 	return func(c *dialXConfig) {
-		c.Proxy = append(c.Proxy, utils.StringArrayFilterEmpty(proxy)...)
+		c.Proxy = append(utils.StringArrayFilterEmpty(proxy), c.Proxy...)
 	}
 }
 
