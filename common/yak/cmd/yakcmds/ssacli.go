@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -211,16 +212,23 @@ var SSACompilerCommands = []*cli.Command{
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
 
-			// TODO: support multiple syntaxflow query, from file or directory
-			for _, name := range c.Args() {
-				_ = name
-			}
-
-			if syntaxFlow == "" {
-				log.Errorf("syntax flow query code is required")
+			if syntaxFlow != "" {
+				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 				return
 			}
-			SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+
+			for _, name := range c.Args() {
+				log.Infof("start to use SyntaxFlow rule: %v", name)
+				raw, err := os.ReadFile(name)
+				if err != nil {
+					log.Errorf("read file [%v] failed: %v", name, err)
+					return
+				}
+				syntaxFlow = string(raw)
+				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				fmt.Println()
+				fmt.Println()
+			}
 		},
 	},
 }
