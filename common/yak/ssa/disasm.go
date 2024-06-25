@@ -213,7 +213,7 @@ func (u *Undefined) String() string {
 		valid = "(valid)"
 	}
 	if u.IsMember() {
-		return fmt.Sprintf("%s = undefined-%s%s", getStr(u), u.GetVerboseName(), valid)
+		return fmt.Sprintf("%s = undefined-%s%s(from:%d)", getStr(u), u.GetVerboseName(), valid, u.GetObject().GetId())
 	}
 	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetName())
 }

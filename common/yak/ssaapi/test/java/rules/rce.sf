@@ -1,0 +1,11 @@
+desc(title: "rce")
+
+ProcessBuilder(* as $cmd) as $builder
+$builder.start() as $execBuilder
+
+
+Runtime.getRuntime().exec(* as $cmd)
+$cmd #-> * as $target
+
+check $target then "fine" else "rce 2 SyntaxFlow error"
+
