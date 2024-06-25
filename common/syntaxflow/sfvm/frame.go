@@ -555,8 +555,25 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if elseStr == "" {
 			elseStr = "$" + i.UnaryStr + "is not found"
 		}
+
+		haveResult := false
+
 		results, ok := s.GetSymbolTable().Get(i.UnaryStr)
-		if !ok || results == nil {
+		if !ok {
+			haveResult = true
+		} else if results == nil {
+			haveResult = false
+		} else {
+			_ = results.Recursive(func(operator ValueOperator) error {
+				if _, ok := operator.(ssa.GetIdIF); ok {
+					haveResult = true
+					return utils.Error("abort")
+				}
+				return nil
+			})
+		}
+
+		if !haveResult {
 			s.debugSubLog("-   error: " + elseStr)
 			if s.config.FailFast {
 				return utils.Wrapf(CriticalError, "check params failed: %v", elseStr)
