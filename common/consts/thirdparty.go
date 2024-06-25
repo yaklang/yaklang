@@ -86,6 +86,22 @@ func (c *thirdPartyApplicationConfig) ToMap() map[string]string {
 	}
 	return params
 }
+func GetCommonThirdPartyApplicationConfig(t string) (*ypb.ThirdPartyApplicationConfig, error) {
+	if v, ok := thirdPartyConfig.Load(t); ok {
+		rawCfg := v.(*thirdPartyApplicationConfig)
+		utils.ImportAppConfigToStruct(rawCfg, rawCfg.ToMap())
+		config := &ypb.ThirdPartyApplicationConfig{}
+		config.APIKey = rawCfg.APIKey
+		config.UserIdentifier = rawCfg.UserIdentifier
+		config.UserSecret = rawCfg.UserSecret
+		config.Namespace = rawCfg.Namespace
+		config.Domain = rawCfg.Domain
+		config.WebhookURL = rawCfg.WebhookURL
+		config.Type = t
+		return config, nil
+	}
+	return nil, errors.New("third party application config not found")
+}
 
 // GetThirdPartyApplicationConfig
 // first argument is the type of third party application, second argument is the config struct pointer,

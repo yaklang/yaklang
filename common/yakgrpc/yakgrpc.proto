@@ -662,7 +662,9 @@ service Yak {
   rpc DeleteHybridScanTask(DeleteHybridScanTaskRequest) returns (Empty);
 
   rpc GetSpaceEngineStatus(GetSpaceEngineStatusRequest) returns(SpaceEngineStatus);
+  // 由于第三方应用配置改为从后端动态的获取表单字段名，所以弃用此接口改用GetSpaceEngineAccountStatusV2
   rpc GetSpaceEngineAccountStatus(GetSpaceEngineAccountStatusRequest) returns(SpaceEngineStatus);
+  rpc GetSpaceEngineAccountStatusV2(ThirdPartyApplicationConfig) returns(SpaceEngineStatus);
   rpc FetchPortAssetFromSpaceEngine(FetchPortAssetFromSpaceEngineRequest) returns (stream ExecResult);
 
   // 表达式执行
