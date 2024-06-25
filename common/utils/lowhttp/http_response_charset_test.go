@@ -2,7 +2,9 @@ package lowhttp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,6 +118,32 @@ func TestFixResponse_CharSet(t *testing.T) {
 		sample := "你好，世界！"
 		fmt.Println(sample)
 		test.Contains(string(rsp), sample)
+	})
+
+	t.Run("content-type charset gbk,body gbk (limit break)", func(t *testing.T) {
+		test := assert.New(t)
+
+		raw, _ := codec.Utf8ToGB18030([]byte(`你好世界`))
+		body := strings.Repeat("a", mimetype.GetLimit()-1)
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=gbk\r\nContent-Length: 18\r\n\r\n" + body + string(raw))
+		rsp, _, err := FixHTTPResponse(packet)
+		fmt.Println(string(rsp))
+		test.Nil(err, "FixHTTPResponse error")
+		test.Contains(string(rsp), "Content-Type: text/html; charset=utf-8")
+		test.Contains(string(rsp), "你好世界")
+	})
+
+	t.Run("content-type charset gbk,body gbk (limit break 2)", func(t *testing.T) {
+		test := assert.New(t)
+
+		raw, _ := codec.Utf8ToGB18030([]byte(`你好世界`))
+		body := strings.Repeat("a", mimetype.GetLimit()-len(raw)+1)
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=gbk\r\nContent-Length: 18\r\n\r\n" + body + string(raw))
+		rsp, _, err := FixHTTPResponse(packet)
+		fmt.Println(string(rsp))
+		test.Nil(err, "FixHTTPResponse error")
+		test.Contains(string(rsp), "Content-Type: text/html; charset=utf-8")
+		test.Contains(string(rsp), "你好世界")
 	})
 
 	t.Run("no content-type charset,meta gbk", func(t *testing.T) {

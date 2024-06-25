@@ -111,7 +111,7 @@ func (t *MIMEResult) _tryUTF8Convertor(raw []byte) ([]byte, bool) {
 		}
 	}
 
-	switch strings.ToLower(t.Charset) {
+	switch charsetLower := strings.ToLower(t.Charset); charsetLower {
 	case "gb18030", "gb-18030", "gbk", "gb2312", "gb-2312":
 		result, err := GB18030ToUtf8(raw)
 		if err != nil {
@@ -124,13 +124,13 @@ func (t *MIMEResult) _tryUTF8Convertor(raw []byte) ([]byte, bool) {
 			return raw, false
 		}
 
-		if t.Charset != "" && t.Charset != "utf-8" {
+		if charsetLower != "" && charsetLower != "utf-8" {
 			log.Warnf("TBD: charset %#v not supported yet, use origin raw input", t.Charset)
 		}
 
-		if t.Charset == "" && t.IsText {
-			t.Charset = mimecharset.FromPlain(raw)
-			enc, _ := charset.Lookup(t.Charset)
+		if charsetLower == "" && t.IsText {
+			charsetLower = mimecharset.FromPlain(raw)
+			enc, _ := charset.Lookup(charsetLower)
 			if enc != nil {
 				fixed, err := enc.NewDecoder().Bytes(raw)
 				if err == nil {
