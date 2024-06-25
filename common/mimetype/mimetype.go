@@ -10,6 +10,7 @@ import (
 	"mime"
 	"os"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 var defaultLimit uint32 = 3072
@@ -21,15 +22,56 @@ var readLimit uint32 = defaultLimit
 //
 // The result is always a valid MIME type, with application/octet-stream
 // returned when identification failed.
-func Detect(in []byte) *MIME {
+func Detect(raw []byte) *MIME {
 	// Using atomic because readLimit can be written at the same time in other goroutine.
 	l := atomic.LoadUint32(&readLimit)
+
+	in := raw
 	if l > 0 && len(in) > int(l) {
 		in = in[:l]
 	}
+
+	// try to ensure the boundary is a complete UTF-8 character
+	// dont cut bad
+	if uint32(len(raw)) > l {
+		count := 0
+		for {
+			count++
+			if count > 4 {
+				break
+			}
+			last, size := utf8.DecodeLastRune(in)
+			if last == utf8.RuneError {
+				in = raw[:len(in)-size]
+			} else {
+				break
+			}
+		}
+	}
+
 	mu.RLock()
 	defer mu.RUnlock()
-	return root.match(in, l)
+
+	mimeType := root.match(in, l)
+	// is utf8
+	if mimeType.NeedCharset() && mimeType.Charset() == "utf-8" {
+		if ret := uint32(len(raw)); ret > l && ret <= 1024*1024 {
+			var newSampleIndex uint32 = 0
+			for _idx := l; _idx < ret; {
+				r, size := utf8.DecodeRune(raw[_idx:])
+				if r == utf8.RuneError {
+					newSampleIndex = _idx
+					break
+				}
+				_idx += uint32(size)
+			}
+			if newSampleIndex > 0 {
+				in = raw[newSampleIndex:]
+				mimeType = root.match(in, 1024*1024)
+			}
+		}
+	}
+	return mimeType
 }
 
 // DetectReader returns the MIME type of the provided reader.
@@ -109,6 +151,12 @@ func EqualsAny(s string, mimes ...string) bool {
 func SetLimit(limit uint32) {
 	// Using atomic because readLimit can be read at the same time in other goroutine.
 	atomic.StoreUint32(&readLimit, limit)
+}
+
+// GetLimit returns the maximum number of bytes read from input when detecting the MIME type.
+func GetLimit() int {
+	// Using atomic because readLimit can be read at the same time in other goroutine.
+	return int(atomic.LoadUint32(&readLimit))
 }
 
 // Extend adds detection for other file formats.
