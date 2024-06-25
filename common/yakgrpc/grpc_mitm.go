@@ -126,6 +126,33 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		sendError = stream.Send(rsp)
 		return
 	}
+	getPlainRequestBytes := func(req *http.Request) []byte {
+		var plainRequest []byte
+		if httpctx.GetRequestIsModified(req) {
+			plainRequest = httpctx.GetHijackedRequestBytes(req)
+		} else {
+			plainRequest = httpctx.GetPlainRequestBytes(req)
+			if len(plainRequest) <= 0 {
+				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
+				httpctx.SetPlainRequestBytes(req, decoded)
+				plainRequest = decoded
+			}
+		}
+		return plainRequest
+	}
+	getPlainResponseBytes := func(req *http.Request) []byte {
+		var plainResponse []byte
+		if httpctx.GetResponseIsModified(req) {
+			plainResponse = httpctx.GetHijackedResponseBytes(req)
+		} else {
+			plainResponse = httpctx.GetPlainResponseBytes(req)
+			if len(plainResponse) <= 0 {
+				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+				httpctx.SetPlainResponseBytes(req, plainResponse)
+			}
+		}
+		return plainResponse
+	}
 
 	firstReq, err := stream.Recv()
 	if err != nil {
@@ -680,11 +707,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 
-		wsReq, err := utils.DumpHTTPRequest(req, true)
-		if err != nil {
-			log.Errorf("dump request failed: %s", err)
-			return raw
-		}
+		wsReq := getPlainRequestBytes(req)
 		responseCounter := time.Now().UnixNano()
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
@@ -757,30 +780,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 		originRspRaw := rsp[:]
-		// plain -> bare -> rsp
-		plainResponse := httpctx.GetPlainResponseBytes(req)
-		if len(plainResponse) <= 0 {
-			plainResponse, _, _ = lowhttp.FixHTTPResponse(httpctx.GetBareResponseBytes(req))
-		}
+		plainResponse := getPlainResponseBytes(req)
 		if len(plainResponse) > 0 {
-			httpctx.SetPlainResponseBytes(req, plainResponse)
 			rsp = plainResponse
 		}
 
 		urlStr := httpctx.GetRequestURL(req)
 
 		// use handled request
-		var plainRequest []byte
-		if httpctx.GetRequestIsModified(req) {
-			plainRequest = httpctx.GetHijackedRequestBytes(req)
-		} else {
-			plainRequest = httpctx.GetPlainRequestBytes(req)
-			if len(plainRequest) <= 0 {
-				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
-				httpctx.SetPlainRequestBytes(req, decoded)
-				plainRequest = decoded
-			}
-		}
+		plainRequest := getPlainRequestBytes(req)
 
 		plainResponseHash := codec.Sha256(plainResponse)
 		handleResponseModified := func(r []byte) bool {
@@ -1054,11 +1062,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			controller.finishHijack(taskID)
 		}()
 
-		wsReq, err := utils.DumpHTTPRequest(req, true)
-		if err != nil {
-			log.Errorf("dump request failed: %s", err)
-			return raw
-		}
+		wsReq := getPlainRequestBytes(req)
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
@@ -1187,11 +1191,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		method := originReqIns.Method
 
 		// make it plain
-		plainRequest := httpctx.GetPlainRequestBytes(originReqIns)
-		if plainRequest == nil || len(plainRequest) == 0 {
-			plainRequest = lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(originReqIns))
-			httpctx.SetPlainRequestBytes(originReqIns, plainRequest)
-		}
+		plainRequest := getPlainRequestBytes(originReqIns)
 
 		// handle rules
 		originRequestHash := codec.Sha256(plainRequest)
@@ -1459,26 +1459,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 
-		var plainRequest []byte
-		if httpctx.GetRequestIsModified(req) {
-			plainRequest = httpctx.GetHijackedRequestBytes(req)
-		} else {
-			plainRequest = httpctx.GetPlainRequestBytes(req)
-			if len(plainRequest) <= 0 {
-				plainRequest = lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
-			}
-		}
-
+		plainRequest := getPlainRequestBytes(req)
+		plainResponse := getPlainResponseBytes(req)
 		responseOverSize := false
-		var plainResponse []byte
-		if httpctx.GetResponseIsModified(req) {
-			plainResponse = httpctx.GetHijackedResponseBytes(req)
-		} else {
-			plainResponse = httpctx.GetPlainResponseBytes(req)
-			if len(plainResponse) <= 0 {
-				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
-			}
-		}
 		if len(plainResponse) > packetLimit {
 			responseOverSize = true
 		}
