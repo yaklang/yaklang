@@ -56,6 +56,30 @@ func saveHTTPFlowFromRawWithType(url string, req, rsp []byte, typeStr string) er
 	return err
 }
 
+func saveHTTPFlowFromRawWithOption(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return utils.Error("empty database")
+	}
+	https := false
+	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
+		https = true
+	}
+	extOpts := []yakit.CreateHTTPFlowOptions{
+		yakit.CreateHTTPFlowWithHTTPS(https), yakit.CreateHTTPFlowWithRequestRaw(req), yakit.CreateHTTPFlowWithResponseRaw(rsp), yakit.CreateHTTPFlowWithURL(url),
+	}
+	extOpts = append(extOpts, exOption...)
+	flow, err := yakit.CreateHTTPFlow(extOpts...)
+	if err != nil {
+		return err
+	}
+	err = yakit.CreateOrUpdateHTTPFlow(db, flow.CalcHash(), flow)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 var DatabaseExports = map[string]interface{}{
 	// Download IP
 	"DownloadGeoIP": DownloadMMDB,
@@ -67,6 +91,7 @@ var DatabaseExports = map[string]interface{}{
 	"SaveHTTPFlowFromRawWithType":    saveHTTPFlowFromRawWithType,
 	"SaveHTTPFlowFromNative":         saveCrawler,
 	"SaveHTTPFlowFromNativeWithType": saveHTTPFlowWithType,
+	"SaveHTTPFlowFromRawWithOption":  saveHTTPFlowFromRawWithOption,
 	"SavePortFromResult":             savePortFromObj,
 	"SaveDomain":                     saveDomain,
 	"SavePayload":                    savePayloads,
@@ -133,6 +158,8 @@ var DatabaseExports = map[string]interface{}{
 	"QueryAliveHost": func(runtimeId string) chan *schema.AliveHost {
 		return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
 	},
+
+	"SaveHTTPFlowWithTags": yakit.CreateHTTPFlowWithTags,
 }
 
 func _deleteYakScriptByName(i string) error {
