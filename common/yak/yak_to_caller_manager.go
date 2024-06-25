@@ -635,6 +635,21 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		})
 	}
 
+	//db http flow
+	nIns.GetVM().RegisterMapMemberCallHandler("db", "SaveHTTPFlowFromRawWithOption", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error)
+		if ok {
+			return func(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error {
+				if runtimeId != "" {
+					exOption = append(exOption, yakit.CreateHTTPFlowWithSource("scan"))
+					exOption = append(exOption, yakit.CreateHTTPFlowWithRuntimeID(runtimeId))
+				}
+				return originFunc(url, req, rsp, exOption...)
+			}
+		}
+		return i
+	})
+
 	// poc
 	hookPocFunc := func(f interface{}) interface{} {
 		funcValue := reflect.ValueOf(f)
