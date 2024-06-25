@@ -10,8 +10,19 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
+func checkNo(t *testing.T, code string, op sfvm.SFVMOpCode) {
+	if checkContain(t, code, op) {
+		t.Fatalf("found %v", op)
+	}
+}
 func check(t *testing.T, code string, op sfvm.SFVMOpCode) {
+	if !checkContain(t, code, op) {
+		t.Fatalf("not found %v", op)
+	}
+}
+func checkContain(t *testing.T, code string, op sfvm.SFVMOpCode) bool {
 	{
+		fmt.Printf("code: %v\n", code)
 		lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(code))
 		lexer.RemoveErrorListeners()
 		astParser := sf.NewSyntaxFlowParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
@@ -24,20 +35,46 @@ func check(t *testing.T, code string, op sfvm.SFVMOpCode) {
 	frame, err := vm.Compile(code)
 	assert.NoError(t, err)
 
-	match := false
 	vm.Show()
 	for _, c := range frame.Codes {
 		if op == c.OpCode {
-			match = true
-			return
+			return true
 		}
 	}
-	if !match {
-		t.Fatalf("opcode %v not found", op)
-	}
+	return false
 }
 
 func TestOpcode(t *testing.T) {
+	// comment
+	t.Run("comment", func(t *testing.T) {
+		checkNo(t, `// a `, sfvm.OpPushSearchExact)
+	})
+	t.Run("comment line", func(t *testing.T) {
+		checkNo(t, `# a `, sfvm.OpPushSearchExact)
+	})
+	t.Run("comment with keywords", func(t *testing.T) {
+		checkNo(t, `# # # // a as $aaaa`, sfvm.OpUpdateRef)
+		checkNo(t, `# # # // a as $aaaa`, sfvm.OpNewRef)
+		checkNo(t, `# a as $aaaa`, sfvm.OpUpdateRef)
+		check(t, `
+		# a as $aaaa
+		a 
+		`, sfvm.OpPushSearchExact)
+		checkNo(t, `
+		# a as $aaaa
+		a 
+		`, sfvm.OpUpdateRef)
+		checkNo(t, `# check $aaae `, sfvm.OpCheckParams)
+	})
+
+	//  description
+	t.Run("description", func(t *testing.T) {
+		check(t, `desc(a: b)`, sfvm.OpAddDescription)
+	})
+	t.Run("description no :", func(t *testing.T) {
+		check(t, `desc("xxxx")`, sfvm.OpAddDescription)
+	})
+
 	// search
 	t.Run("search exact", func(t *testing.T) {
 		check(t, `aaa as $target`, sfvm.OpPushSearchExact)
@@ -77,6 +114,14 @@ func TestOpcode(t *testing.T) {
 	})
 	t.Run("get ref", func(t *testing.T) {
 		check(t, `$a.f as $target`, sfvm.OpNewRef)
+	})
+
+	// check expr enter
+	t.Run("enter expr with variable", func(t *testing.T) {
+		check(t, `$a.b`, sfvm.OpFilterExprEnter)
+	})
+	t.Run("enter expr with expr", func(t *testing.T) {
+		check(t, `a.b`, sfvm.OpFilterExprEnter)
 	})
 
 	// function call

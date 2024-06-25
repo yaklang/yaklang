@@ -15,10 +15,6 @@ func (v *BaseSyntaxFlowVisitor) VisitStatements(ctx *StatementsContext) interfac
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilter(ctx *FilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowVisitor) VisitCheck(ctx *CheckContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -31,6 +27,14 @@ func (v *BaseSyntaxFlowVisitor) VisitAlert(ctx *AlertContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitFilter(ctx *FilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitCommand(ctx *CommandContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitEmpty(ctx *EmptyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -40,6 +44,10 @@ func (v *BaseSyntaxFlowVisitor) VisitRefFilterExpr(ctx *RefFilterExprContext) in
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitPureFilterExpr(ctx *PureFilterExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitComment(ctx *CommentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
