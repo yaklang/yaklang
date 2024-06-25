@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -34,7 +35,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 			t.Fatal(err)
 		}
 		var checking = false
-		fmt.Printf("result: %#v \n", rsp)
+		fmt.Printf("result: %#v \n", rsp.String())
 		if tc.zeroScore && rsp.Score != 0 {
 			// want score == 0 but get !0
 			t.Fatal("this test should have score = 0")
@@ -114,4 +115,101 @@ yakit.AutoInitYakit()
 
 	})
 
+	t.Run("test nuiclei", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `id: CVE-2024-32030
+
+info:
+  name: CVE-2024-32030 JMX Metrics Collection JNDI RCE
+  severity: critical
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/clusters/malicious-cluster"
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "malicious-cluster"
+`,
+			err:       "误报",
+			codeTyp:   "nuclei",
+			zeroScore: false,
+		})
+	})
+
+	t.Run("test nuclei", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `id: CVE-2024-32030
+
+info:
+  name: CVE-2024-32030 JMX Metrics Collection JNDI RCE
+  severity: critical
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/clusters/malicious-cluster"
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "malicious-cluster"
+`,
+			err:       "误报",
+			codeTyp:   "nuclei",
+			zeroScore: false,
+		})
+	})
+
+	t.Run("test nuclei positive", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `id: WebFuzzer-Template-idZEfBnT
+info:
+  name: WebFuzzer Template idZEfBnT
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: 39724ac438ac2b32ae79defc1f3eac22
+http:
+- method: POST
+  path:
+  - '{{RootURL}}/'
+  payloads:
+    aa:
+    - '{{rand_char(5)}}'
+  headers:
+    Content-Type: application/json
+  body: "bbbb"
+  # attack: pitchfork
+  max-redirects: 3
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: dsl
+    part: body
+    dsl:
+    - '{{contains(body,aa)}}'
+    condition: and`,
+			err:       "",
+			codeTyp:   "nuclei",
+			zeroScore: false,
+		})
+	})
+
+}
+
+func TestA(t *testing.T) {
+	host, port := setupEachServe(context.Background())
+	log.Infof("host: %s, port: %d", host, port)
+	select {}
 }
