@@ -140,3 +140,39 @@ match rdp m|\x03\x00\x00\x13\x0e\xd0\x00\x00\x124\x00\x02\x00\x08\x00\x02\x00\x0
 		t.FailNow()
 	}
 }
+
+func Test_parseNmapProbe(t *testing.T) {
+	type args struct {
+		line string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Probe UDP IKE_MAIN_MODE",
+			args: args{
+				// https://svn.nmap.org/nmap/nmap-service-probes
+				line: `Probe UDP IKE_MAIN_MODE q|\0\x11\x22\x33\x44\x55\x66\x77\0\0\0\0\0\0\0\0\x01\x10\x02\0\0\0\0\0\0\0\0\xC0\0\0\0\xA4\0\0\0\x01\0\0\0\x01\0\0\0\x98\x01\x01\0\x04\x03\0\0\x24\x01\x01\0\0\x80\x01\0\x05\x80\x02\0\x02\x80\x03\0\x01\x80\x04\0\x02\x80\x0B\0\x01\0\x0C\0\x04\0\0\0\x01\x03\0\0\x24\x02\x01\0\0\x80\x01\0\x05\x80\x02\0\x01\x80\x03\0\x01\x80\x04\0\x02\x80\x0B\0\x01\0\x0C\0\x04\0\0\0\x01\x03\0\0\x24\x03\x01\0\0\x80\x01\0\x01\x80\x02\0\x02\x80\x03\0\x01\x80\x04\0\x02\x80\x0B\0\x01\0\x0C\0\x04\0\0\0\x01\0\0\0\x24\x04\x01\0\0\x80\x01\0\x01\x80\x02\0\x01\x80\x03\0\x01\x80\x04\0\x02\x80\x0B\0\x01\0\x0C\0\x04\0\0\0\x01| source=500`,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Probe TCP GetRequest",
+			args: args{
+				line: `Probe TCP GetRequest q|GET / HTTP/1.0\r\n\r\n|`,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseNmapProbe(tt.args.line)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseNmapProbe() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}

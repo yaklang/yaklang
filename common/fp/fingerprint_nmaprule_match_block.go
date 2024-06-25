@@ -134,7 +134,9 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 					Proto:  block.Probe.Proto,
 				}
 			)
-
+			if banner == nil {
+				return OPEN, resultFingerprintInfo, nil
+			}
 			rules := block.Matched
 			shortBanner := utils2.RemoveUnprintableChars(string(banner))
 			if len(shortBanner) > 30 {
