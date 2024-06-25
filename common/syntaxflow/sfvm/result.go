@@ -57,6 +57,10 @@ func (s *SFFrameResult) String() string {
 	if s.SymbolTable.Len() > 0 {
 		buf.WriteString("Result Vars: \n")
 	}
+	if s.SymbolTable.Len() > 1 && s.SymbolTable.Have("_") {
+		s.SymbolTable.Delete("_")
+		s.SymbolTable.Delete("$_")
+	}
 	s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
 		count++
 		var all []ValueOperator
