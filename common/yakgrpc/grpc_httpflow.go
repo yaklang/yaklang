@@ -24,46 +24,50 @@ import (
 )
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
-	var (
-		websocketHash []string
-		httpFlowsHash []string
-	)
-	db := yakit.QueryWebsocketFlowsByHTTPFlowHash(s.GetProjectDatabase(), r)
-	res := yakit.YieldHTTPFlows(db, ctx)
-	for v := range res {
-		if v.WebsocketHash != "" {
-			websocketHash = append(websocketHash, v.WebsocketHash)
-		}
-		httpFlowsHash = append(httpFlowsHash, v.Hash)
-	}
-	db = db.Model(&schema.WebsocketFlow{})
-	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
-		for _, hash := range httpFlowsHash {
-			internalTx := tx.Where("websocket_request_hash = ?", hash).Unscoped().Delete(&schema.ExtractedData{})
-			if internalTx.Error != nil {
-				return internalTx.Error
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		log.Error(err)
-	}
-	db = db.Model(&schema.ExtractedData{}).Where("source_type == 'httpflow' ")
-	err = utils.GormTransaction(db, func(tx *gorm.DB) error {
-		for _, hash := range httpFlowsHash {
-			internalTx := tx.Where("trace_id = ?", hash).Unscoped().Delete(&schema.ExtractedData{})
-			if internalTx.Error != nil {
-				return internalTx.Error
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		log.Error(err)
-	}
+	db := s.GetProjectDatabase()
+	if !r.GetDeleteAll() {
+		var (
+			websocketHash []string
+			httpFlowsHash []string
+		)
 
-	err = yakit.DeleteHTTPFlow(s.GetProjectDatabase(), r)
+		db = yakit.QueryWebsocketFlowsByHTTPFlowHash(db, r)
+		res := yakit.YieldHTTPFlows(db, ctx)
+		for v := range res {
+			if v.WebsocketHash != "" {
+				websocketHash = append(websocketHash, v.WebsocketHash)
+			}
+			httpFlowsHash = append(httpFlowsHash, v.Hash)
+		}
+		err := utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
+			for _, hash := range httpFlowsHash {
+				err := yakit.DeleteWebsocketFlowsByHTTPFlowHash(tx, hash)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			log.Error(err)
+		}
+		err = utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
+			for _, hash := range httpFlowsHash {
+				err := yakit.DeleteExtractedDataByTraceId(tx, hash)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			log.Error(err)
+		}
+	} else {
+		yakit.DropWebsocketFlowTable(db)
+		yakit.DropExtractedDataTable(db)
+	}
+	err := yakit.DeleteHTTPFlow(s.GetProjectDatabase(), r)
 	if err != nil {
 		log.Error(err)
 	}

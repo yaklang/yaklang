@@ -120,11 +120,28 @@ func DeleteWebsocketFlowAll(db *gorm.DB) error {
 	return nil
 }
 
-func DeleteWebsocketFlowsByHTTPFlowHash(db *gorm.DB, hash []string) error {
+func DropWebsocketFlowTable(db *gorm.DB) {
+	db.DropTableIfExists(&schema.WebsocketFlow{})
+	if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='websocket_flows';`); db.Error != nil {
+		log.Errorf("update sqlite sequence failed: %s", db.Error)
+	}
+	db.AutoMigrate(&schema.WebsocketFlow{})
+}
+
+func DeleteWebsocketFlowsByHTTPFlowHashList(db *gorm.DB, hash []string) error {
 	db = db.Model(&schema.WebsocketFlow{}).Where(
 		"websocket_request_hash in (?)", hash,
 	).Unscoped().Delete(&schema.WebsocketFlow{})
 	if db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func DeleteWebsocketFlowsByHTTPFlowHash(db *gorm.DB, hash string) error {
+	if db := db.Model(&schema.WebsocketFlow{}).Where(
+		"websocket_request_hash = ?", hash,
+	).Unscoped().Delete(&schema.WebsocketFlow{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
