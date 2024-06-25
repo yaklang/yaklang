@@ -14,16 +14,20 @@ flow: statements EOF;
 statements: statement+;
 
 statement
-    : filterStatement eos?              # Filter
-    | checkStatement eos?               # Check
+    : checkStatement eos?               # Check
     | descriptionStatement eos?         # Description
     | alertStatement eos?               # Alert
+    | filterStatement eos?              # Filter
+    | comment eos?                      # Command
     | eos                               # Empty
     ;
+
 filterStatement
     : refVariable filterItem*  (As refVariable)? # RefFilterExpr
     | filterExpr  (As refVariable)?              # PureFilterExpr
     ;
+
+comment:  ('//'|'#') (~'\n')*;
 
 
 // eos means end of statement
@@ -142,7 +146,7 @@ keywords
     | opcodes
     | Opcode
     // | As
-    // | Check
+    | Check
     | Then
     | Desc
     | Else

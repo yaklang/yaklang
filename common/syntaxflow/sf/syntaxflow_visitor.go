@@ -13,9 +13,6 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#statements.
 	VisitStatements(ctx *StatementsContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#Filter.
-	VisitFilter(ctx *FilterContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#Check.
 	VisitCheck(ctx *CheckContext) interface{}
 
@@ -25,6 +22,12 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#Alert.
 	VisitAlert(ctx *AlertContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#Filter.
+	VisitFilter(ctx *FilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#Command.
+	VisitCommand(ctx *CommandContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#Empty.
 	VisitEmpty(ctx *EmptyContext) interface{}
 
@@ -33,6 +36,9 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#PureFilterExpr.
 	VisitPureFilterExpr(ctx *PureFilterExprContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#comment.
+	VisitComment(ctx *CommentContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#eos.
 	VisitEos(ctx *EosContext) interface{}
