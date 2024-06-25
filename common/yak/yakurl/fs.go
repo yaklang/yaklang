@@ -13,18 +13,13 @@ import (
 
 type fileSystemAction struct{}
 
-func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, inDir bool) *ypb.YakURLResource {
-	rawPath := filepath.Join(originParam.GetPath(), info.Name())
-	absPath, err := filepath.Abs(rawPath)
-	if err != nil {
-		absPath = rawPath
-	}
+func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
 	newParam := &ypb.YakURL{
 		Schema:   originParam.Schema,
 		User:     originParam.GetUser(),
 		Pass:     originParam.GetPass(),
 		Location: originParam.GetLocation(),
-		Path:     absPath,
+		Path:     currentPath,
 		Query:    originParam.GetQuery(),
 	}
 	if !inDir {
@@ -35,20 +30,20 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, inDir bool) *
 		Size:              info.Size(),
 		SizeVerbose:       utils.ByteSize(uint64(info.Size())),
 		ModifiedTimestamp: info.ModTime().Unix(),
-		Path:              absPath,
+		Path:              currentPath,
 		YakURLVerbose:     "",
 		Url:               newParam,
 	}
 	if info.IsDir() {
 		src.ResourceType = "dir"
 		src.VerboseType = "filesystem-directory"
-		infos, err := os.ReadDir(absPath)
+		infos, err := os.ReadDir(currentPath)
 		if err == nil {
 			src.HaveChildrenNodes = len(infos) > 0
 		}
 	}
 
-	dirName, fileName := filepath.Split(absPath)
+	dirName, fileName := filepath.Split(currentPath)
 	src.ResourceName = fileName
 	if !info.IsDir() && info.Size() > 0 {
 		src.VerboseName = fmt.Sprintf("%v [%v]", fileName, src.SizeVerbose)
@@ -68,8 +63,6 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	if err != nil {
 		return nil, err
 	}
-	//_ = filename
-	//_ = dirname
 
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -94,13 +87,13 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 				if info == nil {
 					continue
 				}
-				res = append(res, fileInfoToResource(params.GetUrl(), info, true))
+				currentPath := filepath.Join(params.GetUrl().Path, info.Name())
+				res = append(res, fileInfoToResource(params.GetUrl(), info, currentPath, true))
 			}
 		}
 	default:
-		res = append(res, fileInfoToResource(params.GetUrl(), info, false))
+		res = append(res, fileInfoToResource(params.GetUrl(), info, absPath, false))
 	}
-
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
@@ -115,6 +108,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	if err != nil {
 		return nil, err
 	}
+
 	info, err := os.Stat(absPath)
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
@@ -124,19 +118,23 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
+
 	switch query.Get("op") {
 	case "rename":
 		newName := query.Get("newname")
 		if newName == "" {
 			return nil, utils.Errorf("newname is required")
 		}
+
 		if !filepath.IsAbs(newName) { // Compatible abs path and relative path
 			newName = filepath.Join(dirname, newName)
 		}
+
 		err := os.Rename(absPath, newName)
 		if err != nil {
 			return nil, utils.Errorf("cannot rename file[%s]: %s", u.GetPath(), err)
 		}
+
 		absPath = newName
 	case "content":
 		fallthrough
@@ -149,17 +147,19 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
 		}
 	}
-	info, err = os.Stat(absPath)
-	if err != nil {
-		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
-	}
+
 	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
 		err = YakRunnerMonitor.UpdateFileTree()
 		if err != nil {
 			log.Errorf("failed to update file tree: %s", err)
 		}
 	}
-	res := fileInfoToResource(params.GetUrl(), info, false)
+
+	currentInfo, err := os.Stat(absPath)
+	if err != nil {
+		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
+	}
+	res := fileInfoToResource(params.GetUrl(), currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
@@ -183,35 +183,38 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
-	var isDir bool
 	switch query.Get("type") {
 	case "dir":
 		err := os.MkdirAll(absPath, 0755)
 		if err != nil {
 			return nil, err
 		}
-		isDir = true
 	case "file":
 		fallthrough
 	default:
-		create, err := os.Create(absPath)
+		fileCreate, err := os.Create(absPath)
 		if err != nil {
 			return nil, err
 		}
-		create.Close()
+		defer fileCreate.Close()
+		_, err = fileCreate.Write(params.GetBody())
+		if err != nil {
+			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
+		}
 	}
 
-	info, err := os.Stat(absPath)
-	if err != nil {
-		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err) // check file / dir
-	}
 	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
 		err = YakRunnerMonitor.UpdateFileTree()
 		if err != nil {
 			log.Errorf("failed to update file tree: %s", err)
 		}
 	}
-	res := fileInfoToResource(params.GetUrl(), info, isDir)
+
+	currentInfo, err := os.Stat(absPath)
+	if err != nil {
+		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err) // check file / dir
+	}
+	res := fileInfoToResource(params.GetUrl(), currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
