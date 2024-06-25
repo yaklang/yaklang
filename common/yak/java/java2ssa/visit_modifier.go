@@ -134,7 +134,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			if annotationName == "" {
 				fieldAnnotationName = annotationContainerInstance.GetName()
 			}
-			y.AssignVariable(y.CreateMemberCallVariable(value, y.EmitConstInst(fieldAnnotationName)), annotationContainerInstance)
+			y.AssignVariable(y.CreateMemberCallVariable(annotationCollector, y.EmitConstInst(fieldAnnotationName)), annotationContainerInstance)
 		}
 }
 
