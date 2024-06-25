@@ -13,10 +13,11 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"hash"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
 
 	"github.com/BurntSushi/toml"
 	"github.com/dlclark/regexp2"
@@ -1108,5 +1109,19 @@ func (flow *CodecExecFlow) CustomCodecPlugin(pluginContent string) error {
 		return utils.Errorf("import %v' s handle failed: %s", "temp-codec", err)
 	}
 	flow.Text = utils.InterfaceToBytes(pluginRes)
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "GB18030ToUTF8-8"
+// Desc ="""GB18030是一种中文编码标准，支持简体中文、繁体中文、日文和韩文等多种字符集，是GB2312和GBK的扩展。该函数将GB18030编码的文本转换为UTF-8编码。"""
+// Params = [
+// ]
+func (flow *CodecExecFlow) GB18030ToUTF8() error {
+	text, err := codec.GB18030ToUtf8(flow.Text)
+	if err != nil {
+		return err
+	}
+	flow.Text = text
 	return nil
 }
