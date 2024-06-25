@@ -1,6 +1,7 @@
 package java
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -19,7 +20,6 @@ newDocumentBuilder().parse(* #-> *?{opcode: param && .annotation} as $param)
 
 check $param then "dangerous xml doc builder" else "safe xml doc builder";
 alert $param;
-
 `)
 		if err != nil {
 			t.Fatal(err)
@@ -34,7 +34,19 @@ alert $param;
 		if count <= 0 {
 			t.Fatal("param not found")
 		}
+
+		result, err = prog.SyntaxFlowWithError(`
+newDocumentBuilder().parse(* #-> *?{opcode: param && .annotation.*Param} as $param)
+
+check $param then "dangerous xml doc builder" else "safe xml doc builder";
+alert $param;
+`)
+		if err != nil {
+			t.Fatal(err)
+		}
 		result.Show()
+		dotGraph := ssaapi.SyntaxFlowVariableToValues(result.GetValues("param")).DotGraph()
+		fmt.Println(dotGraph)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
