@@ -553,7 +553,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		var thenStr = i.ValueByIndex(0)
 		var elseStr = i.ValueByIndex(1)
 		if elseStr == "" {
-			elseStr = "$" + i.UnaryStr + "is not found"
+			elseStr = "$" + i.UnaryStr + " is not found"
 		}
 
 		haveResult := false
