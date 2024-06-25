@@ -108,9 +108,23 @@ type CreateHTTPFlowConfig struct {
 	remoteAddr  string
 	reqIns      *http.Request // 如果设置了，则不会再解析reqRaw
 	hiddenIndex string
+	runtimeID   string
+	tags        string
 }
 
 type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
+
+func CreateHTTPFlowWithTags(tags string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.tags = tags
+	}
+}
+
+func CreateHTTPFlowWithRuntimeID(runtimeId string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.runtimeID = runtimeId
+	}
+}
 
 func CreateHTTPFlowWithHTTPS(isHttps bool) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
@@ -216,6 +230,8 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		url        = c.url
 		remoteAddr = c.remoteAddr
 		reqIns     = c.reqIns
+		runtimeID  = c.runtimeID
+		tags       = c.tags
 	)
 
 	var (
@@ -276,6 +292,8 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		Response:    responseRaw,
 		RemoteAddr:  remoteAddr,
 		HiddenIndex: uuid.NewString(),
+		RuntimeId:   runtimeID,
+		Tags:        tags,
 	}
 
 	// 如果设置了 reqIns，则不会再解析 reqRaw
