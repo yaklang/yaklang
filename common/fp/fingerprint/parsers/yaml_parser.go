@@ -17,7 +17,7 @@ func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
 func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rule.FingerPrintRule, error) {
 	convertToMap := func(o *webfingerprint.CPE) *rule.FingerprintInfo {
 		return &rule.FingerprintInfo{
-			CPE: &rule.CPE{
+			CPE: rule.CPE{
 				Part:     o.Part,
 				Vendor:   o.Vendor,
 				Product:  o.Product,
@@ -44,7 +44,7 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 		r.Method = "complex"
 		r.MatchParam = &rule.MatchMethodParam{
 			SubRules:  rules,
-			Condition: "and",
+			Condition: condition,
 		}
 		r.MatchParam.Info = utils.GetLastElement(rules).MatchParam.Info
 		return r
