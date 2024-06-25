@@ -252,6 +252,8 @@ func ExtractBlockFromMatch(raw string) []string {
 }
 
 func parseNmapProbe(line string) (*NmapProbe, error) {
+	line = strings.SplitAfterN(line, "| ", 2)[0]
+	line = strings.TrimSuffix(line, " ")
 	results := strings.SplitN(line, " ", 4)
 	if len(results) != 4 {
 		return nil, errors.New("Parse nmap probe failed: length of blocks is not 4")
