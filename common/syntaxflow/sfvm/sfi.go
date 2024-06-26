@@ -230,8 +230,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" $%v"+suffix, "check", s.UnaryStr)
 	case OpAddDescription:
 		var suffix string
-		if ret := s.ValueByIndex(0); ret != "" {
+		if ret := s.ValueByIndex(1); ret != "" {
 			suffix += " value: " + ret
+		} else if ret := s.ValueByIndex(0); ret != "" {
+			suffix += " value: true"
 		}
 		return fmt.Sprintf(verboseLen+" %v"+suffix, "desc", s.UnaryStr)
 	case OpAlert:
