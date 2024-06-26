@@ -29,10 +29,10 @@ func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
 	}
 
 	// 尝试完全匹配
-	vs, ok := req.Header[key]
-	if !ok || len(vs) == 0 {
-		return ""
+	if vs, ok := req.Header[key]; ok {
+		return vs[0]
 	}
+
 	// 尝试模糊匹配
 	key = strings.ToLower(key)
 
