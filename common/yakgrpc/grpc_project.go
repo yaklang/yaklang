@@ -104,19 +104,29 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 	if req.Type == "" {
 		return nil, utils.Errorf("type is empty")
 	}
-	name := req.GetProjectName()
+	name := req.GetProjectName() // maybe project or folder name
 	if !projectNameRe.MatchString(name) {
-		return nil, utils.Errorf("create project by name failed! name should match %v", projectNameRe.String())
+		return nil, utils.Errorf("name invalid, should match pattern: %v", projectNameRe.String())
 	}
 	var pathName string
-	// 项目需要存，文件夹不需要
-	if req.Type == yakit.TypeProject {
+	isCreate := req.GetId() == 0
+	isHandleProject := req.Type == yakit.TypeProject
+
+	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
+	if pro != nil {
+		return nil, utils.Errorf("Project or directory name can not be duplicated in the same directory")
+	}
+
+	if isHandleProject { // project
 		databaseName := fmt.Sprintf("yakit-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
 		pathName = filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
-		if ok, _ := utils.PathExists(pathName); ok {
-			return nil, utils.Errorf("path: %v is not existed", pathName)
+		if isCreate {
+			if ok, _ := utils.PathExists(pathName); ok {
+				return nil, utils.Errorf("BUG: file already exist: %v", pathName)
+			}
 		}
 	}
+
 	projectData := &schema.Project{
 		ProjectName:   req.GetProjectName(),
 		Description:   req.GetDescription(),
@@ -125,48 +135,45 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		FolderID:      req.FolderId,
 		ChildFolderID: req.ChildFolderId,
 	}
-	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
-	if pro != nil {
-		return nil, utils.Errorf("同级目录下项目或文件名不能重复")
+
+	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
+		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
 	}
 
-	if req.GetId() > 0 {
+	if !isCreate { // rename
 		oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
 		if err != nil {
-			return nil, utils.Errorf("update project not exist %v", err.Error())
+			return nil, utils.Errorf("update row not exist: %v", err)
 		}
 
-		err = os.Rename(oldPro.DatabasePath, pathName)
-		if err != nil {
-			return nil, errors.Errorf(" oldfile=%v rename newname=%v fail=%v", oldPro.DatabasePath, pathName, err)
+		if isHandleProject && oldPro.DatabasePath != pathName { // only project should rename file, folder is virtual
+			err = os.Rename(oldPro.DatabasePath, pathName)
+			if err != nil {
+				return nil, errors.Errorf("rename %s to %s error: %v", oldPro.DatabasePath, pathName, err)
+			}
 		}
+
 		err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), *projectData)
 		if err != nil {
 			return nil, utils.Errorf("update project failed!")
 		}
 
 		return &ypb.NewProjectResponse{Id: req.GetId(), ProjectName: req.GetProjectName()}, nil
-
-	} else {
-		if CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
-			return nil, utils.Errorf("cannot use this name: %s, %v is for buildin", yakit.INIT_DATABASE_RECORD_NAME, yakit.INIT_DATABASE_RECORD_NAME)
-		}
 	}
 
-	/*pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.FolderId, req.ChildFolderId, req.Type, 0)
-	if pro != nil {
-		return nil, utils.Errorf("同级目录下文件/文件夹名不能重复")
-	}*/
+	// create
+	// insert database row
 	db := s.GetProfileDatabase()
 	if db = db.Create(&projectData); db.Error != nil {
 		return nil, db.Error
 	}
-	// 创建库
-	projectDatabase, err := consts.CreateProjectDatabase(pathName)
-	if err != nil {
-		return nil, utils.Errorf("create project database failed: %s", err)
+	if isHandleProject {
+		projectDatabase, err := consts.CreateProjectDatabase(pathName)
+		if err != nil {
+			return nil, utils.Errorf("create project database failed: %s", err)
+		}
+		defer projectDatabase.Close()
 	}
-	projectDatabase.Close()
 
 	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
 }
