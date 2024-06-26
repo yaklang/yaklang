@@ -18,7 +18,7 @@ import (
 //go:embed sample
 var sample_code embed.FS
 
-//go:embed rules
+//go:embed mustpass
 var sf_rules embed.FS
 
 func Test_Debug(t *testing.T) {
@@ -29,7 +29,7 @@ func Test_Debug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse project error: %v", err)
 	}
-	Check(t, progs, "rce.sf")
+	Check(t, progs, "xxe.sf")
 }
 
 func TestCheckRuleInSource(t *testing.T) {
@@ -84,7 +84,7 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
 	vs := sfvm.NewValues(lo.Map(progs, func(v *ssaapi.Program, _ int) sfvm.ValueOperator { return v }))
 	vm := sfvm.NewSyntaxFlowVirtualMachine(sfvm.WithEnableDebug(false), sfvm.WithFailFast())
-	entry, err := sf_rules.ReadDir("rules")
+	entry, err := sf_rules.ReadDir("mustpass")
 	if err != nil {
 		t.Fatalf("no embed syntax files found: %v", err)
 	}
@@ -92,7 +92,7 @@ func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
 		if f.IsDir() {
 			continue
 		}
-		path := filepath.Join("rules", f.Name())
+		path := filepath.Join("mustpass", f.Name())
 		raw, err := sf_rules.ReadFile(path)
 		if err != nil {
 			t.Fatalf("cannot found syntax fs: %v", path)
