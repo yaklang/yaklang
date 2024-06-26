@@ -156,6 +156,14 @@ cache = append(a, 4, 5)`,
 			ssa.NewSliceType(ssa.GetNumberType()))
 	})
 
+	t.Run("append-bytes", func(t *testing.T) {
+		test.CheckType(t, `
+a = b"asd"
+b = b"qwe"
+target = append(a, b...)`,
+			ssa.GetBytesType())
+	})
+
 	t.Run("append-string", func(t *testing.T) {
 		test.CheckType(t, `
 a = ["a"]
