@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
@@ -560,7 +561,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		results, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if !ok {
-			haveResult = true
+			haveResult = false
 		} else if results == nil {
 			haveResult = false
 		} else {
@@ -773,15 +774,26 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 	filterStackLen := s.filterExprStack.Len()
 
 	prefix := strings.Repeat(" ", filterStackLen)
-
-	formatter := "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix + i + "\n"
-	if len(item) > 0 {
-		fmt.Printf(formatter, item...)
-	} else {
-		fmt.Printf(formatter)
+	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
+	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
+		fmt.Print(prefix + line + "\n")
 	}
 }
 
 func (s *SFFrame) debugSubLog(i string, item ...any) {
-	s.debugLog("  |-- "+i, item...)
+	prefix := "  |-- "
+	results := fmt.Sprintf(i, item...)
+	var result bytes.Buffer
+	lines := strings.Split(results, "\n")
+	for idx, line := range lines {
+		if line == "" && idx == len(lines)-1 {
+			break
+		}
+		if idx > 0 {
+			result.WriteString("\n")
+			prefix = "  |       "
+		}
+		result.WriteString(prefix + line)
+	}
+	s.debugLog(result.String())
 }
