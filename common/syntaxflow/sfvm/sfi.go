@@ -245,9 +245,9 @@ func (s *SFI) String() string {
 	case OpIterNext:
 		return fmt.Sprintf(verboseLen+" start: %v end: %v", "iter-next", s.iter.start, s.iter.end)
 	case OpFilterExprEnter:
-		return fmt.Sprintf(verboseLen, "-\\")
+		return fmt.Sprintf(verboseLen, "  \\")
 	case OpFilterExprExit:
-		return fmt.Sprintf(verboseLen, "-/")
+		return fmt.Sprintf(verboseLen, " /")
 	case OpCheckStackTop:
 		return fmt.Sprintf(verboseLen+" %v", "check top", s.UnaryStr)
 	case OpMergeRef:
