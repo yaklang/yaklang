@@ -611,9 +611,18 @@ func TestGRPCMUSTPASS_Delete_HTTPFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	db := consts.GetGormProjectDatabase()
-	token := utils.RandStringBytes(5)
+	token1 := utils.RandStringBytes(5)
+	token2 := utils.RandStringBytes(5)
+
+	url1 := "http://" + token1 + ".com"
+	url2 := "http://" + token2 + ".com"
 	for i := 0; i < 100; i++ {
-		flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithSource(token))
+		flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1))
+		require.NoError(t, err)
+		err = yakit.InsertHTTPFlow(db, flow)
+		require.NoError(t, err)
+
+		flow, err = yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url2))
 		require.NoError(t, err)
 		err = yakit.InsertHTTPFlow(db, flow)
 		require.NoError(t, err)
@@ -621,13 +630,22 @@ func TestGRPCMUSTPASS_Delete_HTTPFlow(t *testing.T) {
 
 	_, err = client.DeleteHTTPFlows(ctx, &ypb.DeleteHTTPFlowRequest{
 		Filter: &ypb.QueryHTTPFlowRequest{
-			SourceType: token,
+			Keyword: token1,
 		},
 	})
 	require.NoError(t, err)
 
 	var count int
-	db.Model(&schema.HTTPFlow{}).Where("source_type = ?", token).Count(&count)
+	yakit.FilterHTTPFlow(db, &ypb.QueryHTTPFlowRequest{Keyword: token1}).Count(&count)
+	require.Equal(t, 0, count, "delete token1 fail")
 
-	require.Equal(t, 0, count, "delete fail")
+	yakit.FilterHTTPFlow(db, &ypb.QueryHTTPFlowRequest{Keyword: token2}).Count(&count)
+	require.Equal(t, 100, count, "error delete token2")
+
+	err = yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+		Filter: &ypb.QueryHTTPFlowRequest{
+			Keyword: token2,
+		},
+	})
+	require.NoError(t, err)
 }
