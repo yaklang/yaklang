@@ -1169,3 +1169,43 @@ http:
 		t.Fatal("hide id test failed")
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzerTaskToYaml(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	rsp, err := client.ExportHTTPFuzzerTaskToYaml(ctx, &ypb.ExportHTTPFuzzerTaskToYamlRequest{
+		Requests: &ypb.FuzzerRequests{
+			Requests: []*ypb.FuzzerRequest{
+				{
+					RequestRaw: []byte(`GET / HTTP/1.1
+Host: www.example.com
+
+{{p(a)}}`),
+					IsHTTPS:                  false,
+					PerRequestTimeoutSeconds: 5,
+					RedirectTimes:            3,
+					Params: []*ypb.FuzzerParamItem{
+						{
+							Key:   "a",
+							Value: "{{rand_char(5)}}",
+							Type:  "nuclei-dsl",
+						},
+					},
+				},
+			},
+		},
+		TemplateType: "path",
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(rsp.YamlContent)
+	if !strings.Contains(rsp.YamlContent, `variables:
+  a: '{{rand_char(5)}}'`) {
+		t.Fatal("export yaml failed")
+	}
+}
