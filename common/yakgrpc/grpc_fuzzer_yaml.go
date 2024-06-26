@@ -248,8 +248,8 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	bulk.Matcher = &httptpl.YakMatcher{
 		SubMatcherCondition: "and",
 	}
+	vars := httptpl.NewVars()
 	for index, request := range seq.GetRequests() {
-		vars := httptpl.NewVars()
 		for _, param := range request.Params {
 			if err := vars.SetWithType(param.Key, param.Value, param.Type); err != nil {
 				log.Errorf("set vars error: %v", err)
@@ -349,16 +349,16 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		bulk.InheritVariables = request.InheritVariables
 		bulk.StopAtFirstMatch = request.StopAtFirstMatch
 		bulk.AfterRequested = request.AfterRequested
-		payloadsMap := map[string]any{}
-		for k, v := range vars.GetRaw() {
-			data := strings.Split(v.Data, "\n")
-			payloadsMap[k] = data
-		}
-		payloads, err := httptpl.NewYakPayloads(payloadsMap)
-		if err != nil {
-			log.Errorf("generate yak payloads error: %v", err)
-		}
-		bulk.Payloads = payloads
+		//payloadsMap := map[string]any{}
+		//for k, v := range vars.GetRaw() {
+		//	data := strings.Split(v.Data, "\n")
+		//	payloadsMap[k] = data
+		//}
+		//payloads, err := httptpl.NewYakPayloads(payloadsMap)
+		//if err != nil {
+		//	log.Errorf("generate yak payloads error: %v", err)
+		//}
+		//bulk.Payloads = payloads
 	}
 	//
 	template := &httptpl.YakTemplate{}
@@ -380,6 +380,9 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		}
 	}
 	template.Sign = template.SignMainParams()
+	if vars.ToMap() != nil {
+		template.Variables = vars
+	}
 	// 转换为Yaml
 	yamlContent, err := MarshalYakTemplateToYaml(template)
 	if err != nil {
@@ -402,6 +405,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	rootMap.AddEmptyLine()
 	infoMap := rootMap.NewSubMapBuilder("info")
 	rootMap.AddEmptyLine()
+	varMap := rootMap.NewSubMapBuilder("variables")
 	reqSequencesArray := rootMap.NewSubArrayBuilder("http")
 	writeConfig := func(builder *YamlMapBuilder, config *httptpl.RequestConfig) {
 		builder.AddEmptyLine()
@@ -449,6 +453,10 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	classification.Set("cve-id", y.CVE)
 	infoMap.Set("tags", strings.Join(y.Tags, ","))
 	yakitInfo := infoMap.NewSubMapBuilder("yakit-info")
+
+	for k, v := range y.Variables.GetRaw() {
+		varMap.Set(k, v.GetValue())
+	}
 	//生成req sequences
 	maxRequest := 0
 	//signElements := make([]string, 0)

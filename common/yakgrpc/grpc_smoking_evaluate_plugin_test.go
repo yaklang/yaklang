@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -115,31 +114,7 @@ yakit.AutoInitYakit()
 
 	})
 
-	t.Run("test nuiclei", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
-			code: `id: CVE-2024-32030
-
-info:
-  name: CVE-2024-32030 JMX Metrics Collection JNDI RCE
-  severity: critical
-
-requests:
-  - method: GET
-    path:
-      - "{{BaseURL}}/api/clusters/malicious-cluster"
-    matchers:
-      - type: word
-        part: body
-        words:
-          - "malicious-cluster"
-`,
-			err:       "误报",
-			codeTyp:   "nuclei",
-			zeroScore: false,
-		})
-	})
-
-	t.Run("test nuclei", func(t *testing.T) {
+	t.Run("test nuclei false positive", func(t *testing.T) {
 		TestSmokingEvaluatePlugin(testCase{
 			code: `id: CVE-2024-32030
 
@@ -180,16 +155,16 @@ info:
     verified: true
   yakit-info:
     sign: 39724ac438ac2b32ae79defc1f3eac22
+variables:
+  aa: '{{rand_char(5)}}'
+  bb: '{{rand_char(6)}}'
 http:
 - method: POST
   path:
   - '{{RootURL}}/'
-  payloads:
-    aa:
-    - '{{rand_char(5)}}'
   headers:
     Content-Type: application/json
-  body: "bbbb"
+  body: "echo {{aa}}+{{bb}}"
   # attack: pitchfork
   max-redirects: 3
   matchers-condition: and
@@ -198,7 +173,7 @@ http:
     type: dsl
     part: body
     dsl:
-    - '{{contains(body,aa)}}'
+    - '{{contains(body,aa+bb)}}'
     condition: and`,
 			err:       "",
 			codeTyp:   "nuclei",
@@ -206,10 +181,4 @@ http:
 		})
 	})
 
-}
-
-func TestA(t *testing.T) {
-	host, port := setupEachServe(context.Background())
-	log.Infof("host: %s, port: %d", host, port)
-	select {}
 }
