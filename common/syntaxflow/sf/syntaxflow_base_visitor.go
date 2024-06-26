@@ -59,6 +59,10 @@ func (v *BaseSyntaxFlowVisitor) VisitLine(ctx *LineContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitLines(ctx *LinesContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitDescriptionStatement(ctx *DescriptionStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
