@@ -602,19 +602,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			// 运行时更新代理
-			downstreamProxy, err := getDownstreamProxy(reqInstance)
-			if err == nil && mServer != nil {
-				err = mServer.Configure(crep.MITM_SetDownstreamProxy(downstreamProxy))
-				if err != nil {
-					feedbackToUser(fmt.Sprintf("设置下游代理失败 / set downstream proxy failed: %v", err))
-					log.Errorf("set downstream proxy failed: %s", err)
+			if reqInstance.GetSetDownstreamProxy() {
+				downstreamProxy, err := getDownstreamProxy(reqInstance)
+				if err == nil && mServer != nil {
+					err = mServer.Configure(crep.MITM_SetDownstreamProxy(downstreamProxy))
+					if err != nil {
+						feedbackToUser(fmt.Sprintf("设置下游代理失败 / set downstream proxy failed: %v", err))
+						log.Errorf("set downstream proxy failed: %s", err)
+					}
+					mitmPluginCaller.SetProxy(downstreamProxy)
+					feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
 				}
-				mitmPluginCaller.SetProxy(downstreamProxy)
-				feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
 			}
-			//defer func() {
-			//	recover()
-			//}()
 			messageChan <- reqInstance
 		}
 	}()
