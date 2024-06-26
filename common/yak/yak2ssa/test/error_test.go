@@ -229,7 +229,6 @@ func TestAssign(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestFreeValue(t *testing.T) {
@@ -1342,7 +1341,6 @@ func TestErrorHandler(t *testing.T) {
 			Want: []string{},
 		})
 	})
-
 }
 
 func TestTryCatch(t *testing.T) {
@@ -1458,5 +1456,20 @@ func TestSwitch(t *testing.T) {
 				ssa4analyze.ConditionIsConst("if"),
 			},
 		})
+	})
+}
+
+func TestErrorGenericFunc(t *testing.T) {
+	t.Run("append-int-with-string", func(t *testing.T) {
+		test.CheckError(t,
+			test.TestCase{
+				Code: `
+a = [1]
+target = append(a, 2, "3")`,
+				Want: []string{
+					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetNumberType(), ssa.GetStringType()),
+				},
+			},
+		)
 	})
 }
