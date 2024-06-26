@@ -149,16 +149,17 @@ func TestYaklangType_Object(t *testing.T) {
 
 func TestYaklangGenericFunc(t *testing.T) {
 	t.Run("append-int", func(t *testing.T) {
-		test.CheckTypeKind(t, `
+		test.CheckType(t, `
 a = [1]
-target = append(a, 2, 3)`,
-			ssa.SliceTypeKind)
+target = append(a, 2, 3)
+cache = append(a, 4, 5)`,
+			ssa.NewSliceType(ssa.GetNumberType()))
 	})
-	t.Run("append", func(t *testing.T) {
-		test.CheckTypeKind(t, `
-a = [1]
-b = append(a, 2, 3)
-target = b[0]`,
-			ssa.NumberTypeKind)
+
+	t.Run("append-string", func(t *testing.T) {
+		test.CheckType(t, `
+a = ["a"]
+target = append(a, "b", "c")`,
+			ssa.NewSliceType(ssa.GetStringType()))
 	})
 }
