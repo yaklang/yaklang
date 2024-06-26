@@ -1,9 +1,11 @@
 package fingerprint
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 )
 
@@ -15,7 +17,8 @@ type MatchFun func(data []byte) (bool, error)
 type Matcher struct {
 	regexpCache map[string]*regexp.Regexp
 	ErrorHandle func(error)
-	rules       []*rule.FingerPrintRule
+	Route       func(ctx context.Context, webPath string) ([]byte, error)
+	rules       [][]*rule.OpCode
 }
 
 func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
@@ -28,23 +31,43 @@ func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
 }
 
 func (m *Matcher) AddRules(rules []*rule.FingerPrintRule) {
-	m.rules = append(m.rules, rules...)
+	for _, printRule := range rules {
+		ops := printRule.ToOpCodes()
+		if len(ops) != 0 {
+			m.rules = append(m.rules, ops)
+		}
+	}
 }
-func (m *Matcher) Match(data []byte) []*rule.FingerprintInfo {
+func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.FingerprintInfo {
 	var result []*rule.FingerprintInfo
-	for _, r := range m.rules {
-		f, err := m.LoadMethod(r.Method, r.MatchParam)
+	cached := map[string][]byte{}
+	for i, r := range m.rules {
+		_ = i
+		select {
+		case <-ctx.Done():
+			return result
+		default:
+		}
+		info, err := rule.Execute(func(path string) (*rule.MatchResource, error) {
+			if path == "" || path == "/" {
+				return rule.NewHttpResource(data), nil
+			}
+			if v, ok := cached[path]; ok {
+				return rule.NewHttpResource(v), nil
+			}
+			data, err := m.Route(ctx, path)
+			if err != nil {
+				return nil, err
+			}
+			cached[path] = data
+			return rule.NewHttpResource(data), nil
+		}, r)
 		if err != nil {
-			m.ErrorHandle(err)
+			log.Errorf("execute rule failed: %v", err)
 			continue
 		}
-		ok, err := f(data)
-		if err != nil {
-			m.ErrorHandle(err)
-			continue
-		}
-		if ok {
-			result = append(result, r.MatchParam.Info)
+		if info != nil {
+			result = append(result, info)
 		}
 	}
 	return result

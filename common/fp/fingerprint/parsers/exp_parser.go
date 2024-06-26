@@ -1,15 +1,17 @@
 package parsers
 
 import (
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"sort"
 	"strconv"
 	"strings"
 )
 
-var buildinTokens = []string{"(", ")", "||", "&&", "=", "\"", "\\"}
+var buildinTokens = []string{"(", ")", "||", "&&", "=", "!=", "\"", "\\"}
 
 func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 	res := []*rule.FingerPrintRule{}
@@ -21,11 +23,13 @@ func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 		}
 		r, err := compileExp(exp)
 		if err != nil {
-			r, err = compatibleSyntaxCompileExp(exp)
-			if err != nil {
-				log.Errorf("parse exp %s error: %v", exp, err)
-				continue
-			}
+			//r, err = compatibleSyntaxCompileExp(exp)
+			//if err != nil {
+			//	log.Errorf("parse exp %s error: %v", exp, err)
+			//	continue
+			//}
+			log.Errorf("parse exp %s error: %v", exp, err)
+			continue
 		}
 		r.MatchParam.Info = &rule.FingerprintInfo{
 			Info: info,
@@ -74,26 +78,30 @@ func compatibleSyntaxCompileExp(exp string) (*rule.FingerPrintRule, error) {
 			continue
 		}
 		left, rightStr, ok := strings.Cut(token, "=")
-		if !ok {
-			return nil, fmt.Errorf("parse exp failed: %v", token)
-		}
 		var right any
-		if len(rightStr) > 1 && rightStr[0] == '"' && rightStr[len(rightStr)-1] == '"' {
-			right = rightStr[1 : len(rightStr)-1]
+		if !ok {
+			left = "branner"
+			right = token
 		} else {
-			if token == "true" {
-				right = true
-			} else if token == "false" {
-				right = false
+			if len(rightStr) > 1 && rightStr[0] == '"' && rightStr[len(rightStr)-1] == '"' {
+				right = rightStr[1 : len(rightStr)-1]
 			} else {
-				v, err := strconv.Atoi(token)
-				if err != nil {
-					right = rightStr
+				if token == "true" {
+					right = true
+				} else if token == "false" {
+					right = false
 				} else {
-					right = v
+					v, err := strconv.Atoi(token)
+					if err != nil {
+						right = rightStr
+					} else {
+						right = v
+					}
 				}
 			}
 		}
+
+		left = strings.TrimSpace(left)
 		currentRule := &rule.FingerPrintRule{
 			Method: "exp",
 			MatchParam: &rule.MatchMethodParam{
@@ -180,7 +188,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 	}
 	cut(len(exp))
 	index := 0
-	currentStatus := "exp"
+	currentStatus := "start"
 	strBuf := ""
 	escape := false
 	var currentRule *rule.FingerPrintRule
@@ -197,9 +205,9 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 			continue
 		}
 		switch currentStatus {
-		case "exp":
+		case "start":
 			switch token {
-			case "(", ")", "||", "&&":
+			case "(", ")":
 				tmpItems = append(tmpItems, token)
 			default:
 				data := token
@@ -211,8 +219,16 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				r.MatchParam.Params = append(r.MatchParam.Params, data)
 				currentStatus = "op"
 			}
+		case "condition":
+			switch token {
+			case "||", "&&":
+				tmpItems = append(tmpItems, token)
+				currentStatus = "start"
+			default:
+				return nil, fmt.Errorf("unsupported condition %s", token)
+			}
 		case "op":
-			if !utils.StringArrayContains([]string{"="}, token) {
+			if !utils.StringArrayContains([]string{"=", "!=", "~="}, token) {
 				return nil, fmt.Errorf("unsupported op %s", token)
 			}
 			currentRule.MatchParam.Op = token
@@ -232,7 +248,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 						currentRule.MatchParam.Params = append(currentRule.MatchParam.Params, v)
 					}
 				}
-				currentStatus = "exp"
+				currentStatus = "condition"
 			}
 		case "stringValue":
 			if escape {
@@ -245,7 +261,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				case "\"":
 					currentRule.MatchParam.Params = append(currentRule.MatchParam.Params, strBuf)
 					strBuf = ""
-					currentStatus = "exp"
+					currentStatus = "condition"
 				case "\\":
 					escape = true
 				default:
@@ -253,7 +269,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				}
 			}
 		default:
-			return nil, fmt.Errorf("bug: unsupported status: %s", token)
+			return nil, fmt.Errorf("bug: unsupported status: %s", currentStatus)
 		}
 		index++
 	}
@@ -263,6 +279,9 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 		item := tmpItems[i]
 		switch v := item.(type) {
 		case *rule.FingerPrintRule:
+			if v.MatchParam.Op == "" || len(v.MatchParam.Params) != 2 {
+				return nil, errors.New("invalid rule")
+			}
 			resStack.Push(v)
 		case string:
 			switch v {
@@ -291,6 +310,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 	}
 	resStack = reverseResStack
 	newComplex := func(op string, rs []*rule.FingerPrintRule) *rule.FingerPrintRule {
+		sort.Slice(rs, func(i, j int) bool { return true })
 		return &rule.FingerPrintRule{
 			Method: "complex",
 			MatchParam: &rule.MatchMethodParam{
