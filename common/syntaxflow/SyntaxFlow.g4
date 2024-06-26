@@ -27,7 +27,7 @@ filterStatement
     | filterExpr  (As refVariable)?              # PureFilterExpr
     ;
 
-comment:  ('//'|'#') (~'\n')*;
+comment: LineComment;
 
 
 // eos means end of statement
@@ -37,8 +37,8 @@ line: '\n';
 lines: line+;
 
 // descriptionStatement will describe the filterExpr with stringLiteral
-descriptionStatement: Desc ('(' lines? descriptionItems? ')') | ('{' descriptionItems? '}');
-descriptionItems: descriptionItem (',' descriptionItem)*;
+descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
+descriptionItems: lines? descriptionItem (',' lines? descriptionItem)*;
 descriptionItem
     : stringLiteral lines?
     | stringLiteral ':' stringLiteral lines?
@@ -206,7 +206,7 @@ As: 'as';
 Backtick: '`';
 SingleQuote: '\'';
 DoubleQuote: '"';
-
+LineComment: '//' | '#' (~[\r\n])*;
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
 OctalNumber: '0o' OctalDigit+;
