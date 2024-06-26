@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -169,5 +170,27 @@ target = append(a, b...)`,
 a = ["a"]
 target = append(a, "b", "c")`,
 			ssa.NewSliceType(ssa.GetStringType()))
+	})
+
+	t.Run("Keys-string", func(t *testing.T) {
+		test.CheckType(t, `
+a = {"a":1, "b":2}
+target = Keys(a)`,
+			ssa.NewSliceType(ssa.GetStringType()),
+			ssaapi.WithExternValue(map[string]any{
+				"Keys": func(i interface{}) interface{} {
+					// ...
+					return nil
+				},
+			}),
+			ssaapi.WithExternBuildValueHandler("Keys", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
+				// Keys(map[T]U) []T
+				typ := ssa.NewFunctionTypeDefine(id, []ssa.Type{ssa.NewMapType(ssa.TypeT, ssa.TypeU)}, []ssa.Type{ssa.NewSliceType(ssa.TypeT)}, false)
+				f := ssa.NewFunctionWithType(id, typ)
+				f.SetGeneric(true)
+				f.SetRange(b.CurrentRange)
+				return f
+			}),
+		)
 	})
 }
