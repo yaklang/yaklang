@@ -642,6 +642,10 @@ func (value Values) Ref(name string) Values {
 }
 
 func (v Values) StringEx(flag int) string {
+	if len(v) <= 0 {
+		return "Values: 0"
+	}
+
 	ret := ""
 	ret += fmt.Sprintf("Values: %d\n", len(v))
 	for i, v := range v {
