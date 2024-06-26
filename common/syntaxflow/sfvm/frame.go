@@ -524,7 +524,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if i.UnaryStr == "" {
 			return utils.Errorf("add description failed: empty name")
 		}
-		ret := i.ValueByIndex(0)
+		ret := i.ValueByIndex(1)
+		if ret == "" {
+			ret = i.ValueByIndex(0)
+		}
 		s.result.Description.Set(i.UnaryStr, ret)
 		if ret != "" {
 			s.debugSubLog("- key: %v, value: %v", i.UnaryStr, ret)
