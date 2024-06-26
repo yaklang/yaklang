@@ -206,7 +206,7 @@ As: 'as';
 Backtick: '`';
 SingleQuote: '\'';
 DoubleQuote: '"';
-LineComment: '//' | '#' (~[\r\n])*;
+LineComment: '//' (~[\r\n])*;
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
 OctalNumber: '0o' OctalDigit+;

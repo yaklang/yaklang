@@ -62,7 +62,7 @@ func (y *SyntaxFlowVisitor) VisitStatement(raw sf.IStatementContext) {
 	case *sf.EmptyContext:
 		return
 	default:
-		log.Warnf("unexpected filter statement: %T", i)
+		log.Infof("syntaxflow met statement: %v", strings.TrimSpace(i.GetText()))
 	}
 	return
 }
