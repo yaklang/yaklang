@@ -103,9 +103,9 @@ func syntaxflowParserInit() {
 		3, 21, 285, 8, 21, 1, 21, 4, 21, 288, 8, 21, 11, 21, 12, 21, 289, 1, 21,
 		3, 21, 293, 8, 21, 1, 21, 3, 21, 296, 8, 21, 3, 21, 298, 8, 21, 1, 22,
 		1, 22, 1, 22, 1, 22, 3, 22, 304, 8, 22, 1, 23, 1, 23, 1, 23, 3, 23, 309,
-		8, 23, 1, 23, 3, 23, 312, 8, 23, 1, 23, 1, 23, 1, 24, 3, 24, 317, 8, 24,
-		1, 24, 1, 24, 1, 24, 5, 24, 322, 8, 24, 10, 24, 12, 24, 325, 9, 24, 1,
-		24, 3, 24, 328, 8, 24, 1, 25, 1, 25, 1, 25, 1, 25, 3, 25, 334, 8, 25, 1,
+		8, 23, 1, 23, 3, 23, 312, 8, 23, 1, 23, 1, 23, 1, 24, 1, 24, 1, 24, 5,
+		24, 319, 8, 24, 10, 24, 12, 24, 322, 9, 24, 1, 24, 3, 24, 325, 8, 24, 1,
+		25, 3, 25, 328, 8, 25, 1, 25, 1, 25, 1, 25, 1, 25, 3, 25, 334, 8, 25, 1,
 		26, 1, 26, 3, 26, 338, 8, 26, 1, 26, 1, 26, 1, 26, 1, 26, 3, 26, 344, 8,
 		26, 1, 27, 1, 27, 3, 27, 348, 8, 27, 1, 28, 1, 28, 1, 28, 3, 28, 353, 8,
 		28, 1, 29, 1, 29, 1, 29, 1, 29, 5, 29, 359, 8, 29, 10, 29, 12, 29, 362,
@@ -134,7 +134,7 @@ func syntaxflowParserInit() {
 		24, 188, 1, 0, 0, 0, 26, 196, 1, 0, 0, 0, 28, 199, 1, 0, 0, 0, 30, 202,
 		1, 0, 0, 0, 32, 216, 1, 0, 0, 0, 34, 257, 1, 0, 0, 0, 36, 259, 1, 0, 0,
 		0, 38, 266, 1, 0, 0, 0, 40, 280, 1, 0, 0, 0, 42, 297, 1, 0, 0, 0, 44, 303,
-		1, 0, 0, 0, 46, 311, 1, 0, 0, 0, 48, 316, 1, 0, 0, 0, 50, 329, 1, 0, 0,
+		1, 0, 0, 0, 46, 311, 1, 0, 0, 0, 48, 315, 1, 0, 0, 0, 50, 327, 1, 0, 0,
 		0, 52, 343, 1, 0, 0, 0, 54, 347, 1, 0, 0, 0, 56, 352, 1, 0, 0, 0, 58, 389,
 		1, 0, 0, 0, 60, 391, 1, 0, 0, 0, 62, 402, 1, 0, 0, 0, 64, 443, 1, 0, 0,
 		0, 66, 456, 1, 0, 0, 0, 68, 460, 1, 0, 0, 0, 70, 464, 1, 0, 0, 0, 72, 466,
@@ -229,12 +229,12 @@ func syntaxflowParserInit() {
 		309, 3, 48, 24, 0, 308, 307, 1, 0, 0, 0, 308, 309, 1, 0, 0, 0, 309, 310,
 		1, 0, 0, 0, 310, 312, 5, 39, 0, 0, 311, 305, 1, 0, 0, 0, 311, 306, 1, 0,
 		0, 0, 311, 312, 1, 0, 0, 0, 312, 313, 1, 0, 0, 0, 313, 314, 3, 6, 3, 0,
-		314, 47, 1, 0, 0, 0, 315, 317, 3, 14, 7, 0, 316, 315, 1, 0, 0, 0, 316,
-		317, 1, 0, 0, 0, 317, 318, 1, 0, 0, 0, 318, 323, 3, 50, 25, 0, 319, 320,
-		5, 34, 0, 0, 320, 322, 3, 50, 25, 0, 321, 319, 1, 0, 0, 0, 322, 325, 1,
-		0, 0, 0, 323, 321, 1, 0, 0, 0, 323, 324, 1, 0, 0, 0, 324, 327, 1, 0, 0,
-		0, 325, 323, 1, 0, 0, 0, 326, 328, 5, 34, 0, 0, 327, 326, 1, 0, 0, 0, 327,
-		328, 1, 0, 0, 0, 328, 49, 1, 0, 0, 0, 329, 330, 3, 74, 37, 0, 330, 331,
+		314, 47, 1, 0, 0, 0, 315, 320, 3, 50, 25, 0, 316, 317, 5, 34, 0, 0, 317,
+		319, 3, 50, 25, 0, 318, 316, 1, 0, 0, 0, 319, 322, 1, 0, 0, 0, 320, 318,
+		1, 0, 0, 0, 320, 321, 1, 0, 0, 0, 321, 324, 1, 0, 0, 0, 322, 320, 1, 0,
+		0, 0, 323, 325, 5, 34, 0, 0, 324, 323, 1, 0, 0, 0, 324, 325, 1, 0, 0, 0,
+		325, 49, 1, 0, 0, 0, 326, 328, 3, 12, 6, 0, 327, 326, 1, 0, 0, 0, 327,
+		328, 1, 0, 0, 0, 328, 329, 1, 0, 0, 0, 329, 330, 3, 74, 37, 0, 330, 331,
 		5, 42, 0, 0, 331, 333, 3, 52, 26, 0, 332, 334, 3, 14, 7, 0, 333, 332, 1,
 		0, 0, 0, 333, 334, 1, 0, 0, 0, 334, 51, 1, 0, 0, 0, 335, 338, 3, 74, 37,
 		0, 336, 338, 3, 66, 33, 0, 337, 335, 1, 0, 0, 0, 337, 336, 1, 0, 0, 0,
@@ -301,7 +301,7 @@ func syntaxflowParserInit() {
 		0, 0, 72, 90, 94, 98, 102, 106, 110, 113, 119, 124, 129, 131, 137, 144,
 		149, 154, 157, 160, 165, 170, 175, 181, 183, 191, 194, 208, 213, 216, 221,
 		224, 240, 246, 257, 263, 268, 272, 277, 280, 284, 289, 292, 295, 297, 303,
-		308, 311, 316, 323, 327, 333, 337, 343, 347, 352, 360, 364, 380, 383, 386,
+		308, 311, 320, 324, 327, 333, 337, 343, 347, 352, 360, 364, 380, 383, 386,
 		389, 396, 400, 417, 421, 436, 441, 443, 451, 453, 460, 464, 471, 484,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
@@ -5473,22 +5473,6 @@ func (s *RecursiveConfigContext) RecursiveConfigItem(i int) IRecursiveConfigItem
 	return t.(IRecursiveConfigItemContext)
 }
 
-func (s *RecursiveConfigContext) Lines() ILinesContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ILinesContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(ILinesContext)
-}
-
 func (s *RecursiveConfigContext) AllComma() []antlr.TerminalNode {
 	return s.GetTokens(SyntaxFlowParserComma)
 }
@@ -5542,48 +5526,37 @@ func (p *SyntaxFlowParser) RecursiveConfig() (localctx IRecursiveConfigContext) 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(316)
-	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
-
-	if _la == SyntaxFlowParserT__1 {
-		{
-			p.SetState(315)
-			p.Lines()
-		}
-
-	}
 	{
-		p.SetState(318)
+		p.SetState(315)
 		p.RecursiveConfigItem()
 	}
-	p.SetState(323)
+	p.SetState(320)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 46, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 45, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(319)
+				p.SetState(316)
 				p.Match(SyntaxFlowParserComma)
 			}
 			{
-				p.SetState(320)
+				p.SetState(317)
 				p.RecursiveConfigItem()
 			}
 
 		}
-		p.SetState(325)
+		p.SetState(322)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 46, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 45, p.GetParserRuleContext())
 	}
-	p.SetState(327)
+	p.SetState(324)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SyntaxFlowParserComma {
 		{
-			p.SetState(326)
+			p.SetState(323)
 			p.Match(SyntaxFlowParserComma)
 		}
 
@@ -5666,6 +5639,22 @@ func (s *RecursiveConfigItemContext) RecursiveConfigItemValue() IRecursiveConfig
 	return t.(IRecursiveConfigItemValueContext)
 }
 
+func (s *RecursiveConfigItemContext) Line() ILineContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ILineContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ILineContext)
+}
+
 func (s *RecursiveConfigItemContext) Lines() ILinesContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -5725,6 +5714,17 @@ func (p *SyntaxFlowParser) RecursiveConfigItem() (localctx IRecursiveConfigItemC
 	}()
 
 	p.EnterOuterAlt(localctx, 1)
+	p.SetState(327)
+	p.GetErrorHandler().Sync(p)
+	_la = p.GetTokenStream().LA(1)
+
+	if _la == SyntaxFlowParserT__1 {
+		{
+			p.SetState(326)
+			p.Line()
+		}
+
+	}
 	{
 		p.SetState(329)
 		p.Identifier()
