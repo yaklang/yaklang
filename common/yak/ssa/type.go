@@ -2,9 +2,10 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -668,7 +669,10 @@ func (itype *ObjectType) String() string {
 	if itype.Name != "" {
 		return itype.Name
 	}
-	return itype.RawString()
+	itype.Name = "..." // avoid RawString -> String -> RawString loop
+	ret := itype.RawString()
+	itype.Name = ""
+	return ret
 }
 
 func (i *ObjectType) PkgPathString() string {
@@ -680,7 +684,6 @@ func (i *ObjectType) PkgPathString() string {
 }
 
 func (itype *ObjectType) RawString() string {
-	itype.Name = "..."
 	ret := ""
 	switch itype.Kind {
 	case SliceTypeKind:
@@ -724,7 +727,6 @@ func (itype *ObjectType) RawString() string {
 			),
 		)
 	}
-	itype.Name = ""
 	return ret
 }
 
@@ -881,7 +883,10 @@ func (s *FunctionType) String() string {
 	if s.Name != "" {
 		return s.Name
 	}
-	return s.RawString()
+	s.Name = "..." // avoid RawString -> String -> RawString loop
+	ret := s.RawString()
+	s.Name = ""
+	return ret
 }
 
 func (s *FunctionType) RawString() string {
