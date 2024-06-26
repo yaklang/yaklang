@@ -3,6 +3,7 @@ package java
 import (
 	"embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"io/fs"
 	"strings"
 	"testing"
@@ -56,7 +57,7 @@ func TestMustPass_Debug(t *testing.T) {
 		return
 	}
 
-	keyword := "jdbc.sf"
+	keyword := "url-open-connection.sf"
 	prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +73,7 @@ func TestMustPass_Debug(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		result, err := prog.SyntaxFlowWithError(string(raw))
+		result, err := prog.SyntaxFlowWithError(string(raw), sfvm.WithEnableDebug(true))
 		if err != nil {
 			t.Fatal(err)
 		}
