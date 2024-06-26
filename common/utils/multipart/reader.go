@@ -125,6 +125,9 @@ func (r *Reader) NextPart() (*Part, error) {
 		switch state {
 		case FINDING_BOUNDARY:
 			lineBoundary := string(trimed)
+			if lineBoundary == "" {
+				continue
+			}
 			if strings.HasPrefix(lineBoundary, "--") {
 				r.boundary = lineBoundary[2:]
 			} else {
