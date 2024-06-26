@@ -18,9 +18,31 @@ Tag1: ---aexeaaaa
 </html>
 `)
 
+var resourceGetter = func(path string) (*rule.MatchResource, error) {
+	return rule.NewHttpResource(rsp), nil
+}
+
+func TestExpressionOpCode1(t *testing.T) {
+	r, err := parsers.ParseExpRule([][2]string{{`title="Powered by JEECMS" || (body="Powered by" && body="http://www.jeecms.com" && body="JEECMS")`, "ok"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = rule.Execute(resourceGetter, r[0].ToOpCodes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err = parsers.ParseExpRule([][2]string{{`header="VIDEO WEB" && title="title"`, "ok"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = rule.Execute(resourceGetter, r[0].ToOpCodes())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 func TestExpressionOpCode(t *testing.T) {
 	trueExp := `header = "VIDEO WEB SERVER"`
-	falseExp := `header = "aa"`
+	falseExp := `header = "haha"`
 	testTypes, err := cartesian.Product[bool]([][]bool{{true, false}, {true, false}, {true, false}, {true, false}})
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +70,7 @@ func TestExpressionOpCode(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		info, err := rule.Execute(rsp, r[0].ToOpCodes())
+		info, err := rule.Execute(resourceGetter, r[0].ToOpCodes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +141,7 @@ func TestYamlOpCode(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		info, err := rule.Execute(rsp, r[0].ToOpCodes())
+		info, err := rule.Execute(resourceGetter, r[0].ToOpCodes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,6 +149,44 @@ func TestYamlOpCode(t *testing.T) {
 			assert.Nil(t, info)
 		} else {
 			assert.Equal(t, "exe", info.CPE.Product)
+		}
+	}
+}
+
+func TestYamlActiveModeOpCode(t *testing.T) {
+	for _, testCase := range []struct {
+		rule   string
+		expect bool
+	}{
+		{
+			`- path: /favicon.ico
+  methods:
+    - md5s:
+        - product: windows
+          md5: 47bce5c74f589f4867dbd57e9ca9f808`, true,
+		},
+	} {
+		yamlRule := testCase.rule
+		expect := testCase.expect
+		r, err := parsers.ParseYamlRule(yamlRule)
+		if err != nil {
+			t.Fatal(err)
+		}
+		info, err := rule.Execute(func(path string) (*rule.MatchResource, error) {
+			if path == "/favicon.ico" {
+				return &rule.MatchResource{Protocol: "http", Data: []byte(`HTTP/1.1 200 OK
+
+aaa`)}, nil
+			}
+			return nil, nil
+		}, r[0].ToOpCodes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !expect {
+			assert.Nil(t, info)
+		} else {
+			assert.Equal(t, "windows", info.CPE.Product)
 		}
 	}
 }

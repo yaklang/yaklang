@@ -18,9 +18,8 @@ const (
 	OpPush        OpFlag = "push"
 	OpOr          OpFlag = "or"
 	OpAnd         OpFlag = "and"
-	//OpJmpIfTrue   OpFlag = "jmp_true"
-	//OpJmp         OpFlag = "jmp"
-	//OpJmpIfFalse  OpFlag = "jmp_false"
+
+	OpNot         OpFlag = "not"
 	OpEqual       OpFlag = "equal"
 	OpContains    OpFlag = "contains"
 	OpRegexpMatch OpFlag = "regexp_match"
@@ -36,10 +35,24 @@ type matchedResult struct {
 	info *FingerprintInfo
 }
 
-func Execute(data []byte, codes []*OpCode) (*FingerprintInfo, error) {
+func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) (*FingerprintInfo, error) {
 	stack := utils.NewStack[any]()
 	for i := 0; i < len(codes); i++ {
 		code := codes[i]
+		getData := func() (*MatchResource, error) {
+			if len(code.data) == 0 {
+				return nil, fmt.Errorf("no data")
+			}
+			webPath, ok := code.data[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid web path: %s", code.data[0])
+			}
+			res, err := getter(webPath)
+			if err != nil {
+				return nil, err
+			}
+			return res, nil
+		}
 		switch code.Op {
 		case OpInfo:
 			if v := stack.Pop().(*matchedResult); v.ok {
@@ -50,32 +63,53 @@ func Execute(data []byte, codes []*OpCode) (*FingerprintInfo, error) {
 				}
 			}
 		case OpData:
-			stack.Push(string(data))
+			data, err := getData()
+			if err != nil {
+				return nil, err
+			}
+			stack.Push(string(data.Data))
 		case OpExtractData:
-			switch code.data[0] {
+			resource, err := getData()
+			if err != nil {
+				return nil, err
+			}
+			data := resource.Data
+			switch code.data[1] {
+			case "protocol":
+				stack.Push(resource.Protocol)
 			case "md5":
-				stack.Push(codec.Md5(data))
+				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
+				stack.Push(codec.Md5(body))
 			case "header_item":
-				stack.Push(lowhttp.GetHTTPPacketHeader(data, utils.InterfaceToString(code.data[1])))
-			case "header":
+				stack.Push(lowhttp.GetHTTPPacketHeader(data, utils.InterfaceToString(code.data[2])))
+			case "header", "headers":
 				header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(string(header))
 			case "body":
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(string(body))
+			case "title":
+				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
+				title := utils.ExtractTitleFromHTMLTitle(string(body), "")
+				stack.Push(title)
+			case "server":
+				server := lowhttp.GetHTTPPacketHeader(data, "server")
+				stack.Push(server)
+			case "raw", "banner":
+				stack.Push(string(data))
 			default:
-				return nil, fmt.Errorf("not support var: %v", code.data[0])
+				return nil, fmt.Errorf("not support var: %v", code.data[1])
 			}
 		case OpPush:
 			stack.Push(code.data[0])
 		case OpOr:
 			if v := stack.Pop().(*matchedResult); v.ok {
-				i = code.data[0].(int) - 1
+				i += code.data[0].(int) - 1
 				stack.Push(v)
 			}
 		case OpAnd:
 			if v := stack.Pop().(*matchedResult); !v.ok {
-				i = code.data[0].(int) - 1
+				i += code.data[0].(int) - 1
 				stack.Push(v)
 			}
 		//case OpJmp:

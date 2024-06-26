@@ -142,7 +142,24 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				CPEs:           currentCPE,
 			}
 			httpflows = append(httpflows, flow)
-			fpInfos := f.matcher.Match(info.Response)
+			f.matcher.Route = func(ctx context.Context, webPath string) ([]byte, error) {
+				target := utils2.HostPort(host, port)
+				packet := []byte(fmt.Sprintf(`GET %s HTTP/1.1
+Host: %v
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+`, target, webPath))
+				ok, flow, err := FetchBannerFromHostPort(iotDetectCtx, packet, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+				if err != nil {
+					return nil, err
+				}
+				if !ok {
+					return nil, fmt.Errorf("fetch path %s banner failed", webPath)
+				}
+				f := utils2.GetLastElement(flow)
+				return f.Response, nil
+			}
+			fpInfos := f.matcher.Match(iotDetectCtx, info.Response)
 			//cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
 			//if err != nil {
 			//	if !strings.Contains(err.Error(), "no rules matched") {
@@ -152,7 +169,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 
 			var cpes []*rule.CPE
 			for _, fpInfo := range fpInfos {
-				cpes = append(cpes, fpInfo.CPE)
+				cpes = append(cpes, &fpInfo.CPE)
 			}
 			// 如果检测到指纹信息
 			if len(fpInfos) > 0 {
