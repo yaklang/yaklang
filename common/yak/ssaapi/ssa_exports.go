@@ -27,10 +27,11 @@ type config struct {
 	programPath string
 	includePath []string
 
-	externLib    map[string]map[string]any
-	externValue  map[string]any
-	defineFunc   map[string]any
-	externMethod ssa.MethodBuilder
+	externLib               map[string]map[string]any
+	externValue             map[string]any
+	defineFunc              map[string]any
+	externMethod            ssa.MethodBuilder
+	externBuildValueHandler map[string]func(b *ssa.FunctionBuilder, id string, v any) (value ssa.Value)
 
 	DatabaseProgramName        string
 	DatabaseProgramCacheHitter func(any)
@@ -111,6 +112,15 @@ func WithExternValue(table map[string]any) Option {
 func WithExternMethod(b ssa.MethodBuilder) Option {
 	return func(c *config) {
 		c.externMethod = b
+	}
+}
+
+func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder, id string, v any) ssa.Value) Option {
+	return func(c *config) {
+		if c.externBuildValueHandler == nil {
+			c.externBuildValueHandler = make(map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value)
+		}
+		c.externBuildValueHandler[id] = callback
 	}
 }
 

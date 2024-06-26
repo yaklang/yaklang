@@ -185,10 +185,11 @@ type Program struct {
 	packagePathList packagePathList
 
 	// extern lib
-	cacheExternInstance map[string]Value // lib and value
-	externType          map[string]Type
-	ExternInstance      map[string]any
-	ExternLib           map[string]map[string]any
+	cacheExternInstance     map[string]Value // lib and value
+	externType              map[string]Type
+	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
+	ExternInstance          map[string]any
+	ExternLib               map[string]map[string]any
 }
 
 type Package struct {
@@ -247,6 +248,8 @@ type Function struct {
 	builder *FunctionBuilder
 	// this function is variadic parameter, for function type create
 	hasEllipsis bool
+	// generic
+	isGeneric bool
 }
 
 func (f *Function) FirstBlockInstruction() []Instruction {

@@ -24,7 +24,7 @@ func TestFunctionCallTypeCheck(t *testing.T) {
 		})
 	})
 
-	//TODO: check this parameter type
+	// TODO: check this parameter type
 	t.Run("variadic function call, error type in variadic parament", func(t *testing.T) {
 		check(t, `
 		ssa.Parse("a", 1)
