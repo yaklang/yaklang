@@ -2,10 +2,11 @@ package netx
 
 import (
 	"crypto/tls"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type dialXConfig struct {
@@ -174,8 +175,13 @@ func DialX_WithTimeout(timeout time.Duration) DialXOption {
 }
 
 func DialX_WithProxy(proxy ...string) DialXOption {
+	proxy = utils.StringArrayFilterEmpty(proxy)
+	if len(proxy) == 0 {
+		return func(c *dialXConfig) {}
+	}
+
 	return func(c *dialXConfig) {
-		c.Proxy = utils.StringArrayFilterEmpty(proxy)
+		c.Proxy = proxy
 	}
 }
 
