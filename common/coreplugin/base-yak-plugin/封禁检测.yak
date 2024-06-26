@@ -1,0 +1,23 @@
+yakit.AutoInitYakit()
+target = cli.String("target", cli.setRequired(true),cli.setVerboseName("目标"))
+httpcheck = cli.Bool("httpcheck", cli.setVerboseName("http检查"))
+cli.check()
+
+urlIns = str.ParseStringUrlToUrlInstance(target)~
+if urlIns.Scheme == "" {
+    urlIns.Scheme = "http"
+    target = urlIns.String()
+}
+
+rsp,_,err =  poc.Get(target,poc.noRedirect(true))
+reachable = err == nil
+if err != nil {
+    yakit.Error(err.Error())
+}
+yakit.StatusCard("本地可达性（仅代表可联）",reachable)
+
+
+res = risk.CheckServerReachable(context.Background(),target,httpcheck)~
+yakit.StatusCard("yak内置服务器可达性",res.Reachable)
+yakit.StatusCard("yak内置服务器检测信息",res.Verbose)
+db.SaveHTTPFlowFromRawWithOption(target,res.HTTPRequest,res.HTTPResponse,db.SaveHTTPFlowWithTags("封禁检测（内置服务器流量）"))
