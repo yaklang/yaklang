@@ -777,11 +777,6 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
         X-Requested-With: XMLHttpRequest
         Referer: http://www.example.com
 
-    payloads:
-      username:
-        - admin
-      password:
-        - admin
     cookie-reuse: true
     matchers:
       - type: dsl
@@ -794,20 +789,21 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		_ = i
-		rsp, err := client.ImportHTTPFuzzerTaskFromYaml(context.Background(), &ypb.ImportHTTPFuzzerTaskFromYamlRequest{
-			YamlContent: testCase.content,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		res, err := client.ExportHTTPFuzzerTaskToYaml(context.Background(), &ypb.ExportHTTPFuzzerTaskToYamlRequest{
-			Requests: rsp.Requests,
-		})
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			rsp, err := client.ImportHTTPFuzzerTaskFromYaml(context.Background(), &ypb.ImportHTTPFuzzerTaskFromYamlRequest{
+				YamlContent: testCase.content,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err := client.ExportHTTPFuzzerTaskToYaml(context.Background(), &ypb.ExportHTTPFuzzerTaskToYamlRequest{
+				Requests: rsp.Requests,
+			})
 
-		if err := CompareNucleiYaml(res.YamlContent, testCase.expect); err != nil {
-			t.Fatal(err)
-		}
+			if err := CompareNucleiYaml(res.YamlContent, testCase.expect); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 func TestGRPCMUSTPASS_HTTPFuzzer_ExtractWithId(t *testing.T) {
