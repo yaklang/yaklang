@@ -16,7 +16,14 @@ func MergeValues(values ...ValueOperator) ValueOperator {
 }
 
 func NewValues(values []ValueOperator) ValueOperator {
-	return &ValueList{values: values}
+	v := &ValueList{values: values}
+	vs := make([]ValueOperator, 0, len(values))
+	v.Recursive(func(operator ValueOperator) error {
+		vs = append(vs, operator)
+		return nil
+	})
+	// flat
+	return &ValueList{values: vs}
 }
 
 type ValueList struct {

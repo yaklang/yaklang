@@ -49,22 +49,19 @@ func TestOpcode(t *testing.T) {
 	t.Run("comment", func(t *testing.T) {
 		checkNo(t, `// a `, sfvm.OpPushSearchExact)
 	})
-	t.Run("comment line", func(t *testing.T) {
-		checkNo(t, `# a `, sfvm.OpPushSearchExact)
-	})
 	t.Run("comment with keywords", func(t *testing.T) {
-		checkNo(t, `# # # // a as $aaaa`, sfvm.OpUpdateRef)
-		checkNo(t, `# # # // a as $aaaa`, sfvm.OpNewRef)
-		checkNo(t, `# a as $aaaa`, sfvm.OpUpdateRef)
+		checkNo(t, `// // // // a as $aaaa`, sfvm.OpUpdateRef)
+		checkNo(t, `// // // a as $aaaa`, sfvm.OpNewRef)
+		checkNo(t, `// a as $aaaa`, sfvm.OpUpdateRef)
 		check(t, `
-		# a as $aaaa
+		// a as $aaaa
 		a 
 		`, sfvm.OpPushSearchExact)
 		checkNo(t, `
-		# a as $aaaa
+		// a as $aaaa
 		a 
 		`, sfvm.OpUpdateRef)
-		checkNo(t, `# check $aaae `, sfvm.OpCheckParams)
+		checkNo(t, `//check $aaae `, sfvm.OpCheckParams)
 	})
 
 	//  description

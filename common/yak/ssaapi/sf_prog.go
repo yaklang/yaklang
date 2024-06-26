@@ -30,8 +30,8 @@ func (p *Program) GetOpcode() string {
 	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
 }
 
-func (p *Program) Recursive(func(operator sfvm.ValueOperator) error) error {
-	return nil
+func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
+	return f(p)
 }
 
 func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error) {
