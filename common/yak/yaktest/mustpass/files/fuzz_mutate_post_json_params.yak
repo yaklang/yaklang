@@ -7,17 +7,18 @@ var checkb = false
 packet = `GET / HTTP/1.1
 Host: www.baidu.com
 Test: 111111
-Content-Type: application/json
-content-type: application/text
-Content-type: application/octet-stream
+Content-Type: a/1
+content-type: a/2
+Content-type: a/3
 a: bbbbb
 
 {"key":"a","$key":"$", "b":[{"c":"ckey"}]}`
 
 freq = fuzz.HTTPRequest(packet)~
-assert freq.GetHeaderParamByName("Content-Type").GetFirstValue() == "application/json"
-assert freq.GetHeaderParamByName("content-type").GetFirstValue() == "application/text"
-assert freq.GetHeaderParamByName("Content-type").GetFirstValue() == "application/octet-stream"
+assert freq.GetHeaderParamByName("CONTENT-TYPE").GetFirstValue() in ["a/1","a/2", "a/3"]
+assert freq.GetHeaderParamByName("Content-Type").GetFirstValue() == "a/1"
+assert freq.GetHeaderParamByName("content-type").GetFirstValue() == "a/2"
+assert freq.GetHeaderParamByName("Content-type").GetFirstValue() == "a/3"
 assert freq.GetHeaderParamByName("a").GetFirstValue() == "bbbbb"
 assert freq.GetHeaderParamByName("Host").GetFirstValue() == "www.baidu.com"
 
