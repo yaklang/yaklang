@@ -46,6 +46,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#line.
 	VisitLine(ctx *LineContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#lines.
+	VisitLines(ctx *LinesContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#descriptionStatement.
 	VisitDescriptionStatement(ctx *DescriptionStatementContext) interface{}
 

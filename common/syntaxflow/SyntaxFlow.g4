@@ -34,13 +34,14 @@ comment:  ('//'|'#') (~'\n')*;
 // the ';' can be
 eos: ';' | line ;
 line: '\n';
+lines: line+;
 
 // descriptionStatement will describe the filterExpr with stringLiteral
-descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
+descriptionStatement: Desc ('(' lines? descriptionItems? ')') | ('{' descriptionItems? '}');
 descriptionItems: descriptionItem (',' descriptionItem)*;
 descriptionItem
-    : stringLiteral
-    | stringLiteral ':' stringLiteral
+    : stringLiteral lines?
+    | stringLiteral ':' stringLiteral lines?
     ;
 
 // echo statement will echo the variable 
@@ -59,12 +60,12 @@ refVariable
 
 filterItemFirst
     : nameFilter                                 # NamedFilter
-    | '.' nameFilter                             # FieldCallFilter
+    | '.' lines? nameFilter                             # FieldCallFilter
     ;
 
 filterItem
     : filterItemFirst                            #First
-    | '(' actualParam? ')'                       # FunctionCallFilter
+    | '(' lines? actualParam? ')'                       # FunctionCallFilter
     | '[' sliceCallItem ']'                      # FieldIndexFilter
     | '?{' conditionExpression '}'               # OptionalFilter
     | '->'                                       # NextFilter
@@ -90,16 +91,16 @@ useDefCalcParams
     ;
 
 actualParam
-    : singleParam                      # AllParam
-    | actualParamFilter+ singleParam?  # EveryParam
+    : singleParam    lines?                   # AllParam
+    | actualParamFilter+ singleParam? lines?  # EveryParam
     ;
 
 actualParamFilter: singleParam ',' | ',';
 
 singleParam: ( '#>' | '#{' (recursiveConfig)? '}' )? filterStatement ;
 
-recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','? line?;
-recursiveConfigItem: line? identifier ':' recursiveConfigItemValue ;
+recursiveConfig: lines? recursiveConfigItem (',' recursiveConfigItem)* ','?;
+recursiveConfigItem: identifier ':' recursiveConfigItemValue lines?;
 recursiveConfigItemValue
     : (identifier | numberLiteral)
     | '`' filterStatement '`'
