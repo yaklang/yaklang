@@ -2,9 +2,10 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -97,6 +98,15 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		} else {
 			return true
 		}
+	case GenericTypeKind:
+		if t2kind != GenericTypeKind {
+			return false
+		}
+
+		if t2.(*GenericType).symbol == t1.(*GenericType).symbol {
+			return true
+		}
+		return false
 	default:
 	}
 	return t1kind == t2kind
@@ -263,6 +273,7 @@ const (
 	FunctionTypeKind
 
 	ClassBluePrintTypeKind
+	GenericTypeKind
 )
 
 type BasicType struct {
@@ -931,4 +942,209 @@ func (s *FunctionType) GetTypeKind() TypeKind {
 
 func (f *FunctionType) AddAnnotationFunc(handler ...func(Value)) {
 	f.AnnotationFunc = append(f.AnnotationFunc, handler...)
+}
+
+// ====================== generic type
+type GenericType struct {
+	method map[string]*Function
+	symbol string
+}
+
+var _ (Type) = (*GenericType)(nil)
+
+func (c *GenericType) SetMethod(m map[string]*Function) {
+	c.method = m
+}
+
+func (b *GenericType) AddMethod(id string, f *Function) {
+	if b.method == nil {
+		b.method = make(map[string]*Function)
+	}
+	b.method[id] = f
+}
+
+func (c *GenericType) GetMethod() map[string]*Function {
+	return c.method
+}
+
+func (c *GenericType) GetTypeKind() TypeKind {
+	return GenericTypeKind
+}
+
+var (
+	// T is a generic type
+	TypeT = NewGenericType("T")
+	TypeU = NewGenericType("U")
+)
+
+func NewGenericType(symbol string) *GenericType {
+	return &GenericType{
+		symbol: symbol,
+		method: make(map[string]*Function),
+	}
+}
+
+func (c GenericType) String() string {
+	return fmt.Sprintf("%s", c.symbol)
+}
+
+func (c GenericType) PkgPathString() string {
+	return fmt.Sprintf("%s", c.symbol)
+}
+
+func (c GenericType) RawString() string {
+	return c.String()
+}
+
+func isSameGenericType(t1, t2 Type) bool {
+	if t1.GetTypeKind() != GenericTypeKind || t2.GetTypeKind() != GenericTypeKind {
+		return false
+	}
+	return t1.(*GenericType).symbol == t2.(*GenericType).symbol
+}
+
+func GetGenericTypeFromType(t Type) []Type {
+	typs := make([]Type, 0)
+	switch t.GetTypeKind() {
+	case GenericTypeKind:
+		typs = append(typs, t)
+	case ChanTypeKind:
+		typs = append(typs, GetGenericTypeFromType(t.(*ChanType).Elem)...)
+	case SliceTypeKind:
+		typs = append(typs, GetGenericTypeFromType(t.(*ObjectType).FieldType)...)
+	case TupleTypeKind:
+		obj := t.(*ObjectType)
+		for _, typ := range obj.FieldTypes {
+			typs = append(typs, GetGenericTypeFromType(typ)...)
+		}
+	case MapTypeKind:
+		obj := t.(*ObjectType)
+		typs = append(typs, GetGenericTypeFromType(obj.KeyTyp)...)
+		typs = append(typs, GetGenericTypeFromType(obj.FieldType)...)
+	case FunctionTypeKind:
+		obj := t.(*FunctionType)
+		for _, typ := range obj.Parameter {
+			typs = append(typs, GetGenericTypeFromType(typ)...)
+		}
+		typs = append(typs, GetGenericTypeFromType(obj.ReturnType)...)
+	}
+	return typs
+}
+
+func (c *GenericType) Binding(real, generic Type, symbolsTypeMap map[string]Type) (errMsg string) {
+	setBinding := func(typ Type) {
+		if existed, ok := symbolsTypeMap[c.symbol]; ok {
+			if !TypeCompare(existed, typ) {
+				errMsg = GenericTypeError(c, generic, existed, typ)
+			}
+		} else {
+			symbolsTypeMap[c.symbol] = typ
+		}
+	}
+
+	switch real.GetTypeKind() {
+	case GenericTypeKind,
+		StringTypeKind, NumberTypeKind, BooleanTypeKind, BytesTypeKind,
+		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
+		if isSameGenericType(generic, c) {
+			setBinding(real)
+		}
+	case ChanTypeKind:
+		if t, ok := generic.(*ChanType); ok && isSameGenericType(t.Elem, c) {
+			setBinding(real.(*ChanType).Elem)
+		}
+	case SliceTypeKind:
+		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.FieldType, c) {
+			setBinding(real.(*ObjectType).FieldType)
+		}
+	case MapTypeKind:
+		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.KeyTyp, c) {
+			setBinding(real.(*ObjectType).KeyTyp)
+		}
+		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.FieldType, c) {
+			setBinding(real.(*ObjectType).FieldType)
+		}
+	case TupleTypeKind:
+		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.FieldType, c) {
+			setBinding(real.(*ObjectType).FieldType)
+		}
+	case FunctionTypeKind:
+		if t, ok := generic.(*FunctionType); ok {
+			rt := real.(*FunctionType)
+			for i, typ := range t.Parameter {
+				if !isSameGenericType(typ, c) {
+					continue
+				}
+				setBinding(rt.Parameter[i])
+			}
+			if isSameGenericType(t.ReturnType, c) {
+				setBinding(rt.ReturnType)
+			}
+		}
+	}
+	return
+}
+
+func (c *GenericType) Apply(raw Type, symbolsTypeMap map[string]Type) Type {
+	new, ok := CloneType(raw)
+	if !ok {
+		return raw
+	}
+
+	switch raw.GetTypeKind() {
+	case GenericTypeKind:
+		if TypeCompare(new, c) {
+			if new, ok := CloneType(symbolsTypeMap[c.symbol]); ok {
+				return new
+			}
+		}
+	case ChanTypeKind:
+		t := new.(*ChanType)
+		t.Elem = c.Apply(t.Elem, symbolsTypeMap)
+		return new
+	case SliceTypeKind:
+		t := new.(*ObjectType)
+		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
+	case MapTypeKind:
+		t := new.(*ObjectType)
+		t.KeyTyp = c.Apply(t.KeyTyp, symbolsTypeMap)
+		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
+	case TupleTypeKind:
+		t := new.(*ObjectType)
+		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
+	case FunctionTypeKind:
+		t := new.(*FunctionType)
+		for i, typ := range t.Parameter {
+			t.Parameter[i] = c.Apply(typ, symbolsTypeMap)
+		}
+		t.ReturnType = c.Apply(t.ReturnType, symbolsTypeMap)
+	}
+
+	return new
+}
+
+// Shallow copy
+func CloneType(t Type) (Type, bool) {
+	switch t.GetTypeKind() {
+	case GenericTypeKind,
+		StringTypeKind, NumberTypeKind, BooleanTypeKind, BytesTypeKind,
+		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
+		return t, true
+	case ChanTypeKind:
+		old := t.(*ChanType)
+		return NewChanType(old.Elem), true
+	case SliceTypeKind:
+		old := t.(*ObjectType)
+		return NewSliceType(old.FieldType), true
+	case MapTypeKind:
+		old := t.(*ObjectType)
+		return NewMapType(old.KeyTyp, old.FieldType), true
+	case TupleTypeKind:
+		old := t.(*ObjectType)
+		return CalculateType(old.FieldTypes), true
+	case FunctionTypeKind:
+		old := t.(*FunctionType)
+		return NewFunctionType(old.Name, old.Parameter, old.ReturnType, old.IsVariadic), true
+	}
+	return nil, false
 }

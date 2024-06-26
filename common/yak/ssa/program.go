@@ -1,9 +1,10 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -13,18 +14,19 @@ import (
 
 func NewProgram(dbProgramName string, fs filesys.FileSystem, programPath string) *Program {
 	prog := &Program{
-		Name:                dbProgramName,
-		Packages:            make(map[string]*Package),
-		errors:              make([]*SSAError, 0),
-		Cache:               NewDBCache(dbProgramName),
-		OffsetMap:           make(map[int]*OffsetItem),
-		OffsetSortedSlice:   make([]int, 0),
-		editorStack:         omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
-		editorMap:           omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
-		cacheExternInstance: make(map[string]Value),
-		externType:          make(map[string]Type),
-		ExternInstance:      make(map[string]any),
-		ExternLib:           make(map[string]map[string]any),
+		Name:                    dbProgramName,
+		Packages:                make(map[string]*Package),
+		errors:                  make([]*SSAError, 0),
+		Cache:                   NewDBCache(dbProgramName),
+		OffsetMap:               make(map[int]*OffsetItem),
+		OffsetSortedSlice:       make([]int, 0),
+		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		cacheExternInstance:     make(map[string]Value),
+		externType:              make(map[string]Type),
+		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
+		ExternInstance:          make(map[string]any),
+		ExternLib:               make(map[string]map[string]any),
 	}
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
@@ -57,6 +59,15 @@ func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Func
 	}
 
 	return fun
+}
+
+func (prog *Program) GetCacheExternInstance(name string) (Value, bool) {
+	v, ok := prog.cacheExternInstance[name]
+	return v, ok
+}
+
+func (prog *Program) SetCacheExternInstance(name string, v Value) {
+	prog.cacheExternInstance[name] = v
 }
 
 // create or get main function builder

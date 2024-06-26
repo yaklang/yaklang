@@ -22,6 +22,10 @@ func (b *FunctionBuilder) WithExternLib(lib map[string]map[string]any) {
 	b.GetProgram().ExternLib = lib
 }
 
+func (b *FunctionBuilder) WithExternBuildValueHandler(m map[string]func(b *FunctionBuilder, id string, v any) (value Value)) {
+	b.GetProgram().externBuildValueHandler = m
+}
+
 func (b *FunctionBuilder) WithExternMethod(builder MethodBuilder) {
 	ExternMethodBuilder = builder
 }
@@ -152,15 +156,20 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 		return nil
 	}
 	str := id
-	switch itype.Kind() {
-	case reflect.Func:
-		f := NewFunctionWithType(str, prog.CoverReflectFunctionType(itype, 0))
-		f.SetRange(b.CurrentRange)
-		value = f
-	default:
-		value = NewParam(str, false, b)
-		value.SetType(prog.handlerType(itype, 0))
+	if handler, ok := prog.externBuildValueHandler[id]; ok {
+		value = handler(b, id, v)
+	} else {
+		switch itype.Kind() {
+		case reflect.Func:
+			f := NewFunctionWithType(str, prog.CoverReflectFunctionType(itype, 0))
+			f.SetRange(b.CurrentRange)
+			value = f
+		default:
+			value = NewParam(str, false, b)
+			value.SetType(prog.handlerType(itype, 0))
+		}
 	}
+
 	value.SetExtern(true)
 	prog.SetVirtualRegister(value)
 	prog.SetInstructionWithName(str, value)
