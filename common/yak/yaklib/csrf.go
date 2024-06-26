@@ -1,11 +1,14 @@
 package yaklib
 
 import (
+	"errors"
 	"html/template"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -53,16 +56,16 @@ xhr.send(new Blob([aBody]));
 `)))
 
 type _csrfKeyValues struct {
-	Type  string
-	Name  string
-	Value string
+	Type  template.HTMLAttr
+	Name  template.HTMLAttr
+	Value template.HTMLAttr
 }
 type _csrfTemplateConfig struct {
-	Url         string
-	Method      string
-	ContentType string
-	EncType     string
-	Body        string
+	Url         any
+	Method      any
+	ContentType any
+	EncType     any
+	Body        any
 	Inputs      []_csrfKeyValues
 }
 
@@ -98,8 +101,8 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		config         *_csrfConfig
 		templateConfig *_csrfTemplateConfig
 
-		template *template.Template = csrfFormTemplate
-		err      error
+		tmpl *template.Template = csrfFormTemplate
+		err  error
 	)
 
 	switch raw.(type) {
@@ -116,10 +119,6 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		opt(config)
 	}
 
-	if config.MultipartDefaultValue {
-		template = csrfJSTemplate
-	}
-
 	u, err = lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.https)
 	if err != nil {
 		return "", utils.Wrap(err, "extract url failed")
@@ -131,11 +130,21 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	}
 
 	method = strings.ToUpper(req.Method)
-	templateConfig = &_csrfTemplateConfig{
-		Url:     u.String(),
-		Method:  method,
-		EncType: "application/x-www-form-urlencoded",
-		Inputs:  make([]_csrfKeyValues, 0),
+
+	if config.MultipartDefaultValue {
+		tmpl = csrfJSTemplate
+		templateConfig = &_csrfTemplateConfig{
+			Url:    template.JSStr(u.String()),
+			Method: template.JSStr(method),
+			Inputs: make([]_csrfKeyValues, 0),
+		}
+	} else {
+		templateConfig = &_csrfTemplateConfig{
+			Url:     template.HTMLAttr(u.String()),
+			Method:  template.HTMLAttr(method),
+			EncType: template.HTMLAttr("application/x-www-form-urlencoded"),
+			Inputs:  make([]_csrfKeyValues, 0),
+		}
 	}
 
 	for key, values = range req.Header {
@@ -145,7 +154,11 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		for _, value = range values {
 			templateConfig.ContentType = value
 			if strings.Contains(strings.ToLower(value), "multipart/form-data;") {
-				templateConfig.EncType = "multipart/form-data"
+				if tmpl == csrfFormTemplate {
+					templateConfig.EncType = template.HTMLAttr(value)
+				} else if tmpl == csrfJSTemplate {
+					templateConfig.ContentType = template.JSStr(value)
+				}
 				break
 			} else if strings.Contains(strings.ToLower(value), "application/json") {
 				break
@@ -154,30 +167,31 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		break
 	}
 
-	if method == "POST" {
-		rawBody, err = ioutil.ReadAll(req.Body)
-		if err != nil {
-			return "", utils.Wrap(err, "read body failed")
-		}
-		params, _, err := lowhttp.GetParamsFromBody(templateConfig.ContentType, rawBody)
+	rawBody, err = ioutil.ReadAll(req.Body)
+	if tmpl == csrfJSTemplate {
+		templateConfig.Body = template.JS(strconv.Quote(string(rawBody)))
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", utils.Wrap(err, "read body failed")
+	}
+	if len(rawBody) > 0 {
+		params, _, err := lowhttp.GetParamsFromBody(utils.InterfaceToString(templateConfig.ContentType), rawBody)
 		if err != nil {
 			return "", utils.Wrap(err, "get params from body failed")
 		}
 		for key, values = range params {
 			for _, value := range values {
-				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", key, value})
+				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", template.HTMLAttr(key), template.HTMLAttr(value)})
 			}
 		}
-	} else if method == "GET" {
+	} else {
 		vals := lowhttp.ParseQueryParams(strings.TrimSpace(string(u.RawQuery)))
 		for _, item := range vals.Items {
-			templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", item.Key, item.Value})
+			templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", template.HTMLAttr(item.Key), template.HTMLAttr(item.Value)})
 		}
-	} else {
-		return "", utils.Wrap(err, "not support method")
 	}
 
-	err = template.Execute(builder, templateConfig)
+	err = tmpl.Execute(builder, templateConfig)
 	if err != nil {
 		return "", err
 	}
