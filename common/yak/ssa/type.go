@@ -83,6 +83,10 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		return typeCompareEx(t1o.FieldType, t2o.FieldType, depth) && typeCompareEx(t1o.KeyTyp, t2o.KeyTyp, depth)
 	case StructTypeKind:
 	case ObjectTypeKind:
+	case ByteTypeKind:
+		if t2kind == NumberTypeKind {
+			return true
+		}
 	case BytesTypeKind:
 		// string | []number
 		if t2kind == StringTypeKind {
@@ -274,6 +278,7 @@ const (
 
 	ClassBluePrintTypeKind
 	GenericTypeKind
+	ByteTypeKind
 )
 
 type BasicType struct {
@@ -337,6 +342,7 @@ func (b *BasicType) AddMethod(id string, f *Function) {
 var BasicTypes = map[TypeKind]*BasicType{
 	NumberTypeKind:    NewBasicType(NumberTypeKind, "number"),
 	StringTypeKind:    NewBasicType(StringTypeKind, "string"),
+	ByteTypeKind:      NewBasicType(ByteTypeKind, "byte"),
 	BytesTypeKind:     NewBasicType(BytesTypeKind, "bytes"),
 	BooleanTypeKind:   NewBasicType(BooleanTypeKind, "boolean"),
 	UndefinedTypeKind: NewBasicType(UndefinedTypeKind, "undefined"),
@@ -347,6 +353,10 @@ var BasicTypes = map[TypeKind]*BasicType{
 
 func GetNumberType() Type {
 	return BasicTypes[NumberTypeKind]
+}
+
+func GetByteType() Type {
+	return BasicTypes[ByteTypeKind]
 }
 
 func GetStringType() Type {
@@ -1044,11 +1054,14 @@ func (c *GenericType) Binding(real, generic Type, symbolsTypeMap map[string]Type
 
 	switch real.GetTypeKind() {
 	case GenericTypeKind,
-		StringTypeKind, NumberTypeKind, BooleanTypeKind, BytesTypeKind,
+		StringTypeKind, NumberTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
+
 		if isSameGenericType(generic, c) {
 			setBinding(real)
 		}
+	case BytesTypeKind:
+		setBinding(GetByteType())
 	case ChanTypeKind:
 		if t, ok := generic.(*ChanType); ok && isSameGenericType(t.Elem, c) {
 			setBinding(real.(*ChanType).Elem)
@@ -1093,7 +1106,7 @@ func (c *GenericType) Apply(raw Type, symbolsTypeMap map[string]Type) Type {
 
 	switch raw.GetTypeKind() {
 	case GenericTypeKind:
-		if TypeCompare(new, c) {
+		if isSameGenericType(new, c) {
 			if new, ok := CloneType(symbolsTypeMap[c.symbol]); ok {
 				return new
 			}
@@ -1105,6 +1118,10 @@ func (c *GenericType) Apply(raw Type, symbolsTypeMap map[string]Type) Type {
 	case SliceTypeKind:
 		t := new.(*ObjectType)
 		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
+		// hook bytes
+		if t.FieldType.GetTypeKind() == ByteTypeKind {
+			new = GetBytesType()
+		}
 	case MapTypeKind:
 		t := new.(*ObjectType)
 		t.KeyTyp = c.Apply(t.KeyTyp, symbolsTypeMap)
@@ -1127,7 +1144,7 @@ func (c *GenericType) Apply(raw Type, symbolsTypeMap map[string]Type) Type {
 func CloneType(t Type) (Type, bool) {
 	switch t.GetTypeKind() {
 	case GenericTypeKind,
-		StringTypeKind, NumberTypeKind, BooleanTypeKind, BytesTypeKind,
+		StringTypeKind, NumberTypeKind, BooleanTypeKind, ByteTypeKind, BytesTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
 		return t, true
 	case ChanTypeKind:
