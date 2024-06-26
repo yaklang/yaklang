@@ -18,7 +18,7 @@ func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
 	var values []string
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
-		return values[0]
+		return ""
 	}
 	canonical := false
 	if len(canonicals) > 0 {
@@ -29,8 +29,9 @@ func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
 	}
 
 	// 尝试完全匹配
-	if vs, ok := req.Header[key]; ok {
-		return vs[0]
+	vs, ok := req.Header[key]
+	if !ok || len(vs) == 0 {
+		return ""
 	}
 	// 尝试模糊匹配
 	key = strings.ToLower(key)
@@ -39,6 +40,9 @@ func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
 		if strings.ToLower(k) == key {
 			values = append(values, v...)
 		}
+	}
+	if len(values) == 0 {
+		return ""
 	}
 
 	return values[0]
