@@ -34,8 +34,14 @@ func CodecFlowExec(req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err erro
 		}
 		return nil, utils.Errorf("not support type %v", fieldType.Kind())
 	}
+	var text []byte
+	if req.GetInputBytes() != nil {
+		text = req.GetInputBytes()
+	} else {
+		text = []byte(req.GetText())
+	}
 
-	codecFlow := NewCodecExecFlow([]byte(req.GetText()), req.GetWorkFlow())
+	codecFlow := NewCodecExecFlow(text, req.GetWorkFlow())
 	flowValue := reflect.ValueOf(codecFlow)
 	for _, work := range codecFlow.Flow {
 		methodValue := flowValue.MethodByName(work.CodecType)
