@@ -5,15 +5,18 @@ import "fmt"
 func BindingNotFound(v string, r *Range) string {
 	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the calling location [%s--%s].", v, r.GetStart(), r.GetEnd())
 }
+
 func BindingNotFoundInCall(v string) string {
 	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the call", v)
 }
+
 func FreeValueNotMember(name, key string, r *Range) string {
 	return fmt.Sprintf(
 		"The FreeValue %s unable to access the member with name or index {%s} at the calling location [%s--%s].",
 		name, key, r.GetStart(), r.GetEnd(),
 	)
 }
+
 func FreeValueNotMemberInCall(name, key string) string {
 	return fmt.Sprintf(
 		"The value %s unable to access the member with name or index {%s} at the call.",
@@ -24,6 +27,7 @@ func FreeValueNotMemberInCall(name, key string) string {
 func ExternFieldError(instance, name, key, want string) string {
 	return fmt.Sprintf("Extern%s [%s] don't has [%s], maybe you meant %s ?", instance, name, key, want)
 }
+
 func ContAssignExtern(name string) string {
 	return fmt.Sprintf("cannot assign to  %s, this is extern-instance", name)
 }
@@ -42,6 +46,15 @@ func ValueIsNull() string {
 
 func FunctionContReturnError() string {
 	return "This function cannot return error"
+}
+
+func GenericTypeError(symbol, generic, want, got Type) string {
+	symbolStr, genericStr := symbol.String(), generic.String()
+	if symbolStr != "" && symbolStr == genericStr {
+		return fmt.Sprintf("%s should be %s, but got %s", symbolStr, want, got)
+	} else {
+		return fmt.Sprintf("%s of %s should be %s, but got %s", symbol, generic, want, got)
+	}
 }
 
 func CallAssignmentMismatch(left int, right string) string {

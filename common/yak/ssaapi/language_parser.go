@@ -210,6 +210,7 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 	builder.WithExternLib(c.externLib)
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
+	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
 	builder.SetRangeInit(editor)
 	return prog, builder, nil

@@ -25,8 +25,10 @@ type TestCase struct {
 	Option      []ssaapi.Option
 }
 
-var languageOption ssaapi.Option = nil
-var language ssaapi.Language
+var (
+	languageOption ssaapi.Option = nil
+	language       ssaapi.Language
+)
 
 func SetLanguage(lang ssaapi.Language, build ssaapi.Builder) {
 	ssaapi.LanguageBuilders[lang] = build
@@ -135,6 +137,7 @@ func CheckParse(t *testing.T, code string, opt ...ssaapi.Option) {
 	}
 	CheckTestCase(t, tc)
 }
+
 func CheckNoError(t *testing.T, code string, opt ...ssaapi.Option) {
 	tc := TestCase{
 		Code: code,
@@ -145,6 +148,7 @@ func CheckNoError(t *testing.T, code string, opt ...ssaapi.Option) {
 	}
 	CheckTestCase(t, tc)
 }
+
 func CheckError(t *testing.T, tc TestCase) {
 	check := func(prog *ssaapi.Program, want []string) {
 		errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
@@ -157,7 +161,7 @@ func CheckError(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
-func CheckType(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.Option) {
+func CheckTypeKind(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.Option) {
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {
@@ -169,6 +173,24 @@ func CheckType(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.Optio
 
 			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
 			require.Equal(t, kind, v.GetTypeKind())
+		},
+		Option: opt,
+	}
+	CheckTestCase(t, tc)
+}
+
+func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {
+	tc := TestCase{
+		Code: code,
+		Check: func(prog *ssaapi.Program, _ []string) {
+			vs := prog.Ref("target")
+			require.Len(t, vs, 1)
+
+			v := vs[0]
+			require.NotNil(t, v)
+
+			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
+			require.Truef(t, ssa.TypeCompare(ssaapi.GetBareType(v.GetType()), typ), "want %s, got %s", typ, v.GetType())
 		},
 		Option: opt,
 	}
@@ -235,7 +257,6 @@ func CheckParameter(t *testing.T, tc TestCase) {
 		require.Equal(t, want, parameters)
 	}
 	CheckTestCase(t, tc)
-
 }
 
 func CheckParameterMember(t *testing.T, tc TestCase) {
@@ -255,7 +276,6 @@ func CheckParameterMember(t *testing.T, tc TestCase) {
 		require.Equal(t, want, parameters)
 	}
 	CheckTestCase(t, tc)
-
 }
 
 func CheckFunctionReturnType(t *testing.T, code string, kind ssa.TypeKind) {

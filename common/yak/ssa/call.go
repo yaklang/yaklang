@@ -1,12 +1,15 @@
 package ssa
 
 import (
+	"sort"
+	"strings"
+
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 func NewCall(target Value, args []Value, binding map[string]Value, block *BasicBlock) *Call {
-
 	if binding == nil {
 		binding = make(map[string]Value)
 	}
@@ -35,11 +38,92 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	}
 
 	f.emit(c)
+	c.handlerGeneric()
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
 
 	return c
+}
+
+func (c *Call) handlerGeneric() {
+	newMethod := c.Method
+	if !newMethod.IsExtern() || newMethod.GetOpcode() != SSAOpcodeFunction {
+		return
+	}
+	f := newMethod.(*Function)
+	if !f.isGeneric {
+		return
+	}
+
+	fType := f.Type
+	genericTypes := make(map[Type]struct{}, 0)
+	for _, typ := range fType.Parameter {
+		types := GetGenericTypeFromType(typ)
+		for _, typ := range types {
+			if _, ok := genericTypes[typ]; !ok {
+				genericTypes[typ] = struct{}{}
+			}
+		}
+	}
+
+	if len(genericTypes) == 0 {
+		return
+	}
+
+	// binding generic type
+	isVariadic := fType.IsVariadic
+	genericTypeMap := make(map[string]Type, len(genericTypes))
+	paramsType := make([]Type, fType.ParameterLen)
+	returnType := fType.ReturnType
+	for symbol := range genericTypes {
+		genericTyp := symbol.(*GenericType)
+		for i, arg := range c.Args {
+			index := i
+			if isVariadic && i > fType.ParameterLen-1 {
+				index = fType.ParameterLen - 1
+			} else {
+				// variadic should not set new paramsType
+				paramsType[i] = arg.GetType()
+			}
+
+			errMsg := genericTyp.Binding(arg.GetType(), fType.Parameter[index], genericTypeMap)
+			if errMsg != "" {
+				c.NewError(Error, SSATAG, errMsg)
+			}
+		}
+	}
+	// calc name
+	var nameBuilder strings.Builder
+	nameBuilder.WriteString(newMethod.GetName())
+	keys := lo.Keys(genericTypeMap)
+	sort.Strings(keys)
+	for _, k := range keys {
+		nameBuilder.WriteRune('-')
+		nameBuilder.WriteString(genericTypeMap[k].String())
+	}
+	name := nameBuilder.String()
+
+	prog := c.GetProgram()
+	if prog == nil {
+		log.Errorf("[ssa.Call.handlerGeneric] Can't found ssa program")
+		return
+	}
+
+	if value, ok := prog.GetCacheExternInstance(name); !ok {
+		// apply generic type
+		for symbol := range genericTypes {
+			genericTyp := symbol.(*GenericType)
+			returnType = genericTyp.Apply(returnType, genericTypeMap)
+		}
+		// create new function type and set cache
+		newFuncTyp := NewFunctionType(newMethod.GetName(), paramsType, returnType, fType.IsVariadic)
+		newMethod = NewFunctionWithType(newMethod.GetName(), newFuncTyp)
+		prog.SetCacheExternInstance(name, newMethod)
+	} else {
+		newMethod = value
+	}
+	c.Method = newMethod
 }
 
 func (c *Call) handlerObjectMethod() {
@@ -116,7 +200,6 @@ func (c *Call) handlerReturnType() {
 
 // handler if method, set object for first argument
 func (c *Call) handleCalleeFunction() {
-
 	// get function type
 	funcTyp, ok := ToFunctionType(c.Method.GetType())
 	if !ok {
@@ -206,7 +289,6 @@ func (c *Call) handleCalleeFunction() {
 		// error
 		return
 	}
-
 }
 
 func (c *Call) HandleFreeValue(fvs []*Parameter) {

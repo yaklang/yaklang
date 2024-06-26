@@ -75,6 +75,10 @@ func (f *Function) SetType(t Type) {
 	}
 }
 
+func (f *Function) SetGeneric(b bool) {
+	f.isGeneric = b
+}
+
 func (f *Function) GetProgram() *Program {
 	if f.Package == nil {
 		return nil
@@ -149,7 +153,7 @@ func (f *Function) GetParent() *Function {
 // just create a function define, only function parameter type \ return type \ ellipsis
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f := &Function{
-		anValue:        NewValue(),
+		anValue: NewValue(),
 	}
 	f.SetType(typ)
 	f.SetName(name)
