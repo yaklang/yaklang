@@ -2,6 +2,9 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -138,8 +141,24 @@ const (
 
 func (v *SyntaxFlowVisitor) EmitCompareString(i []string, mode int) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpCompareString,
-		Values:   i,
+		OpCode: OpCompareString,
+		Values: lo.Map(i, func(item string, index int) string {
+			if strings.HasPrefix(item, "'") && strings.HasSuffix(item, "'") {
+				result, err := yakunquote.Unquote(item)
+				if err != nil {
+					return item
+				}
+				return result
+			} else if strings.HasPrefix(item, `"`) && strings.HasSuffix(item, `"`) {
+				result, err := yakunquote.Unquote(item)
+				if err != nil {
+					return item
+				}
+				return result
+			} else {
+				return item
+			}
+		}),
 		UnaryInt: mode,
 	})
 }
