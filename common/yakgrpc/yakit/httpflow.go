@@ -3,13 +3,6 @@ package yakit
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
-	"time"
-
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,6 +15,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func init() {
@@ -564,6 +563,34 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		params = &ypb.QueryHTTPFlowRequest{}
 	}
 
+	if params.GetAfterUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
+	}
+	db = bizhelper.FuzzSearchEx(db, []string{
+		"tags", "url", "path", "request",
+		"response", "remote_addr",
+	}, params.GetKeyword(), false)
+	if params.GetAfterId() > 0 {
+		db = db.Where("id > ?", params.GetAfterId())
+	}
+	if params.GetBeforeUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdatedAt())
+	}
+	if params.GetBeforeId() > 0 {
+		db = db.Where("id < ?", params.GetBeforeId())
+	}
+
+	if params.GetOnlyWebsocket() {
+		// log.Info("query websocket request flow")
+		db = db.Where("is_websocket = ?", params.OnlyWebsocket)
+	}
+	switch params.GetIsWebsocket() {
+	case "http/https":
+		db = db.Where("is_websocket = false")
+	case "websocket":
+		db = db.Where("is_websocket = true")
+	}
+
 	db = bizhelper.ExactQueryStringArrayOr(db, "source_type", utils.PrettifyListFromStringSplited(params.SourceType, ","))
 	// 过滤 Methods
 	if ms := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(params.GetMethods(), ",")); ms != nil {
@@ -752,34 +779,6 @@ too_large_response_header_file, too_large_response_body_file
 	p := params.Pagination
 	if p.OrderBy == "" {
 		p.OrderBy = "id" // 如果 没有设置 orderby 则以ID排序
-	}
-
-	if params.GetAfterUpdatedAt() > 0 {
-		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
-	}
-	db = bizhelper.FuzzSearchEx(db, []string{
-		"tags", "url", "path", "request",
-		"response", "remote_addr",
-	}, params.GetKeyword(), false)
-	if params.GetAfterId() > 0 {
-		db = db.Where("id > ?", params.GetAfterId())
-	}
-	if params.GetBeforeUpdatedAt() > 0 {
-		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdatedAt())
-	}
-	if params.GetBeforeId() > 0 {
-		db = db.Where("id < ?", params.GetBeforeId())
-	}
-
-	if params.GetOnlyWebsocket() {
-		// log.Info("query websocket request flow")
-		db = db.Where("is_websocket = ?", params.OnlyWebsocket)
-	}
-	switch params.GetIsWebsocket() {
-	case "http/https":
-		db = db.Where("is_websocket = false")
-	case "websocket":
-		db = db.Where("is_websocket = true")
 	}
 
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
