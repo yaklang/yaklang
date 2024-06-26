@@ -15,9 +15,10 @@ func (f *FuzzHTTPRequest) GetBytes() []byte {
 }
 
 func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
+	var values []string
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
-		return ""
+		return values[0]
 	}
 	canonical := false
 	if len(canonicals) > 0 {
@@ -26,9 +27,18 @@ func (f *FuzzHTTPRequest) GetHeader(key string, canonicals ...bool) string {
 	if canonical {
 		key = textproto.CanonicalMIMEHeaderKey(key)
 	}
-	values, ok := req.Header[key]
-	if !ok || len(values) == 0 {
-		return ""
+
+	// 尝试完全匹配
+	if vs, ok := req.Header[key]; ok {
+		return vs[0]
+	}
+	// 尝试模糊匹配
+	key = strings.ToLower(key)
+
+	for k, v := range req.Header {
+		if strings.ToLower(k) == key {
+			values = append(values, v...)
+		}
 	}
 
 	return values[0]
@@ -192,7 +202,7 @@ func (f *FuzzHTTPRequest) GetMethod() string {
 }
 
 func (f *FuzzHTTPRequest) GetContentType() string {
-	ct := f.GetHeader("content-type")
+	ct := f.GetHeaderParamByName("content-type").GetFirstValue().(string)
 	mt, params, err := mime.ParseMediaType(ct)
 	if err != nil {
 		return ct
