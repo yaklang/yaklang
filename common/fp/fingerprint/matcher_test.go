@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule_resources"
@@ -25,14 +26,14 @@ func TestMatch(t *testing.T) {
 	matcher.ErrorHandle = func(err error) {
 		log.Error(err)
 	}
-	matchRes := matcher.Match(raw)
+	matchRes := matcher.Match(context.Background(), raw)
 	println()
 	_ = matchRes
 }
 
 func TestExpressionMatch(t *testing.T) {
 	rules1 := LoadAllDefaultRules()
-	_= rules1
+	_ = rules1
 	content, err := rule_resources.FS.ReadFile("exp_rule.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +47,7 @@ func TestExpressionMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	matcher := NewMatcher(rules...)
-	info := matcher.Match([]byte(`HTTP/1.1 200 OK
+	info := matcher.Match(context.Background(), []byte(`HTTP/1.1 200 OK
 Tag: --- VIDEO WEB SERVER ---
 
 

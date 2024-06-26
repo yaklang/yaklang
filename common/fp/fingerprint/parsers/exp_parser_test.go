@@ -33,6 +33,12 @@ func TestCompilerSpecialSyntax(t *testing.T) {
 	}
 	assert.Equal(t, `or`, rules[0].MatchParam.Condition)
 
+	rules, err = ParseExpRule([][2]string{{`server="TornadoServer"&&Celery`, "a"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, `and`, rules[0].MatchParam.Condition)
+	assert.Equal(t, `raw`, rules[0].MatchParam.SubRules[1].MatchParam.Params[0])
 }
 func TestCompiler(t *testing.T) {
 	rules, err := ParseExpRule([][2]string{{`header="\"MiniCMS\""`, "a"}})

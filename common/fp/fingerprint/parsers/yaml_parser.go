@@ -72,8 +72,8 @@ func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rul
 				r := rule.NewEmptyFingerPrintRule()
 				r.Method = "md5"
 				r.MatchParam = &rule.MatchMethodParam{
-					HeaderKey: md5.MD5,
-					Info:      convertToMap(&md5.CPE),
+					Md5:  md5.MD5,
+					Info: convertToMap(&md5.CPE),
 				}
 				methodRules = append(methodRules, r)
 			}

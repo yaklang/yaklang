@@ -7,6 +7,18 @@ import (
 	"strings"
 )
 
+type MatchResource struct {
+	Data     []byte
+	Protocol string
+}
+
+func NewHttpResource(data []byte) *MatchResource {
+	return &MatchResource{
+		Data:     data,
+		Protocol: "http",
+	}
+}
+
 type MatchMethodParam struct {
 	ExtParams map[string]any
 	Info      *FingerprintInfo
@@ -31,12 +43,7 @@ type MatchMethodParam struct {
 	Op     string
 }
 
-type Pair struct {
-	Key  string
-	Name string
-}
 type FingerPrintRule struct {
-	ActiveMode bool
 	Method     string
 	WebPath    string
 	MatchParam *MatchMethodParam
@@ -56,14 +63,6 @@ type CPE struct {
 	Update   string `yaml:"update,omitempty" json:"update"`
 	Edition  string `yaml:"edition,omitempty" json:"edition"`
 	Language string `yaml:"language,omitempty" json:"language"`
-}
-
-func (f *FingerPrintRule) ToYaml() string {
-	return ""
-}
-
-func (f *FingerPrintRule) ToExpression() string {
-	return ""
 }
 
 func (f *FingerPrintRule) preToOpCodes() []*OpCode {
@@ -86,11 +85,16 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 		}
 		ref := strParams[0]
 		value := strParams[1]
-		pushCode(&OpCode{Op: OpExtractData, data: []any{ref}})
+		pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, ref}})
 		pushCode(&OpCode{Op: OpPush, data: []any{value}})
-		pushCode(&OpCode{Op: OpContains})
+		if f.MatchParam.Op == "=" {
+			pushCode(&OpCode{Op: OpContains})
+		} else if f.MatchParam.Op == "!=" {
+			pushCode(&OpCode{Op: OpContains})
+			pushCode(&OpCode{Op: OpNot})
+		}
 	case "regexp":
-		pushCode(&OpCode{Op: OpData})
+		pushCode(&OpCode{Op: OpData, data: []any{f.WebPath}})
 		pushCode(&OpCode{Op: OpPush, data: []any{f.MatchParam.RegexpPattern}})
 		extGroup := []any{f.MatchParam.Keyword.VersionIndex, f.MatchParam.Keyword.ProductIndex, f.MatchParam.Keyword.VersionIndex, f.MatchParam.Keyword.UpdateIndex, f.MatchParam.Keyword.EditionIndex, f.MatchParam.Keyword.LanguageIndex}
 		if !funk.Any(extGroup...) {
@@ -98,11 +102,11 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 		}
 		pushCode(&OpCode{Op: OpRegexpMatch, data: extGroup})
 	case "md5":
-		pushCode(&OpCode{Op: OpExtractData, data: []any{"md5"}})
+		pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, "md5"}})
 		pushCode(&OpCode{Op: OpPush, data: []any{f.MatchParam.Md5}})
 		pushCode(&OpCode{Op: OpEqual})
 	case "http_header":
-		pushCode(&OpCode{Op: OpExtractData, data: []any{"header_item", f.MatchParam.HeaderKey}})
+		pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, "header_item", f.MatchParam.HeaderKey}})
 		subParam := f.MatchParam.HeaderMatchRule.MatchParam
 		pushCode(&OpCode{Op: OpPush, data: []any{subParam.RegexpPattern}})
 		extGroup := []any{subParam.Keyword.VersionIndex, subParam.Keyword.ProductIndex, subParam.Keyword.VersionIndex, subParam.Keyword.UpdateIndex, subParam.Keyword.EditionIndex, subParam.Keyword.LanguageIndex}
@@ -111,31 +115,37 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 		}
 		pushCode(&OpCode{Op: OpRegexpMatch, data: extGroup})
 	case "complex":
-		code := &OpCode{Op: OpOr}
+		jmpPoint := map[*OpCode]int{}
 		codes := []*OpCode{}
 		switch f.MatchParam.Condition {
 		case "or":
-			code = &OpCode{Op: OpOr}
 			for i, rule := range f.MatchParam.SubRules {
 				codes = append(codes, rule.preToOpCodes()...)
 				if i == len(f.MatchParam.SubRules)-1 {
 					continue
 				}
+				code := &OpCode{Op: OpOr}
+				jmpPoint[code] = len(codes)
 				codes = append(codes, code)
 			}
 			res = append(res, codes...)
-			code.data = []any{len(res)}
+			for opCode, i := range jmpPoint {
+				opCode.data = []any{len(codes) - i}
+			}
 		case "and":
-			code = &OpCode{Op: OpAnd}
 			for i, rule := range f.MatchParam.SubRules {
 				codes = append(codes, rule.preToOpCodes()...)
 				if i == len(f.MatchParam.SubRules)-1 {
 					continue
 				}
+				code := &OpCode{Op: OpAnd}
+				jmpPoint[code] = len(codes)
 				codes = append(codes, code)
 			}
 			res = append(res, codes...)
-			code.data = []any{len(res)}
+			for opCode, i := range jmpPoint {
+				opCode.data = []any{len(codes) - i}
+			}
 		}
 	default:
 		return nil
