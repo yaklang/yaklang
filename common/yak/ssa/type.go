@@ -1014,13 +1014,6 @@ func isGenericType(t Type) bool {
 	return t.GetTypeKind() == GenericTypeKind
 }
 
-func isSameGenericType(t1, t2 Type) bool {
-	if t1.GetTypeKind() != GenericTypeKind || t2.GetTypeKind() != GenericTypeKind {
-		return false
-	}
-	return t1.(*GenericType).symbol == t2.(*GenericType).symbol
-}
-
 func GetGenericTypeFromType(t Type) []Type {
 	typs := make([]Type, 0)
 	switch t.GetTypeKind() {

@@ -80,6 +80,7 @@ func (c *Call) handlerGeneric() {
 	hasError := false
 	for i, arg := range c.Args {
 		index := i
+		argTyp := arg.GetType()
 		if isVariadic && i > fType.ParameterLen-1 {
 			index = fType.ParameterLen - 1
 		} else {
@@ -87,7 +88,18 @@ func (c *Call) handlerGeneric() {
 			paramsType[i] = arg.GetType()
 		}
 
-		errMsg := BindingGenericTypeWithRealType(arg.GetType(), fType.Parameter[index], genericTypeMap)
+		// unpack T...([]T) to T
+		if i >= fType.ParameterLen-1 && c.IsEllipsis {
+			if argTyp.GetTypeKind() == SliceTypeKind {
+				argTyp = argTyp.(*ObjectType).FieldType
+			} else if argTyp.GetTypeKind() == BytesTypeKind {
+				argTyp = GetByteType()
+			} else {
+				// todo: should error
+			}
+		}
+
+		errMsg := BindingGenericTypeWithRealType(argTyp, fType.Parameter[index], genericTypeMap)
 		if errMsg != "" && !hasError {
 			hasError = true
 			c.NewError(Error, SSATAG, errMsg)
