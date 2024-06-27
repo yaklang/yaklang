@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"os"
 
 	"github.com/segmentio/ksuid"
@@ -97,6 +98,11 @@ var SSACompilerCommands = []*cli.Command{
 			}
 
 			programName := c.String("program")
+			if programName != "" {
+				defer func() {
+					ssa.ShowDatabaseCacheCost()
+				}()
+			}
 			entry := c.String("entry")
 			language := c.String("language")
 			inMemory := c.Bool("memory")

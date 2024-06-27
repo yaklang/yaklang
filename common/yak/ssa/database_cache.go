@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -10,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"go.uber.org/atomic"
+
+	syncAtomic "sync/atomic"
 )
 
 var CachePool = omap.NewEmptyOrderedMap[string, *Cache]()
@@ -174,6 +177,22 @@ func (c *Cache) GetClassInstance(name string) []Instruction {
 	return c.Class2InstIndex[name]
 }
 
+var (
+	_SSASaveIrCodeCost uint64
+)
+
+func GetSSASaveIrCodeCost() time.Duration {
+	return time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeCost) * uint64(time.Millisecond))
+}
+
+func ShowDatabaseCacheCost() {
+	log.Infof("SSA Database SaveIrCode Cost: %v", GetSSASaveIrCodeCost())
+	log.Infof("SSA Database SaveVariable Cost: %v", ssadb.GetSSAVariableCost())
+	log.Infof("SSA Database SaveSourceCode Cost: %v", ssadb.GetSSASourceCodeCost())
+	log.Infof("SSA Database SaveType Cost: %v", ssadb.GetSSASaveTypeCost())
+	log.Infof("SSA Database SaveScope Cost: %v", ssautil.GetSSAScopeTimeCost())
+}
+
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
 func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
@@ -181,6 +200,11 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 		log.Errorf("BUG: saveInstruction called when DB is nil")
 		return false
 	}
+
+	start := time.Now()
+	defer func() {
+		syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Milliseconds()))
+	}()
 
 	// all instruction from database will be lazy instruction
 	if lz, ok := ToLazyInstruction(instIr.inst); ok {
