@@ -63,44 +63,27 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 		predecessorNodeId := g.GetOrCreateNode(name)
 		log.Infof("add predecessor nodeId(%v): %v", predecessorNodeId, name)
 		edges := g.GetEdges(predecessorNodeId, self)
+
+		edgeLabel := predecessor.Info.Label
+		if predecessor.Info.Step > 0 {
+			edgeLabel = fmt.Sprintf(`step[%v]: %v`, predecessor.Info.Step, edgeLabel)
+		}
+
 		if len(edges) > 0 {
 			for _, edge := range edges {
 				g.EdgeAttribute(edge, "color", "red")
+				g.EdgeAttribute(edge, "fontcolor", "red")
 				g.EdgeAttribute(edge, "penwidth", "3.0")
-				g.EdgeAttribute(edge, "label", predecessor.Info.Label)
+				g.EdgeAttribute(edge, "label", edgeLabel)
 			}
 		} else {
-			edgeId := g.AddEdge(predecessorNodeId, self, predecessor.Info.Label)
+			edgeId := g.AddEdge(predecessorNodeId, self, edgeLabel)
 			g.EdgeAttribute(edgeId, "color", "red")
+			g.EdgeAttribute(edgeId, "fontcolor", "red")
 			g.EdgeAttribute(edgeId, "penwidth", "3.0")
 		}
 		_marshal(m, g, predecessorNodeId, predecessor.Node)
 	}
-
-	//for _, predRaw := range t.Predecessors {
-	//	pred := predRaw.Node
-	//	predNode := g.GetOrCreateNode(pred.GetVerboseName())
-	//	edgs := g.GetEdges(predNode, self)
-	//	edgsR := g.GetEdges(self, predNode)
-	//	if len(edgs) <= 0 && len(edgsR) <= 0 {
-	//		label := predRaw.Info.Label
-	//		if predRaw.Info.Step >= 0 {
-	//			label = fmt.Sprintf(`%v:%v`, predRaw.Info.Step, label)
-	//		}
-	//		eid := g.AddEdge(predNode, self, label)
-	//		g.EdgeAttribute(eid, "color", "red")
-	//		g.EdgeAttribute(eid, "penwidth", "3.0")
-	//	} else {
-	//		for _, eid := range edgs {
-	//			g.EdgeAttribute(eid, "color", "red")
-	//			g.EdgeAttribute(eid, "penwidth", "3.0")
-	//		}
-	//		for _, eid := range edgsR {
-	//			g.EdgeAttribute(eid, "color", "red")
-	//			g.EdgeAttribute(eid, "penwidth", "3.0")
-	//		}
-	//	}
-	//}
 }
 
 func (v *Value) DotGraph() string {
