@@ -32,10 +32,11 @@ func SaveIrSource(editor *memedit.MemEditor, hash string) error {
 	if ok {
 		return nil
 	}
+	irSourceCache.Set(hash, editor)
 
 	start := time.Now()
 	defer func() {
-		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Milliseconds()))
+		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
 	var fileUrl string
@@ -64,7 +65,6 @@ func SaveIrSource(editor *memedit.MemEditor, hash string) error {
 		if err := db.Create(irSource).Error; err != nil {
 			return utils.Wrapf(err, "save ir source failed")
 		}
-		irSourceCache.Set(hash, editor)
 		return nil
 	}
 	return nil
