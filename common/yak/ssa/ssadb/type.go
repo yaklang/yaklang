@@ -4,6 +4,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"sync/atomic"
+	"time"
 )
 
 type IrType struct {
@@ -34,6 +36,11 @@ func (t *IrType) BeforeCreate() error {
 }
 
 func SaveType(kind int, str string, extra string) int {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSASaveTypeCost, uint64(time.Now().Sub(start).Milliseconds()))
+	}()
+
 	db := GetDB()
 	irType := &IrType{
 		Kind:             kind,

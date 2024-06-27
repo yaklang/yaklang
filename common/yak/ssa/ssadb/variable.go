@@ -3,6 +3,8 @@ package ssadb
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -32,6 +34,11 @@ type SSAValue interface {
 }
 
 func SaveVariable(db *gorm.DB, program, variable string, insts []SSAValue) error {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSAVariableCost, uint64(time.Now().Sub(start).Milliseconds()))
+	}()
+
 	db = db.Model(&IrVariable{})
 	// save new ircode
 
@@ -67,6 +74,11 @@ func SaveVariable(db *gorm.DB, program, variable string, insts []SSAValue) error
 }
 
 func SaveClassInstance(db *gorm.DB, program, class string, instIDs []int64) error {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSAVariableCost, uint64(time.Now().Sub(start).Milliseconds()))
+	}()
+
 	db = db.Model(&IrVariable{})
 	irVariable := &IrVariable{}
 	irVariable.IsClassInstance = true

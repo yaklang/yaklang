@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"path"
 	"strconv"
+	"sync/atomic"
+	"time"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
@@ -30,6 +32,11 @@ func SaveIrSource(editor *memedit.MemEditor, hash string) error {
 	if ok {
 		return nil
 	}
+
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Milliseconds()))
+	}()
 
 	var fileUrl string
 	var filename, filepath string
