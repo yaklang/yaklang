@@ -222,7 +222,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return res
 		default:
 			i.AppendDependOn(callerValue)
-			var nodes = Values{callerValue}
+			nodes := Values{callerValue}
 			for _, val := range inst.Args {
 				arg := i.NewValue(val)
 				i.AppendDependOn(arg)
@@ -238,8 +238,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				if subNode == nil {
 					continue
 				}
-				//getTopDefs(nil,opt...)第一个参数指定为nil
-				//提供一个新的上下文，避免指向新的actx.self导致多余的结果
+				// getTopDefs(nil,opt...)第一个参数指定为nil
+				// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
 				vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
 				results = append(results, vals...)
 			}
@@ -328,7 +328,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				if inst.MemberCallKind == ssa.ParameterMemberCall {
 					objValue := i.NewValue(obj)
 					val := objValue.GetFunction().GetParameter(inst.MemberCallObjectIndex)
-					vals = append(vals, val)
+					if val != nil {
+						vals = append(vals, val)
+					}
 				} else if inst.MemberCallKind == ssa.FreeValueMemberCall {
 					param := inst.GetFunc().FreeValues[obj.GetName()]
 					val := i.NewValue(param)
