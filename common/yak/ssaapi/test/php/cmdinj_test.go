@@ -22,3 +22,26 @@ system($command); //system函数特性 执行结果会自动打印
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
 }
+
+func TestPHP_CMDInjNilPointer(t *testing.T) {
+	code := `<?php
+$a = $_GET[1];
+
+
+
+$b= base64_decode($a);
+
+$c= base64_decode($b);
+
+
+
+system($c);`
+
+	ssatest.CheckSyntaxFlow(t, code,
+		`system(*  #-> * as $command)`,
+		map[string][]string{
+			"command": {"ParameterMember-parameter[0].1", "Undefined-base64_decode"},
+		},
+		ssaapi.WithLanguage(ssaapi.PHP),
+	)
+}
