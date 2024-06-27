@@ -287,6 +287,8 @@ func SyntaxFlowQuery(
 		}
 	} else {
 		result.Show()
+		fmt.Println("---------------------")
+		fmt.Println(result.GetAllValuesChain().DotGraph())
 	}
 }
 
