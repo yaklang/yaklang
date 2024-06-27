@@ -1708,6 +1708,7 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketFirstLine":                   lowhttp.ReplaceHTTPPacketFirstLine,
 	"ReplaceHTTPPacketHeader":                      lowhttp.ReplaceHTTPPacketHeader,
 	"ReplaceHTTPPacketBody":                        lowhttp.ReplaceHTTPPacketBodyFast,
+	"ReplaceHTTPPacketJsonBody":                    lowhttp.ReplaceHTTPPacketJsonBody,
 	"ReplaceHTTPPacketCookie":                      lowhttp.ReplaceHTTPPacketCookie,
 	"ReplaceHTTPPacketCookies":                     lowhttp.ReplaceHTTPPacketCookies,
 	"ReplaceHTTPPacketHost":                        lowhttp.ReplaceHTTPPacketHost,
