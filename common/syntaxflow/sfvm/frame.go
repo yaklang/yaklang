@@ -435,7 +435,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
 		s.debugSubLog("<< push users")
-		_ = vals.AppendPredecessor(value, s.withPredecessorContext("effect"))
 		s.stack.Push(vals)
 	case OpGetBottomUsers:
 		s.debugSubLog(">> pop")
@@ -449,7 +448,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
 		s.debugSubLog("<< push bottom uses")
-		_ = vals.AppendPredecessor(value, s.withPredecessorContext("bottom-effect"))
 		s.stack.Push(vals)
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
@@ -463,7 +461,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push users")
-		_ = vals.AppendPredecessor(value, s.withPredecessorContext("definition"))
 		s.stack.Push(vals)
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
@@ -477,7 +474,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push top defs %s", vals.String())
-		_ = vals.AppendPredecessor(value, s.withPredecessorContext("top-definition"))
 		s.stack.Push(vals)
 	case OpNewRef:
 		if i.UnaryStr == "" {
