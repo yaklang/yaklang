@@ -57,7 +57,7 @@ func (c *Call) handlerGeneric() {
 	}
 
 	fType := f.Type
-	genericTypes := make(map[Type]struct{}, 0)
+	genericTypes := make(map[Type]struct{}, 0) // for calculate cache name
 	for _, typ := range fType.Parameter {
 		types := GetGenericTypeFromType(typ)
 		for _, typ := range types {
@@ -76,24 +76,25 @@ func (c *Call) handlerGeneric() {
 	genericTypeMap := make(map[string]Type, len(genericTypes))
 	paramsType := make([]Type, fType.ParameterLen)
 	returnType := fType.ReturnType
-	for symbol := range genericTypes {
-		genericTyp := symbol.(*GenericType)
-		for i, arg := range c.Args {
-			index := i
-			if isVariadic && i > fType.ParameterLen-1 {
-				index = fType.ParameterLen - 1
-			} else {
-				// variadic should not set new paramsType
-				paramsType[i] = arg.GetType()
-			}
 
-			errMsg := genericTyp.Binding(arg.GetType(), fType.Parameter[index], genericTypeMap)
-			if errMsg != "" {
-				c.NewError(Error, SSATAG, errMsg)
-			}
+	hasError := false
+	for i, arg := range c.Args {
+		index := i
+		if isVariadic && i > fType.ParameterLen-1 {
+			index = fType.ParameterLen - 1
+		} else {
+			// variadic should not set new paramsType
+			paramsType[i] = arg.GetType()
+		}
+
+		errMsg := BindingGenericTypeWithRealType(arg.GetType(), fType.Parameter[index], genericTypeMap)
+		if errMsg != "" && !hasError {
+			hasError = true
+			c.NewError(Error, SSATAG, errMsg)
 		}
 	}
-	// calc name
+
+	// calculate cache name
 	var nameBuilder strings.Builder
 	nameBuilder.WriteString(newMethod.GetName())
 	keys := lo.Keys(genericTypeMap)
@@ -112,10 +113,7 @@ func (c *Call) handlerGeneric() {
 
 	if value, ok := prog.GetCacheExternInstance(name); !ok {
 		// apply generic type
-		for symbol := range genericTypes {
-			genericTyp := symbol.(*GenericType)
-			returnType = genericTyp.Apply(returnType, genericTypeMap)
-		}
+		returnType = ApplyGenericType(returnType, genericTypeMap)
 		// create new function type and set cache
 		newFuncTyp := NewFunctionType(newMethod.GetName(), paramsType, returnType, fType.IsVariadic)
 		newMethod = NewFunctionWithType(newMethod.GetName(), newFuncTyp)
