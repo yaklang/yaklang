@@ -61,6 +61,7 @@ type Risk struct {
 	TaskName            string `json:"task_name"`
 	CveAccessVector     string `json:"cve_access_vector"`
 	CveAccessComplexity string `json:"cve_access_complexity"`
+	Tags                string `json:"tags"`
 }
 
 func (p *Risk) ColorizedShow() {
@@ -135,6 +136,8 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		RuntimeId: utils.EscapeInvalidUTF8Byte([]byte(p.RuntimeId)),
 		CVE:       utils.EscapeInvalidUTF8Byte([]byte(p.CVE)),
 		TaskName:  utils.EscapeInvalidUTF8Byte([]byte(p.TaskName)),
+		Tags:      p.Tags,
+		IsRead:    p.IsRead,
 	}
 }
 

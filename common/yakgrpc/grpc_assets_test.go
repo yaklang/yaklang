@@ -128,3 +128,51 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 		checkFuzzerResponse(t, ctx, taskID, 0)
 	})
 }
+
+func TestSetTagForRisk(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	riskResponse, err := client.QueryRisks(context.Background(), &ypb.QueryRisksRequest{
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 1,
+		},
+		IsRead: "",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.SetTagForRisk(context.Background(), &ypb.SetTagForRiskRequest{
+		Id:   riskResponse.Data[0].Id,
+		Hash: riskResponse.Data[0].Hash,
+		Tags: []string{"误报, 忽略, 待处理"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestQueryRiskTags(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.QueryRiskTags(context.Background(), &ypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRiskFieldGroup(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.RiskFieldGroup(context.Background(), &ypb.Empty{})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

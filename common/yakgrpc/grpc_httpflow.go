@@ -522,7 +522,7 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 	}
 	if httpFlow.WebsocketHash != "" {
 		db2 := bizhelper.ExactQueryString(s.GetProjectDatabase(), "websocket_request_hash", httpFlow.WebsocketHash)
-		websocketFlows := yakit.BatchWebsocketFlows(db2.Debug(), ctx)
+		websocketFlows := yakit.BatchWebsocketFlows(db2, ctx)
 		for v := range websocketFlows {
 			raw, _ := strconv.Unquote(string(v.QuotedData))
 			if len(raw) <= 0 {
