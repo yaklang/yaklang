@@ -36,7 +36,7 @@ type SSAValue interface {
 func SaveVariable(db *gorm.DB, program, variable string, insts []SSAValue) error {
 	start := time.Now()
 	defer func() {
-		atomic.AddUint64(&_SSAVariableCost, uint64(time.Now().Sub(start).Milliseconds()))
+		atomic.AddUint64(&_SSAVariableCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
 	db = db.Model(&IrVariable{})
@@ -76,7 +76,7 @@ func SaveVariable(db *gorm.DB, program, variable string, insts []SSAValue) error
 func SaveClassInstance(db *gorm.DB, program, class string, instIDs []int64) error {
 	start := time.Now()
 	defer func() {
-		atomic.AddUint64(&_SSAVariableCost, uint64(time.Now().Sub(start).Milliseconds()))
+		atomic.AddUint64(&_SSAVariableCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
 	db = db.Model(&IrVariable{})

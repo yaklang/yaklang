@@ -3,6 +3,7 @@ package ssautil
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -16,7 +17,7 @@ var (
 )
 
 func GetSSAScopeTimeCost() time.Duration {
-	return time.Duration(_SSAScopeTimeCost * uint64(time.Millisecond))
+	return time.Duration(atomic.LoadUint64(&_SSAScopeTimeCost))
 }
 
 func (s *ScopedVersionedTable[T]) SetParentId(i int64) {
@@ -58,11 +59,6 @@ func ssaValueMarshal(raw any) ([]byte, error) {
 }
 
 func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&_SSAScopeTimeCost, uint64(time.Now().Sub(start).Milliseconds()))
-	}()
-
 	return s._SaveToDatabase()
 }
 
@@ -75,13 +71,21 @@ func (s *ScopedVersionedTable[T]) _SaveToDatabase() error {
 	// save to database
 	params["level"] = s.level
 
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSAScopeTimeCost, uint64(time.Now().Sub(start).Nanoseconds()))
+	}()
+
 	// ScopedVersionedTable.values
 	if s.values.Len() > 0 {
 		values, err := s.values.MarshalJSONWithKeyValueFetcher(nil, ssaValueMarshal)
 		if err != nil {
-			return utils.Wrap(err, "marshal scope.values error")
+			log.Warnf("marshal scope.values error: %v", err)
+			params["values"] = "[]"
+		} else {
+			params["values"] = strconv.Quote(string(values))
 		}
-		params["values"] = strconv.Quote(string(values))
+
 	} else {
 		params["values"] = "[]"
 	}

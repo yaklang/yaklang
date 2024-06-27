@@ -182,7 +182,7 @@ var (
 )
 
 func GetSSASaveIrCodeCost() time.Duration {
-	return time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeCost) * uint64(time.Millisecond))
+	return time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeCost))
 }
 
 func ShowDatabaseCacheCost() {
@@ -191,6 +191,8 @@ func ShowDatabaseCacheCost() {
 	log.Infof("SSA Database SaveSourceCode Cost: %v", ssadb.GetSSASourceCodeCost())
 	log.Infof("SSA Database SaveType Cost: %v", ssadb.GetSSASaveTypeCost())
 	log.Infof("SSA Database SaveScope Cost: %v", ssautil.GetSSAScopeTimeCost())
+	log.Infof("SSA Database CacheToDatabase Cost: %v", GetSSACacheToDatabaseCost())
+	log.Infof("SSA DB Cache DEBUG Cost: %v", GetSSACacheIterationCost())
 }
 
 // =============================================== Database =======================================================
@@ -201,11 +203,6 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 		return false
 	}
 
-	start := time.Now()
-	defer func() {
-		syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Milliseconds()))
-	}()
-
 	// all instruction from database will be lazy instruction
 	if lz, ok := ToLazyInstruction(instIr.inst); ok {
 		// we just check if this lazy-instruction should be saved again?
@@ -214,7 +211,8 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 		}
 	}
 
-	if err := Instruction2IrCode(instIr.inst, instIr.irCode); err != nil {
+	err := Instruction2IrCode(instIr.inst, instIr.irCode)
+	if err != nil {
 		log.Errorf("FitIRCode error: %s", err)
 		return false
 	}
@@ -222,12 +220,15 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}
+
+	start := time.Now()
 	if r := instIr.inst.GetRange(); r != nil {
 		err := ssadb.SaveIrSource(r.GetEditor(), instIr.irCode.SourceCodeHash)
 		if err != nil {
 			log.Warnf("save source error: %v", err)
 		}
 	}
+	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	return true
 }
 
@@ -263,21 +264,45 @@ func (c *Cache) saveClassInstance(name string, insts []Instruction) {
 	}
 }
 
+var (
+	_SSACacheToDatabaseCost uint64
+	_SSACacheIterationCost  uint64
+)
+
+func GetSSACacheToDatabaseCost() time.Duration {
+	return time.Duration(syncAtomic.LoadUint64(&_SSACacheToDatabaseCost))
+}
+
+func GetSSACacheIterationCost() time.Duration {
+	return time.Duration(syncAtomic.LoadUint64(&_SSACacheIterationCost))
+}
+
 func (c *Cache) SaveToDatabase() {
 	if c.DB == nil {
 		return
 	}
+
+	start := time.Now()
+	defer func() {
+		syncAtomic.AddUint64(&_SSACacheToDatabaseCost, uint64(time.Now().Sub(start).Nanoseconds()))
+	}()
+
 	insturctionCache := c.InstructionCache.GetAll()
 	c.InstructionCache.Close()
+
 	for _, instIR := range insturctionCache {
 		c.saveInstruction(instIR)
 	}
 
 	variableCache := c.VariableCache.GetAll()
 	c.VariableCache.Close()
+
+	insIterStart := time.Now()
 	for variable, insts := range variableCache {
 		c.saveVariable(variable, insts)
 	}
+	syncAtomic.AddUint64(&_SSACacheIterationCost, uint64(time.Now().Sub(insIterStart).Nanoseconds()))
+
 	for name, insts := range c.Class2InstIndex {
 		c.saveClassInstance(name, insts)
 	}
