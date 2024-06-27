@@ -250,41 +250,9 @@ func (v Values) DotGraph() string {
 
 	visisted := new(sync.Map)
 	for _, subValue := range v {
-		n := g.AddNode(subValue.GetVerboseName())
+		n := g.GetOrCreateNode(subValue.GetVerboseName())
+		log.Infof("add or create node: %v", subValue.GetVerboseName())
 		_marshal(visisted, g, n, subValue)
-	}
-
-	cartResult, _ := cartesian.Product([][]*Value{v, v})
-	for _, result := range cartResult {
-		if len(result) <= 1 {
-			continue
-		}
-		a1, a2 := result[0], result[1]
-		if a1.GetId() == a2.GetId() {
-			continue
-		}
-
-		connected := false
-		a1.GetTopDefs(WithHookEveryNode(func(value *Value) error {
-			if value.GetId() == a2.GetId() {
-				n1, n2 := g.GetOrCreateNode(a1.GetVerboseName()), g.GetOrCreateNode(a2.GetVerboseName())
-				g.AddDashEdge(n1, n2, "")
-				connected = true
-				return nil
-			}
-			return nil
-		}))
-		if !connected {
-			a1.GetBottomUses(WithHookEveryNode(func(value *Value) error {
-				if value.GetId() == a2.GetId() {
-					n1, n2 := g.GetOrCreateNode(a1.GetVerboseName()), g.GetOrCreateNode(a2.GetVerboseName())
-					g.AddDashEdge(n2, n1, "")
-					connected = true
-					return nil
-				}
-				return nil
-			}))
-		}
 	}
 
 	var buf bytes.Buffer
