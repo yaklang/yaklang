@@ -11,6 +11,7 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/yaklang/yaklang/common/javascript"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/embed"
 )
@@ -27,6 +28,7 @@ var JSOttoExports = map[string]interface{}{
 	"libCryptoJSV3": _libCryptoJSV3,
 	"libCryptoJSV4": _libCryptoJSV4,
 	"libJSRSASign":  _libJSRSASign,
+	"libJsEncrypt":  _libJsEncrypt,
 
 	// AST
 	"ASTWalk":   javascript.BasicJavaScriptASTWalker,
@@ -138,6 +140,26 @@ func _libJSRSASign() jsRunOpts {
 	return opt
 }
 
+// _libJsEncrypt 是一个JS运行选项参数，用于在运行JS代码时嵌入JsEncrypt 3.3.2库
+// Example:
+// ```
+// _, value = js.Run("var encrypt = new JSEncrypt();", js._libJsEncrypt())~
+// println(value.String())
+// ```
+func _libJsEncrypt() jsRunOpts {
+	var (
+		opt jsRunOpts
+		ok  bool
+	)
+	if opt, ok = jsRunOptsCache.Get("libJsEncrypt"); !ok {
+		src, _ := embed.Asset("data/js-libs/jsencrypt/3.3.2/jsencrypt.min.js.gz")
+		prog, _ := goja.Compile("jsencrypt-3.3.2", string(src), false)
+		opt = jsRunWithLibs(&jsLibrary{"jsencrypt", "3.3.2", prog})
+		jsRunOptsCache.Set("libJsEncrypt", opt)
+	}
+	return opt
+}
+
 // Parse 对传入的JS代码进行解析并返回解析后的AST树和错误
 // Example:
 // ```
@@ -157,16 +179,31 @@ func _Parse(code string) (*ast.Program, error) {
 // Example:
 // ```
 // engine = js.New()
-// val = engine.Eval("1+1")~.ToInteger()~
+// val = engine.RunString("1+1")~.ToInteger()~
 // println(val)
 // ```
-func _jsNewEngine() *goja.Runtime {
+func _jsNewEngine(opts ...jsRunOpts) *goja.Runtime {
+	config := newJsRunConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	vm := goja.New()
+
 	// enable require function and console and buffer module
 	new(require.Registry).Enable(vm)
 	// use custom printer
 	console.Enable(vm)
 	buffer.Enable(vm)
+
+	for _, lib := range config.libs {
+		_, err := vm.RunProgram(lib.program)
+		if err != nil {
+			log.Errorf("run js lib[%s] error: %v", lib.name, err)
+			return vm
+		}
+	}
+
 	return vm
 }
 
@@ -179,17 +216,7 @@ func _jsNewEngine() *goja.Runtime {
 // println(value.String())
 // ```
 func _run(src any, opts ...jsRunOpts) (*goja.Runtime, goja.Value, error) {
-	config := newJsRunConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	vm := _jsNewEngine()
-	for _, lib := range config.libs {
-		_, err := vm.RunProgram(lib.program)
-		if err != nil {
-			return vm, goja.Undefined(), err
-		}
-	}
+	vm := _jsNewEngine(opts...)
 
 	value, err := vm.RunString(utils.InterfaceToString(src))
 	return vm, value, err
