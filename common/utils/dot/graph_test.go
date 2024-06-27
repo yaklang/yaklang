@@ -89,7 +89,7 @@ func TestGraph_CreateRepeatedNode(t *testing.T) {
 	}
 
 	n1 = g.GetOrCreateNode("foo1")
-	n2 = g.GetOrCreateNode("foo2")
+	n2 = g.GetOrCreateNode("foo1")
 	if n1 != n2 {
 		t.Errorf("node not match")
 		t.Fail()
