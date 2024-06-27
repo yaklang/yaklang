@@ -281,7 +281,8 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 
 	// set proxy and check
 	stream.Send(&ypb.MITMRequest{
-		DownstreamProxy: "http://" + utils.HostPort("127.0.0.1", port),
+		SetDownstreamProxy: true,
+		DownstreamProxy:    "http://" + utils.HostPort("127.0.0.1", port),
 	})
 	if _, err := yak.Execute(
 		`
