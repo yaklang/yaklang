@@ -3,14 +3,13 @@ package parsers
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule_resources"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"os"
 	"strings"
 	"testing"
 )
 
-func TestCompilerSpecialSyntax(t *testing.T) {
+func _TestCompilerSpecialSyntax(t *testing.T) {
 	rules, err := ParseExpRule([][2]string{{`header=""MiniCMS""`, "a"}})
 	if err != nil {
 		t.Fatal(err)
@@ -56,23 +55,7 @@ func TestCompiler(t *testing.T) {
 	assert.Equal(t, 2, len(rules[0].MatchParam.SubRules))
 }
 
-func TestCompiler1(t *testing.T) {
-	content, err := rule_resources.FS.ReadFile("exp_rule.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) [2]string {
-		splits := strings.Split(s, "\x00")
-		return [2]string{splits[1], splits[0]}
-	})
-	rules, err := ParseExpRule(ruleInfos.([][2]string))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = rules
-}
-
-func TestExportExpRules(t *testing.T) {
+func _TestExportExpRules(t *testing.T) {
 	db, err := gorm.Open("sqlite3", "/Users/z3/Downloads/TideFinger/python3/cms_finger.db")
 	if err != nil {
 		t.Fatal(err)

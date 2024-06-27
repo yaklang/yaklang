@@ -2,15 +2,9 @@ package fingerprint
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"regexp"
-)
-
-var (
-	invalidParamError = errors.New("invalid param")
 )
 
 type MatchFun func(data []byte) (bool, error)
@@ -71,11 +65,4 @@ func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.FingerprintInf
 		}
 	}
 	return result
-}
-
-func (m *Matcher) LoadMethod(name string, params *rule.MatchMethodParam) (MatchFun, error) {
-	if v, ok := MethodGetterMap[name]; ok {
-		return v(m, params)
-	}
-	return nil, fmt.Errorf("not found method: %v", name)
 }

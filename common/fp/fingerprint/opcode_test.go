@@ -93,6 +93,20 @@ func TestYamlOpCode(t *testing.T) {
     - headers:
         - key: Tag1
           value:
+            product: exe`, true,
+		},
+		{
+			`- methods:
+    - headers:
+        - key: Tag2
+          value:
+            product: exe`, false,
+		},
+		{
+			`- methods:
+    - headers:
+        - key: Tag1
+          value:
             product_index: 1
             regexp: a(e.e)a`, true,
 		}, {

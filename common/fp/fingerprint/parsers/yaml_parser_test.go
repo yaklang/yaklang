@@ -16,7 +16,3 @@ func TestMatcher(t *testing.T) {
 	}
 	_ = rules
 }
-
-func TestName(t *testing.T) {
-
-}
