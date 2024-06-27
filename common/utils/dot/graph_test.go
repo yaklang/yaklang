@@ -12,7 +12,7 @@ import (
 
 // This example shows how Graph can be used to display a simple linked list.
 // The output can be piped to the dot tool to generate an image.
-func TestlinkedList(t *testing.T) {
+func TestLinkedList(t *testing.T) {
 	G := New()
 	G.MakeDirected()
 	n1 := G.AddNode("Hello")
@@ -75,6 +75,23 @@ func TestGraph(t *testing.T) {
 	spew.Dump(data)
 	if !utils.MatchAllOfSubString(data, `label="1"`, `label="2"`) {
 		t.Errorf("label not match")
+		t.Fail()
+	}
+}
+
+func TestGraph_CreateRepeatedNode(t *testing.T) {
+	g := New()
+	n1 := g.AddNode("foo")
+	n2 := g.GetOrCreateNode("foo")
+	if n1 != n2 {
+		t.Errorf("node not match")
+		t.Fail()
+	}
+
+	n1 = g.GetOrCreateNode("foo1")
+	n2 = g.GetOrCreateNode("foo2")
+	if n1 != n2 {
+		t.Errorf("node not match")
 		t.Fail()
 	}
 }

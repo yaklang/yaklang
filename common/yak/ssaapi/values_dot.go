@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
@@ -16,7 +17,7 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 	}
 	m.Store(t.GetId(), t)
 
-	if len(t.DependOn) == 0 && len(t.EffectOn) == 0 {
+	if len(t.DependOn) == 0 && len(t.EffectOn) == 0 && len(t.Predecessors) == 0 {
 		return
 	}
 
@@ -53,30 +54,53 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 		_marshal(m, g, id, node)
 	}
 
-	for _, predRaw := range t.Predecessors {
-		pred := predRaw.Node
-		predNode := g.GetOrCreateNode(pred.GetVerboseName())
-		edgs := g.GetEdges(predNode, self)
-		edgsR := g.GetEdges(self, predNode)
-		if len(edgs) <= 0 && len(edgsR) <= 0 {
-			label := predRaw.Info.Label
-			if predRaw.Info.Step >= 0 {
-				label = fmt.Sprintf(`%v:%v`, predRaw.Info.Step, label)
-			}
-			eid := g.AddEdge(predNode, self, label)
-			g.EdgeAttribute(eid, "color", "red")
-			g.EdgeAttribute(eid, "penwidth", "3.0")
-		} else {
-			for _, eid := range edgs {
-				g.EdgeAttribute(eid, "color", "red")
-				g.EdgeAttribute(eid, "penwidth", "3.0")
-			}
-			for _, eid := range edgsR {
-				g.EdgeAttribute(eid, "color", "red")
-				g.EdgeAttribute(eid, "penwidth", "3.0")
-			}
+	for _, predecessor := range t.Predecessors {
+		if predecessor.Node == nil {
+			continue
 		}
+
+		name := predecessor.Node.GetVerboseName()
+		predecessorNodeId := g.GetOrCreateNode(name)
+		log.Infof("add predecessor nodeId(%v): %v", predecessorNodeId, name)
+		edges := g.GetEdges(predecessorNodeId, self)
+		if len(edges) > 0 {
+			for _, edge := range edges {
+				g.EdgeAttribute(edge, "color", "red")
+				g.EdgeAttribute(edge, "penwidth", "3.0")
+				g.EdgeAttribute(edge, "label", predecessor.Info.Label)
+			}
+		} else {
+			edgeId := g.AddEdge(predecessorNodeId, self, predecessor.Info.Label)
+			g.EdgeAttribute(edgeId, "color", "red")
+			g.EdgeAttribute(edgeId, "penwidth", "3.0")
+		}
+		_marshal(m, g, predecessorNodeId, predecessor.Node)
 	}
+
+	//for _, predRaw := range t.Predecessors {
+	//	pred := predRaw.Node
+	//	predNode := g.GetOrCreateNode(pred.GetVerboseName())
+	//	edgs := g.GetEdges(predNode, self)
+	//	edgsR := g.GetEdges(self, predNode)
+	//	if len(edgs) <= 0 && len(edgsR) <= 0 {
+	//		label := predRaw.Info.Label
+	//		if predRaw.Info.Step >= 0 {
+	//			label = fmt.Sprintf(`%v:%v`, predRaw.Info.Step, label)
+	//		}
+	//		eid := g.AddEdge(predNode, self, label)
+	//		g.EdgeAttribute(eid, "color", "red")
+	//		g.EdgeAttribute(eid, "penwidth", "3.0")
+	//	} else {
+	//		for _, eid := range edgs {
+	//			g.EdgeAttribute(eid, "color", "red")
+	//			g.EdgeAttribute(eid, "penwidth", "3.0")
+	//		}
+	//		for _, eid := range edgsR {
+	//			g.EdgeAttribute(eid, "color", "red")
+	//			g.EdgeAttribute(eid, "penwidth", "3.0")
+	//		}
+	//	}
+	//}
 }
 
 func (v *Value) DotGraph() string {
