@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
+	charsetLib "golang.org/x/net/html/charset"
 
 	"github.com/BurntSushi/toml"
 	"github.com/dlclark/regexp2"
@@ -1113,7 +1114,7 @@ func (flow *CodecExecFlow) CustomCodecPlugin(pluginContent string) error {
 }
 
 // Tag = "其他"
-// CodecName = "GB18030ToUTF8-8"
+// CodecName = "GB18030ToUTF8"
 // Desc ="""GB18030是一种中文编码标准，支持简体中文、繁体中文、日文和韩文等多种字符集，是GB2312和GBK的扩展。该函数将GB18030编码的文本转换为UTF-8编码。"""
 // Params = [
 // ]
@@ -1123,5 +1124,43 @@ func (flow *CodecExecFlow) GB18030ToUTF8() error {
 		return err
 	}
 	flow.Text = text
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "字符集转换为UTF8字符集"
+// Desc ="""尝试将文本从指定的字符集转换为UTF-8字符集。"""
+// Params = [
+// { Name = "charset", Type = "select",DefaultValue = "gb18030",Options = ["gb18030", "windows-1252", "iso-8859-1", "big5", "utf-16"], Required = true , Label = "字符集"},
+// ]
+func (flow *CodecExecFlow) CharsetToUTF8(charset string) error {
+	enc, name := charsetLib.Lookup(charset)
+	if enc == nil {
+		return utils.Errorf("Can't find charset: %s", charset)
+	}
+	decoded, err := enc.NewDecoder().Bytes(flow.Text)
+	if err != nil {
+		return utils.Wrapf(err, "transform %s to utf8 error", name)
+	}
+	flow.Text = decoded
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "UTF8字符集转换为其他字符集"
+// Desc ="""尝试将文本从UTF-8字符集转换为指定的字符集。"""
+// Params = [
+// { Name = "charset", Type = "select",DefaultValue = "gb18030",Options = ["gb18030", "windows-1252", "iso-8859-1", "big5", "utf-16"], Required = true , Label = "字符集"},
+// ]
+func (flow *CodecExecFlow) UTF8ToCharset(charset string) error {
+	enc, name := charsetLib.Lookup(charset)
+	if enc == nil {
+		return utils.Errorf("Can't find charset: %s", charset)
+	}
+	encoded, err := enc.NewEncoder().Bytes(flow.Text)
+	if err != nil {
+		return utils.Wrapf(err, "transform utf8 to %s error", name)
+	}
+	flow.Text = encoded
 	return nil
 }
