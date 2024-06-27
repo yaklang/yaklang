@@ -90,6 +90,9 @@ type Config struct {
 
 	//ctx
 	Ctx context.Context
+
+	//Disable default fingerprint
+	DisableDefaultFingerprint bool
 }
 
 func (c *Config) IsFiltered(host string, port int) bool {
@@ -288,10 +291,10 @@ func (c *Config) init() {
 }
 
 func (c *Config) lazyInit() {
-	if len(c.WebFingerprintRules) <= 0 {
-		c.WebFingerprintRules, _ = GetDefaultWebFingerprintRules()
+	if !c.DisableDefaultFingerprint {
+		webFingerprintRules, _ := GetDefaultWebFingerprintRules()
+		c.WebFingerprintRules = append(c.WebFingerprintRules, webFingerprintRules...)
 	}
-
 	if len(c.FingerprintRules) <= 0 {
 		c.FingerprintRules, _ = GetDefaultNmapServiceProbeRules()
 	}
