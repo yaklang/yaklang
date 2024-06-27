@@ -38,7 +38,7 @@ func (t *IrType) BeforeCreate() error {
 func SaveType(kind int, str string, extra string) int {
 	start := time.Now()
 	defer func() {
-		atomic.AddUint64(&_SSASaveTypeCost, uint64(time.Now().Sub(start).Milliseconds()))
+		atomic.AddUint64(&_SSASaveTypeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
 	db := GetDB()
