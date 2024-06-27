@@ -2346,3 +2346,53 @@ Content-Disposition: form-data; name="b"
 		})
 	}
 }
+
+func TestReplaceHTTPPacketBodyJson(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		jsonMap  map[string]interface{}
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			jsonMap: map[string]interface{}{"a": 1, "b": 2},
+			expected: `GET / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 13
+
+{"a":1,"b":2}`,
+		},
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			jsonMap: map[string]interface{}{"a": 1, "b": "2"},
+			expected: `GET / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 15
+
+{"a":1,"b":"2"}`,
+		},
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			jsonMap: map[string]interface{}{"a": 1, "b": map[string]interface{}{"c": "d", "e": 2}},
+			expected: `GET / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 27 
+
+{"a":1,"b":{"c":"d","e":2}}`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := ReplaceHTTPPacketJsonBody([]byte(testcase.origin), testcase.jsonMap)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketJsonBody failed: want %s got %s", string(expected), string(actual))
+		}
+	}
+}
