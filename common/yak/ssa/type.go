@@ -1010,6 +1010,10 @@ func (c GenericType) RawString() string {
 	return c.String()
 }
 
+func isGenericType(t Type) bool {
+	return t.GetTypeKind() == GenericTypeKind
+}
+
 func isSameGenericType(t1, t2 Type) bool {
 	if t1.GetTypeKind() != GenericTypeKind || t2.GetTypeKind() != GenericTypeKind {
 		return false
@@ -1043,105 +1047,6 @@ func GetGenericTypeFromType(t Type) []Type {
 		typs = append(typs, GetGenericTypeFromType(obj.ReturnType)...)
 	}
 	return typs
-}
-
-func (c *GenericType) Binding(real, generic Type, symbolsTypeMap map[string]Type) (errMsg string) {
-	setBinding := func(typ Type) {
-		if existed, ok := symbolsTypeMap[c.symbol]; ok {
-			if !TypeCompare(existed, typ) {
-				errMsg = GenericTypeError(c, generic, existed, typ)
-			}
-		} else {
-			symbolsTypeMap[c.symbol] = typ
-		}
-	}
-
-	switch real.GetTypeKind() {
-	case GenericTypeKind,
-		StringTypeKind, NumberTypeKind, BooleanTypeKind,
-		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
-
-		if isSameGenericType(generic, c) {
-			setBinding(real)
-		}
-	case BytesTypeKind:
-		setBinding(GetByteType())
-	case ChanTypeKind:
-		if t, ok := generic.(*ChanType); ok && isSameGenericType(t.Elem, c) {
-			setBinding(real.(*ChanType).Elem)
-		}
-	case SliceTypeKind:
-		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.FieldType, c) {
-			setBinding(real.(*ObjectType).FieldType)
-		}
-	case MapTypeKind:
-		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.KeyTyp, c) {
-			setBinding(real.(*ObjectType).KeyTyp)
-		}
-		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.FieldType, c) {
-			setBinding(real.(*ObjectType).FieldType)
-		}
-	case TupleTypeKind:
-		if t, ok := generic.(*ObjectType); ok && isSameGenericType(t.FieldType, c) {
-			setBinding(real.(*ObjectType).FieldType)
-		}
-	case FunctionTypeKind:
-		if t, ok := generic.(*FunctionType); ok {
-			rt := real.(*FunctionType)
-			for i, typ := range t.Parameter {
-				if !isSameGenericType(typ, c) {
-					continue
-				}
-				setBinding(rt.Parameter[i])
-			}
-			if isSameGenericType(t.ReturnType, c) {
-				setBinding(rt.ReturnType)
-			}
-		}
-	}
-	return
-}
-
-func (c *GenericType) Apply(raw Type, symbolsTypeMap map[string]Type) Type {
-	new, ok := CloneType(raw)
-	if !ok {
-		return raw
-	}
-
-	switch raw.GetTypeKind() {
-	case GenericTypeKind:
-		if isSameGenericType(new, c) {
-			if new, ok := CloneType(symbolsTypeMap[c.symbol]); ok {
-				return new
-			}
-		}
-	case ChanTypeKind:
-		t := new.(*ChanType)
-		t.Elem = c.Apply(t.Elem, symbolsTypeMap)
-		return new
-	case SliceTypeKind:
-		t := new.(*ObjectType)
-		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
-		// hook bytes
-		if t.FieldType.GetTypeKind() == ByteTypeKind {
-			new = GetBytesType()
-		}
-	case MapTypeKind:
-		t := new.(*ObjectType)
-		t.KeyTyp = c.Apply(t.KeyTyp, symbolsTypeMap)
-		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
-	case TupleTypeKind:
-		t := new.(*ObjectType)
-		t.FieldType = c.Apply(t.FieldType, symbolsTypeMap)
-	case FunctionTypeKind:
-		t := new.(*FunctionType)
-		for i, typ := range t.Parameter {
-			t.Parameter[i] = c.Apply(typ, symbolsTypeMap)
-		}
-		t.ReturnType = c.Apply(t.ReturnType, symbolsTypeMap)
-	}
-
-	return new
 }
 
 // Shallow copy

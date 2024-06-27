@@ -1472,4 +1472,16 @@ target = append(a, 2, "3")`,
 			},
 		)
 	})
+	t.Run("append-bytes-with-bytes", func(t *testing.T) {
+		test.CheckError(t,
+			test.TestCase{
+				Code: `
+a = b"asd"
+target = append(a, b"qwe", b"zxc")`,
+				Want: []string{
+					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetByteType(), ssa.GetBytesType()),
+				},
+			},
+		)
+	})
 }

@@ -165,6 +165,13 @@ target = append(a, b...)`,
 			ssa.GetBytesType())
 	})
 
+	t.Run("append-bytes-with-bytes-fallback", func(t *testing.T) {
+		test.CheckType(t, `
+		a = b"asd"
+		target = append(a, b"qwe", b"zxc")`,
+			ssa.NewSliceType(ssa.GetAnyType()))
+	})
+
 	t.Run("append-string", func(t *testing.T) {
 		test.CheckType(t, `
 a = ["a"]
