@@ -8,6 +8,7 @@ saveClosed = cli.Bool("save-closed-ports")
 proxies = cli.String("proxy", cli.setDefault("no"))
 probeTimeoutFloat = cli.Float("probe-timeout", cli.setDefault(5.0), cli.setRequired(false))
 probeMax = cli.Int("probe-max", cli.setRequired(false), cli.setDefault(4))
+fingerprintFiles = cli.String("fingerprint-files", cli.setRequired(false), cli.setDefault(""))
 
 // host alive scan
 skippedHostAliveScan = cli.Bool("skipped-host-alive-scan")
@@ -42,7 +43,6 @@ hosts = string(hostRaw)
 if hosts == "" {
 	die("target / hosts empty")
 }
-
 
 hostTotal = len(str.ParseStringToHosts(str.Trim(hosts, ",")))
 portTotal = len(str.ParseStringToPorts(str.Trim(ports, ",")))
@@ -97,6 +97,12 @@ if !skippedHostAliveScan{
 
 opts = []
 opts = append(opts, servicescan.active(active))
+
+if fingerprintFiles != ""{
+    fingerprintFileList = str.Split(fingerprintFiles,",")
+    opts = append(opts,servicescan.fingerprintFile(fingerprintFileList...))
+}
+
 
 if concurrent > 0 {
     opts = append(opts, servicescan.concurrent(concurrent))
