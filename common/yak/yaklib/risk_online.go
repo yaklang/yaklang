@@ -53,7 +53,7 @@ func (s *OnlineClient) UploadRiskToOnline(ctx context.Context,
 	req.Header.Set("Authorization", token)
 	rsp, err := s.client.Do(req)
 	if err != nil {
-		return utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
+		return utils.Errorf("HTTP Post %v failed: %v ", urlIns.String(), err)
 	}
 	rawResponse, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {

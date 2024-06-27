@@ -413,7 +413,6 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		}
 		raw, _ := json.Marshal(params)
 		paramsStr := strconv.Quote(string(raw))
-
 		existedYakScript, _ := yakit.GetYakScriptByName(db, i.ScriptName)
 		if existedYakScript != nil {
 			yakit.DeleteYakScriptByName(db, existedYakScript.ScriptName)
@@ -748,8 +747,23 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 	}
 	var riskDetailJson []*OnlineRiskDetail
 	var paramsJson []*OnlinePluginParam
+	var yakScriptParams []*ypb.YakScriptParam
 	_ = json.Unmarshal([]byte(riskDetail), &riskDetailJson)
-	_ = json.Unmarshal([]byte(params), &paramsJson)
+	r, _ := strconv.Unquote(params)
+	_ = json.Unmarshal([]byte(r), &yakScriptParams)
+	for _, v := range yakScriptParams {
+		paramsJson = append(paramsJson, &OnlinePluginParam{
+			Field:        v.Field,
+			DefaultValue: v.DefaultValue,
+			TypeVerbose:  v.TypeVerbose,
+			FieldVerbose: v.FieldVerbose,
+			Help:         v.Help,
+			Required:     v.Required,
+			Group:        v.Group,
+			ExtraSetting: v.ExtraSetting,
+			MethodType:   v.MethodType,
+		})
+	}
 	tagsJson := strings.Split(tags, ",")
 	raw, err := json.Marshal(SaveYakScriptOnlineRequest{
 		ScriptName:           scriptName,

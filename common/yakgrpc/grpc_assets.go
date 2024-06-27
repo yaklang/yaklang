@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 
@@ -411,50 +412,10 @@ func riskTypeGroupVerbose(i string, defaultStr string) string {
 }
 
 func (s *Server) QueryAvailableRiskType(ctx context.Context, req *ypb.Empty) (*ypb.Fields, error) {
-	var types []*riskType
-	if rows, err := s.GetProjectDatabase().Table("risks").Raw(
-		`select distinct risk_type_verbose, risk_type, count(*) as total from risks  where waiting_verified = false group by risk_type_verbose;`,
-	).Rows(); err != nil {
+	riskTypes, err := AvailableRiskType(s.GetProjectDatabase())
+	if err != nil {
 		return nil, utils.Errorf("query risk types failed: %s", err)
-	} else {
-		for rows.Next() {
-			var verbose string
-			var typeStr string
-			var total int32
-			err := rows.Scan(&verbose, &typeStr, &total)
-			if err != nil {
-				log.Errorf("scan risk_type failed: %s", err)
-				continue
-			}
-			types = append(types, &riskType{
-				RiskTypeVerbose: verbose,
-				RiskType:        typeStr,
-				Total:           total,
-			})
-		}
 	}
-
-	var riskTypes = make(map[string]*ypb.FieldName)
-	for _, t := range types {
-		var typeStr = t.RiskType
-		for _, prefix := range riskTypeGroup {
-			if strings.HasPrefix(t.RiskType, prefix) {
-				typeStr = prefix
-			}
-		}
-		result, ok := riskTypes[typeStr]
-		if !ok {
-			result = &ypb.FieldName{
-				Name:    typeStr,
-				Verbose: riskTypeGroupVerbose(typeStr, t.RiskTypeVerbose),
-				Total:   t.Total,
-			}
-			riskTypes[typeStr] = result
-			continue
-		}
-		result.Total += t.Total
-	}
-
 	return &ypb.Fields{
 		Values: funk.Values(riskTypes).([]*ypb.FieldName),
 	}, nil
@@ -466,7 +427,7 @@ func severityVerbose(i string) string {
 	case "trace", "debug", "note":
 		return "调试信息"
 	case "info", "fingerprint", "infof", "default":
-		return "信息/指纹"
+		return "信息"
 	case "low":
 		return "低危"
 	case "middle", "warn", "warning", "medium":
@@ -485,44 +446,9 @@ var (
 )
 
 func (s *Server) QueryAvailableRiskLevel(ctx context.Context, _ *ypb.Empty) (*ypb.Fields, error) {
-	fixRiskOnce.Do(func() {
-		yakit.FixRiskType(s.GetProjectDatabase())
-	})
-	var severities = make(map[string]*ypb.FieldName)
-	if rows, err := s.GetProjectDatabase().Raw(
-		`select distinct severity, count(*) as total from risks where waiting_verified = false group by severity;`,
-	).Rows(); err != nil {
+	severities, err := AvailableRiskLevel(s.GetProjectDatabase())
+	if err != nil {
 		return nil, utils.Errorf("fetch risk type error: %s", err)
-	} else {
-		var severityRaw interface{} = ""
-		var total int32
-		for rows.Next() {
-			err := rows.Scan(&severityRaw, &total)
-			if err != nil {
-				log.Errorf("scan severity level failed: %s", err)
-				continue
-			}
-			var severityStr string
-			switch ret := severityRaw.(type) {
-			case string:
-				severityStr = ret
-			case []byte:
-				severityStr = string(ret)
-			default:
-				severityStr = ""
-			}
-			r, ok := severities[severityStr]
-			if !ok {
-				r = &ypb.FieldName{
-					Name:    severityStr,
-					Verbose: severityVerbose(severityStr),
-					Total:   total,
-				}
-				severities[severityStr] = r
-				continue
-			}
-			r.Total += total
-		}
 	}
 	return &ypb.Fields{Values: funk.Values(severities).([]*ypb.FieldName)}, nil
 }
@@ -673,12 +599,14 @@ func (s *Server) QueryNewRisk(ctx context.Context, req *ypb.QueryNewRiskRequest)
 	}
 	p, _, _ := yakit.QueryNewRisk(s.GetProjectDatabase(), req, true, false)
 
-	paging, _, _ := yakit.QueryNewRisk(s.GetProjectDatabase(), req, false, true)
+	count, _ := yakit.QueryRiskCount(s.GetProjectDatabase(), "")
+	unreadCount, _ := yakit.QueryRiskCount(s.GetProjectDatabase(), "false")
 
 	rsp := &ypb.QueryNewRiskResponse{
-		Total:        int64(paging.TotalRecord),
+		Total:        count,
 		NewRiskTotal: int64(p.TotalRecord),
 		Data:         nil,
+		Unread:       unreadCount,
 	}
 	for _, r := range data {
 		rsp.Data = append(rsp.Data, NewRiskGRPCModel(r))
@@ -702,13 +630,13 @@ func NewRiskGRPCModel(p *schema.Risk) *ypb.NewRisk {
 func (s *Server) NewRiskRead(ctx context.Context, req *ypb.NewRiskReadRequest) (*ypb.Empty, error) {
 	if len(req.GetIds()) > 0 {
 		for _, v := range funk.ChunkInt64s(req.Ids, 100) {
-			err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), req, v)
+			err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), v)
 			if err != nil {
 				log.Errorf("NewRiskRead error: %v", err)
 			}
 		}
 	} else {
-		err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), req, req.Ids)
+		err := yakit.NewRiskReadRequest(s.GetProjectDatabase(), []int64{})
 		if err != nil {
 			return nil, utils.Errorf("NewRiskRead error: %v", err)
 		}
@@ -863,4 +791,219 @@ func IsValueInSortedSlice(value string, slice []string) bool {
 		}
 	}
 	return false
+}
+
+func (s *Server) SetTagForRisk(ctx context.Context, req *ypb.SetTagForRiskRequest) (*ypb.Empty, error) {
+	if len(req.GetTags()) > 0 {
+		risk, err := yakit.GetRiskByIDOrHash(s.GetProjectDatabase(), req.Id, req.Hash)
+		if err != nil {
+			return nil, err
+		}
+		extLen := len(req.GetTags())
+		tagsData := make([]string, extLen)
+		if extLen > 0 {
+			for i := 0; i < extLen; i++ {
+				tagsData[i] = req.Tags[i]
+			}
+		}
+		risk.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
+		err = yakit.UpdateRiskTags(s.GetProjectDatabase(), risk)
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.Empty{}, nil
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) QueryRiskTags(ctx context.Context, req *ypb.Empty) (*ypb.QueryRiskTagsResponse, error) {
+	var riskTags []*ypb.FieldGroup
+	db := s.GetProjectDatabase().Where("tags IS NOT NULL")
+	data := yakit.YieldRisks(db, context.Background())
+	tagCounts := make(map[string]int)
+	for k := range data {
+		for _, tag := range strings.Split(k.Tags, "|") {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tagCounts[tag]++
+			}
+		}
+	}
+	for k, v := range tagCounts {
+		riskTags = append(riskTags, &ypb.FieldGroup{
+			Name:  k,
+			Total: int32(v),
+		})
+
+	}
+	return &ypb.QueryRiskTagsResponse{RiskTags: riskTags}, nil
+}
+
+func (s *Server) RiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb.RiskFieldGroupResponse, error) {
+	riskLevel, err := AvailableRiskLevel(s.GetProjectDatabase())
+	if err != nil {
+		log.Errorf("risk level group filed %s", err.Error())
+	}
+
+	var riskTypeGroup, riskLevelGroup []*ypb.FieldName
+	for _, v := range riskLevel {
+		riskLevelGroup = append(riskLevelGroup, &ypb.FieldName{
+			Name:    v.Name,
+			Verbose: v.Verbose,
+			Total:   v.Total,
+		})
+	}
+
+	riskType, err := AvailableRiskType(s.GetProjectDatabase())
+	if err != nil {
+		log.Errorf("risk level group filed %s", err.Error())
+	}
+
+	typeSlice := make([]*ypb.FieldName, 0, len(riskType))
+	for _, value := range riskType {
+		typeSlice = append(typeSlice, value)
+	}
+
+	sort.Slice(typeSlice, func(i, j int) bool {
+		return typeSlice[i].Total > typeSlice[j].Total
+	})
+
+	for _, v := range typeSlice {
+		if len(riskTypeGroup) < 10 {
+			riskTypeGroup = append(riskTypeGroup, &ypb.FieldName{
+				Name:    v.Name,
+				Verbose: v.Verbose,
+				Total:   v.Total,
+			})
+		}
+	}
+
+	riskIP, err := AvailableRiskIP(s.GetProjectDatabase())
+	if err != nil {
+		log.Errorf("risk ip group filed %s", err.Error())
+	}
+	return &ypb.RiskFieldGroupResponse{
+		RiskIPGroup:    riskIP,
+		RiskLevelGroup: riskLevelGroup,
+		RiskTypeGroup:  riskTypeGroup,
+	}, nil
+}
+
+func AvailableRiskLevel(db *gorm.DB) (map[string]*ypb.FieldName, error) {
+	fixRiskOnce.Do(func() {
+		yakit.FixRiskType(db)
+	})
+	var severities = make(map[string]*ypb.FieldName)
+	if rows, err := db.Raw(
+		`select distinct severity, count(*) as total from risks where waiting_verified = false group by severity;`,
+	).Rows(); err != nil {
+		return nil, utils.Errorf("fetch risk level error: %s", err)
+	} else {
+		var severityRaw interface{} = ""
+		var total int32
+		for rows.Next() {
+			err = rows.Scan(&severityRaw, &total)
+			if err != nil {
+				log.Errorf("scan severity level failed: %s", err)
+				continue
+			}
+			var severityStr string
+			switch ret := severityRaw.(type) {
+			case string:
+				severityStr = ret
+			case []byte:
+				severityStr = string(ret)
+			default:
+				severityStr = ""
+			}
+			r, ok := severities[severityStr]
+			if !ok {
+				r = &ypb.FieldName{
+					Name:    severityStr,
+					Verbose: severityVerbose(severityStr),
+					Total:   total,
+				}
+				severities[severityStr] = r
+				continue
+			}
+			r.Total += total
+		}
+	}
+	return severities, nil
+}
+
+func AvailableRiskType(db *gorm.DB) (map[string]*ypb.FieldName, error) {
+	var types []*riskType
+	if rows, err := db.Table("risks").Raw(
+		`select distinct risk_type_verbose, risk_type, count(*) as total from risks  where waiting_verified = false group by risk_type_verbose;`,
+	).Rows(); err != nil {
+		return nil, utils.Errorf("query risk types failed: %s", err)
+	} else {
+		for rows.Next() {
+			var verbose string
+			var typeStr string
+			var total int32
+			err = rows.Scan(&verbose, &typeStr, &total)
+			if err != nil {
+				log.Errorf("scan risk_type failed: %s", err)
+				continue
+			}
+			types = append(types, &riskType{
+				RiskTypeVerbose: verbose,
+				RiskType:        typeStr,
+				Total:           total,
+			})
+		}
+	}
+
+	var riskTypes = make(map[string]*ypb.FieldName)
+	for _, t := range types {
+		var typeStr = t.RiskType
+		for _, prefix := range riskTypeGroup {
+			if strings.HasPrefix(t.RiskType, prefix) {
+				typeStr = prefix
+			}
+		}
+		result, ok := riskTypes[typeStr]
+		if !ok {
+			result = &ypb.FieldName{
+				Name:    typeStr,
+				Verbose: riskTypeGroupVerbose(typeStr, t.RiskTypeVerbose),
+				Total:   t.Total,
+			}
+			riskTypes[typeStr] = result
+			continue
+		}
+		result.Total += t.Total
+	}
+
+	return riskTypes, nil
+}
+
+func AvailableRiskIP(db *gorm.DB) ([]*ypb.FieldGroup, error) {
+	var riskIP []*ypb.FieldGroup
+	if rows, err := db.Table("risks").Raw(
+		`SELECT	((ip_segment >> 24) & 255) || '.' || ((ip_segment >> 16) & 255) || '.' || ((ip_segment >> 8) & 255) || '.1/24' AS ip_segment, total
+	FROM (
+		SELECT(ip_integer & 0xFFFFFF00) AS ip_segment, COUNT(*) AS total FROM risks	WHERE waiting_verified = false	GROUP BY ip_segment) AS grouped_segments ORDER BY total DESC `).Rows(); err != nil {
+		return nil, utils.Errorf("query risk IP failed: %s", err)
+	} else {
+		for rows.Next() {
+			var (
+				value string
+				total int32
+			)
+			err = rows.Scan(&value, &total)
+			if err != nil {
+				log.Errorf("scan risk ip failed: %s", err)
+				continue
+			}
+			riskIP = append(riskIP, &ypb.FieldGroup{
+				Name:  value,
+				Total: total,
+			})
+		}
+	}
+
+	return riskIP, nil
 }

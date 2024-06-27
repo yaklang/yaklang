@@ -419,6 +419,10 @@ service Yak {
   rpc QueryNewRisk(QueryNewRiskRequest) returns (QueryNewRiskResponse);
   rpc NewRiskRead(NewRiskReadRequest) returns (Empty);
   rpc UploadRiskToOnline(UploadRiskToOnlineRequest) returns (Empty);
+  rpc SetTagForRisk(SetTagForRiskRequest) returns (Empty);
+  rpc QueryRiskTags(Empty) returns (QueryRiskTagsResponse);
+  rpc RiskFieldGroup(Empty) returns (RiskFieldGroupResponse);
+
 
   // Report
   rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
@@ -2902,6 +2906,8 @@ message Risk {
   string Description = 24;
   string Solution = 25;
   string TaskName = 26;
+  string Tags = 27;
+  bool IsRead = 28;
 }
 
 message QueryRisksRequest {
@@ -2917,6 +2923,10 @@ message QueryRisksRequest {
 
   int64 FromId = 9;
   int64 UntilId = 10;
+  string Tags = 11;
+  string IsRead = 12;
+  string Title = 13;
+  repeated int64 Ids = 14;
 }
 
 message QueryRisksResponse {
@@ -2933,6 +2943,22 @@ message QueryNewRiskResponse {
   repeated NewRisk Data = 1;
   int64 NewRiskTotal = 2;
   int64 Total = 3;
+  int64 Unread = 4;
+}
+
+message QueryRiskTagsResponse {
+  repeated FieldGroup RiskTags = 1;
+}
+
+message RiskFieldGroupResponse {
+  repeated FieldGroup RiskIPGroup = 1;
+  repeated FieldName RiskLevelGroup = 2;
+  repeated FieldName RiskTypeGroup = 3;
+}
+
+message FieldGroup {
+  string Name = 1;
+  int32 Total = 2;
 }
 
 message NewRisk {
@@ -2954,6 +2980,13 @@ message UploadRiskToOnlineRequest {
   string Token = 1;
   string ProjectName = 2;
 }
+
+message SetTagForRiskRequest {
+  int64 Id = 1;
+  string Hash = 2;
+  repeated string Tags = 3;
+}
+
 
 message VerifyTunnelServerDomainParams {
   GetTunnelServerExternalIPParams ConnectParams = 1;

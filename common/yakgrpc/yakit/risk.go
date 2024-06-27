@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"time"
 )
 
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
@@ -127,14 +128,25 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 	}, params.GetSearch(), false)
 	// 搜索风险类型
 	db = bizhelper.FuzzQueryStringArrayOrPrefixLike(
-		db, "risk_type",
+		db, "risk_type_verbose",
 		utils.PrettifyListFromStringSplitEx(params.GetRiskType()),
 	)
 	db = bizhelper.FuzzQueryStringArrayOrPrefixLike(
 		db, "severity",
 		utils.PrettifyListFromStringSplitEx(params.GetSeverity()),
 	)
-	db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
+	db = bizhelper.FuzzQueryStringArrayOrLike(
+		db, "tags",
+		utils.PrettifyListFromStringSplitEx(params.GetTags(), "|"),
+	)
+	if params.IsRead == "false" {
+		db = db.Where("is_read = false OR is_read IS NULL")
+	}
+	db = bizhelper.FuzzSearchEx(db, []string{
+		"title", "title_verbose",
+	}, params.GetTitle(), false)
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetIds())
+	//db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
 	return db, nil
 }
 
@@ -169,15 +181,6 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 	if err != nil {
 		return nil, nil, err
 	}
-	//db = bizhelper.FuzzQueryLike(db, "service_type", params.GetService())
-	//db = bizhelper.FuzzQueryLike(db, "html_title", params.GetTitle())
-	//
-	//if params.GetState() == "" {
-	//	db = bizhelper.ExactQueryString(db, "state", "open")
-	//} else {
-	//	db = bizhelper.ExactQueryString(db, "state", params.GetState())
-	//}
-
 	var ret []*schema.Risk
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
@@ -337,8 +340,9 @@ func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRea
 	}
 	// 未读
 	if !isRead {
-		db = db.Where("is_read = false")
+		db = db.Where("is_read = false OR is_read IS NULL")
 	}
+	db = db.Where("waiting_verified = false")
 	db = db.Where("risk_type NOT IN (?) OR ip <> ?", []string{"reverse-http", "reverse-tcp", "reverse-https"}, "127.0.0.1")
 	db = db.Order("id desc")
 	var ret []*schema.Risk
@@ -351,12 +355,12 @@ func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRea
 	return paging, ret, nil
 }
 
-func NewRiskReadRequest(db *gorm.DB, req *ypb.NewRiskReadRequest, Ids []int64) error {
+func NewRiskReadRequest(db *gorm.DB, Ids []int64) error {
 	db = db.Model(&schema.Risk{})
 	if len(Ids) > 0 {
-		db = db.Where("id in (?)", Ids)
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", Ids)
 	} else {
-		db = db.Where("id > ?", req.AfterId)
+		db = db.Where("created_at <= ?", time.Unix(time.Now().Unix(), 0))
 	}
 	db = db.Update(map[string]interface{}{"is_read": true})
 	if db.Error != nil {
@@ -409,4 +413,48 @@ func UploadRiskToOnline(db *gorm.DB, hash []string) error {
 		return utils.Errorf("UploadRiskToOnline failed %s", db.Error)
 	}
 	return nil
+}
+
+func GetRiskByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.Risk, error) {
+	var req schema.Risk
+	if db := db.Model(&schema.Risk{}).Where("id = ? OR hash = ?", id, hash).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+
+	return &req, nil
+}
+
+func UpdateRiskTags(db *gorm.DB, i *schema.Risk) error {
+	if i == nil {
+		return nil
+	}
+	db = db.Model(&schema.Risk{})
+
+	if i.ID > 0 {
+		if db = db.Where("id = ?", i.ID).Update("tags", i.Tags); db.Error != nil {
+			log.Errorf("update tags(by id) failed: %s", db.Error)
+			return db.Error
+		}
+	} else if i.Hash != "" {
+		if db = db.Where("hash = ?", i.Hash).Update("tags", i.Tags); db.Error != nil {
+			log.Errorf("update tags(by hash) failed: %s", db.Error)
+			return db.Error
+		}
+	}
+	return nil
+}
+
+func QueryRiskCount(db *gorm.DB, isRead string) (int64, error) {
+	db = db.Model(&schema.Risk{})
+	// 未读
+	if isRead == "false" {
+		db = db.Where("is_read = false OR is_read IS NULL ")
+	}
+	db = db.Where("waiting_verified = false")
+	var count int64
+	db.Count(&count)
+	if db.Error != nil {
+		return 0, utils.Errorf("QueryRiskCount failed: %s", db.Error)
+	}
+	return count, nil
 }
