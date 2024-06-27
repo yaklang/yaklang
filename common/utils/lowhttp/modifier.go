@@ -1937,7 +1937,7 @@ func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 	}
 }
 
-// ReplaceHTTPPacketBody 是一个辅助函数，用于改变请求报文，修改请求体内容，第一个参数为修改后的请求体内容，第二个参数为是否分块传输
+// ReplaceHTTPPacketBody 是一个辅助函数，用于改变 HTTP 报文，修改 HTTP 报文主体内容，第一个参数为原始 HTTP 报文，第二个参数为修改的报文主体内容
 // Example:
 // ```
 // poc.ReplaceHTTPPacketBody(poc.BasicRequest(), "a=b") // 修改请求体内容为a=b
@@ -1950,4 +1950,17 @@ func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 		}
 	})
 	return ReplaceHTTPPacketBody(packet, body, isChunked)
+}
+
+// ReplaceHTTPPacketJsonBody 是一个辅助函数，用于改变 HTTP 报文，修改 HTTP 报文主体内容（ json 格式），第一个参数为原始 HTTP 报文，第二个参数为修改的报文主体内容（ map 对象）
+// Example:
+// ```
+// poc.ReplaceHTTPPacketJsonBody(poc.BasicRequest(), {"a":"b"}) // 修改请求体内容为{"a":"b"}
+// ```
+func ReplaceHTTPPacketJsonBody(packet []byte, jsonMap map[string]interface{}) []byte {
+	newBody, err := json.Marshal(jsonMap)
+	if err != nil {
+		log.Errorf("json marshal error: %v", err)
+	}
+	return ReplaceHTTPPacketBodyFast(packet, newBody)
 }
