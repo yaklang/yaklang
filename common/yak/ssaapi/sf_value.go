@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -144,6 +145,7 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 			for _, opt := range opts {
 				opt(ctx)
 			}
+			log.Infof("set: %v for: %v", ctx.Label, result.String())
 			v.Predecessors = append(v.Predecessors, &PredecessorValue{
 				Node: result, Info: ctx,
 			})

@@ -75,14 +75,6 @@ func (g *Graph) AddNode(label string) int {
 	return nod.id
 }
 
-func (g *Graph) GetOrCreateNodeInstance(label string) int {
-	id, ok := g.NodeExisted(label)
-	if ok {
-		return id
-	}
-	return g.AddNode(label)
-}
-
 func (g *Graph) GetOrCreateSubGraph(label string) *Graph {
 	for _, sub := range g.subGraphs {
 		if sub.GraphAttribute("label", label); sub != nil {

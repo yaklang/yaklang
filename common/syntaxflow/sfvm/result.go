@@ -91,7 +91,7 @@ func (s *SFFrameResult) String() string {
 						if fileName == "" {
 							var err error
 							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
-							if CriticalError != nil {
+							if err != nil {
 								log.Warn(err)
 							}
 							if editor != nil {

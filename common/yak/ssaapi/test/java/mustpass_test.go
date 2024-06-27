@@ -57,7 +57,7 @@ func TestMustPass_Debug(t *testing.T) {
 		return
 	}
 
-	keyword := "url-open-connection.sf"
+	keyword := "xxe.sf"
 	prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
 	if err != nil {
 		t.Fatal(err)
