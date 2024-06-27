@@ -3,6 +3,7 @@ package fp
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
@@ -293,7 +294,7 @@ func (c *Config) init() {
 func (c *Config) lazyInit() {
 	if !c.DisableDefaultFingerprint {
 		webFingerprintRules, _ := GetDefaultWebFingerprintRules()
-		c.WebFingerprintRules = append(c.WebFingerprintRules, webFingerprintRules...)
+		c.WebFingerprintRules = append(webFingerprintRules, c.WebFingerprintRules...)
 	}
 	if len(c.FingerprintRules) <= 0 {
 		c.FingerprintRules, _ = GetDefaultNmapServiceProbeRules()
@@ -487,22 +488,22 @@ func WithWebFingerprintUseAllRules(b bool) ConfigOption {
 
 // webRule servicescan 的配置选项，设置本次扫描使用的 Web 指纹规则
 // @param {interface{}} i Web 指纹规则
-func WithWebFingerprintRule(rules []*rule.FingerPrintRule) ConfigOption {
-	//var rules []*webfingerprint.WebRule
-	//switch ret := i.(type) {
-	//case []byte:
-	//	rules, _ = webfingerprint.ParseWebFingerprintRules(ret)
-	//case string:
-	//	e := utils.GetFirstExistedPath(ret)
-	//	if e != "" {
-	//		raw, _ := ioutil.ReadFile(e)
-	//		rules, _ = webfingerprint.ParseWebFingerprintRules(raw)
-	//	} else {
-	//		rules, _ = webfingerprint.ParseWebFingerprintRules([]byte(ret))
-	//	}
-	//case []*webfingerprint.WebRule:
-	//	rules = ret
-	//}
+func WithWebFingerprintRule(i any) ConfigOption {
+	var rules []*rule.FingerPrintRule
+	switch ret := i.(type) {
+	case []byte:
+		rules, _ = parsers.ParseYamlRule(string(ret))
+	case string:
+		e := utils.GetFirstExistedPath(ret)
+		if e != "" {
+			raw, _ := ioutil.ReadFile(e)
+			rules, _ = parsers.ParseYamlRule(string(raw))
+		} else {
+			rules, _ = parsers.ParseYamlRule(ret)
+		}
+	case []*rule.FingerPrintRule:
+		rules = ret
+	}
 
 	return func(config *Config) {
 		if rules == nil {
