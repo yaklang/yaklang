@@ -37,6 +37,9 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 	if t1kind == AnyTypeKind || t2kind == AnyTypeKind {
 		return true
 	}
+	if t1kind == GenericTypeKind || t2kind == GenericTypeKind {
+		return true
+	}
 
 	// TODO: check InterfaceType, compare method function
 	if t1kind == InterfaceTypeKind || t2kind == InterfaceTypeKind {
@@ -91,6 +94,11 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		// string | []number
 		if t2kind == StringTypeKind {
 			return true
+		}
+		if t2kind == SliceTypeKind {
+			if o, ok := ToObjectType(t2); ok {
+				return typeCompareEx(GetByteType(), o.FieldType, depth)
+			}
 		}
 	case StringTypeKind:
 		if t2kind == BytesTypeKind {
