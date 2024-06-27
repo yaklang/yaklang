@@ -100,7 +100,7 @@ opts = append(opts, servicescan.active(active))
 
 if fingerprintFiles != ""{
     fingerprintFileList = str.Split(fingerprintFiles,",")
-    opts = append(opts,servicescan.fingerprintFile(fingerprintFileList...))
+    opts = append(opts,servicescan.webRule(fingerprintFileList...))
 }
 
 

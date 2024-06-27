@@ -143,7 +143,7 @@ tcpOps = append(tcpOps, servicescan.active(active))
 
 if userfpFile != ""{
     fs = str.Split(userfpFile,"\n")
-    tcpOps = append(tcpOps, servicescan.fingerprintFile(fs...))
+    tcpOps = append(tcpOps, servicescan.webRule(fs...))
 }
 
 if concurrent > 0 {
