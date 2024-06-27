@@ -68,6 +68,13 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 		reqParams.LinkPluginConfig.PluginNames = append(reqParams.LinkPluginConfig.PluginNames, req.ScriptNames...)
 	}
 
+	if len(req.GetUserFingerprintFiles()) > 0 {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
+			Key:   "fingerprint-files",
+			Value: strings.Join(req.GetUserFingerprintFiles(), ","),
+		})
+	}
+
 	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "target-file",
 		Value: tmpTargetFile.Name(),
