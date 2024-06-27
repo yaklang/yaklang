@@ -277,13 +277,16 @@ type YakClient interface {
 	QueryNewRisk(ctx context.Context, in *QueryNewRiskRequest, opts ...grpc.CallOption) (*QueryNewRiskResponse, error)
 	NewRiskRead(ctx context.Context, in *NewRiskReadRequest, opts ...grpc.CallOption) (*Empty, error)
 	UploadRiskToOnline(ctx context.Context, in *UploadRiskToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
+	SetTagForRisk(ctx context.Context, in *SetTagForRiskRequest, opts ...grpc.CallOption) (*Empty, error)
+	QueryRiskTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryRiskTagsResponse, error)
+	RiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RiskFieldGroupResponse, error)
 	// Report
 	QueryReports(ctx context.Context, in *QueryReportsRequest, opts ...grpc.CallOption) (*QueryReportsResponse, error)
 	QueryReport(ctx context.Context, in *QueryReportRequest, opts ...grpc.CallOption) (*Report, error)
 	DeleteReport(ctx context.Context, in *DeleteReportRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAvailableReportFrom(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	DownloadReport(ctx context.Context, in *DownloadReportRequest, opts ...grpc.CallOption) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoClassOptionsResponseWithVerbose, error)
@@ -405,7 +408,8 @@ type YakClient interface {
 	MigrateLegacyDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -3212,6 +3216,33 @@ func (c *yakClient) UploadRiskToOnline(ctx context.Context, in *UploadRiskToOnli
 	return out, nil
 }
 
+func (c *yakClient) SetTagForRisk(ctx context.Context, in *SetTagForRiskRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/SetTagForRisk", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryRiskTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryRiskTagsResponse, error) {
+	out := new(QueryRiskTagsResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryRiskTags", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RiskFieldGroupResponse, error) {
+	out := new(RiskFieldGroupResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/RiskFieldGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) QueryReports(ctx context.Context, in *QueryReportsRequest, opts ...grpc.CallOption) (*QueryReportsResponse, error) {
 	out := new(QueryReportsResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryReports", in, out, opts...)
@@ -5450,13 +5481,16 @@ type YakServer interface {
 	QueryNewRisk(context.Context, *QueryNewRiskRequest) (*QueryNewRiskResponse, error)
 	NewRiskRead(context.Context, *NewRiskReadRequest) (*Empty, error)
 	UploadRiskToOnline(context.Context, *UploadRiskToOnlineRequest) (*Empty, error)
+	SetTagForRisk(context.Context, *SetTagForRiskRequest) (*Empty, error)
+	QueryRiskTags(context.Context, *Empty) (*QueryRiskTagsResponse, error)
+	RiskFieldGroup(context.Context, *Empty) (*RiskFieldGroupResponse, error)
 	// Report
 	QueryReports(context.Context, *QueryReportsRequest) (*QueryReportsResponse, error)
 	QueryReport(context.Context, *QueryReportRequest) (*Report, error)
 	DeleteReport(context.Context, *DeleteReportRequest) (*Empty, error)
 	QueryAvailableReportFrom(context.Context, *Empty) (*Fields, error)
 	DownloadReport(context.Context, *DownloadReportRequest) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(context.Context, *Empty) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoClassOptionsResponseWithVerbose, error)
@@ -5578,7 +5612,8 @@ type YakServer interface {
 	MigrateLegacyDatabase(context.Context, *Empty) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
@@ -6286,6 +6321,15 @@ func (UnimplementedYakServer) NewRiskRead(context.Context, *NewRiskReadRequest) 
 }
 func (UnimplementedYakServer) UploadRiskToOnline(context.Context, *UploadRiskToOnlineRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UploadRiskToOnline not implemented")
+}
+func (UnimplementedYakServer) SetTagForRisk(context.Context, *SetTagForRiskRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetTagForRisk not implemented")
+}
+func (UnimplementedYakServer) QueryRiskTags(context.Context, *Empty) (*QueryRiskTagsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryRiskTags not implemented")
+}
+func (UnimplementedYakServer) RiskFieldGroup(context.Context, *Empty) (*RiskFieldGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RiskFieldGroup not implemented")
 }
 func (UnimplementedYakServer) QueryReports(context.Context, *QueryReportsRequest) (*QueryReportsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryReports not implemented")
@@ -10628,6 +10672,60 @@ func _Yak_UploadRiskToOnline_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_SetTagForRisk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetTagForRiskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetTagForRisk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/SetTagForRisk",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetTagForRisk(ctx, req.(*SetTagForRiskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryRiskTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryRiskTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryRiskTags",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryRiskTags(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RiskFieldGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RiskFieldGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/RiskFieldGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RiskFieldGroup(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_QueryReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryReportsRequest)
 	if err := dec(in); err != nil {
@@ -14142,6 +14240,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UploadRiskToOnline",
 			Handler:    _Yak_UploadRiskToOnline_Handler,
+		},
+		{
+			MethodName: "SetTagForRisk",
+			Handler:    _Yak_SetTagForRisk_Handler,
+		},
+		{
+			MethodName: "QueryRiskTags",
+			Handler:    _Yak_QueryRiskTags_Handler,
+		},
+		{
+			MethodName: "RiskFieldGroup",
+			Handler:    _Yak_RiskFieldGroup_Handler,
 		},
 		{
 			MethodName: "QueryReports",
