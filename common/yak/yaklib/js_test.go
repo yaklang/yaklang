@@ -77,3 +77,12 @@ publicKey.encrypt("yaklang");
 	}
 	t.Log(value.String())
 }
+
+func TestRunWithJSEncrypt(t *testing.T) {
+	code := `new JSEncrypt();`
+	_, value, err := _run(code, _libJsEncrypt())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(value.String())
+}
