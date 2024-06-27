@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"testing"
 	"time"
@@ -134,20 +135,14 @@ func TestSetTagForRisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	riskResponse, err := client.QueryRisks(context.Background(), &ypb.QueryRisksRequest{
-		Pagination: &ypb.Paging{
-			Page:  1,
-			Limit: 1,
-		},
-		IsRead: "",
-	})
+	r := yakit.CreateRisk("http://127.0.0.1")
+	err = yakit.SaveRisk(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = client.SetTagForRisk(context.Background(), &ypb.SetTagForRiskRequest{
-		Id:   riskResponse.Data[0].Id,
-		Hash: riskResponse.Data[0].Hash,
+		Hash: r.Hash,
 		Tags: []string{"误报, 忽略, 待处理"},
 	})
 	if err != nil {
