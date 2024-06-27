@@ -423,6 +423,15 @@ func _allOption() fp.ConfigOption {
 	}
 }
 
+func _disableDefaultFingerprint(b ...bool) fp.ConfigOption {
+	return func(config *fp.Config) {
+		if len(b) == 0 {
+			config.DisableDefaultFingerprint = true
+		} else {
+			config.DisableDefaultFingerprint = utils.GetLastElement(b)
+		}
+	}
+}
 func _fingerprintFile(fs ...string) fp.ConfigOption {
 	return func(config *fp.Config) {
 		rules := []*rule.FingerPrintRule{}
@@ -439,7 +448,7 @@ func _fingerprintFile(fs ...string) fp.ConfigOption {
 			}
 			rules = append(rules, rs...)
 		}
-		config.WebFingerprintRules = rules
+		config.WebFingerprintRules = append(config.WebFingerprintRules, rules...)
 	}
 }
 
@@ -495,5 +504,6 @@ var FingerprintScanExports = map[string]interface{}{
 	// 全部服务扫描
 	"all": _allOption,
 
-	"fingerprintFile": _fingerprintFile,
+	"fingerprintFile":  _fingerprintFile,
+	"disableDefaultFP": _disableDefaultFingerprint,
 }
