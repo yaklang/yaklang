@@ -86,10 +86,10 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		return typeCompareEx(t1o.FieldType, t2o.FieldType, depth) && typeCompareEx(t1o.KeyTyp, t2o.KeyTyp, depth)
 	case StructTypeKind:
 	case ObjectTypeKind:
-	case ByteTypeKind:
-		if t2kind == NumberTypeKind {
-			return true
-		}
+	// case ByteTypeKind:
+	// 	if t2kind == NumberTypeKind {
+	// 		return true
+	// 	}
 	case BytesTypeKind:
 		// string | []number
 		if t2kind == StringTypeKind {
