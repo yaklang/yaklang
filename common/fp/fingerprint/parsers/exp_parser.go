@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strconv"
@@ -15,6 +14,7 @@ var buildinTokens = []string{"(", ")", "||", "&&", "=", "!=", "\"", "\\"}
 
 func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 	res := []*rule.FingerPrintRule{}
+	errs := []error{}
 	for _, ruleInfo := range rules {
 		exp := ruleInfo[0]
 		info := ruleInfo[1]
@@ -23,12 +23,7 @@ func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 		}
 		r, err := compileExp(exp)
 		if err != nil {
-			//r, err = compatibleSyntaxCompileExp(exp)
-			//if err != nil {
-			//	log.Errorf("parse exp %s error: %v", exp, err)
-			//	continue
-			//}
-			log.Errorf("parse exp %s error: %v", exp, err)
+			errs = append(errs, fmt.Errorf("parse exp %s error: %v", exp, err))
 			continue
 		}
 		r.MatchParam.Info = &rule.FingerprintInfo{
@@ -36,7 +31,7 @@ func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 		}
 		res = append(res, r)
 	}
-	return res, nil
+	return res, utils.JoinErrors(errs...)
 }
 
 func compatibleSyntaxCompileExp(exp string) (*rule.FingerPrintRule, error) {
@@ -221,6 +216,8 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 			}
 		case "condition":
 			switch token {
+			case "(", ")":
+				tmpItems = append(tmpItems, token)
 			case "||", "&&":
 				tmpItems = append(tmpItems, token)
 				currentStatus = "start"

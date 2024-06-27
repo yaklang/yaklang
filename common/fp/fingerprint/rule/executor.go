@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -31,8 +32,9 @@ type OpCode struct {
 }
 
 type matchedResult struct {
-	ok   bool
-	info *FingerprintInfo
+	ok      bool
+	AddInfo func(*FingerprintInfo)
+	//info    *FingerprintInfo
 }
 
 func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) (*FingerprintInfo, error) {
@@ -56,11 +58,11 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 		switch code.Op {
 		case OpInfo:
 			if v := stack.Pop().(*matchedResult); v.ok {
-				if v.info != nil {
-					stack.Push(v.info)
-				} else {
-					stack.Push(code.data[0].(*FingerprintInfo))
+				info := code.data[0].(*FingerprintInfo)
+				if v.AddInfo != nil {
+					v.AddInfo(info)
 				}
+				stack.Push(info)
 			}
 		case OpData:
 			data, err := getData()
@@ -81,7 +83,16 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(codec.Md5(body))
 			case "header_item":
-				stack.Push(lowhttp.GetHTTPPacketHeader(data, utils.InterfaceToString(code.data[2])))
+				var vals []string
+				lowhttp.SplitHTTPPacket(data, nil, nil, func(line string) string {
+					if k, v := lowhttp.SplitHTTPHeader(line); k != "" {
+						if strings.Contains(strings.ToLower(k), strings.ToLower(utils.InterfaceToString(code.data[2]))) {
+							vals = append(vals, v)
+						}
+					}
+					return line
+				})
+				stack.Push(vals)
 			case "header", "headers":
 				header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(string(header))
@@ -133,31 +144,61 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 			stack.Push(&matchedResult{ok: strings.Contains(d1, d2)})
 		case OpRegexpMatch:
 			d := stack.PopN(2)
-			d1 := d[1].(string)
-			d2 := d[0].(string)
-			re := regexp.MustCompile(d2)
-			ok := re.MatchString(d1)
-			if !ok {
-				stack.Push(&matchedResult{ok: false})
-				break
+			datas := []string{}
+			switch ret := d[1].(type) {
+			case string:
+				datas = append(datas, ret)
+			case []string:
+				datas = ret
+			default:
+				return nil, errors.New("invalid data type")
 			}
-			if len(code.data) == 6 {
-				info := &FingerprintInfo{}
-				res := re.FindAllStringSubmatch(d1, 1)
-				getGroup := func(s *string, index int) {
-					if index != 0 && len(res) > 0 && index < len(res[0]) {
-						*s = res[0][index]
+			pattern := d[0].(string)
+			if pattern == "" {
+				ok := false
+				for _, data := range datas {
+					if data != "" {
+						ok = true
 					}
 				}
-				getGroup(&info.CPE.Vendor, code.data[0].(int))
-				getGroup(&info.CPE.Product, code.data[1].(int))
-				getGroup(&info.CPE.Version, code.data[2].(int))
-				getGroup(&info.CPE.Update, code.data[3].(int))
-				getGroup(&info.CPE.Edition, code.data[4].(int))
-				getGroup(&info.CPE.Language, code.data[5].(int))
-				stack.Push(&matchedResult{ok: true, info: info})
+				stack.Push(&matchedResult{ok: ok})
+				continue
+			}
+			re := regexp.MustCompile(pattern)
+			matchOk := false
+			var matchedData string
+			for _, data := range datas {
+				if data == "" {
+					continue
+				}
+				matchOk = re.MatchString(data)
+				if !matchOk {
+					continue
+				}
+				matchedData = data
+				break
+			}
+			if matchOk {
+				if len(code.data) == 6 {
+					stack.Push(&matchedResult{ok: true, AddInfo: func(info *FingerprintInfo) {
+						res := re.FindAllStringSubmatch(matchedData, 1)
+						getGroup := func(s *string, index int) {
+							if index != 0 && len(res) > 0 && index < len(res[0]) {
+								*s = res[0][index]
+							}
+						}
+						getGroup(&info.CPE.Vendor, code.data[0].(int))
+						getGroup(&info.CPE.Product, code.data[1].(int))
+						getGroup(&info.CPE.Version, code.data[2].(int))
+						getGroup(&info.CPE.Update, code.data[3].(int))
+						getGroup(&info.CPE.Edition, code.data[4].(int))
+						getGroup(&info.CPE.Language, code.data[5].(int))
+					}})
+				} else {
+					stack.Push(&matchedResult{ok: true})
+				}
 			} else {
-				stack.Push(&matchedResult{ok: true})
+				stack.Push(&matchedResult{ok: false})
 			}
 		}
 	}

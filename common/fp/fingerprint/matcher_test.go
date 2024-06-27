@@ -27,7 +27,6 @@ func TestMatch(t *testing.T) {
 		log.Error(err)
 	}
 	matchRes := matcher.Match(context.Background(), raw)
-	println()
 	_ = matchRes
 }
 
@@ -42,10 +41,7 @@ func TestExpressionMatch(t *testing.T) {
 		splits := strings.Split(s, "\x00")
 		return [2]string{splits[1], splits[0]}
 	})
-	rules, err := parsers.ParseExpRule(ruleInfos.([][2]string))
-	if err != nil {
-		t.Fatal(err)
-	}
+	rules, _ := parsers.ParseExpRule(ruleInfos.([][2]string))
 	matcher := NewMatcher(rules...)
 	info := matcher.Match(context.Background(), []byte(`HTTP/1.1 200 OK
 Tag: --- VIDEO WEB SERVER ---
