@@ -3,12 +3,21 @@ package ssautil
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"strconv"
+	"sync/atomic"
+	"time"
 )
+
+var (
+	_SSAScopeTimeCost uint64
+)
+
+func GetSSAScopeTimeCost() time.Duration {
+	return time.Duration(_SSAScopeTimeCost * uint64(time.Millisecond))
+}
 
 func (s *ScopedVersionedTable[T]) SetParentId(i int64) {
 	s.parentId = i
@@ -49,6 +58,15 @@ func ssaValueMarshal(raw any) ([]byte, error) {
 }
 
 func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSAScopeTimeCost, uint64(time.Now().Sub(start).Milliseconds()))
+	}()
+
+	return s._SaveToDatabase()
+}
+
+func (s *ScopedVersionedTable[T]) _SaveToDatabase() error {
 	if !s.ShouldSaveToDatabase() {
 		return nil
 	}
