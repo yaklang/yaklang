@@ -200,4 +200,28 @@ target = Keys(a)`,
 			}),
 		)
 	})
+
+	t.Run("Complex-wrap-type", func(t *testing.T) {
+		test.CheckType(t, `
+a = make([]chan string, 0)
+a = append(a, make(chan string))
+a = append(a, make(chan string))
+target = Test(a)`,
+			ssa.NewSliceType(ssa.GetStringType()),
+			ssaapi.WithExternValue(map[string]any{
+				"Test": func(i interface{}) interface{} {
+					// ...
+					return nil
+				},
+			}),
+			ssaapi.WithExternBuildValueHandler("Test", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
+				// Test([]chan T) []T
+				typ := ssa.NewFunctionTypeDefine(id, []ssa.Type{ssa.NewSliceType(ssa.NewChanType(ssa.TypeT))}, []ssa.Type{ssa.NewSliceType(ssa.TypeT)}, false)
+				f := ssa.NewFunctionWithType(id, typ)
+				f.SetGeneric(true)
+				f.SetRange(b.CurrentRange)
+				return f
+			}),
+		)
+	})
 }
