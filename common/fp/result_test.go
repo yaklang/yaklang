@@ -41,7 +41,7 @@ func TestParseNmapStringByRegexp2Match(t *testing.T) {
 	}
 }
 
-func _TestParseNmapStringByRegexp2Match2(t *testing.T) {
+func TestParseNmapStringByRegexp2Match2(t *testing.T) {
 	match, err := parseNmapMatch(`match ssh m|^SSH-([\d.]+)-OpenSSH_([^ ]+)[ -]{1,2}Ubuntu[ -_]([^\r\n]+)\r?\n| p/OpenSSH/ v/$2 Ubuntu $3/ i/Ubuntu Linux; protocol $1/ o/Linux/ cpe:/a:openbsd:openssh:$2/ cpe:/o:canonical:ubuntu_linux/ cpe:/o:linux:linux_kernel/`)
 	if err != nil {
 		t.Logf("parse nmap match failed: %s", err)
@@ -85,7 +85,7 @@ func _TestParseNmapStringByRegexp2Match2(t *testing.T) {
 	}
 }
 
-func _TestParseNmapStringByRegexp2Match3(t *testing.T) {
+func TestParseNmapStringByRegexp2Match3(t *testing.T) {
 	match, err := parseNmapMatch(`match ssh m|^SSH-([\d]+).*?-OpenSSH_([^ ]+)[ -]{1,2}Ubuntu[ -_]([^\r\n]+)\r?\n| p/OpenSSH/ v/$2 Ubuntu $3/ i/Ubuntu Linux; protocol $1/ o/Linux/ cpe:/a:openbsd:openssh:$2/ cpe:/o:canonical:ubuntu_linux/ cpe:/o:linux:linux_kernel/`)
 	if err != nil {
 		t.Logf("parse nmap match failed: %s", err)

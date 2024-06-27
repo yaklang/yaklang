@@ -93,6 +93,9 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		log.Debugf("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(redirectInfos))
 		result.State = OPEN
 		result.Fingerprint.ServiceName = "http"
+		if len(redirectInfos) > 1 {
+			redirectInfos = append([]*lowhttp.RedirectFlow{utils2.GetLastElement(redirectInfos)}, redirectInfos[1:]...)
+		}
 		for _, i := range redirectInfos {
 			var iotdevResults = iotdevfp.MatchAll(i.Response)
 			if result.Fingerprint == nil {
