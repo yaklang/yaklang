@@ -282,8 +282,26 @@ func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string) string {
 	if document != "" {
 		document = "\n\n" + document
 	}
-	desc := fmt.Sprintf("```go\nfunc %s\n```%s", funcDecl.Decl, document)
-	desc = strings.Replace(desc, "func(", typStr+"(", 1)
+	decl := funcDecl.Decl
+	decl = strings.Replace(decl, "func(", typStr+"(", 1)
+
+	desc := fmt.Sprintf("```go\nfunc %s\n```%s", decl, document)
+	desc = yakdoc.ShrinkTypeVerboseName(desc)
+	return desc
+}
+
+func getFuncDeclDescEx(funcDecl *yakdoc.FuncDecl, typStr string, f *ssa.Function) string {
+	document := funcDecl.Document
+	if document != "" {
+		document = "\n\n" + document
+	}
+	decl := funcDecl.Decl
+	if f.IsGeneric() {
+		decl = funcDecl.MethodName + f.GetType().RawString()
+	}
+	decl = strings.Replace(decl, "func(", typStr+"(", 1)
+
+	desc := fmt.Sprintf("```go\nfunc %s\n```%s", decl, document)
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
@@ -518,6 +536,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 		parentTypStr = getGolangTypeStringBySSAType(parentBareTyp)
 	}
 
+	varname := v.GetName()
 	bareTyp := ssaapi.GetBareType(v.GetType())
 	typStr := getGolangTypeStringBySSAType(bareTyp)
 	typKind := bareTyp.GetTypeKind()
@@ -529,15 +548,20 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 	if v.IsExtern() {
 		if v.IsExternLib() {
 			// 标准库
-			desc = getExternLibDesc(v.GetName())
+			desc = getExternLibDesc(varname)
 		} else {
-
-			libName, lastName, _ := strings.Cut(v.GetName(), ".")
+			var libName, lastName string
+			if strings.Contains(varname, ".") {
+				libName, lastName, _ = strings.Cut(varname, ".")
+			} else {
+				libName, lastName = "", varname
+			}
 			if typKind == ssa.FunctionTypeKind {
 				// 标准库函数
 				funcDecl := getFuncDeclByName(libName, lastName)
 				if funcDecl != nil {
-					desc = getFuncDeclDesc(funcDecl, typStr)
+					f, _ := ssa.ToFunction(ssaapi.GetBareNode(v))
+					desc = getFuncDeclDescEx(funcDecl, typStr, f)
 				}
 			} else {
 				// 标准库常量
@@ -563,7 +587,8 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			if ok {
 				funcDecl, ok := lib.Functions[lastName]
 				if ok {
-					desc = getFuncDeclDesc(funcDecl, lastName)
+					f, _ := ssa.ToFunction(ssaapi.GetBareNode(v))
+					desc = getFuncDeclDescEx(funcDecl, lastName, f)
 					break
 				}
 			}

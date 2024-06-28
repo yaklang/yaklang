@@ -411,7 +411,7 @@ func TestErrorMemberCall(t *testing.T) {
 			Want: []string{
 				ssa4analyze.InvalidField("number", "F"),
 				ssa4analyze.InvalidField("number", "B"),
-				ssa4analyze.InvalidField("( ) -> number", "B"),
+				ssa4analyze.InvalidField("() -> number", "B"),
 				ssa4analyze.InvalidField("number", "B"),
 				// ssa4analyze.InvalidField("number", "$Key"),
 			},
