@@ -7,14 +7,19 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// parseInt 尝试将传入的字符串转换为整数，如果失败则返回0
+// parseInt 尝试将传入的字符串转换为对应进制的整数，默认为十进制，如果失败则返回0
 // Example:
 // ```
 // parseInt("123") // 123
+// parseInt("10", 16) // 16
 // parseInt("abc") // 0
 // ```
-func parseInt(s string) int {
-	i, err := strconv.ParseInt(s, 10, 64)
+func parseInt(s string, bases ...int) int {
+	base := 10
+	if len(bases) > 0 {
+		base = bases[0]
+	}
+	i, err := strconv.ParseInt(s, base, 64)
 	if err != nil {
 		log.Errorf("parse int[%s] failed: %s", s, err)
 		return 0
