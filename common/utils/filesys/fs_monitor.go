@@ -35,6 +35,13 @@ type EventSet struct {
 	ChangeEvents []Event
 }
 
+func (set EventSet) IsEmpty() bool {
+	if len(set.CreateEvents) == 0 && len(set.DeleteEvents) == 0 && len(set.ChangeEvents) == 0 {
+		return true
+	}
+	return false
+}
+
 type YakFileMonitor struct {
 	Events          chan *EventSet
 	RecursiveFinish chan struct{} // recursive finish
