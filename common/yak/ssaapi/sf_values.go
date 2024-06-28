@@ -31,6 +31,23 @@ func (value Values) GetCalled() (sfvm.ValueOperator, error) {
 	return vv, nil
 }
 
+func (value Values) GetFields() (sfvm.ValueOperator, error) {
+	var vv []sfvm.ValueOperator
+	for _, i := range value {
+		i, err := i.GetFields()
+		if err != nil {
+			continue
+		}
+		_ = i.Recursive(func(operator sfvm.ValueOperator) error {
+			if _, ok := operator.(*Value); ok {
+				vv = append(vv, operator)
+			}
+			return nil
+		})
+	}
+	return sfvm.NewValues(vv), nil
+}
+
 func (value Values) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	for _, v := range value {
 		err := f(v)
