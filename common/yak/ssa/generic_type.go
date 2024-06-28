@@ -18,6 +18,13 @@ func BindingGenericTypeWithRealType(real, generic Type, symbolsTypeMap map[strin
 		}
 	}
 
+	if generic.GetTypeKind() == OrTypeKind {
+		for _, t := range generic.(*OrType).types {
+			BindingGenericTypeWithRealType(real, t, symbolsTypeMap)
+		}
+		return
+	}
+
 	switch real.GetTypeKind() {
 	case BytesTypeKind:
 		if t, ok := generic.(*ObjectType); ok && isGenericType(t.FieldType) {
