@@ -26,18 +26,28 @@ const (
 	OpRegexpMatch OpFlag = "regexp_match"
 )
 
+const (
+	ConstProtocol = "protocol"
+	ConstMd5      = "md5"
+	ConstHeader   = "header"
+	ConstHeaders  = "headers"
+	ConstBody     = "body"
+	ConstTitle    = "title"
+	ConstServer   = "server"
+	ConstBanner   = "banner"
+)
+
 type OpCode struct {
 	Op   OpFlag
 	data []any
 }
 
 type matchedResult struct {
-	ok      bool
-	AddInfo func(*FingerprintInfo)
-	//info    *FingerprintInfo
+	ok         bool
+	RebuildCPE func(*CPE)
 }
 
-func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) (*FingerprintInfo, error) {
+func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) (*CPE, error) {
 	stack := utils.NewStack[any]()
 	for i := 0; i < len(codes); i++ {
 		code := codes[i]
@@ -58,9 +68,9 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 		switch code.Op {
 		case OpInfo:
 			if v := stack.Pop().(*matchedResult); v.ok {
-				info := code.data[0].(*FingerprintInfo)
-				if v.AddInfo != nil {
-					v.AddInfo(info)
+				info := code.data[0].(*CPE)
+				if v.RebuildCPE != nil {
+					v.RebuildCPE(info)
 				}
 				stack.Push(info)
 			}
@@ -77,9 +87,9 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 			}
 			data := resource.Data
 			switch code.data[1] {
-			case "protocol":
+			case ConstProtocol:
 				stack.Push(resource.Protocol)
-			case "md5":
+			case ConstMd5:
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(codec.Md5(body))
 			case "header_item":
@@ -93,20 +103,20 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 					return line
 				})
 				stack.Push(vals)
-			case "header", "headers":
+			case ConstHeader, ConstHeaders:
 				header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(string(header))
-			case "body":
+			case ConstBody:
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				stack.Push(string(body))
-			case "title":
+			case ConstTitle:
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(data)
 				title := utils.ExtractTitleFromHTMLTitle(string(body), "")
 				stack.Push(title)
-			case "server":
+			case ConstServer:
 				server := lowhttp.GetHTTPPacketHeader(data, "server")
 				stack.Push(server)
-			case "raw", "banner":
+			case ConstBanner:
 				stack.Push(string(data))
 			default:
 				return nil, fmt.Errorf("not support var: %v", code.data[1])
@@ -123,16 +133,6 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 				i += code.data[0].(int) - 1
 				stack.Push(v)
 			}
-		//case OpJmp:
-		//	i = code.data[0].(int) - 1
-		//case OpJmpIfTrue:
-		//	if stack.Pop().(bool) {
-		//		i = code.data[0].(int) - 1
-		//	}
-		//case OpJmpIfFalse:
-		//	if !stack.Pop().(bool) {
-		//		i = code.data[0].(int) - 1
-		//	}
 		case OpEqual:
 			d1 := stack.Pop().(string)
 			d2 := stack.Pop().(string)
@@ -180,19 +180,19 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 			}
 			if matchOk {
 				if len(code.data) == 6 {
-					stack.Push(&matchedResult{ok: true, AddInfo: func(info *FingerprintInfo) {
+					stack.Push(&matchedResult{ok: true, RebuildCPE: func(info *CPE) {
 						res := re.FindAllStringSubmatch(matchedData, 1)
 						getGroup := func(s *string, index int) {
 							if index != 0 && len(res) > 0 && index < len(res[0]) {
 								*s = res[0][index]
 							}
 						}
-						getGroup(&info.CPE.Vendor, code.data[0].(int))
-						getGroup(&info.CPE.Product, code.data[1].(int))
-						getGroup(&info.CPE.Version, code.data[2].(int))
-						getGroup(&info.CPE.Update, code.data[3].(int))
-						getGroup(&info.CPE.Edition, code.data[4].(int))
-						getGroup(&info.CPE.Language, code.data[5].(int))
+						getGroup(&info.Vendor, code.data[0].(int))
+						getGroup(&info.Product, code.data[1].(int))
+						getGroup(&info.Version, code.data[2].(int))
+						getGroup(&info.Update, code.data[3].(int))
+						getGroup(&info.Edition, code.data[4].(int))
+						getGroup(&info.Language, code.data[5].(int))
 					}})
 				} else {
 					stack.Push(&matchedResult{ok: true})
@@ -205,5 +205,5 @@ func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) 
 	if stack.Size() == 0 {
 		return nil, nil
 	}
-	return stack.Pop().(*FingerprintInfo), nil
+	return stack.Pop().(*CPE), nil
 }

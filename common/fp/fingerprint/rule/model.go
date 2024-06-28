@@ -2,6 +2,8 @@ package rule
 
 import (
 	"fmt"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"strings"
@@ -9,6 +11,7 @@ import (
 
 type MatchResource struct {
 	Data     []byte
+	Port     int
 	Protocol string
 }
 
@@ -19,9 +22,20 @@ func NewHttpResource(data []byte) *MatchResource {
 	}
 }
 
+type GeneralRule struct {
+	gorm.Model
+	*CPE
+	MatchExpression string `gorm:"uniqueIndex"`
+}
+
+func init() {
+	db := consts.GetGormProjectDatabase()
+	db.AutoMigrate(&GeneralRule{})
+}
+
 type MatchMethodParam struct {
 	ExtParams map[string]any
-	Info      *FingerprintInfo
+	Info      *CPE
 
 	// regexp
 	RegexpPattern string
@@ -183,15 +197,4 @@ func (c *CPE) String() string {
 	raw = strings.ReplaceAll(raw, " ", "_")
 	raw = strings.ToLower(raw)
 	return raw
-}
-
-type FingerprintInfo struct {
-	Proto          string `json:"proto"`
-	ServiceName    string `json:"service_name"`
-	ProductVerbose string `json:"product_verbose"`
-	Info           string `json:"info"`
-	Version        string `json:"version"`
-	DeviceType     string `json:"device_type"`
-	CPE            CPE    `json:"cpes"`
-	Raw            string `json:"raw"`
 }
