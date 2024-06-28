@@ -3,6 +3,7 @@ package yakurl
 import (
 	"context"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -16,7 +17,9 @@ var YakRunnerMonitor *filesys.YakFileMonitor
 func init() {
 	yakit.YakitDuplexConnectionServer.RegisterHandler("file_monitor", func(ctx context.Context, request *ypb.DuplexConnectionRequest) error {
 		eventsHandler := func(eventSet *filesys.EventSet) {
-			yakit.BroadcastData("file_monitor", eventSet)
+			if !eventSet.IsEmpty() {
+				yakit.BroadcastData("file_monitor", eventSet)
+			}
 		}
 		data := request.GetData()
 		op := gjson.Get(string(data), "operate").String()
@@ -31,10 +34,12 @@ func init() {
 				YakRunnerMonitor.CancelFunc()
 			}
 			YakRunnerMonitor = m
+			log.Infof("Start monitor path: %v", path)
 		case OP_STOP_MONITOR:
 			if YakRunnerMonitor != nil {
 				YakRunnerMonitor.CancelFunc()
 				YakRunnerMonitor = nil
+				log.Infof("Stop monitor path")
 			}
 		default:
 		}
