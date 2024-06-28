@@ -79,6 +79,10 @@ func (f *Function) SetGeneric(b bool) {
 	f.isGeneric = b
 }
 
+func (f *Function) IsGeneric() bool {
+	return f.isGeneric
+}
+
 func (f *Function) GetProgram() *Program {
 	if f.Package == nil {
 		return nil

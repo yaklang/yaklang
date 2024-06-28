@@ -1000,10 +1000,10 @@ func (s *FunctionType) RawString() string {
 	}
 
 	return fmt.Sprintf(
-		"(%s %s) -> %s",
+		"(%s%s) -> %s",
 		strings.Join(
 			paras,
-			",",
+			", ",
 		),
 		variadic,
 		s.ReturnType,
