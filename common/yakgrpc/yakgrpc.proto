@@ -680,6 +680,11 @@ service Yak {
 
   // AI相关
   rpc CheckHahValidAiConfig(Empty) returns (GeneralResponse);
+
+  // 指纹库
+  rpc GetFingerprint(GetFingerprintRequest) returns (GetFingerprintResponse);
+  rpc AddFingerprint(AddFingerprintRequest) returns (AddFingerprintResponse);
+  rpc ModifyFingerprint(ModifyFingerprintRequest) returns (ModifyFingerprintResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5172,4 +5177,23 @@ message GetThirdPartyAppConfigTemplate {
 }
 message GetThirdPartyAppConfigTemplateResponse{
   repeated GetThirdPartyAppConfigTemplate Templates = 2;
+}
+message GetFingerprintRequest{
+
+}
+message GetFingerprintResponse{
+
+}
+message AddFingerprintRequest{
+  string Name = 1;
+  string Fingerprint = 2;
+}
+message AddFingerprintResponse{
+
+}
+message ModifyFingerprintRequest{
+}
+
+message ModifyFingerprintResponse{
+
 }

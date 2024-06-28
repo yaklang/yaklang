@@ -162,25 +162,15 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 				f := utils2.GetLastElement(flow)
 				return f.Response, nil
 			}
-			fpInfos := f.matcher.Match(iotDetectCtx, info.Response)
+			cpes := f.matcher.Match(iotDetectCtx, info.Response)
 			//cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
 			//if err != nil {
 			//	if !strings.Contains(err.Error(), "no rules matched") {
 			//		continue
 			//	}
 			//}
-
-			var cpes []*rule.CPE
-			infos := []string{}
-			for _, fpInfo := range fpInfos {
-				if fpInfo.Info != "" {
-					infos = append(infos, fpInfo.Info)
-				}
-				cpes = append(cpes, &fpInfo.CPE)
-			}
-			result.Fingerprint.Info = strings.Join(infos, ",")
 			// 如果检测到指纹信息
-			if len(fpInfos) > 0 {
+			if len(cpes) > 0 {
 				currentCPE = append(currentCPE, cpes...)
 				urlStr := info.RespRecord.Url
 				cpeAnalyzer.Feed(urlStr, cpes...)
