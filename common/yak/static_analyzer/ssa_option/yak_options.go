@@ -44,15 +44,8 @@ func YakGetTypeSSAOpt() []ssaapi.Option {
 
 	opts = append(opts, ssaapi.WithExternValue(valueTable))
 	opts = append(opts, ssaapi.WithExternMethod(&Builder{}))
-	opts = append(opts, ssaapi.WithExternBuildValueHandler("append", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
-		// append([]T, T...) []T
-		sliceTypeT := ssa.NewSliceType(ssa.TypeT)
-		typ := ssa.NewFunctionTypeDefine(id, []ssa.Type{sliceTypeT, ssa.TypeT}, []ssa.Type{sliceTypeT}, true)
-		f := ssa.NewFunctionWithType(id, typ)
-		f.SetGeneric(true)
-		f.SetRange(b.CurrentRange)
-		return f
-	}))
+	opts = append(opts, genericGlobalFunctionOption()...)
+	opts = append(opts, genericXLibraryFunctionOption()...)
 	opts = append(opts, ssaapi.WithExternInfo("plugin-type:yak"))
 	return opts
 }
