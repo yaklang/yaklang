@@ -32,11 +32,6 @@ func BindingGenericTypeWithRealType(real, generic Type, symbolsTypeMap map[strin
 		}
 		// if T is bytes
 		fallthrough
-	case StringTypeKind, NumberTypeKind, BooleanTypeKind,
-		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind, InterfaceTypeKind:
-		if isGenericType(generic) {
-			setBinding(generic.(*GenericType), real)
-		}
 	case ChanTypeKind:
 		if t, ok := generic.(*ChanType); ok && isGenericType(t.Elem) {
 			if isGenericType(t.Elem) {
@@ -83,6 +78,10 @@ func BindingGenericTypeWithRealType(real, generic Type, symbolsTypeMap map[strin
 				BindingGenericTypeWithRealType(rt.ReturnType, t.ReturnType, symbolsTypeMap)
 			}
 		}
+	}
+
+	if isGenericType(generic) {
+		setBinding(generic.(*GenericType), real)
 	}
 	return
 }
