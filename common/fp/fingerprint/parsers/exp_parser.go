@@ -12,13 +12,13 @@ import (
 
 var buildinTokens = []string{"(", ")", "||", "&&", "=", "!=", "\"", "\\"}
 
-func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
-	res := []*rule.FingerPrintRule{}
+func ParseExpRule(rules ...*rule.GeneralRule) ([][]*rule.OpCode, error) {
+	res := [][]*rule.OpCode{}
 	errs := []error{}
 	for _, ruleInfo := range rules {
-		exp := ruleInfo[0]
-		info := ruleInfo[1]
-		if exp == "" || info == "" {
+		exp := ruleInfo.MatchExpression
+		cpe := ruleInfo.CPE
+		if exp == "" {
 			continue
 		}
 		r, err := compileExp(exp)
@@ -26,10 +26,11 @@ func ParseExpRule(rules [][2]string) ([]*rule.FingerPrintRule, error) {
 			errs = append(errs, fmt.Errorf("parse exp %s error: %v", exp, err))
 			continue
 		}
-		r.MatchParam.Info = &rule.FingerprintInfo{
-			Info: info,
+		r.MatchParam.Info = cpe
+		codes := r.ToOpCodes()
+		if len(codes) != 0 {
+			res = append(res, codes)
 		}
-		res = append(res, r)
 	}
 	return res, utils.JoinErrors(errs...)
 }

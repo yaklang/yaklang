@@ -8,6 +8,15 @@ import (
 	"testing"
 )
 
+func newTestGenerateRule(exp string) *rule.GeneralRule {
+	return &rule.GeneralRule{
+		MatchExpression: exp,
+		CPE: &rule.CPE{
+			Product: "ok",
+		},
+	}
+}
+
 var rsp = []byte(`HTTP/1.1 200 OK
 Tag: --- VIDEO WEB SERVER ---
 Tag1: ---aexeaaaa
@@ -23,22 +32,23 @@ var resourceGetter = func(path string) (*rule.MatchResource, error) {
 }
 
 func TestExpressionOpCode1(t *testing.T) {
-	r, err := parsers.ParseExpRule([][2]string{{`title="Powered by JEECMS" || (body="Powered by" && body="http://www.jeecms.com" && body="JEECMS")`, "ok"}})
+	r, err := parsers.ParseExpRule(newTestGenerateRule(`title="Powered by JEECMS" || (body="Powered by" && body="http://www.jeecms.com" && body="JEECMS")`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = rule.Execute(resourceGetter, r[0].ToOpCodes())
+	_, err = rule.Execute(resourceGetter, r[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err = parsers.ParseExpRule([][2]string{{`header="VIDEO WEB" && title="title"`, "ok"}})
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header="VIDEO WEB" && title="title"`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = rule.Execute(resourceGetter, r[0].ToOpCodes())
+	_, err = rule.Execute(resourceGetter, r[0])
 	if err != nil {
 		t.Fatal(err)
 	}
+
 }
 func TestExpressionOpCode(t *testing.T) {
 	trueExp := `header = "VIDEO WEB SERVER"`
@@ -66,18 +76,18 @@ func TestExpressionOpCode(t *testing.T) {
 	for _, testCase := range testCases {
 		exp := testCase[0].(string)
 		expect := testCase[1].(bool)
-		r, err := parsers.ParseExpRule([][2]string{{exp, "ok"}})
+		r, err := parsers.ParseExpRule(newTestGenerateRule(exp))
 		if err != nil {
 			t.Fatal(err)
 		}
-		info, err := rule.Execute(resourceGetter, r[0].ToOpCodes())
+		info, err := rule.Execute(resourceGetter, r[0])
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !expect {
 			assert.Nil(t, info)
 		} else {
-			assert.Equal(t, "ok", info.Info)
+			assert.Equal(t, "ok", info.Product)
 		}
 	}
 }
@@ -155,14 +165,14 @@ func TestYamlOpCode(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		info, err := rule.Execute(resourceGetter, r[0].ToOpCodes())
+		info, err := rule.Execute(resourceGetter, r[0])
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !expect {
 			assert.Nil(t, info)
 		} else {
-			assert.Equal(t, "exe", info.CPE.Product)
+			assert.Equal(t, "exe", info.Product)
 		}
 	}
 }
@@ -193,14 +203,14 @@ func TestYamlActiveModeOpCode(t *testing.T) {
 aaa`)}, nil
 			}
 			return nil, nil
-		}, r[0].ToOpCodes())
+		}, r[0])
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !expect {
 			assert.Nil(t, info)
 		} else {
-			assert.Equal(t, "windows", info.CPE.Product)
+			assert.Equal(t, "windows", info.Product)
 		}
 	}
 }

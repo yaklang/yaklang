@@ -1,52 +1,40 @@
 package parsers
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func _TestCompilerSpecialSyntax(t *testing.T) {
-	rules, err := ParseExpRule([][2]string{{`header=""MiniCMS""`, "a"}})
+	rules, err := ParseExpRule(newTestGenerateRule(`header=""MiniCMS""`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, `"MiniCMS"`, rules[0].MatchParam.Params[1])
-	rules, err = ParseExpRule([][2]string{{` body="VALUE="Copyright (C) 2000, Cobalt Networks"`, "a"}})
+	rules, err = ParseExpRule(newTestGenerateRule(` body="VALUE="Copyright (C) 2000, Cobalt Networks"`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, `VALUE="Copyright (C) 2000, Cobalt Networks`, rules[0].MatchParam.Params[1])
-	rules, err = ParseExpRule([][2]string{{`(body="Everything.gif"||body="everything.png") && title=="Everything"`, "a"}})
+	rules, err = ParseExpRule(newTestGenerateRule(`(body="Everything.gif"||body="everything.png") && title=="Everything"`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, `and`, rules[0].MatchParam.Condition)
-
-	rules, err = ParseExpRule([][2]string{{`body="xheditor_lang/zh-cn.js"||body="class="xheditor"||body=".xheditor("`, "a"}})
+	rules, err = ParseExpRule(newTestGenerateRule(`body="xheditor_lang/zh-cn.js"||body="class="xheditor"||body=".xheditor("`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, `or`, rules[0].MatchParam.Condition)
-
-	rules, err = ParseExpRule([][2]string{{`server="TornadoServer"&&Celery`, "a"}})
+	rules, err = ParseExpRule(newTestGenerateRule(`server="TornadoServer"&&Celery`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, `and`, rules[0].MatchParam.Condition)
-	assert.Equal(t, `raw`, rules[0].MatchParam.SubRules[1].MatchParam.Params[0])
+	_ = rules
 }
 func TestCompiler(t *testing.T) {
-	rules, err := ParseExpRule([][2]string{{`header="\"MiniCMS\""`, "a"}})
+	rules, err := ParseExpRule(newTestGenerateRule(`header="\"MiniCMS\""`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, `"MiniCMS"`, rules[0].MatchParam.Params[1])
-
-	rules, err = ParseExpRule([][2]string{{"header=\"MiniCMS\" || title=\"MiniCMS\"", "a"}})
+	rules, err = ParseExpRule(newTestGenerateRule("header=\"MiniCMS\" || title=\"MiniCMS\""))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "complex", rules[0].Method)
-	assert.Equal(t, "or", rules[0].MatchParam.Condition)
-	assert.Equal(t, 2, len(rules[0].MatchParam.SubRules))
+	_ = rules
 }

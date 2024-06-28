@@ -15,7 +15,7 @@ type Matcher struct {
 	rules       [][]*rule.OpCode
 }
 
-func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
+func NewMatcher(rules ...[]*rule.OpCode) *Matcher {
 	matcher := &Matcher{
 		ErrorHandle: func(err error) {},
 		regexpCache: map[string]*regexp.Regexp{},
@@ -24,16 +24,11 @@ func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
 	return matcher
 }
 
-func (m *Matcher) AddRules(rules []*rule.FingerPrintRule) {
-	for _, printRule := range rules {
-		ops := printRule.ToOpCodes()
-		if len(ops) != 0 {
-			m.rules = append(m.rules, ops)
-		}
-	}
+func (m *Matcher) AddRules(rules [][]*rule.OpCode) {
+	m.rules = append(m.rules, rules...)
 }
-func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.FingerprintInfo {
-	var result []*rule.FingerprintInfo
+func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {
+	var result []*rule.CPE
 	cached := map[string][]byte{}
 	for i, r := range m.rules {
 		_ = i

@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule_resources"
@@ -22,22 +23,36 @@ func LoadCPEFromWebfingerrintCPE(o *webfingerprint.CPE) *rule.CPE {
 	}
 }
 
-func LoadAllDefaultRules() (rules []*rule.FingerPrintRule) {
+func LoadAllDefaultRules() (rules [][]*rule.OpCode) {
 	for _, f := range []func() error{
 		func() error {
 			content, err := rule_resources.FS.ReadFile("exp_rule.txt")
 			if err != nil {
 				return err
 			}
-			ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) [2]string {
+			ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) *rule.GeneralRule {
 				splits := strings.Split(s, "\x00")
-				return [2]string{splits[1], splits[0]}
+				return &rule.GeneralRule{MatchExpression: splits[1], CPE: &rule.CPE{Product: splits[0]}}
 			})
-			rs, err := parsers.ParseExpRule(ruleInfos.([][2]string))
+			rs, err := parsers.ParseExpRule(ruleInfos.([]*rule.GeneralRule)...)
 			if err != nil {
 				return err
 			}
 			rules = append(rules, rs...)
+			return nil
+		},
+		func() error {
+			db := consts.GetGormProjectDatabase()
+			var rs []*rule.GeneralRule
+			db = db.Model(&rule.GeneralRule{}).Find(&rs)
+			if db.Error != nil {
+				return db.Error
+			}
+			codes, err := parsers.ParseExpRule(rs...)
+			if err != nil {
+				return err
+			}
+			rules = append(rules, codes...)
 			return nil
 		},
 		func() error {

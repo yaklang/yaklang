@@ -7,25 +7,34 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
+func ParseYamlRule(ruleContent string) ([][]*rule.OpCode, error) {
 	rules, err := webfingerprint.ParseWebFingerprintRules([]byte(ruleContent))
 	if err != nil {
 		return nil, errors.Errorf("parse wappalyzer rules failed: %s", err)
 	}
-	return ConvertOldYamlWebRuleToGeneralRule(rules)
+	rs, err := ConvertOldYamlWebRuleToGeneralRule(rules)
+	if err != nil {
+		return nil, err
+	}
+	codes := [][]*rule.OpCode{}
+	for _, r := range rs {
+		ops := r.ToOpCodes()
+		if len(ops) != 0 {
+			codes = append(codes, ops)
+		}
+	}
+	return codes, nil
 }
 func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rule.FingerPrintRule, error) {
-	convertToMap := func(o *webfingerprint.CPE) *rule.FingerprintInfo {
-		return &rule.FingerprintInfo{
-			CPE: rule.CPE{
-				Part:     o.Part,
-				Vendor:   o.Vendor,
-				Product:  o.Product,
-				Version:  o.Version,
-				Update:   o.Update,
-				Edition:  o.Edition,
-				Language: o.Language,
-			},
+	convertToMap := func(o *webfingerprint.CPE) *rule.CPE {
+		return &rule.CPE{
+			Part:     o.Part,
+			Vendor:   o.Vendor,
+			Product:  o.Product,
+			Version:  o.Version,
+			Update:   o.Update,
+			Edition:  o.Edition,
+			Language: o.Language,
 		}
 	}
 	convertRegexpRule := func(keyword *webfingerprint.KeywordMatcher) *rule.FingerPrintRule {
