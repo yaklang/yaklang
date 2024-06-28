@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"os"
 	"testing"
 
@@ -124,6 +125,9 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 	rsp, err := stream.Recv()
 	require.NoError(t, err)
 	require.True(t, rsp.IsTooLargeResponse)
+
+	fuzzerBody := lowhttp.GetHTTPPacketBody(rsp.ResponseRaw)
+	require.Equal(t, len(fuzzerBody), expectedCL-1, "response is not right")
 	require.NotEmpty(t, rsp.TooLargeResponseBodyFile)
 	require.NotEmpty(t, rsp.TooLargeResponseHeaderFile)
 
