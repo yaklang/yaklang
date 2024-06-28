@@ -18,7 +18,7 @@ import (
 // Scan servicescan 库使用的端口扫描类型的方式为全连接扫描，用于对连接目标进行精准的扫描，相比 synscan 库的单纯扫描，servicescan 库会尝试获取精确指纹信息以及 CPE 信息
 // @param {string} target 目标地址，支持 CIDR 格式，支持 192.168.1.1-100 格式
 // @param {string} port 端口，支持 1-65535、1,2,3、1-100,200-300 格式
-// @param {ConfigOption} [opts] servicescan 扫描参数
+// @param {SynConfigOption} [opts] servicescan 扫描参数
 // @return {chan *MatchResult} 返回结果
 // Example:
 // ```
@@ -41,7 +41,7 @@ func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan 
 // ScanOne servicescan 单体扫描，同步扫描一个目标，主机+端口
 // @param {string} target 目标地址
 // @param {int} port 端口
-// @param {ConfigOption} [opts] servicescan 扫描参数
+// @param {SynConfigOption} [opts] servicescan 扫描参数
 // @return {MatchResult} 返回结果
 // Example:
 // ```
@@ -154,7 +154,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 // ScanFromPing 从 ping.Scan 的结果中进行指纹识别
 // @param {chan *pingutil.PingResult} res ping.Scan 的结果
 // @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
-// @param {ConfigOption} [opts] synscan 扫描参数
+// @param {SynConfigOption} [opts] synscan 扫描参数
 // @return {chan *MatchResult} 返回结果
 // Example:
 // ```
@@ -351,7 +351,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 
 // proto servicescan 的配置选项，用于指定扫描协议
 // @param {...interface{}} [proto] 协议，例如：tcp、udp，可选参数，不传入参数默认为 tcp
-// @return {ConfigOption} 返回配置选项
+// @return {SynConfigOption} 返回配置选项
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.proto(["tcp","udp"]...)) // 使用 TCP 和 UDP 进行扫描
@@ -367,7 +367,7 @@ func _protoOption(proto ...interface{}) fp.ConfigOption {
 }
 
 // web servicescan 的配置选项，用于指定扫描指纹的类型为 web
-// @return {ConfigOption} 返回配置选项
+// @return {SynConfigOption} 返回配置选项
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.web()) // 使用 web 指纹进行扫描
@@ -385,7 +385,7 @@ func _webOption() fp.ConfigOption {
 }
 
 // service servicescan 的配置选项，用于指定扫描指纹的类型为 service
-// @return {ConfigOption} 返回配置选项
+// @return {SynConfigOption} 返回配置选项
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.service()) // 使用 service 指纹进行扫描
@@ -403,7 +403,7 @@ func _serviceOption() fp.ConfigOption {
 }
 
 // all servicescan 的配置选项，用于指定扫描指纹的类型为 web 和 service
-// @return {ConfigOption} 返回配置选项
+// @return {SynConfigOption} 返回配置选项
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.all()) // 使用 web 和 service 指纹进行扫描

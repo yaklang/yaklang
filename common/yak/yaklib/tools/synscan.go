@@ -330,13 +330,12 @@ func _scanOptOpenPortInitPortFilter(f string) scanOpt {
 //	}
 //}
 
-func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig) (chan *synscan.SynScanResult, error) {
-	if targetChan == nil {
+func _synScanDo(targets chan string, ports string, config *_yakPortScanConfig) (chan *synscan.SynScanResult, error) {
+	if targets == nil {
 		return nil, utils.Error("empty target")
 	}
-	defer config.excludePorts.Close()
 
-	filteredTargetChan, sampleTarget := filterTargetChannel(targetChan, config.IsFiltered)
+	filteredTargetChan, sampleTarget := filterTargetChannel(targets, config.IsFiltered)
 
 	openResult := make(chan *synscan.SynScanResult, 10000)
 
@@ -438,7 +437,7 @@ func getSampleTarget(targetList []string) string {
 
 func runScan(sampleTarget string, filteredTargetChan chan string, ports string, config *_yakPortScanConfig, openResult chan *synscan.SynScanResult) error {
 	var (
-		synScanOptions []synscan.ConfigOption
+		synScanOptions []synscan.SynConfigOption
 		err            error
 		stringFilter   *filter.StringFilter
 	)
@@ -456,13 +455,10 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		return fmt.Errorf("create synscan config failed: %w", err)
 	}
 
-	scanCenterConfig, err := hybridscan.NewDefaultConfigWithSynScanConfig(synScanConfig)
+	scanCenterConfig, err := hybridscan.NewDefaultConfigWithSynScanConfig(synScanConfig, hybridscan.WithDisableFingerprintMatch(false))
 	if err != nil {
 		return fmt.Errorf("default config failed: %w", err)
 	}
-
-	// Fingerprint scan switch
-	scanCenterConfig.DisableFingerprintMatch = true // !config.enableFingerprint
 
 	log.Info("start create hyper scan center...")
 	scanCenter, err := hybridscan.NewHyperScanCenter(context.Background(), scanCenterConfig)
@@ -651,8 +647,8 @@ func pingutilsToChan(res chan *pingutil.PingResult) chan string {
 }
 
 // Scan 使用 SYN 扫描技术进行端口扫描，它不必打开一个完整的TCP连接，只发送一个SYN包，就能做到打开连接的效果，然后等待对端的反应
-// @param {string} target 目标地址，支持 CIDR 格式
-// @param {string} port 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @param {string} targets 目标地址，支持 CIDR 格式
+// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
 // @param {scanOpt} [opts] synscan 扫描参数
 // @return {chan *synscan.SynScanResult} 返回结果
 // Example:
@@ -665,12 +661,13 @@ func pingutilsToChan(res chan *pingutil.PingResult) chan string {
 //	}
 //
 // ```
-func _scan(target string, port string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
+func _scan(targets string, ports string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
 	config := getDefaultPortScanConfig()
+	defer config.excludePorts.Close()
 	for _, opt := range opts {
 		opt(config)
 	}
-	return _synScanDo(hostsToChan(target), port, config)
+	return _synScanDo(hostsToChan(targets), ports, config)
 }
 
 func _scanDo(targetChan chan string, ports string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {

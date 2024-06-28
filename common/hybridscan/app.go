@@ -11,7 +11,7 @@ import (
 )
 
 type HyperScanCenter struct {
-	config *Config
+	config *HyperScanConfig
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -28,7 +28,7 @@ type HyperScanCenter struct {
 	openPortHandlers     map[string]func(ip net.IP, port int)
 }
 
-func NewHyperScanCenter(ctx context.Context, config *Config) (*HyperScanCenter, error) {
+func NewHyperScanCenter(ctx context.Context, config *HyperScanConfig) (*HyperScanCenter, error) {
 	nCtx, cancel := context.WithCancel(ctx)
 
 	center := &HyperScanCenter{

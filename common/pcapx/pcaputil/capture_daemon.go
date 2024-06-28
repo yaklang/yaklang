@@ -140,8 +140,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 					log.Infof("background iface: %v is start...", ifaceName)
 				}
 
-				packetSource := gopacket.NewPacketSource(handler, handler.LinkType()).Packets()
-
+				packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+				packetSource.Lazy = true
+				packetSource.NoCopy = true
+				packetSource.DecodeStreamsAsDatagrams = true
+				source := packetSource.Packets()
 				onceFirstPacket := new(sync.Once)
 
 				go func() {
@@ -158,7 +161,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 
 					for {
 						select {
-						case packet := <-packetSource:
+						case packet := <-source:
 							if packet == nil {
 								return
 							}

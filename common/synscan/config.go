@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type Config struct {
+type SynConfig struct {
 	isLoopback bool
 	// 发包必须的几个字段
 	Iface     *net.Interface
@@ -21,7 +21,7 @@ type Config struct {
 	FetchGatewayHardwareAddressTimeout time.Duration
 }
 
-func NewDefaultConfig(extra ...ConfigOption) (*Config, error) {
+func NewDefaultConfig(extra ...SynConfigOption) (*SynConfig, error) {
 	options, err := CreateConfigOptionsByTargetNetworkOrDomain("8.8.8.8", 5*time.Second)
 	if err != nil {
 		return nil, err
@@ -30,8 +30,8 @@ func NewDefaultConfig(extra ...ConfigOption) (*Config, error) {
 	return NewConfig(append(options, extra...)...)
 }
 
-func NewConfig(options ...ConfigOption) (*Config, error) {
-	config := &Config{
+func NewConfig(options ...SynConfigOption) (*SynConfig, error) {
+	config := &SynConfig{
 		FetchGatewayHardwareAddressTimeout: 5 * time.Second,
 	}
 
@@ -45,33 +45,33 @@ func NewConfig(options ...ConfigOption) (*Config, error) {
 	return config, nil
 }
 
-type ConfigOption func(config *Config)
+type SynConfigOption func(config *SynConfig)
 
-func WithLoopback(b bool) ConfigOption {
-	return func(config *Config) {
+func WithLoopback(b bool) SynConfigOption {
+	return func(config *SynConfig) {
 		config.isLoopback = b
 	}
 }
 
-func WithNetInterface(iface *net.Interface) ConfigOption {
-	return func(config *Config) {
+func WithNetInterface(iface *net.Interface) SynConfigOption {
+	return func(config *SynConfig) {
 		config.Iface = iface
 	}
 }
 
-func WithGatewayIP(ip net.IP) ConfigOption {
-	return func(config *Config) {
+func WithGatewayIP(ip net.IP) SynConfigOption {
+	return func(config *SynConfig) {
 		config.GatewayIP = ip
 	}
 }
 
-func WithDefaultSourceIP(ip net.IP) ConfigOption {
-	return func(config *Config) {
+func WithDefaultSourceIP(ip net.IP) SynConfigOption {
+	return func(config *SynConfig) {
 		config.SourceIP = ip
 	}
 }
 
-func CreateConfigOptionsByIfaceName(ifaceName string) ([]ConfigOption, error) {
+func CreateConfigOptionsByIfaceName(ifaceName string) ([]SynConfigOption, error) {
 	var iface *net.Interface
 	var err error
 	// 支持 net interface name 和 pcap dev name
@@ -104,7 +104,7 @@ func CreateConfigOptionsByIfaceName(ifaceName string) ([]ConfigOption, error) {
 		return nil, errors.Errorf("iface: %s has no addrs", iface.Name)
 	}
 
-	var opts = []ConfigOption{
+	var opts = []SynConfigOption{
 		WithNetInterface(iface),
 		//WithGatewayIP(gIp),
 		WithDefaultSourceIP(ifaceIp),
@@ -112,14 +112,14 @@ func CreateConfigOptionsByIfaceName(ifaceName string) ([]ConfigOption, error) {
 	return opts, nil
 }
 
-func CreateConfigOptionsByTargetNetworkOrDomain(targetRaw string, duration time.Duration) ([]ConfigOption, error) {
+func CreateConfigOptionsByTargetNetworkOrDomain(targetRaw string, duration time.Duration) ([]SynConfigOption, error) {
 	target := utils.ExtractHost(targetRaw)
 	iface, gIp, sIp, err := netutil.Route(duration, target)
 	if err != nil {
 		return nil, errors.Errorf("route to %s failed: %s", target, err)
 	}
 
-	var opts = []ConfigOption{
+	var opts = []SynConfigOption{
 		WithDefaultSourceIP(sIp),
 		WithGatewayIP(gIp),
 		WithNetInterface(iface),
@@ -127,18 +127,18 @@ func CreateConfigOptionsByTargetNetworkOrDomain(targetRaw string, duration time.
 	return opts, nil
 }
 
-func WithIntervalMilliseconds(interval int) ConfigOption {
-	return func(config *Config) {
+func WithIntervalMilliseconds(interval int) SynConfigOption {
+	return func(config *SynConfig) {
 	}
 }
 
-func WithPacketsPerSeconds(count int) ConfigOption {
-	return func(config *Config) {
+func WithPacketsPerSeconds(count int) SynConfigOption {
+	return func(config *SynConfig) {
 	}
 }
 
-func WithFetchGatewayHardwareAddressTimeout(timeout time.Duration) ConfigOption {
-	return func(config *Config) {
+func WithFetchGatewayHardwareAddressTimeout(timeout time.Duration) SynConfigOption {
+	return func(config *SynConfig) {
 		config.FetchGatewayHardwareAddressTimeout = timeout
 	}
 }

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 	"time"
@@ -28,12 +29,13 @@ func TestBasicSynScanIntegrate(t *testing.T) {
 		waiting:           10 * time.Second,
 		rateLimitDelayMs:  1,
 		rateLimitDelayGap: 5,
+		excludePorts: filter.NewFilter(),
 		//netInterface:      "\\Device\\NPF_{6E6F3FC9-4678-48E2-B746-C5DEEFE6CDF0}",
 		//netInterface: "WLAN 4",
-		netInterface: "Radmin VPN",
+		//netInterface: "Radmin VPN",
 	}
 
-	res, err := _synScanDo(hostsToChan("124.222.42.210"), "80", config)
+	res, err := _synScanDo(hostsToChan("192.168.3.2"), "21,22,23,80,443,U:161", config)
 	if err != nil {
 		return
 	}

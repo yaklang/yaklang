@@ -24,7 +24,7 @@ type Scanner struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	iface  *net.Interface
-	config *Config
+	config *SynConfig
 
 	handlerWriteChan chan []byte
 	handlerIsAlive   *utils.AtomicBool
@@ -274,7 +274,7 @@ func (s *Scanner) startWriting(handle *pcap.Handle, packetsChan chan []byte) {
 	}
 }
 
-func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
+func NewScanner(ctx context.Context, config *SynConfig) (*Scanner, error) {
 	// 初始化扫描网卡
 	iface, gatewayIp, srcIp := config.Iface, config.GatewayIP, config.SourceIP
 	if iface == nil {
