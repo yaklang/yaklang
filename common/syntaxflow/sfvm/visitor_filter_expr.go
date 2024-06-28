@@ -44,6 +44,11 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		} else {
 			y.EmitGetCall()
 		}
+	case *sf.DeepChainFilterContext:
+		if filter.NameFilter().GetText() == "*" {
+			return utils.Error("Syntax ERROR: deep chain filter cannot be ...*")
+		}
+		y.VisitRecursiveNameFilter(true, true, filter.NameFilter())
 	case *sf.FieldIndexFilterContext:
 		memberRaw := filter.SliceCallItem()
 		member, ok := memberRaw.(*sf.SliceCallItemContext)
@@ -105,6 +110,70 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 	}
 
 	return nil
+}
+
+func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bool, i sf.INameFilterContext) error {
+	if i == nil {
+		return nil
+	}
+
+	ret, ok := i.(*sf.NameFilterContext)
+	if !ok {
+		return utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
+	}
+
+	mod := NameMatch
+	if isMember {
+		mod = KeyMatch
+	}
+
+	if s := ret.Star(); s != nil {
+		if isMember {
+			// get all member
+			if recursive {
+				return utils.Errorf("Syntax ERROR: recursive name filter cannot be *")
+			} else {
+				y.EmitSearchGlob(mod, "*")
+			}
+		}
+		// skip
+		return nil
+		// } else if id := ret.DollarOutput(); id != nil {
+		// 	y.EmitSearchExact(mod, id.GetText())
+		// 	return nil
+	} else if id := ret.Identifier(); id != nil {
+		text := ret.Identifier().GetText()
+		filter, isGlob := y.FormatStringOrGlob(text) // emit field
+		if isGlob {
+			if recursive {
+				y.EmitRecursiveSearchGlob(mod, filter)
+			} else {
+				y.EmitSearchGlob(mod, filter)
+			}
+		} else {
+			if recursive {
+				y.EmitRecursiveSearchExact(mod, filter)
+			} else {
+				y.EmitSearchExact(mod, filter)
+			}
+		}
+		return nil
+	} else if re, ok := ret.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
+		text := re.RegexpLiteral().GetText()
+		text = text[1 : len(text)-1]
+		// log.Infof("regexp: %s", text)
+		reIns, err := regexp.Compile(text)
+		if err != nil {
+			return err
+		}
+		if recursive {
+			y.EmitRecursiveSearchRegexp(mod, reIns.String())
+		} else {
+			y.EmitSearchRegexp(mod, reIns.String())
+		}
+		return nil
+	}
+	return utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
 }
 
 func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterContext) error {

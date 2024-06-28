@@ -23,6 +23,10 @@ func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextO
 	return nil
 }
 
+func (p *Program) GetFields() (sfvm.ValueOperator, error) {
+	return sfvm.NewValues(nil), nil
+}
+
 func (p *Program) IsList() bool {
 	//TODO implement me
 	return false

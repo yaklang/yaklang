@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 
@@ -100,6 +101,16 @@ func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 		return v.GetCalledBy(), nil
 	}
 	return nil, utils.Errorf("ssa.Value %v is not called", v.String())
+}
+
+func (v *Value) GetFields() (sfvm.ValueOperator, error) {
+	if v.IsMap() || v.IsObject() {
+		members := lo.Map(v.GetAllMember(), func(item *Value, index int) sfvm.ValueOperator {
+			return item
+		})
+		return sfvm.NewValues(members), nil
+	}
+	return sfvm.NewValues(nil), nil
 }
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, error) {

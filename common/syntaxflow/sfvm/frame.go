@@ -258,6 +258,68 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 
 var CriticalError = utils.Error("CriticalError(BUG)")
 
+func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
+	if visited == nil {
+		visited = make(map[int64]struct{})
+	}
+
+	var next []ValueOperator
+
+	val, _ := element.GetCalled()
+	if val != nil {
+		_ = val.Recursive(func(operator ValueOperator) error {
+			if idGetter, ok := operator.(ssa.GetIdIF); ok {
+				if _, ok := visited[idGetter.GetId()]; ok {
+					return nil
+				}
+				visited[idGetter.GetId()] = struct{}{}
+
+				fields, _ := operator.GetFields()
+				if fields != nil {
+					_ = fields.Recursive(func(fieldElement ValueOperator) error {
+						if idGetter, ok := fieldElement.(ssa.GetIdIF); ok {
+							if _, ok := visited[idGetter.GetId()]; ok {
+								return nil
+							}
+							visited[idGetter.GetId()] = struct{}{}
+
+							if !handle(fieldElement) {
+								next = append(next, fieldElement)
+							}
+						}
+						return nil
+					})
+				}
+			}
+			return nil
+		})
+	}
+
+	val, _ = element.GetFields()
+	if val != nil {
+		_ = val.Recursive(func(operator ValueOperator) error {
+			if idGetter, ok := operator.(ssa.GetIdIF); ok {
+				if _, ok := visited[idGetter.GetId()]; ok {
+					return nil
+				}
+				visited[idGetter.GetId()] = struct{}{}
+
+				if !handle(operator) {
+					next = append(next, operator)
+				}
+			}
+			return nil
+		})
+	}
+
+	if len(next) <= 0 {
+		return nil
+	}
+
+	nextValues := NewValues(next)
+	return recursiveDeepChain(nextValues, handle, visited)
+}
+
 func (s *SFFrame) execStatement(i *SFI) error {
 	switch i.OpCode {
 	case OpDuplicate:
@@ -293,6 +355,132 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("error: %v", err)
 			return err
 		}
+	case OpRecursiveSearchExact:
+		s.debugSubLog(">> pop recursive search exactly: %v", i.UnaryStr)
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "recursive search exact failed: stack top is empty")
+		}
+		mod := i.UnaryInt
+
+		var next []ValueOperator
+		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
+			ok, results, _ := operator.ExactMatch(mod, i.UnaryStr)
+			if ok {
+				have := false
+				_ = results.Recursive(func(operator ValueOperator) error {
+					_, ok := operator.(ssa.GetIdIF)
+					if ok {
+						have = true
+						return utils.Error("normal abort")
+					}
+					return nil
+				})
+				next = append(next, results)
+				if have {
+					return true
+				}
+			}
+			return false
+		}, nil)
+		if err != nil {
+			err = utils.Wrapf(err, "recursive search exact failed")
+		}
+
+		results := NewValues(next)
+		s.debugSubLog("result next: %v", results.String())
+		_ = results.AppendPredecessor(value, s.withPredecessorContext("recursive search "+i.UnaryStr))
+		s.stack.Push(results)
+		s.debugSubLog("<< push next")
+	case OpRecursiveSearchGlob:
+		s.debugSubLog(">> pop recursive search glob: %v", i.UnaryStr)
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "recursive search glob failed: stack top is empty")
+		}
+
+		mod := i.UnaryInt
+
+		globIns, err := glob.Compile(i.UnaryStr)
+		if err != nil {
+			err = utils.Wrap(CriticalError, "compile glob failed")
+		}
+
+		var next []ValueOperator
+		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
+			ok, results, _ := operator.GlobMatch(mod|NameMatch, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
+			if ok {
+				have := false
+				_ = results.Recursive(func(operator ValueOperator) error {
+					_, ok := operator.(ssa.GetIdIF)
+					if ok {
+						have = true
+						return utils.Error("normal abort")
+					}
+					return nil
+				})
+				next = append(next, results)
+				if have {
+					return true
+				}
+			}
+			return false
+		}, nil)
+		if err != nil {
+			err = utils.Wrapf(err, "recursive search glob failed")
+			s.debugSubLog("ERROR: %v", err)
+		}
+		results := NewValues(next)
+		s.debugSubLog("result next: %v", results.String())
+		_ = results.AppendPredecessor(value, s.withPredecessorContext("recursive search "+i.UnaryStr))
+		s.stack.Push(results)
+		s.debugSubLog("<< push next")
+	case OpRecursiveSearchRegexp:
+		s.debugSubLog(">> pop recursive search regexp: %v", i.UnaryStr)
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "recursive search regexp failed: stack top is empty")
+		}
+		mod := i.UnaryInt
+
+		regexpIns, err := regexp.Compile(i.UnaryStr)
+		if err != nil {
+			return utils.Wrapf(CriticalError, "compile regexp[%v] failed: %v", i.UnaryStr, err)
+		}
+
+		var next []ValueOperator
+		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
+			//log.Infof("recursive search regexp: %v", operator.String())
+			//if strings.Contains(operator.String(), "aaa") {
+			//	spew.Dump(1)
+			//}
+			ok, results, _ := operator.RegexpMatch(mod|NameMatch, regexpIns)
+			if ok {
+				have := false
+				_ = results.Recursive(func(operator ValueOperator) error {
+					_, ok := operator.(ssa.GetIdIF)
+					if ok {
+						have = true
+						return utils.Error("normal abort")
+					}
+					return nil
+				})
+				next = append(next, results)
+				if have {
+					return true
+				}
+			}
+			return false
+		}, nil)
+		if err != nil {
+			err = utils.Wrapf(err, "recursive search regexp failed")
+			s.debugSubLog("ERROR: %v", err)
+		}
+		results := NewValues(next)
+		s.debugSubLog("result next: %v", results.String())
+		_ = results.AppendPredecessor(value, s.withPredecessorContext("recursive search "+i.UnaryStr))
+		s.stack.Push(results)
+		s.debugSubLog("<< push next")
 	case OpPushSearchGlob:
 		s.debugSubLog(">> pop search glob: %v", i.UnaryStr)
 		value := s.stack.Pop()

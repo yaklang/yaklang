@@ -82,6 +82,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#First.
 	VisitFirst(ctx *FirstContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#DeepChainFilter.
+	VisitDeepChainFilter(ctx *DeepChainFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#FunctionCallFilter.
 	VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{}
 

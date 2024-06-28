@@ -176,28 +176,64 @@ func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	}
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchExact(mod int, i string) {
-	v.codes = append(v.codes, &SFI{
+func (v *SyntaxFlowVisitor) EmitSearchExact(mod int, i string) *SFI {
+	sfi := &SFI{
 		OpCode:   OpPushSearchExact,
 		UnaryStr: i,
 		UnaryInt: mod,
-	})
+	}
+	v.codes = append(v.codes, sfi)
+	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchGlob(mod int, i string) {
-	v.codes = append(v.codes, &SFI{
+func (v *SyntaxFlowVisitor) EmitRecursiveSearchExact(mod int, i string) *SFI {
+	sfi := &SFI{
+		OpCode:   OpRecursiveSearchExact,
+		UnaryStr: i,
+		UnaryInt: mod,
+	}
+	v.codes = append(v.codes, sfi)
+	return sfi
+}
+
+func (v *SyntaxFlowVisitor) EmitSearchGlob(mod int, i string) *SFI {
+	sfi := &SFI{
 		OpCode:   OpPushSearchGlob,
 		UnaryStr: i,
 		UnaryInt: mod,
-	})
+	}
+	v.codes = append(v.codes, sfi)
+	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchRegexp(mod int, i string) {
-	v.codes = append(v.codes, &SFI{
+func (v *SyntaxFlowVisitor) EmitRecursiveSearchGlob(mod int, i string) *SFI {
+	sfi := &SFI{
+		OpCode:   OpRecursiveSearchGlob,
+		UnaryStr: i,
+		UnaryInt: mod,
+	}
+	v.codes = append(v.codes, sfi)
+	return sfi
+}
+
+func (v *SyntaxFlowVisitor) EmitSearchRegexp(mod int, i string) *SFI {
+	sfi := &SFI{
 		OpCode:   OpPushSearchRegexp,
 		UnaryStr: i,
 		UnaryInt: mod,
-	})
+	}
+	v.codes = append(v.codes, sfi)
+	return sfi
+}
+
+func (v *SyntaxFlowVisitor) EmitRecursiveSearchRegexp(mod int, i string) *SFI {
+	sfi := &SFI{
+		OpCode:   OpRecursiveSearchRegexp,
+		UnaryStr: i,
+		UnaryInt: mod,
+	}
+	v.codes = append(v.codes, sfi)
+	return sfi
 }
 
 func (v *SyntaxFlowVisitor) EmitGetUsers() {
