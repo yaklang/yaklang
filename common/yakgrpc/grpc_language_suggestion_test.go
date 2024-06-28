@@ -307,6 +307,20 @@ rsp.`,
 			labelsNotContainsCallback(t, []string{"Parse"}),
 		)
 	})
+
+	t.Run("orType completion", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionContains(t,
+			`a = x.If(true, [1, 2], {"a":1});a.`,
+			&ypb.Range{
+				Code:        ".",
+				StartLine:   1,
+				StartColumn: 34,
+				EndLine:     1,
+				EndColumn:   35,
+			}, []string{"Pop", "Keys"})
+	})
 }
 
 var local ypb.YakClient = nil
