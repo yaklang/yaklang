@@ -23,6 +23,71 @@ func init() {
 
 const MAXTypeCompareDepth = 10
 
+func typeEqualEx(t1, t2 Type, depth int) bool {
+	t1kind := t1.GetTypeKind()
+	t2kind := t2.GetTypeKind()
+	if depth == MAXTYPELEVEL {
+		return true
+	}
+	depth += 1
+
+	switch t1kind {
+	case FunctionTypeKind:
+		t1f, _ := ToFunctionType(t1)
+		t2f, _ := ToFunctionType(t2)
+		if t1f.ParameterLen != t2f.ParameterLen {
+			return false
+		}
+		for i := 0; i < t1f.ParameterLen; i++ {
+			if !typeEqualEx(t1f.Parameter[i], t2f.Parameter[i], depth) {
+				return false
+			}
+		}
+		return typeEqualEx(t1f.ReturnType, t2f.ReturnType, depth)
+	case SliceTypeKind:
+		t1o, _ := ToObjectType(t1)
+		t2o, _ := ToObjectType(t2)
+		return typeEqualEx(t1o.FieldType, t2o.FieldType, depth)
+	case MapTypeKind:
+		t1o, _ := ToObjectType(t1)
+		t2o, _ := ToObjectType(t2)
+		return typeEqualEx(t1o.FieldType, t2o.FieldType, depth) && typeEqualEx(t1o.KeyTyp, t2o.KeyTyp, depth)
+	case StructTypeKind, ObjectTypeKind:
+	case BytesTypeKind:
+		if t2kind == StringTypeKind {
+			return true
+		}
+	case StringTypeKind:
+		if t2kind == BytesTypeKind {
+			return true
+		}
+	case GenericTypeKind:
+		if t2kind != GenericTypeKind {
+			return false
+		}
+
+		return t2.(*GenericType).symbol == t1.(*GenericType).symbol
+	case OrTypeKind:
+		t1o := t1.(*OrType)
+		t2o := t2.(*OrType)
+		if len(t1o.types) != len(t2o.types) {
+			return false
+		}
+		for i, t := range t1o.types {
+			t2 := t2o.types[i]
+			if !typeEqualEx(t, t2, depth) {
+				return false
+			}
+		}
+	}
+
+	return t1kind == t2kind
+}
+
+func TypeEqual(t1, t2 Type) bool {
+	return typeEqualEx(t1, t2, 0) || typeEqualEx(t2, t1, 0)
+}
+
 func TypeCompare(t1, t2 Type) bool {
 	return typeCompareEx(t1, t2, 0) || typeCompareEx(t2, t1, 0)
 }
@@ -115,10 +180,15 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 			return false
 		}
 
-		if t2.(*GenericType).symbol == t1.(*GenericType).symbol {
-			return true
+		return t2.(*GenericType).symbol == t1.(*GenericType).symbol
+	case OrTypeKind:
+		rt1 := t1.(*OrType)
+		for _, t := range rt1.types {
+			ok := typeCompareEx(t, t2, depth)
+			if ok {
+				return true
+			}
 		}
-		return false
 	default:
 	}
 	return t1kind == t2kind
@@ -287,6 +357,7 @@ const (
 	ClassBluePrintTypeKind
 	GenericTypeKind
 	ByteTypeKind
+	OrTypeKind
 )
 
 type BasicType struct {
@@ -997,6 +1068,8 @@ var (
 	// T is a generic type
 	TypeT = NewGenericType("T")
 	TypeU = NewGenericType("U")
+	TypeK = NewGenericType("K")
+	TypeV = NewGenericType("V")
 )
 
 func NewGenericType(symbol string) *GenericType {
@@ -1074,4 +1147,50 @@ func CloneType(t Type) (Type, bool) {
 		return NewFunctionType(old.Name, old.Parameter, old.ReturnType, old.IsVariadic), true
 	}
 	return nil, false
+}
+
+// ====================== or type
+type OrType struct {
+	method map[string]*Function
+	types  Types
+}
+
+var _ (Type) = (*OrType)(nil)
+
+func (c *OrType) SetMethod(m map[string]*Function) {
+	c.method = m
+}
+
+func (b *OrType) AddMethod(id string, f *Function) {
+	if b.method == nil {
+		b.method = make(map[string]*Function)
+	}
+	b.method[id] = f
+}
+
+func (c *OrType) GetMethod() map[string]*Function {
+	return c.method
+}
+
+func (c *OrType) GetTypeKind() TypeKind {
+	return OrTypeKind
+}
+
+func NewOrType(types ...Type) *OrType {
+	return &OrType{
+		types:  Types(types),
+		method: make(map[string]*Function),
+	}
+}
+
+func (c OrType) String() string {
+	return strings.Join(lo.Map(c.types, func(t Type, _ int) string { return t.String() }), "|")
+}
+
+func (c OrType) PkgPathString() string {
+	return strings.Join(lo.Map(c.types, func(t Type, _ int) string { return t.PkgPathString() }), "|")
+}
+
+func (c OrType) RawString() string {
+	return strings.Join(lo.Map(c.types, func(t Type, _ int) string { return t.RawString() }), "|")
 }

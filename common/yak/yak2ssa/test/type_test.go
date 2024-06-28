@@ -224,4 +224,36 @@ target = Test(a)`,
 			}),
 		)
 	})
+
+	t.Run("OrType", func(t *testing.T) {
+		test.CheckType(t, `
+a = {"a":1, "b":2}
+target = Test(a, func(i) { return int(i) })
+`,
+			ssa.NewSliceType(ssa.GetNumberType()),
+			ssaapi.WithExternValue(map[string]any{
+				"Test": func(i interface{}, fc func(i interface{}) interface{}) interface{} {
+					// func(Or([]T | Map[U]T), func(T) K) []K
+					return nil
+				},
+			}),
+			ssaapi.WithExternBuildValueHandler("Test", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
+				// Test(Or([]T | Map[U]T), func(T) K) []K
+				typ := ssa.NewFunctionTypeDefine(id, []ssa.Type{
+					ssa.NewOrType(
+						ssa.NewSliceType(ssa.TypeT),
+						ssa.NewMapType(ssa.TypeU, ssa.TypeT),
+					),
+					ssa.NewFunctionTypeDefine("anonymous",
+						[]ssa.Type{ssa.TypeT},
+						[]ssa.Type{ssa.TypeK},
+						false),
+				}, []ssa.Type{ssa.NewSliceType(ssa.TypeK)}, false)
+				f := ssa.NewFunctionWithType(id, typ)
+				f.SetGeneric(true)
+				f.SetRange(b.CurrentRange)
+				return f
+			}),
+		)
+	})
 }

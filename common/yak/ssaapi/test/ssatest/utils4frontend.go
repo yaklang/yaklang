@@ -180,14 +180,6 @@ func CheckTypeKind(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.O
 }
 
 func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {
-	typeCompare := func(t1, t2 ssa.Type) (ret bool) {
-		t1Kind, t2Kind := t1.GetTypeKind(), t2.GetTypeKind()
-		ret = ssa.TypeCompare(t1, t2)
-		if ret == true && t1Kind != t2Kind {
-			ret = false
-		}
-		return ret
-	}
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {
@@ -198,7 +190,7 @@ func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {
 			require.NotNil(t, v)
 
 			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
-			require.Truef(t, typeCompare(ssaapi.GetBareType(v.GetType()), typ), "want %s, got %s", typ, v.GetType())
+			require.Truef(t, ssa.TypeEqual(ssaapi.GetBareType(v.GetType()), typ), "want %s, got %s", typ, v.GetType())
 		},
 		Option: opt,
 	}
