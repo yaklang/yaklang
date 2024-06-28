@@ -60,12 +60,13 @@ refVariable
 
 filterItemFirst
     : nameFilter                                 # NamedFilter
-    | '.' lines? nameFilter                             # FieldCallFilter
+    | '.' lines? nameFilter                      # FieldCallFilter
     ;
 
 filterItem
-    : filterItemFirst                            #First
-    | '(' lines? actualParam? ')'                       # FunctionCallFilter
+    : filterItemFirst                            # First
+    | '...' lines? nameFilter                    # DeepChainFilter
+    | '(' lines? actualParam? ')'                # FunctionCallFilter
     | '[' sliceCallItem ']'                      # FieldIndexFilter
     | '?{' conditionExpression '}'               # OptionalFilter
     | '->'                                       # NextFilter

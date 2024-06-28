@@ -26,6 +26,10 @@ func NewValues(values []ValueOperator) ValueOperator {
 	return &ValueList{values: vs}
 }
 
+func NewEmptyValues() ValueOperator {
+	return NewValues(nil)
+}
+
 type ValueList struct {
 	values []ValueOperator
 }
@@ -88,6 +92,18 @@ func (v *ValueList) GetCalled() (ValueOperator, error) {
 			continue
 		}
 		res = append(res, called)
+	}
+	return NewValues(res), nil
+}
+
+func (v *ValueList) GetFields() (ValueOperator, error) {
+	var res []ValueOperator
+	for _, v := range v.values {
+		fields, err := v.GetFields()
+		if err != nil {
+			continue
+		}
+		res = append(res, fields)
 	}
 	return NewValues(res), nil
 }

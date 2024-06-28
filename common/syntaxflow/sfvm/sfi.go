@@ -22,6 +22,11 @@ const (
 	OpPushSearchGlob
 	OpPushSearchRegexp
 
+	// OpRecursive... can fetch origin value (not program) push data from origin
+	OpRecursiveSearchExact
+	OpRecursiveSearchGlob
+	OpRecursiveSearchRegexp
+
 	// handle function call
 	OpGetCall
 	OpGetCallArgs
@@ -254,6 +259,12 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "merge$ref", s.UnaryStr)
 	case OpRemoveRef:
 		return fmt.Sprintf(verboseLen+" %v", "remove$ref", s.UnaryStr)
+	case OpRecursiveSearchRegexp:
+		return fmt.Sprintf(verboseLen+" %v", "recursive$regexp", s.UnaryStr)
+	case OpRecursiveSearchGlob:
+		return fmt.Sprintf(verboseLen+" %v", "recursive$glob", s.UnaryStr)
+	case OpRecursiveSearchExact:
+		return fmt.Sprintf(verboseLen+" %v", "recursive$exact", s.UnaryStr)
 	default:
 		panic("unhandled default case")
 	}

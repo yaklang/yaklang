@@ -107,6 +107,10 @@ func (v *BaseSyntaxFlowVisitor) VisitFirst(ctx *FirstContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitDeepChainFilter(ctx *DeepChainFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }

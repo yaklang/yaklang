@@ -109,6 +109,7 @@ type ValueOperator interface {
 	GetCalled() (ValueOperator, error)
 	GetCallActualParams(int) (ValueOperator, error)
 	GetAllCallActualParams() (ValueOperator, error)
+	GetFields() (ValueOperator, error)
 
 	// GetTopDef and GetBottomUse is for OpBottomUse
 	// use and def
