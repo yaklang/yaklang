@@ -183,6 +183,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		payloads             = option.Payloads
 		firstAuth            = true
 		reqIns               = option.NativeHTTPRequestInstance
+		maxContentLength     = option.MaxContentLength
 	)
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -210,7 +211,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			}
 			if httpctx.GetResponseTooLarge(reqIns) {
 				response.TooLarge = true
-				response.TooLargeLimit = int64(option.MaxContentLength)
+				response.TooLargeLimit = int64(maxContentLength)
 			}
 			// response.TooLarge = true
 			SaveLowHTTPResponse(response)
@@ -235,8 +236,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	response.Payloads = payloads
 
-	if option.EnableMaxContentLength && option.MaxContentLength > 0 {
-		httpctx.SetResponseMaxContentLength(reqIns, option.MaxContentLength)
+	if option.EnableMaxContentLength && maxContentLength > 0 {
+		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)
 	}
 
 	// proxy
@@ -899,6 +900,11 @@ RECONNECT:
 		}
 
 		rawBytes = responseRaw.Bytes()
+		if option.EnableMaxContentLength && maxContentLength > 0 {
+			if body := GetHTTPPacketBody(rawBytes); len(body) > maxContentLength {
+				rawBytes = ReplaceHTTPPacketBodyFast(rawBytes, body[:maxContentLength])
+			}
+		}
 		if haveNativeHTTPRequestInstance {
 			httpctx.SetBareResponseBytes(reqIns, rawBytes)
 		}
