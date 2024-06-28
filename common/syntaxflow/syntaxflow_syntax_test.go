@@ -128,7 +128,7 @@ func TestSyntaxInOne(t *testing.T) {
 		"exec(* #-> ?{(any: 'example',abc,) && (opcode: call,phi)})",
 		"exec(* #-> ?{((any: 'example',abc,) && (opcode: phi))})",
 		"a...b",
-		"a..b.ccc()...e",
+		"a...b.ccc()...e",
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)
