@@ -1178,6 +1178,10 @@ func (c *OrType) GetTypeKind() TypeKind {
 	return OrTypeKind
 }
 
+func (c *OrType) GetTypes() Types {
+	return c.types
+}
+
 func NewOrType(types ...Type) *OrType {
 	return &OrType{
 		types:  Types(types),

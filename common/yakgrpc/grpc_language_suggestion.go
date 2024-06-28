@@ -858,9 +858,27 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value) (ret []*ypb.Suggestio
 	return
 }
 
-func completionYakTypeBUiltinMethod(rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
-	bareTyp := ssaapi.GetBareType(v.GetType())
+func completionYakTypeBuiltinMethod(rng *ssa.Range, v *ssaapi.Value, realTyp ...ssa.Type) (ret []*ypb.SuggestionDescription) {
+	var bareTyp ssa.Type
+	if len(realTyp) > 0 {
+		bareTyp = realTyp[0]
+	} else {
+		bareTyp = ssaapi.GetBareType(v.GetType())
+	}
+
 	typKind := bareTyp.GetTypeKind()
+	if typKind == ssa.OrTypeKind {
+		// or 类型特殊处理
+		orTyp, ok := bareTyp.(*ssa.OrType)
+		if !ok {
+			return
+		}
+		for _, typ := range orTyp.GetTypes() {
+			ret = append(ret, completionYakTypeBuiltinMethod(rng, v, typ)...)
+		}
+		return
+	}
+
 	switch typKind {
 	case ssa.BytesTypeKind:
 		// []byte 内置方法
@@ -900,8 +918,26 @@ func completionYakTypeBUiltinMethod(rng *ssa.Range, v *ssaapi.Value) (ret []*ypb
 	return
 }
 
-func completionComplexStructMethodAndInstances(v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
-	bareTyp := ssaapi.GetBareType(v.GetType())
+func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.Type) (ret []*ypb.SuggestionDescription) {
+	var bareTyp ssa.Type
+	if len(realTyp) > 0 {
+		bareTyp = realTyp[0]
+	} else {
+		bareTyp = ssaapi.GetBareType(v.GetType())
+	}
+	typKind := bareTyp.GetTypeKind()
+	if typKind == ssa.OrTypeKind {
+		// or 类型特殊处理
+		orTyp, ok := bareTyp.(*ssa.OrType)
+		if !ok {
+			return
+		}
+		for _, typ := range orTyp.GetTypes() {
+			ret = append(ret, completionComplexStructMethodAndInstances(v, typ)...)
+		}
+		return
+	}
+
 	typStr := getGolangTypeStringBySSAType(bareTyp)
 	// 接口方法，结构体成员与方法，定义类型方法
 	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
@@ -948,7 +984,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		ret = append(ret, completionYakGlobalFunctions()...)
 	} else {
 		ret = append(ret, completionYakStandardLibraryChildren(v)...)
-		ret = append(ret, completionYakTypeBUiltinMethod(rng, v)...)
+		ret = append(ret, completionYakTypeBuiltinMethod(rng, v)...)
 		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
 	}
 	return ret
