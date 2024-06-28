@@ -1145,6 +1145,8 @@ func CloneType(t Type) (Type, bool) {
 	case FunctionTypeKind:
 		old := t.(*FunctionType)
 		return NewFunctionType(old.Name, old.Parameter, old.ReturnType, old.IsVariadic), true
+	case OrTypeKind:
+		return NewOrType(t.(*OrType).types...), true
 	}
 	return nil, false
 }
