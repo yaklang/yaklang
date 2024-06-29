@@ -34,8 +34,6 @@ func CheckWithName(
 		opt = append(opt, ssaapi.WithDisableCache(true))
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
-		// prog.Program.ShowWithSource()
-		// prog.Show()
 
 		log.Infof("only in memory ")
 		err = handler(prog)

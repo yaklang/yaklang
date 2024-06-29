@@ -1,7 +1,9 @@
 package memedit
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -480,6 +482,14 @@ func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
 }
 
 func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int, prefix ...func(i int) string) (string, error) {
+	var prefixFunc func(i int) string
+	if len(prefix) > 0 && prefix[0] != nil {
+		prefixFunc = prefix[0]
+	}
+	return ve.GetContextAroundRangeEx(startPos, endPos, n, prefixFunc, nil)
+}
+
+func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos PositionIf, n int, prefix func(i int) string, suffix func(i int) string) (string, error) {
 	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
 	if start < 0 || end > ve.safeSourceCode.Len() || start > end {
 		return "", errors.New("invalid range")
@@ -494,14 +504,13 @@ func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int, p
 	var contextBuilder strings.Builder
 	for i := startContextLine; i <= endContextLine; i++ {
 		lineText, _ := ve.GetLine(i)
-		if len(prefix) > 0 {
-			var pres []string
-			for _, p := range prefix {
-				pres = append(pres, p(i))
-			}
-			contextBuilder.WriteString(strings.Join(pres, " "))
+		if prefix != nil {
+			contextBuilder.WriteString(prefix(i))
 		}
 		contextBuilder.WriteString(lineText)
+		if suffix != nil {
+			contextBuilder.WriteString(suffix(i))
+		}
 		contextBuilder.WriteString("\n")
 	}
 
@@ -546,4 +555,100 @@ func (ve *MemEditor) SourceCodeSha256() string {
 
 func (ve *MemEditor) GetSourceCode() string {
 	return ve.safeSourceCode.String()
+}
+
+func (e *MemEditor) GetTextContextWithPrompt(p RangeIf, n int, msg ...string) string {
+	start := p.GetStart()
+	end := p.GetEnd()
+
+	const prefixTemplate = "%4d | "
+	const prefixHitTemplate = "%4d > "
+	const suffixTemplate = "       "
+
+	endMessage := strings.Join(msg, " ")
+	endMessage = strings.ReplaceAll(endMessage, "\n", " ")
+
+	raw, err := e.GetContextAroundRangeEx(start, end, n, func(i int) string {
+		if i >= start.GetLine() && i <= end.GetLine() {
+			return fmt.Sprintf(prefixHitTemplate, i)
+		} else {
+			return fmt.Sprintf(prefixTemplate, i)
+		}
+	}, func(i int) string {
+
+		if i > end.GetLine() || i < start.GetLine() {
+			return ""
+		}
+
+		var buf bytes.Buffer
+		buf.WriteByte('\n')
+		buf.WriteString(suffixTemplate)
+
+		if start.GetLine() == end.GetLine() {
+			line, _ := e.GetLine(i)
+			for j := 0; j < len(line); j++ {
+				if j < start.GetColumn() {
+					buf.WriteByte(' ')
+				} else if j == start.GetColumn() {
+					buf.WriteByte('^')
+				} else if j > start.GetColumn() && j <= end.GetColumn() {
+					buf.WriteByte('~')
+				} else {
+					buf.WriteByte(' ')
+				}
+			}
+			if strings.TrimSpace(endMessage) != "" {
+				buf.WriteString(" -- " + endMessage)
+			}
+			return buf.String()
+		}
+
+		if start.GetLine() > end.GetLine() {
+			return ""
+		}
+
+		if i < end.GetLine() && i > start.GetLine() {
+			line, _ := e.GetLine(i)
+			for j := 0; j < len(line); j++ {
+				buf.WriteByte('~')
+			}
+			return buf.String()
+		}
+
+		if i == start.GetLine() {
+			line, _ := e.GetLine(i)
+			for j := 0; j < len(line); j++ {
+				if j < start.GetColumn() {
+					buf.WriteByte(' ')
+				} else if j == start.GetColumn() {
+					buf.WriteByte('^')
+				} else {
+					buf.WriteByte('~')
+				}
+			}
+			return buf.String()
+		}
+
+		if i == end.GetLine() {
+			for j := 0; j < end.GetColumn()+1; j++ {
+				if j == end.GetColumn() {
+					buf.WriteByte('^')
+				} else if j < end.GetColumn() {
+					buf.WriteByte('~')
+				} else {
+					buf.WriteByte(' ')
+				}
+			}
+			if strings.TrimSpace(endMessage) != "" {
+				buf.WriteString(" -- " + endMessage)
+			}
+			return buf.String()
+		}
+
+		return ""
+	})
+	if err != nil {
+		return ""
+	}
+	return raw
 }
