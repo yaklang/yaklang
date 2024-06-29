@@ -683,6 +683,9 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 		return fuzzParams
 	}
 	bodyStr := string(bytes.TrimSpace(bodyRaw))
+	if _, ok := utils.IsJSON(bodyStr); !ok {
+		return fuzzParams
+	}
 	call := func(key, val gjson.Result, gPath, jPath string) {
 		var paramValue interface{}
 		if val.IsObject() || val.IsArray() {
@@ -990,7 +993,7 @@ func (f *FuzzHTTPRequest) GetHeaderParams() []*FuzzHTTPRequestParam {
 	for i, k := range keys {
 		value := f.GetHeader(k)
 		params[i] = &FuzzHTTPRequestParam{
-			position: lowhttp.PosHeader,
+			position:   lowhttp.PosHeader,
 			param:      k,
 			paramValue: value,
 			origin:     f,
@@ -1002,7 +1005,7 @@ func (f *FuzzHTTPRequest) GetHeaderParams() []*FuzzHTTPRequestParam {
 func (f *FuzzHTTPRequest) GetHeaderParamByName(k string) *FuzzHTTPRequestParam {
 	value := f.GetHeader(k)
 	return &FuzzHTTPRequestParam{
-		position: lowhttp.PosHeader,
+		position:   lowhttp.PosHeader,
 		param:      k,
 		paramValue: value,
 		origin:     f,
