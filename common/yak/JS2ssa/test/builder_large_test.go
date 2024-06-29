@@ -18,11 +18,6 @@ var largeJS string
 //go:embed test-seq.js
 var largeExprSeqJS string
 
-// func checkLarge(t *testing.T, code string) {
-// 	prog := ParseSSA(code, none)
-// 	prog.ShowWithSource()
-// }
-
 func TestJS_MVP_ASTLargeText(t *testing.T) {
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(largeExprSeqJS))
 	lexer.RemoveErrorListeners()

@@ -113,13 +113,25 @@ func (v *Value) ShortString() string {
 	}
 	return ssa.LineShortDisasm(v.node)
 }
-func (v *Value) StringWithSource() string {
+func (v *Value) StringWithRange() string {
 	if v.IsNil() {
 		return ""
 	}
 
 	if v.disasmLine == "" {
 		v.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[v.node.GetOpcode()], ssa.LineDisasm(v.node), v.node.GetRange())
+	}
+	return v.disasmLine
+}
+
+func (v *Value) StringWithSourceCode(msg ...string) string {
+	if v.IsNil() {
+		return ""
+	}
+
+	if v.disasmLine == "" {
+		v.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[v.node.GetOpcode()], ssa.LineDisasm(v.node), v.node.GetRange())
+		v.disasmLine += "\n" + v.GetRange().GetTextContextWithPrompt(2, msg...)
 	}
 	return v.disasmLine
 }
@@ -148,8 +160,9 @@ func (v *Value) GetVerboseName() string {
 	return fmt.Sprintf(`t%d: %v`, v.GetId(), v.ShortString())
 }
 
-func (i *Value) Show()           { fmt.Println(i) }
-func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }
+func (i *Value) Show()               { fmt.Println(i) }
+func (i *Value) ShowWithRange()      { fmt.Println(i.StringWithRange()) }
+func (i *Value) ShowWithSourceCode() { fmt.Println(i.StringWithSourceCode()) }
 
 func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
@@ -653,7 +666,7 @@ func (v Values) StringEx(flag int) string {
 		case 0:
 			ret += fmt.Sprintf("\t%d: %s\n", i, v)
 		case 1:
-			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithSource())
+			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithRange())
 		}
 	}
 	return ret

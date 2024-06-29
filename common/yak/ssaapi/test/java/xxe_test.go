@@ -34,7 +34,7 @@ func TestXXE_WithConditionExpr_Basic(t *testing.T) {
 
 func TestXXE_WithConditionExpr(t *testing.T) {
 	ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain(`
+		if ret := prog.SyntaxFlowChain(`
 desc("Description": 'checking setFeature/setXIncludeAware/setExpandEntityReferences in DocumentBuilderFactory.newInstance()')
 
 DocumentBuilderFactory.newInstance()?{(.setFeature) || (.setXIncludeAware) || (.setExpandEntityReferences)} as $entry;
@@ -42,8 +42,10 @@ $entry.*Builder().parse() as $result;
 
 check $result then "dangerous xml doc builder" else "safe xml doc builder";
 
-`, sfvm.WithEnableDebug(true)).Show().Len() <= 0 {
+`, sfvm.WithEnableDebug(true)).Show(); ret.Len() <= 0 {
 			t.Fatal("setFeature(*) not found")
+		} else {
+			ret.Get(0).ShowWithSourceCode()
 		}
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
