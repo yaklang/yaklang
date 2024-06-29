@@ -68,7 +68,7 @@ func handleJS(code string, callback func(*requestNewTarget)) {
 			// log.Infof("v: %s, key: %s, key-const: %v", value.String(), value.GetKey().String(), value.GetKey().GetConstValue())
 			switch value.GetKey().GetConstValue() {
 			case "open":
-				log.Infof("open: %v", value.StringWithSource())
+				log.Infof("open: %v", value.StringWithRange())
 				value.GetUsers().Filter(func(v *ssaapi.Value) bool {
 					return v.IsCall()
 				}).ForEach(func(value *ssaapi.Value) {
@@ -85,7 +85,7 @@ func handleJS(code string, callback func(*requestNewTarget)) {
 					}
 				})
 			case "setRequestHeader":
-				log.Infof("set request header: %v", value.StringWithSource())
+				log.Infof("set request header: %v", value.StringWithRange())
 				value.GetUsers().Filter(func(v *ssaapi.Value) bool {
 					return v.IsCall()
 				}).ForEach(func(value *ssaapi.Value) {

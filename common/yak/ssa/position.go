@@ -120,6 +120,14 @@ func (p *Range) GetTextContext(n int) string {
 	return result
 }
 
+func (p *Range) GetTextContextWithPrompt(n int, msg ...string) string {
+	if p == nil || p.editor == nil {
+		log.Warn("range or range.editor is nil")
+		return ""
+	}
+	return p.editor.GetTextContextWithPrompt(p, n, msg...)
+}
+
 func (p *Range) GetWordText() string {
 	return p.editor.GetWordTextFromRange(p)
 }

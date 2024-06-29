@@ -111,7 +111,7 @@ window.location.href = "www"
 	win.Show()
 	win.ShowWithSource()
 	win.ForEach(func(window *Value) {
-		window.ShowWithSource()
+		window.ShowWithRange()
 		if !window.InMainFunction() {
 			fun := window.GetFunction()
 			if !checkFunctionReachable(fun) {
@@ -257,12 +257,12 @@ func TestAAA(t *testing.T) {
 	`)
 	test.Nil(err)
 	prog.Ref("a").ForEach(func(v *Value) {
-		v.ShowWithSource()
+		v.ShowWithRange()
 		v.ShowUseDefChain()
 	})
 
 	prog.Ref("target").ForEach(func(v *Value) {
-		v.ShowWithSource()
+		v.ShowWithRange()
 		v.ShowUseDefChain()
 	})
 }
