@@ -1,10 +1,38 @@
-host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
+// post-query
+raw = `POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+ip=ABC&port=123&name=123&age=123`
+
+freq = fuzz.MustHTTPRequest(raw)
+params := freq.GetCommonParams()
+if len(params) != 4 {
+    dump(params)
+    die(sprintf("获取通用参数数量错误: %s", len(params)))
+}
+
+for p in params {
+    res, err = p.Fuzz("HACKEDPARAM{{i(1-2)}}").Results()
+    if err != nil {
+        die("Fuzz failed")
+    }
+    for i, r := range res {
+        raw = http.dump(r)~
+        raw = string(raw)
+        printf("%s\n", raw)
+        expected = sprintf("HACKEDPARAM%d", i+1)
+        if !raw.Contains(expected) {
+            die(sprintf("%d FAILED: not found HACKEDPARAM%d\n%s", i, i+1, raw))
+        }
+    }
+}
 
 // post-json
-raw = f`GET / HTTP/1.1
-Host: ${host}:${port}
+raw = `GET / HTTP/1.1
+Host: www.yaklang.com
 
-` + `{"abc": "123", "a": 123, "c":["123"]}`
+{"abc": "123", "a": 123, "c":["123"]}`
 freq = fuzz.MustHTTPRequest(raw)
 params := freq.GetCommonParams()
 if len(params) != 4 {
@@ -30,7 +58,7 @@ for p in params {
 
 // base64
 raw = f`GET /?a=cXdl&b=enhjdg%3D%3D HTTP/1.1
-Host: ${host}:${port}
+Host: www.yaklang.com
 
 a=cXdl&b=enhjdg%3D%3D`
 freq = fuzz.MustHTTPRequest(raw)
