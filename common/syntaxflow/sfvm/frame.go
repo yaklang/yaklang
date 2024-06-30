@@ -361,13 +361,12 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if value == nil {
 			return utils.Wrap(CriticalError, "recursive search exact failed: stack top is empty")
 		}
-		mod := i.UnaryInt
-
 		var next []ValueOperator
 		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
-			ok, results, _ := operator.ExactMatch(mod, i.UnaryStr)
+			ok, results, _ := operator.ExactMatch(BothMatch, i.UnaryStr)
 			if ok {
 				have := false
+				log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
 				_ = results.Recursive(func(operator ValueOperator) error {
 					_, ok := operator.(ssa.GetIdIF)
 					if ok {
@@ -907,6 +906,21 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.stack.Push(newVal)
 		s.debugSubLog("<< push")
+	case OpNativeCall:
+		s.debugSubLog(">> pop")
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
+		}
+		call, err := GetNativeCall(i.UnaryStr)
+		if err != nil {
+			return err
+		}
+		ok, ret, err := call(value, s)
+		if err != nil || !ok {
+			return err
+		}
+		s.stack.Push(ret)
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

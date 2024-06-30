@@ -72,23 +72,27 @@ filterItem
     | '->'                                       # NextFilter
     | '#>'                                       # DefFilter
     | '-->'                                      # DeepNextFilter
-    | '-{' (recursiveConfig)? '}->'              # DeepNextConfigFilter
+    | '-{' (config)? '}->'                       # DeepNextConfigFilter
     | '#->'                                      # TopDefFilter
-    | '#{' (recursiveConfig)? '}->'              # TopDefConfigFilter
-    | '-<' useDefCalcDescription '>-'            # UseDefCalcFilter
+    | '#{' (config)? '}->'                       # TopDefConfigFilter
+    | nativeCall                                 # NativeCallFilter
     | '+' refVariable                            # MergeRefFilter
     | '-' refVariable                            # RemoveRefFilter
     ;
 
 filterExpr: filterItemFirst filterItem* ;
 
-useDefCalcDescription
+nativeCall
+    : '<' useNativeCall '>'
+    ;
+
+useNativeCall
     : identifier useDefCalcParams?
     ;
 
 useDefCalcParams
-    : '{' recursiveConfig? '}'
-    | '(' recursiveConfig? ')'
+    : '{' config? '}'
+    | '(' config? ')'
     ;
 
 actualParam
@@ -98,9 +102,9 @@ actualParam
 
 actualParamFilter: singleParam ',' | ',';
 
-singleParam: ( '#>' | '#{' (recursiveConfig)? '}' )? filterStatement ;
+singleParam: ( '#>' | '#{' (config)? '}' )? filterStatement ;
 
-recursiveConfig: recursiveConfigItem (',' recursiveConfigItem)* ','?;
+config: recursiveConfigItem (',' recursiveConfigItem)* ','?;
 recursiveConfigItem: line? identifier ':' recursiveConfigItemValue lines?;
 recursiveConfigItemValue
     : (identifier | numberLiteral)

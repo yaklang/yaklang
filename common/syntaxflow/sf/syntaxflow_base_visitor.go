@@ -147,7 +147,7 @@ func (v *BaseSyntaxFlowVisitor) VisitTopDefConfigFilter(ctx *TopDefConfigFilterC
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -163,7 +163,11 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpr(ctx *FilterExprContext) interfac
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcDescription(ctx *UseDefCalcDescriptionContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitNativeCall(ctx *NativeCallContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitUseNativeCall(ctx *UseNativeCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -187,7 +191,7 @@ func (v *BaseSyntaxFlowVisitor) VisitSingleParam(ctx *SingleParamContext) interf
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitRecursiveConfig(ctx *RecursiveConfigContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitConfig(ctx *ConfigContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

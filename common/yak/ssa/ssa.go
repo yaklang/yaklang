@@ -207,6 +207,9 @@ type Package struct {
 type Function struct {
 	anValue
 
+	isMethod   bool
+	methodName string
+
 	// package, double link
 	Package *Package
 
@@ -250,6 +253,15 @@ type Function struct {
 	hasEllipsis bool
 	// generic
 	isGeneric bool
+}
+
+func (f *Function) SetMethodName(name string) {
+	f.isMethod = true
+	f.methodName = name
+}
+
+func (f *Function) GetMethodName() string {
+	return f.methodName
 }
 
 func (f *Function) FirstBlockInstruction() []Instruction {
