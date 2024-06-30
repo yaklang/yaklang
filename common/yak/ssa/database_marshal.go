@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -89,6 +90,8 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		for k, v := range ret.FreeValues {
 			freeValues[k] = v.GetId()
 		}
+		params["is_method"] = ret.isMethod
+		params["method_name"] = ret.methodName
 		params["free_values"] = freeValues
 		params["parameter_members"] = fetchIds(ret.ParameterMembers)
 		var sideEffects []map[string]any
@@ -370,6 +373,20 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
+	toBool := func(i any) bool {
+		switch ret := i.(type) {
+		case bool:
+			return ret
+		default:
+			res, _ := strconv.ParseBool(fmt.Sprint(i))
+			return res
+		}
+	}
+
+	toString := func(i any) string {
+		return codec.AnyToString(i)
+	}
+
 	//toInt64 := func(i any) int64 {
 	//	switch ret := i.(type) {
 	//	case float64:
@@ -399,7 +416,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.canBeReached = codec.Atoi(fmt.Sprint(params["block_can_be_reached"]))
 		ret.Insts = unmarshalInstructions(params["block_insts"])
 		ret.Phis = unmarshalValues(params["block_phis"])
-		ret.finish = params["block_finish"].(bool)
+		ret.finish = toBool(params["block_finish"])
 		if scopeTable, ok := params["block_scope_table"]; ok {
 			ret.ScopeTable = GetLazyScopeFromIrScopeId(int64(toInt(scopeTable)))
 		}
@@ -416,12 +433,12 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Args = unmarshalValues(params["call_args"])
 		ret.ArgMember = unmarshalValues(params["call_arg_member"])
 		ret.Binding = unmarshalMapValues(params["call_binding"])
-		ret.Async = params["call_async"].(bool)
-		ret.Unpack = params["call_unpack"].(bool)
-		ret.IsDropError = params["call_drop_error"].(bool)
-		ret.IsEllipsis = params["call_ellipsis"].(bool)
+		ret.Async = toBool(params["call_async"])
+		ret.Unpack = toBool(params["call_unpack"])
+		ret.IsDropError = toBool(params["call_drop_error"])
+		ret.IsEllipsis = toBool(params["call_ellipsis"])
 	case *Next:
-		ret.InNext = params["next_in_next"].(bool)
+		ret.InNext = toBool(params["next_in_next"])
 		ret.Iter = newLazyInstruction(params["next_iter"])
 	case *Parameter:
 		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
@@ -500,6 +517,8 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *Function:
 		ret.Params = unmarshalValues(params["params"])
 		ret.ParamLength = toInt(params["param_length"])
+		ret.isMethod = toBool(params["is_method"])
+		ret.methodName = toString(params["method_name"])
 		ret.FreeValues = unmarshalMapValues(params["free_values"])
 		ret.ParameterMembers = unmarshalValues(params["parameter_members"])
 		if ses := params["side_effect"]; ses != nil && funk.IsIteratee(ses) {

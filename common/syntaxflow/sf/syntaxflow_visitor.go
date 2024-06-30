@@ -112,8 +112,8 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#TopDefConfigFilter.
 	VisitTopDefConfigFilter(ctx *TopDefConfigFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#UseDefCalcFilter.
-	VisitUseDefCalcFilter(ctx *UseDefCalcFilterContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#NativeCallFilter.
+	VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#MergeRefFilter.
 	VisitMergeRefFilter(ctx *MergeRefFilterContext) interface{}
@@ -124,8 +124,11 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#filterExpr.
 	VisitFilterExpr(ctx *FilterExprContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#useDefCalcDescription.
-	VisitUseDefCalcDescription(ctx *UseDefCalcDescriptionContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#nativeCall.
+	VisitNativeCall(ctx *NativeCallContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#useNativeCall.
+	VisitUseNativeCall(ctx *UseNativeCallContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#useDefCalcParams.
 	VisitUseDefCalcParams(ctx *UseDefCalcParamsContext) interface{}
@@ -142,8 +145,8 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#singleParam.
 	VisitSingleParam(ctx *SingleParamContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#recursiveConfig.
-	VisitRecursiveConfig(ctx *RecursiveConfigContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#config.
+	VisitConfig(ctx *ConfigContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#recursiveConfigItem.
 	VisitRecursiveConfigItem(ctx *RecursiveConfigItemContext) interface{}

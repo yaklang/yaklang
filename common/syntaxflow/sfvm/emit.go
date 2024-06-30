@@ -258,6 +258,13 @@ func (y *SyntaxFlowVisitor) EmitMergeRef(i string) {
 	})
 }
 
+func (y *SyntaxFlowVisitor) EmitNativaCall(i string, results ...any) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpNativeCall,
+		UnaryStr: i,
+	})
+}
+
 func (y *SyntaxFlowVisitor) EmitRemoveRef(i string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpRemoveRef,

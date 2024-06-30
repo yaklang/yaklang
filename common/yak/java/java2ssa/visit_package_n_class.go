@@ -479,9 +479,11 @@ func (y *builder) VisitMethodDeclaration(
 
 	key := i.Identifier().GetText()
 	funcName := fmt.Sprintf("%s_%s", class.Name, key)
+	methodName := key
 
 	if isStatic {
 		newFunction := y.NewFunc(funcName)
+		newFunction.SetMethodName(methodName)
 
 		build := func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
@@ -510,6 +512,8 @@ func (y *builder) VisitMethodDeclaration(
 		return build
 	}
 	newFunction := y.NewFunc(funcName)
+	newFunction.SetMethodName(methodName)
+
 	build := func() {
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		y.MarkedThisClassBlueprint = class

@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -71,20 +70,29 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitGetBottomUsers()
 	case *sf.DeepNextConfigFilterContext:
 		config := []*RecursiveConfigItem{}
-		if i := filter.RecursiveConfig(); i != nil {
-			config = y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext))
+		if i := filter.Config(); i != nil {
+			config = y.VisitRecursiveConfig(i.(*sf.ConfigContext))
 		}
 		y.EmitGetBottomUsers(config...)
 	case *sf.TopDefFilterContext:
 		y.EmitGetTopDefs()
 	case *sf.TopDefConfigFilterContext:
 		config := []*RecursiveConfigItem{}
-		if i := filter.RecursiveConfig(); i != nil {
-			config = y.VisitRecursiveConfig(i.(*sf.RecursiveConfigContext))
+		if i := filter.Config(); i != nil {
+			config = y.VisitRecursiveConfig(i.(*sf.ConfigContext))
 		}
 		y.EmitGetTopDefs(config...)
-	case *sf.UseDefCalcFilterContext:
-		log.Warnf("TBD: UseDefCalcFilterContext: %v", raw.GetText())
+	case *sf.NativeCallFilterContext:
+		var varname string
+		if nc, ok := filter.NativeCall().(*sf.NativeCallContext); ok {
+			if identify, ok := nc.UseNativeCall().(*sf.UseNativeCallContext); ok {
+				varname = identify.GetText()
+			}
+		}
+		if utils.MatchAnyOfSubString(varname, "/", "*", `"`, "`") {
+			return utils.Errorf("Syntax ERROR: invalid native call name: %s", varname)
+		}
+		y.EmitNativaCall(varname)
 	case *sf.MergeRefFilterContext:
 		y.EmitMergeRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.RemoveRefFilterContext:

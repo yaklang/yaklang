@@ -84,9 +84,9 @@ func TestSyntaxInOne(t *testing.T) {
 		a -{
 			until:` + " `*->a`" + `
 		}-> *`,
-		"a -<abc>- b",
-		"a -<abc{depth: 1}>- b",
-		"a -<abc(depth: 1, asdf: `a -{}-> *`)>- b",
+		"a<abc> b",
+		"a<abc{depth: 1}> b",
+		"a <abc(depth: 1, asdf: `a -{}-> *`)> b",
 		"a ->",
 		"a #>",
 		"a #->",
