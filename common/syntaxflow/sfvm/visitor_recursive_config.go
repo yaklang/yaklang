@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
 
-func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.RecursiveConfigContext) []*RecursiveConfigItem {
+func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*RecursiveConfigItem {
 	if i == nil {
 		return nil
 	}

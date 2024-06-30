@@ -105,6 +105,8 @@ const (
 
 	OpMergeRef
 	OpRemoveRef
+
+	OpNativeCall
 )
 
 type SFI struct {
@@ -265,6 +267,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "recursive$glob", s.UnaryStr)
 	case OpRecursiveSearchExact:
 		return fmt.Sprintf(verboseLen+" %v", "recursive$exact", s.UnaryStr)
+	case OpNativeCall:
+		return fmt.Sprintf(verboseLen+" %v", "native$call", s.UnaryStr)
 	default:
 		panic("unhandled default case")
 	}
