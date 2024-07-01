@@ -51,6 +51,11 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		}
 	}()
 
+	firstInput, err := inputStream.Recv()
+	if err != nil {
+		return err
+	}
+
 	// exec
 	shell, err := getShellCommand()
 	if err != nil {
@@ -59,6 +64,9 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 
 	cmds, _ := shlex.Split(shell)
 	cmd := exec.CommandContext(ctx, cmds[0], cmds[1:]...)
+	if firstInput.GetPath() != "" {
+		cmd.Path = firstInput.GetPath()
+	}
 
 	streamerRWC := &OpenPortServerStreamerHelperRWC{
 		stream: inputStream,
@@ -67,46 +75,16 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 	cmd.Stdout = streamerRWC
 	cmd.Stderr = streamerRWC
 
-	return cmd.Run()
-	// stdin, _ := cmd.StdinPipe()
-	// stdout, _ := cmd.StdoutPipe()
-	// stderr, _ := cmd.StderrPipe()
-	// defer func() {
-	// 	stdin.Close()
-	// 	stdout.Close()
-	// }()
-	// cmd.Start()
-	// go func() {
-	// 	defer cancel()
-	// 	_, err := io.Copy(streamerRWC, stdout)
-	// 	if err != nil {
-	// 		log.Errorf("stream copy stdout from local process to grpcChannel failed: %s", err)
-	// 	}
-	// 	// log.Infof("finished for conn %v <-- %v ", addr, conn.RemoteAddr())
-	// 	streamerRWC.stream.Send(&ypb.Output{
-	// 		Control: true,
-	// 		Closed:  true,
-	// 	})
-	// }()
-	// go func() {
-	// 	defer cancel()
-	// 	_, err := io.Copy(streamerRWC, stderr)
-	// 	if err != nil {
-	// 		log.Errorf("stream copy stderr from local process to grpcChannel failed: %s", err)
-	// 	}
-	// }()
+	inputStream.Send(&ypb.Output{
+		Control: true,
+		Waiting: true,
+	})
 
-	// go func() {
-	// 	defer cancel()
-	// 	_, err := io.Copy(stdin, streamerRWC)
-	// 	if err != nil {
-	// 		log.Errorf("stream copy stdin from grpcChannel to local process failed: %s", err)
-	// 	}
-	// 	streamerRWC.stream.Send(&ypb.Output{
-	// 		Control: true,
-	// 		Closed:  true,
-	// 	})
-	// }()
-	// cmd.Wait()
-	// return nil
+	defer func() {
+		inputStream.Send(&ypb.Output{
+			Control: true,
+			Closed:  true,
+		})
+	}()
+	return cmd.Run()
 }
