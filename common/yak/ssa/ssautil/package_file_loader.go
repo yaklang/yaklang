@@ -9,26 +9,26 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-type PackageLoaderOption func(*PackageLoader)
+type PackageLoaderOption func(*PackageFileLoader)
 
 func WithFileSystem(fs filesys.FileSystem) PackageLoaderOption {
-	return func(loader *PackageLoader) {
+	return func(loader *PackageFileLoader) {
 		loader.fs = fs
 	}
 }
 
 func WithIncludePath(paths ...string) PackageLoaderOption {
-	return func(loader *PackageLoader) {
+	return func(loader *PackageFileLoader) {
 		loader.includePath = paths
 	}
 }
 func WithCurrentPath(path string) PackageLoaderOption {
-	return func(loader *PackageLoader) {
+	return func(loader *PackageFileLoader) {
 		loader.currentPath = path //当前路径
 	}
 }
 
-type PackageLoader struct {
+type PackageFileLoader struct {
 	fs           filesys.FileSystem
 	currentPath  string
 	includePath  []string
@@ -36,12 +36,12 @@ type PackageLoader struct {
 	packagePath  []string
 }
 
-func (p *PackageLoader) GetFilesysFileSystem() filesys.FileSystem {
+func (p *PackageFileLoader) GetFilesysFileSystem() filesys.FileSystem {
 	return p.fs
 }
 
-func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
-	loader := &PackageLoader{
+func NewPackageLoader(opts ...PackageLoaderOption) *PackageFileLoader {
+	loader := &PackageFileLoader{
 		currentPath:  "",
 		includePath:  make([]string, 0),
 		includedPath: make(map[string]struct{}),
@@ -55,39 +55,39 @@ func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 	return loader
 }
 
-func (p *PackageLoader) SetCurrentPath(currentPath string) {
+func (p *PackageFileLoader) SetCurrentPath(currentPath string) {
 	p.currentPath = currentPath
 }
 
-func (p *PackageLoader) GetCurrentPath() string {
+func (p *PackageFileLoader) GetCurrentPath() string {
 	return p.currentPath
 }
 
-func (p *PackageLoader) AddPackagePath(path []string) {
+func (p *PackageFileLoader) AddPackagePath(path []string) {
 	p.packagePath = path
 }
 
-func (p *PackageLoader) GetPackagePath() []string {
+func (p *PackageFileLoader) GetPackagePath() []string {
 	return p.packagePath
 }
 
-func (p *PackageLoader) AddIncludePath(s ...string) {
+func (p *PackageFileLoader) AddIncludePath(s ...string) {
 	p.includePath = append(p.includePath, s...)
 }
 
-func (p *PackageLoader) FilePath(wantPath string, once bool) (string, error) {
+func (p *PackageFileLoader) FilePath(wantPath string, once bool) (string, error) {
 	return p.getPath(wantPath, once,
 		func(fi fs.FileInfo) bool { return !fi.IsDir() },
 	)
 }
 
-func (p *PackageLoader) DirPath(wantPath string, once bool) (string, error) {
+func (p *PackageFileLoader) DirPath(wantPath string, once bool) (string, error) {
 	return p.getPath(wantPath, once,
 		func(fi fs.FileInfo) bool { return fi.IsDir() },
 	)
 }
 
-func (p *PackageLoader) getPath(want string, once bool, f func(fs.FileInfo) bool) (string, error) {
+func (p *PackageFileLoader) getPath(want string, once bool, f func(fs.FileInfo) bool) (string, error) {
 	fs := p.fs
 	if fs == nil {
 		return "", utils.Errorf("file system is nil")
@@ -114,7 +114,7 @@ func (p *PackageLoader) getPath(want string, once bool, f func(fs.FileInfo) bool
 	return "", utils.Errorf("file or directory %s not found in include path", want)
 }
 
-func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, *memedit.MemEditor, error) {
+func (p *PackageFileLoader) LoadFilePackage(packageName string, once bool) (string, *memedit.MemEditor, error) {
 	if p.fs == nil {
 		return "", nil, utils.Errorf("file system is nil")
 	}
@@ -131,7 +131,7 @@ type FileDescriptor struct {
 	Info     fs.FileInfo
 }
 
-func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (chan FileDescriptor, error) {
+func (p *PackageFileLoader) LoadDirectoryPackage(packageName string, once bool) (chan FileDescriptor, error) {
 	ch := make(chan FileDescriptor)
 
 	absDir, err := p.DirPath(packageName, once)
