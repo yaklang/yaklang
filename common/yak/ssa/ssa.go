@@ -173,7 +173,7 @@ type Program struct {
 	OffsetSortedSlice []int
 
 	// package Loader
-	Loader *ssautil.PackageLoader
+	Loader *ssautil.PackageFileLoader
 	Build  Build
 
 	errors SSAErrors
