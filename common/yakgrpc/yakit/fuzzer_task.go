@@ -260,6 +260,14 @@ func SaveWebFuzzerResponseEx(taskId int, hiddenIndex string, rsp *ypb.FuzzerResp
 	}
 }
 
+func CountWebFuzzerResponses(db *gorm.DB, id int) (int, error) {
+	var count int
+	if db := db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id).Count(&count); db.Error != nil {
+		return 0, utils.Errorf("count webfuzzer response error %s", db.Error)
+	}
+	return count, nil
+}
+
 func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *schema.WebFuzzerResponse {
 	db = db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id)
 	outC := make(chan *schema.WebFuzzerResponse)
