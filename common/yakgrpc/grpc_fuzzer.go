@@ -301,11 +301,23 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			return utils.Errorf("pause task[%d] not found", pauseTaskID)
 		}
 	}
+	// rawRequest
+	var rawRequest []byte
+	if !isRetry {
+		if len(req.GetRequestRaw()) > 0 {
+			rawRequest = req.GetRequestRaw()
+		} else {
+			rawRequest = []byte(req.GetRequest())
+		}
+	}
 
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
 	if strings.TrimSpace(req.GetHotPatchCode()) != "" {
 		extraOpt = append(extraOpt, yak.Fuzz_WithHotPatch(stream.Context(), req.GetHotPatchCode()))
+		extraOpt = append(extraOpt, mutate.Fuzz_WithExtraFuzzTagHandler("request", func(s string) []string {
+			return []string{utils.UnsafeBytesToString(rawRequest)}
+		}))
 	}
 
 	/*
@@ -537,7 +549,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		return nil
 	}
-	if !isRetry && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
+	if !isRetry && len(rawRequest) <= 0 {
 		return utils.Errorf("empty request is not allowed")
 	}
 
@@ -589,15 +601,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		keywords = filter.GetKeywords()
 		minBody = filter.GetMinBodySize()
 		maxBody = filter.GetMaxBodySize()
-	}
-
-	var rawRequest []byte
-	if !isRetry {
-		if len(req.GetRequestRaw()) > 0 {
-			rawRequest = req.GetRequestRaw()
-		} else {
-			rawRequest = []byte(req.GetRequest())
-		}
 	}
 
 	// 保存 request 中 host/port
