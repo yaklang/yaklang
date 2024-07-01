@@ -75,7 +75,7 @@ func (y *builder) BuildPackage(pkgNames []string) *ssa.Package {
 	return y.GetPackage(pkgName)
 }
 
-func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageLoader, fileName string, data *memedit.MemEditor) {
+func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageFileLoader, fileName string, data *memedit.MemEditor) {
 	originPath := loader.GetCurrentPath()
 	defer func() {
 		loader.SetCurrentPath(originPath)
