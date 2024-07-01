@@ -38,7 +38,7 @@ lines: line+;
 
 // descriptionStatement will describe the filterExpr with stringLiteral
 descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
-descriptionItems: lines? descriptionItem (',' lines? descriptionItem)* ','?;
+descriptionItems: lines? descriptionItem (',' lines? descriptionItem)* ','? lines?;
 descriptionItem
     : stringLiteral lines?
     | stringLiteral ':' stringLiteral lines?
@@ -160,6 +160,7 @@ keywords
     | In
     | Have
     | HaveAny
+    | BoolLiteral
     ;
 
 opcodes: Call | Constant | Phi | FormalParam | Return;
