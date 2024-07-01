@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func ParseYamlRule(ruleContent string) ([][]*rule.OpCode, error) {
+func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
 	rules, err := webfingerprint.ParseWebFingerprintRules([]byte(ruleContent))
 	if err != nil {
 		return nil, errors.Errorf("parse wappalyzer rules failed: %s", err)
@@ -16,14 +16,7 @@ func ParseYamlRule(ruleContent string) ([][]*rule.OpCode, error) {
 	if err != nil {
 		return nil, err
 	}
-	codes := [][]*rule.OpCode{}
-	for _, r := range rs {
-		ops := r.ToOpCodes()
-		if len(ops) != 0 {
-			codes = append(codes, ops)
-		}
-	}
-	return codes, nil
+	return rs, nil
 }
 func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rule.FingerPrintRule, error) {
 	convertToMap := func(o *webfingerprint.CPE) *rule.CPE {
