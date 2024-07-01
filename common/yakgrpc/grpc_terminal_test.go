@@ -35,6 +35,9 @@ func TestTerminal(t *testing.T) {
 	require.NoError(t, err)
 
 	stream.Send(&ypb.Input{
+		Path: "",
+	})
+	stream.Send(&ypb.Input{
 		Raw: []byte(fmt.Sprintf("%s %s\n", testBinaryPath, temp.Name())),
 	})
 

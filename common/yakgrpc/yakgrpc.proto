@@ -5007,6 +5007,7 @@ message Input {
 
   string host = 2;
   uint32 port = 3;
+  string path = 4;
 }
 
 message Output {
