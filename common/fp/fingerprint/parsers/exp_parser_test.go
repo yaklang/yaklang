@@ -1,9 +1,15 @@
 package parsers
 
 import (
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"testing"
 )
 
+func newTestGenerateRule(exp string) *rule.GeneralRule {
+	return &rule.GeneralRule{
+		MatchExpression: exp,
+	}
+}
 func _TestCompilerSpecialSyntax(t *testing.T) {
 	rules, err := ParseExpRule(newTestGenerateRule(`header=""MiniCMS""`))
 	if err != nil {

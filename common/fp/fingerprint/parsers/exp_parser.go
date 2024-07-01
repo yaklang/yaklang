@@ -12,8 +12,8 @@ import (
 
 var buildinTokens = []string{"(", ")", "||", "&&", "=", "!=", "\"", "\\"}
 
-func ParseExpRule(rules ...*rule.GeneralRule) ([][]*rule.OpCode, error) {
-	res := [][]*rule.OpCode{}
+func ParseExpRule(rules ...*rule.GeneralRule) ([]*rule.FingerPrintRule, error) {
+	res := []*rule.FingerPrintRule{}
 	errs := []error{}
 	for _, ruleInfo := range rules {
 		exp := ruleInfo.MatchExpression
@@ -27,10 +27,7 @@ func ParseExpRule(rules ...*rule.GeneralRule) ([][]*rule.OpCode, error) {
 			continue
 		}
 		r.MatchParam.Info = cpe
-		codes := r.ToOpCodes()
-		if len(codes) != 0 {
-			res = append(res, codes)
-		}
+		res = append(res, r)
 	}
 	return res, utils.JoinErrors(errs...)
 }
