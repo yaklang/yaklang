@@ -12,10 +12,10 @@ type Matcher struct {
 	regexpCache map[string]*regexp.Regexp
 	ErrorHandle func(error)
 	Route       func(ctx context.Context, webPath string) ([]byte, error)
-	rules       [][]*rule.OpCode
+	rules       []*rule.FingerPrintRule
 }
 
-func NewMatcher(rules ...[]*rule.OpCode) *Matcher {
+func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
 	matcher := &Matcher{
 		ErrorHandle: func(err error) {},
 		regexpCache: map[string]*regexp.Regexp{},
@@ -24,7 +24,7 @@ func NewMatcher(rules ...[]*rule.OpCode) *Matcher {
 	return matcher
 }
 
-func (m *Matcher) AddRules(rules [][]*rule.OpCode) {
+func (m *Matcher) AddRules(rules []*rule.FingerPrintRule) {
 	m.rules = append(m.rules, rules...)
 }
 func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {

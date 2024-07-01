@@ -23,7 +23,7 @@ func LoadCPEFromWebfingerrintCPE(o *webfingerprint.CPE) *rule.CPE {
 	}
 }
 
-func LoadAllDefaultRules() (rules [][]*rule.OpCode) {
+func LoadAllDefaultRules() (rules []*rule.FingerPrintRule) {
 	for _, f := range []func() error{
 		func() error {
 			content, err := rule_resources.FS.ReadFile("exp_rule.txt")

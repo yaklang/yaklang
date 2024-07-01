@@ -47,7 +47,8 @@ type matchedResult struct {
 	RebuildCPE func(*CPE)
 }
 
-func Execute(getter func(path string) (*MatchResource, error), codes []*OpCode) (*CPE, error) {
+func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrintRule) (*CPE, error) {
+	codes := rule.ToOpCodes()
 	stack := utils.NewStack[any]()
 	for i := 0; i < len(codes); i++ {
 		code := codes[i]

@@ -58,6 +58,7 @@ type MatchMethodParam struct {
 }
 
 type FingerPrintRule struct {
+	opCodes    []*OpCode
 	Method     string
 	WebPath    string
 	MatchParam *MatchMethodParam
@@ -167,8 +168,12 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 	return res
 }
 func (f *FingerPrintRule) ToOpCodes() []*OpCode {
+	if f.opCodes != nil {
+		return f.opCodes
+	}
 	codes := f.preToOpCodes()
 	codes = append(codes, &OpCode{Op: OpInfo, data: []any{f.MatchParam.Info}})
+	f.opCodes = codes
 	return codes
 }
 
