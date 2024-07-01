@@ -496,12 +496,16 @@ func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
 	}
 }
 
-func InsertHTTPFlowEx(i *schema.HTTPFlow) error {
+func InsertHTTPFlowEx(i *schema.HTTPFlow, finishHandler ...func()) error {
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
 		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
 	} else {
 		DBSaveAsyncChannel <- func(db *gorm.DB) error {
-			return InsertHTTPFlow(db, i)
+			err := InsertHTTPFlow(db, i)
+			for _, h := range finishHandler {
+				h()
+			}
+			return err
 		}
 		return nil
 	}

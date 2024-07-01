@@ -2,18 +2,18 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net"
 	"sync/atomic"
 	"testing"
-
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
-	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
-	c, err := NewLocalClient(true)
+	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,18 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 	}
 
 	retryTestCases := []int{7, 9, 9, 10}
+	needTaskRespCount := []int{10, 5, 3, 1}
 	for i, wantSuccessCount := range retryTestCases {
+		require.NoError(t, utils.AttemptWithDelayFast(func() error {
+			taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(taskID))
+			if err != nil {
+				return err
+			}
+			if taskRespCount != needTaskRespCount[i] {
+				return utils.Errorf("want 10 task resp ,but got %d", taskRespCount)
+			}
+			return nil
+		}))
 		client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 			RetryTaskID: taskID,
 		})

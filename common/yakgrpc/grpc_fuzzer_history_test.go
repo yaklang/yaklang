@@ -2,17 +2,15 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
-	"net/http"
-	"testing"
-
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/http"
+	"testing"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_History_Detail(t *testing.T) {
-	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
-	c, err := NewLocalClient(true)
+	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,19 +85,23 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 			t.Fatal("TaskID not found in response")
 		}
 
-		client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-			HistoryWebFuzzerId: int32(taskID),
-		})
-		count := 0
-		for {
-			_, err := client.Recv()
-			if err != nil {
-				break
+		err = utils.AttemptWithDelayFast(func() error {
+			client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+				HistoryWebFuzzerId: int32(taskID),
+			})
+			count := 0
+			for {
+				_, err := client.Recv()
+				if err != nil {
+					break
+				}
+				count++
 			}
-			count++
-		}
-		if count != 10 {
-			t.Fatalf("Get History WebFuzzer Detail Failed, want 10 responses, but got %d", count)
-		}
+			if count != 10 {
+				return utils.Errorf("Get History WebFuzzer Detail Failed, want 10 responses, but got %d", count)
+			}
+			return nil
+		})
+		require.NoError(t, err)
 	})
 }
