@@ -1525,17 +1525,44 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				*flow = *replaced
 			},
 			func() {
-				isDroppedSaveFlow.IsSet()
+				isDroppedSaveFlow.Set()
 			},
 		)
 		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 
+		saveBarePacketHandler := func() {
+			// 存储KV，将flow ID作为key，bare request和bare response作为value
+			if httpctx.GetRequestIsModified(req) {
+				bareReq := httpctx.GetPlainRequestBytes(req)
+				if len(bareReq) == 0 {
+					bareReq = httpctx.GetBareRequestBytes(req)
+				}
+				log.Debugf("[KV] save bare Request(%d)", flow.ID)
+
+				if len(bareReq) > 0 && flow.ID > 0 {
+					keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
+					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
+				}
+			}
+
+			if httpctx.GetResponseIsModified(req) || isResponseDropped {
+				bareRsp := httpctx.GetPlainResponseBytes(req)
+				if len(bareRsp) == 0 {
+					bareRsp = httpctx.GetBareResponseBytes(req)
+				}
+				log.Debugf("[KV] save bare Response(%d)", flow.ID)
+
+				if len(bareRsp) > 0 && flow.ID > 0 {
+					keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
+					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
+				}
+			}
+		}
+
 		// storage
 		if flow != nil && !isDroppedSaveFlow.IsSet() {
 			flow.Hash = flow.CalcHash()
-			flow := flow
 			startCreateFlow = time.Now()
-
 			colorOK := make(chan struct{})
 
 			var extracted []*schema.ExtractedData
@@ -1556,14 +1583,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			var needUpdate bool
-			// wait for max 300ms
 			select {
 			case <-colorOK:
-			case <-time.After(time.Millisecond * 300):
+			case <-time.After(time.Millisecond * 300): // wait for max 300ms
 				needUpdate = true
 			}
 
-			err := yakit.InsertHTTPFlowEx(flow)
+			err := yakit.InsertHTTPFlowEx(flow, saveBarePacketHandler)
 			if err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else if needUpdate {
@@ -1577,34 +1603,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+		} else {
+			saveBarePacketHandler()
 		}
 
-		// 存储KV，将flow ID作为key，bare request和bare response作为value
-		if httpctx.GetRequestIsModified(req) {
-			bareReq := httpctx.GetPlainRequestBytes(req)
-			if len(bareReq) == 0 {
-				bareReq = httpctx.GetBareRequestBytes(req)
-			}
-			log.Debugf("[KV] save bare Request(%d)", flow.ID)
-
-			if len(bareReq) > 0 && flow.ID > 0 {
-				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
-				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
-			}
-		}
-
-		if httpctx.GetResponseIsModified(req) || isResponseDropped {
-			bareRsp := httpctx.GetPlainResponseBytes(req)
-			if len(bareRsp) == 0 {
-				bareRsp = httpctx.GetBareResponseBytes(req)
-			}
-			log.Debugf("[KV] save bare Response(%d)", flow.ID)
-
-			if len(bareRsp) > 0 && flow.ID > 0 {
-				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
-				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
-			}
-		}
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig
