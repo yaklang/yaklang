@@ -2,17 +2,20 @@ package yakcmds
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"os"
-
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 type languageCtx struct {
@@ -223,18 +226,58 @@ var SSACompilerCommands = []*cli.Command{
 				return
 			}
 
-			for _, name := range c.Args() {
-				log.Infof("start to use SyntaxFlow rule: %v", name)
-				raw, err := os.ReadFile(name)
+			var dirChecking []string
+
+			handleByFilename := func(filename string) {
+				log.Infof("start to use SyntaxFlow rule: %v", filename)
+				raw, err := os.ReadFile(filename)
 				if err != nil {
-					log.Errorf("read file [%v] failed: %v", name, err)
+					log.Errorf("read file [%v] failed: %v", filename, err)
 					return
 				}
 				syntaxFlow = string(raw)
 				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 				fmt.Println()
-				fmt.Println()
 			}
+
+			for _, originName := range c.Args() {
+				name := utils.GetFirstExistedFile(originName)
+				if name == "" {
+					infos, _ := utils.ReadDir(originName)
+					if len(infos) > 0 {
+						dirChecking = append(dirChecking, originName)
+						continue
+					}
+
+					if filepath.IsAbs(originName) {
+						log.Warnf("cannot find rule as %v", originName)
+					} else {
+						absName, _ := filepath.Abs(originName)
+						if absName != "" {
+							log.Warnf("cannot find rule as %v(abs: %v)", originName, absName)
+						} else {
+							log.Warnf("cannot find rule as %v", originName)
+						}
+					}
+					continue
+				}
+				handleByFilename(name)
+			}
+
+			for _, dir := range dirChecking {
+				log.Infof("start to read directory: %v", dir)
+				err := filesys.Recursive(dir, filesys.WithRecursiveDirectory(true), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					fileExt := strings.ToLower(filepath.Ext(s))
+					if strings.HasSuffix(fileExt, ".sf") {
+						handleByFilename(s)
+					}
+					return nil
+				}))
+				if err != nil {
+					log.Warnf("read directory [%v] failed: %v", dir, err)
+				}
+			}
+
 		},
 	},
 }
@@ -293,8 +336,10 @@ func SyntaxFlowQuery(
 		}
 	} else {
 		result.Show()
-		fmt.Println("---------------------")
-		fmt.Println(result.GetAllValuesChain().DotGraph())
+		if showDot {
+			fmt.Println("---------------------")
+			fmt.Println(result.GetAllValuesChain().DotGraph())
+		}
 	}
 }
 
