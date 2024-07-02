@@ -177,3 +177,55 @@ func Test_Function_Parameter_Call(t *testing.T) {
 		)
 	})
 }
+
+func Test_ArgumentAndRest(t *testing.T) {
+	t.Run("test argument and call ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `f(1, 2, 3)`,
+			`f(* as $a, ,* as $c) as $call`,
+			map[string][]string{
+				"a":    {"1"},
+				"c":    {"3"},
+				"call": {"Undefined-f(1,2,3)"},
+			},
+		)
+	})
+
+	t.Run("test argument and function", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f = (i) => {
+			i()
+		}
+		f(()=>{print(1)})
+		`, `f(*() as $i) as $fun`, map[string][]string{
+			"i":   {"Parameter-i()"},
+			"fun": {"Function-f(Function-main$1)"},
+		})
+	})
+
+	t.Run("test java ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+package example;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+
+public class Example {
+    public static void main(String[] args) {
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter("example.txt"));
+            writer.write("Hello, world!");
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+		`,
+			`BufferedWriter(* as $filename).write() as $sink`,
+			map[string][]string{
+				"sink": {`Undefined-writer.write(valid)("Hello, world!")`},
+			},
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+}
