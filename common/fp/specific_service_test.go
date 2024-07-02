@@ -3,7 +3,6 @@ package fp
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
-	"strings"
 	"testing"
 )
 
@@ -37,10 +36,7 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 	//
 	//rules, _ := webfingerprint.ParseWebFingerprintRules(resp)
 
-	rules, _ := GetDefaultWebFingerprintRules()
-
-	config := NewConfig(WithWebFingerprintRule(
-		rules),
+	config := NewConfig(
 		WithOnlyEnableWebFingerprint(true),
 		WithFingerprintDataSize(204800),
 	)
@@ -59,12 +55,9 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 	spew.Dump(len(wantRules))
 	//spew.Dump(result.GetServiceName())
 	//spew.Dump(result.GetServiceName())
-	spew.Dump(len(result.GetCPEs()))
 	resultMap := make(map[string]bool)
-	for _, cpe := range result.Fingerprint.CPEs {
-		productName := strings.Split(cpe, ":")[3]
-		//fmt.Println(productName)
-		resultMap[productName] = true
+	for _, cpe := range result.Fingerprint.HttpFlows[0].CPEs {
+		resultMap[cpe.Product] = true
 	}
 
 	for _, want := range wantRules {
