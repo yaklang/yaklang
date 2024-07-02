@@ -3,11 +3,6 @@ package crep
 import (
 	"bytes"
 	"context"
-	"io"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -18,6 +13,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 )
 
 func (m *MITMServer) setHijackHandler(rootCtx context.Context) {

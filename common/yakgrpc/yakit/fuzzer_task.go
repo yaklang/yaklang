@@ -3,6 +3,7 @@ package yakit
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/consts"
 	"strconv"
 	"strings"
 
@@ -246,6 +247,25 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb
 		log.Errorf("save web fuzzer response to database failed: %s", db.Error)
 		return
 	}
+}
+
+func SaveWebFuzzerResponseEx(taskId int, hiddenIndex string, rsp *ypb.FuzzerResponse) {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		SaveWebFuzzerResponse(consts.GetGormProjectDatabase(), taskId, hiddenIndex, rsp)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			SaveWebFuzzerResponse(db, taskId, hiddenIndex, rsp)
+			return nil
+		}
+	}
+}
+
+func CountWebFuzzerResponses(db *gorm.DB, id int) (int, error) {
+	var count int
+	if db := db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id).Count(&count); db.Error != nil {
+		return 0, utils.Errorf("count webfuzzer response error %s", db.Error)
+	}
+	return count, nil
 }
 
 func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *schema.WebFuzzerResponse {

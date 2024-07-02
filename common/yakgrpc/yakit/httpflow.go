@@ -28,6 +28,7 @@ func init() {
 		RegisterLowHTTPSaveCallback()
 		return nil
 	})
+
 }
 
 func RegisterLowHTTPSaveCallback() {
@@ -60,7 +61,7 @@ func RegisterLowHTTPSaveCallback() {
 			reqIns = r.MultiResponseInstances[0].Request
 		}
 
-		db := consts.GetGormProjectDatabase()
+		//db := consts.GetGormProjectDatabase()
 		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
@@ -86,9 +87,9 @@ func RegisterLowHTTPSaveCallback() {
 		flow.RuntimeId = runtimeId
 		flow.HiddenIndex = hiddenIndex
 		flow.Payload = strings.Join(payloads, ",")
-		err = InsertHTTPFlow(db, flow)
+		err = InsertHTTPFlowEx(flow)
 		if err != nil {
-			log.Errorf("save httpflow failed: %s", err)
+			log.Errorf("insert httpflow failed: %s", err)
 		}
 	})
 }
@@ -426,6 +427,7 @@ func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *h
 	return createHTTPFlowFromHTTP(isHttps, req, rsp, source, url, remoteAddr, opts...)
 }
 
+// direct save
 func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) error {
 	if i == nil {
 		return nil
@@ -480,6 +482,44 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
 	}
 	return nil
+}
+
+// choose db save mode by const
+func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			return UpdateHTTPFlowTags(db, i)
+		}
+		return nil
+	}
+}
+
+func InsertHTTPFlowEx(i *schema.HTTPFlow, finishHandler ...func()) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			err := InsertHTTPFlow(db, i)
+			for _, h := range finishHandler {
+				h()
+			}
+			return err
+		}
+		return nil
+	}
+}
+
+func CreateOrUpdateHTTPFlowExg(hash string, i *schema.HTTPFlow) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase(), hash, i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			return CreateOrUpdateHTTPFlow(db, hash, i)
+		}
+		return nil
+	}
 }
 
 func GetHTTPFlow(db *gorm.DB, id int64) (*schema.HTTPFlow, error) {

@@ -2,6 +2,7 @@ package bizhelper
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
 	"math"
 )
 
@@ -44,20 +45,27 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 		}
 	}
 
-	done := make(chan bool, 1)
 	var paginator Paginator
 	var count int
 	var offset int
 
-	go countRecords(db, result, done, &count)
+	db = utils.GormTransactionReturnDb(db, func(tx *gorm.DB) {
+		if tx.Model(result).Count(&count); tx.Error != nil {
+			return
+		}
+		if p.Limit == -1 {
+			tx.Find(result)
+		} else {
+			if p.Page == 1 {
+				offset = 0
+			} else {
+				offset = (p.Page - 1) * p.Limit
+			}
+			tx.Limit(p.Limit).Offset(offset).Find(result)
+		}
+	})
 
-	if p.Page == 1 {
-		offset = 0
-	} else {
-		offset = (p.Page - 1) * p.Limit
-	}
 	if p.Limit == -1 {
-		db.Find(result)
 		paginator.TotalRecord = count
 		paginator.Records = result
 		paginator.Page = 1
@@ -67,8 +75,6 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 		paginator.TotalPage = int(math.Ceil(float64(count) / float64(p.Limit)))
 		return &paginator, db
 	}
-	db.Limit(p.Limit).Offset(offset).Find(result)
-	<-done
 
 	paginator.TotalRecord = count
 	paginator.Records = result

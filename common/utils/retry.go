@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"time"
 )
@@ -96,4 +97,15 @@ func RetryWithExpBackOffEx(times int, begin int, f func() error) error {
 		time.Sleep(time.Duration(begin*(1<<i)) * time.Millisecond)
 	}
 	return err
+}
+
+func AttemptWithDelay(maxIteration int, delay time.Duration, f func() error) error {
+	_, _, err := lo.AttemptWithDelay(maxIteration, delay, func(index int, duration time.Duration) error {
+		return f()
+	})
+	return err
+}
+
+func AttemptWithDelayFast(f func() error) error {
+	return AttemptWithDelay(3, 300*time.Millisecond, f)
 }

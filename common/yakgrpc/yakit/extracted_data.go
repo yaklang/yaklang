@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
@@ -51,6 +52,17 @@ func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error
 	}
 
 	return nil
+}
+
+func CreateOrUpdateExtractedDataEx(mainId int64, i interface{}) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return CreateOrUpdateExtractedData(consts.GetGormProjectDatabase(), mainId, i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			return CreateOrUpdateExtractedData(db, mainId, i)
+		}
+		return nil
+	}
 }
 
 func GetExtractedData(db *gorm.DB, id int64) (*schema.ExtractedData, error) {

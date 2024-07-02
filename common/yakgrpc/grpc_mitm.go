@@ -20,9 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/davecgh/go-spew/spew"
-	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -623,18 +621,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置数据包计数器
 	*/
-	offset := time.Now().UnixNano()
 	count := 0
 	packetCountLock := new(sync.Mutex)
 	addCounter := func() {
 		packetCountLock.Lock()
 		defer packetCountLock.Unlock()
 		count++
-	}
-	getPacketIndex := func() string {
-		packetCountLock.Lock()
-		defer packetCountLock.Unlock()
-		return fmt.Sprintf("%v_%v", offset, count)
 	}
 
 	// 缓存 Websocket ID (当前程序的指针，一般不太会有问题)
@@ -1022,7 +1014,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				flow.WebsocketHash = wshash
 				flow.HiddenIndex = wshash
 				flow.Hash = flow.CalcHash()
-				err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+				//err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+				//if err != nil {
+				//	log.Errorf("create / save httpflow(websocket) error: %s", err)
+				//}
+				err := yakit.InsertHTTPFlowEx(flow)
 				if err != nil {
 					log.Errorf("create / save httpflow(websocket) error: %s", err)
 				}
@@ -1396,7 +1392,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					}
 					log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
 					// Hidden Index 用来标注 MITM 劫持的顺序
-					flow.HiddenIndex = getPacketIndex()
 					flow.Hash = flow.CalcHash()
 					flow.AddTagToFirst("[被丢弃]")
 					flow.Purple()
@@ -1496,8 +1491,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
 
-		// Hidden Index 用来标注 MITM 劫持的顺序
-		flow.HiddenIndex = getPacketIndex()
 		flow.Hash = flow.CalcHash()
 		if isViewed {
 			if isModified {
@@ -1532,122 +1525,88 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				*flow = *replaced
 			},
 			func() {
-				isDroppedSaveFlow.IsSet()
+				isDroppedSaveFlow.Set()
 			},
 		)
 		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 
+		saveBarePacketHandler := func() {
+			// 存储KV，将flow ID作为key，bare request和bare response作为value
+			if httpctx.GetRequestIsModified(req) {
+				bareReq := httpctx.GetPlainRequestBytes(req)
+				if len(bareReq) == 0 {
+					bareReq = httpctx.GetBareRequestBytes(req)
+				}
+				log.Debugf("[KV] save bare Request(%d)", flow.ID)
+
+				if len(bareReq) > 0 && flow.ID > 0 {
+					keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
+					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
+				}
+			}
+
+			if httpctx.GetResponseIsModified(req) || isResponseDropped {
+				bareRsp := httpctx.GetPlainResponseBytes(req)
+				if len(bareRsp) == 0 {
+					bareRsp = httpctx.GetBareResponseBytes(req)
+				}
+				log.Debugf("[KV] save bare Response(%d)", flow.ID)
+
+				if len(bareRsp) > 0 && flow.ID > 0 {
+					keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
+					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
+				}
+			}
+		}
+
 		// storage
 		if flow != nil && !isDroppedSaveFlow.IsSet() {
 			flow.Hash = flow.CalcHash()
-			flow := flow
 			startCreateFlow = time.Now()
-
 			colorOK := make(chan struct{})
+
 			var extracted []*schema.ExtractedData
 
 			if replacer != nil {
 				go func() {
 					extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
-					log.Debugf("replacer.hookColor(requestRaw, responseRaw, req, flow); for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 					close(colorOK)
+					for _, e := range extracted {
+						err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
+						if err != nil {
+							log.Errorf("save hookcolor error: %s", err)
+						}
+					}
 				}()
 			} else {
 				close(colorOK)
 			}
 
-			// wait for max 300ms
+			var needUpdate bool
 			select {
 			case <-colorOK:
-			case <-time.NewTimer(time.Millisecond * 300).C:
+			case <-time.After(time.Millisecond * 300): // wait for max 300ms
+				needUpdate = true
 			}
 
-			var GoColor bool
-			if err := utils.RetryWithExpBackOff(func() (err error) {
-				select {
-				case <-colorOK:
-					GoColor = false
-				default:
-					GoColor = true
-				}
-
-				return utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
-					if err = yakit.InsertHTTPFlow(tx, flow); err != nil {
-						return err
-					}
-
-					// for color hook
-					if !GoColor {
-						if len(extracted) != 0 {
-							for _, e := range extracted {
-								if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
-									return err
-								}
-							}
-						}
-						if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
-							return err
-						}
-					}
-					return nil
-				})
-			}); err != nil {
+			err := yakit.InsertHTTPFlowEx(flow, saveBarePacketHandler)
+			if err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
-				flow.HiddenIndex = uuid.New().String() + "_" + flow.HiddenIndex
-			}
-
-			if GoColor {
+			} else if needUpdate {
 				go func() {
 					<-colorOK
-					if err := utils.RetryWithExpBackOff(func() (err error) {
-						return utils.GormTransaction(consts.GetGormProjectDatabase(), func(tx *gorm.DB) error {
-							if len(extracted) != 0 {
-								for _, e := range extracted {
-									if err := yakit.CreateOrUpdateExtractedData(tx, -1, e); err != nil {
-										return err
-									}
-								}
-							}
-							if err = yakit.UpdateHTTPFlowTags(tx, flow); err != nil {
-								return err
-							}
-							return nil
-						})
-					}); err != nil {
-						log.Errorf("hookcolor error: %s", err)
+					err := yakit.UpdateHTTPFlowTagsEx(flow)
+					if err != nil {
+						log.Errorf("update http flow tags error: %s", err)
 					}
 				}()
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+		} else {
+			saveBarePacketHandler()
 		}
 
-		// 存储KV，将flow ID作为key，bare request和bare response作为value
-		if httpctx.GetRequestIsModified(req) {
-			bareReq := httpctx.GetPlainRequestBytes(req)
-			if len(bareReq) == 0 {
-				bareReq = httpctx.GetBareRequestBytes(req)
-			}
-			log.Debugf("[KV] save bare Request(%d)", flow.ID)
-
-			if len(bareReq) > 0 && flow.ID > 0 {
-				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
-				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
-			}
-		}
-
-		if httpctx.GetResponseIsModified(req) || isResponseDropped {
-			bareRsp := httpctx.GetPlainResponseBytes(req)
-			if len(bareRsp) == 0 {
-				bareRsp = httpctx.GetBareResponseBytes(req)
-			}
-			log.Debugf("[KV] save bare Response(%d)", flow.ID)
-
-			if len(bareRsp) > 0 && flow.ID > 0 {
-				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
-				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
-			}
-		}
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig
