@@ -49,7 +49,8 @@ func TestRequestYakURLPut(t *testing.T) {
 		client, err := NewLocalClient()
 		require.NoError(t, err)
 		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
-		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		content := utils.RandStringBytes(20)
+		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "PUT",
 			Url: &ypb.YakURL{
 				Schema: "file",
@@ -61,10 +62,13 @@ func TestRequestYakURLPut(t *testing.T) {
 					},
 				},
 			},
+			Body: []byte(content),
 		})
 		require.NoError(t, err)
-		_, err = os.Stat(fileName)
+		require.Equal(t, res.GetResources()[0].Path, fileName)
+		readContent, err := os.ReadFile(fileName)
 		require.NoError(t, err)
+		require.Equal(t, content, string(readContent))
 		os.Remove(fileName)
 	})
 
@@ -74,7 +78,7 @@ func TestRequestYakURLPut(t *testing.T) {
 		client, err := NewLocalClient()
 		require.NoError(t, err)
 		dirName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
-		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "PUT",
 			Url: &ypb.YakURL{
 				Schema: "file",
@@ -88,6 +92,7 @@ func TestRequestYakURLPut(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		require.Equal(t, res.GetResources()[0].Path, dirName)
 		_, err = os.Stat(dirName)
 		require.NoError(t, err)
 		os.Remove(dirName)
@@ -105,7 +110,7 @@ func TestRequestYakURLPost(t *testing.T) {
 		require.NoError(t, err)
 		create.Close()
 		fileContent := utils.RandStringBytes(20)
-		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
 				Schema: "file",
@@ -120,6 +125,7 @@ func TestRequestYakURLPost(t *testing.T) {
 			Body: []byte(fileContent),
 		})
 		require.NoError(t, err)
+		require.Equal(t, res.GetResources()[0].Path, fileName)
 		readContent, err := os.ReadFile(fileName)
 		require.NoError(t, err)
 		require.Equal(t, fileContent, string(readContent))
@@ -136,7 +142,7 @@ func TestRequestYakURLPost(t *testing.T) {
 		require.NoError(t, err)
 		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		create.Close()
-		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
 				Schema: "file",
@@ -153,6 +159,7 @@ func TestRequestYakURLPost(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		require.Equal(t, res.GetResources()[0].Path, newName)
 		exists, err := utils.PathExists(fileName)
 		require.False(t, exists)
 		require.NoError(t, err)
@@ -172,7 +179,7 @@ func TestRequestYakURLPost(t *testing.T) {
 		err = os.Mkdir(dirName, 0755)
 		require.NoError(t, err)
 		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
-		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
 				Schema: "file",
@@ -189,6 +196,7 @@ func TestRequestYakURLPost(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		require.Equal(t, res.GetResources()[0].Path, newName)
 		exists, err := utils.PathExists(dirName)
 		require.False(t, exists)
 		require.NoError(t, err)

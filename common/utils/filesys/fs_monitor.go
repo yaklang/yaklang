@@ -35,6 +35,13 @@ type EventSet struct {
 	ChangeEvents []Event
 }
 
+func (set EventSet) IsEmpty() bool {
+	if len(set.CreateEvents) == 0 && len(set.DeleteEvents) == 0 && len(set.ChangeEvents) == 0 {
+		return true
+	}
+	return false
+}
+
 type YakFileMonitor struct {
 	Events          chan *EventSet
 	RecursiveFinish chan struct{} // recursive finish
@@ -148,7 +155,9 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 				return
 			case <-m.RecursiveFinish:
 				events := <-m.Events
-				eventHandler(events)
+				if !events.IsEmpty() {
+					eventHandler(events)
+				}
 			}
 		}
 	}()
@@ -189,11 +198,11 @@ func CompareFileTree(perv, current *FileNode) *EventSet {
 		}
 
 		for k, _ := range currentNode {
-			events.CreateEvents = append(events.CreateEvents, Event{Path: k, Op: FsMonitorCreate})
+			events.CreateEvents = append(events.CreateEvents, Event{Path: k, Op: FsMonitorCreate, IsDir: currentNode[k].IsDir()})
 		}
 
 		for k, _ := range pervNode {
-			events.DeleteEvents = append(events.DeleteEvents, Event{Path: k, Op: FsMonitorDelete})
+			events.DeleteEvents = append(events.DeleteEvents, Event{Path: k, Op: FsMonitorDelete, IsDir: pervNode[k].IsDir()})
 		}
 
 		if len(nextDepthPervNode) == 0 && len(nextDepthCurrentNode) == 0 {

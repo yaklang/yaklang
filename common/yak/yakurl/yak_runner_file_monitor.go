@@ -3,6 +3,7 @@ package yakurl
 import (
 	"context"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -31,10 +32,12 @@ func init() {
 				YakRunnerMonitor.CancelFunc()
 			}
 			YakRunnerMonitor = m
+			log.Infof("Start monitor path: %v", path)
 		case OP_STOP_MONITOR:
 			if YakRunnerMonitor != nil {
 				YakRunnerMonitor.CancelFunc()
 				YakRunnerMonitor = nil
+				log.Infof("Stop monitor path")
 			}
 		default:
 		}
