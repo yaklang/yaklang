@@ -319,6 +319,8 @@ service Yak {
   rpc YaklangInspectInformation(YaklangInspectInformationRequest) returns (YaklangInspectInformationResponse);
   // 进行数据迁移使用
   rpc YaklangGetCliCodeFromDatabase(YaklangGetCliCodeFromDatabaseRequest) returns (YaklangGetCliCodeFromDatabaseResponse);
+  // editor terminal 交互
+  rpc YaklangTerminal(stream Input) returns (stream Output);
 
   // 端口扫描的封装
   rpc PortScan(PortScanRequest) returns (stream ExecResult);
@@ -5005,6 +5007,7 @@ message Input {
 
   string host = 2;
   uint32 port = 3;
+  string path = 4;
 }
 
 message Output {

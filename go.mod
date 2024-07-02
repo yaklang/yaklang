@@ -16,6 +16,7 @@ require (
 	github.com/antchfx/xpath v1.2.1
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
+	github.com/aymanbagabas/go-pty v0.2.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
@@ -139,6 +140,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/creack/pty v1.1.21 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -175,8 +177,8 @@ require (
 	github.com/lib/pq v1.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
-	github.com/mdlayher/ethernet v0.0.0-20190313224307-5b5fc417d966 // indirect
-	github.com/mdlayher/raw v0.0.0-20190313224157-43dbcdd7739d // indirect
+	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
+	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
@@ -196,6 +198,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
+	github.com/u-root/u-root v0.11.0 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
 	github.com/vmihailenco/bufpool v0.1.11 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.0 // indirect
