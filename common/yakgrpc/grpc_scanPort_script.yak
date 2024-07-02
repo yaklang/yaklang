@@ -46,6 +46,7 @@ if hosts == "" {
 
 hostTotal = len(str.ParseStringToHosts(str.Trim(hosts, ",")))
 portTotal = len(str.ParseStringToPorts(str.Trim(ports, ",")))
+allTasks = hostTotal*portTotal
 // yakit.StatusCard("扫描主机数", hostTotal)
 // yakit.StatusCard("扫描端口数", portTotal)
 
@@ -55,11 +56,6 @@ pingProgress = {
     "doneTasks":0.0,
 }
 
-synProgressLock = sync.NewLock()
-synProgress = {
-    "title":"syn端口开放探测",
-    "doneTasks":0.0,
-}
 
 fingerPrintProgressLock = sync.NewLock()
 fingerPrintProgress =  {
@@ -74,25 +70,23 @@ pluginProgress = {
 }
 
 
-updateProgress = func(progressIns,lock,delta,total...){
-    allTasks = hostTotal*portTotal
-    if len(total) > 0 {
-        allTasks = total[0]
-    }
+sendProgress = func(progressIns,lock,delta){
+    lock.Lock()
+    defer lock.Unlock()
     if allTasks <= 0 {
         yakit.SetProgressEx(progressIns.title,1)
     }
-    lock.Lock()
-    defer lock.Unlock()
-    progressIns.doneTasks += delta
+
+    progressIns.doneTasks = progressIns.doneTasks + delta
+
     if allTasks < progressIns.doneTasks {
         progressIns.doneTasks = allTasks
     }
-    yakit.SetProgressEx(progressIns.title,(float(progressIns.doneTasks) / float(allTasks) ))
+    yakit.SetProgressEx(progressIns.title,(float(progressIns.doneTasks) / float(allTasks)))
 }
 
 if !skippedHostAliveScan{
-    updateProgress(pingProgress,pingProgressLock, 0)
+    sendProgress(pingProgress,pingProgressLock, 0)
 }
 
 opts = []
@@ -216,7 +210,7 @@ handleCrawler = func(result) {
         addr = str.HostPort(result.Target, result.Port)
         res, err = crawler.Start(
             addr, crawler.maxRequest(crawlerMaxRequest),
-            crawler.autoLogin("admin", "password"), 
+            crawler.autoLogin("admin", "password"),
             crawler.urlRegexpExclude(`(?i).*?\/?(logout|reset|delete|setup).*`),
             crawler.jsParser(crawlerEnableJSParser),
         )
@@ -234,7 +228,7 @@ handleCrawler = func(result) {
             } ()
         }
         wg.Wait()
-        updateProgress(pluginProgress,pluginProgressLock,0.5)
+        sendProgress(pluginProgress,pluginProgressLock,0.5)
     }
 }
 
@@ -306,7 +300,7 @@ handleFpResult = func(result) {
             if err != nil { yakit.Error("call port-scan plugin failed: %s", err) }
         }
         manager.GetNativeCaller().CallByNameSync("handle", result)
-        updateProgress(pluginProgress,pluginProgressLock,0.5)
+        sendProgress(pluginProgress,pluginProgressLock,0.5)
     }()
 
     go func{
@@ -319,29 +313,30 @@ getPingScan = func() {
         hosts, ping.proxy(proxies), ping.skip(skippedHostAliveScan), ping.tcpPingPorts(hostAliveTCPPorts),
         ping.timeout(hostAliveTimeout), ping.concurrent(hostAliveConcurrent), ping.onResult(func(i){
             if !(i.Ok) {
-                hostTotal--
+                sendProgress(fingerPrintProgress,fingerPrintProgressLock,portTotal)
+                sendProgress(pluginProgress,pluginProgressLock,portTotal)
             }
             if i.Reason == "skipped"{
                 return
             }
-            updateProgress(pingProgress,pingProgressLock, portTotal)
+            sendProgress(pingProgress,pingProgressLock,portTotal)
         }), ping.excludeHosts(excludeHosts),
     )
 }
 
 if mode == "fingerprint" {
-    updateProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
-    updateProgress(pluginProgress,pluginProgressLock,0)
+    sendProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
+    sendProgress(pluginProgress,pluginProgressLock,0)
     res, err := servicescan.ScanFromPing(
         getPingScan(),
         ports, opts...)
     die(err)
 
     for result = range res {
-        updateProgress(fingerPrintProgress,fingerPrintProgressLock,1)
+        sendProgress(fingerPrintProgress,fingerPrintProgressLock,1)
         handleFpResult(result)
     }
-    updateProgress(fingerPrintProgress,fingerPrintProgressLock,hostTotal*portTotal)
+    sendProgress(fingerPrintProgress,fingerPrintProgressLock,hostTotal*portTotal)
 }
 
 synOpenPortCount = 0
@@ -360,7 +355,6 @@ startSYNPacketCounter = func(){
 }
 
 if mode == "syn" {
-    updateProgress(synProgress,synProgressLock,0)
     startSYNPacketCounter()
     synResults, err := synscan.ScanFromPing(
         getPingScan(), ports, synscan.initHostFilter(hosts), synscan.initPortFilter(ports),
@@ -372,7 +366,6 @@ if mode == "syn" {
     die(err)
 
     for result := range synResults {
-        updateProgress(synProgress,synProgressLock,1)
         addSynOpenPortCount()
 	    yakit.Output({
 		    "host": result.Host,
@@ -384,13 +377,12 @@ if mode == "syn" {
         }
         result.Show()
     }
-    updateProgress(synProgress,synProgressLock,hostTotal*portTotal)
+    yakit.StatusCard("SYN 扫描完成")
 }
 
 if mode == "all" {
-    updateProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
-    updateProgress(pluginProgress,pluginProgressLock,0)
-    updateProgress(synProgress,synProgressLock,0)
+    sendProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
+    sendProgress(pluginProgress,pluginProgressLock,0)
     startSYNPacketCounter()
     synResults, err := synscan.ScanFromPing(
         getPingScan(), ports,
@@ -411,12 +403,11 @@ if mode == "all" {
     die(err)
 
     for result := range res {
-        updateProgress(synProgress,synProgressLock,1)
-        updateProgress(fingerPrintProgress,fingerPrintProgressLock,1)
+        sendProgress(fingerPrintProgress,fingerPrintProgressLock,1)
         handleFpResult(result)
     }
-    updateProgress(synProgress,synProgressLock,hostTotal*portTotal)
-    updateProgress(fingerPrintProgress,fingerPrintProgressLock,hostTotal*portTotal)
+    yakit.StatusCard("","SYN 扫描完成")
+    sendProgress(fingerPrintProgress,fingerPrintProgressLock,hostTotal*portTotal)
 }
 
 
@@ -462,5 +453,5 @@ yakit.Info("PortScan Finished Waiting for Plugin Results")
 println("PortScan Finished... Waiting Plugins")
 manager.Wait()
 if mode == "all" || mode == "fingerprint" {
-    updateProgress(pluginProgress,pluginProgressLock,hostTotal*portTotal)
+    sendProgress(pluginProgress,pluginProgressLock,hostTotal*portTotal)
 }
