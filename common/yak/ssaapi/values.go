@@ -534,11 +534,11 @@ func (v *Value) IsMethod() bool {
 		return false
 	}
 
-	f, ok := ssa.ToFunction(v.node)
+	f, ok := ssa.ToFunctionType(v.node.GetType())
 	if !ok {
 		return false
 	}
-	return f.IsMethod()
+	return f.IsMethod
 }
 
 func (v *Value) GetFunctionObjectType() ssa.Type {
