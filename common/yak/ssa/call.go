@@ -237,14 +237,15 @@ func (c *Call) handleCalleeFunction() {
 				if _, typ := checkCanMemberCall(object, key); typ == nil {
 					builder.NewErrorWithPos(Error, SSATAG,
 						p.GetRange(),
-						FreeValueNotMember(
+						ValueNotMember(
+							object.GetOpcode(),
 							objectName,
 							p.MemberCallKey.String(),
 							c.GetRange(),
 						),
 					)
 					c.NewError(Error, SSATAG,
-						FreeValueNotMemberInCall(
+						ValueNotMemberInCall(
 							objectName,
 							p.MemberCallKey.String(),
 						),
