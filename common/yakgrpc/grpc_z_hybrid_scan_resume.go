@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -136,11 +137,21 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		feedbackStatus()
 		targetWg := new(sync.WaitGroup)
 
+		conn, err := netx.DialX(utils.ExtractHostPort(__currentTarget.Url))
+		if err != nil {
+			log.Errorf("dial target failed: %s", err)
+			hasUnavailableTarget = true
+			statusManager.DoneTarget()
+			feedbackStatus()
+			continue
+		}
+		conn.Close()
+
+		// check can use mitm
+		skipMitm := false
 		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps), lowhttp.WithRuntimeId(task.TaskId))
 		if err != nil {
-			log.Errorf("request target failed: %s", err)
-			hasUnavailableTarget = true
-			continue
+			skipMitm = true
 		}
 		__currentTarget.Response = resp.RawPacket
 
@@ -179,6 +190,15 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 
 			taskIndex := statusManager.DoActiveTask(task)
 			feedbackStatus()
+
+			if __pluginInstance.Type == "mitm" && skipMitm {
+				log.Debugf("skip mitm plugin: %s", __pluginInstance.ScriptName)
+				statusManager.DoneTask(taskIndex, task)
+				statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
+				feedbackStatus()
+				targetWg.Done()
+				continue
+			}
 
 			for !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
