@@ -39,8 +39,14 @@ func (r *SyntaxFlowResult) GetAllValues() map[string]Values {
 func (r *SyntaxFlowResult) GetAllValuesChain() Values {
 	var results Values
 	m := r.GetAllValues()
-	for _, vs := range m {
+	for name, vs := range m {
+		if name == "_" {
+			continue
+		}
 		results = append(results, vs...)
+	}
+	if len(results) == 0 {
+		results = append(results, r.GetValues("_")...)
 	}
 	return results
 }
