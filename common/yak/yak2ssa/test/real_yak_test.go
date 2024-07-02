@@ -307,12 +307,12 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			f()
 			`,
 			Want: []string{
-				ssa.FreeValueNotMember("a", "b", ssa.NewRange(
+				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", ssa.NewRange(
 					nil,
 					ssa.NewPosition(6, 3),
 					ssa.NewPosition(6, 6),
 				)),
-				ssa.FreeValueNotMemberInCall("a", "b"),
+				ssa.ValueNotMemberInCall("a", "b"),
 			},
 		})
 	})
