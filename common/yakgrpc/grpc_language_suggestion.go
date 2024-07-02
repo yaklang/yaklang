@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
@@ -722,6 +723,31 @@ func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ss
 	return values[0].GetSelf()
 }
 
+func getFuncCompletionBySSAType(funcName string, typ ssa.Type) string {
+	s, ok := ssa.ToFunctionType(typ)
+	if !ok {
+		return ""
+	}
+
+	paras := make([]string, 0, s.ParameterLen)
+	for i := 0; i < s.ParameterLen; i++ {
+		paramsStr := s.Parameter[i].String()
+		if (i == s.ParameterLen-1) && s.IsVariadic {
+			paramsStr = "..." + paramsStr
+		}
+		paras = append(paras, fmt.Sprintf("${%d:%s}", i+1, paramsStr))
+	}
+
+	return fmt.Sprintf(
+		"%s(%s)",
+		funcName,
+		strings.Join(
+			paras,
+			", ",
+		),
+	)
+}
+
 func trimSourceCode(sourceCode string) (string, bool) {
 	containPoint := strings.Contains(sourceCode, ".")
 	if strings.HasSuffix(sourceCode, ".") {
@@ -890,27 +916,27 @@ func completionYakTypeBuiltinMethod(rng *ssa.Range, v *ssaapi.Value, realTyp ...
 		ret = append(ret, getMapBuiltinMethodSuggestions()...)
 
 		// map 成员
-		filterMap := make(map[string]struct{})
-		v.GetUsers().Filter(func(u *ssaapi.Value) bool {
-			rng2 := u.GetRange()
-			if rng2 == nil {
-				return false
+		for _, slices := range v.GetMembers() {
+			key, member := slices[0], slices[1]
+
+			kind := "Field"
+			insertText := ""
+			label := key.String()
+			if kind := key.GetTypeKind(); kind == ssa.StringTypeKind || kind == ssa.BytesTypeKind {
+				label, _ = strconv.Unquote(label)
 			}
-			endOffset := rng2.GetEndOffset()
-			return u.IsMember() && endOffset < rng.GetEndOffset()
-		}).ForEach(func(v *ssaapi.Value) {
-			key := v.GetOperand(1)
-			if _, ok := filterMap[key.String()]; ok {
-				return
+
+			if typ := ssaapi.GetBareType(member.GetType()); typ.GetTypeKind() == ssa.FunctionTypeKind {
+				kind = "Method"
+				insertText = getFuncCompletionBySSAType(label, typ)
 			}
 			ret = append(ret, &ypb.SuggestionDescription{
-				Label:       key.String(),
+				Label:       label,
 				Description: "",
-				InsertText:  key.String(),
-				Kind:        "Field",
+				InsertText:  insertText,
+				Kind:        kind,
 			})
-			filterMap[key.String()] = struct{}{}
-		})
+		}
 	case ssa.StringTypeKind:
 		// string 内置方法
 		ret = append(ret, getStringBuiltinMethodSuggestions()...)
