@@ -13,6 +13,13 @@ var MathExport = map[string]interface{}{
 	"Abs":         Abs,
 	"NaN":         NaN,
 	"IsNaN":       IsNaN,
+	"Sinh":        Sinh,
+	"Sin":         Sin,
+	"Cos":         Cos,
+	"Tan":         Tan,
+	"Asin":        Asin,
+	"Acos":        Acos,
+	"Atan":        Atan,
 	"Pi":          math.Pi,
 	"Ln10":        math.Ln10,
 	"Ln2":         math.Ln2,
@@ -123,4 +130,41 @@ func NaN() float64 {
 // ```
 func IsNaN(x float64) bool {
 	return math.IsNaN(x)
+}
+
+// Sinh 双曲正弦函数
+func Sinh(x float64) float64 {
+	return math.Sinh(x)
+}
+
+//trigonometric functions
+
+// Sin 三角函数 sin
+func Sin(x float64) float64 {
+	return math.Sin(x)
+}
+
+// Cos 三角函数 Cos
+func Cos(x float64) float64 {
+	return math.Cos(x)
+}
+
+// Tan 三角函数 Tan
+func Tan(x float64) float64 {
+	return math.Tan(x)
+}
+
+// Asin 反三角函数 Asin
+func Asin(x float64) float64 {
+	return math.Asin(x)
+}
+
+// Acos 反三角函数 Acos
+func Acos(x float64) float64 {
+	return math.Acos(x)
+}
+
+// Atan 反三角函数 Atan
+func Atan(x float64) float64 {
+	return math.Atan(x)
 }
