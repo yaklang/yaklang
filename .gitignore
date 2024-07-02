@@ -47,3 +47,4 @@ tmp_build/
 gen
 .antlr/
 common/xlic/*.gzip
+.go-version
