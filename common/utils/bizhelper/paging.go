@@ -54,20 +54,18 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 			return
 		}
 		if p.Limit == -1 {
-			db.Find(result)
+			tx.Find(result)
 		} else {
 			if p.Page == 1 {
 				offset = 0
 			} else {
 				offset = (p.Page - 1) * p.Limit
 			}
-			db.Limit(p.Limit).Offset(offset).Find(result)
+			tx.Limit(p.Limit).Offset(offset).Find(result)
 		}
-
 	})
 
 	if p.Limit == -1 {
-		db.Find(result)
 		paginator.TotalRecord = count
 		paginator.Records = result
 		paginator.Page = 1
@@ -77,7 +75,6 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 		paginator.TotalPage = int(math.Ceil(float64(count) / float64(p.Limit)))
 		return &paginator, db
 	}
-	db.Limit(p.Limit).Offset(offset).Find(result)
 
 	paginator.TotalRecord = count
 	paginator.Records = result
