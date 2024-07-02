@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -107,12 +108,14 @@ func (v *Value) String() string {
 	}
 	return ssa.LineDisasm(v.node)
 }
+
 func (v *Value) ShortString() string {
 	if v.IsNil() {
 		return ""
 	}
 	return ssa.LineShortDisasm(v.node)
 }
+
 func (v *Value) StringWithRange() string {
 	if v.IsNil() {
 		return ""
@@ -511,6 +514,19 @@ func (v *Value) GetAllMember() Values {
 	return ret
 }
 
+// GetAllMember get member keys and values
+func (v *Value) GetMembers() [][]*Value {
+	if v.IsNil() {
+		return nil
+	}
+	all := v.node.GetAllMember()
+	ret := make([][]*Value, 0, len(all))
+	for key, value := range all {
+		ret = append(ret, []*Value{v.NewValue(key), v.NewValue(value)})
+	}
+	return ret
+}
+
 // // MemberCall : member
 
 func (v *Value) IsMethod() bool {
@@ -617,7 +633,6 @@ func (v *Value) GetCalledBy() Values {
 				vs = append(vs, v.NewValue(call))
 			}
 		}
-
 	}
 	add(v.node)
 	for _, ref := range v.node.Reference() {
