@@ -56,7 +56,16 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 	}
 	defer file.Close()
 	file.WriteString("# " + lib.Name + "\n\n")
-	file.WriteString("|成员函数|函数描述/介绍|\n")
+	if len(lib.Instances) > 0 {
+		file.WriteString("|实例名|实例描述|\n")
+		file.WriteString("|:------|:--------|\n")
+		for _, ins := range lib.Instances {
+			file.WriteString(fmt.Sprintf("%s|(%s) %s|\n", ins.InstanceName, ins.Type, ins.ValueStr))
+		}
+		file.WriteString("\n")
+	}
+
+	file.WriteString("|函数名|函数描述/介绍|\n")
 	file.WriteString("|:------|:--------|\n")
 
 	// 将Functions转成list

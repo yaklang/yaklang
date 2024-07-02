@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -212,33 +213,6 @@ rsp.`, &ypb.Range{
 			EndColumn:   5,
 		}, []string{"Response", "Body", "Status", "Data"})
 	})
-	// 	t.Run("cache", func(t *testing.T) {
-	// 		t.Parallel()
-	// 		code := `asd = fuzz.HTTPRequest("")~
-	// for a in asd.GetCommonParams() {
-	// v = a
-	// a
-	// }`
-	// 		id := uuid.NewString()
-	// 		// // trigger cache
-	// 		// getCompletion(t, code, &ypb.Range{
-	// 		// 	Code:        "a",
-	// 		// 	StartLine:   4,
-	// 		// 	StartColumn: 0,
-	// 		// 	EndLine:     4,
-	// 		// 	EndColumn:   1,
-	// 		// }, id)
-
-	// 		// // check cache
-	// 		code = strings.Replace(code, "\na\n", "\na.\n", 1)
-	// 		checkCompletionContains(t, code, &ypb.Range{
-	// 			Code:        "a.",
-	// 			StartLine:   4,
-	// 			StartColumn: 0,
-	// 			EndLine:     4,
-	// 			EndColumn:   2,
-	// 		}, []string{"Fuzz", "Value", "Name"}, id)
-	// 	})
 
 	t.Run("chain function call", func(t *testing.T) {
 		t.Parallel()
@@ -320,6 +294,68 @@ rsp.`,
 				EndLine:     1,
 				EndColumn:   35,
 			}, []string{"Pop", "Keys"})
+	})
+
+	t.Run("fix map field and func", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("map field", func(t *testing.T) {
+			checkCompletionWithCallbacks(t,
+				`a = {b"field": 1};a.`,
+				&ypb.Range{
+					Code:        "a.",
+					StartLine:   1,
+					StartColumn: 20,
+					EndLine:     1,
+					EndColumn:   21,
+				},
+				labelsContainsCallback(t, []string{"field", "Keys"}),
+			)
+		})
+
+		t.Run("map function", func(t *testing.T) {
+			checkCompletionWithCallbacks(t,
+				`a = {"func": func(b, c) {return 2}};a.`,
+				&ypb.Range{
+					Code:        "a.",
+					StartLine:   1,
+					StartColumn: 37,
+					EndLine:     1,
+					EndColumn:   39,
+				},
+				func(suggestions []*ypb.SuggestionDescription) {
+					// check
+					items := lo.Filter(suggestions, func(item *ypb.SuggestionDescription, _ int) bool {
+						return item.Label == "func"
+					})
+					require.Len(t, items, 1, `want map func but not`)
+
+					// check type kind
+					item := items[0]
+					require.Equal(t, "Method", item.Kind)
+					require.Equal(t, getFuncCompletionBySSAType("func",
+						ssa.NewFunctionTypeDefine("func", []ssa.Type{ssa.GetAnyType(), ssa.GetAnyType()}, []ssa.Type{ssa.GetNumberType()}, false)),
+						item.InsertText)
+				},
+			)
+		})
+	})
+
+	t.Run("halfway", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`a = {"a":1};a.del`,
+			&ypb.Range{
+				Code:        "a.Del",
+				StartLine:   1,
+				StartColumn: 13,
+				EndLine:     1,
+				EndColumn:   18,
+			},
+			labelsContainsCallback(t, []string{"Delete"}),
+			labelsNotContainsCallback(t, []string{"del"}),
+		)
 	})
 }
 
@@ -820,6 +856,8 @@ c = poc.HTTP
 c()
 d = ""
 d.Contains("c")
+e={"a":1}
+e.Delete
 `
 
 	pocLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
@@ -867,13 +905,26 @@ d.Contains("c")
 	t.Run("type builtin method", func(t *testing.T) {
 		t.Parallel()
 
-		ssaRange := &ypb.Range{
-			Code:        "d.Contains",
-			StartLine:   7,
-			StartColumn: 1,
-			EndLine:     7,
-			EndColumn:   11,
-		}
-		check(t, code, "yak", ssaRange, "func (string) Contains(r1 string) boolean", "判断字符串是否包含子串")
+		t.Run("slice", func(t *testing.T) {
+			ssaRange := &ypb.Range{
+				Code:        "d.Contains",
+				StartLine:   7,
+				StartColumn: 1,
+				EndLine:     7,
+				EndColumn:   11,
+			}
+			check(t, code, "yak", ssaRange, "func (string) Contains(r1 string) boolean", "判断字符串是否包含子串")
+		})
+
+		t.Run("map", func(t *testing.T) {
+			ssaRange := &ypb.Range{
+				Code:        "e.Delete",
+				StartLine:   9,
+				StartColumn: 1,
+				EndLine:     9,
+				EndColumn:   9,
+			}
+			check(t, code, "yak", ssaRange, "func (map[string]number) Delete(r1 string) null", "移除一个值")
+		})
 	})
 }

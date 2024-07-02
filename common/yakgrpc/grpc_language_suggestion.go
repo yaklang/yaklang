@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
@@ -181,10 +182,15 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	return standardLibrarySuggestions
 }
 
-func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ssa.Range) *ssaapi.Value {
+func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ssa.Range, skipNum int) *ssaapi.Value {
 	// use editor instead of prog.Program.Editor because of ssa cache
+	var value ssa.Value
 	offset := rng.GetEndOffset()
-	value := prog.Program.GetFrontValueByOffset(offset)
+	for i := 0; i < skipNum; i++ {
+		_, offset = prog.Program.SearchIndexAndOffsetByOffset(offset)
+		offset--
+	}
+	_, value = prog.Program.GetFrontValueByOffset(offset)
 	if !utils.IsNil(value) {
 		return prog.NewValue(value)
 	}
@@ -296,7 +302,7 @@ func getFuncDeclDescEx(funcDecl *yakdoc.FuncDecl, typStr string, f *ssa.Function
 		document = "\n\n" + document
 	}
 	decl := funcDecl.Decl
-	if f.IsGeneric() {
+	if f != nil && f.IsGeneric() {
 		decl = funcDecl.MethodName + f.GetType().RawString()
 	}
 	decl = strings.Replace(decl, "func(", typStr+"(", 1)
@@ -579,6 +585,8 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 
 	switch typKind {
 	case ssa.FunctionTypeKind:
+		document := ""
+
 		if v.IsMethod() {
 			parentBareTyp := v.GetFunctionObjectType()
 			parentTypStr = getGolangTypeStringBySSAType(parentBareTyp)
@@ -587,19 +595,12 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			if ok {
 				funcDecl, ok := lib.Functions[lastName]
 				if ok {
-					f, _ := ssa.ToFunction(ssaapi.GetBareNode(v))
-					desc = getFuncDeclDescEx(funcDecl, lastName, f)
-					break
+					document = funcDecl.Document
 				}
 			}
-
 		} else if parentV != nil {
 			// 类型内置方法
-			decl, document := getBuiltinFuncDeclAndDoc(lastName, parentBareTyp)
-			if decl != "" {
-				desc = fmt.Sprintf("```go\nfunc %s\n```\n\n%s", decl, document)
-				break
-			}
+			_, document = getBuiltinFuncDeclAndDoc(lastName, parentBareTyp)
 		}
 
 		// 用户自定义函数
@@ -607,7 +608,10 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 		if !ok {
 			break
 		}
-		desc = fmt.Sprintf("```go\n%s\n```", getFuncTypeDesc(funcTyp, lastName))
+		if document != "" {
+			document = "\n\n" + document
+		}
+		desc = fmt.Sprintf("```go\n%s\n```%s", getFuncTypeDesc(funcTyp, lastName), document)
 	case ssa.StructTypeKind:
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
 		if !ok {
@@ -720,6 +724,31 @@ func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ss
 		return nil
 	}
 	return values[0].GetSelf()
+}
+
+func getFuncCompletionBySSAType(funcName string, typ ssa.Type) string {
+	s, ok := ssa.ToFunctionType(typ)
+	if !ok {
+		return ""
+	}
+
+	paras := make([]string, 0, s.ParameterLen)
+	for i := 0; i < s.ParameterLen; i++ {
+		paramsStr := s.Parameter[i].String()
+		if (i == s.ParameterLen-1) && s.IsVariadic {
+			paramsStr = "..." + paramsStr
+		}
+		paras = append(paras, fmt.Sprintf("${%d:%s}", i+1, paramsStr))
+	}
+
+	return fmt.Sprintf(
+		"%s(%s)",
+		funcName,
+		strings.Join(
+			paras,
+			", ",
+		),
+	)
 }
 
 func trimSourceCode(sourceCode string) (string, bool) {
@@ -890,27 +919,30 @@ func completionYakTypeBuiltinMethod(rng *ssa.Range, v *ssaapi.Value, realTyp ...
 		ret = append(ret, getMapBuiltinMethodSuggestions()...)
 
 		// map 成员
-		filterMap := make(map[string]struct{})
-		v.GetUsers().Filter(func(u *ssaapi.Value) bool {
-			rng2 := u.GetRange()
-			if rng2 == nil {
-				return false
+		for _, slices := range v.GetMembers() {
+			key, member := slices[0], slices[1]
+			if member.IsUndefined() {
+				continue
 			}
-			endOffset := rng2.GetEndOffset()
-			return u.IsMember() && endOffset < rng.GetEndOffset()
-		}).ForEach(func(v *ssaapi.Value) {
-			key := v.GetOperand(1)
-			if _, ok := filterMap[key.String()]; ok {
-				return
+
+			kind := "Field"
+			insertText := ""
+			label := key.String()
+			if kind := key.GetTypeKind(); kind == ssa.StringTypeKind || kind == ssa.BytesTypeKind {
+				label, _ = strconv.Unquote(label)
+			}
+
+			if typ := ssaapi.GetBareType(member.GetType()); typ.GetTypeKind() == ssa.FunctionTypeKind {
+				kind = "Method"
+				insertText = getFuncCompletionBySSAType(label, typ)
 			}
 			ret = append(ret, &ypb.SuggestionDescription{
-				Label:       key.String(),
+				Label:       label,
 				Description: "",
-				InsertText:  key.String(),
-				Kind:        "Field",
+				InsertText:  insertText,
+				Kind:        kind,
 			})
-			filterMap[key.String()] = struct{}{}
-		})
+		}
 	case ssa.StringTypeKind:
 		// string 内置方法
 		ret = append(ret, getStringBuiltinMethodSuggestions()...)
@@ -986,6 +1018,14 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		ret = append(ret, completionYakStandardLibraryChildren(v)...)
 		ret = append(ret, completionYakTypeBuiltinMethod(rng, v)...)
 		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
+	}
+	if len(ret) == 0 && containPoint && v.IsUndefined() {
+		// undefined means halfway through the analysis
+		// so try to get the value before and complete again
+		v = v.GetObject()
+		if !v.IsNil() {
+			return OnCompletion(prog, word, containPoint, rng, v)
+		}
 	}
 	return ret
 }

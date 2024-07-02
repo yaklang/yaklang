@@ -149,7 +149,7 @@ func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, 
 	return
 }
 
-func (prog *Program) GetFrontValueByOffset(searchOffset int) (value Value) {
+func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value Value) {
 	index, offset := prog.SearchIndexAndOffsetByOffset(searchOffset)
 	// 如果二分查找的结果是大于目标值的，那么就需要回退一个
 	if offset > searchOffset {
@@ -159,7 +159,7 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (value Value) {
 	if item, ok := prog.OffsetMap[offset]; ok {
 		value = item.GetValue()
 	}
-	return value
+	return offset, value
 }
 
 func (prog *Program) IsPackagePathInList(pkgName string) bool {
