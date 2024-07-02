@@ -340,6 +340,23 @@ rsp.`,
 			)
 		})
 	})
+
+	t.Run("halfway", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`a = {"a":1};a.del`,
+			&ypb.Range{
+				Code:        "a.Del",
+				StartLine:   1,
+				StartColumn: 13,
+				EndLine:     1,
+				EndColumn:   18,
+			},
+			labelsContainsCallback(t, []string{"Delete"}),
+			labelsNotContainsCallback(t, []string{"del"}),
+		)
+	})
 }
 
 var local ypb.YakClient = nil
@@ -839,6 +856,8 @@ c = poc.HTTP
 c()
 d = ""
 d.Contains("c")
+e={"a":1}
+e.Delete
 `
 
 	pocLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
@@ -886,13 +905,26 @@ d.Contains("c")
 	t.Run("type builtin method", func(t *testing.T) {
 		t.Parallel()
 
-		ssaRange := &ypb.Range{
-			Code:        "d.Contains",
-			StartLine:   7,
-			StartColumn: 1,
-			EndLine:     7,
-			EndColumn:   11,
-		}
-		check(t, code, "yak", ssaRange, "func (string) Contains(r1 string) boolean", "判断字符串是否包含子串")
+		t.Run("slice", func(t *testing.T) {
+			ssaRange := &ypb.Range{
+				Code:        "d.Contains",
+				StartLine:   7,
+				StartColumn: 1,
+				EndLine:     7,
+				EndColumn:   11,
+			}
+			check(t, code, "yak", ssaRange, "func (string) Contains(r1 string) boolean", "判断字符串是否包含子串")
+		})
+
+		t.Run("map", func(t *testing.T) {
+			ssaRange := &ypb.Range{
+				Code:        "e.Delete",
+				StartLine:   9,
+				StartColumn: 1,
+				EndLine:     9,
+				EndColumn:   9,
+			}
+			check(t, code, "yak", ssaRange, "func (map[string]number) Delete(r1 string) null", "移除一个值")
+		})
 	})
 }

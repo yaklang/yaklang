@@ -182,10 +182,15 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	return standardLibrarySuggestions
 }
 
-func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ssa.Range) *ssaapi.Value {
+func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ssa.Range, skipNum int) *ssaapi.Value {
 	// use editor instead of prog.Program.Editor because of ssa cache
+	var value ssa.Value
 	offset := rng.GetEndOffset()
-	value := prog.Program.GetFrontValueByOffset(offset)
+	for i := 0; i < skipNum; i++ {
+		_, offset = prog.Program.SearchIndexAndOffsetByOffset(offset)
+		offset--
+	}
+	_, value = prog.Program.GetFrontValueByOffset(offset)
 	if !utils.IsNil(value) {
 		return prog.NewValue(value)
 	}
@@ -918,6 +923,9 @@ func completionYakTypeBuiltinMethod(rng *ssa.Range, v *ssaapi.Value, realTyp ...
 		// map 成员
 		for _, slices := range v.GetMembers() {
 			key, member := slices[0], slices[1]
+			if member.IsUndefined() {
+				continue
+			}
 
 			kind := "Field"
 			insertText := ""
@@ -1012,6 +1020,14 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		ret = append(ret, completionYakStandardLibraryChildren(v)...)
 		ret = append(ret, completionYakTypeBuiltinMethod(rng, v)...)
 		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
+	}
+	if len(ret) == 0 && containPoint && v.IsUndefined() {
+		// undefined means halfway through the analysis
+		// so try to get the value before and complete again
+		v = v.GetObject()
+		if !v.IsNil() {
+			return OnCompletion(prog, word, containPoint, rng, v)
+		}
 	}
 	return ret
 }
