@@ -40,9 +40,8 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	case *sf.FunctionCallFilterContext:
 		if filter.ActualParam() != nil {
 			y.VisitActualParam(filter.ActualParam())
-		} else {
-			y.EmitGetCall()
 		}
+		y.EmitGetCall()
 	case *sf.DeepChainFilterContext:
 		if filter.NameFilter().GetText() == "*" {
 			return utils.Error("Syntax ERROR: deep chain filter cannot be ...*")
