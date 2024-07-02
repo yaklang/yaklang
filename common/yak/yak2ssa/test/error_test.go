@@ -1485,3 +1485,61 @@ target = append(a, b"qwe", b"zxc")`,
 		)
 	})
 }
+
+func TestParameterMember(t *testing.T) {
+	t.Run("assign", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			a = 1
+			f = (a) => {
+				a.b = 1 
+			}
+			f(a)
+			`,
+			Want: []string{
+				ssa4analyze.InvalidField("number", "b"),
+			},
+		})
+	})
+
+	t.Run("read", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			a = 1
+			f = (a) => {
+				b = a.b
+			}
+			f(a)
+			`,
+			Want: []string{
+				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", ssa.NewRange(
+					nil,
+					ssa.NewPosition(6, 3),
+					ssa.NewPosition(6, 7),
+				)),
+				ssa.ValueNotMemberInCall("a", "b"),
+			},
+		})
+	})
+
+	t.Run("++, read and write by variable", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			a = 1
+			f = (a) => {
+				a.b += 1
+			}
+			f(a)
+			`,
+			Want: []string{
+				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", ssa.NewRange(
+					nil,
+					ssa.NewPosition(6, 3),
+					ssa.NewPosition(6, 7),
+				)),
+				ssa.ValueNotMemberInCall("a", "b"),
+				ssa4analyze.InvalidField("number", "b"),
+			},
+		})
+	})
+}

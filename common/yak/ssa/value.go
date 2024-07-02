@@ -16,6 +16,14 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 		return ret
 	}
 
+	if para, ok := ToParameter(v.object); ok {
+		name, typ := checkCanMemberCall(para, v.key)
+		newParamterMember := b.NewParameterMember(name, para, v.key)
+		newParamterMember.SetType(typ)
+		SetMemberCall(para, v.key, newParamterMember)
+		setMemberVerboseName(newParamterMember)
+	}
+
 	return b.ReadValue(v.GetName())
 }
 
