@@ -51,7 +51,7 @@ for req in reqs {
     go fn {
         defer swg.Done()
         try {
-            switch {
+            switch pluginType {
                 case "nuclei":
                     u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps )~
                     caller.MirrorHTTPFlowExSync(!isSmoking,req.IsHttps, u.String(), req.RawHTTPRequest, "", "") // nuclei scan not need rsp
