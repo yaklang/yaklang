@@ -112,6 +112,10 @@ func (l *LowhttpResponse) GetBody() []byte {
 	return body
 }
 
+func (l *LowhttpResponse) GetStatusCode() int {
+	return GetStatusCodeFromResponse(l.RawPacket)
+}
+
 func (l *LowhttpResponse) GetDurationFloat() float64 {
 	if l == nil {
 		return 0
@@ -133,7 +137,6 @@ type LowhttpTraceInfo struct {
 	// 完整请求的耗时
 	TotalTime time.Duration
 }
-
 
 func (l *LowhttpTraceInfo) GetServerDurationMS() int64 {
 	if l == nil {
