@@ -178,12 +178,8 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		return utils.Error("target is empty")
 	}
 
-	isUrlParam := false
 	switch strings.ToLower(scriptType) {
-	case "mitm", "port-scan":
-	case "nuclei":
-		isUrlParam = true
-		break
+	case "mitm", "port-scan", "nuclei":
 	default:
 		return utils.Error("unsupported plugin type: " + scriptType)
 	}
@@ -221,15 +217,6 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		}
 	}()
 
-	// 不同的插件类型，需要不同的处理
-	switch strings.ToLower(scriptType) {
-	case "mitm":
-	case "nuclei":
-	case "port-scan":
-	default:
-		return utils.Error("unsupported plugin type: " + scriptType)
-	}
-
 	// smoking
 	isSmoking := false
 	if len(execParams) > 0 {
@@ -255,15 +242,14 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(streamCtx, debugScriptCode, map[string]any{
-		"REQUESTS":     reqs,
-		"CTX":          streamCtx,
-		"PLUGIN":       scriptInstance,
-		"PLUGIN_CODE":  scriptCode,
-		"PLUGIN_NAME":  scriptName,
-		"IS_URL_PARAM": isUrlParam,
-		"PLUGIN_TYPE":  strings.ToLower(scriptType),
-		"IS_SMOKING":   isSmoking,
-		"RUNTIME_ID":   runtimeId,
+		"REQUESTS":    reqs,
+		"CTX":         streamCtx,
+		"PLUGIN":      scriptInstance,
+		"PLUGIN_CODE": scriptCode,
+		"PLUGIN_NAME": scriptName,
+		"PLUGIN_TYPE": strings.ToLower(scriptType),
+		"IS_SMOKING":  isSmoking,
+		"RUNTIME_ID":  runtimeId,
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)

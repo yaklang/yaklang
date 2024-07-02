@@ -8,7 +8,6 @@ reqs = [{"RawHTTPRequest": b`GET / HTTP/1.1
 Host: www.example.com
 `, "IsHttps": true}]
 
-isUrlParam = false
 pluginType = "mitm"
 isSmoking = false
 runtimeId = ""
@@ -18,7 +17,6 @@ if getParams("REQUESTS") != undefined {
     plugin = getParams("PLUGIN")
     pluginName = getParams("PLUGIN_NAME")
     pluginCode = getParams("PLUGIN_CODE")
-    isUrlParam = getParams("IS_URL_PARAM")
     pluginType = getParams("PLUGIN_TYPE")
     isSmoking = getParams("IS_SMOKING")
     runtimeId = getParams("RUNTIME_ID")
@@ -29,7 +27,7 @@ Init Yakit
 */
 yakit.AutoInitYakit()
 yakit.Info("Start to load plugin: %v", pluginName)
-yakit.Info("RuntimeID: %v", RUNTIME_ID)
+yakit.Info("RuntimeID: %v", runtimeId)
 
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
@@ -53,28 +51,33 @@ for req in reqs {
     go fn {
         defer swg.Done()
         try {
-            if isUrlParam {
-                u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps /*type: bool*/)~
-                caller.MirrorHTTPFlow(req.IsHttps, u.String(), req.RawHTTPRequest, "", "")
-            } else {
-                rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
-                rsp = rspIns.RawPacket
-                firstRsp = rspIns.RedirectRawPackets[0].Response
-                firstReq = rspIns.RedirectRawPackets[0].Request
-                reqRaw = rspIns.RedirectRawPackets[-1].Request
-                if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
-                    reqRaw = firstReq
-                }
-                println("---------------------")
-                println(string(reqRaw))
-                println(string(rsp))
-                println("---------------------")
-                isHttps = req.IsHttps
+            switch {
+                case "nuclei":
+                    u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps )~
+                    caller.MirrorHTTPFlowExSync(!isSmoking,req.IsHttps, u.String(), req.RawHTTPRequest, "", "") // nuclei scan not need rsp
+                case "port-scan":
+                    u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps )~
+                    caller.MirrorHTTPFlowExSync(!isSmoking,req.IsHttps, u.String(), "", "", "") // port scan not need req and rsp
+                default:
+                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
+                    rsp = rspIns.RawPacket
+                    firstRsp = rspIns.RedirectRawPackets[0].Response
+                    firstReq = rspIns.RedirectRawPackets[0].Request
+                    reqRaw = rspIns.RedirectRawPackets[-1].Request
+                    if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
+                        reqRaw = firstReq
+                    }
+                    println("---------------------")
+                    println(string(reqRaw))
+                    println(string(rsp))
+                    println("---------------------")
+                    isHttps = req.IsHttps
 
-                u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
-                header, body = poc.Split(rsp)~
-                caller.MirrorHTTPFlowExSync(!isSmoking, isHttps, u.String(), reqRaw, rsp, body)
-                sleep(float(randn(40,100))/float(1000))
+                    u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
+                    header, body = poc.Split(rsp)~
+                    caller.MirrorHTTPFlowExSync(!isSmoking, isHttps, u.String(), reqRaw, rsp, body)
+                    sleep(float(randn(40,100))/float(1000))
+
             }
         } catch err {
             println("===================packet=================== \n%v" % string(req.RawHTTPRequest))
