@@ -109,8 +109,7 @@ Host: www.example.com
 }
 
 func TestGRPCMUSTPASS_HTTP_HijackedFlow_Request(t *testing.T) {
-	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
-	client, err := NewLocalClient(true)
+	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,29 +174,38 @@ assert string(poc.Split(rsp)[1]) == token2
 		}
 	}
 
-	rpcResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-		Pagination: &ypb.Paging{
-			Page:  1,
-			Limit: 100,
-		},
-		SourceType: "mitm",
-		Keyword:    token2,
+	var rpcResponse *ypb.QueryHTTPFlowResponse
+	err = utils.AttemptWithDelayFast(func() error {
+		rpcResponse, err = client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 100,
+			},
+			SourceType: "mitm",
+			Keyword:    token2,
+		})
+		if err != nil {
+			return err
+		}
+		if rpcResponse.GetTotal() <= 0 {
+			return utils.Errorf("got 0 flows")
+		}
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rpcResponse.GetTotal() <= 0 {
-		t.Fatal("no flow")
-	}
+	require.NoError(t, err)
+
 	flow := rpcResponse.GetData()[0]
 	finalRequest := flow.Request
-	rpcResponse2, err := client.GetHTTPFlowBare(context.Background(), &ypb.HTTPFlowBareRequest{
-		Id:       int64(flow.GetId()),
-		BareType: "request",
+	var rpcResponse2 *ypb.HTTPFlowBareResponse
+	err1 := utils.AttemptWithDelayFast(func() error {
+		rpcResponse2, err = client.GetHTTPFlowBare(context.Background(), &ypb.HTTPFlowBareRequest{
+			Id:       int64(flow.GetId()),
+			BareType: "request",
+		})
+		return err
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err1)
+
 	// 检验原始请求
 	if !strings.Contains(string(rpcResponse2.GetData()), "Token: aaaaa") {
 		t.Fatal("not found origin token")
@@ -210,8 +218,7 @@ assert string(poc.Split(rsp)[1]) == token2
 }
 
 func TestGRPCMUSTPASS_HTTP_HijackedFlow_Response(t *testing.T) {
-	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
-	client, err := NewLocalClient(true)
+	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,31 +300,39 @@ assert string(body) == token2, sprintf("get %s != %s", string(body), string(toke
 		}
 	}
 
-	rpcResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-		Pagination: &ypb.Paging{
-			Page:  1,
-			Limit: 100,
-		},
-		SourceType: "mitm",
-		Keyword:    token2,
-		Full:       true,
+	var rpcResponse *ypb.QueryHTTPFlowResponse
+	err = utils.AttemptWithDelayFast(func() error {
+		rpcResponse, err = client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 100,
+			},
+			SourceType: "mitm",
+			Keyword:    token2,
+			Full:       true,
+		})
+		if err != nil {
+			return err
+		}
+		if rpcResponse.GetTotal() <= 0 {
+			return utils.Errorf("got 0 flows")
+		}
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rpcResponse.GetTotal() <= 0 {
-		t.Fatal("no flow")
-	}
+	require.NoError(t, err)
 
 	flow := rpcResponse.GetData()[0]
 	finalResponse := flow.Response
-	rpcResponse2, err := client.GetHTTPFlowBare(context.Background(), &ypb.HTTPFlowBareRequest{
-		Id:       int64(flow.GetId()),
-		BareType: "response",
+	var rpcResponse2 *ypb.HTTPFlowBareResponse
+	err1 := utils.AttemptWithDelayFast(func() error {
+		rpcResponse2, err = client.GetHTTPFlowBare(context.Background(), &ypb.HTTPFlowBareRequest{
+			Id:       int64(flow.GetId()),
+			BareType: "response",
+		})
+		return err
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err1)
+
 	// 检验原始响应
 	if !strings.Contains(string(rpcResponse2.GetData()), token1) {
 		t.Fatalf("not found origin token, raw response: %s", string(rpcResponse2.GetData()))
