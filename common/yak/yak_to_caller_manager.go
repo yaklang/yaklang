@@ -1264,7 +1264,7 @@ func (y *YakToCallerManager) CallByName(name string, items ...interface{}) {
 }
 
 func (y *YakToCallerManager) CallByNameSync(name string, items ...interface{}) {
-	y.CallPluginKeyByName("", name, items...)
+	y.CallPluginKeyByNameSync("", name, items...)
 }
 
 func (y *YakToCallerManager) CallByNameEx(name string, items ...func() interface{}) {
