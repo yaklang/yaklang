@@ -126,7 +126,7 @@ func (ve *MemEditor) GetLine(x int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	//return ve.sourceCode[start:end], nil
+	// return ve.sourceCode[start:end], nil
 	return ve.safeSourceCode.Slice2(start, end), nil
 }
 
@@ -329,7 +329,7 @@ func (ve *MemEditor) GetTextFromOffset(offset1, offset2 int) string {
 	if end <= 0 {
 		end = 0
 	}
-	//return ve.sourceCode[start:end]
+	// return ve.sourceCode[start:end]
 	return ve.safeSourceCode.Slice2(start, end)
 }
 
@@ -353,6 +353,21 @@ func (ve *MemEditor) boundary(c rune) bool {
 	return !('a' <= c && c <= 'z') && !('A' <= c && c <= 'Z') && !('0' <= c && c <= '9')
 }
 
+func (ve *MemEditor) ExpandWordTextOffset(startOffset, endOffset int) (int, int) {
+	// 扩展起始偏移到前一个单词边界
+	startWordOffset := startOffset
+	for startWordOffset > 0 && !ve.boundary(rune(ve.safeSourceCode.Slice1(startWordOffset-1))) {
+		startWordOffset--
+	}
+
+	// 扩展结束偏移到后一个单词边界
+	endWordOffset := endOffset
+	for endWordOffset < ve.safeSourceCode.Len() && !ve.boundary(ve.safeSourceCode.Slice1(endWordOffset)) {
+		endWordOffset++
+	}
+	return startWordOffset, endWordOffset
+}
+
 func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
 	startPos := i.GetStart()
 	endPos := i.GetEnd()
@@ -360,24 +375,15 @@ func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
 	startOffset, _ := ve.GetOffsetByPositionWithError(startPos.GetLine(), startPos.GetColumn())
 	endOffset, _ := ve.GetOffsetByPositionWithError(endPos.GetLine(), endPos.GetColumn())
 
-	// 定义单词边界符，这里使用非字母数字作为分隔符，可根据实际需求调整
-	boundary := func(c rune) bool {
-		return !('a' <= c && c <= 'z') && !('A' <= c && c <= 'Z') && !('0' <= c && c <= '9')
-	}
-
-	// 扩展起始偏移到前一个单词边界
-	startWordOffset := startOffset
-	for startWordOffset > 0 && !boundary(rune(ve.safeSourceCode.Slice1(startWordOffset-1))) {
-		startWordOffset--
-	}
-
-	// 扩展结束偏移到后一个单词边界
-	endWordOffset := endOffset
-	for endWordOffset < ve.safeSourceCode.Len() && !boundary(ve.safeSourceCode.Slice1(endWordOffset)) {
-		endWordOffset++
-	}
+	startWordOffset, endWordOffset := ve.ExpandWordTextOffset(startOffset, endOffset)
 
 	return NewRange(ve.GetPositionByOffset(startWordOffset), ve.GetPositionByOffset(endWordOffset))
+}
+
+func (ve *MemEditor) GetWordTextFromOffset(start, end int) string {
+	start, end = ve.ExpandWordTextOffset(start, end)
+
+	return ve.GetTextFromOffset(start, end)
 }
 
 func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
@@ -575,7 +581,6 @@ func (e *MemEditor) GetTextContextWithPrompt(p RangeIf, n int, msg ...string) st
 			return fmt.Sprintf(prefixTemplate, i)
 		}
 	}, func(i int) string {
-
 		if i > end.GetLine() || i < start.GetLine() {
 			return ""
 		}
