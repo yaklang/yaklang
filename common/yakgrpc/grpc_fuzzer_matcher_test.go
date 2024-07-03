@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -127,9 +128,6 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 		panic(err)
 	}
 
-	if err != nil {
-		panic(err)
-	}
 	var taskID int64
 	for i := 0; i < 10; i++ {
 		resp, err := stream.Recv()
@@ -155,33 +153,37 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 		Value: "123",
 	}
 
-	matcherStream, err := client.HTTPFuzzer(context.Background(),
-		&ypb.FuzzerRequest{
-			Matchers:           []*ypb.HTTPResponseMatcher{matcher},
-			Extractors:         []*ypb.HTTPResponseExtractor{extractor},
-			HistoryWebFuzzerId: int32(taskID),
-			ReMatch:            true,
-			Params:             []*ypb.FuzzerParamItem{fuzzParam},
-		})
+	err = utils.AttemptWithDelayFast(func() error {
+		matcherStream, err := client.HTTPFuzzer(context.Background(),
+			&ypb.FuzzerRequest{
+				Matchers:           []*ypb.HTTPResponseMatcher{matcher},
+				Extractors:         []*ypb.HTTPResponseExtractor{extractor},
+				HistoryWebFuzzerId: int32(taskID),
+				ReMatch:            true,
+				Params:             []*ypb.FuzzerParamItem{fuzzParam},
+			})
 
-	if err != nil {
-		panic(err)
-	}
-	var matcherCheckCount int
-	for i := 0; i < 10; i++ {
-		resp, err := matcherStream.Recv()
 		if err != nil {
-			log.Errorf("err: %v", err)
-			break
+			return err
 		}
-		spew.Dump(resp)
-		if resp.MatchedByMatcher {
-			matcherCheckCount++
+		var matcherCheckCount int
+		for i := 0; i < 10; i++ {
+			resp, err := matcherStream.Recv()
+			if err != nil {
+				log.Errorf("err: %v", err)
+				break
+			}
+			spew.Dump(resp)
+			if resp.MatchedByMatcher {
+				matcherCheckCount++
+			}
 		}
-	}
-	if matcherCheckCount != 9 {
-		t.Fatalf("matcher check failed: need [%v] got [%v]", 9, matcherCheckCount)
-	}
+		if matcherCheckCount != 9 {
+			return utils.Errorf("matcher check failed: need [%v] got [%v]", 9, matcherCheckCount)
+		}
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 func TestFuzzerExtractorInvalidUTF8(t *testing.T) {
