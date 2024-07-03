@@ -1,6 +1,7 @@
 package yakcmds
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -95,7 +96,7 @@ var SSACompilerCommands = []*cli.Command{
 				Name: "with-code,code", Usage: "show code context",
 			},
 		},
-		Action: func(c *cli.Context) {
+		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
 				log.SetLevel(ret)
 			}
@@ -127,15 +128,14 @@ var SSACompilerCommands = []*cli.Command{
 				if target == "" &&
 					utils.GetFirstExistedFile(databaseFileRaw) == "" {
 					// no compile ,database not existed
-					log.Errorf("database file not found: %v", databaseFileRaw)
+					return utils.Errorf("database file not found: %v", databaseFileRaw)
 				}
 			}
 			consts.SetSSADataBaseName(databaseFileRaw)
 
 			// compile
 			if target == "" {
-				log.Errorf("target file not found: %v", rawFile)
-				return
+				return utils.Errorf("target file not found: %v", rawFile)
 			}
 			opt := make([]ssaapi.Option, 0, 3)
 			log.Infof("start to compile file: %v ", target)
@@ -161,19 +161,20 @@ var SSACompilerCommands = []*cli.Command{
 			if !noOverride {
 				ssadb.DeleteProgram(ssadb.GetDB(), programName)
 			} else {
-				log.Warnf("no-override flag is set, will not delete existed program")
+				log.Warnf("no-override flag is set, will not delete existed program: %v", programName)
 			}
 
 			proj, err := ssaapi.ParseProjectFromPath(target, opt...)
 			if err != nil {
-				log.Errorf("parse project [%v] failed: %v", target, err)
+				return utils.Errorf("parse project [%v] failed: %v", target, err)
 			}
 
 			log.Infof("finished compiling..., results: %v", len(proj))
 			if syntaxFlow != "" {
-				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 				log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
+				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 			}
+			return nil
 		},
 	},
 	{
@@ -209,7 +210,7 @@ var SSACompilerCommands = []*cli.Command{
 				Name: "with-code,code", Usage: "show code context",
 			},
 		},
-		Action: func(c *cli.Context) {
+		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
 				log.SetLevel(ret)
 			}
@@ -222,24 +223,27 @@ var SSACompilerCommands = []*cli.Command{
 			withCode := c.Bool("with-code")
 
 			if syntaxFlow != "" {
-				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
-				return
+				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 			}
 
 			var dirChecking []string
 
-			handleByFilename := func(filename string) {
+			handleByFilename := func(filename string) error {
 				log.Infof("start to use SyntaxFlow rule: %v", filename)
 				raw, err := os.ReadFile(filename)
 				if err != nil {
-					log.Errorf("read file [%v] failed: %v", filename, err)
-					return
+					return utils.Wrapf(err, "read %v failed", filename)
 				}
 				syntaxFlow = string(raw)
-				SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				err = SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				if err != nil {
+					return err
+				}
 				fmt.Println()
+				return nil
 			}
 
+			var errs []error
 			for _, originName := range c.Args() {
 				name := utils.GetFirstExistedFile(originName)
 				if name == "" {
@@ -261,7 +265,10 @@ var SSACompilerCommands = []*cli.Command{
 					}
 					continue
 				}
-				handleByFilename(name)
+				err := handleByFilename(name)
+				if err != nil {
+					errs = append(errs, err)
+				}
 			}
 
 			for _, dir := range dirChecking {
@@ -269,7 +276,10 @@ var SSACompilerCommands = []*cli.Command{
 				err := filesys.Recursive(dir, filesys.WithRecursiveDirectory(true), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 					fileExt := strings.ToLower(filepath.Ext(s))
 					if strings.HasSuffix(fileExt, ".sf") {
-						handleByFilename(s)
+						err := handleByFilename(s)
+						if err != nil {
+							errs = append(errs, err)
+						}
 					}
 					return nil
 				}))
@@ -278,6 +288,17 @@ var SSACompilerCommands = []*cli.Command{
 				}
 			}
 
+			if len(errs) > 0 {
+				var buf bytes.Buffer
+				for i, e := range errs {
+					buf.WriteString("  ")
+					buf.WriteString(fmt.Sprintf("%-2d: ", i+1))
+					buf.WriteString(e.Error())
+					buf.WriteByte('\n')
+				}
+				return utils.Errorf("many error happened: \n%v", buf.String())
+			}
+			return nil
 		},
 	},
 }
@@ -286,20 +307,19 @@ func SyntaxFlowQuery(
 	programName, databaseFileRaw string,
 	syntaxFlow string,
 	dbDebug, sfDebug, showDot, withCode bool,
-) {
-
+) error {
 	// set database
 	if databaseFileRaw != "" {
 		// set database path
 		if utils.GetFirstExistedFile(databaseFileRaw) == "" {
 			// no compile ,database not existed
-			log.Errorf("database file not found: %v use default database", databaseFileRaw)
+			return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
 		}
 	}
 	consts.SetSSADataBaseName(databaseFileRaw)
 
 	if programName == "" {
-		log.Errorf("program name is required when using syntax flow query language")
+		return utils.Error("program name is required when using syntax flow query language")
 	}
 	// program from database
 	prog, err := ssaapi.FromDatabase(programName)
@@ -313,10 +333,14 @@ func SyntaxFlowQuery(
 	if sfDebug {
 		opt = append(opt, sfvm.WithEnableDebug())
 	}
+	var execError error
 	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
 	if err != nil {
-		log.Errorf("syntax flow [%s] query failed: %v", syntaxFlow, err)
-		return
+		var otherErrs []string
+		if result != nil && len(result.Errors) > 0 {
+			otherErrs = utils.StringArrayFilterEmpty(utils.RemoveRepeatStringSlice(result.Errors))
+		}
+		execError = utils.Wrapf(err, "prompt error: \n%v", strings.Join(otherErrs, "\n  "))
 	}
 	log.Infof("syntax flow query result:")
 	if withCode {
@@ -341,6 +365,7 @@ func SyntaxFlowQuery(
 			fmt.Println(result.GetAllValuesChain().DotGraph())
 		}
 	}
+	return execError
 }
 
 func showValues(name string, vs ssaapi.Values, showDot bool) {
