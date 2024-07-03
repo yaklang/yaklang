@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -19,7 +18,7 @@ func findVariable(v *ssaapi.Value, word string, containPoint bool) []*ssa.Variab
 		if variable := v.GetVariable(word); variable != nil {
 			variables = append(variables, variable)
 		} else {
-			log.Errorf("BUG: Value[%s] don't has variable[%s]", v, word)
+			// log.Errorf("BUG: Value[%s] don't has variable[%s]", v, word)
 		}
 	} else {
 		// fuzz match variable name
@@ -48,19 +47,13 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 		variables = append(variables, findVariable(v, word, containPoint)...)
 	}
 
-	// handle free value, find value by prog.Ref and filter by same default value
 	if v.IsFreeValue() {
 		parameter = ssaapi.GetFreeValue(v)
-		defaultValue := parameter.GetDefault()
-
-		prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
-			if v.IsFreeValue() {
-				return ssaapi.GetFreeValue(v).GetDefault() == defaultValue
-			}
-			return false
-		}).ForEach(func(v *ssaapi.Value) {
-			builtinFindVariable(v)
-		})
+		defaultValue := v.NewValue(parameter.GetDefault())
+		// free value should find from raw value
+		if defaultValue != nil {
+			return languageServerFind(prog, word, containPoint, defaultValue, isReference)
+		}
 	}
 
 	if isReference {
@@ -72,11 +65,14 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 				return
 			}
 			level++
-			// try to convert value to phi, add each edge variable
 			for _, user := range value.GetUsers() {
-				if user.IsPhi() {
-					handler(user, level)
-				}
+				handler(user, level)
+			}
+			for _, ref := range value.GetReferences() {
+				handler(ref, level)
+			}
+			for _, mask := range value.GetMask() {
+				handler(mask, level)
 			}
 		}
 		handler(v, 0)

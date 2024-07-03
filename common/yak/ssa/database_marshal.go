@@ -443,7 +443,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *Parameter:
 		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
 		if defaultValue, ok := params["formalParam_default"]; ok {
-			ret.defaultValue = newLazyInstruction(defaultValue)
+			ret.SetDefault(newLazyInstruction(defaultValue))
 		}
 		ret.FormalParameterIndex = int(params["formalParam_index"].(float64))
 	case *ParameterMember:
