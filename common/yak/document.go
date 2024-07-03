@@ -341,7 +341,6 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 		handleTypesList.Remove(iTyp)
 
 		typ := iTyp.Value.(reflect.Type)
-		typName := typ.Name()
 
 		if _, ok := filter[typ]; ok {
 			continue
@@ -370,7 +369,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 			pushBackWithoutNil(handleTypesList, typ.Elem())
 		} else if typKind == reflect.Struct {
 			// 结构体类型，需要转到指针，因为指针拿到的方法比较全
-			pushBackWithoutNil(handleTypesList, reflect.New(typ).Type())
+			pushBackWithoutNil(handleTypesList, reflect.PtrTo(typ))
 			continue
 		} else if typKind == reflect.Func {
 			// 形如 func() (callback func()) {}
@@ -392,23 +391,14 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 
 		// 如果是接口类型，那么需要获取其对应的包，然后再获取其对应的文档
 		if typKind == reflect.Interface {
-			if typName == "" {
-				_, after, ok := strings.Cut(pkgPathName, ".")
-				if ok {
-					typName = after
-				} else if index := strings.LastIndex(pkgPathName, "/"); index != -1 {
-					typName = pkgPathName[index+1:]
-				}
-			}
-
 			if canAutoInjectInterface {
 				pkg, ok = pkgs[pkgPath]
 				if ok {
-					documents = GetInterfaceDocumentFromAST(pkg, typName)
+					documents = GetInterfaceDocumentFromAST(pkg, pkgPathName)
 				}
 			}
 			if !ok && strings.HasPrefix(pkgPath, "github.com/yaklang/yaklang") {
-				log.Warnf("need inject interface document for: %s.%s", pkgPath, typName)
+				log.Warnf("need inject interface document for: %s.%s", pkgPath, pkgPathName)
 			}
 		}
 
@@ -428,11 +418,11 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 				getTypMember = func(typ reflect.Type) {
 					for i := 0; i < typ.NumField(); i++ {
 						field := typ.Field(i)
+						lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(pkgPathName, field.Name, field.Type, nil)
+						pushBackWithoutNil(handleTypesList, field.Type)
 						if !field.Anonymous {
-							lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(pkgPathName, field.Name, field.Type, nil)
 							continue
 						}
-						lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(pkgPathName, field.Name, field.Type, nil)
 
 						innerTyp := field.Type
 						if innerTyp.Kind() == reflect.Pointer {
