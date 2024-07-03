@@ -341,6 +341,22 @@ rsp.`,
 		})
 	})
 
+	t.Run("inner struct", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`rsp, req = poc.Get("")~;flow=rsp.RedirectRawPackets[0];flow.`,
+			&ypb.Range{
+				Code:        "flow.",
+				StartLine:   1,
+				StartColumn: 57,
+				EndLine:     1,
+				EndColumn:   62,
+			},
+			labelsContainsCallback(t, []string{"Request", "Response", "IsHttps", "RespRecord"}),
+		)
+	})
+
 	t.Run("halfway", func(t *testing.T) {
 		t.Parallel()
 
