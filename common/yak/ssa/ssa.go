@@ -514,6 +514,7 @@ func (p *Parameter) GetDefault() Value {
 
 func (p *Parameter) SetDefault(v Value) {
 	p.defaultValue = v
+	v.AddReference(p)
 }
 
 var (

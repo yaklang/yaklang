@@ -261,6 +261,26 @@ func (v *Value) GetUsers() Values {
 	return v.users
 }
 
+func (v *Value) GetReferences() Values {
+	if v.IsNil() {
+		return nil
+	}
+
+	return lo.Map(v.node.Reference(), func(item ssa.Value, index int) *Value {
+		return v.NewValue(item)
+	})
+}
+
+func (v *Value) GetMask() Values {
+	if v.IsNil() {
+		return nil
+	}
+
+	return lo.Map(v.node.GetMask(), func(item ssa.Value, index int) *Value {
+		return v.NewValue(item)
+	})
+}
+
 func (v *Value) GetUser(index int) *Value {
 	if v.IsNil() {
 		return nil

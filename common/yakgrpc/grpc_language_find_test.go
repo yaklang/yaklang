@@ -58,6 +58,7 @@ func getFindReferences(local ypb.YakClient, pluginType string, t *testing.T, cod
 func getFindDefinition(local ypb.YakClient, pluginType string, t *testing.T, code string, Range *ypb.Range, id string) *ypb.YaklangLanguageFindResponse {
 	return getFind(local, "definition", pluginType, t, code, Range, id)
 }
+
 func RangeIfToGrpcRangeRaw(rng memedit.RangeIf) *ypb.Range {
 	start, end := rng.GetStart(), rng.GetEnd()
 	return &ypb.Range{
@@ -391,7 +392,8 @@ println(a)
 		)
 	})
 }
-func TestGRPCMUSTPASS_LANGUAGE_Find_FreeValue(t *testing.T) {
+
+func TestGRPCMUSTPASS_LANGUAGE_Find_FreeValue_Const(t *testing.T) {
 	local, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -434,5 +436,105 @@ return a
 				newRangeFromText("10:8 10:9"),
 			},
 		)
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_Find_FreeValue_Func(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	code := `a = () => {}
+b = () => {
+a()
+}`
+	t.Run("def", func(t *testing.T) {
+		want := newRangeFromText("1:1 1:2")
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("3:1 3:2"),
+			want,
+		)
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("1:1 1:2"),
+			want,
+		)
+	})
+
+	t.Run("ref", func(t *testing.T) {
+		wants := []memedit.RangeIf{
+			newRangeFromText("1:1 1:2"),
+			newRangeFromText("3:1 3:2"),
+		}
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("3:1 3:2"),
+			wants,
+		)
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("1:1 1:2"),
+			wants,
+		)
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_Find_Mask(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	code := `a = [1]
+b = () => {
+a = append(a, 2)
+}
+println(a)
+`
+	t.Run("def", func(t *testing.T) {
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("3:12 3:13"), // append inner a
+			newRangeFromText("1:1 1:2"),   // raw a
+		)
+		checkDefinition(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("3:1 3:2"), // append return a
+			newRangeFromText("3:1 3:2"), // append return a
+		)
+	})
+
+	t.Run("ref", func(t *testing.T) {
+		wants := []memedit.RangeIf{
+			newRangeFromText("1:1 1:2"),
+			newRangeFromText("3:1 3:2"),
+			newRangeFromText("3:12 3:13"),
+			newRangeFromText("5:9 5:10"),
+		}
+		for i, want := range wants {
+			wants := wants
+			if i == 1 { // append return a can only find itself
+				wants = []memedit.RangeIf{
+					want,
+				}
+			}
+			checkReferences(t,
+				local,
+				code,
+				"yak",
+				want,  // raw a
+				wants, // all a
+			)
+		}
 	})
 }
