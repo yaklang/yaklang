@@ -772,6 +772,27 @@ a.Parse()`,
 	})
 }
 
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_UnFinish_InputError(t *testing.T) {
+	t.Parallel()
+
+	check := CheckHover(t)
+	check(t, `
+t = ""
+host, port, _ = str.ParseStringToHostPort(t)
+ssa.
+`,
+		"mitm",
+		&ypb.Range{
+			Code:        "ssa",
+			StartLine:   4,
+			StartColumn: 1,
+			EndLine:     4,
+			EndColumn:   4,
+		},
+		getExternLibDesc("ssa"),
+	)
+}
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_StructMemberAndMethod(t *testing.T) {
 	check := CheckHover(t)
 	code := `rsp, err = http.Request("GET", "https://baidu.com")
