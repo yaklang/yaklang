@@ -43,13 +43,22 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 			return prog, nil
 		}
 
+		startOffset, endOffset := ssaRange.GetOffset(), ssaRange.GetEndOffset()
+		shouldTrim := containPoint
+		fixRange := true
+		if !containPoint && editor.GetTextFromOffset(endOffset, endOffset+1) == "." {
+			// fix for hover or signature
+			fixRange = false
+			shouldTrim = true
+			rangeWordText = editor.GetWordTextFromOffset(startOffset, endOffset+1)
+		}
+
 		// try to remove content after point
-		if containPoint && inspectType == COMPLETION {
-			offset, endOffset := ssaRange.GetOffset()-1, ssaRange.GetEndOffset()
+		if shouldTrim {
+			offset := startOffset - 1
 			if offset < 0 {
 				offset = 0
 			}
-
 			before, after, _ := strings.Cut(rangeWordText, ".")
 			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
 
@@ -61,7 +70,9 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 					newEditor = memedit.NewMemEditor(trimCode)
 				}
 				// end use old editor to get position
-				ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-len(after)-1))
+				if fixRange {
+					ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-len(after)-1))
+				}
 				editor = newEditor
 
 				return prog, nil
