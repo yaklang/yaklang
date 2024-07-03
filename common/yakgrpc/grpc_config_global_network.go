@@ -69,11 +69,13 @@ func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalN
 		consts.ConvertCompatibleConfig(appConfig)
 	}
 	total := aispec.RegisteredAIGateways()
-	for i, s := range config.AiApiPriority { // remove deprecated ai type
-		if !utils.StringArrayContains(total, s) {
-			config.AiApiPriority = append(config.AiApiPriority[:i], config.AiApiPriority[i+1:]...)
+	canUseAiApiPriority := make([]string, 0)
+	for _, s := range config.AiApiPriority { // remove deprecated ai type
+		if utils.StringArrayContains(total, s) {
+			canUseAiApiPriority = append(canUseAiApiPriority, s)
 		}
 	}
+	config.AiApiPriority = canUseAiApiPriority
 	for _, s := range total { // add new ai type
 		if !utils.StringArrayContains(config.AiApiPriority, s) {
 			config.AiApiPriority = append(config.AiApiPriority, s)
