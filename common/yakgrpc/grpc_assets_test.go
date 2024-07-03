@@ -25,12 +25,23 @@ func TestGRPCMUSTPASS_HTTPFuzzer_DeleteHistory(t *testing.T) {
 
 	checkFuzzerTask := func(t *testing.T, ctx context.Context, fuzzerTabIndex string, wantNum int) {
 		t.Helper()
-		queryFuzzerTaskRsp, err := c.QueryHistoryHTTPFuzzerTaskEx(ctx, &ypb.QueryHistoryHTTPFuzzerTaskExParams{
-			FuzzerTabIndex: fuzzerTabIndex,
-			Pagination: &ypb.Paging{
-				Page:  1,
-				Limit: 10,
-			},
+		var queryFuzzerTaskRsp *ypb.HistoryHTTPFuzzerTasksResponse
+		var err error
+		err = utils.AttemptWithDelayFast(func() error {
+			queryFuzzerTaskRsp, err = c.QueryHistoryHTTPFuzzerTaskEx(ctx, &ypb.QueryHistoryHTTPFuzzerTaskExParams{
+				FuzzerTabIndex: fuzzerTabIndex,
+				Pagination: &ypb.Paging{
+					Page:  1,
+					Limit: 10,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			if int(queryFuzzerTaskRsp.Total) != wantNum {
+				return utils.Errorf("want %d, got %d", wantNum, int(queryFuzzerTaskRsp.Total))
+			}
+			return nil
 		})
 		require.NoError(t, err)
 		require.Equal(t, wantNum, int(queryFuzzerTaskRsp.Total))
@@ -38,13 +49,26 @@ func TestGRPCMUSTPASS_HTTPFuzzer_DeleteHistory(t *testing.T) {
 
 	checkFuzzerResponse := func(t *testing.T, ctx context.Context, taskID int64, wantNum int) {
 		t.Helper()
-		queryFuzzerResponseRsp, err := c.QueryHTTPFuzzerResponseByTaskId(ctx, &ypb.QueryHTTPFuzzerResponseByTaskIdRequest{
-			TaskId: taskID,
-			Pagination: &ypb.Paging{
-				Page:  1,
-				Limit: 10,
-			},
+
+		var queryFuzzerResponseRsp *ypb.QueryHTTPFuzzerResponseByTaskIdResponse
+		var err error
+		err = utils.AttemptWithDelayFast(func() error {
+			queryFuzzerResponseRsp, err = c.QueryHTTPFuzzerResponseByTaskId(ctx, &ypb.QueryHTTPFuzzerResponseByTaskIdRequest{
+				TaskId: taskID,
+				Pagination: &ypb.Paging{
+					Page:  1,
+					Limit: 10,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			if int(queryFuzzerResponseRsp.Total) != wantNum {
+				return utils.Errorf("want %d, got %d", wantNum, int(queryFuzzerResponseRsp.Total))
+			}
+			return nil
 		})
+
 		require.NoError(t, err)
 		require.Equal(t, wantNum, int(queryFuzzerResponseRsp.Total))
 	}
