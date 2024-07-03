@@ -159,6 +159,7 @@ func (lz *LazyInstruction) GetName() string {
 	}
 	return lz.ir.Name
 }
+
 func (lz *LazyInstruction) GetVerboseName() string {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -166,6 +167,7 @@ func (lz *LazyInstruction) GetVerboseName() string {
 	}
 	return lz.ir.VerboseName
 }
+
 func (lz *LazyInstruction) GetShortVerboseName() string {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -173,6 +175,7 @@ func (lz *LazyInstruction) GetShortVerboseName() string {
 	}
 	return lz.ir.ShortVerboseName
 }
+
 func (lz *LazyInstruction) IsExtern() bool {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -180,6 +183,7 @@ func (lz *LazyInstruction) IsExtern() bool {
 	}
 	return lz.ir.IsExternal
 }
+
 func (lz *LazyInstruction) GetOpcode() Opcode {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -187,6 +191,7 @@ func (lz *LazyInstruction) GetOpcode() Opcode {
 	}
 	return Opcode(lz.ir.Opcode)
 }
+
 func (lz *LazyInstruction) String() string {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -202,6 +207,7 @@ func (lz *LazyInstruction) HasUsers() bool {
 	}
 	return len(lz.ir.Users) == 0
 }
+
 func (lz *LazyInstruction) HasValues() bool {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -209,6 +215,7 @@ func (lz *LazyInstruction) HasValues() bool {
 	}
 	return len(lz.ir.Defs) == 0
 }
+
 func (lz *LazyInstruction) IsMember() bool {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -216,6 +223,7 @@ func (lz *LazyInstruction) IsMember() bool {
 	}
 	return lz.ir.IsObjectMember
 }
+
 func (lz *LazyInstruction) IsObject() bool {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -223,6 +231,7 @@ func (lz *LazyInstruction) IsObject() bool {
 	}
 	return lz.ir.IsObject
 }
+
 func (lz *LazyInstruction) IsUndefined() bool {
 	if lz.ir == nil {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
@@ -581,4 +590,12 @@ func (lz *LazyInstruction) Reference() Values {
 		return nil
 	}
 	return lz.Value.Reference()
+}
+
+func (lz *LazyInstruction) AddReference(v Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.AddReference(v)
 }
