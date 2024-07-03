@@ -316,12 +316,21 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 	for i := 0; i < 3; i++ {
 		lowhttp.HTTPWithoutRedirect(lowhttp.WithRequest(packet))
 	}
-	_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-		Keyword: token,
+	var flows []*schema.HTTPFlow
+	err = utils.AttemptWithDelayFast(func() error {
+		_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		})
+		if err != nil {
+			return err
+		}
+		if len(flows) != 3 {
+			return utils.Errorf("flow count not match")
+		}
+		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, err)
 
 	ids := []int64{}
 	for _, flow := range flows {
@@ -380,46 +389,49 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	status2 := utils.RandStringBytes(5)
 	status3 := utils.RandStringBytes(5)
 	status4 := utils.RandStringBytes(5)
+
+	source1 := utils.RandStringBytes(5)
+	source2 := utils.RandStringBytes(5)
 	var DateTask = []*schema.HybridScanTask{
 		{
 			Status:               status1,
 			Targets:              target1,
-			HybridScanTaskSource: "test",
+			HybridScanTaskSource: source1,
 		},
 		{
 			Status:               status2,
 			Targets:              target1,
-			HybridScanTaskSource: "test",
+			HybridScanTaskSource: source1,
 		},
 		{
 			Status:               status3,
 			Targets:              target1,
-			HybridScanTaskSource: "test",
+			HybridScanTaskSource: source1,
 		},
 		{
 			Status:               status4,
 			Targets:              target1,
-			HybridScanTaskSource: "test",
+			HybridScanTaskSource: source1,
 		},
 		{
 			Status:               status1,
 			Targets:              target2,
-			HybridScanTaskSource: "demo",
+			HybridScanTaskSource: source2,
 		},
 		{
 			Status:               status2,
 			Targets:              target2,
-			HybridScanTaskSource: "demo",
+			HybridScanTaskSource: source2,
 		},
 		{
 			Status:               status3,
 			Targets:              target2,
-			HybridScanTaskSource: "demo",
+			HybridScanTaskSource: source2,
 		},
 		{
 			Status:               status4,
 			Targets:              target2,
-			HybridScanTaskSource: "demo",
+			HybridScanTaskSource: source2,
 		},
 	}
 	for _, task := range DateTask {
@@ -459,7 +471,7 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 	rsp, err = client.QueryHybridScanTask(context.Background(), &ypb.QueryHybridScanTaskRequest{
 		Pagination: &ypb.Paging{},
 		Filter: &ypb.HybridScanTaskFilter{
-			HybridScanTaskSource: []string{"test"},
+			HybridScanTaskSource: []string{source1},
 		},
 	})
 	if err != nil {
