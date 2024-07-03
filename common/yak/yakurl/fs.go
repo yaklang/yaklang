@@ -2,10 +2,11 @@ package yakurl
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -129,10 +130,17 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		if !filepath.IsAbs(newName) { // Compatible abs path and relative path
 			newName = filepath.Join(dirname, newName)
 		}
+		if ok, err := utils.PathExists(newName); ok {
+			return nil, utils.Errorf("file or directory is exists: %s", newName)
+		} else if err != nil {
+			return nil, utils.Errorf("cannot check file or directory exists: %s", newName)
+		}
 
 		err := os.Rename(absPath, newName)
 		if err != nil {
-			return nil, utils.Errorf("cannot rename file[%s]: %s", u.GetPath(), err)
+			relOldPath, _ := filepath.Rel(dirname, absPath)
+			relNewPath, _ := filepath.Rel(dirname, newName)
+			return nil, utils.Errorf("cannot rename %s to %s", relOldPath, relNewPath)
 		}
 
 		absPath = newName
@@ -142,7 +150,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		if info.IsDir() {
 			return nil, utils.Errorf("cannot post to a directory: %s", u.GetPath())
 		}
-		err = os.WriteFile(absPath, params.GetBody(), 0644)
+		err = os.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
 			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
 		}
@@ -176,7 +184,9 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	}
 	exists, err := utils.PathExists(absPath)
 	if exists {
-		return nil, utils.Errorf("file [%s] exists", u.GetPath()) //  if file exists can't use put
+		return nil, utils.Error("file exists") //  if file exists can't use put
+	} else if err != nil {
+		return nil, utils.Errorf("file exists check error: %v", err)
 	}
 
 	query := make(url.Values)
@@ -185,7 +195,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	}
 	switch query.Get("type") {
 	case "dir":
-		err := os.MkdirAll(absPath, 0755)
+		err := os.MkdirAll(absPath, 0o755)
 		if err != nil {
 			return nil, err
 		}
