@@ -86,7 +86,7 @@ func (b *FunctionBuilder) readValueEx(
 		if parentValue, ok := b.getParentFunctionVariable(name); ok {
 			// the ret variable should be FreeValue
 			para := b.BuildFreeValue(name)
-			para.defaultValue = parentValue
+			para.SetDefault(parentValue)
 			para.SetType(parentValue.GetType())
 			return para
 		}
