@@ -27,6 +27,11 @@ func (y *YakitPluginContext) WithPluginName(id string) *YakitPluginContext {
 	return y
 }
 
+func (y *YakitPluginContext) WithPluginUUID(uuid string) *YakitPluginContext {
+	y.PluginUUID = uuid
+	return y
+}
+
 func (y *YakitPluginContext) WithProxy(proxy string) *YakitPluginContext {
 	y.Proxy = proxy
 	return y
