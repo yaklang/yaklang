@@ -124,13 +124,14 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 	})
 }
 
-func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPluginContext, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
+func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPluginContext, script *schema.YakScript, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	fTable := map[string]*YakFunctionCaller{}
 	engine := NewScriptEngine(1) // 因为需要在 hook 里传回执行引擎, 所以这里不能并发
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		if id != "" {
-			pluginContext.PluginName = id
+		if script != nil {
+			pluginContext.PluginName = script.ScriptName
+			pluginContext.PluginUUID = script.Uuid
 		}
 		BindYakitPluginContextToEngine(engine, pluginContext)
 		return nil
@@ -138,11 +139,13 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 	// engine.HookOsExit()
 	// timeoutCtx, cancel := context.WithTimeout(ctx, loadTimeout)
 	// defer func() { cancel() }()
+	scriptName := script.ScriptName
+
 	loadCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.loadTimeout)
 	defer cancel()
 	ins, err := engine.ExecuteExWithContext(loadCtx, code, map[string]interface{}{
 		"ROOT_CONTEXT": loadCtx,
-		"YAK_FILENAME": id,
+		"YAK_FILENAME": scriptName,
 	})
 	if err != nil {
 		log.Errorf("init execute plugin finished: %s", err)
@@ -169,7 +172,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 			Handler: func(args ...interface{}) {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, id, err)
+						log.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
 						fmt.Println()
 						if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
 							utils.PrintCurrentGoroutineRuntimeStack()
@@ -178,7 +181,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 				}()
 
 				subCtx, _ := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
-				subCtx = context.WithValue(subCtx, "pluginName", id)
+				subCtx = context.WithValue(subCtx, "pluginName", scriptName)
 				_, err = nIns.CallYakFunctionNative(subCtx, f, args...)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
@@ -360,7 +363,7 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 	}()
 
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), "", code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), nil, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -600,9 +603,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	if nIns == nil {
 		return
 	}
-	var pluginName string
-	var runtimeId string
-	var proxy string
+	var pluginName, runtimeId, proxy, pluginUUID string
 	if pluginContext == nil {
 		return
 	}
@@ -611,6 +612,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 
 	runtimeId = pluginContext.RuntimeId
 	pluginName = pluginContext.PluginName
+	pluginUUID = pluginContext.PluginUUID
 	proxy = pluginContext.Proxy
 	if pluginContext.Ctx != nil {
 		streamContext = pluginContext.Ctx
@@ -789,7 +791,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(target string, opts ...yakit.RiskParamsOpt))
 		if ok {
 			return func(target string, opts ...yakit.RiskParamsOpt) {
-				opts = append(opts, yakit.WithRiskParam_YakitPluginName(pluginName))
+				opts = append(opts, yakit.WithRiskParam_YakitPluginName(pluginName), yakit.WithRiskParam_YakScriptUUID(pluginUUID))
 				if runtimeId != "" {
 					opts = append(opts, yakit.WithRiskParam_RuntimeId(runtimeId))
 				}
@@ -1102,7 +1104,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 }
 
 func (y *YakToCallerManager) AddForYakit(
-	ctx context.Context, id string,
+	ctx context.Context, script *schema.YakScript,
 	paramMap map[string]any,
 	code string, callerIf interface {
 		Send(result *ypb.ExecResult) error
@@ -1113,11 +1115,12 @@ func (y *YakToCallerManager) AddForYakit(
 		return callerIf.Send(result)
 	}
 	db := consts.GetGormProjectDatabase()
-	return y.Add(ctx, id, paramMap, code, func(engine *antlr4yak.Engine) error {
+	return y.Add(ctx, script, paramMap, code, func(engine *antlr4yak.Engine) error {
+		scriptName := script.ScriptName
 		engine.SetVar("RUNTIME_ID", y.runtimeId)
-		engine.SetVar("YAKIT_PLUGIN_ID", id)
-		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
-		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, id))
+		engine.SetVar("YAKIT_PLUGIN_ID", scriptName)
+		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, scriptName))
+		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, scriptName))
 		engine.SetVar("yakit_status", func(id string, i interface{}) {
 			FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
 				Id:   id,
@@ -1125,7 +1128,6 @@ func (y *YakToCallerManager) AddForYakit(
 			})
 		})
 		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
-		BindYakitPluginContextToEngine(engine, y.getYakitPluginContext(ctx).WithPluginName(id))
 		return nil
 	}, hooks...)
 }
@@ -1143,7 +1145,7 @@ func (y *YakToCallerManager) getDefaultFilter() *filter.StringFilter {
 	return y.defaultFilter
 }
 
-func (y *YakToCallerManager) Add(ctx context.Context, id string, paramMap map[string]any, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
+func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, paramMap map[string]any, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("load caller failed: %v", err)
@@ -1153,7 +1155,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, paramMap map[st
 	}()
 
 	var engine *antlr4yak.Engine
-
+	var id = script.ScriptName
 	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
 		if v, ok := y.table.Load(HOOK_LoadNaslScriptByNameFunc); ok {
 			v.(func(string))(id)
@@ -1168,7 +1170,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, paramMap map[st
 		y.ContextCancelFuncs.Store(id, cancel)
 	}
 
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), id, code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), script, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -1511,7 +1513,7 @@ func loadScriptCtx(mng *YakToCallerManager, ctx context.Context, scriptType stri
 	counter := 0
 	for script := range yakit.YieldYakScripts(db, ctx) {
 		counter++
-		err := mng.AddForYakit(ctx, script.ScriptName, nil, script.Content, YakitCallerIf(func(result *ypb.ExecResult) error {
+		err := mng.AddForYakit(ctx, script, nil, script.Content, YakitCallerIf(func(result *ypb.ExecResult) error {
 			return nil
 		}), hookNames...)
 		if err != nil {
@@ -1540,7 +1542,7 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 	counter := 0
 	for script := range yakit.YieldYakScripts(db, ctx) {
 		counter++
-		err := mng.AddForYakit(ctx, script.ScriptName, nil, script.Content, YakitCallerIf(func(result *ypb.ExecResult) error {
+		err := mng.AddForYakit(ctx, script, nil, script.Content, YakitCallerIf(func(result *ypb.ExecResult) error {
 			return nil
 		}), hookNames...)
 		if err != nil {

@@ -351,6 +351,8 @@ func PocVulToRisk(p *PocVul) *schema.Risk {
 		yakit.WithRiskParam_RiskType(fmt.Sprintf("nuclei-%v", p.Tags)),
 		yakit.WithRiskParam_Severity(p.Severity),
 		yakit.WithRiskParam_Details(p.Details),
+		yakit.WithRiskParam_FromScript(p.ScriptName),
+		yakit.WithRiskParam_YakScriptUUID(p.UUID),
 	)
 }
 
@@ -524,4 +526,8 @@ type PocVul struct {
 	TitleName     string
 	Details       map[string]interface{}
 	RuntimeId     string
+
+	// meta info
+	ScriptName string
+	UUID       string
 }

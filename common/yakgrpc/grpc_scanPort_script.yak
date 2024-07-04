@@ -33,6 +33,8 @@ crawlerMaxRequest = cli.Int("basic-crawler-request-max")
 crawlerEnableJSParser = cli.Bool("basic-crawler-enable-jsparser", cli.setDefault(false), cli.setRequired(false))
 cli.check()
 
+status = msg => yakit.StatusCard("Status", f`${msg}`)
+
 if proxies == "no" {
 	proxies = ""
 }
@@ -154,6 +156,8 @@ if !enableCrawler {
 /*
 Loading Plugins
 */
+
+status("插件加载中")
 
 scriptNameList = str.Join(x.Map( scriptNames, func(i) {
     // 0x60 反引号
@@ -324,6 +328,7 @@ getPingScan = func() {
     )
 }
 
+status("扫描进行中")
 if mode == "fingerprint" {
     sendProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
     sendProgress(pluginProgress,pluginProgressLock,0)
@@ -448,6 +453,7 @@ if len(targetCounter) > 0 {
 reportIns.Save()
 
 
+status("等待插件执行中")
 // 等待插件执行结果
 yakit.Info("PortScan Finished Waiting for Plugin Results")
 println("PortScan Finished... Waiting Plugins")
@@ -455,3 +461,4 @@ manager.Wait()
 if mode == "all" || mode == "fingerprint" {
     sendProgress(pluginProgress,pluginProgressLock,hostTotal*portTotal)
 }
+status("扫描完成")

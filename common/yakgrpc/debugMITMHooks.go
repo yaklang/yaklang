@@ -73,7 +73,7 @@ func execTestCaseMITMHooksCaller(rootCtx context.Context, y *schema.YakScript, p
 	})
 	manager := yak.NewYakToCallerManager()
 	err := manager.AddForYakit(
-		ctx, y.ScriptName, paramMap, y.Content,
+		ctx, y, paramMap, y.Content,
 		yak.YakitCallerIf(func(result *ypb.ExecResult) error {
 			return streamFeedback(result)
 		}),
