@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -73,7 +74,14 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 
 	cmd := ptmx.CommandContext(ctx, commands[0], commands[1:]...)
 	if firstInput.GetPath() != "" {
-		cmd.Path = firstInput.GetPath()
+		cmd.Dir = firstInput.GetPath()
+	} else {
+		path, err := os.UserHomeDir()
+		if err != nil {
+			// log.Infof("failed to get user home dir: %s", err)
+			return err
+		}
+		cmd.Dir = path
 	}
 
 	streamerRWC := &OpenPortServerStreamerHelperRWC{
