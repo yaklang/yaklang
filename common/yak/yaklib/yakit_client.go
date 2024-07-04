@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -68,8 +67,7 @@ type YakitClient struct {
 }
 
 func (c *YakitClient) AddCounter() uint32 {
-	atomic.AddUint32(c.riskCounter, 1)
-	return atomic.LoadUint32(c.riskCounter)
+	return atomic.AddUint32(c.riskCounter, 1)
 }
 
 func NewYakitClient(addr string) *YakitClient {
@@ -132,6 +130,11 @@ func (c *YakitClient) SetYakLog(logger *YakLogger) {
 
 // 输入
 func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) error {
+	if level == "json-risk" {
+		c.Output(&YakitStatusCard{
+			Id: "漏洞/风险/指纹", Data: fmt.Sprint(c.AddCounter()), Tags: nil,
+		})
+	}
 	var data = tmp
 	if len(items) > 0 {
 		data = fmt.Sprintf(tmp, items...)
@@ -168,12 +171,6 @@ func (c *YakitClient) YakitDraw(level string, data interface{}) {
 	}
 }
 func (c *YakitClient) Output(i interface{}) error {
-	_, ok := i.(*schema.Risk)
-	if ok {
-		c.Output(&YakitStatusCard{
-			Id: "漏洞/风险/指纹", Data: fmt.Sprint(c.AddCounter()), Tags: nil,
-		})
-	}
 	level, msg := MarshalYakitOutput(i)
 	return c.YakitLog(level, msg)
 }

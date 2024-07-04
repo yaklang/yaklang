@@ -3,6 +3,7 @@ package httptpl
 import (
 	"bufio"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"reflect"
 	"strconv"
 	"strings"
@@ -93,6 +94,16 @@ func _ParseNucleiTag(raw string) []*NucleiTagData {
 	}
 
 	return data
+}
+
+func CreateYakTemplateFromYakScript(s *schema.YakScript) (*YakTemplate, error) {
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(s.Content)
+	if err != nil {
+		return nil, err
+	}
+	tpl.UUID = s.Uuid
+	tpl.ScriptName = s.ScriptName
+	return tpl, nil
 }
 
 func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error) {

@@ -417,7 +417,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 				for y := range yakit.YieldYakScripts(
 					consts.GetGormProfileDatabase().Where("type = 'nuclei'"),
 					context.Background()) {
-					tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+					tpl, err := CreateYakTemplateFromYakScript(y)
 					if err != nil {
 						log.Errorf("create yak template failed (fuzz query mode): %s", err)
 						continue
@@ -436,7 +436,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 			}
 
 			for _, y := range c.ExactTemplateInstances {
-				tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+				tpl, err := CreateYakTemplateFromYakScript(y)
 				if err != nil {
 					log.Errorf("create yak template failed (template names): %s", err)
 					continue
@@ -450,7 +450,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 					log.Errorf("get nuclei yak script by name failed: %s", err)
 					continue
 				}
-				tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+				tpl, err := CreateYakTemplateFromYakScript(y)
 				if err != nil {
 					log.Errorf("create yak template failed (template names): %s", err)
 					continue
@@ -468,7 +468,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 					}, queries, false,
 				)
 				for y := range yakit.YieldYakScripts(db, context.Background()) {
-					tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+					tpl, err := CreateYakTemplateFromYakScript(y)
 					if err != nil {
 						log.Errorf("create yak template failed (fuzz query mode): %s", err)
 						continue
@@ -487,7 +487,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 					}, tags, false,
 				)
 				for y := range yakit.YieldYakScripts(db, context.Background()) {
-					tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+					tpl, err := CreateYakTemplateFromYakScript(y)
 					if err != nil {
 						if !strings.Contains(err.Error(), "(*)") {
 							// debug io
