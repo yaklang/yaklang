@@ -2894,6 +2894,8 @@ message Risk {
   string Details = 12;
 
   string FromYakScript = 13;
+  string YakScriptUUID = 29;
+
   bool WaitingVerified = 14;
   string ReverseToken = 15;
 
