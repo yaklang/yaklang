@@ -59,7 +59,8 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 			if offset < 0 {
 				offset = 0
 			}
-			before, after, _ := strings.Cut(rangeWordText, ".")
+			lastIndex := strings.LastIndex(rangeWordText, ".")
+			before, after := rangeWordText[:lastIndex], rangeWordText[lastIndex+1:]
 			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
 
 			prog, err = ssaapi.Parse(trimCode, opt...)
