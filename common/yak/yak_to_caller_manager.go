@@ -139,7 +139,10 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 	// engine.HookOsExit()
 	// timeoutCtx, cancel := context.WithTimeout(ctx, loadTimeout)
 	// defer func() { cancel() }()
-	scriptName := script.ScriptName
+	var scriptName = ""
+	if script != nil {
+		scriptName = script.ScriptName
+	}
 
 	loadCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.loadTimeout)
 	defer cancel()
