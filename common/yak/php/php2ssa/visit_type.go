@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/samber/lo"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -18,7 +17,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 		return nil
 	}
 	if r := i.QualifiedStaticTypeRef(); r != nil {
-		// 这里类型就行修复
+		//这里类型就行修复
 		className := y.VisitQualifiedStaticTypeRef(r)
 		return y.GetClassBluePrint(className)
 	} else if i.Callable() != nil {
@@ -26,10 +25,12 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	} else if i.PrimitiveType() != nil {
 		return y.VisitPrimitiveType(i.PrimitiveType())
 	} else if i.Pipe() != nil {
-		types := lo.Map(i.AllTypeHint(), func(item phpparser.ITypeHintContext, index int) ssa.Type {
-			return y.VisitTypeHint(item)
-		})
-		return ssa.NewOrType(types...)
+		//types := lo.Map(i.AllTypeHint(), func(item phpparser.ITypeHintContext, index int) ssa.Type {
+		//	return y.VisitTypeHint(i)
+		//})
+		//_ = types
+		// need a
+		// return ssa.NewUnionType(types)
 	}
 	return ssa.GetAnyType()
 }
@@ -49,6 +50,7 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
 	if i.QualifiedNamespaceName() != nil {
 		y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 	} else if i.IndirectTypeRef() != nil {
+
 	} else if i.PrimitiveType() != nil {
 		return y.VisitPrimitiveType(i.PrimitiveType())
 	} else if i.Static() != nil {
@@ -124,7 +126,6 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	}
 	return nil
 }
-
 func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) string {
 	if y == nil || raw == nil {
 		return ""

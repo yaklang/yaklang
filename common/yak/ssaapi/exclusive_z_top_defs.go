@@ -175,7 +175,32 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		callerValue := i.NewValue(caller)
 		_, isFunc := ssa.ToFunction(caller)
 		funcType, isFuncTyp := ssa.ToFunctionType(caller.GetType())
-
+		if callerValue.IsExtern() {
+			i.AppendDependOn(callerValue)
+			nodes := Values{callerValue}
+			for _, val := range inst.Args {
+				arg := i.NewValue(val)
+				i.AppendDependOn(arg)
+				nodes = append(nodes, arg)
+			}
+			for _, value := range inst.Binding {
+				arg := i.NewValue(value)
+				i.AppendDependOn(arg)
+				nodes = append(nodes, arg)
+			}
+			var results Values
+			for _, subNode := range nodes {
+				if subNode == nil {
+					continue
+				}
+				// getTopDefs(nil,opt...)第一个参数指定为nil
+				// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
+				vals := subNode.GetTopDefs(opt...).AppendEffectOn(subNode)
+				//vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
+				results = append(results, vals...)
+			}
+			return results
+		}
 		switch {
 		case isFunc:
 			callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
@@ -220,30 +245,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				)
 			}
 			return res
-		default:
-			i.AppendDependOn(callerValue)
-			nodes := Values{callerValue}
-			for _, val := range inst.Args {
-				arg := i.NewValue(val)
-				i.AppendDependOn(arg)
-				nodes = append(nodes, arg)
-			}
-			for _, value := range inst.Binding {
-				arg := i.NewValue(value)
-				i.AppendDependOn(arg)
-				nodes = append(nodes, arg)
-			}
-			var results Values
-			for _, subNode := range nodes {
-				if subNode == nil {
-					continue
-				}
-				// getTopDefs(nil,opt...)第一个参数指定为nil
-				// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
-				vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
-				results = append(results, vals...)
-			}
-			return results
 		}
 	case *ssa.Function:
 		var vals Values
