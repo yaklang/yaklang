@@ -644,7 +644,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 				EndLine:     2,
 				EndColumn:   64,
 			},
-			"```go\nfunc modify(r1 schema.HTTPFlow) null\n```",
+			"```go\nfunc modify(i1 schema.HTTPFlow) null\n```",
 		)
 	})
 }
@@ -922,7 +922,7 @@ e.Delete
 			EndLine:     2,
 			EndColumn:   2,
 		}
-		wantLabel := "func a(r1 any, r2 ...any) null"
+		wantLabel := "func a(i1 any, i2 ...any) null"
 		check(t, code, "yak", ssaRange, wantLabel, "")
 	})
 
@@ -950,7 +950,7 @@ e.Delete
 				EndLine:     7,
 				EndColumn:   11,
 			}
-			check(t, code, "yak", ssaRange, "func (string) Contains(r1 string) boolean", "判断字符串是否包含子串")
+			check(t, code, "yak", ssaRange, "func (string) Contains(i1 string) boolean", "判断字符串是否包含子串")
 		})
 
 		t.Run("map", func(t *testing.T) {
@@ -961,7 +961,7 @@ e.Delete
 				EndLine:     9,
 				EndColumn:   9,
 			}
-			check(t, code, "yak", ssaRange, "func (map[string]number) Delete(r1 string) null", "移除一个值")
+			check(t, code, "yak", ssaRange, "func (map[string]number) Delete(i1 string) null", "移除一个值")
 		})
 	})
 }
