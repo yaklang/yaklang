@@ -418,7 +418,7 @@ func SyntaxFlowQuery(
 		} else {
 			showValues("_", result.GetValues("_"), showDot)
 		}
-	} else {
+	} else if result != nil {
 		result.Show()
 		if showDot {
 			fmt.Println("---------------------")
