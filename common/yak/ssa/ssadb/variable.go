@@ -1,10 +1,11 @@
 package ssadb
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 

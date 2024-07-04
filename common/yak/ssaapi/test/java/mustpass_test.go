@@ -3,10 +3,11 @@ package java
 import (
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"io/fs"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -38,12 +39,11 @@ func TestMustPass_JAVA_Debug_Compile(t *testing.T) {
 		return
 	}
 
-	ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
-
 	_, err := ssaapi.ParseProject(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithDatabaseProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
+	defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
 	program, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
 	if err != nil {
 		t.Fatalf("get program from database failed: %v", err)
@@ -56,6 +56,12 @@ func TestMustPass_Debug(t *testing.T) {
 		t.Skip()
 		return
 	}
+
+	_, err := ssaapi.ParseProject(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithDatabaseProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+	defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
 
 	keyword := "xxe.sf"
 	prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)

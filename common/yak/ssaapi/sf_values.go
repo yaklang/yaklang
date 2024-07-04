@@ -1,8 +1,10 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"regexp"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -76,13 +78,17 @@ func (values Values) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator,
 	return len(newValue) > 0, newValue, nil
 }
 
-func (values Values) GlobMatch(mod int, glob ssa.Glob) (bool, sfvm.ValueOperator, error) {
-	newValue := _SearchValues(values, mod, glob.Match)
+func (values Values) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error) {
+	newValue := _SearchValues(values, mod, func(s string) bool {
+		return glob.MustCompile(g).Match(s)
+	})
 	return len(newValue) > 0, newValue, nil
 }
 
-func (values Values) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	newValue := _SearchValues(values, mod, regexp.MatchString)
+func (values Values) RegexpMatch(mod int, re string) (bool, sfvm.ValueOperator, error) {
+	newValue := _SearchValues(values, mod, func(s string) bool {
+		return regexp.MustCompile(re).MatchString(s)
+	})
 	return len(newValue) > 0, newValue, nil
 }
 

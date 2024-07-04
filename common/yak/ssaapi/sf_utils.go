@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -21,26 +22,26 @@ func _SearchValues(values Values, mod int, handler func(string) bool) Values {
 	// return newValue
 }
 
-func _SearchValue(value *Value, mod int, handler func(string) bool) Values {
+func _SearchValue(value *Value, mod int, compare func(string) bool) Values {
 	var newValue Values
 	check := func(value *Value) bool {
-		if handler(value.GetName()) || handler(value.String()) {
+		if compare(value.GetName()) || compare(value.String()) {
 			return true
 		}
 
-		if value.IsConstInst() && handler(codec.AnyToString(value.GetConstValue())) {
+		if value.IsConstInst() && compare(codec.AnyToString(value.GetConstValue())) {
 			return true
 		}
 
 		for name := range value.GetAllVariables() {
-			if handler(name) {
+			if compare(name) {
 				return true
 			}
 		}
 
 		if key := value.GetKey(); key != nil {
 			keyName := fmt.Sprint(key.GetConstValue())
-			if keyName != "" && handler(keyName) {
+			if keyName != "" && compare(keyName) {
 				return true
 			}
 		}
