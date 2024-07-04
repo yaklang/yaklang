@@ -8,6 +8,7 @@ import (
 
 type YakitPluginContext struct {
 	PluginName    string
+	PluginUUID    string
 	RuntimeId     string
 	Proxy         string
 	Ctx           context.Context
