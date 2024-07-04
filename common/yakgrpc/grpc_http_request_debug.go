@@ -82,7 +82,7 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 			tempArgs := makeArgs(streamCtx, params, script.Content)
 			app = yak.HookCliArgs(engine, tempArgs)
 		}
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithCliApp(app).WithContextCancel(cancel))
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithCliApp(app).WithContextCancel(cancel).WithPluginUUID(script.Uuid))
 
 		return nil
 	})
