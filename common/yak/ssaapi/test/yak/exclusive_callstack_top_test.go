@@ -18,6 +18,18 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 			ssatest.CheckTopDef_Equal("a", []string{"333333"}),
 		)
 	})
+	t.Run("test external function", func(t *testing.T) {
+		ssatest.Check(t, `a=f(333)`,
+			ssatest.CheckTopDef_Equal("a", []string{"333", "Function-f"}),
+			ssaapi.WithExternValue(map[string]any{
+				"f": func(i int) int { return i },
+			}))
+	})
+	t.Run("test undefined function", func(t *testing.T) {
+		ssatest.Check(t, `a=f(333)`,
+			ssatest.CheckTopDef_Equal("a", []string{"Undefined-f", "333"}),
+		)
+	})
 
 	t.Run("test level1 object", func(t *testing.T) {
 		ssatest.Check(t, `
