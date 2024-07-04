@@ -95,6 +95,14 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		checkCompletionWithCallbacks(t, code, r, labelsContainsCallback(t, want))
 	}
 
+	gotExactSuggestion := func(t *testing.T, suggestions []*ypb.SuggestionDescription, label string) *ypb.SuggestionDescription {
+		items := lo.Filter(suggestions, func(item *ypb.SuggestionDescription, _ int) bool {
+			return item.Label == label
+		})
+		require.Lenf(t, items, 1, `want only 1 %s but not`, label)
+		return items[0]
+	}
+
 	t.Run("before symbols", func(t *testing.T) {
 		t.Parallel()
 
@@ -135,13 +143,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 			},
 			func(suggestions []*ypb.SuggestionDescription) {
 				// check only one "a"
-				items := lo.Filter(suggestions, func(item *ypb.SuggestionDescription, _ int) bool {
-					return item.Label == "a"
-				})
-				require.Len(t, items, 1, `want only 1 "a" label but got 2`)
-
-				// check the "a" is a function
-				item := items[0]
+				item := gotExactSuggestion(t, suggestions, "a")
 				require.Equal(t, "Function", item.Kind)
 			})
 	})
@@ -310,6 +312,10 @@ rsp.`,
 					EndColumn:   21,
 				},
 				labelsContainsCallback(t, []string{"field", "Keys"}),
+				func(suggestions []*ypb.SuggestionDescription) {
+					item := gotExactSuggestion(t, suggestions, "field")
+					require.Equal(t, "field", item.InsertText)
+				},
 			)
 		})
 
@@ -325,13 +331,7 @@ rsp.`,
 				},
 				func(suggestions []*ypb.SuggestionDescription) {
 					// check
-					items := lo.Filter(suggestions, func(item *ypb.SuggestionDescription, _ int) bool {
-						return item.Label == "func"
-					})
-					require.Len(t, items, 1, `want map func but not`)
-
-					// check type kind
-					item := items[0]
+					item := gotExactSuggestion(t, suggestions, "func")
 					require.Equal(t, "Method", item.Kind)
 					require.Equal(t, getFuncCompletionBySSAType("func",
 						ssa.NewFunctionTypeDefine("func", []ssa.Type{ssa.GetAnyType(), ssa.GetAnyType()}, []ssa.Type{ssa.GetNumberType()}, false)),
