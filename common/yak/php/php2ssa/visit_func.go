@@ -162,37 +162,3 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 	y.FunctionBuilder = y.PopFunction()
 	return newFunc
 }
-
-//func (y *builder) VisitLambdaFunctionUseVars(raw phpparser.ILambdaFunctionUseVarsContext, sideEffect bool) interface{} {
-//	if y == nil || raw == nil {
-//		return nil
-//	}
-//	recoverRange := y.SetRange(raw)
-//	defer recoverRange()
-//
-//	i, _ := raw.(*phpparser.LambdaFunctionUseVarsContext)
-//	if i == nil {
-//		return nil
-//	}
-//	for _, useVars := range i.AllLambdaFunctionUseVar() {
-//		y.VisitLambdaFunctionUseVar(useVars)
-//	}
-//	return nil
-//}
-
-//func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarContext) interface{} {
-//	if y == nil || raw == nil {
-//		return nil
-//	}
-//	recoverRange := y.SetRange(raw)
-//	defer recoverRange()
-//
-//	i, _ := raw.(*phpparser.LambdaFunctionUseVarContext)
-//	if i == nil {
-//		return nil
-//	}
-//	if i.Ampersand() != nil {
-//		//doSomethings
-//	}
-//	return nil
-//}

@@ -94,7 +94,9 @@ var phpBuildIn = map[string]any{
 	"PHP_EOL":   "",
 	"echo":      func(...any) {},
 	"println":   func(...any) {},
-	"phpinfo":   func() {},
+	"phpinfo": func() any {
+		return nil
+	},
 	"strrev": func(value string) string {
 		return ""
 	},
@@ -297,6 +299,7 @@ var phpBuildIn = map[string]any{
 	"unserialize": func(raw string) ssa.Value {
 		return ssa.NewNil()
 	},
-	"eval":   func(code interface{}) {},
-	"assert": func(code interface{}) {},
+	"eval":          func(code interface{}) {},
+	"assert":        func(code interface{}) {},
+	"base64_decode": func(code interface{}) string { return "" },
 }

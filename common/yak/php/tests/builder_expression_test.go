@@ -354,9 +354,9 @@ println($test);`,
 func TestAssignVariables(t *testing.T) {
 	t.Run("test $_GET variables", func(t *testing.T) {
 		code := `<?php
- $a = $_GET["1"];
+$a = $_GET["1"];
 println($a);`
-		ssatest.MockSSA(t, code)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-$a(valid)"}, t)
 	})
 }
 

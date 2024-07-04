@@ -165,11 +165,10 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 			f.SetRange(b.CurrentRange)
 			value = f
 		default:
-			value = NewParam(str, false, b)
-			value.SetType(prog.handlerType(itype, 0))
+			value = NewUndefined(str)
+			value.SetRange(b.CurrentRange)
 		}
 	}
-
 	value.SetExtern(true)
 	prog.SetVirtualRegister(value)
 	prog.SetInstructionWithName(str, value)

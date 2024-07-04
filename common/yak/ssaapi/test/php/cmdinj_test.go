@@ -17,7 +17,7 @@ system($command); //system函数特性 执行结果会自动打印
 	ssatest.CheckSyntaxFlow(t, code,
 		`system( * as $command)`,
 		map[string][]string{
-			"command": {`add("ping -c 1 ", ParameterMember-parameter[0].'ip')`},
+			"command": {`add("ping -c 1 ", Undefined-$_GET.'ip'(valid))`},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -40,8 +40,47 @@ system($c);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(*  #-> * as $command)`,
 		map[string][]string{
-			"command": {"ParameterMember-parameter[0].1", "Undefined-base64_decode"},
+			"command": {"Function-base64_decode", "Undefined-$_GET"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
+}
+
+func TestPHP_CMD(t *testing.T) {
+	code := `<?php
+$a = $_GET[1];
+eval($a);
+`
+	ssatest.CheckSyntaxFlow(t, code,
+		`eval(* #-> * as $command)`,
+		map[string][]string{
+			"command": {"Undefined-$_GET"},
+		},
+		ssaapi.WithLanguage(ssaapi.PHP),
+	)
+}
+func TestPHP_EVALGetTop(t *testing.T) {
+	code := `<?php
+
+function test($a){
+  eval($a);
+}
+
+test($_GET[1]);`
+	ssatest.CheckSyntaxFlow(t, code, `eval(* #-> * as $command)`, map[string][]string{
+		"command": {"Undefined-$_GET", "Undefined-$_GET.1(valid)"},
+	},
+		ssaapi.WithLanguage(ssaapi.PHP))
+}
+
+func TestPhpEval(t *testing.T) {
+	code := `<?php
+function test($a){
+  system($a);
+}
+test($_GET[1]);`
+	ssatest.CheckSyntaxFlow(t, code,
+		`*_GET[*] --> * as $sink`,
+		map[string][]string{"sink": {"Parameter-$a"}},
+		ssaapi.WithLanguage(ssaapi.PHP))
 }
