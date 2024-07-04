@@ -437,7 +437,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	}
 
 	if script.Type == "nuclei" {
-		_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
+		_, err := httptpl.CreateYakTemplateFromYakScript(script)
 		if err != nil {
 			return err
 		}
@@ -448,7 +448,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	}
 
 	if forNuclei {
-		err := m.callers.AddForYakit(ctx, name, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NucleiScanHandle)
+		err := m.callers.AddForYakit(ctx, script, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NucleiScanHandle)
 		if err != nil {
 			m.FeedbackOrdinary(fmt.Sprintf("Initailzed Nuclei Plugin[%v] Failed: %v", name, err))
 			return nil
@@ -457,7 +457,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	}
 	if forNasl {
 		ctx.Value("ctx_info").(map[string]interface{})["isNaslScript"] = true
-		err := m.callers.AddForYakit(ctx, name, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NaslScanHandle)
+		err := m.callers.AddForYakit(ctx, script, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NaslScanHandle)
 		if err != nil {
 			m.FeedbackOrdinary(fmt.Sprintf("Initailzed Nasl Plugin[%v] Failed: %v", name, err))
 			return nil
@@ -474,7 +474,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 		hooks = MITMAndPortScanHooks
 	}
 
-	err := m.callers.AddForYakit(ctx, name, paramMap, code, YakitCallerIf(m.feedbackHandler), hooks...)
+	err := m.callers.AddForYakit(ctx, script, paramMap, code, YakitCallerIf(m.feedbackHandler), hooks...)
 	if err != nil {
 		m.FeedbackOrdinary(fmt.Sprintf("Initailzed MITM/ScanPort Plugin[%v] Failed: %v", name, err))
 		return err

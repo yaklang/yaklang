@@ -67,6 +67,9 @@ type YakTemplate struct {
 	// placeHolderMap
 	PlaceHolderMap map[string]string
 	Variables      *YakVariables
+
+	UUID       string
+	ScriptName string
 }
 
 func (y *YakTemplate) NoMatcherAndExtractor() bool {
