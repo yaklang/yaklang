@@ -95,6 +95,7 @@ func TestTerminalControlChar(t *testing.T) {
 	for {
 		output, err := stream.Recv()
 		if err != nil {
+			t.Logf(err.Error())
 			break
 		}
 		outputStr := strings.TrimSpace(string(output.Raw))
@@ -181,5 +182,4 @@ func TestTerminalPath(t *testing.T) {
 	if !passed {
 		t.Fatalf("failed to read expect output from terminal")
 	}
-
 }
