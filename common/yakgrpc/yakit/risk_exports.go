@@ -303,6 +303,12 @@ func WithRiskParam_Severity(i string) RiskParamsOpt {
 	}
 }
 
+func WithRiskParam_YakScriptUUID(i string) RiskParamsOpt {
+	return func(r *schema.Risk) {
+		r.YakScriptUUID = i
+	}
+}
+
 func WithRiskParam_FromScript(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.FromYakScript = i

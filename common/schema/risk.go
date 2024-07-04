@@ -40,6 +40,7 @@ type Risk struct {
 
 	// 来源于哪个插件？
 	FromYakScript string `json:"from_yak_script"`
+	YakScriptUUID string `json:"yak_script_uuid"`
 
 	// 等待验证中？
 	WaitingVerified bool `json:"waiting_verified"`
@@ -138,6 +139,8 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		TaskName:  utils.EscapeInvalidUTF8Byte([]byte(p.TaskName)),
 		Tags:      p.Tags,
 		IsRead:    p.IsRead,
+
+		YakScriptUUID: p.YakScriptUUID,
 	}
 }
 
