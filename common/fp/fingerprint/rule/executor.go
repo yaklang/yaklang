@@ -35,6 +35,8 @@ const (
 	ConstTitle    = "title"
 	ConstServer   = "server"
 	ConstBanner   = "banner"
+	ConstPort     = "port"
+	ConstPath     = "path"
 )
 
 type OpCode struct {
@@ -47,7 +49,12 @@ type matchedResult struct {
 	RebuildCPE func(*CPE)
 }
 
-func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrintRule) (*CPE, error) {
+func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrintRule) (cpe *CPE, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Error(e)
+		}
+	}()
 	codes := rule.ToOpCodes()
 	stack := utils.NewStack[any]()
 	for i := 0; i < len(codes); i++ {
@@ -88,6 +95,10 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 			}
 			data := resource.Data
 			switch code.data[1] {
+			case ConstPort:
+				stack.Push(resource.Port)
+			case ConstPath:
+				stack.Push(resource.Path)
 			case ConstProtocol:
 				stack.Push(resource.Protocol)
 			case ConstMd5:
@@ -135,14 +146,18 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 				stack.Push(v)
 			}
 		case OpEqual:
-			d1 := stack.Pop().(string)
-			d2 := stack.Pop().(string)
+			d1 := stack.Pop()
+			d2 := stack.Pop()
 			stack.Push(&matchedResult{ok: d1 == d2})
 		case OpContains:
 			d := stack.PopN(2)
-			d1 := d[1].(string)
-			d2 := d[0].(string)
+			d1 := utils.InterfaceToString(d[1])
+			d2 := utils.InterfaceToString(d[0])
 			stack.Push(&matchedResult{ok: strings.Contains(d1, d2)})
+		case OpNot:
+			res := stack.Pop().(*matchedResult)
+			res.ok = !res.ok
+			stack.Push(res)
 		case OpRegexpMatch:
 			d := stack.PopN(2)
 			datas := []string{}

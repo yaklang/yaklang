@@ -40,15 +40,69 @@ func TestExpressionOpCode1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header="VIDEO WEB" && title!="title"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := rule.Execute(resourceGetter, r[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotNil(t, res)
 	r, err = parsers.ParseExpRule(newTestGenerateRule(`header="VIDEO WEB" && title="title"`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = rule.Execute(resourceGetter, r[0])
+	res, err = rule.Execute(resourceGetter, r[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	assert.Nil(t, res)
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header=="VIDEO WEB" && header_Tag="--- VIDEO WEB SERVER ---"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = rule.Execute(resourceGetter, r[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Nil(t, res)
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header=="VIDEO WEB" || header_Tag="--- VIDEO WEB SERVER ---"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = rule.Execute(resourceGetter, r[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotNil(t, res)
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header=="VIDEO WEB" || header_tag="--- VIDEO WEB SERVER ---"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = rule.Execute(resourceGetter, r[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotNil(t, res)
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header=="VIDEO WEB" || header_Tag~=".* VIDEO WEB SERVER ---"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = rule.Execute(resourceGetter, r[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NotNil(t, res)
+	r, err = parsers.ParseExpRule(newTestGenerateRule(`header=="VIDEO WEB" && header_Tag~=".* VIDEO WEB SERVER ---"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = rule.Execute(resourceGetter, r[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Nil(t, res)
 }
 func TestExpressionOpCode(t *testing.T) {
 	trueExp := `header = "VIDEO WEB SERVER"`
