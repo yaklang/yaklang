@@ -178,6 +178,66 @@ var SSACompilerCommands = []*cli.Command{
 		},
 	},
 	{
+		Name:    "syntaxflow-create",
+		Aliases: []string{"create-sf", "csf"},
+		Usage:   "create syntaxflow template file",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "language,l"},
+			cli.StringFlag{Name: "keyword"},
+			cli.BoolFlag{Name: "is-vuln,vuln,v", Usage: "set the current SyntaxFlow Rule is a vuln (in desc)"},
+			cli.BoolFlag{Name: "audit-suggestion,audit,a", Usage: "set the current SyntaxFlow Rule is a suggestion"},
+			cli.BoolFlag{Name: "sec-config,security-config,s", Usage: "set the current SyntaxFlow Rule is a suggestion"},
+			cli.StringFlag{Name: "output,o,f", Usage: `set output filename`},
+		},
+		Action: func(c *cli.Context) error {
+			var buf bytes.Buffer
+
+			var typeStrs []string
+
+			switch {
+			case c.Bool("is-vuln"):
+				typeStrs = append(typeStrs, "vuln")
+			case c.Bool("audit-suggestion"):
+				typeStrs = append(typeStrs, "audit")
+			case c.Bool("security-config"):
+				typeStrs = append(typeStrs, "sec-config")
+			}
+
+			if len(typeStrs) <= 0 {
+				typeStrs = append(typeStrs, "audit")
+			}
+
+			buf.WriteString("desc(\n  ")
+			buf.WriteString("title: 'checking []',\n  ")
+			buf.WriteString("type: " + strings.Join(typeStrs, "|") + "\n)\n\n")
+			buf.WriteString("// write your SyntaxFlow Rule, like:\n")
+			buf.WriteString("//     DocumentBuilderFactory.newInstance()...parse(* #-> * as $source) as $sink; // find some call chain for parse\n")
+			buf.WriteString("//     check $sink then 'find sink point' else 'No Found' // if not found sink, the rule will stop here and report error\n")
+			buf.WriteString("//     alert $source // record $source\n\n\n")
+			buf.WriteString("// the template is generate by yak.ssa.syntaxflow command line\n")
+
+			filename := c.String("output")
+
+			if l := c.String("language"); filename != "" && l != "" {
+				l = strings.TrimSpace(strings.ToLower(l))
+				dirname, filename := filepath.Split(filename)
+				if !strings.HasPrefix(filename, l+"-") {
+					filename = l + "-" + filename
+				}
+				filename = filepath.Join(dirname, filename)
+			}
+
+			if filename == "" {
+				fmt.Println(buf.String())
+				return nil
+			}
+			if !strings.HasSuffix(filename, ".sf") {
+				filename += ".sf"
+			}
+			return os.WriteFile(filename, buf.Bytes(), 0o666)
+		},
+	},
+	{
 		Name:    "ssa-query",
 		Aliases: []string{"sf", "syntaxFlow"},
 		Usage:   "Use SyntaxFlow query SSA OpCodes from database",
