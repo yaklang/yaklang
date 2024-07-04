@@ -402,6 +402,10 @@ func SyntaxFlowQuery(
 		}
 		execError = utils.Wrapf(err, "prompt error: \n%v", strings.Join(otherErrs, "\n  "))
 	}
+	if result == nil {
+		return execError
+	}
+
 	log.Infof("syntax flow query result:")
 	if withCode {
 		if len(result.AlertSymbolTable) != 0 {
@@ -418,7 +422,7 @@ func SyntaxFlowQuery(
 		} else {
 			showValues("_", result.GetValues("_"), showDot)
 		}
-	} else if result != nil {
+	} else {
 		result.Show()
 		if showDot {
 			fmt.Println("---------------------")
