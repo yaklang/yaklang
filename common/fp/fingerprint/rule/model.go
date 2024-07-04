@@ -1,17 +1,22 @@
 package rule
 
 import (
+	"errors"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/maps"
 	"strings"
 )
 
 type MatchResource struct {
 	Data     []byte
 	Port     int
+	Path     string
 	Protocol string
 }
 
@@ -25,9 +30,70 @@ func NewHttpResource(data []byte) *MatchResource {
 type GeneralRule struct {
 	gorm.Model
 	*CPE
+	WebPath         string
+	ExtInfo         string
 	MatchExpression string `gorm:"uniqueIndex"`
 }
 
+func (g *GeneralRule) String() string {
+	items := []string{}
+	cpeStr := g.CPE.String()
+	items = append(items, fmt.Sprintf("cpe:%s", cpeStr))
+
+	if g.WebPath != "" {
+		items = append(items, fmt.Sprintf("webpath:%s", g.WebPath))
+	}
+	if g.ExtInfo != "" {
+		items = append(items, fmt.Sprintf("info:%s", g.ExtInfo))
+	}
+	items = append(items, fmt.Sprintf("rule:%s", g.MatchExpression))
+	return strings.Join(items, " ")
+}
+
+func NewEmptyGeneralRule() *GeneralRule {
+	return &GeneralRule{
+		CPE: &CPE{},
+	}
+}
+func ParseGeneralRule(s string) (*GeneralRule, error) {
+	rule := NewEmptyGeneralRule()
+	infoItems := map[string]func(s string){"cpe:": func(s string) {
+		cpe, err := ParseToCPE(s)
+		if err != nil {
+			log.Error(err)
+		}
+		rule.CPE = cpe
+	}, "webpath:": func(s string) {
+		rule.WebPath = s
+	}, "info:": func(s string) {
+		rule.ExtInfo = s
+	}, "rule:": func(s string) {
+		rule.MatchExpression = s
+	}}
+	keys := maps.Keys(infoItems)
+	res := utils.IndexAllSubstrings(s, keys...)
+
+	if len(res) > 0 {
+		pre := res[0]
+		for _, info := range res[1:] {
+			v, ok := infoItems[keys[pre[0]]]
+			if !ok {
+				continue
+			}
+			v(s[pre[1]+len(keys[pre[0]]) : info[1]])
+			pre = info
+		}
+		v, ok := infoItems[keys[pre[0]]]
+		if ok {
+			v(s[pre[1]+len(keys[pre[0]]):])
+		}
+	}
+
+	if rule.MatchExpression == "" {
+		return nil, errors.New("not set rule")
+	}
+	return rule, nil
+}
 func init() {
 	db := consts.GetGormProjectDatabase()
 	db.AutoMigrate(&GeneralRule{})
@@ -90,23 +156,35 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 		if len(f.MatchParam.Params) != 2 {
 			return nil
 		}
-		strParams := []string{}
+		params := []any{}
 		for _, param := range f.MatchParam.Params {
-			p, ok := param.(string)
-			if !ok {
-				return nil
-			}
-			strParams = append(strParams, p)
+			params = append(params, param)
 		}
-		ref := strParams[0]
-		value := strParams[1]
-		pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, ref}})
-		pushCode(&OpCode{Op: OpPush, data: []any{value}})
-		if f.MatchParam.Op == "=" {
+		ref := params[0].(string)
+		value := params[1]
+		if strings.HasPrefix(ref, "header_") {
+			pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, "header_item", strings.TrimLeft(ref, "header_")}})
+			pushCode(&OpCode{Op: OpPush, data: []any{value}})
+		} else {
+			pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, ref}})
+			pushCode(&OpCode{Op: OpPush, data: []any{value}})
+		}
+		switch f.MatchParam.Op {
+		case "=":
 			pushCode(&OpCode{Op: OpContains})
-		} else if f.MatchParam.Op == "!=" {
+		case "!=":
 			pushCode(&OpCode{Op: OpContains})
 			pushCode(&OpCode{Op: OpNot})
+		case "==":
+			pushCode(&OpCode{Op: OpEqual})
+		case "!==":
+			pushCode(&OpCode{Op: OpEqual})
+			pushCode(&OpCode{Op: OpNot})
+		case "~=":
+			pushCode(&OpCode{Op: OpRegexpMatch})
+		default:
+			log.Errorf("not supported op: %s", f.MatchParam.Op)
+			return nil
 		}
 	case "regexp":
 		pushCode(&OpCode{Op: OpData, data: []any{f.WebPath}})
@@ -177,7 +255,7 @@ func (f *FingerPrintRule) ToOpCodes() []*OpCode {
 	return codes
 }
 
-func (c *CPE) init() {
+func (c *CPE) Init() {
 	if c.Part == "" {
 		c.Part = "a"
 	}
@@ -197,9 +275,40 @@ func (c *CPE) init() {
 }
 
 func (c *CPE) String() string {
-	c.init()
+	c.Init()
 	raw := fmt.Sprintf("cpe:/%s:%s:%s:%s:%s:%s:%s", c.Part, c.Vendor, c.Product, c.Version, c.Update, c.Edition, c.Language)
 	raw = strings.ReplaceAll(raw, " ", "_")
 	raw = strings.ToLower(raw)
 	return raw
+}
+func ParseToCPE(cpe string) (*CPE, error) {
+	if (!strings.HasPrefix(cpe, "cpe:/")) && (!strings.HasPrefix(cpe, "cpe:2.3:")) {
+		return nil, utils.Errorf("raw [%s] is not a valid cpe", cpe)
+	}
+
+	if strings.HasPrefix(cpe, "cpe:2.3:") {
+		cpe = strings.Replace(cpe, "cpe:2.3:", "cpe:/", 1)
+	}
+
+	var cpeArgs [7]string
+	s := strings.Split(cpe, ":")
+	for i := 1; i <= len(s)-1; i++ {
+		ret := strings.ReplaceAll(s[i], "%", "")
+		cpeArgs[i-1] = ret
+		if i == 7 {
+			break
+		}
+	}
+	cpeArgs[0] = cpeArgs[0][1:]
+	cpeModel := &CPE{
+		Part:     cpeArgs[0],
+		Vendor:   cpeArgs[1],
+		Product:  cpeArgs[2],
+		Version:  cpeArgs[3],
+		Update:   cpeArgs[4],
+		Edition:  cpeArgs[5],
+		Language: cpeArgs[6],
+	}
+	cpeModel.Init()
+	return cpeModel, nil
 }

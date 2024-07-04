@@ -422,7 +422,6 @@ type trieNode struct {
 	flag       int // 对节点的标记，可以用来标记结束节点
 }
 
-
 func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 	// 构建trie树
 	root := &trieNode{
@@ -441,12 +440,12 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 					failure:    nil,
 					flag:       0,
 					patternLen: 0,
-					id:         patternIndex,
 				}
 			}
 			node = node.children[char]
 		}
 		node.flag = 1
+		node.id = patternIndex
 		node.patternLen = len(pattern)
 	}
 	// 构建Failure
