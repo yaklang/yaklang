@@ -334,7 +334,7 @@ func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *schema.YakScrip
 				Value: pocName,
 			})
 
-			_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
+			_, err := httptpl.CreateYakTemplateFromYakScript(script)
 			if err != nil {
 				return nil, nil, utils.Errorf("pocFile: %v is not valid nuclei yaml poc", script.ScriptName)
 			}
