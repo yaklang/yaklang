@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -29,16 +30,17 @@ func (p *Program) show(flag FunctionAsmFlag) {
 		}
 	}
 
-	for _, pkg := range p.Packages {
-		fmt.Println("==============================\npackage:", pkg.Name)
-		for _, i := range pkg.Funcs {
-			showFunc(i)
-		}
+	fmt.Println("==============================\npackage:", p.Name, p.ProgramKind)
+	for _, i := range p.Funcs {
+		showFunc(i)
 	}
 }
 
 func (p *Program) Show() *Program {
 	p.show(DisAsmDefault)
+	for _, up := range p.UpStream {
+		up.show(DisAsmDefault)
+	}
 	return p
 }
 

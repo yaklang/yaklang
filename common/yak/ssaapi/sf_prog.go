@@ -1,8 +1,6 @@
 package ssaapi
 
 import (
-	"regexp"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,7 +40,7 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 
 func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		p.DBCache.GetByVariableExact(mod, s),
+		ssa.MatchInstructionByExact(p.Program, mod, s),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
@@ -54,9 +52,9 @@ func (p *Program) ExactMatch(mod int, s string) (bool, sfvm.ValueOperator, error
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) GlobMatch(mod int, g ssa.Glob) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		p.DBCache.GetByVariableGlob(mod, g),
+		ssa.MatchInstructionByGlob(p.Program, mod, g),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true
@@ -67,9 +65,9 @@ func (p *Program) GlobMatch(mod int, g ssa.Glob) (bool, sfvm.ValueOperator, erro
 	return len(values) > 0, values, nil
 }
 
-func (p *Program) RegexpMatch(mod int, re *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(mod int, re string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		p.DBCache.GetByVariableRegexp(mod, re),
+		ssa.MatchInstructionByRegexp(p.Program, mod, re),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true

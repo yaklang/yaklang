@@ -40,18 +40,6 @@ type SFFrame struct {
 
 	predCounter int
 }
-type GlobEx struct {
-	Origin glob.Glob
-	Rule   string
-}
-
-func (g *GlobEx) Match(d string) bool {
-	return g.Origin.Match(d)
-}
-
-func (g *GlobEx) String() string {
-	return g.Rule
-}
 
 func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
 	v := vars
@@ -404,10 +392,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			err = utils.Wrap(CriticalError, "compile glob failed")
 		}
+		_ = globIns
 
 		var next []ValueOperator
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
-			ok, results, _ := operator.GlobMatch(mod|NameMatch, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
+			ok, results, _ := operator.GlobMatch(mod|NameMatch, i.UnaryStr)
 			if ok {
 				have := false
 				_ = results.Recursive(func(operator ValueOperator) error {
@@ -446,6 +435,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Wrapf(CriticalError, "compile regexp[%v] failed: %v", i.UnaryStr, err)
 		}
+		_ = regexpIns
 
 		var next []ValueOperator
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
@@ -453,7 +443,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			//if strings.Contains(operator.String(), "aaa") {
 			//	spew.Dump(1)
 			//}
-			ok, results, _ := operator.RegexpMatch(mod|NameMatch, regexpIns)
+			ok, results, _ := operator.RegexpMatch(mod|NameMatch, i.UnaryStr)
 			if ok {
 				have := false
 				_ = results.Recursive(func(operator ValueOperator) error {
@@ -490,12 +480,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			err = utils.Wrap(CriticalError, "compile glob failed")
 		}
+		_ = globIns
 
 		mod := i.UnaryInt
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		result, next, err := value.GlobMatch(mod, &GlobEx{Origin: globIns, Rule: i.UnaryStr})
+		result, next, err := value.GlobMatch(mod, i.UnaryStr)
 		if err != nil {
 			err = utils.Wrapf(err, "search glob failed")
 		}
@@ -524,7 +515,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		result, next, err := value.RegexpMatch(mod, regexpIns)
+		result, next, err := value.RegexpMatch(mod, regexpIns.String())
 		if err != nil {
 			err = utils.Wrap(err, "search regexp failed")
 		}
@@ -545,7 +536,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "E: stack is empty, cannot pop")
 		}
 		i := s.stack.Pop()
-		s.debugSubLog(">> pop %v", i.String())
+		s.debugSubLog(">> pop %v", valuesLen(i))
 		s.debugSubLog("save-to $_")
 		err := s.output("_", i)
 		if err != nil {
@@ -570,7 +561,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return err
 		}
 		callLen := valuesLen(results)
-		s.debugSubLog("- call Called: %v", results.String())
 		s.debugSubLog("<< push len: %v", callLen)
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
 		s.stack.Push(results)
@@ -634,7 +624,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
-		s.debugSubLog("<< push bottom uses")
+		s.debugSubLog("<< push bottom uses %v", valuesLen(vals))
 		s.stack.Push(vals)
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
@@ -647,7 +637,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
 		}
-		s.debugSubLog("<< push users")
+		s.debugSubLog("<< push users %v", valuesLen(vals))
 		s.stack.Push(vals)
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
@@ -660,7 +650,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
-		s.debugSubLog("<< push top defs %s", vals.String())
+		s.debugSubLog("<< push top defs %v", valuesLen(vals))
 		s.stack.Push(vals)
 	case OpNewRef:
 		if i.UnaryStr == "" {

@@ -12,7 +12,7 @@ type SyntaxFlowResult struct {
 }
 
 func (r *SyntaxFlowResult) GetValues(name string) Values {
-	if r.symbol == nil || r.SFFrameResult == nil {
+	if r == nil || r.symbol == nil || r.SFFrameResult == nil {
 		return nil
 	}
 	if vs, ok := r.symbol[name]; ok {
@@ -27,7 +27,7 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 }
 
 func (r *SyntaxFlowResult) GetAllValues() map[string]Values {
-	if r.symbol == nil || r.SFFrameResult == nil {
+	if r == nil || r.symbol == nil || r.SFFrameResult == nil {
 		return nil
 	}
 	for name := range r.SFFrameResult.SymbolTable.GetMap() {

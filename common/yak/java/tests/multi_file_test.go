@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"gotest.tools/v3/assert"
 )
@@ -15,7 +16,14 @@ func Test_Multi_File(t *testing.T) {
 		ssaapi.WithFileSystemEntry("org/main/Main.java"),
 	)
 	require.NoError(t, err)
+	applicationLen := 0
 	_ = progs
-	assert.Equal(t, 1, len(progs))
+	for _, p := range progs {
+		if p.GetProgramKind() == ssa.Application {
+			applicationLen++
+		}
+		p.Show()
+	}
+	assert.Equal(t, 1, applicationLen)
 	progs[0].Show()
 }

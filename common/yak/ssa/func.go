@@ -6,11 +6,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func (p *Package) NewFunction(name string) *Function {
+func (p *Program) NewFunction(name string) *Function {
 	return p.NewFunctionWithParent(name, nil)
 }
 
-func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function {
+func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function {
 	index := len(p.Funcs)
 	if index == 0 && name == "" {
 		name = "main"
@@ -24,7 +24,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		anValue:     NewValue(),
-		Package:     p,
+		prog:        p,
 		Params:      make([]Value, 0),
 		hasEllipsis: false,
 		Blocks:      make([]Instruction, 0),
@@ -45,14 +45,14 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	} else {
 		p.Funcs[name] = f
 	}
-	p.Prog.SetVirtualRegister(f)
+	p.SetVirtualRegister(f)
 	// function 's Range is essential!
 	if f.GetRange() == nil {
-		if editor := p.Prog.getCurrentEditor(); editor != nil {
-			f.SetRangeInit(editor)
-		} else {
-			log.Warnf("the program must contains a editor to init function range: %v", p.Prog.Name)
-		}
+		// if editor := p.getCurrentEditor(); editor != nil {
+		// 	f.SetRangeInit(editor)
+		// } else {
+		log.Warnf("the program must contains a editor to init function range: %v", p.Name)
+		// }
 	}
 
 	f.EnterBlock = f.NewBasicBlock("entry")
@@ -84,10 +84,10 @@ func (f *Function) IsGeneric() bool {
 }
 
 func (f *Function) GetProgram() *Program {
-	if f.Package == nil {
+	if f.prog == nil {
 		return nil
 	}
-	return f.Package.Prog
+	return f.prog
 }
 
 func (f *Function) GetFunc() *Function {

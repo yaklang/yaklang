@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -153,22 +154,38 @@ type User interface {
 
 type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
 
-type (
-	packagePath     []string
-	packagePathList []packagePath
+type ProgramKind string
+
+const (
+	Application ProgramKind = "application"
+	Library                 = "library"
 )
 
 // both instruction and value
 type Program struct {
 	// package list
 	Name        string
+	Version     string
+	ProgramKind ProgramKind // is library or application
+
 	SCAPackages []*dxtypes.Package
-	Packages    map[string]*Package
+
+	// program relationship
+	DownStream map[string]*Program
+	UpStream   map[string]*Program
+
+	EnableDatabase bool // for compile, whether use database
 
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
 	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]
 
 	Cache *Cache
+
+	// function list
+	Funcs map[string]*Function
+
+	// class blue print
+	ClassBluePrint map[string]*ClassBluePrint
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
@@ -183,26 +200,12 @@ type Program struct {
 	// for build
 	buildOnce sync.Once
 
-	// cache hitter
-	packagePathList packagePathList
-
 	// extern lib
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
 	ExternLib               map[string]map[string]any
-}
-
-type Package struct {
-	Name string
-	// point to program
-	Prog *Program
-	// function list
-	Funcs map[string]*Function
-
-	// class blue print
-	ClassBluePrint map[string]*ClassBluePrint
 }
 
 // implement Value
@@ -213,7 +216,7 @@ type Function struct {
 	methodName string
 
 	// package, double link
-	Package *Package
+	prog *Program
 
 	// Type
 	Type *FunctionType

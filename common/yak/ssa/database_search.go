@@ -3,67 +3,89 @@ package ssa
 import (
 	"regexp"
 
+	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-type Glob interface {
-	Match(string) bool
-	String() string
-}
-
-func (c *Cache) GetByVariableExact(mod int, name string) []Instruction {
-	// return c._getByVariableEx(isMember,
-	// 	func() chan int64 { return ssadb.ExactSearchVariable(c.DB, isMember, name) },
-	// )
-	if c.HaveDatabaseBackend() {
-		var insts []Instruction
-		ch := ssadb.ExactSearchVariable(c.DB, mod, name)
-		for id := range ch {
-			inst := c.newLazyInstruction(id)
-			insts = append(insts, inst)
-		}
-		return insts
-	}
-	return c._getByVariableEx(mod,
-		func(s string) bool { return s == name },
-	)
+func MatchInstructionByExact(prog *Program, mod int, e string) []Instruction {
+	return matchInstructionsEx(prog, ssadb.ExactCompare, mod, e)
 }
 
 // GetByVariableGlob means get variable name(glob).
-func (c *Cache) GetByVariableGlob(mod int, g Glob) []Instruction {
-	if c.HaveDatabaseBackend() {
-		var insts []Instruction
-		ch := ssadb.GlobSearchVariable(c.DB, mod, g.String())
-		for id := range ch {
-			inst := c.newLazyInstruction(id)
-			insts = append(insts, inst)
-		}
-		return insts
-	}
-	return c._getByVariableEx(mod,
-		func(s string) bool { return g.Match(s) },
-	)
+func MatchInstructionByGlob(prog *Program, mod int, g string) []Instruction {
+	return matchInstructionsEx(prog, ssadb.GlobCompare, mod, g)
 }
 
 // GetByVariableRegexp will filter Instruction via variable regexp name
-func (c *Cache) GetByVariableRegexp(mod int, r *regexp.Regexp) []Instruction {
-	if c.HaveDatabaseBackend() {
+func MatchInstructionByRegexp(prog *Program, mod int, r string) []Instruction {
+	return matchInstructionsEx(prog, ssadb.RegexpCompare, mod, r)
+}
+
+func matchInstructionsEx(
+	prog *Program,
+	compareMode, matchMode int,
+	name string,
+) []Instruction {
+	// all application in database, just use sql
+	if prog.EnableDatabase {
 		var insts []Instruction
-		ch := ssadb.RegexpSearchVariable(c.DB, mod, r.String())
+		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), compareMode, matchMode, name)
 		for id := range ch {
-			inst := c.newLazyInstruction(id)
+			inst := prog.Cache.newLazyInstruction(id)
 			insts = append(insts, inst)
 		}
 		return insts
 	}
-	return c._getByVariableEx(mod,
-		func(s string) bool { return r.MatchString(s) },
-	)
+
+	res := make([]Instruction, 0)
+	tmp := make(map[int64]struct{})
+	addRes := func(insts ...Instruction) {
+		for _, inst := range insts {
+			if _, ok := tmp[inst.GetId()]; !ok {
+				res = append(res, inst)
+				tmp[inst.GetId()] = struct{}{}
+			}
+		}
+	}
+	handler := func(prog *Program) {
+		if prog.EnableDatabase {
+			// from database
+			var insts []Instruction
+			ch := ssadb.SearchVariable(
+				ssadb.GetDB().Where("program_name = ?", prog.Name),
+				compareMode, matchMode, name,
+			)
+			for id := range ch {
+				inst := prog.Cache.newLazyInstruction(id)
+				insts = append(insts, inst)
+			}
+			addRes(insts...)
+		} else {
+			// from cache
+			check := func(s string) bool {
+				switch compareMode {
+				case ssadb.ExactCompare:
+					return s == name
+				case ssadb.GlobCompare:
+					return glob.MustCompile(name).Match(s)
+				case ssadb.RegexpCompare:
+					return regexp.MustCompile(name).MatchString(s)
+				}
+				return false
+			}
+			addRes(prog.Cache._getByVariableEx(matchMode, check)...)
+		}
+	}
+
+	handler(prog)
+	for _, up := range prog.UpStream {
+		handler(up)
+	}
+	return res
 }
 
 func (c *Cache) _getByVariableEx(
 	mod int,
-	// checkValueFromDB func() chan int64,
 	checkValue func(string) bool,
 ) []Instruction {
 	var ins []Instruction

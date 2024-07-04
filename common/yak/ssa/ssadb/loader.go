@@ -91,6 +91,24 @@ const (
 	BothMatch     = NameMatch | KeyMatch
 )
 
+const (
+	ExactCompare int = iota
+	GlobCompare
+	RegexpCompare
+)
+
+func SearchVariable(db *gorm.DB, compareMode, matchMod int, value string) chan int64 {
+	switch compareMode {
+	case ExactCompare:
+		return ExactSearchVariable(db, matchMod, value)
+	case GlobCompare:
+		return GlobSearchVariable(db, matchMod, value)
+	case RegexpCompare:
+		return RegexpSearchVariable(db, matchMod, value)
+	}
+	return nil
+}
+
 func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrVariable{})
 	switch mod {
@@ -105,7 +123,7 @@ func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 }
 
 func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
-	db := DB.Model(&IrVariable{}).Debug()
+	db := DB.Model(&IrVariable{})
 	switch mod {
 	case NameMatch:
 		db = db.Where("variable_name GLOB ?", value)

@@ -1,10 +1,11 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 func (b *FunctionBuilder) AddIncludePath(path string) {
@@ -55,16 +56,11 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 }
 
 func (b *FunctionBuilder) AddCurrentPackagePath(path []string) *FunctionBuilder {
-	p := b.GetProgram()
-	p.Loader.AddPackagePath(path)
-
+	prog := b.GetProgram()
 	pkgName := strings.Join(path, ".")
 	if pkgName != "" {
-		if !p.IsPackagePathInList(pkgName) {
-			p.AddPackage(NewPackage(pkgName))
-			p.packagePathList = append(p.packagePathList, path)
-		}
-		return p.GetAndCreateFunctionBuilder(pkgName, "init")
+		lib := prog.NewLibrary(pkgName, path)
+		return lib.GetAndCreateFunctionBuilder(pkgName, "init")
 	}
 	return nil
 

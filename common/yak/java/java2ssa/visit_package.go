@@ -1,8 +1,9 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -15,37 +16,38 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		pkgNames, static, all := y.VisitImportDeclaration(pkgImport)
 		_, _, _ = pkgNames, static, all
 
-		var pkg *ssa.Package
+		var prog *ssa.Program
 		var className string
 		// found package
 		for i := len(pkgNames) - 1; i > 0; i-- {
 			className = strings.Join(pkgNames[i:], ".")
-			if pkg = y.GetPackage(strings.Join(pkgNames[:i], ".")); pkg != nil {
+			if p, err := ssa.GetProgram(strings.Join(pkgNames[:i], "."), ssa.Library); err == nil {
+				prog = p
 				break
 			}
-			if pkg = y.BuildPackage(pkgNames[:i]); pkg != nil {
+			if prog = y.BuildPackage(pkgNames[:i]); prog != nil {
 				break
 			}
 		}
-		if pkg == nil {
+		if prog == nil {
 			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
 			return
 		}
 
 		// get class
 		if all {
-			for _, class := range pkg.ClassBluePrint {
+			for _, class := range prog.ClassBluePrint {
 				y.SetClassBluePrint(class.Name, class)
 			}
-		} else if class := pkg.GetClassBluePrint(className); class != nil {
+		} else if class := prog.GetClassBluePrint(className); class != nil {
 			y.SetClassBluePrint(className, class)
 		} else {
-			log.Warnf("BUG: Import  class %s but not found in package %v", className, pkg.Name)
+			log.Warnf("BUG: Import  class %s but not found in package %v", className, prog.Name)
 		}
 	}
 }
 
-func (y *builder) BuildPackage(pkgNames []string) *ssa.Package {
+func (y *builder) BuildPackage(pkgNames []string) *ssa.Program {
 	if y == nil {
 		return nil
 	}
@@ -72,7 +74,10 @@ func (y *builder) BuildPackage(pkgNames []string) *ssa.Package {
 	}
 
 	pkgName := strings.Join(pkgNames, ".")
-	return y.GetPackage(pkgName)
+	if p, err := ssa.GetProgram(pkgName, ssa.Library); err == nil {
+		return p
+	}
+	return nil
 }
 
 func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageFileLoader, fileName string, data *memedit.MemEditor) {

@@ -1,11 +1,9 @@
 package sfvm
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type RecursiveConfigKey string
@@ -101,9 +99,9 @@ type ValueOperator interface {
 	// ExactMatch return ops, for OpPushSearchExact
 	ExactMatch(int, string) (bool, ValueOperator, error)
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(int, ssa.Glob) (bool, ValueOperator, error)
+	GlobMatch(int, string) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
-	RegexpMatch(int, *regexp.Regexp) (bool, ValueOperator, error)
+	RegexpMatch(int, string) (bool, ValueOperator, error)
 
 	// GetCallActualParams for OpGetCallArgs
 	GetCalled() (ValueOperator, error)

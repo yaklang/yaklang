@@ -42,14 +42,17 @@ var AllLanguageBuilders = []ssa.Builder{
 }
 
 func (c *config) parseProject() ([]*Program, error) {
-	ret := make([]*Program, 0)
+	// ret := make([]*ssa.Program, 0)
 
 	programPath := c.programPath
+	prog, builder, err := c.init()
+	_ = prog
+	_ = builder
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
 
 	// parse project
-	err := ssareducer.ReducerCompile(
+	err = ssareducer.ReducerCompile(
 		programPath, // base
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithEntryFiles(c.entryFile...),
@@ -62,14 +65,20 @@ func (c *config) parseProject() ([]*Program, error) {
 				return nil, err
 			}
 
-			prog, err := c.parseSimple(path, memedit.NewMemEditor(string(raw)))
-			endTime := time.Now()
-			if err != nil {
+			// check
+			if err := c.checkLanguage(path); err != nil {
+				return nil, err
+			}
+
+			// build
+			if err := prog.Build(path, memedit.NewMemEditor(string(raw)), builder); err != nil {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
+
+			endTime := time.Now()
 			log.Infof("compile %s cost: %v", path, endTime.Sub(startTime))
-			ret = append(ret, NewProgram(prog, c))
+			// ret = append(ret, prog)
 			exclude := prog.GetIncludeFiles()
 			if len(exclude) > 0 {
 				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
@@ -80,7 +89,10 @@ func (c *config) parseProject() ([]*Program, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")
 	}
-	return ret, nil
+	prog.Finish()
+	return []*Program{
+		NewProgram(prog, c),
+	}, nil
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
@@ -88,6 +100,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 	if err != nil {
 		return nil, err
 	}
+	prog.Finish()
 	return NewProgram(prog, c), nil
 }
 
@@ -111,7 +124,11 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 		}
 	}()
 
-	prog, builder, err := c.init(path, r)
+	if err := c.checkLanguage(path); err != nil {
+		return nil, err
+	}
+	prog, builder, err := c.init()
+	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
 	}
@@ -121,15 +138,14 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
-	prog.Finish()
+	// prog.Finish()
 	return prog, nil
 }
 
 var SkippedError = ssareducer.SkippedError
 
-func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ssa.FunctionBuilder, error) {
+func (c *config) checkLanguage(path string) error {
 	LanguageBuilder := c.Builder
-	programName := c.DatabaseProgramName
 
 	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
 		for _, instance := range builders {
@@ -158,7 +174,7 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 			LanguageBuilder, err = processBuilders(AllLanguageBuilders...)
 		}
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 	} else {
 		// path is empty, use language or YakLang as default
@@ -167,8 +183,16 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 			// log.Infof("use default language [%s] for empty path", Yak)
 		}
 	}
+	c.Builder = LanguageBuilder
+	return nil
+}
 
-	prog := ssa.NewProgram(programName, c.fs, c.programPath)
+func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
+	LanguageBuilder := c.Builder
+	programName := c.DatabaseProgramName
+
+	prog := ssa.NewProgram(programName, c.DatabaseProgramName != "", ssa.Application, c.fs, c.programPath)
+
 	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
 		// check builder
 		if LanguageBuilder == nil {
@@ -212,7 +236,6 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
 
-	prog.PushEditor(editor)
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	// TODO: this extern info should be set in program
 	builder.WithExternLib(c.externLib)
@@ -220,6 +243,5 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
-	builder.SetRangeInit(editor)
 	return prog, builder, nil
 }

@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -15,14 +16,14 @@ import (
 	syncAtomic "sync/atomic"
 )
 
-var CachePool = omap.NewEmptyOrderedMap[string, *Cache]()
+var cachePool = omap.NewEmptyOrderedMap[string, *Cache]()
 
 func GetCacheFromPool(programName string) *Cache {
-	if cache, ok := CachePool.Get(programName); ok {
+	if cache, ok := cachePool.Get(programName); ok {
 		return cache
 	}
-	cache := NewDBCache(programName)
-	CachePool.Set(programName, cache)
+	cache := NewDBCache(programName, true)
+	cachePool.Set(programName, cache)
 	return cache
 }
 
@@ -47,8 +48,7 @@ type Cache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
-	databaseEnable := programName != ""
+func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Duration) *Cache {
 	ttl := time.Duration(0)
 	if databaseEnable {
 		// enable database
@@ -166,7 +166,7 @@ func (c *Cache) ForEachVariable(handle func(string, []Instruction)) {
 }
 
 func (c *Cache) AddClassInstance(name string, inst Instruction) {
-	// log.Infof("AddClassInstance: %s : %v", name, inst)
+	// log.Errorf("AddClassInstance: %s : %v", name, inst)
 	// if _, ok := c.Class2InstIndex[name]; !ok {
 	// 	c.Class2InstIndex[name] = make([]Instruction, 0, 1)
 	// }

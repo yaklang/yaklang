@@ -2,24 +2,29 @@ package ssa
 
 import (
 	"sort"
-	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewProgram(dbProgramName string, fs filesys.FileSystem, programPath string) *Program {
+func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs filesys.FileSystem, programPath string) *Program {
 	prog := &Program{
-		Name:                    dbProgramName,
-		Packages:                make(map[string]*Package),
+		Name:                    ProgramName,
+		ProgramKind:             kind,
+		UpStream:                make(map[string]*Program),
+		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		Cache:                   NewDBCache(dbProgramName),
+		Cache:                   NewDBCache(ProgramName, enableDatabase),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
+		Funcs:                   make(map[string]*Function),
+		ClassBluePrint:          make(map[string]*ClassBluePrint),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		cacheExternInstance:     make(map[string]Value),
@@ -28,10 +33,40 @@ func NewProgram(dbProgramName string, fs filesys.FileSystem, programPath string)
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
 	}
+	prog.EnableDatabase = enableDatabase
+	setProgramCachePool(ProgramName, prog)
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
 		ssautil.WithIncludePath(programPath),
 	)
+	return prog
+}
+
+func (prog *Program) NewLibrary(name string, path []string) *Program {
+	// get lib from up-stream
+	if lib, ok := prog.UpStream[name]; ok {
+		return lib
+	}
+
+	// create lib
+	fs := prog.Loader.GetFilesysFileSystem()
+	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
+	prog.UpStream[name] = lib
+	lib.DownStream[prog.Name] = prog
+	lib.PushEditor(prog.getCurrentEditor())
+	return lib
+}
+
+func NewProgramFromDB(p *ssadb.IrProgram) *Program {
+	prog := &Program{
+		Name:           p.ProgramName,
+		ProgramKind:    ProgramKind(p.ProgramKind),
+		UpStream:       make(map[string]*Program),
+		DownStream:     make(map[string]*Program),
+		Cache:          GetCacheFromPool(p.ProgramName),
+		EnableDatabase: true,
+	}
+	// TODO: handler up and down stream
 	return prog
 }
 
@@ -40,22 +75,17 @@ func (prog *Program) GetProgramName() string {
 }
 
 func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Function {
-	pkg := prog.GetPackage(pkgName)
-	if pkg == nil {
-		pkg = NewPackage(pkgName)
-		prog.AddPackage(pkg)
-	}
-	fun := pkg.GetFunction(funcName)
+	fun := prog.GetFunction(funcName)
 	if fun == nil {
-		fun = pkg.NewFunction(funcName)
+		fun = prog.NewFunction(funcName)
 	}
 
 	if fun.GetRange() == nil {
-		if editor := prog.getCurrentEditor(); editor != nil {
-			fun.SetRangeInit(editor)
-		} else {
-			log.Warnf("the program must contains a editor to init function range: %v", prog.Name)
-		}
+		// if editor := prog.getCurrentEditor(); editor != nil {
+		// 	fun.SetRangeInit(editor)
+		// } else {
+		log.Warnf("the program must contains a editor to init function range: %v", prog.Name)
+		// }
 	}
 
 	return fun
@@ -80,33 +110,9 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	return builder
 }
 
-func (prog *Program) AddPackage(pkg *Package) {
-	pkg.Prog = prog
-	prog.Packages[pkg.Name] = pkg
-}
-
-func (prog *Program) GetPackage(name string) *Package {
-	if p, ok := prog.Packages[name]; ok {
-		return p
-	} else {
-		return nil
-	}
-}
-
-func (p *Program) GetFunctionFast(paths ...string) *Function {
-	if len(paths) > 1 {
-		pkg := p.GetPackage(paths[0])
-		if pkg != nil {
-			return pkg.GetFunction(paths[1])
-		}
-	} else if len(paths) == 1 {
-		if ret := p.GetPackage("main"); ret != nil {
-			return ret.GetFunction(paths[0])
-		}
-	} else {
-		if ret := p.GetPackage("main"); ret != nil {
-			return ret.GetFunction("main")
-		}
+func (p *Program) GetFunction(name string) *Function {
+	if f, ok := p.Funcs[name]; ok {
+		return f
 	}
 	return nil
 }
@@ -125,15 +131,22 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 		}
 	}
 
-	for _, pkg := range prog.Packages {
-		for _, f := range pkg.Funcs {
-			handFunc(f)
-		}
+	for _, f := range prog.Funcs {
+		handFunc(f)
 	}
 }
 
 func (prog *Program) Finish() {
+	for _, up := range prog.UpStream {
+		up.Finish()
+	}
 	prog.Cache.SaveToDatabase()
+	deleteProgramCachePool(prog.Name)
+	if prog.EnableDatabase {
+		ssadb.SaveProgram(prog.Name, prog.Version, string(prog.ProgramKind),
+			lo.Keys(prog.DownStream), lo.Keys(prog.UpStream),
+		)
+	}
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
@@ -160,16 +173,6 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 		value = item.GetValue()
 	}
 	return offset, value
-}
-
-func (prog *Program) IsPackagePathInList(pkgName string) bool {
-	for _, pkgPath := range prog.packagePathList {
-		name := strings.Join(pkgPath, ".")
-		if name == pkgName {
-			return true
-		}
-	}
-	return false
 }
 
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
@@ -201,26 +204,4 @@ func (p *Program) PopEditor() {
 		return
 	}
 	p.editorStack.Pop()
-}
-
-func NewPackage(name string) *Package {
-	pkg := &Package{
-		Name:           name,
-		Funcs:          make(map[string]*Function, 0),
-		ClassBluePrint: make(map[string]*ClassBluePrint),
-	}
-	return pkg
-}
-
-func (pkg *Package) GetFunction(name string) *Function {
-	if f, ok := pkg.Funcs[name]; ok {
-		return f
-	} else {
-		return nil
-	}
-}
-
-func (f *FunctionBuilder) GetPackage(name string) *Package {
-	prog := f.GetProgram()
-	return prog.GetPackage(name)
 }

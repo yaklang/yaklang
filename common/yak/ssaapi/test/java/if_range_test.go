@@ -2,9 +2,10 @@ package java
 
 import (
 	_ "embed"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 //go:embed sample/groovy_eval_with_if.java

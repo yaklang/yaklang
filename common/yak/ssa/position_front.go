@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -34,19 +35,19 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	}
 }
 
-func (b *FunctionBuilder) SetRangeInit(p *memedit.MemEditor) {
-	if b.CurrentRange != nil {
-		log.Warnf("init for set-range for function builder: %v, but the current range is not nil", b.name)
-		return
-	}
+// func (b *FunctionBuilder) SetRangeInit(p *memedit.MemEditor) {
+// 	if b.CurrentRange != nil {
+// 		log.Warnf("init for set-range for function builder: %v, but the current range is not nil", b.name)
+// 		return
+// 	}
 
-	fullRange := p.GetFullRange()
-	if fullRange == nil {
-		log.Warnf("init for set-range for function builder: %v, but the full range is nil", b.name)
-		return
-	}
-	b.CurrentRange = NewRange(p, fullRange.GetStart(), fullRange.GetEnd())
-}
+// 	fullRange := p.GetFullRange()
+// 	if fullRange == nil {
+// 		log.Warnf("init for set-range for function builder: %v, but the full range is nil", b.name)
+// 		return
+// 	}
+// 	b.CurrentRange = NewRange(p, fullRange.GetStart(), fullRange.GetEnd())
+// }
 
 func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *Range {
 	if b.CurrentRange != nil {

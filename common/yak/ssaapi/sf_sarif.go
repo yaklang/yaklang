@@ -2,6 +2,9 @@ package ssaapi
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
-	"strings"
 )
 
 type SarifContext struct {

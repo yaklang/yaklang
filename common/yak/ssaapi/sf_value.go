@@ -1,8 +1,10 @@
 package ssaapi
 
 import (
-	"github.com/samber/lo"
 	"regexp"
+
+	"github.com/gobwas/glob"
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -33,8 +35,10 @@ func (v *Value) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, erro
 	return value != nil, value, nil
 }
 
-func (v *Value) GlobMatch(mod int, g ssa.Glob) (bool, sfvm.ValueOperator, error) {
-	value := _SearchValue(v, mod, g.Match)
+func (v *Value) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, mod, func(s string) bool {
+		return glob.MustCompile(g).Match(s)
+	})
 	return value != nil, value, nil
 }
 
@@ -43,6 +47,13 @@ func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 	vals = append(vals, v)
 	vals = append(vals, sf...)
 	return sfvm.NewValues(vals), nil
+}
+
+func (v *Value) RegexpMatch(mod int, re string) (bool, sfvm.ValueOperator, error) {
+	value := _SearchValue(v, mod, func(s string) bool {
+		return regexp.MustCompile(re).MatchString(s)
+	})
+	return value != nil, value, nil
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
@@ -58,11 +69,6 @@ func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 		return sfvm.NewValues(nil), nil
 	}
 	return v, nil
-}
-
-func (v *Value) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, sfvm.ValueOperator, error) {
-	value := _SearchValue(v, mod, regexp.MatchString)
-	return value != nil, value, nil
 }
 
 func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {

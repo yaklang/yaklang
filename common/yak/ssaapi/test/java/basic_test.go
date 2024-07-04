@@ -16,7 +16,7 @@ func Test_Class_Member(t *testing.T) {
 		}
 		`,
 			SF:      "a --> as $target",
-			Contain: true,
+			Contain: false,
 			Expect: map[string][]string{
 				"target": {"Undefined-println(Undefined-a)"},
 			},

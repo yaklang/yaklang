@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"encoding/json"
+
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -16,7 +17,7 @@ type IrCode struct {
 	gorm.Model
 
 	ProgramName string `json:"program_name" gorm:"index"`
-	PackageName string `json:"package_name" gorm:"index"`
+	Version     string `json:"package_version" gorm:"index"`
 
 	// source code
 	SourceCodeStartOffset int64  `json:"source_code_start_offset"`

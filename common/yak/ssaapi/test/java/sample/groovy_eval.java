@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequestMapping("/home/rce")
-public class GroovyExec {
+public class GroovyExecIF {
 
     @GetMapping("/groovy")
     public String groovyExec(String cmd, Model model) {

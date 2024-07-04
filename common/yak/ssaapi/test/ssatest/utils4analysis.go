@@ -148,6 +148,7 @@ func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
+		assert.NotNil(t, results)
 		for key, value := range results.GetAllValues() {
 			log.Infof("\nkey: %s", key)
 			value.Show()
