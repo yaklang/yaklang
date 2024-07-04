@@ -414,11 +414,12 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 				Description:   tpl.Description,
 				Payload:       payloads,
 				RuntimeId:     runtimeId,
+				UUID:          tpl.UUID,
+				ScriptName:    tpl.ScriptName,
 			}
 			if !filterVul.Exist(calcSha1) {
 				filterVul.Insert(calcSha1)
 				risk := tools.PocVulToRisk(pv)
-				risk.FromYakScript = tpl.Name
 				risk.RuntimeId = runtimeId
 				for _, h := range handlers {
 					h(risk)
