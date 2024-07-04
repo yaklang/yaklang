@@ -93,7 +93,8 @@ type Config struct {
 	Ctx context.Context
 
 	//Disable default fingerprint
-	DisableDefaultFingerprint bool
+	DisableDefaultFingerprint    bool
+	DisableDefaultIotFingerprint bool
 }
 
 func (c *Config) IsFiltered(host string, port int) bool {
@@ -471,6 +472,12 @@ func WithFingerprintRule(rules map[*NmapProbe][]*NmapMatch) ConfigOption {
 func WithDisableWebFingerprint(t bool) ConfigOption {
 	return func(config *Config) {
 		config.DisableWebFingerprint = t
+	}
+}
+
+func WithDisableIotWebFingerprint(t bool) ConfigOption {
+	return func(config *Config) {
+		config.DisableDefaultIotFingerprint = t
 	}
 }
 

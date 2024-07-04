@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/fp/fingerprint"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/utils"
+	"github.com/yaklang/yaklang/common/fp/iotdevfp"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net"
@@ -14,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/fp/iotdevfp"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 )
@@ -97,7 +97,20 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			redirectInfos = append([]*lowhttp.RedirectFlow{utils2.GetLastElement(redirectInfos)}, redirectInfos[1:]...)
 		}
 		for _, i := range redirectInfos {
-			var iotdevResults = iotdevfp.MatchAll(i.Response)
+
+			var currentCPE []*rule.CPE
+			if !f.Config.DisableDefaultIotFingerprint {
+				var iotdevResults = iotdevfp.MatchAll(i.Response)
+				for _, iotdevResult := range iotdevResults {
+					result.Fingerprint.CPEs = append(result.Fingerprint.CPEs, iotdevResult.GetCPE())
+					cpeIns, _ := webfingerprint.ParseToCPE(iotdevResult.GetCPE())
+
+					if cpeIns != nil {
+						currentCPE = append(currentCPE, fingerprint.LoadCPEFromWebfingerrintCPE(cpeIns))
+					}
+				}
+			}
+
 			if result.Fingerprint == nil {
 				result.Fingerprint = &FingerprintInfo{
 					IP:          ip.String(),
@@ -120,16 +133,6 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 					result.Fingerprint.ServiceName = "https"
 				}
 
-			}
-
-			var currentCPE []*rule.CPE
-			for _, iotdevResult := range iotdevResults {
-				result.Fingerprint.CPEs = append(result.Fingerprint.CPEs, iotdevResult.GetCPE())
-				cpeIns, _ := webfingerprint.ParseToCPE(iotdevResult.GetCPE())
-
-				if cpeIns != nil {
-					currentCPE = append(currentCPE, fingerprint.LoadCPEFromWebfingerrintCPE(cpeIns))
-				}
 			}
 
 			info := i
@@ -162,7 +165,28 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 				f := utils2.GetLastElement(flow)
 				return f.Response, nil
 			}
-			cpes := f.matcher.Match(iotDetectCtx, info.Response)
+			cpes := f.matcher.MatchResource(iotDetectCtx, func(path string) (*rule.MatchResource, error) {
+				res := &rule.MatchResource{
+					Protocol: "http",
+					Port:     port,
+					Path:     path,
+				}
+				cached := map[string][]byte{}
+				if path == "" || path == "/" {
+					res.Data = info.Response
+					return res, nil
+				}
+				if v, ok := cached[path]; ok {
+					res.Data = v
+					return res, nil
+				}
+				data, err := f.matcher.Route(ctx, path)
+				if err != nil {
+					return nil, err
+				}
+				cached[path] = data
+				return rule.NewHttpResource(data), nil
+			})
 			//cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
 			//if err != nil {
 			//	if !strings.Contains(err.Error(), "no rules matched") {

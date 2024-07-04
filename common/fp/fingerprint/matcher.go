@@ -27,9 +27,8 @@ func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
 func (m *Matcher) AddRules(rules []*rule.FingerPrintRule) {
 	m.rules = append(m.rules, rules...)
 }
-func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {
+func (m *Matcher) MatchResource(ctx context.Context, getter func(path string) (*rule.MatchResource, error)) []*rule.CPE {
 	var result []*rule.CPE
-	cached := map[string][]byte{}
 	for i, r := range m.rules {
 		_ = i
 		select {
@@ -37,20 +36,7 @@ func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {
 			return result
 		default:
 		}
-		info, err := rule.Execute(func(path string) (*rule.MatchResource, error) {
-			if path == "" || path == "/" {
-				return rule.NewHttpResource(data), nil
-			}
-			if v, ok := cached[path]; ok {
-				return rule.NewHttpResource(v), nil
-			}
-			data, err := m.Route(ctx, path)
-			if err != nil {
-				return nil, err
-			}
-			cached[path] = data
-			return rule.NewHttpResource(data), nil
-		}, r)
+		info, err := rule.Execute(getter, r)
 		if err != nil {
 			log.Errorf("execute rule failed: %v", err)
 			continue
@@ -60,4 +46,21 @@ func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {
 		}
 	}
 	return result
+}
+func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {
+	return m.MatchResource(ctx, func(path string) (*rule.MatchResource, error) {
+		cached := map[string][]byte{}
+		if path == "" || path == "/" {
+			return rule.NewHttpResource(data), nil
+		}
+		if v, ok := cached[path]; ok {
+			return rule.NewHttpResource(v), nil
+		}
+		data, err := m.Route(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+		cached[path] = data
+		return rule.NewHttpResource(data), nil
+	})
 }

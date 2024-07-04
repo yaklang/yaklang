@@ -10,8 +10,12 @@ import (
 	"strings"
 )
 
-var buildinTokens = []string{"(", ")", "||", "&&", "=", "!=", "\"", "\\"}
+var buildinOps = []string{"!==", "!=", "==", "=", "~="}
+var buildinTokens = []string{"(", ")", "||", "&&", "\"", "\\"}
 
+func init() {
+	buildinTokens = append(buildinTokens, buildinOps...)
+}
 func ParseExpRule(rules ...*rule.GeneralRule) ([]*rule.FingerPrintRule, error) {
 	res := []*rule.FingerPrintRule{}
 	errs := []error{}
@@ -163,6 +167,17 @@ func compatibleSyntaxCompileExp(exp string) (*rule.FingerPrintRule, error) {
 }
 func compileExp(exp string) (*rule.FingerPrintRule, error) {
 	res := utils.IndexAllSubstrings(exp, buildinTokens...)
+	newRes := [][2]int{}
+	preN := -1
+	for i := 0; i < len(res); i++ {
+		if res[i][1] == preN {
+			newRes[len(newRes)-1] = res[i]
+		} else {
+			newRes = append(newRes, res[i])
+			preN = res[i][1]
+		}
+	}
+	res = newRes
 	tokens := []string{}
 	pre := 0
 	cut := func(i int) {
@@ -223,7 +238,7 @@ func compileExp(exp string) (*rule.FingerPrintRule, error) {
 				return nil, fmt.Errorf("unsupported condition %s", token)
 			}
 		case "op":
-			if !utils.StringArrayContains([]string{"=", "!=", "~="}, token) {
+			if !utils.StringArrayContains(buildinOps, token) {
 				return nil, fmt.Errorf("unsupported op %s", token)
 			}
 			currentRule.MatchParam.Op = token
