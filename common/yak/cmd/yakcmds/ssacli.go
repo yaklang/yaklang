@@ -3,6 +3,11 @@ package yakcmds
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
@@ -13,10 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 type languageCtx struct {
@@ -386,8 +387,8 @@ func SyntaxFlowQuery(
 	if err != nil {
 		log.Errorf("load program [%v] from database failed: %v", programName, err)
 	}
-	if prog.DBCache != nil && dbDebug {
-		prog.DBCache.DB = prog.DBCache.DB.Debug()
+	if dbDebug {
+		prog.DBDebug()
 	}
 	opt := make([]sfvm.Option, 0)
 	if sfDebug {

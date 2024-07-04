@@ -11,9 +11,11 @@ import (
 )
 
 type Program struct {
+	// TODO: one program may have multiple program,
+	// 	 	 only one Application and multiple Library
 	Program *ssa.Program
-	DBCache *ssa.Cache
-	config  *config
+	// DBCache *ssa.Cache
+	config *config
 
 	// come from database will affect search operation
 	comeFromDatabase bool
@@ -23,18 +25,29 @@ func (p *Program) GetNames() []string {
 	return []string{p.Program.GetProgramName()}
 }
 
+func (p *Program) GetProgramKind() ssa.ProgramKind {
+	return p.Program.ProgramKind
+}
+
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program: prog,
 		config:  config,
 	}
 
-	if config.DatabaseProgramName == "" {
-		p.DBCache = prog.Cache
-	} else {
-		p.DBCache = ssa.GetCacheFromPool(config.DatabaseProgramName)
-	}
+	// if config.DatabaseProgramName == "" {
+	// 	p.DBCache = prog.Cache
+	// } else {
+	// 	p.DBCache = ssa.GetCacheFromPool(config.DatabaseProgramName)
+	// }
 	return p
+}
+
+func (p *Program) DBDebug() {
+	if p == nil || p.Program == nil {
+		return
+	}
+	p.Program.Cache.DB = p.Program.Cache.DB.Debug()
 }
 
 func (p *Program) Show() *Program {
@@ -76,7 +89,7 @@ func (p *Program) GetInstructionById(id int64) ssa.Instruction {
 
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
-		p.DBCache.GetByVariableExact(ssadb.NameMatch, name),
+		ssa.MatchInstructionByExact(p.Program, ssadb.NameMatch, name),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, ok := i.(ssa.Value); ok {
 				return p.NewValue(v), true

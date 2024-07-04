@@ -193,7 +193,9 @@ func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...Can
 	if r == nil && len(pos) > 0 {
 		r = b.GetCurrentRange(pos[0])
 	}
-	ret.SetDefRange(r)
+	if r != nil {
+		ret.SetDefRange(r)
+	}
 	// set offset variable for program
 	program := b.GetProgram()
 	if program != nil {

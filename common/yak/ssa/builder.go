@@ -110,9 +110,9 @@ func (b *FunctionBuilder) IsBlockFinish() bool {
 func (b *FunctionBuilder) NewFunc(name string) *Function {
 	var f *Function
 	if b.SupportClosure {
-		f = b.Package.NewFunctionWithParent(name, b.Function)
+		f = b.prog.NewFunctionWithParent(name, b.Function)
 	} else {
-		f = b.Package.NewFunctionWithParent(name, nil)
+		f = b.prog.NewFunctionWithParent(name, nil)
 	}
 	f.SetRange(b.CurrentRange)
 	f.SetFunc(b.Function)

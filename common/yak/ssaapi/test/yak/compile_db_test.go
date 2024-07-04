@@ -56,7 +56,8 @@ dump(c)
 		panic(err)
 	}
 	prog.Show()
-	funcIns := prog.Program.GetFunctionFast("main")
+	funcIns := prog.Program.GetFunction("main")
+	assert.NotNil(t, funcIns)
 	br := funcIns.Blocks[len(funcIns.Blocks)-1]
 	block, _ := ssa.ToBasicBlock(br)
 	scope := block.ScopeTable

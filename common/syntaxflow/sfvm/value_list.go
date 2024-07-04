@@ -1,7 +1,6 @@
 package sfvm
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -223,7 +222,7 @@ func (v *ValueList) ExactMatch(mod int, s string) (bool, ValueOperator, error) {
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) GlobMatch(mod int, s ssa.Glob) (bool, ValueOperator, error) {
+func (v *ValueList) GlobMatch(mod int, s string) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
 		match, next, err := value.GlobMatch(mod, s)
@@ -239,7 +238,7 @@ func (v *ValueList) GlobMatch(mod int, s ssa.Glob) (bool, ValueOperator, error) 
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) RegexpMatch(mod int, regexp *regexp.Regexp) (bool, ValueOperator, error) {
+func (v *ValueList) RegexpMatch(mod int, regexp string) (bool, ValueOperator, error) {
 	var res []ValueOperator
 	for _, value := range v.values {
 		match, next, err := value.RegexpMatch(mod, regexp)

@@ -19,7 +19,7 @@ const (
 	Readonly
 )
 
-func (pkg *Package) GetClassBluePrint(name string) *ClassBluePrint {
+func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
 	if c, ok := pkg.ClassBluePrint[name]; ok {
 		return c
 	}
@@ -28,7 +28,7 @@ func (pkg *Package) GetClassBluePrint(name string) *ClassBluePrint {
 }
 
 func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {
-	p := b.Package
+	p := b.prog
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("SetClassBluePrint: this class redeclare")
 	}
@@ -42,7 +42,7 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) 
 // saving the static variables and util methods.
 func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
 	// p := b.GetProgram()
-	p := b.Package
+	p := b.prog
 	c := NewClassBluePrint()
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("CreateClassBluePrint: this class redeclare")
@@ -63,7 +63,7 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 
 func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
 	// p := b.GetProgram()
-	p := b.Package
+	p := b.prog
 	return p.GetClassBluePrint(name)
 }
 

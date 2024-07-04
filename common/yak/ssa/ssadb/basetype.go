@@ -126,6 +126,11 @@ func (ss *StringSlice) Scan(value interface{}) error {
 		return errors.New("unsupported type: " + reflect.TypeOf(value).String() + " for Int64Slice.Scan")
 	}
 
+	if strValue == "" {
+		*ss = nil
+		return nil
+	}
+
 	parts := strings.Split(strValue, ",")
 	*ss = parts
 	return nil

@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -111,11 +110,11 @@ func (a *anInstruction) GetProgram() *Program {
 		log.Errorf("this value function is nil")
 		return nil
 	}
-	if f.Package == nil {
+	if f.prog == nil {
 		log.Warnf("this value function package is nil")
 		return nil
 	}
-	return f.Package.Prog
+	return f.prog
 }
 func (a *anInstruction) SetIsAnnotation(b bool) {
 	a.isAnnotation = b
@@ -146,12 +145,12 @@ func (c *anInstruction) SetRange(pos *Range) {
 	// }
 }
 
-func (c *anInstruction) SetRangeInit(editor *memedit.MemEditor) {
-	if c.R == nil {
-		fullRange := editor.GetFullRange()
-		c.R = NewRange(editor, fullRange.GetStart(), fullRange.GetEnd())
-	}
-}
+// func (c *anInstruction) SetRangeInit(editor *memedit.MemEditor) {
+// 	if c.R == nil {
+// 		fullRange := editor.GetFullRange()
+// 		c.R = NewRange(editor, fullRange.GetStart(), fullRange.GetEnd())
+// 	}
+// }
 
 func (c *anInstruction) IsExtern() bool   { return c.isExtern }
 func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }

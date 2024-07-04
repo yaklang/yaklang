@@ -12,6 +12,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -22,14 +23,19 @@ var sample_code embed.FS
 var sf_rules embed.FS
 
 func Test_Debug(t *testing.T) {
+	programID := uuid.NewString()
 	progs, err := ssaapi.ParseProject(
 		filesys.NewEmbedFS(sample_code),
 		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithDatabaseProgramName(programID),
 	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}()
 	if err != nil {
 		t.Fatalf("parse project error: %v", err)
 	}
-	Check(t, progs, "xxe.sf")
+	Check(t, progs, "groovy_eval.sf")
 }
 
 func TestCheckRuleInSource(t *testing.T) {
@@ -51,6 +57,9 @@ func TestCheckRuleWithDatabase(t *testing.T) {
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithDatabaseProgramName(programID),
 	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	}()
 	if err != nil {
 		t.Fatalf("parse project error: %v", err)
 	}
@@ -66,6 +75,9 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 			ssaapi.WithLanguage(ssaapi.JAVA),
 			ssaapi.WithDatabaseProgramName(programID),
 		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		}()
 		if err != nil {
 			t.Fatalf("parse project error: %v", err)
 		}
@@ -83,7 +95,7 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 
 func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
 	vs := sfvm.NewValues(lo.Map(progs, func(v *ssaapi.Program, _ int) sfvm.ValueOperator { return v }))
-	vm := sfvm.NewSyntaxFlowVirtualMachine(sfvm.WithEnableDebug(false), sfvm.WithFailFast())
+	vm := sfvm.NewSyntaxFlowVirtualMachine(sfvm.WithEnableDebug(true), sfvm.WithFailFast())
 	entry, err := sf_rules.ReadDir("mustpass")
 	if err != nil {
 		t.Fatalf("no embed syntax files found: %v", err)
