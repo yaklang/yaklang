@@ -283,7 +283,7 @@ func shouldExport(key string) bool {
 	return (key[0] >= 'A' && key[0] <= 'Z')
 }
 
-func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string) string {
+func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string, funcTyps ...*ssa.FunctionType) string {
 	document := funcDecl.Document
 	if document != "" {
 		document = "\n\n" + document
@@ -291,23 +291,18 @@ func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string) string {
 	decl := funcDecl.Decl
 	decl = strings.Replace(decl, "func(", typStr+"(", 1)
 
-	desc := fmt.Sprintf("```go\nfunc %s\n```%s", decl, document)
-	desc = yakdoc.ShrinkTypeVerboseName(desc)
-	return desc
-}
-
-func getFuncDeclDescEx(funcDecl *yakdoc.FuncDecl, typStr string, f *ssa.Function) string {
-	document := funcDecl.Document
-	if document != "" {
-		document = "\n\n" + document
+	desc := ""
+	if len(funcTyps) > 0 {
+		funcTyp := funcTyps[0]
+		if funcTyp.IsMethod && len(funcTyp.Parameter) > 0 {
+			desc = fmt.Sprintf("```go\nfunc (%s) %s\n```%s", funcTyp.Parameter[0], decl, document)
+		}
 	}
-	decl := funcDecl.Decl
-	if f != nil && f.IsGeneric() {
-		decl = funcDecl.MethodName + f.GetType().RawString()
-	}
-	decl = strings.Replace(decl, "func(", typStr+"(", 1)
 
-	desc := fmt.Sprintf("```go\nfunc %s\n```%s", decl, document)
+	if desc == "" {
+		desc = fmt.Sprintf("```go\nfunc %s\n```%s", decl, document)
+	}
+
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
@@ -319,7 +314,6 @@ func getConstInstanceDesc(instance *yakdoc.LibInstance) string {
 }
 
 func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
-	// funcTyp.IsMethod
 	lenOfParams := len(funcTyp.Parameter)
 	params := funcTyp.Parameter
 	if funcTyp.IsMethod {
@@ -329,28 +323,24 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 		}
 	}
 
-	paramsStr := strings.Join(lo.Map(
+	paramsStr := lo.Map(
 		params, func(typ ssa.Type, i int) string {
 			if i == lenOfParams-1 && funcTyp.IsVariadic {
 				typStr := typ.String()
 				typStr = strings.TrimLeft(typStr, "[]")
-				return fmt.Sprintf("r%d ...%s", i+1, typStr)
+				return fmt.Sprintf("i%d ...%s", i+1, typStr)
 			}
-			return fmt.Sprintf("r%d %s", i+1, typ)
-		}),
-		", ",
-	)
+			return fmt.Sprintf("i%d %s", i+1, typ)
+		})
+	paramsRaw := strings.Join(paramsStr, ", ")
+
 	var desc string
 
-	if funcTyp.IsMethod {
-		if len(funcTyp.Parameter) > 0 {
-			desc = fmt.Sprintf("func (%s) %s(%s) %s", funcTyp.Parameter[0], funcName, paramsStr, funcTyp.ReturnType)
-		} else {
-			desc = fmt.Sprintf("func %s(%s) %s", funcName, paramsStr, funcTyp.ReturnType)
-		}
+	if funcTyp.IsMethod && len(funcTyp.Parameter) > 0 {
+		desc = fmt.Sprintf("func (%s) %s(%s) %s", funcTyp.Parameter[0], funcName, paramsRaw, funcTyp.ReturnType)
 	} else {
 		desc = fmt.Sprintf("func %s(%s) %s", funcName,
-			paramsStr,
+			paramsRaw,
 			funcTyp.ReturnType,
 		)
 	}
@@ -454,16 +444,28 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 		lastName = after
 	}
 
+	var (
+		parentBareTyp ssa.Type
+		parentTypStr  string
+		funcTyp       *ssa.FunctionType
+	)
+	parentV := v.GetObject()
+	if parentV != nil {
+		parentBareTyp = ssaapi.GetBareType(parentV.GetType())
+		parentTypStr = getGolangTypeStringBySSAType(parentBareTyp)
+	}
+
 	bareTyp := ssaapi.GetBareType(v.GetType())
-	typStr := getGolangTypeStringBySSAType(bareTyp)
 	typKind := bareTyp.GetTypeKind()
+	if bareTyp.GetTypeKind() == ssa.FunctionTypeKind {
+		funcTyp, _ = ssa.ToFunctionType(bareTyp)
+	}
 
 	if v.IsExtern() {
 		if typKind == ssa.FunctionTypeKind {
 			// 标准库函数
 			// value name 里包含了库名与函数名
 			libName, lastName, _ := strings.Cut(v.GetName(), ".")
-
 			funcDecl := getFuncDeclByName(libName, lastName)
 			if funcDecl != nil {
 				return yakdoc.ShrinkTypeVerboseName(funcDecl.Decl), funcDecl.Document
@@ -472,25 +474,22 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 	}
 
 	// 结构体 / 接口方法
-	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
+	lib, ok := doc.DefaultDocumentHelper.StructMethods[parentTypStr]
 	if ok {
 		funcDecl, ok := lib.Functions[lastName]
 		if ok {
-			return yakdoc.ShrinkTypeVerboseName(funcDecl.Decl), funcDecl.Document
+			return getFuncDeclDesc(funcDecl, lastName, funcTyp), funcDecl.Document
 		}
 	}
 
-	// 类型内置方法
+	// 类型内置方法, 方法签名现在用 SSA Value 获取
 	funcObjectType := v.GetFunctionObjectType()
-	desc, document = getBuiltinFuncDeclAndDoc(lastName, funcObjectType)
+	_, document = getBuiltinFuncDeclAndDoc(lastName, funcObjectType)
 
 	// 用户自定义函数
-	if bareTyp.GetTypeKind() == ssa.FunctionTypeKind {
-		funcTyp, ok := ssa.ToFunctionType(bareTyp)
-		if ok {
-			desc = getFuncTypeDesc(funcTyp, lastName)
-			return
-		}
+	if funcTyp != nil {
+		desc = getFuncTypeDesc(funcTyp, lastName)
+		return
 	}
 
 	return
@@ -527,19 +526,9 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 
 	desc := ""
 	lastName := name
-	_, after, ok := strings.Cut(name, ".")
-	if ok {
-		lastName = after
-	}
 
-	parentV := v.GetObject()
-	var (
-		parentBareTyp ssa.Type
-		parentTypStr  string
-	)
-	if parentV != nil {
-		parentBareTyp = ssaapi.GetBareType(parentV.GetType())
-		parentTypStr = getGolangTypeStringBySSAType(parentBareTyp)
+	if lastIndex := strings.LastIndex(name, "."); lastIndex != -1 {
+		lastName = name[lastIndex+1:]
 	}
 
 	varname := v.GetName()
@@ -565,9 +554,9 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			if typKind == ssa.FunctionTypeKind {
 				// 标准库函数
 				funcDecl := getFuncDeclByName(libName, lastName)
-				if funcDecl != nil {
-					f, _ := ssa.ToFunction(ssaapi.GetBareNode(v))
-					desc = getFuncDeclDescEx(funcDecl, typStr, f)
+				funcTyp, ok := ssa.ToFunctionType(bareTyp)
+				if funcDecl != nil && ok {
+					desc = getFuncDeclDesc(funcDecl, typStr, funcTyp)
 				}
 			} else {
 				// 标准库常量
@@ -585,33 +574,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 
 	switch typKind {
 	case ssa.FunctionTypeKind:
-		document := ""
-
-		if v.IsMethod() {
-			parentBareTyp := v.GetFunctionObjectType()
-			parentTypStr = getGolangTypeStringBySSAType(parentBareTyp)
-			// 结构体 / 接口方法
-			lib, ok := doc.DefaultDocumentHelper.StructMethods[parentTypStr]
-			if ok {
-				funcDecl, ok := lib.Functions[lastName]
-				if ok {
-					document = funcDecl.Document
-				}
-			}
-		} else if parentV != nil {
-			// 类型内置方法
-			_, document = getBuiltinFuncDeclAndDoc(lastName, parentBareTyp)
-		}
-
-		// 用户自定义函数
-		funcTyp, ok := ssa.ToFunctionType(bareTyp)
-		if !ok {
-			break
-		}
-		if document != "" {
-			document = "\n\n" + document
-		}
-		desc = fmt.Sprintf("```go\n%s\n```%s", getFuncTypeDesc(funcTyp, lastName), document)
+		desc, _ = getFuncDeclAndDocBySSAValue(name, v)
 	case ssa.StructTypeKind:
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
 		if !ok {
@@ -645,19 +608,24 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 		desc += "\n```"
 	}
 
-	if desc == "" && parentV != nil {
-		// 结构体成员
-		lib, ok := doc.DefaultDocumentHelper.StructMethods[parentTypStr]
-		if ok {
-			instance, ok := lib.Instances[lastName]
+	// 结构体成员
+	if desc == "" {
+		parentV := v.GetObject()
+		if parentV != nil {
+			parentBareTyp := ssaapi.GetBareType(parentV.GetType())
+			parentTypStr := getGolangTypeStringBySSAType(parentBareTyp)
+			lib, ok := doc.DefaultDocumentHelper.StructMethods[parentTypStr]
 			if ok {
-				desc = yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("```go\nfield %s %s\n```", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type)))
+				instance, ok := lib.Instances[lastName]
+				if ok {
+					desc = yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("```go\nfield %s %s\n```", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type)))
+				}
 			}
 		}
 	}
 
 	if desc == "" {
-		desc = fmt.Sprintf("```go\ntype %s %s\n```", name, typStr)
+		desc = fmt.Sprintf("```go\ntype %s %s\n```", lastName, typStr)
 	}
 	return desc
 }
@@ -685,6 +653,7 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Valu
 	return values
 }
 
+// Deprecated: now can get the closest value
 func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
 	word := strings.Split(sourceCode, ".")[0]
 	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
@@ -704,6 +673,7 @@ func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, positi
 	return values[0].GetSelf()
 }
 
+// Deprecated: now can get the closest value
 func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
 	var values ssaapi.Values
 	for i, word := range strings.Split(sourceCode, ".") {
