@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"net/http"
 	"reflect"
@@ -1072,4 +1074,136 @@ http:
 
 		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
 	})
+}
+
+var nucleiCode = `id: WebFuzzer-Template-dwgZTlBz
+
+info:
+  name: WebFuzzer Template dwgZTlBz
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: bf1b38820525a92e811300bf655c8fe7
+
+http:
+- method: POST
+  path:
+  - '{{RootURL}}/'
+  headers:
+    Content-Type: application/json
+  body: '{"key": "value"}'
+
+  max-redirects: 3
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: status
+    words:
+    - "200"
+    condition: and
+
+
+# Generated From WebFuzzer on 2024-06-13 16:14:16
+`
+var yakCode = `
+ risk.NewRisk("127.0.0.1")
+`
+
+func TestGRPCMUSTPASS_DebugPlugin_Risk_PluginMetaInfo(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	yakScript, err := yakit.NewTemporaryYakScript("yak", yakCode)
+	require.NoError(t, err)
+	yakScript.Uuid = uuid.New().String()
+	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), yakScript.ScriptName, yakScript)
+	require.NoError(t, err)
+
+	nucleiScript, err := yakit.NewTemporaryYakScript("nuclei", nucleiCode)
+	require.NoError(t, err)
+	nucleiScript.Uuid = uuid.New().String()
+	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName, nucleiScript)
+	require.NoError(t, err)
+
+	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+
+aaa`))
+	target := utils.HostPort(server, port)
+	t.Run("nuclei risk info", func(t *testing.T) {
+		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+			PluginName: nucleiScript.ScriptName,
+			PluginType: "nuclei",
+			ExecParams: []*ypb.KVPair{},
+			Input:      target,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Fatalf("check YakitPlugin param error:%s", err)
+				}
+				break
+			}
+
+			if rsp.GetIsMessage() {
+				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
+				if level == "json-risk" {
+					var riskIns ypb.Risk
+					err := json.Unmarshal([]byte(gjson.Get(string(rsp.GetMessage()), "content.data").String()), &riskIns)
+					require.NoError(t, err)
+					require.Equal(t, riskIns.GetYakScriptUUID(), nucleiScript.Uuid, "nuclei uuid not match")
+					require.Equal(t, riskIns.GetFromYakScript(), nucleiScript.ScriptName, "nuclei name not match")
+				}
+			}
+		}
+	})
+
+	t.Run("yak risk info", func(t *testing.T) {
+		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+			PluginName: yakScript.ScriptName,
+			PluginType: "yak",
+			ExecParams: []*ypb.KVPair{},
+			Input:      target,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Fatalf("check YakitPlugin param error:%s", err)
+				}
+				break
+			}
+
+			if rsp.GetIsMessage() {
+				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
+				if level == "json-risk" {
+					var riskIns ypb.Risk
+					err := json.Unmarshal([]byte(gjson.Get(string(rsp.GetMessage()), "content.data").String()), &riskIns)
+					spew.Dump(riskIns)
+					require.NoError(t, err)
+					require.Equal(t, riskIns.GetYakScriptUUID(), yakScript.Uuid, "yak uuid not match")
+					require.Equal(t, riskIns.GetFromYakScript(), yakScript.ScriptName, "yak name not match")
+				}
+			}
+		}
+	})
+
 }
