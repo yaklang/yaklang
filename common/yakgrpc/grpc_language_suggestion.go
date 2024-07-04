@@ -931,6 +931,7 @@ func completionYakTypeBuiltinMethod(rng *ssa.Range, v *ssaapi.Value, realTyp ...
 			if kind := key.GetTypeKind(); kind == ssa.StringTypeKind || kind == ssa.BytesTypeKind {
 				label, _ = strconv.Unquote(label)
 			}
+			insertText = label
 
 			if typ := ssaapi.GetBareType(member.GetType()); typ.GetTypeKind() == ssa.FunctionTypeKind {
 				kind = "Method"
