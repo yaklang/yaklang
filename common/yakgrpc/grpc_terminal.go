@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -13,12 +14,13 @@ import (
 	"github.com/google/shlex"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"golang.org/x/term"
 )
 
-func getShellCommand() (string, error) {
+func getShellCommand() (string, string, error) {
 	switch os := runtime.GOOS; os {
 	case "windows":
-		return "cmd /k", nil
+		return "C:\\\\Windows\\\\system32\\\\cmd.exe /k", "\r\n", nil
 	case "linux", "darwin":
 		var (
 			finErr error
@@ -36,11 +38,11 @@ func getShellCommand() (string, error) {
 		}
 
 		if shell == "" && finErr != nil {
-			return "", utils.Errorf("failed to find shell: %s", finErr)
+			return "", "", utils.Errorf("failed to find shell: %s", finErr)
 		}
-		return shell, nil
+		return shell, "\n", nil
 	default:
-		return "", utils.Errorf("unsupported os: %s", os)
+		return "", "", utils.Errorf("unsupported os: %s", os)
 	}
 }
 
@@ -61,62 +63,85 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 	}
 
 	// exec
-	shell, err := getShellCommand()
+	shell, eol, err := getShellCommand()
 	if err != nil {
 		return err
-	}
-	ptmx, err := pty.New()
-	if err != nil {
-		return err
-	}
-	defer ptmx.Close()
-	commands, _ := shlex.Split(shell)
-
-	cmd := ptmx.CommandContext(ctx, commands[0], commands[1:]...)
-	if firstInput.GetPath() != "" {
-		cmd.Dir = firstInput.GetPath()
-	} else {
-		path, err := os.UserHomeDir()
-		if err != nil {
-			// log.Infof("failed to get user home dir: %s", err)
-			return err
-		}
-		cmd.Dir = path
 	}
 
 	streamerRWC := &OpenPortServerStreamerHelperRWC{
 		stream: inputStream,
 	}
+	commands, _ := shlex.Split(shell)
 
-	go io.Copy(ptmx, streamerRWC) // stdin
-	go func() {
-		if runtime.GOOS == "windows" {
-			// split the first output
-			buf := make([]byte, 4096)
-			n, err := ptmx.Read(buf)
+	ptmx, err := pty.New()
+	if err != nil {
+		// fallback
+		cmd := exec.CommandContext(ctx, commands[0], commands[1:]...)
+		stdin, _ := cmd.StdinPipe()
+		stdout, _ := cmd.StdoutPipe()
+		stderr, _ := cmd.StderrPipe()
+		if firstInput.GetPath() != "" {
+			cmd.Dir = firstInput.GetPath()
+		} else {
+			path, err := os.UserHomeDir()
 			if err != nil {
-				return
+				return err
 			}
-			buf = buf[:n]
-			_, after, ok := bytes.Cut(buf, []byte{0x1b, 0x5b, 0x48})
-			if ok {
-				buf = after
-				before, _, ok := bytes.Cut(buf, []byte{0x1b, 0x5d, 0x30})
-				if ok {
-					buf = before
-				}
-			}
-			streamerRWC.Write(buf)
+			cmd.Dir = path
 		}
+		cmd.Start()
 
-		io.Copy(streamerRWC, ptmx) // stdout
-	}()
+		terminal := term.NewTerminal(streamerRWC, "")
+		go io.Copy(terminal, stdout)
+		go io.Copy(terminal, stderr)
+		for {
+			line, err := terminal.ReadLine()
+			if errors.Is(err, io.EOF) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if line == "" {
+				continue
+			}
+			stdin.Write([]byte(line + eol))
+		}
+	} else {
+		defer ptmx.Close()
 
-	defer func() {
-		inputStream.Send(&ypb.Output{
-			Control: true,
-			Closed:  true,
-		})
-	}()
-	return cmd.Run()
+		go io.Copy(ptmx, streamerRWC) // stdin
+		go func() {
+			if runtime.GOOS == "windows" {
+				// split the first output
+				buf := make([]byte, 4096)
+				n, err := ptmx.Read(buf)
+				if err != nil {
+					return
+				}
+				buf = buf[:n]
+				_, after, ok := bytes.Cut(buf, []byte{0x1b, 0x5b, 0x48})
+				if ok {
+					buf = after
+					before, _, ok := bytes.Cut(buf, []byte{0x1b, 0x5d, 0x30})
+					if ok {
+						buf = before
+					}
+				}
+				streamerRWC.Write(buf)
+			}
+
+			io.Copy(streamerRWC, ptmx) // stdout
+		}()
+
+		defer func() {
+			inputStream.Send(&ypb.Output{
+				Control: true,
+				Closed:  true,
+			})
+		}()
+
+		cmd := ptmx.CommandContext(ctx, commands[0], commands[1:]...)
+		return cmd.Run()
+	}
 }
