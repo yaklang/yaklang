@@ -50,7 +50,7 @@ func NewNil() *ConstInst {
 }
 
 func NewAny() *ConstInst {
-	return NewConst(struct{}{})
+	return NewConst("")
 }
 
 // create const
