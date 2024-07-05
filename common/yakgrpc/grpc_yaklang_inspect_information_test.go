@@ -11,14 +11,13 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -945,7 +944,7 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 
 	for i, check := range testcase {
 		t.Run(fmt.Sprintf("test %d", i), func(t *testing.T) {
-			prog, err := ssaapi.Parse(check.code, static_analyzer.GetPluginSSAOpt(check.pluginType)...)
+			prog, err := static_analyzer.SSAParse(check.code, check.pluginType)
 			if err != nil {
 				t.Fatal(err)
 			}
