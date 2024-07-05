@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -174,7 +175,8 @@ type Program struct {
 	DownStream map[string]*Program
 	UpStream   map[string]*Program
 
-	EnableDatabase bool // for compile, whether use database
+	EnableDatabase bool             // for compile, whether use database
+	irProgram      *ssadb.IrProgram // from database program
 
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
 	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]
