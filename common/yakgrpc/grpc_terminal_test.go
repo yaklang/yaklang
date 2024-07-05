@@ -183,3 +183,77 @@ func TestTerminalPath(t *testing.T) {
 		t.Fatalf("failed to read expect output from terminal")
 	}
 }
+
+func TestTerminalReconnect(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// one
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+
+		stream, err := client.YaklangTerminal(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.Input{
+			Path: "",
+		})
+
+		_, err = stream.Recv()
+		assert.NilError(t, err)
+		cancel()
+	}
+
+	// second
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+
+		stream, err := client.YaklangTerminal(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.Input{
+			Path: "",
+		})
+
+		_, err = stream.Recv()
+		assert.NilError(t, err)
+		cancel()
+	}
+
+	{
+		ctx1, cancel1 := context.WithCancel(context.Background())
+
+		stream1, err := client.YaklangTerminal(ctx1)
+		require.NoError(t, err)
+		stream1.Send(&ypb.Input{
+			Path: "",
+		})
+
+		_, err = stream1.Recv()
+		assert.NilError(t, err)
+		ctx2, cancel2 := context.WithCancel(context.Background())
+
+		stream2, err := client.YaklangTerminal(ctx2)
+		require.NoError(t, err)
+		stream2.Send(&ypb.Input{
+			Path: "",
+		})
+
+		_, err = stream2.Recv()
+		assert.NilError(t, err)
+
+		cancel1()
+		cancel2()
+	}
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+
+		stream, err := client.YaklangTerminal(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.Input{
+			Path: "",
+		})
+
+		_, err = stream.Recv()
+		assert.NilError(t, err)
+		cancel()
+	}
+}
