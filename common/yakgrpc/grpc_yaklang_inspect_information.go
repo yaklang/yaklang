@@ -16,8 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -120,7 +119,7 @@ func riskInfo2grpc(info []*information.RiskInfo, db *gorm.DB) []*ypb.YakRiskInfo
 
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
-	prog, err := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
+	prog, err := static_analyzer.SSAParse(req.YakScriptCode, req.YakScriptType)
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
@@ -306,7 +305,7 @@ func getParameterFromParamJson(j string) ([]*ypb.YakScriptParam, error) {
 }
 
 func getNeedReturn(script *schema.YakScript) ([]*ypb.YakScriptParam, error) {
-	prog, err := ssaapi.Parse(script.Content, pta.GetPluginSSAOpt("yak")...)
+	prog, err := static_analyzer.SSAParse(script.Content, "yak")
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}

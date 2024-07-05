@@ -35,7 +35,7 @@ type config struct {
 
 	DatabaseProgramName        string
 	DatabaseProgramCacheHitter func(any)
-	DisableCache               bool
+	EnableCache                bool
 	// for hash
 	externInfo string
 }
@@ -126,7 +126,7 @@ func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder
 
 func WithIgnoreSyntaxError(b ...bool) Option {
 	return func(c *config) {
-		if len(b) > 1 {
+		if len(b) > 0 {
 			c.ignoreSyntaxErr = b[0]
 		} else {
 			c.ignoreSyntaxErr = true
@@ -150,7 +150,7 @@ func WithDefineFunc(table map[string]any) Option {
 
 func WithFeedCode(b ...bool) Option {
 	return func(c *config) {
-		if len(b) > 1 {
+		if len(b) > 0 {
 			c.feedCode = b[0]
 		} else {
 			c.feedCode = true
@@ -171,9 +171,13 @@ func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 	}
 }
 
-func WithDisableCache(b bool) Option {
+func WithEnableCache(b ...bool) Option {
 	return func(c *config) {
-		c.DisableCache = b
+		if len(b) > 0 {
+			c.EnableCache = b[0]
+		} else {
+			c.EnableCache = true
+		}
 	}
 }
 
@@ -222,14 +226,14 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	}
 
 	hash := config.CalcHash()
-	if !config.DisableCache {
+	if config.EnableCache {
 		if prog, ok := ttlSSAParseCache.Get(hash); ok {
 			return prog, nil
 		}
 	}
 
 	ret, err := config.parseFile()
-	if err == nil && !config.DisableCache {
+	if err == nil && config.EnableCache {
 		ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
 	}
 	return ret, err

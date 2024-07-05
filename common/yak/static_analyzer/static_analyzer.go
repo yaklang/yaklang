@@ -44,7 +44,7 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*result.StaticAnalyzeResult {
 		}
 	}
 
-	prog, err := ssaapi.Parse(code, GetPluginSSAOpt(codeTyp)...)
+	prog, err := SSAParse(code, codeTyp)
 	if err != nil {
 		log.Error("SSA 解析失败：", err)
 		return results
@@ -90,4 +90,10 @@ func checkPluginType(plugin string, prog *ssaapi.Program) *result.StaticAnalyzeR
 		ret.Merge(plugin_type.CheckPluginType(pluginType, prog))
 	}
 	return ret
+}
+func SSAParse(code, scriptType string, o ...ssaapi.Option) (*ssaapi.Program, error) {
+	opt := GetPluginSSAOpt(scriptType)
+	opt = append(opt, ssaapi.WithEnableCache())
+	opt = append(opt, o...)
+	return ssaapi.Parse(code, opt...)
 }
