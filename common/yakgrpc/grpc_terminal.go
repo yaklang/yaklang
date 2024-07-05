@@ -61,6 +61,16 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 	if err != nil {
 		return err
 	}
+	path := ""
+	if firstInput.GetPath() != "" {
+		path = firstInput.GetPath()
+	} else {
+		p, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		path = p
+	}
 
 	// exec
 	shell, eol, err := getShellCommand()
@@ -80,15 +90,7 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		stdin, _ := cmd.StdinPipe()
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
-		if firstInput.GetPath() != "" {
-			cmd.Dir = firstInput.GetPath()
-		} else {
-			path, err := os.UserHomeDir()
-			if err != nil {
-				return err
-			}
-			cmd.Dir = path
-		}
+		cmd.Dir = path
 		cmd.Start()
 
 		terminal := term.NewTerminal(streamerRWC, "")
@@ -142,6 +144,7 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		}()
 
 		cmd := ptmx.CommandContext(ctx, commands[0], commands[1:]...)
+		cmd.Dir = path
 		return cmd.Run()
 	}
 }
