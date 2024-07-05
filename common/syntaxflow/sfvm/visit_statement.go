@@ -92,5 +92,13 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 	// i.RefVariable()
 	ref := i.RefVariable().GetText()
 	ref = strings.TrimLeft(ref, "$")
-	y.EmitAlert(ref)
+
+	if i.For() != nil {
+		text := i.StringLiteral().GetText()
+		forString := mustUnquoteSyntaxFlowString(text)
+		y.EmitAlert(ref, forString)
+	} else {
+		y.EmitAlert(ref, "")
+	}
+
 }

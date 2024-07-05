@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -8,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"strconv"
 	"strings"
 )
 
@@ -55,7 +57,7 @@ func NewSarifContext() *SarifContext {
 	}
 }
 
-func (s *SarifContext) AddSSAValue(v *Value) {
+func (s *SarifContext) AddSSAValue(v *Value, extraMsg ...string) {
 	rg := v.GetRange()
 	editor := rg.GetEditor()
 	if editor == nil {
@@ -69,10 +71,15 @@ func (s *SarifContext) AddSSAValue(v *Value) {
 		return
 	}
 	s.locations = append(s.locations, s.CreateLocation(artifactId, rg))
-	cf := sarif.NewCodeFlow().WithTextMessage(v.StringWithRange())
+	cf := sarif.NewCodeFlow()
+	cf.WithTextMessage(v.StringWithRange())
+	if len(extraMsg) > 0 {
+		pb := sarif.NewPropertyBag()
+		pb.AddString("extraMessage", fmt.Sprintf("%s:\nt%s:%s", extraMsg[0], strconv.FormatInt(v.GetId(), 10), v.StringWithRange()))
+		cf.AttachPropertyBag(pb)
+	}
 	cf.WithThreadFlows(s.CreateThreadFlowsFromPredecessor(v))
 	s.codeFlows = append(s.codeFlows, cf)
-
 }
 
 func (s *SarifContext) createThreadFlowsFromPredecessor(v *Value, add func(flow *sarif.ThreadFlow), visited map[int64]struct{}) {
@@ -189,10 +196,14 @@ func ConvertSyntaxFlowResultToSarif(r ...*sfvm.SFFrameResult) (*sarif.Report, er
 		if frame.AlertSymbolTable == nil {
 			frame.AlertSymbolTable = make(map[string]sfvm.ValueOperator)
 		}
-		for _, i := range frame.AlertSymbolTable {
-			i.Recursive(func(operator sfvm.ValueOperator) error {
+		for k, v := range frame.AlertSymbolTable {
+			v.Recursive(func(operator sfvm.ValueOperator) error {
 				if raw, ok := operator.(*Value); ok {
-					sctx.AddSSAValue(raw)
+					if msg := frame.AlertMsgTable[k]; msg != "" {
+						sctx.AddSSAValue(raw, msg)
+					} else {
+						sctx.AddSSAValue(raw)
+					}
 					haveResult = true
 				}
 				return nil

@@ -727,6 +727,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("alert failed: not found: %v", i.UnaryStr)
 		}
 		s.result.AlertSymbolTable[i.UnaryStr] = value
+		alStr := i.ValueByIndex(0)
+		if alStr != "" {
+			s.result.AlertMsgTable[i.UnaryStr] = alStr
+		}
 	case OpCheckParams:
 		if i.UnaryStr == "" {
 			return utils.Errorf("check params failed: empty name")
