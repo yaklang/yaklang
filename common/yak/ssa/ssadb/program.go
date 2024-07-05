@@ -20,15 +20,15 @@ type IrProgram struct {
 	DownStream StringSlice `json:"down_stream_programs" gorm:"type:text"`
 }
 
-func SaveProgram(name, version, kind string, down, up []string) {
-	db := GetDB()
-	db.Save(&IrProgram{
+func CreateProgram(name, kind, version string) *IrProgram {
+	db := GetDB().Model(&IrProgram{})
+	out := &IrProgram{
 		ProgramName: name,
 		Version:     version,
 		ProgramKind: kind,
-		UpStream:    up,
-		DownStream:  down,
-	})
+	}
+	db.Save(out)
+	return out
 }
 
 func GetProgram(name, kind string) (*IrProgram, error) {

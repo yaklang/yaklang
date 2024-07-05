@@ -1,6 +1,8 @@
 package java2ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 )
@@ -20,7 +22,14 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 
 	if ret := i.PackageDeclaration(); ret != nil {
 		pkgPath := y.VisitPackageDeclaration(ret)
-		builder := y.AddCurrentPackagePath(pkgPath)
+		pkgName := strings.Join(pkgPath, ".")
+		// TODO: 1. check hash 2. should use pkgName inner file, but we only get pkgPath
+		prog := y.GetProgram()
+		if prog.HaveLibrary(pkgName) {
+			return nil
+		}
+		lib := prog.NewLibrary(pkgName, pkgPath)
+		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
 		if builder != nil {
 			builder.SupportClass = true
 			y.FunctionBuilder = builder

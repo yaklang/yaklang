@@ -3,8 +3,8 @@ package ssa
 import (
 	"sort"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/exp/slices"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -34,7 +34,6 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ExternLib:               make(map[string]map[string]any),
 	}
 	prog.EnableDatabase = enableDatabase
-	setProgramCachePool(ProgramName, prog)
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
 		ssautil.WithIncludePath(programPath),
@@ -42,12 +41,27 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	return prog
 }
 
-func (prog *Program) NewLibrary(name string, path []string) *Program {
-	// get lib from up-stream
-	if lib, ok := prog.UpStream[name]; ok {
-		return lib
+func (prog *Program) HaveLibrary(name string) bool {
+	if _, ok := prog.UpStream[name]; ok {
+		return true
+	}
+	if prog.irProgram != nil {
+		if slices.Contains(prog.irProgram.UpStream, name) {
+			return true
+		}
 	}
 
+	p, err := GetProgram(name, Library)
+	if err != nil {
+		return false
+	}
+	prog.UpStream[name] = p
+	// update down stream
+	p.DownStream[prog.Name] = prog
+	return true
+}
+
+func (prog *Program) NewLibrary(name string, path []string) *Program {
 	// create lib
 	fs := prog.Loader.GetFilesysFileSystem()
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
@@ -65,6 +79,7 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 		DownStream:     make(map[string]*Program),
 		Cache:          GetCacheFromPool(p.ProgramName),
 		EnableDatabase: true,
+		irProgram:      p,
 	}
 	// TODO: handler up and down stream
 	return prog
@@ -141,11 +156,8 @@ func (prog *Program) Finish() {
 		up.Finish()
 	}
 	prog.Cache.SaveToDatabase()
-	deleteProgramCachePool(prog.Name)
 	if prog.EnableDatabase {
-		ssadb.SaveProgram(prog.Name, prog.Version, string(prog.ProgramKind),
-			lo.Keys(prog.DownStream), lo.Keys(prog.UpStream),
-		)
+		updateToDatabase(prog)
 	}
 }
 
