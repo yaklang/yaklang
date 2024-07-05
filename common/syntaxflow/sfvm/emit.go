@@ -60,10 +60,11 @@ func (y *SyntaxFlowVisitor) EmitOperator(i string) {
 	}
 }
 
-func (y *SyntaxFlowVisitor) EmitAlert(ref string) {
+func (y *SyntaxFlowVisitor) EmitAlert(ref string, value string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpAlert,
 		UnaryStr: ref,
+		Values:   []string{value},
 	})
 }
 

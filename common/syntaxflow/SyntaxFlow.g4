@@ -45,7 +45,7 @@ descriptionItem
     ;
 
 // echo statement will echo the variable 
-alertStatement: Alert refVariable; 
+alertStatement: Alert refVariable (For stringLiteral)?;
 
 // checkStatement will check the filterExpr($params) is true( .len > 0), if not,
 // it will record an error with stringLiteral
@@ -241,6 +241,7 @@ Opcode: 'opcode';
 Have: 'have';
 HaveAny: 'any';
 Not: 'not';
+For: 'for';
 
 Identifier: IdentifierCharStart IdentifierChar*;
 IdentifierChar: [0-9] | IdentifierCharStart;

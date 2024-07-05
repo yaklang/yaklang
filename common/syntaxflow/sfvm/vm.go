@@ -70,7 +70,6 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
-		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
 	}
 	defer func() {
 		if err := recover(); err != nil {
