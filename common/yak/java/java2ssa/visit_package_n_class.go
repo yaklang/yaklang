@@ -757,8 +757,8 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	}
 
 	key := i.Identifier().GetText()
-	pkgPath := y.GetCurrentPackagePath()
-	pkgName := strings.Join(pkgPath, "_")
+	pkgName := y.GetProgram()
+	// pkgName := strings.Join(pkgPath, "_")
 	funcName := fmt.Sprintf("%s_%s_%s", pkgName, class.Name, key)
 
 	createFunction := func() *ssa.Function {

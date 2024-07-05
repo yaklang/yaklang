@@ -1,8 +1,9 @@
 package ssautil
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"io/fs"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

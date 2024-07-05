@@ -1,27 +1,22 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-var programCachePool = omap.NewEmptyOrderedMap[string, *Program]()
+// var programCachePool = omap.NewEmptyOrderedMap[string, *Program]()
 
-func setProgramCachePool(program string, prog *Program) {
-	programCachePool.Set(program, prog)
-}
+// func setProgramCachePool(program string, prog *Program) {
+// 	programCachePool.Set(program, prog)
+// }
 
-func deleteProgramCachePool(program string) {
-	programCachePool.Delete(program)
-}
+// func deleteProgramCachePool(program string) {
+// 	programCachePool.Delete(program)
+// }
 
 func GetProgram(program string, kind ProgramKind) (*Program, error) {
-	// check in memory
-	if prog, ok := programCachePool.Get(program); ok {
-		return prog, nil
-	}
-
 	// rebuild in database
 	p, err := ssadb.GetProgram(program, string(kind))
 	if err != nil {
@@ -29,4 +24,17 @@ func GetProgram(program string, kind ProgramKind) (*Program, error) {
 	}
 	prog := NewProgramFromDB(p)
 	return prog, nil
+}
+
+func updateToDatabase(prog *Program) {
+	ir := prog.irProgram
+	if ir == nil {
+		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)
+	}
+	ir.ProgramKind = string(prog.ProgramKind)
+	ir.ProgramName = prog.Name
+	ir.Version = prog.Version
+	ir.UpStream = append(ir.UpStream, lo.Keys(prog.UpStream)...)
+	ir.DownStream = append(ir.DownStream, lo.Keys(prog.DownStream)...)
+	ssadb.UpdateProgram(ir)
 }

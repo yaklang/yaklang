@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -29,16 +30,17 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	return err
 }
 
-func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
+func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Program, error) {
 	p := b.GetProgram()
-	ch, err := p.Loader.LoadDirectoryPackage(name, once)
+
+	path := p.Loader.GetFilesysFileSystem().Join(name...)
+	ch, err := p.Loader.LoadDirectoryPackage(path, once)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for v := range ch {
-
 		_path := p.Loader.GetCurrentPath()
-		p.Loader.SetCurrentPath(path.Dir(v.FileName))
+		p.Loader.SetCurrentPath(path)
 
 		raw, err := p.Loader.GetFilesysFileSystem().ReadFile(v.FileName)
 		if err != nil {
@@ -49,25 +51,14 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 		p.Loader.SetCurrentPath(_path)
 
 		if err != nil {
-			return err
+			// return err
+			continue
 		}
 	}
-	return nil
-}
-
-func (b *FunctionBuilder) AddCurrentPackagePath(path []string) *FunctionBuilder {
-	prog := b.GetProgram()
-	pkgName := strings.Join(path, ".")
-	if pkgName != "" {
-		lib := prog.NewLibrary(pkgName, path)
-		return lib.GetAndCreateFunctionBuilder(pkgName, "init")
+	// TODO: get program from name, but in some case, package name not same with path
+	if prog, err := GetProgram(strings.Join(name, "."), Library); err == nil {
+		// prog.Finish()
+		return prog, nil
 	}
-	return nil
-
-}
-
-func (b *FunctionBuilder) GetCurrentPackagePath() []string {
-	p := b.GetProgram()
-	pkgPath := p.Loader.GetPackagePath()
-	return pkgPath
+	return nil, utils.Errorf("Build package %v failed", name)
 }

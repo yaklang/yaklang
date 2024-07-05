@@ -1,9 +1,10 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"

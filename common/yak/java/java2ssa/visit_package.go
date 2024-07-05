@@ -3,12 +3,9 @@ package java2ssa
 import (
 	"strings"
 
-	"github.com/yaklang/yaklang/common/utils/memedit"
-
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
@@ -25,7 +22,8 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 				prog = p
 				break
 			}
-			if prog = y.BuildPackage(pkgNames[:i]); prog != nil {
+			if p, err := y.BuildDirectoryPackage(pkgNames[:i], true); err != nil {
+				prog = p
 				break
 			}
 		}
@@ -44,50 +42,5 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		} else {
 			log.Warnf("BUG: Import  class %s but not found in package %v", className, prog.Name)
 		}
-	}
-}
-
-func (y *builder) BuildPackage(pkgNames []string) *ssa.Program {
-	if y == nil {
-		return nil
-	}
-	prog := y.GetProgram()
-	if prog == nil {
-		return nil
-	}
-	loader := prog.Loader
-
-	pkgPath := strings.Join(pkgNames, "/")
-	_ = pkgPath
-
-	ch, err := loader.LoadDirectoryPackage(pkgPath, true)
-	if err != nil {
-		return nil
-	}
-	for fd := range ch {
-		raw, err := loader.GetFilesysFileSystem().ReadFile(fd.FileName)
-		if err != nil {
-			log.Errorf("Build with file loader failed: %s", err)
-			continue
-		}
-		y.LoadPackageByPath(prog, loader, fd.FileName, memedit.NewMemEditor(string(raw)))
-	}
-
-	pkgName := strings.Join(pkgNames, ".")
-	if p, err := ssa.GetProgram(pkgName, ssa.Library); err == nil {
-		return p
-	}
-	return nil
-}
-
-func (y *builder) LoadPackageByPath(prog *ssa.Program, loader *ssautil.PackageFileLoader, fileName string, data *memedit.MemEditor) {
-	originPath := loader.GetCurrentPath()
-	defer func() {
-		loader.SetCurrentPath(originPath)
-	}()
-	err := prog.Build(fileName, data, y.FunctionBuilder)
-	if err != nil {
-		log.Warnf("TBD: Build via LoadPackageByPath failed: %v", err)
-		return
 	}
 }
