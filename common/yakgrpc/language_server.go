@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -35,10 +35,8 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 	rangeWordText := ssaRange.GetWordText()
 	word, containPoint := trimSourceCode(rangeWordText)
 
-	opt := pta.GetPluginSSAOpt(scriptType)
-
 	getProgram := func() (*ssaapi.Program, error) {
-		prog, err := ssaapi.Parse(code, opt...)
+		prog, err := static_analyzer.SSAParse(code, scriptType)
 		if err == nil {
 			return prog, nil
 		}
@@ -63,7 +61,7 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 			before, after := rangeWordText[:lastIndex], rangeWordText[lastIndex+1:]
 			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
 
-			prog, err = ssaapi.Parse(trimCode, opt...)
+			prog, err = static_analyzer.SSAParse(trimCode, scriptType)
 			if err == nil {
 				// reset ssaRange and editor
 				newEditor, ok := prog.Program.GetEditor("")
@@ -81,8 +79,7 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 		}
 
 		// try ignore syntax error
-		opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
-		prog, err = ssaapi.Parse(code, opt...)
+		prog, err = static_analyzer.SSAParse(code, scriptType, ssaapi.WithIgnoreSyntaxError())
 
 		return prog, err
 	}

@@ -31,7 +31,6 @@ func CheckWithName(
 ) {
 	// only in memory
 	{
-		opt = append(opt, ssaapi.WithDisableCache(true))
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
 
@@ -50,7 +49,7 @@ func CheckWithName(
 	fmt.Println("-----------------------------------------------------------------------------")
 	// parse with database
 	{
-		opt = append(opt, ssaapi.WithDatabaseProgramName(programID), ssaapi.WithDisableCache(true))
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
 		defer func() {
 			if name == "" {
