@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
@@ -470,7 +468,7 @@ func GetType(i any) Type {
 	if typ := GetTypeByStr(reflect.TypeOf(i).String()); typ != nil {
 		return typ
 	} else {
-		panic("undefined type: " + spew.Sdump(i))
+		return GetAnyType()
 	}
 }
 
