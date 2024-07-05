@@ -23,6 +23,7 @@ type SFFrameResult struct {
 	// value
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	AlertSymbolTable map[string]ValueOperator
+	AlertMsgTable    map[string]string
 }
 
 func NewSFResult(rule string) *SFFrameResult {
@@ -32,6 +33,7 @@ func NewSFResult(rule string) *SFFrameResult {
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
 		AlertSymbolTable: make(map[string]ValueOperator),
+		AlertMsgTable:    make(map[string]string),
 	}
 }
 
