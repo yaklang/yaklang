@@ -135,7 +135,7 @@ func Run(tc testcase) []*dxtypes.Package {
 		return k, analyzer.FileInfo{
 			Path:        k,
 			Analyzer:    tc.a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(f),
+			LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
 			MatchStatus: tc.matchType,
 		}
 	})
@@ -151,7 +151,7 @@ func Run(tc testcase) []*dxtypes.Package {
 		Self: analyzer.FileInfo{
 			Path:        tc.virtualPath,
 			Analyzer:    tc.a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(f),
+			LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
 			MatchStatus: tc.matchType,
 		},
 		MatchedFileInfos: matchedFileInfos,
