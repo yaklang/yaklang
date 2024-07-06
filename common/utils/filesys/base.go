@@ -16,6 +16,14 @@ type embedFs struct {
 	f embed.FS
 }
 
+func (e *embedFs) PathSplit(s string) (string, string) {
+	return splitWithSeparator(s, e.GetSeparators())
+}
+
+func (e *embedFs) Ext(s string) string {
+	return getExtension(s)
+}
+
 var _ FileSystem = (*embedFs)(nil)
 
 func (e *embedFs) ReadFile(name string) ([]byte, error) {
@@ -49,6 +57,14 @@ func NewEmbedFS(fs embed.FS) FileSystem {
 // local filesystem
 type LocalFs struct {
 	cache *utils.CacheWithKey[string, *bytes.Buffer]
+}
+
+func (f *LocalFs) PathSplit(s string) (string, string) {
+	return splitWithSeparator(s, f.GetSeparators())
+}
+
+func (f *LocalFs) Ext(s string) string {
+	return getExtension(s)
 }
 
 func NewLocalFs() *LocalFs {

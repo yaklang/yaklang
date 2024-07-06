@@ -14,7 +14,8 @@ import (
 
 // ========================================== For SSAAPI ==========================================
 
-type SSABuilder struct{}
+type SSABuilder struct {
+}
 
 var Builder = &SSABuilder{}
 

@@ -10,7 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type SSABuilder struct{}
+type SSABuilder struct {
+	ssa.DummyExtraFileAnalyzer
+}
 
 var Builder = &SSABuilder{}
 

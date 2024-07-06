@@ -1,6 +1,9 @@
 package filesys
 
-import "io/fs"
+import (
+	"io/fs"
+	"strings"
+)
 
 // FileSystem defines the methods of an abstract filesystem.
 type FileSystem interface {
@@ -21,4 +24,39 @@ type FileSystem interface {
 	// Rel(targpath string) (string, error)
 
 	GetSeparators() rune
+
+	PathSplit(string) (string, string)
+	Ext(string) string
+}
+
+func splitWithSeparator(path string, sep rune) (string, string) {
+	if len(path) == 0 {
+		return "", ""
+	}
+	idx := strings.LastIndexFunc(path, func(r rune) bool {
+		if r == sep {
+			return true
+		}
+		return false
+	})
+	if idx == -1 {
+		return "", path
+	}
+	return path[:idx], path[idx:]
+}
+
+func getExtension(path string) string {
+	if len(path) == 0 {
+		return ""
+	}
+	idx := strings.LastIndexFunc(path, func(r rune) bool {
+		if r == '.' {
+			return true
+		}
+		return false
+	})
+	if idx == -1 {
+		return ""
+	}
+	return path[idx:]
 }

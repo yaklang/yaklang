@@ -17,6 +17,14 @@ type VirtualFS struct {
 	dirEntry []fs.DirEntry
 }
 
+func (vs *VirtualFS) PathSplit(s string) (string, string) {
+	return splitWithSeparator(s, vs.GetSeparators())
+}
+
+func (vs *VirtualFS) Ext(s string) string {
+	return getExtension(s)
+}
+
 var _ FileSystem = (*VirtualFS)(nil)
 
 func NewVirtualFs() *VirtualFS {
