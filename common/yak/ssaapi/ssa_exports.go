@@ -15,7 +15,7 @@ import (
 
 type config struct {
 	language        Language
-	Builder         Builder
+	Builder         ssa.Builder
 	feedCode        bool
 	ignoreSyntaxErr bool
 

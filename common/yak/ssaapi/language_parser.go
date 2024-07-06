@@ -26,12 +26,7 @@ const (
 	JAVA Language = "java"
 )
 
-type Builder interface {
-	Build(string, bool, *ssa.FunctionBuilder) error
-	FilterFile(string) bool
-}
-
-var LanguageBuilders = map[Language]Builder{
+var LanguageBuilders = map[Language]ssa.Builder{
 	Yak:  yak2ssa.Builder,
 	JS:   js2ssa.Builder,
 	PHP:  php2ssa.Builder,
