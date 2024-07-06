@@ -185,7 +185,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			var isS5 bool
 			var handledConnection net.Conn
 			var firstByte byte
-			handledConnection, isS5, firstByte, err = s5config.IsSocks5HandleShake(originConn)
+			handledConnection, isS5, firstByte, err = IsSocks5HandleShake(originConn)
 			if err != nil {
 				removeConns(uidStr, originConn)
 				log.Errorf("check socks5 handle shake failed: %s", err)
