@@ -33,6 +33,14 @@ var LanguageBuilders = map[Language]ssa.Builder{
 	JAVA: java2ssa.Builder,
 }
 
+var AllLanguageBuilders = []ssa.Builder{
+	php2ssa.Builder,
+	java2ssa.Builder,
+
+	yak2ssa.Builder,
+	js2ssa.Builder,
+}
+
 func (c *config) parseProject() ([]*Program, error) {
 	ret := make([]*Program, 0)
 
@@ -121,30 +129,35 @@ var SkippedError = ssareducer.SkippedError
 
 func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	LanguageBuilder := c.Builder
-	language := c.language
 	programName := c.DatabaseProgramName
+
+	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
+		for _, instance := range builders {
+			if instance.FilterFile(path) {
+				return instance, nil
+			}
+		}
+		return nil, utils.Wrapf(ssareducer.SkippedError, "file[%s] is not supported by any language builder, skip this file", path)
+	}
 
 	if path != "" {
 		// TODO: whether to use the same programName for all program ?? when call ParseProject
 		// programName += "-" + path
-
-		// auto select language by path filter, if not set language
+		var err error
 		if LanguageBuilder != nil {
-			if !LanguageBuilder.FilterFile(path) {
-				return nil, nil, utils.Wrapf(ssareducer.SkippedError, "file[%s] is filtered by language [%s], skip this file", path, language)
-			}
-		} else {
-			for lang, languageBuilder := range LanguageBuilders {
-				if languageBuilder.FilterFile(path) {
-					language = lang
-					LanguageBuilder = languageBuilder
-					break
+			if LanguageBuilder.EnableExtraFileAnalyzer() {
+				err = LanguageBuilder.ExtraFileAnalyze(c.fs, path)
+				if err != nil {
+					return nil, nil, err
 				}
 			}
-			if LanguageBuilder == nil {
-				return nil, nil, utils.Errorf("file[%s] is not supported by any language builder, skip this file", path)
-			}
-			log.Infof("file[%s] is supported by language [%s], use this language", path, language)
+			LanguageBuilder, err = processBuilders(LanguageBuilder)
+		} else {
+			log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
+			LanguageBuilder, err = processBuilders(AllLanguageBuilders...)
+		}
+		if err != nil {
+			return nil, nil, err
 		}
 	} else {
 		// path is empty, use language or YakLang as default
