@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE sqlMap PUBLIC "-//ibatis.apache.org//DTD SQL Map 2.0//EN" "http://ibatis.apache.org/dtd/ibatis-2.dtd">
+
+<sqlMap namespace="ExampleMap">
+    <!-- 定义一个别名，简化后续的类型引用 -->
+    <typeAlias alias="User" type="com.example.User"/>
+
+    <!-- 插入操作 -->
+    <insert id="insertUser" parameterClass="User">
+        INSERT INTO Users (username, password, email)
+        VALUES (#username#, #password#, #email#)
+    </insert>
+
+    <!-- 更新操作 -->
+    <update id="updateUser" parameterClass="User">
+        UPDATE Users SET
+        username = #username#,
+        password = #password#,
+        email = #email#
+        WHERE id = #id#
+    </update>
+
+    <!-- 删除操作 -->
+    <delete id="deleteUser" parameterClass="int">
+        DELETE FROM Users WHERE id = #id#
+    </delete>
+
+    <!-- 查询操作 -->
+    <select id="selectUserById" parameterClass="int" resultClass="User">
+        SELECT id, username, password, email
+        FROM Users WHERE id = #id#
+    </select>
+</sqlMap>

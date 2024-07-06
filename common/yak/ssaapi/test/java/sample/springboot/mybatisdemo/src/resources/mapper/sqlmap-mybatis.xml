@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.UserMapper">
+
+    <!-- 选择表名和插入数据的示例 -->
+    <insert id="insertUser" parameterType="com.example.User">
+        INSERT INTO ${tableName} (username, email, age)
+        VALUES (#{username}, #{email}, #{age})
+    </insert>
+
+    <!-- 使用动态表名和动态字段名查询用户信息 -->
+    <select id="selectUserByUsername" parameterType="map" resultType="com.example.User">
+        SELECT ${columnName} as username, email, age
+        FROM ${tableName}
+        WHERE ${columnName} = #{value}
+    </select>
+
+    <!-- 更新用户信息 -->
+    <update id="updateUserEmail" parameterType="map">
+        UPDATE ${tableName}
+        SET email = #{email}
+        WHERE username = #{username}
+    </update>
+
+    <!-- 删除用户 -->
+    <delete id="deleteUser" parameterType="map">
+        DELETE FROM ${tableName}
+        WHERE username = #{username}
+    </delete>
+
+</mapper>

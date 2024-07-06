@@ -30,7 +30,7 @@ var (
 	language       ssaapi.Language
 )
 
-func SetLanguage(lang ssaapi.Language, build ssaapi.Builder) {
+func SetLanguage(lang ssaapi.Language, build ssa.Builder) {
 	ssaapi.LanguageBuilders[lang] = build
 	languageOption = ssaapi.WithLanguage(lang)
 	language = lang

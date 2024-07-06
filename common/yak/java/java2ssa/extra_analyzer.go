@@ -1,6 +1,8 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"strings"
@@ -13,14 +15,33 @@ func (*SSABuilder) EnableExtraFileAnalyzer() bool {
 }
 
 func (s *SSABuilder) ExtraFileAnalyze(fs filesys.FileSystem, path string) error {
-	idx := strings.LastIndexFunc(path, func(r rune) bool {
-		if r == fs.GetSeparators() {
-			return true
+	dirname, filename := fs.PathSplit(path)
+	_ = dirname
+	_ = filename
+
+	// pom.xml
+	if strings.TrimLeft(filename, "/") == "pom.xml" {
+		raw, err := fs.ReadFile(path)
+		if err != nil {
+			log.Warnf("read pom.xml error: %v", err)
+			return nil
 		}
-		return false
-	})
-	if idx == -1 {
+		vfs := filesys.NewVirtualFs()
+		vfs.AddFile("pom.xml", string(raw))
+		pkgs, err := sca.ScanFilesystem(vfs)
+		if err != nil {
+			log.Warnf("scan pom.xml error: %v", err)
+			return nil
+		}
+		s.Dependencies = append(s.Dependencies, pkgs...)
 		return nil
+	}
+
+	switch strings.ToLower(fs.Ext(path)) {
+	case ".xml":
+		log.Infof("scan xml file: %v", path)
+	case ".properties":
+		log.Infof("scan properties file: %v", path)
 	}
 	return nil
 }

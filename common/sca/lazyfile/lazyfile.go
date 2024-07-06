@@ -1,36 +1,42 @@
 package lazyfile
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io"
 	"io/fs"
-	"os"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 )
 
 type LazyFile struct {
-	*os.File
+	fs.File
+	io.Seeker
+	io.ReaderAt
 
 	fileName string
 	openOnce *sync.Once
 	finalErr error
 
-	finalOpen func() (file *os.File, err error)
+	finalOpen func() (file fs.File, err error)
 }
 
-func LazyOpenReadCloserFile(name string, flag int, perm os.FileMode) io.ReadCloser {
+func LazyOpenStreamByFilePath(fsIns fs.FS, name string) *LazyFile {
+	if fsIns == nil {
+		fsIns = filesys.NewLocalFs()
+	}
 	lf := &LazyFile{
 		openOnce: new(sync.Once),
 	}
 	lf.fileName = name
 
-	lf.finalOpen = func() (file *os.File, err error) {
+	lf.finalOpen = func() (file fs.File, err error) {
 		if lf.finalErr != nil {
 			return nil, lf.finalErr
 		}
 
-		f, err := os.OpenFile(name, flag, perm)
+		f, err := fsIns.Open(name)
 		if err != nil {
 			lf.finalErr = err
 			return nil, err
@@ -41,30 +47,18 @@ func LazyOpenReadCloserFile(name string, flag int, perm os.FileMode) io.ReadClos
 	return lf
 }
 
-func LazyOpenStreamByFilePath(name string) *LazyFile {
-	lf := &LazyFile{
-		openOnce: new(sync.Once),
+func LazyOpenStreamByFile(f fs.FS, rf fs.File) *LazyFile {
+	var name string
+	info, _ := rf.Stat()
+	if info != nil {
+		name = info.Name()
 	}
-	lf.fileName = name
 
-	lf.finalOpen = func() (file *os.File, err error) {
-		if lf.finalErr != nil {
-			return nil, lf.finalErr
-		}
-
-		f, err := os.OpenFile(name, os.O_RDWR, os.ModePerm)
-		if err != nil {
-			lf.finalErr = err
-			return nil, err
-		}
-		lf.File = f
-		return f, nil
+	if nameGetter, ok := rf.(interface{ Name() string }); ok {
+		name = nameGetter.Name()
 	}
-	return lf
-}
 
-func LazyOpenStreamByFile(rf *os.File) *LazyFile {
-	return LazyOpenStreamByFilePath(rf.Name())
+	return LazyOpenStreamByFilePath(f, name)
 }
 
 func (f *LazyFile) lazyOpen() error {
@@ -82,7 +76,13 @@ func (f *LazyFile) ReadAt(b []byte, off int64) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	return f.File.ReadAt(b, off)
+
+	if ins, ok := f.File.(interface {
+		ReadAt([]byte, int64) (int, error)
+	}); ok {
+		return ins.ReadAt(b, off)
+	}
+	return 0, utils.Wrap(fs.ErrInvalid, "ReadAt not supported")
 }
 
 func (f *LazyFile) Read(b []byte) (int, error) {
@@ -101,13 +101,13 @@ func (f *LazyFile) Stat() (fs.FileInfo, error) {
 	return f.File.Stat()
 }
 
-func (f *LazyFile) Write(b []byte) (int, error) {
-	err := f.lazyOpen()
-	if err != nil {
-		return 0, err
-	}
-	return f.File.Write(b)
-}
+//func (f *LazyFile) Write(b []byte) (int, error) {
+//	err := f.lazyOpen()
+//	if err != nil {
+//		return 0, err
+//	}
+//	return f.File.Write(b)
+//}
 
 func (f *LazyFile) Close() error {
 	if f.File == nil {
@@ -126,4 +126,18 @@ func (f *LazyFile) Close() error {
 
 func (f *LazyFile) Name() string {
 	return f.fileName
+}
+
+func (f *LazyFile) Seek(offset int64, whence int) (int64, error) {
+	err := f.lazyOpen()
+	if err != nil {
+		return 0, err
+	}
+
+	if ins, ok := f.File.(interface {
+		Seek(int64, int) (int64, error)
+	}); ok {
+		return ins.Seek(offset, whence)
+	}
+	return 0, utils.Wrap(fs.ErrInvalid, "Seek not supported")
 }

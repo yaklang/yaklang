@@ -3,6 +3,7 @@ package analyzer
 import (
 	"archive/zip"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -43,7 +44,9 @@ func init() {
 	RegisterAnalyzer(TypPythonPackaging, NewPythonPackagingAnalyzer())
 }
 
-type pythonPackagingAnalyzer struct{}
+type pythonPackagingAnalyzer struct {
+	fileSystem fs.FS
+}
 
 func NewPythonPackagingAnalyzer() *pythonPackagingAnalyzer {
 	return &pythonPackagingAnalyzer{}
@@ -106,7 +109,7 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Packag
 			f.Seek(0, 0)
 
 			return ParseLanguageConfiguration(FileInfo{
-				LazyFile: lazyfile.LazyOpenStreamByFile(f),
+				LazyFile: lazyfile.LazyOpenStreamByFile(a.fileSystem, f),
 			}, packaging.NewParser())
 		}
 	case statusPythonPackaging:
