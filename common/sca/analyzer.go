@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -35,6 +34,7 @@ type ScanConfig struct {
 	numWorkers    int
 	scanMode      analyzer.ScanMode
 	usedAnalyzers []analyzer.TypAnalyzer
+	fs            fs.FS
 }
 
 type ScanOption func(*ScanConfig)
@@ -128,17 +128,21 @@ func getContainerMountFSSource(c *client.Client, containerID string) ([]string, 
 
 type walkFunc func(string, fs.FileInfo, io.Reader) error
 
-func walkFS(pathStr string, handler walkFunc) error {
+func walkFS(config *ScanConfig, pathStr string, handler walkFunc) error {
 	startPath := pathStr
-	var err error
-	if !filepath.IsAbs(pathStr) {
-		startPath, err = filepath.Abs(pathStr)
-		if err != nil {
-			return utils.Errorf("cannot fetch the absolute path: %v", err)
-		}
+	//var err error
+	//if !filepath.IsAbs(pathStr) {
+	//	startPath, err = filepath.Abs(pathStr)
+	//	if err != nil {
+	//		return utils.Errorf("cannot fetch the absolute path: %v", err)
+	//	}
+	//}
+
+	if config.fs == nil {
+		config.fs = os.DirFS(startPath)
 	}
 
-	return fs.WalkDir(os.DirFS(startPath), ".", func(filePath string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(config.fs, ".", func(filePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return utils.Errorf("failed to walk the directory: %v", err)
 		}
@@ -153,7 +157,7 @@ func walkFS(pathStr string, handler walkFunc) error {
 			return err
 		}
 
-		f := lazyfile.LazyOpenStreamByFilePath(filePath)
+		f := lazyfile.LazyOpenStreamByFilePath(config.fs, filePath)
 		defer f.Close()
 		return handler(filePath, statsInfo, f)
 	})
@@ -340,7 +344,11 @@ func scanFS(fsPath string, config *ScanConfig) ([]*dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
-	err := walkFS(fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
+	if config.fs == nil {
+		config.fs = os.DirFS(fsPath)
+	}
+
+	err := walkFS(config, fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
 		if err := ag.Match(path, fi, r); err != nil {
 			return err
 		}
@@ -363,12 +371,24 @@ func scanFS(fsPath string, config *ScanConfig) ([]*dxtypes.Package, error) {
 	return ag.Packages(), nil
 }
 
-func ScanFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, error) {
+func ScanLocalFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 	return scanFS(p, config)
+}
+
+func ScanFilesystem(p fs.FS, opts ...ScanOption) ([]*dxtypes.Package, error) {
+	config := NewConfig()
+	config.fs = p
+	for _, opt := range opts {
+		opt(config)
+	}
+	if config.fs == nil {
+		return nil, utils.Errorf("ScanFilesystem need fs.FS interface as input, try filesys.New... instead: %T", p)
+	}
+	return scanFS(".", config)
 }
 
 func ScanGitRepo(repoDir string, opts ...ScanOption) ([]*dxtypes.Package, error) {

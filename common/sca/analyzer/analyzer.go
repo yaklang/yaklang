@@ -60,6 +60,8 @@ type MatchInfo struct {
 }
 
 type AnalyzerGroup struct {
+	fileSystem fs.FS
+
 	analyzers []Analyzer
 
 	// consume
@@ -194,17 +196,16 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		if err != nil {
 			return utils.Errorf("failed to create analyzer temporary file")
 		}
-		defer f.Close()
-
 		if _, err := io.Copy(f, br); err != nil {
 			return utils.Errorf("failed to copy the file: %v", err)
 		}
+		f.Close()
 
 		// add to scanned files
 		ag.matchedFileInfos[path] = FileInfo{
 			Path:        path,
 			Analyzer:    a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(f),
+			LazyFile:    lazyfile.LazyOpenStreamByFile(ag.fileSystem, f),
 			MatchStatus: matchStatus,
 		}
 	}

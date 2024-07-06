@@ -7,7 +7,7 @@ ret := string(file.ReadFile(file.Join(localReposDir, `testdata`,`node_npm`,`posi
 dump(ret)
 assert `unopinionated, minimalist web framework` in ret
 checked = false
-for result in sca.ScanFilesystem(file.Join(localReposDir, `testdata`))~ {
+for result in sca.ScanLocalFilesystem(file.Join(localReposDir, `testdata`))~ {
     if `53733d3ba4843f2efb79e7c70ef0615f2aa22581` in sdump(result) { checked = true}
 }
 if !checked {

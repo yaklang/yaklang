@@ -133,6 +133,13 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 
 	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
 		for _, instance := range builders {
+			if instance.EnableExtraFileAnalyzer() {
+				err := instance.ExtraFileAnalyze(c.fs, path)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			if instance.FilterFile(path) {
 				return instance, nil
 			}
@@ -145,12 +152,6 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 		// programName += "-" + path
 		var err error
 		if LanguageBuilder != nil {
-			if LanguageBuilder.EnableExtraFileAnalyzer() {
-				err = LanguageBuilder.ExtraFileAnalyze(c.fs, path)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
 			LanguageBuilder, err = processBuilders(LanguageBuilder)
 		} else {
 			log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
