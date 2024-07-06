@@ -162,6 +162,10 @@ type VirtualFile struct {
 	index   int
 }
 
+func (f *VirtualFile) FS() FileSystem {
+	return f.fs
+}
+
 var _ fs.File = (*VirtualFile)(nil)
 
 func NewVirtualFile(name string, content string) *VirtualFile {
