@@ -2,7 +2,6 @@ package java2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -15,9 +14,7 @@ import (
 
 // ========================================== For SSAAPI ==========================================
 
-type SSABuilder struct {
-	Dependencies []*dxtypes.Package
-}
+type SSABuilder struct{}
 
 var Builder = &SSABuilder{}
 

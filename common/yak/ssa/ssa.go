@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"sync"
 
 	"github.com/samber/lo"
@@ -160,8 +161,9 @@ type (
 // both instruction and value
 type Program struct {
 	// package list
-	Name     string
-	Packages map[string]*Package
+	Name        string
+	SCAPackages []*dxtypes.Package
+	Packages    map[string]*Package
 
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
 	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]

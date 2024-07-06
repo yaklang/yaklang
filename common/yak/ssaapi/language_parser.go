@@ -134,7 +134,7 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
 		for _, instance := range builders {
 			if instance.EnableExtraFileAnalyzer() {
-				err := instance.ExtraFileAnalyze(c.fs, path)
+				err := instance.ExtraFileAnalyze(c.fs, nil, path)
 				if err != nil {
 					return nil, err
 				}
@@ -169,7 +169,6 @@ func (c *config) init(path string, editor *memedit.MemEditor) (*ssa.Program, *ss
 	}
 
 	prog := ssa.NewProgram(programName, c.fs, c.programPath)
-
 	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
 		// check builder
 		if LanguageBuilder == nil {

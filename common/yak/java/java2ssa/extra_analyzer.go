@@ -14,7 +14,7 @@ func (*SSABuilder) EnableExtraFileAnalyzer() bool {
 	return true
 }
 
-func (s *SSABuilder) ExtraFileAnalyze(fs filesys.FileSystem, path string) error {
+func (s *SSABuilder) ExtraFileAnalyze(fs filesys.FileSystem, prog *ssa.Program, path string) error {
 	dirname, filename := fs.PathSplit(path)
 	_ = dirname
 	_ = filename
@@ -33,7 +33,10 @@ func (s *SSABuilder) ExtraFileAnalyze(fs filesys.FileSystem, path string) error 
 			log.Warnf("scan pom.xml error: %v", err)
 			return nil
 		}
-		s.Dependencies = append(s.Dependencies, pkgs...)
+		if prog == nil {
+			prog = &ssa.Program{}
+		}
+		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		return nil
 	}
 
