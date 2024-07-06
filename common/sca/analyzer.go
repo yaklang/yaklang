@@ -3,6 +3,7 @@ package sca
 import (
 	"archive/tar"
 	"context"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io"
 	"io/fs"
 	"os"
@@ -129,7 +130,7 @@ func getContainerMountFSSource(c *client.Client, containerID string) ([]string, 
 type walkFunc func(string, fs.FileInfo, io.Reader) error
 
 func walkFS(config *ScanConfig, pathStr string, handler walkFunc) error {
-	startPath := pathStr
+	//startPath := pathStr
 	//var err error
 	//if !filepath.IsAbs(pathStr) {
 	//	startPath, err = filepath.Abs(pathStr)
@@ -139,10 +140,18 @@ func walkFS(config *ScanConfig, pathStr string, handler walkFunc) error {
 	//}
 
 	if config.fs == nil {
-		config.fs = os.DirFS(startPath)
+		config.fs = filesys.NewLocalFs()
 	}
 
-	return fs.WalkDir(config.fs, ".", func(filePath string, d fs.DirEntry, err error) error {
+	_, isLocal := config.fs.(*filesys.LocalFs)
+	var startPath string
+	if isLocal {
+		startPath = pathStr
+	} else {
+		startPath = "."
+	}
+
+	return fs.WalkDir(config.fs, startPath, func(filePath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return utils.Errorf("failed to walk the directory: %v", err)
 		}
@@ -150,7 +159,7 @@ func walkFS(config *ScanConfig, pathStr string, handler walkFunc) error {
 			log.Debugf("skipping the directory: %s", filePath)
 			return nil
 		}
-		filePath = path.Join(startPath, filePath)
+		//filePath = path.Join(startPath, filePath)
 
 		statsInfo, err := d.Info()
 		if err != nil {
@@ -345,7 +354,7 @@ func scanFS(fsPath string, config *ScanConfig) ([]*dxtypes.Package, error) {
 
 	// match file
 	if config.fs == nil {
-		config.fs = os.DirFS(fsPath)
+		config.fs = filesys.NewLocalFs()
 	}
 
 	err := walkFS(config, fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
