@@ -4,7 +4,7 @@ import "github.com/yaklang/yaklang/common/utils/filesys"
 
 type ExtraFileAnalyzer interface {
 	EnableExtraFileAnalyzer() bool
-	ExtraFileAnalyze(filesys.FileSystem, string) error
+	ExtraFileAnalyze(filesys.FileSystem, *Program, string) error
 }
 
 type Builder interface {
@@ -23,6 +23,6 @@ func (d *DummyExtraFileAnalyzer) EnableExtraFileAnalyzer() bool {
 	return false
 }
 
-func (d *DummyExtraFileAnalyzer) ExtraFileAnalyze(filesys.FileSystem, string) error {
+func (d *DummyExtraFileAnalyzer) ExtraFileAnalyze(filesys.FileSystem, *Program, string) error {
 	return nil
 }
