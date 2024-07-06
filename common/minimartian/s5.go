@@ -38,6 +38,8 @@ const (
 	authNoAcceptable        = 0xFF
 
 	commandConnect = 0x01
+	commandBind    = 0x02
+	commandUDP     = 0x03
 
 	addrTypeIPv4 = 0x01
 	addrTypeFQDN = 0x03
@@ -46,7 +48,7 @@ const (
 	replySuccess = 0x00
 )
 
-func (c *S5Config) IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ byte, _ error) {
+func IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ byte, _ error) {
 	peekable := utils.NewPeekableNetConn(conn)
 
 	defer func() {
@@ -70,26 +72,32 @@ func (c *S5Config) IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _
 }
 
 func (c *S5Config) Handshake(conn net.Conn) (net.Conn, error) {
-	peekable, isSocks5, _, err := c.IsSocks5HandleShake(conn)
-	if err != nil {
-		return nil, utils.Errorf("check s5 failed: %s", err)
-	}
-	if !isSocks5 {
-		return nil, utils.Error("not socks5")
-	}
-	err = c.handshakeHandler(peekable)
+	err := c.handshakeHandler(conn)
 	if err != nil {
 		return nil, utils.Errorf("s5 handshake failed: %s", err)
 	}
-	return peekable, nil
+	return conn, nil
 }
+
+//func (c *S5Config) Negotiation(conn net.Conn) error {
+//	res, err := parser.ParseBinary(conn, "application-layer.socks5", "ClientNegotiation")
+//	if err != nil {
+//		return utils.Errorf("parse s5 negotiation failed: %s", err)
+//	}
+//	if clientNegotiation,ok := binparser.NodeToMap(res).(map[string]any); ok {
+//
+//	}else {
+//		return utils.Errorf("parse s5 negotiation failed: %s", err)
+//	}
+//
+//}
 
 func (c *S5Config) handshakeHandler(conn net.Conn) error {
 	// handle shake
-	var handshakeTimeout = 30 * time.Second
+	conn.SetReadDeadline(time.Now().Add(c.HandshakeTimeout))
 
-	conn.SetReadDeadline(time.Now().Add(handshakeTimeout))
 	var buf = make([]byte, 2)
+
 	if _, err := io.ReadFull(conn, buf); err != nil {
 		return utils.Errorf("handle shake header failed: %s", err)
 	}
