@@ -73,7 +73,7 @@ func withUseZoomeye(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "zoomeye"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("zoomeye", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -90,7 +90,7 @@ func withUseShodan(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "shodan"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("shodan", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -107,7 +107,7 @@ func withUseQuake(api ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "quake"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("quake", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
@@ -124,7 +124,7 @@ func withUseHunter(auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		c.engine = "hunter"
 		cfg := &base.BaseSpaceEngineConfig{}
-		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
+		err := consts.GetThirdPartyApplicationConfig("hunter", cfg)
 		if err != nil {
 			log.Errorf("load third party application config failed: %v", err)
 		}
