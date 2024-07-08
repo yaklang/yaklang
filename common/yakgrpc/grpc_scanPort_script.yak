@@ -49,8 +49,29 @@ if hosts == "" {
 hostTotal = len(str.ParseStringToHosts(str.Trim(hosts, ",")))
 portTotal = len(str.ParseStringToPorts(str.Trim(ports, ",")))
 allTasks = hostTotal*portTotal
-// yakit.StatusCard("扫描主机数", hostTotal)
-// yakit.StatusCard("扫描端口数", portTotal)
+
+
+yakit.StatusCard("单个IP扫描端口数", portTotal)
+
+aliveHost = 0
+aliveHostLock = sync.NewLock()
+addAliveHost = func() {
+    aliveHostLock.Lock()
+    defer aliveHostLock.Unlock()
+    aliveHost ++
+    yakit.StatusCard("存活主机数/扫描主机数",f"${aliveHost}/${hostTotal}")
+}
+
+openPort = 0
+openPortLock = sync.NewLock()
+addOpenPort = func() {
+    openPortLock.Lock()
+    defer openPortLock.Unlock()
+    openPort++
+    yakit.StatusCard("开放端口", openPort)
+}
+
+runningPluginOnce = sync.NewOnce()
 
 pingProgressLock = sync.NewLock()
 pingProgress = {
@@ -65,11 +86,6 @@ fingerPrintProgress =  {
     "doneTasks":0.0,
 }
 
-pluginProgressLock = sync.NewLock()
-pluginProgress = {
-    "title":"插件执行",
-    "doneTasks":0.0,
-}
 
 
 sendProgress = func(progressIns,lock,delta){
@@ -182,6 +198,9 @@ x.Foreach(scriptNames, func(e){
     println(e + " Is Loaded")
 })
 
+
+
+
 // handle Result
 handleMITMPluginCaller = func(crawlerReq) {
     defer func{
@@ -196,7 +215,7 @@ handleMITMPluginCaller = func(crawlerReq) {
     isHttps = x.If(str.HasPrefix(url, "https://"), true, false)
     rsp, _ = http.dumphead(rspIns)
     rsp = str.ReplaceHTTPPacketBody(rsp, body, false)
-    manager.MirrorHTTPFlowExSync(false, isHttps, url, req, rsp, body)
+    manager.MirrorHTTPFlowEx(false, isHttps, url, req, rsp, body)
 }
 
 handleCrawler = func(result) {
@@ -232,7 +251,6 @@ handleCrawler = func(result) {
             } ()
         }
         wg.Wait()
-        sendProgress(pluginProgress,pluginProgressLock,0.5)
     }
 }
 
@@ -273,6 +291,7 @@ handleFpResult = func(result) {
 	}
 
     if result.IsOpen() {
+        addOpenPort()
         addPortTableData(result.Target, result.Port, result.GetServiceName(), result.GetHtmlTitle())
         updateCounter(result.Target)
 	    yakit.Output({
@@ -298,13 +317,22 @@ handleFpResult = func(result) {
         println(result.String(protos))
     }
 
+
+    runningPluginOnce.Do(func(){
+        go func() {
+            for {
+                yakit.StatusCard("正在运行的插件数", manager.GetNativeCaller().GetWaitingEventCount())
+                sleep(2)
+            }
+        }()
+    })
+
 	go func(){
         defer func{
             err = recover()
             if err != nil { yakit.Error("call port-scan plugin failed: %s", err) }
         }
-        manager.GetNativeCaller().CallByNameSync("handle", result)
-        sendProgress(pluginProgress,pluginProgressLock,0.5)
+        manager.GetNativeCaller().CallByName("handle", result)
     }()
 
     go func{
@@ -318,7 +346,8 @@ getPingScan = func() {
         ping.timeout(hostAliveTimeout), ping.concurrent(hostAliveConcurrent), ping.onResult(func(i){
             if !(i.Ok) {
                 sendProgress(fingerPrintProgress,fingerPrintProgressLock,portTotal)
-                sendProgress(pluginProgress,pluginProgressLock,portTotal)
+            }else{
+                addAliveHost()
             }
             if i.Reason == "skipped"{
                 return
@@ -331,7 +360,6 @@ getPingScan = func() {
 status("扫描进行中")
 if mode == "fingerprint" {
     sendProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
-    sendProgress(pluginProgress,pluginProgressLock,0)
     res, err := servicescan.ScanFromPing(
         getPingScan(),
         ports, opts...)
@@ -382,12 +410,11 @@ if mode == "syn" {
         }
         result.Show()
     }
-    yakit.StatusCard("SYN 扫描完成")
+    yakit.StatusCard("","SYN 扫描完成")
 }
 
 if mode == "all" {
     sendProgress(fingerPrintProgress,fingerPrintProgressLock, 0)
-    sendProgress(pluginProgress,pluginProgressLock,0)
     startSYNPacketCounter()
     synResults, err := synscan.ScanFromPing(
         getPingScan(), ports,
@@ -458,7 +485,5 @@ status("等待插件执行中")
 yakit.Info("PortScan Finished Waiting for Plugin Results")
 println("PortScan Finished... Waiting Plugins")
 manager.Wait()
-if mode == "all" || mode == "fingerprint" {
-    sendProgress(pluginProgress,pluginProgressLock,hostTotal*portTotal)
-}
+yakit.StatusCard("正在运行的插件数", 0)
 status("扫描完成")
