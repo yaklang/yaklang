@@ -6,7 +6,7 @@ import (
 )
 
 func TestDecompiler(t *testing.T) {
-	classesContent, err := classes.FS.ReadFile("RuntimeExec.class")
+	classesContent, err := classes.FS.ReadFile("Demo.class")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,9 +14,9 @@ func TestDecompiler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := cf.Dump()
+	_, err = cf.Dump()
 	if err != nil {
 		t.Fatal(err)
 	}
-	println(source)
+	//println(source)
 }
