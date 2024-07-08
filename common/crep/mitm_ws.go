@@ -128,8 +128,11 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		return utils.Wrap(err, "parse port to int error")
 	}
 
-	var toClient, toServer *lowhttp.WebsocketClient
-	var isClientClosed, isServerClosed bool
+	var (
+		toClient, toServer             *lowhttp.WebsocketClient
+		isClientClosed, isServerClosed bool
+		upgradeRspIns                  *http.Response
+	)
 	_, _ = isClientClosed, isServerClosed
 
 	serverAllFrameCallbackFactory := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
@@ -139,7 +142,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			c.WritePong(data, true)
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			if isHijack {
-				b := w.websocketResponseHijackHandler(data, req, nil, time.Now().UnixNano())
+				b := w.websocketResponseHijackHandler(data, req, upgradeRspIns, time.Now().UnixNano())
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				go w.websocketResponseMirror(data)
@@ -165,7 +168,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			c.WritePong(data, true)
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			if isHijack {
-				b := w.websocketRequestHijackHandler(data, req, nil, time.Now().UnixNano())
+				b := w.websocketRequestHijackHandler(data, req, upgradeRspIns, time.Now().UnixNano())
 				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				go w.websocketRequestMirror(data)
@@ -201,6 +204,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			// write back to client
 			brw.Writer.Write(fixRspRaw)
 			brw.Flush()
+			upgradeRspIns = rsp
 			return fixRspRaw
 		}),
 		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallbackFactory),
