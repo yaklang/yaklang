@@ -21,6 +21,7 @@ func getShellCommand() (string, string, error) {
 	var (
 		finErr, err          error
 		shell                string
+		shellOpts            string
 		shellNames           []string
 		el                   string
 		needReplaceBackslash bool
@@ -34,6 +35,7 @@ func getShellCommand() (string, string, error) {
 	case "linux", "darwin":
 		el = "\n"
 		shellNames = []string{"bash", "sh"}
+		shellOpts = " -i"
 	default:
 		return "", "", utils.Errorf("unsupported os: %s", goos)
 	}
@@ -54,7 +56,7 @@ func getShellCommand() (string, string, error) {
 		// for windows
 		shell = strings.ReplaceAll(shell, "\\", "\\\\")
 	}
-	return shell, el, nil
+	return shell + shellOpts, el, nil
 }
 
 func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) error {
