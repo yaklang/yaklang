@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/twofa"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/twofa"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -116,7 +117,7 @@ func initYaklangLib() {
 	yaklang.Import("file", yaklib.FileExport)
 	yaklang.Import("filesys", filesys.Exports)
 	yaklang.Import("re", yaklib.RegexpExport)
-	yaklang.Import("re2", yaklib.RegexpExport)
+	yaklang.Import("re2", yaklib.Regexp2Export)
 	yaklang.Import("regen", yaklib.RegenExports)
 	yaklang.Import("env", yaklib.EnvExports)
 	// yaklang.Import("grok", yaklib.GrokExports)

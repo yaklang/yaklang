@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/dlclark/regexp2"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -84,38 +85,10 @@ func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
 		return r.cache, nil
 	}
 
-	opt := regexp2.ECMAScript | regexp2.Multiline
-	var rule string
-	if strings.HasPrefix(r.Rule, "(?") {
-		rightParenIndex := strings.IndexRune(r.Rule, ')')
-		modes := r.Rule[2:rightParenIndex]
-		for _, mode := range strings.Split(modes, "") {
-			switch mode {
-			case "i":
-				opt |= regexp2.IgnoreCase
-			case "s":
-				opt |= regexp2.Singleline
-			case "m":
-				opt |= regexp2.Multiline
-			case "n":
-				opt |= regexp2.ExplicitCapture
-			case "c":
-				opt |= regexp2.Compiled
-			case "x":
-				opt |= regexp2.IgnorePatternWhitespace
-			case "r":
-				opt |= regexp2.RightToLeft
-			}
-		}
-		rule = r.Rule[rightParenIndex+1:]
-	} else {
-		rule = r.Rule
-	}
-
-	re, err := regexp2.Compile(rule, regexp2.RegexOptions(opt))
+	rule, _, re, err := utils.Regexp2Compile(r.Rule)
 	if err != nil {
 		log.Debugf("regexp2 compile %v failed: %s", rule, err)
-		re, err = regexp2.Compile(regexp2.Escape(r.Rule), regexp2.RegexOptions(opt))
+		_, _, re, err = utils.Regexp2Compile(regexp2.Escape(r.Rule))
 		if err != nil {
 			return nil, err
 		} else {
@@ -442,38 +415,10 @@ func (m *mitmReplacer) getRule(r *ypb.MITMContentReplacer) *regexp2.Regexp {
 		return raw.(*regexp2.Regexp)
 	}
 
-	opt := regexp2.ECMAScript | regexp2.Multiline
-	var rule string
-	if strings.HasPrefix(r.Rule, "(?") {
-		rightParenIndex := strings.IndexRune(r.Rule, ')')
-		modes := r.Rule[2:rightParenIndex]
-		for _, mode := range strings.Split(modes, "") {
-			switch mode {
-			case "i":
-				opt |= regexp2.IgnoreCase
-			case "s":
-				opt |= regexp2.Singleline
-			case "m":
-				opt |= regexp2.Multiline
-			case "n":
-				opt |= regexp2.ExplicitCapture
-			case "c":
-				opt |= regexp2.Compiled
-			case "x":
-				opt |= regexp2.IgnorePatternWhitespace
-			case "r":
-				opt |= regexp2.RightToLeft
-			}
-		}
-		rule = r.Rule[rightParenIndex+1:]
-	} else {
-		rule = r.Rule
-	}
-
-	re, err := regexp2.Compile(rule, regexp2.RegexOptions(opt))
+	rule, _, re, err := utils.Regexp2Compile(r.Rule)
 	if err != nil {
 		log.Debugf("regexp2 compile %v failed: %s", rule, err)
-		re, err = regexp2.Compile(regexp2.Escape(r.Rule), regexp2.RegexOptions(opt))
+		_, _, re, err = utils.Regexp2Compile(regexp2.Escape(r.Rule))
 		if err != nil {
 			log.Debugf("regexp2 compile %v failed: %s", regexp2.Escape(r.Rule), err)
 			m._ruleRegexpCache.Store(r, nil)
