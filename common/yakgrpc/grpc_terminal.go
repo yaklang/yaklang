@@ -18,32 +18,43 @@ import (
 )
 
 func getShellCommand() (string, string, error) {
-	switch os := runtime.GOOS; os {
-	case "windows":
-		return "C:\\\\Windows\\\\system32\\\\cmd.exe /k", "\r\n", nil
-	case "linux", "darwin":
-		var (
-			finErr error
-			shell  string
-		)
-		for _, shellName := range []string{"bash", "sh"} {
-			cmd := exec.Command("which", shellName)
-			shellBytes, err := cmd.CombinedOutput()
-			if err == nil {
-				shell = strings.TrimSpace(string(shellBytes))
-				break
-			} else {
-				finErr = err
-			}
-		}
+	var (
+		finErr, err          error
+		shell                string
+		shellNames           []string
+		el                   string
+		needReplaceBackslash bool
+	)
 
-		if shell == "" && finErr != nil {
-			return "", "", utils.Errorf("failed to find shell: %s", finErr)
-		}
-		return shell, "\n", nil
+	switch goos := runtime.GOOS; goos {
+	case "windows":
+		el = "\r\n"
+		shellNames = []string{"powershell", "cmd"}
+		needReplaceBackslash = true
+	case "linux", "darwin":
+		el = "\n"
+		shellNames = []string{"bash", "sh"}
 	default:
-		return "", "", utils.Errorf("unsupported os: %s", os)
+		return "", "", utils.Errorf("unsupported os: %s", goos)
 	}
+
+	for _, shellName := range shellNames {
+		shell, err = exec.LookPath(shellName)
+		if err == nil {
+			break
+		} else {
+			finErr = err
+		}
+	}
+
+	if shell == "" && finErr != nil {
+		return "", "", utils.Errorf("failed to find shell: %s", finErr)
+	}
+	if needReplaceBackslash {
+		// for windows
+		shell = strings.ReplaceAll(shell, "\\", "\\\\")
+	}
+	return shell, el, nil
 }
 
 func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) error {
