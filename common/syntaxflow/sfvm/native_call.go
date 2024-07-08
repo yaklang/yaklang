@@ -1,6 +1,8 @@
 package sfvm
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type NativeCallFunc func(v ValueOperator, frame *SFFrame) (bool, ValueOperator, error)
 

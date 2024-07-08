@@ -635,7 +635,8 @@ func (v *Value) IsCalled() bool {
 	}
 
 	return len(v.GetUsers().Filter(func(value *Value) bool {
-		return value.IsCall()
+		called := value.IsCall()
+		return called
 	})) > 0
 }
 
@@ -647,10 +648,14 @@ func (v *Value) GetCalledBy() Values {
 	vs := make(Values, 0)
 	add := func(node ssa.Value) {
 		for _, user := range node.GetUsers() {
-			if call, ok := ssa.ToCall(user); ok &&
-				call != nil && call.Method != nil &&
-				call.Method.GetId() == node.GetId() {
-				vs = append(vs, v.NewValue(call))
+			if call, ok := ssa.ToCall(user); ok {
+				if call != nil && call.Method != nil {
+					methodId := call.Method.GetId()
+					nodeId := node.GetId()
+					if methodId != nodeId {
+						vs = append(vs, v.NewValue(call))
+					}
+				}
 			}
 		}
 	}
@@ -662,6 +667,7 @@ func (v *Value) GetCalledBy() Values {
 }
 
 // GetCallee desc any of 'Users' is Call
+// return the first Call, if `risk.New()`, GetCallee will return `risk.New`.
 func (v *Value) GetCallee() *Value {
 	if v.IsNil() {
 		return nil
