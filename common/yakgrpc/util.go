@@ -28,10 +28,11 @@ import (
 type OpenPortServerStreamerHelperRWC struct {
 	io.ReadWriteCloser
 
-	stream     ypb.Yak_OpenPortServer
-	rbuf       []byte
-	LocalAddr  string
-	RemoveAddr string
+	stream       ypb.Yak_OpenPortServer
+	rbuf         []byte
+	LocalAddr    string
+	RemoveAddr   string
+	sizeCallback func(width, height int)
 }
 
 func (c *OpenPortServerStreamerHelperRWC) Read(b []byte) (n int, _ error) {
@@ -42,6 +43,11 @@ func (c *OpenPortServerStreamerHelperRWC) Read(b []byte) (n int, _ error) {
 	}
 
 	msg, err := c.stream.Recv()
+	// control message
+	if c.sizeCallback != nil && msg.GetWidth() > 0 {
+		c.sizeCallback(int(msg.GetWidth()), int(msg.GetHeight()))
+		return 0, nil
+	}
 	if err != nil {
 		return 0, errors.Errorf("failed to recv from client stream: %s", err)
 	}
@@ -186,7 +192,6 @@ func newLocalClientEx(locals ...bool) (ypb.YakClient, error) {
 	if local || !utils.InGithubActions() {
 		var finalErr error
 		initLocalClientOnce.Do(func() {
-
 			port = utils.GetRandomAvailableTCPPort()
 			addr = utils.HostPort("127.0.0.1", port)
 			grpcTrans := grpc.NewServer(
