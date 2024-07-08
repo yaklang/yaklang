@@ -163,7 +163,7 @@ keywords
     | BoolLiteral
     ;
 
-opcodes: Call | Constant | Phi | FormalParam | Return;
+opcodes: Call | Constant | Phi | FormalParam | Return | Function;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -233,6 +233,7 @@ Else: 'else';
 Type: 'type';
 In: 'in';
 Call: 'call';
+Function: 'function';
 Constant: 'const' | 'constant';
 Phi: 'phi';
 FormalParam: 'param' | 'formal_param';
