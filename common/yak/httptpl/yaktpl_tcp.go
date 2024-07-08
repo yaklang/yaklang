@@ -16,6 +16,8 @@ type YakNetworkBulkConfig struct {
 
 	Matcher   *YakMatcher
 	Extractor []*YakExtractor
+
+	ReverseConnectionNeed bool
 }
 
 type YakTcpInput struct {
