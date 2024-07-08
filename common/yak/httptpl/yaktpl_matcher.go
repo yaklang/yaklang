@@ -1,7 +1,6 @@
 package httptpl
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -155,7 +154,7 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars m
 func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
-	var reverseProto []string
+	//var reverseProto []string
 
 	getMaterial := func() string {
 		if isExpr {
@@ -167,43 +166,23 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 
 		material, ok := matcherResponseCache.Get(scopeHash)
 		if !ok {
-			switch scope {
-			case "status", "status_code":
-				material = utils.InterfaceToString(lowhttp.ExtractStatusCodeFromResponse(rsp))
-			case "header":
-				header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
-				material = header
-			case "body":
-				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
-				material = string(body)
-			case "interactsh_protocol", "oob_protocol":
-				var oobTimeout float64
-				if config == nil || config.OOBTimeout <= 0 {
-					oobTimeout = 5
+			if material, ok = vars[scope].(string); !ok {
+				switch scope {
+				case "status", "status_code":
+					material = utils.InterfaceToString(lowhttp.ExtractStatusCodeFromResponse(rsp))
+				case "header":
+					header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
+					material = header
+				case "body":
+					_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
+					material = string(body)
+				//case "interactsh_protocol", "oob_protocol":
+				//	//material = vars
+				case "raw":
+					fallthrough
+				default:
+					material = string(rsp)
 				}
-				if config == nil {
-					log.Errorf("oob feature need config is nil")
-					return ""
-				}
-				if !utils.StringSliceContain(reverseProto, "dns") {
-					var checkingDNS func(string, ...float64) bool
-					if config == nil || config.OOBRequireCheckingTrigger == nil {
-						checkingDNS = CheckingDNSLogOOB
-					} else {
-						checkingDNS = config.OOBRequireCheckingTrigger
-					}
-					token, ok := vars["reverse_dnslog_token"]
-					if ok {
-						if checkingDNS(strings.ToLower(fmt.Sprint(token)), oobTimeout) {
-							reverseProto = append(reverseProto, "dns")
-						}
-					}
-				}
-				material = strings.Join(reverseProto, ",")
-			case "raw":
-				fallthrough
-			default:
-				material = string(rsp)
 			}
 		}
 		matcherResponseCache.Set(scopeHash, material)

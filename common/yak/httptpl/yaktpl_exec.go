@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -367,6 +368,12 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			for k, v := range varsInResponse {
 				runtimeVars[k] = v
 			}
+
+			if y.ReverseConnectionNeed {
+				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
+					InjectInteractshVar(v.Data, runtimeVars)
+				}
+			}
 			for _, extractor := range reqOrigin.Extractor {
 				if extractor.Id != 0 && extractor.Id != index+1 {
 					continue
@@ -407,4 +414,25 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		}
 	}
 	return responses, matchResults, extracted, count
+}
+
+func InjectInteractshVar(token string, vars map[string]any) {
+	interactsh_protocol := ""
+	interactsh_request := []byte("")
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token)
+	if err != nil {
+		log.Error("CheckDNSLogByToken failed: ", err)
+	}
+	HTTPLogEvents, err := yakit.CheckHTTPLogByToken(token)
+	if err != nil {
+		log.Error("CheckHTTPLogByToken failed: ", err)
+	}
+	if len(HTTPLogEvents) > 0 {
+		interactsh_protocol = "http"
+		interactsh_request = HTTPLogEvents[len(HTTPLogEvents)-1].Request
+	} else if len(DnsLogEvents) > 0 {
+		interactsh_protocol = "dns"
+	}
+	vars["interactsh_protocol"] = interactsh_protocol
+	vars["interactsh_request"] = interactsh_request
 }

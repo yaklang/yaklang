@@ -27,16 +27,17 @@ func parseNetworkInputs(data map[string]any) []*YakTcpInput {
 	return inputs
 }
 
-func parseNetworkBulk(ret []any) ([]*YakNetworkBulkConfig, error) {
+func parseNetworkBulk(ret []any, ReverseConnectionNeed bool) ([]*YakNetworkBulkConfig, error) {
 	var confs []*YakNetworkBulkConfig
 	for _, i := range utils.InterfaceToSliceInterface(ret) {
 		data := utils.InterfaceToGeneralMap(i)
 		inputs := parseNetworkInputs(data)
 		hosts := utils.InterfaceToStringSlice(utils.MapGetFirstRaw(data, "host", "hosts"))
 		network := &YakNetworkBulkConfig{
-			Inputs:   inputs,
-			Hosts:    hosts,
-			ReadSize: 2048,
+			Inputs:                inputs,
+			Hosts:                 hosts,
+			ReadSize:              2048,
+			ReverseConnectionNeed: ReverseConnectionNeed,
 		}
 		_ = network
 		readSize := utils.MapGetIntEx(data, "read-size", "read_size", "readSize", "readsize")

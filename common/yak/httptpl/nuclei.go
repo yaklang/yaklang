@@ -146,7 +146,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 				return nil, utils.Error("nuclei template `network` is not slice")
 			}
 			// network means tcp packets...
-			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret))
+			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret), yakTemp.ReverseConnectionNeed)
 			if err != nil {
 				return nil, utils.Errorf("parse network bulk failed: %v", err)
 			}
@@ -429,7 +429,7 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 		case "raw", "":
 			match.Scope = "raw"
 		case "interactsh_protocol", "oob_protocol":
-			match.Scope = "oob_protocol"
+			match.Scope = "interactsh_protocol"
 		}
 
 		switch utils.MapGetString(m, "type") {
