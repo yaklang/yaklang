@@ -85,7 +85,7 @@ func (s *SFFrame) ToRight() bool {
 	return !s.ToLeft()
 }
 
-func (s *SFFrame) withPredecessorContext(label string) AnalysisContextOption {
+func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 	s.predCounter++
 	return func(context *AnalysisContext) {
 		context.Step = s.predCounter
@@ -348,7 +348,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		s.debugSubLog("result next: %v", next.String())
-		_ = next.AppendPredecessor(value, s.withPredecessorContext("search "+i.UnaryStr))
+		_ = next.AppendPredecessor(value, s.WithPredecessorContext("search "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -388,7 +388,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", results.String())
-		_ = results.AppendPredecessor(value, s.withPredecessorContext("recursive search "+i.UnaryStr))
+		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 	case OpRecursiveSearchGlob:
@@ -431,7 +431,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", results.String())
-		_ = results.AppendPredecessor(value, s.withPredecessorContext("recursive search "+i.UnaryStr))
+		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 	case OpRecursiveSearchRegexp:
@@ -477,7 +477,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", results.String())
-		_ = results.AppendPredecessor(value, s.withPredecessorContext("recursive search "+i.UnaryStr))
+		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 	case OpPushSearchGlob:
@@ -503,7 +503,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
 		}
 		s.debugSubLog("result next: %v", next.String())
-		_ = next.AppendPredecessor(value, s.withPredecessorContext("search: "+i.UnaryStr))
+		_ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -532,7 +532,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			err = utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
 		}
 		s.debugSubLog("result next: %v", next.String())
-		_ = next.AppendPredecessor(value, s.withPredecessorContext("search: "+i.UnaryStr))
+		_ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -572,7 +572,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		callLen := valuesLen(results)
 		s.debugSubLog("- call Called: %v", results.String())
 		s.debugSubLog("<< push len: %v", callLen)
-		_ = results.AppendPredecessor(value, s.withPredecessorContext("call"))
+		_ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
 		s.stack.Push(results)
 
 	case OpGetCallArgs:
@@ -590,7 +590,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
 
-		_ = results.AppendPredecessor(value, s.withPredecessorContext("actual-args["+fmt.Sprint(i.UnaryInt)+"]"))
+		_ = results.AppendPredecessor(value, s.WithPredecessorContext("actual-args["+fmt.Sprint(i.UnaryInt)+"]"))
 		s.stack.Push(results)
 
 	case OpGetAllCallArgs:
@@ -607,7 +607,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("- get all argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
-		_ = results.AppendPredecessor(value, s.withPredecessorContext("all-actual-args"))
+		_ = results.AppendPredecessor(value, s.WithPredecessorContext("all-actual-args"))
 		s.stack.Push(results)
 
 	case OpGetUsers:

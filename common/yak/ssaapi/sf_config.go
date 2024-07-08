@@ -6,10 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var existedNativeCall = []string{
-	NativaCall_FormalParamToCall,
-}
-
 func WithSyntaxFlowConfig(
 	cb func(...OperationOption) Values,
 	opts ...*sf.RecursiveConfigItem,
