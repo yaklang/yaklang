@@ -97,6 +97,10 @@ func HunterQuery(key, query string, maxPage, pageSize, maxRecord int, domains ..
 	} else {
 		client = hunter.NewClient(key)
 	}
+	// too large page size will cause hunter 493 status code
+	if pageSize > 10 {
+		pageSize = 10
+	}
 
 	go func() {
 		defer close(ch)
