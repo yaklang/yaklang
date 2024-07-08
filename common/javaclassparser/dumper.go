@@ -1,7 +1,6 @@
 package javaclassparser
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
@@ -165,33 +164,11 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		c.Tab()
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
-				code += "\n"
-				instrNameList := []string{}
-				reader := bytes.NewReader(codeAttr.Code)
-				for {
-					b, err := reader.ReadByte()
-					if err != nil {
-						break
-					}
-					instr, ok := allInstr[b]
-					if !ok {
-						instrNameList = append(instrNameList, "-")
-					} else {
-						instrNameList = append(instrNameList, instr.name)
-					}
-					n := instr.length - 1
-					if n > 0 {
-						reader.Read(make([]byte, n))
-					}
+				sourceCode,err := ParseBytesCode(c,codeAttr)
+				if err != nil{
+					return nil, err
 				}
-				for i, s := range instrNameList {
-					code += strings.Repeat("\t", c.TabNumber()) + s
-					if i != len(instrNameList)-1 {
-						code += "\n"
-					}
-				}
-				//code += strings.Join(instrNameList, "\n")
-				code += "\n"
+				code = sourceCode
 			}
 		}
 		c.UnTab()
