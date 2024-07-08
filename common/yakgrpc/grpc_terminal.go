@@ -72,7 +72,10 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 	if err != nil {
 		return err
 	}
-	path := ""
+	var (
+		path          string
+		width, height int
+	)
 	if firstInput.GetPath() != "" {
 		path = firstInput.GetPath()
 	} else {
@@ -81,6 +84,11 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 			return err
 		}
 		path = p
+	}
+
+	if firstInput.GetWidth() != 0 && firstInput.GetHeight() != 0 {
+		width = int(firstInput.GetWidth())
+		height = int(firstInput.GetHeight())
 	}
 
 	// exec
@@ -96,6 +104,7 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 
 	ptmx, err := pty.New()
 	if err != nil {
+
 		// fallback
 		cmd := exec.CommandContext(ctx, commands[0], commands[1:]...)
 		stdin, _ := cmd.StdinPipe()
@@ -105,6 +114,13 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		cmd.Start()
 
 		terminal := term.NewTerminal(streamerRWC, "")
+		streamerRWC.sizeCallback = func(width, height int) {
+			terminal.SetSize(width, height)
+		}
+		if width > 0 && height > 0 {
+			terminal.SetSize(width, height)
+		}
+
 		go io.Copy(terminal, stdout)
 		go io.Copy(terminal, stderr)
 		for {
@@ -122,10 +138,16 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		}
 	} else {
 		defer ptmx.Close()
+		streamerRWC.sizeCallback = func(width, height int) {
+			ptmx.Resize(width, height)
+		}
+		if width > 0 && height > 0 {
+			ptmx.Resize(width, height)
+		}
 
 		go io.Copy(ptmx, streamerRWC) // stdin
 		go func() {
-			if runtime.GOOS == "windows" {
+			if runtime.GOOS == "windows" && strings.Contains(shell, "cmd.exe") {
 				// split the first output
 				buf := make([]byte, 4096)
 				n, err := ptmx.Read(buf)
