@@ -1528,34 +1528,49 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "yso:dnslog",
 		HandlerEx: func(s string) []*fuzztag.FuzzExecResult {
-			var getDomain func() string
+			var getDomain func(name string) string
 			sSplit := strings.Split(s, "|")
 			if len(sSplit) == 2 {
 				n := 0
-				getDomain = func() string {
+				getDomain = func(name string) string {
 					n++
 					return fmt.Sprintf("%s%d.%s", sSplit[1], n, sSplit[0])
 				}
 			} else {
-				getDomain = func() string {
-					return s
+				getDomain = func(name string) string {
+					return fmt.Sprintf("%s.%s", name, sSplit[0])
 				}
 			}
 			var result []*fuzztag.FuzzExecResult
 			pushNewResult := func(d []byte, verbose []string) {
 				result = append(result, fuzztag.NewFuzzExecResult(d, verbose))
 			}
-			for _, gadget := range yso.GetAllTemplatesGadget() {
-				domain := getDomain()
-				javaObj, err := gadget(yso.SetDnslogEvilClass(domain))
-				if javaObj == nil || err != nil {
-					continue
+			for _, gadgetInfo := range yso.YsoConfigInstance.Gadgets {
+				domain := getDomain(gadgetInfo.Name)
+				if gadgetInfo.IsTemplateImpl {
+					javaObj, err := yso.GenerateGadget(gadgetInfo.Name, "DNSLog", domain)
+					if javaObj == nil || err != nil {
+						continue
+					}
+					objBytes, err := yso.ToBytes(javaObj)
+					if err != nil {
+						continue
+					}
+					pushNewResult(objBytes, []string{javaObj.Verbose().GetNameVerbose(), "dnslog evil class", domain})
+				} else {
+					if gadgetInfo.Name == string(yso.GadgetFindAllClassesByDNS) {
+						continue
+					}
+					javaObj, err := yso.GenerateGadget(gadgetInfo.Name, "dnslog", domain)
+					if javaObj == nil || err != nil {
+						continue
+					}
+					objBytes, err := yso.ToBytes(javaObj)
+					if err != nil {
+						continue
+					}
+					pushNewResult(objBytes, []string{javaObj.Verbose().GetNameVerbose(), "dnslog by transform chain", domain})
 				}
-				objBytes, err := yso.ToBytes(javaObj)
-				if err != nil {
-					continue
-				}
-				pushNewResult(objBytes, []string{javaObj.Verbose().GetNameVerbose(), "dnslog evil class", domain})
 			}
 			if len(result) > 0 {
 				return result
