@@ -127,7 +127,10 @@ func init() {
 					vals = append(vals, callee)
 				}
 			default:
-				for _, call := range val.GetCalledBy() {
+				for _, call := range val.GetUsers() {
+					if call.getOpcode() != ssa.SSAOpcodeCall {
+						continue
+					}
 					if callee := call.GetCallee(); callee != nil {
 						callee.AppendPredecessor(v, frame.WithPredecessorContext("getFunc"))
 						vals = append(vals, callee)
@@ -238,10 +241,11 @@ func init() {
 			if !ok {
 				return nil
 			}
-			calls := val.GetCalledBy()
-			for _, call := range calls {
-				call.AppendPredecessor(v, frame.WithPredecessorContext("getCall"))
-				vals = append(vals, call)
+			for _, u := range val.GetUsers() {
+				if u.getOpcode() == ssa.SSAOpcodeCall {
+					u.AppendPredecessor(v, frame.WithPredecessorContext("getCall"))
+					vals = append(vals, u)
+				}
 			}
 			return nil
 		})
@@ -313,13 +317,13 @@ func init() {
 						})
 					}
 				default:
-					for _, call := range val.GetCalledBy() {
-						call.AppendPredecessor(val, frame.WithPredecessorContext("searchCall"))
-						funcIns := call.GetCallee()
-						name := funcIns.GetName()
-						log.Info(name)
-						vals = append(vals, call)
-					}
+					//for _, call := range val.GetCalledBy() {
+					//	call.AppendPredecessor(val, frame.WithPredecessorContext("searchCall"))
+					//	funcIns := call.GetCallee()
+					//	name := funcIns.GetName()
+					//	log.Info(name)
+					//	vals = append(vals, call)
+					//}
 				}
 			}
 			return nil

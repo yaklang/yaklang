@@ -652,7 +652,7 @@ func (v *Value) GetCalledBy() Values {
 				if call != nil && call.Method != nil {
 					methodId := call.Method.GetId()
 					nodeId := node.GetId()
-					if methodId != nodeId {
+					if methodId == nodeId {
 						vs = append(vs, v.NewValue(call))
 					}
 				}
