@@ -575,6 +575,9 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 	switch typKind {
 	case ssa.FunctionTypeKind:
 		desc, _ = getFuncDeclAndDocBySSAValue(name, v)
+		if !strings.HasPrefix(desc, "```") {
+			desc = fmt.Sprintf("```go\n%s\n```", desc)
+		}
 	case ssa.StructTypeKind:
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
 		if !ok {
