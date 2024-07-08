@@ -1,6 +1,8 @@
 package php
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
@@ -17,14 +19,9 @@ $c=$a.$s.$_GET["func2"];
 $c($fun);
 `
 	_ = code
-	//	ssatest.CheckSyntaxFlow(t, code,
-	//		`
-	//*_GET[*] --> * as $func
-	//$func(* as $input) as $sink
-	//
-	//check $sink then "ok" else "no"
-	//`,
-	//		map[string][]string{},
-	//		ssaapi.WithLanguage(ssaapi.PHP),
-	//	)
+	ssatest.CheckSyntaxFlow(t, code,
+		"*_GET[*] -{until: `* ?{opcode:call}`}-> * as $func",
+		map[string][]string{"func": {`add("as", Undefined-$_GET."func2"(valid))(Function-base64_decode(Undefined-$_GET.'func'(valid)))`, `Function-base64_decode(Undefined-$_GET.'func'(valid))`}},
+		ssaapi.WithLanguage(ssaapi.PHP),
+	)
 }

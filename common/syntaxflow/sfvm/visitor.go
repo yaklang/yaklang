@@ -201,6 +201,8 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeParameter])
 			case "return":
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeReturn])
+			case "function":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeFunction])
 			default:
 				log.Errorf("unknown opcode: %s", opcode.GetText())
 			}

@@ -126,7 +126,7 @@ func TestSyntaxInOne(t *testing.T) {
 		"exec(* #-> ?{(any: 'example',abc,)})",
 		"exec(* #-> ?{((any: 'example',abc,) && (opcode: call,phi))})",
 		"exec(* #-> ?{(any: 'example',abc,) && (opcode: call,phi)})",
-		"exec(* #-> ?{((any: 'example',abc,) && (opcode: phi))})",
+		"exec(* #-> ?{((any: 'example',abc,) && (opcode: phi,function))})",
 		"a...b",
 		"a...b.ccc()...e",
 	} {
