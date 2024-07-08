@@ -218,6 +218,13 @@ type YakToCallerManager struct {
 	ContextCancelFuncs *sync.Map
 }
 
+func (c *YakToCallerManager) GetWaitingEventCount() int {
+	if c.swg != nil {
+		return int(c.swg.WaitingEventCount.Load())
+	}
+	return 0
+}
+
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
 	c.loadTimeout = time.Duration(i * float64(time.Second))
 }
