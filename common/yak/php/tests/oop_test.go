@@ -29,10 +29,10 @@ println($$b::$my_static . PHP_EOL); // dynamic variable
 
 ?>    
 	`, []string{
-			"add(\"foo\", Parameter-PHP_EOL)",
-			"add(\"foo\", Parameter-PHP_EOL)",
-			"add(\"foo\", Parameter-PHP_EOL)",
-			"add(\"foo\", Parameter-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
 		}, t)
 
 	})
@@ -48,7 +48,7 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`, []string{
-			"add(Undefined-Foo_my_static, Parameter-PHP_EOL)",
+			"add(Undefined-Foo_my_static, Undefined-PHP_EOL)",
 		}, t)
 	})
 
@@ -66,7 +66,7 @@ println(Foo::$my_static . PHP_EOL);
 	`
 		ssatest.CheckPrintlnValue(
 			code, []string{
-				"add(\"foo\", Parameter-PHP_EOL)",
+				"add(\"foo\", Undefined-PHP_EOL)",
 			}, t)
 	})
 
