@@ -2,11 +2,11 @@ package yaklib
 
 import (
 	"fmt"
+
 	"github.com/dlclark/regexp2"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 func re2Find(data interface{}, text string) string {
@@ -53,7 +53,7 @@ func re2FindSubmatch(i interface{}, rule string) []string {
 		log.Error(err)
 		return nil
 	}
-	var result = make([]string, match.GroupCount())
+	result := make([]string, match.GroupCount())
 	for index, g := range match.Groups() {
 		result[index] = g.String()
 	}
@@ -86,21 +86,8 @@ func re2FindSubmatchAll(i interface{}, raw string) [][]string {
 }
 
 func re2Compile(rawRule string) (*regexp2.Regexp, error) {
-	opt := regexp2.ECMAScript | regexp2.Multiline
-	var rule string
-	if strings.HasPrefix(rawRule, "(?i)") {
-		rule = rawRule[4:]
-		opt |= regexp2.IgnoreCase
-	} else if strings.HasPrefix(rawRule, `(?s)`) {
-		rule = rawRule[4:]
-		opt |= regexp2.Singleline
-	} else if strings.HasPrefix(rawRule, `(?si)`) || strings.HasPrefix(rawRule, `(?si)`) {
-		rule = rawRule[5:]
-		opt |= regexp2.Singleline | regexp2.IgnoreCase
-	} else {
-		rule = rawRule
-	}
-	return regexp2.Compile(rule, regexp2.RegexOptions(opt))
+	_, _, pattern, err := utils.Regexp2Compile(rawRule)
+	return pattern, err
 }
 
 func re2ReplaceAll(i interface{}, pattern string, target string) string {
@@ -170,7 +157,7 @@ func re2ExtractGroupsAll(i interface{}, raw string) []map[string]string {
 	}
 
 	for {
-		var result = make(map[string]string)
+		result := make(map[string]string)
 		result["__all__"] = match.String()
 		for _, value := range match.Groups() {
 			if value.Name == "" {
@@ -194,7 +181,8 @@ var Regexp2Export = map[string]interface{}{
 	"QuoteMeta": regexp2.Escape,
 	"Compile":   re2Compile,
 	"CompileWithOption": func(rule string, opt int) (*regexp2.Regexp, error) {
-		return regexp2.Compile(rule, regexp2.RegexOptions(opt))
+		_, _, pattern, err := utils.Regexp2Compile(rule, opt)
+		return pattern, err
 	},
 	"OPT_None":                    regexp2.None,
 	"OPT_IgnoreCase":              regexp2.IgnoreCase,
