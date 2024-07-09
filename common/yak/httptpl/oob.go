@@ -1,9 +1,12 @@
 package httptpl
 
 import (
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"strings"
 	"time"
 )
 
@@ -27,14 +30,23 @@ func RequireOOBAddr(timeout ...float64) (string, string, error) {
 	return "", "", utils.Errorf("get dnslog domain failed")
 }
 
-func CheckingDNSLogOOB(token string, timeout ...float64) bool {
-	logs, err := yakit.CheckDNSLogByToken(token, timeout...)
+func CheckingDNSLogOOB(token string, timeout ...float64) (string, []byte) {
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, timeout...)
 	if err != nil {
-		log.Error("checking oob-dnslog by token: " + token + " failed: " + err.Error())
-		return false
+		log.Error("CheckDNSLogByToken failed: ", err)
 	}
-	if len(logs) > 0 {
-		return true
+	HTTPLogEvents, err := yakit.CheckHTTPLogByToken(token, timeout...)
+	if err != nil {
+		log.Error("CheckHTTPLogByToken failed: ", err)
 	}
-	return false
+
+	var request []byte
+
+	if len(HTTPLogEvents) > 0 {
+		request = HTTPLogEvents[len(HTTPLogEvents)-1].Request
+	}
+
+	return strings.Join(lo.Uniq(lo.Map(DnsLogEvents, func(item *tpb.DNSLogEvent, index int) string {
+		return item.Type
+	})), ","), request
 }
