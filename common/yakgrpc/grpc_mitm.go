@@ -669,7 +669,40 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 保存到数据库
-		wshash := utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
+		isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
+		wshash := httpctx.GetWebsocketRequestHash(req)
+		if wshash == "" {
+			wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
+		}
+
+		_, ok := websocketHashCache.Load(wshash)
+		if !ok {
+			// 证明这是新的 wshash
+			// 在这儿可以给数据库增加一个记录了
+			websocketHashCache.Store(wshash, true)
+			httpctx.SetWebsocketRequestHash(req, wshash)
+
+			flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
+				isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
+			)
+			if err != nil {
+				log.Errorf("httpflow failed: %s", err)
+			}
+			if flow != nil {
+				flow.IsWebsocket = true
+				flow.WebsocketHash = wshash
+				flow.HiddenIndex = wshash
+				flow.Hash = flow.CalcHash()
+				//err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+				//if err != nil {
+				//	log.Errorf("create / save httpflow(websocket) error: %s", err)
+				//}
+				err := yakit.InsertHTTPFlowEx(flow)
+				if err != nil {
+					log.Errorf("create / save httpflow(websocket) error: %s", err)
+				}
+			}
+		}
 		err := yakit.SaveFromServerWebsocketFlow(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:])
 		if err != nil {
 			log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -695,7 +728,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		defer func() {
 			controller.finishHijack(taskID)
 		}()
-		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 
 		wsReq := getPlainRequestBytes(req)
 		responseCounter := time.Now().UnixNano()
@@ -996,12 +1028,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
 		}
-		wshash := utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
+		wshash := httpctx.GetWebsocketRequestHash(req)
+		if wshash == "" {
+			wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
+		}
 		_, ok := websocketHashCache.Load(wshash)
 		if !ok {
 			// 证明这是新的 wshash
 			// 在这儿可以给数据库增加一个记录了
 			websocketHashCache.Store(wshash, true)
+			httpctx.SetWebsocketRequestHash(req, wshash)
 
 			flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
 				isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
@@ -1606,7 +1642,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		} else {
 			saveBarePacketHandler()
 		}
-
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig

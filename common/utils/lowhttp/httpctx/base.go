@@ -290,6 +290,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile     = "ResponseTooLargeBodyFile"
 	REQUEST_CONTEXT_KEY_ResponseBodySize             = "ResponseBodySize"
 	REQUEST_CONTEXT_KEY_MatchedRules                 = "MatchedRules"
+	REQUEST_CONTEXT_KEY_WebsocketRequestHash         = "websocketRequestHash"
 )
 
 func SetResponseBodySize(req *http.Request, i int64) {
@@ -636,4 +637,12 @@ func SetResponseTraceInfo(req *http.Request, info any) {
 func GetResponseTraceInfo(req *http.Request) any {
 	// could not assert to *lowhttp.LowhttpTraceInfo, because of circular import
 	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTraceInfo)
+}
+
+func GetWebsocketRequestHash(r *http.Request) string {
+	return GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_WebsocketRequestHash)
+}
+
+func SetWebsocketRequestHash(r *http.Request, hash string) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_WebsocketRequestHash, hash)
 }
