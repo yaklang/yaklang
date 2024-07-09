@@ -85,13 +85,11 @@ func (y *YakNetworkBulkConfig) handleConn(
 				bufferSize = y.ReadSize
 			}
 			response := utils.StableReaderEx(conn, 5*time.Second, bufferSize)
-
 			if y.ReverseConnectionNeed {
 				if token, ok := vars["reverse_dnslog_token"].(string); ok {
 					InjectInteractshVar(token, vars)
 				}
 			}
-
 			for _, extractor := range y.Extractor {
 				extractorVars, err := extractor.Execute(response, vars)
 				if err != nil {

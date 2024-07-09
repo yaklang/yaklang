@@ -155,7 +155,8 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars m
 func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
-	var reverseProto []string
+	var interactsh_protocol = utils.InterfaceToString(vars["interactsh_protocol"])
+	var interactsh_request = utils.InterfaceToString(vars["interactsh_request"])
 
 	getMaterial := func() string {
 		if isExpr {
@@ -177,33 +178,58 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
 				material = string(body)
 			case "interactsh_protocol", "oob_protocol":
-				var oobTimeout float64
-				if config == nil || config.OOBTimeout <= 0 {
-					oobTimeout = 5
-				}
-				if config == nil {
-					log.Errorf("oob feature need config is nil")
-					return ""
-				}
-				if !utils.StringSliceContain(reverseProto, "dns") {
-					var checkingDNS func(string, ...float64) bool
-					if config == nil || config.OOBRequireCheckingTrigger == nil {
-						if material, ok = vars[scope].(string); !ok {
-							checkingDNS = CheckingDNSLogOOB
-						}
-					} else {
-						checkingDNS = config.OOBRequireCheckingTrigger
+				if interactsh_protocol != "" {
+					material = interactsh_protocol
+				} else {
+					material = ""
+					var oobTimeout float64
+					if config == nil || config.OOBTimeout <= 0 {
+						oobTimeout = 5
 					}
-					if checkingDNS != nil {
+					if config == nil {
+						log.Errorf("oob feature need config is nil")
+						return ""
+					}
+					var checkingInteractsh func(string, ...float64) (string, []byte)
+					if config == nil || config.OOBRequireCheckingTrigger == nil {
+						checkingInteractsh = CheckingDNSLogOOB // if not set, use default func try get
+					} else {
+						checkingInteractsh = config.OOBRequireCheckingTrigger
+					}
+					if checkingInteractsh != nil {
 						token, ok := vars["reverse_dnslog_token"]
 						if ok {
-							if checkingDNS(strings.ToLower(fmt.Sprint(token)), oobTimeout) {
-								reverseProto = append(reverseProto, "dns")
-							}
+							material, _ = checkingInteractsh(strings.ToLower(fmt.Sprint(token)), oobTimeout)
 						}
 					}
 				}
-				material = strings.Join(reverseProto, ",")
+			case "interactsh_request":
+				if interactsh_request != "" {
+					material = interactsh_request
+				} else {
+					material = ""
+					var oobTimeout float64
+					if config == nil || config.OOBTimeout <= 0 {
+						oobTimeout = 5
+					}
+					if config == nil {
+						log.Errorf("oob feature need config is nil")
+						return ""
+					}
+					var checkingInteractsh func(string, ...float64) (string, []byte)
+					if config == nil || config.OOBRequireCheckingTrigger == nil {
+						checkingInteractsh = CheckingDNSLogOOB // if not set, use default func try get
+					} else {
+						checkingInteractsh = config.OOBRequireCheckingTrigger
+					}
+					if checkingInteractsh != nil {
+						token, ok := vars["reverse_dnslog_token"]
+						if ok {
+							_, request := checkingInteractsh(strings.ToLower(fmt.Sprint(token)), oobTimeout)
+							material = string(request)
+						}
+					}
+				}
 			case "raw":
 				fallthrough
 			default:

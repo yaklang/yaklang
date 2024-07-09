@@ -2,6 +2,8 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/url"
 	"strings"
@@ -358,6 +360,11 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		for _, reqRaw := range reqs {
 			atomic.AddInt64(&count, 1)
 			rsp, err := sender([]byte(reqRaw), req)
+			if y.ReverseConnectionNeed { //check token even if send error
+				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
+					InjectInteractshVar(v.Data, runtimeVars)
+				}
+			}
 			if err == nil {
 				responses = append(responses, rsp)
 			} else {
@@ -369,11 +376,6 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				runtimeVars[k] = v
 			}
 
-			if y.ReverseConnectionNeed {
-				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
-					InjectInteractshVar(v.Data, runtimeVars)
-				}
-			}
 			for _, extractor := range reqOrigin.Extractor {
 				if extractor.Id != 0 && extractor.Id != index+1 {
 					continue
@@ -417,8 +419,6 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 }
 
 func InjectInteractshVar(token string, vars map[string]any) {
-	interactsh_protocol := ""
-	interactsh_request := []byte("")
 	DnsLogEvents, err := yakit.CheckDNSLogByToken(token)
 	if err != nil {
 		log.Error("CheckDNSLogByToken failed: ", err)
@@ -427,12 +427,11 @@ func InjectInteractshVar(token string, vars map[string]any) {
 	if err != nil {
 		log.Error("CheckHTTPLogByToken failed: ", err)
 	}
+	vars["interactsh_protocol"] = strings.Join(lo.Uniq(lo.Map(DnsLogEvents, func(item *tpb.DNSLogEvent, index int) string {
+		return item.Type
+	})), ",")
 	if len(HTTPLogEvents) > 0 {
-		interactsh_protocol = "http"
-		interactsh_request = HTTPLogEvents[len(HTTPLogEvents)-1].Request
-	} else if len(DnsLogEvents) > 0 {
-		interactsh_protocol = "dns"
+		vars["interactsh_request"] = HTTPLogEvents[len(HTTPLogEvents)-1].Request
 	}
-	vars["interactsh_protocol"] = interactsh_protocol
-	vars["interactsh_request"] = interactsh_request
+	vars["interactsh_request"] = ""
 }
