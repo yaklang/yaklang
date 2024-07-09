@@ -17,6 +17,7 @@ const (
 	RecursiveConfig_DepthMax                    = "depth_max"
 	RecursiveConfig_Exclude                     = "exclude"
 	RecursiveConfig_Until                       = "until"
+	RecursiveConfig_Hook                        = "hook"
 )
 
 func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
@@ -31,6 +32,8 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 		return RecursiveConfig_Exclude
 	case "until":
 		return RecursiveConfig_Until
+	case "hook":
+		return RecursiveConfig_Hook
 	default:
 		log.Warnf("unknown recursive config key: %s", i)
 	}
@@ -116,8 +119,8 @@ type ValueOperator interface {
 	GetSyntaxFlowUse() (ValueOperator, error)
 	GetSyntaxFlowDef() (ValueOperator, error)
 	// top and bottom
-	GetSyntaxFlowTopDef(...*RecursiveConfigItem) (ValueOperator, error)
-	GetSyntaxFlowBottomUse(...*RecursiveConfigItem) (ValueOperator, error)
+	GetSyntaxFlowTopDef(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
+	GetSyntaxFlowBottomUse(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
 
 	// ListIndex for OpListIndex, like a[1] a must be list...
 	ListIndex(i int) (ValueOperator, error)

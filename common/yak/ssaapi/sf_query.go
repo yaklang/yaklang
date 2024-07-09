@@ -90,3 +90,21 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Optio
 		symbol:        make(map[string]Values),
 	}, err
 }
+
+func SyntaxFlowWithOldEnv(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
+	if utils.IsNil(p) {
+		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
+	}
+	vm := sfvm.NewSyntaxFlowVirtualMachine()
+	vm.SetConfig(sfConfig)
+	frame, err := vm.Compile(sfCode)
+	if err != nil {
+		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
+	}
+	frame.SetSFResult(sfResult)
+	res, err := frame.Feed(p)
+	return &SyntaxFlowResult{
+		SFFrameResult: res,
+		symbol:        make(map[string]Values),
+	}, err
+}

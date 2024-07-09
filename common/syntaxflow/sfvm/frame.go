@@ -66,7 +66,9 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 }
 
 func (s *SFFrame) Flush() {
-	s.result = NewSFResult(s.Text)
+	if s.result == nil {
+		s.result = NewSFResult(s.Text) // TODO: This code affects the reentrancy of the function
+	}
 	s.stack = utils.NewStack[ValueOperator]()
 	s.filterExprStack = utils.NewStack[*filterExprContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
@@ -101,6 +103,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 
 	// clear
 	s.Flush()
+
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)
@@ -630,7 +633,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get bottom uses failed, empty stack")
 		}
 		s.debugSubLog("- call BottomUses")
-		vals, err := value.GetSyntaxFlowBottomUse(i.SyntaxFlowConfig...)
+		vals, err := value.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
@@ -656,7 +659,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
-		vals, err := value.GetSyntaxFlowTopDef(i.SyntaxFlowConfig...)
+		vals, err := value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
@@ -998,4 +1001,8 @@ func (s *SFFrame) debugSubLog(i string, item ...any) {
 		result.WriteString(prefix + line)
 	}
 	s.debugLog(result.String())
+}
+
+func (s *SFFrame) SetSFResult(sfResult *SFFrameResult) {
+	s.result = sfResult
 }

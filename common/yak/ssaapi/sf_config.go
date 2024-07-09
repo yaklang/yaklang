@@ -7,6 +7,8 @@ import (
 )
 
 func WithSyntaxFlowConfig(
+	sfResult *sf.SFFrameResult,
+	config *sf.Config,
 	cb func(...OperationOption) Values,
 	opts ...*sf.RecursiveConfigItem,
 ) Values {
@@ -25,7 +27,8 @@ func WithSyntaxFlowConfig(
 			if !op.SyntaxFlowRule {
 				return utils.Error("exclude value must be a syntaxFlow rule")
 			}
-			res, err := SyntaxFlowWithError(value, op.Value)
+			//res,err := SyntaxFlowWithError(value,op.Value)
+			res, err := SyntaxFlowWithOldEnv(value, op.Value, sfResult, config)
 			if err != nil {
 				return err
 			}
@@ -73,6 +76,10 @@ func WithSyntaxFlowConfig(
 				return nil
 			})
 			useResult = true
+		case sf.RecursiveConfig_Hook:
+			runSyntaxFlow(op, func(m map[string]Values, v *Value) error {
+				return nil
+			})
 		}
 	}
 
