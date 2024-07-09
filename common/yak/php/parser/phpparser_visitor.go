@@ -316,9 +316,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#BackQuoteStringExpression.
 	VisitBackQuoteStringExpression(ctx *BackQuoteStringExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#MemberCallExpression.
-	VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#ArrayCreationUnpackExpression.
 	VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{}
 
@@ -421,8 +418,8 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
 	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#leftVariable.
-	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+	// Visit a parse tree produced by PHPParser#flexiVariable.
+	VisitFlexiVariable(ctx *FlexiVariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#defineExpr.
 	VisitDefineExpr(ctx *DefineExprContext) interface{}

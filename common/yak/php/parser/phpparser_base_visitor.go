@@ -419,10 +419,6 @@ func (v *BasePHPParserVisitor) VisitBackQuoteStringExpression(ctx *BackQuoteStri
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -559,7 +555,7 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+func (v *BasePHPParserVisitor) VisitFlexiVariable(ctx *FlexiVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

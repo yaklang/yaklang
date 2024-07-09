@@ -38,11 +38,23 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	}
 	obj.SetType(class)
 
-	constructor := class.Constructor
+	findConstructor := func(class *ssa.ClassBluePrint) ssa.Value {
+		tmpClass := class
+		for {
+			if tmpClass.Constructor != nil {
+				return tmpClass.Constructor
+			}
+			if len(tmpClass.ParentClass) != 0 {
+				tmpClass = class.ParentClass[0]
+			} else {
+				return nil
+			}
+		}
+	}
+	constructor := findConstructor(class)
 	if constructor == nil {
 		return obj
 	}
-
 	args := []ssa.Value{obj}
 	ellipsis := false
 	if i.Arguments() != nil {
@@ -104,6 +116,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 
 			class := y.CreateClassBluePrint(className)
 			if parentClass := y.GetClassBluePrint(parentClassName); parentClass != nil {
+				//感觉在ssa-classBlue中做更好，暂时修复
 				class.AddParentClass(parentClass)
 			}
 			for _, statement := range i.AllClassStatement() {
@@ -204,6 +217,9 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		case "__construct":
 			newFunction := createFunction()
 			class.Constructor = newFunction
+		case "__destruct":
+			function := createFunction()
+			class.Destructor = function
 		default:
 			newFunction := createFunction()
 			if isStatic {
