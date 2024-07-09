@@ -217,6 +217,9 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 		return false
 	}
 
+	if instIr.irCode.Opcode == 0 {
+		log.Errorf("BUG: saveInstruction called with empty opcode: %v", instIr.inst.GetName())
+	}
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}

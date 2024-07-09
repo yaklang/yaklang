@@ -274,3 +274,11 @@ func TestNumber(t *testing.T) {
 	}
 	prog.Show()
 }
+
+func TestTemplateString(t *testing.T) {
+	prog, err := ParseSSA("a = 12; print(`aaa${a}bbb`)")
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
+	prog.Show()
+}

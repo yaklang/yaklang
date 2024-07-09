@@ -678,3 +678,11 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 		}, t)
 	})
 }
+
+func TestTemplateString(t *testing.T) {
+	prog, err := ssaapi.Parse("a = 12; print(f`aaa${a}bbb`)", ssaapi.WithLanguage(ssaapi.Yak))
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
+	prog.Show()
+}
