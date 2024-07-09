@@ -2,17 +2,39 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+type YakHttpFlowMatcher struct { // Added some display fields
+	Matcher *YakMatcher
+	Color   string
+}
+
+func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakHttpFlowMatcher {
+	return &YakHttpFlowMatcher{
+		Matcher: &YakMatcher{
+			MatcherType:         m.GetMatcherType(),
+			ExprType:            m.GetExprType(),
+			Scope:               m.GetScope(),
+			Condition:           m.GetCondition(),
+			Group:               m.GetGroup(),
+			GroupEncoding:       m.GetGroupEncoding(),
+			Negative:            m.GetNegative(),
+			SubMatcherCondition: m.GetSubMatcherCondition(),
+			SubMatchers:         funk.Map(m.GetSubMatchers(), NewMatcherFromGRPCModel).([]*YakMatcher),
+		},
+		Color: m.GetHitColor(),
+	}
+}
 
 func NewMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakMatcher {
 	return &YakMatcher{
