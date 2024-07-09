@@ -179,6 +179,7 @@ type Program struct {
 	irProgram      *ssadb.IrProgram // from database program
 
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
+	FileList    map[string]string // file-name and file hash
 	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]
 
 	Cache *Cache

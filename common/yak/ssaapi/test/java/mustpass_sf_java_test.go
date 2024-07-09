@@ -27,7 +27,7 @@ func Test_Debug(t *testing.T) {
 	progs, err := ssaapi.ParseProject(
 		filesys.NewEmbedFS(sample_code),
 		ssaapi.WithLanguage(ssaapi.JAVA),
-		ssaapi.WithDatabaseProgramName(programID),
+		// ssaapi.WithDatabaseProgramName(programID),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -35,7 +35,7 @@ func Test_Debug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse project error: %v", err)
 	}
-	Check(t, progs, "groovy_eval.sf")
+	Check(t, progs, "jseval.sf")
 }
 
 func TestCheckRuleInSource(t *testing.T) {

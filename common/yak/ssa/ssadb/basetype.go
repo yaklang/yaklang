@@ -11,14 +11,14 @@ import (
 )
 
 // type Int64Map map[int64]int64
-type item struct {
-	key, value int64
+type item[T any] struct {
+	key, value T
 }
 
-type Int64Map []item
+type Int64Map []item[int64]
 
 func (m *Int64Map) Append(key, value int64) {
-	*m = append(*m, item{key, value})
+	*m = append(*m, item[int64]{key, value})
 }
 
 func (m Int64Map) ForEach(fn func(key, value int64)) {
@@ -33,7 +33,7 @@ func (m *Int64Map) Scan(value any) error {
 	}
 	val := codec.AnyToString(value)
 	subVal := strings.Split(val, ",")
-	nm := make([]item, 0, len(subVal))
+	nm := make(Int64Map, 0, len(subVal))
 	for _, sub := range subVal {
 		subVals := strings.Split(sub, ":")
 		if len(subVals) != 2 {
@@ -47,7 +47,7 @@ func (m *Int64Map) Scan(value any) error {
 		if err != nil {
 			continue
 		}
-		nm = append(nm, item{nmKey, nmVal})
+		nm.Append(nmKey, nmVal)
 	}
 	*m = nm
 	return nil
@@ -138,4 +138,52 @@ func (ss *StringSlice) Scan(value interface{}) error {
 
 func (us StringSlice) Value() (driver.Value, error) {
 	return strings.Join(us, ","), nil
+}
+
+type StringMap []item[string]
+
+func CoverStringMap(m map[string]string) StringMap {
+	var sm StringMap
+	for k, v := range m {
+		sm.Append(k, v)
+	}
+	return sm
+}
+
+func CoverStringMapToMap(m StringMap) map[string]string {
+	res := make(map[string]string)
+	for _, item := range m {
+		res[item.key] = item.value
+	}
+	return res
+}
+
+func (m *StringMap) Append(key, value string) {
+	*m = append(*m, item[string]{key, value})
+}
+
+func (m StringMap) Value() (driver.Value, error) {
+	var parts []string
+	for _, item := range m {
+		parts = append(parts, item.key+":"+item.value)
+	}
+	return strings.Join(parts, ","), nil
+}
+
+func (m *StringMap) Scan(value any) error {
+	if m == nil {
+		return nil
+	}
+	val := codec.AnyToString(value)
+	subVal := strings.Split(val, ",")
+	nm := make(StringMap, 0, len(subVal))
+	for _, sub := range subVal {
+		subVals := strings.Split(sub, ":")
+		if len(subVals) != 2 {
+			continue
+		}
+		nm.Append(subVals[0], subVals[1])
+	}
+	*m = nm
+	return nil
 }

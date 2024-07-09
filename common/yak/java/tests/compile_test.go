@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -288,5 +289,94 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	if slices.Contains(programsInIrProgram, pkgName) {
 		t.Fatalf("package %s should not be in the ir-program table", pkgName)
 	}
+
+}
+
+func TestCompileProgram_MultipleFileInLibrary(t *testing.T) {
+	pkgName := "a" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	ssadb.DeleteProgram(ssadb.GetDB(), pkgName)
+	vf := filesys.NewVirtualFs()
+	vf.AddDir("org/main")
+	vf.AddFile("org/main/Main.java", fmt.Sprintf(`
+	package %s;
+	public class Main {
+		public static void main(String[] args) {
+			int a = 1;
+		}
+	}
+	`, pkgName))
+	vf.AddFile("org/main/Utils.java", fmt.Sprintf(`
+	package %s;
+	public class Utils {
+		public static void A() {
+			int a = 2;
+		}
+	}
+	`, pkgName))
+
+	downStream := []string{}
+	defer func() {
+		for _, programID := range downStream {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		}
+	}()
+	pkgFileLen := 2
+
+	check := func(programID string, want []string) {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		prog, err := ssaapi.ParseProject(
+			vf,
+			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithDatabaseProgramName(programID),
+		)
+		assert.NoError(t, err)
+		// prog.Show()
+		_ = prog
+
+		downStream = append(downStream, programID)
+		irProg, err := ssadb.GetProgram(pkgName, ssa.Library)
+		assert.NoError(t, err)
+		assert.Equal(t, downStream, []string(irProg.DownStream))
+		assert.Equal(t, len(irProg.FileList), pkgFileLen)
+
+		{
+			prog, err := ssaapi.FromDatabase(programID)
+			assert.NoError(t, err)
+			_ = prog
+			res, err := prog.SyntaxFlowWithError(`a as $a`, sfvm.WithEnableDebug())
+			assert.NoError(t, err)
+			assert.Equal(t,
+				want,
+				lo.Map(
+					res.GetValues("a"),
+					func(v *ssaapi.Value, _ int) string { return v.String() },
+				),
+			)
+		}
+	}
+
+	// compile with database
+	t.Run("compile and test", func(t *testing.T) {
+		check(uuid.NewString(), []string{"1", "2"})
+	})
+	// re-build, test package re-use
+	t.Run("re-compile and test re-use", func(t *testing.T) {
+		check(uuid.NewString(), []string{"1", "2"})
+		check(uuid.NewString(), []string{"1", "2"})
+	})
+
+	t.Run("re-compile add file", func(t *testing.T) {
+		check(uuid.NewString(), []string{"1", "2"})
+		vf.AddFile("org/main/B.java", fmt.Sprintf(`
+		package %s;
+		public class B {
+			public static void A() {
+				int a = 3;
+			}
+		}
+		`, pkgName))
+		pkgFileLen++
+		check(uuid.NewString(), []string{"1", "2", "3"})
+	})
 
 }
