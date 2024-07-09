@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -16,7 +17,9 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	}
 	i, ok := raw.(*sf.FilterExprContext)
 	if !ok {
-		return utils.Errorf("BUG: in filterExpr: %s", reflect.TypeOf(raw))
+		err := utils.Errorf("BUG: in filterExpr: %s", reflect.TypeOf(raw))
+		log.Errorf("%v", err)
+		return err
 	}
 
 	enter := y.EmitFilterExprEnter()
@@ -44,7 +47,9 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitGetCall()
 	case *sf.DeepChainFilterContext:
 		if filter.NameFilter().GetText() == "*" {
-			return utils.Error("Syntax ERROR: deep chain filter cannot be ...*")
+			err := utils.Error("Syntax ERROR: deep chain filter cannot be ...*")
+			log.Errorf("%v", err)
+			return err
 		}
 		y.VisitRecursiveNameFilter(true, true, filter.NameFilter())
 	case *sf.FieldIndexFilterContext:
@@ -89,7 +94,9 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			}
 		}
 		if utils.MatchAnyOfSubString(varname, "/", "*", `"`, "`") {
-			return utils.Errorf("Syntax ERROR: invalid native call name: %s", varname)
+			err := utils.Errorf("Syntax ERROR: invalid native call name: %s", varname)
+			log.Errorf("%v", err)
+			return err
 		}
 		y.EmitNativaCall(varname)
 	case *sf.MergeRefFilterContext:
@@ -126,7 +133,9 @@ func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bo
 
 	ret, ok := i.(*sf.NameFilterContext)
 	if !ok {
-		return utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
+		err := utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
+		log.Errorf("%v", err)
+		return err
 	}
 
 	mod := NameMatch
@@ -138,7 +147,9 @@ func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bo
 		if isMember {
 			// get all member
 			if recursive {
-				return utils.Errorf("Syntax ERROR: recursive name filter cannot be *")
+				err := utils.Errorf("Syntax ERROR: recursive name filter cannot be *")
+				log.Errorf("%v", err)
+				return err
 			} else {
 				y.EmitSearchGlob(mod, "*")
 			}
@@ -171,6 +182,7 @@ func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bo
 		// log.Infof("regexp: %s", text)
 		reIns, err := regexp.Compile(text)
 		if err != nil {
+			log.Errorf("regexp compile failed: %v", err)
 			return err
 		}
 		if recursive {
@@ -180,17 +192,21 @@ func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bo
 		}
 		return nil
 	}
-	return utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
+	err := utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
+	log.Errorf("%v", err)
+	return err
 }
 
-func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterContext) error {
+func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterContext) (err error) {
 	if i == nil {
 		return nil
 	}
 
 	ret, ok := i.(*sf.NameFilterContext)
 	if !ok {
-		return utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
+		err := utils.Errorf("BUG: in nameFilter: %s", reflect.TypeOf(i))
+		log.Errorf("%v", err)
+		return err
 	}
 
 	mod := NameMatch
@@ -223,12 +239,16 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		// log.Infof("regexp: %s", text)
 		reIns, err := regexp.Compile(text)
 		if err != nil {
+			err := utils.Wrap(err, "regexp compile failed")
+			log.Errorf("%v", err)
 			return err
 		}
 		y.EmitSearchRegexp(mod, reIns.String())
 		return nil
 	}
-	return utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
+	err = utils.Errorf("BUG: in nameFilter, unknown type: %s:%s", reflect.TypeOf(ret), ret.GetText())
+	log.Error(err)
+	return err
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
