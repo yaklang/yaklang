@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -25,6 +26,7 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	astBuilder := &astbuilder{
 		FunctionBuilder: b,
 	}
+	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
 	return nil
 }

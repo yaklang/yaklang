@@ -23,12 +23,16 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 	if ret := i.PackageDeclaration(); ret != nil {
 		pkgPath := y.VisitPackageDeclaration(ret)
 		pkgName := strings.Join(pkgPath, ".")
-		// TODO: 1. check hash 2. should use pkgName inner file, but we only get pkgPath
 		prog := y.GetProgram()
-		if prog.HaveLibrary(pkgName) {
+		lib, skip := prog.GetLibrary(pkgName)
+		if skip {
 			return nil
 		}
-		lib := prog.NewLibrary(pkgName, pkgPath)
+		if lib == nil {
+			lib = prog.NewLibrary(pkgName, pkgPath)
+		}
+		lib.PushEditor(prog.GetCurrentEditor())
+
 		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
 		if builder != nil {
 			builder.SupportClass = true

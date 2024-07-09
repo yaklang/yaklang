@@ -188,12 +188,12 @@ func (c *config) checkLanguage(path string) error {
 }
 
 func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
-	LanguageBuilder := c.Builder
 	programName := c.DatabaseProgramName
 
 	prog := ssa.NewProgram(programName, c.DatabaseProgramName != "", ssa.Application, c.fs, c.programPath)
 
 	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
+		LanguageBuilder := c.Builder
 		// check builder
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)

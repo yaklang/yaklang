@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -27,6 +26,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ClassBluePrint:          make(map[string]*ClassBluePrint),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		FileList:                make(map[string]string),
 		cacheExternInstance:     make(map[string]Value),
 		externType:              make(map[string]Type),
 		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
@@ -41,24 +41,37 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	return prog
 }
 
-func (prog *Program) HaveLibrary(name string) bool {
-	if _, ok := prog.UpStream[name]; ok {
-		return true
-	}
-	if prog.irProgram != nil {
-		if slices.Contains(prog.irProgram.UpStream, name) {
-			return true
+func (prog *Program) GetLibrary(name string) (*Program, bool) {
+	currentEditor := prog.GetCurrentEditor()
+	hasFile := func(p *Program) bool {
+		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+			if hash == currentEditor.SourceCodeMd5() {
+				return true
+			}
 		}
-	}
-
-	p, err := GetProgram(name, Library)
-	if err != nil {
 		return false
 	}
-	prog.UpStream[name] = p
-	// update down stream
-	p.DownStream[prog.Name] = prog
-	return true
+
+	// contain in memory
+	if p, ok := prog.UpStream[name]; ok {
+		return p, hasFile(p)
+	}
+
+	if !prog.EnableDatabase {
+		return nil, false
+	}
+
+	// library in  database, load and set relation
+	p, err := GetProgram(name, Library)
+	if err != nil {
+		return p, false
+	}
+	if !slices.Contains(p.irProgram.UpStream, name) {
+		// update up-down stream
+		prog.UpStream[name] = p
+		p.DownStream[prog.Name] = prog
+	}
+	return p, hasFile(p)
 }
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
@@ -67,22 +80,7 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
 	prog.UpStream[name] = lib
 	lib.DownStream[prog.Name] = prog
-	lib.PushEditor(prog.getCurrentEditor())
 	return lib
-}
-
-func NewProgramFromDB(p *ssadb.IrProgram) *Program {
-	prog := &Program{
-		Name:           p.ProgramName,
-		ProgramKind:    ProgramKind(p.ProgramKind),
-		UpStream:       make(map[string]*Program),
-		DownStream:     make(map[string]*Program),
-		Cache:          GetCacheFromPool(p.ProgramName),
-		EnableDatabase: true,
-		irProgram:      p,
-	}
-	// TODO: handler up and down stream
-	return prog
 }
 
 func (prog *Program) GetProgramName() string {
@@ -120,7 +118,7 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {
-		builder = NewBuilder(prog.getCurrentEditor(), fun, nil)
+		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)
 	}
 	return builder
 }
@@ -194,13 +192,14 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
 	p.editorMap.Set(e.GetUrl(), e)
+	p.FileList[e.GetUrl()] = e.SourceCodeMd5()
 }
 
 func (p *Program) GetIncludeFiles() []string {
 	return p.editorMap.Keys()
 }
 
-func (p *Program) getCurrentEditor() *memedit.MemEditor {
+func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil
 	}

@@ -52,9 +52,9 @@ func CheckWithName(
 		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
 		defer func() {
-			if name == "" {
-				ssadb.DeleteProgram(ssadb.GetDB(), programID)
-			}
+			// if name == "" {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			// }
 		}()
 		assert.Nil(t, err)
 		// prog.Show()
@@ -91,6 +91,8 @@ func CheckFSWithProgram(
 		programName = "test-" + uuid.New().String()
 	}
 	ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
 	opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
 	_, err := ssaapi.ParseProject(codeFS, opt...)
 	if err != nil {
