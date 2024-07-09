@@ -19,10 +19,8 @@ import (
 	"github.com/samber/lo"
 )
 
-var (
-	//go:embed testdata
-	testFS embed.FS
-)
+//go:embed testdata
+var testFS embed.FS
 
 type testcase struct {
 	name           string
@@ -172,7 +170,6 @@ func Run(tc testcase) []*dxtypes.Package {
 
 	if !tc.skipCheck {
 		Check(pkgs, tc.wantPkgs, t.Name(), tc.t)
-
 	}
 
 	fmt.Println("===============================")
@@ -652,6 +649,7 @@ func TestJavaJar(t *testing.T) {
 		Run(tc)
 	})
 }
+
 func TestJavaGradle(t *testing.T) {
 	t.Run("positive", func(t *testing.T) {
 		tc := testcase{
@@ -692,6 +690,20 @@ func TestJavaPom(t *testing.T) {
 			matchType:      1,
 			matchedFileMap: map[string]string{},
 			wantPkgs:       JavaPomPkgs,
+		}
+		Run(tc)
+	})
+
+	t.Run("positive2", func(t *testing.T) {
+		tc := testcase{
+			name:           "positive",
+			filePath:       "./testdata/java_pom/positive2/pom.xml",
+			virtualPath:    "/test/pom.xml",
+			t:              t,
+			a:              analyzer.NewJavaPomAnalyzer(),
+			matchType:      1,
+			matchedFileMap: map[string]string{},
+			wantPkgs:       JavaPom2Pkgs,
 		}
 		Run(tc)
 	})
@@ -799,6 +811,7 @@ func TestNodeNpm(t *testing.T) {
 		// analyzer.DrawPackagesDOT(ret)
 	})
 }
+
 func TestNodePnpm(t *testing.T) {
 	t.Run("positive", func(t *testing.T) {
 		tc := testcase{
@@ -813,6 +826,7 @@ func TestNodePnpm(t *testing.T) {
 		Run(tc)
 	})
 }
+
 func TestNodeYarn(t *testing.T) {
 	t.Run("positive", func(t *testing.T) {
 		tc := testcase{

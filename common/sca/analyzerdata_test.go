@@ -7,7 +7,6 @@ import (
 )
 
 var APKWantPkgs = []*dxtypes.Package{
-
 	{
 		Name:         "alpine-baselayout",
 		Version:      "3.4.3-r1",
@@ -1498,6 +1497,7 @@ var ConanWantPkgs = []*dxtypes.Package{
 		Version: "1.2.12",
 	},
 }
+
 var GOBianryWantPkgs = []*dxtypes.Package{
 	{
 		Name:    "github.com/aquasecurity/go-pep440-version",
@@ -1523,6 +1523,7 @@ var GoModWantPkgs = []*dxtypes.Package{
 		Version: "0.0.0-20200804184101-5ec99f83aff1",
 	},
 }
+
 var GoModLess117Pkgs = []*dxtypes.Package{
 	{
 		Name:    "github.com/aquasecurity/go-dep-parser",
@@ -1566,6 +1567,7 @@ var PHPComposerWrongJsonPkgs = []*dxtypes.Package{
 		License: []string{"BSD-2-Clause"},
 	},
 }
+
 var PHPComposerNoJsonPkgs = []*dxtypes.Package{
 	{
 		Name:         "pear/log",
@@ -1602,6 +1604,7 @@ var PythonPackagingEggPkg = []*dxtypes.Package{
 		License: []string{"Python license"},
 	},
 }
+
 var PythonPackagingWheel = []*dxtypes.Package{
 	{
 		Name:         "distlib",
@@ -1680,6 +1683,7 @@ var PythonPoetryPkgs = []*dxtypes.Package{
 		Version: "1.0.1",
 	},
 }
+
 var PythonPoetryNoProjectPkgs = []*dxtypes.Package{
 	{
 		Name:    "click",
@@ -1703,10 +1707,12 @@ var PythonPoetryWrongProjectPkgs = []*dxtypes.Package{
 }
 
 var JavaGradlePkgs = []*dxtypes.Package{
-	{Name: "com.example:example",
+	{
+		Name:    "com.example:example",
 		Version: "0.0.1",
 	},
 }
+
 var JavaPomPkgs = []*dxtypes.Package{
 	{
 		Name:         "com.example:example",
@@ -1716,6 +1722,28 @@ var JavaPomPkgs = []*dxtypes.Package{
 		License: []string{"Apache-2.0"},
 	},
 }
+
+var JavaPom2Pkgs = []*dxtypes.Package{
+	{
+		Name:         "com.example:demo",
+		Version:      "0.0.1-SNAPSHOT",
+		Verification: "",
+	},
+	{
+		Name: "org.springframework.boot:spring-boot-starter-web",
+	},
+	{
+		Name: "org.springframework.boot:spring-boot-starter-test",
+	},
+	{
+		Name:    "org.mybatis.spring.boot:mybatis-spring-boot-starter",
+		Version: "2.2.0",
+	},
+	{
+		Name: "mysql:mysql-connector-java",
+	},
+}
+
 var JavaPomRequirementPkgs = []*dxtypes.Package{
 	{
 		Name:         "com.example:example",
@@ -1724,7 +1752,12 @@ var JavaPomRequirementPkgs = []*dxtypes.Package{
 
 		License: []string{"Apache-2.0"},
 	},
+	{
+		Name:    "org.example:example-api",
+		Version: "",
+	},
 }
+
 var JavaJarWarPkgs = []*dxtypes.Package{
 	{
 		Name:    "org.glassfish:javax.el",
@@ -1759,12 +1792,14 @@ var JavaJarWarPkgs = []*dxtypes.Package{
 		Version: "1.0-SNAPSHOT",
 	},
 }
+
 var JavaJarParPkgs = []*dxtypes.Package{
 	{
 		Name:    "com.fasterxml.jackson.core:jackson-core",
 		Version: "2.9.10",
 	},
 }
+
 var JavaJarJarPkgs = []*dxtypes.Package{
 	{
 		Name:    "org.apache:tomcat-embed-websocket",
@@ -1991,6 +2026,7 @@ var NodeNpmPkgs = []*dxtypes.Package{
 		Potential:    false,
 	},
 }
+
 var NodeNpmPkgsFolder = []*dxtypes.Package{
 	{
 		Name:         "statuses",
@@ -2326,6 +2362,7 @@ var NodeYarnPkgs = []*dxtypes.Package{
 		Potential:    false,
 	},
 }
+
 var NodeYarnProtocolPkgs = []*dxtypes.Package{
 	{
 		Name:         "prettier",
@@ -3196,8 +3233,8 @@ var RubyGemspecPkgs = []*dxtypes.Package{
 		},
 	},
 }
-var RustCargoPkgs = []*dxtypes.Package{
 
+var RustCargoPkgs = []*dxtypes.Package{
 	{
 		Name:         "memchr",
 		Version:      "1.0.2",
