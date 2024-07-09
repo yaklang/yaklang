@@ -128,6 +128,10 @@ func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) ([]*SFFrameResult, erro
 	return results, errs
 }
 
+func (s *SyntaxFlowVirtualMachine) SetConfig(config *Config) {
+	s.config = config
+}
+
 func (frame *SFFrame) Feed(i ValueOperator) (*SFFrameResult, error) {
 	err := frame.exec(i)
 	return frame.result, err
