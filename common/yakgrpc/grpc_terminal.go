@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,10 +13,47 @@ import (
 
 	"github.com/aymanbagabas/go-pty"
 	"github.com/google/shlex"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/term"
 )
+
+var charsetPriority = map[string]int{
+	"C.UTF-8":     2,
+	"zh_CN.UTF-8": 1,
+}
+
+func getAvailableLocaleUTF8() (string, error) {
+	lang := os.Getenv("LANG")
+	if lang != "" {
+		return lang, nil
+	}
+	lang = os.Getenv("LC_ALL")
+	if lang != "" {
+		return lang, nil
+	}
+
+	// fallback
+	cmd := exec.Command("locale", "-a")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	locales := strings.Split(strings.TrimSpace(string(out)), "\n")
+	locales = lo.Filter(locales, func(s string, _ int) bool {
+		return strings.HasSuffix(s, ".UTF-8")
+	})
+	if len(locales) == 0 {
+	return "", utils.Errorf("no available locale with UTF-8")
+	}
+
+	sort.SliceStable(locales, func(i, j int) bool {
+		return charsetPriority[locales[i]] > charsetPriority[locales[j]]
+	})
+
+	return locales[0], nil
+}
 
 func getShellCommand() (string, string, error) {
 	var (
@@ -32,9 +70,13 @@ func getShellCommand() (string, string, error) {
 		el = "\r\n"
 		shellNames = []string{"powershell", "cmd"}
 		needReplaceBackslash = true
-	case "linux", "darwin":
+	case "linux":
 		el = "\n"
 		shellNames = []string{"bash", "sh"}
+		shellOpts = " -i"
+	case "darwin":
+		el = "\n"
+		shellNames = []string{"zsh", "bash", "sh"}
 		shellOpts = " -i"
 	default:
 		return "", "", utils.Errorf("unsupported os: %s", goos)
@@ -95,6 +137,18 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 
 	// exec
 	shell, eol, err := getShellCommand()
+	isUnix := runtime.GOOS != "windows"
+	envs := os.Environ()
+	if isUnix {
+		charset, err := getAvailableLocaleUTF8()
+		if err == nil {
+			for _, key := range []string{"LANG"} {
+				envs = append(envs, fmt.Sprintf("%s=%s", key, charset))
+			}
+		} else {
+			log.Warnf("not install available locale with UTF-8: %s", err)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -113,6 +167,9 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
 		cmd.Dir = path
+		if len(envs) > 0 {
+			cmd.Env = envs
+		}
 		cmd.Start()
 
 		terminal := term.NewTerminal(streamerRWC, "")
@@ -179,6 +236,9 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		}()
 
 		cmd := ptmx.CommandContext(ctx, commands[0], commands[1:]...)
+		if len(envs) > 0 {
+			cmd.Env = envs
+		}
 		cmd.Dir = path
 		return cmd.Run()
 	}
