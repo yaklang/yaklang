@@ -159,6 +159,9 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		case OpCreateIter:
 			s.debugSubLog(">> pop")
 			vs := s.stack.Peek()
+			if vs == nil {
+				return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
+			}
 			channel := make(chan ValueOperator)
 			go func() {
 				defer close(channel)
@@ -245,7 +248,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				// go to expression end
 				result := s.filterExprStack.Peek()
 				if result == nil {
-					return utils.Wrap(CriticalError, "filter expr stack is empty")
+					return err
 				}
 				s.idx = result.end
 				continue
@@ -673,10 +676,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog(">> from ref: %v ", i.UnaryStr)
 		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if ok {
+			if vs == nil {
+				return utils.Errorf("new ref failed: empty value: %v", i.UnaryStr)
+			}
 			s.debugSubLog(">> get value: %v ", vs)
 			s.stack.Push(vs)
 		} else {
-			s.debugSubLog(">> no this variable %v ", i.UnaryStr)
+			return utils.Errorf("new ref failed: not found: %v", i.UnaryStr)
 		}
 	case OpUpdateRef:
 		if i.UnaryStr == "" {
