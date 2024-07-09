@@ -5,8 +5,12 @@ import (
 	"errors"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"net/http"
@@ -56,7 +60,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 		if err != nil {
 			break
 		}
-		spew.Dump(resp.ResponseRaw)
+		//spew.Dump(resp.ResponseRaw)
 		taskID = resp.TaskId
 	}
 
@@ -89,6 +93,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 		if err != nil {
 			break
 		}
+		spew.Dump(resp)
 		if resp.MatchedByMatcher {
 			matcherCheckCount++
 		}
@@ -143,6 +148,16 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 		//spew.Dump(resp.ResponseRaw)
 		taskID = resp.TaskId
 	}
+	require.NoError(t, utils.AttemptWithDelayFast(func() error {
+		taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(taskID))
+		if err != nil {
+			return err
+		}
+		if taskRespCount != 10 {
+			return utils.Errorf("want 10 task resp ,but got %d", taskRespCount)
+		}
+		return nil
+	}))
 
 	matcher := &ypb.HTTPResponseMatcher{
 		MatcherType: "expr",
@@ -223,4 +238,66 @@ func TestFuzzerExtractorInvalidUTF8(t *testing.T) {
 		}
 		spew.Dump(rsp)
 	}
+}
+
+func TestFuzzerMatchMultipleColor(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	token1 := utils.RandStringBytes(5)
+	token2 := utils.RandStringBytes(5)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
+		if index%2 == 0 {
+			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token1)
+		} else {
+			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token2)
+		}
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matcher1 := &ypb.HTTPResponseMatcher{
+		MatcherType: "word",
+		Scope:       "raw",
+		Condition:   "and",
+		Group:       []string{token1},
+		ExprType:    "nuclei-dsl",
+		HitColor:    "red",
+	}
+	matcher2 := &ypb.HTTPResponseMatcher{
+		MatcherType: "word",
+		Scope:       "raw",
+		Condition:   "and",
+		Group:       []string{token2},
+		ExprType:    "nuclei-dsl",
+		HitColor:    "blue",
+	}
+	target := utils.HostPort(host, port)
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		ForceFuzz: true,
+		Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+	})
+	require.NoError(t, err)
+	var redCount int
+	var blueCount int
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if resp.MatchedByMatcher {
+			if resp.HitColor == "red" {
+				redCount++
+			}
+			if resp.HitColor == "blue" {
+				blueCount++
+			}
+		}
+	}
+	require.Equal(t, 6, redCount, "token1 count is not 6")
+	require.Equal(t, 5, blueCount, "token2 count is not 5")
 }
