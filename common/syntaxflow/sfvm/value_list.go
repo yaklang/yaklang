@@ -168,10 +168,10 @@ func (v *ValueList) GetSyntaxFlowUse() (ValueOperator, error) {
 	}
 	return NewValues(res), nil
 }
-func (v *ValueList) GetSyntaxFlowTopDef(config ...*RecursiveConfigItem) (ValueOperator, error) {
+func (v *ValueList) GetSyntaxFlowTopDef(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
-		topDef, err := v.GetSyntaxFlowTopDef(config...)
+		topDef, err := v.GetSyntaxFlowTopDef(sfResult, sfConfig, config...)
 		if err != nil {
 			return nil, err
 		}
@@ -180,10 +180,10 @@ func (v *ValueList) GetSyntaxFlowTopDef(config ...*RecursiveConfigItem) (ValueOp
 	return NewValues(res), nil
 }
 
-func (v *ValueList) GetSyntaxFlowBottomUse(config ...*RecursiveConfigItem) (ValueOperator, error) {
+func (v *ValueList) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (ValueOperator, error) {
 	var res []ValueOperator
 	for _, v := range v.values {
-		bottomUse, err := v.GetSyntaxFlowBottomUse()
+		bottomUse, err := v.GetSyntaxFlowBottomUse(sfResult, sfConfig, config...)
 		if err != nil {
 			return nil, err
 		}

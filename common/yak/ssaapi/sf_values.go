@@ -134,12 +134,12 @@ func (value Values) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
 func (value Values) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 	return value.GetOperands(), nil
 }
-func (value Values) GetSyntaxFlowTopDef(config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return WithSyntaxFlowConfig(value.GetTopDefs, config...), nil
+func (value Values) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+	return WithSyntaxFlowConfig(sfResult, sfConfig, value.GetTopDefs, config...), nil
 }
 
-func (value Values) GetSyntaxFlowBottomUse(config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return WithSyntaxFlowConfig(value.GetBottomUses, config...), nil
+func (value Values) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+	return WithSyntaxFlowConfig(sfResult, sfConfig, value.GetBottomUses, config...), nil
 }
 
 func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {

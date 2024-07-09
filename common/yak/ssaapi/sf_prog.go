@@ -106,11 +106,11 @@ func (p *Program) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
 func (p *Program) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow use")
 }
-func (p *Program) GetSyntaxFlowTopDef(config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow top def")
 }
 
-func (p *Program) GetSyntaxFlowBottomUse(config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow bottom use")
 }
 
