@@ -27,6 +27,20 @@ println($PHP_EOL);`
 	})
 }
 
+func TestMemberAdd(t *testing.T) {
+	code := `<?php
+
+class test{
+    public $a=0;
+}
+
+$a = new test;
+$a->a++;
+println($a->a);
+`
+	ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+}
+
 func TestExperssion_PHP_Scope(t *testing.T) {
 	t.Run("block scope capture a", func(t *testing.T) {
 		code := `<?php

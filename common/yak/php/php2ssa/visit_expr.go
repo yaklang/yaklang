@@ -75,8 +75,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}).Build()
 		return nil
 	case *phpparser.VariableExpressionContext:
-		id := y.VisitVariable(ret.Variable())
-		return y.ReadValue(id)
+		return y.VisitRightValue(ret.FlexiVariable())
 	case *phpparser.CodeExecExpressionContext:
 		var code string
 		value := y.VisitExpression(ret.Expression())
@@ -112,10 +111,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
-	case *phpparser.MemberCallExpressionContext: // $a->b
-		obj := y.VisitExpression(ret.Expression())
-		key := y.VisitMemberCallKey(ret.MemberCallKey())
 		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.SliceCallAssignmentExpressionContext: // $a[1] = expr
 		// build left
@@ -203,7 +198,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.PrefixIncDecExpressionContext:
 		// variable := y.variable
 		// val := y.VisitExpression(ret.Expression())
-		variable := y.VisitLeftVariable(ret.LeftVariable())
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
 		val := y.ReadValueByVariable(variable)
 		if ret.Inc() != nil {
 			after := y.EmitBinOp(ssa.OpAdd, val, y.EmitConstInst(1))
@@ -217,7 +212,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return y.EmitConstInstNil()
 	case *phpparser.PostfixIncDecExpressionContext:
-		variable := y.VisitLeftVariable(ret.LeftVariable())
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
 		val := y.ReadValueByVariable(variable)
 		if ret.Inc() != nil {
 			after := y.EmitBinOp(ssa.OpAdd, val, y.EmitConstInst(1))
@@ -436,7 +431,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return nil
 
 	case *phpparser.OrdinaryAssignmentExpressionContext:
-		variable := y.VisitLeftVariable(ret.LeftVariable())
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.AssignVariable(variable, rightValue)
@@ -1141,27 +1136,51 @@ func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.V
 	return rightValue
 }
 
-func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Variable {
+// VisitLeftVariable  左值 不适合member->key的方式
+func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Variable {
 	if y == nil || raw == nil {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	i, ok := raw.(*phpparser.LeftVariableContext)
+	i, ok := raw.(*phpparser.FlexiVariableContext)
 	if !ok {
 		return nil
 	}
-
+	if i.FlexiVariable() != nil {
+		value := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitMemberCallKey(i.MemberCallKey())
+		member := y.CreateMemberCallVariable(value, key)
+		return member
+	}
 	return y.CreateVariable(
 		y.VisitVariable(i.Variable()),
 	)
+}
+
+// flexivariable读右值
+func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	flexVariable := raw.(*phpparser.FlexiVariableContext)
+	if flexVariable.FlexiVariable() != nil {
+		obj := y.VisitRightValue(flexVariable.FlexiVariable())
+		key := y.VisitMemberCallKey(flexVariable.MemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	} else {
+		id := y.VisitVariable(flexVariable.Variable())
+		return y.ReadValue(id)
+	}
 }
 
 func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	switch ret := raw.(type) {
 	case *phpparser.NormalVariableContext:
 		return ret.VarName().GetText()

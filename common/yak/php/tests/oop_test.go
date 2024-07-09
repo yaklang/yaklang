@@ -397,3 +397,69 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 	})
 
 }
+
+func TestOOP_Extend(t *testing.T) {
+	t.Run("no impl __construct", func(t *testing.T) {
+		code := `<?php
+
+
+class b{
+    public $a;
+    public function __construct($a){
+        $this->a = $a;
+    }
+}
+
+class childB extends b{
+}
+$a = new childB(1);
+println($a->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+	})
+	t.Run("impl __construct", func(t *testing.T) {
+		code := `<?php
+
+
+class b{
+    public $a;
+    public function __construct($a){
+        $this->a = $a;
+    }
+}
+
+class childB extends b{
+    public $c;
+    public function __construct($a){
+     parent::__construct($a);
+}
+}
+$b = new childB(1);
+println($b->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-.a(valid)"}, t)
+	})
+	t.Run("get parent static member", func(t *testing.T) {
+		code := `<?php
+class b{
+    public static $a=1;
+}
+class childB extends b{
+}
+println(b::$a);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+}
+
+func TestA(t *testing.T) {
+	code := `<?php
+
+class test{
+    public $a=0;
+}
+
+$a = new test;
+$a->a=1;
+`
+	ssatest.MockSSA(t, code)
+}

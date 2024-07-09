@@ -523,10 +523,9 @@ expression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
     | expression OpenCurlyBracket indexMemberCallKey CloseCurlyBracket    # IndexLegacyCallExpression
     | expression arguments                                        # FunctionCallExpression
-    | expression '->' memberCallKey                               # MemberCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | staticClassExpr                                             # StaticClassAccessExpression
-    | variable                                                    # VariableExpression
+    | flexiVariable                                                # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
@@ -541,7 +540,7 @@ expression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression
     | Empty '(' chain ')'                                         # SpecialWordExpression
-    | (Exit|Die)  '(' expression? ')'                             # SpecialWordExpression
+    | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
     | (Eval|Assert) expression                                    # CodeExecExpression
     | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
@@ -549,8 +548,8 @@ expression
     | '(' castOperation ')' expression                            # CastExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
-    | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
+    | ('++' | '--') flexiVariable                                      # PrefixIncDecExpression
+    | flexiVariable ('++' | '--')                                      # PostfixIncDecExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
     | expression InstanceOf typeRef                               # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
@@ -572,7 +571,7 @@ expression
     | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
     | expression '->' memberCallKey assignmentOperator expression    # FieldMemberCallAssignmentExpression
     | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
-    | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
+    | flexiVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression
     | expression op = LogicalXor expression                       # LogicalExpression
@@ -580,10 +579,11 @@ expression
     ;
 
 
-leftVariable
+//即能当左值又能当右值
+flexiVariable
     : variable
+    | flexiVariable '->' memberCallKey
     ;
-
 
 defineExpr
     : Define '(' constantString ',' expression ')'
