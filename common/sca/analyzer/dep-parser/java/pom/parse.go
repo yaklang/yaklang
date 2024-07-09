@@ -376,11 +376,6 @@ func (p *parser) parseDependencies(deps []pomDependency, props map[string]string
 	for _, d := range deps {
 		// Resolve dependencies
 		d = d.Resolve(props, depManagement, rootDepManagement)
-
-		if (d.Scope != "" && d.Scope != "compile") || d.Optional {
-			continue
-		}
-
 		dependencies = append(dependencies, d.ToArtifact(opts))
 	}
 	return dependencies
