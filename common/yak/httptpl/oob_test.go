@@ -56,11 +56,11 @@ tcp:
 		WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 			return "adf.dnslog.mock", "adf", nil
 		}),
-		WithOOBRequireCheckingTrigger(func(s string, f ...float64) bool {
+		WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
 			if s == "adf" {
-				return true
+				return "dns", []byte("")
 			}
-			return false
+			return "", []byte("")
 		}),
 		WithDebug(true), WithDebugRequest(true), WithDebugResponse(true),
 	)

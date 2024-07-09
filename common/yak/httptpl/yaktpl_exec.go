@@ -362,7 +362,9 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			rsp, err := sender([]byte(reqRaw), req)
 			if y.ReverseConnectionNeed { //check token even if send error
 				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
-					InjectInteractshVar(v.Data, runtimeVars)
+					if config.OOBRequireCheckingTrigger == nil {
+						InjectInteractshVar(v.Data, runtimeVars)
+					}
 				}
 			}
 			if err == nil {

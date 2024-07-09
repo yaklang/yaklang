@@ -11,8 +11,10 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -1580,12 +1582,12 @@ http:
 	ok := false
 	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 		return "a.aaa.asdgiqwfkbas.com", "token", nil
-	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) bool {
+	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
 		if s == "token" {
 			ok = true
-			return true
+			return "dns", []byte("")
 		}
-		return false
+		return "", []byte("")
 	}))
 	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
 	if !ok {
@@ -1761,3 +1763,179 @@ http:
 		t.FailNow()
 	}
 }
+
+func TestMockTest_interactsh(t *testing.T) {
+	rootDomain := utils.RandStringBytes(5) + ".com"
+	token := strings.ToLower(utils.RandStringBytes(5))
+	tokenDomain := token + "." + rootDomain
+
+	interactshProtocol := make(map[string]string)
+	interactshRequest := make(map[string][][]byte)
+
+	dnsServer := facades.MockDNSServer(context.Background(), rootDomain, 8902, func(record string, domain string) string {
+		if strings.Contains(domain, token) {
+			interactshProtocol[token] = "dns"
+		}
+		return "127.0.0.1"
+	})
+
+	_, httpServerPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		reqStr := string(req)
+		if strings.Contains(reqStr, token) {
+			interactshProtocol[token] = "http"
+			interactshRequest[token] = append(interactshRequest[token], req)
+		}
+		return []byte("HTTP/1.1 200 OK\r\n\r\n")
+	})
+
+	sendToken := utils.RandStringBytes(5)
+	server, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("ok"))
+		u := request.URL.Query().Get("consumerUri")
+		urlIns, err := url.Parse(u)
+		if err != nil {
+			t.Fatal(err)
+			return
+		}
+		urlIns.RawQuery = fmt.Sprintf("a=%s", sendToken)
+		poc.DoGET(urlIns.String(), poc.WithDNSServers(dnsServer))
+	})
+	tmp := fmt.Sprintf(`id: CVE-2017-9506
+
+info:
+  name: Atlassian Jira IconURIServlet - Cross-Site Scripting/Server-Side Request Forgery
+  author: pdteam
+  severity: medium
+  description: The Atlassian Jira IconUriServlet of the OAuth Plugin from version 1.3.0 before version 1.9.12 and from version 2.0.0 before version 2.0.4 contains a cross-site scripting vulnerability which allows remote attackers to access the content of internal network resources and/or perform an attack via Server Side Request Forgery.
+  remediation: |
+    Apply the latest security patches provided by Atlassian to mitigate these vulnerabilities.
+  reference:
+    - http://dontpanic.42.nl/2017/12/there-is-proxy-in-your-atlassian.html
+    - https://ecosystem.atlassian.net/browse/OAUTH-344
+    - https://medium.com/bugbountywriteup/piercing-the-veil-server-side-request-forgery-to-niprnet-access-171018bca2c3
+    - https://nvd.nist.gov/vuln/detail/CVE-2017-9506
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+    cvss-score: 6.1
+    cve-id: CVE-2017-9506
+    cwe-id: CWE-918
+    epss-score: 0.00575
+    epss-percentile: 0.75469
+    cpe: cpe:2.3:a:atlassian:oauth:1.3.0:*:*:*:*:*:*:*
+  metadata:
+    max-request: 1
+    vendor: atlassian
+    product: oauth
+    shodan-query: http.component:"Atlassian Jira"
+  tags: cve,cve2017,atlassian,jira,ssrf,oast
+
+http:
+  - raw:
+      - |
+        GET /plugins/servlet/oauth/users/icon-uri?consumerUri=http://{{interactsh-url}} HTTP/1.1
+        Host: {{Hostname}}
+        Origin: {{BaseURL}}
+
+    matchers:
+      - type: word
+        part: interactsh_protocol # Confirms the HTTP Interaction
+        words:
+          - "http"
+      - type: word
+        part: interactsh_request
+        words:
+          - "%s"
+          `, sendToken)
+	tmpIns, err := CreateYakTemplateFromNucleiTemplateRaw(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := false
+	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
+		return fmt.Sprintf("%s:%d", tokenDomain, httpServerPort), token, nil
+	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
+		if interactshProtocol[s] == "http" {
+			for _, request := range interactshRequest[s] {
+				if strings.Contains(string(request), sendToken) {
+					ok = true
+					return "http,dns", request
+				}
+			}
+		}
+		ok = false
+		return "", []byte("")
+	}))
+	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
+	if !ok {
+		t.Error("test oob error")
+	}
+}
+
+//
+//func TestMockTest_OOBAAAA(t *testing.T) {
+//
+//	server, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+//		writer.Write([]byte("ok"))
+//		u := request.URL.Query().Get("consumerUri")
+//		urlIns, err := url.Parse(u)
+//		if err != nil {
+//			t.Fatal(err)
+//			return
+//		}
+//		//netx.LookupFirst(urlIns.Host, netx.WithTimeout(time.Second), netx.WithDNSDisableSystemResolver(true))
+//		poc.DoGET(urlIns.String())
+//	})
+//	tmp := `id: CVE-2017-9506
+//
+//info:
+//  name: Atlassian Jira IconURIServlet - Cross-Site Scripting/Server-Side Request Forgery
+//  author: pdteam
+//  severity: medium
+//  description: The Atlassian Jira IconUriServlet of the OAuth Plugin from version 1.3.0 before version 1.9.12 and from version 2.0.0 before version 2.0.4 contains a cross-site scripting vulnerability which allows remote attackers to access the content of internal network resources and/or perform an attack via Server Side Request Forgery.
+//  remediation: |
+//    Apply the latest security patches provided by Atlassian to mitigate these vulnerabilities.
+//  reference:
+//    - http://dontpanic.42.nl/2017/12/there-is-proxy-in-your-atlassian.html
+//    - https://ecosystem.atlassian.net/browse/OAUTH-344
+//    - https://medium.com/bugbountywriteup/piercing-the-veil-server-side-request-forgery-to-niprnet-access-171018bca2c3
+//    - https://nvd.nist.gov/vuln/detail/CVE-2017-9506
+//  classification:
+//    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+//    cvss-score: 6.1
+//    cve-id: CVE-2017-9506
+//    cwe-id: CWE-918
+//    epss-score: 0.00575
+//    epss-percentile: 0.75469
+//    cpe: cpe:2.3:a:atlassian:oauth:1.3.0:*:*:*:*:*:*:*
+//  metadata:
+//    max-request: 1
+//    vendor: atlassian
+//    product: oauth
+//    shodan-query: http.component:"Atlassian Jira"
+//  tags: cve,cve2017,atlassian,jira,ssrf,oast
+//
+//http:
+//  - raw:
+//      - |
+//        GET /plugins/servlet/oauth/users/icon-uri?consumerUri=http://{{interactsh-url}} HTTP/1.1
+//        Host: {{Hostname}}
+//        Origin: {{BaseURL}}
+//
+//    matchers:
+//      - type: word
+//        part: interactsh_protocol # Confirms the HTTP Interaction
+//        words:
+//          - "http"
+//
+//# digest: 4a0a0047304502203f149b24ebd177d43629ee418d28fc0878939ccdd4283537cbaced55a753b59f0221008b8e75e9de7c7ddd6fd2ffe85e574fc9b523f0980011ed7a71df7e6d8475ec4a:922c64590222798bb761d5b6d8e72950`
+//	tmpIns, err := CreateYakTemplateFromNucleiTemplateRaw(tmp)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	ok := false
+//	config := NewConfig()
+//	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
+//	if !ok {
+//		t.Error("test oob error")
+//	}
+//}
