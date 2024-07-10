@@ -196,12 +196,25 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			}()
 
 			if isS5 {
-				err := s5config.ServeConn(handledConnection)
+				err := s5config.Handshake(handledConnection)
 				if err != nil {
-					log.Errorf("socks5 handle failed: %s", err)
+					log.Errorf("socks5 Handshake failed: %s", err)
 					return
 				}
-				return
+
+				_, cmd, _, _, err := s5config.HandleS5RequestHeader(handledConnection)
+				if err != nil {
+					log.Errorf("socks5 handle request failed: %s", err)
+					return
+				}
+				if cmd != commandConnect {
+					return
+				}
+				host, port, err := utils.ParseStringToHostPort(conn.LocalAddr().String())
+				if err != nil {
+					return
+				}
+				handledConnection.Write(BuildReply(net.ParseIP(host), port))
 			}
 
 			p.handleLoop(firstByte == 0x16, handledConnection, ctx)
