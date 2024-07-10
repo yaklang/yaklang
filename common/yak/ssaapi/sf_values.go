@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"io/fs"
 	"regexp"
 
 	"github.com/gobwas/glob"
@@ -190,4 +191,8 @@ func (value Values) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.
 		}
 	}
 	return nil
+}
+
+func (value Values) FileFilter(fs.File, string, map[string]string) (sfvm.ValueOperator, error) {
+	return nil, utils.Error("ssa.Values is not supported file filter")
 }

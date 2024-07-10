@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"io/fs"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -114,4 +116,8 @@ func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig 
 
 func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
+}
+
+func (p *Program) FileFilter(fs.File, string, map[string]string) (sfvm.ValueOperator, error) {
+	return nil, utils.Error("ssa.Program is not supported file filter")
 }
