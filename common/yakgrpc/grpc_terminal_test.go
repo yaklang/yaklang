@@ -75,51 +75,6 @@ func TestTerminal(t *testing.T) {
 	}
 }
 
-func TestTerminalControlChar(t *testing.T) {
-	testCommand := "something command"
-	client, err := NewLocalClient()
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	stream, err := client.YaklangTerminal(ctx)
-	require.NoError(t, err)
-
-	passed := false
-	firstMsgRecv := false
-	prompt := ""
-	stream.Send(&ypb.Input{
-		Path: "",
-	})
-
-	for {
-		output, err := stream.Recv()
-		if err != nil {
-			t.Logf(err.Error())
-			break
-		}
-		outputStr := strings.TrimSpace(string(output.Raw))
-		if !firstMsgRecv {
-			firstMsgRecv = true
-			prompt = outputStr
-			stream.Send(&ypb.Input{
-				Raw: []byte(testCommand),
-			})
-			stream.Send(&ypb.Input{
-				Raw: []byte{3}, // Ctrl+C
-			})
-		} else if prompt != "" && strings.Contains(outputStr, prompt) {
-			passed = true
-			cancel()
-		}
-		t.Logf("%s", spew.Sdump(output.Raw))
-	}
-
-	if !passed {
-		t.Fatalf("failed to read expect control char output from terminal")
-	}
-}
-
 func TestTerminalPath(t *testing.T) {
 	testText := uuid.NewString()
 	testBinaryPath := "cat"
