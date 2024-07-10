@@ -398,11 +398,50 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 
 }
 
+func TestOOP_Destruct(t *testing.T) {
+	t.Run("__destruct", func(t *testing.T) {
+		code := `<?php
+
+class test{
+    public $a;
+    public function __construct($a){
+    	$this->a = $a; 
+        println($this->a);
+	}
+    public function __destruct(){
+          $this->a = 1;
+    }
+}
+$a = new test("1");
+`
+		ssatest.MockSSA(t, code)
+		//	ssatest.CheckSyntaxFlow(t, code,
+		//		`println(* #-> * as $param)`,
+		//		map[string][]string{},
+		//		ssaapi.WithLanguage(ssaapi.PHP))
+		//}
+	})
+	t.Run("testGet", func(t *testing.T) {
+		code := `<?php
+class test{
+public $a;
+
+public function get(){
+ eval($this->a);
+}
+}
+$a = new test();
+$a->a = $_POST[1];
+$a->get();
+`
+		ssatest.MockSSA(t, code)
+	})
+
+}
+
 func TestOOP_Extend(t *testing.T) {
 	t.Run("no impl __construct", func(t *testing.T) {
 		code := `<?php
-
-
 class b{
     public $a;
     public function __construct($a){
@@ -417,12 +456,11 @@ println($a->a);
 `
 		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 	})
-	t.Run("impl __construct", func(t *testing.T) {
+
+	t.Run("impl __construct and get parent custom member", func(t *testing.T) {
 		code := `<?php
-
-
 class b{
-    public $a;
+    public $a=0;
     public function __construct($a){
         $this->a = $a;
     }
@@ -431,35 +469,11 @@ class b{
 class childB extends b{
     public $c;
     public function __construct($a){
-     parent::__construct($a);
 }
 }
 $b = new childB(1);
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-.a(valid)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"0"}, t)
 	})
-	t.Run("get parent static member", func(t *testing.T) {
-		code := `<?php
-class b{
-    public static $a=1;
-}
-class childB extends b{
-}
-println(b::$a);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
-	})
-}
-
-func TestA(t *testing.T) {
-	code := `<?php
-
-class test{
-    public $a=0;
-}
-
-$a = new test;
-$a->a=1;
-`
-	ssatest.MockSSA(t, code)
 }

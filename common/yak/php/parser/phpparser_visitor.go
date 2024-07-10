@@ -388,9 +388,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#PrefixIncDecExpression.
 	VisitPrefixIncDecExpression(ctx *PrefixIncDecExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#FieldMemberCallAssignmentExpression.
-	VisitFieldMemberCallAssignmentExpression(ctx *FieldMemberCallAssignmentExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#ComparisonExpression.
 	VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{}
 
