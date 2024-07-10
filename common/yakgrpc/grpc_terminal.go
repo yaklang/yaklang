@@ -67,11 +67,9 @@ func getAvailableLocaleUTF8() (string, error) {
 	return locales[0], nil
 }
 
-func getShellCommand() (string, string, error) {
+func getShellCommand() (shell, shellOpts, eol string, err error) {
 	var (
-		finErr, err          error
-		shell                string
-		shellOpts            string
+		finErr               error
 		shellNames           []string
 		el                   string
 		needReplaceBackslash bool
@@ -91,7 +89,7 @@ func getShellCommand() (string, string, error) {
 		shellNames = []string{"zsh", "bash", "sh"}
 		shellOpts = " -i"
 	default:
-		return "", "", utils.Errorf("unsupported os: %s", goos)
+		return "", "", "", utils.Errorf("unsupported os: %s", goos)
 	}
 
 	for _, shellName := range shellNames {
@@ -104,13 +102,13 @@ func getShellCommand() (string, string, error) {
 	}
 
 	if shell == "" && finErr != nil {
-		return "", "", utils.Errorf("failed to find shell: %s", finErr)
+		return "", "", "", utils.Errorf("failed to find shell: %s", finErr)
 	}
 	if needReplaceBackslash {
 		// for windows
 		shell = strings.ReplaceAll(shell, "\\", "\\\\")
 	}
-	return shell + shellOpts, el, nil
+	return shell, shellOpts, el, nil
 }
 
 func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) error {
@@ -148,7 +146,8 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 	}
 
 	// exec
-	shell, eol, err := getShellCommand()
+	shell, opts, eol, err := getShellCommand()
+	command := shell + opts
 	eolBytes := []byte(eol)
 	isUnix := runtime.GOOS != "windows"
 	envs := os.Environ()
@@ -161,7 +160,10 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		} else {
 			log.Warnf("not install available locale with UTF-8: %s", err)
 		}
+		envs = append(envs, fmt.Sprintf("SHELL=%s", shell))
+		envs = append(envs, fmt.Sprintf("TERM=xterm-256color"))
 	}
+	envs = append(envs, "TERM_PROGRAM=yaklang")
 	if err != nil {
 		return err
 	}
@@ -169,7 +171,7 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 	streamerRWC := &OpenPortServerStreamerHelperRWC{
 		stream: inputStream,
 	}
-	commands, _ := shlex.Split(shell)
+	commands, _ := shlex.Split(command)
 
 	ptmx, err := pty.New()
 	if err != nil {
