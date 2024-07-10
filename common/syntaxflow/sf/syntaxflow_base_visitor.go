@@ -31,11 +31,47 @@ func (v *BaseSyntaxFlowVisitor) VisitFilter(ctx *FilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContent(ctx *FileFilterContentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitCommand(ctx *CommandContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitEmpty(ctx *EmptyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentStatement(ctx *FileFilterContentStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentInput(ctx *FileFilterContentInputContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentMethod(ctx *FileFilterContentMethodContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentMethodParam(ctx *FileFilterContentMethodParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentMethodParamItem(ctx *FileFilterContentMethodParamItemContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentMethodParamKey(ctx *FileFilterContentMethodParamKeyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileFilterContentMethodParamValue(ctx *FileFilterContentMethodParamValueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFileName(ctx *FileNameContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
