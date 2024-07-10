@@ -569,8 +569,7 @@ expression
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
     | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
     | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
-    | expression '->' memberCallKey assignmentOperator expression    # FieldMemberCallAssignmentExpression
-    | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
+    | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression
     | flexiVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression

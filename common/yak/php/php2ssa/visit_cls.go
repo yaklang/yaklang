@@ -38,24 +38,39 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	}
 	obj.SetType(class)
 
-	findConstructor := func(class *ssa.ClassBluePrint) ssa.Value {
+	findConstructorAndDestruct := func(class *ssa.ClassBluePrint) (ssa.Value, ssa.Value) {
 		tmpClass := class
+		var (
+			constructor ssa.Value = nil
+			destructor  ssa.Value = nil
+		)
+
 		for {
-			if tmpClass.Constructor != nil {
-				return tmpClass.Constructor
+			if tmpClass.Constructor != nil && constructor == nil {
+				constructor = tmpClass.Constructor
+			}
+			if tmpClass.Destructor != nil && destructor == nil {
+				destructor = tmpClass.Destructor
+			}
+			if constructor != nil && destructor != nil {
+				return constructor, destructor
 			}
 			if len(tmpClass.ParentClass) != 0 {
 				tmpClass = class.ParentClass[0]
 			} else {
-				return nil
+				return constructor, destructor
 			}
 		}
 	}
-	constructor := findConstructor(class)
+	args := []ssa.Value{obj}
+	constructor, destructor := findConstructorAndDestruct(class)
+	if destructor != nil {
+		call := y.NewCall(destructor, args)
+		y.AddDefer(call)
+	}
 	if constructor == nil {
 		return obj
 	}
-	args := []ssa.Value{obj}
 	ellipsis := false
 	if i.Arguments() != nil {
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
@@ -65,6 +80,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	c := y.NewCall(constructor, args)
 	c.IsEllipsis = ellipsis
 	y.EmitCall(c)
+
 	return obj
 }
 
@@ -140,11 +156,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	if y == nil || raw == nil {
 		return
 	}
-
-	// i, _ := raw.(*phpparser.ClassStatementContext)
-	// if i == nil {
-	// 	return
-	// }
 
 	switch ret := raw.(type) {
 	case *phpparser.PropertyModifiersVariableContext:
@@ -423,7 +434,6 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	getValue := func(class, key string) ssa.Value {
 		// class const  variable
 		if !y.isFunction {
@@ -460,7 +470,6 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		exprName := y.VisitVariable(i.Variable())
 		value := y.ReadValue(exprName)
 		key := i.Identifier().GetText()
-
 		// if value is instance of class, check this class static function or const member
 		if typ, ok := ssa.ToObjectType(value.GetType()); ok {
 			if v := getValue(typ.Name, key); v != nil {
@@ -481,9 +490,10 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	var class, key string
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticVariableContext:
-		// TODO class
+		// TODO class 命令空间
 		key = i.VarName().GetText()
 	case *phpparser.ClassDirectStaticVariableContext:
+		//肯定是一个class，
 		class = i.Identifier().GetText()
 		key = i.VarName().GetText()
 	case *phpparser.StringAsIndirectClassStaticVariableContext:
@@ -504,7 +514,6 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	if class == "" {
 		return nil
 	}
-
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]

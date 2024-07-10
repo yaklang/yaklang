@@ -139,16 +139,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
 		y.AssignVariable(member, rightValue)
 		return rightValue
-	case *phpparser.FieldMemberCallAssignmentExpressionContext: // $a->b = expr
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		member := y.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(1))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.AssignVariable(member, rightValue)
-		return rightValue
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction
 		y.isFunction = true
@@ -500,6 +490,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 
 	// TODO: static class member
+	// 静态方法调用
 	case *phpparser.StaticClassAccessExpressionContext:
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
