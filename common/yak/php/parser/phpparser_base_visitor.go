@@ -515,10 +515,6 @@ func (v *BasePHPParserVisitor) VisitPrefixIncDecExpression(ctx *PrefixIncDecExpr
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitFieldMemberCallAssignmentExpression(ctx *FieldMemberCallAssignmentExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
