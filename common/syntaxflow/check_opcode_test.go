@@ -197,4 +197,40 @@ func TestOpcode(t *testing.T) {
 		f.b()
 		`, sfvm.OpCheckStackTop)
 	})
+
+	t.Run("test OpFileFilterXpath 1", func(t *testing.T) {
+		check(t, `
+		${application.properties}.xpath(select: aaa)
+		`, sfvm.OpFileFilterXpath)
+	})
+
+	t.Run("test OpFileFilterXpath 2", func(t *testing.T) {
+		check(t, `
+		${/xml$/}.xpath(select: aa)
+		`, sfvm.OpFileFilterXpath)
+	})
+
+	t.Run("test OpFileFilterJsonPath 1 ", func(t *testing.T) {
+		check(t, `
+		${application.properties}.json(select: aaa)
+		`, sfvm.OpFileFilterJsonPath)
+	})
+
+	t.Run("test OpFileFilterJsonPath 2 ", func(t *testing.T) {
+		check(t, `
+		${application.properties}.jsonpath(select: aaa)
+		`, sfvm.OpFileFilterJsonPath)
+	})
+
+	t.Run("test OpFileFilterReg 1 ", func(t *testing.T) {
+		check(t, `
+		${application.properties}.re(select: aaa)
+		`, sfvm.OpFileFilterReg)
+	})
+
+	t.Run("test OpFileFilterReg 2", func(t *testing.T) {
+		check(t, `
+		${application.properties}.regexp(select: aaa)
+		`, sfvm.OpFileFilterReg)
+	})
 }

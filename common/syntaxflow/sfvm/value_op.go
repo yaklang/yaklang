@@ -129,5 +129,5 @@ type ValueOperator interface {
 
 	AppendPredecessor(ValueOperator, ...AnalysisContextOption) error
 	// fileFilter
-	FileFilter(fs.File, string, map[string]string) (ValueOperator, error)
+	FileFilter(fs.File, string, map[string]string, []string) (ValueOperator, error)
 }

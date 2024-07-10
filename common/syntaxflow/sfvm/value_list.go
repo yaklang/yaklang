@@ -255,6 +255,6 @@ func (v *ValueList) RegexpMatch(mod int, regexp string) (bool, ValueOperator, er
 	return len(res) > 0, NewValues(res), nil
 }
 
-func (v *ValueList) FileFilter(fs.File, string, map[string]string) (ValueOperator, error) {
+func (v *ValueList) FileFilter(fs.File, string, map[string]string, []string) (ValueOperator, error) {
 	return nil, utils.Error("ValueList is not supported file filter")
 }

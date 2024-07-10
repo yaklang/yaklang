@@ -129,6 +129,12 @@ func TestSyntaxInOne(t *testing.T) {
 		"exec(* #-> ?{((any: 'example',abc,) && (opcode: phi,function))})",
 		"a...b",
 		"a...b.ccc()...e",
+		"${application.properties}.re(select: aaa)",
+		"${application.properties}.xpath(select: aaa)",
+		"${application.properties}.json(select: aaa)",
+		"${application.properties}.jsonpath(select: aaa)",
+		"${/xml$/}.xpath(select: aaa)",
+		"${application.properties}.re(aaa)",
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)

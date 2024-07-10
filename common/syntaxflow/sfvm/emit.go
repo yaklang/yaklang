@@ -357,3 +357,30 @@ func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
 		OpCode: OpCheckStackTop,
 	})
 }
+
+func (y *SyntaxFlowVisitor) EmitFileFilterReg(i string, m map[string]string, s []string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:               OpFileFilterReg,
+		UnaryStr:             i,
+		FileFilterMethodItem: m,
+		Values:               s,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitFileFilterXpath(i string, m map[string]string, s []string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:               OpFileFilterXpath,
+		UnaryStr:             i,
+		FileFilterMethodItem: m,
+		Values:               s,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitFileFilterJsonPath(i string, m map[string]string, s []string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:               OpFileFilterJsonPath,
+		UnaryStr:             i,
+		FileFilterMethodItem: m,
+		Values:               s,
+	})
+}
