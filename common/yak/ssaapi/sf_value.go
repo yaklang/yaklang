@@ -1,10 +1,12 @@
 package ssaapi
 
 import (
+	"io/fs"
 	"regexp"
 
-	"github.com/gobwas/glob"
 	"github.com/samber/lo"
+
+	"github.com/gobwas/glob"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -167,4 +169,8 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 		}
 		return nil
 	})
+}
+
+func (v *Value) FileFilter(fs.File, string, map[string]string) (sfvm.ValueOperator, error) {
+	return nil, utils.Error("ssa.Value is not supported file filter")
 }
