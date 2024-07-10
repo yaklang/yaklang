@@ -61,6 +61,8 @@ func (y *SyntaxFlowVisitor) VisitStatement(raw sf.IStatementContext) {
 		y.VisitAlertStatement(i.AlertStatement())
 	case *sf.EmptyContext:
 		return
+	case *sf.FileFilterContentContext:
+		y.VisitFileFilterContent(i.FileFilterContentStatement())
 	default:
 		log.Infof("syntaxflow met statement: %v", strings.TrimSpace(i.GetText()))
 	}
