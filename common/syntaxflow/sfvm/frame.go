@@ -924,6 +924,39 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return err
 		}
 		s.stack.Push(ret)
+	case OpFileFilterJsonPath:
+		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+		name := i.UnaryStr
+		if name == "" {
+			return utils.Errorf("file filter failed: file name is empty")
+		}
+		paramList := i.Values
+		paramMap := i.FileFilterMethodItem
+		_ = paramList
+		_ = paramMap
+	case OpFileFilterXpath:
+		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+		name := i.UnaryStr
+		if name == "" {
+			return utils.Errorf("file filter failed: file name is empty")
+		}
+		paramList := i.Values
+		paramMap := i.FileFilterMethodItem
+		_ = paramList
+		_ = paramMap
+	case OpFileFilterReg:
+		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+		name := i.UnaryStr
+		if name == "" {
+			return utils.Errorf("file filter failed: file name is empty")
+		}
+		paramList := i.Values
+		paramMap := i.FileFilterMethodItem
+		_ = paramList
+		_ = paramMap
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

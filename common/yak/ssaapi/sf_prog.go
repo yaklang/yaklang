@@ -118,6 +118,6 @@ func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
 }
 
-func (p *Program) FileFilter(fs.File, string, map[string]string) (sfvm.ValueOperator, error) {
+func (p *Program) FileFilter(fs.File, string, map[string]string, []string) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported file filter")
 }
