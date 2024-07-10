@@ -28,7 +28,7 @@ fileFilterContentStatement
     ;
 
 // match filter content
-fileFilterContentInput: (identifier | regexpLiteral);
+fileFilterContentInput: ( fileName | regexpLiteral);
 
 // only specific method can be used
 // 1. regexp  (re)
@@ -43,6 +43,7 @@ fileFilterContentMethodParam:  fileFilterContentMethodParamItem lines? (',' line
 fileFilterContentMethodParamItem: fileFilterContentMethodParamKey? fileFilterContentMethodParamValue;
 fileFilterContentMethodParamKey: Identifier ':';
 fileFilterContentMethodParamValue: nameFilter;
+fileName:identifier (. identifier)*;
 
 filterStatement
     : refVariable filterItem*  (As refVariable)? # RefFilterExpr
