@@ -374,7 +374,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 				}
 			}
 
-			break
+			return
 		}
 
 		b.NewError(ssa.Error, TAG, "binary operator not support: %s", stmt.GetText())
