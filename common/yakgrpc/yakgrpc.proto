@@ -4178,6 +4178,8 @@ message HTTPResponseMatcher {
   string GroupEncoding = 7;
   bool Negative = 8;
   string ExprType = 9;
+
+  string HitColor = 10;
 }
 
 message RenderVariablesRequest {

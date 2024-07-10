@@ -157,20 +157,11 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	}
 	// 匹配响应
 	var httpTPLmatchersResult bool
+	var hitColor string
 	if len(req.GetMatchers()) != 0 {
-		httpTplMatcher := make([]*httptpl.YakMatcher, 0)
+		httpTplMatcher := make([]*httptpl.YakHttpFlowMatcher, 0)
 		for _, matcher := range req.GetMatchers() {
-			httpTplMatcher = append(httpTplMatcher, httptpl.NewMatcherFromGRPCModel(matcher))
-		}
-		cond := "and"
-		switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
-		case "or", "and":
-			cond = ret
-		default:
-		}
-		ins := &httptpl.YakMatcher{
-			SubMatcherCondition: cond,
-			SubMatchers:         httpTplMatcher,
+			httpTplMatcher = append(httpTplMatcher, httptpl.NewHttpFlowMatcherFromGRPCModel(matcher))
 		}
 		mergedParams := make(map[string]interface{})
 		renderedParams, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
@@ -188,7 +179,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 
 		matcherParams := utils.CopyMapInterface(mergedParams)
-		httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{RawPacket: rspRaw}, matcherParams)
+		httpTPLmatchersResult, hitColor = MatchColor(httpTplMatcher, &httptpl.RespForMatch{RawPacket: rspRaw}, matcherParams)
 		if err != nil {
 			log.Errorf("httptpl.YakMatcher execute failed: %s", err)
 		}
@@ -201,7 +192,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		RequestRaw:            resultRequest,
 		ExtractedResults:      extractResults,
 		MatchedByMatcher:      httpTPLmatchersResult,
-		HitColor:              req.GetHitColor(),
+		HitColor:              hitColor,
 	}
 	rsp.UUID = uuid.New().String()
 	rsp.Timestamp = start.Unix()
@@ -414,6 +405,23 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	historyID := req.GetHistoryWebFuzzerId()
 	reMatch := req.GetReMatch()
+
+	httpTplMatcher := make([]*httptpl.YakHttpFlowMatcher, len(req.GetMatchers()))
+	httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+	haveHTTPTplMatcher := len(httpTplMatcher) > 0
+	haveHTTPTplExtractor := len(httpTplExtractor) > 0
+	if haveHTTPTplExtractor {
+		for i, e := range req.GetExtractors() {
+			httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
+		}
+	}
+
+	if haveHTTPTplMatcher {
+		for i, m := range req.GetMatchers() {
+			httpTplMatcher[i] = httptpl.NewHttpFlowMatcherFromGRPCModel(m)
+		}
+	}
+
 	if historyID > 0 {
 		// 回溯找到所有之前的包，进行整合
 		oldIDs, err := yakit.GetWebFuzzerTasksIDByRetryRootID(s.GetProjectDatabase(), uint(historyID))
@@ -433,35 +441,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
-				newHitColor := req.GetHitColor()
-				httpTplMatcher := make([]*httptpl.YakMatcher, len(req.GetMatchers()))
-				httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-				haveHTTPTplMatcher := len(httpTplMatcher) > 0
-				haveHTTPTplExtractor := len(httpTplExtractor) > 0
-
-				if haveHTTPTplExtractor {
-					for i, e := range req.GetExtractors() {
-						httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
-					}
-				}
-
-				if haveHTTPTplMatcher {
-					for i, m := range req.GetMatchers() {
-						httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
-					}
-				}
-
-				cond := "and"
-				if ret := strings.ToLower(req.GetMatchersCondition()); ret == "or" {
-					cond = ret
-				}
-
-				// new Matcher
-				ins := &httptpl.YakMatcher{
-					SubMatcherCondition: cond,
-					SubMatchers:         httpTplMatcher,
-				}
-
 				_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode(), nil)
 				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
@@ -493,7 +472,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 
-						if respModel != nil && getMirrorHTTPFlowParams != nil {
+						if getMirrorHTTPFlowParams != nil {
 							for k, v := range getMirrorHTTPFlowParams(respModel.RequestRaw, respModel.ResponseRaw, existedParams) { // 热加载的参数
 								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v))})
 							}
@@ -503,7 +482,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						for _, kv := range extractorResults { // 合并
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
-						httpTPLmatchersResult, err := ins.Execute(
+						httpTPLmatchersResult, hitColor := MatchColor(httpTplMatcher,
 							&httptpl.RespForMatch{
 								RawPacket: respModel.ResponseRaw,
 								Duration:  float64(respModel.DurationMs),
@@ -515,7 +494,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						}
 						if httpTPLmatchersResult {
 							respModel.MatchedByMatcher = true
-							respModel.HitColor = newHitColor
+							respModel.HitColor = hitColor
 							break
 						}
 					}
@@ -622,23 +601,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	inStatusCode := utils.ParseStringToPorts(req.GetRetryInStatusCode())
 	notInStatusCode := utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
 
-	httpTplMatcher := make([]*httptpl.YakMatcher, len(req.GetMatchers()))
-	httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-	haveHTTPTplMatcher := len(httpTplMatcher) > 0
-	haveHTTPTplExtractor := len(httpTplExtractor) > 0
-	if haveHTTPTplExtractor {
-		for i, e := range req.GetExtractors() {
-			httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
-		}
-	}
-
-	if haveHTTPTplMatcher {
-		for i, m := range req.GetMatchers() {
-			httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
-		}
-	}
-
-	// 重试处理，通过taskid找到所有失败的发送包
 	var iInput any
 	retryPayloadsMap := make(map[string][]string, 0) // key 是原始请求报文，value 是重试的payload，我们需要将重试的payload绑定回去
 	// 这里可能会出现原始请求报文一样的情况，但是这样也是因为payload没有而导致的，例如{{repeat(10)}}
@@ -865,30 +827,36 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			httpTPLmatchersResult := false
+			hitColor := ""
 			lowhttpResponse := result.LowhttpResponse
 
 			if haveHTTPTplMatcher && lowhttpResponse != nil {
-				cond := "and"
-				switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
-				case "or", "and":
-					cond = ret
-				default:
-				}
-				ins := &httptpl.YakMatcher{
-					SubMatcherCondition: cond,
-					SubMatchers:         httpTplMatcher,
-				}
+				//cond := "and"
+				//switch ret := strings.ToLower(req.GetMatchersCondition()); ret {
+				//case "or", "and":
+				//	cond = ret
+				//default:
+				//}
+				//ins := &httptpl.YakMatcher{
+				//	SubMatcherCondition: cond,
+				//	SubMatchers:         httpTplMatcher,
+				//}
 				matcherParams := utils.CopyMapInterface(mergedParams)
 				for _, kv := range extractorResultsOrigin {
 					matcherParams[kv.GetKey()] = kv.GetValue()
 				}
-				httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
+				httpTPLmatchersResult, hitColor = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
 					RawPacket: result.ResponseRaw,
 					Duration:  lowhttpResponse.GetDurationFloat(),
 				}, matcherParams)
-				if finalError != nil {
-					log.Errorf("httptpl.YakMatcher execute failed: %s", err)
-				}
+
+				//httpTPLmatchersResult, err = ins.Execute(&httptpl.RespForMatch{
+				//	RawPacket: result.ResponseRaw,
+				//	Duration:  lowhttpResponse.GetDurationFloat(),
+				//}, matcherParams)
+				//if finalError != nil {
+				//	log.Errorf("httptpl.YakMatcher execute failed: %s", err)
+				//}
 			}
 
 			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
@@ -925,7 +893,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				IsHTTPS:                    strings.HasPrefix(strings.ToLower(result.Url), "https://"),
 				ExtractedResults:           extractorResults,
 				MatchedByMatcher:           httpTPLmatchersResult,
-				HitColor:                   req.GetHitColor(),
+				HitColor:                   hitColor,
 				IsTooLargeResponse:         lowhttpResponse.TooLarge,
 				TooLargeResponseBodyFile:   tooLargeBodyFile,
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
@@ -1044,7 +1012,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						Payloads:              payloads,
 						IsHTTPS:               redirectRes.Https,
 						MatchedByMatcher:      httpTPLmatchersResult,
-						HitColor:              req.GetHitColor(),
+						HitColor:              hitColor,
 						RuntimeID:             runtimeID,
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
@@ -1609,4 +1577,18 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty) (*ypb.DefaultDnsServerResponse, error) {
 	servers, err := utils.GetSystemDnsServers()
 	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err
+}
+
+func MatchColor(m []*httptpl.YakHttpFlowMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor string) {
+	for _, flowMatcher := range m {
+		res, err := flowMatcher.Matcher.Execute(rsp, vars, suf...)
+		if err != nil {
+			log.Errorf("yak match err :%s", err)
+		}
+		if res {
+			matched = true
+			hitColor = flowMatcher.Color
+		}
+	}
+	return
 }
