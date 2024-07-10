@@ -9,15 +9,27 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/aymanbagabas/go-pty"
 	"github.com/google/shlex"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/term"
 )
+
+type TerminalWrapper struct {
+	current *term.Terminal
+}
+
+func (t *TerminalWrapper) Write(p []byte) (n int, err error) {
+	return t.current.Write(p)
+}
+
+var CtrlCBytes = []byte("^C")
 
 var charsetPriority = map[string]int{
 	"C.UTF-8":     2,
@@ -45,7 +57,7 @@ func getAvailableLocaleUTF8() (string, error) {
 		return strings.HasSuffix(s, ".UTF-8")
 	})
 	if len(locales) == 0 {
-	return "", utils.Errorf("no available locale with UTF-8")
+		return "", utils.Errorf("no available locale with UTF-8")
 	}
 
 	sort.SliceStable(locales, func(i, j int) bool {
@@ -137,6 +149,7 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 
 	// exec
 	shell, eol, err := getShellCommand()
+	eolBytes := []byte(eol)
 	isUnix := runtime.GOOS != "windows"
 	envs := os.Environ()
 	if isUnix {
@@ -171,30 +184,42 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 			cmd.Env = envs
 		}
 		cmd.Start()
+		// if !isUnix {
+		// 	stdin.Write([]byte("chcp 65001"))
+		// 	stdin.Write(eolBytes)
+		// }
+		terminalWrapper := &TerminalWrapper{}
 
-		terminal := term.NewTerminal(streamerRWC, "")
 		streamerRWC.sizeCallback = func(width, height int) {
-			terminal.SetSize(width, height)
+			terminalWrapper.current.SetSize(width, height)
 		}
 		if width > 0 && height > 0 {
-			terminal.SetSize(width, height)
+			terminalWrapper.current.SetSize(width, height)
 		}
 
-		go io.Copy(terminal, stdout)
-		go io.Copy(terminal, stderr)
+		go io.Copy(terminalWrapper, stdout)
+		go io.Copy(terminalWrapper, stderr)
+
 		for {
-			line, err := terminal.ReadLine()
-			if errors.Is(err, io.EOF) {
-				continue
+			terminal := term.NewTerminal(streamerRWC, "")
+			terminalWrapper.current = terminal
+
+			for {
+				line, err := terminal.ReadLine()
+				if errors.Is(err, io.EOF) {
+					stdin.Write(eolBytes)
+					streamerRWC.Write(CtrlCBytes)
+					streamerRWC.Write(eolBytes)
+					break
+				} else if err != nil {
+					return err
+				}
+
+				stdin.Write([]byte(line))
+				stdin.Write(eolBytes)
 			}
-			if err != nil {
-				return err
-			}
-			if line == "" {
-				continue
-			}
-			stdin.Write([]byte(line + eol))
 		}
+
 	} else {
 		defer ptmx.Close()
 		streamerRWC.sizeCallback = func(width, height int) {
