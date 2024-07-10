@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	// "github.com/yaklang/yaklang/common/yak/ssa"
@@ -59,8 +61,61 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	
+	type StringAtom interface {
+		GetText() string
+		SingleExpression() JS.ISingleExpressionContext
+	}
+	var tmpStr string
+	var value ssa.Value
+	value = b.EmitConstInst("")
 
-	//TODO:unfinshed
+	templateQuoteEscapeChar := func(quote byte, s string) string {
+		s = strings.Replace(s, "\\$", "$", -1)
+		if quote == '`' {
+			s = strings.Replace(s, "\\n", "\\\\n", -1)
+			s = strings.Replace(s, "\\r", "\\\\r", -1)
+		}
+		escapeString, err := yakunquote.UnquoteInner(s, quote)
+		if err != nil {
+			b.NewError(ssa.Error, TAG, "const parse %s as template string literal escape char: %v", s, err)
+			return ""
+		}
+		return escapeString
+	}
+
+	parseStringAtom := func(prefix byte, atom StringAtom) {
+		expr := atom.SingleExpression()
+		if expr != nil {
+			s := templateQuoteEscapeChar(prefix, tmpStr)
+			tmpStr = ""
+			value = b.EmitBinOp(ssa.OpAdd, value, b.EmitConstInst(s))
+
+			v,_ := b.buildSingleExpression(expr,false)
+			t := b.EmitTypeCast(v, ssa.BasicTypes[ssa.StringTypeKind])
+			value = b.EmitBinOp(ssa.OpAdd, value, t)
+		} else {
+			tmpStr += atom.GetText()
+		}
+	}
+
+	handlerTemplate := func(prefix byte, atoms []StringAtom) {
+		for _, item := range atoms {
+			parseStringAtom(prefix, item)
+		}
+
+		if tmpStr != "" {
+			s := templateQuoteEscapeChar(prefix, tmpStr)
+			value = b.EmitBinOp(ssa.OpAdd, value, b.EmitConstInst(s))
+		}
+	}
+
+	handlerTemplate('`', lo.FilterMap(
+		stmt.AllTemplateStringAtom(),
+		func(atom JS.ITemplateStringAtomContext, _ int) (StringAtom, bool) {
+			item, ok := atom.(*JS.TemplateStringAtomContext)
+			return item, ok
+		}))
 
 	return b.EmitConstInst(1)
 }
