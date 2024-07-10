@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -207,6 +208,28 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 				Required: true,
 			})
 		}
+		domain := ""
+		switch name {
+		case "shodan":
+			domain = "https://api.shodan.io"
+		case "fofa":
+			domain = "https://fofa.info"
+		case "quake":
+			domain = "https://quake.360.net"
+		case "hunter":
+			domain = "https://hunter.qianxin.com"
+		case "zoomeye":
+			domain = "https://api.zoomeye.org"
+		}
+
+		seOpts = append(seOpts, &ypb.ThirdPartyAppConfigItemTemplate{
+			Name:         "domain",
+			Verbose:      "域名",
+			Type:         "string",
+			Desc:         "第三方加速域名",
+			DefaultValue: domain,
+			Required:     false,
+		})
 		return newConfigTemplate(name, verbose, "spaceengine", nil, seOpts...)
 	}
 	opts = append(opts, newSpaceEngineTmp("shodan", "Shodan", false))
