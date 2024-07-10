@@ -25,11 +25,38 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#Filter.
 	VisitFilter(ctx *FilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#FileFilterContent.
+	VisitFileFilterContent(ctx *FileFilterContentContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#Command.
 	VisitCommand(ctx *CommandContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#Empty.
 	VisitEmpty(ctx *EmptyContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentStatement.
+	VisitFileFilterContentStatement(ctx *FileFilterContentStatementContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentInput.
+	VisitFileFilterContentInput(ctx *FileFilterContentInputContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentMethod.
+	VisitFileFilterContentMethod(ctx *FileFilterContentMethodContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentMethodParam.
+	VisitFileFilterContentMethodParam(ctx *FileFilterContentMethodParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentMethodParamItem.
+	VisitFileFilterContentMethodParamItem(ctx *FileFilterContentMethodParamItemContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentMethodParamKey.
+	VisitFileFilterContentMethodParamKey(ctx *FileFilterContentMethodParamKeyContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileFilterContentMethodParamValue.
+	VisitFileFilterContentMethodParamValue(ctx *FileFilterContentMethodParamValueContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#fileName.
+	VisitFileName(ctx *FileNameContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#RefFilterExpr.
 	VisitRefFilterExpr(ctx *RefFilterExprContext) interface{}
