@@ -117,7 +117,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralCo
 			return item, ok
 		}))
 
-	return b.EmitConstInst(1)
+	return value
 }
 
 func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Value {
