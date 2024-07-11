@@ -3,11 +3,12 @@ package yakit
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -248,6 +249,16 @@ func GetKey(db *gorm.DB, key interface{}) string {
 		return kv.Value
 	}
 	return v
+}
+
+func GetKeyFromProjectOrProfile(key interface{}) string {
+	projectDB, profileDB := consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()
+	// project first
+	value := GetProjectKey(projectDB, key)
+	if value == "" {
+		value = GetKey(profileDB, key)
+	}
+	return value
 }
 
 func TidyGeneralStorage(db *gorm.DB) {

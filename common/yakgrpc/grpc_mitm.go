@@ -253,7 +253,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置过滤器
 	*/
-	filterManager := NewMITMFilterManager(s.GetProfileDatabase())
+	filterManager := GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
 
 	/*
 		设置内容替换模块，通过正则驱动
