@@ -58,7 +58,6 @@ func (s *SynxConfig) callCallback(r *synscan.SynScanResult) {
 	s.callback(r)
 }
 
-
 func (s *SynxConfig) filtered(port int) bool {
 	if s.ExcludePorts != nil && port > 0 {
 		if s.ExcludePorts.Exist(fmt.Sprint(port)) {
@@ -70,10 +69,11 @@ func (s *SynxConfig) filtered(port int) bool {
 
 func NewDefaultConfig() *SynxConfig {
 	return &SynxConfig{
-		waiting:           5 * time.Second,
-		rateLimitDelayMs:  1,
-		rateLimitDelayGap: 5,
-		ExcludePorts:      filter.NewFilter(),
+		waiting:                            5 * time.Second,
+		rateLimitDelayMs:                   1,
+		rateLimitDelayGap:                  100,
+		ExcludePorts:                       filter.NewFilter(),
+		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
 	}
 }
 
@@ -159,7 +159,6 @@ func WithSubmitTaskCallback(callback func(i string)) SynxConfigOption {
 		config.submitTaskCallback = callback
 	}
 }
-
 
 func WithIface(iface string) SynxConfigOption {
 	return func(config *SynxConfig) {

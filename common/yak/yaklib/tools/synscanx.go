@@ -28,7 +28,6 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	scanner.Cancel = cancel
 	sendDoneSignal := make(chan struct{})
 
-	_ = sendDoneSignal
 	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1000)
 
@@ -41,7 +40,11 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	}()
 
 	// 生产者
-	go scanner.SubmitTask(targets, ports, targetCh)
+	go func() {
+		scanner.SubmitTask(targets, ports, targetCh)
+		<-sendDoneSignal
+		close(resultCh)
+	}()
 
 	return resultCh, nil
 }

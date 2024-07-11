@@ -48,11 +48,10 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	}
 
 	// IPv4
-	opts = append(opts, pcapx.WithIPv4_ID(40000+rand.Intn(10000)))
 	opts = append(opts, pcapx.WithIPv4_Flags(layers.IPv4DontFragment))
 	opts = append(opts, pcapx.WithIPv4_Version(4))
 	opts = append(opts, pcapx.WithIPv4_NextProtocol(layers.IPProtocolTCP))
-	opts = append(opts, pcapx.WithIPv4_TTL(128))
+	opts = append(opts, pcapx.WithIPv4_TTL(64))
 	opts = append(opts, pcapx.WithIPv4_ID(40000+rand.Intn(10000)))
 	opts = append(opts, pcapx.WithIPv4_SrcIP(ipSrc))
 	opts = append(opts, pcapx.WithIPv4_DstIP(host))

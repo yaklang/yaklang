@@ -8,6 +8,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
@@ -134,7 +135,6 @@ func (s *Scannerx) GetFilterHosts(targets string) []string {
 	s.hosts = hostsparser.NewHostsParser(s.Ctx, strings.Join(filteredHosts, ","))
 	return filteredHosts
 }
-
 func (s *Scannerx) SubmitTask(targets, ports string, targetCh chan *SynxTarget) {
 	filteredHosts := s.GetFilterHosts(targets)
 	filtedPorts := s.GetFilterPorts(ports)
@@ -143,28 +143,33 @@ func (s *Scannerx) SubmitTask(targets, ports string, targetCh chan *SynxTarget) 
 		for _, port := range filtedPorts {
 			if s.sample == "" {
 				s.sample = host
-				err := s.getGatewayMac()
-				if err != nil {
+				if err := s.getGatewayMac(); err != nil {
 					log.Errorf("getGatewayMac failed: %v", err)
-					return
+					break
 				}
 			}
+			log.Infof("submit task: %s:%d", host, port)
 			proto, p := utils.ParsePortToProtoPort(port)
+			target := &SynxTarget{
+				Host: host,
+				Port: p,
+				Mode: TCP, // 默认 TCP
+			}
 			if proto == "udp" {
-				targetCh <- &SynxTarget{
-					Host: host,
-					Port: p,
-					Mode: UDP,
-				}
-			} else if proto == "tcp" {
-				targetCh <- &SynxTarget{
-					Host: host,
-					Port: p,
-					Mode: TCP,
-				}
+				target.Mode = UDP
+			}
+
+			select {
+			case <-s.Ctx.Done():
+				log.Infof("SubmitTask canceled")
+				close(targetCh)
+				return
+			case targetCh <- target:
 			}
 		}
 	}
+	log.Info("SubmitTask done")
+	close(targetCh)
 }
 
 func (s *Scannerx) getGatewayMac() error {
@@ -185,28 +190,33 @@ func (s *Scannerx) getGatewayMac() error {
 
 	wg := sync.WaitGroup{}
 
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.FetchGatewayHardwareAddressTimeout)
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		err := pcaputil.Start(
+			pcaputil.WithContext(ctx),
 			pcaputil.WithDevice(s.config.Iface.Name),
 			pcaputil.WithDisableAssembly(true),
 			pcaputil.WithBPFFilter("udp dst port 65321"),
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				go func() {
-					if ethLayer := packet.Layer(layers.LayerTypeEthernet); ethLayer != nil {
-						if !bytes.Equal(ethLayer.(*layers.Ethernet).DstMAC, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
-							log.Infof("MAC Address found: %s", ethLayer.(*layers.Ethernet).DstMAC)
-							macCh <- ethLayer.(*layers.Ethernet).DstMAC
-						}
+				//go func() {
+				if ethLayer := packet.Layer(layers.LayerTypeEthernet); ethLayer != nil {
+					if !bytes.Equal(ethLayer.(*layers.Ethernet).DstMAC, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
+						log.Infof("MAC Address found: %s", ethLayer.(*layers.Ethernet).DstMAC)
+						macCh <- ethLayer.(*layers.Ethernet).DstMAC
+						cancel()
 					}
-				}()
+				}
+				//}()
 			}),
 		)
 		if err != nil {
 			log.Errorf("pcaputil.Start failed: %v", err)
 			return
 		}
+
 	}()
 
 	connectUdp := func() error {
@@ -242,10 +252,11 @@ func (s *Scannerx) getGatewayMac() error {
 	}()
 	go func() {
 		wg.Wait()
+		//cancel()
 		close(macCh)
 	}()
 
-	timer := time.NewTimer(time.Second * 2)
+	timer := time.NewTimer(time.Second * 3)
 	defer timer.Stop()
 
 	select {
@@ -259,35 +270,6 @@ func (s *Scannerx) getGatewayMac() error {
 }
 
 func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh chan *synscan.SynScanResult) error {
-	iface, gatewayIP, srcIP := s.config.Iface, s.config.GatewayIP, s.config.SourceIP
-	if iface == nil {
-		return utils.Errorf("iface is nil")
-	}
-
-	_ = gatewayIP
-
-	isLocalhost := utils.IsLoopback(srcIP.String())
-
-	_ = isLocalhost
-
-	var localIfaceName string
-
-	_ = localIfaceName
-
-	//devs, err := pcap.FindAllDevs()
-	//if err != nil {
-	//	info, err := codec.GB18030ToUtf8([]byte(err.Error()))
-	//	if err != nil {
-	//		return utils.Errorf("cannot find pcap ifaceDevs: %v", err)
-	//	}
-	//	return utils.Errorf("cannot find pcap ifaceDevs: %v", string(info))
-	//}
-	//
-	//for _, d := range devs {
-	//	if len(d.Addresses) == 0 {
-	//		continue
-	//	}
-	//}
 	openPortLock := new(sync.Mutex)
 	var openPortCount int
 
@@ -303,10 +285,19 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 		}
 	}
 
+	resultFilter := filter.NewFilter()
+	defer resultFilter.Close()
 	if s.OpenPortHandlers == nil {
 		s.OpenPortHandlers = func(host net.IP, port int) {
 			openPortLock.Lock()
 			defer openPortLock.Unlock()
+
+			addr := utils.HostPort(host.String(), port)
+			if resultFilter.Exist(addr) {
+				return
+			}
+			resultFilter.Insert(addr)
+
 			if !s.hosts.Contains(host.String()) || !s.ports.Contains(port) {
 				return
 			}
@@ -317,17 +308,14 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 			}
 			s.config.callCallback(result)
 
-			select {
-			case resultCh <- result:
-			}
+			resultCh <- result
 
 			if outputFile != nil {
 				outputFile.Write(
 					[]byte(fmt.Sprintf(
-						"%s%s:%d\n",
+						"%s%v\n",
 						s.config.outputFilePrefix,
-						host.String(),
-						port,
+						addr,
 					)),
 				)
 			}
@@ -346,7 +334,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	}()
 	wg.Wait()
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(s.config.waiting)
 
 	wCancel()
 
@@ -354,6 +342,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 
 	done <- struct{}{}
 
+	log.Infof("open port count: %d", openPortCount)
 	return nil
 }
 
@@ -370,26 +359,37 @@ func (s *Scannerx) sleepRateLimit() {
 func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
 	var counter int
 	var total int64
-	for target := range targetCh {
-		host := target.Host
-		port := target.Port
-		proto := target.Mode
-		if s.config.rateLimitDelayMs > 0 && s.config.rateLimitDelayGap > 0 {
-			if counter > s.config.rateLimitDelayGap {
-				counter = 0
-				s.sleepRateLimit()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("Context cancelled, stopping packet sending")
+			return
+		case target, ok := <-targetCh:
+			if !ok {
+				log.Info("target channel closed, stopping packet sending")
+				return
 			}
-		}
-		packet, err := s.assemblePacket(host, port, proto)
-		if err != nil {
-			log.Errorf("assemble packet failed: %v", err)
-			continue
-		}
-		err = s.Handle.WritePacketData(packet)
-		total++
-		counter++
-		if err != nil {
-			log.Errorf("write to device failed: %v", err)
+			host := target.Host
+			port := target.Port
+			proto := target.Mode
+			if s.config.rateLimitDelayMs > 0 && s.config.rateLimitDelayGap > 0 {
+				if counter > s.config.rateLimitDelayGap {
+					counter = 0
+					s.sleepRateLimit()
+				}
+			}
+			packet, err := s.assemblePacket(host, port, proto)
+			if err != nil {
+				log.Errorf("assemble packet failed: %v", err)
+				continue
+			}
+			err = s.Handle.WritePacketData(packet)
+			if err != nil {
+				log.Errorf("write to device failed: %v", err)
+			}
+			total++
+			counter++
 		}
 	}
 }
@@ -413,6 +413,7 @@ func (s *Scannerx) HandlerReadPacket(ctx context.Context, resultCh chan *synscan
 	for {
 		select {
 		case <-ctx.Done():
+			return
 		case packet := <-packetSource.Packets():
 			if packet == nil {
 				continue
