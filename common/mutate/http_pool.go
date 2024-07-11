@@ -876,20 +876,22 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 				if config.BatchTarget != "" {
 					targetsReplaced := utils.PrettifyListFromStringSplitEx(config.BatchTarget, "\n", ",", "|")
 					for _, newTarget := range targetsReplaced {
-						overrideHttps := config.IsHttps
+						isHTTPS := config.IsHttps
 						var overrideHost string
 						if strings.HasPrefix(strings.ToLower(newTarget), "https://") {
-							overrideHttps = true
+							isHTTPS = true
+						} else if strings.HasPrefix(strings.ToLower(newTarget), "http://") {
+							isHTTPS = false
 						}
 						host, port, _ := utils.ParseStringToHostPort(newTarget)
-						if (overrideHttps && port != 443) || (!overrideHttps && port != 80) {
+						if (isHTTPS && port != 443) || (!isHTTPS && port != 80) {
 							// hide port
 							overrideHost = utils.HostPort(host, port)
 						} else {
 							overrideHost = host
 						}
 						replacedPacket := lowhttp.ReplaceHTTPPacketHeader(targetRequest, "Host", overrideHost)
-						execSubmitTaskWithoutBatchTarget(overrideHttps, overrideHost, replacedPacket, payloads...)
+						execSubmitTaskWithoutBatchTarget(isHTTPS, overrideHost, replacedPacket, payloads...)
 					}
 				}
 				execSubmitTaskWithoutBatchTarget(false, "", targetRequest, payloads...)
