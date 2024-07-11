@@ -29,6 +29,77 @@ b = () => {
 }
 if e {b()}
 c = a;
-		`, ssatest.CheckTopDef_Contain("c", []string{"2", "1"}, true))
+		`, ssatest.CheckTopDef_Contain("c", []string{"2", "1", "Undefined-e"}, true))
+	})
+
+	t.Run("if-else phi side-effect", func(t *testing.T) {
+		ssatest.Check(t, `
+		d = "kkk"
+		ok = foo("ooo", d)
+		a= 1 
+		if ok{
+			a= 1
+		}else{
+			a = 2
+		}
+		b = a
+
+		`, ssatest.CheckTopDef_Contain("b", []string{
+			"1",
+			"2",
+			"Undefined-foo(\"ooo\",\"kkk\")",
+			"Undefined-foo",
+			"ooo",
+			"kkk",
+		}, true))
+	})
+
+	t.Run("simple if else-if phi side-effect ", func(t *testing.T) {
+		ssatest.Check(t, `
+		a = 3
+		if c{
+			a= 1
+		}else if d{
+			a = 2
+		}
+		b = a
+
+		`, ssatest.CheckTopDef_Contain("b", []string{
+			"1",
+			"2",
+			"3",
+			"Undefined-c",
+			"Undefined-d",
+		}, true))
+	})
+
+	t.Run("complex if else-if phi side-effect", func(t *testing.T) {
+		ssatest.Check(t, `
+		a = 1
+
+		ok = false
+		if e {
+			ok = true
+		}else{
+			ok = false
+		}
+
+		if c{
+			a= 11
+		}else if ok{
+			a = 111
+		}
+		b = a
+
+		`, ssatest.CheckTopDef_Contain("b", []string{
+			"1",
+			"111",
+			"11",
+			"Undefined-c",
+			"phi(ok)[true,false]",
+			"true",
+			"false",
+			"Undefined-e",
+		}, true))
 	})
 }

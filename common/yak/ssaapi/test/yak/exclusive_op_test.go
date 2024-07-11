@@ -162,7 +162,7 @@ g = d
 	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		defs := value.GetTopDefs()
 		log.Infof("defs: %v", defs)
-		if len(defs) == 2 {
+		if len(defs) == 4 {
 			lenCheck = true
 		}
 		if len(defs) > 0 {
@@ -226,7 +226,7 @@ g = d
 			}
 		}
 	})
-	if topDefsCount != 5 {
+	if topDefsCount != 7 {
 		t.Errorf("len check failed %d", topDefsCount)
 	}
 	if !valCheck {
