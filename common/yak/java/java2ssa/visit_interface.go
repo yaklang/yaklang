@@ -49,6 +49,10 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 		if !ok {
 			continue
 		}
+
+		cbs, defs, isStatic := y.VisitModifiers(memberRaw.Modifiers())
+		_ = isStatic
+
 		recv, ok := memberRaw.InterfaceMemberDeclaration().(*javaparser.InterfaceMemberDeclarationContext)
 		if !ok {
 			continue
@@ -57,6 +61,14 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 			record := ret.(*javaparser.RecordDeclarationContext)
 			if name, vals := y.VisitRecordDeclaration(record); name != "" {
 				for _, val := range vals {
+					if val != nil {
+						for _, cb := range cbs {
+							cb(val)
+						}
+						for _, def := range defs {
+							def(val)
+						}
+					}
 					handler(name, val)
 				}
 			}
@@ -73,6 +85,14 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 				}
 				for _, val := range vals {
 					val.SetType(valType)
+					if val != nil {
+						for _, cb := range cbs {
+							cb(val)
+						}
+						for _, def := range defs {
+							def(val)
+						}
+					}
 					handler(name, val)
 				}
 			}
@@ -137,12 +157,35 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 			for _, def := range defCallbacks {
 				def(val)
 			}
+			for _, cb := range cbs {
+				cb(val)
+			}
+			for _, def := range defs {
+				def(val)
+			}
 			handler(memberName, val)
 		} else if ret := recv.GenericInterfaceMethodDeclaration(); ret != nil {
 			raw, ok := ret.(*javaparser.GenericInterfaceMethodDeclarationContext)
 			if !ok {
 				continue
 			}
+
+			// String url = app.GetProperties("jdbc.url");
+			// String url = "jdbc... from file";
+			//
+			// JDBCConnectionBuilder = JDBC....getConnection(url);
+			//
+			// app.GetProper*(*?{opcode: const} as $literalConfig)
+			// ${/(\.xml)|(.proper.*?)/}.regexp(result: $literalConfig<buildExpr>)
+			// $result?{!(any: "127.0.0.1",localhost,*.internel)} as $dangerous
+			// check $dangerout
+			//
+			// class{
+			//   @Properties("aliyunoss.ak")
+			//   String accessKey = null;
+			// }
+			//
+			//
 
 			var insCallbacks, defCallbacks []func(ssa.Value)
 			for _, modRaw := range raw.AllInterfaceMethodModifier() {
