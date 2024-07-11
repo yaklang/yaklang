@@ -2,13 +2,14 @@ package yakit
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"strconv"
 )
 
 func SaveToServerWebsocketFlow(db *gorm.DB, owner string, index int, data []byte) error {
@@ -45,6 +46,39 @@ func SaveFromServerWebsocketFlow(db *gorm.DB, owner string, index int, data []by
 		"quoted_data":            strconv.Quote(string(data)),
 		"message_type":           "text",
 	})
+}
+
+func SaveFromServerWebsocketFlowEx(db *gorm.DB, owner string, index int, data []byte, finishHandler ...func(error)) error {
+	f := &schema.WebsocketFlow{
+		WebsocketRequestHash: owner,
+		FrameIndex:           index,
+		FromServer:           true,
+		QuotedData:           strconv.Quote(string(data)),
+		MessageType:          "text",
+	}
+	f.Hash = f.CalcHash()
+	return CreateOrUpdateWebsocketFlowEx(db, f.Hash, map[string]interface{}{
+		"frame_index":            index,
+		"from_server":            true,
+		"websocket_request_hash": owner,
+		"quoted_data":            strconv.Quote(string(data)),
+		"message_type":           "text",
+	}, finishHandler...)
+}
+
+func CreateOrUpdateWebsocketFlowEx(db *gorm.DB, hash string, i interface{}, finishHandler ...func(error)) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+		return CreateOrUpdateWebsocketFlow(consts.GetGormProjectDatabase(), hash, i)
+	} else {
+		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+			err := CreateOrUpdateWebsocketFlow(db, hash, i)
+			for _, h := range finishHandler {
+				h(err)
+			}
+			return err
+		}
+		return nil
+	}
 }
 
 func CreateOrUpdateWebsocketFlow(db *gorm.DB, hash string, i interface{}) error {
@@ -152,7 +186,7 @@ func BatchWebsocketFlows(db *gorm.DB, ctx context.Context) chan *schema.Websocke
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*schema.WebsocketFlow
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{

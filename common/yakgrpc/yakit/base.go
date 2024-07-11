@@ -1,18 +1,21 @@
 package yakit
 
 import (
+	"sync"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"sync"
 )
 
-var __initializingDatabase []func() error
-var __mutexForInit = new(sync.Mutex)
+var (
+	__initializingDatabase []func() error
+	__mutexForInit         = new(sync.Mutex)
+)
 
 type DbExecFunc func(db *gorm.DB) error
 
-var DBSaveAsyncChannel = make(chan DbExecFunc, 500)
+var DBSaveAsyncChannel = make(chan DbExecFunc, 1000)
 
 func init() {
 	go func() {
@@ -47,7 +50,7 @@ func CallPostInitDatabase() error {
 func InitialDatabase() {
 	consts.GetGormProfileDatabase()
 	consts.GetGormProjectDatabase()
-	var err = CallPostInitDatabase()
+	err := CallPostInitDatabase()
 	if err != nil {
 		log.Errorf(`yakit.CallPostInitDatabase failed: %s`, err)
 	}

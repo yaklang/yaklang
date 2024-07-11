@@ -105,7 +105,15 @@ Accept: */*
 	require.True(t, flows[0].IsWebsocket, "flow is not websocket")
 	hash := flows[0].WebsocketHash
 
-	_, wsFlows, err := yakit.QueryWebsocketFlowByWebsocketHash(consts.GetGormProjectDatabase(), hash, 1, 10)
+	var wsFlows []*schema.WebsocketFlow
+	err = utils.AttemptWithDelayFast(func() error {
+		_, wsFlows, err = yakit.QueryWebsocketFlowByWebsocketHash(consts.GetGormProjectDatabase(), hash, 1, 10)
+		if len(wsFlows) != 6 {
+			return utils.Errorf("len(wsFlows) != 6, got %d", len(wsFlows))
+		}
+		return err
+	})
+
 	require.NoError(t, err)
 	require.Len(t, wsFlows, 6, "len(wsFlows) != 6")
 
