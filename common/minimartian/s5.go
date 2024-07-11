@@ -318,7 +318,10 @@ func (c *S5Config) HandleS5Request(conn net.Conn) (net.Conn, error) {
 			return nil, err
 		}
 	case commandBind:
-
+		err := c.HandleBind(conn, target)
+		if err != nil {
+			return nil, err
+		}
 	case commandUDP:
 		//TODO
 	}
