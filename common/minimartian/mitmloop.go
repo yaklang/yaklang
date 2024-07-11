@@ -201,22 +201,25 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 Handshake failed: %s", err)
 					return
 				}
-
 				_, cmd, _, _, err := s5config.HandleS5RequestHeader(handledConnection)
 				if err != nil {
 					log.Errorf("socks5 handle request failed: %s", err)
 					return
 				}
 				if cmd != commandConnect {
+					log.Errorf("mitm socks5 proxy error : mitm not support command %s", cmd)
 					return
 				}
-				host, port, err := utils.ParseStringToHostPort(conn.LocalAddr().String())
+				host, port, err := utils.ParseStringToHostPort(handledConnection.LocalAddr().String())
 				if err != nil {
 					return
 				}
-				handledConnection.Write(BuildReply(net.ParseIP(host), port))
+				_, err = handledConnection.Write(BuildReply(net.ParseIP(host), port))
+				if err != nil {
+					log.Errorf("socks5 server reply failed: %v", err)
+					return
+				}
 			}
-
 			p.handleLoop(firstByte == 0x16, handledConnection, ctx)
 		}(uid, conn)
 	}
