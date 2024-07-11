@@ -703,10 +703,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			}
 		}
-		err := yakit.SaveFromServerWebsocketFlow(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:])
-		if err != nil {
-			log.Warnf("save websocket flow(from server) failed: %s", err)
-		}
+		yakit.SaveFromServerWebsocketFlowEx(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
+			if err != nil {
+				log.Warnf("save websocket flow(from server) failed: %s", err)
+			}
+		})
 
 		if autoForward.IsSet() {
 			// 自动转发的内容，按理说这儿应该接入内部规则
@@ -1064,11 +1065,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		originReqRaw := raw[:]
 		finalResult = originReqRaw
 
-		// 保存每一个请求
-		err = yakit.SaveToServerWebsocketFlow(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:])
-		if err != nil {
-			log.Warnf("save to websocket flow failed: %s", err)
-		}
+		yakit.SaveFromServerWebsocketFlowEx(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
+			if err != nil {
+				log.Warnf("save to websocket flow failed: %s", err)
+			}
+		})
 
 		// MITM 自动转发
 		if autoForward.IsSet() {
