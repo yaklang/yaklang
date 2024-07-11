@@ -327,11 +327,35 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.ParameterMember:
+		var vals Values
+		getCalledByValue := func(called *Value) Values {
+			calledInstance, ok := ssa.ToCall(called.node)
+			if !ok {
+				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
+				return Values{}
+			}
+			var actualParam ssa.Value
+			if inst.FormalParameterIndex >= len(calledInstance.Args) {
+				log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+				return getMemberCall(i.node, actx)
+			}
+			actualParam = calledInstance.Args[inst.FormalParameterIndex]
+			traced := i.NewValue(actualParam).AppendEffectOn(called)
+			call := actx.PopCall()
+			ret := traced.getTopDefs(actx)
+			if call != nil {
+				actx.PushCall(call)
+			}
+			if len(ret) > 0 {
+				return ret
+			} else {
+				return Values{traced}
+			}
+		}
 		// log.Info("ParameterMember")
 		called := actx.GetCurrentCall()
 		if called == nil {
 			// log.Info("parent function is not called by any other function, skip")
-			var vals Values
 			vals = append(vals, i)
 			// 获取ParameterMember的形参定义
 			obj := inst.GetObject()
@@ -348,25 +372,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					vals = append(vals, val)
 				}
 			}
-			return vals
 		}
-		calledInstance, ok := ssa.ToCall(called.node)
-		if !ok {
-			log.Infof("parent function is not called by any other function, skip (%T)", called)
-			return Values{i}
-		}
-
-		// parameter
-		if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
-			log.Infof("formal parameter member index: %d is out of range", inst.FormalParameterIndex)
-			return getMemberCall(i.node, actx)
-		}
-		actualParam := calledInstance.ArgMember[inst.FormalParameterIndex]
-		traced := i.NewValue(actualParam).AppendEffectOn(called)
-		if ret := traced.getTopDefs(actx); len(ret) > 0 {
-			return ret
-		} else {
-			return Values{traced}
+		if actx.config.AllowIgnoreCallStack {
+			if fun := i.GetFunction(); fun != nil {
+				fun.GetCalledBy().ForEach(func(value *Value) {
+					val := getCalledByValue(value)
+					vals = append(vals, val...)
+				})
+			}
 		}
 
 	case *ssa.Parameter:

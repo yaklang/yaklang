@@ -215,7 +215,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				this := y.NewParam("$this")
-				_ = this
+				this.SetType(class)
 				y.VisitFormalParameterList(ret.FormalParameterList())
 				y.VisitMethodBody(ret.MethodBody())
 				y.Finish()
