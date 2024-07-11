@@ -54,7 +54,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 				continue
 			}
 
-			defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload?token=%s HTTP/1.1
 Host: %s
 Accept-Encoding: gzip, deflate
