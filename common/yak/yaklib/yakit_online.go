@@ -413,10 +413,12 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		}
 		raw, _ := json.Marshal(params)
 		paramsStr := strconv.Quote(string(raw))
-		existedYakScript, _ := yakit.GetYakScriptByName(db, i.ScriptName)
-		if existedYakScript != nil {
-			yakit.DeleteYakScriptByName(db, existedYakScript.ScriptName)
+
+		err := yakit.DeleteYakScriptByNameOrUUID(db, i.ScriptName, i.UUID)
+		if err != nil {
+			log.Errorf("save [%s] to local failed: %s", i.ScriptName, err)
 		}
+
 		var scriptName = i.ScriptName
 
 		var tags []string
@@ -508,7 +510,6 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 	}
 
 	if len(scripts) == 1 {
-		//err := yakit.CreateOrUpdateYakScriptByOnlineId(db, scripts[0].OnlineId, scripts[0])
 		err := yakit.CreateOrUpdateYakScriptByName(db, scripts[0].ScriptName, scripts[0])
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", scripts[0].ScriptName, err)
@@ -517,7 +518,6 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 	}
 
 	for _, i := range scripts {
-		//err := yakit.CreateOrUpdateYakScriptByOnlineId(db, i.OnlineId, i)
 		err := yakit.CreateOrUpdateYakScriptByName(db, i.ScriptName, i)
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", i.ScriptName, err)
