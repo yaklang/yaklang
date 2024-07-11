@@ -367,11 +367,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	frame.rawPayload = make([]byte, len(data))
 	copy(frame.rawPayload, data)
 
-	_, err = rawBuf.Write(frame.rawPayload)
-	if err != nil {
-		return frame, utils.Wrap(err, "websocket: frameReader.Reader io.LimitReader failed")
-	}
-
+	rawBuf.Write(frame.rawPayload)
 	// 先对 masked payload 进行异或操作
 	if frame.mask {
 		maskBytes(frame.maskingKey, data, len(data))
