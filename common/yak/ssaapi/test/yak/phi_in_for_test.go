@@ -123,3 +123,37 @@ os.System(input)
 		return nil
 	})
 }
+func TestPhiInCFG_If_Without_ElseStatement(t *testing.T) {
+	code := `
+		a = 1
+		if c{
+			a=2
+		}
+		b = a
+`
+	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("b as $b").GetValues("b")
+		phi := phis[0]
+		phi.GetId()
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		if targetIns.CFGEntryBasicBlock != nil {
+			next, ok := targetIns.CFGEntryBasicBlock.IsCFGEnterBlock()
+			if !ok {
+				t.Fatal("not enter block")
+			}
+			_, ok = next[0].(*ssa.If)
+			assert.True(t, ok)
+			// else statement should contain an if branch?
+			// ignore else...
+			assert.Equal(t, 1, len(next))
+		}
+		return nil
+	})
+}
