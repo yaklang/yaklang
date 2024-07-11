@@ -164,7 +164,17 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{}
 		}
 		actx.VisitPhi(i)
-		return getMemberCall(inst, actx)
+
+		conds := inst.GetControlFlowConditions()
+		result := getMemberCall(inst, actx)
+		for _, cond := range conds {
+			v := i.NewValue(cond)
+			ret := v.getTopDefs(actx, opt...)
+			result = append(result, v)
+			result = append(result, ret...)
+		}
+		_ = conds
+		return result
 	case *ssa.Call:
 		caller := inst.Method
 		if caller == nil {
