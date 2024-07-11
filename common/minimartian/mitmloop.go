@@ -31,10 +31,14 @@ import (
 
 var IsDroppedError = utils.Error("dropped")
 
+const (
+	S5_CONNECT_ADDR  = "S5ConnectAddr"
+	CONN_PROXY_IS_S5 = "connProxyIsS5"
+)
+
 // Serve accepts connections from the listener and handles the requests.
 func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	defer l.Close()
-
 	s5config := NewSocks5Config()
 	host, port, err := utils.ParseStringToHostPort(l.Addr().String())
 	if err != nil {
@@ -173,6 +177,8 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 
 		log.Debugf("mitm: accepted connection from %s", conn.RemoteAddr())
 		go func(uidStr string, originConn net.Conn) {
+			subCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("handle mitm proxy loop failed: %s", err)
@@ -201,7 +207,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 Handshake failed: %s", err)
 					return
 				}
-				_, cmd, _, _, err := s5config.HandleS5RequestHeader(handledConnection)
+				_, cmd, _, target, err := s5config.HandleS5RequestHeader(handledConnection)
 				if err != nil {
 					log.Errorf("socks5 handle request failed: %s", err)
 					return
@@ -212,6 +218,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				}
 				host, port, err := utils.ParseStringToHostPort(handledConnection.LocalAddr().String())
 				if err != nil {
+					log.Errorf("socks5 server parse host port failed: %v", err)
 					return
 				}
 				_, err = handledConnection.Write(BuildReply(net.ParseIP(host), port))
@@ -219,8 +226,9 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 server reply failed: %v", err)
 					return
 				}
+				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, target)
 			}
-			p.handleLoop(firstByte == 0x16, handledConnection, ctx)
+			p.handleLoop(firstByte == 0x16, handledConnection, subCtx)
 		}(uid, conn)
 	}
 }
@@ -298,6 +306,19 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 	if err != nil {
 		log.Errorf("mitm: failed to create context: %v", err)
 		return
+	}
+
+	// s5 proxy needs to have higher priority than http proxy
+	if s5ProxyAddr, ok := rootCtx.Value(S5_CONNECT_ADDR).(string); ok && s5ProxyAddr != "" {
+		host, port, err := utils.ParseStringToHostPort(s5ProxyAddr)
+		if err != nil {
+			log.Errorf("mitm: failed to parse s5 proxy addr: %v", err)
+		} else {
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, host)
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
+			ctx.Session().Set(CONN_PROXY_IS_S5, true)
+		}
 	}
 
 	timerInterval := time.Second * 10
@@ -585,7 +606,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 
 	isProxy := req.Method == "CONNECT" || req.Header.Get("Proxy-Connection") != "" || req.Header.Get("Proxy-Authorization") != ""
-	if isProxy {
+	if isProxy && !ctx.GetSessionBoolValue(CONN_PROXY_IS_S5) {
 		if p.proxyUsername != "" || p.proxyPassword != "" {
 			// 开启认证
 			failed := func(reason string) error {
@@ -627,7 +648,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		}
 	}
 
-	if req.Method == "CONNECT" {
+	if req.Method == "CONNECT" && !ctx.GetSessionBoolValue(CONN_PROXY_IS_S5) { // if s5 proxy, skip handle CONNECT
 		return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw)
 	}
 
