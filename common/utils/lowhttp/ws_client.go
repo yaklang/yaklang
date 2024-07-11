@@ -368,6 +368,7 @@ func (c *WebsocketClient) StartFromServer() {
 						shouldReturn = true
 					})
 					if shouldReturn {
+						log.Debugf("[ws] call shutdown, return")
 						return
 					}
 				} else {
@@ -465,17 +466,13 @@ func (c *WebsocketClient) WriteClose() error {
 }
 
 func (c *WebsocketClient) WriteCloseEx(closeCode int, message string) error {
-	// todo: handle close message
-
-	// if c.strictMode && len(message) > 125 {
-	// 	message = message[:125]
-	// }
 	if err := c.fw.WriteEx(GetClosePayloadFromCloseCode(closeCode), CloseMessage, true); err != nil {
 		return errors.Wrap(err, "write close frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
 		return errors.Wrap(err, "flush failed")
 	}
+	log.Debugf("[ws] write close frame: %d %s", closeCode, message)
 	return nil
 }
 
