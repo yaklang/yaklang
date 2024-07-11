@@ -199,7 +199,12 @@ func ParseProject(fs filesys.FileSystem, opts ...Option) ([]*Program, error) {
 	return ret, err
 }
 
-var ttlSSAParseCache = utils.NewTTLCache[*Program](30 * time.Minute)
+var ttlSSAParseCache = createCache(10 * time.Second)
+
+func createCache(ttl time.Duration) *utils.CacheWithKey[string, *Program] {
+	cache := utils.NewTTLCacheWithKey[string, *Program](ttl)
+	return cache
+}
 
 func ClearCache() {
 	ttlSSAParseCache.Purge()
