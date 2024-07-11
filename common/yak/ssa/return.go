@@ -101,6 +101,7 @@ func (b *FunctionBuilder) Finish() {
 		deferBlock := b.GetDeferBlock()
 		b.CurrentBlock = deferBlock
 		for _, i := range b.deferExpr {
+			b.EmitCall(i)
 			if len(deferBlock.Insts) == 0 {
 				deferBlock.Insts = append(deferBlock.Insts, i)
 			} else {

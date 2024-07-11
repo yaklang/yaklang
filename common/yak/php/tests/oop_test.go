@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -398,30 +399,58 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 
 }
 
-func TestOOP_Destruct(t *testing.T) {
-	t.Run("__destruct", func(t *testing.T) {
+func TestOOP_Syntax(t *testing.T) {
+	t.Run("__construct", func(t *testing.T) {
 		code := `<?php
-
 class test{
     public $a;
     public function __construct($a){
     	$this->a = $a; 
         println($this->a);
 	}
-    public function __destruct(){
-          $this->a = 1;
-    }
 }
 $a = new test("1");
 `
-		ssatest.MockSSA(t, code)
-		//	ssatest.CheckSyntaxFlow(t, code,
-		//		`println(* #-> * as $param)`,
-		//		map[string][]string{},
-		//		ssaapi.WithLanguage(ssaapi.PHP))
-		//}
+		ssatest.CheckSyntaxFlow(t, code,
+			`println(* #-> * as $param)`,
+			map[string][]string{"param": {"\"1\"", "Undefined-.a(valid)", "make(test)"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("__destruct", func(t *testing.T) {
+		code := `<?php
+class test{
+    public $a;
+    function __destruct(){
+        $this->a=1;
+        print($this->a);
+    }
+}
+$c = new test;
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $param)`,
+			map[string][]string{"param": {"make(test)", "1", "Undefined-.a(valid)"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("extends __destruct", func(t *testing.T) {
+		code := `<?php
 
+class test{
+    public $a;
+    function __destruct(){
+        print($this->a);
+    }
+}
+
+class childTest extends test{}
+$c = new childTest;
+$c->a = 1;
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $param)`,
+			map[string][]string{"param": {"make(test)", "1", "Undefined-.a(valid)"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
 
 func TestOOP_Extend(t *testing.T) {
@@ -454,7 +483,7 @@ class b{
 class childB extends b{
     public $c;
     public function __construct($a){
-}
+    }
 }
 $b = new childB(1);
 println($b->a);
