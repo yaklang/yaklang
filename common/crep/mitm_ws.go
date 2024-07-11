@@ -145,13 +145,14 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				b := w.websocketResponseHijackHandler(data, req, upgradeRspIns, time.Now().UnixNano())
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
+				if w.websocketResponseMirror != nil {
 				go w.websocketResponseMirror(data)
+				}
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
 			}
 		case lowhttp.CloseMessage:
 			toServer.WriteCloseEx(f.GetCloseCode(), "")
 			isServerClosed = true
-			fallthrough
 		default:
 			toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
 		}
@@ -171,7 +172,9 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				b := w.websocketRequestHijackHandler(data, req, upgradeRspIns, time.Now().UnixNano())
 				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
+				if w.websocketRequestMirror != nil {
 				go w.websocketRequestMirror(data)
+				}
 				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
 			}
 		case lowhttp.CloseMessage:
@@ -182,7 +185,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		}
 		if isClientClosed && isServerClosed {
 			c.Close()
-			toClient.Close()
+			toServer.Close()
 		}
 	}
 
@@ -202,7 +205,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			fixRspRaw := w.ResponseHijackCallback(req, rsp, rspRaw)
 
 			// write back to client
-			brw.Writer.Write(fixRspRaw)
+			brw.Write(fixRspRaw)
 			brw.Flush()
 			upgradeRspIns = rsp
 			return fixRspRaw
