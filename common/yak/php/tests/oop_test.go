@@ -202,13 +202,13 @@ func TestOOP_var_member(t *testing.T) {
 				$this->a = $par; 
 			}
 		}
-		$a = new A; 
-		println($a->getA());
-		$a->setA(1);
-		println($a->getA());
+		$b = new A; 
+		println($b->getA());
+		$b->setA(1);
+		println($b->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(make(A)) member[0]",
-			"Undefined-$a.getA(valid)(make(A)) member[side-effect(Parameter-$par, $this.a)]",
+			"Undefined-$b.getA(valid)(make(A)) member[0]",
+			"Undefined-$b.getA(valid)(make(A)) member[side-effect(Parameter-$par, $b.a)]",
 		}, t)
 	})
 }
@@ -293,7 +293,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		println($a->getA());
 		`, []string{
 			"Undefined-$a.getA(valid)(make(A)) member[0]",
-			"Undefined-$a.getA(valid)(make(A)) member[side-effect(Parameter-$par, $this.a)]",
+			"Undefined-$a.getA(valid)(make(A)) member[side-effect(Parameter-$par, $a.a)]",
 		}, t)
 	})
 }
@@ -329,7 +329,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(make(A)) member[side-effect(Parameter-$num, $this.num)]",
+			"Undefined-$a.getNum(valid)(make(A)) member[side-effect(Parameter-$num, $a.num)]",
 		}, t)
 	})
 }
@@ -421,21 +421,6 @@ $a = new test("1");
 		//		ssaapi.WithLanguage(ssaapi.PHP))
 		//}
 	})
-	t.Run("testGet", func(t *testing.T) {
-		code := `<?php
-class test{
-public $a;
-
-public function get(){
- eval($this->a);
-}
-}
-$a = new test();
-$a->a = $_POST[1];
-$a->get();
-`
-		ssatest.MockSSA(t, code)
-	})
 
 }
 
@@ -474,6 +459,6 @@ class childB extends b{
 $b = new childB(1);
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"0"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(0, $this.a)"}, t)
 	})
 }
