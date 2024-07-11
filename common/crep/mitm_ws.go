@@ -146,19 +146,22 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				if w.websocketResponseMirror != nil {
-				go w.websocketResponseMirror(data)
+					go w.websocketResponseMirror(data)
 				}
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
 			}
 		case lowhttp.CloseMessage:
 			toServer.WriteCloseEx(f.GetCloseCode(), "")
 			isServerClosed = true
+			log.Debugf("[grpc-ws] [>server] write close message: %d %s", f.GetCloseCode(), f.GetData())
 		default:
 			toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			log.Debugf("[grpc-ws] [>server] write unknown message: %d", f.GetData())
 		}
 		if isClientClosed && isServerClosed {
 			c.Close()
 			toClient.Close()
+			log.Debugf("[grpc-ws] [>server] close client and server")
 		}
 	}
 
@@ -173,19 +176,22 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				if w.websocketRequestMirror != nil {
-				go w.websocketRequestMirror(data)
+					go w.websocketRequestMirror(data)
 				}
 				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
 			}
 		case lowhttp.CloseMessage:
 			toServer.WriteCloseEx(f.GetCloseCode(), "")
 			isClientClosed = true
+			log.Debugf("[grpc-ws] [>client] write close message: %d %s", f.GetCloseCode(), f.GetData())
 		default:
 			toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			log.Debugf("[grpc-ws] [>client] write unknown message: %d", f.GetData())
 		}
 		if isClientClosed && isServerClosed {
 			c.Close()
 			toServer.Close()
+			log.Debugf("[grpc-ws] [>client] close client and server")
 		}
 	}
 
