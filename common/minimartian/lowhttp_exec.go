@@ -69,15 +69,23 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithNativeHTTPRequestInstance(req),
 	)
 
+	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
+	//	portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
+	//	if !portValid {
+	//		// 修复host和port
+	//		if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
+	//			opts = append(opts, lowhttp.WithHost(host))
+	//		}
+	//		opts = append(opts, lowhttp.WithPort(connectedPort))
+	//	}
+	//}
+
 	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
-		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
-		if !portValid {
-			// 修复host和port
-			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
-				opts = append(opts, lowhttp.WithHost(host))
-			}
-			opts = append(opts, lowhttp.WithPort(connectedPort))
-		}
+		opts = append(opts, lowhttp.WithPort(connectedPort))
+	}
+
+	if connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); connectedHost != "" {
+		opts = append(opts, lowhttp.WithHost(connectedHost))
 	}
 
 	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {
