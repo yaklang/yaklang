@@ -24,3 +24,22 @@ func TestJavaInterfaceMapper(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestJavaInterfaceMapper_WithAnnotation(t *testing.T) {
+	ssatest.Check(t, javaIfEmbed, func(prog *ssaapi.Program) error {
+		prog.Show()
+		assert.Greater(t, prog.SyntaxFlowChain(`Select.__ref__?{have: getUserById} as $sink`).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain(`getUserById.annotation?{.Select} as $sink`).Show().Len(), 0)
+
+		assert.Greater(t, prog.SyntaxFlowChain(`Insert.__ref__?{have: insertUser} as $sink`).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain(`Options.__ref__?{have: insertUser} as $sink`).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain(`insertUser.annotation?{.Insert && .Options} as $sink`).Show().Len(), 0)
+
+		assert.Greater(t, prog.SyntaxFlowChain(`Update.__ref__?{have: updateUser} as $sink`).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain(`updateUser.annotation?{.Update} as $sink`).Show().Len(), 0)
+
+		assert.Greater(t, prog.SyntaxFlowChain(`Delete.__ref__?{have: deleteUser} as $sink`).Show().Len(), 0)
+		assert.Greater(t, prog.SyntaxFlowChain(`deleteUser.annotation?{.Delete} as $sink`).Show().Len(), 0)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
