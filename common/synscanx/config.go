@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
@@ -33,16 +34,34 @@ type SynxConfig struct {
 	Iface     *net.Interface
 	GatewayIP net.IP
 	SourceIP  net.IP
+	RemoteMac net.HardwareAddr
 
 	// Fetch Gateway Hardware Address TimeoutSeconds
 	FetchGatewayHardwareAddressTimeout time.Duration
 }
 
+func (s *SynxConfig) callCallback(r *synscan.SynScanResult) {
+	if s == nil {
+		return
+	}
+
+	if s.callback == nil {
+		return
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("synscan callback failed: %s", err)
+		}
+	}()
+
+	s.callback(r)
+}
 
 
-func (sc *SynxConfig) filtered(port int) bool {
-	if sc.ExcludePorts != nil && port > 0 {
-		if sc.ExcludePorts.Exist(fmt.Sprint(port)) {
+func (s *SynxConfig) filtered(port int) bool {
+	if s.ExcludePorts != nil && port > 0 {
+		if s.ExcludePorts.Exist(fmt.Sprint(port)) {
 			return true
 		}
 	}
@@ -138,5 +157,12 @@ func WithCallback(callback func(result *synscan.SynScanResult)) SynxConfigOption
 func WithSubmitTaskCallback(callback func(i string)) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.submitTaskCallback = callback
+	}
+}
+
+
+func WithIface(iface string) SynxConfigOption {
+	return func(config *SynxConfig) {
+		config.netInterface = iface
 	}
 }

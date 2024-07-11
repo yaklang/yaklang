@@ -20,11 +20,16 @@ func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (ch
 
 func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	scanner := synscanx.NewScannerx(ctx, config)
+	scanner, err := synscanx.NewScannerx(ctx, config)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
 	scanner.Cancel = cancel
 	sendDoneSignal := make(chan struct{})
 
-	targetCh := make(chan *synscan.SynScanResult, 16)
+	_ = sendDoneSignal
+	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1000)
 
 	go func() {

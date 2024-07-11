@@ -18,7 +18,7 @@ func TestUdpConn_Send(t *testing.T) {
 	}()
 
 	time.Sleep(1 * time.Second)
-	conn, err := connectUdp("127.0.0.1:55433", "55433")
+	conn, err := ConnectUdp("127.0.0.1:55433", "55433")
 	if err != nil {
 		spew.Dump(err)
 		return

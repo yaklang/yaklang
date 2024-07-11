@@ -218,6 +218,13 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		return cacheId, daemon.handler, err
 	}
 	handler, err := OpenIfaceLive(ifaceName)
+	if err != nil {
+		return "", nil, err
+	}
+	err = handler.SetBPFFilter(conf.BPFFilter)
+	if err != nil {
+		return "", handler, err
+	}
 	return "", handler, err
 }
 

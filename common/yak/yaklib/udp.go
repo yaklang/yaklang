@@ -50,7 +50,7 @@ func clientTimeout(target float64) udpClientOption {
 	}
 }
 
-func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConnection, error) {
+func ConnectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConnection, error) {
 	config := &udpClientConfig{timeoutSeconds: 5 * time.Second}
 	for _, opt := range opts {
 		opt(config)
@@ -323,7 +323,7 @@ func udpServe(host string, port interface{}, opts ...UdpServerOpt) error {
 
 var UDPExport = map[string]interface{}{
 	"MockUDPProtocol": DebugMockUDPProtocol,
-	"Connect":         connectUdp,
+	"Connect":         ConnectUdp,
 	"clientTimeout":   clientTimeout,
 	"clientLocalAddr": clientLocalAddr,
 
