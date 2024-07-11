@@ -11,18 +11,20 @@ import (
 )
 
 type QueryHTTPFlowOnlineRequest struct {
-	ProjectName string `json:"projectName"`
-	Content     []byte `json:"content"`
+	ProjectName        string `json:"projectName"`
+	Content            []byte `json:"content"`
+	ProjectDescription string `json:"projectDescription"`
 }
 
-func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, token, projectName string, content []byte) error {
+func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, token, projectName, projectDescription string, content []byte) error {
 	urlIns, err := url.Parse(s.genUrl("/api/httpflow/upload"))
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)
 	}
 	raw, err := json.Marshal(QueryHTTPFlowOnlineRequest{
-		Content:     content,
-		ProjectName: projectName,
+		Content:            content,
+		ProjectName:        projectName,
+		ProjectDescription: projectDescription,
 	})
 	if err != nil {
 		return utils.Errorf("marshal params failed: %s", err)

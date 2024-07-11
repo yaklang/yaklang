@@ -556,3 +556,25 @@ func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) 
 	}
 	return db
 }
+
+func GetYakScriptByWhere(db *gorm.DB, name string, id int64) (*schema.YakScript, error) {
+	var req schema.YakScript
+
+	if db := db.Model(&schema.YakScript{}).Where("script_name = ? AND id <> ?", name, id).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
+	}
+
+	return &req, nil
+}
+
+func DeleteYakScriptByNameOrUUID(db *gorm.DB, name, uuid string) error {
+	yakScriptOpLock.Lock()
+	defer yakScriptOpLock.Unlock()
+
+	if db := db.Model(&schema.YakScript{}).Where(
+		"script_name = ? or uuid = ?", name, uuid,
+	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
