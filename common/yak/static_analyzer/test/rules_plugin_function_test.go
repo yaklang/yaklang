@@ -33,6 +33,18 @@ func TestRulesDefineFunction(t *testing.T) {
 			"codec",
 		)
 	})
+	t.Run("test implement define function in mitm, but empty ", func(t *testing.T) {
+		check(t,
+			`
+			mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+			}
+			`,
+			[]string{
+				rules.FunctionEmpty("mirrorHTTPFlow"),
+				"empty block",
+			},
+			"mitm")
+	})
 
 	t.Run("test no implement define function in mitm", func(t *testing.T) {
 		funcs := []string{

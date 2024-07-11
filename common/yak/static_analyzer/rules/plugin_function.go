@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
@@ -68,7 +69,7 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 
 	find := false
 	for _, name := range funcs {
-		defineFuncs := prog.Ref(name).Filter(func(v *ssaapi.Value) bool { return v.IsFunction() })
+		defineFuncs := prog.SyntaxFlow(fmt.Sprintf("%s?{opcode: function} as $fun", name)).GetValues("fun")
 		if len(defineFuncs) == 0 {
 			// not implement
 			continue
@@ -76,14 +77,31 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 		// implement
 		find = true
 
-		if len(defineFuncs) == 1 {
-			continue
+		if len(defineFuncs) != 1 {
+			// duplicate
+			defineFuncs.ForEach(func(v *ssaapi.Value) {
+				// v.NewWarn(CheckDefineFunctionTag, DuplicateFunction(name))
+				ret.NewWarn(DuplicateFunction(name), v)
+			})
 		}
-		// duplicate
-		defineFuncs.ForEach(func(v *ssaapi.Value) {
-			// v.NewWarn(CheckDefineFunctionTag, DuplicateFunction(name))
-			ret.NewWarn(DuplicateFunction(name), v)
-		})
+		fun := defineFuncs[0]
+		hasCode := false
+		if f, ok := ssa.ToFunction(ssaapi.GetBareNode(fun)); ok {
+			for _, block := range f.Blocks {
+				b, ok := ssa.ToBasicBlock(block)
+				if !ok {
+					continue
+				}
+				if len(b.Insts) > 0 {
+					hasCode = true
+					break
+				}
+			}
+		}
+		if !hasCode {
+			ret.NewError(FunctionEmpty(name), fun)
+		}
+
 	}
 
 	if !find {
@@ -94,4 +112,8 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 
 func LeastImplementOneFunctions(name []string) string {
 	return fmt.Sprintf("At least implement one function: %v", name)
+}
+
+func FunctionEmpty(name string) string {
+	return fmt.Sprintf("Function [%s] is empty, should implement this function", name)
 }
