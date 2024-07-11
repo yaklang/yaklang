@@ -890,12 +890,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 						host, port, _ := utils.ParseStringToHostPort(newTarget)
 						if (overrideHttps && port != 443) || (!overrideHttps && port != 80) {
+							// hide port
 							overrideHost = utils.HostPort(host, port)
 						} else {
-							overrideHost = newTarget
+							overrideHost = host
 						}
-						overrideTarget := lowhttp.ReplaceHTTPPacketHeader(targetRequest, "Host", overrideHost)
-						execSubmitTaskWithoutBatchTarget(overrideHttps, overrideHost, overrideTarget, payloads...)
+						replacedPacket := lowhttp.ReplaceHTTPPacketHeader(targetRequest, "Host", overrideHost)
+						execSubmitTaskWithoutBatchTarget(overrideHttps, overrideHost, replacedPacket, payloads...)
 					}
 				}
 				execSubmitTaskWithoutBatchTarget(false, "", targetRequest, payloads...)
