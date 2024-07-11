@@ -116,9 +116,21 @@ func (s *Server) GetYakScriptById(ctx context.Context, req *ypb.GetYakScriptById
 }
 
 func (s *Server) GetYakScriptByName(ctx context.Context, req *ypb.GetYakScriptByNameRequest) (*ypb.YakScript, error) {
-	ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), req.GetName())
-	if err != nil {
-		return nil, err
+	if req.UUID == "" && req.Name == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+	var (
+		ins *schema.YakScript
+		err error
+	)
+	if req.UUID != "" {
+		ins, _ = yakit.GetYakScriptByUUID(s.GetProfileDatabase(), req.UUID)
+	}
+	if ins == nil {
+		ins, err = yakit.GetYakScriptByName(s.GetProfileDatabase(), req.GetName())
+		if err != nil {
+			return nil, utils.Errorf("get plugin failed: %s", err)
+		}
 	}
 	return ins.ToGRPCModel(), nil
 }
@@ -956,33 +968,23 @@ func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScr
 	}
 	script.ScriptName = strings.TrimSpace(script.ScriptName)
 
-	yakScript, _ := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
+	yakScript, _ := yakit.GetYakScriptByWhere(s.GetProfileDatabase(), script.ScriptName, script.Id)
+	var isUpdate bool
 
-	if script.Id > 0 {
-		if yakScript != nil && int64(yakScript.ID) != script.Id {
-			return nil, utils.Errorf("save plugin failed! 插件名重复")
-		}
-		yakScript, _ = yakit.GetYakScript(s.GetProfileDatabase(), script.Id)
-		if yakScript == nil {
-			return nil, utils.Errorf("更新插件不存在")
-		}
-		var err error
-		if (script.ScriptName != yakScript.ScriptName && len(yakScript.OnlineBaseUrl) <= 0) || yakScript.ScriptName == script.ScriptName {
-			// 更新
-			err = yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, GRPCYakScriptToYakScript(script))
-		} else {
-			err = yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakScript(script))
-		}
+	if (script.Id > 0 && yakScript != nil) || (script.Id <= 0 && yakScript != nil) {
+		return nil, utils.Errorf("save plugin failed! 插件名重复")
+	}
+	yakScript, _ = yakit.GetYakScript(s.GetProfileDatabase(), script.Id)
+	if yakScript != nil {
+		isUpdate = true
+		err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, GRPCYakScriptToYakScript(script))
 		if err != nil {
 			return nil, utils.Errorf("update yakScript failed: %s", err.Error())
 		}
 	} else {
-		if yakScript != nil {
-			return nil, utils.Errorf("save plugin failed! 插件名重复")
-		}
 		err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakScript(script))
 		if err != nil {
-			return nil, utils.Errorf("create or update yakScript failed: %s", err.Error())
+			return nil, utils.Errorf("create yakScript failed: %s", err.Error())
 		}
 	}
 
@@ -990,8 +992,9 @@ func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScr
 	if err != nil {
 		return nil, utils.Errorf("query saved yak script failed: %s", err)
 	}
-
-	return res.ToGRPCModel(), nil
+	data := res.ToGRPCModel()
+	data.IsUpdate = isUpdate
+	return data, nil
 }
 
 func (s *Server) ExportLocalYakScript(ctx context.Context, req *ypb.ExportLocalYakScriptRequest) (*ypb.ExportLocalYakScriptResponse, error) {
