@@ -46,6 +46,7 @@ type LowhttpExecConfig struct {
 	BeforeDoRequest                  func([]byte) []byte
 	Ctx                              context.Context
 	SaveHTTPFlow                     bool
+	SaveHTTPFlowHandler              func(*LowhttpResponse)
 	RequestSource                    string
 	EtcHosts                         map[string]string
 	DNSServers                       []string
@@ -433,6 +434,12 @@ func WithForceLegacyProxy(b bool) LowhttpOpt {
 func WithSaveHTTPFlow(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.SaveHTTPFlow = b
+	}
+}
+
+func WithSaveHTTPFlowHandler(f func(*LowhttpResponse)) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.SaveHTTPFlowHandler = f
 	}
 }
 
