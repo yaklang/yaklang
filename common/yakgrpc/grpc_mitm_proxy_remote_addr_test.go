@@ -3,7 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -65,12 +67,19 @@ cancel()
 
 	}
 
-	_, data, _ := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-		Keyword: token,
+	time.Sleep(time.Second)
+	var data []*schema.HTTPFlow
+	err = utils.AttemptWithDelayFast(func() error {
+		_, data, _ = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		})
+		if len(data) <= 0 {
+			return utils.Errorf("query empty")
+		}
+		return nil
 	})
-	if len(data) == 0 {
-		t.Fatal("query empty")
-	}
+	require.NoError(t, err)
+
 	spew.Dump(data[0].RemoteAddr)
 	spew.Dump(targetHost, targetPort)
 	spew.Dump(data[0].Response)
