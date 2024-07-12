@@ -369,7 +369,7 @@ func ParseStringToHostsWithCallback(raw string, callback func(string) bool) {
 // str.ParseStringToHosts("192.168.0.1/32,127.0.0.1") // ["192.168.0.1", "127.0.0.1"]
 // ```
 func ParseStringToHosts(raw string) []string {
-	targets := []string{}
+	var targets []string
 	for _, h := range PrettifyListFromStringSplitEx(raw, ",", "\n") {
 		// 解析 IP
 		if ret := net.ParseIP(FixForParseIP(h)); ret != nil {

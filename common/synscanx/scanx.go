@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
@@ -29,6 +30,7 @@ type Scannerx struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
 	config *SynxConfig
+
 	sample string
 	hosts  *hostsparser.HostsParser
 	ports  *utils.PortsFilter
@@ -135,20 +137,21 @@ func (s *Scannerx) GetFilterHosts(targets string) []string {
 	s.hosts = hostsparser.NewHostsParser(s.Ctx, strings.Join(filteredHosts, ","))
 	return filteredHosts
 }
+
 func (s *Scannerx) SubmitTask(targets, ports string, targetCh chan *SynxTarget) {
 	filteredHosts := s.GetFilterHosts(targets)
 	filtedPorts := s.GetFilterPorts(ports)
 
 	for _, host := range filteredHosts {
-		for _, port := range filtedPorts {
-			if s.sample == "" {
-				s.sample = host
-				if err := s.getGatewayMac(); err != nil {
-					log.Errorf("getGatewayMac failed: %v", err)
-					break
-				}
+		if s.sample == "" {
+			s.sample = host
+			if err := s.getGatewayMac(); err != nil {
+				log.Errorf("getGatewayMac failed: %v", err)
+				break
 			}
-			log.Infof("submit task: %s:%d", host, port)
+		}
+		for _, port := range filtedPorts {
+			//time.Sleep(100 * time.Millisecond)
 			proto, p := utils.ParsePortToProtoPort(port)
 			target := &SynxTarget{
 				Host: host,
@@ -158,18 +161,14 @@ func (s *Scannerx) SubmitTask(targets, ports string, targetCh chan *SynxTarget) 
 			if proto == "udp" {
 				target.Mode = UDP
 			}
-
 			select {
 			case <-s.Ctx.Done():
 				log.Infof("SubmitTask canceled")
-				close(targetCh)
 				return
 			case targetCh <- target:
 			}
 		}
 	}
-	log.Info("SubmitTask done")
-	close(targetCh)
 }
 
 func (s *Scannerx) getGatewayMac() error {
@@ -201,7 +200,6 @@ func (s *Scannerx) getGatewayMac() error {
 			pcaputil.WithDisableAssembly(true),
 			pcaputil.WithBPFFilter("udp dst port 65321"),
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				//go func() {
 				if ethLayer := packet.Layer(layers.LayerTypeEthernet); ethLayer != nil {
 					if !bytes.Equal(ethLayer.(*layers.Ethernet).DstMAC, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
 						log.Infof("MAC Address found: %s", ethLayer.(*layers.Ethernet).DstMAC)
@@ -209,7 +207,6 @@ func (s *Scannerx) getGatewayMac() error {
 						cancel()
 					}
 				}
-				//}()
 			}),
 		)
 		if err != nil {
@@ -252,7 +249,6 @@ func (s *Scannerx) getGatewayMac() error {
 	}()
 	go func() {
 		wg.Wait()
-		//cancel()
 		close(macCh)
 	}()
 
@@ -270,7 +266,7 @@ func (s *Scannerx) getGatewayMac() error {
 }
 
 func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh chan *synscan.SynScanResult) error {
-	openPortLock := new(sync.Mutex)
+	//openPortLock := new(sync.Mutex)
 	var openPortCount int
 
 	var outputFile *os.File
@@ -289,16 +285,17 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	defer resultFilter.Close()
 	if s.OpenPortHandlers == nil {
 		s.OpenPortHandlers = func(host net.IP, port int) {
-			openPortLock.Lock()
-			defer openPortLock.Unlock()
+			//openPortLock.Lock()
+			//defer openPortLock.Unlock()
 
 			addr := utils.HostPort(host.String(), port)
 			if resultFilter.Exist(addr) {
 				return
 			}
+
 			resultFilter.Insert(addr)
 
-			if !s.hosts.Contains(host.String()) || !s.ports.Contains(port) {
+			if !(s.hosts.Contains(host.String()) && s.ports.Contains(port)) {
 				return
 			}
 			openPortCount++
@@ -330,10 +327,13 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		s.arpScan()
 		s.sendPacket(s.Ctx, targetCh)
 	}()
+	log.Info("start send packet")
 	wg.Wait()
 
+	log.Info("waiting for done signal")
 	time.Sleep(s.config.waiting)
 
 	wCancel()
@@ -347,13 +347,10 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 }
 
 func (s *Scannerx) sleepRateLimit() {
-	if s == nil {
-		return
-	}
 	if s.config.rateLimitDelayMs <= 0 {
 		return
 	}
-	time.Sleep(time.Duration(s.config.rateLimitDelayMs*1000) * time.Microsecond)
+	time.Sleep(time.Duration(s.config.rateLimitDelayMs*100) * time.Millisecond)
 }
 
 func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
@@ -400,6 +397,8 @@ func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) ([]
 		return s.assembleSynPacket(host, port)
 	case UDP:
 	case ICMP:
+	case ARP:
+		return s.assembleArpPacket(host)
 	}
 	return nil, nil
 }
@@ -425,12 +424,8 @@ func (s *Scannerx) HandlerReadPacket(ctx context.Context, resultCh chan *synscan
 
 func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.SynScanResult) {
 	if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-		switch arpLayer.LayerType() {
-		case layers.LayerTypeARP:
-			arp, ok := arpLayer.(*layers.ARP)
-			if !ok {
-				return
-			}
+		arp := arpLayer.(*layers.ARP)
+		if arp.Operation == 2 {
 			srcIP := net.IP(arp.SourceProtAddress)
 			srcHw := net.HardwareAddr(arp.SourceHwAddress)
 			s.onArp(srcIP, srcHw)
@@ -440,6 +435,7 @@ func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.S
 	if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
 		l, ok := tcpSynLayer.(*layers.TCP)
 		if !ok {
+			spew.Dump(packet)
 			return
 		}
 
@@ -492,9 +488,31 @@ func (s *Scannerx) initHandle() error {
 }
 
 func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
+	log.Debugf("ARP: %s -> %s", ip.String(), hw.String())
 	if s.MacHandlers != nil {
 		s.MacHandlers(ip, hw)
 	}
 
 	s.macTable.Store(ip.String(), hw)
+}
+
+func (s *Scannerx) arpScan() {
+	for target := range s.hosts.Hosts() {
+		s.sleepRateLimit()
+		select {
+		case <-s.Ctx.Done():
+			return
+		default:
+			packet, err := s.assemblePacket(target, 0, ARP)
+			if err != nil {
+				log.Errorf("assemble packet failed: %v", err)
+				continue
+			}
+			err = s.Handle.WritePacketData(packet)
+			if err != nil {
+				log.Errorf("write to device failed: %v", err)
+				continue
+			}
+		}
+	}
 }

@@ -22,20 +22,20 @@ func init() {
 type ArpConfig func(arp *layers.ARP) error
 
 func WithArp_RequestEx(selfIP, selfMac string, remoteIP string) ArpConfig {
-	local := net.ParseIP(selfIP)
+	local := net.ParseIP(selfIP).To4()
 	srcMac, _ := net.ParseMAC(selfMac)
 	ip := remoteIP
 	return func(arp *layers.ARP) error {
 		arp.HwAddressSize = 6
 		arp.ProtAddressSize = 4
 		arp.Operation = layers.ARPRequest
-		arp.SourceProtAddress = net.ParseIP(local.String())
+		arp.SourceProtAddress = []byte(local)
 		if arp.SourceProtAddress == nil {
 			return errors.New("invalid source ip: " + local.String())
 		}
 		arp.SourceHwAddress = srcMac
 		arp.DstHwAddress = make([]byte, 6)
-		arp.DstProtAddress = net.ParseIP(ip)
+		arp.DstProtAddress = []byte(net.ParseIP(ip).To4())
 		if arp.DstProtAddress == nil {
 			return errors.New("invalid destination ip: " + ip)
 		}

@@ -7,9 +7,10 @@ import (
 
 func Test__scanx(t *testing.T) {
 	res, err := _scanx(
-		"47.52.100.35/24",
-		"21",
-		synscanx.WithIface("WLAN 4"),
+		"192.168.3.1-255",
+		//"47.52.100.35/24",
+		"80",
+		synscanx.WithIface("WLAN"),
 	)
 	if err != nil {
 		t.Fatal(err)

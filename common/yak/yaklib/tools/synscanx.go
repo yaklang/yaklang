@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/synscanx"
+	"time"
 )
 
 func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (chan *synscan.SynScanResult, error) {
@@ -31,19 +32,23 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1000)
 
+	// 生产者
+	go func() {
+		scanner.SubmitTask(targets, ports, targetCh)
+		close(targetCh)
+		<-sendDoneSignal
+		close(resultCh)
+		log.Infof("send done signal")
+	}()
+
+	time.Sleep(1000 * time.Millisecond)
+
 	go func() {
 		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
 		if err != nil {
 			close(resultCh)
 			log.Errorf("scan failed: %s", err)
 		}
-	}()
-
-	// 生产者
-	go func() {
-		scanner.SubmitTask(targets, ports, targetCh)
-		<-sendDoneSignal
-		close(resultCh)
 	}()
 
 	return resultCh, nil

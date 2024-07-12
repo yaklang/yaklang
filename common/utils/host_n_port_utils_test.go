@@ -326,3 +326,9 @@ func TestHostContains(t *testing.T) {
 		assert.Equal(t, c.result, res, "input: %v,%v exclude: %v", c.input, c.target, c.result)
 	}
 }
+
+func TestParseStringToHosts1(t *testing.T) {
+
+	res := ParseStringToHosts("192.168.3.1-254")
+	spew.Dump(res)
+}

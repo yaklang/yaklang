@@ -6,6 +6,7 @@ const (
 	TCP ProtocolType = iota
 	UDP
 	ICMP
+	ARP
 )
 
 type SynxTarget struct {

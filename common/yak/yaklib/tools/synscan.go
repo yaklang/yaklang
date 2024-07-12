@@ -119,7 +119,7 @@ func _scanOptSYNConcurrent(count int) scanOpt {
 			count = 1000
 		}
 
-		config.rateLimitDelayMs = float64(float64((time.Second / time.Duration(count)).Microseconds()) / float64(1e3))
+		config.rateLimitDelayMs = float64((time.Second / time.Duration(count)).Microseconds()) / 1e3
 		config.rateLimitDelayGap = 5
 		log.Infof("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
 		log.Infof("rate limit delay gap: %v", config.rateLimitDelayGap)

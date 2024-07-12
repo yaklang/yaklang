@@ -1,6 +1,7 @@
 package synscanx
 
 import (
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,8 +17,8 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 
 	dstMac := s.config.RemoteMac
 
-	if nmac, ok := s.macTable.Load(host); ok {
-		dstMac = nmac.(net.HardwareAddr)
+	if mac, ok := s.macTable.Load(host); ok {
+		dstMac = mac.(net.HardwareAddr)
 	}
 
 	if s.config.RemoteMac == nil {
@@ -46,7 +47,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	} else {
 		ipSrc = s.config.SourceIP.String()
 	}
-
+	srcPort := 52873
 	// IPv4
 	opts = append(opts, pcapx.WithIPv4_Flags(layers.IPv4DontFragment))
 	opts = append(opts, pcapx.WithIPv4_Version(4))
@@ -58,7 +59,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	opts = append(opts, pcapx.WithIPv4_Option(nil, nil))
 
 	opts = append(opts,
-		pcapx.WithTCP_SrcPort(rand.Intn(65534)+1),
+		pcapx.WithTCP_SrcPort(srcPort),
 		pcapx.WithTCP_DstPort(port),
 		pcapx.WithTCP_Flags(pcapx.TCP_FLAG_SYN),
 		pcapx.WithTCP_Window(1024),
@@ -71,4 +72,51 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 		return nil, err
 	}
 	return packetBytes, nil
+}
+
+func (s *Scannerx) assembleArpPacket(host string) ([]byte, error) {
+	//var opts []any
+	//srcMac := s.config.Iface.HardwareAddr.String()
+	//srcIP := s.config.SourceIP.String()
+	//opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
+	//opts = append(opts, pcapx.WithEthernet_DstMac(net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}))
+	//opts = append(opts, pcapx.WithEthernet_NextLayerType(layers.EthernetTypeARP))
+	//
+	//opts = append(opts, pcapx.WithArp_RequestEx(srcIP, srcMac, host))
+	//
+	//packetBytes, err := pcapx.PacketBuilder(opts...)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	srcMac := s.config.Iface.HardwareAddr
+	srcIP := s.config.SourceIP
+	eth := &layers.Ethernet{
+		SrcMAC:       srcMac,
+		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		EthernetType: layers.EthernetTypeARP,
+	}
+	arp := &layers.ARP{
+		AddrType:          layers.LinkTypeEthernet,
+		Protocol:          layers.EthernetTypeIPv4,
+		HwAddressSize:     6,
+		ProtAddressSize:   4,
+		Operation:         layers.ARPRequest,
+		SourceHwAddress:   srcMac,
+		SourceProtAddress: []byte(srcIP.To4()),
+		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
+		DstProtAddress:    []byte(net.ParseIP(host).To4()),
+	}
+
+	var packetBytes = gopacket.NewSerializeBuffer()
+	err := gopacket.SerializeLayers(
+		packetBytes,
+		gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true},
+		eth, arp,
+	)
+	if err != nil {
+		return nil, utils.Errorf(`gopacket.SerializeLayers failed: %s`, err)
+	}
+
+	return packetBytes.Bytes(), nil
 }
