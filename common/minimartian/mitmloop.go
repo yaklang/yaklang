@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"net"
 	"net/http"
@@ -25,15 +26,14 @@ import (
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 var IsDroppedError = utils.Error("dropped")
 
 const (
-	S5_CONNECT_ADDR  = "S5ConnectAddr"
-	CONN_PROXY_IS_S5 = "connProxyIsS5"
+	S5_CONNECT_ADDR = "S5ConnectAddr"
+	AUTH_FINISH     = "authFinish"
 )
 
 // Serve accepts connections from the listener and handles the requests.
@@ -182,10 +182,10 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("handle mitm proxy loop failed: %s", err)
-					if originConn != nil {
-						originConn.Close()
-					}
 					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+				if originConn != nil {
+					originConn.Close()
 				}
 			}()
 			var isS5 bool
@@ -308,16 +308,18 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 		return
 	}
 
+	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "http")
 	// s5 proxy needs to have higher priority than http proxy
 	if s5ProxyAddr, ok := rootCtx.Value(S5_CONNECT_ADDR).(string); ok && s5ProxyAddr != "" {
 		host, port, err := utils.ParseStringToHostPort(s5ProxyAddr)
-		if err != nil {
+		if err != nil || host == "" || port <= 0 {
 			log.Errorf("mitm: failed to parse s5 proxy addr: %v", err)
 		} else {
 			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
 			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, host)
 			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
-			ctx.Session().Set(CONN_PROXY_IS_S5, true)
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
+			ctx.Session().Set(AUTH_FINISH, true)
 		}
 	}
 
@@ -560,6 +562,11 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	link(req, ctx, p)
 	defer unlink(req, p)
 
+	var proxyProtocol = ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol)
+	var authFinish = ctx.GetSessionBoolValue(AUTH_FINISH)
+	var needAuth = p.proxyUsername != "" || p.proxyPassword != ""
+	httpctx.SetRequestProxyProtocol(req, proxyProtocol)
+
 	var isHttps bool
 	if tconn, ok := conn.(*tls.Conn); ok {
 		session.MarkSecure()
@@ -605,9 +612,8 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		httpctx.SetRequestViaCONNECT(req, true)
 	}
 
-	isProxy := req.Method == "CONNECT" || req.Header.Get("Proxy-Connection") != "" || req.Header.Get("Proxy-Authorization") != ""
-	if isProxy && !ctx.GetSessionBoolValue(CONN_PROXY_IS_S5) {
-		if p.proxyUsername != "" || p.proxyPassword != "" {
+	if proxyProtocol == "http" { // if proxy is http ,need handle proxy request connect(1.1) or 1.0
+		if needAuth && !authFinish {
 			// 开启认证
 			failed := func(reason string) error {
 				res := proxyutil.NewResponse(407, http.NoBody, req)
@@ -642,14 +648,14 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 					// 认证失败
 					return failed("username/password is not valid!")
 				}
+				ctx.Session().Set(AUTH_FINISH, true)
 			} else {
 				return failed("empty Proxy-Authorization Header")
 			}
 		}
-	}
-
-	if req.Method == "CONNECT" && !ctx.GetSessionBoolValue(CONN_PROXY_IS_S5) { // if s5 proxy, skip handle CONNECT
-		return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw)
+		if req.Method == "CONNECT" { // handle connect request
+			return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw)
+		}
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
