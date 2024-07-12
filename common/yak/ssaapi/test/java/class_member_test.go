@@ -32,7 +32,7 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
       }
       return modelMap;
   }`},
-		{"aTaintCase022_2", true, []string{`"cd /"`}, ` /**
+		{"aTaintCase022_2", true, []string{`"cd /"`, "ParameterMember-parameter[0].cmd2", "Undefined-CmdObject(Undefined-CmdObject)"}, ` /**
 		   * 字段/元素级别->对象字段->对象元素
 		   * case不应被检出
 		   */

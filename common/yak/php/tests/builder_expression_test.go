@@ -522,3 +522,14 @@ include('syntax/include/include.php');
 	})
 
 }
+
+func TestVariables(t *testing.T) {
+	code := `<?php 
+$a = &$c;
+$fields_meta{1}->a;
+$fields_meta[1]->a;
+$fields_meta{1}{1}->a;
+$fields_meta{1}{1}->a=1;
+`
+	ssatest.CheckPrintlnValue(code, []string{}, t)
+}

@@ -331,9 +331,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#LogicalExpression.
 	VisitLogicalExpression(ctx *LogicalExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#SliceCallAssignmentExpression.
-	VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#PrintExpression.
 	VisitPrintExpression(ctx *PrintExpressionContext) interface{}
 
@@ -351,9 +348,6 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#SliceCallAutoAssignmentExpression.
-	VisitSliceCallAutoAssignmentExpression(ctx *SliceCallAutoAssignmentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#StaticClassMemberCallAssignmentExpression.
 	VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{}
@@ -415,8 +409,17 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
 	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#flexiVariable.
-	VisitFlexiVariable(ctx *FlexiVariableContext) interface{}
+	// Visit a parse tree produced by PHPParser#IndexLegacyCallVariable.
+	VisitIndexLegacyCallVariable(ctx *IndexLegacyCallVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#IndexVariable.
+	VisitIndexVariable(ctx *IndexVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#CustomVariable.
+	VisitCustomVariable(ctx *CustomVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#MemberVariable.
+	VisitMemberVariable(ctx *MemberVariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#defineExpr.
 	VisitDefineExpr(ctx *DefineExprContext) interface{}
