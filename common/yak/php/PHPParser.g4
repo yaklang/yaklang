@@ -525,7 +525,7 @@ expression
     | expression arguments                                        # FunctionCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | staticClassExpr                                             # StaticClassAccessExpression
-    | flexiVariable                                                # VariableExpression
+    | '&'? flexiVariable                                           # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
@@ -567,8 +567,8 @@ expression
     | expression op = '<=>' expression                            # SpaceshipExpression
     //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
-    | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
-    | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
+//    | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
+//    | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
     | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression
     | flexiVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
@@ -580,8 +580,10 @@ expression
 
 //即能当左值又能当右值
 flexiVariable
-    : variable
-    | flexiVariable '->' memberCallKey
+    : variable                                    #CustomVariable
+    | flexiVariable '[' indexMemberCallKey? ']'    #IndexVariable
+    | flexiVariable OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket    # IndexLegacyCallVariable
+    | flexiVariable '->' memberCallKey            #MemberVariable
     ;
 
 defineExpr
