@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -275,7 +276,6 @@ return "aaa" + sprintf("_origin(%v)", param)
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch3ErrCheck(t *testing.T) {
-
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -325,6 +325,7 @@ handle1 = s => {die("expected panic")}
 		t.Fatalf("expect 3, got %v", count)
 	}
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_FuzzWithHotPatch(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -414,9 +415,14 @@ afterRequest = func(rsp){
 		if err != nil {
 			break
 		}
-		spew.Dump(rsp.ResponseRaw)
-		if !bytes.Contains(rsp.ResponseRaw, []byte(token2)) {
-			t.Fatal("afterRequest hotpatch failed")
-		}
+		// check fuzzer response
+		require.Contains(t, string(rsp.ResponseRaw), token2, "afterRequest hotpatch failed")
+
+		// check history response
+		out, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+			RuntimeId: rsp.RuntimeID,
+		}, 1)
+		require.NoError(t, err)
+		require.Contains(t, string(out.Data[0].Response), token2, "afterRequest hotpatch failed")
 	}
 }
