@@ -112,33 +112,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
 		return y.ReadMemberCallVariable(obj, key)
-	case *phpparser.SliceCallAssignmentExpressionContext: // $a[1] = expr
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
-		member := y.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(1))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.AssignVariable(member, rightValue)
-		return rightValue
-	case *phpparser.SliceCallAutoAssignmentExpressionContext: // $a[] = expr
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		//key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
-		key := y.EmitUndefined("-1")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		member := y.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(1))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.AssignVariable(member, rightValue)
-		return rightValue
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction
 		y.isFunction = true
@@ -1127,27 +1100,41 @@ func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.V
 	return rightValue
 }
 
-// VisitLeftVariable  左值 不适合member->key的方式
+// VisitLeftVariable
 func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Variable {
 	if y == nil || raw == nil {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
-	i, ok := raw.(*phpparser.FlexiVariableContext)
-	if !ok {
-		return nil
-	}
-	if i.FlexiVariable() != nil {
+	//todo $_POST{}、$_POST[] 这两种情况
+	switch i := raw.(type) {
+	case *phpparser.CustomVariableContext:
+		return y.CreateVariable(
+			y.VisitVariable(i.Variable()),
+		)
+	case *phpparser.IndexVariableContext:
+		value := y.VisitRightValue(i.FlexiVariable())
+		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
+			return y.CreateMemberCallVariable(value, key)
+		} else {
+			return y.VisitLeftVariable(i.FlexiVariable())
+		}
+	case *phpparser.IndexLegacyCallVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
+			return y.VisitLeftVariable(i.FlexiVariable())
+		} else {
+			return y.CreateMemberCallVariable(obj, key)
+		}
+	case *phpparser.MemberVariableContext:
 		value := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
 		member := y.CreateMemberCallVariable(value, key)
 		return member
+	default:
+		return nil
 	}
-	return y.CreateVariable(
-		y.VisitVariable(i.Variable()),
-	)
 }
 
 // flexivariable读右值
@@ -1155,14 +1142,24 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	if y == nil || raw == nil {
 		return nil
 	}
-	flexVariable := raw.(*phpparser.FlexiVariableContext)
-	if flexVariable.FlexiVariable() != nil {
-		obj := y.VisitRightValue(flexVariable.FlexiVariable())
-		key := y.VisitMemberCallKey(flexVariable.MemberCallKey())
+	switch i := raw.(type) {
+	case *phpparser.CustomVariableContext:
+		variable := y.VisitVariable(i.Variable())
+		return y.ReadValue(variable)
+	case *phpparser.IndexVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
 		return y.ReadMemberCallVariable(obj, key)
-	} else {
-		id := y.VisitVariable(flexVariable.Variable())
-		return y.ReadValue(id)
+	case *phpparser.IndexLegacyCallVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	case *phpparser.MemberVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitMemberCallKey(i.MemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	default:
+		return nil
 	}
 }
 

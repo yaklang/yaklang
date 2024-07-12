@@ -439,10 +439,6 @@ func (v *BasePHPParserVisitor) VisitLogicalExpression(ctx *LogicalExpressionCont
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -464,10 +460,6 @@ func (v *BasePHPParserVisitor) VisitCodeExecExpression(ctx *CodeExecExpressionCo
 }
 
 func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitSliceCallAutoAssignmentExpression(ctx *SliceCallAutoAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -551,7 +543,19 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitFlexiVariable(ctx *FlexiVariableContext) interface{} {
+func (v *BasePHPParserVisitor) VisitIndexLegacyCallVariable(ctx *IndexLegacyCallVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitIndexVariable(ctx *IndexVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitCustomVariable(ctx *CustomVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitMemberVariable(ctx *MemberVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

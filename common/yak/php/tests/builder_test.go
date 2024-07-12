@@ -310,7 +310,6 @@ false xor true;
 
 func TestParseSSA_SMOKING(t *testing.T) {
 	code := `<?php
-abc[1];
 (bool)1;
 (int)1;1;
 (double)1;
