@@ -13,7 +13,7 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
 		expect []string
 		code   string
 	}{
-		{"aTaintCase022", true, []string{"Parameter-cmd"},
+		{"aTaintCase022", false, []string{"Parameter-cmd"},
 			`/**
    * 字段/元素级别->对象字段->对象元素
    * case应该被检出
