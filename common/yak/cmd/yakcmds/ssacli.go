@@ -109,7 +109,7 @@ var SSACompilerCommands = []*cli.Command{
 				}()
 			}
 			entry := c.String("entry")
-			language := c.String("language")
+			input_language := c.String("language")
 			inMemory := c.Bool("memory")
 			rawFile := c.String("target")
 			target := utils.GetFirstExistedPath(rawFile)
@@ -140,9 +140,19 @@ var SSACompilerCommands = []*cli.Command{
 			}
 			opt := make([]ssaapi.Option, 0, 3)
 			log.Infof("start to compile file: %v ", target)
-			if language != "" {
+			if input_language != "" {
+				input_language = strings.ToLower(input_language)
+				var language ssaapi.Language
+				switch strings.ToLower(input_language) {
+				case "javascript", "js":
+					language = ssaapi.JS
+				case "yak", "yaklang":
+					language = ssaapi.Yak
+				default:
+					language = ssaapi.Language(input_language)
+				}
 				log.Infof("start to use language: %v", language)
-				opt = append(opt, ssaapi.WithLanguage(ssaapi.Language(language)))
+				opt = append(opt, ssaapi.WithLanguage(language))
 			}
 			if entry != "" {
 				log.Infof("start to use entry file: %v", entry)

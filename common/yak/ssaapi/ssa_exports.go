@@ -67,6 +67,7 @@ func WithLanguage(language Language) Option {
 		if parser, ok := LanguageBuilders[language]; ok {
 			c.Builder = parser
 		} else {
+			log.Errorf("SSA not support language %s", language)
 			c.Builder = nil
 		}
 	}
