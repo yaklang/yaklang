@@ -170,6 +170,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		noFixContentLength   = option.NoFixContentLength
 		proxy                = option.Proxy
 		saveHTTPFlow         = option.SaveHTTPFlow
+		saveHTTPFlowHandler  = option.SaveHTTPFlowHandler
 		session              = option.Session
 		ctx                  = option.Ctx
 		traceInfo            = newLowhttpTraceInfo()
@@ -213,7 +214,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				response.TooLarge = true
 				response.TooLargeLimit = int64(maxContentLength)
 			}
-			// response.TooLarge = true
+
+			if saveHTTPFlowHandler != nil {
+				saveHTTPFlowHandler(response)
+			}
+
 			SaveLowHTTPResponse(response)
 		}()
 		select {
