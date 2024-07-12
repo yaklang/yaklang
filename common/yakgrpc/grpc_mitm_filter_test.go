@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
@@ -31,25 +30,43 @@ func RunMITMTestServer(
 	req *ypb.MITMRequest,
 	onLoad func(mitmClient ypb.Yak_MITMClient),
 ) (host, port string) {
+	return RunMITMTestServerEx(client, ctx, func(mitmClient ypb.Yak_MITMClient) {
+		mitmClient.Send(req)
+	}, onLoad, nil)
+}
+
+func RunMITMTestServerEx(
+	client ypb.YakClient,
+	ctx context.Context,
+	onInit func(mitmClient ypb.Yak_MITMClient),
+	onLoad func(mitmClient ypb.Yak_MITMClient),
+	onRecv func(mitmClient ypb.Yak_MITMClient, msg *ypb.MITMResponse),
+) (host, port string) {
 	stream, err := client.MITM(ctx)
 	if err != nil {
 		panic(err)
 	}
-	stream.Send(req)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	onInit(stream)
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
 			break
 		}
-		msgStr := spew.Sdump(msg)
-		// fmt.Println("MTIM CLIENT RECV: " + msgStr)
-		if strings.Contains(msgStr, `MITM 服务器已启动`) {
-			go func() {
-				defer wg.Done()
-				onLoad(stream)
-			}()
+		if msg.GetHaveMessage() {
+			msgStr := string(msg.GetMessage().GetMessage())
+			if strings.Contains(msgStr, `starting mitm serve`) {
+				if onLoad != nil {
+					go func() {
+						defer wg.Done()
+						onLoad(stream)
+					}()
+				}
+			}
+		}
+		if onRecv != nil {
+			onRecv(stream, msg)
 		}
 	}
 	wg.Wait()
