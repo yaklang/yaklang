@@ -3,6 +3,7 @@ package yaklib
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -130,6 +131,7 @@ var FunkExports = map[string]interface{}{
 	"ConvertToMap": func(i interface{}) map[string][]string {
 		return utils.InterfaceToMap(i)
 	},
+	"GC": runtime.GC,
 }
 
 func min(i interface{}) interface{} {
