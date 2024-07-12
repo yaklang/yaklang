@@ -92,9 +92,11 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	}
 
 	// remove proxy-connection like!
-	err := header.NewHopByHopModifier().ModifyRequest(req)
-	if err != nil {
-		log.Errorf("remove hop by hop header failed: %s", err)
+	if httpctx.GetRequestProxyProtocol(req) == "http" {
+		err := header.NewHopByHopModifier().ModifyRequest(req)
+		if err != nil {
+			log.Errorf("remove hop by hop header failed: %s", err)
+		}
 	}
 	if !httpctx.GetRequestViaCONNECT(req) {
 		// 不是通过 CONNECT 方法的代理，一般常见非 HTTPS 代理，这种情况下
@@ -127,7 +129,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	if m.requestHijackHandler != nil {
 		hijackedRaw := httpctx.GetBareRequestBytes(req)
 		if hijackedRaw == nil || len(hijackedRaw) == 0 {
-			hijackedRaw, err = utils.DumpHTTPRequest(req, true)
+			hijackedRaw, err := utils.DumpHTTPRequest(req, true)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
 				return nil
