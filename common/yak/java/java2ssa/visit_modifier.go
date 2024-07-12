@@ -114,6 +114,14 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 				y.AssignVariable(variable, v)
 			}
 		}, func(value ssa.Value) {
+			/*
+				@RequestParam(value = "xml_str") String xmlStr
+
+				means
+					xmlStr.annotation.RequestParam.value = "xml_str"
+					RequestParam.__ref__ = xmlStr
+			*/
+
 			// function instance
 			// parameter instance
 			if annotationContainerVariable == nil || annotationContainerInstance == nil {
@@ -124,9 +132,9 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			annotationToRef := "__ref__"
 			ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(annotationToRef))
 			y.AssignVariable(ref, value)
-			for _, v := range annotationContainerInstance.GetAllMember() {
-				y.AssignVariable(y.CreateMemberCallVariable(v, y.EmitConstInst(annotationToRef)), value)
-			}
+			//for _, v := range annotationContainerInstance.GetAllMember() {
+			//	y.AssignVariable(y.CreateMemberCallVariable(v, y.EmitConstInst(annotationToRef)), value)
+			//}
 			annotationContainer := y.CreateMemberCallVariable(value, y.EmitConstInst("annotation"))
 			annotationCollector := y.EmitEmptyContainer()
 			y.AssignVariable(annotationContainer, annotationCollector)

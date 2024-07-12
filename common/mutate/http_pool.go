@@ -762,6 +762,20 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithPayloads(payloads))
 						}
 
+						if config.HookAfterRequest != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSaveHTTPFlowHandler(func(rspIns *lowhttp.LowhttpResponse) {
+								newRspRaw := config.HookAfterRequest(https, nil, targetRequest, nil, rspIns.RawPacket)
+								if len(newRspRaw) > 0 {
+									rspIns.BareResponse = newRspRaw
+									if fixed, _, err := lowhttp.FixHTTPResponse(newRspRaw); err == nil {
+										rspIns.RawPacket = fixed
+									} else {
+										rspIns.RawPacket = newRspRaw
+									}
+								}
+							}))
+						}
+
 						rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 						var rsp []byte
 						if rspInstance != nil {
@@ -774,13 +788,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 										rsp = rspFixed
 									}
 								}
-							}
-						}
-
-						if config.HookAfterRequest != nil {
-							newRsp := config.HookAfterRequest(https, nil, targetRequest, nil, rsp)
-							if len(newRsp) > 0 {
-								rsp = newRsp
 							}
 						}
 

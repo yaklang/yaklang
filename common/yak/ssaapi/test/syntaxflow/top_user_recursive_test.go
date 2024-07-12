@@ -21,7 +21,7 @@ e = a
 		ssatest.CheckSyntaxFlow(t, code,
 			`e #-> * as $target`,
 			map[string][]string{
-				"target": {"1", "3"},
+				"target": {"1", "3", "Undefined-c"},
 			})
 	})
 }

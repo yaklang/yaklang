@@ -105,6 +105,7 @@ message GetYakScriptByIdRequest {
 
 message GetYakScriptByNameRequest {
   string Name = 1;
+  string UUID = 2;
 }
 
 message GetYakScriptByOnlineIDRequest {
@@ -3872,6 +3873,7 @@ message YakScript {
   // 协作者
   repeated Collaborator CollaboratorInfo = 35;
   repeated YakRiskInfo RiskInfo = 36;
+  bool IsUpdate = 37;
 }
 
 message Collaborator {
@@ -4563,6 +4565,7 @@ message QueryHTTPFlowRequest {
 message HTTPFlowsToOnlineRequest {
   string Token = 1;
   string ProjectName = 2;
+  string ProjectDescription = 3;
 }
 
 message ExportHTTPFlowsRequest {

@@ -830,7 +830,7 @@ func (i *If) getSiblings(m map[int64]struct{}) []*If {
 	}
 
 	falseBlock, ok := ToBasicBlock(i.False)
-	if !ok {
+	if !ok || len(falseBlock.Insts) == 0 {
 		return nil
 	}
 	raw := falseBlock.LastInst()

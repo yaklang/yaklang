@@ -419,19 +419,6 @@ func (y *builder) VisitClassBodyDeclaration(
 	}
 	return func() {}
 }
-func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-	i, _ := raw.(*javaparser.InterfaceDeclarationContext)
-	if i == nil {
-		return nil
-	}
-
-	return nil
-}
 
 func (y *builder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeDeclarationContext) interface{} {
 	if y == nil || raw == nil {
@@ -447,18 +434,20 @@ func (y *builder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeD
 	return nil
 }
 
-func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContext) interface{} {
+func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContext) (string, []ssa.Value) {
 	if y == nil || raw == nil {
-		return nil
+		return "", nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.RecordDeclarationContext)
 	if i == nil {
-		return nil
+		return "", nil
 	}
 
-	return nil
+	return i.Identifier().GetText(), []ssa.Value{
+		y.EmitConstInst(i.GetText()),
+	}
 }
 
 func (y *builder) VisitMethodDeclaration(

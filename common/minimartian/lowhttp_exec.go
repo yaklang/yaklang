@@ -124,7 +124,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 				bwr.Write(headerBytes)
 				utils.FlushWriter(bwr)
 				go func() {
-					_, err := io.Copy(bwr, buffer)
+					_, err := utils.IOCopy(bwr, buffer, nil)
 					utils.FlushWriter(bwr)
 					if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 						log.Errorf("io.Copy error: %s", err)

