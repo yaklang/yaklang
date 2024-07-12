@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -93,4 +94,67 @@ abc`)
 	if count != 4 {
 		t.Fatalf("expect 4, got %v", count)
 	}
+}
+
+// when batchTarget has full url without port, it make Host header same as batchTarget
+// Input:
+// batchTarget = "http://127.0.0.1"
+// Expect:
+// Host: 127.0.0.1
+// Got:
+// Host: http://127.0.0.1
+func TestGRPCMUSTPASS_HTTPFUZZER_BatchTarget_FixBUG(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+	batchTarget := "http://127.0.0.1"
+	recvRequest := false
+
+	RunMITMTestServerEx(client, ctx,
+		func(stream ypb.Yak_MITMClient) {
+			stream.Send(&ypb.MITMRequest{
+				Host: mitmHost,
+				Port: uint32(mitmPort),
+			})
+			stream.Send(&ypb.MITMRequest{
+				SetAutoForward:   true,
+				AutoForwardValue: false,
+			})
+		},
+		func(stream ypb.Yak_MITMClient) {
+			fuzzerStream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+				Request:         "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+				BatchTargetFile: false,
+				BatchTarget:     []byte(batchTarget), // cause bug
+				Proxy:           proxy,
+			})
+			require.NoError(t, err)
+
+			for {
+				_, err := fuzzerStream.Recv()
+				if err != nil {
+					break
+				}
+			}
+			cancel()
+		}, func(stream ypb.Yak_MITMClient, grpcRsp *ypb.MITMResponse) {
+			if reqRaw := grpcRsp.GetRequest(); len(reqRaw) > 0 {
+				stream.Send(&ypb.MITMRequest{
+					Id:   grpcRsp.GetId(),
+					Drop: true,
+				})
+				if strings.Contains(string(reqRaw), "www.example.com") {
+					// do not check raw packet
+					return
+				}
+				recvRequest = true
+				require.NotContains(t, string(reqRaw), "Host: "+batchTarget, "batchTarget should not be used as Host header")
+				require.Contains(t, string(reqRaw), "Host: 127.0.0.1", "host should be 127.0.0.1")
+			}
+		})
+	require.True(t, recvRequest, "mitm not recv fuzzer request")
 }

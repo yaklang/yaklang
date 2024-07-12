@@ -754,7 +754,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				fuzzMode = "close"
 			}
 		}
-		mutate.WithPoolOpt_ForceFuzzDangerous(req.GetForceFuzz())
 		if isRetry {
 			// 重试的时候，不需要渲染fuzztag
 			fuzzMode = "close"
@@ -836,7 +835,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 
 				task.HTTPFlowFailedCount++
-				//yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), hiddenIndex, rsp)
+				// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), hiddenIndex, rsp)
 				yakit.SaveWebFuzzerResponseEx(int(task.ID), hiddenIndex, rsp)
 				_ = feedbackResponse(rsp, false)
 				continue
@@ -1104,7 +1103,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					//yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
+					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					redirectRsp.TaskId = int64(taskID)
 					err := feedbackResponse(redirectRsp, false)
@@ -1118,7 +1117,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
 			}
-			//yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
+			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
 			err := feedbackResponse(rsp, false)
