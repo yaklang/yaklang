@@ -746,6 +746,7 @@ constantInitializer
     | Array '(' (arrayItemList ','?)? ')'
     | '[' (arrayItemList ','?)? ']'
     | ('+' | '-') constantInitializer
+    | expression
     ;
 
 constantString: string | constant;

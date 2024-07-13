@@ -275,7 +275,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
 		// instanceof
-		panic("NOT IMPL")
+		log.Error("InstanceOfExpressionContext unfinished")
+		log.Error("InstanceOfExpressionContext unfinished")
+		log.Error("InstanceOfExpressionContext unfinished")
+		y.EmitUndefined("")
 	case *phpparser.ComparisonExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "<<":
@@ -773,7 +776,9 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 		return nil
 	}
 	if ret := i.QualifiedStaticTypeRef(); ret != nil {
-		panic("NOT IMPL")
+		log.Error(`QualifiedStaticTypeRef unfinished`)
+		log.Error(`QualifiedStaticTypeRef unfinished`)
+		log.Error(`QualifiedStaticTypeRef unfinished`)
 	} else {
 		var ret ssa.Value
 		for _, i := range i.AllKeyedVariable() {
