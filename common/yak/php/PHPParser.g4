@@ -874,6 +874,7 @@ modifier
 identifier
     : Label
     | key
+    | '\\' identifier
     ;
 
 key
