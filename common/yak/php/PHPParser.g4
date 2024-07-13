@@ -506,6 +506,7 @@ memberCallKey
     : identifier
     | string
     | variable
+    | OpenCurlyBracket expression CloseCurlyBracket
     ;
 
 indexMemberCallKey

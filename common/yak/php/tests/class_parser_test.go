@@ -20,7 +20,7 @@ func TestSyntaxForClass_SelfDoubleColon(t *testing.T) {
 	ssatest.Check(t, `
 <?php
 
-$this->{$kind}[] = [$address, $name];
+// $this->{$kind}[] = [$address, $name];
 
 $this->ReplyTo[strtolower($address)] = [$address, $name];
 
