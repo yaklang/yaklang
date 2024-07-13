@@ -20,6 +20,16 @@ func TestSyntaxForClass_SelfDoubleColon(t *testing.T) {
 	ssatest.Check(t, `
 <?php
 
+$this->{$kind}[] = [$address, $name];
+
+$this->ReplyTo[strtolower($address)] = [$address, $name];
+
+\array_keys;
+
+\array_keys($allowedOptions);
+
+$allowedOptions = \array_keys($allowedOptions);
+
 class SMTP
 {
     const VERSION = self::DEBUG_OFF;

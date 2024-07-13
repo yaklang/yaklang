@@ -43,6 +43,13 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 }
 
 func (c *ClassBluePrint) Apply(obj Value) Type {
+	if c == nil {
+		log.Error("BUG: ClassBluePrint is nil")
+		log.Error("BUG: ClassBluePrint is nil")
+		log.Error("BUG: ClassBluePrint is nil")
+		log.Error("BUG: ClassBluePrint is nil")
+		return NewAny().GetType()
+	}
 
 	builder := obj.GetFunc().builder
 	_ = builder
@@ -50,6 +57,12 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	prog := builder.GetProgram()
 
 	for _, parent := range c.ParentClass {
+		if parent == nil {
+			log.Warn("ClassBluePrint.ParentClass is nil")
+			log.Warn("ClassBluePrint.ParentClass is nil")
+			log.Warn("ClassBluePrint.ParentClass is nil")
+			continue
+		}
 		parent.Apply(obj)
 	}
 
