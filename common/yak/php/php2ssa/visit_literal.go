@@ -177,7 +177,12 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
-	return raw.GetText()
+
+	r := raw.GetText()
+	if strings.HasPrefix(r, "\\") {
+		r = r[1:]
+	}
+	return r
 }
 
 func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) string {

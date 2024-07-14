@@ -570,18 +570,14 @@ func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	i, _ := raw.(*phpparser.KeyedFieldNameContext)
-	if i == nil {
-		return nil
-	}
+	i := raw.(*phpparser.KeyedFieldNameContext)
 
 	if i.KeyedSimpleFieldName() != nil {
-		y.VisitKeyedSimpleFieldName(i.KeyedSimpleFieldName())
+		return y.VisitKeyedSimpleFieldName(i.KeyedSimpleFieldName())
 	} else if i.KeyedVariable() != nil {
-		y.VisitKeyedVariable(i.KeyedVariable())
+		return y.VisitKeyedVariable(i.KeyedVariable())
 	}
-
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Value {
@@ -622,7 +618,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 
 	for _, a := range i.AllSquareCurlyExpression() {
 		v := y.VisitSquareCurlyExpression(a)
-		if v == nil {
+		if v != nil {
 			varMain = y.ReadOrCreateMemberCallVariable(varMain, v)
 		}
 	}
@@ -630,7 +626,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	return varMain
 }
 
-func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameContext) interface{} {
+func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -642,19 +638,23 @@ func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameC
 		return nil
 	}
 
+	var val ssa.Value
 	if i.Identifier() != nil {
-		v := y.VisitIdentifier(i.Identifier())
-		_ = v
+		val = y.EmitConstInst(y.VisitIdentifier(i.Identifier()))
 	} else if i.Expression() != nil {
-		v := y.VisitExpression(i.Expression())
-		_ = v
+		val = y.VisitExpression(i.Expression())
+	} else {
+		val = y.EmitEmptyContainer()
 	}
 
 	for _, sce := range i.AllSquareCurlyExpression() {
-		y.VisitSquareCurlyExpression(sce)
+		v := y.VisitSquareCurlyExpression(sce)
+		if v != nil {
+			val = y.ReadOrCreateMemberCallVariable(val, v)
+		}
 	}
 
-	return nil
+	return val
 }
 
 func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressionContext) ssa.Value {
@@ -679,6 +679,11 @@ func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressio
 
 				// 现在，$a 包含 "apple", "banana", "cherry"
 			*/
+			// call len
+			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
 			log.Warnf("PHP $a[...] call empty")
 			return y.EmitUndefined("$var[]")
 		}
@@ -998,6 +1003,8 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 			return y.EmitUnOp(ssa.OpNeg, val)
 		}
 		return y.EmitUnOp(ssa.OpPlus, val)
+	} else if ret := i.Expression(); ret != nil {
+		return y.VisitExpression(ret)
 	} else {
 		var initVal ssa.Value
 		for _, c := range i.AllConstantString() {

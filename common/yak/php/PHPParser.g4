@@ -525,8 +525,9 @@ expression
     | expression OpenCurlyBracket indexMemberCallKey CloseCurlyBracket    # IndexLegacyCallExpression
     | expression arguments                                        # FunctionCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
+    | '\\' identifier                                             # ShortQualifiedNameExpression
     | staticClassExpr                                             # StaticClassAccessExpression
-    | '&'? flexiVariable                                           # VariableExpression
+    | '&'? flexiVariable                                          # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
@@ -875,7 +876,6 @@ modifier
 identifier
     : Label
     | key
-    | '\\' identifier
     ;
 
 key
