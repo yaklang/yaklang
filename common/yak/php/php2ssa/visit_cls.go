@@ -492,23 +492,26 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticVariableContext:
 		// TODO class 命令空间
-		key = i.VarName().GetText()
+		//key = i.VarName().GetText()
 	case *phpparser.ClassDirectStaticVariableContext:
 		//肯定是一个class，
 		class = i.Identifier().GetText()
-		key = i.VarName().GetText()
+		key = y.VisitRightValue(i.FlexiVariable()).GetName()
+		//key = i.VarName().GetText()
 	case *phpparser.StringAsIndirectClassStaticVariableContext:
+		// "test"::a;
 		str, err := strconv.Unquote(i.String_().GetText())
 		if err != nil {
 			class = i.String_().GetText()
 		} else {
 			class = str
 		}
-		key = i.VarName().GetText()
+		key = y.VisitRightValue(i.FlexiVariable()).GetName()
 	case *phpparser.VariableAsIndirectClassStaticVariableContext:
 		exprName := y.VisitVariable(i.Variable())
 		class = y.ReadValue(exprName).String()
-		key = i.VarName().GetText()
+		key = y.VisitRightValue(i.FlexiVariable()).GetName()
+		//return y.GetStaticMember(class, value.String())
 	default:
 		_ = i
 	}

@@ -495,10 +495,10 @@ staticClassExprFunctionMember
     ;
 
 staticClassExprVariableMember
-    : fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
-    | identifier '::' VarName                     # ClassDirectStaticVariable
-    | string '::' VarName                         # StringAsIndirectClassStaticVariable
-    | variable '::' VarName                       # VariableAsIndirectClassStaticVariable
+    : fullyQualifiedNamespaceExpr '::' flexiVariable    # ClassStaticVariable
+    | identifier '::' flexiVariable                     # ClassDirectStaticVariable
+    | string '::' flexiVariable                         # StringAsIndirectClassStaticVariable
+    | variable '::' flexiVariable                       # VariableAsIndirectClassStaticVariable
     ;
 
 

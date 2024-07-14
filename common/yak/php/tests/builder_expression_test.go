@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -536,6 +537,23 @@ $d->getMockBuilder();
 a::c()->c();
 a::c()->b;
 $stub = $this->getMockBuilder(SMTP::class)->getMock();
+$a = <<<EOT 
+ac
+EOT;
 `
 	ssatest.CheckPrintlnValue(code, []string{}, t)
+}
+func TestSyntaxClassStatic(t *testing.T) {
+	code := `<?php
+$a = $c::$c;
+$c = $c::${$c->c};
+$a = c::$c;
+$a = c::${$c->c};
+$a = "test"::$c;
+$a = "test"::${$c->c};
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
