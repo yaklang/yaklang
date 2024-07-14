@@ -123,7 +123,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			// as class alias is right as compiler! XD
 			fallthrough
 		case "class":
-			className = i.Identifier().GetText()
+			className = y.VisitIdentifier(i.Identifier())
 
 			parentClassName := ""
 			if i.Extends() != nil {
@@ -141,7 +141,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		}
 	} else {
 		// as interface
-		className = i.Identifier().GetText()
+		className = y.VisitIdentifier(i.Identifier())
 		if i.Extends() != nil {
 			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
 				mergedTemplate = append(mergedTemplate, impl.GetText())
@@ -208,7 +208,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		isRef := ret.Ampersand()
 		_ = isRef
 
-		funcName := ret.Identifier().GetText()
+		funcName := y.VisitIdentifier(ret.Identifier())
 
 		createFunction := func() *ssa.Function {
 			newFunction := y.NewFunc(funcName)
@@ -379,9 +379,10 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 		return "", nil
 	}
 	var unquote string
-	_unquote, err := yakunquote.Unquote(i.Identifier().GetText())
+	rawName := y.VisitIdentifier(i.Identifier())
+	_unquote, err := yakunquote.Unquote(rawName)
 	if err != nil {
-		unquote = i.Identifier().GetText()
+		unquote = rawName
 	} else {
 		unquote = _unquote
 	}
@@ -639,7 +640,11 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 		return y.EmitConstInst(i.String_().GetText())
 	}
 
-	return nil
+	if ret := i.Expression(); ret != nil {
+		return y.VisitExpression(ret)
+	}
+
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
