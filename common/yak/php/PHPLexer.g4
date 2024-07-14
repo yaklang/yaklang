@@ -328,10 +328,7 @@ BackQuoteString   : '`' ~'`'* '`';
 SingleQuoteString : '\'' (~('\'' | '\\') | '\\' .)* '\'';
 DoubleQuote       : '"' -> pushMode(InterpolationString);
 
-StartNowDoc:
-    '<<<' [ \t]* '\'' NameString '\'' { this.ShouldPushHereDocMode(1) }? -> pushMode(HereDoc)
-;
-StartHereDoc : '<<<' [ \t]* NameString { this.ShouldPushHereDocMode(1) }? -> pushMode(HereDoc);
+StartNowDoc: '<<<' Label -> pushMode(HereDoc);
 ErrorPhp     : .                       -> channel(ErrorLexem);
 
 mode InterpolationString;
@@ -355,10 +352,10 @@ CommentQuestionMark     : '?'    -> type(Comment), channel(PhpComments);
 CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from comment.
 
 mode HereDoc;
-// TODO: interpolation for heredoc strings.
-
+//todo：$a 情况
+WS : [ \t]+ -> skip;
 HereDocText: ~[\r\n]*? ('\r'? '\n' | '\r');
-
+EndDoc: ([a-z_0-9]+){this.DocIsEnd()}? ->popMode;
 // fragments.
 // '<?=' will be transformed to 'echo' token.
 // '<?= "Hello world"; ?>' will be transformed to '<?php echo "Hello world"; ?>'

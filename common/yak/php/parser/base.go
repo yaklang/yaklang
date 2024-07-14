@@ -1,6 +1,7 @@
 package phpparser
 
 import (
+	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"reflect"
 	"strings"
@@ -25,6 +26,7 @@ type PHPLexerBase struct {
 	_prevTokenType     int
 	_heredocIdentifier string
 	_astTags           bool
+	_isVariable        bool
 }
 
 func reflectGetInt(i any, field string) (finalRet int) {
@@ -104,10 +106,9 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 	default:
 		mode := reflectGetInt(p.BaseLexer, "mode")
 		if mode == PHPLexerHereDoc {
-			if token.GetTokenType() == PHPLexerStartHereDoc || token.GetTokenType() == PHPLexerStartNowDoc {
+			if token.GetTokenType() == PHPLexerStartNowDoc {
 				p._heredocIdentifier = strings.ReplaceAll(strings.TrimSpace(token.GetText()[3:]), "'", "")
 			} else if token.GetTokenType() == PHPLexerHereDocText {
-				p.PopMode()
 				var heredocIdentifier = p.GetHeredocEnd(token.GetText())
 				if strings.HasSuffix(strings.TrimSpace(token.GetText()), ";") {
 					var text = heredocIdentifier + ";\n"
@@ -128,6 +129,11 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 	return token
 }
 
+func (p *PHPLexerBase) DocIsEnd() bool {
+	index := p.GetInputStream().Index()
+	text := p.GetInputStream().GetText(index-len(p._heredocIdentifier)-1, index)
+	return text == fmt.Sprintf("\n%s;", p._heredocIdentifier)
+}
 func (p *PHPLexerBase) GetHeredocEnd(i string) string {
 	return strings.TrimRight(strings.TrimSpace(i), ";")
 }
@@ -177,6 +183,16 @@ func (p *PHPLexerBase) ShouldPushHereDocMode(i int) bool {
 	return t == '\r' || t == '\n'
 }
 
+func (p *PHPLexerBase) PushVariables() {
+	p._isVariable = true
+}
+
+func (p *PHPLexerBase) IsVariables() bool {
+	return p._isVariable
+}
+func (p *PHPLexerBase) PopVariables() {
+	p._isVariable = false
+}
 func (p *PHPLexerBase) IsCurlyDollar(i int) bool {
 	return p.GetInputStream().LA(i) == '$'
 }
