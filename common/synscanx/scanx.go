@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
@@ -18,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -141,7 +141,7 @@ func (s *Scannerx) GetFilterHosts(targets string) []string {
 func (s *Scannerx) SubmitTask(targets, ports string, targetCh chan *SynxTarget) {
 	filteredHosts := s.GetFilterHosts(targets)
 	filtedPorts := s.GetFilterPorts(ports)
-
+	var counter int
 	for _, host := range filteredHosts {
 		if s.sample == "" {
 			s.sample = host
@@ -151,7 +151,13 @@ func (s *Scannerx) SubmitTask(targets, ports string, targetCh chan *SynxTarget) 
 			}
 		}
 		for _, port := range filtedPorts {
-			//time.Sleep(100 * time.Millisecond)
+			if s.config.rateLimitDelayMs > 0 && s.config.rateLimitDelayGap > 0 {
+				if counter > s.config.rateLimitDelayGap {
+					counter = 0
+					s.sleepRateLimit()
+				}
+			}
+			counter++
 			proto, p := utils.ParsePortToProtoPort(port)
 			target := &SynxTarget{
 				Host: host,
@@ -266,7 +272,7 @@ func (s *Scannerx) getGatewayMac() error {
 }
 
 func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh chan *synscan.SynScanResult) error {
-	//openPortLock := new(sync.Mutex)
+	openPortLock := new(sync.Mutex)
 	var openPortCount int
 
 	var outputFile *os.File
@@ -285,8 +291,8 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	defer resultFilter.Close()
 	if s.OpenPortHandlers == nil {
 		s.OpenPortHandlers = func(host net.IP, port int) {
-			//openPortLock.Lock()
-			//defer openPortLock.Unlock()
+			openPortLock.Lock()
+			defer openPortLock.Unlock()
 
 			addr := utils.HostPort(host.String(), port)
 			if resultFilter.Exist(addr) {
@@ -320,7 +326,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	}
 
 	wCtx, wCancel := context.WithCancel(context.Background())
-	go s.HandlerReadPacket(wCtx, resultCh)
+	go s.HandlerZeroCopyReadPacket(wCtx, resultCh)
 	time.Sleep(100 * time.Millisecond)
 
 	wg := sync.WaitGroup{}
@@ -330,10 +336,8 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 		s.arpScan()
 		s.sendPacket(s.Ctx, targetCh)
 	}()
-	log.Info("start send packet")
 	wg.Wait()
 
-	log.Info("waiting for done signal")
 	time.Sleep(s.config.waiting)
 
 	wCancel()
@@ -354,9 +358,7 @@ func (s *Scannerx) sleepRateLimit() {
 }
 
 func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
-	var counter int
-	var total int64
-
+	log.Info("start send packet")
 	for {
 		select {
 		case <-ctx.Done():
@@ -364,18 +366,12 @@ func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
 			return
 		case target, ok := <-targetCh:
 			if !ok {
-				log.Info("target channel closed, stopping packet sending")
+				log.Debugf("target channel closed, stopping packet sending")
 				return
 			}
 			host := target.Host
 			port := target.Port
 			proto := target.Mode
-			if s.config.rateLimitDelayMs > 0 && s.config.rateLimitDelayGap > 0 {
-				if counter > s.config.rateLimitDelayGap {
-					counter = 0
-					s.sleepRateLimit()
-				}
-			}
 			packet, err := s.assemblePacket(host, port, proto)
 			if err != nil {
 				log.Errorf("assemble packet failed: %v", err)
@@ -385,8 +381,6 @@ func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
 			if err != nil {
 				log.Errorf("write to device failed: %v", err)
 			}
-			total++
-			counter++
 		}
 	}
 }
@@ -422,6 +416,26 @@ func (s *Scannerx) HandlerReadPacket(ctx context.Context, resultCh chan *synscan
 	}
 }
 
+func (s *Scannerx) HandlerZeroCopyReadPacket(ctx context.Context, resultCh chan *synscan.SynScanResult) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			data, _, err := s.Handle.ZeroCopyReadPacketData()
+			if errors.Is(err, pcap.NextErrorTimeoutExpired) || errors.Is(err, pcap.NextErrorReadError) || errors.Is(err, io.EOF) {
+				continue
+			} else if err != nil {
+				log.Printf("Error reading packet: %v", err)
+				continue
+			}
+
+			packet := gopacket.NewPacket(data, s.Handle.LinkType(), gopacket.Default)
+			s.handlePacket(packet, resultCh)
+		}
+	}
+}
+
 func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.SynScanResult) {
 	if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
 		arp := arpLayer.(*layers.ARP)
@@ -435,7 +449,6 @@ func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.S
 	if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
 		l, ok := tcpSynLayer.(*layers.TCP)
 		if !ok {
-			spew.Dump(packet)
 			return
 		}
 
@@ -461,7 +474,8 @@ func (s *Scannerx) initHandle() error {
 	if err != nil {
 		return utils.Errorf("iface name to pcap iface name failed: %v", err)
 	}
-	inactive, err := pcap.NewInactiveHandle(pcapIface)
+	handle, err := pcap.OpenLive(pcapIface, 65536, true, pcap.BlockForever)
+
 	if err != nil {
 		info, err := codec.GB18030ToUtf8([]byte(err.Error()))
 		if err != nil {
@@ -469,17 +483,8 @@ func (s *Scannerx) initHandle() error {
 		}
 		return utils.Errorf("cannot find pcap ifaceDevs: %v", string(info))
 	}
-	if err = inactive.SetSnapLen(65536); err != nil {
-		return utils.Errorf("could not set snap length: %v", err)
-	} else if err = inactive.SetTimeout(time.Second); err != nil {
-		return utils.Errorf("could not set timeout: %v", err)
-	}
 
-	handle, err := inactive.Activate()
-	if err != nil {
-		return utils.Errorf("PCAP Activate error: %v", err)
-	}
-	err = handle.SetBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)")
+	err = handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String()))
 	if err != nil {
 		return utils.Errorf("SetBPFFilter failed: %v", err)
 	}
@@ -488,7 +493,7 @@ func (s *Scannerx) initHandle() error {
 }
 
 func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
-	log.Debugf("ARP: %s -> %s", ip.String(), hw.String())
+	log.Infof("ARP: %s -> %s", ip.String(), hw.String())
 	if s.MacHandlers != nil {
 		s.MacHandlers(ip, hw)
 	}
@@ -497,21 +502,36 @@ func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
 }
 
 func (s *Scannerx) arpScan() {
+	addrs, _ := s.config.Iface.Addrs()
+
+	var ifaceIPNet *net.IPNet
+
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok || ipNet == nil {
+			continue
+		}
+		ifaceIPNet = ipNet
+		break
+	}
 	for target := range s.hosts.Hosts() {
 		s.sleepRateLimit()
 		select {
 		case <-s.Ctx.Done():
 			return
 		default:
+			if !ifaceIPNet.Contains(net.ParseIP(target)) {
+				continue
+			}
 			packet, err := s.assemblePacket(target, 0, ARP)
 			if err != nil {
 				log.Errorf("assemble packet failed: %v", err)
-				continue
+				return
 			}
 			err = s.Handle.WritePacketData(packet)
 			if err != nil {
 				log.Errorf("write to device failed: %v", err)
-				continue
+				return
 			}
 		}
 	}
