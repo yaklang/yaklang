@@ -295,4 +295,12 @@ $a();
 `
 		test.MockSSA(t, code)
 	})
+	t.Run("test-3", func(t *testing.T) {
+		code := `<?php
+$a = <<<a
+dad
+a;
+`
+		test.MockSSA(t, code)
+	})
 }

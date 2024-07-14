@@ -521,8 +521,9 @@ expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
+    | expression ObjectOperator memberCallKey                               #MemerCallExpression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
-    | expression OpenCurlyBracket indexMemberCallKey CloseCurlyBracket    # IndexLegacyCallExpression
+    | expression ObjectOperator?  OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket  # IndexLegacyCallExpression
     | expression arguments                                        # FunctionCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | '\\' identifier                                             # ShortQualifiedNameExpression
@@ -569,14 +570,13 @@ expression
     | expression op = '<=>' expression                            # SpaceshipExpression
     //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
-//    | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
-//    | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
     | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression
     | flexiVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression
     | expression op = LogicalXor expression                       # LogicalExpression
     | expression op = LogicalOr expression                        # LogicalExpression
+    | DoubleQuote OpenCurlyBracket expression CloseCurlyBracket DoubleQuote #TemplateExpression
     ;
 
 
@@ -585,7 +585,7 @@ flexiVariable
     : variable                                    #CustomVariable
     | flexiVariable '[' indexMemberCallKey? ']'    #IndexVariable
     | flexiVariable OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket    # IndexLegacyCallVariable
-    | flexiVariable '->' memberCallKey            #MemberVariable
+    | flexiVariable ObjectOperator memberCallKey            #MemberVariable
     ;
 
 defineExpr
@@ -709,7 +709,7 @@ anonymousClass
     ;
 
 indirectTypeRef
-    : chainBase ('->' keyedFieldName)*
+    : chainBase (ObjectOperator keyedFieldName)*
     ;
 
 qualifiedNamespaceName
@@ -736,6 +736,7 @@ arguments
 
 actualArgument
     : argumentName? '...'? expression
+    |  OpenCurlyBracket flexiVariable CloseCurlyBracket
     | '&' chain
     ;
 
@@ -787,8 +788,8 @@ stringConstant
     ;
 
 string
-    : StartHereDoc HereDocText+
-    | StartNowDoc HereDocText+
+//    : StartHereDoc HereDocText+
+    : StartNowDoc HereDocText+
     | SingleQuoteString
     | DoubleQuote interpolatedStringPart* DoubleQuote
     ;
@@ -815,7 +816,7 @@ chainOrigin
     ;
 
 memberAccess
-    : '->' keyedFieldName actualArguments?
+    : ObjectOperator keyedFieldName actualArguments?
     ;
 
 functionCall

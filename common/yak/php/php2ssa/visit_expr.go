@@ -76,6 +76,11 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return nil
 	case *phpparser.VariableExpressionContext:
 		return y.VisitRightValue(ret.FlexiVariable())
+	case *phpparser.MemerCallExpressionContext:
+		obj := y.VisitExpression(ret.Expression())
+		key := y.VisitMemberCallKey(ret.MemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+
 	case *phpparser.CodeExecExpressionContext:
 		var code string
 		value := y.VisitExpression(ret.Expression())
@@ -107,10 +112,16 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.IndexCallExpressionContext: // $a[1]
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		if key == nil {
+			return obj
+		}
 		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		if key == nil {
+			return obj
+		}
 		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction

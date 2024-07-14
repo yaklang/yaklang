@@ -447,6 +447,10 @@ func (v *BasePHPParserVisitor) VisitPostfixIncDecExpression(ctx *PostfixIncDecEx
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitMemerCallExpression(ctx *MemerCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitIncludeExpression(ctx *IncludeExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -480,6 +484,10 @@ func (v *BasePHPParserVisitor) VisitSpaceshipExpression(ctx *SpaceshipExpression
 }
 
 func (v *BasePHPParserVisitor) VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitTemplateExpression(ctx *TemplateExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

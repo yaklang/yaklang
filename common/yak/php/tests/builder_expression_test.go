@@ -530,6 +530,12 @@ $fields_meta{1}->a;
 $fields_meta[1]->a;
 $fields_meta{1}{1}->a;
 $fields_meta{1}{1}->a=1;
+$this->{$kind} = [$address, $name];
+$this->{$kind}[] = [$address, $name];
+$d->getMockBuilder();
+a::c()->c();
+a::c()->b;
+$stub = $this->getMockBuilder(SMTP::class)->getMock();
 `
 	ssatest.CheckPrintlnValue(code, []string{}, t)
 }

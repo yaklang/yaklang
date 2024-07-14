@@ -337,6 +337,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#PostfixIncDecExpression.
 	VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#MemerCallExpression.
+	VisitMemerCallExpression(ctx *MemerCallExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#IncludeExpression.
 	VisitIncludeExpression(ctx *IncludeExpressionContext) interface{}
 
@@ -363,6 +366,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#ConditionalExpression.
 	VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#TemplateExpression.
+	VisitTemplateExpression(ctx *TemplateExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#VariableExpression.
 	VisitVariableExpression(ctx *VariableExpressionContext) interface{}
