@@ -99,7 +99,12 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 			}
 		}
 		if !hasCode {
-			ret.NewError(FunctionEmpty(name), fun)
+			// ret.NewError(FunctionEmpty(name), fun)
+			/* TODO: check function data has code,
+			1.	this rule should be evaluate not static-analyze
+				should in file: common/yakgrpc/grpc_smoking_evaluate_plugin.go
+			2. 	this rule, should check other yak-plugin: (mitm, port-scan, codec)
+			*/
 		}
 
 	}
