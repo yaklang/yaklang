@@ -30,23 +30,23 @@ func RequireOOBAddr(timeout ...float64) (string, string, error) {
 	return "", "", utils.Errorf("get dnslog domain failed")
 }
 
-func CheckingDNSLogOOB(token string, timeout ...float64) (string, []byte) {
-	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, timeout...)
+func CheckingDNSLogOOB(token string, runtimeID string, timeout ...float64) (string, []byte) {
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, runtimeID, timeout...)
 	if err != nil {
 		log.Error("CheckDNSLogByToken failed: ", err)
 	}
-	HTTPLogEvents, err := yakit.CheckHTTPLogByToken(token, timeout...)
-	if err != nil {
-		log.Error("CheckHTTPLogByToken failed: ", err)
-	}
 
 	var request []byte
-
-	if len(HTTPLogEvents) > 0 {
-		request = HTTPLogEvents[len(HTTPLogEvents)-1].Request
+	for _, item := range DnsLogEvents {
+		if strings.ToLower(item.Type) == "http" {
+			request = item.Raw
+			break
+		}
 	}
-
 	return strings.Join(lo.Uniq(lo.Map(DnsLogEvents, func(item *tpb.DNSLogEvent, index int) string {
+		if item.Type == "A" || item.Type == "AAAA" || item.Type == "CNAME" {
+			return "dns"
+		}
 		return item.Type
 	})), ","), request
 }
