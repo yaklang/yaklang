@@ -29,6 +29,7 @@ type PluginParamSelect struct {
 
 type PluginParamSelectData struct {
 	Key   string `json:"key"`
+	Label string `json:"label"`
 	Value string `json:"value"`
 }
 
@@ -61,6 +62,7 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			for k, v := range param.SelectOption {
 				paramSelect.Data = append(paramSelect.Data, PluginParamSelectData{
 					Key:   k,
+					Label: k,
 					Value: v,
 				})
 			}
@@ -214,6 +216,9 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 				json.Unmarshal([]byte(para.ExtraSetting), &dataSelect)
 				Option = append(Option, fmt.Sprintf(`cli.setMultipleSelect(%t)`, dataSelect.Double))
 				for _, v := range dataSelect.Data {
+					if v.Key == "" && v.Label != "" {
+						v.Key = v.Label
+					}
 					Option = append(Option, fmt.Sprintf(`cli.setSelectOption(%#v, %#v)`, v.Key, v.Value))
 				}
 			}
@@ -320,10 +325,6 @@ func getNeedReturn(script *schema.YakScript) ([]*ypb.YakScriptParam, error) {
 	if err != nil {
 		return nil, utils.Wrapf(err, "get cli code from param json error")
 	}
-
-	log.Infof("codeParameter: %d, databaseParameter: %d", len(codeParameter), len(databaseParameter))
-	log.Infof("codeParameter: %v", codeParameter)
-	log.Infof("databaseParameter: %v", databaseParameter)
 
 	if len(codeParameter) < len(databaseParameter) {
 		return databaseParameter, nil

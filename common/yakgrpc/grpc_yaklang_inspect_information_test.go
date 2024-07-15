@@ -945,15 +945,42 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_CLI_SelectOption(t *testing.T) {
-	t.Run("code gen", func(t *testing.T) {
-		json := `"[{\"Field\":\"types\",\"DefaultValue\":\"admin,backup,robots-100\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"检查项目\",\"Help\":\"选择内置的字典来完成测试\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":true,\\\"data\\\":[{\\\"key\\\":\\\"爆破备份文件\\\",\\\"value\\\":\\\"backup\\\"},{\\\"key\\\":\\\"爆破后台\\\",\\\"value\\\":\\\"admin\\\"},{\\\"key\\\":\\\"爆破 API 接口\\\",\\\"value\\\":\\\"apipath\\\"},{\\\"key\\\":\\\"PHP 路径字典\\\",\\\"value\\\":\\\"php\\\"},{\\\"key\\\":\\\"JSP 路径字典\\\",\\\"value\\\":\\\"jsp\\\"},{\\\"key\\\":\\\"ASPX 路径字典\\\",\\\"value\\\":\\\"aspx\\\"},{\\\"key\\\":\\\"MDB 数据库字典\\\",\\\"value\\\":\\\"mdb-download\\\"},{\\\"key\\\":\\\"综合字典3000+\\\",\\\"value\\\":\\\"misc-gt-3000\\\"},{\\\"key\\\":\\\"robots.txt top100\\\",\\\"value\\\":\\\"robots-100\\\"},{\\\"key\\\":\\\"禁用内置字典\\\",\\\"value\\\":\\\"disable-buildin-dict\\\"}]}\"}]"`
+
+	t.Run("code gen by both", func(t *testing.T) {
+		json := `"[{\"Field\":\"types\",\"DefaultValue\":\"admin,backup,robots-100\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"检查项目\",\"Help\":\"选择内置的字典来完成测试\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":true,\\\"data\\\":[{\\\"key\\\":\\\"爆破备份文件\\\",\\\"label\\\":\\\"爆破备份文件\\\",\\\"value\\\":\\\"backup\\\"},{\\\"key\\\":\\\"\\\", \\\"label\\\":\\\"爆破后台\\\",\\\"value\\\":\\\"admin\\\"}]}\"}]"`
 		params, err := getParameterFromParamJson(json)
 		assert.NoError(t, err)
 		log.Infof("params: %v", params)
 
 		code := getCliCodeFromParam(params)
 		log.Infof("code: %s", code)
-		if !strings.Contains(code, `cli.setSelectOption("爆破备份文件", "backup"),cli.setSelectOption("爆破后台", "admin"),cli.setSelectOption("爆破 API 接口", "apipath"),cli.setSelectOption("PHP 路径字典", "php"),cli.setSelectOption("JSP 路径字典", "jsp"),cli.setSelectOption("ASPX 路径字典", "aspx"),cli.setSelectOption("MDB 数据库字典", "mdb-download"),cli.setSelectOption("综合字典3000+", "misc-gt-3000"),cli.setSelectOption("robots.txt top100", "robots-100"),cli.setSelectOption("禁用内置字典", "disable-buildin-dict"),cli.setHelp("选择内置的字典来完成测试"),cli.setVerboseName("检查项目")`) {
+		if !strings.Contains(code, `cli.StringSlice("types", cli.setMultipleSelect(true),cli.setSelectOption("爆破备份文件", "backup"),cli.setSelectOption("爆破后台", "admin"),cli.setHelp("选择内置的字典来完成测试"),cli.setVerboseName("检查项目"),cli.setRequired(true))`) {
+			t.Fatalf("code not match")
+		}
+	})
+
+	t.Run("code gen by key", func(t *testing.T) {
+		json := `"[{\"Field\":\"types\",\"DefaultValue\":\"admin,backup,robots-100\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"检查项目\",\"Help\":\"选择内置的字典来完成测试\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":true,\\\"data\\\":[{\\\"key\\\":\\\"爆破备份文件\\\",\\\"value\\\":\\\"backup\\\"},{\\\"key\\\":\\\"爆破后台\\\",\\\"value\\\":\\\"admin\\\"}]}\"}]"`
+		params, err := getParameterFromParamJson(json)
+		assert.NoError(t, err)
+		log.Infof("params: %v", params)
+
+		code := getCliCodeFromParam(params)
+		log.Infof("code: %s", code)
+		if !strings.Contains(code, `cli.StringSlice("types", cli.setMultipleSelect(true),cli.setSelectOption("爆破备份文件", "backup"),cli.setSelectOption("爆破后台", "admin"),cli.setHelp("选择内置的字典来完成测试"),cli.setVerboseName("检查项目"),cli.setRequired(true))`) {
+			t.Fatalf("code not match")
+		}
+	})
+
+	t.Run("code gen by label", func(t *testing.T) {
+		json := `"[{\"Field\":\"types\",\"DefaultValue\":\"admin,backup,robots-100\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"检查项目\",\"Help\":\"选择内置的字典来完成测试\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":true,\\\"data\\\":[{\\\"label\\\":\\\"爆破备份文件\\\",\\\"value\\\":\\\"backup\\\"},{\\\"label\\\":\\\"爆破后台\\\",\\\"value\\\":\\\"admin\\\"}]}\"}]"`
+		params, err := getParameterFromParamJson(json)
+		assert.NoError(t, err)
+		log.Infof("params: %v", params)
+
+		code := getCliCodeFromParam(params)
+		log.Infof("code: %s", code)
+		if !strings.Contains(code, `cli.StringSlice("types", cli.setMultipleSelect(true),cli.setSelectOption("爆破备份文件", "backup"),cli.setSelectOption("爆破后台", "admin"),cli.setHelp("选择内置的字典来完成测试"),cli.setVerboseName("检查项目"),cli.setRequired(true))`) {
 			t.Fatalf("code not match")
 		}
 	})
@@ -982,5 +1009,48 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_CLI_SelectOption(t *testing.T)
 			},
 		}
 		assert.NoError(t, CompareScriptParams(got, want))
+	})
+}
+
+type S struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+func TestAA(t *testing.T) {
+	t.Run("marshal", func(t *testing.T) {
+		s := S{
+			Key:   "111",
+			Label: "222",
+			Value: "3333",
+		}
+		data, err := json.Marshal(s)
+		assert.NoError(t, err)
+		log.Infof("data: %s", string(data))
+	})
+
+	t.Run("unmarshal full ", func(t *testing.T) {
+		data := ` {"key":"111","label":"222","value":"3333"}`
+		var s S
+		err := json.Unmarshal([]byte(data), &s)
+		assert.NoError(t, err)
+		log.Infof("s: %v", s)
+	})
+
+	t.Run("unmarshal partial", func(t *testing.T) {
+		data := ` {"key":"111","value":"3333"}`
+		var s S
+		err := json.Unmarshal([]byte(data), &s)
+		assert.NoError(t, err)
+		log.Info("s: ", s)
+	})
+
+	t.Run("unmarshal partial", func(t *testing.T) {
+		data := ` {"label":"222","value":"3333"}`
+		var s S
+		err := json.Unmarshal([]byte(data), &s)
+		assert.NoError(t, err)
+		log.Info("s: ", s)
 	})
 }
