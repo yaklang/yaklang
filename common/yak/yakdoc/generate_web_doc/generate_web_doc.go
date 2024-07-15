@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"path"
 	"sort"
@@ -14,6 +15,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
+
+func specialPatchValueStr(ins *yakdoc.LibInstance) string {
+	valueStr := ins.ValueStr
+	if ins.LibName == "os" && ins.InstanceName == "Args" {
+		valueStr = "Command line arguments"
+	}
+	return html.EscapeString(valueStr)
+}
 
 func CheckDocCodeBlockMatched() {
 	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
@@ -59,8 +68,15 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 	if len(lib.Instances) > 0 {
 		file.WriteString("|实例名|实例描述|\n")
 		file.WriteString("|:------|:--------|\n")
-		for _, ins := range lib.Instances {
-			file.WriteString(fmt.Sprintf("%s|(%s) %s|\n", ins.InstanceName, ins.Type, ins.ValueStr))
+		keys := lo.Keys(lib.Instances)
+		sort.Strings(keys)
+		for _, key := range keys {
+			ins := lib.Instances[key]
+			file.WriteString(fmt.Sprintf("%s|(%s) %s|\n",
+				html.EscapeString(ins.InstanceName),
+				html.EscapeString(ins.Type),
+				specialPatchValueStr(ins),
+			))
 		}
 		file.WriteString("\n")
 	}
@@ -83,12 +99,10 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 		if exampleIndex != -1 {
 			// Example 代码块不应该替换<和>
 			doc := document[:exampleIndex]
-			doc = strings.ReplaceAll(doc, "<", "&lt;")
-			doc = strings.ReplaceAll(doc, ">", "&gt;")
+			doc = html.EscapeString(doc)
 			document = doc + document[exampleIndex:]
 		} else {
-			document = strings.ReplaceAll(document, "<", "&lt;")
-			document = strings.ReplaceAll(document, ">", "&gt;")
+			document = html.EscapeString(document)
 		}
 
 		// 简略的描述，去除\r，替换\n，删除Example:后面的内容，转义|，截取150个字符
@@ -110,17 +124,22 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 		// 	document = strings.ReplaceAll(document[:exampleIndex], "\n", "\n\n") + document[exampleIndex:]
 		// }
 		lowerMethodName := strings.ToLower(fun.MethodName)
-		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, lowerMethodName, simpleDocument))
+		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n",
+			html.EscapeString(fun.LibName),
+			html.EscapeString(fun.MethodName),
+			html.EscapeString(lowerMethodName),
+			html.EscapeString(simpleDocument),
+		))
 		buf := strings.Builder{}
-		buf.WriteString(fmt.Sprintf("### %s\n\n", fun.MethodName))
-		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", document))
-		buf.WriteString(fmt.Sprintf("#### 定义\n\n`%s`\n\n", fun.Decl))
+		buf.WriteString(fmt.Sprintf("### %s\n\n", html.EscapeString(fun.MethodName)))
+		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", html.EscapeString(document)))
+		buf.WriteString(fmt.Sprintf("#### 定义\n\n`%s`\n\n", html.EscapeString(fun.Decl)))
 		if len(fun.Params) > 0 {
 			buf.WriteString("#### 参数\n")
 			buf.WriteString("|参数名|参数类型|参数解释|\n")
 			buf.WriteString("|:-----------|:---------- |:-----------|\n")
 			for _, param := range fun.Params {
-				buf.WriteString(fmt.Sprintf("| %s | `%s` |   |\n", param.Name, param.Type))
+				buf.WriteString(fmt.Sprintf("| %s | `%s` |   |\n", html.EscapeString(param.Name), html.EscapeString(param.Type)))
 			}
 			buf.WriteString("\n")
 		}
@@ -129,7 +148,7 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 			buf.WriteString("|返回值(顺序)|返回值类型|返回值解释|\n")
 			buf.WriteString("|:-----------|:---------- |:-----------|\n")
 			for _, result := range fun.Results {
-				buf.WriteString(fmt.Sprintf("| %s | `%s` |   |\n", result.Name, result.Type))
+				buf.WriteString(fmt.Sprintf("| %s | `%s` |   |\n", html.EscapeString(result.Name), html.EscapeString(result.Type)))
 			}
 			buf.WriteString("\n")
 		}
