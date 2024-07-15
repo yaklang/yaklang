@@ -7,9 +7,9 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
-	"sync/atomic"
 	"time"
 )
 
@@ -46,9 +46,9 @@ func NewVirtualYakitClient(h func(i *ypb.ExecResult) error) *YakitClient {
 	return remoteClient
 }
 
-func NewVirtualYakitClientWithRiskCount(h func(i *ypb.ExecResult) error, riskCounter *uint32) *YakitClient {
+func NewVirtualYakitClientWithRuntimeID(h func(i *ypb.ExecResult) error, runtimeID string) *YakitClient {
 	yakitClient := NewVirtualYakitClient(h)
-	yakitClient.riskCounter = riskCounter
+	yakitClient.runtimeID = runtimeID
 	return yakitClient
 }
 
@@ -59,20 +59,15 @@ func RawHandlerToExecOutput(h func(any) error) func(result *ypb.ExecResult) erro
 }
 
 type YakitClient struct {
-	addr        string
-	client      *http.Client
-	yakLogger   *YakLogger
-	send        func(i interface{}) error
-	riskCounter *uint32
-}
-
-func (c *YakitClient) AddCounter() uint32 {
-	return atomic.AddUint32(c.riskCounter, 1)
+	addr      string
+	client    *http.Client
+	yakLogger *YakLogger
+	send      func(i interface{}) error
+	runtimeID string
 }
 
 func NewYakitClient(addr string) *YakitClient {
 	logger := CreateYakLogger()
-	var riskCounter uint32 = 0
 	client := &YakitClient{
 		addr: addr,
 		client: &http.Client{
@@ -93,8 +88,7 @@ func NewYakitClient(addr string) *YakitClient {
 			},
 			Timeout: 15 * time.Second,
 		},
-		yakLogger:   logger,
-		riskCounter: &riskCounter,
+		yakLogger: logger,
 	}
 
 	client.send = func(i interface{}) error {
@@ -130,11 +124,6 @@ func (c *YakitClient) SetYakLog(logger *YakLogger) {
 
 // 输入
 func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) error {
-	if level == "json-risk" {
-		c.Output(&YakitStatusCard{
-			Id: "漏洞/风险/指纹", Data: fmt.Sprint(c.AddCounter()), Tags: nil,
-		})
-	}
 	var data = tmp
 	if len(items) > 0 {
 		data = fmt.Sprintf(tmp, items...)
@@ -185,7 +174,11 @@ func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	//修改yakit库的客户端
 	e.ImportSubLibs("yakit", GetExtYakitLibByClient(client))
 	e.ImportSubLibs("risk", map[string]interface{}{
-		"NewRisk": YakitNewRiskBuilder(client),
+		"NewRisk":                   YakitNewRiskBuilder(client),
+		"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(client.runtimeID),
+		"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(client.runtimeID),
+		"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(client.runtimeID),
+		"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(client.runtimeID),
 	})
 
 	//修改全局默认客户端
