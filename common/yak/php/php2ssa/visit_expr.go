@@ -691,11 +691,11 @@ func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressio
 				// 现在，$a 包含 "apple", "banana", "cherry"
 			*/
 			// call len
-			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
-			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
-			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
-			log.Error("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
-			log.Warnf("PHP $a[...] call empty")
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Error("PHP $a[...] call empty")
 			return y.EmitUndefined("$var[]")
 		}
 	} else {
