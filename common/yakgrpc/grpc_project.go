@@ -109,7 +109,6 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		return nil, utils.Errorf("name invalid, should match pattern: %v", projectNameRe.String())
 	}
 	var pathName string
-	isCreate := req.GetId() == 0
 	isHandleProject := req.Type == yakit.TypeProject
 
 	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
@@ -120,10 +119,8 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 	if isHandleProject { // project
 		databaseName := fmt.Sprintf("yakit-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
 		pathName = filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
-		if isCreate {
-			if ok, _ := utils.PathExists(pathName); ok {
-				return nil, utils.Errorf("BUG: file already exist: %v", pathName)
-			}
+		if ok, _ := utils.PathExists(pathName); ok {
+			return nil, utils.Errorf("BUG: file already exist: %v", pathName)
 		}
 	}
 
@@ -138,27 +135,6 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 
 	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
 		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
-	}
-
-	if !isCreate { // rename
-		oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
-		if err != nil {
-			return nil, utils.Errorf("update row not exist: %v", err)
-		}
-
-		if isHandleProject && oldPro.DatabasePath != pathName { // only project should rename file, folder is virtual
-			err = os.Rename(oldPro.DatabasePath, pathName)
-			if err != nil {
-				return nil, errors.Errorf("rename %s to %s error: %v", oldPro.DatabasePath, pathName, err)
-			}
-		}
-
-		err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), *projectData)
-		if err != nil {
-			return nil, utils.Errorf("update project failed!")
-		}
-
-		return &ypb.NewProjectResponse{Id: req.GetId(), ProjectName: req.GetProjectName()}, nil
 	}
 
 	// create
@@ -178,17 +154,54 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
 }
 
-/*func (s *Server) RemoveProject(ctx context.Context, req *ypb.RemoveProjectRequest) (*ypb.Empty, error) {
-	if req.GetProjectName() == yakit.INIT_DATABASE_RECORD_NAME {
-		return nil, utils.Error("[default] cannot be deleted")
+func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) (*ypb.NewProjectResponse, error) {
+	if req.Type == "" {
+		return nil, utils.Errorf("type is empty")
+	}
+	name := req.GetProjectName() // maybe project or folder name
+	if !projectNameRe.MatchString(name) {
+		return nil, utils.Errorf("name invalid, should match pattern: %v", projectNameRe.String())
+	}
+	var pathName string
+	isHandleProject := req.Type == yakit.TypeProject
+	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
+	if pro != nil {
+		return nil, utils.Errorf("not found this project")
+	}
+	if isHandleProject { // project
+		databaseName := fmt.Sprintf("yakit-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
+		pathName = filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
+	}
+	projectData := &schema.Project{
+		ProjectName:   req.GetProjectName(),
+		Description:   req.GetDescription(),
+		DatabasePath:  pathName,
+		Type:          req.Type,
+		FolderID:      req.FolderId,
+		ChildFolderID: req.ChildFolderId,
+	}
+	if isHandleProject && CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) != nil {
+		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
+	}
+	oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
+	if err != nil {
+		return nil, utils.Errorf("update row not exist: %v", err)
 	}
 
-	err := yakit.DeleteProjectByProjectName(s.GetProfileDatabase(), req.GetProjectName())
-	if err != nil {
-		return nil, err
+	if isHandleProject && oldPro.DatabasePath != pathName { // only project should rename file, folder is virtual
+		err = os.Rename(oldPro.DatabasePath, pathName)
+		if err != nil {
+			return nil, errors.Errorf("rename %s to %s error: %v", oldPro.DatabasePath, pathName, err)
+		}
 	}
-	return &ypb.Empty{}, nil
-}*/
+
+	err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), *projectData)
+	if err != nil {
+		return nil, utils.Errorf("update project failed!")
+	}
+
+	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
+}
 
 func (s *Server) IsProjectNameValid(ctx context.Context, req *ypb.IsProjectNameValidRequest) (*ypb.Empty, error) {
 	if req.GetType() == "" {
