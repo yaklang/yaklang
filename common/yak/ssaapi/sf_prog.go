@@ -125,7 +125,9 @@ func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 }
 
 func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
-
+	if p.comeFromDatabase {
+		log.Infof("file filter support with database")
+	}
 	res := []sfvm.ValueOperator{}
 	addRes := func(str string) {
 		res = append(res, p.NewValue(ssa.NewConst(str)))
