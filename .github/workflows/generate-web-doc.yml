@@ -1,6 +1,7 @@
 name: Push web docs
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - "doc/ci/*"
