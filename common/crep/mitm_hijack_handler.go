@@ -87,6 +87,14 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		return nil
 	}
 
+	/*
+		handle websocket
+		use utils.GetHTTPHeader instead of req.Header.Get for compatible with all lowercase request header
+	*/
+	if req.Method != "CONNECT" && utils.IContains(utils.GetHTTPHeader(req.Header, "connection"), "upgrade") && utils.IContains(utils.GetHTTPHeader(req.Header, "upgrade"), "websocket") {
+		return wsModifier.ModifyRequest(req)
+	}
+
 	// remove proxy-connection like!
 	err := header.NewHopByHopModifier().ModifyRequest(req)
 	if err != nil {
@@ -106,14 +114,6 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 
 	if req.Method == "CONNECT" {
 		return nil
-	}
-
-	/*
-		handle websocket
-		use utils.GetHTTPHeader instead of req.Header.Get for compatible with all lowercase request header
-	*/
-	if utils.IContains(utils.GetHTTPHeader(req.Header, "connection"), "upgrade") && utils.IContains(utils.GetHTTPHeader(req.Header, "upgrade"), "websocket") {
-		return wsModifier.ModifyRequest(req)
 	}
 
 	/*
