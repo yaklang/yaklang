@@ -703,7 +703,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			}
 		}
-		yakit.SaveFromServerWebsocketFlowEx(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
+		yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), true, wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
 			if err != nil {
 				log.Warnf("save websocket flow(from server) failed: %s", err)
 			}
@@ -1065,7 +1065,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		originReqRaw := raw[:]
 		finalResult = originReqRaw
 
-		yakit.SaveFromServerWebsocketFlowEx(s.GetProjectDatabase(), wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
+		yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), false, wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
 			if err != nil {
 				log.Warnf("save to websocket flow failed: %s", err)
 			}
