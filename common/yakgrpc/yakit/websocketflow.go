@@ -48,18 +48,18 @@ func SaveFromServerWebsocketFlow(db *gorm.DB, owner string, index int, data []by
 	})
 }
 
-func SaveFromServerWebsocketFlowEx(db *gorm.DB, owner string, index int, data []byte, finishHandler ...func(error)) error {
+func SaveWebsocketFlowEx(db *gorm.DB, fromServer bool, owner string, index int, data []byte, finishHandler ...func(error)) error {
 	f := &schema.WebsocketFlow{
 		WebsocketRequestHash: owner,
 		FrameIndex:           index,
-		FromServer:           true,
+		FromServer:           fromServer,
 		QuotedData:           strconv.Quote(string(data)),
 		MessageType:          "text",
 	}
 	f.Hash = f.CalcHash()
 	return CreateOrUpdateWebsocketFlowEx(db, f.Hash, map[string]interface{}{
 		"frame_index":            index,
-		"from_server":            true,
+		"from_server":            fromServer,
 		"websocket_request_hash": owner,
 		"quoted_data":            strconv.Quote(string(data)),
 		"message_type":           "text",
