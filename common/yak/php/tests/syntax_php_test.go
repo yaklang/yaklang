@@ -161,3 +161,21 @@ echo "Script execution completed.\n";
 	_ = code
 	// ssatest.MockSSA(t, code)
 }
+
+func TestValidatePHPHereDoc(t *testing.T) {
+	validateSource(t, "", `<?php
+	$var = <<<EOF
+Hello World
+EOF."CCCCCCCC";
+?>
+`)
+}
+
+func TestValidatePHPHereWithVariableDoc(t *testing.T) {
+	validateSource(t, "", `<?php
+	$var = <<<EOF
+Hello World $var1
+EOF;
+?>
+`)
+}

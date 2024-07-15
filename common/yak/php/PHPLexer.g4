@@ -328,7 +328,10 @@ BackQuoteString   : '`' ~'`'* '`';
 SingleQuoteString : '\'' (~('\'' | '\\') | '\\' .)* '\'';
 DoubleQuote       : '"' -> pushMode(InterpolationString);
 
-StartNowDoc: '<<<' Label -> pushMode(HereDoc);
+StartNowDoc: '<<<' [ \t]* (
+    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
+    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
+  ) '\n' -> pushMode(HereDoc);
 ErrorPhp     : .                       -> channel(ErrorLexem);
 
 mode InterpolationString;
@@ -352,10 +355,10 @@ CommentQuestionMark     : '?'    -> type(Comment), channel(PhpComments);
 CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from comment.
 
 mode HereDoc;
-//todo：$a 情况
-WS : [ \t]+ -> skip;
-HereDocText: ~[\r\n]*? ('\r'? '\n' | '\r');
-EndDoc: ([a-z_0-9]+){this.DocIsEnd()}? ->popMode;
+EndDoc: '\n' Label {this.DocIsEnd()}? ->popMode;
+HereDocText: '\n' | (~[\n]+) ;
+HereDocVariable: '$' Label;
+
 // fragments.
 // '<?=' will be transformed to 'echo' token.
 // '<?= "Hello world"; ?>' will be transformed to '<?php echo "Hello world"; ?>'
