@@ -1582,7 +1582,7 @@ http:
 	ok := false
 	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 		return "a.aaa.asdgiqwfkbas.com", "token", nil
-	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
+	}), WithOOBRequireCheckingTrigger(func(s string, runtimeID string, f ...float64) (string, []byte) {
 		if s == "token" {
 			ok = true
 			return "dns", []byte("")
@@ -1853,7 +1853,7 @@ http:
 	ok := false
 	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 		return fmt.Sprintf("%s:%d", tokenDomain, httpServerPort), token, nil
-	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
+	}), WithOOBRequireCheckingTrigger(func(s string, runtimeID string, f ...float64) (string, []byte) {
 		if interactshProtocol[s] == "http" {
 			for _, request := range interactshRequest[s] {
 				if strings.Contains(string(request), sendToken) {

@@ -950,8 +950,7 @@ func TestDebugPluginRiskCount(t *testing.T) {
 		}
 		code := `
 for i in 10 {
-a = risk.CreateRisk("127.0.0.1")
-yakit.Output(a)
+a = risk.NewRisk("127.0.0.1")
 }
 `
 		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
@@ -964,7 +963,7 @@ yakit.Output(a)
 		}
 
 		var cardCount = 0
-		var riskMessageCount = 0
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -974,6 +973,9 @@ yakit.Output(a)
 				break
 			}
 
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
+			}
 			if rsp.GetIsMessage() {
 				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
 				if level == "feature-status-card-data" {
@@ -981,12 +983,11 @@ yakit.Output(a)
 					if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
 						cardCount = int(gjson.Get(data, "data").Int())
 					}
-				} else if level == "json-risk" {
-					riskMessageCount++
 				}
 			}
 		}
-
+		riskMessageCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
 		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
 	})
 
@@ -1049,7 +1050,7 @@ http:
 		}
 
 		var cardCount = 0
-		var riskMessageCount = 0
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -1058,7 +1059,9 @@ http:
 				}
 				break
 			}
-
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
+			}
 			if rsp.GetIsMessage() {
 				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
 				if level == "feature-status-card-data" {
@@ -1066,12 +1069,12 @@ http:
 					if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
 						cardCount = int(gjson.Get(data, "data").Int())
 					}
-				} else if level == "json-risk" {
-					riskMessageCount++
 				}
 			}
 		}
 
+		riskMessageCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
 		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
 	})
 }
@@ -1150,6 +1153,7 @@ aaa`))
 			t.Fatal(err)
 		}
 
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -1159,16 +1163,16 @@ aaa`))
 				break
 			}
 
-			if rsp.GetIsMessage() {
-				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
-				if level == "json-risk" {
-					var riskIns ypb.Risk
-					err := json.Unmarshal([]byte(gjson.Get(string(rsp.GetMessage()), "content.data").String()), &riskIns)
-					require.NoError(t, err)
-					require.Equal(t, riskIns.GetYakScriptUUID(), nucleiScript.Uuid, "nuclei uuid not match")
-					require.Equal(t, riskIns.GetFromYakScript(), nucleiScript.ScriptName, "nuclei name not match")
-				}
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
 			}
+		}
+
+		risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
+		for _, riskIns := range risks {
+			require.Equal(t, riskIns.YakScriptUUID, nucleiScript.Uuid, "nuclei uuid not match")
+			require.Equal(t, riskIns.FromYakScript, nucleiScript.ScriptName, "nuclei name not match")
 		}
 	})
 
@@ -1183,6 +1187,7 @@ aaa`))
 			t.Fatal(err)
 		}
 
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -1192,17 +1197,16 @@ aaa`))
 				break
 			}
 
-			if rsp.GetIsMessage() {
-				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
-				if level == "json-risk" {
-					var riskIns ypb.Risk
-					err := json.Unmarshal([]byte(gjson.Get(string(rsp.GetMessage()), "content.data").String()), &riskIns)
-					spew.Dump(riskIns)
-					require.NoError(t, err)
-					require.Equal(t, riskIns.GetYakScriptUUID(), yakScript.Uuid, "yak uuid not match")
-					require.Equal(t, riskIns.GetFromYakScript(), yakScript.ScriptName, "yak name not match")
-				}
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
 			}
+		}
+
+		risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
+		for _, riskIns := range risks {
+			require.Equal(t, riskIns.YakScriptUUID, yakScript.Uuid, "nuclei uuid not match")
+			require.Equal(t, riskIns.FromYakScript, yakScript.ScriptName, "nuclei name not match")
 		}
 	})
 
