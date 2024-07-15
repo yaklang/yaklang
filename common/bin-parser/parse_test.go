@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
-	utils2 "github.com/yaklang/yaklang/common/bin-parser/utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
@@ -755,13 +754,6 @@ func testParse(data []byte, rule string) (*base.Node, error) {
 	return res, nil
 }
 
-type S5 struct {
-	Version  uint8
-	NMethods uint8
-	Methods  []uint8
-	payload  *[]byte
-}
-
 func TestSocks5(t *testing.T) {
 	t.Run("socks5 client negotiation", func(t *testing.T) {
 		data := `050100`
@@ -775,11 +767,6 @@ func TestSocks5(t *testing.T) {
 			t.Fatal(err)
 		}
 		DumpNode(res)
-		var a S5
-		err = utils2.NodeToStruct(res, &a)
-		if err != nil {
-			return
-		}
 	})
 
 	t.Run("socks5 server negotiation", func(t *testing.T) {
