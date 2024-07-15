@@ -120,6 +120,69 @@ Accept: */*
 	require.Equal(t, 3, count, "TestGRPCMUSTPASS_MITM_WebSocket count(%d) != 3")
 }
 
+func TestGRPCMUSTPASS_MITM_WebSocket_EmptyRequestOrResponse(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
+	defer cancel()
+
+	token := utils.RandStringBytes(60)
+
+	host, port := utils.DebugMockEchoWs("test_empty")
+	log.Infof("addr: %s:%d", host, port)
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+
+	for {
+
+		rpcResponse, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		if msg := rpcResponse.GetMessage(); msg != nil && len(msg.GetMessage()) > 0 {
+			if !strings.Contains(string(msg.GetMessage()), `MITM 服务器已启动`) {
+				continue
+			}
+
+			defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+
+			wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /test_empty?token=%s HTTP/1.1
+Host: %s
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Cache-Control: no-cache
+Pragma: no-cache
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: keep-alive, Upgrade
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
+Accept: */*
+`, token, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy))
+			require.NoError(t, err)
+			wsClient.Close()
+			cancel()
+		}
+	}
+
+	_, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
+	require.NoError(t, err)
+}
+
 func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
 	defer cancel()
