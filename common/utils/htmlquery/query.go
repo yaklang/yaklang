@@ -282,7 +282,7 @@ type NodeNavigator struct {
 }
 
 func (h *NodeNavigator) Current() *html.Node {
-	return h.curr
+	return getCurrentNode(h)
 }
 
 func (h *NodeNavigator) NodeType() xpath.NodeType {

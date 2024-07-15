@@ -21,6 +21,8 @@ type Program struct {
 	comeFromDatabase bool
 }
 
+type Programs []*Program
+
 func (p *Program) GetNames() []string {
 	return []string{p.Program.GetProgramName()}
 }

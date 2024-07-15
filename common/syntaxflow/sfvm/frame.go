@@ -735,14 +735,25 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		result, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if ok {
-			om := omap.NewEmptyOrderedMap[int64, ValueOperator]()
+			res := make([]ValueOperator, 0, valuesLen(result))
+			tmp := make(map[int64]struct{})
 			_ = result.Recursive(func(operator ValueOperator) error {
 				if i, ok := operator.(ssa.GetIdIF); ok {
-					om.Set(i.GetId(), operator)
+					if i.GetId() == -1 {
+						// syntax-flow  runtime will create new template value
+						// the "fileFilter" function will create.
+						res = append(res, operator)
+					} else {
+						_, ok := tmp[i.GetId()]
+						if !ok {
+							res = append(res, operator)
+							tmp[i.GetId()] = struct{}{}
+						}
+					}
 				}
 				return nil
 			})
-			s.GetSymbolTable().Set(i.UnaryStr, NewValues(om.Values()))
+			s.GetSymbolTable().Set(i.UnaryStr, NewValues(res))
 		}
 
 		s.debugSubLog(" -> save $" + i.UnaryStr)

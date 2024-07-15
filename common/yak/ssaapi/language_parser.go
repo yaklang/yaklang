@@ -41,15 +41,17 @@ var AllLanguageBuilders = []ssa.Builder{
 	js2ssa.Builder,
 }
 
-func (c *config) parseProject() ([]*Program, error) {
+func (c *config) parseProject() (Programs, error) {
 	// ret := make([]*ssa.Program, 0)
 
 	programPath := c.programPath
 	prog, builder, err := c.init()
-	_ = prog
-	_ = builder
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
+
+	if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
+		language.ExtraFileAnalyze(c.fs, prog, programPath)
+	}
 
 	// parse project
 	err = ssareducer.ReducerCompile(
@@ -96,7 +98,7 @@ func (c *config) parseProject() ([]*Program, error) {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	prog, err := c.parseSimple("", c.originEditor)
+	prog, err := c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +116,7 @@ func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	return nil
 }
 
-func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Program, err error) {
+func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			ret = nil
@@ -123,9 +125,10 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-
-	if err := c.checkLanguage(path); err != nil {
-		return nil, err
+	// path is empty, use language or YakLang as default
+	if c.LanguageBuilder == nil {
+		c.LanguageBuilder = LanguageBuilders[Yak]
+		// log.Infof("use default language [%s] for empty path", Yak)
 	}
 	prog, builder, err := c.init()
 	// builder.SetRangeInit(r)
@@ -133,7 +136,7 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 		return nil, err
 	}
 	// parse code
-	if err := prog.Build(path, r, builder); err != nil {
+	if err := prog.Build("", r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()
@@ -145,17 +148,10 @@ func (c *config) parseSimple(path string, r *memedit.MemEditor) (ret *ssa.Progra
 var SkippedError = ssareducer.SkippedError
 
 func (c *config) checkLanguage(path string) error {
-	LanguageBuilder := c.Builder
+	LanguageBuilder := c.LanguageBuilder
 
 	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
 		for _, instance := range builders {
-			if instance.EnableExtraFileAnalyzer() {
-				err := instance.ExtraFileAnalyze(c.fs, nil, path)
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			if instance.FilterFile(path) {
 				return instance, nil
 			}
@@ -163,27 +159,19 @@ func (c *config) checkLanguage(path string) error {
 		return nil, utils.Wrapf(ssareducer.SkippedError, "file[%s] is not supported by any language builder, skip this file", path)
 	}
 
-	if path != "" {
-		// TODO: whether to use the same programName for all program ?? when call ParseProject
-		// programName += "-" + path
-		var err error
-		if LanguageBuilder != nil {
-			LanguageBuilder, err = processBuilders(LanguageBuilder)
-		} else {
-			log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
-			LanguageBuilder, err = processBuilders(AllLanguageBuilders...)
-		}
-		if err != nil {
-			return err
-		}
+	// TODO: whether to use the same programName for all program ?? when call ParseProject
+	// programName += "-" + path
+	var err error
+	if LanguageBuilder != nil {
+		LanguageBuilder, err = processBuilders(LanguageBuilder)
 	} else {
-		// path is empty, use language or YakLang as default
-		if LanguageBuilder == nil {
-			LanguageBuilder = LanguageBuilders[Yak]
-			// log.Infof("use default language [%s] for empty path", Yak)
-		}
+		log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
+		LanguageBuilder, err = processBuilders(AllLanguageBuilders...)
 	}
-	c.Builder = LanguageBuilder
+	if err != nil {
+		return err
+	}
+	c.LanguageBuilder = LanguageBuilder
 	return nil
 }
 
@@ -193,7 +181,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	prog := ssa.NewProgram(programName, c.DatabaseProgramName != "", ssa.Application, c.fs, c.programPath)
 
 	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
-		LanguageBuilder := c.Builder
+		LanguageBuilder := c.LanguageBuilder
 		// check builder
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)

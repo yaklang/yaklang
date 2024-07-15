@@ -169,7 +169,9 @@ type Program struct {
 	Version     string
 	ProgramKind ProgramKind // is library or application
 
+	// from pom.xml file
 	SCAPackages []*dxtypes.Package
+	ExtraFile   map[string]string // filename and data
 
 	// program relationship
 	DownStream map[string]*Program
