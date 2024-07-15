@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type (
@@ -40,6 +42,7 @@ type WebSocketModifier struct {
 	ProxyGetter                    func() *minimartian.Proxy
 	RequestHijackCallback          func(req *http.Request) error
 	ResponseHijackCallback         func(req *http.Request, rsp *http.Response, rspRaw []byte) []byte
+	hashCache                      *sync.Map
 }
 
 func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
@@ -193,6 +196,37 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			brw.Write(fixRspRaw)
 			brw.Flush()
 			upgradeRspIns = rsp
+
+			// Save HTTPFlow
+			isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
+			wshash := httpctx.GetWebsocketRequestHash(req)
+			if wshash == "" {
+				wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), time.Now())
+			}
+
+			_, ok := w.hashCache.Load(wshash)
+			if !ok {
+				w.hashCache.Store(wshash, true)
+				httpctx.SetWebsocketRequestHash(req, wshash)
+
+				flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
+					isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
+				)
+				if err != nil {
+					log.Errorf("httpflow failed: %s", err)
+				}
+				if flow != nil {
+					flow.IsWebsocket = true
+					flow.WebsocketHash = wshash
+					flow.HiddenIndex = wshash
+					flow.Hash = flow.CalcHash()
+					err := yakit.InsertHTTPFlowEx(flow)
+					if err != nil {
+						log.Errorf("create / save httpflow(websocket) error: %s", err)
+					}
+				}
+			}
+
 			return fixRspRaw
 		}),
 		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallbackFactory),
