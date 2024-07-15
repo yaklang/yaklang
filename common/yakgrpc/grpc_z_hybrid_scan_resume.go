@@ -102,9 +102,26 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	swg := utils.NewSizedWaitGroup(int(scanConfig.Concurrent))                                                                     // 设置并发数
 	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(scanConfig.TotalTimeoutSecond)*time.Second) // 设置总超时
 	// init some config
-	var riskCount, _ = yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), task.TaskId)
 	var resumeFilterManager = NewFilterManager(12, 1<<15, 30)
 	var hasUnavailableTarget = false
+
+	countRiskClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+		result.RuntimeID = task.TaskId
+		currentStatus := statusManager.GetStatus(task)
+		currentStatus.ExecResult = result
+		return stream.Send(currentStatus)
+	})
+	go func() {
+		for {
+			err := s.countRisk(task.TaskId, countRiskClient)
+			if err != nil {
+				log.Errorf("count risk failed: %v", err)
+				return
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}()
+	defer s.countRisk(task.TaskId, countRiskClient)
 
 	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
@@ -241,7 +258,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				callerFilter := resumeFilterManager.DequeueFilter()
 				defer resumeFilterManager.EnqueueFilter(callerFilter)
 
-				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
+				feedbackClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 					// shrink context
 					if manager.IsStop() {
 						return nil
@@ -252,7 +269,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					currentStatus.CurrentPluginName = pluginInstance.ScriptName
 					currentStatus.ExecResult = result
 					return stream.Send(currentStatus)
-				}, &riskCount)
+				}, task.TaskId)
 
 				err := ScanHybridTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, scanConfig.Proxy, feedbackClient, callerFilter)
 				if err != nil {

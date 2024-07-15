@@ -71,8 +71,8 @@ func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*schema.Risk, error) 
 	return r, nil
 }
 
-func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (uint32, error) {
-	var count uint32
+func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (int, error) {
+	var count int
 	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Count(&count); db.Error != nil {
 		return 0, utils.Errorf("get Risks count failed: %s", db.Error)
 	}
