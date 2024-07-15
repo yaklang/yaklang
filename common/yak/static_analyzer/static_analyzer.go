@@ -16,9 +16,16 @@ import (
 	_ "github.com/yaklang/yaklang/common/yak/static_analyzer/ssa_option"
 )
 
+type StaticAnalyzeKind uint8
+
+const (
+	Analyze StaticAnalyzeKind = iota
+	Score
+)
+
 // plugin type : "yak" "mitm" "port-scan" "codec"
 
-func StaticAnalyzeYaklang(code, codeTyp string) []*result.StaticAnalyzeResult {
+func StaticAnalyzeYaklang(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
 	var results []*result.StaticAnalyzeResult
 
 	// compiler
@@ -49,7 +56,7 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*result.StaticAnalyzeResult {
 		log.Error("SSA 解析失败：", err)
 		return results
 	}
-	results = append(results, checkPluginType(codeTyp, prog).Get()...)
+	results = append(results, checkRules(codeTyp, prog, kind).Get()...)
 
 	errs := prog.GetErrors()
 	for _, err := range errs {
@@ -82,15 +89,28 @@ func GetPluginSSAOpt(plugin string) []ssaapi.Option {
 	return ret
 }
 
-func checkPluginType(plugin string, prog *ssaapi.Program) *result.StaticAnalyzeResults {
+func checkRules(plugin string, prog *ssaapi.Program, kind StaticAnalyzeKind) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults()
-	ret.Merge(plugin_type.CheckPluginType(plugin_type.PluginTypeYak, prog))
-	pluginType := plugin_type.ToPluginType(plugin)
-	if pluginType != plugin_type.PluginTypeYak {
-		ret.Merge(plugin_type.CheckPluginType(pluginType, prog))
+	switch kind {
+	case Score:
+		ret.Merge(plugin_type.CheckScoreRules(plugin_type.PluginTypeYak, prog))
+		pluginType := plugin_type.ToPluginType(plugin)
+		if pluginType != plugin_type.PluginTypeYak {
+			ret.Merge(plugin_type.CheckScoreRules(pluginType, prog))
+		}
+	case Analyze:
+		fallthrough
+	default:
+		ret.Merge(plugin_type.CheckRules(plugin_type.PluginTypeYak, prog))
+		pluginType := plugin_type.ToPluginType(plugin)
+		if pluginType != plugin_type.PluginTypeYak {
+			ret.Merge(plugin_type.CheckRules(pluginType, prog))
+		}
 	}
+
 	return ret
 }
+
 func SSAParse(code, scriptType string, o ...ssaapi.Option) (*ssaapi.Program, error) {
 	opt := GetPluginSSAOpt(scriptType)
 	opt = append(opt, ssaapi.WithEnableCache())
