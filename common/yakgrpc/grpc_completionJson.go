@@ -16,8 +16,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-var completionJsonCd = utils.NewCoolDown(5 * time.Second)
-var completionJsonRaw []byte
+var (
+	completionJsonCd  = utils.NewCoolDown(5 * time.Second)
+	completionJsonRaw []byte
+)
 
 func (s *Server) GetYakVMBuildInMethodCompletion(
 	ctx context.Context,
@@ -128,7 +130,7 @@ func (s *Server) GetYakitCompletionRaw(ctx context.Context, _ *ypb.Empty) (*ypb.
 }
 
 func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErrorRequest) (*ypb.StaticAnalyzeErrorResponse, error) {
-	tmpRes := yak.StaticAnalyzeYaklang(string(r.GetCode()), r.GetPluginType())
+	tmpRes := yak.StaticAnalyzeYaklang(string(r.GetCode()), yak.WithStaticAnalyzePluginType(r.GetPluginType()))
 	es := lo.Map(tmpRes, func(i *result.StaticAnalyzeResult, _ int) *ypb.StaticAnalyzeErrorResult {
 		return &ypb.StaticAnalyzeErrorResult{
 			Message:         []byte(i.Message),

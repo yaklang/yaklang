@@ -3,7 +3,6 @@ package rules
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
@@ -12,7 +11,6 @@ import (
 func init() {
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, CheckDefineFunctionCodec)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, CheckDefineFunctionPortScan)
-	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, CheckDefineFunctionMitm)
 }
 
 // var CheckDefineFunctionTag string = "CheckDefineFunction"
@@ -42,7 +40,6 @@ func checkFreeValue(fun *ssaapi.Value) {
 	if !fun.IsFunction() {
 		return
 	}
-
 }
 
 func CheckDefineFunctionCodec(prog *ssaapi.Program) *result.StaticAnalyzeResults {
@@ -51,74 +48,4 @@ func CheckDefineFunctionCodec(prog *ssaapi.Program) *result.StaticAnalyzeResults
 
 func CheckDefineFunctionPortScan(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	return checkDefineFunction(prog, "handle")
-}
-
-func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults("check define function in mitm ")
-	funcs := []string{
-		"hijackSaveHTTPFlow",
-		"hijackHTTPResponse",
-		"hijackHTTPResponseEx",
-		"hijackHTTPRequest",
-		"mirrorNewWebsitePathParams",
-		"mirrorNewWebsitePath",
-		"mirrorNewWebsite",
-		"mirrorFilteredHTTPFlow",
-		"mirrorHTTPFlow",
-	}
-
-	find := false
-	for _, name := range funcs {
-		defineFuncs := prog.SyntaxFlow(fmt.Sprintf("%s?{opcode: function} as $fun", name)).GetValues("fun")
-		if len(defineFuncs) == 0 {
-			// not implement
-			continue
-		}
-		// implement
-		find = true
-
-		if len(defineFuncs) != 1 {
-			// duplicate
-			defineFuncs.ForEach(func(v *ssaapi.Value) {
-				// v.NewWarn(CheckDefineFunctionTag, DuplicateFunction(name))
-				ret.NewWarn(DuplicateFunction(name), v)
-			})
-		}
-		fun := defineFuncs[0]
-		hasCode := false
-		if f, ok := ssa.ToFunction(ssaapi.GetBareNode(fun)); ok {
-			for _, block := range f.Blocks {
-				b, ok := ssa.ToBasicBlock(block)
-				if !ok {
-					continue
-				}
-				if len(b.Insts) > 0 {
-					hasCode = true
-					break
-				}
-			}
-		}
-		if !hasCode {
-			// ret.NewError(FunctionEmpty(name), fun)
-			/* TODO: check function data has code,
-			1.	this rule should be evaluate not static-analyze
-				should in file: common/yakgrpc/grpc_smoking_evaluate_plugin.go
-			2. 	this rule, should check other yak-plugin: (mitm, port-scan, codec)
-			*/
-		}
-
-	}
-
-	if !find {
-		ret.NewError(LeastImplementOneFunctions(funcs), nil)
-	}
-	return ret
-}
-
-func LeastImplementOneFunctions(name []string) string {
-	return fmt.Sprintf("At least implement one function: %v", name)
-}
-
-func FunctionEmpty(name string) string {
-	return fmt.Sprintf("Function [%s] is empty, should implement this function", name)
 }

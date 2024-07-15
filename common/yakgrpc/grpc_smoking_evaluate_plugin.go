@@ -118,9 +118,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	if slices.Contains([]string{
 		"mitm", "port-scan", "codec", "yak",
 	}, pluginType) {
-		staticCheckingFailed := false
-		staticResults := yak.StaticAnalyzeYaklang(pluginCode, pluginType)
+		staticResults := yak.StaticAnalyzeYaklang(pluginCode,
+			yak.WithStaticAnalyzePluginType(pluginType),
+			yak.WithStaticAnalyzeKindScore(),
+		)
 		if len(staticResults) > 0 {
+			score = result.CalculateScoreFromResults(staticResults)
 			for _, sRes := range staticResults {
 				R := &ypb.Range{
 					StartLine:   int64(sRes.StartLineNumber),
@@ -130,21 +133,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				}
 				switch sRes.Severity {
 				case result.Error:
-					staticCheckingFailed = true
 					pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, []byte(sRes.From))
 				case result.Warn:
 					pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
-					score = 60
 				}
 			}
 			log.Error("static analyze failed")
-		}
-
-		if staticCheckingFailed {
-			return &ypb.SmokingEvaluatePluginResponse{
-				Score:   0,
-				Results: results,
-			}, nil
 		}
 	}
 

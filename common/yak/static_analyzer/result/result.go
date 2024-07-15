@@ -6,8 +6,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-type MarkerSeverity string
-type MarkerTag string
+type (
+	MarkerSeverity string
+	MarkerTag      string
+)
 
 const (
 	Error MarkerSeverity = "Error"
@@ -30,7 +32,12 @@ type StaticAnalyzeResult struct {
 	EndLineNumber   int64          `json:"endLineNumber"`
 	EndColumn       int64          `json:"endColumn"`
 	Tag             MarkerTag      `json:"tag"`
-	From            string         `json: "from"`
+	From            string         `json:"from"`
+	ScoreOffset     int            `json:"scoreOffset"`
+}
+
+func (e *StaticAnalyzeResult) SetNegativeScore(score int) {
+	e.ScoreOffset = 0 - score
 }
 
 func (e *StaticAnalyzeResult) String() string {
@@ -70,24 +77,27 @@ func (e *StaticAnalyzeResults) Merge(o *StaticAnalyzeResults) {
 }
 
 // NewError in v.Range or [0:0-0:1]
-func (e *StaticAnalyzeResults) NewError(message string, v *ssaapi.Value) {
+func (e *StaticAnalyzeResults) NewError(message string, v *ssaapi.Value) *StaticAnalyzeResult {
 	res := New(None, Error, message, v)
 	res.From = e.from
 	e.res = append(e.res, res)
+	return res
 }
 
 // NewWarn in v.Range or [0:0-0:1]
-func (e *StaticAnalyzeResults) NewWarn(message string, v *ssaapi.Value) {
+func (e *StaticAnalyzeResults) NewWarn(message string, v *ssaapi.Value) *StaticAnalyzeResult {
 	res := New(None, Warn, message, v)
 	res.From = e.from
 	e.res = append(e.res, res)
+	return res
 }
 
 // NewDeprecated in v.Range or [0:0-0:1]
-func (e *StaticAnalyzeResults) NewDeprecated(message string, v *ssaapi.Value) {
+func (e *StaticAnalyzeResults) NewDeprecated(message string, v *ssaapi.Value) *StaticAnalyzeResult {
 	res := New(Deprecated, Hint, message, v)
 	res.From = e.from
 	e.res = append(e.res, res)
+	return res
 }
 
 // New Result
@@ -118,4 +128,32 @@ func New(tag MarkerTag, severity MarkerSeverity, message string, v *ssaapi.Value
 	}
 
 	return ret
+}
+
+func CalculateScoreFromResults(results []*StaticAnalyzeResult) int {
+	score := 100
+	for _, sRes := range results {
+		switch sRes.Severity {
+		case Error:
+			if sRes.ScoreOffset == 0 {
+				score -= 100 // if no score offset, score will be 0
+			} else {
+				score += sRes.ScoreOffset // use score offset
+			}
+		case Warn:
+			if sRes.ScoreOffset == 0 {
+				if score > 60 {
+					score = 60 // if no score offset, score will be 60
+				}
+			} else {
+				score += sRes.ScoreOffset // use score offset
+			}
+		}
+	}
+
+	if score < 0 {
+		score = 0
+	}
+
+	return score
 }
