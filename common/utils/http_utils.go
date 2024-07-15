@@ -2,43 +2,24 @@ package utils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/pkg/errors"
 )
 
-func HttpGetWithRetry(retry int, url string) ([]byte, error) {
-	var e error
-	for ; retry > 0; retry-- {
-		b, err := HttpGet(url)
-		if err == nil {
-			return b, nil
-		} else {
-			e = err
-			continue
-		}
+func GetHTTPHeader(headers http.Header, key string) string {
+	if v := headers.Get(key); len(v) > 0 {
+		return v
 	}
-	return nil, e
-}
-
-func HttpGet(url string) ([]byte, error) {
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, errors.Errorf("HTTP GET %s error: %s", url, err)
+	if values := headers[key]; len(values) > 0 {
+		return values[0]
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.Errorf("read response body error: %s", body)
-	}
-	return body, nil
+	return ""
 }
 
 func MarshalHTTPRequest(req *http.Request) ([]byte, error) {

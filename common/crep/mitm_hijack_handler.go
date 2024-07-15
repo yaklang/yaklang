@@ -3,6 +3,11 @@ package crep
 import (
 	"bytes"
 	"context"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -13,10 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"io"
-	"net/http"
-	"strings"
-	"time"
 )
 
 func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
@@ -84,13 +85,6 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		return nil
 	}
 
-	/*
-		handle websocket
-	*/
-	if utils.IContains(req.Header.Get("Connection"), "upgrade") && req.Header.Get("Upgrade") == "websocket" {
-		return wsModifier.ModifyRequest(req)
-	}
-
 	// remove proxy-connection like!
 	err := header.NewHopByHopModifier().ModifyRequest(req)
 	if err != nil {
@@ -110,6 +104,14 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 
 	if req.Method == "CONNECT" {
 		return nil
+	}
+
+	/*
+		handle websocket
+		use utils.GetHTTPHeader instead of req.Header.Get for compatible with all lowercase request header
+	*/
+	if utils.IContains(utils.GetHTTPHeader(req.Header, "connection"), "upgrade") && utils.IContains(utils.GetHTTPHeader(req.Header, "upgrade"), "websocket") {
+		return wsModifier.ModifyRequest(req)
 	}
 
 	/*

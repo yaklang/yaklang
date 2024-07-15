@@ -43,28 +43,7 @@ type WebSocketModifier struct {
 }
 
 func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
-	var (
-		err error
-		got bool
-	)
-
-	// check if it is a websocket upgrade request
-	if req.Method != http.MethodGet {
-		return nil
-	}
-	for _, vs := range req.Header["Connection"] {
-		for _, v := range strings.Split(vs, ",") {
-			if strings.TrimSpace(strings.ToLower(v)) == "upgrade" {
-				got = true
-			}
-		}
-	}
-	if !got {
-		return nil
-	}
-	if req.Header.Get("Upgrade") != "websocket" {
-		return nil
-	}
+	var err error
 
 	isHijack := w.websocketHijackMode != nil && w.websocketHijackMode.IsSet()
 
