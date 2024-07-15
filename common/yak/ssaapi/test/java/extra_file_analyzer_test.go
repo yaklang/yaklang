@@ -81,6 +81,119 @@ func TestSimpleExtraFile(t *testing.T) {
 	})
 }
 
+func TestExtraFile_GetFunction(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/resources/dao/HomeDao.xml", `
+	<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.portal.dao.HomeDao">
+    <resultMap id="flashPromotionProduct" type="com.macro.mall.portal.domain.FlashPromotionProduct"
+               extends="com.macro.mall.mapper.PmsProductMapper.BaseResultMap">
+        <result column="flash_promotion_price" property="flashPromotionPrice"/>
+        <result column="flash_promotion_count" property="flashPromotionCount"/>
+        <result column="flash_promotion_limit" property="flashPromotionLimit"/>
+    </resultMap>
+
+    <select id="getRecommendBrandList" resultMap="com.macro.mall.mapper.PmsBrandMapper.BaseResultMap">
+        SELECT b.*
+        FROM
+            sms_home_brand hb
+            LEFT JOIN pms_brand b ON hb.brand_id = b.id
+        WHERE
+            hb.recommend_status = 1
+            AND b.show_status = 1
+        ORDER BY
+            hb.sort DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="getFlashProductList" resultMap="flashPromotionProduct">
+        SELECT
+            pr.flash_promotion_price,
+            pr.flash_promotion_count,
+            pr.flash_promotion_limit,
+            p.*
+        FROM
+            sms_flash_promotion_product_relation pr
+            LEFT JOIN pms_product p ON pr.product_id = p.id
+        WHERE
+            pr.flash_promotion_id = ${flashPromotionId}
+            AND pr.flash_promotion_session_id = #{sessionId}
+    </select>
+</mapper>`)
+	vf.AddFile("src/main/java/com/macro/mall/portal/dao/HomeDao.java", `
+package com.macro.mall.portal.dao;
+
+import com.macro.mall.model.CmsSubject;
+import com.macro.mall.model.PmsBrand;
+import com.macro.mall.model.PmsProduct;
+import com.macro.mall.portal.domain.FlashPromotionProduct;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+/**
+ * 首页内容管理自定义Dao
+ * Created by macro on 2019/1/28.
+ */
+public interface HomeDao {
+
+    /**
+     * 获取推荐品牌
+     */
+    List<PmsBrand> getRecommendBrandList(@Param("offset") Integer offset,@Param("limit") Integer limit);
+
+    /**
+     * 获取秒杀商品
+     */
+    List<FlashPromotionProduct> getFlashProductList(@Param("flashPromotionId") Long flashPromotionId, @Param("sessionId") Long sessionId);
+
+    /**
+     * 获取新品推荐
+     */
+    List<PmsProduct> getNewProductList(@Param("offset") Integer offset,@Param("limit") Integer limit);
+    /**
+     * 获取人气推荐
+     */
+    List<PmsProduct> getHotProductList(@Param("offset") Integer offset,@Param("limit") Integer limit);
+
+    /**
+     * 获取推荐专题
+     */
+    List<CmsSubject> getRecommendSubjectList(@Param("offset") Integer offset, @Param("limit") Integer limit);
+}
+`)
+
+	t.Run("test get function name from xml", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf,
+			`${*Dao.xml}.xpath("//mapper/*[contains(.,'${') and @id]/@id") as $url`,
+			map[string][]string{
+				"url": {`"getFlashProductList"`},
+			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test get function by name", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf,
+			`getFlashProductList as $func`,
+			map[string][]string{
+				"func": {"Function-HomeDao.getFlashProductList", "Undefined-HomeDao.getFlashProductList(valid)"},
+			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test get function from xml", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf,
+			`${*Dao.xml}.xpath("//mapper/*[contains(.,'${') and @id]/@id") as $url
+			$url<searchFunc> as $func
+			`,
+			map[string][]string{
+				"func": {"Function-HomeDao.getFlashProductList", "Undefined-HomeDao.getFlashProductList(valid)"},
+			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+}
+
 func TestMultipleResultExtraFile(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/resources/a.properties", `
