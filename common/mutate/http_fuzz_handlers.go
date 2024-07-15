@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
+
 	"github.com/antchfx/xmlquery"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io/ioutil"
-	"net/http"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -70,7 +71,7 @@ func (f *FuzzHTTPRequest) Results() ([]*http.Request, error) {
 		return nil, err
 	}
 	if req != nil {
-		req = _fixReq(req, f.isHttps)
+		req = f._fixReq(req, f.isHttps)
 		return []*http.Request{req}, nil
 	}
 	return nil, utils.Errorf("BUG: http.Request is nil...")
@@ -89,7 +90,7 @@ func reqToOpts(req *http.Request) []BuildFuzzHTTPRequestOption {
 	return nil
 }
 
-func _fixReq(req *http.Request, isHttps bool) *http.Request {
+func (f *FuzzHTTPRequest) _fixReq(req *http.Request, isHttps bool) *http.Request {
 	if isHttps {
 		req.URL.Scheme = "https"
 	} else {
@@ -103,7 +104,10 @@ func _fixReq(req *http.Request, isHttps bool) *http.Request {
 
 	// fix: single "Connection: close"
 	if connection, ok := req.Header["Connection"]; ok {
-		if len(connection) > 0 {
+		if len(connection) > 1 {
+			f.mutex.Lock()
+			defer f.mutex.Unlock()
+
 			req.Header["Connection"] = []string{connection[0]}
 		}
 	}
@@ -435,7 +439,7 @@ func modifyJSONValue(rawJson, jsonPath, value string, val any, index int) (strin
 		jsonPath = "$." + jsonPath
 	}
 	var newValue interface{} = value
-	//originalValue := jsonpath.Find(rawJson, jsonPath)
+	// originalValue := jsonpath.Find(rawJson, jsonPath)
 
 	// 如果原始值为空，或者原始值类型和新值类型一致，或者原始值是float64类型，新值是int类型就进入下面的逻辑
 	//if originalValue == nil ||
