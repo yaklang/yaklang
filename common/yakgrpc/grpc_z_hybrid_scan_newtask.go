@@ -156,9 +156,26 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	stream.Send(currentStatus)
 
 	// init some config
-	var riskCount uint32 = 0
 	hasUnavailableTarget := false
 	scanFilterManager := NewFilterManager(12, 1<<15, 30)
+
+	countRiskClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+		result.RuntimeID = taskId
+		currentStatus = statusManager.GetStatus(taskRecorder)
+		currentStatus.ExecResult = result
+		return stream.Send(currentStatus)
+	})
+	go func() {
+		for {
+			err := s.countRisk(taskId, countRiskClient)
+			if err != nil {
+				log.Errorf("count risk failed: %v", err)
+				return
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}()
+	defer s.countRisk(taskId, countRiskClient)
 
 	// build match
 	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
@@ -277,18 +294,17 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				callerFilter := scanFilterManager.DequeueFilter()
 				defer scanFilterManager.EnqueueFilter(callerFilter)
-				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(
+				feedbackClient := yaklib.NewVirtualYakitClientWithRuntimeID(
 					func(result *ypb.ExecResult) error {
 						if manager.IsStop() || manager.IsPaused() {
 							return nil
 						}
 						result.RuntimeID = taskId
-						currentStatus := statusManager.GetStatus(taskRecorder)
+						currentStatus = statusManager.GetStatus(taskRecorder)
 						currentStatus.CurrentPluginName = pluginInstance.ScriptName
 						currentStatus.ExecResult = result
 						return stream.Send(currentStatus)
-					},
-					&riskCount)
+					}, taskId)
 				err := ScanHybridTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)

@@ -37,7 +37,6 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 
 `, title, risk.IP))
 			}
-			client.Output(risk)
 		}
 	}
 }
@@ -78,10 +77,10 @@ var (
 		"NewRandomPortTrigger":      yakit.NewRandomPortTrigger,
 		"NewDNSLogDomain":           yakit.NewDNSLogDomain,
 		"NewHTTPLog":                yakit.NewHTTPLog,
-		"CheckDNSLogByToken":        yakit.CheckDNSLogByToken,
-		"CheckHTTPLogByToken":       yakit.CheckHTTPLogByToken,
-		"CheckRandomTriggerByToken": yakit.CheckRandomTriggerByToken,
-		"CheckICMPTriggerByLength":  yakit.CheckICMPTriggerByLength,
+		"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(""),
+		"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(""),
+		"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(""),
+		"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(""),
 		"CheckServerReachable":      yakit.CheckServerReachable,
 		"ExtractTokenFromUrl":       yakit.ExtractTokenFromUrl,
 		"payload":                   yakit.WithRiskParam_Payload,
