@@ -228,6 +228,49 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			}
 			s.debugSubLog("<< push condition results[len: %v]", results)
 			s.conditionStack.Push(results)
+		case OpFileFilterJsonPath:
+			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+			name := i.UnaryStr
+			if name == "" {
+				return utils.Errorf("file filter failed: file name is empty")
+			}
+			paramList := i.Values
+			paramMap := i.FileFilterMethodItem
+			res, err := input.FileFilter(name, "jsonpath", paramMap, paramList)
+			if err != nil {
+				return utils.Errorf("file filter failed: %v", err)
+			}
+			s.stack.Push(res)
+		case OpFileFilterXpath:
+			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+			name := i.UnaryStr
+			if name == "" {
+				return utils.Errorf("file filter failed: file name is empty")
+			}
+			paramList := i.Values
+			paramMap := i.FileFilterMethodItem
+			res, err := input.FileFilter(name, "xpath", paramMap, paramList)
+			if err != nil {
+				return utils.Errorf("file filter failed: %v", err)
+			}
+			s.stack.Push(res)
+			_ = paramList
+			_ = paramMap
+		case OpFileFilterReg:
+			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+			name := i.UnaryStr
+			if name == "" {
+				return utils.Errorf("file filter failed: file name is empty")
+			}
+			paramList := i.Values
+			paramMap := i.FileFilterMethodItem
+			res, err := input.FileFilter(name, "regexp", paramMap, paramList)
+			if err != nil {
+				return utils.Errorf("file filter failed: %v", err)
+			}
+			s.stack.Push(res)
+			// _ = paramList
+			// _ = paramMap
 		default:
 			if err := s.execStatement(i); err != nil {
 				if errors.Is(err, CriticalError) {
