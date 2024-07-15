@@ -37,18 +37,16 @@ func CheckWithFS(fs filesys.FileSystem, t *testing.T, handler func(ssaapi.Progra
 	programID := uuid.NewString()
 	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
 	log.Info("Program ID: ", programID)
+	ssadb.DeleteProgram(ssadb.GetDB(), programID)
 	fmt.Println("-----------------------------------------------------------------------------")
 	// parse with database
 	{
 		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
 		prog, err := ssaapi.ParseProject(fs, opt...)
 		defer func() {
-			// if name == "" {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
-			// }
 		}()
 		assert.Nil(t, err)
-		// prog.Show()
 
 		log.Infof("with database ")
 		err = handler(prog)
