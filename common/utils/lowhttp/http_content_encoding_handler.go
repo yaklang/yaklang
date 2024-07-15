@@ -5,11 +5,13 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"compress/zlib"
-	"github.com/andybalholm/brotli"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
+
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func ContentEncodingDecode(contentEncoding string, bodyRaw []byte) (finalResult []byte, fixed bool) {
@@ -61,6 +63,18 @@ func ContentEncodingDecode(contentEncoding string, bodyRaw []byte) (finalResult 
 		}
 		raw, err := ioutil.ReadAll(rawReader)
 		if err != nil {
+			return bodyRaw, false
+		}
+		return raw, true
+	case utils.IContains(contentEncoding, "zstd"):
+		reader, err := zstd.NewReader(bytes.NewBuffer(bodyRaw))
+		if err != nil {
+			log.Errorf("read[zstd] new reader failed: %s", err)
+		}
+		raw, err := ioutil.ReadAll(reader)
+		if err != nil {
+			log.Errorf("read[zstd] decode failed: %s", err)
+			log.Infof("bodyRaw: %v", bodyRaw)
 			return bodyRaw, false
 		}
 		return raw, true
