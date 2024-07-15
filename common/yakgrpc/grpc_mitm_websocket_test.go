@@ -157,7 +157,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_EmptyRequestOrResponse(t *testing.T) {
 				continue
 			}
 
-			defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 
 			wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /test_empty?token=%s HTTP/1.1
 Host: %s
