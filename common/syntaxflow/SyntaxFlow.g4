@@ -24,7 +24,7 @@ statement
     ;
 
 fileFilterContentStatement
-    : '${' fileFilterContentInput '}' lines? '.' fileFilterContentMethod
+    : '${' fileFilterContentInput '}' lines? '.' fileFilterContentMethod (As refVariable)?
     ;
 
 // match filter content
@@ -43,7 +43,7 @@ fileFilterContentMethodParam:  fileFilterContentMethodParamItem lines? (',' line
 fileFilterContentMethodParamItem: fileFilterContentMethodParamKey? fileFilterContentMethodParamValue;
 fileFilterContentMethodParamKey: Identifier ':';
 fileFilterContentMethodParamValue: nameFilter;
-fileName:identifier (. identifier)*;
+fileName:nameFilter (. nameFilter)*;
 
 filterStatement
     : refVariable filterItem*  (As refVariable)? # RefFilterExpr

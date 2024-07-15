@@ -105,6 +105,25 @@ func TestOpcode(t *testing.T) {
 		check(t, `alert $a`, sfvm.OpAlert)
 	})
 
+	// file filter
+	t.Run("file filter", func(t *testing.T) {
+		check(t, `${application.properties}.re(/datasource.url=(.*)/) as $target`, sfvm.OpFileFilterReg)
+		check(t, `${application.properties}.json("") as $target`, sfvm.OpFileFilterJsonPath)
+		check(t, `${application.properties}.xpath("//path/a/b/@c") as $target`, sfvm.OpFileFilterXpath)
+	})
+
+	t.Run("file filter with variable", func(t *testing.T) {
+		check(t, `${application.properties}.re(/datasource.url=(.*)/) as $target`, sfvm.OpUpdateRef)
+		check(t, `${application.properties}.json("") as $target`, sfvm.OpUpdateRef)
+		check(t, `${application.properties}.xpath("//path/a/b/@c") as $target`, sfvm.OpUpdateRef)
+	})
+
+	t.Run("file filter check for input(program)", func(t *testing.T) {
+		check(t, `${application.properties}.re(/datasource.url=(.*)/) as $target`, sfvm.OpCheckStackTop)
+		check(t, `${application.properties}.json("") as $target`, sfvm.OpCheckStackTop)
+		check(t, `${application.properties}.xpath("//path/a/b/@c") as $target`, sfvm.OpCheckStackTop)
+	})
+
 	// variable
 	t.Run("update ref", func(t *testing.T) {
 		check(t, `a as $target`, sfvm.OpUpdateRef)

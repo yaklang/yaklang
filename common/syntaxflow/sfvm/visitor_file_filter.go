@@ -1,10 +1,13 @@
 package sfvm
 
 import (
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
-	"strings"
 )
 
 func (y *SyntaxFlowVisitor) VisitFileFilterContent(raw sf.IFileFilterContentStatementContext) error {
@@ -16,6 +19,7 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContent(raw sf.IFileFilterContentStat
 		return nil
 	}
 
+	y.EmitCheckStackTop()
 	var f string // fileName or compiled reg expression for fileName
 	var err error
 	if i.FileFilterContentInput() != nil {
@@ -27,6 +31,10 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContent(raw sf.IFileFilterContentStat
 
 	if i.FileFilterContentMethod() != nil {
 		err = y.VisitFileFilterContentMethod(i.FileFilterContentMethod(), f)
+	}
+	if ref, ok := i.RefVariable().(*sf.RefVariableContext); ok {
+		varName := y.VisitRefVariable(ref)
+		y.EmitUpdate(varName)
 	}
 	return err
 }
@@ -107,8 +115,32 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethodParam(raw sf.IFileFilter
 				paramMap[key] = value
 			}
 		} else {
-			value := item.FileFilterContentMethodParamValue().(*sf.FileFilterContentMethodParamValueContext).NameFilter().GetText()
-			paramList = append(paramList, value)
+			// y.VisitNameFilter()
+			value, ok := item.FileFilterContentMethodParamValue().(*sf.FileFilterContentMethodParamValueContext)
+			if !ok {
+				continue
+			}
+			name, ok := value.NameFilter().(*sf.NameFilterContext)
+			if !ok {
+				continue
+			}
+			res := ""
+			if reg, ok := name.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
+				reg := reg.GetText()
+				reg = reg[1 : len(reg)-1]
+				_, err := regexp.Compile(reg)
+				if err != nil {
+					log.Errorf("regexp compile failed: %v", err)
+					continue
+				}
+				res = reg
+			} else {
+				res = name.Identifier().GetText()
+			}
+			if s, err := strconv.Unquote(res); err == nil {
+				res = s
+			}
+			paramList = append(paramList, res)
 		}
 	}
 	return paramMap, paramList

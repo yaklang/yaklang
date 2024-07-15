@@ -135,6 +135,8 @@ func TestSyntaxInOne(t *testing.T) {
 		"${application.properties}.jsonpath(select: aaa)",
 		"${/xml$/}.xpath(select: aaa)",
 		"${application.properties}.re(aaa)",
+		"${application.properties}.re(aaa) as $a",
+		`${application.properties}.xpath("//ar/*[contain(., '#{') and @id]/@id") as $a`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)
