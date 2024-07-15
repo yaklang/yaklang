@@ -2,11 +2,13 @@ package ssaapi
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 var ExistedNativeCall = []string{
@@ -315,6 +317,17 @@ func init() {
 							vals = append(vals, callee)
 							return nil
 						})
+					}
+				case ssa.SSAOpcodeConstInst:
+					// name := val.GetName()
+					funcName := val.String()
+					if str, err := strconv.Unquote(funcName); err == nil {
+						funcName = str
+					}
+					ok, next, _ := val.ParentProgram.ExactMatch(sfvm.BothMatch, funcName)
+					if ok {
+						next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
+						vals = append(vals, next)
 					}
 				default:
 					//for _, call := range val.GetCalledBy() {
