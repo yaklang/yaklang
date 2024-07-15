@@ -190,7 +190,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 						log.Errorf("oob feature need config is nil")
 						return ""
 					}
-					var checkingInteractsh func(string, ...float64) (string, []byte)
+					var checkingInteractsh func(string, string, ...float64) (string, []byte)
 					if config == nil || config.OOBRequireCheckingTrigger == nil {
 						checkingInteractsh = CheckingDNSLogOOB // if not set, use default func try get
 					} else {
@@ -199,7 +199,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 					if checkingInteractsh != nil {
 						token, ok := vars["reverse_dnslog_token"]
 						if ok {
-							material, _ = checkingInteractsh(strings.ToLower(fmt.Sprint(token)), oobTimeout)
+							material, _ = checkingInteractsh(strings.ToLower(fmt.Sprint(token)), config.RuntimeId, oobTimeout)
 						}
 					}
 				}
@@ -216,7 +216,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 						log.Errorf("oob feature need config is nil")
 						return ""
 					}
-					var checkingInteractsh func(string, ...float64) (string, []byte)
+					var checkingInteractsh func(string, string, ...float64) (string, []byte)
 					if config == nil || config.OOBRequireCheckingTrigger == nil {
 						checkingInteractsh = CheckingDNSLogOOB // if not set, use default func try get
 					} else {
@@ -225,7 +225,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 					if checkingInteractsh != nil {
 						token, ok := vars["reverse_dnslog_token"]
 						if ok {
-							_, request := checkingInteractsh(strings.ToLower(fmt.Sprint(token)), oobTimeout)
+							_, request := checkingInteractsh(strings.ToLower(fmt.Sprint(token)), config.RuntimeId, oobTimeout)
 							material = string(request)
 						}
 					}

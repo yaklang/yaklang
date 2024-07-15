@@ -93,7 +93,7 @@ type Config struct {
 
 	OOBTimeout                float64
 	OOBRequireCallback        func(...float64) (string, string, error)
-	OOBRequireCheckingTrigger func(string, ...float64) (string, []byte)
+	OOBRequireCheckingTrigger func(string, string, ...float64) (string, []byte)
 
 	// onTempalteLoaded
 	OnTemplateLoaded  func(*YakTemplate) bool
@@ -122,7 +122,7 @@ func WithContext(c context.Context) ConfigOption {
 	}
 }
 
-func WithOOBRequireCheckingTrigger(f func(string, ...float64) (string, []byte)) ConfigOption {
+func WithOOBRequireCheckingTrigger(f func(string, string, ...float64) (string, []byte)) ConfigOption {
 	return func(config *Config) {
 		config.OOBRequireCheckingTrigger = f
 	}
