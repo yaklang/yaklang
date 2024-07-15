@@ -15,6 +15,8 @@ import (
 var (
 	DefaultNmapServiceProbeRules     map[*NmapProbe][]*NmapMatch
 	DefaultNmapServiceProbeRulesOnce sync.Once
+	DefaultWebFingerprintRules       []*rule.FingerPrintRule
+	DefaultWebFingerprintRulesOnce   sync.Once
 )
 
 func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
@@ -85,30 +87,25 @@ func GetDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
 	})
 	return DefaultNmapServiceProbeRules, err
 }
-
 func GetDefaultWebFingerprintRules() ([]*rule.FingerPrintRule, error) {
-	content, err := embed.Asset("data/fingerprint-rules.yml.gz")
-	if err != nil {
-		return nil, errors.Errorf("get local web fingerprint rules failed: %s", err)
-	}
-	buildinYamlRules, err := parsers.ParseYamlRule(string(content))
-	if err != nil {
-		return nil, err
-	}
-	buildinRules, err := parsers.ConvertOldYamlWebRuleToGeneralRule(webfingerprint.DefaultWebFingerprintRules)
-	if err != nil {
-		return nil, err
-	}
-	return append(buildinRules, buildinYamlRules...), nil
-	//content, err = rule_resources.FS.ReadFile("exp_rule.txt")
-	//if err != nil {
-	//	return nil, err
-	//}
-	//ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) [2]string {
-	//	splits := strings.Split(s, "\x00")
-	//	return [2]string{splits[1], splits[0]}
-	//})
-	//expRules, err := parsers.ParseExpRule(ruleInfos.([][2]string))
-	//
-	//return append(append(buildinRules, buildinYamlRules...), expRules...), nil
+	var loadErr error
+	DefaultWebFingerprintRulesOnce.Do(func() {
+		content, err := embed.Asset("data/fingerprint-rules.yml.gz")
+		if err != nil {
+			loadErr = err
+			return
+		}
+		buildinYamlRules, err := parsers.ParseYamlRule(string(content))
+		if err != nil {
+			loadErr = err
+			return
+		}
+		buildinRules, err := parsers.ConvertOldYamlWebRuleToGeneralRule(webfingerprint.DefaultWebFingerprintRules)
+		if err != nil {
+			loadErr = err
+			return
+		}
+		DefaultWebFingerprintRules = append(buildinRules, buildinYamlRules...)
+	})
+	return DefaultWebFingerprintRules, loadErr
 }
