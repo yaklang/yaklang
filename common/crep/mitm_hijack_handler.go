@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -31,6 +32,7 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 		websocketRequestMirror:         m.websocketRequestMirror,
 		websocketResponseMirror:        m.websocketResponseMirror,
 		ProxyGetter:                    m.GetMartianProxy,
+		hashCache:                      new(sync.Map),
 		RequestHijackCallback: func(req *http.Request) error {
 			var isHttps bool
 			switch req.URL.Scheme {
@@ -208,17 +210,17 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		}
 	}()
 
-	requestOrigin := rsp.Request
-	rsp.TLS = requestOrigin.TLS
+	req := rsp.Request
+	rsp.TLS = req.TLS
 
-	if requestOrigin.Method == "CONNECT" {
+	if req.Method == "CONNECT" {
 		return nil
 	}
 
 	/*
 		return the ca certs
 	*/
-	if utils.StringArrayContains(defaultBuildinDomains, requestOrigin.URL.Hostname()) {
+	if utils.StringArrayContains(defaultBuildinDomains, req.URL.Hostname()) {
 		return handleBuildInMITMDefaultPageResponse(rsp)
 	}
 
@@ -227,11 +229,11 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		dropped       = utils.NewBool(false)
 	)
 
-	tooLarge := httpctx.GetResponseTooLarge(requestOrigin)
+	tooLarge := httpctx.GetResponseTooLarge(req)
 
 	// response hijacker
 	if m.responseHijackHandler != nil {
-		responseBytes = httpctx.GetBareResponseBytes(requestOrigin)
+		responseBytes = httpctx.GetBareResponseBytes(req)
 		if len(responseBytes) <= 0 {
 			var err error
 			responseBytes, err = utils.DumpHTTPResponse(rsp, !tooLarge)
@@ -239,14 +241,14 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 				log.Errorf("mitm-hijack marshal response to bytes failed: %s", err)
 				return nil
 			}
-			httpctx.SetBareResponseBytes(requestOrigin, responseBytes)
+			httpctx.SetBareResponseBytes(req, responseBytes)
 		}
 
 		isHttps := httpctx.GetRequestHTTPS(rsp.Request)
-		result := m.responseHijackHandler(isHttps, requestOrigin, rsp, responseBytes, httpctx.GetRemoteAddr(requestOrigin))
+		result := m.responseHijackHandler(isHttps, req, rsp, responseBytes, httpctx.GetRemoteAddr(req))
 		if result == nil {
 			dropped.Set()
-			rsp = proxyutil.NewResponseFromOldResponse(200, strings.NewReader("响应被用户丢弃"), requestOrigin, rsp)
+			rsp = proxyutil.NewResponseFromOldResponse(200, strings.NewReader("响应被用户丢弃"), req, rsp)
 		} else {
 			responseBytes = make([]byte, len(result))
 			copy(responseBytes, result)
@@ -257,8 +259,8 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 				return utils.Errorf("hijacking modified response parsing failed: %s", err)
 			}
 			*rsp = *resultRsp
-			rsp.Request = requestOrigin
-			rsp.TLS = requestOrigin.TLS
+			rsp.Request = req
+			rsp.TLS = req.TLS
 		}
 	}
 
@@ -270,13 +272,13 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 				log.Errorf("dump response mirror failed: %s", err)
 				return nil
 			}
-			httpctx.SetBareResponseBytes(requestOrigin, responseBytes)
+			httpctx.SetBareResponseBytes(req, responseBytes)
 		}
 
-		reqRawBytes := httpctx.GetRequestBytes(requestOrigin)
+		reqRawBytes := httpctx.GetRequestBytes(req)
 		if reqRawBytes != nil {
 			start := time.Now()
-			m.httpFlowMirror(httpctx.GetRequestHTTPS(requestOrigin), requestOrigin, rsp, start.Unix())
+			m.httpFlowMirror(httpctx.GetRequestHTTPS(req), req, rsp, start.Unix())
 			end := time.Now()
 			cost := end.Sub(start)
 			if cost.Milliseconds() > 600 {
