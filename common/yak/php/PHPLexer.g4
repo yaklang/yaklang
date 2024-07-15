@@ -121,7 +121,6 @@ Whitespace        : [ \t\r\n]+    -> channel(SkipChannel);
 MultiLineComment  : '/*' .*? '*/' -> channel(PhpComments);
 SingleLineComment : '//'          -> channel(SkipChannel), pushMode(SingleLineCommentMode);
 ShellStyleComment : '#'           -> channel(SkipChannel), pushMode(SingleLineCommentMode);
-
 AttributeStart: '#[';
 
 Abstract        : 'abstract';
@@ -324,11 +323,11 @@ Real    : (LNum '.' LNum? | LNum? '.' LNum) ExponentPart? | LNum+ ExponentPart;
 Hex     : '0x' HexDigit+ ('_' HexDigit+)*;
 Binary  : '0b' [01]+ ('_' [01]+)*;
 
+StartNowDoc: '<<<' Label [\r\n]* -> channel(SkipChannel),pushMode(HereDoc);
 BackQuoteString   : '`' ~'`'* '`';
 SingleQuoteString : '\'' (~('\'' | '\\') | '\\' .)* '\'';
 DoubleQuote       : '"' -> pushMode(InterpolationString);
 
-StartNowDoc: '<<<' Label -> pushMode(HereDoc);
 ErrorPhp     : .                       -> channel(ErrorLexem);
 
 mode InterpolationString;
@@ -352,10 +351,8 @@ CommentQuestionMark     : '?'    -> type(Comment), channel(PhpComments);
 CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from comment.
 
 mode HereDoc;
-//todo：$a 情况
-WS : [ \t]+ -> skip;
 HereDocText: ~[\r\n]*? ('\r'? '\n' | '\r');
-EndDoc: ([a-z_0-9]+){this.DocIsEnd()}? ->popMode;
+EndDoc: [a-z_0-9]+{this.DocIsEnd()}? ->popMode;
 // fragments.
 // '<?=' will be transformed to 'echo' token.
 // '<?= "Hello world"; ?>' will be transformed to '<?php echo "Hello world"; ?>'

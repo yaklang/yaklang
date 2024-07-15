@@ -557,3 +557,14 @@ $a = "test"::${$c->c};
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
+
+func TestExpre(t *testing.T) {
+	code := `<?php
+$a = <<<ab
+ac
+b;`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+}

@@ -1,7 +1,6 @@
 package phpparser
 
 import (
-	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"reflect"
 	"strings"
@@ -109,15 +108,6 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 			if token.GetTokenType() == PHPLexerStartNowDoc {
 				p._heredocIdentifier = strings.ReplaceAll(strings.TrimSpace(token.GetText()[3:]), "'", "")
 			} else if token.GetTokenType() == PHPLexerHereDocText {
-				var heredocIdentifier = p.GetHeredocEnd(token.GetText())
-				if strings.HasSuffix(strings.TrimSpace(token.GetText()), ";") {
-					var text = heredocIdentifier + ";\n"
-					reflectSetInt(token, "tokenType", PHPLexerSemiColon)
-					token.SetText(text)
-				} else {
-					token = p.BaseLexer.NextToken()
-					token.SetText(heredocIdentifier + ";\n")
-				}
 			}
 		} else if mode == PHPLexerPHP {
 			if reflectGetInt(p.BaseLexer, "channel") == antlr.TokenHiddenChannel {
@@ -131,8 +121,8 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 
 func (p *PHPLexerBase) DocIsEnd() bool {
 	index := p.GetInputStream().Index()
-	text := p.GetInputStream().GetText(index-len(p._heredocIdentifier)-1, index)
-	return text == fmt.Sprintf("\n%s;", p._heredocIdentifier)
+	text := p.GetInputStream().GetText(index-len(p._heredocIdentifier), index-1)
+	return text == p._heredocIdentifier
 }
 func (p *PHPLexerBase) GetHeredocEnd(i string) string {
 	return strings.TrimRight(strings.TrimSpace(i), ";")
