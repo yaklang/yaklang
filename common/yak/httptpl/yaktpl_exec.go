@@ -363,7 +363,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			if y.ReverseConnectionNeed { //check token even if send error
 				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
 					if config.OOBRequireCheckingTrigger == nil {
-						InjectInteractshVar(v.Data, runtimeVars)
+						InjectInteractshVar(v.Data, config.RuntimeId, runtimeVars)
 					}
 				}
 			}
@@ -420,20 +420,15 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	return responses, matchResults, extracted, count
 }
 
-func InjectInteractshVar(token string, vars map[string]any) {
-	DnsLogEvents, err := yakit.CheckDNSLogByToken(token)
+func InjectInteractshVar(token string, runtimeID string, vars map[string]any) {
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, runtimeID)
 	if err != nil {
 		log.Error("CheckDNSLogByToken failed: ", err)
 	}
-	HTTPLogEvents, err := yakit.CheckHTTPLogByToken(token)
-	if err != nil {
-		log.Error("CheckHTTPLogByToken failed: ", err)
-	}
 	vars["interactsh_protocol"] = strings.Join(lo.Uniq(lo.Map(DnsLogEvents, func(item *tpb.DNSLogEvent, index int) string {
+		if item.Type == "A" || item.Type == "AAAA" || item.Type == "CNAME" {
+			return "dns"
+		}
 		return item.Type
 	})), ",")
-	if len(HTTPLogEvents) > 0 {
-		vars["interactsh_request"] = HTTPLogEvents[len(HTTPLogEvents)-1].Request
-	}
-	vars["interactsh_request"] = ""
 }

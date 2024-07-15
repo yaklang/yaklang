@@ -591,7 +591,7 @@ func NewHTTPLog(i ...any) (domain string, token string, _ error) {
 	}
 }
 
-func CheckHTTPLogByToken(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
+func CheckHTTPLogByToken(token string, runtimeId string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
 	var f float64
 	if len(timeout) > 0 {
 		f = timeout[0]
@@ -639,13 +639,20 @@ func CheckHTTPLogByToken(token string, timeout ...float64) ([]*tpb.HTTPRequestTr
 				WithRiskParam_RiskType("httplog"),
 				WithRiskParam_Token(token),
 				WithRiskParam_Details(details),
+				WithRiskParam_RuntimeId(runtimeId),
 			)
 		}
 		return rsp.GetNotifications(), nil
 	}
 }
 
-func CheckDNSLogByToken(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+func YakitNewCheckHTTPLogByToken(runtimeID string) func(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
+	return func(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
+		return CheckHTTPLogByToken(token, runtimeID, timeout...)
+	}
+}
+
+func CheckDNSLogByToken(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	var f float64
 	if len(timeout) > 0 {
 		f = timeout[0]
@@ -673,12 +680,19 @@ func CheckDNSLogByToken(token string, timeout ...float64) ([]*tpb.DNSLogEvent, e
 				WithRiskParam_RiskType(fmt.Sprintf("dns[%v]", e.Type)),
 				WithRiskParam_RiskType(fmt.Sprint("dnslog")),
 				WithRiskParam_Payload(e.Domain), WithRiskParam_Token(e.Token),
+				WithRiskParam_RuntimeId(runtimeId),
 			)
 		}
 		if len(events) > 0 {
 			return events, nil
 		}
 		time.Sleep(1 * time.Second)
+	}
+}
+
+func YakitNewCheckDNSLogByToken(runtimeID string) func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+	return func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+		return CheckDNSLogByToken(token, runtimeID, timeout...)
 	}
 }
 
@@ -704,7 +718,13 @@ func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ er
 	return token, checkAddr, nil
 }
 
-func CheckICMPTriggerByLength(i int) (*tpb.ICMPTriggerNotification, error) {
+func YakitNewCheckICMPTriggerByLength(runtimeID string) func(i int) (*tpb.ICMPTriggerNotification, error) {
+	return func(i int) (*tpb.ICMPTriggerNotification, error) {
+		return CheckICMPTriggerByLength(i, runtimeID)
+	}
+}
+
+func CheckICMPTriggerByLength(i int, runtimeID string) (*tpb.ICMPTriggerNotification, error) {
 	addr, secret, err := _fetBridgeAddrAndSecret()
 	if err != nil {
 		return nil, err
@@ -727,11 +747,18 @@ func CheckICMPTriggerByLength(i int) (*tpb.ICMPTriggerNotification, error) {
 		),
 		WithRiskParam_Details(event),
 		WithRiskParam_Severity("info"),
+		WithRiskParam_RuntimeId(runtimeID),
 	)
 	return event, nil
 }
 
-func CheckRandomTriggerByToken(t string) (*tpb.RandomPortTriggerEvent, error) {
+func YakitNewCheckRandomTriggerByToken(runtimeID string) func(t string) (*tpb.RandomPortTriggerEvent, error) {
+	return func(t string) (*tpb.RandomPortTriggerEvent, error) {
+		return CheckRandomTriggerByToken(t, runtimeID)
+	}
+}
+
+func CheckRandomTriggerByToken(t string, runtimeID string) (*tpb.RandomPortTriggerEvent, error) {
 	addr, secret, err := _fetBridgeAddrAndSecret()
 	if err != nil {
 		return nil, err
@@ -764,6 +791,7 @@ func CheckRandomTriggerByToken(t string) (*tpb.RandomPortTriggerEvent, error) {
 		WithRiskParam_Token(t),
 		WithRiskParam_Details(event),
 		WithRiskParam_Severity("info"),
+		WithRiskParam_RuntimeId(runtimeID),
 	)
 	return event, nil
 }
