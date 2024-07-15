@@ -23,6 +23,49 @@ import (
 
 type checkFunction func(*ssaapi.Program) error
 
+func CheckWithFS(fs filesys.FileSystem, t *testing.T, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+	// only in memory
+	{
+		prog, err := ssaapi.ParseProject(fs, opt...)
+		assert.Nil(t, err)
+
+		log.Infof("only in memory ")
+		err = handler(prog)
+		assert.Nil(t, err)
+	}
+
+	programID := uuid.NewString()
+	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
+	log.Info("Program ID: ", programID)
+	fmt.Println("-----------------------------------------------------------------------------")
+	// parse with database
+	{
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		prog, err := ssaapi.ParseProject(fs, opt...)
+		defer func() {
+			// if name == "" {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			// }
+		}()
+		assert.Nil(t, err)
+		// prog.Show()
+
+		log.Infof("with database ")
+		err = handler(prog)
+		assert.Nil(t, err)
+	}
+
+	// just use database
+	{
+		prog, err := ssaapi.FromDatabase(programID)
+		assert.Nil(t, err)
+
+		log.Infof("only use database ")
+		err = handler([]*ssaapi.Program{prog})
+		assert.Nil(t, err)
+	}
+}
+
 func CheckWithName(
 	name string,
 	t *testing.T, code string,
@@ -132,6 +175,15 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
 
+func CheckSyntaxFlowWithFS(t *testing.T, fs filesys.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
+	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
+		results, err := p.SyntaxFlowWithError(sf)
+		assert.Nil(t, err)
+		assert.NotNil(t, results)
+		compareResult(t, contain, results, wants)
+		return nil
+	}, opt...)
+}
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }
@@ -150,28 +202,28 @@ func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
-		for key, value := range results.GetAllValues() {
-			log.Infof("\nkey: %s", key)
-			value.Show()
-		}
-
-		for k, want := range wants {
-			gotVs := results.GetValues(k)
-			assert.Greater(t, len(gotVs), 0, "key[%s] not found", k)
-			got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
-			sort.Strings(got)
-			sort.Strings(want)
-			if contain {
-				if !utils.ContainsAll(got, want...) {
-					t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
-				}
-			} else {
-				assert.Equal(t, len(want), len(gotVs))
-				assert.Equal(t, want, got)
-			}
-		}
+		compareResult(t, contain, results, wants)
 		return nil
 	}, ssaOpt...)
+}
+
+func compareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult, wants map[string][]string) {
+	results.Show()
+	for k, want := range wants {
+		gotVs := results.GetValues(k)
+		assert.Greater(t, len(gotVs), 0, "key[%s] not found", k)
+		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+		sort.Strings(got)
+		sort.Strings(want)
+		if contain {
+			if !utils.ContainsAll(got, want...) {
+				t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
+			}
+		} else {
+			assert.Equal(t, len(want), len(gotVs))
+			assert.Equal(t, want, got)
+		}
+	}
 }
 
 func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {

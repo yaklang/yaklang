@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strconv"
@@ -140,50 +141,23 @@ func (us StringSlice) Value() (driver.Value, error) {
 	return strings.Join(us, ","), nil
 }
 
-type StringMap []item[string]
-
-func CoverStringMap(m map[string]string) StringMap {
-	var sm StringMap
-	for k, v := range m {
-		sm.Append(k, v)
-	}
-	return sm
-}
-
-func CoverStringMapToMap(m StringMap) map[string]string {
-	res := make(map[string]string)
-	for _, item := range m {
-		res[item.key] = item.value
-	}
-	return res
-}
-
-func (m *StringMap) Append(key, value string) {
-	*m = append(*m, item[string]{key, value})
-}
+type StringMap map[string]string
 
 func (m StringMap) Value() (driver.Value, error) {
-	var parts []string
-	for _, item := range m {
-		parts = append(parts, item.key+":"+item.value)
+	data, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
 	}
-	return strings.Join(parts, ","), nil
+	return data, nil
 }
 
 func (m *StringMap) Scan(value any) error {
 	if m == nil {
 		return nil
 	}
-	val := codec.AnyToString(value)
-	subVal := strings.Split(val, ",")
-	nm := make(StringMap, 0, len(subVal))
-	for _, sub := range subVal {
-		subVals := strings.Split(sub, ":")
-		if len(subVals) != 2 {
-			continue
-		}
-		nm.Append(subVals[0], subVals[1])
+	val := codec.AnyToBytes(value)
+	if err := json.Unmarshal(val, m); err != nil {
+		return err
 	}
-	*m = nm
 	return nil
 }
