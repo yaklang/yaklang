@@ -704,6 +704,9 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 }
 
 func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext) (typeCallback, insCallback func(ssa.Value)) {
+	typeCallback = func(ssa.Value) {}
+	insCallback = func(ssa.Value) {}
+
 	if y == nil || raw == nil {
 		return
 	}
