@@ -637,7 +637,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		3. 镜像 HTTP 请求和响应
 	*/
 	var wshashFrameIndexLock sync.Mutex
-	websocketHashCache := new(sync.Map)
 	wshashFrameIndex := make(map[string]int)
 	requireWsFrameIndexByWSHash := func(i string) int {
 		/*这个函数目前用在 Hijack 里面，不太需要加锁，因为 mitmLock 已经一般生效了*/
@@ -668,41 +667,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return originRspRaw
 		}
 
-		// 保存到数据库
-		isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
+		// 保存Websocket Flow
+		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		wshash := httpctx.GetWebsocketRequestHash(req)
 		if wshash == "" {
 			wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
 		}
 
-		_, ok := websocketHashCache.Load(wshash)
-		if !ok {
-			// 证明这是新的 wshash
-			// 在这儿可以给数据库增加一个记录了
-			websocketHashCache.Store(wshash, true)
-			httpctx.SetWebsocketRequestHash(req, wshash)
-
-			flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
-				isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
-			)
-			if err != nil {
-				log.Errorf("httpflow failed: %s", err)
-			}
-			if flow != nil {
-				flow.IsWebsocket = true
-				flow.WebsocketHash = wshash
-				flow.HiddenIndex = wshash
-				flow.Hash = flow.CalcHash()
-				//err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
-				//if err != nil {
-				//	log.Errorf("create / save httpflow(websocket) error: %s", err)
-				//}
-				err := yakit.InsertHTTPFlowEx(flow)
-				if err != nil {
-					log.Errorf("create / save httpflow(websocket) error: %s", err)
-				}
-			}
-		}
 		yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), true, wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
 			if err != nil {
 				log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -1033,38 +1004,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if wshash == "" {
 			wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
 		}
-		_, ok := websocketHashCache.Load(wshash)
-		if !ok {
-			// 证明这是新的 wshash
-			// 在这儿可以给数据库增加一个记录了
-			websocketHashCache.Store(wshash, true)
-			httpctx.SetWebsocketRequestHash(req, wshash)
-
-			flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
-				isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
-			)
-			if err != nil {
-				log.Errorf("httpflow failed: %s", err)
-			}
-			if flow != nil {
-				flow.IsWebsocket = true
-				flow.WebsocketHash = wshash
-				flow.HiddenIndex = wshash
-				flow.Hash = flow.CalcHash()
-				//err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
-				//if err != nil {
-				//	log.Errorf("create / save httpflow(websocket) error: %s", err)
-				//}
-				err := yakit.InsertHTTPFlowEx(flow)
-				if err != nil {
-					log.Errorf("create / save httpflow(websocket) error: %s", err)
-				}
-			}
-		}
 
 		originReqRaw := raw[:]
 		finalResult = originReqRaw
 
+		// 保存 Websocket Flow
 		yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), false, wshash, requireWsFrameIndexByWSHash(wshash), raw[:], func(err error) {
 			if err != nil {
 				log.Warnf("save to websocket flow failed: %s", err)
