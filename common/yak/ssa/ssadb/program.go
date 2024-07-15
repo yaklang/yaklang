@@ -19,7 +19,11 @@ type IrProgram struct {
 	// down-stream program is the program that depends on this program
 	DownStream StringSlice `json:"down_stream_programs" gorm:"type:text"`
 
+	// this  program  contain this file
 	FileList StringMap `json:"file_list" gorm:"type:text"`
+
+	// program extra file: *.properties, *.xml, *.json, etc
+	ExtraFile StringMap `json:"extra_file" gorm:"type:text"`
 }
 
 func CreateProgram(name, kind, version string) *IrProgram {

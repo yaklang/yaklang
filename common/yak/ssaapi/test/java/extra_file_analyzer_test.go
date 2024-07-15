@@ -4,10 +4,10 @@ import (
 	"embed"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 //go:embed sample/springboot
@@ -57,37 +57,27 @@ func TestSimpleExtraFile(t *testing.T) {
 	</mapper>
 	`)
 
-	check := func(sfCode string) (*ssaapi.SyntaxFlowResult, error) {
-		progs, err := ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA))
-		if err != nil {
-			return nil, err
-		}
-		return progs.SyntaxFlowWithError(sfCode)
-	}
-
 	t.Run("test simple config file", func(t *testing.T) {
-		res, err := check(`
-		${*.properties}.regexp(/spring.datasource.url=(.*)/) as $url
-		`)
-		assert.NoErrorf(t, err, "error: %v", err)
-		res.Show()
-		url := lo.Map(res.GetValues("url"), func(v *ssaapi.Value, _ int) string { return v.String() })
-		assert.Equal(t, []string{`"jdbc:mysql://localhost:3306/your_database"`}, url)
+		ssatest.CheckSyntaxFlowWithFS(t, vf,
+			`${*.properties}.re(/spring.datasource.url=(.*)/) as $url`,
+			map[string][]string{
+				"url": {`"jdbc:mysql://localhost:3306/your_database"`},
+			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
 	})
 
 	t.Run("test simple mybatis mapper file", func(t *testing.T) {
-		res, err := check(`
+		ssatest.CheckSyntaxFlowWithFS(t, vf,
+			`
 		${*Mapper.xml}.xpath("//mapper/*[contains(., '${') and @id]/@id") as $url
 		${*Mapper.xml}.xpath("string(//mapper/*[contains(., '${') and @id]/@id)") as $url2
-		`)
-		assert.NoErrorf(t, err, "error: %v", err)
-		_ = res
-		res.Show()
-		url := lo.Map(res.GetValues("url"), func(v *ssaapi.Value, _ int) string { return v.String() })
-		assert.Equal(t, []string{`"selectUserByUsername"`}, url)
-
-		url = lo.Map(res.GetValues("url2"), func(v *ssaapi.Value, _ int) string { return v.String() })
-		assert.Equal(t, []string{`"selectUserByUsername"`}, url)
+		`,
+			map[string][]string{
+				"url":  {`"selectUserByUsername"`},
+				"url2": {`"selectUserByUsername"`},
+			}, false,
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
 	})
 }
 
@@ -99,19 +89,11 @@ func TestMultipleResultExtraFile(t *testing.T) {
 	vf.AddFile("src/resources/b.properties", `
 	b.url=http://b.com
 	`)
-
-	prog, err := ssaapi.ParseProject(
-		vf, ssaapi.WithLanguage(ssaapi.JAVA),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	res, err := prog.SyntaxFlowWithError(
+	ssatest.CheckSyntaxFlowWithFS(t, vf,
 		`${*.properties}.re(/url=(.*)/) as $url`,
+		map[string][]string{
+			"url": {`"http://a.com"`, `"http://b.com"`},
+		}, false,
+		ssaapi.WithLanguage(ssaapi.JAVA),
 	)
-	assert.NoErrorf(t, err, "SyntaxFlowWithError error: %v", err)
-	res.Show()
-
-	url := lo.Map(res.GetValues("url"), func(v *ssaapi.Value, _ int) string { return v.String() })
-	assert.Equal(t, []string{`"http://a.com"`, `"http://b.com"`}, url)
 }
