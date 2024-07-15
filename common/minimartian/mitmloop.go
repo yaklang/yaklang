@@ -32,6 +32,8 @@ import (
 var IsDroppedError = utils.Error("dropped")
 
 const (
+	S5_CONNECT_HOST = "S5ConnectHost"
+	S5_CONNECT_PORT = "S5ConnectPort"
 	S5_CONNECT_ADDR = "S5ConnectAddr"
 	AUTH_FINISH     = "authFinish"
 )
@@ -207,13 +209,13 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 Handshake failed: %s", err)
 					return
 				}
-				_, cmd, _, target, err := s5config.HandleS5RequestHeader(handledConnection)
+				req, err := s5config.HandleS5RequestHeader(handledConnection)
 				if err != nil {
 					log.Errorf("socks5 handle request failed: %s", err)
 					return
 				}
-				if cmd != commandConnect {
-					log.Errorf("mitm socks5 proxy error : mitm not support command %s", cmd)
+				if req.Cmd != commandConnect {
+					log.Errorf("mitm socks5 proxy error : mitm not support command %s", req.Cmd)
 					return
 				}
 				host, port, err := utils.ParseStringToHostPort(handledConnection.LocalAddr().String())
@@ -221,12 +223,14 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 server parse host port failed: %v", err)
 					return
 				}
-				_, err = handledConnection.Write(BuildReply(net.ParseIP(host), port))
+				_, err = handledConnection.Write(NewReply(net.ParseIP(host), port))
 				if err != nil {
 					log.Errorf("socks5 server reply failed: %v", err)
 					return
 				}
-				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, target)
+				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(string(req.DstHost), req.DstPort))
+				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, host)
+				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, host)
 			}
 			p.handleLoop(firstByte == 0x16, handledConnection, subCtx)
 		}(uid, conn)
@@ -311,16 +315,11 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "http")
 	// s5 proxy needs to have higher priority than http proxy
 	if s5ProxyAddr, ok := rootCtx.Value(S5_CONNECT_ADDR).(string); ok && s5ProxyAddr != "" {
-		host, port, err := utils.ParseStringToHostPort(s5ProxyAddr)
-		if err != nil || host == "" || port <= 0 {
-			log.Errorf("mitm: failed to parse s5 proxy addr: %v", err)
-		} else {
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, host)
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
-			ctx.Session().Set(AUTH_FINISH, true)
-		}
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, rootCtx.Value(S5_CONNECT_HOST).(string))
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, rootCtx.Value(S5_CONNECT_PORT).(string))
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
+		ctx.Session().Set(AUTH_FINISH, true)
 	}
 
 	timerInterval := time.Second * 10
