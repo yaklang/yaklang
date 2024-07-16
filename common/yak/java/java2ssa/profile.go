@@ -15,7 +15,18 @@ var (
 
 	lastPackageSecond int64
 	packageCostNano   int64 = 0
+
+	lastAssignVariableSecond int64
+	assignVariableCostNano   int64 = 0
 )
+
+func deltaAssignVariableCostFrom(t time.Time) {
+	du := atomic.AddInt64(&assignVariableCostNano, time.Now().Sub(t).Nanoseconds())
+	if ret := time.Duration(du).Seconds(); ret > float64(lastAssignVariableSecond+5) {
+		log.Infof("abnormal deltaAssignVariableCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		lastAssignVariableSecond = int64(ret)
+	}
+}
 
 func deltaAnnotationCostFrom(t time.Time) {
 	du := atomic.AddInt64(&annotationCostNano, time.Now().Sub(t).Nanoseconds())
@@ -47,4 +58,12 @@ func ShowJavaCompilingCost() {
 
 func init() {
 	ssa.RegisterCostCallback(ShowJavaCompilingCost)
+}
+
+func (y *builder) AssignVariable(variable *ssa.Variable, val ssa.Value) {
+	start := time.Now()
+	defer func() {
+		deltaAssignVariableCostFrom(start)
+	}()
+	y.FunctionBuilder.AssignVariable(variable, val)
 }
