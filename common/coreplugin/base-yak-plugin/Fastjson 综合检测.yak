@@ -1,10 +1,17 @@
 // 插件配置
 dnslogTimeout = 3
-timeoutTolerance = 2 // 2 秒的超时容错
-fuzzTimeout = 10
+timeoutTolerance = 2 // 2 秒的超时容错，如果当前请求时长和常规请求时长相差小于2秒则认为是正常请求，否则认为是延时payload生效
+fuzzTimeout = 5 // 5 秒的超时时间
 networkFluctuation = 5 // 网络波动，fuzztimeout = networkFluctuation * getCommonWastTime()
-log.setLevel("info")
-
+log.setLevel("debug")
+getRequestDuration = (rsp)=>{
+    try{
+        t = rsp.LowhttpResponse.TraceInfo.TotalTime
+        return int64(t)/1000/1000/1000
+    }catch e{
+        return 0
+    }
+}
 encodePayload = payload=>{
     res = re.FindAll(payload, `"(.*?)"`)
     for i in res{
@@ -156,7 +163,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     risk.payload(payload),
                     risk.description(description),
                     risk.solution(solution),
-                    risk.details({"currentDuration":rsp.DurationMs/1000.0,"normalDurationS":getCommonWastTime(),"timeoutTolerance":timeoutTolerance})
+                    risk.details({"currentDuration":getRequestDuration(rsp),"normalDurationS":getCommonWastTime(),"timeoutTolerance":timeoutTolerance})
                 )
             }})
         }
@@ -262,7 +269,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     }
                     exp = exp[0]
                     rsp,err = param.delayFuzz(exp)
-                    wastTime = rsp.DurationMs/1000.0
+                    wastTime = getRequestDuration(rsp)
                     if checkDns{
                         res,err = risk.CheckDNSLogByToken(token,dnslogTimeout)
                         if err{
@@ -286,7 +293,18 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     log.debug("当前请求时长: %v", wastTime)
                     log.debug("常规请求时长: %v", getCommonWastTime())
                     log.debug("当前超时容错值: %v", timeoutTolerance)
-                    if wastTime - getCommonWastTime() > timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                    delayCheckOk = true
+                    for i in 3{
+                        if i != 0{
+                            rsp,err = param.delayFuzz(exp)
+                            wastTime = getRequestDuration(rsp)
+                        }
+                        if wastTime - getCommonWastTime() < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                            delayCheckOk = false
+                            break
+                        }
+                    }
+                    if delayCheckOk{
                         newRisk("目标 fastjson 框架可能存在 RCE 漏洞 (Delay Check)",exp,param,2)
                         break
                     }
@@ -352,7 +370,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         newParam["delayFuzz"] = delayFuzz
         newParam["fuzz"] = payload=>{ // 每次常规请求会计入平均请求时长
             rsp,err = delayFuzz(payload)
-            wastTime = rsp.DurationMs/1000.0
+            wastTime = getRequestDuration(rsp)
             v,ok = globalInfo.Load("wastTimes")
             commonWastTime = getCommonWastTime()
             if commonWastTime != -1{ // 调整网络波动，根据网络波动可以计算出超时时长
@@ -425,15 +443,26 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     rsp,err = param.delayFuzz(poc)
                     if checkDns{
                         res,err = risk.CheckDNSLogByToken(token, dnslogTimeout)
-                        die(err)
                         if len(res)>0{
                             globalInfo.Store("outNet",1)
                             newRisk("目标 fastjson 框架存在 dnslog 回显",poc,param,0)
                             break
                         }
                     }
-                    wastTime = rsp.DurationMs/1000.0
-                    if wastTime - getCommonWastTime() > timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                    wastTime = getRequestDuration(rsp)
+
+                    delayCheckOk = true
+                    for i in 3{
+                        if i != 0{
+                            rsp,err = param.delayFuzz(exp)
+                            wastTime = getRequestDuration(rsp)
+                        }
+                        if wastTime - getCommonWastTime() < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                            delayCheckOk = false
+                            break
+                        }
+                    }
+                    if delayCheckOk{
                         newRisk("目标 fastjson 框架可能存在漏洞 (Delay Check)",poc,param,0)
                         break
                     }
@@ -455,7 +484,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     fuzzOk = true
                     for in 3{
                         rsp,err = param.delayFuzz(poc_redos)
-                        if rsp.DurationMs/1000.0 - getCommonWastTime() <= timeoutTolerance {
+                        if getRequestDuration(rsp) - getCommonWastTime() <= timeoutTolerance {
                             fuzzOk = false
                             break
                         }else{
