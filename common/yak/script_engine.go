@@ -236,7 +236,7 @@ func initYaklangLib() {
 	// t3反序列化利用
 	yaklang.Import("t3", t3.Exports)
 	yaklang.Import("iiop", iiop.Exports)
-	yaklang.Import("js", yaklib.JSOttoExports)
+	yaklang.Import("js", yaklib.JSExports)
 
 	yaklang.Import("db", yaklib.DatabaseExports)
 
