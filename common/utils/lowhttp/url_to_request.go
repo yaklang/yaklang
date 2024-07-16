@@ -14,123 +14,105 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func NewRequestPacketFromMethod(method string, u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
-	originReqIns, err := ParseBytesToHttpRequest(originRequest)
-	if err != nil && err != io.EOF {
-		log.Warnf("parse origin request error: %s\n%v", err.Error(), fmt.Sprint(string(originRequest)))
-	}
-	parseReqOk := originReqIns != nil
-
-	if !utils.IsHttpOrHttpsUrl(u) {
-		urlIns, _ := ExtractURLFromHTTPRequest(originReqIns, originRequestHttps)
+func NewRequestPacketFromMethod(method string, targetURL string, originRequest []byte, originReqIns *http.Request, https bool, jar http.CookieJar, cookies ...*http.Cookie) []byte {
+	if !utils.IsHttpOrHttpsUrl(targetURL) {
+		urlIns, _ := ExtractURLFromHTTPRequest(originReqIns, https)
 		if urlIns != nil {
-			nu, _ := utils.UrlJoin(urlIns.String(), u)
+			nu, _ := utils.UrlJoin(urlIns.String(), targetURL)
 			if nu != "" {
-				u = nu
+				targetURL = nu
 			}
 		}
 	}
 
-	reqIns, err := http.NewRequest(method, u, http.NoBody)
-	if err != nil {
+	targetURLIns, err := url.Parse(targetURL)
+	if err != nil || targetURLIns == nil {
 		return nil
 	}
-	reqIns.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0")
-	if parseReqOk {
-		if len(cookies) > 0 {
-			cookies = append(cookies, originReqIns.Cookies()...)
-		} else {
-			cookies = originReqIns.Cookies()
-		}
 
-		jar, err := cookiejar.New(nil)
+	if jar != nil {
+		cookies = append(cookies, jar.Cookies(targetURLIns)...)
+	}
+
+	raw := bytes.Clone(originRequest)
+	if jar == nil {
+		jar, err = cookiejar.New(nil)
 		if err != nil {
 			return nil
 		}
-
-		jar.SetCookies(reqIns.URL, cookies)
-		ret := CookiesToString(jar.Cookies(reqIns.URL))
-		if len(ret) > 0 {
-			reqIns.Header.Set("Cookie", ret)
-		}
 	}
 
-	reqRaw, err := utils.HttpDumpWithBody(reqIns, true)
 	if err != nil {
 		return nil
 	}
-	return FixHTTPRequest(reqRaw)
+
+	cookieRaw := CookiesToString(cookies)
+	if len(cookieRaw) == 0 {
+		raw = DeleteHTTPPacketHeader(raw, "Cookie")
+	} else {
+		raw = ReplaceHTTPPacketHeader(raw, "Cookie", cookieRaw)
+	}
+
+	raw = ReplaceHTTPPacketHost(raw, targetURLIns.Host)
+	proto := "HTTP/1.1"
+	if originReqIns != nil {
+		proto = originReqIns.Proto
+	}
+	raw = ReplaceHTTPPacketFirstLine(raw, fmt.Sprintf("%s %s %s", method, targetURLIns.RequestURI(), proto))
+
+	return raw
 }
 
 func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
-	return urlToRequestPacket("GET", u, originRequest, originRequestHttps, -1, cookies...)
-}
-
-// 提取响应码以处理307和302的问题
-func UrlToGetRequestPacketWithResponse(u string, originRequest, originResponse []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
-	res, err := ParseBytesToHTTPResponse(originResponse)
-	statusCode := -1
-	if err == nil {
-		statusCode = res.StatusCode
+	raw, err := UrlToRequestPacketEx(http.MethodGet, u, originRequest, originRequestHttps, -1, nil, cookies...)
+	if err != nil {
+		log.Warnf("url to GET request packet error: %v", err)
 	}
-	return urlToRequestPacket("GET", u, originRequest, originRequestHttps, statusCode, cookies...)
+	return raw
 }
 
 func UrlToRequestPacket(method string, u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
-	return urlToRequestPacket(method, u, originRequest, originRequestHttps, -1, cookies...)
+	raw, err := UrlToRequestPacketEx(method, u, originRequest, originRequestHttps, -1, nil, cookies...)
+	if err != nil {
+		log.Warnf("url to request packet error: %v", err)
+	}
+	return raw
 }
 
-func urlToRequestPacket(method string, u string, originRequest []byte, https bool, responseStatusCode int, cookies ...*http.Cookie) []byte {
-	// 无原始请求或者303状态码，直接构造请求
-	if originRequest == nil || responseStatusCode == http.StatusSeeOther {
-		return NewRequestPacketFromMethod(method, u, originRequest, https, cookies...)
+func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte, https bool, statusCode int, jar http.CookieJar, cookies ...*http.Cookie) ([]byte, error) {
+	var raw []byte
+
+	// 303/302
+	// 302在规范下也应该保留请求体和请求方法，但是实际上大部分浏览器都会改为GET请求，所以我们就不保留
+	is302Or303 := statusCode == http.StatusSeeOther || statusCode == http.StatusFound
+	if is302Or303 {
+		method = http.MethodGet
+	}
+	var originReqIns *http.Request
+	if len(originRequest) > 0 {
+		originReqIns, err := ParseBytesToHttpRequest(originRequest)
+		if err != nil && err != io.EOF {
+			return nil, utils.Wrap(err, "parse bytes to http request error")
+		}
+		if originReqIns == nil {
+			return nil, utils.Error("parse bytes to http request error, empty request")
+		}
+		if https {
+			// fix https externally
+			originReqIns.URL.Scheme = "https"
+		}
+		if method == "" {
+			method = originReqIns.Method
+		}
 	}
 
-	originReqIns, err := ParseBytesToHttpRequest(originRequest)
-	if err != nil {
-		return nil
+	raw = NewRequestPacketFromMethod(method, targetURL, originRequest, originReqIns, https, jar, cookies...)
+	if is302Or303 {
+		raw = ReplaceHTTPPacketBodyFast(raw, nil)
 	}
+	raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
 
-	// originUrl, err := ExtractURLFromHTTPRequestRaw(originRequest, https)
-	// if err != nil {
-	// 	return nil
-	// }
-	// originHost, _, _ := utils.ParseStringToHostPort(originUrl.String())
-	// currentHost, _, _ := utils.ParseStringToHostPort(u)
-	// inSameOrigin := originHost != "" && (strings.Contains(currentHost, originHost) || strings.Contains(originHost, currentHost))
-	// sameMethod := strings.ToUpper(reqIns.Method) == strings.ToUpper(method)
-
-	// 307状态码保留请求体和请求方法，改变url，添加cookie
-	// 302状态码在规范下也应该保留请求体和请求方法，但是实际上大部分浏览器都会改为GET请求，所以我们就不保留
-	if responseStatusCode == http.StatusTemporaryRedirect {
-		originReqIns.URL, _ = url.Parse(u)
-		if originReqIns.URL == nil {
-			return nil
-		}
-		originReqIns.Host = originReqIns.URL.Host
-		originReqIns.RequestURI = originReqIns.URL.RequestURI()
-
-		if len(cookies) > 0 {
-			jar, err := cookiejar.New(nil)
-			if err != nil {
-				return nil
-			}
-			jar.SetCookies(originReqIns.URL, append(originReqIns.Cookies(), cookies...))
-			res := CookiesToString(jar.Cookies(originReqIns.URL))
-			if len(res) > 0 {
-				originReqIns.Header.Set("Cookie", res)
-			}
-		}
-
-		raw, err := utils.HttpDumpWithBody(originReqIns, true)
-		if err != nil {
-			return nil
-		}
-
-		return raw
-	}
-
-	return NewRequestPacketFromMethod(method, u, originRequest, https, cookies...)
+	return FixHTTPRequest(raw), nil
 }
 
 func UrlToHTTPRequest(text string) ([]byte, error) {
