@@ -177,7 +177,8 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	r := raw.GetText()
 	if strings.HasPrefix(r, "\\") {
 		r = r[1:]

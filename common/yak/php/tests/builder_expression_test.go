@@ -39,7 +39,7 @@ $a = new test;
 $a->a++;
 println($a->a);
 `
-	ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"add(Undefined-$a.a(valid), 1)"}, t)
 }
 
 func TestExperssion_PHP_Scope(t *testing.T) {

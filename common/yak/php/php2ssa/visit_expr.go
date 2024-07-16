@@ -119,7 +119,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		defer func() {
 			y.isFunction = tmp
 		}()
-
 		fname := y.VisitExpression(ret.Expression())
 		if ret, isConst := ssa.ToConst(fname); isConst {
 			if ret != nil {
@@ -373,7 +372,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if leftValue := y.VisitExpression(ret.Expression(0)); leftValue.IsUndefined() {
 			return y.VisitExpression(ret.Expression(1)) // 如果是undefined就返回1
 		} else {
-			return y.EmitConstInstNil()
+			return leftValue
 		}
 	case *phpparser.DefinedOrScanDefinedExpressionContext:
 		return y.VisitDefineExpr(ret.DefineExpr())
@@ -739,7 +738,8 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 
 	if ret := i.QualifiedNamespaceName(); ret != nil {
 		text := y.VisitQualifiedNamespaceName(ret)
-		return y.ReadValue(text)
+		_ = text
+		//return y.ReadValue(text)
 	} else if ret := i.ChainBase(); ret != nil {
 		return y.VisitChainBase(ret)
 	} else if ret := i.ClassConstant(); ret != nil {
@@ -890,7 +890,8 @@ func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) (ssa.Value, ss
 	if y == nil || raw == nil {
 		return nil, nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.ArrayItemContext)
 	if i == nil {
 		return nil, nil
@@ -1184,6 +1185,8 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	switch i := raw.(type) {
 	case *phpparser.CustomVariableContext:
 		variable := y.VisitVariable(i.Variable())
