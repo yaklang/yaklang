@@ -650,7 +650,11 @@ service Yak {
   rpc ResetGlobalNetworkConfig(ResetGlobalNetworkConfigRequest) returns (Empty);
   rpc ValidP12PassWord(ValidP12PassWordRequest) returns (ValidP12PassWordResponse);
 
+  // YAKURL
   rpc RequestYakURL(RequestYakURLParams) returns (RequestYakURLResponse);
+  
+  // 文件IO
+  rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse);
 
   // Wireshark
   rpc GetPcapMetadata(PcapMetadataRequest) returns (PcapMetadata);
@@ -660,6 +664,7 @@ service Yak {
   rpc QueryTrafficTCPReassembled(QueryTrafficTCPReassembledRequest) returns (QueryTrafficTCPReassembledResponse);
   rpc ParseTraffic(ParseTrafficRequest) returns (ParseTrafficResponse);
 
+  // 与前端交互的双工长连接，用于通知某些消息
   rpc DuplexConnection(stream DuplexConnectionRequest) returns (stream DuplexConnectionResponse);
 
 
@@ -5209,4 +5214,14 @@ message ModifyFingerprintRequest{
 
 message ModifyFingerprintResponse{
 
+}
+
+message ReadFileRequest {
+  string FilePath = 1;
+  int64 BufSize = 2;
+}
+
+message ReadFileResponse {
+  bytes Data = 1;
+  bool EOF = 2;
 }
