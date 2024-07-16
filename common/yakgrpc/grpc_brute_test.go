@@ -1,20 +1,15 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
-	"os"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -28,70 +23,49 @@ func TestGRPCMUSTPASS_Brute(t *testing.T) {
 
 	host, port = tools.DebugMockRedis(ctx, false)
 	unAuthTarget := utils.HostPort(host, port)
+
+	client, err := NewLocalClient()
+	stream, err := client.StartBrute(ctx, &ypb.StartBruteParams{
+		Type:                       "redis",
+		Targets:                    target + "\n" + unAuthTarget,
+		Usernames:                  []string{},
+		Passwords:                  []string{"123456"},
+		ReplaceDefaultPasswordDict: true,
+		ReplaceDefaultUsernameDict: true,
+		OkToStop:                   true,
+		Concurrent:                 50,
+		TargetTaskConcurrent:       1,
+		DelayMax:                   5,
+		DelayMin:                   1,
+	})
+	require.NoError(t, err)
+
+	var runtimeID string
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if rsp.RuntimeID != "" {
+			runtimeID = rsp.RuntimeID
+		}
+	}
+
+	risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+	require.NoError(t, err)
+	require.Len(t, risks, 2)
+
 	weakPasswdOk := false
 	unAuthOk := false
-	feedbackClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
-		spew.Dump(result)
-
-		if result.IsMessage {
-			if bytes.Contains(result.GetMessage(), []byte("Weak Password[redis]")) {
-				weakPasswdOk = true
-			}
-			if bytes.Contains(result.GetMessage(), []byte("未授权访问")) {
-				unAuthOk = true
-			}
+	for _, r := range risks {
+		if strings.Contains(r.TitleVerbose, "未授权访问") {
+			weakPasswdOk = true
 		}
-		return nil
-	})
-
-	targetFile, err := utils.DumpHostFileWithTextAndFiles(target+"\n"+unAuthTarget, "\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(targetFile)
-	userListFile, err := utils.DumpFileWithTextAndFiles(strings.Join([]string{}, "\n"), "\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(userListFile)
-
-	passListFile, err := utils.DumpFileWithTextAndFiles(strings.Join([]string{"123456"}, "\n"), "\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(passListFile)
-	cliArgs := []string{
-		"yak",
-		"--types", "redis",
-		"--target-file", targetFile,
-		"--user-list-file", userListFile,
-		"--pass-list-file", passListFile,
-		"--replace-default-password-dict",
-		"--replace-default-username-dict",
-		"--ok-to-stop",
-		"--concurrent", "50",
-		"--task-concurrent", "1",
-		"--delay-min", "1",
-		"--delay-max", "5",
+		if strings.Contains(r.TitleVerbose, "弱口令") {
+			unAuthOk = true
+		}
 	}
 
-	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
-	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
-	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
-			PluginName: "brute-temp",
-			Ctx:        ctx,
-		})
-		yak.HookCliArgs(engine, cliArgs)
-		return nil
-	})
-	_, err = engine.ExecuteExWithContext(ctx, startBruteScript, map[string]any{
-		"CTX":         ctx,
-		"PLUGIN_NAME": "brute-temp",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if !weakPasswdOk {
 		t.Fatal("brute weak password failed")
 	}
