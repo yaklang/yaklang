@@ -89,7 +89,6 @@ func NewTypeValue(typ Type) *TypeValue {
 	t := &TypeValue{
 		anValue: NewValue(),
 	}
-	t.SetType(typ)
 	return t
 }
 
