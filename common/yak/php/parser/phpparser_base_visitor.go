@@ -727,6 +727,10 @@ func (v *BasePHPParserVisitor) VisitString(ctx *StringContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitHereDocContent(ctx *HereDocContentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitInterpolatedStringPart(ctx *InterpolatedStringPartContext) interface{} {
 	return v.VisitChildren(ctx)
 }
