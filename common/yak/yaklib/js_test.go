@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/dop251/goja/parser"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestWalk(t *testing.T) {
@@ -85,4 +87,14 @@ func TestRunWithJSEncrypt(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(value.String())
+}
+
+func TestRunWithVariable(t *testing.T) {
+	code := `params`
+	wantStr := utils.RandStringBytes(32)
+	_, value, err := _run(code, _withVariables(map[string]any{
+		"params": wantStr,
+	}))
+	require.NoError(t, err)
+	require.Equal(t, wantStr, value.String())
 }

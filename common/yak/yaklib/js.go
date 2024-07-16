@@ -18,7 +18,7 @@ import (
 
 var defaultJSRuntime = goja.New()
 
-var JSOttoExports = map[string]interface{}{
+var JSExports = map[string]interface{}{
 	"PoweredBy":            "github.com/dop251/goja",
 	"New":                  _jsNewEngine,
 	"Run":                  _run,
@@ -29,6 +29,8 @@ var JSOttoExports = map[string]interface{}{
 	"libCryptoJSV4": _libCryptoJSV4,
 	"libJSRSASign":  _libJSRSASign,
 	"libJsEncrypt":  _libJsEncrypt,
+	"withVariable":  _withVariable,
+	"withVariables": _withVariables,
 
 	// AST
 	"ASTWalk":   javascript.BasicJavaScriptASTWalker,
@@ -60,11 +62,14 @@ type jsLibrary struct {
 }
 
 type JsRunConfig struct {
-	libs []*jsLibrary
+	libs      []*jsLibrary
+	variables map[string]any
 }
 
 func newJsRunConfig() *JsRunConfig {
-	return &JsRunConfig{}
+	return &JsRunConfig{
+		variables: make(map[string]any),
+	}
 }
 
 type jsRunOpts func(*JsRunConfig)
@@ -72,6 +77,20 @@ type jsRunOpts func(*JsRunConfig)
 func jsRunWithLibs(libs ...*jsLibrary) jsRunOpts {
 	return func(c *JsRunConfig) {
 		c.libs = append(c.libs, libs...)
+	}
+}
+
+func _withVariable(name string, value any) jsRunOpts {
+	return func(c *JsRunConfig) {
+		c.variables[name] = value
+	}
+}
+
+func _withVariables(vars map[string]any) jsRunOpts {
+	return func(c *JsRunConfig) {
+		for k, v := range vars {
+			c.variables[k] = v
+		}
 	}
 }
 
@@ -189,6 +208,9 @@ func _jsNewEngine(opts ...jsRunOpts) *goja.Runtime {
 	}
 
 	vm := goja.New()
+	for k, v := range config.variables {
+		vm.Set(k, v)
+	}
 
 	// enable require function and console and buffer module
 	new(require.Registry).Enable(vm)
