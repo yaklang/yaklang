@@ -264,6 +264,24 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 }
 
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
+	if utils.IsNil(value) {
+		log.Errorf("BUG: ReadMemberCallVariable from nil ssa.Value: %v", value)
+	}
+	if utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallVariable from nil ssa.Value: %v", key)
+	}
+
+	if utils.IsNil(value) && utils.IsNil(key) {
+		log.Error("BUG: ReadMemberCallVariable's value and key is all nil...")
+		return b.EmitUndefined("")
+	} else if utils.IsNil(value) && !utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallVariable's value is nil, key: %v", key)
+		return b.EmitUndefined("")
+	} else if !utils.IsNil(value) && utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallVariable's key is nil, value: %v", value)
+		return b.EmitUndefined("")
+	}
+
 	program := b.GetProgram()
 
 	// to extern lib
@@ -302,6 +320,12 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		p.SetExtern(true)
 		return p
 	}
+
+	switch value.(type) {
+	case *Call:
+		log.Infof("DEBUG: here call")
+	}
+
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
 		name, typ := checkCanMemberCall(value, key)
 		member := b.getOriginMember(name, typ, value, key)

@@ -301,7 +301,13 @@ func (n *anValue) RemoveUser(u User) {
 }
 
 // for Value : type
-func (n *anValue) GetType() Type { return n.typ }
+func (n *anValue) GetType() Type {
+	if n == nil {
+		log.Errorf("BUG in *anValue.GetType(), the *anValue is nil!")
+		return GetAnyType()
+	}
+	return n.typ
+}
 func (n *anValue) SetType(typ Type) {
 	if typ == nil {
 		return

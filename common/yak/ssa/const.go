@@ -161,5 +161,8 @@ func (c *Const) IsString() bool {
 }
 
 func (c *Const) VarString() string {
+	if c.value == nil {
+		return ""
+	}
 	return c.value.(string)
 }
