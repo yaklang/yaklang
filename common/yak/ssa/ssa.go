@@ -173,6 +173,7 @@ type Program struct {
 	SCAPackages []*dxtypes.Package
 	ExtraFile   map[string]string // filename and data
 
+	Application *Program // current Application
 	// program relationship
 	DownStream map[string]*Program
 	UpStream   map[string]*Program
