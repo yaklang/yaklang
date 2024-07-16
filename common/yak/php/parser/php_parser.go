@@ -148,7 +148,7 @@ func phpparserParserInit() {
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 247, 2123, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
+		4, 1, 247, 2124, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
 		7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10,
 		7, 10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7,
 		15, 2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20,
@@ -364,28 +364,28 @@ func phpparserParserInit() {
 		125, 1, 125, 1, 125, 1, 125, 3, 125, 1924, 8, 125, 1, 126, 1, 126, 1, 127,
 		1, 127, 1, 127, 1, 127, 1, 127, 1, 127, 3, 127, 1934, 8, 127, 1, 127, 1,
 		127, 1, 127, 3, 127, 1939, 8, 127, 1, 127, 1, 127, 1, 127, 3, 127, 1944,
-		8, 127, 3, 127, 1946, 8, 127, 1, 128, 1, 128, 1, 129, 1, 129, 4, 129, 1952,
-		8, 129, 11, 129, 12, 129, 1953, 1, 129, 1, 129, 1, 129, 1, 129, 5, 129,
-		1960, 8, 129, 10, 129, 12, 129, 1963, 9, 129, 1, 129, 3, 129, 1966, 8,
-		129, 1, 130, 1, 130, 1, 130, 3, 130, 1971, 8, 130, 1, 131, 1, 131, 1, 131,
-		5, 131, 1976, 8, 131, 10, 131, 12, 131, 1979, 9, 131, 1, 132, 1, 132, 5,
-		132, 1983, 8, 132, 10, 132, 12, 132, 1986, 9, 132, 1, 132, 3, 132, 1989,
-		8, 132, 1, 133, 1, 133, 1, 133, 1, 133, 1, 133, 1, 133, 3, 133, 1997, 8,
-		133, 1, 134, 1, 134, 1, 134, 3, 134, 2002, 8, 134, 1, 135, 1, 135, 1, 135,
-		1, 136, 1, 136, 1, 136, 1, 136, 1, 136, 3, 136, 2012, 8, 136, 1, 137, 4,
-		137, 2015, 8, 137, 11, 137, 12, 137, 2016, 1, 137, 5, 137, 2020, 8, 137,
-		10, 137, 12, 137, 2023, 9, 137, 1, 138, 1, 138, 1, 138, 3, 138, 2028, 8,
-		138, 1, 138, 1, 138, 1, 138, 1, 138, 3, 138, 2034, 8, 138, 1, 139, 1, 139,
-		3, 139, 2038, 8, 139, 1, 140, 1, 140, 1, 140, 1, 140, 1, 140, 3, 140, 2045,
-		8, 140, 1, 140, 5, 140, 2048, 8, 140, 10, 140, 12, 140, 2051, 9, 140, 1,
-		141, 5, 141, 2054, 8, 141, 10, 141, 12, 141, 2057, 9, 141, 1, 141, 1, 141,
-		1, 141, 1, 141, 1, 141, 1, 141, 3, 141, 2065, 8, 141, 1, 141, 5, 141, 2068,
-		8, 141, 10, 141, 12, 141, 2071, 9, 141, 1, 142, 1, 142, 3, 142, 2075, 8,
-		142, 1, 142, 1, 142, 1, 142, 1, 142, 1, 142, 3, 142, 2082, 8, 142, 1, 143,
-		3, 143, 2085, 8, 143, 1, 143, 1, 143, 3, 143, 2089, 8, 143, 5, 143, 2091,
-		8, 143, 10, 143, 12, 143, 2094, 9, 143, 1, 144, 1, 144, 1, 144, 1, 144,
-		1, 144, 1, 144, 1, 144, 3, 144, 2103, 8, 144, 1, 145, 1, 145, 1, 146, 1,
-		146, 3, 146, 2109, 8, 146, 1, 147, 1, 147, 1, 148, 1, 148, 1, 149, 1, 149,
+		8, 127, 3, 127, 1946, 8, 127, 1, 128, 1, 128, 1, 129, 1, 129, 5, 129, 1952,
+		8, 129, 10, 129, 12, 129, 1955, 9, 129, 1, 129, 1, 129, 1, 129, 1, 129,
+		5, 129, 1961, 8, 129, 10, 129, 12, 129, 1964, 9, 129, 1, 129, 3, 129, 1967,
+		8, 129, 1, 130, 1, 130, 1, 130, 3, 130, 1972, 8, 130, 1, 131, 1, 131, 1,
+		131, 5, 131, 1977, 8, 131, 10, 131, 12, 131, 1980, 9, 131, 1, 132, 1, 132,
+		5, 132, 1984, 8, 132, 10, 132, 12, 132, 1987, 9, 132, 1, 132, 3, 132, 1990,
+		8, 132, 1, 133, 1, 133, 1, 133, 1, 133, 1, 133, 1, 133, 3, 133, 1998, 8,
+		133, 1, 134, 1, 134, 1, 134, 3, 134, 2003, 8, 134, 1, 135, 1, 135, 1, 135,
+		1, 136, 1, 136, 1, 136, 1, 136, 1, 136, 3, 136, 2013, 8, 136, 1, 137, 4,
+		137, 2016, 8, 137, 11, 137, 12, 137, 2017, 1, 137, 5, 137, 2021, 8, 137,
+		10, 137, 12, 137, 2024, 9, 137, 1, 138, 1, 138, 1, 138, 3, 138, 2029, 8,
+		138, 1, 138, 1, 138, 1, 138, 1, 138, 3, 138, 2035, 8, 138, 1, 139, 1, 139,
+		3, 139, 2039, 8, 139, 1, 140, 1, 140, 1, 140, 1, 140, 1, 140, 3, 140, 2046,
+		8, 140, 1, 140, 5, 140, 2049, 8, 140, 10, 140, 12, 140, 2052, 9, 140, 1,
+		141, 5, 141, 2055, 8, 141, 10, 141, 12, 141, 2058, 9, 141, 1, 141, 1, 141,
+		1, 141, 1, 141, 1, 141, 1, 141, 3, 141, 2066, 8, 141, 1, 141, 5, 141, 2069,
+		8, 141, 10, 141, 12, 141, 2072, 9, 141, 1, 142, 1, 142, 3, 142, 2076, 8,
+		142, 1, 142, 1, 142, 1, 142, 1, 142, 1, 142, 3, 142, 2083, 8, 142, 1, 143,
+		3, 143, 2086, 8, 143, 1, 143, 1, 143, 3, 143, 2090, 8, 143, 5, 143, 2092,
+		8, 143, 10, 143, 12, 143, 2095, 9, 143, 1, 144, 1, 144, 1, 144, 1, 144,
+		1, 144, 1, 144, 1, 144, 3, 144, 2104, 8, 144, 1, 145, 1, 145, 1, 146, 1,
+		146, 3, 146, 2110, 8, 146, 1, 147, 1, 147, 1, 148, 1, 148, 1, 149, 1, 149,
 		1, 150, 1, 150, 1, 151, 1, 151, 1, 152, 1, 152, 1, 152, 0, 3, 122, 180,
 		182, 153, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32,
 		34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68,
@@ -407,7 +407,7 @@ func phpparserParserInit() {
 		130, 132, 164, 4, 0, 44, 44, 81, 81, 114, 117, 122, 122, 1, 0, 157, 164,
 		1, 0, 141, 156, 7, 0, 45, 45, 48, 48, 64, 64, 98, 99, 110, 110, 120, 120,
 		123, 123, 9, 0, 45, 45, 47, 48, 63, 64, 83, 83, 96, 99, 110, 110, 120,
-		120, 123, 123, 129, 131, 2375, 0, 307, 1, 0, 0, 0, 2, 319, 1, 0, 0, 0,
+		120, 123, 123, 129, 131, 2376, 0, 307, 1, 0, 0, 0, 2, 319, 1, 0, 0, 0,
 		4, 327, 1, 0, 0, 0, 6, 357, 1, 0, 0, 0, 8, 360, 1, 0, 0, 0, 10, 367, 1,
 		0, 0, 0, 12, 378, 1, 0, 0, 0, 14, 390, 1, 0, 0, 0, 16, 392, 1, 0, 0, 0,
 		18, 400, 1, 0, 0, 0, 20, 413, 1, 0, 0, 0, 22, 415, 1, 0, 0, 0, 24, 437,
@@ -446,14 +446,14 @@ func phpparserParserInit() {
 		0, 236, 1838, 1, 0, 0, 0, 238, 1846, 1, 0, 0, 0, 240, 1875, 1, 0, 0, 0,
 		242, 1877, 1, 0, 0, 0, 244, 1908, 1, 0, 0, 0, 246, 1912, 1, 0, 0, 0, 248,
 		1917, 1, 0, 0, 0, 250, 1923, 1, 0, 0, 0, 252, 1925, 1, 0, 0, 0, 254, 1945,
-		1, 0, 0, 0, 256, 1947, 1, 0, 0, 0, 258, 1965, 1, 0, 0, 0, 260, 1970, 1,
-		0, 0, 0, 262, 1972, 1, 0, 0, 0, 264, 1988, 1, 0, 0, 0, 266, 1996, 1, 0,
-		0, 0, 268, 1998, 1, 0, 0, 0, 270, 2003, 1, 0, 0, 0, 272, 2011, 1, 0, 0,
-		0, 274, 2014, 1, 0, 0, 0, 276, 2033, 1, 0, 0, 0, 278, 2037, 1, 0, 0, 0,
-		280, 2044, 1, 0, 0, 0, 282, 2055, 1, 0, 0, 0, 284, 2081, 1, 0, 0, 0, 286,
-		2084, 1, 0, 0, 0, 288, 2102, 1, 0, 0, 0, 290, 2104, 1, 0, 0, 0, 292, 2108,
-		1, 0, 0, 0, 294, 2110, 1, 0, 0, 0, 296, 2112, 1, 0, 0, 0, 298, 2114, 1,
-		0, 0, 0, 300, 2116, 1, 0, 0, 0, 302, 2118, 1, 0, 0, 0, 304, 2120, 1, 0,
+		1, 0, 0, 0, 256, 1947, 1, 0, 0, 0, 258, 1966, 1, 0, 0, 0, 260, 1971, 1,
+		0, 0, 0, 262, 1973, 1, 0, 0, 0, 264, 1989, 1, 0, 0, 0, 266, 1997, 1, 0,
+		0, 0, 268, 1999, 1, 0, 0, 0, 270, 2004, 1, 0, 0, 0, 272, 2012, 1, 0, 0,
+		0, 274, 2015, 1, 0, 0, 0, 276, 2034, 1, 0, 0, 0, 278, 2038, 1, 0, 0, 0,
+		280, 2045, 1, 0, 0, 0, 282, 2056, 1, 0, 0, 0, 284, 2082, 1, 0, 0, 0, 286,
+		2085, 1, 0, 0, 0, 288, 2103, 1, 0, 0, 0, 290, 2105, 1, 0, 0, 0, 292, 2109,
+		1, 0, 0, 0, 294, 2111, 1, 0, 0, 0, 296, 2113, 1, 0, 0, 0, 298, 2115, 1,
+		0, 0, 0, 300, 2117, 1, 0, 0, 0, 302, 2119, 1, 0, 0, 0, 304, 2121, 1, 0,
 		0, 0, 306, 308, 5, 10, 0, 0, 307, 306, 1, 0, 0, 0, 307, 308, 1, 0, 0, 0,
 		308, 312, 1, 0, 0, 0, 309, 311, 3, 2, 1, 0, 310, 309, 1, 0, 0, 0, 311,
 		314, 1, 0, 0, 0, 312, 310, 1, 0, 0, 0, 312, 313, 1, 0, 0, 0, 313, 315,
@@ -1124,78 +1124,78 @@ func phpparserParserInit() {
 		3, 292, 146, 0, 1942, 1944, 3, 282, 141, 0, 1943, 1941, 1, 0, 0, 0, 1943,
 		1942, 1, 0, 0, 0, 1944, 1946, 1, 0, 0, 0, 1945, 1927, 1, 0, 0, 0, 1945,
 		1938, 1, 0, 0, 0, 1946, 255, 1, 0, 0, 0, 1947, 1948, 5, 228, 0, 0, 1948,
-		257, 1, 0, 0, 0, 1949, 1951, 5, 237, 0, 0, 1950, 1952, 5, 246, 0, 0, 1951,
-		1950, 1, 0, 0, 0, 1952, 1953, 1, 0, 0, 0, 1953, 1951, 1, 0, 0, 0, 1953,
-		1954, 1, 0, 0, 0, 1954, 1955, 1, 0, 0, 0, 1955, 1966, 5, 245, 0, 0, 1956,
-		1966, 5, 235, 0, 0, 1957, 1961, 5, 236, 0, 0, 1958, 1960, 3, 260, 130,
-		0, 1959, 1958, 1, 0, 0, 0, 1960, 1963, 1, 0, 0, 0, 1961, 1959, 1, 0, 0,
-		0, 1961, 1962, 1, 0, 0, 0, 1962, 1964, 1, 0, 0, 0, 1963, 1961, 1, 0, 0,
-		0, 1964, 1966, 5, 236, 0, 0, 1965, 1949, 1, 0, 0, 0, 1965, 1956, 1, 0,
-		0, 0, 1965, 1957, 1, 0, 0, 0, 1966, 259, 1, 0, 0, 0, 1967, 1971, 5, 241,
-		0, 0, 1968, 1971, 5, 240, 0, 0, 1969, 1971, 3, 264, 132, 0, 1970, 1967,
-		1, 0, 0, 0, 1970, 1968, 1, 0, 0, 0, 1970, 1969, 1, 0, 0, 0, 1971, 261,
-		1, 0, 0, 0, 1972, 1977, 3, 264, 132, 0, 1973, 1974, 5, 220, 0, 0, 1974,
-		1976, 3, 264, 132, 0, 1975, 1973, 1, 0, 0, 0, 1976, 1979, 1, 0, 0, 0, 1977,
-		1975, 1, 0, 0, 0, 1977, 1978, 1, 0, 0, 0, 1978, 263, 1, 0, 0, 0, 1979,
-		1977, 1, 0, 0, 0, 1980, 1984, 3, 266, 133, 0, 1981, 1983, 3, 268, 134,
-		0, 1982, 1981, 1, 0, 0, 0, 1983, 1986, 1, 0, 0, 0, 1984, 1982, 1, 0, 0,
-		0, 1984, 1985, 1, 0, 0, 0, 1985, 1989, 1, 0, 0, 0, 1986, 1984, 1, 0, 0,
-		0, 1987, 1989, 3, 194, 97, 0, 1988, 1980, 1, 0, 0, 0, 1988, 1987, 1, 0,
-		0, 0, 1989, 265, 1, 0, 0, 0, 1990, 1997, 3, 276, 138, 0, 1991, 1997, 3,
-		270, 135, 0, 1992, 1993, 5, 214, 0, 0, 1993, 1994, 3, 208, 104, 0, 1994,
-		1995, 5, 215, 0, 0, 1995, 1997, 1, 0, 0, 0, 1996, 1990, 1, 0, 0, 0, 1996,
-		1991, 1, 0, 0, 0, 1996, 1992, 1, 0, 0, 0, 1997, 267, 1, 0, 0, 0, 1998,
-		1999, 5, 195, 0, 0, 1999, 2001, 3, 278, 139, 0, 2000, 2002, 3, 274, 137,
-		0, 2001, 2000, 1, 0, 0, 0, 2001, 2002, 1, 0, 0, 0, 2002, 269, 1, 0, 0,
-		0, 2003, 2004, 3, 272, 136, 0, 2004, 2005, 3, 274, 137, 0, 2005, 271, 1,
-		0, 0, 0, 2006, 2012, 3, 230, 115, 0, 2007, 2012, 3, 254, 127, 0, 2008,
-		2012, 3, 276, 138, 0, 2009, 2012, 3, 166, 83, 0, 2010, 2012, 5, 228, 0,
-		0, 2011, 2006, 1, 0, 0, 0, 2011, 2007, 1, 0, 0, 0, 2011, 2008, 1, 0, 0,
-		0, 2011, 2009, 1, 0, 0, 0, 2011, 2010, 1, 0, 0, 0, 2012, 273, 1, 0, 0,
-		0, 2013, 2015, 3, 238, 119, 0, 2014, 2013, 1, 0, 0, 0, 2015, 2016, 1, 0,
-		0, 0, 2016, 2014, 1, 0, 0, 0, 2016, 2017, 1, 0, 0, 0, 2017, 2021, 1, 0,
-		0, 0, 2018, 2020, 3, 284, 142, 0, 2019, 2018, 1, 0, 0, 0, 2020, 2023, 1,
-		0, 0, 0, 2021, 2019, 1, 0, 0, 0, 2021, 2022, 1, 0, 0, 0, 2022, 275, 1,
-		0, 0, 0, 2023, 2021, 1, 0, 0, 0, 2024, 2027, 3, 282, 141, 0, 2025, 2026,
-		5, 194, 0, 0, 2026, 2028, 3, 282, 141, 0, 2027, 2025, 1, 0, 0, 0, 2027,
-		2028, 1, 0, 0, 0, 2028, 2034, 1, 0, 0, 0, 2029, 2030, 3, 222, 111, 0, 2030,
-		2031, 5, 194, 0, 0, 2031, 2032, 3, 282, 141, 0, 2032, 2034, 1, 0, 0, 0,
-		2033, 2024, 1, 0, 0, 0, 2033, 2029, 1, 0, 0, 0, 2034, 277, 1, 0, 0, 0,
-		2035, 2038, 3, 280, 140, 0, 2036, 2038, 3, 282, 141, 0, 2037, 2035, 1,
-		0, 0, 0, 2037, 2036, 1, 0, 0, 0, 2038, 279, 1, 0, 0, 0, 2039, 2045, 3,
-		292, 146, 0, 2040, 2041, 5, 218, 0, 0, 2041, 2042, 3, 180, 90, 0, 2042,
-		2043, 5, 219, 0, 0, 2043, 2045, 1, 0, 0, 0, 2044, 2039, 1, 0, 0, 0, 2044,
-		2040, 1, 0, 0, 0, 2045, 2049, 1, 0, 0, 0, 2046, 2048, 3, 284, 142, 0, 2047,
-		2046, 1, 0, 0, 0, 2048, 2051, 1, 0, 0, 0, 2049, 2047, 1, 0, 0, 0, 2049,
-		2050, 1, 0, 0, 0, 2050, 281, 1, 0, 0, 0, 2051, 2049, 1, 0, 0, 0, 2052,
-		2054, 5, 211, 0, 0, 2053, 2052, 1, 0, 0, 0, 2054, 2057, 1, 0, 0, 0, 2055,
-		2053, 1, 0, 0, 0, 2055, 2056, 1, 0, 0, 0, 2056, 2064, 1, 0, 0, 0, 2057,
-		2055, 1, 0, 0, 0, 2058, 2065, 5, 227, 0, 0, 2059, 2060, 5, 211, 0, 0, 2060,
-		2061, 5, 218, 0, 0, 2061, 2062, 3, 180, 90, 0, 2062, 2063, 5, 219, 0, 0,
-		2063, 2065, 1, 0, 0, 0, 2064, 2058, 1, 0, 0, 0, 2064, 2059, 1, 0, 0, 0,
-		2065, 2069, 1, 0, 0, 0, 2066, 2068, 3, 284, 142, 0, 2067, 2066, 1, 0, 0,
-		0, 2068, 2071, 1, 0, 0, 0, 2069, 2067, 1, 0, 0, 0, 2069, 2070, 1, 0, 0,
-		0, 2070, 283, 1, 0, 0, 0, 2071, 2069, 1, 0, 0, 0, 2072, 2074, 5, 216, 0,
-		0, 2073, 2075, 3, 180, 90, 0, 2074, 2073, 1, 0, 0, 0, 2074, 2075, 1, 0,
-		0, 0, 2075, 2076, 1, 0, 0, 0, 2076, 2082, 5, 217, 0, 0, 2077, 2078, 5,
-		218, 0, 0, 2078, 2079, 3, 180, 90, 0, 2079, 2080, 5, 219, 0, 0, 2080, 2082,
-		1, 0, 0, 0, 2081, 2072, 1, 0, 0, 0, 2081, 2077, 1, 0, 0, 0, 2082, 285,
-		1, 0, 0, 0, 2083, 2085, 3, 288, 144, 0, 2084, 2083, 1, 0, 0, 0, 2084, 2085,
-		1, 0, 0, 0, 2085, 2092, 1, 0, 0, 0, 2086, 2088, 5, 220, 0, 0, 2087, 2089,
-		3, 288, 144, 0, 2088, 2087, 1, 0, 0, 0, 2088, 2089, 1, 0, 0, 0, 2089, 2091,
-		1, 0, 0, 0, 2090, 2086, 1, 0, 0, 0, 2091, 2094, 1, 0, 0, 0, 2092, 2090,
-		1, 0, 0, 0, 2092, 2093, 1, 0, 0, 0, 2093, 287, 1, 0, 0, 0, 2094, 2092,
-		1, 0, 0, 0, 2095, 2103, 3, 264, 132, 0, 2096, 2097, 5, 102, 0, 0, 2097,
-		2098, 5, 214, 0, 0, 2098, 2099, 3, 286, 143, 0, 2099, 2100, 5, 215, 0,
-		0, 2100, 2103, 1, 0, 0, 0, 2101, 2103, 3, 216, 108, 0, 2102, 2095, 1, 0,
-		0, 0, 2102, 2096, 1, 0, 0, 0, 2102, 2101, 1, 0, 0, 0, 2103, 289, 1, 0,
-		0, 0, 2104, 2105, 7, 20, 0, 0, 2105, 291, 1, 0, 0, 0, 2106, 2109, 5, 228,
-		0, 0, 2107, 2109, 3, 294, 147, 0, 2108, 2106, 1, 0, 0, 0, 2108, 2107, 1,
-		0, 0, 0, 2109, 293, 1, 0, 0, 0, 2110, 2111, 7, 21, 0, 0, 2111, 295, 1,
-		0, 0, 0, 2112, 2113, 7, 22, 0, 0, 2113, 297, 1, 0, 0, 0, 2114, 2115, 7,
-		23, 0, 0, 2115, 299, 1, 0, 0, 0, 2116, 2117, 7, 24, 0, 0, 2117, 301, 1,
-		0, 0, 0, 2118, 2119, 7, 25, 0, 0, 2119, 303, 1, 0, 0, 0, 2120, 2121, 7,
-		26, 0, 0, 2121, 305, 1, 0, 0, 0, 266, 307, 312, 319, 324, 327, 353, 357,
+		257, 1, 0, 0, 0, 1949, 1953, 5, 237, 0, 0, 1950, 1952, 5, 246, 0, 0, 1951,
+		1950, 1, 0, 0, 0, 1952, 1955, 1, 0, 0, 0, 1953, 1951, 1, 0, 0, 0, 1953,
+		1954, 1, 0, 0, 0, 1954, 1956, 1, 0, 0, 0, 1955, 1953, 1, 0, 0, 0, 1956,
+		1967, 5, 245, 0, 0, 1957, 1967, 5, 235, 0, 0, 1958, 1962, 5, 236, 0, 0,
+		1959, 1961, 3, 260, 130, 0, 1960, 1959, 1, 0, 0, 0, 1961, 1964, 1, 0, 0,
+		0, 1962, 1960, 1, 0, 0, 0, 1962, 1963, 1, 0, 0, 0, 1963, 1965, 1, 0, 0,
+		0, 1964, 1962, 1, 0, 0, 0, 1965, 1967, 5, 236, 0, 0, 1966, 1949, 1, 0,
+		0, 0, 1966, 1957, 1, 0, 0, 0, 1966, 1958, 1, 0, 0, 0, 1967, 259, 1, 0,
+		0, 0, 1968, 1972, 5, 241, 0, 0, 1969, 1972, 5, 240, 0, 0, 1970, 1972, 3,
+		264, 132, 0, 1971, 1968, 1, 0, 0, 0, 1971, 1969, 1, 0, 0, 0, 1971, 1970,
+		1, 0, 0, 0, 1972, 261, 1, 0, 0, 0, 1973, 1978, 3, 264, 132, 0, 1974, 1975,
+		5, 220, 0, 0, 1975, 1977, 3, 264, 132, 0, 1976, 1974, 1, 0, 0, 0, 1977,
+		1980, 1, 0, 0, 0, 1978, 1976, 1, 0, 0, 0, 1978, 1979, 1, 0, 0, 0, 1979,
+		263, 1, 0, 0, 0, 1980, 1978, 1, 0, 0, 0, 1981, 1985, 3, 266, 133, 0, 1982,
+		1984, 3, 268, 134, 0, 1983, 1982, 1, 0, 0, 0, 1984, 1987, 1, 0, 0, 0, 1985,
+		1983, 1, 0, 0, 0, 1985, 1986, 1, 0, 0, 0, 1986, 1990, 1, 0, 0, 0, 1987,
+		1985, 1, 0, 0, 0, 1988, 1990, 3, 194, 97, 0, 1989, 1981, 1, 0, 0, 0, 1989,
+		1988, 1, 0, 0, 0, 1990, 265, 1, 0, 0, 0, 1991, 1998, 3, 276, 138, 0, 1992,
+		1998, 3, 270, 135, 0, 1993, 1994, 5, 214, 0, 0, 1994, 1995, 3, 208, 104,
+		0, 1995, 1996, 5, 215, 0, 0, 1996, 1998, 1, 0, 0, 0, 1997, 1991, 1, 0,
+		0, 0, 1997, 1992, 1, 0, 0, 0, 1997, 1993, 1, 0, 0, 0, 1998, 267, 1, 0,
+		0, 0, 1999, 2000, 5, 195, 0, 0, 2000, 2002, 3, 278, 139, 0, 2001, 2003,
+		3, 274, 137, 0, 2002, 2001, 1, 0, 0, 0, 2002, 2003, 1, 0, 0, 0, 2003, 269,
+		1, 0, 0, 0, 2004, 2005, 3, 272, 136, 0, 2005, 2006, 3, 274, 137, 0, 2006,
+		271, 1, 0, 0, 0, 2007, 2013, 3, 230, 115, 0, 2008, 2013, 3, 254, 127, 0,
+		2009, 2013, 3, 276, 138, 0, 2010, 2013, 3, 166, 83, 0, 2011, 2013, 5, 228,
+		0, 0, 2012, 2007, 1, 0, 0, 0, 2012, 2008, 1, 0, 0, 0, 2012, 2009, 1, 0,
+		0, 0, 2012, 2010, 1, 0, 0, 0, 2012, 2011, 1, 0, 0, 0, 2013, 273, 1, 0,
+		0, 0, 2014, 2016, 3, 238, 119, 0, 2015, 2014, 1, 0, 0, 0, 2016, 2017, 1,
+		0, 0, 0, 2017, 2015, 1, 0, 0, 0, 2017, 2018, 1, 0, 0, 0, 2018, 2022, 1,
+		0, 0, 0, 2019, 2021, 3, 284, 142, 0, 2020, 2019, 1, 0, 0, 0, 2021, 2024,
+		1, 0, 0, 0, 2022, 2020, 1, 0, 0, 0, 2022, 2023, 1, 0, 0, 0, 2023, 275,
+		1, 0, 0, 0, 2024, 2022, 1, 0, 0, 0, 2025, 2028, 3, 282, 141, 0, 2026, 2027,
+		5, 194, 0, 0, 2027, 2029, 3, 282, 141, 0, 2028, 2026, 1, 0, 0, 0, 2028,
+		2029, 1, 0, 0, 0, 2029, 2035, 1, 0, 0, 0, 2030, 2031, 3, 222, 111, 0, 2031,
+		2032, 5, 194, 0, 0, 2032, 2033, 3, 282, 141, 0, 2033, 2035, 1, 0, 0, 0,
+		2034, 2025, 1, 0, 0, 0, 2034, 2030, 1, 0, 0, 0, 2035, 277, 1, 0, 0, 0,
+		2036, 2039, 3, 280, 140, 0, 2037, 2039, 3, 282, 141, 0, 2038, 2036, 1,
+		0, 0, 0, 2038, 2037, 1, 0, 0, 0, 2039, 279, 1, 0, 0, 0, 2040, 2046, 3,
+		292, 146, 0, 2041, 2042, 5, 218, 0, 0, 2042, 2043, 3, 180, 90, 0, 2043,
+		2044, 5, 219, 0, 0, 2044, 2046, 1, 0, 0, 0, 2045, 2040, 1, 0, 0, 0, 2045,
+		2041, 1, 0, 0, 0, 2046, 2050, 1, 0, 0, 0, 2047, 2049, 3, 284, 142, 0, 2048,
+		2047, 1, 0, 0, 0, 2049, 2052, 1, 0, 0, 0, 2050, 2048, 1, 0, 0, 0, 2050,
+		2051, 1, 0, 0, 0, 2051, 281, 1, 0, 0, 0, 2052, 2050, 1, 0, 0, 0, 2053,
+		2055, 5, 211, 0, 0, 2054, 2053, 1, 0, 0, 0, 2055, 2058, 1, 0, 0, 0, 2056,
+		2054, 1, 0, 0, 0, 2056, 2057, 1, 0, 0, 0, 2057, 2065, 1, 0, 0, 0, 2058,
+		2056, 1, 0, 0, 0, 2059, 2066, 5, 227, 0, 0, 2060, 2061, 5, 211, 0, 0, 2061,
+		2062, 5, 218, 0, 0, 2062, 2063, 3, 180, 90, 0, 2063, 2064, 5, 219, 0, 0,
+		2064, 2066, 1, 0, 0, 0, 2065, 2059, 1, 0, 0, 0, 2065, 2060, 1, 0, 0, 0,
+		2066, 2070, 1, 0, 0, 0, 2067, 2069, 3, 284, 142, 0, 2068, 2067, 1, 0, 0,
+		0, 2069, 2072, 1, 0, 0, 0, 2070, 2068, 1, 0, 0, 0, 2070, 2071, 1, 0, 0,
+		0, 2071, 283, 1, 0, 0, 0, 2072, 2070, 1, 0, 0, 0, 2073, 2075, 5, 216, 0,
+		0, 2074, 2076, 3, 180, 90, 0, 2075, 2074, 1, 0, 0, 0, 2075, 2076, 1, 0,
+		0, 0, 2076, 2077, 1, 0, 0, 0, 2077, 2083, 5, 217, 0, 0, 2078, 2079, 5,
+		218, 0, 0, 2079, 2080, 3, 180, 90, 0, 2080, 2081, 5, 219, 0, 0, 2081, 2083,
+		1, 0, 0, 0, 2082, 2073, 1, 0, 0, 0, 2082, 2078, 1, 0, 0, 0, 2083, 285,
+		1, 0, 0, 0, 2084, 2086, 3, 288, 144, 0, 2085, 2084, 1, 0, 0, 0, 2085, 2086,
+		1, 0, 0, 0, 2086, 2093, 1, 0, 0, 0, 2087, 2089, 5, 220, 0, 0, 2088, 2090,
+		3, 288, 144, 0, 2089, 2088, 1, 0, 0, 0, 2089, 2090, 1, 0, 0, 0, 2090, 2092,
+		1, 0, 0, 0, 2091, 2087, 1, 0, 0, 0, 2092, 2095, 1, 0, 0, 0, 2093, 2091,
+		1, 0, 0, 0, 2093, 2094, 1, 0, 0, 0, 2094, 287, 1, 0, 0, 0, 2095, 2093,
+		1, 0, 0, 0, 2096, 2104, 3, 264, 132, 0, 2097, 2098, 5, 102, 0, 0, 2098,
+		2099, 5, 214, 0, 0, 2099, 2100, 3, 286, 143, 0, 2100, 2101, 5, 215, 0,
+		0, 2101, 2104, 1, 0, 0, 0, 2102, 2104, 3, 216, 108, 0, 2103, 2096, 1, 0,
+		0, 0, 2103, 2097, 1, 0, 0, 0, 2103, 2102, 1, 0, 0, 0, 2104, 289, 1, 0,
+		0, 0, 2105, 2106, 7, 20, 0, 0, 2106, 291, 1, 0, 0, 0, 2107, 2110, 5, 228,
+		0, 0, 2108, 2110, 3, 294, 147, 0, 2109, 2107, 1, 0, 0, 0, 2109, 2108, 1,
+		0, 0, 0, 2110, 293, 1, 0, 0, 0, 2111, 2112, 7, 21, 0, 0, 2112, 295, 1,
+		0, 0, 0, 2113, 2114, 7, 22, 0, 0, 2114, 297, 1, 0, 0, 0, 2115, 2116, 7,
+		23, 0, 0, 2116, 299, 1, 0, 0, 0, 2117, 2118, 7, 24, 0, 0, 2118, 301, 1,
+		0, 0, 0, 2119, 2120, 7, 25, 0, 0, 2120, 303, 1, 0, 0, 0, 2121, 2122, 7,
+		26, 0, 0, 2122, 305, 1, 0, 0, 0, 266, 307, 312, 319, 324, 327, 353, 357,
 		362, 367, 373, 376, 390, 394, 400, 405, 410, 417, 423, 430, 437, 440, 444,
 		452, 455, 460, 463, 466, 469, 475, 479, 485, 487, 493, 505, 513, 521, 525,
 		530, 536, 541, 547, 554, 561, 566, 572, 602, 616, 620, 629, 633, 638, 664,
@@ -1213,9 +1213,9 @@ func phpparserParserInit() {
 		1723, 1729, 1735, 1739, 1744, 1747, 1750, 1753, 1756, 1761, 1765, 1771,
 		1773, 1776, 1782, 1792, 1796, 1799, 1809, 1813, 1815, 1820, 1828, 1832,
 		1836, 1843, 1848, 1854, 1858, 1863, 1866, 1875, 1885, 1892, 1894, 1900,
-		1902, 1908, 1912, 1917, 1923, 1933, 1938, 1943, 1945, 1953, 1961, 1965,
-		1970, 1977, 1984, 1988, 1996, 2001, 2011, 2016, 2021, 2027, 2033, 2037,
-		2044, 2049, 2055, 2064, 2069, 2074, 2081, 2084, 2088, 2092, 2102, 2108,
+		1902, 1908, 1912, 1917, 1923, 1933, 1938, 1943, 1945, 1953, 1962, 1966,
+		1971, 1978, 1985, 1989, 1997, 2002, 2012, 2017, 2022, 2028, 2034, 2038,
+		2045, 2050, 2056, 2065, 2070, 2075, 2082, 2085, 2089, 2093, 2103, 2109,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -29908,7 +29908,7 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 
 	var _alt int
 
-	p.SetState(1965)
+	p.SetState(1966)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
@@ -29918,56 +29918,56 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 			p.SetState(1949)
 			p.Match(PHPParserStartNowDoc)
 		}
-		p.SetState(1951)
+		p.SetState(1953)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for ok := true; ok; ok = _la == PHPParserHereDocText {
+		for _la == PHPParserHereDocText {
 			{
 				p.SetState(1950)
 				p.Match(PHPParserHereDocText)
 			}
 
-			p.SetState(1953)
+			p.SetState(1955)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
-			p.SetState(1955)
+			p.SetState(1956)
 			p.Match(PHPParserEndDoc)
 		}
 
 	case PHPParserSingleQuoteString:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1956)
+			p.SetState(1957)
 			p.Match(PHPParserSingleQuoteString)
 		}
 
 	case PHPParserDoubleQuote:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(1957)
+			p.SetState(1958)
 			p.Match(PHPParserDoubleQuote)
 		}
-		p.SetState(1961)
+		p.SetState(1962)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 240, p.GetParserRuleContext())
 
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
-					p.SetState(1958)
+					p.SetState(1959)
 					p.InterpolatedStringPart()
 				}
 
 			}
-			p.SetState(1963)
+			p.SetState(1964)
 			p.GetErrorHandler().Sync(p)
 			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 240, p.GetParserRuleContext())
 		}
 		{
-			p.SetState(1964)
+			p.SetState(1965)
 			p.Match(PHPParserDoubleQuote)
 		}
 
@@ -30081,28 +30081,28 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		}
 	}()
 
-	p.SetState(1970)
+	p.SetState(1971)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserStringPart:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1967)
+			p.SetState(1968)
 			p.Match(PHPParserStringPart)
 		}
 
 	case PHPParserUnicodeEscape:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1968)
+			p.SetState(1969)
 			p.Match(PHPParserUnicodeEscape)
 		}
 
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUse, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserNamespaceSeparator, PHPParserDollar, PHPParserOpenRoundBracket, PHPParserOpenSquareBracket, PHPParserVarName, PHPParserLabel, PHPParserSingleQuoteString, PHPParserDoubleQuote, PHPParserStartNowDoc:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(1969)
+			p.SetState(1970)
 			p.Chain()
 		}
 
@@ -30244,24 +30244,24 @@ func (p *PHPParser) ChainList() (localctx IChainListContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1972)
+		p.SetState(1973)
 		p.Chain()
 	}
-	p.SetState(1977)
+	p.SetState(1978)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
-			p.SetState(1973)
+			p.SetState(1974)
 			p.Match(PHPParserComma)
 		}
 		{
-			p.SetState(1974)
+			p.SetState(1975)
 			p.Chain()
 		}
 
-		p.SetState(1979)
+		p.SetState(1980)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
@@ -30422,26 +30422,26 @@ func (p *PHPParser) Chain() (localctx IChainContext) {
 		}
 	}()
 
-	p.SetState(1988)
+	p.SetState(1989)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 245, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1980)
+			p.SetState(1981)
 			p.ChainOrigin()
 		}
-		p.SetState(1984)
+		p.SetState(1985)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserObjectOperator {
 			{
-				p.SetState(1981)
+				p.SetState(1982)
 				p.MemberAccess()
 			}
 
-			p.SetState(1986)
+			p.SetState(1987)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
@@ -30449,7 +30449,7 @@ func (p *PHPParser) Chain() (localctx IChainContext) {
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1987)
+			p.SetState(1988)
 			p.ArrayCreation()
 		}
 
@@ -30593,35 +30593,35 @@ func (p *PHPParser) ChainOrigin() (localctx IChainOriginContext) {
 		}
 	}()
 
-	p.SetState(1996)
+	p.SetState(1997)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 246, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(1990)
+			p.SetState(1991)
 			p.ChainBase()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(1991)
+			p.SetState(1992)
 			p.FunctionCall()
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(1992)
+			p.SetState(1993)
 			p.Match(PHPParserOpenRoundBracket)
 		}
 		{
-			p.SetState(1993)
+			p.SetState(1994)
 			p.NewExpr()
 		}
 		{
-			p.SetState(1994)
+			p.SetState(1995)
 			p.Match(PHPParserCloseRoundBracket)
 		}
 
@@ -30747,19 +30747,19 @@ func (p *PHPParser) MemberAccess() (localctx IMemberAccessContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(1998)
+		p.SetState(1999)
 		p.Match(PHPParserObjectOperator)
 	}
 	{
-		p.SetState(1999)
+		p.SetState(2000)
 		p.KeyedFieldName()
 	}
-	p.SetState(2001)
+	p.SetState(2002)
 	p.GetErrorHandler().Sync(p)
 
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 247, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(2000)
+			p.SetState(2001)
 			p.ActualArguments()
 		}
 
@@ -30881,11 +30881,11 @@ func (p *PHPParser) FunctionCall() (localctx IFunctionCallContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2003)
+		p.SetState(2004)
 		p.FunctionCallName()
 	}
 	{
-		p.SetState(2004)
+		p.SetState(2005)
 		p.ActualArguments()
 	}
 
@@ -31039,41 +31039,41 @@ func (p *PHPParser) FunctionCallName() (localctx IFunctionCallNameContext) {
 		}
 	}()
 
-	p.SetState(2011)
+	p.SetState(2012)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 248, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(2006)
+			p.SetState(2007)
 			p.QualifiedNamespaceName()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(2007)
+			p.SetState(2008)
 			p.ClassConstant()
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(2008)
+			p.SetState(2009)
 			p.ChainBase()
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(2009)
+			p.SetState(2010)
 			p.Parentheses()
 		}
 
 	case 5:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(2010)
+			p.SetState(2011)
 			p.Match(PHPParserLabel)
 		}
 
@@ -31246,14 +31246,14 @@ func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(2014)
+	p.SetState(2015)
 	p.GetErrorHandler().Sync(p)
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
 		case 1:
 			{
-				p.SetState(2013)
+				p.SetState(2014)
 				p.Arguments()
 			}
 
@@ -31261,23 +31261,23 @@ func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
 			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 		}
 
-		p.SetState(2016)
+		p.SetState(2017)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 249, p.GetParserRuleContext())
 	}
-	p.SetState(2021)
+	p.SetState(2022)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 250, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(2018)
+				p.SetState(2019)
 				p.SquareCurlyExpression()
 			}
 
 		}
-		p.SetState(2023)
+		p.SetState(2024)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 250, p.GetParserRuleContext())
 	}
@@ -31425,26 +31425,26 @@ func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
 		}
 	}()
 
-	p.SetState(2033)
+	p.SetState(2034)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserDollar, PHPParserVarName:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(2024)
+			p.SetState(2025)
 			p.KeyedVariable()
 		}
-		p.SetState(2027)
+		p.SetState(2028)
 		p.GetErrorHandler().Sync(p)
 
 		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 251, p.GetParserRuleContext()) == 1 {
 			{
-				p.SetState(2025)
+				p.SetState(2026)
 				p.Match(PHPParserDoubleColon)
 			}
 			{
-				p.SetState(2026)
+				p.SetState(2027)
 				p.KeyedVariable()
 			}
 
@@ -31453,15 +31453,15 @@ func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUse, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserNamespaceSeparator, PHPParserLabel:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(2029)
+			p.SetState(2030)
 			p.QualifiedStaticTypeRef()
 		}
 		{
-			p.SetState(2030)
+			p.SetState(2031)
 			p.Match(PHPParserDoubleColon)
 		}
 		{
-			p.SetState(2031)
+			p.SetState(2032)
 			p.KeyedVariable()
 		}
 
@@ -31583,21 +31583,21 @@ func (p *PHPParser) KeyedFieldName() (localctx IKeyedFieldNameContext) {
 		}
 	}()
 
-	p.SetState(2037)
+	p.SetState(2038)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUse, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserOpenCurlyBracket, PHPParserLabel:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(2035)
+			p.SetState(2036)
 			p.KeyedSimpleFieldName()
 		}
 
 	case PHPParserDollar, PHPParserVarName:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(2036)
+			p.SetState(2037)
 			p.KeyedVariable()
 		}
 
@@ -31771,46 +31771,46 @@ func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContex
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(2044)
+	p.SetState(2045)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUse, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserLabel:
 		{
-			p.SetState(2039)
+			p.SetState(2040)
 			p.Identifier()
 		}
 
 	case PHPParserOpenCurlyBracket:
 		{
-			p.SetState(2040)
+			p.SetState(2041)
 			p.Match(PHPParserOpenCurlyBracket)
 		}
 		{
-			p.SetState(2041)
+			p.SetState(2042)
 			p.expression(0)
 		}
 		{
-			p.SetState(2042)
+			p.SetState(2043)
 			p.Match(PHPParserCloseCurlyBracket)
 		}
 
 	default:
 		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 	}
-	p.SetState(2049)
+	p.SetState(2050)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 255, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(2046)
+				p.SetState(2047)
 				p.SquareCurlyExpression()
 			}
 
 		}
-		p.SetState(2051)
+		p.SetState(2052)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 255, p.GetParserRuleContext())
 	}
@@ -31977,66 +31977,66 @@ func (p *PHPParser) KeyedVariable() (localctx IKeyedVariableContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(2055)
+	p.SetState(2056)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 256, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(2052)
+				p.SetState(2053)
 				p.Match(PHPParserDollar)
 			}
 
 		}
-		p.SetState(2057)
+		p.SetState(2058)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 256, p.GetParserRuleContext())
 	}
-	p.SetState(2064)
+	p.SetState(2065)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserVarName:
 		{
-			p.SetState(2058)
+			p.SetState(2059)
 			p.Match(PHPParserVarName)
 		}
 
 	case PHPParserDollar:
 		{
-			p.SetState(2059)
+			p.SetState(2060)
 			p.Match(PHPParserDollar)
 		}
 		{
-			p.SetState(2060)
+			p.SetState(2061)
 			p.Match(PHPParserOpenCurlyBracket)
 		}
 		{
-			p.SetState(2061)
+			p.SetState(2062)
 			p.expression(0)
 		}
 		{
-			p.SetState(2062)
+			p.SetState(2063)
 			p.Match(PHPParserCloseCurlyBracket)
 		}
 
 	default:
 		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 	}
-	p.SetState(2069)
+	p.SetState(2070)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 258, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(2066)
+				p.SetState(2067)
 				p.SquareCurlyExpression()
 			}
 
 		}
-		p.SetState(2071)
+		p.SetState(2072)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 258, p.GetParserRuleContext())
 	}
@@ -32156,44 +32156,44 @@ func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionCont
 		}
 	}()
 
-	p.SetState(2081)
+	p.SetState(2082)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserOpenSquareBracket:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(2072)
+			p.SetState(2073)
 			p.Match(PHPParserOpenSquareBracket)
 		}
-		p.SetState(2074)
+		p.SetState(2075)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&-1) != 0 || (int64((_la-108)) & ^0x3f) == 0 && ((int64(1)<<(_la-108))&1873497444977737727) != 0 || (int64((_la-196)) & ^0x3f) == 0 && ((int64(1)<<(_la-196))&4396974138193) != 0 {
 			{
-				p.SetState(2073)
+				p.SetState(2074)
 				p.expression(0)
 			}
 
 		}
 		{
-			p.SetState(2076)
+			p.SetState(2077)
 			p.Match(PHPParserCloseSquareBracket)
 		}
 
 	case PHPParserOpenCurlyBracket:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(2077)
+			p.SetState(2078)
 			p.Match(PHPParserOpenCurlyBracket)
 		}
 		{
-			p.SetState(2078)
+			p.SetState(2079)
 			p.expression(0)
 		}
 		{
-			p.SetState(2079)
+			p.SetState(2080)
 			p.Match(PHPParserCloseCurlyBracket)
 		}
 
@@ -32334,39 +32334,39 @@ func (p *PHPParser) AssignmentList() (localctx IAssignmentListContext) {
 	}()
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(2084)
+	p.SetState(2085)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&-1) != 0 || (int64((_la-108)) & ^0x3f) == 0 && ((int64(1)<<(_la-108))&1873497444977737727) != 0 || (int64((_la-196)) & ^0x3f) == 0 && ((int64(1)<<(_la-196))&4396974138193) != 0 {
 		{
-			p.SetState(2083)
+			p.SetState(2084)
 			p.AssignmentListElement()
 		}
 
 	}
-	p.SetState(2092)
+	p.SetState(2093)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
-			p.SetState(2086)
+			p.SetState(2087)
 			p.Match(PHPParserComma)
 		}
-		p.SetState(2088)
+		p.SetState(2089)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&-1) != 0 || (int64((_la-108)) & ^0x3f) == 0 && ((int64(1)<<(_la-108))&1873497444977737727) != 0 || (int64((_la-196)) & ^0x3f) == 0 && ((int64(1)<<(_la-196))&4396974138193) != 0 {
 			{
-				p.SetState(2087)
+				p.SetState(2088)
 				p.AssignmentListElement()
 			}
 
 		}
 
-		p.SetState(2094)
+		p.SetState(2095)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
@@ -32513,39 +32513,39 @@ func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementCont
 		}
 	}()
 
-	p.SetState(2102)
+	p.SetState(2103)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 264, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(2095)
+			p.SetState(2096)
 			p.Chain()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(2096)
+			p.SetState(2097)
 			p.Match(PHPParserList)
 		}
 		{
-			p.SetState(2097)
+			p.SetState(2098)
 			p.Match(PHPParserOpenRoundBracket)
 		}
 		{
-			p.SetState(2098)
+			p.SetState(2099)
 			p.AssignmentList()
 		}
 		{
-			p.SetState(2099)
+			p.SetState(2100)
 			p.Match(PHPParserCloseRoundBracket)
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(2101)
+			p.SetState(2102)
 			p.ArrayItem()
 		}
 
@@ -32644,7 +32644,7 @@ func (p *PHPParser) Modifier() (localctx IModifierContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2104)
+		p.SetState(2105)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == PHPParserAbstract || _la == PHPParserFinal) {
@@ -32757,21 +32757,21 @@ func (p *PHPParser) Identifier() (localctx IIdentifierContext) {
 		}
 	}()
 
-	p.SetState(2108)
+	p.SetState(2109)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserLabel:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(2106)
+			p.SetState(2107)
 			p.Match(PHPParserLabel)
 		}
 
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUse, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(2107)
+			p.SetState(2108)
 			p.Key()
 		}
 
@@ -33296,7 +33296,7 @@ func (p *PHPParser) Key() (localctx IKeyContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2110)
+		p.SetState(2111)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&-144959677430546433) != 0 || (int64((_la-108)) & ^0x3f) == 0 && ((int64(1)<<(_la-108))&144115188067333119) != 0) {
@@ -33420,7 +33420,7 @@ func (p *PHPParser) MemberModifier() (localctx IMemberModifierContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2112)
+		p.SetState(2113)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == PHPParserAbstract || (int64((_la-81)) & ^0x3f) == 0 && ((int64(1)<<(_la-81))&2327872274433) != 0) {
@@ -33548,7 +33548,7 @@ func (p *PHPParser) MagicConstant() (localctx IMagicConstantContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2114)
+		p.SetState(2115)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-157)) & ^0x3f) == 0 && ((int64(1)<<(_la-157))&255) != 0) {
@@ -33708,7 +33708,7 @@ func (p *PHPParser) MagicMethod() (localctx IMagicMethodContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2116)
+		p.SetState(2117)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-141)) & ^0x3f) == 0 && ((int64(1)<<(_la-141))&65535) != 0) {
@@ -33836,7 +33836,7 @@ func (p *PHPParser) PrimitiveType() (localctx IPrimitiveTypeContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2118)
+		p.SetState(2119)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == PHPParserArray || _la == PHPParserBoolType || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&648588766625136641) != 0) {
@@ -33996,7 +33996,7 @@ func (p *PHPParser) CastOperation() (localctx ICastOperationContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(2120)
+		p.SetState(2121)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&33777272083972109) != 0 || (int64((_la-110)) & ^0x3f) == 0 && ((int64(1)<<(_la-110))&3679233) != 0) {
