@@ -217,8 +217,7 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 		return nil
 	}
 
-	log.Infof("start to handle type type: %v", i.GetText())
-
+	//log.Infof("start to handle type type: %v", i.GetText())
 	for _, annotation := range i.AllAnnotation() {
 		y.VisitAnnotation(annotation)
 	}

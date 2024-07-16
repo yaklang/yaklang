@@ -2,10 +2,14 @@ package ssatest
 
 import (
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -122,6 +126,52 @@ func Check(
 	opt ...ssaapi.Option,
 ) {
 	CheckWithName("", t, code, handler, opt...)
+}
+
+func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, prog *ssaapi.Program, start time.Time) error, opt ...ssaapi.Option) {
+	opt = append(opt, ssaapi.WithLanguage(ssaapi.JAVA))
+
+	{
+		start := time.Now()
+		errListener := antlr4util.NewErrorListener()
+		lexer := javaparser.NewJavaLexer(antlr.NewInputStream(code))
+		lexer.RemoveErrorListeners()
+		lexer.AddErrorListener(errListener)
+		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+		parser := javaparser.NewJavaParser(tokenStream)
+		parser.RemoveErrorListeners()
+		parser.AddErrorListener(errListener)
+		parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+		ast := parser.CompilationUnit()
+		_ = ast
+		assert.NoError(t, handler(true, nil, start))
+	}
+
+	// only in memory
+	{
+
+		start := time.Now()
+		prog, err := ssaapi.Parse(code, opt...)
+		assert.Nil(t, err)
+
+		log.Infof("only in memory ")
+		err = handler(true, prog, start)
+		assert.Nil(t, err)
+	}
+
+	programID := uuid.NewString()
+	ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	// parse with database
+	{
+		start := time.Now()
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		prog, err := ssaapi.Parse(code, opt...)
+		assert.Nil(t, err)
+		log.Infof("with database ")
+		err = handler(false, prog, start)
+		assert.Nil(t, err)
+	}
 }
 
 func CheckFSWithProgram(
