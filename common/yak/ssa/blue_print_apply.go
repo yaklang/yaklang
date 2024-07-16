@@ -50,8 +50,17 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		log.Error("BUG: ClassBluePrint is nil")
 		return NewAny().GetType()
 	}
+	if obj == nil {
+		log.Errorf("BUG: ClassBluePrint.Apply: obj is nil, c: %v", c)
+		return NewAny().GetType()
+	}
 
-	builder := obj.GetFunc().builder
+	fun := obj.GetFunc()
+	if fun == nil {
+		log.Errorf("BUG: ClassBluePrint.Apply: obj.GetFunc() is nil, obj: %v", obj)
+		return NewAny().GetType()
+	}
+	builder := fun.builder
 	_ = builder
 
 	prog := builder.GetProgram()
