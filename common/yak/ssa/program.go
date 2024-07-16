@@ -66,6 +66,11 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 		return p, hasFile(p)
 	}
 
+	if p, ok := prog.UpStream[name]; ok {
+		app.UpStream[name] = p
+		return p, hasFile(p)
+	}
+
 	if !app.EnableDatabase {
 		return nil, false
 	}
@@ -73,10 +78,10 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	// library in  database, load and set relation
 	p, err := GetProgram(name, Library)
 	if err != nil {
-		return p, false
+		return nil, false
 	}
+	app.UpStream[name] = p
 	if !slices.Contains(p.irProgram.UpStream, name) {
-		app.UpStream[name] = p
 		// update up-down stream
 		prog.UpStream[name] = p
 		p.DownStream[prog.Name] = prog
