@@ -7,14 +7,14 @@ import (
 
 func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if y == nil || raw == nil {
-		return nil
+		return ssa.GetAnyType()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeHintContext)
 	if i == nil {
-		return nil
+		return ssa.GetAnyType()
 	}
 	if r := i.QualifiedStaticTypeRef(); r != nil {
 		//这里类型就行修复
@@ -35,7 +35,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	return ssa.GetAnyType()
 }
 
-func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
+func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -52,9 +52,8 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
 	} else if i.IndirectTypeRef() != nil {
 
 	} else if i.PrimitiveType() != nil {
-		return y.VisitPrimitiveType(i.PrimitiveType())
+
 	} else if i.Static() != nil {
-		// as class name
 	}
 
 	return nil
