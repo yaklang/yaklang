@@ -79,7 +79,7 @@ func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlo
 func (ps Programs) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
 	return SyntaxFlowWithError(
 		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
-		i,
+		i, opts...,
 	)
 }
 
