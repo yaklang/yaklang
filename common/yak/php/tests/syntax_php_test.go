@@ -41,6 +41,24 @@ func validateSource(t *testing.T, filename string, src string) {
 				case phpparser.PHPLexerHtmlEquals:
 					fmt.Print("HTML_EQ ")
 				}
+			case "<<<":
+				fmt.Print("HEREDOC ")
+				if ty != phpparser.PHPLexerStartNowDoc {
+					fmt.Print("NOT_START_NOWDOC BAD... ")
+				}
+			case "EOF":
+				fmt.Print("EOF ")
+				switch ty {
+				case phpparser.PHPLexerHereDocIdentiferName:
+					fmt.Print("HERE_DOC_NAME ")
+				case phpparser.PHPLexerHereDocIdentiferRaw:
+					fmt.Print("HERE_DOC_RAW ")
+				}
+			case "\nEOF":
+				fmt.Print("HERE DOC END ")
+				if ty != phpparser.PHPLexerEndDoc {
+					fmt.Print("NOT_END_NOWDOC BAD... ")
+				}
 			}
 			fmt.Println(t)
 		}
@@ -198,9 +216,14 @@ echo "Script execution completed.\n";
 
 func TestValidatePHPHereDoc(t *testing.T) {
 	validateSource(t, "", `<?php
+
+
 	$abb = <<<EOF
 Hello World
 EOF."CCCCCCCC";
+
+
+
 ?>
 `)
 }

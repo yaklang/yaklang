@@ -788,10 +788,12 @@ stringConstant
     ;
 
 string
-    : StartNowDoc HereDocText* EndDoc
+    : StartNowDoc (HereDocIdentiferName | HereDocIdentiferRaw) HereDocIdentifierBreak hereDocContent? EndDoc
     | SingleQuoteString
     | DoubleQuote interpolatedStringPart* DoubleQuote
     ;
+
+hereDocContent: HereDocText+;
 
 interpolatedStringPart
     : StringPart

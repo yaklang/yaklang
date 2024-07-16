@@ -280,10 +280,11 @@ BooleanAnd       : '&&';
 NullCoalescing      : '??';
 NullCoalescingEqual : '??=';
 
-StartNowDoc: '<<<' [ \t]* (
-    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
-    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
-  ) '\r'? '\n' -> pushMode(HereDoc);
+//StartNowDoc: '<<<' [ \t]* (
+//    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
+//    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
+//  ) '\r'? '\n' -> pushMode(HereDoc);
+StartNowDoc: '<<<' -> pushMode(HereDocIdentifer);
 ShiftLeft          : '<<';
 ShiftRight         : '>>';
 DoubleColon        : '::';
@@ -357,6 +358,12 @@ Comment                 : ~[\r\n?]+ -> channel(PhpComments);
 PHPEndSingleLineComment : '?' '>';
 CommentQuestionMark     : '?'    -> type(Comment), channel(PhpComments);
 CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from comment.
+
+mode HereDocIdentifer;
+HereDocIdentiferWhite: [ \r\t] -> skip;
+HereDocIdentiferRaw: {this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()};
+HereDocIdentiferName: (HereDocIdentiferRaw) | ('\'' (HereDocIdentiferRaw) '\'');
+HereDocIdentifierBreak: '\n' -> popMode,pushMode(HereDoc);
 
 mode HereDoc;
 EndDoc: '\n' Label {this.DocIsEnd()}? ->popMode;

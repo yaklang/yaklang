@@ -547,6 +547,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#string.
 	VisitString(ctx *StringContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#hereDocContent.
+	VisitHereDocContent(ctx *HereDocContentContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#interpolatedStringPart.
 	VisitInterpolatedStringPart(ctx *InterpolatedStringPartContext) interface{}
 
