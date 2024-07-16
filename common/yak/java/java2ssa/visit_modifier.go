@@ -2,6 +2,7 @@ package java2ssa
 
 import (
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -50,6 +51,9 @@ type AnnotationDescription struct {
 }
 
 func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (instanceCallback func(ssa.Value), defCallback func(ssa.Value)) {
+	start := time.Now()
+	defer deltaAnnotationCostFrom(start)
+
 	instanceCallback = func(ssa.Value) {}
 	defCallback = func(ssa.Value) {}
 
@@ -104,6 +108,9 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 	}
 
 	return func(v ssa.Value) {
+			start := time.Now()
+			defer deltaAnnotationCostFrom(start)
+
 			recoverRange := y.SetCurrent(v)
 			defer recoverRange()
 
@@ -121,6 +128,8 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 					xmlStr.annotation.RequestParam.value = "xml_str"
 					RequestParam.__ref__ = xmlStr
 			*/
+			start := time.Now()
+			defer deltaAnnotationCostFrom(start)
 
 			// function instance
 			// parameter instance

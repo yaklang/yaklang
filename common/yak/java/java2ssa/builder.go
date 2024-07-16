@@ -2,14 +2,13 @@ package java2ssa
 
 import (
 	"fmt"
-	"path/filepath"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"path/filepath"
 )
 
 // ========================================== For SSAAPI ==========================================
