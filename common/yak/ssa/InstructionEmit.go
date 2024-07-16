@@ -326,6 +326,10 @@ func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
 
 func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len, Cap Value) *Make {
 	if f.CurrentBlock.finish {
+		log.Errorf("BUG: current block is finish, can't emit make")
+		log.Errorf("BUG: current block is finish, can't emit make")
+		log.Errorf("BUG: current block is finish, can't emit make")
+		log.Errorf("BUG: current block is finish, can't emit make")
 		return nil
 	}
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
