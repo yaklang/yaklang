@@ -391,6 +391,7 @@ func (f *FunctionBuilder) EmitTypeValue(typ Type) *TypeValue {
 	}
 	t := NewTypeValue(typ)
 	f.emit(t)
+	t.SetType(typ)
 	return t
 }
 
