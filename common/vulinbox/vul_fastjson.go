@@ -1,6 +1,7 @@
 package vulinbox
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -38,7 +39,7 @@ func generateFastjsonParser(version string) JsonParser {
 func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) {
 	// redos
 	if strings.Contains(data, "regex") {
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 	var dnslog string
 	// 查找dnslog
@@ -54,9 +55,16 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 		}
 	}
 	if dnslog != "" {
-		ip := netx.LookupFirst(dnslog, netx.WithTimeout(5*time.Second), netx.WithDNSNoCache(true))
-		if ip != "" {
-			DnsRecord.Store(dnslog, ip)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		go func() {
+			ip := netx.LookupFirst(dnslog, netx.WithDNSContext(ctx), netx.WithDNSNoCache(true))
+			if ip != "" {
+				DnsRecord.Store(dnslog, ip)
+			}
+			cancel()
+		}()
+		select {
+		case <-ctx.Done():
 		}
 	}
 	var js map[string]any
@@ -152,6 +160,7 @@ func mockJacksonController(req *http.Request, data string) string {
 }
 func (s *VulinServer) registerFastjson() {
 	r := s.router
+	globalIdForUnstableNetwork := 0
 	var fastjsonGroup = r.PathPrefix("/fastjson").Name("Fastjson 案例").Subrouter()
 	var vuls = []*VulInfo{
 		{
@@ -394,6 +403,42 @@ func (s *VulinServer) registerFastjson() {
 					writer.Write([]byte(response))
 				} else {
 					writer.WriteHeader(http.StatusMethodNotAllowed)
+				}
+			},
+		},
+		{
+			Title: "网络不稳定的靶站",
+			Path:  "/unstable-network",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodPost {
+					if globalIdForUnstableNetwork != 2 {
+						time.Sleep(3 * time.Second)
+					}
+					writer.Write([]byte("HTTP/1.1 200 OK"))
+					globalIdForUnstableNetwork = (globalIdForUnstableNetwork + 1) % 3
+				} else {
+					writer.Write([]byte(utils2.Format(string(fastjson_loginPage), map[string]string{
+						"script": `function load(){
+            name=$("#username").val();
+            password=$("#password").val();
+            auth = {"user":name,"password":password};
+            $.ajax({
+                type:"post",
+                url:"/fastjson/json-in-form",
+                data:{"auth":JSON.stringify(auth),"action":"login"},
+				dataType: "json",
+                success: function (data ,textStatus, jqXHR)
+                {
+                    $("#response").text(JSON.stringify(data));
+					console.log(data);
+                },
+                error:function (XMLHttpRequest, textStatus, errorThrown) {      
+                    alert("请求出错");
+                },
+            })
+        }`,
+					})))
+					return
 				}
 			},
 		},
