@@ -31,7 +31,14 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	}
 	className := i.TypeRef().GetText()
 	class := y.GetClassBluePrint(className)
-	obj := y.EmitMakeWithoutType(nil, nil)
+	obj := y.EmitEmptyContainer()
+	if utils.IsNil(obj) {
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		return y.EmitUndefined(raw.GetText())
+	}
 	if class == nil {
 		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", className)
 		obj.SetType(ssa.GetAnyType())
