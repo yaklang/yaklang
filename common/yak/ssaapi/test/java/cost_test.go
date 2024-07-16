@@ -265,3 +265,28 @@ func TestBigJavaFile2(t *testing.T) {
 	log.Info("mem cost: ", memCost)
 	log.Info(" db cost: ", dbCost)
 }
+
+//go:embed badcase/bigclass.java
+var big2 string
+
+func TestBigJavaFile3(t *testing.T) {
+	var astCost time.Duration
+	var memCost time.Duration
+	var dbCost time.Duration
+	ssatest.ProfileJavaCheck(t, big2, func(mem bool, prog *ssaapi.Program, start time.Time) error {
+		if prog == nil {
+			astCost = time.Since(start)
+			return nil
+		}
+		if mem {
+			memCost = time.Since(start)
+		} else {
+			dbCost = time.Since(start)
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssa.ShowDatabaseCacheCost()
+	log.Info("ast cost: ", astCost)
+	log.Info("mem cost: ", memCost)
+	log.Info(" db cost: ", dbCost)
+}
