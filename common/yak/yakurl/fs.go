@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -14,8 +15,8 @@ import (
 
 type fileSystemAction struct{}
 
-func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
-	newParam := &ypb.YakURL{
+func fileInfoToResource(originParam *ypb.YakURL, query url.Values, info os.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
+	yakURL := &ypb.YakURL{
 		Schema:   originParam.Schema,
 		User:     originParam.GetUser(),
 		Pass:     originParam.GetPass(),
@@ -24,7 +25,7 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath s
 		Query:    originParam.GetQuery(),
 	}
 	if !inDir {
-		newParam.Path = originParam.GetPath()
+		yakURL.Path = originParam.GetPath()
 	}
 
 	src := &ypb.YakURLResource{
@@ -33,7 +34,7 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath s
 		ModifiedTimestamp: info.ModTime().Unix(),
 		Path:              currentPath,
 		YakURLVerbose:     "",
-		Url:               newParam,
+		Url:               yakURL,
 	}
 	if info.IsDir() {
 		src.ResourceType = "dir"
@@ -55,10 +56,34 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath s
 		Key:   "Directory-Name",
 		Value: utils.EscapeInvalidUTF8Byte([]byte(dirName)),
 	})
+	if !info.IsDir() && strings.ToLower(query.Get("detectPlainText")) == "true" {
+		// read first 514 bytes to check if it is a plain text file
+		fh, err := os.Open(currentPath)
+		if err == nil {
+			defer fh.Close()
+			size := src.Size
+			if size > 514 {
+				size = 514
+			}
+
+			buf := make([]byte, size)
+			n, err := fh.Read(buf)
+			if err == nil {
+				buf = buf[:n]
+				src.Extra = append(src.Extra, &ypb.KVPair{
+					Key:   "IsPlainText",
+					Value: utils.AsDebugString(utils.IsPlainText(buf)),
+				})
+			}
+		}
+	}
 	return src
 }
 
 func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	// available query:
+	// op=list # list directory
+	// detectPlainText=true # detect if file is plain text, return: IsPlainText:true/false
 	u := params.GetUrl()
 	absPath, _, _, err := FormatPath(params)
 	if err != nil {
@@ -89,11 +114,11 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 					continue
 				}
 				currentPath := filepath.Join(params.GetUrl().Path, info.Name())
-				res = append(res, fileInfoToResource(params.GetUrl(), info, currentPath, true))
+				res = append(res, fileInfoToResource(params.GetUrl(), query, info, currentPath, true))
 			}
 		}
 	default:
-		res = append(res, fileInfoToResource(params.GetUrl(), info, absPath, false))
+		res = append(res, fileInfoToResource(params.GetUrl(), query, info, absPath, false))
 	}
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
@@ -167,7 +192,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
 	}
-	res := fileInfoToResource(params.GetUrl(), currentInfo, absPath, false)
+	res := fileInfoToResource(params.GetUrl(), query, currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
@@ -224,7 +249,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err) // check file / dir
 	}
-	res := fileInfoToResource(params.GetUrl(), currentInfo, absPath, false)
+	res := fileInfoToResource(params.GetUrl(), query, currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
