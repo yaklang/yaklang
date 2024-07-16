@@ -151,7 +151,6 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		}
 
 		log.Info("start to echo debug script")
-		var fetchRisk bool
 		runtimeId := uuid.New().String()
 		err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 			if result.IsMessage {
@@ -164,10 +163,6 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				spew.Dump(m["request"])
 				spew.Dump(m["response"])
 				log.Info("debugScript recv: ", string(result.Message))
-				switch utils.MapGetString(utils.MapGetMapRaw(m, "content"), "level") {
-				case "json-risk":
-					fetchRisk = true
-				}
 			}
 			return nil
 		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}}, runtimeId)
@@ -176,7 +171,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			log.Errorf("debugScript failed: %v", err)
 			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error(), nil, Error)
 		}
-		if fetchRisk {
+		riskCount, err := yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
+		if err != nil {
+			score -= 60
+			log.Errorf("debugScript failed: %v", err)
+		}
+		if riskCount > 0 {
 			score -= 50
 			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error)
 		}
