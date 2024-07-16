@@ -652,7 +652,7 @@ service Yak {
 
   // YAKURL
   rpc RequestYakURL(RequestYakURLParams) returns (RequestYakURLResponse);
-  
+
   // 文件IO
   rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse);
 
@@ -693,6 +693,10 @@ service Yak {
   rpc GetFingerprint(GetFingerprintRequest) returns (GetFingerprintResponse);
   rpc AddFingerprint(AddFingerprintRequest) returns (AddFingerprintResponse);
   rpc ModifyFingerprint(ModifyFingerprintRequest) returns (ModifyFingerprintResponse);
+
+  // 反弹shell命令生成
+  rpc GetReverseShellProgramList(GetReverseShellProgramListRequest) returns (GetReverseShellProgramListResponse);
+  rpc GenerateReverseShellCommand(GenerateReverseShellCommandRequest) returns (GenerateReverseShellCommandResponse);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5224,4 +5228,28 @@ message ReadFileRequest {
 message ReadFileResponse {
   bytes Data = 1;
   bool EOF = 2;
+}
+
+message GetReverseShellProgramListRequest{
+  string System = 1;
+  string CmdType = 2;
+}
+
+message GetReverseShellProgramListResponse{
+  repeated string ProgramList = 1;
+  repeated string ShellList = 2;
+}
+message GenerateReverseShellCommandRequest{
+  string System = 1;
+  string CmdType = 2;
+  string ShellType = 4;
+  string Encode = 5;
+  string Program = 6;
+  string IP = 7;
+  int32 port = 8;
+}
+
+message GenerateReverseShellCommandResponse{
+    GeneralResponse Status = 1;
+    string Result =2;
 }
