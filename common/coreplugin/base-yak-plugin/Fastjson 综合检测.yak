@@ -3,7 +3,7 @@ dnslogTimeout = 3
 timeoutTolerance = 2 // 2 秒的超时容错，如果当前请求时长和常规请求时长相差小于2秒则认为是正常请求，否则认为是延时payload生效
 fuzzTimeout = 5 // 5 秒的超时时间
 networkFluctuation = 5 // 网络波动，fuzztimeout = networkFluctuation * getCommonWastTime()
-log.setLevel("debug")
+log.setLevel("info")
 getRequestDuration = (rsp)=>{
     try{
         t = rsp.LowhttpResponse.TraceInfo.TotalTime
