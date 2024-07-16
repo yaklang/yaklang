@@ -468,7 +468,10 @@ type YakClient interface {
 	SetGlobalNetworkConfig(ctx context.Context, in *GlobalNetworkConfig, opts ...grpc.CallOption) (*Empty, error)
 	ResetGlobalNetworkConfig(ctx context.Context, in *ResetGlobalNetworkConfigRequest, opts ...grpc.CallOption) (*Empty, error)
 	ValidP12PassWord(ctx context.Context, in *ValidP12PassWordRequest, opts ...grpc.CallOption) (*ValidP12PassWordResponse, error)
+	// YAKURL
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
+	// 文件IO
+	ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (Yak_ReadFileClient, error)
 	// Wireshark
 	GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error)
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error)
@@ -476,6 +479,7 @@ type YakClient interface {
 	QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error)
 	QueryTrafficTCPReassembled(ctx context.Context, in *QueryTrafficTCPReassembledRequest, opts ...grpc.CallOption) (*QueryTrafficTCPReassembledResponse, error)
 	ParseTraffic(ctx context.Context, in *ParseTrafficRequest, opts ...grpc.CallOption) (*ParseTrafficResponse, error)
+	// 与前端交互的双工长连接，用于通知某些消息
 	DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (Yak_DuplexConnectionClient, error)
 	// 混合批量扫描
 	HybridScan(ctx context.Context, opts ...grpc.CallOption) (Yak_HybridScanClient, error)
@@ -5011,6 +5015,38 @@ func (c *yakClient) RequestYakURL(ctx context.Context, in *RequestYakURLParams, 
 	return out, nil
 }
 
+func (c *yakClient) ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (Yak_ReadFileClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], "/ypb.Yak/ReadFile", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakReadFileClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Yak_ReadFileClient interface {
+	Recv() (*ReadFileResponse, error)
+	grpc.ClientStream
+}
+
+type yakReadFileClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakReadFileClient) Recv() (*ReadFileResponse, error) {
+	m := new(ReadFileResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error) {
 	out := new(PcapMetadata)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/GetPcapMetadata", in, out, opts...)
@@ -5021,7 +5057,7 @@ func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest
 }
 
 func (c *yakClient) PcapX(ctx context.Context, opts ...grpc.CallOption) (Yak_PcapXClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], "/ypb.Yak/PcapX", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], "/ypb.Yak/PcapX", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5088,7 +5124,7 @@ func (c *yakClient) ParseTraffic(ctx context.Context, in *ParseTrafficRequest, o
 }
 
 func (c *yakClient) DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (Yak_DuplexConnectionClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], "/ypb.Yak/DuplexConnection", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], "/ypb.Yak/DuplexConnection", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5119,7 +5155,7 @@ func (x *yakDuplexConnectionClient) Recv() (*DuplexConnectionResponse, error) {
 }
 
 func (c *yakClient) HybridScan(ctx context.Context, opts ...grpc.CallOption) (Yak_HybridScanClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], "/ypb.Yak/HybridScan", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], "/ypb.Yak/HybridScan", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5195,7 +5231,7 @@ func (c *yakClient) GetSpaceEngineAccountStatusV2(ctx context.Context, in *Third
 }
 
 func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5757,7 +5793,10 @@ type YakServer interface {
 	SetGlobalNetworkConfig(context.Context, *GlobalNetworkConfig) (*Empty, error)
 	ResetGlobalNetworkConfig(context.Context, *ResetGlobalNetworkConfigRequest) (*Empty, error)
 	ValidP12PassWord(context.Context, *ValidP12PassWordRequest) (*ValidP12PassWordResponse, error)
+	// YAKURL
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
+	// 文件IO
+	ReadFile(*ReadFileRequest, Yak_ReadFileServer) error
 	// Wireshark
 	GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error)
 	PcapX(Yak_PcapXServer) error
@@ -5765,6 +5804,7 @@ type YakServer interface {
 	QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error)
 	QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error)
 	ParseTraffic(context.Context, *ParseTrafficRequest) (*ParseTrafficResponse, error)
+	// 与前端交互的双工长连接，用于通知某些消息
 	DuplexConnection(Yak_DuplexConnectionServer) error
 	// 混合批量扫描
 	HybridScan(Yak_HybridScanServer) error
@@ -6830,6 +6870,9 @@ func (UnimplementedYakServer) ValidP12PassWord(context.Context, *ValidP12PassWor
 }
 func (UnimplementedYakServer) RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestYakURL not implemented")
+}
+func (UnimplementedYakServer) ReadFile(*ReadFileRequest, Yak_ReadFileServer) error {
+	return status.Errorf(codes.Unimplemented, "method ReadFile not implemented")
 }
 func (UnimplementedYakServer) GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPcapMetadata not implemented")
@@ -13341,6 +13384,27 @@ func _Yak_RequestYakURL_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ReadFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ReadFileRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ReadFile(m, &yakReadFileServer{stream})
+}
+
+type Yak_ReadFileServer interface {
+	Send(*ReadFileResponse) error
+	grpc.ServerStream
+}
+
+type yakReadFileServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakReadFileServer) Send(m *ReadFileResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 func _Yak_GetPcapMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PcapMetadataRequest)
 	if err := dec(in); err != nil {
@@ -15313,6 +15377,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "TraceRoute",
 			Handler:       _Yak_TraceRoute_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ReadFile",
+			Handler:       _Yak_ReadFile_Handler,
 			ServerStreams: true,
 		},
 		{
