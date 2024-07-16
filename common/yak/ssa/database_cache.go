@@ -179,7 +179,12 @@ func (c *Cache) GetClassInstance(name string) []Instruction {
 
 var (
 	_SSASaveIrCodeCost uint64
+	_CostCallback      []func()
 )
+
+func RegisterCostCallback(f func()) {
+	_CostCallback = append(_CostCallback, f)
+}
 
 func GetSSASaveIrCodeCost() time.Duration {
 	return time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeCost))
@@ -193,6 +198,9 @@ func ShowDatabaseCacheCost() {
 	log.Infof("SSA Database SaveScope Cost: %v", ssautil.GetSSAScopeTimeCost())
 	log.Infof("SSA Database CacheToDatabase Cost: %v", GetSSACacheToDatabaseCost())
 	log.Infof("SSA DB Cache DEBUG Cost: %v", GetSSACacheIterationCost())
+	for _, cb := range _CostCallback {
+		cb()
+	}
 }
 
 // =============================================== Database =======================================================
