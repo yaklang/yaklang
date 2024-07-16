@@ -51,8 +51,6 @@ func validateSource(t *testing.T, filename string, src string) {
 				switch ty {
 				case phpparser.PHPLexerHereDocIdentiferName:
 					fmt.Print("HERE_DOC_NAME ")
-				case phpparser.PHPLexerHereDocIdentiferRaw:
-					fmt.Print("HERE_DOC_RAW ")
 				}
 			case "\nEOF":
 				fmt.Print("HERE DOC END ")
