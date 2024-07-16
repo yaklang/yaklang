@@ -16,28 +16,14 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 		return nil
 	}
 
-	// java interface
-	// to yaklang classless oop
-	//
-	// name = {};
-	// name.method = undefined
-	//
 	ifaceName := i.Identifier().GetText()
-	variable := y.CreateVariable(ifaceName, i.Identifier())
-	container := y.EmitEmptyContainer()
-	y.AssignVariable(variable, container)
+	interfaceClass := y.CreateClassBluePrint(ifaceName)
+	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), interfaceClass)
 
-	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), func(name string, val ssa.Value) {
-		variable := y.CreateMemberCallVariable(container, y.EmitConstInst(name))
-		if val == nil {
-			val = y.EmitUndefined("")
-		}
-		y.AssignVariable(variable, val)
-	})
 	return nil
 }
 
-func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler func(name string, val ssa.Value)) interface{} {
+func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.ClassBluePrint) interface{} {
 	if y == nil || c == nil {
 		return nil
 	}
@@ -69,7 +55,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 							def(val)
 						}
 					}
-					handler(name, val)
+					// TODO: record in interface
+					// handler(name, val)
 				}
 			}
 		} else if ret := recv.ConstDeclaration(); ret != nil {
@@ -93,7 +80,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 							def(val)
 						}
 					}
-					handler(name, val)
+					// TODO: const  in interface
+					// handler(name, val)
 				}
 			}
 		} else if ret := recv.InterfaceMethodDeclaration(); ret != nil {
@@ -126,6 +114,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 			fakeFunc := y.NewFunc(member.Identifier().GetText())
 			fakeFunc.SetMethodName(member.Identifier().GetText())
 			y.FunctionBuilder = y.PushFunction(fakeFunc)
+			thisPara := y.NewParam("this", raw)
+			thisPara.SetType(this)
 			y.VisitFormalParameters(member.FormalParameters())
 			y.VisitMethodBody(member.MethodBody())
 			if len(fakeFunc.Return) <= 0 {
@@ -163,7 +153,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 			for _, def := range defs {
 				def(val)
 			}
-			handler(memberName, val)
+			this.AddMethod(memberName, val)
+			// handler(memberName, val)
 		} else if ret := recv.GenericInterfaceMethodDeclaration(); ret != nil {
 			raw, ok := ret.(*javaparser.GenericInterfaceMethodDeclarationContext)
 			if !ok {
@@ -226,15 +217,16 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, handler
 			for _, def := range defCallbacks {
 				def(val)
 			}
-			handler(memberName, val)
+			// TODO: GenericInterfaceMethodDeclaration
+			// handler(memberName, val)
 		} else if ret := recv.InterfaceDeclaration(); ret != nil {
 			y.VisitInterfaceDeclaration(ret.(*javaparser.InterfaceDeclarationContext))
 		} else if ret := recv.AnnotationTypeDeclaration(); ret != nil {
 
 		} else if ret := recv.ClassDeclaration(); ret != nil {
-			y.VisitClassDeclaration(ret.(*javaparser.ClassDeclarationContext), nil)
+			y.VisitClassDeclaration(ret.(*javaparser.ClassDeclarationContext), this)
 		} else if ret := recv.EnumDeclaration(); ret != nil {
-			y.VisitEnumDeclaration(ret, nil)
+			y.VisitEnumDeclaration(ret, this)
 		}
 	}
 
