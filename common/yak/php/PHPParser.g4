@@ -480,7 +480,7 @@ parentheses
     : '(' expression ')'
     ;
 
-fullyQualifiedNamespaceExpr: identifier '\\' (identifier '\\')* identifier;
+fullyQualifiedNamespaceExpr: '\\'? identifier '\\' (identifier '\\')* identifier;
 
 staticClassExpr
     : staticClassExprFunctionMember
@@ -527,7 +527,7 @@ expression
     | expression arguments                                        # FunctionCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | '\\' identifier                                             # ShortQualifiedNameExpression
-    | staticClassExpr                                             # StaticClassAccessExpression
+    | '\\'? staticClassExpr                                        # StaticClassAccessExpression
     | '&'? flexiVariable                                          # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | constant                                                    # ScalarExpression

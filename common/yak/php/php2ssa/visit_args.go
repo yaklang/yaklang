@@ -9,7 +9,8 @@ func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([
 	if y == nil || raw == nil {
 		return nil, false
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.ActualArgumentsContext)
 	if i == nil {
 		return nil, false
@@ -37,7 +38,8 @@ func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, 
 	if y == nil || raw == nil {
 		return nil, false
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.ArgumentsContext)
 	if i == nil {
 		return nil, false
@@ -65,7 +67,8 @@ func (y *builder) VisitActualArgument(raw phpparser.IActualArgumentContext) (ssa
 	if y == nil || raw == nil {
 		return nil, false
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.ActualArgumentContext)
 	if i == nil {
 		return nil, false

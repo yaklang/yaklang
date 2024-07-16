@@ -81,6 +81,12 @@ func (c *ClassBluePrint) GetMember(key string) *BluePrintMember {
 			member = m
 			return true
 		}
+		for _, class := range c.ParentClass {
+			if m, ok := class.NormalMember[key]; ok {
+				member = m
+				return true
+			}
+		}
 		return false
 	})
 	return member

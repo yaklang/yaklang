@@ -260,11 +260,12 @@ func Test_Function_WithMemberCall(t *testing.T) {
 		$a = new A();
 		$b = $a->fun1();
 		println($b);
-		`, []string{"Undefined-$a.fun1(valid)(make(A))"}, t)
+		`, []string{"Undefined-$a.fun1(valid)(Undefined-$a)"}, t)
 	})
 
 	t.Run("multiple member call", func(t *testing.T) {
 		test.CheckPrintlnValue(`
+
 		<?php
 		class A {
 			function fun1() {
@@ -275,9 +276,10 @@ func Test_Function_WithMemberCall(t *testing.T) {
 			var A $a;
 		}
 		$b = new B();
+		$b->a = new A();
 		$call = $b->a->fun1();
 		println($call);
-		`, []string{"Undefined-.a.fun1(valid)(Undefined-.a(valid))"}, t)
+		`, []string{"Undefined-$b.a.fun1(valid)(Undefined-$b.a)"}, t)
 	})
 }
 

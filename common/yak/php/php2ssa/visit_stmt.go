@@ -3,6 +3,7 @@ package php2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"strings"
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
@@ -83,10 +84,49 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	if i == nil {
 		return nil
 	}
-
+	list, _ := y.VisitNamespaceNameList(i.NamespaceNameList())
+	pkgName := strings.Join(list, ".")
+	if pkgName != "" {
+		program := y.GetProgram()
+		lib, _ := program.GetLibrary(pkgName)
+		if lib == nil {
+			lib = program.NewLibrary(pkgName, list)
+		}
+		lib.PushEditor(program.GetCurrentEditor())
+		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
+		if builder != nil {
+			builder.SupportClass = true
+			currentBuilder := y.FunctionBuilder
+			y.FunctionBuilder = builder
+			defer func() {
+				y.FunctionBuilder = currentBuilder
+			}()
+		}
+	}
+	for _, statement := range i.AllNamespaceStatement() {
+		y.VisitNamesPaceStatement(statement)
+	}
 	return nil
 }
 
+func (y *builder) VisitNamesPaceStatement(raw phpparser.INamespaceStatementContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.NamespaceStatementContext)
+	if i == nil {
+		return nil
+	}
+	y.VisitStatement(i.Statement())
+	y.VisitUseDeclaration(i.UseDeclaration())
+	y.VisitFunctionDeclaration(i.FunctionDeclaration())
+	y.VisitClassDeclaration(i.ClassDeclaration())
+	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
+	return nil
+}
 func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
@@ -98,6 +138,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	if i == nil {
 		return nil
 	}
+
 	return nil
 }
 
