@@ -18,8 +18,8 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		// found package
 		for i := len(pkgNames) - 1; i > 0; i-- {
 			className = strings.Join(pkgNames[i:], ".")
-			if p, err := ssa.GetProgram(strings.Join(pkgNames[:i], "."), ssa.Library); err == nil {
-				prog = p
+			if lib, _ := y.GetProgram().GetLibrary(strings.Join(pkgNames[:i], ".")); lib != nil {
+				prog = lib
 				break
 			}
 			if p, err := y.BuildDirectoryPackage(pkgNames[:i], true); err != nil {

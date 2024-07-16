@@ -33,6 +33,9 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
 	}
+	if kind == Application {
+		prog.Application = prog
+	}
 	prog.EnableDatabase = enableDatabase
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
@@ -42,7 +45,13 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 }
 
 func (prog *Program) GetLibrary(name string) (*Program, bool) {
+	if prog == nil && prog.Application == nil {
+		return nil, false
+	}
+	// get lib from application
+	app := prog.Application
 	currentEditor := prog.GetCurrentEditor()
+	// this program has current file
 	hasFile := func(p *Program) bool {
 		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
 			if hash == currentEditor.SourceCodeMd5() {
@@ -53,11 +62,11 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	}
 
 	// contain in memory
-	if p, ok := prog.UpStream[name]; ok {
+	if p, ok := app.UpStream[name]; ok {
 		return p, hasFile(p)
 	}
 
-	if !prog.EnableDatabase {
+	if !app.EnableDatabase {
 		return nil, false
 	}
 
@@ -67,6 +76,7 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 		return p, false
 	}
 	if !slices.Contains(p.irProgram.UpStream, name) {
+		app.UpStream[name] = p
 		// update up-down stream
 		prog.UpStream[name] = p
 		p.DownStream[prog.Name] = prog
@@ -80,6 +90,7 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
 	prog.UpStream[name] = lib
 	lib.DownStream[prog.Name] = prog
+	lib.Application = prog.Application
 	return lib
 }
 
