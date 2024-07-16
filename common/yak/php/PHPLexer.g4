@@ -361,8 +361,7 @@ CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from 
 
 mode HereDocIdentifer;
 HereDocIdentiferWhite: [ \r\t] -> skip;
-HereDocIdentiferRaw: {this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()};
-HereDocIdentiferName: (HereDocIdentiferRaw) | ('\'' (HereDocIdentiferRaw) '\'');
+HereDocIdentiferName: ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) | ('\'' ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) '\'');
 HereDocIdentifierBreak: '\n' -> popMode,pushMode(HereDoc);
 
 mode HereDoc;
