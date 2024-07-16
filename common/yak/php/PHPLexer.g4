@@ -280,6 +280,10 @@ BooleanAnd       : '&&';
 NullCoalescing      : '??';
 NullCoalescingEqual : '??=';
 
+StartNowDoc: '<<<' [ \t]* (
+    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
+    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
+  ) '\r'? '\n' -> pushMode(HereDoc);
 ShiftLeft          : '<<';
 ShiftRight         : '>>';
 DoubleColon        : '::';
@@ -328,10 +332,10 @@ BackQuoteString   : '`' ~'`'* '`';
 SingleQuoteString : '\'' (~('\'' | '\\') | '\\' .)* '\'';
 DoubleQuote       : '"' -> pushMode(InterpolationString);
 
-StartNowDoc: '<<<' [ \t]* (
-    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
-    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
-  ) '\n' -> pushMode(HereDoc);
+//StartNowDoc: '<<<' [ \t]* (
+//    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
+//    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
+//  ) '\n' -> pushMode(HereDoc);
 ErrorPhp     : .                       -> channel(ErrorLexem);
 
 mode InterpolationString;
