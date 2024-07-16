@@ -2,6 +2,7 @@ package java2ssa
 
 import (
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -9,6 +10,11 @@ import (
 )
 
 func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
+	start := time.Now()
+	defer func() {
+		deltaPackageCostFrom(start)
+	}()
+
 	for _, pkgImport := range i.AllImportDeclaration() {
 		pkgNames, static, all := y.VisitImportDeclaration(pkgImport)
 		_, _, _ = pkgNames, static, all
