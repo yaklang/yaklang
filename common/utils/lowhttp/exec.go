@@ -60,6 +60,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		redirectTimes      = option.RedirectTimes
 		redirectHandler    = option.RedirectHandler
 		jsRedirect         = option.JsRedirect
+		session            = option.Session
 		redirectRawPackets []*RedirectFlow
 		response           *LowhttpResponse
 		err                error
@@ -79,6 +80,9 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if redirectTimes > 0 {
 		lastPacket := raw
+		method := GetHTTPRequestMethod(r)
+		statusCode := GetStatusCodeFromResponse(lastPacket.Response)
+
 		for i := 0; i < redirectTimes; i++ {
 			target := GetRedirectFromHTTPResponse(lastPacket.Response, jsRedirect)
 			if target == "" {
@@ -95,7 +99,14 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
-			r = UrlToGetRequestPacketWithResponse(targetUrl, r, lastPacket.Response, forceHttps, ExtractCookieJarFromHTTPResponse(lastPacket.Response)...)
+			cookiejar := GetCookiejar(session)
+			// should not extract response cookie
+			r, err = UrlToRequestPacketEx(method, targetUrl, r, forceHttps, statusCode, cookiejar)
+			if err != nil {
+				log.Errorf("met error in redirect: %v", err)
+				response.RawPacket = lastPacket.Response // 保留原始报文
+				return response, nil
+			}
 
 			if redirectHandler != nil {
 				if !redirectHandler(forceHttps, r, lastPacket.Response) {
@@ -109,20 +120,21 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			newOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(r))
 			response, err = HTTPWithoutRedirect(newOpts...)
 			if err != nil {
-				log.Errorf("met error in redirect...: %s", err)
+				log.Errorf("met error in redirect: %v", err)
 				response.RawPacket = lastPacket.Response // 保留原始报文
 				return response, nil
 			}
+			if response == nil {
+				return response, nil
+			}
+
 			responseRaw := &RedirectFlow{
 				IsHttps:    response.Https,
 				Request:    response.RawRequest,
 				Response:   response.RawPacket,
 				RespRecord: response,
 			}
-			if response == nil {
-				response.RawPacket = lastPacket.Response // 保留原始报文
-				return response, nil
-			}
+
 			redirectRawPackets = append(redirectRawPackets, responseRaw)
 			response.RedirectRawPackets = redirectRawPackets
 
