@@ -2,18 +2,29 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func ExtraKVPairsToMap(pairs []*ypb.KVPair) map[string]string {
+	m := make(map[string]string)
+	for _, pair := range pairs {
+		m[pair.Key] = pair.Value
+	}
+	return m
+}
+
 func TestRequestYakURLGet(t *testing.T) {
-	t.Run("fs", func(t *testing.T) {
+	t.Run("fs-list", func(t *testing.T) {
 		p := "/"
 		if runtime.GOOS == "windows" {
 			p = "C:\\"
@@ -24,21 +35,62 @@ func TestRequestYakURLGet(t *testing.T) {
 		require.NoError(t, err)
 
 		resources, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
-			Method: "GET",
+			Method: http.MethodGet,
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   p,
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "list",
-					},
-				},
+				FromRaw: fmt.Sprintf("file://%s?op=list", p),
 			},
 		})
 		require.NoError(t, err)
 		t.Logf("resources len: %d", resources.Total)
 		require.Greater(t, int(resources.Total), 0, "resources should not be empty")
+	})
+
+	t.Run("fs-get-detect-plain-text-text", func(t *testing.T) {
+		fh, err := os.CreateTemp("", "yak-test-fs")
+		require.NoError(t, err)
+		defer os.Remove(fh.Name())
+		_, err = fh.WriteString("hello")
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		resources, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+			Method: http.MethodGet,
+			Url: &ypb.YakURL{
+				FromRaw: fmt.Sprintf("file://%s?detectPlainText=true", fh.Name()),
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources.Resources, 1)
+		resource := resources.Resources[0]
+		extra := ExtraKVPairsToMap(resource.GetExtra())
+		require.Equal(t, "true", extra["IsPlainText"])
+	})
+
+	t.Run("fs-get-detect-plain-text-image", func(t *testing.T) {
+		fh, err := os.CreateTemp("", "yak-test-fs")
+		require.NoError(t, err)
+		defer os.Remove(fh.Name())
+		_, err = fh.WriteString("GIF89a") // GIF magic number
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		resources, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+			Method: http.MethodGet,
+			Url: &ypb.YakURL{
+				FromRaw: fmt.Sprintf("file://%s?detectPlainText=true", fh.Name()),
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources.Resources, 1)
+		resource := resources.Resources[0]
+		extra := ExtraKVPairsToMap(resource.GetExtra())
+		require.Equal(t, "false", extra["IsPlainText"])
 	})
 }
 
@@ -53,14 +105,7 @@ func TestRequestYakURLPut(t *testing.T) {
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "PUT",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   fileName,
-				Query: []*ypb.KVPair{
-					{
-						Key:   "type",
-						Value: "file",
-					},
-				},
+				FromRaw: fmt.Sprintf("file://%s?type=file", fileName),
 			},
 			Body: []byte(content),
 		})
@@ -81,14 +126,7 @@ func TestRequestYakURLPut(t *testing.T) {
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "PUT",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   dirName,
-				Query: []*ypb.KVPair{
-					{
-						Key:   "type",
-						Value: "dir",
-					},
-				},
+				FromRaw: fmt.Sprintf("file://%s?type=dir", dirName),
 			},
 		})
 		require.NoError(t, err)
@@ -113,14 +151,7 @@ func TestRequestYakURLPost(t *testing.T) {
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   fileName,
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "content",
-					},
-				},
+				FromRaw: fmt.Sprintf("file://%s?op=content", fileName),
 			},
 			Body: []byte(fileContent),
 		})
@@ -145,17 +176,7 @@ func TestRequestYakURLPost(t *testing.T) {
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   fileName,
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "rename",
-					}, {
-						Key:   "newname",
-						Value: newName,
-					},
-				},
+				FromRaw: fmt.Sprintf("file://%s?op=rename&newname=%s", fileName, newName),
 			},
 		})
 		require.NoError(t, err)
@@ -176,23 +197,13 @@ func TestRequestYakURLPost(t *testing.T) {
 		client, err := NewLocalClient()
 		require.NoError(t, err)
 		dirName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
-		err = os.Mkdir(dirName, 0755)
+		err = os.Mkdir(dirName, 0o755)
 		require.NoError(t, err)
 		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   dirName,
-				Query: []*ypb.KVPair{
-					{
-						Key:   "op",
-						Value: "rename",
-					}, {
-						Key:   "newname",
-						Value: newName,
-					},
-				},
+				FromRaw: fmt.Sprintf("file://%s?op=rename&newname=%s", dirName, newName),
 			},
 		})
 		require.NoError(t, err)
@@ -221,9 +232,7 @@ func TestRequestYakURLDelete(t *testing.T) {
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "DELETE",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   fileName,
-				Query:  []*ypb.KVPair{},
+				FromRaw: fmt.Sprintf("file://%s", fileName),
 			},
 		})
 		require.NoError(t, err)
@@ -239,14 +248,12 @@ func TestRequestYakURLDelete(t *testing.T) {
 		client, err := NewLocalClient()
 		require.NoError(t, err)
 		fileName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
-		err = os.Mkdir(fileName, 0755)
+		err = os.Mkdir(fileName, 0o755)
 		require.NoError(t, err)
 		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "DELETE",
 			Url: &ypb.YakURL{
-				Schema: "file",
-				Path:   fileName,
-				Query:  []*ypb.KVPair{},
+				FromRaw: fmt.Sprintf("file://%s", fileName),
 			},
 		})
 		require.NoError(t, err)
