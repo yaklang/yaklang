@@ -1207,3 +1207,68 @@ aaa`))
 	})
 
 }
+
+func TestGRPCMUSTPASS_DebugPlugin_Nuclei_Risk_URL(t *testing.T) {
+	randPath := utils.RandStringBytes(5)
+	token := utils.RandStringBytes(5)
+	nucleiScript, err := yakit.NewTemporaryYakScript("nuclei", fmt.Sprintf(`id: test 
+
+info:
+  name: test 
+  author: god
+  severity: critical
+  description: test
+
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    GET /%s HTTP/1.1
+    Host: {{Hostname}}
+
+  max-redirects: 3
+  matchers-condition: and
+  matchers:
+      - type: word
+        words:
+          - "%s"
+        part: body`, randPath, token))
+	require.NoError(t, err)
+	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName, nucleiScript)
+	require.NoError(t, err)
+	defer yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(token))
+	})
+	targetUrl := fmt.Sprintf("http://%s:%d/%s", host, port, randPath)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		PluginName: nucleiScript.ScriptName,
+		PluginType: "nuclei",
+		ExecParams: []*ypb.KVPair{},
+		Input:      targetUrl,
+	})
+	require.NoError(t, err)
+
+	var runtimeID string
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatalf("check YakitPlugin param error:%s", err)
+			}
+			break
+		}
+		if rsp.RuntimeID != "" {
+			runtimeID = rsp.RuntimeID
+		}
+	}
+
+	risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+	require.NoError(t, err)
+	require.Len(t, risks, 1)
+	for _, risk := range risks {
+		require.Equal(t, risk.Url, targetUrl)
+	}
+}
