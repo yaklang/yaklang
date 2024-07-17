@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"strings"
 
@@ -14,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func NewRequestPacketFromMethod(method string, targetURL string, originRequest []byte, originReqIns *http.Request, https bool, jar http.CookieJar, cookies ...*http.Cookie) []byte {
+func NewRequestPacketFromMethod(method string, targetURL string, originRequest []byte, originReqIns *http.Request, https bool, cookies ...*http.Cookie) []byte {
 	if !utils.IsHttpOrHttpsUrl(targetURL) {
 		urlIns, _ := ExtractURLFromHTTPRequest(originReqIns, https)
 		if urlIns != nil {
@@ -30,21 +29,7 @@ func NewRequestPacketFromMethod(method string, targetURL string, originRequest [
 		return nil
 	}
 
-	if jar != nil {
-		cookies = append(cookies, jar.Cookies(targetURLIns)...)
-	}
-
 	raw := bytes.Clone(originRequest)
-	if jar == nil {
-		jar, err = cookiejar.New(nil)
-		if err != nil {
-			return nil
-		}
-	}
-
-	if err != nil {
-		return nil
-	}
 
 	cookieRaw := CookiesToString(cookies)
 	if len(cookieRaw) == 0 {
@@ -64,7 +49,7 @@ func NewRequestPacketFromMethod(method string, targetURL string, originRequest [
 }
 
 func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
-	raw, err := UrlToRequestPacketEx(http.MethodGet, u, originRequest, originRequestHttps, -1, nil, cookies...)
+	raw, err := UrlToRequestPacketEx(http.MethodGet, u, originRequest, originRequestHttps, -1, cookies...)
 	if err != nil {
 		log.Warnf("url to GET request packet error: %v", err)
 	}
@@ -72,14 +57,14 @@ func UrlToGetRequestPacket(u string, originRequest []byte, originRequestHttps bo
 }
 
 func UrlToRequestPacket(method string, u string, originRequest []byte, originRequestHttps bool, cookies ...*http.Cookie) []byte {
-	raw, err := UrlToRequestPacketEx(method, u, originRequest, originRequestHttps, -1, nil, cookies...)
+	raw, err := UrlToRequestPacketEx(method, u, originRequest, originRequestHttps, -1, cookies...)
 	if err != nil {
 		log.Warnf("url to request packet error: %v", err)
 	}
 	return raw
 }
 
-func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte, https bool, statusCode int, jar http.CookieJar, cookies ...*http.Cookie) ([]byte, error) {
+func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte, https bool, statusCode int, cookies ...*http.Cookie) ([]byte, error) {
 	var raw []byte
 
 	// 303/302
@@ -113,7 +98,7 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 		}
 	}
 
-	raw = NewRequestPacketFromMethod(method, targetURL, originRequest, originReqIns, https, jar, cookies...)
+	raw = NewRequestPacketFromMethod(method, targetURL, originRequest, originReqIns, https, cookies...)
 	if is302Or303 {
 		raw = ReplaceHTTPPacketBodyFast(raw, nil)
 	}

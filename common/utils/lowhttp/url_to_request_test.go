@@ -3,7 +3,6 @@ package lowhttp
 import (
 	"bytes"
 	"net/http"
-	"net/http/cookiejar"
 	"sort"
 	"strings"
 	"testing"
@@ -11,7 +10,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 func CheckRequest(t *testing.T, raw []byte, wantReq string) {
@@ -92,7 +90,7 @@ Referer: https://example.com/qwe
 
 func TestUrlToRequestPacketEx(t *testing.T) {
 	t.Run("nil origin request", func(t *testing.T) {
-		result, err := UrlToRequestPacketEx(http.MethodGet, "https://example.com/asd", nil, true, -1, nil)
+		result, err := UrlToRequestPacketEx(http.MethodGet, "https://example.com/asd", nil, true, -1)
 		require.NoError(t, err)
 
 		wantResult := `GET /asd HTTP/1.1
@@ -148,39 +146,6 @@ AAA: BBB
 Referer: https://example.com/asd
 
 aaa`
-		CheckRequest(t, result, wantResult)
-	})
-
-	t.Run("jar", func(t *testing.T) {
-		jar, err := cookiejar.New(nil)
-		require.NoError(t, err)
-
-		urlIns := utils.ParseStringToUrl("https://example.com")
-		jar.SetCookies(urlIns, []*http.Cookie{
-			{
-				Name:  "test",
-				Value: "12",
-			},
-		})
-
-		result, err := UrlToRequestPacketEx(http.MethodPost, "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
-Host: example.com
-AAA: BBB
-Content-Length: 4
-
-ab
-`), true, 307, jar)
-		require.NoError(t, err)
-
-		wantResult := `POST /qwe HTTP/1.1
-Host: example.com
-Cookie: test=12
-AAA: BBB
-Content-Length: 4
-Referer: https://example.com/asd
-
-ab
-`
 		CheckRequest(t, result, wantResult)
 	})
 }
