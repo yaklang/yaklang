@@ -259,10 +259,6 @@ func (v *BasePHPParserVisitor) VisitGlobalStatement(ctx *GlobalStatementContext)
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitGlobalVar(ctx *GlobalVarContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitEchoStatement(ctx *EchoStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
