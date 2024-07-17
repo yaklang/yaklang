@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"sync/atomic"
 )
 
 type objectItem struct {
@@ -31,6 +32,20 @@ type AnalyzeContext struct {
 	config *OperationConfig
 
 	depth int
+
+	_recursiveCounter int64
+}
+
+func (a *AnalyzeContext) GetRecursiveCounter() int64 {
+	return atomic.LoadInt64(&a._recursiveCounter)
+}
+
+func (a *AnalyzeContext) EnterRecursive() {
+	atomic.AddInt64(&a._recursiveCounter, 1)
+}
+
+func (a *AnalyzeContext) ExitRecursive() {
+	atomic.AddInt64(&a._recursiveCounter, -1)
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
