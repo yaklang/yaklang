@@ -2,8 +2,9 @@ package java
 
 import (
 	_ "embed"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -72,5 +73,28 @@ public class DemoABCEntryClass {
 		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && !have: this} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
 		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{have: this} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
 		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestAnnotation_GetTopDef(t *testing.T) {
+	code := `
+public class XXEController {
+    public void yourMethod(@RequestParam(value = "xml_str") String xmlStr) {
+        println(xmlStr.a);
+    }
+}
+
+public class Demo3 {
+	XXEController xxeController ;
+    public String one() {
+		var aArgs = new String[]{"aaaaaaa"};
+        xxeController.yourMethod(aArgs);
+    }
+}
+	`
+	ssatest.CheckSyntaxFlowContain(t, code, `
+	println(* #-> as $target)
+	`, map[string][]string{
+		"target": {`"aaaaaaa"`},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

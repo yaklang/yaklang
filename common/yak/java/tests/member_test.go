@@ -23,7 +23,7 @@ class A {
 		ssatest.CheckSyntaxFlow(t, code,
 			`key.String() as $target`,
 			map[string][]string{
-				"target": {"Undefined-this.key.String(valid)()"},
+				"target": {"Undefined-this.key.String()"},
 			},
 			ssaapi.WithLanguage(ssaapi.JAVA),
 		)

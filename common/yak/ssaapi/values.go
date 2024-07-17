@@ -344,6 +344,18 @@ func (v *Value) GetParameter(i int) *Value {
 	}
 	return nil
 }
+func (v *Value) GetFreeValue(name string) *Value {
+	if v.IsNil() {
+		return nil
+	}
+
+	if f, ok := ssa.ToFunction(v.node); ok {
+		if fv, ok := f.FreeValues[name]; ok {
+			return v.NewValue(fv)
+		}
+	}
+	return nil
+}
 
 func (v *Value) GetParameters() Values {
 	if v.IsNil() {

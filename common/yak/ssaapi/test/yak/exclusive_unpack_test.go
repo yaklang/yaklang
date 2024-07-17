@@ -3,9 +3,9 @@ package ssaapi
 import (
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestUnpack_Basic(t *testing.T) {
@@ -27,19 +27,12 @@ func TestUnpack_Basic2(t *testing.T) {
 }
 
 func TestUnpack_Basic3(t *testing.T) {
-	prog, err := ssaapi.Parse(`
+	ssatest.CheckSyntaxFlowContain(t, `
 	a={"b": f, "c": 2}; 
 	e=a.b+a.b+a.b+a.b+a.b+a.b;
-`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Show()
-	values := lo.UniqBy(
-		prog.Ref("e").GetTopDefs().Show(),
-		func(v *ssaapi.Value) int64 { return v.GetId() },
-	)
-	assert.Equal(t, 3, len(values))
+	`, `e #-> as $res`, map[string][]string{
+		"res": {"Undefined-a.b"},
+	})
 }
 
 func TestUnpack_BasicFunctionUnpack(t *testing.T) {
