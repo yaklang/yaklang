@@ -38,9 +38,12 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 			undefineMember = true
 		}
 	}
-	if v.IsMember() && !undefineMember && actx.TheMemberShouldBeVisited(v) {
+	if v.IsMember() && !undefineMember {
 		obj := v.GetObject()
-		actx.PushObject(obj, v.GetKey(), v)
+		if err := actx.PushObject(obj, v.GetKey(), v); err != nil {
+			log.Errorf("%v", err)
+			return v.visitedDefsDefault(actx)
+		}
 		vals = append(vals, obj.getBottomUses(actx)...)
 		actx.PopObject()
 	}
@@ -108,7 +111,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// the phi is existed, visited in the same stack.
 			return Values{}
 		}
-		actx.VisitPhi(v)
 		return v.visitUserFallback(actx)
 	case *ssa.Call:
 		if !actx.TheCallShouldBeVisited(ins) {

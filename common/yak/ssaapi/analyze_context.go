@@ -19,15 +19,10 @@ type AnalyzeContext struct {
 	Self *Value
 	// function call stack
 	_callStack *utils.Stack[*Value]
+	_callTable *omap.OrderedMap[int64, *CallVisited]
+
 	// object visit stack
 	_objectStack *utils.Stack[objectItem]
-
-	// for PHI, create  visitedPhi map for  echo call stack
-	_callTable *omap.OrderedMap[int64, *omap.OrderedMap[int64, *Value]]
-	// in main function, no call stack, we need a global visitedPhi map
-	_visitedPhi *omap.OrderedMap[int64, *Value]
-
-	_visitedDefault map[int64]struct{}
 
 	config *OperationConfig
 
@@ -48,16 +43,33 @@ func (a *AnalyzeContext) ExitRecursive() {
 	atomic.AddInt64(&a._recursiveCounter, -1)
 }
 
-func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
-	return &AnalyzeContext{
-		_callStack:      utils.NewStack[*Value](),
-		_objectStack:    utils.NewStack[objectItem](),
-		_callTable:      omap.NewOrderedMap[int64, *omap.OrderedMap[int64, *Value]](map[int64]*omap.OrderedMap[int64, *Value]{}),
-		_visitedPhi:     omap.NewOrderedMap[int64, *Value](map[int64]*Value{}),
+// CallVisited is used to record the visited phi\object\default,
+// and only used in the single call
+type CallVisited struct {
+	_visitedPhi     map[int64]struct{}
+	_visitedObject  map[int64]struct{}
+	_visitedDefault map[int64]struct{}
+}
+
+func NewCallVisited() *CallVisited {
+	ret := &CallVisited{
+		_visitedPhi:     make(map[int64]struct{}),
+		_visitedObject:  make(map[int64]struct{}),
 		_visitedDefault: make(map[int64]struct{}),
-		config:          NewOperations(opt...),
-		depth:           -1,
 	}
+	return ret
+}
+
+func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
+	actx := &AnalyzeContext{
+		_callStack:   utils.NewStack[*Value](),
+		_objectStack: utils.NewStack[objectItem](),
+		_callTable:   omap.NewEmptyOrderedMap[int64, *CallVisited](),
+		config:       NewOperations(opt...),
+		depth:        -1,
+	}
+	actx._callTable.Set(-1, NewCallVisited())
+	return actx
 }
 
 // ========================================== CALL STACK ==========================================
@@ -70,7 +82,7 @@ func (a *AnalyzeContext) PushCall(i *Value) error {
 		return utils.Errorf("call[%v] is existed on s-runtime call stack %v", i.GetId(), i.String())
 	}
 	a._callStack.Push(i)
-	a._callTable.Set(i.GetId(), omap.NewOrderedMap[int64, *Value](map[int64]*Value{}))
+	a._callTable.Set(i.GetId(), NewCallVisited())
 	return nil
 }
 
@@ -102,6 +114,9 @@ func (g *AnalyzeContext) GetCurrentCall() *Value {
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
+	if !g.TheMemberShouldBeVisited(member) {
+		return utils.Errorf("This member(%d) visited, skip", member.GetId())
+	}
 	if !obj.IsObject() {
 		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
 	}
@@ -137,57 +152,51 @@ func (g *AnalyzeContext) GetCurrentObject() (*Value, *Value, *Value) {
 	return item.object, item.key, item.member
 }
 
-func (g *AnalyzeContext) TheMemberShouldBeVisited(member *Value) bool {
-	for i := 0; i < g._objectStack.Len(); i++ {
-		item := g._objectStack.PeekN(i)
-		if ValueCompare(item.member, member) {
-			return false
-		}
+func (a *AnalyzeContext) getVisit() *CallVisited {
+	_, callvisited, ok := a._callTable.Last()
+	if !ok {
+		log.Warnf("peeked call[%v] not bind visited map", a._callStack.Peek().GetId())
+		return nil
 	}
-	// should visited
-	return true
+	return callvisited
 }
 
 // ========================================== PHI STACK ==========================================
 // ThePhiShouldBeVisited is used to check whether the phi should be visited
 func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
-	if a._callStack.Len() <= 0 {
-		if a._visitedPhi.Have(i.GetId()) {
-			return false
-		}
-		return true
+	callVisited := a.getVisit()
+	if callVisited == nil {
+		return false
 	}
-
-	visited, ok := a._callTable.Get(a._callStack.Peek().GetId())
-	if !ok {
-		log.Warnf("peeked call[%v] not bind visited map", a._callStack.Peek().GetId())
-		return true
-	}
-	if !visited.Have(i.GetId()) {
+	if _, ok := callVisited._visitedPhi[i.GetId()]; !ok {
+		callVisited._visitedPhi[i.GetId()] = struct{}{}
 		return true
 	}
 	return false
 }
 
-func (a *AnalyzeContext) VisitPhi(i *Value) {
-	if a._callStack.Len() <= 0 {
-		a._visitedPhi.Set(i.GetId(), i)
-		return
-	}
-	visited, ok := a._callTable.Get(a._callStack.Peek().GetId())
-	if !ok {
-		log.Warnf("peeked call[%v] not bind visited map", a._callStack.Peek().GetId())
-		return
-	}
-	visited.Set(i.GetId(), i)
-}
-
 // ========================================== DEFAULT STACK ==========================================
 
 func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
-	if _, ok := a._visitedDefault[i.GetId()]; ok {
+	callVisited := a.getVisit()
+	if callVisited == nil {
 		return false
 	}
-	a._visitedDefault[i.GetId()] = struct{}{}
-	return true
+	if _, ok := callVisited._visitedDefault[i.GetId()]; !ok {
+		callVisited._visitedDefault[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
+
+func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
+	callVisited := a.getVisit()
+	if callVisited == nil {
+		return false
+	}
+	if _, ok := callVisited._visitedObject[i.GetId()]; !ok {
+		callVisited._visitedObject[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
 }
