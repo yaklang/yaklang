@@ -87,6 +87,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		actx = NewAnalyzeContext(opt...)
 	}
 
+	actx.EnterRecursive()
+	defer func() {
+		actx.ExitRecursive()
+	}()
+
+	// 1w recursive call check
+	if !utils.InGithubActions() {
+		if actx.GetRecursiveCounter() > 10000 {
+			log.Warnf("recursive call is over 10000, stop it")
+			return nil
+		}
+	}
+
 	actx.depth--
 	defer func() {
 		actx.depth++
@@ -169,11 +182,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		result := getMemberCall(inst, actx)
 		for _, cond := range conds {
 			v := i.NewValue(cond)
-			ret := v.getTopDefs(actx, opt...)
+			ret := v.AppendEffectOn(i).getTopDefs(actx, opt...)
 			result = append(result, v)
 			result = append(result, ret...)
 		}
-		_ = conds
 		return result
 	case *ssa.Call:
 		caller := inst.Method
