@@ -115,6 +115,9 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 	_ = allowNull
 
 	typeHint := y.VisitTypeHint(i.TypeHint())
+	if typeHint.RawString() == "" {
+		typeHint = ssa.GetAnyType()
+	}
 	isRef := i.Ampersand() != nil
 	isVariadic := i.Ellipsis()
 	_, _, _ = typeHint, isRef, isVariadic
