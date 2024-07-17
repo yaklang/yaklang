@@ -29,10 +29,9 @@ type FunctionBuilder struct {
 
 	// disable free-value
 	SupportClosure bool
-	// Support obtaining static members from the StaticMember of the class's blueprint,
-	// even if the class is not instantiated
-	SupportGetStaticMember bool
-	SupportClass           bool
+	// Support obtaining static members and static method, even if the class is not instantiated.
+	SupportClassStaticModifier bool
+	SupportClass               bool
 
 	RefParameter map[string]struct{}
 

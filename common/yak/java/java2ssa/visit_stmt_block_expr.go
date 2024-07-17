@@ -1737,7 +1737,7 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 }
 
 func (y *builder) VisitIdentifier(name string) ssa.Value {
-	y.SupportGetStaticMember = true
+	y.SupportClassStaticModifier = true
 	if value := y.PeekValue(name); value != nil {
 		// found
 		return value
