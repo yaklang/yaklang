@@ -93,7 +93,7 @@ func (s *ScopedVersionedTable[T]) Spin(
 ) {
 	s.spin = false
 	s.createEmptyPhi = nil
-	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
+	s.ForEachCapturedVariable(func(name string, ver VersionedIF[T]) {
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
@@ -101,7 +101,6 @@ func (s *ScopedVersionedTable[T]) Spin(
 			v := s.CreateVariable(name, false)
 			s.AssignVariable(v, value)
 		}
-		return true
 	})
 }
 
