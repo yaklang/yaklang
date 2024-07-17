@@ -1,12 +1,11 @@
 package ssautil
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"reflect"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // for builder
@@ -98,14 +97,20 @@ type ScopedVersionedTable[T versionedValue] struct {
 	// new versioned variable
 	newVersioned VersionedBuilder[T]
 
-	// record the lexical variable
-	values   *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // from variable get value, assigned variable
-	variable *omap.OrderedMap[T, []VersionedIF[T]]                              // from value get variable
+	callback        func(...any)
+	linkValues      linkNodeMap[T]
+	linkVariable    linkNodeTMap[T]
+	linkCaptured    linkNodeMap[T]
+	linkIncomingPhi linkNodeMap[T]
 
-	// for closure function or block scope
-	captured *omap.OrderedMap[string, VersionedIF[T]]
-
-	incomingPhi *omap.OrderedMap[string, VersionedIF[T]]
+	//// record the lexical variable
+	//values   *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // from variable get value, assigned variable
+	//variable *omap.OrderedMap[T, []VersionedIF[T]]                              // from value get variable
+	//
+	//// for closure function or block scope
+	//captured *omap.OrderedMap[string, VersionedIF[T]]
+	//
+	//incomingPhi *omap.OrderedMap[string, VersionedIF[T]]
 
 	// for loop
 	spin           bool
@@ -141,10 +146,19 @@ func NewScope[T versionedValue](
 		persistentId:          treeNodeId,
 		offsetFetcher:         fetcher,
 		newVersioned:          newVersioned,
-		values:                omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
-		variable:              omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
-		captured:              omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
-		incomingPhi:           omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
+
+		callback: func(a ...any) {
+			spew.Dump(a)
+		},
+		linkValues:      newLinkNodeMap[T](),
+		linkVariable:    newLinkNodeTMap[T](),
+		linkCaptured:    newLinkNodeMap[T](),
+		linkIncomingPhi: newLinkNodeMap[T](),
+
+		//values:      omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
+		//variable:    omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
+		//captured:    omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
+		//incomingPhi: omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 	}
 	s.SetThis(s)
 	if parent != nil {
@@ -235,12 +249,17 @@ func isZeroValue(i any) bool {
 // ---------------- read
 
 func (v *ScopedVersionedTable[T]) getLatestVersionInCurrentLexicalScope(name string) VersionedIF[T] {
-	if ret, ok := v.values.Get(name); !ok {
+	result, ok := v.linkValues[name]
+	if !ok {
 		return nil
-	} else {
-		var _, ver, _ = ret.Last()
-		return ver
 	}
+	return result.Last().Value
+	//if ret, ok := v.values.Get(name); !ok {
+	//	return nil
+	//} else {
+	//	var _, ver, _ = ret.Last()
+	//	return ver
+	//}
 }
 func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	// var parent = v
@@ -261,7 +280,8 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 			t := scope.CreateVariable(name, false)
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
-			scope.incomingPhi.Set(name, t)
+			//scope.incomingPhi.Set(name, t)
+			scope.linkIncomingPhi.Append(name, t, scope.callback)
 			if err := scope.SaveToDatabase(); err != nil {
 				log.Warnf("save to database failed: %s", err)
 			}
@@ -293,31 +313,28 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 		}
 	}()
 
-	ret, ok := scope.values.Get(variable.GetName())
-	if !ok {
-		scope.values.Set(variable.GetName(), omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}))
-		scope.AssignVariable(variable, value)
-		return
-	}
+	result := scope.linkValues.Append(variable.GetName(), variable, scope.callback)
+
+	//ret, ok := scope.values.Get(variable.GetName())
+	//if !ok {
+	//	ret = omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{})
+	//	scope.values.Set(variable.GetName(), ret)
+	//}
 
 	err := variable.Assign(value)
 	if err != nil {
 		log.Warnf("BUG: variable.Assign error: %v", err)
 	}
-
-	variable.SetVersion(ret.Len())
-	err = ret.Add(variable)
-	if err != nil {
-		log.Warnf("BUG: add variable to scope failed: %v", err)
-	}
+	variable.SetVersion(result.Id)
 
 	{
-		variables, ok := scope.variable.Get(value)
-		if !ok {
-			variables = make([]VersionedIF[T], 0, 1)
-		}
-		variables = append(variables, variable)
-		scope.variable.Set(value, variables)
+		scope.linkVariable.Append(value, variable, scope.callback)
+		//variables, ok := scope.variable.Get(value)
+		//if !ok {
+		//	variables = make([]VersionedIF[T], 0, 1)
+		//}
+		//variables = append(variables, variable)
+		//scope.variable.Set(value, variables)
 	}
 
 	if !variable.GetLocal() && !scope.IsRoot() {
@@ -326,25 +343,34 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 }
 
 func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[T] {
-	variables, ok := scope.variable.Get(value)
-	if ok {
-		return variables[len(variables)-1]
+	//variables, ok := scope.variable.Get(value)
+	//if ok {
+	//	return variables[len(variables)-1]
+	//}
+	//return nil
+	result, ok := scope.linkVariable[value]
+	if !ok {
+		return nil
 	}
-	return nil
+	return result.Last().Value
 }
 
 func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler CaptureVariableHandler[T]) {
-	ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
-		handler(name, ver)
-		return true
-	})
+	for name, linked := range ps.linkCaptured {
+		handler(name, linked.Last().Value)
+	}
+	//ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
+	//	handler(name, ver)
+	//	return true
+	//})
 }
 
 func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {
-	scope.captured.Set(name, ver)
-	if err := scope.SaveToDatabase(); err != nil {
-		log.Warnf("save to database failed: %s", err)
-	}
+	scope.linkCaptured.Append(name, ver, scope.callback)
+	//scope.captured.Set(name, ver)
+	//if err := scope.SaveToDatabase(); err != nil {
+	//	log.Warnf("save to database failed: %s", err)
+	//}
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
@@ -380,7 +406,8 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 	}
 	// mark original captured variable
 	ver.SetCaptured(parentVariable)
-	v.captured.Set(name, ver)
+	v.linkCaptured.Append(name, ver, v.callback)
+	//v.captured.Set(name, ver)
 }
 
 func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF[T] {
