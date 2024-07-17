@@ -60,7 +60,6 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		redirectTimes      = option.RedirectTimes
 		redirectHandler    = option.RedirectHandler
 		jsRedirect         = option.JsRedirect
-		session            = option.Session
 		redirectRawPackets []*RedirectFlow
 		response           *LowhttpResponse
 		err                error
@@ -99,9 +98,8 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
-			cookiejar := GetCookiejar(session)
 			// should not extract response cookie
-			r, err = UrlToRequestPacketEx(method, targetUrl, r, forceHttps, statusCode, cookiejar)
+			r, err = UrlToRequestPacketEx(method, targetUrl, r, forceHttps, statusCode)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
 				response.RawPacket = lastPacket.Response // 保留原始报文
