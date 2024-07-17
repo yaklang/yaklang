@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -14,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var CookiejarPool sync.Map
@@ -99,7 +101,10 @@ func CookieSafeUnquoteString(i string) string {
 const CookieTimeFormat = "Mon, 02 Jan 2006 15:04:05 GMT"
 
 func CookiesToString(cookies []*http.Cookie) string {
-	results := funk.Map(cookies, func(c *http.Cookie) string {
+	results := lo.FilterMap(cookies, func(c *http.Cookie, _ int) (string, bool) {
+		if c == nil {
+			return "", false
+		}
 		var b strings.Builder
 		b.Grow(len(c.Name) + len(c.Value) + len(c.Domain) + len(c.Path) + 110 /*RFC 6265 Sec 4.1. extraCookieLength*/)
 		b.WriteString(url.QueryEscape(c.Name))
@@ -142,9 +147,9 @@ func CookiesToString(cookies []*http.Cookie) string {
 		case http.SameSiteStrictMode:
 			b.WriteString("; SameSite=Strict")
 		}
-		return b.String()
+		return b.String(), true
 	})
-	return strings.Join(results.([]string), "; ")
+	return strings.Join(results, "; ")
 }
 
 func CookiesToRaw(cookies []*http.Cookie) string {
@@ -203,7 +208,6 @@ func CookieToNative(cookies []*http.Cookie) string {
 		cookieStrings = append(cookieStrings, cookie.String())
 	}
 	return strings.Join(cookieStrings, "; ")
-
 }
 
 func AddOrUpgradeCookie(raw []byte, value string) ([]byte, error) {
