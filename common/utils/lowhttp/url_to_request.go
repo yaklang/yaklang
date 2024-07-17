@@ -53,12 +53,12 @@ func NewRequestPacketFromMethod(method string, targetURL string, originRequest [
 		raw = ReplaceHTTPPacketHeader(raw, "Cookie", cookieRaw)
 	}
 
-	raw = ReplaceHTTPPacketHost(raw, targetURLIns.Host)
 	proto := "HTTP/1.1"
 	if originReqIns != nil {
 		proto = originReqIns.Proto
 	}
 	raw = ReplaceHTTPPacketFirstLine(raw, fmt.Sprintf("%s %s %s", method, targetURLIns.RequestURI(), proto))
+	raw = ReplaceHTTPPacketHost(raw, targetURLIns.Host)
 
 	return raw
 }
@@ -88,9 +88,12 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 	if is302Or303 {
 		method = http.MethodGet
 	}
-	var originReqIns *http.Request
+	var (
+		originReqIns *http.Request
+		err          error
+	)
 	if len(originRequest) > 0 {
-		originReqIns, err := ParseBytesToHttpRequest(originRequest)
+		originReqIns, err = ParseBytesToHttpRequest(originRequest)
 		if err != nil && err != io.EOF {
 			return nil, utils.Wrap(err, "parse bytes to http request error")
 		}
@@ -110,7 +113,9 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 	if is302Or303 {
 		raw = ReplaceHTTPPacketBodyFast(raw, nil)
 	}
-	raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
+	if originReqIns != nil && originReqIns.URL != nil {
+		raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
+	}
 
 	return FixHTTPRequest(raw), nil
 }
