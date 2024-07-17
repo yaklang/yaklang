@@ -381,13 +381,7 @@ typeHint
     ;
 
 globalStatement
-    : Global globalVar (',' globalVar)* SemiColon
-    ;
-
-globalVar
-    : VarName
-    | Dollar chain
-    | Dollar OpenCurlyBracket expression CloseCurlyBracket
+    : Global chain (',' chain)* SemiColon
     ;
 
 echoStatement
@@ -808,7 +802,6 @@ chainList
 chain
     : flexiVariable
     | staticClassExprVariableMember
-//    | arrayCreation // [$a,$b]=$c
     ;
 
 chainOrigin
