@@ -346,9 +346,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#IndexCallExpression.
 	VisitIndexCallExpression(ctx *IndexCallExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#CodeExecExpression.
-	VisitCodeExecExpression(ctx *CodeExecExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
 
