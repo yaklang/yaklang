@@ -92,6 +92,8 @@ type httpPoolConfig struct {
 
 	// withPayloads 是否查询 payloads
 	WithPayloads bool
+
+	Session string // for cookie jar
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -500,6 +502,12 @@ func _httpPool_withPayloads(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_withSession(session string) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.Session = session
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -748,6 +756,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
+							lowhttp.WithSession(config.Session),
 						}
 
 						if config.OverrideEnableSystemProxyEnv {
@@ -1044,4 +1053,5 @@ var (
 	WithConnPool                           = _httpPool_withConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
+	WithPoolOpt_Session                    = _httpPool_withSession
 )
