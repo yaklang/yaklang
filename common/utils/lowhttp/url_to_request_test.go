@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func CheckResponse(t *testing.T, raw []byte, wantReq string) {
+func CheckRequest(t *testing.T, raw []byte, wantReq string) {
 	t.Helper()
 
 	raw = FixHTTPRequest(raw)
@@ -87,10 +87,20 @@ Host: example.com
 AAA: BBB
 Referer: https://example.com/qwe
 `
-	CheckResponse(t, result, wantResult)
+	CheckRequest(t, result, wantResult)
 }
 
 func TestUrlToRequestPacketEx(t *testing.T) {
+	t.Run("nil origin request", func(t *testing.T) {
+		result, err := UrlToRequestPacketEx(http.MethodGet, "https://example.com/asd", nil, true, -1, nil)
+		require.NoError(t, err)
+
+		wantResult := string(FixHTTPRequest([]byte(`GET /asd HTTP/1.1
+Host: example.com
+
+`)))
+		CheckRequest(t, result, string(wantResult))
+	})
 	t.Run("302", func(t *testing.T) {
 		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
 Host: example.com
@@ -105,7 +115,7 @@ Host: example.com
 AAA: BBB
 Referer: https://example.com/asd
 `
-		CheckResponse(t, result, wantResult)
+		CheckRequest(t, result, wantResult)
 	})
 	t.Run("307", func(t *testing.T) {
 		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
@@ -122,7 +132,7 @@ AAA: BBB
 Referer: https://example.com/asd
 
 aaa`
-		CheckResponse(t, result, wantResult)
+		CheckRequest(t, result, wantResult)
 	})
 
 	t.Run("jar", func(t *testing.T) {
@@ -155,7 +165,7 @@ Referer: https://example.com/asd
 
 ab
 `
-		CheckResponse(t, result, wantResult)
+		CheckRequest(t, result, wantResult)
 	})
 }
 
