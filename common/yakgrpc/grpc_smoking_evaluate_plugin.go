@@ -133,9 +133,9 @@ func BuildPluginTestingJunkData() []byte {
 	var junkData []byte
 	junkData = append(junkData, []byte(strings.Join(mutate.MutateQuick("{{int(10000-99999)}}"), ","))...) // number
 	junkData = append(junkData, []byte(strings.Join(mutate.MutateQuick("{{rangechar(20,7e)}}"), ""))...)  // visible characters
-	passwd, _ := embed.Asset("data/plugin-testing-data/top_100_passwd.txt.gz")
+	passwd, _ := embed.Asset("data/plugin-testing-data/top_100_passwd.txt.gz")                            //  top passwd and hash
 	junkData = append(junkData, passwd...)
-	commonWord, _ := embed.Asset("data/plugin-testing-data/common_word.txt.gz")
+	commonWord, _ := embed.Asset("data/plugin-testing-data/common_word.txt.gz") //website common word
 	junkData = append(junkData, commonWord...)
 	return junkData
 }
