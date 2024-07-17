@@ -95,11 +95,27 @@ func TestUrlToRequestPacketEx(t *testing.T) {
 		result, err := UrlToRequestPacketEx(http.MethodGet, "https://example.com/asd", nil, true, -1, nil)
 		require.NoError(t, err)
 
-		wantResult := string(FixHTTPRequest([]byte(`GET /asd HTTP/1.1
+		wantResult := `GET /asd HTTP/1.1
 Host: example.com
 
-`)))
-		CheckRequest(t, result, string(wantResult))
+`
+		CheckRequest(t, result, wantResult)
+	})
+	t.Run("referer", func(t *testing.T) {
+		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
+Host: example.com
+AAA: BBB
+Cookie: test=12;
+
+aaa`), false, 302, nil)
+		require.NoError(t, err)
+
+		wantResult := `GET /qwe HTTP/1.1
+Host: example.com
+AAA: BBB
+Referer: http://example.com/asd
+		`
+		CheckRequest(t, result, wantResult)
 	})
 	t.Run("302", func(t *testing.T) {
 		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
