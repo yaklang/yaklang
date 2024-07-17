@@ -84,6 +84,7 @@ Host: ` + utils.HostPort(host, port) + `
 		t.Fatal("expect matched, got not matched")
 	}
 }
+
 func TestSaveToDB(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
@@ -116,6 +117,7 @@ Host: www.example.com
 	}
 	assert.Equal(t, "http://www.example.com/icons/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/.%%32%65/etc/passwd", tasks.Data[0].Url)
 }
+
 func TestGRPCMUSTPASS_ChangeToUpload(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
@@ -217,12 +219,13 @@ Host: %v
 
 func TestGRPCMUSTPASS_HTTPFuzzer_WITHPLUGIN(t *testing.T) {
 	var token string
-	name, err := httptpl.MockEchoPlugin(func(s string) {
+	name, clearFunc, err := httptpl.MockEchoPlugin(func(s string) {
 		token = s
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer clearFunc()
 
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 12

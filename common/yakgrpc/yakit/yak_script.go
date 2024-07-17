@@ -3,9 +3,10 @@ package yakit
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"gopkg.in/yaml.v2"
 
@@ -110,6 +111,21 @@ func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, 
 		return "", err
 	}
 	return name, nil
+}
+
+func CreateTemporaryYakScriptEx(t string, code string, suffix ...string) (name string, clear func(), err error) {
+	script, err := NewTemporaryYakScript(t, code, suffix...)
+	if err != nil {
+		return "", nil, err
+	}
+	name = script.ScriptName
+	err = CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, script)
+	if err != nil {
+		return "", nil, err
+	}
+	return name, func() {
+		DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+	}, nil
 }
 
 func NewTemporaryYakScript(t string, code string, suffix ...string) (*schema.YakScript, error) {

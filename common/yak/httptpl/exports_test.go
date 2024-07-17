@@ -3,11 +3,12 @@ package httptpl
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strings"
-	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -201,7 +202,7 @@ requests:
 
 	checked := false
 	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com") {
-		var reqIns = req.Requests[0]
+		reqIns := req.Requests[0]
 		println(string(reqIns.Raw))
 		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) {
 			checked = true
@@ -228,7 +229,7 @@ func TestNewVars(t *testing.T) {
 	vars.AutoSet("day", "{{rand_int(10,28)}}")
 	vars.AutoSet("expr", `{{year}}-{{month}}-{{day}}`)
 	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
-	var a = vars.ToMap()
+	a := vars.ToMap()
 
 	actResult := codec.Atoi(fmt.Sprint(a["year"])) - codec.Atoi(fmt.Sprint(a["month"])) - codec.Atoi(fmt.Sprint(a["day"]))
 	if actResult == 0 {
@@ -244,16 +245,16 @@ func TestNewVars(t *testing.T) {
 func TestQueryAll(t *testing.T) {
 	yakit.InitialDatabase()
 	token := ""
-	pluginName, err := MockEchoPlugin(func(s string) {
+	pluginName, clearFunc, err := MockEchoPlugin(func(s string) {
 		token = s
 	})
 	if err != nil {
 		panic(err)
 	}
+	defer clearFunc()
 	// defer yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), pluginName)
-	_ = pluginName
 	log.Info(pluginName)
-	var check = false
+	check := false
 	ScanPacket([]byte(`GET / HTTP/1.1`), WithAllTemplate(true), WithOnTemplateLoaded(func(template *YakTemplate) bool {
 		if strings.Contains(template.Name, token) {
 			check = true

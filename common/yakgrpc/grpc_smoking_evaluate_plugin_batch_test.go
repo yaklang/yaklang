@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -21,25 +22,30 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN_BATCH(t *testing.T) {
 
 	test := func(codes []code) {
 		names := make([]string, 0, len(codes))
+		clearFuncs := make([]func(), 0, len(codes))
 		for _, c := range codes {
 			typ := c.typ
 			if typ == "" {
 				typ = "port-scan"
 			}
-			name, err := yakit.CreateTemporaryYakScript(typ, c.src)
-			if err != nil {
-				t.Fatal(err)
-			}
+			name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(typ, c.src)
+			require.NoError(t, err)
+			clearFuncs = append(clearFuncs, clearFunc)
 			names = append(names, name)
+		}
+		if len(clearFuncs) > 0 {
+			defer func() {
+				for _, f := range clearFuncs {
+					f()
+				}
+			}()
 		}
 
 		fmt.Println("names:", names)
 		streamClient, err := client.SmokingEvaluatePluginBatch(context.Background(), &ypb.SmokingEvaluatePluginBatchRequest{
 			ScriptNames: names,
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		for {
 			res, err := streamClient.Recv()
 			if err != nil {

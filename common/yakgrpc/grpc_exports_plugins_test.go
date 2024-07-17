@@ -3,25 +3,29 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestServerExportsPlugins(t *testing.T) {
 	client, _ := NewLocalClient()
 	uid := uuid.New().String()
 
-	name1, _ := yakit.CreateTemporaryYakScript("yak", "hello 1; "+uid, uid)
-	name2, _ := yakit.CreateTemporaryYakScript("yak", "hello 2; "+uid, uid)
-	assert.NotEmpty(t, name1)
-	assert.NotEmpty(t, name2)
+	name1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 1; "+uid, uid)
+	require.NoError(t, err)
+	defer clearFunc()
+	name2, clearFunc2, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 2; "+uid, uid)
+	require.NoError(t, err)
+	defer clearFunc2()
 	stream, err := client.ExportYakScriptStream(
 		context.Background(),
 		&ypb.ExportYakScriptStreamRequest{
@@ -86,8 +90,12 @@ func TestServerExportsPlugins_Enc(t *testing.T) {
 	client, _ := NewLocalClient()
 	uid := uuid.New().String()
 
-	name1, _ := yakit.CreateTemporaryYakScript("yak", "hello 1; "+uid, uid)
-	name2, _ := yakit.CreateTemporaryYakScript("yak", "hello 2; "+uid, uid)
+	name1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 1; "+uid, uid)
+	require.NoError(t, err)
+	defer clearFunc()
+	name2, clearFunc2, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 2; "+uid, uid)
+	require.NoError(t, err)
+	defer clearFunc2()
 	assert.NotEmpty(t, name1)
 	assert.NotEmpty(t, name2)
 

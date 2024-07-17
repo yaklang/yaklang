@@ -1,17 +1,15 @@
 key = randstr(20)
-pluginName = randstr(20)
 
-code = `
-key="` + key + `";db.SetKey(key, 0)
+code = f`key="${key}";db.SetKey(key, 0)
 count=0
 mirrorNewWebsitePath = (tls, url, req, rsp, body) => {
     count++
     println(url)
     db.SetKey(key, count)
-}
-`
+}`
 
-db.SaveYakitPlugin(pluginName, "mitm" /*type: string*/, code)~
+pluginName = db.CreateTemporaryYakScript("mitm", code)~
+defer db.DeleteYakScriptByName(pluginName)
 
 caller = hook.NewMixPluginCaller()~
 caller.LoadPlugin(pluginName, )

@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/davecgh/go-spew/spew"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -86,20 +86,17 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Dangerous_FuzzTag(t *testing.T) {
 	// create a temporary file to test
 	token1 := utils.RandStringBytes(16)
 	fileName, err := utils.SaveTempFile(token1, "fuzztag-test-file")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	fileName = strings.ReplaceAll(fileName, "\\", "\\\\")
 	// create a codec script to test
 	token2 := utils.RandStringBytes(16)
-	scriptName, err := yakit.CreateTemporaryYakScript("codec", fmt.Sprintf(`
+	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("codec", fmt.Sprintf(`
 	handle = func(origin)  {
 		return "%s"
 	}`, token2))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer yakit.DeleteYakScriptByName(consts.GetGormProjectDatabase(), scriptName)
+
+	require.NoError(t, err)
+	defer clearFunc()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
@@ -107,13 +104,9 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Dangerous_FuzzTag(t *testing.T) {
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	stream, err := client.MITM(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
@@ -156,9 +149,7 @@ assert rsp.RawPacket.Contains("yes")
 				"packet":    string(packetBytes),
 				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			cancel()
 		}
 	}

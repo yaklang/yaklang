@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crep"
@@ -24,7 +26,7 @@ func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
 	})
-	var targetUrl = "http://" + utils.HostPort(targetHost, targetPort)
+	targetUrl := "http://" + utils.HostPort(targetHost, targetPort)
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
@@ -44,7 +46,7 @@ func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
 			break
 		}
 		if data.GetMessage().GetIsMessage() {
-			var msg = string(data.GetMessage().GetMessage())
+			msg := string(data.GetMessage().GetMessage())
 			if strings.Contains(msg, "starting mitm server") {
 				stream.Send(&ypb.MITMRequest{SetYakScript: true, YakScriptContent: `
 mirrorNewWebsite = (tls, url, req, rsp, body) => {
@@ -103,7 +105,7 @@ func TemplateTestGRPCMUSTPASS_MITM_Proxy_Template(t *testing.T) {
 			break
 		}
 		if data.GetMessage().GetIsMessage() {
-			var msg = string(data.GetMessage().GetMessage())
+			msg := string(data.GetMessage().GetMessage())
 			fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
 				// do sth
@@ -128,7 +130,7 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 		}
 		writer.Write([]byte("Hello Token"))
 	})
-	var mockUrl = "http://" + utils.HostPort(mockHost, mockPort)
+	mockUrl := "http://" + utils.HostPort(mockHost, mockPort)
 
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
@@ -168,7 +170,7 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 			break
 		}
 		if data.GetMessage().GetIsMessage() {
-			var msg = string(data.GetMessage().GetMessage())
+			msg := string(data.GetMessage().GetMessage())
 			fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
 				if _, err := yak.Execute(
@@ -193,6 +195,7 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 		t.Fatalf("Network not passed")
 	}
 }
+
 func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 	var (
 		networkIsPassed  bool
@@ -208,7 +211,7 @@ func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 		}
 		writer.Write([]byte("Hello Token"))
 	})
-	var mockUrl = "http://" + utils.HostPort(mockHost, mockPort)
+	mockUrl := "http://" + utils.HostPort(mockHost, mockPort)
 
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
@@ -247,7 +250,7 @@ func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 			break
 		}
 		if data.GetMessage().GetIsMessage() {
-			var msg = string(data.GetMessage().GetMessage())
+			msg := string(data.GetMessage().GetMessage())
 			fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
 				log.Infof("starting mitm server")
@@ -310,7 +313,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	var passed = false
+	passed := false
 	_, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		if bytes.Contains(req, []byte("CONNECT www3.example.com:80 HTTP")) {
 			passed = true
@@ -335,7 +338,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
 			break
 		}
 		if rsp.GetMessage().GetIsMessage() {
-			var msg = string(rsp.GetMessage().GetMessage())
+			msg := string(rsp.GetMessage().GetMessage())
 			if strings.Contains(msg, "starting mitm server") {
 				stream.Send(&ypb.MITMRequest{SetYakScript: true, YakScriptContent: `
 mirrorNewWebsite = (tls, url, req, rsp, body) => {
@@ -363,27 +366,25 @@ poc.Get("http://www.example.com", poc.proxy(mitmProxy))
 }
 
 func TestGRPCMUSTPASS_MITM_Proxy_StatusCard(t *testing.T) {
-	name, err := yakit.CreateTemporaryYakScript("mitm", `
+	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", `
 yakit.AutoInitYakit()
 yakit.StatusCard("mitmId", "StatusCard")
 `)
+	require.NoError(t, err)
+	defer clearFunc()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
 	})
-	var targetUrl = "http://" + utils.HostPort(targetHost, targetPort)
+	targetUrl := "http://" + utils.HostPort(targetHost, targetPort)
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	stream, err := client.MITM(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
@@ -400,7 +401,7 @@ yakit.StatusCard("mitmId", "StatusCard")
 			break
 		}
 		if data.GetMessage().GetIsMessage() {
-			var msg = string(data.GetMessage().GetMessage())
+			msg := string(data.GetMessage().GetMessage())
 			if strings.Contains(msg, "starting mitm server") && !started {
 				stream.Send(&ypb.MITMRequest{
 					SetYakScript: true,
@@ -427,9 +428,7 @@ go func{
 	cancel()
 }
 `, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort), "cancel": cancel})
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 			}
 		}
 
@@ -448,18 +447,10 @@ go func{
 
 	time.Sleep(1 * time.Second)
 
-	if !pluginStatusCardFound {
-		t.Fatal("plugin status card not found")
-	}
-
-	if !hotStatusCardFound {
-		t.Fatal("hot status card not found")
-	}
-
-	if !(pluginStatusCardFound && hotStatusCardFound) {
-		panic("mitm plugin/hot patched status card not found")
-	}
+	require.True(t, pluginStatusCardFound, "plugin status card not found")
+	require.True(t, hotStatusCardFound, "hot status card not found")
 }
+
 func TestGenerateURL(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -493,5 +484,4 @@ func TestGenerateURL(t *testing.T) {
 			t.Fatal("generate url failed")
 		}
 	}
-
 }

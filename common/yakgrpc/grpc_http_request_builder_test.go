@@ -3,13 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -416,7 +417,7 @@ Content-Length: 12
 
 aaabbbaaabbb`))
 
-	var host, port = utils.DebugMockHTTP(rspRaw)
+	host, port := utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to decug mock http on: %v", utils.HostPort(host, port))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`);risk.NewRisk(`baidu.com`);}",
@@ -437,7 +438,7 @@ aaabbbaaabbb`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var checked = false
+	checked := false
 	for {
 		t.Logf("stream.Recv() start...")
 		exec, err := stream.Recv()
@@ -466,7 +467,7 @@ func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug2(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	var host, port = utils.DebugMockHTTP(rspRaw)
+	host, port := utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
@@ -483,7 +484,7 @@ aaacccaaabbb`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var checked = false
+	checked := false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
@@ -510,7 +511,7 @@ func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug3(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	var host, port = utils.DebugMockHTTP(rspRaw)
+	host, port := utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
@@ -527,7 +528,7 @@ aaacccaaabbb`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var checked = false
+	checked := false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
@@ -547,25 +548,21 @@ aaacccaaabbb`))
 
 func TestGRPCMUSTPASS_DebugPlugin(t *testing.T) {
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Content-Length: 12
 
 aaacccaaabbb`))
-	var host, port = utils.DebugMockHTTP(rspRaw)
+	host, port := utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 
-	tempName1, err := yakit.CreateTemporaryYakScript("mitm", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	tempName2, err := yakit.CreateTemporaryYakScript("mitm", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempName1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", "test")
+	require.NoError(t, err)
+	defer clearFunc()
+	tempName2, clearFunc2, err := yakit.CreateTemporaryYakScriptEx("mitm", "test")
+	require.NoError(t, err)
+	defer clearFunc2()
 	// println(string(raw))
 
 	testCode := fmt.Sprintf(`yakit.AutoInitYakit()
@@ -593,11 +590,9 @@ cli.check()
 		},
 		Input: "http://" + utils.HostPort(host, port),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var checkedName = false
-	var checkedFilter = false
+	require.NoError(t, err)
+	checkedName := false
+	checkedFilter := false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
@@ -612,13 +607,9 @@ cli.check()
 			}
 		}
 	}
-	if !checkedName {
-		t.Fatal("load plugin by name failed")
-	}
+	require.True(t, checkedName, "load plugin by name failed")
 
-	if !checkedFilter {
-		t.Fatal("load plugin by filter failed")
-	}
+	require.True(t, checkedFilter, "load plugin by filter failed")
 }
 
 func TestBuild_Http_Request_Packet(t *testing.T) {
@@ -671,7 +662,7 @@ func TestGRPCMUSTPASS_DebugPlugin_ServiceScan_RuntimeId(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	var host, port = utils.DebugMockHTTP(rspRaw)
+	host, port := utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 
 	testCode := fmt.Sprintf(`yakit.AutoInitYakit()
