@@ -4,6 +4,11 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/segmentio/ksuid"
@@ -19,10 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const yakitScanBanner = `
@@ -94,7 +95,7 @@ var hybridScanCommand = &cli.Command{
 		}
 
 		// fix plugin
-		var plugins = utils.PrettifyListFromStringSplitEx(c.String("type"), ",", "|", "\n")
+		plugins := utils.PrettifyListFromStringSplitEx(c.String("type"), ",", "|", "\n")
 		for i := 0; i < len(plugins); i++ {
 			switch ret := strings.ToLower(plugins[i]); ret {
 			case "port-scan", "mitm", "nuclei":
@@ -114,7 +115,7 @@ var hybridScanCommand = &cli.Command{
 			plugins = utils.RemoveRepeatStringSlice(plugins)
 		}
 
-		var pluginName = c.String("plugin")
+		pluginName := c.String("plugin")
 
 		if len(plugins) == 0 || len(pluginName) != 0 {
 			plugins = []string{"mitm", "nuclei", "port-scan"}
@@ -181,12 +182,14 @@ var hybridScanCommand = &cli.Command{
 		}
 
 		handledUUID := false
+		clearFuncs := make([]func(), 0, len(templatesCodes))
 		if len(templatesCodes) > 0 {
 			for _, temp := range templatesCodes {
-				pluginName, err := yakit.CreateTemporaryYakScript(`nuclei`, temp, uid)
+				pluginName, clearFunc, err := yakit.CreateTemporaryYakScriptEx(`nuclei`, temp, uid)
 				if err != nil {
 					return utils.Errorf("create temporary nuclei template failed: %s", err)
 				}
+				clearFuncs = append(clearFuncs, clearFunc)
 				handledUUID = true
 				if pluginName != "" {
 					log.Infof("Generate Temporary Yaml PoC Plugin: %s", pluginName)
@@ -195,6 +198,13 @@ var hybridScanCommand = &cli.Command{
 					plugins = append(plugins, "nuclei")
 				}
 			}
+		}
+		if len(clearFuncs) > 0 {
+			defer func() {
+				for _, f := range clearFuncs {
+					f()
+				}
+			}()
 		}
 
 		if len(portScan) > 0 {
@@ -238,7 +248,7 @@ var hybridScanCommand = &cli.Command{
 			table.SetAutoWrapText(false)
 			table.SetColMinWidth(0, 72)
 			for _, result := range pluginList.Values() {
-				var name = []rune(result.ScriptName)
+				name := []rune(result.ScriptName)
 				if len(name) > 64 {
 					name = append(([]rune(name))[:64], []rune("...")...)
 				}

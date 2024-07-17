@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -29,7 +30,7 @@ func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	name, err := yakit.CreateTemporaryYakScript("nuclei", `id: CNVD-2020-46552
+	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("nuclei", `id: CNVD-2020-46552
 
 info:
   name: Sangfor EDR - Remote Code Execution
@@ -62,6 +63,8 @@ requests:
 
 # Enhanced by mp on 2022/05/18
 `)
+	require.NoError(t, err)
+	defer clearFunc()
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
@@ -70,9 +73,7 @@ requests:
 			{Key: "target", Value: fmt.Sprintf("http://%s:%d", host, port)},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	var runtimes []string
 	for {
@@ -80,28 +81,18 @@ requests:
 		if err != nil {
 			break
 		}
-		if data.RuntimeID == "" {
-			t.Fatal("NO RUNTIME ID FOUND")
-		}
+		require.NotEmpty(t, data.RuntimeID, "NO RUNTIME ID FOUND")
 		if !strings.Contains(strings.Join(runtimes, ","), data.RuntimeID) {
 			runtimes = append(runtimes, data.RuntimeID)
 		}
 	}
 
-	if len(runtimes) != 1 {
-		t.Fatalf("MULTI RUNTIME FOUND: %v", runtimes)
-	}
+	require.Lenf(t, runtimes, 1, "MULTI RUNTIME FOUND: %v", runtimes)
 
-	var runtimeId = runtimes[0]
+	runtimeId := runtimes[0]
 	p, _, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
 		RuntimeId: runtimeId,
 	})
-	if err != nil {
-		t.Fatal("Trace Flow Failed")
-	}
-	if p.TotalRecord > 0 {
-		t.Log("Trace Flow Success")
-	} else {
-		t.Fatal("Trace Flow Failed")
-	}
+	require.NoError(t, err, "Trace Flow Failed")
+	require.Greater(t, p.TotalRecord, 0, "Trace Flow Failed")
 }

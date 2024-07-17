@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -23,7 +24,7 @@ func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	name, err := yakit.CreateTemporaryYakScript("nuclei", `id: CNVD-2020-46552
+	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("nuclei", `id: CNVD-2020-46552
 
 info:
   name: Sangfor EDR - Remote Code Execution
@@ -56,6 +57,8 @@ requests:
 
 # Enhanced by mp on 2022/05/18
 `)
+	require.NoError(t, err)
+	defer clearFunc()
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
@@ -64,9 +67,7 @@ requests:
 			{Key: "target", Value: fmt.Sprintf("http://%s:%d", host, port)},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for {
 		data, err := stream.Recv()
 		if err != nil {
@@ -81,11 +82,13 @@ func TestGRPCMUSTPASS_LANGUAGE_NesureProxyValidInExecBatchYakScript(t *testing.T
 	if err != nil {
 		panic(err)
 	}
-	name, err := yakit.CreateTemporaryYakScript("mitm", `
+	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", `
 mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
     	poc.HTTP(req,poc.https(isHttps),poc.replaceQueryParam("key", "1"))
 }
 `)
+	require.NoError(t, err)
+	defer clearFunc()
 	count := 0
 	host, port := utils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
 		r, _ := lowhttp.ParseBytesToHttpRequest(req)
@@ -129,16 +132,12 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 		Concurrent:          4,
 		Proxy:               fmt.Sprintf("http://%s:%d", host, port),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for {
 		_, err := stream.Recv()
 		if err != nil {
 			break
 		}
 	}
-	if count <= 0 {
-		t.Fatalf("want more than 1 ,but got %d", count)
-	}
+	require.Greater(t, count, 0, "want more than 1, but got %d", count)
 }

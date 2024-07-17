@@ -1,11 +1,12 @@
 package mustpass
 
 import (
+	"sort"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"sort"
-	"testing"
 )
 
 func TestMustPassDebug(t *testing.T) {
@@ -16,7 +17,7 @@ func TestMustPassDebug(t *testing.T) {
 
 	yakit.RegisterLowHTTPSaveCallback()
 
-	debugName := "git_to_sca.yak"
+	debugName := "mixcaller_scheme_n_method.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

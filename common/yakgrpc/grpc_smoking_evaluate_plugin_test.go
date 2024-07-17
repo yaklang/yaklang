@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -23,17 +24,15 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 		zeroScore bool // is score == 0 ?
 	}
 	TestSmokingEvaluatePlugin := func(tc testCase) {
-		name, err := yakit.CreateTemporaryYakScript(tc.codeTyp, tc.code)
-		if err != nil {
-			t.Fatal(err)
-		}
+		name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(tc.codeTyp, tc.code)
+		require.NoError(t, err)
+		defer clearFunc()
 		rsp, err := client.SmokingEvaluatePlugin(context.Background(), &ypb.SmokingEvaluatePluginRequest{
 			PluginName: name,
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var checking = false
+		require.NoError(t, err)
+
+		checking := false
 		fmt.Printf("result: %#v \n", rsp.String())
 		if tc.zeroScore && rsp.Score != 0 {
 			// want score == 0 but get !0
@@ -111,7 +110,6 @@ yakit.AutoInitYakit()
 			codeTyp:   "yak",
 			zeroScore: false,
 		})
-
 	})
 
 	t.Run("test nuclei false positive", func(t *testing.T) {
@@ -180,5 +178,4 @@ http:
 			zeroScore: false,
 		})
 	})
-
 }

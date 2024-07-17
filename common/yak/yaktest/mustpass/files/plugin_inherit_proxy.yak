@@ -119,6 +119,7 @@ mirrorNewWebsite = (isHttps, url, req, rsp, body) => {
     http.Get(url + "?a=finish")~
 }
 `)~
+defer db.DeleteYakScriptByName(name)
 
 response = poc.Get(targetUrl)~[0]
 a = hook.NewMixPluginCaller()~

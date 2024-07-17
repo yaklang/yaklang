@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -104,7 +105,6 @@ func TestGRPCMUSTPASS_HybridScan_status(t *testing.T) {
 			t.Fatal("status not match")
 		}
 	}
-
 }
 
 func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
@@ -152,19 +152,14 @@ func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
-	scriptName, err := yakit.CreateTemporaryYakScript("mitm", "")
-	if err != nil {
-		panic(err)
-	}
+	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", "")
+	require.NoError(t, err)
+	defer clearFunc()
 	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
 	client, err := NewLocalClient()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	stream, err := client.HybridScan(context.Background())
-	if err != nil {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 	stream.Send(&ypb.HybridScanRequest{
 		Control:        true,
 		HybridScanMode: "new",
@@ -189,9 +184,7 @@ func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
 	}
 	var count int
 	consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeID).Count(&count)
-	if count < 1 {
-		t.Fatal("count not match")
-	}
+	require.GreaterOrEqual(t, count, 1, "count not match")
 	spew.Dump(count)
 }
 
@@ -297,7 +290,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 
 func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
 	token := utils.RandSecret(10)
-	scriptName, err := yakit.CreateTemporaryYakScript("mitm", fmt.Sprintf(`
+	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
 	dump(req)
 	if str.Contains(string(req),"%s"){
@@ -305,10 +298,9 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 	}
 }
 `, token))
-	if err != nil {
-		panic(err)
-	}
-	defer yakit.DeleteYakScriptByName(consts.GetGormProjectDatabase(), scriptName)
+	require.NoError(t, err)
+	defer clearFunc()
+
 	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
 
 	packet := fmt.Sprintf("POST /\r\nHost: %s\r\n\r\n"+
@@ -379,7 +371,6 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 	if checkCount != 3 {
 		t.Fatal("count not match")
 	}
-
 }
 
 func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
@@ -392,7 +383,7 @@ func TestGRPCMUSTPASS_QueryHybridScanTaskList(t *testing.T) {
 
 	source1 := utils.RandStringBytes(5)
 	source2 := utils.RandStringBytes(5)
-	var DateTask = []*schema.HybridScanTask{
+	DateTask := []*schema.HybridScanTask{
 		{
 			Status:               status1,
 			Targets:              target1,
