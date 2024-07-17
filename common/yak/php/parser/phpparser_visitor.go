@@ -196,9 +196,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#globalStatement.
 	VisitGlobalStatement(ctx *GlobalStatementContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#globalVar.
-	VisitGlobalVar(ctx *GlobalVarContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#echoStatement.
 	VisitEchoStatement(ctx *EchoStatementContext) interface{}
 
