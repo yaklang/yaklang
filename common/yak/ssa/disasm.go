@@ -200,6 +200,9 @@ func (c Const) String() string {
 
 // ----------- const instruction
 func (c *ConstInst) String() string {
+	if c == nil || utils.IsNil(c) {
+		return ""
+	}
 	if c.Const == nil {
 		return ""
 	}
