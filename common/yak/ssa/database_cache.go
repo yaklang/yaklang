@@ -195,7 +195,7 @@ func ShowDatabaseCacheCost() {
 	log.Infof("SSA Database SaveVariable Cost: %v", ssadb.GetSSAVariableCost())
 	log.Infof("SSA Database SaveSourceCode Cost: %v", ssadb.GetSSASourceCodeCost())
 	log.Infof("SSA Database SaveType Cost: %v", ssadb.GetSSASaveTypeCost())
-	log.Infof("SSA Database SaveScope Cost: %v", ssautil.GetSSAScopeTimeCost())
+	log.Infof("SSA Database SaveScope Cost: %v Count: %v", ssautil.GetSSAScopeTimeCost(), ssautil.GetSSAScopeSaveCounter())
 	log.Infof("SSA Database CacheToDatabase Cost: %v", GetSSACacheToDatabaseCost())
 	log.Infof("SSA DB Cache DEBUG Cost: %v", GetSSACacheIterationCost())
 	for _, cb := range _CostCallback {
