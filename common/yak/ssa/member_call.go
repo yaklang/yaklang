@@ -349,21 +349,44 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 }
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
-	if b.SupportGetStaticMember {
+	if b.SupportClassStaticModifier {
 		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
+				if b.MarkedIsStaticMethod {
+					if value, ok := blueprint.StaticMethod[key.String()]; ok {
+						return value
+					}
+				}
 				if value, ok := blueprint.StaticMember[key.String()]; ok {
-					object.SelfDelete()
 					return value
+				}
+
+			}
+		}
+		//用于没有实例化类的时候获取静态方法或成员
+		//此时这个这个类为不可用undefined类型（UndefinedValueInValid）
+		if u, ok := object.(*Undefined); ok {
+			if u.Kind == UndefinedValueInValid {
+				if blueprint := object.GetProgram().GetClassBluePrint(object.GetName()); blueprint != nil {
+					if b.MarkedIsStaticMethod {
+						if value, ok := blueprint.StaticMethod[key.String()]; ok {
+							return value
+						}
+					}
+					if value, ok := blueprint.StaticMember[key.String()]; ok {
+						return value
+					}
 				}
 			}
 		}
+
 	}
 	name, typ := checkCanMemberCall(object, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
 	return b.getOriginMember(name, typ, object, key)
+
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {

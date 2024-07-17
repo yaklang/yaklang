@@ -498,6 +498,7 @@ func (y *builder) VisitMethodDeclaration(
 			for _, def := range defCallback {
 				def(newFunction)
 			}
+			class.AddStaticMethod(key, newFunction)
 			//y.AddToPackage(funcName)
 		}
 
