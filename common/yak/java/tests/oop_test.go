@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
@@ -311,33 +310,7 @@ public class Main{
 }
 
 func TestJava_OOP_Static_Member(t *testing.T) {
-	t.Run("test simple static member", func(t *testing.T) {
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("src/main/java/A.java", `
-	package A; 
-	class A {
-		public static int a = 1;
-	}
-	`)
-		vf.AddFile("src/main/java/B.java", `
-	package B; 
-	import A.A;
-	class B {
-		public static void main(String[] args) {
-			System.out.println(A.a);
-		}
-	}
-	`)
-
-		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
-		`, map[string][]string{
-			"a": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
-		)
-	})
-
-	t.Run("test static variable and static method within a class", func(t *testing.T) {
+	t.Run("test call self static member", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 public class Main {
     static int a = 1 ;
@@ -346,6 +319,25 @@ public class Main {
         }
  }
 			`, []string{"1"}, t)
+	})
+
+	t.Run("test simple static member", func(t *testing.T) {
+		code := `
+		class A {
+		public static int a = 1;
+		}
+	class B {
+		public static void main(String[] args) {
+			System.out.println(A.a);
+		}
+	}
+	`
+		ssatest.CheckSyntaxFlow(t, code, `
+		System.out.println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"1"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
 	})
 
 	t.Run("test static variable and method within a class (arg is a)", func(t *testing.T) {
@@ -422,33 +414,51 @@ public class Main {
 }
 
 func TestJava_OOP_Static_Method(t *testing.T) {
-	t.Run("test call self's static method", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-class Main{
-		public static void Hello(){
-        }
-		public static void main(String[] args) {
-			println(Hello());
+	t.Run("test call self static method", func(t *testing.T) {
+		code := `class A {
+		public static int get() {
+			return 	 22;
 		}
-}
-		`, []string{"Function-Main_Hello()"}, t)
+		public static void main(String[] args) {
+			System.out.println(A.get());
+		}
+	}`
+
+		ssatest.CheckSyntaxFlow(t, code, `
+		System.out.println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"22"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test call self normal method", func(t *testing.T) {
+		code := `class A {
+		public int get() {
+			return 	 22;
+		}
+		public static void main(String[] args) {
+			A a = new A();
+			System.out.println(a.get());
+		}
+	}`
+		ssatest.CheckSyntaxFlow(t, code, `
+		System.out.println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"22"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
 	})
 
 	t.Run("test the static member and method of the same name without instantiation ", func(t *testing.T) {
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("src/main/java/A.java", `
-	package A; 
-	class A {
+		code := `
+		class A {
 		public static int get = 11;
 		public static int get() {
 			return 	 22;
 		}
 	}
-	`)
-		vf.AddFile("src/main/java/B.java", `
-	package B; 
-	import A.A;
-	class B {
+		class B {
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.get());
@@ -456,101 +466,76 @@ class Main{
 			
 		}
 	}
-	`)
-
-		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+`
+		ssatest.CheckSyntaxFlow(t, code, `
 		System.out.println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
 	t.Run("test the static member and method of the same name ", func(t *testing.T) {
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("src/main/java/A.java", `
-	package A; 
-	class A {
+		code := `class A {
 		public static int get = 11;
 		public static int get() {
 			return 	 22;
 		}
 	}
-	`)
-		vf.AddFile("src/main/java/B.java", `
-	package B; 
-	import A.A;
-	class B {
+		class B {
 		public static void main(String[] args) {
 			System.out.println(A.get());
 			System.out.println(A.get);
 			
 		}
 	}
-	`)
-
-		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+`
+		ssatest.CheckSyntaxFlow(t, code, `
 		System.out.println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
 	t.Run("test static method ", func(t *testing.T) {
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("src/main/java/A.java", `
-	package A; 
-	class A {
+		code := `class A {
 		public static int get() {
 			return 	 1;
 		}
-	}
-	`)
-		vf.AddFile("src/main/java/B.java", `
-	package B; 
-	import A.A;
-	class B {
+		}
+		class B {
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.get());
 		}
-	}
-	`)
-
-		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		}
+	`
+		ssatest.CheckSyntaxFlow(t, code, `
 		System.out.println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
 	t.Run("test static method without instantiation", func(t *testing.T) {
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("src/main/java/A.java", `
-	package A; 
-	class A {
+		code := `class A {
 		public static int get() {
 			return 	 1;
 		}
-	}
-	`)
-		vf.AddFile("src/main/java/B.java", `
-	package B; 
-	import A.A;
-	class B {
+}
+		class B {
 		public static void main(String[] args) {
 			System.out.println(A.get());
 		}
-	}
-	`)
-
-		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+	
+	}`
+		ssatest.CheckSyntaxFlow(t, code, `
 		System.out.println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
