@@ -5,6 +5,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/synscanx"
+	"github.com/yaklang/yaklang/common/utils"
+	"sync"
 	"time"
 )
 
@@ -21,20 +23,23 @@ func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (ch
 
 func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	scanner, err := synscanx.NewScannerx(ctx, config)
+
+	sample := utils.ParseStringToHosts(targets)[0]
+	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
-		cancel()
 		return nil, err
 	}
-	scanner.Cancel = cancel
 	sendDoneSignal := make(chan struct{})
 
 	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1000)
 
-	// 生产者
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	go func() {
-		scanner.SubmitTask(targets, ports, targetCh)
+		defer wg.Done()
+		scanner.SubmitTarget(targets, ports, targetCh)
 		close(targetCh)
 		<-sendDoneSignal
 		close(resultCh)
@@ -44,6 +49,8 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	time.Sleep(1000 * time.Millisecond)
 
 	go func() {
+		defer wg.Done()
+
 		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
 		if err != nil {
 			close(resultCh)
@@ -51,5 +58,27 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 		}
 	}()
 
+	go func() {
+		wg.Wait()
+		cancel()
+	}()
+
 	return resultCh, nil
+}
+
+var SynxPortScanExports = map[string]interface{}{
+	"Scan": _scanx,
+
+	"callback":           synscanx.WithCallback,
+	"submitTaskCallback": synscanx.WithSubmitTaskCallback,
+	"excludeHosts":       synscanx.WithExcludeHosts,
+	"excludePorts":       synscanx.WithExcludePorts,
+	"wait":               synscanx.WithWaiting,
+	"outputFile":         synscanx.WithOutputFile,
+	"outputPrefix":       synscanx.WithOutputFilePrefix,
+	"initHostFilter":     synscanx.WithInitFilterHosts,
+	"initPortFilter":     synscanx.WithInitFilterPorts,
+	"rateLimit":          synscanx.WithRateLimit,
+	"concurrent":         synscanx.WithConcurrent,
+	"iface":              synscanx.WithIface,
 }

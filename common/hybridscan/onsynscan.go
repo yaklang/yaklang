@@ -3,8 +3,6 @@ package hybridscan
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/log"
 	"net"
 )
 
@@ -21,17 +19,6 @@ func (c *HyperScanCenter) onOpenPort(ip net.IP, port int) {
 
 	for _, h := range c.openPortHandlers {
 		h(ip, port)
-	}
-	if c.config.DisableFingerprintMatch {
-		return
-	}
-	select {
-	case c.fpTargetStream <- &fp.PoolTask{
-		Host: ip.String(),
-		Port: port,
-	}:
-	default:
-		log.Errorf("fingerprint buffer is filled")
 	}
 }
 

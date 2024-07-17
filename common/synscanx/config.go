@@ -19,7 +19,7 @@ type SynxConfig struct {
 	waiting          time.Duration
 	initFilterPorts  string
 	initFilterHosts  string
-	netInterface     string
+	netInterface     string // net interface name
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
@@ -31,10 +31,10 @@ type SynxConfig struct {
 	submitTaskCallback func(i string)
 
 	// 发包
-	Iface     *net.Interface
-	GatewayIP net.IP
-	SourceIP  net.IP
-	RemoteMac net.HardwareAddr
+	Iface                *net.Interface
+	GatewayIP            net.IP
+	SourceIP             net.IP
+	SourceMac, RemoteMac net.HardwareAddr
 
 	// Fetch Gateway Hardware Address TimeoutSeconds
 	FetchGatewayHardwareAddressTimeout time.Duration
@@ -69,9 +69,10 @@ func (s *SynxConfig) filtered(port int) bool {
 
 func NewDefaultConfig() *SynxConfig {
 	return &SynxConfig{
-		waiting:                            5 * time.Second,
+		waiting: 5 * time.Second,
+		// 这个限速器每秒可以允许最多 1500 个请求，短时间内可以允许突发的 150 个请求
 		rateLimitDelayMs:                   1,
-		rateLimitDelayGap:                  100,
+		rateLimitDelayGap:                  150,
 		ExcludePorts:                       filter.NewFilter(),
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
 	}
@@ -115,14 +116,19 @@ func WithNetInterface(iface string) SynxConfigOption {
 	}
 }
 
-func WithRateLimitDelayMs(ms float64) SynxConfigOption {
+func WithRateLimit(ms, count int) SynxConfigOption {
 	return func(config *SynxConfig) {
-		config.rateLimitDelayMs = ms
+		config.rateLimitDelayMs = float64(ms)
+		config.rateLimitDelayGap = count
 	}
 }
 
-func WithRateLimitDelayGap(count int) SynxConfigOption {
+func WithConcurrent(count int) SynxConfigOption {
 	return func(config *SynxConfig) {
+		if count <= 0 {
+			count = 1000
+		}
+		config.rateLimitDelayMs = float64(time.Duration(float64(time.Second) / float64(count)))
 		config.rateLimitDelayGap = count
 	}
 }

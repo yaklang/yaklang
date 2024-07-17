@@ -87,7 +87,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			if arpConfig == nil {
 				arpConfig = &layers.ARP{
 					AddrType:        layers.LinkTypeEthernet,
-					Protocol:        layers.EthernetTypeARP,
+					Protocol:        layers.EthernetTypeIPv4,
 					HwAddressSize:   6,
 					ProtAddressSize: 4,
 				}
