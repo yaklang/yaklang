@@ -342,7 +342,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	return ret
 }
 
-// ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员。
+// ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员和方法。
 // 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
 func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 	if class := b.MarkedThisClassBlueprint; class != nil {
@@ -359,6 +359,10 @@ func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 			if member.Value != nil {
 				return member.Value
 			}
+		}
+		haveMethod, ok := class.Method[name]
+		if ok {
+			return haveMethod
 		}
 
 	}
@@ -390,7 +394,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		//此时这个这个类为不可用undefined类型（UndefinedValueInValid）
 		if u, ok := object.(*Undefined); ok {
 			if u.Kind == UndefinedValueInValid {
-				if blueprint := object.GetProgram().GetClassBluePrint(object.GetName()); blueprint != nil {
+				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
 					if b.MarkedIsStaticMethod {
 						if value, ok := blueprint.StaticMethod[key.String()]; ok {
 							return value

@@ -20,6 +20,9 @@ const (
 )
 
 func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
+	if pkg == nil {
+		return nil
+	}
 	if c, ok := pkg.ClassBluePrint[name]; ok {
 		return c
 	}
