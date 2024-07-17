@@ -129,6 +129,43 @@ func AllDevices() []*pcap.Interface {
 	})
 }
 
+func GetLoopBackNetInterface() (*net.Interface, error) {
+	var localIfaceName string
+
+	for _, d := range AllDevices() { // 尝试获取本地回环网卡
+		utils.Debug(func() {
+			log.Debugf("\nDEVICE: %v\nDESC: %v\nFLAGS: %v\n", d.Name, d.Description, net.Flags(d.Flags).String())
+		})
+
+		// 先获取地址 loopback
+		for _, addr := range d.Addresses {
+			if addr.IP.IsLoopback() {
+				localIfaceName = d.Name
+				log.Debugf("fetch loopback by addr: %v", d.Name)
+				break
+			}
+		}
+		if localIfaceName != "" {
+			break
+		}
+
+		// 默认 desc 获取 loopback
+		if strings.Contains(strings.ToLower(d.Description), "adapter for loopback traffic capture") {
+			log.Infof("found loopback by desc: %v", d.Name)
+			localIfaceName = d.Name
+			break
+		}
+
+		// 获取 flags
+		if net.Flags(uint(d.Flags))&net.FlagLoopback == 1 {
+			log.Infof("found loopback by flag: %v", d.Name)
+			localIfaceName = d.Name
+			break
+		}
+	}
+	return PcapIfaceNameToNetInterface(localIfaceName)
+}
+
 func GetPcapInterfaceByIndex(i int) (*pcap.Interface, error) {
 	devs, err := cachedFindAllDevs()
 	if err != nil {
