@@ -342,6 +342,29 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	return ret
 }
 
+// ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员。
+// 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
+func (b *FunctionBuilder) ReadSelfMember(name string) Value {
+	if class := b.MarkedThisClassBlueprint; class != nil {
+		variable := b.GetStaticMember(class.Name, name)
+		if value := b.PeekValueByVariable(variable); value != nil {
+			return value
+		}
+		value, ok := class.StaticMember[name]
+		if ok {
+			return value
+		}
+		member, ok := class.NormalMember[name]
+		if ok {
+			if member.Value != nil {
+				return member.Value
+			}
+		}
+
+	}
+	return nil
+}
+
 func (b *FunctionBuilder) getFieldName(object, key Value) string {
 	name, typ := checkCanMemberCall(object, key)
 	b.getOriginMember(name, typ, object, key) // create undefine member
