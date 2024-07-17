@@ -78,7 +78,7 @@ corsLog = func(result){
 }
 
 csrf_Detect =  func(url,req,rsp,body,ishttps){
-    lowHttpRsp,_,err = poc.HTTPEx(req, [poc.deleteHeader("Cookie"),poc.https(ishttps)]...)
+    lowHttpRsp,_,err = poc.HTTPEx(req, poc.deleteHeader("Cookie"), poc.https(ishttps))
     checkErr(err)
     rspWithoutCookie = lowHttpRsp.RedirectRawPackets[0].Response
 
@@ -88,8 +88,6 @@ csrf_Detect =  func(url,req,rsp,body,ishttps){
     checkErr(err)
     pforms = xpath.Find(phtml,"//form")
     forms = xpath.Find(html,"//form")
-
-
 
     dforms = []
     for pform in pforms{
