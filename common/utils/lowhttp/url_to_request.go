@@ -101,6 +101,9 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 	raw = NewRequestPacketFromMethod(method, targetURL, originRequest, originReqIns, https, cookies...)
 	if is302Or303 {
 		raw = ReplaceHTTPPacketBodyFast(raw, nil)
+		raw = DeleteHTTPPacketHeader(raw, "Content-Length")
+		raw = DeleteHTTPPacketHeader(raw, "Transfer-Encoding")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Type")
 	}
 	if originReqIns != nil && originReqIns.URL != nil {
 		raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
