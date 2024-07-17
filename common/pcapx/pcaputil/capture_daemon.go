@@ -36,10 +36,11 @@ func syncKeepDaemonCache(key string, ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Debugf("keep daemon cache: %v is stop", key)
 			return
-		case <-time.After(3 * time.Second):
+		case <-time.After(5 * time.Second):
+			log.Debugf("keep daemon cache: %v", key)
 			getDaemonCache(key)
-			//log.Infof("keep daemon cache: %v", key)
 		}
 	}
 }
@@ -67,15 +68,13 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			hashRaw.WriteString(conf.OverrideCacheId)
 		}
 		cacheId := codec.Sha256(hashRaw.String())
-		if handler, ok := getDaemonCache(cacheId); ok {
+		if daemon, ok := getDaemonCache(cacheId); ok {
 			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
-				if conf.onNetInterfaceCreated != nil {
-					if oldHandle, ok := handler.handler.(*pcap.Handle); ok {
-						conf.onNetInterfaceCreated(oldHandle)
-					}
+				if oldHandle, ok := daemon.handler.(*pcap.Handle); ok {
+					conf.onNetInterfaceCreated(oldHandle)
 				}
 			}
-			return cacheId, handler.handler, nil
+			return cacheId, daemon.handler, nil
 		}
 
 		var handler *pcap.Handle
@@ -110,8 +109,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 					log.Infof("background iface: %v is start...", ifaceName)
 				}
 
-				packetSource := gopacket.NewPacketSource(handler, handler.LinkType()).Packets()
-
+				packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+				packetSource.Lazy = true
+				packetSource.NoCopy = true
+				packetSource.DecodeStreamsAsDatagrams = true
+				source := packetSource.Packets()
 				onceFirstPacket := new(sync.Once)
 
 				go func() {
@@ -128,7 +130,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 
 					for {
 						select {
-						case packet := <-packetSource:
+						case packet := <-source:
 							if packet == nil {
 								return
 							}
@@ -136,6 +138,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 							daemon.registeredHandlers.ForEach(func(i string, v *pcapPacketHandlerContext) bool {
 								err := v.handler(v.ctx, packet)
 								if err != nil {
+									//defer daemon.handler.Close()
 									log.Errorf("%v handler error: %s", i, err)
 									failedTrigger = append(failedTrigger, i)
 								}
@@ -181,9 +184,16 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			})
 		}
 		registerDaemonCache(cacheId, daemon)
-		return cacheId, handler, err
+		return cacheId, daemon.handler, err
 	}
 	handler, err := OpenIfaceLive(ifaceName)
+	if err != nil {
+		return "", nil, err
+	}
+	err = handler.SetBPFFilter(conf.BPFFilter)
+	if err != nil {
+		return "", handler, err
+	}
 	return "", handler, err
 }
 

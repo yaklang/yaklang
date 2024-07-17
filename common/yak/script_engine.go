@@ -164,7 +164,7 @@ func initYaklangLib() {
 	yaklang.Import("udp", yaklib.UDPExport)
 
 	// SYN 扫描库
-	yaklang.Import("synscan", tools.SynPortScanExports)
+	yaklang.Import("synscan", tools.SynxPortScanExports)
 	yaklang.Import("finscan", tools.FinPortScanExports)
 
 	// 指纹扫描库

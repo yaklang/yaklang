@@ -34,9 +34,9 @@ func WithPayload(payload []byte) BuilderConfigOption {
 	}
 }
 
-func WithLoopback() BuilderConfigOption {
+func WithLoopback(b bool) BuilderConfigOption {
 	return func(config *BuilderConfig) {
-		config.Loopback = true
+		config.Loopback = b
 	}
 }
 
@@ -53,6 +53,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		arpConfig      *layers.ARP
 		ip4Config      *layers.IPv4
 		ethernetConfig *layers.Ethernet
+		loopbackConfig *layers.Loopback
 	)
 	for _, opt := range opts {
 		switch optFunc := opt.(type) {
@@ -86,7 +87,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			if arpConfig == nil {
 				arpConfig = &layers.ARP{
 					AddrType:        layers.LinkTypeEthernet,
-					Protocol:        layers.EthernetTypeARP,
+					Protocol:        layers.EthernetTypeIPv4,
 					HwAddressSize:   6,
 					ProtAddressSize: 4,
 				}
@@ -113,6 +114,19 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 			if err != nil {
 				return nil, utils.Errorf("set ethernet config failed: %s", err)
 			}
+		case LoopbackOption:
+			if loopbackConfig == nil {
+				loopbackConfig = &layers.Loopback{
+					Family: layers.ProtocolFamilyIPv4,
+				}
+			}
+			err := optFunc(loopbackConfig)
+			if err != nil {
+				if err != nil {
+					return nil, utils.Errorf("set loopback config failed: %s", err)
+				}
+
+			}
 		default:
 			log.Errorf("PacketBuilder: unknown option type: %T", optFunc)
 			return nil, utils.Errorf("PacketBuilder: unknown option type: %T", optFunc)
@@ -122,9 +136,14 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 	/**
 	LinkLayer can be Ethernet(Default) or Loopback
 	*/
-	var linkLayer *layers.Ethernet
+	var linkLayer gopacket.SerializableLayer
 	if baseConfig.Loopback {
-		linkLayer = &layers.Ethernet{EthernetType: layers.EthernetTypeIPv4}
+		if loopbackConfig == nil {
+			loopbackConfig = &layers.Loopback{
+				Family: layers.ProtocolFamilyIPv4,
+			}
+		}
+		linkLayer = loopbackConfig
 	} else if ethernetConfig != nil {
 		linkLayer = ethernetConfig
 	} else {
@@ -167,11 +186,11 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		ipEnabled = true
 		networkLayer = ip4Config
 		if ip4Config.Version == 6 {
-			linkLayer.EthernetType = layers.EthernetTypeIPv6
+			linkLayer.(*layers.Ethernet).EthernetType = layers.EthernetTypeIPv6
 		}
 	} else if !funk.IsEmpty(arpConfig) {
 		networkLayer = arpConfig
-		linkLayer.EthernetType = layers.EthernetTypeARP
+		linkLayer.(*layers.Ethernet).EthernetType = layers.EthernetTypeARP
 	} else {
 		return nil, utils.Errorf("PacketBuilder: network layer is empty")
 	}
