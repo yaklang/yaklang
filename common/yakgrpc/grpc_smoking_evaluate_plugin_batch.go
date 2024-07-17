@@ -26,7 +26,7 @@ func (s *Server) SmokingEvaluatePluginBatch(req *ypb.SmokingEvaluatePluginBatchR
 	successNum := 0
 	errorNum := 0
 
-	host, port := setupEachServe(stream.Context())
+	pluginTestingServer := NewPluginTestingEchoServer(stream.Context())
 
 	ch := yakit.YieldYakScripts(
 		bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase(), "script_name", req.GetScriptNames()),
@@ -45,7 +45,7 @@ func (s *Server) SmokingEvaluatePluginBatch(req *ypb.SmokingEvaluatePluginBatchR
 		exist.Add(ins.ScriptName)
 		code := ins.Content
 		pluginType := ins.Type
-		res, err := s.EvaluatePlugin(stream.Context(), code, pluginType, host, port)
+		res, err := s.EvaluatePlugin(stream.Context(), code, pluginType, pluginTestingServer)
 		if err != nil {
 			msg := fmt.Sprintf("%s 启动插件检测失败", ins.ScriptName)
 			send(progress, msg, "error")
