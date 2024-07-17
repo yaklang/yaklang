@@ -31,23 +31,23 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 	if i == nil {
 		return ""
 	}
-
-	if i.Namespace() != nil {
-		// declare namespace mode
-		list := i.NamespaceNameList().(*phpparser.NamespaceNameListContext)
-		if ret := list.NamespaceNameTail(); ret != nil {
-
-		}
-		// return y.EmitConstInst(nil)
-		return ""
-	}
-
-	if nameList := i.NamespaceNameList(); nameList != nil {
-		//todo
-		//return y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
-	}
-
-	return ""
+	return raw.GetText()
+	//if i.Namespace() != nil {
+	//	// declare namespace mode
+	//	list := i.NamespaceNameList().(*phpparser.NamespaceNameListContext)
+	//	if ret := list.NamespaceNameTail(); ret != nil {
+	//
+	//	}
+	//	// return y.EmitConstInst(nil)
+	//	return ""
+	//}
+	//
+	//if nameList := i.NamespaceNameList(); nameList != nil {
+	//	//todo
+	//	//return y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
+	//}
+	//
+	//return ""
 }
 
 func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ([]string, string) {

@@ -557,3 +557,32 @@ $a = "test"::${$c->c};
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
+
+func Test_Array(t *testing.T) {
+	t.Run("array assign1", func(t *testing.T) {
+		code := `<?php
+$validate = "1.2";
+[$validate,$scene]=explode('.',$validate);
+eval($validate);
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`eval(* #-> *  as $param)`,
+			map[string][]string{
+				"param": {"Function-explode", `"."`, `"1.2"`},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("array assign2", func(t *testing.T) {
+		code := `<?php
+	$a = array("1","2");
+	[$validate,$scene]=$a;
+	eval($validate);
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`eval(* #-> *  as $param)`,
+			map[string][]string{
+				"param": {"Function-array", `"2"`, `"1"`},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}

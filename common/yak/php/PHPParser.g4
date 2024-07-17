@@ -91,17 +91,17 @@ importStatement
     ;
 
 topStatement
-    : statement
-    | useDeclaration
+    : useDeclaration
     | namespaceDeclaration
     | functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
     | enumDeclaration
+    | statement
     ;
 
 useDeclaration
-    : Use (Function_ | Const)? useDeclarationContentList SemiColon
+    : Use (Function_ | Const)? useDeclarationContentList  SemiColon
     ;
 
 useDeclarationContentList
@@ -120,8 +120,8 @@ namespaceDeclaration
     ;
 
 namespaceStatement
-    : statement
-    | useDeclaration
+    : useDeclaration
+    | statement
     | functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
@@ -544,7 +544,7 @@ expression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression
     | Empty '(' chain ')'                                         # SpecialWordExpression
     | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
-    | (Eval|Assert) expression                                    # CodeExecExpression
+//    | (Eval|Assert) expression                                    # CodeExecExpression
     | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
@@ -717,7 +717,7 @@ qualifiedNamespaceName
     ;
 
 namespaceNameList
-    : identifier
+    : namespaceNameTail
     | identifier ('\\' identifier)+ ('\\' namespaceNameTail)?
     ;
 
@@ -806,8 +806,9 @@ chainList
     ;
 
 chain
-    : chainOrigin memberAccess*
-    | arrayCreation // [$a,$b]=$c
+    : flexiVariable
+    | staticClassExprVariableMember
+//    | arrayCreation // [$a,$b]=$c
     ;
 
 chainOrigin
@@ -883,6 +884,7 @@ identifier
 key
     : Abstract
     | Array
+    | Assert
     | As
     | BinaryCast
     | BoolType
@@ -910,7 +912,7 @@ key
     | EndIf
     | EndSwitch
     | EndWhile
-//    | Eval
+    | Eval
 //    | Exit
     | Extends
     | Final

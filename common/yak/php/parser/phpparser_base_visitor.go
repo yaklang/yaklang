@@ -459,10 +459,6 @@ func (v *BasePHPParserVisitor) VisitIndexCallExpression(ctx *IndexCallExpression
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitCodeExecExpression(ctx *CodeExecExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
