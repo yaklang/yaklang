@@ -655,26 +655,17 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliGRPC(t *testing.T) {
 	}
 
 	check := func(code string, param []*ypb.YakScriptParam, want string, t *testing.T) {
-		name, err := yakit.CreateTemporaryYakScript("test", code)
-		if err != nil {
-			t.Fatalf("create temporary yak script error: %v", err)
-		}
-		{
-			rsp, err := local.SaveYakScript(context.Background(), &ypb.YakScript{
-				ScriptName: name,
-				Content:    code,
-				Type:       "yak",
-				Params:     param,
-			})
-			if err != nil {
-				t.Fatalf("save yak script error: %v", err)
-			}
+		name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("test", code)
+		require.NoError(t, err)
+		defer clearFunc()
 
-			defer local.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{
-				Id:  rsp.Id,
-				Ids: []int64{},
-			})
-		}
+		_, err = local.SaveYakScript(context.Background(), &ypb.YakScript{
+			ScriptName: name,
+			Content:    code,
+			Type:       "yak",
+			Params:     param,
+		})
+		require.NoError(t, err, "save yak script error")
 
 		if rsp, err := local.YaklangGetCliCodeFromDatabase(context.Background(), &ypb.YaklangGetCliCodeFromDatabaseRequest{
 			ScriptName: name,

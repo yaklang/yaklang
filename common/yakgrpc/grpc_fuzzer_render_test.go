@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -19,28 +19,22 @@ func TestGRPCMUSTPASS_HTTPFuzzer_RenderDangerousFuzztag(t *testing.T) {
 	// create a temporary file to test
 	token1 := utils.RandStringBytes(16)
 	fileName, err := utils.SaveTempFile(token1, "fuzztag-test-file")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	// create a codec script to test
 	token2 := utils.RandStringBytes(16)
-	scriptName, err := yakit.CreateTemporaryYakScript("codec", fmt.Sprintf(`
+	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("codec", fmt.Sprintf(`
 	handle = func(origin)  {
 		return "%s"
 	}`, token2))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer yakit.DeleteYakScriptByName(consts.GetGormProjectDatabase(), scriptName)
+	require.NoError(t, err)
+	defer clearFunc()
 
 	pass := false
 
 	// create a debug server
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		sBody := string(body)
 		if strings.Contains(sBody, token1) && strings.Contains(sBody, token2) {
 			pass = true
@@ -53,9 +47,7 @@ Host: %s
 {{file(%s)}}|{{codec(%s)}}`, utils.HostPort(host, port), fileName, scriptName)
 
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ctx, _ := context.WithTimeout(context.Background(), 80*time.Second)
 
 	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
@@ -71,7 +63,5 @@ Host: %s
 		}
 	}
 
-	if !pass {
-		t.Fatal("HTTPFuzzer failed to render dangerous fuzztag")
-	}
+	require.True(t, pass, "HTTPFuzzer failed to render dangerous fuzztag")
 }

@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestQueryYakScriptRiskDetailByCWE(t *testing.T) {
@@ -28,7 +29,6 @@ func TestYakScriptRiskTypeList(t *testing.T) {
 		test.FailNow(err.Error())
 	}
 	_, err = client.YakScriptRiskTypeList(context.Background(), &ypb.Empty{})
-
 }
 
 func TestImportYakScript(t *testing.T) {
@@ -68,36 +68,24 @@ func TestExportLocalYakScriptStream(t *testing.T) {
 }
 
 func TestTempYakScriptQuery(t *testing.T) {
-	scriptName, err := yakit.CreateTemporaryYakScript("yak", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName)
+	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", "")
+	require.NoError(t, err)
+	defer clearFunc()
 
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	res, err := client.QueryYakScript(context.Background(), &ypb.QueryYakScriptRequest{
 		Keyword:  scriptName,
 		IsIgnore: true,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if len(res.Data) != 1 {
-		t.Fatalf("just keyword query err, len(res)[%d] != 1", len(res.Data))
-	}
+	require.Lenf(t, res.Data, 1, "just keyword query err, len(res)[%d] != 1", len(res.Data))
 
 	res, err = client.QueryYakScript(context.Background(), &ypb.QueryYakScriptRequest{
 		Keyword: scriptName,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Data) != 0 {
-		t.Fatalf("ingore is ineffective, len(res)[%d] != 0", len(res.Data))
-	}
+	require.NoError(t, err)
+	require.Lenf(t, res.Data, 0, "ignore is ineffective, len(res)[%d] != 1", len(res.Data))
 }

@@ -3,10 +3,11 @@ package yak
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestMixCaller_load_Plugin_Timeout(t *testing.T) {
@@ -15,10 +16,11 @@ func TestMixCaller_load_Plugin_Timeout(t *testing.T) {
 	<- ch
 `
 	consts.GetGormProjectDatabase()
-	tempName, err := yakit.CreateTemporaryYakScript("mitm", code)
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer clearFunc()
 
 	caller, err := NewMixPluginCaller()
 	if err != nil {
@@ -50,10 +52,11 @@ func TestMixCaller_call_Plugin_Timeout(t *testing.T) {
 	
 `
 	consts.GetGormProjectDatabase()
-	tempName, err := yakit.CreateTemporaryYakScript("mitm", code)
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer clearFunc()
 
 	caller, err := NewMixPluginCaller()
 	if err != nil {
@@ -92,10 +95,11 @@ func TestMixCaller_load_Plugin_Timeout_effect_call(t *testing.T) {
 	
 `
 	consts.GetGormProjectDatabase()
-	tempName, err := yakit.CreateTemporaryYakScript("mitm", code)
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer clearFunc()
 
 	caller, err := NewMixPluginCaller()
 	if err != nil {
@@ -132,10 +136,11 @@ func TestMixCaller_Wait(t *testing.T) {
 	
 `
 	consts.GetGormProjectDatabase()
-	tempName, err := yakit.CreateTemporaryYakScript("mitm", code)
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer clearFunc()
 
 	caller, err := NewMixPluginCaller()
 	if err != nil {

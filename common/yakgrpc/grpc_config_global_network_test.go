@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -63,7 +64,6 @@ func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
 }
 
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
-
 }
 
 func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
@@ -614,12 +614,13 @@ func TestPluginScanLists(t *testing.T) {
 	require.Nil(t, err, "new mix plugin caller error")
 
 	token := utils.RandStringBytes(100)
-	tmpName, err := yakit.CreateTemporaryYakScript("mitm", fmt.Sprintf(`
+	tmpName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
 	risk.NewRisk(%#v, risk.description("test"), risk.solution("test solution"))
 }
 `, token))
 	require.Nil(t, err, "create temporary yak script error")
+	defer clearFunc()
 	manager.LoadPlugin(tmpName)
 	t.Logf("GlobalPluginScanFilter lists: %#v", yakit.GlobalPluginScanFilter)
 	manager.MirrorHTTPFlow(false, fmt.Sprintf("http://%s:%d", host, port), nil, nil, nil)
@@ -733,6 +734,7 @@ func TestGenThirdPartyConfigOption(t *testing.T) {
 		t.Fatal("check failed")
 	}
 }
+
 func TestLoadThirdPartyConfig(t *testing.T) {
 	config := yakit.GetNetworkConfig()
 	bak := config.AppConfigs
