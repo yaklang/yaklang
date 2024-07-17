@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/embed"
+	"strings"
 	"sync"
 
 	"golang.org/x/exp/slices"
@@ -66,32 +70,80 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 		pluginCode = ins.Content
 		pluginType = ins.Type
 	}
-	host, port := setupEachServe(ctx)
-	return s.EvaluatePlugin(ctx, pluginCode, pluginType, host, port)
+	pluginTestingServer := NewPluginTestingEchoServer(ctx)
+	return s.EvaluatePlugin(ctx, pluginCode, pluginType, pluginTestingServer)
 }
 
-func setupEachServe(ctx context.Context) (string, int) {
-	var host string
-	var port int
-	var wg sync.WaitGroup
-	// start each server
-	wg.Add(1)
-	go func() {
-		defer func() {
-			defer wg.Done()
-			if err := recover(); err != nil {
-				log.Errorf("lowhttp.DebugEchoServer panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		host, port = lowhttp.DebugEchoServerContext(ctx)
+type PluginTestingEchoServer struct {
+	Host                string
+	Port                int
+	RequestsHistory     []byte
+	RequestHistoryMutex *sync.Mutex
+
+	JunkData []byte
+	Ctx      context.Context
+}
+
+func NewPluginTestingEchoServer(ctx context.Context) *PluginTestingEchoServer {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("lowhttp.DebugEchoServer panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
 	}()
-	wg.Wait()
-	return host, port
+	var echoServer = &PluginTestingEchoServer{
+		RequestsHistory:     make([]byte, 0),
+		RequestHistoryMutex: new(sync.Mutex),
+		JunkData:            BuildPluginTestingJunkData(),
+		Ctx:                 ctx,
+	}
+
+	decodeReq := func(req []byte) []byte {
+		method, uri, version := lowhttp.GetHTTPPacketFirstLine(req)
+		decodeReq := lowhttp.ReplaceHTTPPacketFirstLine(req, strings.Join([]string{method, codec.ForceQueryUnescape(uri), version}, " "))
+		decodeReq = lowhttp.ReplaceHTTPPacketBodyFast(decodeReq, []byte(codec.ForceQueryUnescape(string(lowhttp.GetHTTPPacketBody(req)))))
+		if encoding := lowhttp.IGetHeader(req, "content-encoding"); len(encoding) > 0 {
+			decodeReq, _ = lowhttp.ContentEncodingDecode(encoding[0], decodeReq)
+		}
+		return decodeReq
+	}
+
+	echoServer.Host, echoServer.Port = utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+		echoServer.RequestHistoryMutex.Lock()
+		defer echoServer.RequestHistoryMutex.Unlock()
+		echoServer.RequestsHistory = append(echoServer.RequestsHistory, req...)
+		echoServer.RequestsHistory = append(echoServer.RequestsHistory, decodeReq(req)...)
+		body := append(echoServer.JunkData, echoServer.RequestsHistory...)
+
+		return lowhttp.ReplaceHTTPPacketBodyFast([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+`), body)
+	})
+
+	return echoServer
+}
+
+func (s *PluginTestingEchoServer) ClearRequestsHistory() {
+	s.RequestHistoryMutex.Lock()
+	defer s.RequestHistoryMutex.Unlock()
+	s.RequestsHistory = make([]byte, 0)
+}
+
+func BuildPluginTestingJunkData() []byte {
+	var junkData []byte
+	junkData = append(junkData, []byte(strings.Join(mutate.MutateQuick("{{int(10000-99999)}}"), ","))...) // number
+	junkData = append(junkData, []byte(strings.Join(mutate.MutateQuick("{{rangechar(20,7e)}}"), ""))...)  // visible characters
+	passwd, _ := embed.Asset("data/plugin-testing-data/top_100_passwd.txt.gz")
+	junkData = append(junkData, passwd...)
+	commonWord, _ := embed.Asset("data/plugin-testing-data/common_word.txt.gz")
+	junkData = append(junkData, commonWord...)
+	return junkData
 }
 
 // 只在评分中使用
-func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, host string, port int) (*ypb.SmokingEvaluatePluginResponse, error) {
+func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
+	host, port := pluginTestingServer.Host, pluginTestingServer.Port
+	defer pluginTestingServer.ClearRequestsHistory()
 	var results []*ypb.SmokingEvaluateResult
 	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, i ...[]byte) {
 		var buf bytes.Buffer
