@@ -2,8 +2,9 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -77,17 +78,16 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 	if len(f.FreeValues) > 0 {
 		ret += "freeValue: " + strings.Join(
-			lo.MapToSlice(f.FreeValues, func(_ string, key Value) string {
-
-				return getStr(key)
+			lo.MapToSlice(f.FreeValues, func(name string, item Value) string {
+				return fmt.Sprintf("%s:(%d)%s", name, item.GetId(), item.GetName())
 			}),
 			// f.FreeValue,
 			", ") + "\n"
 	}
 	if len(f.ParameterMembers) > 0 {
 		ret += "parameterMember: " + strings.Join(
-			lo.Map(f.ParameterMembers, func(pm Value, _ int) string {
-				return pm.String()
+			lo.Map(f.ParameterMembers, func(item Value, _ int) string {
+				return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
 			}),
 			", ") + "\n"
 	}

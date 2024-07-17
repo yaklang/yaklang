@@ -178,7 +178,7 @@ func CheckSyntaxFlowWithFS(t *testing.T, fs filesys.FileSystem, sf string, wants
 		results, err := p.SyntaxFlowWithError(sf)
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
-		compareResult(t, contain, results, wants)
+		CompareResult(t, contain, results, wants)
 		return nil
 	}, opt...)
 }
@@ -196,16 +196,17 @@ func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map
 
 func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []sfvm.Option) {
 	Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
 		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
-		compareResult(t, contain, results, wants)
+		CompareResult(t, contain, results, wants)
 		return nil
 	}, ssaOpt...)
 }
 
-func compareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult, wants map[string][]string) {
+func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult, wants map[string][]string) {
 	results.Show()
 	for k, want := range wants {
 		gotVs := results.GetValues(k)

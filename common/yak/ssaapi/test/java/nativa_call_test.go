@@ -1,20 +1,20 @@
 package java
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"strings"
-	"testing"
 )
 
 const NativeCallTest = `
 
 @RestController(value = "/xxe")
 public class XXEController {
-
     @RequestMapping(value = "/one")
     public String yourMethod(@RequestParam(value = "xml_str") String xmlStr) throws Exception {
         DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -44,7 +44,7 @@ public class Demo3 {
 	XXEController xxeController = null;
 
     public String one() throws Exception {
-		var aArgs = new String[]{"AARGS"};
+		var aArgs = new String[]{"aaaaaaa"};
         xxeController.yourMethod(aArgs);
     }
 }
@@ -54,7 +54,7 @@ public class Demo4 {
 	AnothorController controller = null;
 
     public String one() throws Exception {
-		var flexible = new String[]{"AARGS"};
+		var flexible = new String[]{"bbbbbb"};
         controller.yourMethod(flexible);
     }
 }
@@ -196,32 +196,12 @@ aArgs <getFunc> as $sink;
 func TestNativeCall_SearchFormalParams(t *testing.T) {
 	ssatest.Check(t, NativeCallTest,
 		func(prog *ssaapi.Program) error {
-			results := prog.SyntaxFlow("DocumentBuilderFactory...parse(* #-> *?{opcode: param} as $source) as $sink", sfvm.WithEnableDebug(true))
-			sink := results.GetValues("sink")
-			if sink.Len() != 1 {
-				t.Fatal("sink.Len() != 1")
-			}
-			source := results.GetValues("source")
-			if source.Len() != 1 {
-				t.Fatal("source.Len() != 1")
-			}
-
-			source = prog.SyntaxFlow(`Document*Factory...parse(* #-> ?{opcode: param}<searchFunc> #-> * as $source)`).GetValues("source")
-
-			check := false
-			if source.Show().Recursive(func(operator sfvm.ValueOperator) error {
-				rfaw := operator.String()
-				spew.Dump(rfaw)
-				if strings.Contains(rfaw, "Hello World") {
-					check = true
-				}
-				return nil
-			}) != nil {
-				t.Fatal("source.Show().Len() != 1")
-			}
-			if !check {
-				t.Fatal("check FormalParamToCall failed")
-			}
+			prog.Show()
+			results := prog.SyntaxFlow("DocumentBuilderFactory...parse(* #-> as $source) as $sink", sfvm.WithEnableDebug(true))
+			results.Show()
+			ssatest.CompareResult(t, true, results, map[string][]string{
+				"source": {`"Hello Native Method"`, `"aaaaaaa"`},
+			})
 			return nil
 		},
 		ssaapi.WithLanguage(ssaapi.JAVA),
