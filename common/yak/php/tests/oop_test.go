@@ -49,7 +49,7 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`, []string{
-			"add(Undefined-Foo_my_static, Undefined-PHP_EOL)",
+			"add(Undefined-Foo.my_static(valid), Undefined-PHP_EOL)",
 		}, t)
 	})
 
@@ -88,6 +88,39 @@ println(Foo::$my_static);
 			"phi(Foo_my_static)[\"foo\",\"bar\"]",
 		}, t)
 	})
+
+	t.Run("Call static members across classes", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+	<?php
+class Foo {
+	public static $my_static = 'foo';
+}
+?>
+<?php
+	class B {
+		public static function test() {
+			println(Foo::$my_static . PHP_EOL); // normal
+			
+			println("Foo"::$my_static . PHP_EOL); // string
+			
+			$a = "Foo";
+			println($a::$my_static . PHP_EOL); // variable
+			
+			$b = "a";
+			println($$b::$my_static . PHP_EOL); // dynamic variable
+    }
+
+	}
+?>    
+	`, []string{
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+		}, t)
+
+	})
+
 }
 
 func TestOOP_static_method(t *testing.T) {
@@ -130,6 +163,39 @@ func TestOOP_static_method(t *testing.T) {
 		`
 		_, err := php2ssa.FrondEnd(code, false)
 		require.Error(t, err)
+	})
+
+	t.Run("Call static method across classes", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+class A {
+    public static function aStaticMethod() {
+				return 22;
+			}
+}
+?>
+<?php
+class B {
+    public static function test() {
+		println(A::aStaticMethod());
+		println("A"::aStaticMethod());
+		$a = "A";
+		println($a::aStaticMethod());
+		$b = "a";
+		println($$b::aStaticMethod());
+		$instance = new A();
+		println($instance::aStaticMethod());
+    }
+}
+?>
+		`, []string{
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+		}, t)
+
 	})
 }
 
