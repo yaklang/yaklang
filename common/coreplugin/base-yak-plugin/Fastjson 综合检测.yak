@@ -440,9 +440,9 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                         continue
                     }
                     poc = poc[0]
-                    rsp,err = param.delayFuzz(poc)
+                    rsp,_ = param.delayFuzz(poc)
                     if checkDns{
-                        res,err = risk.CheckDNSLogByToken(token, dnslogTimeout)
+                        res,_ = risk.CheckDNSLogByToken(token, dnslogTimeout)
                         if len(res)>0{
                             globalInfo.Store("outNet",1)
                             newRisk("目标 fastjson 框架存在 dnslog 回显",poc,param,0)
@@ -454,7 +454,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     delayCheckOk = true
                     for i in 3{
                         if i != 0{
-                            rsp,err = param.delayFuzz(exp)
+                            rsp,_ = param.delayFuzz(poc)
                             wastTime = getRequestDuration(rsp)
                         }
                         if wastTime - getCommonWastTime() < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
