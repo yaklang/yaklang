@@ -40,7 +40,10 @@ import (
 	"github.com/saintfish/chardet"
 )
 
-var _FuzzerTaskSwitchMap = new(sync.Map)
+var (
+	_FuzzerTaskSwitchMap = new(sync.Map)
+	fuzzerSession        = "__FUZZER_SESSION__"
+)
 
 func Chardet(raw []byte) string {
 	res, err := chardet.NewTextDetector().DetectBest(raw)
@@ -743,6 +746,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_MutateWithMethods(req.GetMutateMethods()),
 			mutate.WithPoolOpt_RuntimeId(runtimeID),
 			mutate.WithPoolOpt_WithPayloads(true),
+			mutate.WithPoolOpt_Session(fuzzerSession),
 		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"

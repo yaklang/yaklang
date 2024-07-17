@@ -59,7 +59,7 @@ for req in reqs {
                     u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps )~
                     caller.MirrorHTTPFlowExSync(!isSmoking,req.IsHttps, u.String(), "", "", "") // port scan not need req and rsp
                 default:
-                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
+                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps), poc.session("__GRPC_TEST__"))~
                     rsp = rspIns.RawPacket
                     firstRsp = rspIns.RedirectRawPackets[0].Response
                     firstReq = rspIns.RedirectRawPackets[0].Request
