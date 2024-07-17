@@ -1744,36 +1744,19 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 		// found
 		return value
 	}
-	// if in this class, return
+	//if in this class, return
 	if class := y.MarkedThisClassBlueprint; class != nil {
 		if value, ok := y.ReadClassConst(class.Name, name); ok {
 			return value
 		}
-		variable := y.GetStaticMember(class.Name, name)
-		if value := y.PeekValueByVariable(variable); value != nil {
+		value := y.ReadSelfMember(name)
+		if value != nil {
 			return value
-		}
-		// 读取自身类的静态成员、成员变量的时候，functionBuilder上下文会变化，导致无法读取
-		// 可以直接读取classBluePrint里面的静态成员、成员变量
-		value, ok := class.StaticMember[name]
-		if ok {
-			return value
-		}
-		member, ok := class.NormalMember[name]
-		if ok {
-			if member.Value != nil {
-				return member.Value
-			}
-		}
-
-		haveMethod, ok := class.Method[name]
-		if ok {
-			return haveMethod
 		}
 	}
 	if value, ok := y.ReadConst(name); ok {
 		return value
 	}
-	// just undefine
+	// just undefined
 	return y.ReadValue(name)
 }
