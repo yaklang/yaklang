@@ -100,9 +100,13 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 		if originReqIns == nil {
 			return nil, utils.Error("parse bytes to http request error, empty request")
 		}
-		if https {
-			// fix https externally
-			originReqIns.URL.Scheme = "https"
+		if originReqIns.URL != nil {
+			if https {
+				// fix https externally
+				originReqIns.URL.Scheme = "https"
+			} else if originReqIns.URL.Scheme == "" {
+				originReqIns.URL.Scheme = "http"
+			}
 		}
 		if method == "" {
 			method = originReqIns.Method
