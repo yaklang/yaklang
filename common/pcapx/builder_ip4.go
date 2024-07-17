@@ -125,6 +125,13 @@ func WithIPv4_ID(i any) IPv4Option {
 	}
 }
 
+func WithIPv4_Version(i any) IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Version = uint8(utils.InterfaceToInt(i))
+		return nil
+	}
+}
+
 func WithIPv4_Flags(i any) IPv4Option {
 	return func(pv4 *layers.IPv4) error {
 		pv4.Flags = layers.IPv4Flag(utils.InterfaceToInt(i))
@@ -233,11 +240,15 @@ func WithIPv4_Option(optType any, data []byte) IPv4Option {
 			log.Warnf("ipv4 option data length is too long, max length is 255, got %d, data: %v", len(data), spew.Sdump(data))
 			return nil
 		}
-		pv4.Options = append(pv4.Options, layers.IPv4Option{
-			OptionType:   uint8(utils.InterfaceToInt(optType)),
-			OptionLength: uint8(len(data)) + 2,
-			OptionData:   data,
-		})
+		if optType == nil {
+			pv4.Options = nil
+		} else {
+			pv4.Options = append(pv4.Options, layers.IPv4Option{
+				OptionType:   uint8(utils.InterfaceToInt(optType)),
+				OptionLength: uint8(len(data)) + 2,
+				OptionData:   data,
+			})
+		}
 		return nil
 	}
 }

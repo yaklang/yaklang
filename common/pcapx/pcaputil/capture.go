@@ -2,8 +2,6 @@ package pcaputil
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/google/gopacket"
 	"github.com/google/uuid"
 	"github.com/yaklang/pcap"
@@ -12,11 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle, packetEntry func(context.Context, gopacket.Packet)) error {
+func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-
+	packetSource.Lazy = true
+	packetSource.NoCopy = true
+	packetSource.DecodeStreamsAsDatagrams = true
 	if conf.onNetInterfaceCreated != nil {
 		conf.onNetInterfaceCreated(handler)
 	}
@@ -29,11 +29,8 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle, packe
 			if packet == nil {
 				return nil
 			}
-			if packetEntry != nil {
-				packetEntry(innerCtx, packet)
-			} else {
-				fmt.Println(packet.String())
-			}
+			conf.packetHandler(innerCtx, packet)
+			//fmt.Println(packet.String())
 		}
 	}
 }
@@ -77,7 +74,7 @@ func Start(opt ...CaptureOption) error {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
 				continue
 			}
-			handlers.Set(cacheId, handler.(PcapHandleOperation))
+			handlers.Set(cacheId, handler)
 		}
 	} else {
 		for _, i := range conf.Device {
@@ -131,9 +128,8 @@ func Start(opt ...CaptureOption) error {
 		// hack: use runtimeId to registerCallback
 		var cancels []func()
 		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
-			if conf.EnableCache {
-				cancels = append(cancels, keepDaemonCache(i, ctx))
-			}
+			c := keepDaemonCache(i, ctx)
+			cancels = append(cancels, c)
 			return true
 		})
 		defer func() {
@@ -167,7 +163,7 @@ func Start(opt ...CaptureOption) error {
 			defer func() {
 				handler.Close()
 			}()
-			if err := _open(conf, ctx, handler, conf.packetHandler); err != nil {
+			if err := _open(conf, ctx, handler); err != nil {
 				log.Errorf("open device failed: %s", err)
 			}
 		})

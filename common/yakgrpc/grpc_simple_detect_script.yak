@@ -59,7 +59,7 @@ if proxies == "no" {
 active = cli.Bool("active")
 userfpFile = cli.String("user-fingerprint")
 concurrent = cli.Int("concurrent", cli.setDefault(50))
-synConcurrent = cli.Int("syn-concurrent", cli.setDefault(800))
+synConcurrent = cli.Int("syn-concurrent", cli.setDefault(2000))
 protos = cli.String("proto", cli.setDefault("tcp,udp"))
 
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
@@ -153,7 +153,6 @@ if concurrent > 0 {
 
 if protos != "" {
     protoList = str.Split(protos, ",")
-    printf("PROTO: %#v\n", protos)
     tcpOps = append(tcpOps, servicescan.proto(protoList...))
 }
 
@@ -226,7 +225,6 @@ try {
     yakit.SetProgress(baseProgress + 0.02)
     baseProgress += 0.05
     for res in synscan.Scan("127.0.0.1", "80", synscan.wait(1))~ {  }
-
 
     synscanEnable = true
     yakit.StatusCard("SYN 扫描", "可用")
@@ -663,9 +661,9 @@ addOpenPortCount = func() {
 
 /* 进行 TCP 扫描*/
 
-func handleTCP(target) {
+func handleTCP(targets) {
     try {
-        for result in servicescan.Scan(target, tcpPorts, tcpOps...)~ {
+        for result in servicescan.Scan(targets, tcpPorts, tcpOps...)~ {
             if !result.IsOpen() {
                 continue
             }
@@ -689,51 +687,63 @@ func handleTCP(target) {
         yakit.Error("处理 TCP 指纹识别失败: %v", err)
     }finally{
         p = 1 * len(str.ParseStringToPorts(str.Trim(tcpPorts, ",")))
+        targetNum = len(str.ParseStringToHosts(str.Trim(targets, ",")))
+        p = p * targetNum
         updateProgress(p)
     }
 }
 
-synWg = sync.NewSizedWaitGroup(2)
+//synWg = sync.NewSizedWaitGroup(2)
+// 数据包计数
+synPacketCounter = 0
+addSynPacketCounter = func(){synPacketCounter++}
+startSYNPacketCounter = func(){
+    go func{
+        for { sleep(3); yakit.StatusCard("SYN 发包数", synPacketCounter) }
+    }
+}
+startSYNPacketCounter()
 
-func handleSYN(target) {
-    synWg.Add()
-    go func(ctarget) {
-        defer synWg.Done()
-
-        try {
-            for result in servicescan.ScanFromSynResult(
-                synscan.Scan(ctarget, synPorts, synscan.initPortFilter(synPorts), synscan.initHostFilter(ctarget),
-                             synscan.excludePorts(tcpPorts), synscan.concurrent(synConcurrent))~,
-                tcpOps...,
-            )~ {
-                if !result.IsOpen() {
-                    continue
-                }
-
-                if result.Target not in aliveHostCountList {
-                    aliveHostCountList = append(aliveHostCountList, result.Target)
-                }
-
-                yakit.Info("SYNGOT: %v", result.String())
-                yakit.Output({"host": "SYN-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
-                portRes, _ = yakit.ObjToPort(result)
-                portRes.TaskName = taskName
-                yakit.SavePortFromResult(portRes)
-
-                addOpenPortCount()
-                handleServiceScanResult(result)
+func handleSYN(targets) {
+    try {
+        for result :=range servicescan.ScanFromSynResult(
+            synscan.Scan(
+                targets, synPorts,
+                //synscan.initPortFilter(synPorts),
+                //synscan.initHostFilter(targets),
+                synscan.excludePorts("80"),
+                //synscan.concurrent(synConcurrent),
+                synscan.submitTaskCallback(func(i){ addSynPacketCounter() }),
+                )~,
+                //tcpOps...,
+        )~ {
+            if !result.IsOpen() {
+                continue
             }
 
-        } catch err {
-            yakit.Error("SYN 处理 TCP 指纹识别失败: %v", err)
-        }finally{
-            p = 1 * len(str.ParseStringToPorts(str.Trim(synPorts, ",")))
-            updateProgress(p)
+            if result.Target not in aliveHostCountList {
+                aliveHostCountList = append(aliveHostCountList, result.Target)
+            }
+
+            yakit.Info("SYNGOT: %v", result.String())
+            yakit.Output({"host": "SYN-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
+            portRes, _ = yakit.ObjToPort(result)
+            portRes.TaskName = taskName
+            yakit.SavePortFromResult(portRes)
+
+            addOpenPortCount()
+            handleServiceScanResult(result)
         }
-    }(target)
+    } catch err {
+        yakit.Error("SYN 处理 TCP 指纹识别失败: %v", err)
+    }finally{
+        p = 1 * len(str.ParseStringToPorts(str.Trim(synPorts, ",")))
+        targetNum = len(str.ParseStringToHosts(str.Trim(targets, ",")))
+        p = p * targetNum
+        updateProgress(p)
+    }
 }
 
-swg = sync.NewSizedWaitGroup(20)
 
 fileReader, err = file.NewMultiFileLineReader(files...)
 if err != nil {
@@ -750,36 +760,57 @@ if recordPtr > 0 {
     }
 }
 
-
+targetBatch = ""
+count := 0
+//swg = sync.NewSizedWaitGroup(1)
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
     yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr(),"no display")
-    swg.Add()
-    go func {
-        defer swg.Done()
-        addScanHostCount()
+    if count > 0 {
+        targetBatch += "," + currentTarget
+    } else {
+        targetBatch = currentTarget
+    }
+    count++
+    addScanHostCount()
+
+    if count == 20 {
         wg = sync.NewWaitGroup()
-        wg.Add(1)
-        go func {
-            defer wg.Done()
-
-
-            handleTCP(currentTarget)
-        }
         if synscanEnable {
             wg.Add(1)
             go func {
                 defer wg.Done()
-                handleSYN(currentTarget)
+                handleSYN(targetBatch)
             }
         }
-
         wg.Wait()
+        targetBatch = ""
+        count = 0
     }
 }
 
-synWg.Wait()
-swg.Wait()
+if count > 0 {
+    addScanHostCount()
+    wg = sync.NewWaitGroup()
+    //wg.Add(1)
+    //go func {
+    //    defer wg.Done()
+    //    handleTCP(targets)
+    //}
+    if synscanEnable {
+        wg.Add(1)
+        go func {
+            defer wg.Done()
+            handleSYN(targetBatch)
+        }
+    }
+
+    wg.Wait()
+}
+
+//swg.Wait()
+//synWg.Wait()
+
 yakit.SetProgress(0.94)
 
 go fn {

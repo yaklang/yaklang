@@ -112,7 +112,7 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 	}
 
 	ifIns, ip1, ip2, err := nativeRoute()
-	if err == nil {
+	if err == nil && ip1 != nil {
 		return ifIns, ip1, ip2, nil
 	}
 
