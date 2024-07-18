@@ -54,14 +54,14 @@ func (s *Scannerx) initHandle() error {
 	}
 	if s.config.Iface.Flags&net.FlagLoopback == 0 {
 		// Interface is not loopback, set the filter.
-		err = handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String()))
+		err = handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String()))
 		if err != nil {
 			return utils.Errorf("SetBPFFilter failed: %v", err)
 		}
 	} else {
 		// Interface is loopback, set a different filter.
 		// Replace the following line with the appropriate filter for your use case.
-		err = handle.SetBPFFilter("tcp[tcpflags] == tcp-syn|tcp-ack")
+		err = handle.SetBPFFilter("udp || tcp[tcpflags] == tcp-syn|tcp-ack")
 		if err != nil {
 			return utils.Errorf("Loopback SetBPFFilter failed: %v", err)
 		}
@@ -134,8 +134,8 @@ func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.S
 	//	}
 	//}
 
-	if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
-		switch layer := tcpSynLayer.(type) {
+	if transportLayer := packet.TransportLayer(); transportLayer != nil {
+		switch layer := transportLayer.(type) {
 		case *layers.TCP:
 			if layer.SYN && layer.ACK {
 				if nl := packet.NetworkLayer(); nl != nil {

@@ -136,6 +136,8 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 	opts = append(opts, pcapx.WithUDP_SrcPort(srcPort))
 	opts = append(opts, pcapx.WithUDP_DstPort(port))
 
+	opts = append(opts, pcapx.WithPayload(dnsPayload))
+
 	packetBytes, err = pcapx.PacketBuilder(opts...)
 	if err != nil {
 		return nil, utils.Wrapf(err, "assembleUdpPacket failed")
