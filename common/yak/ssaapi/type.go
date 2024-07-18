@@ -21,6 +21,17 @@ func (t *Type) String() string {
 	return t.t.String()
 }
 
+func (t *Type) IsAny() bool {
+	if t == nil || t.t == nil {
+		return true
+	}
+	b, ok := t.t.(*ssa.BasicType)
+	if !ok {
+		return true
+	}
+	return b.Kind == ssa.AnyTypeKind
+}
+
 func (t *Type) Compare(t2 *Type) bool {
 	return TypeCompare(t, t2)
 }

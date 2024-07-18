@@ -54,9 +54,37 @@ const (
 
 	// NativeCall_GetSiblings is used to get the siblings of a value
 	NativeCall_GetSiblings = "getSiblings"
+
+	// NativeCall_TypeName is used to get the type name of a value
+	NativeCall_TypeName = "typeName"
+
+	// NativeCall_FullTypeName is used to get the full type name of a value
+	NativeCall_FullTypeName = "fullTypeName"
 )
 
 func init() {
+	sfvm.RegisterNativeCall(NativeCall_TypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
+		var vals []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			t := val.GetType()
+			if !t.IsAny() {
+				typeStr := t.String()
+				results := val.NewValue(ssa.NewConst(typeStr))
+				vals = append(vals, results)
+				return nil
+			}
+			return nil
+		})
+		if len(vals) > 0 {
+			return true, sfvm.NewValues(vals), nil
+		}
+		return false, nil, utils.Error("no value found")
+	})
+
 	sfvm.RegisterNativeCall(NativeCall_GetFormalParams, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
 		var vals []sfvm.ValueOperator
 		v.Recursive(func(operator sfvm.ValueOperator) error {
