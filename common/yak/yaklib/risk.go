@@ -38,6 +38,7 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 `, title, risk.IP))
 			}
 		}
+		client.Output(risk)
 	}
 }
 
