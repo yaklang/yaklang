@@ -87,21 +87,22 @@ func (base *ScopedVersionedTable[T]) Merge(
 }
 
 // this handler merge [origin, last] to phi
-func (s *ScopedVersionedTable[T]) Spin(
+func (condition *ScopedVersionedTable[T]) Spin(
 	header, latch ScopedVersionedTableIF[T],
 	handler SpinHandle[T],
 ) {
-	s.spin = false
-	s.createEmptyPhi = nil
-	s.ForEachCapturedVariable(func(name string, ver VersionedIF[T]) {
+	condition.spin = false
+	condition.createEmptyPhi = nil
+	for name, v := range condition.linkIncomingPhi {
+		ver := v.Last().Value
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
 		for name, value := range res {
-			v := s.CreateVariable(name, false)
-			s.AssignVariable(v, value)
+			v := condition.CreateVariable(name, false)
+			condition.AssignVariable(v, value)
 		}
-	})
+	}
 }
 
 func (s *ScopedVersionedTable[T]) SetSpin(create func(string) T) {

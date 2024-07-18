@@ -1,11 +1,12 @@
 package ssautil
 
 import (
+	"reflect"
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"reflect"
-	"sync"
 )
 
 // for builder
@@ -359,10 +360,6 @@ func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler CaptureVariab
 	for name, linked := range ps.linkCaptured {
 		handler(name, linked.Last().Value)
 	}
-	//ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
-	//	handler(name, ver)
-	//	return true
-	//})
 }
 
 func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {

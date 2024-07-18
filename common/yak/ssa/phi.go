@@ -34,7 +34,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			jump loop-header;
 	*/
 	ret := make(map[string]Value)
-	for true {
+	func() {
 		// step 1
 		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch {
@@ -47,14 +47,14 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			}
 
 			ret[name] = header
-			break
+			return
 		}
 
 		// only this value change, create a Phi
 		phi, ok := ToPhi(phiValue)
 		if !ok {
 			log.Errorf("phiValue is not a phi %s: %v", name, phiValue)
-			break
+			return
 		}
 
 		// step 2
@@ -63,7 +63,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 				phi2.Edge[index] = header
 				ret[name] = phi2
 				DeleteInst(phiValue)
-				break
+				return
 			}
 		}
 
@@ -73,8 +73,8 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)
 		ret[name] = phiValue
-		break
-	}
+		return
+	}()
 	return ret
 }
 
