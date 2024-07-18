@@ -59,7 +59,7 @@ if proxies == "no" {
 active = cli.Bool("active")
 userfpFile = cli.String("user-fingerprint")
 concurrent = cli.Int("concurrent", cli.setDefault(50))
-synConcurrent = cli.Int("syn-concurrent", cli.setDefault(2000))
+synConcurrent = cli.Int("syn-concurrent", cli.setDefault(1500))
 protos = cli.String("proto", cli.setDefault("tcp,udp"))
 
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
@@ -709,13 +709,11 @@ func handleSYN(targets) {
         for result :=range servicescan.ScanFromSynResult(
             synscan.Scan(
                 targets, synPorts,
-                //synscan.initPortFilter(synPorts),
-                //synscan.initHostFilter(targets),
-                synscan.excludePorts("80"),
-                //synscan.concurrent(synConcurrent),
+                synscan.excludePorts(tcpPorts),
+                synscan.concurrent(synConcurrent),
                 synscan.submitTaskCallback(func(i){ addSynPacketCounter() }),
                 )~,
-                //tcpOps...,
+                tcpOps...,
         )~ {
             if !result.IsOpen() {
                 continue
@@ -762,7 +760,6 @@ if recordPtr > 0 {
 
 targetBatch = ""
 count := 0
-//swg = sync.NewSizedWaitGroup(1)
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
     yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr(),"no display")
@@ -776,6 +773,11 @@ for fileReader.Next(){
 
     if count == 20 {
         wg = sync.NewWaitGroup()
+        wg.Add(1)
+        go func {
+            defer wg.Done()
+            handleTCP(targetBatch)
+        }
         if synscanEnable {
             wg.Add(1)
             go func {
@@ -792,11 +794,11 @@ for fileReader.Next(){
 if count > 0 {
     addScanHostCount()
     wg = sync.NewWaitGroup()
-    //wg.Add(1)
-    //go func {
-    //    defer wg.Done()
-    //    handleTCP(targets)
-    //}
+    wg.Add(1)
+    go func {
+        defer wg.Done()
+        handleTCP(targetBatch)
+    }
     if synscanEnable {
         wg.Add(1)
         go func {
@@ -804,12 +806,8 @@ if count > 0 {
             handleSYN(targetBatch)
         }
     }
-
     wg.Wait()
 }
-
-//swg.Wait()
-//synWg.Wait()
 
 yakit.SetProgress(0.94)
 

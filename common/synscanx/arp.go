@@ -16,7 +16,7 @@ func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
 			if retry > 2 {
 				return nil, utils.Errorf("cannot fetch hw addr for %v[%v]", s.sampleIP, s.config.Iface.Name)
 			}
-			dstHw, ok := s.macTable.Load(gateway)
+			dstHw, ok := s.macCacheTable.Load(gateway)
 			if ok {
 				s.config.RemoteMac = dstHw.(net.HardwareAddr)
 				log.Infof("use arpx proto to fetch gateway's hw address: %s", dstHw)
@@ -27,84 +27,6 @@ func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
 		}
 	}
 	return nil, utils.Errorf("cannot fetch hw addr for %v[%v]", s.sampleIP, s.config.Iface.Name)
-	//macCh := make(chan net.HardwareAddr)
-	//
-	//wg := sync.WaitGroup{}
-	//
-	//ctx, cancel := context.WithTimeout(context.Background(), s.config.FetchGatewayHardwareAddressTimeout)
-	//
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	err := pcaputil.Start(
-	//		pcaputil.WithContext(ctx),
-	//		pcaputil.WithDevice(s.config.Iface.Name),
-	//		pcaputil.WithDisableAssembly(true),
-	//		pcaputil.WithBPFFilter("udp dst port 65321"),
-	//		pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-	//			if ethLayer := packet.Layer(layers.LayerTypeEthernet); ethLayer != nil {
-	//				if !bytes.Equal(ethLayer.(*layers.Ethernet).DstMAC, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
-	//					log.Infof("MAC Address found: %s", ethLayer.(*layers.Ethernet).DstMAC)
-	//					macCh <- ethLayer.(*layers.Ethernet).DstMAC
-	//					cancel()
-	//				}
-	//			}
-	//		}),
-	//	)
-	//	if err != nil {
-	//		log.Errorf("pcaputil.Start failed: %v", err)
-	//		return
-	//	}
-	//
-	//}()
-	//
-	//connectUdp := func() error {
-	//	conn, err := yaklib.ConnectUdp(s.sampleIP, "65321")
-	//	if err != nil {
-	//		log.Errorf("connect udp failed: %v", err)
-	//		return err
-	//	}
-	//	defer conn.Close()
-	//	_, err = conn.Write([]byte("hello"))
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	err = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-	//	if err != nil {
-	//		return err
-	//	}
-	//	buf := make([]byte, 1024)
-	//	_, _ = conn.Read(buf)
-	//	return nil
-	//}
-	//
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	for i := 0; i < 3; i++ {
-	//		err := connectUdp()
-	//		if err != nil {
-	//			return
-	//		}
-	//	}
-	//}()
-	//go func() {
-	//	wg.Wait()
-	//	close(macCh)
-	//}()
-	//
-	//timer := time.NewTimer(time.Second * 3)
-	//defer timer.Stop()
-	//
-	//select {
-	//case <-timer.C:
-	//	return utils.Errorf("cannot fetch hw addr for %v[%v]", s.sampleIP, s.config.Iface.Name)
-	//case hw := <-macCh:
-	//	s.config.RemoteMac = hw
-	//	log.Infof("use pcap proto to fetch gateway's hw address: %s", hw.String())
-	//	return nil
-	//}
 }
 
 func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
@@ -113,7 +35,7 @@ func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
 		s.MacHandlers(ip, hw)
 	}
 
-	s.macTable.Store(ip.String(), hw)
+	s.macCacheTable.Store(ip.String(), hw)
 }
 
 func (s *Scannerx) arpScan() {
@@ -140,7 +62,7 @@ func (s *Scannerx) arpScan() {
 			return
 		default:
 			targetIP := net.ParseIP(target)
-			if targetIP == nil {
+			if targetIP == nil || targetIP.IsLoopback() || targetIP.IsLinkLocalUnicast() || targetIP.IsLinkLocalMulticast() {
 				continue
 			}
 			if (targetIP.To4() != nil && ifaceIPNetV4 != nil && ifaceIPNetV4.Contains(targetIP)) ||

@@ -734,7 +734,7 @@ func (f *HostsFilter) Add(block ...string) {
 	defer f.mutex.Unlock()
 
 	for _, b := range block {
-		for _, sub := range strings.Split(b, ",") {
+		for _, sub := range ParseStringToHosts(b) {
 			sub = strings.TrimSpace(sub)
 			f.createAction(sub)
 		}
@@ -836,9 +836,8 @@ func (f *PortsFilter) createAction(ports string) {
 
 func (f *PortsFilter) Add(block ...string) {
 	for _, b := range block {
-		for _, sub := range strings.Split(b, ",") {
-			sub = strings.TrimSpace(sub)
-			f.createAction(sub)
+		for _, sub := range ParseStringToPorts(b) {
+			f.createAction(strconv.Itoa(sub))
 		}
 	}
 }
