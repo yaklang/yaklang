@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -157,7 +158,10 @@ func (m *StringMap) Scan(value any) error {
 	}
 	val := codec.AnyToBytes(value)
 	if err := json.Unmarshal(val, m); err != nil {
-		return err
+		log.Errorf("failed to unmarshal string(%#v) map: %v", string(val), err)
+		*m = make(StringMap)
+		(*m)[string(val)] = codec.Md5(string(val))
+		return nil
 	}
 	return nil
 }
