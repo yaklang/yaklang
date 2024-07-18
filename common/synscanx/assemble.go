@@ -16,7 +16,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 
 	dstMac := s.config.RemoteMac
 	srcMac := s.config.SourceMac
-	if mac, ok := s.macTable.Load(host); ok {
+	if mac, ok := s.macCacheTable.Load(host); ok {
 		dstMac = mac.(net.HardwareAddr)
 	}
 

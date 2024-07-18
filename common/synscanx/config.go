@@ -88,7 +88,7 @@ func (s *SynxConfig) filtered(port int) bool {
 func NewDefaultConfig() *SynxConfig {
 	return &SynxConfig{
 		waiting: 5 * time.Second,
-		// 这个限速器每秒可以允许最多 1500 个请求，短时间内可以允许突发的 150 个请求
+		// 这个限速器每秒可以允许最多 1000 个请求，短时间内可以允许突发的 150 个请求
 		rateLimitDelayMs:                   1,
 		rateLimitDelayGap:                  150,
 		ExcludePorts:                       filter.NewFilter(),
@@ -146,8 +146,10 @@ func WithConcurrent(count int) SynxConfigOption {
 		if count <= 0 {
 			count = 1000
 		}
-		config.rateLimitDelayMs = float64(time.Duration(float64(time.Second) / float64(count)))
-		config.rateLimitDelayGap = count
+		config.rateLimitDelayMs = float64(time.Second) / float64(count) / float64(time.Millisecond)
+		config.rateLimitDelayGap = count / 10
+		log.Infof("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
+		log.Infof("rate limit delay gap: %v", config.rateLimitDelayGap)
 	}
 }
 
