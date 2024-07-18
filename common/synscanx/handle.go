@@ -15,6 +15,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"unicode/utf8"
 )
 
 // windows 的pcap 错误信息是gb18030编码的，需要转换成utf8
@@ -23,11 +24,16 @@ func (s *Scannerx) handleError(err error) error {
 		return nil
 	}
 	if runtime.GOOS == "windows" {
-		info, convertErr := codec.GB18030ToUtf8([]byte(err.Error()))
-		if convertErr != nil {
-			return utils.Wrapf(convertErr, "pcap ifaceDevs")
+		errMsg := err.Error()
+		if !utf8.ValidString(errMsg) {
+			info, convertErr := codec.GB18030ToUtf8([]byte(errMsg))
+			if convertErr != nil {
+				return utils.Wrapf(convertErr, "pcap ifaceDevs")
+			}
+			return utils.Wrapf(errors.New(string(info)), "pcap ifaceDevs")
+		} else {
+			return utils.Wrapf(err, "pcap ifaceDevs")
 		}
-		return utils.Wrapf(errors.New(string(info)), "pcap ifaceDevs")
 	} else {
 		return utils.Wrapf(err, "handle Error")
 	}
