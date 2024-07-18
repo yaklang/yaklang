@@ -30,8 +30,8 @@ type Scannerx struct {
 	OpenPortHandlers func(ip net.IP, port int)
 
 	// MAC地址表
-	macTable    *sync.Map
-	MacHandlers func(ip net.IP, addr net.HardwareAddr)
+	macCacheTable *sync.Map
+	MacHandlers   func(ip net.IP, addr net.HardwareAddr)
 
 	Handle *pcap.Handle
 
@@ -44,13 +44,13 @@ type Scannerx struct {
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
 	limitInterval := time.Duration(config.rateLimitDelayMs * float64(time.Millisecond))
 	s := &Scannerx{
-		ctx:         ctx,
-		config:      config,
-		startTime:   time.Now(),
-		macTable:    new(sync.Map),
-		loopbackMap: make(map[string]string),
-		sampleIP:    sample,
-		limiter:     rate.NewLimiter(rate.Every(limitInterval), config.rateLimitDelayGap),
+		ctx:           ctx,
+		config:        config,
+		startTime:     time.Now(),
+		macCacheTable: new(sync.Map),
+		loopbackMap:   make(map[string]string),
+		sampleIP:      sample,
+		limiter:       rate.NewLimiter(rate.Every(limitInterval), config.rateLimitDelayGap),
 	}
 	// 初始化发包相关的配置
 	err := s.initEssentialInfo()
@@ -176,6 +176,18 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 
 	resultFilter := filter.NewFilter()
 	defer resultFilter.Close()
+
+	var hostsFilter *utils.HostsFilter
+	var portsFilter *utils.PortsFilter
+	// 从扫描目标中过滤出你想要的目标
+	if s.config.initFilterHosts != "" {
+		log.Infof("filter hosts: %s", s.config.initFilterHosts)
+		hostsFilter = utils.NewHostsFilter(s.config.initFilterHosts)
+	}
+	if s.config.initFilterPorts != "" {
+		log.Infof("filter ports: %s", s.config.initFilterPorts)
+		portsFilter = utils.NewPortsFilter(s.config.initFilterPorts)
+	}
 	if s.OpenPortHandlers == nil {
 		s.OpenPortHandlers = func(host net.IP, port int) {
 			openPortLock.Lock()
@@ -195,6 +207,14 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 			if !(s.hosts.Contains(host.String()) && s.ports.Contains(port)) {
 				return
 			}
+
+			if hostsFilter != nil && !hostsFilter.Contains(host.String()) {
+				return
+			}
+			if portsFilter != nil && !portsFilter.Contains(port) {
+				return
+			}
+
 			openPortCount++
 			result := &synscan.SynScanResult{
 				Host: host.String(),
@@ -233,10 +253,9 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 
 	wCancel()
 
-	s.Handle.Close()
+	s.Close()
 
 	done <- struct{}{}
-
 	log.Infof("open port count: %d", openPortCount)
 	return nil
 }
