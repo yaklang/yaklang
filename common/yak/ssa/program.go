@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -45,7 +46,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 }
 
 func (prog *Program) GetLibrary(name string) (*Program, bool) {
-	if prog == nil && prog.Application == nil {
+	if prog == nil || (prog.Application == nil) || utils.IsNil(prog.Application) {
 		return nil, false
 	}
 	// get lib from application
