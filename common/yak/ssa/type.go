@@ -1096,6 +1096,10 @@ func isGenericType(t Type) bool {
 func GetGenericTypeFromType(t Type) []Type {
 	typs := make([]Type, 0)
 	switch t.GetTypeKind() {
+	case OrTypeKind:
+		for _, typ := range t.(*OrType).types {
+			typs = append(typs, GetGenericTypeFromType(typ)...)
+		}
 	case GenericTypeKind:
 		typs = append(typs, t)
 	case ChanTypeKind:
