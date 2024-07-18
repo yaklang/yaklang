@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"mime"
 	"net/http"
@@ -16,6 +15,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -1629,7 +1630,7 @@ func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 // GetHTTPPacketHeaders 是一个辅助函数，用于获取请求报文中所有请求头，其返回值为map[string]string
 // Example:
 // ```
-// poc.GetHTTPPacketCookiesFull(`GET /get HTTP/1.1
+// poc.GetHTTPPacketHeaders(`GET /get HTTP/1.1
 // Content-Type: application/json
 // Cookie: a=b; a=c; c=d
 // Host: pie.dev
@@ -1672,15 +1673,15 @@ func GetHTTPPacketHeadersFull(packet []byte) (headers map[string][]string) {
 	return val
 }
 
-// GetHTTPPacketHeaders 是一个辅助函数，用于获取请求报文中指定的请求头，其返回值为string
+// GetHTTPPacketHeader 是一个辅助函数，用于获取请求报文中指定的请求头，其返回值为string
 // Example:
 // ```
-// poc.GetHTTPPacketCookiesFull(`GET /get HTTP/1.1
+// poc.GetHTTPPacketHeader(`GET /get HTTP/1.1
 // Content-Type: application/json
 // Cookie: a=b; a=c; c=d
 // Host: pie.dev
 //
-// `) // 获取Content-Type请求头，这里会返回"application/json"
+// `, "Content-Type") // 获取Content-Type请求头，这里会返回"application/json"
 // ```
 func GetHTTPPacketHeader(packet []byte, key string) (header string) {
 	ret := GetHTTPPacketHeaders(packet)
