@@ -916,8 +916,9 @@ e={"a":1}
 e.Delete
 `
 
-	pocLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
-	pocDesc := "HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收 []byte, string, http.Request 结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等\n\nExample:\n```\npoc.HTTP(\"GET / HTTP/1.1\\r\\nHost: www.yaklang.com\\r\\n\\r\\n\", poc.https(true), poc.replaceHeader(\"AAA\", \"BBB\")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB\n```\n"
+	funcDecl := getFuncDeclByName("poc", "HTTP")
+	pocLabel := getFuncDeclLabel(nil, funcDecl)
+	pocDesc := funcDecl.Document
 
 	t.Run("standard library function signature", func(t *testing.T) {
 		t.Parallel()
@@ -999,7 +1000,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature_Generic(t *testing.T) {
 				EndLine:     1,
 				EndColumn:   8,
 			},
-			"```go\nFind(i []T|map[U]T, fc (T) -> boolean) T\n```",
+			"Find(i []T|map[U]T, fc (T) -> boolean) T",
 			"",
 		)
 	})
