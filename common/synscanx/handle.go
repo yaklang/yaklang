@@ -120,17 +120,33 @@ func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.S
 		}
 	}
 
-	if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
-		l, ok := tcpSynLayer.(*layers.TCP)
-		if !ok {
-			return
-		}
+	//if icmpLayer := packet.Layer(layers.LayerTypeICMPv4); icmpLayer != nil {
+	//	icmp := icmpLayer.(*layers.ICMPv4)
+	//
+	//	// Check if the ICMP message is a port unreachable error
+	//	if icmp.TypeCode == layers.ICMPv4TypeDestinationUnreachable && icmp.TypeCode.Code() == layers.ICMPv6CodePortUnreachable {
+	//		// Handle ICMP port unreachable error here
+	//		fmt.Println("ICMP port unreachable error received")
+	//
+	//		if nl := packet.NetworkLayer(); nl != nil {
+	//			s.ClosedPortHandlers(net.ParseIP(nl.NetworkFlow().Src().String()), int(icmp.Seq))
+	//		}
+	//	}
+	//}
 
-		if l.SYN && l.ACK {
-			if nl := packet.NetworkLayer(); nl != nil {
-				s.OpenPortHandlers(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+	if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
+		switch layer := tcpSynLayer.(type) {
+		case *layers.TCP:
+			if layer.SYN && layer.ACK {
+				if nl := packet.NetworkLayer(); nl != nil {
+					s.OpenPortHandlers(net.ParseIP(nl.NetworkFlow().Src().String()), int(layer.SrcPort))
+				}
+				return
 			}
-			return
+		case *layers.UDP:
+			if nl := packet.NetworkLayer(); nl != nil {
+				s.OpenPortHandlers(net.ParseIP(nl.NetworkFlow().Src().String()), int(layer.SrcPort))
+			}
 		}
 	}
 
