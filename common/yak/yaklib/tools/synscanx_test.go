@@ -13,7 +13,7 @@ func Test__scanx(t *testing.T) {
 	}
 
 	res, err := _scanx(
-		"192.168.3.3/24",
+		"114.114.114.114",
 		//"47.52.100.35/24",
 		"U:53",
 		//synscanx.WithInitFilterPorts("443"),

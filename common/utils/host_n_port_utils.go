@@ -837,6 +837,10 @@ func (f *PortsFilter) createAction(ports string) {
 func (f *PortsFilter) Add(block ...string) {
 	for _, b := range block {
 		for _, sub := range ParseStringToPorts(b) {
+			// support udp
+			if sub > 65535 {
+				sub = sub >> 12
+			}
 			f.createAction(strconv.Itoa(sub))
 		}
 	}
