@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+func TestNucleiTag_RandStr(t *testing.T) {
+	// res, err := ExecNucleiTag(`http://{{HostName}}:80/aaa`, map[string]any{
+	// 	"HostName": "baidu.com",
+	// })
+}
+
 func TestNucleiTag(t *testing.T) {
 	res, err := ExecNucleiTag(`http://{{HostName}}:80/aaa`, map[string]any{
 		"HostName": "baidu.com",
