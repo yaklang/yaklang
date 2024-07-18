@@ -117,6 +117,18 @@ func NewPluginTestingEchoServer(ctx context.Context) *PluginTestingEchoServer {
 
 		return lowhttp.ReplaceHTTPPacketBodyFast([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
+Content-Type: text/plain
+Content-Type: text/xml
+Content-Type: image/gif
+Content-Type: image/jpeg 
+Content-Type: image/png
+Content-Type: application/xhtml+xml
+Content-Type: application/xml
+Content-Type: application/atom+xml
+Content-Type: application/pdf
+Content-Type: application/msword
+Content-Type: application/octet-stream
+Content-Type: application/json
 `), body)
 	})
 
