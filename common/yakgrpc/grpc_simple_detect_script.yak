@@ -693,7 +693,6 @@ func handleTCP(targets) {
     }
 }
 
-//synWg = sync.NewSizedWaitGroup(2)
 // 数据包计数
 synPacketCounter = 0
 addSynPacketCounter = func(){synPacketCounter++}
@@ -760,6 +759,8 @@ if recordPtr > 0 {
 
 targetBatch = ""
 count := 0
+wgTCP := sync.NewWaitGroup()
+
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
     yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr(),"no display")
@@ -772,20 +773,14 @@ for fileReader.Next(){
     addScanHostCount()
 
     if count == 20 {
-        wg = sync.NewWaitGroup()
-        wg.Add(1)
+        wgTCP.Add(1)
         go func {
-            defer wg.Done()
+            defer wgTCP.Done()
             handleTCP(targetBatch)
         }
         if synscanEnable {
-            wg.Add(1)
-            go func {
-                defer wg.Done()
-                handleSYN(targetBatch)
-            }
+            handleSYN(targetBatch)
         }
-        wg.Wait()
         targetBatch = ""
         count = 0
     }
@@ -793,21 +788,21 @@ for fileReader.Next(){
 
 if count > 0 {
     addScanHostCount()
-    wg = sync.NewWaitGroup()
-    wg.Add(1)
+    wgTCP.Add(1)
     go func {
-        defer wg.Done()
+        defer wgTCP.Done()
         handleTCP(targetBatch)
     }
     if synscanEnable {
-        wg.Add(1)
-        go func {
-            defer wg.Done()
-            handleSYN(targetBatch)
-        }
+        handleSYN(targetBatch)
     }
-    wg.Wait()
 }
+
+if synscanEnable {
+    yakit.StatusCard("SYN", "DONE")
+}
+
+wgTCP.Wait()
 
 yakit.SetProgress(0.94)
 
