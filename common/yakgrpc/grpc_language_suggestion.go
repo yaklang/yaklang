@@ -283,19 +283,51 @@ func shouldExport(key string) bool {
 	return (key[0] >= 'A' && key[0] <= 'Z')
 }
 
-func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string, funcTyps ...*ssa.FunctionType) string {
+func getFuncDeclDesc(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
 	document := funcDecl.Document
 	if document != "" {
 		document = "\n\n" + document
 	}
-	decl := funcDecl.Decl
-	decl = strings.Replace(decl, "func(", typStr+"(", 1)
+	decl, desc := funcDecl.Decl, ""
+	funcName := funcDecl.MethodName
 
-	desc := ""
-	if len(funcTyps) > 0 {
-		funcTyp := funcTyps[0]
-		if funcTyp.IsMethod && len(funcTyp.Parameter) > 0 {
-			desc = fmt.Sprintf("```go\nfunc (%s) %s\n```%s", funcTyp.Parameter[0], decl, document)
+	bareV := ssaapi.GetBareNode(v)
+	if f, ok := ssa.ToFunction(bareV); ok {
+		if strings.HasPrefix(decl, "func(") {
+			// fix decl
+			decl = strings.Replace(decl, "func(", funcName+"(", 1)
+		}
+
+		funcTyp, ok := ssa.ToFunctionType(f.GetType())
+		if ok {
+			isMethod := funcTyp.IsMethod
+			prefix := ""
+			if isMethod && len(funcTyp.Parameter) > 0 {
+				prefix = fmt.Sprintf("(%s) ", funcTyp.Parameter[0])
+			}
+
+			if f.IsGeneric() {
+				offset := 0
+				if isMethod {
+					offset = 1
+				}
+				// fix generic function decl
+				paramsStr := strings.Join(lo.Map(funcDecl.Params, func(item *yakdoc.Field, index int) string {
+					return fmt.Sprintf("%s %s", item.Name, funcTyp.Parameter[index+offset])
+				}), ", ")
+				var returnsStr string
+				if funcTyp.ReturnType.GetTypeKind() == ssa.TupleTypeKind {
+					returnTyp, _ := ssa.ToObjectType(funcTyp.ReturnType)
+
+					returnsStr = strings.Join(lo.Map(funcDecl.Results, func(item *yakdoc.Field, index int) string {
+						return fmt.Sprintf("%s %s", item.Name, returnTyp.GetField(ssa.NewConst(index)))
+					}), ", ")
+				} else {
+					returnsStr = funcTyp.ReturnType.String()
+				}
+
+				desc = fmt.Sprintf("```go\n%s%s(%s) %s\n```%s", prefix, funcName, paramsStr, returnsStr, document)
+			}
 		}
 	}
 
@@ -468,7 +500,7 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 			libName, lastName, _ := strings.Cut(v.GetName(), ".")
 			funcDecl := getFuncDeclByName(libName, lastName)
 			if funcDecl != nil {
-				return yakdoc.ShrinkTypeVerboseName(funcDecl.Decl), funcDecl.Document
+				return getFuncDeclDesc(v, funcDecl), funcDecl.Document
 			}
 		}
 	}
@@ -478,7 +510,7 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 	if ok {
 		funcDecl, ok := lib.Functions[lastName]
 		if ok {
-			return getFuncDeclDesc(funcDecl, lastName, funcTyp), funcDecl.Document
+			return getFuncDeclDesc(v, funcDecl), funcDecl.Document
 		}
 	}
 
@@ -554,9 +586,8 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			if typKind == ssa.FunctionTypeKind {
 				// 标准库函数
 				funcDecl := getFuncDeclByName(libName, lastName)
-				funcTyp, ok := ssa.ToFunctionType(bareTyp)
-				if funcDecl != nil && ok {
-					desc = getFuncDeclDesc(funcDecl, typStr, funcTyp)
+				if funcDecl != nil {
+					desc = getFuncDeclDesc(v, funcDecl)
 				}
 			} else {
 				// 标准库常量
