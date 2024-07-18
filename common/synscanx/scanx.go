@@ -294,6 +294,7 @@ func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) ([]
 	case TCP:
 		return s.assembleSynPacket(host, port)
 	case UDP:
+		return s.assembleUdpPacket(host, port)
 	case ICMP:
 	case ARP:
 		return s.assembleArpPacket(host)
