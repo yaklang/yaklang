@@ -649,6 +649,25 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 	})
 }
 
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Generic(t *testing.T) {
+	t.Run("x.Find", func(t *testing.T) {
+		t.Parallel()
+
+		check := CheckHover(t)
+		check(t, `x.Find()`,
+			"yak",
+			&ypb.Range{
+				Code:        "x.Find",
+				StartLine:   1,
+				StartColumn: 1,
+				EndLine:     1,
+				EndColumn:   8,
+			},
+			"```go\nFind(i []T|map[U]T, fc (T) -> boolean) T\n```",
+		)
+	})
+}
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ExternLib(t *testing.T) {
 	check := CheckHover(t)
 	codeTemplate := `%s {
@@ -675,7 +694,7 @@ prog.Packages
 		},
 		{
 			name: "extern lib method",
-			want: getFuncDeclDesc(getFuncDeclByName("ssa", "Parse"), "Parse"),
+			want: getFuncDeclDesc(nil, getFuncDeclByName("ssa", "Parse")),
 			Range: &ypb.Range{
 				Code:        "ssa.Parse",
 				StartLine:   2,
@@ -783,7 +802,7 @@ a.Parse()`,
 				EndLine:     3,
 				EndColumn:   8,
 			},
-			getFuncDeclDesc(getFuncDeclByName("ssa", "Parse"), "Parse"),
+			getFuncDeclDesc(nil, getFuncDeclByName("ssa", "Parse")),
 		)
 	})
 }
@@ -963,5 +982,25 @@ e.Delete
 			}
 			check(t, code, "yak", ssaRange, "func (map[string]number) Delete(i1 string) null", "移除一个值")
 		})
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature_Generic(t *testing.T) {
+	t.Run("x.Find", func(t *testing.T) {
+		t.Parallel()
+
+		check := CheckSignature(t)
+		check(t, `x.Find()`,
+			"yak",
+			&ypb.Range{
+				Code:        "x.Find",
+				StartLine:   1,
+				StartColumn: 1,
+				EndLine:     1,
+				EndColumn:   8,
+			},
+			"```go\nFind(i []T|map[U]T, fc (T) -> boolean) T\n```",
+			"",
+		)
 	})
 }
