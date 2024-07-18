@@ -40,7 +40,7 @@ options {
 }
 
 sourceFile
-    :  (packageClause)* (importDecl eos)* ((functionDecl | methodDecl | declaration) eos)* EOF
+    : packageClause (importDecl eos)* (( methodDecl | functionDecl | declaration) eos)* EOF
     ;
 
 packageClause
@@ -516,7 +516,7 @@ index
     ;
 
 slice_
-    : L_BRACKET (expression? COLON expression? | expression? COLON expression COLON expression) R_BRACKET
+    : L_BRACKET (low = expression? COLON high = expression? | low = expression? COLON high = expression COLON max = expression) R_BRACKET
     ;
 
 typeAssertion
