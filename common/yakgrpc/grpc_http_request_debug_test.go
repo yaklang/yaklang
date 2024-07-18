@@ -963,6 +963,7 @@ a = risk.NewRisk("127.0.0.1")
 		}
 
 		var cardCount = 0
+		var riskMessageCount = 0
 		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
@@ -976,6 +977,7 @@ a = risk.NewRisk("127.0.0.1")
 			if rsp.RuntimeID != "" {
 				runtimeID = rsp.RuntimeID
 			}
+
 			if rsp.GetIsMessage() {
 				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
 				if level == "feature-status-card-data" {
@@ -983,12 +985,15 @@ a = risk.NewRisk("127.0.0.1")
 					if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
 						cardCount = int(gjson.Get(data, "data").Int())
 					}
+				} else if level == "json-risk" {
+					riskMessageCount++
 				}
 			}
 		}
-		riskMessageCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		riskCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
 		require.NoError(t, err)
-		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
+		require.Equal(t, cardCount, riskCount, "risk count not match")
+		require.Equal(t, cardCount, riskMessageCount, "risk message count not match")
 	})
 
 	t.Run("poc risk count", func(t *testing.T) {
@@ -1051,6 +1056,7 @@ http:
 
 		var cardCount = 0
 		var runtimeID string
+		var riskMessageCount = 0
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -1069,13 +1075,16 @@ http:
 					if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
 						cardCount = int(gjson.Get(data, "data").Int())
 					}
+				} else if level == "json-risk" {
+					riskMessageCount++
 				}
 			}
 		}
 
-		riskMessageCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		riskCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
 		require.NoError(t, err)
-		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
+		require.Equal(t, cardCount, riskCount, "risk count not match")
+		require.Equal(t, cardCount, riskMessageCount, "risk message count not match")
 	})
 }
 
