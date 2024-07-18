@@ -1381,7 +1381,7 @@ func HTTPEx(i interface{}, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 	if err != nil {
 		return nil, nil, err
 	}
-	request, err := lowhttp.ParseBytesToHttpRequest(packet)
+	request, err := lowhttp.ParseBytesToHttpRequest(response.RawRequest)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1414,7 +1414,7 @@ func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err e
 	}
 	response, err := pochttp(packet, config)
 	noFixContentLength := config.NoFixContentLength != nil && *config.NoFixContentLength
-	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, noFixContentLength), err
+	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(response.RawRequest, noFixContentLength), err
 }
 
 // Do 向指定 URL 发送指定请求方法的请求并且返回响应结构体，请求结构体以及错误，它的是第一个参数是请求方法，第二个参数 URL 字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等
@@ -1437,7 +1437,7 @@ func Do(method string, urlStr string, opts ...PocConfigOption) (rspInst *lowhttp
 	if err != nil {
 		return nil, nil, err
 	}
-	request, err := lowhttp.ParseBytesToHttpRequest(packet)
+	request, err := lowhttp.ParseBytesToHttpRequest(response.RawRequest)
 	if err != nil {
 		return nil, nil, err
 	}
