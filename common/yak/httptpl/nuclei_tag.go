@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/segmentio/ksuid"
+
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -117,13 +117,7 @@ func FuzzNucleiTag(raw string, vars map[string]any, payload map[string][]string,
 	}, mode)
 }
 
-func execNucleiTag(raw string, payloads map[string][]string, getVar1 func(s string) (string, error), mode string) ([][]byte, error) {
-	getVar := func(s string) (string, error) {
-		if s == "randstr" {
-			return ksuid.New().String(), nil
-		}
-		return getVar1(s)
-	}
+func execNucleiTag(raw string, payloads map[string][]string, getVar func(s string) (string, error), mode string) ([][]byte, error) {
 	nodes, err := parser.Parse(raw,
 		parser.NewTagDefine("nucleiTag", "{{", "}}", &NucleiTag{
 			AttackMode: mode,

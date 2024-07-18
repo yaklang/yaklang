@@ -2,13 +2,14 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -179,7 +180,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 					})
 					rsp, err := lowhttp.HTTP(packetOpt...)
 					if err != nil {
-						//log.Error(err)
+						// log.Error(err)
 						return nil, err
 					}
 					if config.Debug && config.DebugResponse {
@@ -360,7 +361,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		for _, reqRaw := range reqs {
 			atomic.AddInt64(&count, 1)
 			rsp, err := sender([]byte(reqRaw), req)
-			if y.ReverseConnectionNeed { //check token even if send error
+			if y.ReverseConnectionNeed { // check token even if send error
 				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
 					if config.OOBRequireCheckingTrigger == nil {
 						InjectInteractshVar(v.Data, config.RuntimeId, runtimeVars)
@@ -370,7 +371,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			if err == nil {
 				responses = append(responses, rsp)
 			} else {
-				//log.Error(err)
+				// log.Error(err)
 				continue
 			}
 			varsInResponse := LoadVarFromRawResponse(rsp.RawPacket, rsp.GetDurationFloat(), fmt.Sprintf("_%d", index+1))

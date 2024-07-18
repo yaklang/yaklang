@@ -12,6 +12,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -1203,6 +1204,71 @@ requests:
 	}
 }
 
+func TestMockTest_Extractor_BasicCase_Matcher_RandStr(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	hasToken1, hasToken2 := false, false
+	token := ""
+	server, port := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(req)
+		if err == nil {
+			token = reqIns.URL.Query().Get("token")
+			if len(token) > 0 {
+				hasToken1 = true
+			}
+			token2 := reqIns.URL.Query().Get("token2")
+			if len(token) > 0 {
+				hasToken2 = true
+				token = token + token2
+			}
+		}
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(token), token))
+	})
+	spew.Dump(server, port)
+
+	tpl := `id: test1
+info:
+  name: test1
+  author: v1ll4n
+
+requests:
+  - raw:
+    - |
+      GET /?token={{randstr}}&token2={{randstr_1}} HTTP/1.1
+      Host: {{Hostname}}
+
+    req-condition: true
+    matchers:
+      - type: word
+        words:
+          - "{{randstr}}"
+          - "123"
+      - type: status
+        status:    
+          - 200
+`
+	expected := true
+
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tpl)
+	if err != nil {
+		panic(err)
+	}
+
+	checked := false
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		checked = true
+	}))
+	_, err = ytpl.Exec(
+		config, false,
+		[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
+	)
+
+	require.Equal(t, expected, checked)
+	require.True(t, hasToken1, "no randstr token")
+	require.True(t, hasToken2, "no randstr_1 token")
+}
+
 func TestMockTest_Extractor_BasicCase_Matcher_StatusCode(t *testing.T) {
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
@@ -1239,7 +1305,7 @@ requests:
         words:
           - ">aaa</"
       - type: status
-        status:	
+        status:    
           - 200
           - 500
 
@@ -1293,7 +1359,7 @@ func TestMockTest_Extractor_BasicCase_Matcher_Raw(t *testing.T) {
 	/*
 
 
-		# Enhanced by mp on 2022/05/11
+	   # Enhanced by mp on 2022/05/11
 
 	*/
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
