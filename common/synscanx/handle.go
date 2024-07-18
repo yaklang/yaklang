@@ -17,6 +17,7 @@ import (
 	"runtime"
 )
 
+// windows 的pcap 错误信息是gb18030编码的，需要转换成utf8
 func (s *Scannerx) handleError(err error) error {
 	if err == nil {
 		return nil

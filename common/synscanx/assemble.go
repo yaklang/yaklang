@@ -48,8 +48,9 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	} else {
 		ipSrc = s.config.SourceIP.String()
 	}
-	//srcPort := rand.Intn(65534) + 1
-	srcPort := 12345
+	srcPort := rand.Intn(65534) + 1
+	// wireshark filter port
+	//srcPort := 12345
 	// IPv4
 	opts = append(opts, pcapx.WithIPv4_Flags(layers.IPv4DontFragment))
 	opts = append(opts, pcapx.WithIPv4_Version(4))
@@ -92,35 +93,4 @@ func (s *Scannerx) assembleArpPacket(host string) ([]byte, error) {
 		return nil, err
 	}
 	return packetBytes, nil
-
-	//srcMac := s.config.SourceMac
-	//srcIP := s.config.SourceIP
-	//eth := &layers.Ethernet{
-	//	SrcMAC:       srcMac,
-	//	DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-	//	EthernetType: layers.EthernetTypeARP,
-	//}
-	//arp := &layers.ARP{
-	//	AddrType:          layers.LinkTypeEthernet,
-	//	Protocol:          layers.EthernetTypeIPv4,
-	//	HwAddressSize:     6,
-	//	ProtAddressSize:   4,
-	//	Operation:         layers.ARPRequest,
-	//	SourceHwAddress:   srcMac,
-	//	SourceProtAddress: []byte(srcIP.To4()),
-	//	DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
-	//	DstProtAddress:    []byte(net.ParseIP(host).To4()),
-	//}
-	//
-	//var packetBytes = gopacket.NewSerializeBuffer()
-	//err := gopacket.SerializeLayers(
-	//	packetBytes,
-	//	gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true},
-	//	eth, arp,
-	//)
-	//if err != nil {
-	//	return nil, utils.Wrapf(err, "assembleArpPacket failed")
-	//}
-	//
-	//return packetBytes.Bytes(), nil
 }

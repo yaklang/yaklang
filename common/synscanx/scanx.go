@@ -179,7 +179,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 
 	var hostsFilter *utils.HostsFilter
 	var portsFilter *utils.PortsFilter
-	// 从扫描目标中过滤出你想要的目标
+	// 从扫描目标中过滤出想要的目标
 	if s.config.initFilterHosts != "" {
 		log.Infof("filter hosts: %s", s.config.initFilterHosts)
 		hostsFilter = utils.NewHostsFilter(s.config.initFilterHosts)
