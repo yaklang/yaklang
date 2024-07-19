@@ -2,10 +2,12 @@ package yakurl
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/wsm"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/wsm"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type Action interface {
@@ -24,8 +26,10 @@ type ActionService struct {
 	cancel  context.CancelFunc
 }
 
-var actionServiceInstance *ActionService
-var once sync.Once
+var (
+	actionServiceInstance *ActionService
+	once                  sync.Once
+)
 
 func GetActionService() *ActionService {
 	once.Do(func() {
@@ -60,7 +64,9 @@ func (s *ActionService) GetAction(schema string) Action {
 func (s *ActionService) CreateAction(schema string) Action {
 	switch schema {
 	case "file":
-		return &fileSystemAction{}
+		return &fileSystemAction{
+			fs: filesys.NewLocalFs(),
+		}
 	case "website":
 		return &websiteFromHttpFlow{}
 	case "behinder":
