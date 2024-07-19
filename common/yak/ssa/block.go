@@ -7,17 +7,20 @@ import (
 )
 
 func (f *Function) GetDeferBlock() *BasicBlock {
-	if f.DeferBlock == nil {
+	newDefer := func() *BasicBlock {
 		block := f.NewBasicBlockNotAddBlocks("defer")
 		f.DeferBlock = block
+		// TODO: this Scope should be child Scope of other scope in function
+		block.SetScope(NewScope(f, f.GetProgram().GetProgramName()))
 		return block
+	}
+	if f.DeferBlock == nil {
+		return newDefer()
 	}
 	block, ok := f.DeferBlock.(*BasicBlock)
 	if !ok {
 		log.Warnf("defer block is not a basic block")
-		result := f.NewBasicBlockNotAddBlocks("defer")
-		f.DeferBlock = result
-		return result
+		return newDefer()
 	}
 	return block
 }
