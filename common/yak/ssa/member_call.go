@@ -322,6 +322,9 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 }
 
 func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
+	if object.GetId() == -1 {
+		log.Infof("CreateMemberCallVariable: %v, %v", object.GetName(), key)
+	}
 	if _, ok := ToExternLib(object); ok {
 		name := b.getExternLibMemberCall(object, key)
 		return b.CreateVariable(name)
