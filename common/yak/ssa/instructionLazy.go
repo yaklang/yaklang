@@ -280,6 +280,14 @@ func (lz *LazyInstruction) GetProgram() *Program {
 	return lz.Instruction.GetProgram()
 }
 
+func (lz *LazyInstruction) SetProgram(p *Program) {
+	lz.check()
+	if lz.Instruction == nil {
+		return
+	}
+	lz.Instruction.SetProgram(p)
+}
+
 func (lz *LazyInstruction) SetName(name string) {
 	lz.check()
 	if lz.Instruction == nil {

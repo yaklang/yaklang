@@ -12,6 +12,7 @@ import (
 
 type anInstruction struct {
 	fun   Value
+	prog  *Program
 	block Instruction
 	R     *Range
 	// scope *Scope
@@ -96,7 +97,10 @@ func NewInstruction() anInstruction {
 }
 
 // ssa function and block
-func (a *anInstruction) SetFunc(f *Function) { a.fun = f }
+func (a *anInstruction) SetFunc(f *Function) {
+	a.fun = f
+	a.prog = f.GetProgram()
+}
 func (a *anInstruction) GetFunc() *Function {
 	f, ok := ToFunction(a.fun)
 	if ok {
@@ -105,17 +109,13 @@ func (a *anInstruction) GetFunc() *Function {
 	return nil
 }
 func (a *anInstruction) GetProgram() *Program {
-	f := a.GetFunc()
-	if f == nil {
-		log.Errorf("this value function is nil")
-		return nil
-	}
-	if f.prog == nil {
-		log.Warnf("this value function package is nil")
-		return nil
-	}
-	return f.prog
+	return a.prog
 }
+
+func (a *anInstruction) SetProgram(prog *Program) {
+	a.prog = prog
+}
+
 func (a *anInstruction) SetIsAnnotation(b bool) {
 	a.isAnnotation = b
 }
