@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (s *Scannerx) filterHost(host string) bool {
+func (s *Scannerx) nonExcludedHost(host string) bool {
 	if s.config.excludeHosts != nil {
 		if s.config.excludeHosts.Contains(host) {
 			return true
@@ -18,7 +18,7 @@ func (s *Scannerx) filterHost(host string) bool {
 	return false
 }
 
-func (s *Scannerx) filterPort(port int) bool {
+func (s *Scannerx) nonExcludedPort(port int) bool {
 	if s.config.ExcludePorts != nil {
 		if s.config.ExcludePorts.Exist(fmt.Sprint(port)) {
 			return true
@@ -28,29 +28,35 @@ func (s *Scannerx) filterPort(port int) bool {
 	return false
 }
 
-func (s *Scannerx) GetFilterPorts(ports string) []int {
-	var filteredPorts []int
+func (s *Scannerx) GetNonExcludedPorts(ports string) []int {
+	var nonExcludedPorts []int
 	var fp string
 	for _, port := range utils.ParseStringToPorts(ports) {
-		if s.filterPort(port) {
+		if s.nonExcludedPort(port) {
 			continue
 		}
 		fp += strconv.Itoa(port) + ","
-		filteredPorts = append(filteredPorts, port)
+		nonExcludedPorts = append(nonExcludedPorts, port)
 	}
 	s.ports = utils.NewPortsFilter(fp)
-	return filteredPorts
+	if s.config.shuffle {
+		utils.ShuffleInt(nonExcludedPorts)
+	}
+	return nonExcludedPorts
 }
 
-func (s *Scannerx) GetFilterHosts(targets string) []string {
-	var filteredHosts []string
+func (s *Scannerx) GetNonExcludedHosts(targets string) []string {
+	var nonExcludedHosts []string
 
 	for _, host := range utils.ParseStringToHosts(targets) {
-		if s.filterHost(host) {
+		if s.nonExcludedHost(host) {
 			continue
 		}
-		filteredHosts = append(filteredHosts, host)
+		nonExcludedHosts = append(nonExcludedHosts, host)
 	}
-	s.hosts = hostsparser.NewHostsParser(s.ctx, strings.Join(filteredHosts, ","))
-	return filteredHosts
+	s.hosts = hostsparser.NewHostsParser(s.ctx, strings.Join(nonExcludedHosts, ","))
+	if s.config.shuffle {
+		utils.ShuffleString(nonExcludedHosts)
+	}
+	return nonExcludedHosts
 }
