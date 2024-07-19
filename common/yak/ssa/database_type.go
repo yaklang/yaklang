@@ -22,6 +22,10 @@ func SaveTypeToDB(typ Type) int {
 		param["name"] = t.Name
 	case *ObjectType:
 		param["name"] = t.Name
+	case *BasicType:
+		param["name"] = t.name
+		param["kind"] = t.Kind
+		param["fullTypeName"] = t.fullTypeName
 	default:
 	}
 	extra, err := json.Marshal(param)
@@ -68,6 +72,13 @@ func GetTypeFromDB(id int) Type {
 		typ := &ObjectType{}
 		typ.Name = params["name"].(string)
 		typ.Kind = TypeKind(kind)
+		return typ
+	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
+		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
+		typ := &BasicType{}
+		typ.name = params["name"].(string)
+		typ.Kind = TypeKind(kind)
+		typ.fullTypeName = params["fullTypeName"].(string)
 		return typ
 	default:
 
