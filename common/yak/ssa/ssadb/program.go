@@ -101,11 +101,7 @@ func DeleteProgram(db *gorm.DB, program string) {
 		down.UpStream = utils.RemoveSliceItem(down.UpStream, program)
 		UpdateProgram(down)
 	}
-	// delete the program
-	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
-	db.Model(&IrVariable{}).Where("program_name = ?", program).Unscoped().Delete(&IrVariable{})
-	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrScopeNode{})
-	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+	DeleteDB(db, program)
 }
 
 func AllPrograms(db *gorm.DB) []string {

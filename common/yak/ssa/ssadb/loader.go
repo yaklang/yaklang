@@ -44,8 +44,8 @@ func yieldIrCodes(db *gorm.DB, ctx context.Context) chan *IrCode {
 	return outC
 }
 
-func yieldIrVariables(db *gorm.DB, ctx context.Context) chan int64 {
-	db = db.Model(&IrVariable{})
+func yieldIrIndex(db *gorm.DB, ctx context.Context) chan int64 {
+	db = db.Model(&IrIndex{})
 	outC := make(chan int64)
 	go func() {
 		defer close(outC)
@@ -54,7 +54,7 @@ func yieldIrVariables(db *gorm.DB, ctx context.Context) chan int64 {
 
 		var page = 1
 		for {
-			var items []*IrVariable
+			var items []*IrIndex
 			if _, b := bizhelper.Paging(db, page, 100, &items); b.Error != nil {
 				log.Errorf("paging failed: %s", b.Error)
 				return
@@ -62,17 +62,16 @@ func yieldIrVariables(db *gorm.DB, ctx context.Context) chan int64 {
 
 			page++
 			for _, d := range items {
-				for _, id := range d.InstructionID {
-					if _, ok := filter[id]; ok {
-						continue
-					}
-					filter[id] = struct{}{}
+				id := d.ValueID
+				if _, ok := filter[id]; ok {
+					continue
+				}
+				filter[id] = struct{}{}
 
-					select {
-					case <-ctx.Done():
-						return
-					case outC <- id:
-					}
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- id:
 				}
 			}
 
@@ -110,39 +109,39 @@ func SearchVariable(db *gorm.DB, compareMode, matchMod int, value string) chan i
 }
 
 func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
-	db := DB.Model(&IrVariable{})
+	db := DB.Model(&IrIndex{})
 	switch mod {
 	case NameMatch:
-		db = db.Where("variable_name = ?", value)
+		db = db.Where("variable_name = ? OR class_name = ?", value, value)
 	case KeyMatch:
-		db = db.Where("slice_member_name = ? OR field_member_name = ?", value, value)
+		db = db.Where("field_name = ?", value, value)
 	case BothMatch:
-		db = db.Where("variable_name = ? OR slice_member_name = ? OR field_member_name = ?", value, value, value)
+		db = db.Where("variable_name = ? OR class_name = ? OR field_name = ?", value, value, value)
 	}
-	return yieldIrVariables(db, context.Background())
+	return yieldIrIndex(db, context.Background())
 }
 
 func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
-	db := DB.Model(&IrVariable{})
+	db := DB.Model(&IrIndex{})
 	switch mod {
 	case NameMatch:
 		db = db.Where("variable_name GLOB ?", value)
 	case KeyMatch:
-		db = db.Where("slice_member_name GLOB ? OR field_member_name GLOB ?", value, value)
+		db = db.Where("field_name GLOB ?", value, value)
 	case BothMatch:
-		db = db.Where("variable_name GLOB ? OR slice_member_name GLOB ? OR field_member_name GLOB ?", value, value, value)
+		db = db.Where("variable_name GLOB ? OR class_name GLOB ? OR field_name GLOB ?", value, value, value)
 	}
-	return yieldIrVariables(db, context.Background())
+	return yieldIrIndex(db, context.Background())
 }
 func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
-	db := DB.Model(&IrVariable{})
+	db := DB.Model(&IrIndex{})
 	switch mod {
 	case NameMatch:
-		db = db.Where("variable_name REGEXP ?", value)
+		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ?", value, value)
 	case KeyMatch:
-		db = db.Where("slice_member_name REGEXP ? OR field_member_name REGEXP ?", value, value)
+		db = db.Where("field_name REGEXP ?", value)
 	case BothMatch:
-		db = db.Where("variable_name REGEXP ? OR slice_member_name REGEXP ? OR field_member_name REGEXP ?", value, value, value)
+		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ? OR field_name REGEXP ?", value, value, value)
 	}
-	return yieldIrVariables(db, context.Background())
+	return yieldIrIndex(db, context.Background())
 }
