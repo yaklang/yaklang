@@ -7,15 +7,38 @@ import (
 )
 
 func TestBuilder(t *testing.T) {
-	t.Run("normal function", func(t *testing.T) {
+	t.Run("builder", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
-			var a = "hello world"
-			println(a)
+		 	println("hello world")
 		}
 
 		`, []string{
-			"\"hello world\"",
+			`"hello world"`,
 		}, t)
 	})
 }
+
+
+func TestTemp(t *testing.T) {
+	t.Run("temp", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			var x = 10
+			x += 100
+			
+			switch x.(type) {
+			case type1:
+			case type2:
+			default:
+			}
+		}
+
+		`, []string{
+			``,
+		}, t)
+	})
+}
+
+

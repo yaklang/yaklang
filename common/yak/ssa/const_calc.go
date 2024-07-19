@@ -197,6 +197,9 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 			return NewConst(x.Number() ^ y.Number())
 		}
 	case OpAdd:
+		if x.IsFloat() && y.IsFloat() {
+		    return NewConst(x.Float() + y.Float())
+		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() + y.Number())
 		}
@@ -204,10 +207,26 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 			return NewConst(x.VarString() + y.VarString())
 		}
 	case OpSub:
+		if x.IsFloat() && y.IsFloat() {
+		    return NewConst(x.Float() - y.Float())
+		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() - y.Number())
 		}
+	case OpMul:
+		if x.IsFloat() && y.IsFloat() {
+		    return NewConst(x.Float() * y.Float())
+		}
+		if x.IsNumber() && y.IsNumber() {
+			return NewConst(x.Number() * y.Number())
+		}
 	case OpDiv:
+		if x.IsFloat() && y.IsFloat() {
+		    if x.Float() == 0 || y.Float() == 0 {
+		        return NewConst(0)
+			}
+		    return NewConst(x.Float() / y.Float())
+		}
 		if x.IsNumber() && y.IsNumber() {
 			if x.Number() == 0 || y.Number() == 0 {
 				return NewConst(0)
@@ -217,10 +236,6 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 	case OpMod:
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() % y.Number())
-		}
-	case OpMul:
-		if x.IsNumber() && y.IsNumber() {
-			return NewConst(x.Number() * y.Number())
 		}
 	case OpGt:
 		if x.IsNumber() && y.IsNumber() {

@@ -143,7 +143,13 @@ func (c *Const) Number() int64 {
 }
 
 func (c *Const) IsFloat() bool {
-	return c.typ.GetTypeKind() == NumberTypeKind
+	switch c.value.(type) {
+	case float32:
+		return c.typ.GetTypeKind() == NumberTypeKind
+	case float64:
+		return c.typ.GetTypeKind() == NumberTypeKind
+	}
+	return false
 }
 
 func (c *Const) Float() float64 {
