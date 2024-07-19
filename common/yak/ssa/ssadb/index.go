@@ -1,6 +1,9 @@
 package ssadb
 
 import (
+	"sync/atomic"
+	"time"
+
 	"github.com/jinzhu/gorm"
 )
 
@@ -31,6 +34,10 @@ func CreateIndex() *IrIndex {
 	return ret
 }
 func SaveIrIndex(idx *IrIndex) {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSAIndexCost, uint64(time.Now().Sub(start).Nanoseconds()))
+	}()
 	db := GetDB()
 	db.Save(idx)
 }
