@@ -7,7 +7,7 @@ import (
 )
 
 func TestSSARuleMustPassCliDisable(t *testing.T) {
-	t.Run("cli disable in mitm", func(t *testing.T) {
+	t.Run("cli enable in mitm", func(t *testing.T) {
 		check(t, `
 		domains = cli.String("domains")
 		cli.check()
@@ -16,18 +16,30 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 			a = 1
 		}
 			`,
-			[]string{rules.ErrorDisableCLi(), rules.ErrorDisableCLi()},
+			[]string{},
 			"mitm",
 		)
 	})
 
-	t.Run("cli disable in yak", func(t *testing.T) {
+	t.Run("cli enable in yak", func(t *testing.T) {
 		check(t, `
 		domains = cli.String("domains")
 		cli.check()
 			`,
 			[]string{},
 			"yak",
+		)
+	})
+
+	t.Run("cli disable in codec", func(t *testing.T) {
+		check(t, `
+handle = func(s) {
+	cli.String("domains")
+	cli.check()
+}
+			`,
+			[]string{rules.ErrorDisableCLi(), rules.ErrorDisableCLi()},
+			"codec",
 		)
 	})
 }
