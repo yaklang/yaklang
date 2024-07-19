@@ -105,12 +105,9 @@ useDeclaration
     ;
 
 useDeclarationContentList
-    : '\\'? useDeclarationContent (',' '\\'? useDeclarationContent)*
+    : '\\'? namespaceNameList (',' '\\'? namespaceNameList)*
     ;
 
-useDeclarationContent
-    : namespaceNameList
-    ;
 
 namespaceDeclaration
     : Namespace (
@@ -121,10 +118,10 @@ namespaceDeclaration
 
 namespaceStatement
     : useDeclaration
-    | statement
     | functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
+    | statement
     ;
 
 functionDeclaration
@@ -548,7 +545,7 @@ expression
     | ('++' | '--') flexiVariable                                      # PrefixIncDecExpression
     | flexiVariable ('++' | '--')                                      # PostfixIncDecExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
-    | expression InstanceOf typeRef                               # InstanceOfExpression
+    | expression InstanceOf                                # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
     | expression op = ('+' | '-' | '.') expression                # ArithmeticExpression
     | expression op = ('<<' | '>>') expression                    # ComparisonExpression
@@ -687,7 +684,8 @@ qualifiedStaticTypeRef
     ;
 
 typeRef
-    : (qualifiedNamespaceName | indirectTypeRef) // genericDynamicArgs?
+    : indirectTypeRef // genericDynamicArgs?
+    | qualifiedNamespaceName
     | primitiveType
     | Static
     | anonymousClass
@@ -703,7 +701,7 @@ anonymousClass
     ;
 
 indirectTypeRef
-    : chainBase (ObjectOperator keyedFieldName)*
+    : expression ObjectOperator memberCallKey
     ;
 
 qualifiedNamespaceName
@@ -712,7 +710,7 @@ qualifiedNamespaceName
 
 namespaceNameList
     : namespaceNameTail
-    | identifier ('\\' identifier)+ ('\\' namespaceNameTail)?
+    | identifier ('\\' identifier)* ('\\' namespaceNameTail)?
     ;
 
 namespaceNameTail

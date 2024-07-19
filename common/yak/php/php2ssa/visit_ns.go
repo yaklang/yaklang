@@ -32,40 +32,26 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 		return ""
 	}
 	return raw.GetText()
-	//if i.Namespace() != nil {
-	//	// declare namespace mode
-	//	list := i.NamespaceNameList().(*phpparser.NamespaceNameListContext)
-	//	if ret := list.NamespaceNameTail(); ret != nil {
-	//
-	//	}
-	//	// return y.EmitConstInst(nil)
-	//	return ""
-	//}
-	//
-	//if nameList := i.NamespaceNameList(); nameList != nil {
-	//	//todo
-	//	//return y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
-	//}
-	//
-	//return ""
 }
 
-func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ([]string, string) {
+func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) []string {
 	if y == nil || raw == nil {
-		return []string{}, ""
+		return []string{}
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*phpparser.NamespaceNameListContext)
 	if i == nil {
-		return []string{}, ""
+		return []string{}
 	}
 	var pkg []string
 	for _, identifierContext := range i.AllIdentifier() {
 		pkg = append(pkg, y.VisitIdentifier(identifierContext))
 	}
-
-	return pkg, y.VisitNamespaceNameTail(i.NamespaceNameTail())
+	if i.NamespaceNameTail() != nil {
+		pkg = append(pkg, y.VisitNamespaceNameTail(i.NamespaceNameTail()))
+	}
+	return pkg
 }
 
 func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext) (c string) {
