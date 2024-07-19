@@ -9,7 +9,6 @@ import (
 )
 
 func init() {
-	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableCli)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, DisableCli)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, DisableCli)
 
@@ -34,7 +33,7 @@ func ErrorDisableCLi() string {
 func DisableMitmExternLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults("disable some extern lib in mitm")
 	// tag := "SSA-cli-disableMitmExternLib"
-	// 在MITM插件禁用 risk、poc、http、tcp、udp、fuzz.Exec、fuzz.ExecFirst
+	// 在MITM插件的主函数中禁用 risk、poc、http、tcp、udp、fuzz.Exec、fuzz.ExecFirst
 	DisablePack := []string{
 		"risk",
 		"poc",
