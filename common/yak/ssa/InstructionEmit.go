@@ -368,9 +368,9 @@ func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
-	if f.CurrentBlock.finish {
-		return nil
-	}
+	// if f.CurrentBlock.finish {
+	// 	return nil
+	// }
 	ci := NewConst(i)
 	f.emit(ci)
 	return ci
