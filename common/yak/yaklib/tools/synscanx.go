@@ -82,4 +82,5 @@ var SynxPortScanExports = map[string]interface{}{
 	"rateLimit":          synscanx.WithRateLimit,
 	"concurrent":         synscanx.WithConcurrent,
 	"iface":              synscanx.WithIface,
+	"shuffle":            synscanx.WithShuffle,
 }

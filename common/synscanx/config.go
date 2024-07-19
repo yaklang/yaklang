@@ -20,6 +20,7 @@ type SynxConfig struct {
 	initFilterPorts  string
 	initFilterHosts  string
 	netInterface     string // net interface name
+	shuffle          bool // 是否打乱扫描顺序
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
@@ -98,6 +99,12 @@ func NewDefaultConfig() *SynxConfig {
 
 type SynxConfigOption func(config *SynxConfig)
 
+func WithShuffle(s bool) SynxConfigOption {
+	return func(config *SynxConfig) {
+		config.shuffle = s
+	}
+}
+
 func WithOutputFile(file string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.outputFile = file
@@ -125,12 +132,6 @@ func WithInitFilterPorts(ports string) SynxConfigOption {
 func WithInitFilterHosts(hosts string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.initFilterHosts = hosts
-	}
-}
-
-func WithNetInterface(iface string) SynxConfigOption {
-	return func(config *SynxConfig) {
-		config.netInterface = iface
 	}
 }
 

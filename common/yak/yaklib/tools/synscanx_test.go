@@ -7,6 +7,7 @@ import (
 )
 
 func Test__scanx(t *testing.T) {
+
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
 		synPacketCounter++
@@ -28,5 +29,5 @@ func Test__scanx(t *testing.T) {
 	for re := range res {
 		t.Log(re.String())
 	}
-	t.Log("synPacketCounter:", synPacketCounter)
+	//t.Log("synPacketCounter:", synPacketCounter)
 }

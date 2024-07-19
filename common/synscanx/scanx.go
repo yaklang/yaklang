@@ -130,8 +130,8 @@ func (s *Scannerx) rateLimit() {
 }
 
 func (s *Scannerx) SubmitTarget(targets, ports string, targetCh chan *SynxTarget) {
-	filteredHosts := s.GetFilterHosts(targets)
-	filtedPorts := s.GetFilterPorts(ports)
+	filteredHosts := s.GetNonExcludedHosts(targets)
+	filtedPorts := s.GetNonExcludedPorts(ports)
 	s.OnSubmitTask(func(h string, p int) {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
 	})
