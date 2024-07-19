@@ -173,6 +173,10 @@ func TestRequestYakURLPost(t *testing.T) {
 		require.NoError(t, err)
 		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
 		create.Close()
+		defer func() {
+			os.RemoveAll(fileName)
+			os.RemoveAll(newName)
+		}()
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
@@ -200,6 +204,10 @@ func TestRequestYakURLPost(t *testing.T) {
 		err = os.Mkdir(dirName, 0o755)
 		require.NoError(t, err)
 		newName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
+		defer func() {
+			os.RemoveAll(dirName)
+			os.RemoveAll(newName)
+		}()
 		res, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
 			Method: "POST",
 			Url: &ypb.YakURL{
