@@ -1716,6 +1716,7 @@ func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
 
 	// unsealed block
 	block := b.NewBasicBlockUnSealed(text)
+	block.SetScope(b.CurrentBlock.ScopeTable.CreateSubScope())
 	b.AddLabel(text, block)
 	// to block
 	b.EmitJump(block)
