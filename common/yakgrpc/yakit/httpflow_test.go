@@ -124,3 +124,33 @@ func TestHTTPFlow_Inset_FixUrl(t *testing.T) {
 		}
 	}
 }
+
+func TestQueryFilterHTTPFlow(t *testing.T) {
+	token := utils.RandString(10)
+	jsFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.js", token),
+		Path: fmt.Sprintf("https://example.com/%s.js", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsFlow)
+	customFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s", token),
+		Path: fmt.Sprintf("https://example.com/%s", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), customFlow)
+	_, flows, err := QueryHTTPFlow(consts.GetGormProjectDatabase().Debug(), &ypb.QueryHTTPFlowRequest{
+		ExcludeSuffix: []string{".js"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	var flag bool
+	for _, flow := range flows {
+		if flow.ID == jsFlow.ID {
+			panic("filter fail")
+		}
+		if flow.ID == customFlow.ID {
+			flag = true
+		}
+	}
+	assert.True(t, flag)
+}
