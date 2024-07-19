@@ -24,7 +24,6 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		anValue:     NewValue(),
-		prog:        p,
 		Params:      make([]Value, 0),
 		hasEllipsis: false,
 		Blocks:      make([]Instruction, 0),
@@ -37,6 +36,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		builder:     nil,
 	}
 	f.SetName(name)
+	f.SetProgram(p)
 
 	if parent != nil {
 		parent.addAnonymous(f)
@@ -81,13 +81,6 @@ func (f *Function) SetGeneric(b bool) {
 
 func (f *Function) IsGeneric() bool {
 	return f.isGeneric
-}
-
-func (f *Function) GetProgram() *Program {
-	if f.prog == nil {
-		return nil
-	}
-	return f.prog
 }
 
 func (f *Function) GetFunc() *Function {

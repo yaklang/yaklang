@@ -35,6 +35,7 @@ type Instruction interface {
 	SetBlock(*BasicBlock)
 	// program
 	GetProgram() *Program
+	SetProgram(*Program)
 
 	GetName() string
 	SetName(variable string)
@@ -220,9 +221,6 @@ type Function struct {
 
 	isMethod   bool
 	methodName string
-
-	// package, double link
-	prog *Program
 
 	// Type
 	Type *FunctionType
