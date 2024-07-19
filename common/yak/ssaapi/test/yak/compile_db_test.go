@@ -60,42 +60,41 @@ dump(c)
 	br := funcIns.Blocks[len(funcIns.Blocks)-1]
 	block, _ := ssa.ToBasicBlock(br)
 	scope := block.ScopeTable
+	name := scope.GetScopeName()
+	log.Infof("scope name: %s", name)
 	// id := scope.GetPersistentId()
 	// if id <= 0 {
-	// 	t.Fatal("scope is not a persistent scope")
-	// }
-	// if scope.GetPersistentProgramName() != progName {
 	// 	t.Fatal("scope is not a persistent scope")
 	// }
 
 	ePhi := scope.ReadValue("e")
 	t.Log(ePhi.String())
 
-	// scopePersistent := ssa.GetScopeFromIrScopeId(scope.GetPersistentId())
-	// if scopePersistent == nil {
-	// 	t.Fatalf("failed to get scope from ir scope id: %d", scope.GetPersistentId())
-	// }
-	// eLazyPhi := scopePersistent.ReadValue("e")
-	// verbose := eLazyPhi.String()
-	// if verbose == "" {
-	// t.Fatal("failed to get variable e(a) verbos is nil ")
-	// }
-	// if eLazyPhi.GetId() != ePhi.GetId() {
-	// t.Fatalf("failed to get variable e(a) instruction errror: %d vs got(%d)", eLazyPhi.GetId(), ePhi.GetId())
-	// }
-	// log.Infof("eLazyPhi: %s", eLazyPhi.String())
+	scopePersistent, err := ssa.GetScopeFromIrScopeName(progName, scope.GetScopeName())
+	if err != nil {
+		t.Fatalf("failed to get scope from ir scope id: %v", err)
+	}
+	eLazyPhi := scopePersistent.ReadValue("e")
+	verbose := eLazyPhi.String()
+	if verbose == "" {
+		t.Fatal("failed to get variable e(a) verbos is nil ")
+	}
+	if eLazyPhi.GetId() != ePhi.GetId() {
+		t.Fatalf("failed to get variable e(a) instruction errror: %d vs got(%d)", eLazyPhi.GetId(), ePhi.GetId())
+	}
+	log.Infof("eLazyPhi: %s", eLazyPhi.String())
 	log.Infof("ePhi: %s", ePhi.String())
 
 	if ePhi.GetSourceCode() == "" {
 		t.Fatal("failed to get variable e(a) source code (memory)")
 	}
 
-	// if eLazyPhi.GetSourceCode() == "" {
-	// 	t.Fatal("failed to get variable e(a) source code (lazy)")
-	// }
+	if eLazyPhi.GetSourceCode() == "" {
+		t.Fatal("failed to get variable e(a) source code (lazy)")
+	}
 
-	// assert.Equal(t, ePhi.GetSourceCode(), eLazyPhi.GetSourceCode())
-	// assert.Equal(t, ePhi.GetSourceCodeContext(2), eLazyPhi.GetSourceCodeContext(2))
+	assert.Equal(t, ePhi.GetSourceCode(), eLazyPhi.GetSourceCode())
+	assert.Equal(t, ePhi.GetSourceCodeContext(2), eLazyPhi.GetSourceCodeContext(2))
 }
 
 func TestCompileWithDatabase_Scope_Phi2(t *testing.T) {
