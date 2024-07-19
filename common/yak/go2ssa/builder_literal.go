@@ -72,7 +72,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 	defer recoverRange()
 	var values []ssa.Value
 
-	typ, lenv := b.buildTypeLiteral(exp.LiteralType().(*gol.LiteralTypeContext))
+	typ, lenv := b.buildLiteralType(exp.LiteralType().(*gol.LiteralTypeContext))
 	if value := exp.LiteralValue(); value != nil {
 		if s, ok := value.(*gol.LiteralValueContext); ok {
 			values = b.buildLiteralValue(s, typ)
@@ -87,15 +87,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 		}
 	}
 
-	zero := b.EmitConstInst(0)
 	switch typ.GetTypeKind() {
 	case ssa.SliceTypeKind, ssa.BytesTypeKind:
-		if len(values) == 0 {
-			return b.EmitMakeBuildWithType(typ, zero, zero)
-		} else {
-			return b.CreateInterfaceWithSlice(values)
-		}
-
+		return b.CreateInterfaceWithSlice(values)
 	}
 
 	return nil
@@ -145,7 +139,7 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, typ ssa.Type) ([]ssa.
 	return nil
 }
 
-func (b *astbuilder) buildTypeLiteral(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
+func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	text := stmt.GetText()
@@ -246,8 +240,76 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 	if name := typ.TypeName();name != nil {
 	    typeType = ssa.GetTypeByStr(typ.GetText())
 	}
+
+	if lit := typ.TypeLit(); lit != nil {
+	    typeType,_ = b.buildTypeLit(lit.(*gol.TypeLitContext))
+	}
+	
 	return typeType
 }
+
+func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+	text := stmt.GetText()
+
+	// slice type literal
+	if s, ok := stmt.SliceType().(*gol.SliceTypeContext); ok {
+		return b.buildSliceTypeLiteral(s),nil
+	}
+
+	// array type literal
+	if s, ok := stmt.ArrayType().(*gol.ArrayTypeContext); ok {
+	    return b.buildArrayTypeLiteral(s)
+	}
+
+	// map type literal
+	if strings.HasPrefix(text, "map") {
+		if s, ok := stmt.MapType().(*gol.MapTypeContext); ok {
+			return b.buildMapTypeLiteral(s),nil
+		}
+	}
+
+	// struct type literal
+	if strings.HasPrefix(text, "struct") {
+		if s, ok := stmt.StructType().(*gol.StructTypeContext); ok {
+			_ = s
+		}
+	}
+
+	// pointer type literal
+	if strings.HasPrefix(text, "*") {
+	    if s, ok := stmt.PointerType().(*gol.PointerTypeContext); ok {
+			_ = s
+		}
+	}
+
+	// function type literal
+	if strings.HasPrefix(text, "func") {
+	    if s, ok := stmt.FunctionType().(*gol.FunctionTypeContext); ok {
+			_ = s
+		}
+	}
+
+	// interface type literal
+	if strings.HasPrefix(text, "interface") {
+	    if s, ok := stmt.InterfaceType().(*gol.InterfaceTypeContext); ok {
+			_ = s
+		}
+	}
+
+	// channel type literal
+	if strings.HasPrefix(text, "chan") || 
+		strings.HasPrefix(text, "<-chan") || 
+		strings.HasPrefix(text, "chan<-") {
+	    if s, ok := stmt.ChannelType().(*gol.ChannelTypeContext); ok {
+			_ = s
+		}
+	}
+
+	return nil,nil
+}
+
 
 func (b *astbuilder) buildBasicLit(exp *gol.BasicLitContext) (ssa.Value) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
@@ -262,7 +324,12 @@ func (b *astbuilder) buildBasicLit(exp *gol.BasicLitContext) (ssa.Value) {
 	}
 
 	if lit := exp.FLOAT_LIT(); lit != nil {
-		return b.EmitConstInst(lit.GetText())
+		t := lit.GetText()
+		if strings.HasPrefix(t, ".") {
+			t = "0" + t
+		}
+		f, _ := strconv.ParseFloat(t, 64)
+		return b.EmitConstInst(f)
 	}
 
 	if lit := exp.String_(); lit != nil {
