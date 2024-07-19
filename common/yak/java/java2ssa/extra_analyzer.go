@@ -28,7 +28,7 @@ func (s *SSABuilder) ExtraFileAnalyze(fileSystem fi.FileSystem, prog *ssa.Progra
 		_ = filename
 
 		// pom.xml
-		if strings.TrimLeft(filename, "/") == "pom.xml" {
+		if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
 			raw, err := fileSystem.ReadFile(path)
 			if err != nil {
 				log.Warnf("read pom.xml error: %v", err)
