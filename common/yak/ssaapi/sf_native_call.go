@@ -75,7 +75,44 @@ func init() {
 				typeStr := t.String()
 				results := val.NewValue(ssa.NewConst(typeStr))
 				vals = append(vals, results)
+			} else {
+				if b, ok := t.t.(*ssa.BasicType); ok {
+					typeStr := b.GetFullTypeName()
+					lastIndex := strings.LastIndex(typeStr, ".")
+					if lastIndex != -1 && len(typeStr) > lastIndex+1 {
+						typeStr = typeStr[lastIndex+1:]
+						results := val.NewValue(ssa.NewConst(typeStr))
+						vals = append(vals, results)
+					}
+				}
+			}
+			return nil
+		})
+		if len(vals) > 0 {
+			return true, sfvm.NewValues(vals), nil
+		}
+		return false, nil, utils.Error("no value found")
+	})
+
+	sfvm.RegisterNativeCall(NativeCall_FullTypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
+		var vals []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
 				return nil
+			}
+			t := val.GetType()
+			if !t.IsAny() {
+				typeStr := t.String()
+				results := val.NewValue(ssa.NewConst(typeStr))
+				vals = append(vals, results)
+			} else {
+				if b, ok := t.t.(*ssa.BasicType); ok {
+					typeStr := b.GetFullTypeName()
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+
+				}
 			}
 			return nil
 		})
