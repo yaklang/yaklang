@@ -1,7 +1,7 @@
 package yakurl
 
 import (
-	"net/url"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -16,24 +16,22 @@ func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 		return nil, utils.Error("empty yak url")
 	}
 	var (
-		isWindowsPath = false
-		volumeName    string
+		schema, rawPath, queryStr string
+		isWindowsPath             bool
 	)
 
-	before, rawPath, _ := strings.Cut(raw, "://")
+	schema, rawPath, _ = strings.Cut(raw, "://")
+	// should not use filepath.VolumeName
 	if ret := windowsPathPrefixRegex.FindStringSubmatch(rawPath); len(ret) > 1 && ret[0] != "" {
-		// maybe windows path
+		// maybe windows path, fix
 		isWindowsPath = true
-		volumeName = ret[1] + ":"
-		// replace windows path prefix, to avoid url.Parse error
-		raw = before + "://" + windowsPathPrefixRegex.ReplaceAllString(strings.ReplaceAll(rawPath, "\\", "/"), "/")
+		// file://C:\\A\B\C?q=C:\\A\B\C
+		rawPath, queryStr, _ = strings.Cut(rawPath, "?")
+		raw = fmt.Sprintf("%s://%s?%s", schema, windowsPathPrefixRegex.ReplaceAllString(strings.ReplaceAll(rawPath, "\\", "/"), "/"), queryStr)
 	}
-	_ = isWindowsPath
 
-	u, err := url.Parse(raw)
-	if err != nil {
-		return nil, utils.Errorf("cannot parse raw[%v] as url: %s", raw, err)
-	}
+	u := utils.ParseStringToUrl(raw)
+
 	yu := &ypb.YakURL{
 		Schema: strings.TrimSpace(strings.ToLower(u.Scheme)),
 	}
@@ -58,7 +56,7 @@ func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 		}
 	}
 	if isWindowsPath {
-		yu.Path = volumeName + strings.ReplaceAll(yu.Path, "/", "\\")
+		yu.Path = rawPath
 	}
 	return yu, nil
 }

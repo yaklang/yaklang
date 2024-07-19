@@ -19,7 +19,7 @@ func TestCreateUrlFromString(t *testing.T) {
 			{
 				u:          "file://C:/a/b?a=b&c=d",
 				wantSchema: "file",
-				wantPath:   "C:\\a\\b",
+				wantPath:   "C:/a/b",
 				wantQuery: map[string]string{
 					"a": "b",
 					"c": "d",
