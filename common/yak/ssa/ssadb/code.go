@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/davecgh/go-spew/spew"
@@ -117,19 +118,13 @@ func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
 }
 
 func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
-	var irVariable IrVariable
-	if err := db.Model(&IrVariable{}).Where("variable_name = ? AND program_name = ?", name, program).First(&irVariable).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			return nil
-		}
-	}
-
-	ret := make([]*IrCode, 0, len(irVariable.InstructionID))
-	for _, id := range irVariable.InstructionID {
-		r := GetIrCodeById(db, id)
+	// var irVariable IrIndex
+	ret := make([]*IrCode, 0)
+	res := db.Model(&IrIndex{}).Where("(variable_name = ? OR class_name = ?) AND program_name = ?", name, name, program)
+	for v := range yieldIrIndex(res, context.Background()) {
+		r := GetIrCodeById(db, v)
 		ret = append(ret, r)
 	}
-
 	return ret
 }
 

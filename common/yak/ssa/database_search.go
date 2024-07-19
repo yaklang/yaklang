@@ -108,11 +108,11 @@ func (c *Cache) _getByVariableEx(
 	}
 	if mod&ssadb.NameMatch != 0 {
 		// search in variable cache
-		c.VariableCache.ForEach(func(s string, instructions []Instruction) {
-			if checkValue(s) {
-				ins = append(ins, instructions...)
+		for name, insts := range c.VariableCache {
+			if checkValue(name) {
+				ins = append(ins, insts...)
 			}
-		})
+		}
 
 		// search in class instance
 		for name, insts := range c.Class2InstIndex {
