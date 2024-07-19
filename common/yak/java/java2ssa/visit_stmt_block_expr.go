@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -1047,6 +1048,10 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 			if ft, ok := y.fullTypeNameMap[typName]; ok {
 				typ := value.GetType()
 				if b, ok := typ.(*ssa.BasicType); ok && b.IsAny() {
+					sca := y.GetProgram().GetApplication().GetSCAPackageByName(ft)
+					if sca != nil {
+						ft = fmt.Sprintf("%s:%s", ft, sca.Version)
+					}
 					newTyp := ssa.NewBasicType(b.Kind, b.GetName())
 					newTyp.SetFullTypeName(ft)
 					value.SetType(newTyp)
