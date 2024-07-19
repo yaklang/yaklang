@@ -479,11 +479,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		class, key := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
-		if class == "" {
-			return nil
-		}
-		variable := y.GetStaticMember(class, key)
+		variable, _, _ := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
+		//return y.ReadValueByVariable(member)
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.AssignVariable(variable, rightValue)
@@ -529,7 +526,8 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 		return y.VisitLeftVariable(i.FlexiVariable())
 	}
 	if i.StaticClassExprVariableMember() != nil {
-		return y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		return member
 	}
 	return nil
 }

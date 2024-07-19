@@ -462,6 +462,10 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	if y == nil || raw == nil {
 		return nil
 	}
+	y.MarkedIsStaticMethod = true
+	defer func() {
+		y.MarkedIsStaticMethod = false
+	}()
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	getValue := func(class, key string) ssa.Value {
@@ -473,7 +477,13 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		}
 		// function
 		variable := y.GetStaticMember(class, key)
-		return y.ReadValueByVariable(variable)
+		v := y.ReadValueByVariable(variable)
+		if u, ok := v.(*ssa.Undefined); ok && u.Kind == ssa.UndefinedValueInValid {
+			class := y.ResolveValue(class)
+			key := y.EmitConstInst(key)
+			v = y.ReadMemberCallVariable(class, key)
+		}
+		return v
 	}
 
 	// var class, key string
@@ -521,9 +531,9 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	return y.EmitUndefined(raw.GetText())
 }
 
-func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) *ssa.Variable {
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.Variable, string, string) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, "", ""
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
@@ -555,15 +565,15 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 		_ = i
 	}
 	if class == "" {
-		return nil
+		return nil, "", ""
 	}
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]
-		return y.GetStaticMember(class, key)
+		return y.GetStaticMember(class, key), class, key
 	}
 	// function
-	return y.GetStaticMember(class, key)
+	return y.GetStaticMember(class, key), class, key
 }
 
 func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {
@@ -577,8 +587,14 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 			return y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember())
 		}
 		if i.StaticClassExprVariableMember() != nil {
-			variable := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-			return y.ReadValueByVariable(variable)
+			variable, class, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+			v := y.ReadValueByVariable(variable)
+			if u, ok := v.(*ssa.Undefined); ok && u.Kind == ssa.UndefinedValueInValid {
+				class := y.ResolveValue(class)
+				key := y.EmitConstInst(key)
+				v = y.ReadMemberCallVariable(class, key)
+			}
+			return v
 		}
 	}
 
@@ -760,4 +776,25 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 
 	//todo： 获取不到会有问题
 	return nil
+}
+
+func (y *builder) ResolveValue(name string) ssa.Value {
+	y.SupportClassStaticModifier = true
+	if value := y.PeekValue(name); value != nil {
+		// found
+		return value
+	}
+	if class := y.MarkedThisClassBlueprint; class != nil {
+		if value, ok := y.ReadClassConst(class.Name, name); ok {
+			return value
+		}
+		value := y.ReadSelfMember(name)
+		if value != nil {
+			return value
+		}
+	}
+	if value, ok := y.ReadConst(name); ok {
+		return value
+	}
+	return y.ReadValue(name)
 }
