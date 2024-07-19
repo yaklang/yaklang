@@ -17,6 +17,43 @@ type ZipFS struct {
 	forest *utils.PathForest
 }
 
+func (z *ZipFS) IsAbs(s string) bool {
+	return false
+}
+
+func (z *ZipFS) Getwd() (string, error) {
+	return ".", nil
+}
+
+func (z *ZipFS) Exists(s string) (bool, error) {
+	info, err := z.Stat(s)
+	if err != nil {
+		return false, nil
+	}
+	return info != nil, nil
+}
+
+func (z *ZipFS) Rename(s string, s2 string) error {
+	return utils.Error("unsupported on readonly zipfs")
+}
+
+// Rel is calc relative path
+func (z *ZipFS) Rel(s string, s2 string) (string, error) {
+	return "", utils.Error("unsupported on readonly zipfs")
+}
+
+func (z *ZipFS) WriteFile(s string, bytes []byte, mode os.FileMode) error {
+	return utils.Error("unsupported on readonly zipfs")
+}
+
+func (z *ZipFS) Delete(s string) error {
+	return utils.Error("unsupported on readonly zipfs")
+}
+
+func (z *ZipFS) MkdirAll(s string, mode os.FileMode) error {
+	return utils.Error("unsupported on readonly zipfs")
+}
+
 type zipDir struct {
 	zipfile *zip.File
 }
