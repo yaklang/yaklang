@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -36,6 +37,7 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 }
 
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
+	prog := f.GetProgram()
 	b := &BasicBlock{
 		anValue:    NewValue(),
 		Preds:      make([]Value, 0),
@@ -44,7 +46,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		Phis:       make([]Value, 0),
 		Handler:    nil,
 		finish:     false,
-		ScopeTable: NewScope(f.GetProgram().GetProgramName()),
+		ScopeTable: NewScope(prog.GetProgramName()),
 	}
 	b.SetName(name)
 	b.SetFunc(f)

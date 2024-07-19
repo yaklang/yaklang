@@ -4,7 +4,7 @@ package ssautil
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
 	base ScopedVersionedTableIF[T],
-	handler CaptureVariableHandler[T],
+	handler VariableHandler[T],
 ) {
 	scope.ForEachCapturedVariable(func(name string, ver VersionedIF[T]) {
 		if ver.CanCaptureInScope(base) {
@@ -93,8 +93,7 @@ func (condition *ScopedVersionedTable[T]) Spin(
 ) {
 	condition.spin = false
 	condition.createEmptyPhi = nil
-	for name, v := range condition.linkIncomingPhi {
-		ver := v.Last().Value
+	for name, ver := range condition.linkIncomingPhi {
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)

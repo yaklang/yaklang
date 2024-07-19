@@ -156,7 +156,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_phis"] = fetchIds(ret.Phis)
 		params["block_finish"] = ret.finish
 		if ret.ScopeTable != nil {
-			params["block_scope_table"] = ret.ScopeTable.GetPersistentId()
+			// params["block_scope_table"] = ret.ScopeTable.GetPersistentId()
 		}
 	case *BinOp:
 		params["binop_op"] = ret.Op
@@ -417,9 +417,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.Insts = unmarshalInstructions(params["block_insts"])
 		ret.Phis = unmarshalValues(params["block_phis"])
 		ret.finish = toBool(params["block_finish"])
-		if scopeTable, ok := params["block_scope_table"]; ok {
-			ret.ScopeTable = GetLazyScopeFromIrScopeId(int64(toInt(scopeTable)))
-		}
+		// if scopeTable, ok := params["block_scope_table"]; ok {
+		// ret.ScopeTable = GetLazyScopeFromIrScopeId(int64(toInt(scopeTable)))
+		// }
 	case *BinOp:
 		ret.Op = BinaryOpcode(params["binop_op"].(string))
 		if x, ok := params["binop_x"]; ok {
