@@ -37,9 +37,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#useDeclarationContentList.
 	VisitUseDeclarationContentList(ctx *UseDeclarationContentListContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#useDeclarationContent.
-	VisitUseDeclarationContent(ctx *UseDeclarationContentContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#namespaceDeclaration.
 	VisitNamespaceDeclaration(ctx *NamespaceDeclarationContext) interface{}
 
