@@ -17,12 +17,29 @@ type VirtualFS struct {
 	dirEntry []fs.DirEntry
 }
 
-func (vs *VirtualFS) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, vs.GetSeparators())
+func (f *VirtualFS) PathSplit(s string) (string, string) {
+	return splitWithSeparator(s, f.GetSeparators())
+}
+func (f *VirtualFS) Ext(s string) string { return getExtension(s) }
+func (f *VirtualFS) IsAbs(name string) bool {
+	return len(name) > 0 && name[0] == byte(f.GetSeparators())
+}
+func (f *VirtualFS) Getwd() (string, error)             { return ".", nil }
+func (f *VirtualFS) Exists(path string) (bool, error)   { _, err := f.Open(path); return err == nil, err }
+func (f *VirtualFS) Rename(string, string) error        { return utils.Error("implement me") }
+func (f *VirtualFS) Rel(string, string) (string, error) { return "", utils.Error("implement me") }
+func (f *VirtualFS) WriteFile(name string, data []byte, mode os.FileMode) error {
+	f.AddFile(name, string(data))
+	return nil
 }
 
-func (vs *VirtualFS) Ext(s string) string {
-	return getExtension(s)
+func (f *VirtualFS) Delete(path string) error {
+	return f.RemoveFileOrDir(path)
+}
+
+func (f *VirtualFS) MkdirAll(path string, mode os.FileMode) error {
+	f.AddDir(path)
+	return nil
 }
 
 var _ FileSystem = (*VirtualFS)(nil)
@@ -36,8 +53,8 @@ func NewVirtualFs() *VirtualFS {
 	return vs
 }
 
-func (vs *VirtualFS) ReadFile(name string) ([]byte, error) {
-	raw, err := vs.Open(name)
+func (f *VirtualFS) ReadFile(name string) ([]byte, error) {
+	raw, err := f.Open(name)
 	if err != nil {
 		return nil, err
 	}
@@ -45,12 +62,12 @@ func (vs *VirtualFS) ReadFile(name string) ([]byte, error) {
 	return io.ReadAll(raw)
 }
 
-func (vs *VirtualFS) GetLocalFSPath() string {
+func (f *VirtualFS) GetLocalFSPath() string {
 	return ""
 }
 
-func (vs *VirtualFS) Open(name string) (fs.File, error) {
-	vf, fileName, err := vs.get(false, vs.splite(name)...)
+func (f *VirtualFS) Open(name string) (fs.File, error) {
+	vf, fileName, err := f.get(false, f.splite(name)...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +81,8 @@ func (vs *VirtualFS) Open(name string) (fs.File, error) {
 	return NewVirtualFile(file.name, file.content), nil
 }
 
-func (vs *VirtualFS) Stat(name string) (fs.FileInfo, error) {
-	vf, fileName, err := vs.get(false, vs.splite(name)...)
+func (f *VirtualFS) Stat(name string) (fs.FileInfo, error) {
+	vf, fileName, err := f.get(false, f.splite(name)...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,34 +92,35 @@ func (vs *VirtualFS) Stat(name string) (fs.FileInfo, error) {
 	}
 	return file.Stat()
 }
-func (vs *VirtualFS) splite(name string) []string {
-	return strings.Split(name, string(vs.GetSeparators()))
+
+func (f *VirtualFS) splite(name string) []string {
+	return strings.Split(name, string(f.GetSeparators()))
 }
 
-func (vs *VirtualFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	fs, err := vs.getDir(false, strings.Split(name, "/")...)
+func (f *VirtualFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	fs, err := f.getDir(false, strings.Split(name, "/")...)
 	if err != nil {
 		return nil, err
 	}
 	return fs.dirEntry, nil
 }
 
-func (vs *VirtualFS) Join(name ...string) string { return path.Join(name...) }
-func (vs *VirtualFS) GetSeparators() rune        { return '/' }
+func (f *VirtualFS) Join(name ...string) string { return path.Join(name...) }
+func (f *VirtualFS) GetSeparators() rune        { return '/' }
 
-func (vs *VirtualFS) AddFile(name, content string) {
-	v, filename, _ := vs.get(true, strings.Split(name, "/")...)
+func (f *VirtualFS) AddFile(name, content string) {
+	v, filename, _ := f.get(true, strings.Split(name, "/")...)
 	vf := NewVirtualFile(filename, content)
 	v.addFileByVirtualFile(vf)
 }
 
-func (vs *VirtualFS) addFileByVirtualFile(vf *VirtualFile) {
-	vs.files[vf.name] = vf
-	vs.dirEntry = append(vs.dirEntry, vf.info)
+func (f *VirtualFS) addFileByVirtualFile(vf *VirtualFile) {
+	f.files[vf.name] = vf
+	f.dirEntry = append(f.dirEntry, vf.info)
 }
 
-func (vs *VirtualFS) RemoveFileOrDir(name string) error {
-	vf, filename, err := vs.get(false, strings.Split(name, "/")...)
+func (f *VirtualFS) RemoveFileOrDir(name string) error {
+	vf, filename, err := f.get(false, strings.Split(name, "/")...)
 	if err != nil {
 		return err
 	}
@@ -113,24 +131,24 @@ func (vs *VirtualFS) RemoveFileOrDir(name string) error {
 	return fmt.Errorf("file [%v] not exist", name)
 }
 
-func (vf *VirtualFS) AddDir(dirName string) *VirtualFile {
+func (f *VirtualFS) AddDir(dirName string) *VirtualFile {
 	dir := NewVirtualFileDirectory(dirName, NewVirtualFs())
-	vf.files[dirName] = dir
-	vf.dirEntry = append(vf.dirEntry, dir.info)
+	f.files[dirName] = dir
+	f.dirEntry = append(f.dirEntry, dir.info)
 	return dir
 }
 
-func (vs *VirtualFS) get(create bool, names ...string) (*VirtualFS, string, error) {
+func (f *VirtualFS) get(create bool, names ...string) (*VirtualFS, string, error) {
 	path := names[:len(names)-1]
 	filePath := names[len(names)-1]
-	vf, err := vs.getDir(create, path...)
+	vf, err := f.getDir(create, path...)
 	if err != nil {
 		return nil, "", err
 	}
 	return vf, filePath, nil
 }
 
-func (v *VirtualFS) getDir(create bool, dirs ...string) (*VirtualFS, error) {
+func (f *VirtualFS) getDir(create bool, dirs ...string) (*VirtualFS, error) {
 	get := func(v *VirtualFS, dir string) (*VirtualFS, error) {
 		vf, ok := v.files[dir]
 		if !ok {
@@ -144,7 +162,7 @@ func (v *VirtualFS) getDir(create bool, dirs ...string) (*VirtualFS, error) {
 		}
 		return vf.fs, nil
 	}
-	fs := v
+	fs := f
 	var err error
 	for _, name := range dirs {
 		if fs, err = get(fs, name); err != nil {
@@ -214,8 +232,10 @@ type VirtualFileInfo struct {
 	mod  fs.FileMode
 }
 
-var _ fs.FileInfo = (*VirtualFileInfo)(nil)
-var _ fs.DirEntry = (*VirtualFileInfo)(nil)
+var (
+	_ fs.FileInfo = (*VirtualFileInfo)(nil)
+	_ fs.DirEntry = (*VirtualFileInfo)(nil)
+)
 
 func NewVirtualFileInfo(name string, size int64, isDir bool) *VirtualFileInfo {
 	if isDir {
@@ -235,18 +255,23 @@ func NewVirtualFileInfo(name string, size int64, isDir bool) *VirtualFileInfo {
 func (vi *VirtualFileInfo) Name() string {
 	return vi.name
 }
+
 func (vi *VirtualFileInfo) Size() int64 {
 	return vi.size
 }
+
 func (vi *VirtualFileInfo) Mode() os.FileMode {
 	return vi.mod
 }
+
 func (vi *VirtualFileInfo) ModTime() time.Time {
 	return time.Time{}
 }
+
 func (vi *VirtualFileInfo) IsDir() bool {
 	return vi.mod == fs.ModeDir
 }
+
 func (vi *VirtualFileInfo) Sys() any {
 	return nil
 }
@@ -254,6 +279,7 @@ func (vi *VirtualFileInfo) Sys() any {
 func (vi *VirtualFileInfo) Info() (fs.FileInfo, error) {
 	return vi, nil
 }
+
 func (vi *VirtualFileInfo) Type() fs.FileMode {
 	return vi.mod
 }
