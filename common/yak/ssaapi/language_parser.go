@@ -59,6 +59,15 @@ func (c *config) parseProject() (Programs, error) {
 		ssareducer.WithFileSystem(c.fs),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					// ret = nil
+					includeFiles = nil
+					err = utils.Errorf("parse error with panic : %v", r)
+					log.Errorf("parse [%s] error %v  ", path, err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
 			log.Debugf("start to compile from: %v", path)
 			startTime := time.Now()
 
