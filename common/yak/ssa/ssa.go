@@ -256,6 +256,8 @@ type Function struct {
 	errComment ErrorComment
 
 	// ================  for build
+	// scope id
+	scopeId int
 	// builder
 	builder *FunctionBuilder
 	// this function is variadic parameter, for function type create

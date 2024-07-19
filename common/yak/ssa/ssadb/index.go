@@ -34,3 +34,16 @@ func SaveIrIndex(idx *IrIndex) {
 	db := GetDB()
 	db.Save(idx)
 }
+
+func GetScope(programName, scopeName string) ([]IrIndex, error) {
+	db := GetDB()
+	var ret []IrIndex
+	if err := db.Where("scope_name = ?", scopeName).
+		Where("program_name = ?", programName).
+		Group("variable_name").
+		Order("version_id desc").
+		First(&ret).Error; err != nil {
+		return nil, err
+	}
+	return ret, nil
+}

@@ -63,7 +63,7 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 	b.CurrentBlock = SubBlock
 
 	endScope := ssautil.BuildSyntaxBlock[Value](ScopeIF(scope), func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-		b.CurrentBlock.ScopeTable = svt
+		b.CurrentBlock.SetScope(svt)
 		builder()
 		return b.CurrentBlock.ScopeTable
 	})
@@ -73,7 +73,7 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 	}
 
 	EndBlock := b.NewBasicBlock("")
-	EndBlock.ScopeTable = endScope
+	EndBlock.SetScope(endScope)
 
 	b.EmitJump(EndBlock)
 	b.CurrentBlock = EndBlock
@@ -167,7 +167,7 @@ func (lb *LoopBuilder) Finish() {
 
 	LoopBuilder.SetFirst(func(svt ssautil.ScopedVersionedTableIF[Value]) {
 		SSABuild.CurrentBlock = header
-		SSABuild.CurrentBlock.ScopeTable = svt
+		SSABuild.CurrentBlock.SetScope(svt)
 		if lb.firstExpr != nil {
 			lb.firstExpr()
 		}
@@ -177,7 +177,7 @@ func (lb *LoopBuilder) Finish() {
 	// var loop *Loop
 	LoopBuilder.SetCondition(func(svt ssautil.ScopedVersionedTableIF[Value]) {
 		SSABuild.CurrentBlock = condition
-		SSABuild.CurrentBlock.ScopeTable = svt
+		SSABuild.CurrentBlock.SetScope(svt)
 		var conditionValue Value
 		if lb.condition != nil {
 			conditionValue = lb.condition()
@@ -188,7 +188,7 @@ func (lb *LoopBuilder) Finish() {
 
 	LoopBuilder.SetBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 		SSABuild.CurrentBlock = body
-		SSABuild.CurrentBlock.ScopeTable = svt
+		SSABuild.CurrentBlock.SetScope(svt)
 		// TODO handle continue and break target
 
 		addToBlocks(body)
@@ -202,7 +202,7 @@ func (lb *LoopBuilder) Finish() {
 	})
 	LoopBuilder.SetThird(func(svt ssautil.ScopedVersionedTableIF[Value]) {
 		SSABuild.CurrentBlock = latch
-		SSABuild.CurrentBlock.ScopeTable = svt
+		SSABuild.CurrentBlock.SetScope(svt)
 		if lb.thirdExpr != nil {
 			lb.thirdExpr()
 		}
@@ -210,7 +210,7 @@ func (lb *LoopBuilder) Finish() {
 	})
 	endScope := LoopBuilder.Build(SpinHandle, generatePhi(SSABuild, latch, lb.enter), generatePhi(SSABuild, exit, lb.enter))
 
-	exit.ScopeTable = endScope
+	exit.SetScope(endScope)
 	SSABuild.CurrentBlock = exit
 
 	addToBlocks(latch)
@@ -325,13 +325,13 @@ func (i *IfBuilder) Build() *IfBuilder {
 			// ifStmt := builder
 			func(conditionScope ssautil.ScopedVersionedTableIF[Value]) {
 				SSABuilder.CurrentBlock = IfStatementBlock
-				SSABuilder.CurrentBlock.ScopeTable = conditionScope
+				SSABuilder.CurrentBlock.SetScope(conditionScope)
 				condition = item.Condition()
 				IfStatementBlock = SSABuilder.CurrentBlock
 			},
 			func(bodyScope ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 				SSABuilder.CurrentBlock = trueBlock
-				SSABuilder.CurrentBlock.ScopeTable = bodyScope
+				SSABuilder.CurrentBlock.SetScope(bodyScope)
 				item.Body()
 				if SSABuilder.CurrentBlock.finish {
 					return nil
@@ -358,7 +358,7 @@ func (i *IfBuilder) Build() *IfBuilder {
 	// last one
 	if i.elseBody != nil {
 		ScopeBuilder.BuildElse(func(sub ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-			SSABuilder.CurrentBlock.ScopeTable = sub
+			SSABuilder.CurrentBlock.SetScope(sub)
 			i.elseBody()
 			if SSABuilder.CurrentBlock.finish {
 				return nil
@@ -372,7 +372,7 @@ func (i *IfBuilder) Build() *IfBuilder {
 		addToBlocks(DoneBlock)
 		SSABuilder.CurrentBlock = DoneBlock
 		end := ScopeBuilder.BuildFinish(generatePhi(i.builder, DoneBlock, i.enter))
-		DoneBlock.ScopeTable = end
+		DoneBlock.SetScope(end)
 	}
 	return i
 }
@@ -430,7 +430,7 @@ func (t *TryBuilder) Finish() {
 
 	// build try
 	tryBuilder.SetTryBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-		tryBlock.ScopeTable = svt
+		tryBlock.SetScope(svt)
 		builder.CurrentBlock = tryBlock
 		t.buildTry()
 		tryBlock = builder.CurrentBlock
@@ -443,7 +443,7 @@ func (t *TryBuilder) Finish() {
 		errorHandler.AddCatch(catchBody)
 		builder.CurrentBlock = catchBody
 		tryBuilder.AddCache(func(svti ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-			builder.CurrentBlock.ScopeTable = svti
+			builder.CurrentBlock.SetScope(svti)
 			// error variable
 			if id := item.err(); id != "" {
 				p := NewParam(id, false, builder)
@@ -467,7 +467,7 @@ func (t *TryBuilder) Finish() {
 		errorHandler.AddFinal(final)
 		target = final
 
-		final.ScopeTable = tryBuilder.CreateFinally()
+		final.SetScope(tryBuilder.CreateFinally())
 		builder.CurrentBlock = final
 		tryBuilder.SetFinal(func() ssautil.ScopedVersionedTableIF[Value] {
 			t.buildFinally()
@@ -479,7 +479,7 @@ func (t *TryBuilder) Finish() {
 	done := builder.NewBasicBlock(TryDone)
 	builder.CurrentBlock = done
 	end := tryBuilder.Build()
-	done.ScopeTable = end
+	done.SetScope(end)
 	errorHandler.AddDone(done)
 	if target == nil {
 		target = done
@@ -599,7 +599,7 @@ func (t *SwitchBuilder) Finish() {
 		addToBlocks(handlers[i])
 		t.enter.AddSucc(handlers[i])
 		switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-			builder.CurrentBlock.ScopeTable = svt
+			builder.CurrentBlock.SetScope(svt)
 
 			builder.PushTarget(switchBuilder, done, nil, _fallthrough) // fallthrough just jump to next handler
 			t.buildBody(i)
@@ -619,7 +619,7 @@ func (t *SwitchBuilder) Finish() {
 	addToBlocks(defaultb)
 	t.enter.AddSucc(defaultb)
 	switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-		builder.CurrentBlock.ScopeTable = svt
+		builder.CurrentBlock.SetScope(svt)
 		if t.buildDefault != nil {
 			builder.PushTarget(switchBuilder, done, nil, nil)
 			t.buildDefault()
@@ -636,5 +636,5 @@ func (t *SwitchBuilder) Finish() {
 	addToBlocks(done)
 	builder.CurrentBlock = done
 	end := switchBuilder.Build(generatePhi(builder, done, t.enter))
-	done.ScopeTable = end
+	done.SetScope(end)
 }
