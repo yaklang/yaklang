@@ -261,7 +261,6 @@ type Type interface {
 	PkgPathString() string // package path string
 	RawString() string     // string contain inner information
 	GetTypeKind() TypeKind // type kind
-
 	// set/get method, method is a function
 	SetMethod(map[string]*Function)
 	AddMethod(string, *Function)
@@ -363,7 +362,8 @@ type BasicType struct {
 	name    string
 	pkgPath string
 
-	method map[string]*Function
+	method       map[string]*Function
+	fullTypeName string
 }
 
 func NewBasicType(kind TypeKind, name string) *BasicType {
@@ -400,6 +400,19 @@ func (b *BasicType) GetTypeKind() TypeKind {
 func (b *BasicType) GetMethod() map[string]*Function {
 	return b.method
 }
+func (b *BasicType) SetFullTypeName(name string) {
+	if b == nil {
+		return
+	}
+	b.fullTypeName = name
+}
+
+func (b *BasicType) GetFullTypeName() string {
+	if b == nil {
+		return ""
+	}
+	return b.fullTypeName
+}
 
 func (b *BasicType) SetMethod(method map[string]*Function) {
 	b.method = method
@@ -410,6 +423,20 @@ func (b *BasicType) AddMethod(id string, f *Function) {
 		b.method = make(map[string]*Function)
 	}
 	b.method[id] = f
+}
+
+func (b *BasicType) IsAny() bool {
+	if b == nil {
+		return true
+	}
+	if b.Kind == AnyTypeKind {
+		return true
+	}
+	return false
+}
+
+func (b *BasicType) GetName() string {
+	return b.name
 }
 
 // func (b *BasicType) GetAllKey() []string {
