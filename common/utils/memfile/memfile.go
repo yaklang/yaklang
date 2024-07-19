@@ -3,7 +3,9 @@ package memfile
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"sync"
+	"time"
 )
 
 var errInvalid = errors.New("invalid argument")
@@ -16,12 +18,62 @@ type File struct {
 	i int
 
 	closed bool
+
+	filename string
+}
+
+type fileInfo struct {
+	size int64
+	name string
+}
+
+func (f *fileInfo) Name() string {
+	if f.name == "" {
+		return "memfile"
+	}
+	return f.name
+}
+
+func (f *fileInfo) Size() int64 {
+	return f.size
+}
+
+func (f *fileInfo) Mode() fs.FileMode {
+	return 0666
+}
+
+func (f *fileInfo) ModTime() time.Time {
+	return time.Now()
+}
+
+func (f *fileInfo) IsDir() bool {
+	return false // 由于是文件，返回 false
+}
+
+func (f *fileInfo) Sys() any {
+	return nil
+}
+
+var _ fs.FileInfo = (*fileInfo)(nil)
+
+// Stat returns the FileInfo structure describing file.
+func (fb *File) Stat() (fs.FileInfo, error) {
+	return &fileInfo{name: fb.filename, size: int64(len(fb.b))}, nil
 }
 
 // New creates and initializes a new File using b as its initial contents.
 // The new File takes ownership of b.
 func New(b []byte) *File {
 	return &File{b: b}
+}
+
+func NewWithName(i string, b []byte) *File {
+	return &File{b: b, filename: i}
+}
+
+// Name returns the name of the file.
+func (fb *File) Name() string {
+	return fb.filename
 }
 
 // Read reads up to len(b) bytes from the File.
@@ -34,6 +86,11 @@ func (fb *File) Read(b []byte) (int, error) {
 	n, err := fb.readAt(b, int64(fb.i))
 	fb.i += n
 	return n, err
+}
+
+// SetName sets the name of the file.
+func (fb *File) SetName(name string) {
+	fb.filename = name
 }
 
 // ReadAt reads len(b) bytes from the File starting at byte offset.
