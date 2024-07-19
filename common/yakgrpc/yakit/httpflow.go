@@ -728,7 +728,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 	if len(params.GetExcludeSuffix()) > 0 {
 		var suffixes []string
-		for _, suffix := range params.GetIncludeSuffix() {
+		for _, suffix := range params.GetExcludeSuffix() {
 			if !strings.HasPrefix(suffix, ".") {
 				suffix = "." + suffix
 			}
