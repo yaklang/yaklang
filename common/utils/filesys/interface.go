@@ -42,28 +42,18 @@ func splitWithSeparator(path string, sep rune) (string, string) {
 	if len(path) == 0 {
 		return "", ""
 	}
-	idx := strings.LastIndexFunc(path, func(r rune) bool {
-		if r == sep {
-			return true
-		}
-		return false
-	})
+	idx := strings.LastIndex(path, string(sep))
 	if idx == -1 {
 		return "", path
 	}
-	return path[:idx], path[idx:]
+	return path[:idx], path[idx+1:]
 }
 
 func getExtension(path string) string {
 	if len(path) == 0 {
 		return ""
 	}
-	idx := strings.LastIndexFunc(path, func(r rune) bool {
-		if r == '.' {
-			return true
-		}
-		return false
-	})
+	idx := strings.LastIndex(path, ".")
 	if idx == -1 {
 		return ""
 	}
