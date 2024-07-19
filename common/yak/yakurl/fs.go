@@ -213,6 +213,10 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 }
 
 func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	// available query:
+	// type=dir # create directory
+	// type=file # create file
+	// paste=true # paste, auto rename if file exist
 	u := params.GetUrl()
 	fs := f.fs
 
@@ -220,17 +224,37 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	if err != nil {
 		return nil, err
 	}
-	exists, err := fs.Exists(absPath)
-	if exists {
-		return nil, utils.Error("file exists") //  if file exists can't use put
-	} else if err != nil {
-		return nil, utils.Errorf("file exists check error: %v", err)
-	}
 
 	query := make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
+	isPaste := strings.ToLower(query.Get("paste")) == "true"
+
+	exists, err := fs.Exists(absPath)
+	if exists {
+		if !isPaste {
+			return nil, utils.Error("file exists") //  if file exists can't use put
+		}
+		dirPath, name := fs.PathSplit(absPath)
+		filenameWithoutExt, ext := name, fs.Ext(name)
+		if len(ext) > 0 {
+			filenameWithoutExt = strings.TrimSuffix(name, ext)
+		}
+		i := 1
+		for {
+			newName := fmt.Sprintf("%s(%d)%s", filenameWithoutExt, i, ext)
+			newAbsPath := fs.Join(dirPath, newName)
+			if found, _ := fs.Exists(newAbsPath); !found {
+				absPath = newAbsPath
+				break
+			}
+			i++
+		}
+	} else if err != nil {
+		return nil, utils.Errorf("file exists check error: %v", err)
+	}
+
 	switch query.Get("type") {
 	case "dir":
 		err := fs.MkdirAll(absPath, 0o755)
