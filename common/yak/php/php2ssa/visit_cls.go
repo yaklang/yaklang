@@ -29,9 +29,9 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	if i.AnonymousClass() != nil {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
-	className := i.TypeRef().GetText()
-	class := y.GetClassBluePrint(className)
-	obj := y.EmitUndefined(className)
+	class, name := y.VisitTypeRef(i.TypeRef())
+	var obj ssa.Value
+	obj = y.EmitUndefined(name)
 	if utils.IsNil(obj) {
 		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
 		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
@@ -40,10 +40,10 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.EmitUndefined(raw.GetText())
 	}
 	if class == nil {
-		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", className)
+		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", name)
 		obj.SetType(ssa.GetAnyType())
-		variable := y.CreateVariable(className)
-		defaultClassFullback := y.EmitUndefined(className)
+		variable := y.CreateVariable(name)
+		defaultClassFullback := y.EmitUndefined(name)
 		y.AssignVariable(variable, defaultClassFullback)
 		args := []ssa.Value{obj}
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
@@ -557,9 +557,14 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 		}
 		key = y.VisitRightValue(i.FlexiVariable()).GetName()
 	case *phpparser.VariableAsIndirectClassStaticVariableContext:
-		exprName := y.VisitVariable(i.Variable())
-		class = y.ReadValue(exprName).String()
 		key = y.VisitRightValue(i.FlexiVariable()).GetName()
+		exprName := y.VisitVariable(i.Variable())
+		v := y.ReadValue(exprName)
+		if v.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
+			return y.GetStaticMember(v.GetName(), key[1:]), class, key
+		} else {
+			class = v.String()
+		}
 		//return y.GetStaticMember(class, value.String())
 	default:
 		_ = i
@@ -773,9 +778,7 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 		function := library.GetFunction(identifier)
 		return function
 	}
-
-	//todo： 获取不到会有问题
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) ResolveValue(name string) ssa.Value {

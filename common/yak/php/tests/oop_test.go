@@ -440,6 +440,17 @@ println($c->a);`
 	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 }
 
+//func TestOOP_custom_member(t *testing.T) {
+//	code := `<?php
+//    class test{
+//        public $a = 1;
+//    }
+//	$c = new test();
+//	println($c->$a);
+//`
+//	ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+//}
+
 func TestOOP_Class_Instantiation(t *testing.T) {
 	t.Run("Instantiate a non-existent object", func(t *testing.T) {
 		code := `

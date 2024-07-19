@@ -47,10 +47,6 @@ func (v *BasePHPParserVisitor) VisitUseDeclarationContentList(ctx *UseDeclaratio
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitUseDeclarationContent(ctx *UseDeclarationContentContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitNamespaceDeclaration(ctx *NamespaceDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
