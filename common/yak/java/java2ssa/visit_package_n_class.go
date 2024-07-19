@@ -179,7 +179,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
 		for _, variableDeclarator := range variableDeclarators {
 			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
-			name, value := y.VisitVariableDeclarator(v)
+			name, value := y.VisitVariableDeclarator(v, "")
 			value.SetType(fieldType)
 			setMember(name, value)
 		}
