@@ -1011,17 +1011,21 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		value := y.VisitExpression(i.Expression())
 		y.AssignVariable(variable, value)
 	} else if ret := i.VariableDeclarators(); ret != nil {
-		//log.Infof("visit local variable declaration: %v", ret.GetText())
+		var typName string
+		if i.TypeType() != nil {
+			typName = i.TypeType().GetText()
+		}
+		//log.Infof("visit local variable declaration: %v,type:%v", ret.GetText(), typName)
 		decls := ret.(*javaparser.VariableDeclaratorsContext)
 		for _, decl := range decls.AllVariableDeclarator() {
-			y.VisitVariableDeclarator(decl)
+			y.VisitVariableDeclarator(decl, typName)
 		}
 	}
 
 	return nil
 }
 
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext) (name string, value ssa.Value) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typName string) (name string, value ssa.Value) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -1040,6 +1044,14 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		if utils.IsNil(value) {
 			return name, nil
 		} else {
+			if ft, ok := y.fullTypeNameMap[typName]; ok {
+				typ := value.GetType()
+				if b, ok := typ.(*ssa.BasicType); ok && b.IsAny() {
+					newTyp := ssa.NewBasicType(b.Kind, b.GetName())
+					newTyp.SetFullTypeName(ft)
+					value.SetType(newTyp)
+				}
+			}
 			y.AssignVariable(variable, value)
 			return name, value
 		}
