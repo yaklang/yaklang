@@ -25,6 +25,7 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		return err
 	}
 	b.SupportClassStaticModifier = true
+	b.SupportClass = true
 	build := builder{
 		constMap:        make(map[string]ssa.Value),
 		FunctionBuilder: b,
