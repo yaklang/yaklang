@@ -38,8 +38,8 @@ type VersionedIF[T versionedValue] interface {
 	GetName() string
 
 	// version
-	SetVersion(int)
-	GetVersion() int
+	SetVersion(int64)
+	GetVersion() int64
 
 	// local
 	GetLocal() bool
@@ -67,7 +67,7 @@ type VersionedIF[T versionedValue] interface {
 type Versioned[T versionedValue] struct {
 	// origin desc the variable's last or renamed version
 	captureVariable VersionedIF[T]
-	versionIndex    int
+	versionIndex    int64
 	globalIndex     int
 	lexicalName     string
 
@@ -121,7 +121,7 @@ func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
 	capId := v.versionIndex
 	_ = capId
 
-	v.versionIndex = utils.MapGetIntEx(params, "version_index")
+	v.versionIndex = utils.MapGetInt64(params, "version_index")
 	v.globalIndex = utils.MapGetIntEx(params, "global_index")
 	v.lexicalName = utils.MapGetString(params, "lexical_name")
 	v.local = utils.MapGetBool(params, "local")
@@ -158,7 +158,7 @@ func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
 	params["global_index"] = v.globalIndex
 	params["lexical_name"] = v.lexicalName
 	params["local"] = v.local
-	params["scope"] = v.scope.GetPersistentId()
+	// params["scope"] = v.scope.GetPersistentId()
 	params["is_assigned"] = v.isAssigned.IsSet()
 	var valIdx int64 = 0
 	if !isZeroValue(v.Value) {
@@ -234,11 +234,11 @@ func (v *Versioned[T]) String() string {
 func (v *Versioned[T]) GetName() string {
 	return v.lexicalName
 }
-func (v *Versioned[T]) SetVersion(version int) {
+func (v *Versioned[T]) SetVersion(version int64) {
 	v.versionIndex = version
 }
 
-func (v *Versioned[T]) GetVersion() int {
+func (v *Versioned[T]) GetVersion() int64 {
 	return v.versionIndex
 }
 
