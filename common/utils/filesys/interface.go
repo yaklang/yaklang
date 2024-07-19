@@ -2,6 +2,7 @@ package filesys
 
 import (
 	"io/fs"
+	"os"
 	"strings"
 )
 
@@ -27,6 +28,14 @@ type FileSystem interface {
 
 	PathSplit(string) (string, string)
 	Ext(string) string
+	IsAbs(string) bool
+	Getwd() (string, error)
+	Exists(string) (bool, error)
+	Rename(string, string) error
+	Rel(string, string) (string, error)
+	WriteFile(string, []byte, os.FileMode) error
+	Delete(string) error
+	MkdirAll(string, os.FileMode) error
 }
 
 func splitWithSeparator(path string, sep rune) (string, string) {

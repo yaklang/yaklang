@@ -3,52 +3,58 @@ package filesys
 import (
 	"bytes"
 	"embed"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type embedFs struct {
 	f embed.FS
 }
 
-func (e *embedFs) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, e.GetSeparators())
+func (f *embedFs) PathSplit(s string) (string, string) {
+	return splitWithSeparator(s, f.GetSeparators())
 }
 
-func (e *embedFs) Ext(s string) string {
+func (f *embedFs) Ext(s string) string {
 	return getExtension(s)
 }
 
 var _ FileSystem = (*embedFs)(nil)
 
-func (e *embedFs) ReadFile(name string) ([]byte, error) {
-	fn, err := e.f.Open(name)
+func (f *embedFs) ReadFile(name string) ([]byte, error) {
+	fn, err := f.f.Open(name)
 	if err != nil {
 		return nil, err
 	}
 	defer fn.Close()
 	return io.ReadAll(fn)
 }
-func (e *embedFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return e.f.ReadDir(dirname) }
-func (e *embedFs) Open(name string) (fs.File, error)             { return e.f.Open(name) }
-func (e *embedFs) Stat(name string) (fs.FileInfo, error) {
-	fn, err := e.f.Open(name)
+func (f *embedFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return f.f.ReadDir(dirname) }
+func (f *embedFs) Open(name string) (fs.File, error)             { return f.f.Open(name) }
+func (f *embedFs) Stat(name string) (fs.FileInfo, error) {
+	fn, err := f.f.Open(name)
 	if err != nil {
 		return nil, err
 	}
 	return fn.Stat()
 }
 
-func (e *embedFs) GetSeparators() rune { return '/' }
-
-func (f *embedFs) Join(name ...string) string {
-	return path.Join(name...)
-}
+func (f *embedFs) GetSeparators() rune                         { return '/' }
+func (f *embedFs) Join(paths ...string) string                 { return path.Join(paths...) }
+func (f *embedFs) IsAbs(name string) bool                      { return len(name) > 0 && name[0] == byte(f.GetSeparators()) }
+func (f *embedFs) Getwd() (string, error)                      { return "", nil }
+func (f *embedFs) Exists(path string) (bool, error)            { _, err := f.f.Open(path); return err == nil, err }
+func (f *embedFs) Rename(string, string) error                 { return utils.Error("implement me") }
+func (f *embedFs) Rel(string, string) (string, error)          { return "", utils.Error("implement me") }
+func (f *embedFs) WriteFile(string, []byte, os.FileMode) error { return utils.Error("implement me") }
+func (f *embedFs) Delete(string) error                         { return utils.Error("implement me") }
+func (f *embedFs) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 
 func NewEmbedFS(fs embed.FS) FileSystem {
 	return &embedFs{fs}
@@ -88,8 +94,18 @@ func (f *LocalFs) ReadFile(name string) ([]byte, error) {
 	}
 	return data, err
 }
-func (f *LocalFs) Open(name string) (fs.File, error)             { return os.Open(name) }
-func (f *LocalFs) Stat(name string) (fs.FileInfo, error)         { return os.Stat(name) }
-func (f *LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return os.ReadDir(dirname) }
-func (f *LocalFs) GetSeparators() rune                           { return filepath.Separator }
-func (f *LocalFs) Join(name ...string) string                    { return filepath.Join(name...) }
+func (f *LocalFs) Open(name string) (fs.File, error)              { return os.Open(name) }
+func (f *LocalFs) Stat(name string) (fs.FileInfo, error)          { return os.Stat(name) }
+func (f *LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error)  { return os.ReadDir(dirname) }
+func (f *LocalFs) GetSeparators() rune                            { return filepath.Separator }
+func (f *LocalFs) Join(paths ...string) string                    { return filepath.Join(paths...) }
+func (f *LocalFs) IsAbs(name string) bool                         { return filepath.IsAbs(name) }
+func (f *LocalFs) Getwd() (string, error)                         { return os.Getwd() }
+func (f *LocalFs) Exists(path string) (bool, error)               { return utils.PathExists(path) }
+func (f *LocalFs) Rename(old string, new string) error            { return os.Rename(old, new) }
+func (f *LocalFs) Rel(base string, target string) (string, error) { return filepath.Rel(base, target) }
+func (f *LocalFs) WriteFile(name string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(name, data, perm)
+}
+func (f *LocalFs) Delete(name string) error                     { return os.RemoveAll(name) }
+func (f *LocalFs) MkdirAll(name string, perm os.FileMode) error { return os.MkdirAll(name, perm) }
