@@ -37,16 +37,14 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 }
 
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
-	prog := f.GetProgram()
 	b := &BasicBlock{
-		anValue:    NewValue(),
-		Preds:      make([]Value, 0),
-		Succs:      make([]Value, 0),
-		Insts:      make([]Instruction, 0),
-		Phis:       make([]Value, 0),
-		Handler:    nil,
-		finish:     false,
-		ScopeTable: NewScope(prog.GetProgramName()),
+		anValue: NewValue(),
+		Preds:   make([]Value, 0),
+		Succs:   make([]Value, 0),
+		Insts:   make([]Instruction, 0),
+		Phis:    make([]Value, 0),
+		Handler: nil,
+		finish:  false,
 	}
 	b.SetName(name)
 	b.SetFunc(f)
@@ -77,6 +75,13 @@ func addToBlocks(block *BasicBlock) {
 	block.Index = index
 	f.Blocks = append(f.Blocks, block)
 	block.GetProgram().SetVirtualRegister(block)
+}
+
+func (b *BasicBlock) SetScope(s ScopeIF) {
+	if b.ScopeTable != nil {
+		log.Errorf("block %v already has a scope", b.GetName())
+	}
+	b.ScopeTable = s
 }
 
 /*

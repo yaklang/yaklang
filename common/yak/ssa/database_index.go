@@ -44,9 +44,8 @@ func SaveVariableIndex(inst Instruction, name string) {
 		}
 
 		// TODO : scope ID
-		// scope := variable.GetScope()
-		// index.ScopeID = scope.GetPersistentId()
-
+		scope := variable.GetScope()
+		index.ScopeName = scope.GetScopeName()
 	}
 }
 
