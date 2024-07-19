@@ -54,8 +54,7 @@ println(Foo::$my_static . PHP_EOL);
 	})
 
 	t.Run("normal static member,  assign again ", func(t *testing.T) {
-		code := `
-	<?php
+		code := `<?php
 class Foo {
 	public static $my_static;
 }
