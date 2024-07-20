@@ -169,6 +169,7 @@ type Program struct {
 	Name        string
 	Version     string
 	ProgramKind ProgramKind // is library or application
+	Language    string
 
 	// from pom.xml file
 	SCAPackages []*dxtypes.Package

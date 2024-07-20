@@ -2,97 +2,15 @@ package sfdb
 
 import (
 	"encoding/json"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/fs"
 	"strconv"
-	"strings"
 )
 
-type PurposeType string
-type RuleType string
-
-const (
-	PURPOSE_AUDIT    PurposeType = "audit"
-	PURPOSE_VULN     PurposeType = "vuln"
-	PURPOSE_CONFIG   PurposeType = "config"
-	PURPOSE_SECURITY PurposeType = "securiy"
-)
-
-const (
-	RULE_TYPE_YAK RuleType = "yak"
-	RULE_TYPE_SF  RuleType = "sf"
-)
-
-func ValidRuleType(i any) RuleType {
-	switch strings.ToLower(codec.AnyToString(i)) {
-	case "yak", "y", "yaklang":
-		return RULE_TYPE_YAK
-	case "sf", "syntaxflow":
-		return RULE_TYPE_SF
-	default:
-		return RULE_TYPE_SF
-	}
-}
-
-func ValidPurpose(i any) PurposeType {
-	switch strings.ToLower(codec.AnyToString(i)) {
-	case "audit", "a", "audition":
-		return PURPOSE_AUDIT
-	case "vuln", "v", "vulnerability", "vul", "vulnerabilities", "weak", "weakness":
-		return PURPOSE_VULN
-	case "config", "c", "configuration", "conf", "configure":
-		return PURPOSE_CONFIG
-	case "security", "s", "secure", "securely", "secureity":
-		return PURPOSE_SECURITY
-	default:
-		return PURPOSE_AUDIT
-	}
-}
-
-type SyntaxFlowRule struct {
-	gorm.Model
-
-	// Language is the language of the rule.
-	// if the rule is not set, all languages will be used.
-	Language string
-
-	Title       string
-	TitleZh     string
-	Description string
-
-	// yak or sf
-	Type    RuleType
-	Content string
-
-	// Purpose is the purpose of the rule.
-	// audit / vuln / config / security / information
-	Purpose PurposeType
-
-	// DemoFileSystem will description the file system of the rule.
-	// This is a json string.
-	//    save map[string]quotedString
-	TypicalHitFileSystem []byte
-
-	Hash string `json:"hash" gorm:"unique_index"`
-}
-
-func (s *SyntaxFlowRule) CalcHash() string {
-	s.Hash = utils.CalcSha256(s.Content)
-	return s.Hash
-}
-
-func (s *SyntaxFlowRule) BeforeSave() error {
-	s.CalcHash()
-	s.Purpose = ValidPurpose(s.Purpose)
-	s.Type = ValidRuleType(s.Type)
-	return nil
-}
-
-func (s *SyntaxFlowRule) LoadFileSystem(system filesys.FileSystem) error {
+func LoadFileSystem(s *schema.SyntaxFlowRule, system filesys.FileSystem) error {
 	f := make(map[string]string)
 	filesys.Recursive(".", filesys.WithFileSystem(system), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		raw, err := system.ReadFile(s)
@@ -111,7 +29,7 @@ func (s *SyntaxFlowRule) LoadFileSystem(system filesys.FileSystem) error {
 	return nil
 }
 
-func (s *SyntaxFlowRule) BuildFileSystem() (filesys.FileSystem, error) {
+func BuildFileSystem(s *schema.SyntaxFlowRule) (filesys.FileSystem, error) {
 	f := make(map[string]string)
 	raw, _ := utils.GzipDeCompress(s.TypicalHitFileSystem)
 	err := json.Unmarshal(raw, &f)
@@ -129,8 +47,8 @@ func (s *SyntaxFlowRule) BuildFileSystem() (filesys.FileSystem, error) {
 	return fs, nil
 }
 
-func (s *SyntaxFlowRule) Valid() error {
-	fs, err := s.BuildFileSystem()
+func Valid(s *schema.SyntaxFlowRule) error {
+	fs, err := BuildFileSystem(s)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package js2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -36,6 +37,10 @@ func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) err
 
 func (*SSABuild) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".js"
+}
+
+func (*SSABuild) GetLanguage() consts.Language {
+	return consts.JS
 }
 
 type astbuilder struct {

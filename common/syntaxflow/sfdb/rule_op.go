@@ -3,24 +3,21 @@ package sfdb
 import (
 	"context"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"path"
 	"strings"
 )
 
-func init() {
-	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SYNTAXFLOW_RULE, &SyntaxFlowRule{})
-}
-
-func CreateOrUpdateSyntaxFlow(db *gorm.DB, hash string, i any) error {
-	var rule SyntaxFlowRule
+func CreateOrUpdateSyntaxFlow(hash string, i any) error {
+	db := consts.GetGormProfileDatabase()
+	var rule schema.SyntaxFlowRule
 	if err := db.Where("hash = ?", hash).First(&rule).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(i).Error
@@ -32,7 +29,7 @@ func CreateOrUpdateSyntaxFlow(db *gorm.DB, hash string, i any) error {
 }
 
 func ImportValidRule(system filesys.FileSystem, ruleName string, content string) error {
-	var language ssaapi.Language
+	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
 	case "yak", "yaklang":
@@ -45,10 +42,10 @@ func ImportValidRule(system filesys.FileSystem, ruleName string, content string)
 		language = ssaapi.JS
 	}
 
-	var ruleType RuleType
+	var ruleType schema.SyntaxFlowRuleType
 	switch path.Ext(ruleName) {
 	case ".sf", ".syntaxflow":
-		ruleType = RULE_TYPE_SF
+		ruleType = schema.SFR_RULE_TYPE_SF
 	default:
 		return utils.Errorf("invalid rule type: %v is not supported yet", ruleName)
 	}
@@ -58,39 +55,40 @@ func ImportValidRule(system filesys.FileSystem, ruleName string, content string)
 		return err
 	}
 
-	rule := &SyntaxFlowRule{
+	rule := &schema.SyntaxFlowRule{
 		Language:    string(language),
 		Title:       frame.Title,
 		Description: frame.Description,
 		Type:        ruleType,
 		Content:     content,
-		Purpose:     ValidPurpose(frame.Purpose),
+		Purpose:     schema.ValidPurpose(frame.Purpose),
 	}
 
-	err = rule.LoadFileSystem(system)
+	err = LoadFileSystem(rule, system)
 	if err != nil {
 		return utils.Wrap(err, "load file system error")
 	}
 
-	err = rule.Valid()
+	err = Valid(rule)
 	if err != nil {
 		return utils.Wrap(err, "valid rule error")
 	}
 
-	err = CreateOrUpdateSyntaxFlow(ssadb.GetDB(), rule.CalcHash(), rule)
+	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
 	return nil
 }
-func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *SyntaxFlowRule {
-	outC := make(chan *SyntaxFlowRule)
+
+func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
+	outC := make(chan *schema.SyntaxFlowRule)
 	go func() {
 		defer close(outC)
 
 		var page = 1
 		for {
-			var items []*SyntaxFlowRule
+			var items []*schema.SyntaxFlowRule
 			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
 				log.Errorf("paging failed: %s", b.Error)
 				return
