@@ -1,7 +1,10 @@
 package sfdb
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,9 +14,61 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"io"
 	"path"
 	"strings"
 )
+
+func Export() io.ReadCloser {
+	r, w := utils.NewBufPipe(nil)
+	go func() {
+		defer func() {
+			w.Close()
+		}()
+		for result := range YieldSyntaxFlowRules(consts.GetGormProfileDatabase(), context.Background()) {
+			result.ID = 0
+
+			raw, err := json.Marshal(result)
+			if err != nil {
+				log.Errorf("marshal syntax flow rule error: %s", err)
+				continue
+			}
+			_, err = w.Write(raw)
+			if err != nil {
+				log.Errorf("write syntax flow rule error: %s", err)
+				continue
+			}
+			w.Write([]byte{'\n'})
+		}
+	}()
+	return r
+}
+
+func Import(reader io.Reader) error {
+	scanner := bufio.NewReader(reader)
+	for {
+		line, err := utils.BufioReadLine(scanner)
+		if err != nil {
+			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
+				break
+			}
+			return err
+		}
+		var rule schema.SyntaxFlowRule
+		if err := json.Unmarshal(line, &rule); err != nil {
+			log.Errorf("unmarshal syntax flow rule error: %s", err)
+			continue
+		}
+
+		err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), &rule)
+		if err != nil {
+			log.Errorf("create or update syntax flow rule error: %s", err)
+			continue
+		}
+	}
+
+	return nil
+}
 
 func CreateOrUpdateSyntaxFlow(hash string, i any) error {
 	db := consts.GetGormProfileDatabase()
@@ -47,7 +102,8 @@ func ImportValidRule(system filesys.FileSystem, ruleName string, content string)
 	case ".sf", ".syntaxflow":
 		ruleType = schema.SFR_RULE_TYPE_SF
 	default:
-		return utils.Errorf("invalid rule type: %v is not supported yet", ruleName)
+		log.Errorf("invalid rule type: %v is not supported yet", ruleName)
+		return nil
 	}
 
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)

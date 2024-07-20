@@ -122,3 +122,29 @@ func (s *SFFrameResult) Copy() *SFFrameResult {
 	ret.AlertSymbolTable = s.AlertSymbolTable
 	return ret
 }
+
+func (s *SFFrameResult) Name() string {
+	for _, name := range []string{
+		"title", "name", "desc", "description",
+	} {
+		result, ok := s.Description.Get(name)
+		if !ok {
+			continue
+		}
+		return result
+	}
+	return utils.ShrinkString(s.String(), 40)
+}
+
+func (s *SFFrameResult) GetDescription() string {
+	for _, name := range []string{
+		"desc", "description", "help",
+	} {
+		result, ok := s.Description.Get(name)
+		if !ok {
+			continue
+		}
+		return result
+	}
+	return "no description field set"
+}

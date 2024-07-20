@@ -1,14 +1,12 @@
 package ssaapi
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -22,8 +20,9 @@ type SarifContext struct {
 	_ArtifactsTable map[string]int
 
 	// context for result
-	locations []*sarif.Location
-	codeFlows []*sarif.CodeFlow
+	locations   []*sarif.Location
+	codeFlows   []*sarif.CodeFlow
+	invocations []*sarif.Invocation
 }
 
 func (s *SarifContext) CreateSubSarifContext() *SarifContext {
@@ -37,8 +36,9 @@ func (s *SarifContext) ArtifactsExisted(hash string) (int, bool) {
 		if id, ok := s._ArtifactsTable[hash]; ok {
 			return id, true
 		}
-		s._ArtifactsTable[hash] = len(s._artifacts)
-		return -1, false
+		id := len(s._artifacts)
+		s._ArtifactsTable[hash] = id
+		return id, false
 	}
 	return s.root.ArtifactsExisted(hash)
 }
@@ -71,19 +71,10 @@ func (s *SarifContext) AddSSAValue(v *Value, extraMsg ...string) {
 		log.Warn("artifactId < 0 (invalid artifactId value cannot be treated as sarif.CodeFlow)")
 		return
 	}
-	s.locations = append(s.locations, s.CreateLocation(artifactId, rg))
-	cf := sarif.NewCodeFlow()
-	cf.WithTextMessage(v.StringWithRange())
-	if len(extraMsg) > 0 {
-		pb := sarif.NewPropertyBag()
-		pb.AddString("extraMessage", fmt.Sprintf("%s:\nt%s:%s", extraMsg[0], strconv.FormatInt(v.GetId(), 10), v.StringWithRange()))
-		cf.AttachPropertyBag(pb)
-	}
-	cf.WithThreadFlows(s.CreateThreadFlowsFromPredecessor(v))
-	s.codeFlows = append(s.codeFlows, cf)
+	s.CreateCodeFlowsFromPredecessor(v)
 }
 
-func (s *SarifContext) createThreadFlowsFromPredecessor(v *Value, add func(flow *sarif.ThreadFlow), visited map[int64]struct{}) {
+func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value, add func(flow *sarif.CodeFlow), visited map[int64]struct{}) {
 	if visited == nil {
 		visited = make(map[int64]struct{})
 	}
@@ -92,6 +83,10 @@ func (s *SarifContext) createThreadFlowsFromPredecessor(v *Value, add func(flow 
 		return
 	}
 	visited[v.GetId()] = struct{}{}
+
+	if len(v.Predecessors) > 0 {
+		log.Infof("create codeflow preds: %v from: %v", len(v.Predecessors), v)
+	}
 
 	preds := v.Predecessors
 	for _, tf := range preds {
@@ -111,10 +106,17 @@ func (s *SarifContext) createThreadFlowsFromPredecessor(v *Value, add func(flow 
 			sarif.NewThreadFlowLocation().WithLocation(
 				s.CreateLocation(artid, rg),
 			),
-		}).WithTextMessage(tf.Info.Label)
-		add(tfInstance)
+		}).WithMessage(sarif.NewTextMessage(tf.Info.Label))
 
-		s.createThreadFlowsFromPredecessor(v, add, visited)
+		codeflow := sarif.NewCodeFlow().WithThreadFlows([]*sarif.ThreadFlow{
+			tfInstance,
+		}).WithTextMessage(tf.Node.StringWithRange())
+
+		add(codeflow)
+		s.locations = append(s.locations, s.CreateLocation(artid, rg))
+		s.createCodeFlowsFromPredecessor(tf.Node, add, visited)
+		invoc := sarif.NewInvocation().WithArguments([]string{tf.Info.Label})
+		s.invocations = append(s.invocations, invoc)
 	}
 
 	if len(preds) > 0 {
@@ -122,20 +124,46 @@ func (s *SarifContext) createThreadFlowsFromPredecessor(v *Value, add func(flow 
 	}
 
 	for _, dep := range v.DependOn {
-		s.createThreadFlowsFromPredecessor(dep, add, visited)
+		rg := dep.GetRange()
+		if rg == nil {
+			continue
+		}
+		if rg.GetEditor() == nil {
+			continue
+		}
+
+		artid := s.GetArtifactIdFromEditor(rg.GetEditor())
+		if artid < 0 {
+			continue
+		}
+		s.locations = append(s.locations, s.CreateLocation(artid, rg))
+		s.createCodeFlowsFromPredecessor(dep, add, visited)
 	}
 	for _, eff := range v.EffectOn {
-		s.createThreadFlowsFromPredecessor(eff, add, visited)
+		rg := eff.GetRange()
+		if rg == nil {
+			continue
+		}
+		if rg.GetEditor() == nil {
+			continue
+		}
+
+		artid := s.GetArtifactIdFromEditor(rg.GetEditor())
+		if artid < 0 {
+			continue
+		}
+		s.locations = append(s.locations, s.CreateLocation(artid, rg))
+		s.createCodeFlowsFromPredecessor(eff, add, visited)
 	}
 }
 
-func (s *SarifContext) CreateThreadFlowsFromPredecessor(v *Value) []*sarif.ThreadFlow {
-	var flows []*sarif.ThreadFlow
+func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *Value) []*sarif.CodeFlow {
+	var flows []*sarif.CodeFlow
 
-	addFlow := func(tf *sarif.ThreadFlow) {
-		flows = append(flows, tf)
+	addFlow := func(tf *sarif.CodeFlow) {
+		s.codeFlows = append(s.codeFlows, tf)
 	}
-	s.createThreadFlowsFromPredecessor(v, addFlow, nil)
+	s.createCodeFlowsFromPredecessor(v, addFlow, nil)
 	return flows
 }
 
@@ -166,12 +194,9 @@ func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
 	if url == "" {
 		log.Warn("editor.GetUrl() is empty, it will cause some problems will open in some sarif viewer")
 	}
-	if url != "" && !strings.HasPrefix(url, "file://") {
-		url = "file://" + url
-	}
 	sourceCode := editor.GetSourceCode()
 	art := sarif.NewArtifact().WithLength(len(sourceCode)).WithLocation(
-		sarif.NewArtifactLocation().WithUri(url),
+		sarif.NewArtifactLocation().WithUri(url).WithIndex(id),
 	).WithContents(
 		sarif.NewArtifactContent().WithText(sourceCode),
 	).WithHashes(map[string]string{
@@ -183,6 +208,108 @@ func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
 	return id
 }
 
+func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frame *sfvm.SFFrameResult) []*sarif.Run {
+	var results []*sarif.Result
+	var ctxs []*SarifContext
+
+	haveResult := false
+	if frame.AlertSymbolTable == nil {
+		frame.AlertSymbolTable = make(map[string]sfvm.ValueOperator)
+	}
+
+	ruleId := codec.Sha256(frame.Rule)
+
+	rule := sarif.NewRule(ruleId).WithName(frame.Name()).WithDescription(frame.GetDescription())
+	rule.WithFullDescription(sarif.NewMultiformatMessageString(frame.Rule))
+
+	if len(frame.AlertSymbolTable) == 0 {
+		for _, name := range frame.CheckParams {
+			checkResult, ok := frame.SymbolTable.Get(name)
+			if !ok {
+				continue
+			}
+			frame.AlertSymbolTable[name] = checkResult
+		}
+	}
+
+	var defaultEditor *memedit.MemEditor = nil
+
+	for k, v := range frame.AlertSymbolTable {
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			sctx := root.CreateSubSarifContext()
+			if raw, ok := operator.(*Value); ok {
+				if utils.IsNil(defaultEditor) {
+					defaultEditor = raw.GetRange().GetEditor()
+				}
+				if msg := frame.AlertMsgTable[k]; msg != "" {
+					sctx.AddSSAValue(raw, msg)
+				} else {
+					sctx.AddSSAValue(raw)
+				}
+				haveResult = true
+			}
+			if len(sctx.codeFlows) > 0 {
+				ctxs = append(ctxs, sctx)
+			}
+			return nil
+		})
+	}
+
+	if !haveResult {
+		return nil
+	}
+	msgRaw, _ := frame.Description.MarshalJSON()
+	result, ok := frame.Description.Get("title")
+	if ok {
+		msgRaw = []byte(result)
+	}
+
+	tool := sarif.NewTool(&sarif.ToolComponent{
+		FullName:     bizhelper.StrP("syntaxflow"),
+		Name:         "syntaxflow",
+		Organization: bizhelper.StrP("yaklang.io"),
+		Rules:        []*sarif.ReportingDescriptor{rule},
+		Taxa:         []*sarif.ReportingDescriptor{rule},
+	})
+
+	var runs []*sarif.Run
+	for _, sctx := range ctxs {
+		if len(sctx.codeFlows) > 0 {
+			log.Infof("codeflows fetch: %v, location: %v", len(sctx.codeFlows), len(sctx.locations))
+		}
+		results = append(results, sarif.NewRuleResult(
+			ruleId,
+		).WithMessage(
+			sarif.NewTextMessage(frame.Rule),
+		).WithCodeFlows(
+			sctx.codeFlows,
+		).WithLocations(
+			sctx.locations,
+		).WithAnalysisTarget(
+			sarif.NewArtifactLocation().WithIndex(sctx.GetArtifactIdFromEditor(defaultEditor)),
+		).WithMessage(
+			sarif.NewTextMessage(string(msgRaw)),
+		).WithRule(
+			sarif.NewReportingDescriptorReference().WithId(ruleId),
+		))
+
+		run := sarif.NewRun(*tool).WithDefaultSourceLanguage(
+			"java",
+		).WithDefaultEncoding(
+			"utf-8",
+		).WithArtifacts(
+			root._artifacts,
+		).WithResults(
+			results,
+		).WithInvocations(
+			sctx.invocations,
+		)
+
+		runs = append(runs, run)
+	}
+	return runs
+}
+
 func ConvertSyntaxFlowResultToSarif(r ...*sfvm.SFFrameResult) (*sarif.Report, error) {
 	report, err := sarif.New(sarif.Version210, false)
 	if err != nil {
@@ -190,46 +317,13 @@ func ConvertSyntaxFlowResultToSarif(r ...*sfvm.SFFrameResult) (*sarif.Report, er
 	}
 
 	root := NewSarifContext()
-	var results []*sarif.Result
 	for _, frame := range r {
-		haveResult := false
-		sctx := root.CreateSubSarifContext()
-		if frame.AlertSymbolTable == nil {
-			frame.AlertSymbolTable = make(map[string]sfvm.ValueOperator)
+		for _, run := range convertSyntaxFlowFrameToSarifRun(root, frame) {
+			if funk.IsEmpty(run) {
+				continue
+			}
+			report.AddRun(run)
 		}
-		for k, v := range frame.AlertSymbolTable {
-			v.Recursive(func(operator sfvm.ValueOperator) error {
-				if raw, ok := operator.(*Value); ok {
-					if msg := frame.AlertMsgTable[k]; msg != "" {
-						sctx.AddSSAValue(raw, msg)
-					} else {
-						sctx.AddSSAValue(raw)
-					}
-					haveResult = true
-				}
-				return nil
-			})
-		}
-		if !haveResult {
-			continue
-		}
-		msgRaw, _ := frame.Description.MarshalJSON()
-		results = append(results, sarif.NewRuleResult(codec.Sha256(frame.Rule)).WithMessage(sarif.NewTextMessage(frame.Rule)).WithCodeFlows(
-			sctx.codeFlows,
-		).WithLocations(
-			sctx.locations,
-		).WithMessage(sarif.NewTextMessage(string(msgRaw))))
-		//).WithGraphs([]*sarif.Graph{}))
 	}
-
-	report.AddRun(
-		sarif.NewRun(
-			*sarif.NewSimpleTool("syntaxflow"),
-		).WithDefaultSourceLanguage(
-			"java",
-		).WithDefaultEncoding(
-			"utf-8",
-		).WithArtifacts(root._artifacts).WithResults(results),
-	)
 	return report, nil
 }

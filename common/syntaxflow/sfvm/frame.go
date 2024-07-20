@@ -13,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
-
-	_ "github.com/yaklang/yaklang/common/sarif"
 )
 
 type filterExprContext struct {
