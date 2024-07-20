@@ -89,7 +89,7 @@ func (s *SFFrameResult) String() string {
 					if ssaRange != nil {
 						start, end := ssaRange.GetStart(), ssaRange.GetEnd()
 						editor := ssaRange.GetEditor()
-						fileName := editor.GetUrl()
+						fileName := editor.GetFilename()
 						if fileName == "" {
 							var err error
 							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
@@ -97,7 +97,7 @@ func (s *SFFrameResult) String() string {
 								log.Warn(err)
 							}
 							if editor != nil {
-								fileName = editor.GetUrl()
+								fileName = editor.GetFilename()
 								if fileName == "" {
 									fileName = `[md5:` + editor.SourceCodeMd5() + `]`
 								}

@@ -671,7 +671,7 @@ func show(r ssaapi.Values) {
 			},
 		)
 		log.Infof("%s:%s \nIR: %d: %s\n%s\n",
-			editor.GetUrl(), codeRange.String(),
+			editor.GetFilename(), codeRange.String(),
 			v.GetId(), v.String(),
 			ctxText,
 		)

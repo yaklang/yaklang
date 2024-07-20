@@ -53,7 +53,7 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	currentEditor := prog.GetCurrentEditor()
 	// this program has current file
 	hasFile := func(p *Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
 			if hash == currentEditor.SourceCodeMd5() {
 				return true
 			}
@@ -208,8 +208,8 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
-	p.editorMap.Set(e.GetUrl(), e)
-	p.FileList[e.GetUrl()] = e.SourceCodeMd5()
+	p.editorMap.Set(e.GetFilename(), e)
+	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
 }
 
 func (p *Program) GetIncludeFiles() []string {

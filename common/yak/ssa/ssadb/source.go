@@ -41,8 +41,8 @@ func SaveIrSource(editor *memedit.MemEditor, hash string) error {
 
 	var fileUrl string
 	var filename, filepath string
-	if editor.GetUrl() != "" {
-		fileUrl = editor.GetUrl()
+	if editor.GetFilename() != "" {
+		fileUrl = editor.GetFilename()
 		urlIns, err := url.Parse(fileUrl)
 		if err != nil {
 			log.Warnf("parse url %s failed: %v", fileUrl, err)
