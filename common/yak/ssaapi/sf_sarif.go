@@ -190,9 +190,9 @@ func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
 		return id
 	}
 
-	url := editor.GetUrl()
+	url := editor.GetFilename()
 	if url == "" {
-		log.Warn("editor.GetUrl() is empty, it will cause some problems will open in some sarif viewer")
+		log.Warn("editor.GetFilename() is empty, it will cause some problems will open in some sarif viewer")
 	}
 	sourceCode := editor.GetSourceCode()
 	art := sarif.NewArtifact().WithLength(len(sourceCode)).WithLocation(

@@ -45,7 +45,7 @@ func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
 
-func (ve *MemEditor) GetUrl() string {
+func (ve *MemEditor) GetFormatedUrl() string {
 	u := ve.fileUrl
 	if strings.HasPrefix(u, "file://") {
 		return u
@@ -63,6 +63,10 @@ func (ve *MemEditor) GetUrl() string {
 		return "./" + ve.fileUrl
 	}
 	return "file://" + raw
+}
+
+func (ve *MemEditor) GetFilename() string {
+	return ve.fileUrl
 }
 
 func (ve *MemEditor) PushSourceCodeContext(i any) {
