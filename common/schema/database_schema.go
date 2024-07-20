@@ -22,6 +22,7 @@ const (
 	KEY_SCHEMA_CVE_DESCRIPTION_DATABASE
 	KEY_SCHEMA_VULINBOX_DATABASE
 	KEY_SCHEMA_SSA_DATABASE
+	KEY_SCHEMA_SYNTAXFLOW_RULE
 )
 
 // ProfileTables 这些表是独立与项目之外的，每一个用户的数据都不一样
@@ -42,6 +43,7 @@ var databaseSchemas = map[uint8][]any{
 	KEY_SCHEMA_CVE_DESCRIPTION_DATABASE: nil,
 	KEY_SCHEMA_VULINBOX_DATABASE:        nil,
 	KEY_SCHEMA_SSA_DATABASE:             nil,
+	KEY_SCHEMA_SYNTAXFLOW_RULE:          nil,
 }
 
 // ProjectTables 这些表是和项目关联的，导出项目可以直接复制给用户

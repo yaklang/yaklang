@@ -521,6 +521,15 @@ func Utf8ToGB18030(s []byte) ([]byte, error) {
 	return d, nil
 }
 
+func AllASCII(i any) bool {
+	for _, c := range AnyToBytes(i) {
+		if c > 127 {
+			return false
+		}
+	}
+	return true
+}
+
 func Utf8ToHZGB2312(s []byte) ([]byte, error) {
 	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.HZGB2312.NewEncoder())
 	d, e := ioutil.ReadAll(reader)
