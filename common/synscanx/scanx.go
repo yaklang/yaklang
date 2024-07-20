@@ -245,6 +245,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	go func() {
 		defer wg.Done()
 		s.arpScan()
+		time.Sleep(1 * time.Second)
 		s.sendPacket(s.ctx, targetCh)
 	}()
 	wg.Wait()

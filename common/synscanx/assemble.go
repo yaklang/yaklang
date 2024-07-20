@@ -20,7 +20,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 		dstMac = mac.(net.HardwareAddr)
 	}
 
-	if s.config.RemoteMac == nil {
+	if dstMac == nil {
 		if !utils.IsLoopback(host) {
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
@@ -50,7 +50,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	}
 	srcPort := rand.Intn(65534) + 1
 	// wireshark filter port
-	//srcPort := 12345
+	//srcPort := 52873
 	// IPv4
 	opts = append(opts, pcapx.WithIPv4_Flags(layers.IPv4DontFragment))
 	opts = append(opts, pcapx.WithIPv4_Version(4))
@@ -90,7 +90,7 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 		dstMac = mac.(net.HardwareAddr)
 	}
 
-	if s.config.RemoteMac == nil {
+	if dstMac == nil {
 		if !utils.IsLoopback(host) {
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
@@ -118,9 +118,9 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 	} else {
 		ipSrc = s.config.SourceIP.String()
 	}
-	srcPort := rand.Intn(65534) + 1
+	//srcPort := rand.Intn(65534) + 1
 	// wireshark filter port
-	//srcPort := 12345
+	srcPort := 52873
 
 	// IPv4
 	opts = append(opts, pcapx.WithIPv4_Flags(layers.IPv4DontFragment))

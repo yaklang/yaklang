@@ -20,7 +20,7 @@ type SynxConfig struct {
 	initFilterPorts  string
 	initFilterHosts  string
 	netInterface     string // net interface name
-	shuffle          bool // 是否打乱扫描顺序
+	shuffle          bool   // 是否打乱扫描顺序
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
@@ -92,6 +92,7 @@ func NewDefaultConfig() *SynxConfig {
 		// 这个限速器每秒可以允许最多 1000 个请求，短时间内可以允许突发的 150 个请求
 		rateLimitDelayMs:                   1,
 		rateLimitDelayGap:                  150,
+		shuffle:                            true,
 		ExcludePorts:                       filter.NewFilter(),
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
 	}
