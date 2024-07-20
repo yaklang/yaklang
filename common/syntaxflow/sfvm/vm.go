@@ -97,10 +97,11 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	result.text = text
 	result.VisitFlow(flow)
 	frame = result.CreateFrame(s.vars)
-	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
 	frame.debug = s.config.debug
-	frame.debug = s.config.debug
+	frame.Title = result.title
+	frame.Description = result.description
+	frame.Purpose = result.purpose
 	s.frames = append(s.frames, frame)
 
 	return frame, nil

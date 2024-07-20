@@ -151,6 +151,14 @@ func Unquote(str string) (string, error) {
 	return UnquoteInner(str[1:len(str)-1], quote)
 }
 
+func TryUnquote(str string) string {
+	ret, err := Unquote(str)
+	if err != nil {
+		return str
+	}
+	return ret
+}
+
 func UnquoteInner(str string, quote byte) (string, error) {
 	buf := make([]byte, 0, 3*len(str)/2)
 	for {

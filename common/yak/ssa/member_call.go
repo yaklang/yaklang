@@ -321,11 +321,6 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 
-	switch value.(type) {
-	case *Call:
-		log.Infof("DEBUG: here call")
-	}
-
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
 		name, typ := checkCanMemberCall(value, key)
 		member := b.getOriginMember(name, typ, value, key)
