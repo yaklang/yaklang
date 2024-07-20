@@ -65,9 +65,12 @@ func (y *SyntaxFlowVisitor) VisitStatement(raw sf.IStatementContext) {
 	case *sf.EmptyContext:
 		return
 	case *sf.FileFilterContentContext:
-		y.VisitFileFilterContent(i.FileFilterContentStatement())
+		err := y.VisitFileFilterContent(i.FileFilterContentStatement())
+		if err != nil {
+			log.Warnf("visit case *sf.FileFilterContentContext: failed: %s", err)
+		}
 	default:
-		log.Infof("syntaxflow met statement: %v", strings.TrimSpace(i.GetText()))
+		log.Debugf("syntaxflow met statement: %v", strings.TrimSpace(i.GetText()))
 	}
 	return
 }

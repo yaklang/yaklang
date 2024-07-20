@@ -31,6 +31,10 @@ func (p *Program) GetProgramKind() ssa.ProgramKind {
 	return p.Program.ProgramKind
 }
 
+func (p *Program) GetLanguage() string {
+	return p.Program.Language
+}
+
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program: prog,
