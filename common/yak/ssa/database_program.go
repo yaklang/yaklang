@@ -29,6 +29,7 @@ func GetProgram(program string, kind ProgramKind) (*Program, error) {
 func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	prog := NewProgram(p.ProgramName, true, ProgramKind(p.ProgramKind), nil, "")
 	prog.irProgram = p
+	prog.Language = p.Language
 	prog.FileList = p.FileList
 	prog.ExtraFile = p.ExtraFile
 	// TODO: handler up and down stream
@@ -40,6 +41,7 @@ func updateToDatabase(prog *Program) {
 	if ir == nil {
 		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)
 	}
+	ir.Language = prog.Language
 	ir.ProgramKind = string(prog.ProgramKind)
 	ir.ProgramName = prog.Name
 	ir.Version = prog.Version

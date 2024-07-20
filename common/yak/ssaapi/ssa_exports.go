@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ import (
 )
 
 type config struct {
-	language        Language
+	language        consts.Language
 	LanguageBuilder ssa.Builder
 	feedCode        bool
 	ignoreSyntaxErr bool
@@ -61,7 +62,7 @@ func (c *config) CalcHash() string {
 
 type Option func(*config)
 
-func WithLanguage(language Language) Option {
+func WithLanguage(language consts.Language) Option {
 	return func(c *config) {
 		c.language = language
 		if parser, ok := LanguageBuilders[language]; ok {

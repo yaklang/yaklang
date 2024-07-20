@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
 	"strings"
@@ -94,9 +94,9 @@ func ParseGeneralRule(s string) (*GeneralRule, error) {
 	}
 	return rule, nil
 }
+
 func init() {
-	db := consts.GetGormProjectDatabase()
-	db.AutoMigrate(&GeneralRule{})
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_YAKIT_DATABASE, &GeneralRule{})
 }
 
 type MatchMethodParam struct {

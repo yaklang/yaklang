@@ -2,6 +2,7 @@ package ssatest
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"testing"
 
 	"golang.org/x/exp/slices"
@@ -27,10 +28,10 @@ type TestCase struct {
 
 var (
 	languageOption ssaapi.Option = nil
-	language       ssaapi.Language
+	language       consts.Language
 )
 
-func SetLanguage(lang ssaapi.Language, build ssa.Builder) {
+func SetLanguage(lang consts.Language, build ssa.Builder) {
 	ssaapi.LanguageBuilders[lang] = build
 	languageOption = ssaapi.WithLanguage(lang)
 	language = lang

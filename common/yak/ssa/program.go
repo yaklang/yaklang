@@ -93,6 +93,7 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	// create lib
 	fs := prog.Loader.GetFilesysFileSystem()
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
+	lib.Language = prog.Language
 	prog.UpStream[name] = lib
 	lib.DownStream[prog.Name] = prog
 	lib.Application = prog.Application

@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"io/fs"
@@ -138,14 +139,14 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("start to compile file: %v ", target)
 			if input_language != "" {
 				input_language = strings.ToLower(input_language)
-				var language ssaapi.Language
+				var language consts.Language
 				switch strings.ToLower(input_language) {
 				case "javascript", "js":
 					language = ssaapi.JS
 				case "yak", "yaklang":
 					language = ssaapi.Yak
 				default:
-					language = ssaapi.Language(input_language)
+					language = consts.Language(input_language)
 				}
 				log.Infof("start to use language: %v", language)
 				opt = append(opt, ssaapi.WithLanguage(language))
@@ -258,7 +259,6 @@ var SSACompilerCommands = []*cli.Command{
 			},
 		},
 		Action: func(c *cli.Context) error {
-
 			count := 0
 			err := filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				count++
@@ -352,19 +352,22 @@ var SSACompilerCommands = []*cli.Command{
 
 			var dirChecking []string
 
+			handleBySyntaxFlowContent := func(syntaxFlow string) error {
+				err := SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				if err != nil {
+					return err
+				}
+				fmt.Println()
+				return nil
+			}
+
 			handleByFilename := func(filename string) error {
 				log.Infof("start to use SyntaxFlow rule: %v", filename)
 				raw, err := os.ReadFile(filename)
 				if err != nil {
 					return utils.Wrapf(err, "read %v failed", filename)
 				}
-				syntaxFlow = string(raw)
-				err = SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
-				if err != nil {
-					return err
-				}
-				fmt.Println()
-				return nil
+				return handleBySyntaxFlowContent(string(raw))
 			}
 
 			var errs []error
@@ -415,7 +418,13 @@ var SSACompilerCommands = []*cli.Command{
 
 			if len(cmdArgs) <= 0 {
 				// use database
-				sfdb.ImportValidRule()
+				db := consts.GetGormProfileDatabase()
+				for result := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
+					err := handleBySyntaxFlowContent(result.Content)
+					if err != nil {
+						errs = append(errs, err)
+					}
+				}
 			}
 
 			if len(errs) > 0 {

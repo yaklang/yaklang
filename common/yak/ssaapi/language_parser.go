@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"time"
 
@@ -17,16 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
-type Language string
-
 const (
-	Yak  Language = "yak"
-	JS   Language = "js"
-	PHP  Language = "php"
-	JAVA Language = "java"
+	Yak  = consts.Yak
+	JS   = consts.JS
+	PHP  = consts.PHP
+	JAVA = consts.JAVA
 )
 
-var LanguageBuilders = map[Language]ssa.Builder{
+var LanguageBuilders = map[consts.Language]ssa.Builder{
 	Yak:  yak2ssa.Builder,
 	JS:   js2ssa.Builder,
 	PHP:  php2ssa.Builder,
@@ -188,12 +187,17 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.DatabaseProgramName
 
 	prog := ssa.NewProgram(programName, c.DatabaseProgramName != "", ssa.Application, c.fs, c.programPath)
+	prog.Language = string(c.language)
 
 	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
 		LanguageBuilder := c.LanguageBuilder
 		// check builder
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)
+		}
+
+		if prog.Language == "" {
+			prog.Language = string(LanguageBuilder.GetLanguage())
 		}
 
 		// get source code
