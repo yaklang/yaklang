@@ -13,8 +13,11 @@ import (
 )
 
 type SyntaxFlowVisitor struct {
-	text  string
-	codes []*SFI
+	text        string
+	title       string
+	description string
+	purpose     string
+	codes       []*SFI
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {

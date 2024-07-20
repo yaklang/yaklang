@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,11 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
-
-type languageCtx struct {
-	hit     int64
-	matched []string
-}
 
 var SSACompilerCommands = []*cli.Command{
 	{
@@ -249,8 +245,65 @@ var SSACompilerCommands = []*cli.Command{
 		},
 	},
 	{
+		Name:    "syntaxflow-save",
+		Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
+		Usage:   "save SyntaxFlow rule to database",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "filesystem,f",
+				Usage: "file system for MVP",
+			},
+			cli.StringFlag{
+				Name: "rule,r",
+			},
+		},
+		Action: func(c *cli.Context) error {
+
+			count := 0
+			err := filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				count++
+				if count > 50 {
+					return utils.Error("too many files")
+				}
+				// size > 2M will be ignored
+				if info.Size() > 2*1024*1024 {
+					return utils.Errorf("file %v size too large", s)
+				}
+				return nil
+			}))
+			if err != nil {
+				return utils.Wrap(err, "read mvp file system failed")
+			}
+
+			memfs := filesys.NewVirtualFs()
+			local := filesys.NewLocalFs()
+			err = filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				raw, err := local.ReadFile(s)
+				if err != nil {
+					return nil
+				}
+				memfs.AddFile(s, string(raw))
+				return nil
+			}))
+			if err != nil {
+				return err
+			}
+
+			contentRaw, err := local.ReadFile(c.String("rule"))
+			if err != nil {
+				return err
+			}
+			err = sfdb.ImportValidRule(memfs, c.String("rule"), string(contentRaw))
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+
+	{
 		Name:    "ssa-query",
-		Aliases: []string{"sf", "syntaxFlow"},
+		Aliases: []string{"sf", "syntaxFlow", "sf-scan"},
 		Usage:   "Use SyntaxFlow query SSA OpCodes from database",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "log", Usage: "log level"},
@@ -315,7 +368,8 @@ var SSACompilerCommands = []*cli.Command{
 			}
 
 			var errs []error
-			for _, originName := range c.Args() {
+			var cmdArgs []string = c.Args()
+			for _, originName := range cmdArgs {
 				name := utils.GetFirstExistedFile(originName)
 				if name == "" {
 					infos, _ := utils.ReadDir(originName)
@@ -357,6 +411,11 @@ var SSACompilerCommands = []*cli.Command{
 				if err != nil {
 					log.Warnf("read directory [%v] failed: %v", dir, err)
 				}
+			}
+
+			if len(cmdArgs) <= 0 {
+				// use database
+				sfdb.ImportValidRule()
 			}
 
 			if len(errs) > 0 {

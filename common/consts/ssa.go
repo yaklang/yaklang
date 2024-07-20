@@ -41,6 +41,7 @@ func initSSADatabase() {
 		}
 		log.Infof("init ssa database: %s", GetDefaultSSADataBase())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
+		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SYNTAXFLOW_RULE)
 	})
 }
 

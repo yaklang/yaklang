@@ -75,17 +75,18 @@ type SyntaxFlowRule struct {
 	// DemoFileSystem will description the file system of the rule.
 	// This is a json string.
 	//    save map[string]quotedString
-	TypicalHitFileSystem string
+	TypicalHitFileSystem []byte
 
 	Hash string `json:"hash" gorm:"unique_index"`
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
-	return utils.CalcSha256(s.Content)
+	s.Hash = utils.CalcSha256(s.Content)
+	return s.Hash
 }
 
 func (s *SyntaxFlowRule) BeforeSave() error {
-	s.Hash = s.CalcHash()
+	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
 	s.Type = ValidRuleType(s.Type)
 	return nil
@@ -105,13 +106,15 @@ func (s *SyntaxFlowRule) LoadFileSystem(system filesys.FileSystem) error {
 	if err != nil {
 		return utils.Wrapf(err, `failed to marshal file system`)
 	}
-	s.TypicalHitFileSystem = string(raw)
+
+	s.TypicalHitFileSystem, _ = utils.GzipCompress(raw)
 	return nil
 }
 
 func (s *SyntaxFlowRule) BuildFileSystem() (filesys.FileSystem, error) {
 	f := make(map[string]string)
-	err := json.Unmarshal([]byte(s.TypicalHitFileSystem), &f)
+	raw, _ := utils.GzipDeCompress(s.TypicalHitFileSystem)
+	err := json.Unmarshal(raw, &f)
 	if err != nil {
 		return nil, utils.Wrapf(err, `failed to unmarshal file system`)
 	}
