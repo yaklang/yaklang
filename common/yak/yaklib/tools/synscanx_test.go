@@ -14,9 +14,10 @@ func Test__scanx(t *testing.T) {
 	}
 
 	res, err := _scanx(
-		"114.114.114.114",
+		"192.168.3.51",
 		//"47.52.100.35/24",
-		"U:53",
+		"U:137",
+		//"21,22,23,80,443",
 		//synscanx.WithInitFilterPorts("443"),
 		synscanx.WithConcurrent(1000),
 		synscanx.WithSubmitTaskCallback(func(i string) {
