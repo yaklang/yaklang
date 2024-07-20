@@ -63,5 +63,6 @@ func Valid(s *schema.SyntaxFlowRule) error {
 	if len(result.Errors) > 0 {
 		return utils.Errorf(`runtime error: %v`, result.Errors)
 	}
+	s.Verified = true
 	return nil
 }

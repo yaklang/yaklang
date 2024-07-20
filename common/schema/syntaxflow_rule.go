@@ -71,6 +71,7 @@ type SyntaxFlowRule struct {
 	// This is a json string.
 	//    save map[string]quotedString
 	TypicalHitFileSystem []byte
+	Verified             bool
 
 	Hash string `json:"hash" gorm:"unique_index"`
 }
