@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"os"
 	"path/filepath"
 
@@ -38,6 +39,10 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 // FilterFile 这里可能还会有问题 比如配置文件
 func (*SSABuild) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".php"
+}
+
+func (*SSABuild) GetLanguage() consts.Language {
+	return consts.PHP
 }
 
 type builder struct {

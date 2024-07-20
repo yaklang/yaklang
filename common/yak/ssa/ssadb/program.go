@@ -12,6 +12,14 @@ type IrProgram struct {
 
 	ProgramName string `json:"program_name" gorm:"index"`
 	Version     string `json:"package_version" gorm:"index"`
+
+	// Language: yak, java, php, js, etc
+	// if the program contains many language,
+	// use comma to separate them.
+	// e.g. "yak,java,php"
+	Language string `json:"language" gorm:"index"`
+
+	// application / library
 	ProgramKind string `json:"program_kind" gorm:"index"`
 
 	// up-stream program is the program that this program depends on

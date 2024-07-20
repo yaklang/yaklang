@@ -10,6 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+type Language string
+
+const (
+	Yak  Language = "yak"
+	JS   Language = "js"
+	PHP  Language = "php"
+	JAVA Language = "java"
+)
+
 var (
 	YAK_SSA_PROJECT_DB_NAME = ""
 	ssaDatabase             *gorm.DB
@@ -41,7 +50,6 @@ func initSSADatabase() {
 		}
 		log.Infof("init ssa database: %s", GetDefaultSSADataBase())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
-		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SYNTAXFLOW_RULE)
 	})
 }
 
