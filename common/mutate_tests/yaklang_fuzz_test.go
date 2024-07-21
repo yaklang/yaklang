@@ -1137,6 +1137,22 @@ Host: www.baidu.com
 				friendlyDisplay: true,
 			},
 		},
+		{
+			name: "Cookie参数 fix bug",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=123%7B%22cur%22%3A%22HKD%22%7D;b=123%7B%22cur%22%3A%22HKD%22%7D;
+
+`,
+				code: `.FuzzCookie("a", "test")`,
+				expectKeywordInOutputPacket: []string{
+					`a=test`,
+					`b=123%7B%22cur%22%3A%22HKD%22%7D`,
+				},
+				debug: true,
+			},
+		},
 	}
 
 	for _, tc := range tests {

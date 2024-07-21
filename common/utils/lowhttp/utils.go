@@ -365,12 +365,12 @@ func readCookies(h http.Header, filter string) []*http.Cookie {
 				val, _ = parseCookieValue(val, true)
 			}
 
-			if strings.Contains(val, "%") {
-				valUnesc, err := url.QueryUnescape(val)
-				if err == nil {
-					val = valUnesc
-				}
-			}
+			//if strings.Contains(val, "%") {
+			//	valUnesc, err := url.QueryUnescape(val)
+			//	if err == nil {
+			//		val = valUnesc
+			//	}
+			//}
 			cookies = append(cookies, &http.Cookie{Name: name, Value: val})
 		}
 	}
