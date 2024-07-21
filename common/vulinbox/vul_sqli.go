@@ -9,7 +9,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -222,6 +224,15 @@ func (s *VulinServer) registerSQLinj() {
 						writer.WriteHeader(302)
 					}
 					return
+				}
+				if strings.Contains(id, "%") {
+					idUnesc, err := url.QueryUnescape(id)
+					if err != nil {
+						writer.Header().Set("Location", "/user/cookie-id?skip=1")
+						writer.WriteHeader(302)
+						return
+					}
+					id = idUnesc
 				}
 				u, err := s.database.GetUserByIdUnsafe(id)
 				if err != nil {
