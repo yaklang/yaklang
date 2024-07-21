@@ -1,7 +1,6 @@
 package synscanx
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"strconv"
@@ -19,8 +18,8 @@ func (s *Scannerx) nonExcludedHost(host string) bool {
 }
 
 func (s *Scannerx) nonExcludedPort(port int) bool {
-	if s.config.ExcludePorts != nil {
-		if s.config.ExcludePorts.Exist(fmt.Sprint(port)) {
+	if s.config.excludePorts != nil {
+		if s.config.excludePorts.Contains(port) {
 			return true
 		}
 	}

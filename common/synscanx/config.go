@@ -2,8 +2,6 @@ package synscanx
 
 import (
 	"context"
-	"fmt"
-	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,15 +24,20 @@ type SynxConfig struct {
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
 
 	excludeHosts *hostsparser.HostsParser
-	ExcludePorts *filter.StringFilter
+
+	excludePorts *utils.PortsFilter
+
+	maxOpenPorts uint16 // 单个 IP 允许的最大开放端口数
 
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 
 	// 发包
-	Iface                *net.Interface
-	GatewayIP            net.IP
-	SourceIP             net.IP
+	Iface     *net.Interface
+	GatewayIP net.IP
+	SourceIP  net.IP
+	// 内网扫描时，目标机器的 MAC 地址来自 ARP
+	// 外网扫描时，目标机器的 MAC 地址就是网关的 MAC 地址
 	SourceMac, RemoteMac net.HardwareAddr
 
 	// Fetch Gateway Hardware Address TimeoutSeconds
@@ -77,15 +80,6 @@ func (s *SynxConfig) callSubmitTaskCallback(r string) {
 	s.submitTaskCallback(r)
 }
 
-func (s *SynxConfig) filtered(port int) bool {
-	if s.ExcludePorts != nil && port > 0 {
-		if s.ExcludePorts.Exist(fmt.Sprint(port)) {
-			return true
-		}
-	}
-	return false
-}
-
 func NewDefaultConfig() *SynxConfig {
 	return &SynxConfig{
 		waiting: 5 * time.Second,
@@ -93,12 +87,20 @@ func NewDefaultConfig() *SynxConfig {
 		rateLimitDelayMs:                   1,
 		rateLimitDelayGap:                  150,
 		shuffle:                            true,
-		ExcludePorts:                       filter.NewFilter(),
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
 	}
 }
 
 type SynxConfigOption func(config *SynxConfig)
+
+func WithMaxOpenPorts(max int) SynxConfigOption {
+	return func(config *SynxConfig) {
+		if max <= 0 {
+			max = 65535
+		}
+		config.maxOpenPorts = uint16(max)
+	}
+}
 
 func WithShuffle(s bool) SynxConfigOption {
 	return func(config *SynxConfig) {
@@ -169,10 +171,7 @@ func WithExcludePorts(ports string) SynxConfigOption {
 		if ports == "" {
 			return
 		}
-		config.ExcludePorts = filter.NewFilter()
-		for _, port := range utils.ParseStringToPorts(ports) {
-			config.ExcludePorts.Insert(fmt.Sprint(port))
-		}
+		config.excludePorts = utils.NewPortsFilter(ports)
 	}
 }
 
