@@ -530,6 +530,7 @@ var SSACompilerCommands = []*cli.Command{
 				prog, err := ssaapi.FromDatabase(programName)
 				if err != nil {
 					log.Errorf("load program [%v] from database failed: %v", programName, err)
+					return err
 				}
 
 				// use database
