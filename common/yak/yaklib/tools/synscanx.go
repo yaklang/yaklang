@@ -12,7 +12,6 @@ import (
 
 func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (chan *synscan.SynScanResult, error) {
 	config := synscanx.NewDefaultConfig()
-	defer config.ExcludePorts.Close()
 
 	for _, opt := range opts {
 		opt(config)

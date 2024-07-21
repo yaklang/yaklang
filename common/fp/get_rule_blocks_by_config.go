@@ -13,6 +13,12 @@ func (a byRarity) Len() int           { return len(a) }
 func (a byRarity) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byRarity) Less(i, j int) bool { return a[i].Probe.Rarity < a[j].Probe.Rarity }
 
+type byIndex []*RuleBlock
+
+func (a byIndex) Len() int           { return len(a) }
+func (a byIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byIndex) Less(i, j int) bool { return a[i].Probe.Index < a[j].Probe.Index }
+
 type byName []*RuleBlock
 
 func (a byName) Len() int           { return len(a) }
@@ -80,6 +86,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	// 如果 probe 端口匹配到了，则说明这些是最合适的，如果匹配不到，再去使用剩下的内容
 	if len(bestBlocks) > 0 {
 		sort.Sort(byName(bestBlocks))
+		sort.Sort(byIndex(bestBlocks))
 		sort.Sort(byRarity(bestBlocks))
 		//result := funk.Map(bestBlocks, func(i *RuleBlock) string {
 		//	return i.Probe.Name
@@ -98,6 +105,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	}
 
 	sort.Sort(byName(blocks))
+	sort.Sort(byIndex(blocks))
 	sort.Sort(byRarity(blocks))
 	blocks = funk.Filter(blocks, func(block *RuleBlock) bool {
 		if block.Probe == nil {

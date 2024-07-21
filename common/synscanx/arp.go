@@ -12,6 +12,7 @@ func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
 	if gateway != "" && gateway != "<nil>" {
 		var retry int
 		for {
+			// 通过 ARP 协议获取网关的 MAC 地址
 			s.arp(gateway)
 			if retry > 2 {
 				return nil, utils.Errorf("cannot fetch hw addr for %v[%v]", s.sampleIP, s.config.Iface.Name)

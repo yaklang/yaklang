@@ -23,12 +23,17 @@ type Scannerx struct {
 	ctx    context.Context
 	config *SynxConfig
 
-	sampleIP         string
-	hosts            *hostsparser.HostsParser
-	ports            *utils.PortsFilter
+	// 取样IP
+	sampleIP string
+	// 存放未排除的目标
+	hosts *hostsparser.HostsParser
+	// 存放未排除的端口
+	ports *utils.PortsFilter
+	// loopback 对应的实际IP
 	loopbackMap      map[string]string
 	OpenPortHandlers func(ip net.IP, port int)
 
+	ipOpenPortMap *sync.Map
 	// MAC地址表
 	macCacheTable *sync.Map
 	MacHandlers   func(ip net.IP, addr net.HardwareAddr)
@@ -51,6 +56,9 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 		loopbackMap:   make(map[string]string),
 		sampleIP:      sample,
 		limiter:       rate.NewLimiter(rate.Every(limitInterval), config.rateLimitDelayGap),
+	}
+	if s.config.maxOpenPorts > 0 {
+		s.ipOpenPortMap = new(sync.Map)
 	}
 	// 初始化发包相关的配置
 	err := s.initEssentialInfo()
@@ -111,6 +119,7 @@ func (s *Scannerx) initEssentialInfo() error {
 			if srcIP == nil {
 				return utils.Errorf("iface: %s has no addrs", iface.Name)
 			}
+			// 通过网卡名获取到网卡的 IP 地址后，再通过路由获取网关 IP 地址，网关 IP 地址用于获取网关的 MAC 地址，用于外网扫描
 			_, gatewayIP, _, err = netutil.Route(time.Second*2, srcIP.String())
 			if err != nil {
 				return utils.Errorf("get gateway failed: %s", err)
@@ -129,31 +138,53 @@ func (s *Scannerx) rateLimit() {
 	s.limiter.Wait(s.ctx)
 }
 
+func generateHostPort(nonExcludedHosts []string, nonExcludedPorts []int) <-chan SynxTarget {
+	out := make(chan SynxTarget)
+	go func() {
+		defer close(out)
+		for _, host := range nonExcludedHosts {
+			for _, port := range nonExcludedPorts {
+				out <- SynxTarget{Host: host, Port: port}
+			}
+		}
+	}()
+	return out
+}
+
 func (s *Scannerx) SubmitTarget(targets, ports string, targetCh chan *SynxTarget) {
-	filteredHosts := s.GetNonExcludedHosts(targets)
-	filtedPorts := s.GetNonExcludedPorts(ports)
+	nonExcludedHosts := s.GetNonExcludedHosts(targets)
+	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 	s.OnSubmitTask(func(h string, p int) {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
 	})
-	for _, host := range filteredHosts {
-		for _, port := range filtedPorts {
-			s.rateLimit()
-			s.callOnSubmitTask(host, port)
-			proto, p := utils.ParsePortToProtoPort(port)
-			target := &SynxTarget{
-				Host: host,
-				Port: p,
-				Mode: TCP, // 默认 TCP
+	for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
+		host := hp.Host
+		port := hp.Port
+		s.rateLimit()
+		if s.config.maxOpenPorts > 0 {
+			v, ok := s.ipOpenPortMap.Load(host)
+			if ok {
+				if v.(uint16) >= s.config.maxOpenPorts {
+					break
+				}
 			}
-			if proto == "udp" {
-				target.Mode = UDP
-			}
-			select {
-			case <-s.ctx.Done():
-				log.Infof("SubmitTarget canceled")
-				return
-			case targetCh <- target:
-			}
+		}
+
+		s.callOnSubmitTask(host, port)
+		proto, p := utils.ParsePortToProtoPort(port)
+		target := &SynxTarget{
+			Host: host,
+			Port: p,
+			Mode: TCP, // 默认 TCP
+		}
+		if proto == "udp" {
+			target.Mode = UDP
+		}
+		select {
+		case <-s.ctx.Done():
+			log.Infof("SubmitTarget canceled")
+			return
+		case targetCh <- target:
 		}
 	}
 }
@@ -214,6 +245,10 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 			if portsFilter != nil && !portsFilter.Contains(port) {
 				return
 			}
+			if s.config.maxOpenPorts > 0 {
+				v, _ := s.ipOpenPortMap.LoadOrStore(host.String(), 1)
+				s.ipOpenPortMap.Store(host.String(), v.(uint16)+1)
+			}
 
 			openPortCount++
 			result := &synscan.SynScanResult{
@@ -257,7 +292,8 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	s.Close()
 
 	done <- struct{}{}
-	log.Infof("open port count: %d", openPortCount)
+	endTime := time.Now()
+	log.Infof("open port count: %d cost: %v", openPortCount, endTime.Sub(s.startTime))
 	return nil
 }
 
