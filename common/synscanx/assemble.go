@@ -2,6 +2,7 @@ package synscanx
 
 import (
 	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
@@ -16,12 +17,14 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 
 	dstMac := s.config.RemoteMac
 	srcMac := s.config.SourceMac
+	// 内网扫描时，这一步应该能够获取到目标机器的 MAC 地址
 	if mac, ok := s.macCacheTable.Load(host); ok {
 		dstMac = mac.(net.HardwareAddr)
 	}
 
 	if dstMac == nil {
 		if !utils.IsLoopback(host) {
+			// 外网扫描时，目标机器的 MAC 地址就是网关的 MAC 地址
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
 				return nil, utils.Errorf("get gateway mac failed: %s", err)
@@ -135,7 +138,18 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 	// UDP
 	opts = append(opts, pcapx.WithUDP_SrcPort(srcPort))
 	opts = append(opts, pcapx.WithUDP_DstPort(port))
-	payload := getUDPPayloadByPort(port)
+	var payload []byte
+	nmapRuleConfig := fp.NewConfig(
+		fp.WithActiveMode(true),
+		fp.WithTransportProtos(fp.UDP),
+		fp.WithProbesMax(3),
+	)
+	_, blocks, bestMode := fp.GetRuleBlockByConfig(port, nmapRuleConfig)
+	if len(blocks) > 0 && bestMode {
+		payload = []byte(blocks[0].Probe.Payload)
+	}
+	//payload := getUDPPayloadByPort(port)
+
 	opts = append(opts, pcapx.WithPayload(payload))
 
 	packetBytes, err = pcapx.PacketBuilder(opts...)
