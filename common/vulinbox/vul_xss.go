@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strings"
 	textTemp "text/template"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -725,6 +727,15 @@ console.info("Hello" + `+"`{{ .name }}: ${name}`"+`);</script>
 					return
 				}
 
+				if strings.Contains(xCname, "%") {
+					xCnameUnesc, err := url.QueryUnescape(xCname)
+					if err != nil {
+						writer.Header().Set("Location", "/xss/cookie/name?skip=1")
+						writer.WriteHeader(302)
+						return
+					}
+					xCname = xCnameUnesc
+				}
 				unsafeTemplateRender(writer, request, `<!doctype html>
 <html>
 <head>
