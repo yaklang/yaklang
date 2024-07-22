@@ -9,6 +9,7 @@ import (
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -213,41 +214,39 @@ var defaultMITMFilterManager = &MITMFilterManager{
 	ExcludeMIME:      defaultExcludeMIME,
 }
 
-func getInitFilterManager(db *gorm.DB) func() (*MITMFilterManager, error) {
+func getInitFilterManager(db *gorm.DB) (*MITMFilterManager, error) {
 	if db == nil {
-		return nil
+		return nil, utils.Error("no database")
 	}
-	return func() (*MITMFilterManager, error) {
-		if db == nil {
-			return nil, utils.Error("no database set")
-		}
-		results := yakit.GetKey(db, MITMFilterKeyRecords)
-		var manager MITMFilterManager
-		err := json.Unmarshal([]byte(results), &manager)
-		if err != nil {
-			return nil, err
-		}
-		managerP := &manager
-		//managerP.saveHandler = func(filter *MITMFilterManager) {
-		//
-		//}
-		return managerP, nil
+	serializedFilter := ""
+	if db.HasTable(&schema.ProjectGeneralStorage{}) {
+		serializedFilter = yakit.GetProjectKey(db, MITMFilterKeyRecords)
+	} else {
+		serializedFilter = yakit.GetKey(db, MITMFilterKeyRecords)
 	}
+
+	var manager MITMFilterManager
+	err := json.Unmarshal([]byte(serializedFilter), &manager)
+	if err != nil {
+		return nil, err
+	}
+	managerP := &manager
+	return managerP, nil
 }
 
-func NewMITMFilterManager(db *gorm.DB) *MITMFilterManager {
-	initFilter := getInitFilterManager(db)
-	if initFilter == nil {
-		defaultMITMFilterManager.db = db
-		return defaultMITMFilterManager
+func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilterManager {
+	// project first
+	for _, db := range []*gorm.DB{projectDB, profileDB} {
+		result, err := getInitFilterManager(db)
+		if err != nil || result == nil {
+			continue
+		}
+		result.db = db
+		return result
 	}
-	result, err := initFilter()
-	if err != nil || result == nil {
-		defaultMITMFilterManager.db = db
-		return defaultMITMFilterManager
-	}
-	result.db = db
-	return result
+
+	defaultMITMFilterManager.db = projectDB
+	return defaultMITMFilterManager
 }
 
 func (m *MITMFilterManager) IsEmpty() bool {
@@ -273,7 +272,12 @@ func (m *MITMFilterManager) Save() {
 		log.Errorf("marshal mitm filter failed: %s", err)
 		return
 	}
-	err = yakit.SetKey(db, MITMFilterKeyRecords, string(result))
+	// project first
+	if db.HasTable(&schema.ProjectGeneralStorage{}) {
+		err = yakit.SetProjectKey(db, MITMFilterKeyRecords, string(result))
+	} else {
+		err = yakit.SetKey(db, MITMFilterKeyRecords, string(result))
+	}
 	if err != nil {
 		log.Errorf("set filter db key failed: %s", err)
 	}

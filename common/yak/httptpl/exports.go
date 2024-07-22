@@ -361,23 +361,26 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 			runtimeId := utils.MapGetString(i, "runtimeId")
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
-				currTarget = resp[0].RemoteAddr
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
 				if runtimeId != "" {
 					runtimeId = resp[0].RuntimeId
 				}
 				// 根据 payload , tpl 名称 , target 条件过滤
 				// calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
+				var urls []string
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RemoteAddr, target)
 				if len(resp) == 1 {
+					urls = append(urls, resp[0].Url)
 					details["request"] = string(resp[0].RawRequest)
 					details["response"] = string(resp[0].RawPacket)
 				} else {
 					for idx, r := range resp {
+						urls = append(urls, r.Url)
 						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
 						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
 					}
 				}
+				currTarget = strings.Join(urls, ",")
 				payloads, err = httpPayloadsToString(reqBulk.Payloads)
 				if err != nil {
 					log.Errorf("httpPayloadsToString failed: %v", err)

@@ -88,7 +88,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 			if y.ReverseConnectionNeed {
 				if token, ok := vars["reverse_dnslog_token"].(string); ok {
 					if config.OOBRequireCheckingTrigger == nil {
-						InjectInteractshVar(token, vars)
+						InjectInteractshVar(token, config.RuntimeId, vars)
 					}
 				}
 			}

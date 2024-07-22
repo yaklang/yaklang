@@ -107,16 +107,21 @@ const (
 	OpRemoveRef
 
 	OpNativeCall
+
+	//fileFilter
+	OpFileFilterReg
+	OpFileFilterXpath
+	OpFileFilterJsonPath
 )
 
 type SFI struct {
-	OpCode           SFVMOpCode
-	UnaryInt         int
-	UnaryStr         string
-	Desc             string
-	Values           []string
-	SyntaxFlowConfig []*RecursiveConfigItem
-
+	OpCode               SFVMOpCode
+	UnaryInt             int
+	UnaryStr             string
+	Desc                 string
+	Values               []string
+	SyntaxFlowConfig     []*RecursiveConfigItem
+	FileFilterMethodItem map[string]string
 	// iter
 	iter *IterContext
 }
@@ -269,6 +274,12 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "recursive$exact", s.UnaryStr)
 	case OpNativeCall:
 		return fmt.Sprintf(verboseLen+" %v", "native$call", s.UnaryStr)
+	case OpFileFilterReg:
+		return fmt.Sprintf(verboseLen+" %v", "fileFilter$regexp", s.UnaryStr)
+	case OpFileFilterXpath:
+		return fmt.Sprintf(verboseLen+" %v", "fileFilter$xpath", s.UnaryStr)
+	case OpFileFilterJsonPath:
+		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
 	default:
 		panic("unhandled default case")
 	}

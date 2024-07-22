@@ -105,6 +105,25 @@ func TestOpcode(t *testing.T) {
 		check(t, `alert $a`, sfvm.OpAlert)
 	})
 
+	// file filter
+	t.Run("file filter", func(t *testing.T) {
+		check(t, `${application.properties}.re(/datasource.url=(.*)/) as $target`, sfvm.OpFileFilterReg)
+		check(t, `${application.properties}.json("") as $target`, sfvm.OpFileFilterJsonPath)
+		check(t, `${application.properties}.xpath("//path/a/b/@c") as $target`, sfvm.OpFileFilterXpath)
+	})
+
+	t.Run("file filter with variable", func(t *testing.T) {
+		check(t, `${application.properties}.re(/datasource.url=(.*)/) as $target`, sfvm.OpUpdateRef)
+		check(t, `${application.properties}.json("") as $target`, sfvm.OpUpdateRef)
+		check(t, `${application.properties}.xpath("//path/a/b/@c") as $target`, sfvm.OpUpdateRef)
+	})
+
+	t.Run("file filter check for input(program)", func(t *testing.T) {
+		check(t, `${application.properties}.re(/datasource.url=(.*)/) as $target`, sfvm.OpCheckStackTop)
+		check(t, `${application.properties}.json("") as $target`, sfvm.OpCheckStackTop)
+		check(t, `${application.properties}.xpath("//path/a/b/@c") as $target`, sfvm.OpCheckStackTop)
+	})
+
 	// variable
 	t.Run("update ref", func(t *testing.T) {
 		check(t, `a as $target`, sfvm.OpUpdateRef)
@@ -196,5 +215,41 @@ func TestOpcode(t *testing.T) {
 		$a.f 
 		f.b()
 		`, sfvm.OpCheckStackTop)
+	})
+
+	t.Run("test OpFileFilterXpath 1", func(t *testing.T) {
+		check(t, `
+		${application.properties}.xpath(select: aaa)
+		`, sfvm.OpFileFilterXpath)
+	})
+
+	t.Run("test OpFileFilterXpath 2", func(t *testing.T) {
+		check(t, `
+		${/xml$/}.xpath(select: aa)
+		`, sfvm.OpFileFilterXpath)
+	})
+
+	t.Run("test OpFileFilterJsonPath 1 ", func(t *testing.T) {
+		check(t, `
+		${application.properties}.json(select: aaa)
+		`, sfvm.OpFileFilterJsonPath)
+	})
+
+	t.Run("test OpFileFilterJsonPath 2 ", func(t *testing.T) {
+		check(t, `
+		${application.properties}.jsonpath(select: aaa)
+		`, sfvm.OpFileFilterJsonPath)
+	})
+
+	t.Run("test OpFileFilterReg 1 ", func(t *testing.T) {
+		check(t, `
+		${application.properties}.re(select: aaa)
+		`, sfvm.OpFileFilterReg)
+	})
+
+	t.Run("test OpFileFilterReg 2", func(t *testing.T) {
+		check(t, `
+		${application.properties}.regexp(select: aaa)
+		`, sfvm.OpFileFilterReg)
 	})
 }

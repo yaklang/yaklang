@@ -12,6 +12,14 @@ type IrProgram struct {
 
 	ProgramName string `json:"program_name" gorm:"index"`
 	Version     string `json:"package_version" gorm:"index"`
+
+	// Language: yak, java, php, js, etc
+	// if the program contains many language,
+	// use comma to separate them.
+	// e.g. "yak,java,php"
+	Language string `json:"language" gorm:"index"`
+
+	// application / library
 	ProgramKind string `json:"program_kind" gorm:"index"`
 
 	// up-stream program is the program that this program depends on
@@ -19,7 +27,11 @@ type IrProgram struct {
 	// down-stream program is the program that depends on this program
 	DownStream StringSlice `json:"down_stream_programs" gorm:"type:text"`
 
+	// this  program  contain this file
 	FileList StringMap `json:"file_list" gorm:"type:text"`
+
+	// program extra file: *.properties, *.xml, *.json, etc
+	ExtraFile StringMap `json:"extra_file" gorm:"type:text"`
 }
 
 func CreateProgram(name, kind, version string) *IrProgram {
@@ -97,11 +109,7 @@ func DeleteProgram(db *gorm.DB, program string) {
 		down.UpStream = utils.RemoveSliceItem(down.UpStream, program)
 		UpdateProgram(down)
 	}
-	// delete the program
-	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
-	db.Model(&IrVariable{}).Where("program_name = ?", program).Unscoped().Delete(&IrVariable{})
-	db.Model(&IrScopeNode{}).Where("program_name = ?", program).Unscoped().Delete(&IrScopeNode{})
-	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+	DeleteDB(db, program)
 }
 
 func AllPrograms(db *gorm.DB) []string {

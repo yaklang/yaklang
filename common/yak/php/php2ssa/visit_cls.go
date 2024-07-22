@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -28,22 +29,66 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	if i.AnonymousClass() != nil {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
-	className := i.TypeRef().GetText()
-	class := y.GetClassBluePrint(className)
-	obj := y.EmitMakeWithoutType(nil, nil)
+	class, name := y.VisitTypeRef(i.TypeRef())
+	var obj ssa.Value
+	obj = y.EmitUndefined(name)
+	if utils.IsNil(obj) {
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
+		return y.EmitUndefined(raw.GetText())
+	}
 	if class == nil {
-		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", className)
+		log.Warnf("class %v instantiation failed, checking the dependency package is loaded already?", name)
 		obj.SetType(ssa.GetAnyType())
-		return obj
+		variable := y.CreateVariable(name)
+		defaultClassFullback := y.EmitUndefined(name)
+		y.AssignVariable(variable, defaultClassFullback)
+		args := []ssa.Value{obj}
+		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
+		args = append(args, tmp...)
+		call := y.NewCall(defaultClassFullback, args)
+		call.IsEllipsis = hasEllipsis
+		// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
+		return y.EmitCall(call)
 	}
 	obj.SetType(class)
 
-	constructor := class.Constructor
+	findConstructorAndDestruct := func(class *ssa.ClassBluePrint) (ssa.Value, ssa.Value) {
+		tmpClass := class
+		var (
+			constructor ssa.Value = nil
+			destructor  ssa.Value = nil
+		)
+
+		for {
+			if tmpClass.Constructor != nil && constructor == nil {
+				constructor = tmpClass.Constructor
+			}
+			if tmpClass.Destructor != nil && destructor == nil {
+				destructor = tmpClass.Destructor
+			}
+			if constructor != nil && destructor != nil {
+				return constructor, destructor
+			}
+			if len(tmpClass.ParentClass) != 0 {
+				tmpClass = class.ParentClass[0]
+			} else {
+				return constructor, destructor
+			}
+		}
+	}
+	args := []ssa.Value{obj}
+	constructor, destructor := findConstructorAndDestruct(class)
+	if destructor != nil {
+		call := y.NewCall(destructor, args)
+		_ = call
+		y.AddDefer(call)
+	}
 	if constructor == nil {
 		return obj
 	}
-
-	args := []ssa.Value{obj}
 	ellipsis := false
 	if i.Arguments() != nil {
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
@@ -53,6 +98,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	c := y.NewCall(constructor, args)
 	c.IsEllipsis = ellipsis
 	y.EmitCall(c)
+
 	return obj
 }
 
@@ -95,7 +141,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			// as class alias is right as compiler! XD
 			fallthrough
 		case "class":
-			className = i.Identifier().GetText()
+			className = y.VisitIdentifier(i.Identifier())
 
 			parentClassName := ""
 			if i.Extends() != nil {
@@ -104,6 +150,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 
 			class := y.CreateClassBluePrint(className)
 			if parentClass := y.GetClassBluePrint(parentClassName); parentClass != nil {
+				//感觉在ssa-classBlue中做更好，暂时修复
 				class.AddParentClass(parentClass)
 			}
 			for _, statement := range i.AllClassStatement() {
@@ -112,7 +159,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		}
 	} else {
 		// as interface
-		className = i.Identifier().GetText()
+		className = y.VisitIdentifier(i.Identifier())
 		if i.Extends() != nil {
 			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
 				mergedTemplate = append(mergedTemplate, impl.GetText())
@@ -127,12 +174,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	if y == nil || raw == nil {
 		return
 	}
-
-	// i, _ := raw.(*phpparser.ClassStatementContext)
-	// if i == nil {
-	// 	return
-	// }
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	switch ret := raw.(type) {
 	case *phpparser.PropertyModifiersVariableContext:
 		// variable
@@ -184,18 +227,18 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		isRef := ret.Ampersand()
 		_ = isRef
 
-		funcName := ret.Identifier().GetText()
+		funcName := y.VisitIdentifier(ret.Identifier())
 
 		createFunction := func() *ssa.Function {
 			newFunction := y.NewFunc(funcName)
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				this := y.NewParam("$this")
-				_ = this
+				this.SetType(class)
 				y.VisitFormalParameterList(ret.FormalParameterList())
 				y.VisitMethodBody(ret.MethodBody())
-				y.Finish()
 			}
+			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
 			return newFunction
 		}
@@ -204,6 +247,9 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		case "__construct":
 			newFunction := createFunction()
 			class.Constructor = newFunction
+		case "__destruct":
+			function := createFunction()
+			class.Destructor = function
 		default:
 			newFunction := createFunction()
 			if isStatic {
@@ -211,6 +257,13 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				y.AssignVariable(variable, newFunction)
 				class.AddStaticMethod(funcName, newFunction)
 			} else {
+				defer func() {
+					if msg := recover(); msg != nil {
+						fmt.Println("msg:	", msg)
+						fmt.Println("source:	", y.GetSourceCode())
+						panic(newFunction)
+					}
+				}()
 				class.AddMethod(funcName, newFunction)
 			}
 		}
@@ -352,9 +405,10 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 		return "", nil
 	}
 	var unquote string
-	_unquote, err := yakunquote.Unquote(i.Identifier().GetText())
+	rawName := y.VisitIdentifier(i.Identifier())
+	_unquote, err := yakunquote.Unquote(rawName)
 	if err != nil {
-		unquote = i.Identifier().GetText()
+		unquote = rawName
 	} else {
 		unquote = _unquote
 	}
@@ -367,7 +421,8 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 	if y == nil || raw == nil {
 		return "", nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.VariableInitializerContext)
 	if i == nil {
 		return "", nil
@@ -407,7 +462,12 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	y.MarkedIsStaticMethod = true
+	defer func() {
+		y.MarkedIsStaticMethod = false
+	}()
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	getValue := func(class, key string) ssa.Value {
 		// class const  variable
 		if !y.isFunction {
@@ -417,15 +477,24 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		}
 		// function
 		variable := y.GetStaticMember(class, key)
-		return y.ReadValueByVariable(variable)
+		v := y.ReadValueByVariable(variable)
+		if u, ok := v.(*ssa.Undefined); ok && u.Kind == ssa.UndefinedValueInValid {
+			class := y.ResolveValue(class)
+			key := y.EmitConstInst(key)
+			v = y.ReadMemberCallVariable(class, key)
+		}
+		return v
 	}
 
 	// var class, key string
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticFunctionMemberContext:
-		// TODO: class
+		// TODO：修改完staticMember 修改此处
+		expr := y.VisitFullyQualifiedNamespaceExpr(i.FullyQualifiedNamespaceExpr())
 		key := i.Identifier().GetText()
+		_ = expr
 		_ = key
+		//return getValue(expr,key)
 	case *phpparser.ClassDirectFunctionMemberContext:
 		class := i.Identifier(0).GetText()
 		key := i.Identifier(1).GetText()
@@ -444,71 +513,93 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		exprName := y.VisitVariable(i.Variable())
 		value := y.ReadValue(exprName)
 		key := i.Identifier().GetText()
-
 		// if value is instance of class, check this class static function or const member
-		if typ, ok := ssa.ToObjectType(value.GetType()); ok {
-			if v := getValue(typ.Name, key); v != nil {
+		if value.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
+			if v := getValue(value.GetName(), key); v != nil {
 				return v
 			}
 		}
+		//if typ, ok := ssa.ToObjectType(value.GetType()); ok {
+		//	if v := getValue(typ.Name, key); v != nil {
+		//		return v
+		//	}
+		//}
 		return getValue(value.String(), key)
 	default:
 		_ = i
 	}
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
-func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) *ssa.Variable {
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.Variable, string, string) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, "", ""
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	var class, key string
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticVariableContext:
-		// TODO class
-		key = i.VarName().GetText()
+		// TODO class 命令空间
+		//key = i.VarName().GetText()
 	case *phpparser.ClassDirectStaticVariableContext:
+		//肯定是一个class，
 		class = i.Identifier().GetText()
-		key = i.VarName().GetText()
+		key = y.VisitRightValue(i.FlexiVariable()).GetName()
+		//key = i.VarName().GetText()
 	case *phpparser.StringAsIndirectClassStaticVariableContext:
+		// "test"::a;
 		str, err := strconv.Unquote(i.String_().GetText())
 		if err != nil {
 			class = i.String_().GetText()
 		} else {
 			class = str
 		}
-		key = i.VarName().GetText()
+		key = y.VisitRightValue(i.FlexiVariable()).GetName()
 	case *phpparser.VariableAsIndirectClassStaticVariableContext:
+		key = y.VisitRightValue(i.FlexiVariable()).GetName()
 		exprName := y.VisitVariable(i.Variable())
-		class = y.ReadValue(exprName).String()
-		key = i.VarName().GetText()
+		v := y.ReadValue(exprName)
+		if v.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
+			return y.GetStaticMember(v.GetName(), key[1:]), class, key
+		} else {
+			class = v.String()
+		}
+		//return y.GetStaticMember(class, value.String())
 	default:
 		_ = i
 	}
 	if class == "" {
-		return nil
+		return nil, "", ""
 	}
-
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]
-		return y.GetStaticMember(class, key)
+		return y.GetStaticMember(class, key), class, key
 	}
 	// function
-	return y.GetStaticMember(class, key)
+	return y.GetStaticMember(class, key), class, key
 }
 
 func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
 		if i.StaticClassExprFunctionMember() != nil {
 			return y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember())
 		}
 		if i.StaticClassExprVariableMember() != nil {
-			variable := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-			return y.ReadValueByVariable(variable)
+			variable, class, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+			v := y.ReadValueByVariable(variable)
+			if u, ok := v.(*ssa.Undefined); ok && u.Kind == ssa.UndefinedValueInValid {
+				class := y.ResolveValue(class)
+				key := y.EmitConstInst(key)
+				v = y.ReadMemberCallVariable(class, key)
+			}
+			return v
 		}
 	}
 
@@ -572,7 +663,6 @@ func (y *builder) VisitMemberModifier(raw phpparser.IMemberModifierContext) ssa.
 
 func (y *builder) VisitIndexMemberCallKey(raw phpparser.IIndexMemberCallKeyContext) ssa.Value {
 	i, ok := raw.(*phpparser.IndexMemberCallKeyContext)
-
 	if !ok {
 		return nil
 	}
@@ -595,6 +685,8 @@ func (y *builder) VisitIndexMemberCallKey(raw phpparser.IIndexMemberCallKeyConte
 
 func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Value {
 	i, ok := raw.(*phpparser.MemberCallKeyContext)
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	if !ok {
 		return nil
 	}
@@ -614,7 +706,11 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 		return y.EmitConstInst(i.String_().GetText())
 	}
 
-	return nil
+	if ret := i.Expression(); ret != nil {
+		return y.VisitExpression(ret)
+	}
+
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
@@ -657,4 +753,51 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	c.IsEllipsis = ellipsis
 	y.EmitCall(c)
 	return obj
+}
+
+func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.FullyQualifiedNamespaceExprContext)
+	if i == nil {
+		return nil
+	}
+	var pkgPath []string
+	for j := 0; j < len(i.AllIdentifier())-1; j++ {
+		pkgPath = append(pkgPath, y.VisitIdentifier(i.Identifier(j)))
+	}
+	//获取最后一个identifier
+	identifier := y.VisitIdentifier(i.Identifier(len(i.AllIdentifier()) - 1))
+	program := y.GetProgram()
+	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
+	if b {
+		function := library.GetFunction(identifier)
+		return function
+	}
+	return y.EmitUndefined(raw.GetText())
+}
+
+func (y *builder) ResolveValue(name string) ssa.Value {
+	y.SupportClassStaticModifier = true
+	if value := y.PeekValue(name); value != nil {
+		// found
+		return value
+	}
+	if class := y.MarkedThisClassBlueprint; class != nil {
+		if value, ok := y.ReadClassConst(class.Name, name); ok {
+			return value
+		}
+		value := y.ReadSelfMember(name)
+		if value != nil {
+			return value
+		}
+	}
+	if value, ok := y.ReadConst(name); ok {
+		return value
+	}
+	return y.ReadValue(name)
 }

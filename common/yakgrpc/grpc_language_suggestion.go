@@ -283,33 +283,71 @@ func shouldExport(key string) bool {
 	return (key[0] >= 'A' && key[0] <= 'Z')
 }
 
-func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string, funcTyps ...*ssa.FunctionType) string {
-	document := funcDecl.Document
-	if document != "" {
-		document = "\n\n" + document
-	}
-	decl := funcDecl.Decl
-	decl = strings.Replace(decl, "func(", typStr+"(", 1)
+func markdownWrapper(desc string) string {
+	return yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("```go\n%s\n```", desc))
+}
 
-	desc := ""
-	if len(funcTyps) > 0 {
-		funcTyp := funcTyps[0]
-		if funcTyp.IsMethod && len(funcTyp.Parameter) > 0 {
-			desc = fmt.Sprintf("```go\nfunc (%s) %s\n```%s", funcTyp.Parameter[0], decl, document)
+func getFuncDeclDesc(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
+	return markdownWrapper(getFuncDeclLabel(v, funcDecl))
+}
+
+func getFuncDeclLabel(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
+	var (
+		funcName     = funcDecl.MethodName
+		decl         = funcDecl.Decl
+		desc, prefix string
+	)
+
+	if strings.HasPrefix(decl, "func(") {
+		// fix decl
+		decl = strings.Replace(decl, "func(", funcName+"(", 1)
+	}
+
+	if v != nil {
+		bareV := ssaapi.GetBareNode(v)
+		fValue, isFunction := ssa.ToFunction(bareV)
+
+		funcTyp, ok := ssa.ToFunctionType(bareV.GetType())
+		if ok {
+			isMethod := funcTyp.IsMethod
+			if isMethod && len(funcTyp.Parameter) > 0 {
+				prefix = fmt.Sprintf("(%s) ", funcTyp.Parameter[0])
+			}
+
+			if isFunction && fValue.IsGeneric() {
+				offset := 0
+				if isMethod {
+					offset = 1
+				}
+				// fix generic function decl
+				paramsStr := strings.Join(lo.Map(funcDecl.Params, func(item *yakdoc.Field, index int) string {
+					return fmt.Sprintf("%s %s", item.Name, funcTyp.Parameter[index+offset])
+				}), ", ")
+				var returnsStr string
+				if funcTyp.ReturnType.GetTypeKind() == ssa.TupleTypeKind {
+					returnTyp, _ := ssa.ToObjectType(funcTyp.ReturnType)
+
+					returnsStr = strings.Join(lo.Map(funcDecl.Results, func(item *yakdoc.Field, index int) string {
+						return fmt.Sprintf("%s %s", item.Name, returnTyp.GetField(ssa.NewConst(index)))
+					}), ", ")
+				} else {
+					returnsStr = funcTyp.ReturnType.String()
+				}
+
+				desc = fmt.Sprintf("%s%s(%s) %s", prefix, funcName, paramsStr, returnsStr)
+			}
 		}
 	}
 
 	if desc == "" {
-		desc = fmt.Sprintf("```go\nfunc %s\n```%s", decl, document)
+		desc = fmt.Sprintf("func %s%s", prefix, decl)
 	}
 
-	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
 
 func getConstInstanceDesc(instance *yakdoc.LibInstance) string {
-	desc := fmt.Sprintf("```go\nconst %s = %s\n```", instance.InstanceName, instance.ValueStr)
-	desc = yakdoc.ShrinkTypeVerboseName(desc)
+	desc := markdownWrapper(fmt.Sprintf("const %s = %s", instance.InstanceName, instance.ValueStr))
 	return desc
 }
 
@@ -344,7 +382,6 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 			funcTyp.ReturnType,
 		)
 	}
-	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
 
@@ -433,7 +470,7 @@ func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc s
 	return
 }
 
-func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, document string) {
+func getFuncLabelAndDocBySSAValue(name string, v *ssaapi.Value) (label string, document string) {
 	if v.IsNil() {
 		return "", ""
 	}
@@ -468,7 +505,7 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 			libName, lastName, _ := strings.Cut(v.GetName(), ".")
 			funcDecl := getFuncDeclByName(libName, lastName)
 			if funcDecl != nil {
-				return yakdoc.ShrinkTypeVerboseName(funcDecl.Decl), funcDecl.Document
+				return getFuncDeclLabel(v, funcDecl), funcDecl.Document
 			}
 		}
 	}
@@ -478,7 +515,7 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 	if ok {
 		funcDecl, ok := lib.Functions[lastName]
 		if ok {
-			return getFuncDeclDesc(funcDecl, lastName, funcTyp), funcDecl.Document
+			return getFuncDeclLabel(v, funcDecl), funcDecl.Document
 		}
 	}
 
@@ -488,7 +525,7 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 
 	// 用户自定义函数
 	if funcTyp != nil {
-		desc = getFuncTypeDesc(funcTyp, lastName)
+		label = getFuncTypeDesc(funcTyp, lastName)
 		return
 	}
 
@@ -505,18 +542,17 @@ func getExternLibDesc(name string) string {
 
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf("```go\npackage %s\n\n", name))
+	builder.WriteString(fmt.Sprintf("package %s\n\n", name))
 	instanceKeys := utils.GetSortedMapKeys(lib.Instances)
 	for _, key := range instanceKeys {
 		instance := lib.Instances[key]
-		builder.WriteString(yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("const %s %s = %s\n", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr)))
+		builder.WriteString(fmt.Sprintf("const %s %s = %s\n", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr))
 	}
 	builder.WriteRune('\n')
 	builder.WriteString(getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
-		return yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("func %s\n", decl.Decl))
+		return fmt.Sprintf("func %s\n", decl.Decl)
 	}))
-	builder.WriteString("\n```")
-	return builder.String()
+	return markdownWrapper(builder.String())
 }
 
 func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v *ssaapi.Value) string {
@@ -554,9 +590,8 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			if typKind == ssa.FunctionTypeKind {
 				// 标准库函数
 				funcDecl := getFuncDeclByName(libName, lastName)
-				funcTyp, ok := ssa.ToFunctionType(bareTyp)
-				if funcDecl != nil && ok {
-					desc = getFuncDeclDesc(funcDecl, typStr, funcTyp)
+				if funcDecl != nil {
+					desc = getFuncDeclDesc(v, funcDecl)
 				}
 			} else {
 				// 标准库常量
@@ -574,20 +609,18 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 
 	switch typKind {
 	case ssa.FunctionTypeKind:
-		desc, _ = getFuncDeclAndDocBySSAValue(name, v)
-		if !strings.HasPrefix(desc, "```") {
-			desc = fmt.Sprintf("```go\n%s\n```", desc)
-		}
+		label, _ := getFuncLabelAndDocBySSAValue(name, v)
+		desc = markdownWrapper(label)
 	case ssa.StructTypeKind:
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
 		if !ok {
 			break
 		}
 		if rTyp.Combination {
-			desc = fmt.Sprintf("```go\n%s (%s)\n```", name, typStr)
+			desc = markdownWrapper(fmt.Sprintf("%s (%s)", name, typStr))
 			break
 		}
-		desc = fmt.Sprintf("```go\ntype %s struct {\n", shortTypName)
+		desc = fmt.Sprintf("type %s struct {\n", shortTypName)
 		for _, key := range rTyp.Keys {
 			// 过滤掉非导出字段
 			if !shouldExport(key.String()) {
@@ -602,13 +635,13 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			desc += "\n\n"
 			desc += methodDescriptions
 		}
-		desc += "\n```"
+		desc = markdownWrapper(desc)
 	case ssa.InterfaceTypeKind:
-		desc = fmt.Sprintf("```go\ntype %s interface {\n", shortTypName)
+		desc = fmt.Sprintf("type %s interface {\n", shortTypName)
 		methodDescriptions := getFuncDescBytypeStr(typStr, shortTypName, false, true)
 		desc += methodDescriptions
 		desc += "}"
-		desc += "\n```"
+		desc = markdownWrapper(desc)
 	}
 
 	// 结构体成员
@@ -621,14 +654,17 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 			if ok {
 				instance, ok := lib.Instances[lastName]
 				if ok {
-					desc = yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("```go\nfield %s %s\n```", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type)))
+					desc = markdownWrapper(
+						fmt.Sprintf("field %s %s",
+							instance.InstanceName,
+							getGolangTypeStringByTypeStr(instance.Type)))
 				}
 			}
 		}
 	}
 
 	if desc == "" {
-		desc = fmt.Sprintf("```go\ntype %s %s\n```", lastName, typStr)
+		desc = markdownWrapper(fmt.Sprintf("type %s %s", lastName, typStr))
 	}
 	return desc
 }
@@ -743,10 +779,10 @@ func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Rang
 func OnSignature(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 
-	desc, doc := getFuncDeclAndDocBySSAValue(word, v)
-	if desc != "" {
+	label, doc := getFuncLabelAndDocBySSAValue(word, v)
+	if label != "" {
 		ret = append(ret, &ypb.SuggestionDescription{
-			Label:       desc,
+			Label:       label,
 			Description: doc,
 		})
 	}

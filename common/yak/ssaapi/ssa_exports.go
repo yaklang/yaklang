@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"strings"
 	"time"
@@ -14,8 +15,8 @@ import (
 )
 
 type config struct {
-	language        Language
-	Builder         ssa.Builder
+	language        consts.Language
+	LanguageBuilder ssa.Builder
 	feedCode        bool
 	ignoreSyntaxErr bool
 
@@ -43,7 +44,7 @@ type config struct {
 func defaultConfig() *config {
 	return &config{
 		language:                   "",
-		Builder:                    nil,
+		LanguageBuilder:            nil,
 		originEditor:               memedit.NewMemEditor(""),
 		fs:                         filesys.NewLocalFs(),
 		programPath:                ".",
@@ -61,14 +62,14 @@ func (c *config) CalcHash() string {
 
 type Option func(*config)
 
-func WithLanguage(language Language) Option {
+func WithLanguage(language consts.Language) Option {
 	return func(c *config) {
 		c.language = language
 		if parser, ok := LanguageBuilders[language]; ok {
-			c.Builder = parser
+			c.LanguageBuilder = parser
 		} else {
 			log.Errorf("SSA not support language %s", language)
-			c.Builder = nil
+			c.LanguageBuilder = nil
 		}
 	}
 }
@@ -182,12 +183,12 @@ func WithEnableCache(b ...bool) Option {
 	}
 }
 
-func ParseProjectFromPath(path string, opts ...Option) ([]*Program, error) {
+func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
 	opts = append(opts, WithProgramPath(path))
 	return ParseProject(filesys.NewLocalFs(), opts...)
 }
 
-func ParseProject(fs filesys.FileSystem, opts ...Option) ([]*Program, error) {
+func ParseProject(fs filesys.FileSystem, opts ...Option) (Programs, error) {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -246,7 +247,7 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 }
 
 func (p *Program) Feed(code io.Reader) error {
-	if p.config == nil || !p.config.feedCode || p.config.Builder == nil {
+	if p.config == nil || !p.config.feedCode || p.config.LanguageBuilder == nil {
 		return utils.Errorf("not support language %s", p.config.language)
 	}
 

@@ -2,13 +2,14 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -179,7 +180,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 					})
 					rsp, err := lowhttp.HTTP(packetOpt...)
 					if err != nil {
-						//log.Error(err)
+						// log.Error(err)
 						return nil, err
 					}
 					if config.Debug && config.DebugResponse {
@@ -360,17 +361,17 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		for _, reqRaw := range reqs {
 			atomic.AddInt64(&count, 1)
 			rsp, err := sender([]byte(reqRaw), req)
-			if y.ReverseConnectionNeed { //check token even if send error
+			if y.ReverseConnectionNeed { // check token even if send error
 				if v, ok := y.Variables.GetRaw()["reverse_dnslog_token"]; ok {
 					if config.OOBRequireCheckingTrigger == nil {
-						InjectInteractshVar(v.Data, runtimeVars)
+						InjectInteractshVar(v.Data, config.RuntimeId, runtimeVars)
 					}
 				}
 			}
 			if err == nil {
 				responses = append(responses, rsp)
 			} else {
-				//log.Error(err)
+				// log.Error(err)
 				continue
 			}
 			varsInResponse := LoadVarFromRawResponse(rsp.RawPacket, rsp.GetDurationFloat(), fmt.Sprintf("_%d", index+1))
@@ -420,20 +421,15 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	return responses, matchResults, extracted, count
 }
 
-func InjectInteractshVar(token string, vars map[string]any) {
-	DnsLogEvents, err := yakit.CheckDNSLogByToken(token)
+func InjectInteractshVar(token string, runtimeID string, vars map[string]any) {
+	DnsLogEvents, err := yakit.CheckDNSLogByToken(token, runtimeID)
 	if err != nil {
 		log.Error("CheckDNSLogByToken failed: ", err)
 	}
-	HTTPLogEvents, err := yakit.CheckHTTPLogByToken(token)
-	if err != nil {
-		log.Error("CheckHTTPLogByToken failed: ", err)
-	}
 	vars["interactsh_protocol"] = strings.Join(lo.Uniq(lo.Map(DnsLogEvents, func(item *tpb.DNSLogEvent, index int) string {
+		if item.Type == "A" || item.Type == "AAAA" || item.Type == "CNAME" {
+			return "dns"
+		}
 		return item.Type
 	})), ",")
-	if len(HTTPLogEvents) > 0 {
-		vars["interactsh_request"] = HTTPLogEvents[len(HTTPLogEvents)-1].Request
-	}
-	vars["interactsh_request"] = ""
 }

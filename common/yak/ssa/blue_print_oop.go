@@ -20,6 +20,9 @@ const (
 )
 
 func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
+	if pkg == nil {
+		return nil
+	}
 	if c, ok := pkg.ClassBluePrint[name]; ok {
 		return c
 	}
@@ -77,6 +80,12 @@ func (c *ClassBluePrint) GetMember(key string) *BluePrintMember {
 		if m, ok := c.NormalMember[key]; ok {
 			member = m
 			return true
+		}
+		for _, class := range c.ParentClass {
+			if m, ok := class.NormalMember[key]; ok {
+				member = m
+				return true
+			}
 		}
 		return false
 	})

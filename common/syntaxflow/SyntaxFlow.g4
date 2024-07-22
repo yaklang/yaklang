@@ -18,9 +18,32 @@ statement
     | descriptionStatement eos?         # Description
     | alertStatement eos?               # Alert
     | filterStatement eos?              # Filter
+    | fileFilterContentStatement eos ?  # FileFilterContent
     | comment eos?                      # Command
     | eos                               # Empty
     ;
+
+fileFilterContentStatement
+    : '${' fileFilterContentInput '}' lines? '.' fileFilterContentMethod (As refVariable)?
+    ;
+
+// match filter content
+fileFilterContentInput: ( fileName | regexpLiteral);
+
+// only specific method can be used
+// 1. regexp  (re)
+// 2. regexp2 (re2)
+// 3. xpath
+//
+// looks like:
+// ${/*sqlmap*.xml/}.xpath(select: ...)
+// ${application.properties}.re2(jdbc: ...)
+fileFilterContentMethod: Identifier '(' fileFilterContentMethodParam? ')'; // do something check for 'forbidden *'
+fileFilterContentMethodParam:  fileFilterContentMethodParamItem lines? (',' lines? fileFilterContentMethodParamItem lines? )* ','? lines? ;
+fileFilterContentMethodParamItem: fileFilterContentMethodParamKey? fileFilterContentMethodParamValue;
+fileFilterContentMethodParamKey: Identifier ':';
+fileFilterContentMethodParamValue: nameFilter;
+fileName:nameFilter (. nameFilter)*;
 
 filterStatement
     : refVariable filterItem*  (As refVariable)? # RefFilterExpr

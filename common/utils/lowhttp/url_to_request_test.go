@@ -2,102 +2,152 @@ package lowhttp
 
 import (
 	"bytes"
+	"net/http"
+	"sort"
+	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func CheckResponse(t *testing.T, raw []byte, wantReq string) {
+func CheckRequest(t *testing.T, raw []byte, wantReq string) {
 	t.Helper()
 
 	raw = FixHTTPRequest(raw)
 	wantRaw := FixHTTPRequest([]byte(wantReq))
 
 	reqIns, err := ParseBytesToHttpRequest(raw)
-	if err != nil {
-		t.Fatalf("parse request error: %v\n%s", err, string(raw))
-	}
+	require.NoError(t, err, "parse request error")
 	wantReqIns, err := ParseBytesToHttpRequest(wantRaw)
-	if err != nil {
-		t.Fatalf("parse want request error: %v\n%s", err, string(wantRaw))
-	}
+	require.NoError(t, err, "parse want request error")
 
 	// compare method
 	if reqIns.Method != wantReqIns.Method {
-		t.Errorf("method Error: got:\n%s\nwant:\n%s\n", reqIns.Method, wantReqIns.Method)
+		require.Equal(t, wantReqIns.Method, reqIns.Method, "method")
 	}
 	// compare url
 	if reqIns.URL.String() != wantReqIns.URL.String() {
-		t.Errorf("url Error: got:\n%s\nwant:\n%s\n", reqIns.URL.String(), wantReqIns.URL.String())
+		require.Equal(t, wantReqIns.URL.String(), reqIns.URL.String(), "url")
 	}
 	// compare header
 	if len(reqIns.Header) != len(wantReqIns.Header) {
-		t.Errorf("header len Error: got:\n%d\nwant:\n%d\n", len(reqIns.Header), len(wantReqIns.Header))
-	}
-	for k, v := range reqIns.Header {
-		if v[0] != wantReqIns.Header[k][0] {
-			t.Errorf("header Error: got:\n%s\nwant:\n%s\n", v[0], wantReqIns.Header[k][0])
+		require.Len(t, reqIns.Header, len(wantReqIns.Header), "header len")
+	} else {
+		for k, v := range reqIns.Header {
+			require.Greater(t, len(v), 0, "header %s is empty", k)
+			require.Greater(t, len(wantReqIns.Header[k]), 0, "want header %s is empty", k)
+
+			header, wantHeader := v[0], wantReqIns.Header[k][0]
+			if k == "Cookie" {
+				// sort header and wantHeader
+				headers := lo.FilterMap(strings.Split(header, ";"), func(item string, index int) (string, bool) {
+					trimed := strings.TrimSpace(item)
+					return trimed, trimed != ""
+				})
+				wantHeaders := lo.FilterMap(strings.Split(wantHeader, ";"), func(item string, index int) (string, bool) {
+					trimed := strings.TrimSpace(item)
+					return trimed, trimed != ""
+				})
+				sort.Strings(headers)
+				sort.Strings(wantHeaders)
+				header = strings.Join(headers, "; ")
+				wantHeader = strings.Join(wantHeaders, "; ")
+			}
+			require.Equalf(t, wantHeader, header, "Header %s", k)
 		}
 	}
 
 	// compare body
+	if reqIns.Body == nil && wantReqIns.Body != nil {
+		t.Fatal("raw body is nil")
+	}
+	if reqIns.Body != nil && wantReqIns.Body == nil {
+		t.Fatal("new body is nil")
+	}
 	if reqIns.Body != nil && wantReqIns.Body != nil {
 		var buf1, buf2 bytes.Buffer
 		_, _ = buf1.ReadFrom(reqIns.Body)
 		_, _ = buf2.ReadFrom(wantReqIns.Body)
-		if buf1.String() != buf2.String() {
-			t.Errorf("body Error: got:\n%s\nwant:\n%s\n", buf1.String(), buf2.String())
-		}
+		require.Equal(t, buf2.String(), buf1.String(), "body")
 	}
 }
 
 func TestUrlToGetRequestPacket(t *testing.T) {
-	result := UrlToGetRequestPacket("https://baidu.com/asd", []byte(`GET / HTTP/1.1
-Host: baidu.com
-Cookie: test=12;`), false)
+	// keep header
+	result := UrlToGetRequestPacket("https://example.com/asd", []byte(`GET /qwe HTTP/1.1
+Host: example.com
+AAA: BBB
+Cookie: test=12;`), true)
 	wantResult := `GET /asd HTTP/1.1
-Host: baidu.com
-User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
-Cookie: test=12
+Host: example.com
+AAA: BBB
+Referer: https://example.com/qwe
 `
-	CheckResponse(t, result, wantResult)
+	CheckRequest(t, result, wantResult)
 }
 
-func TestUrlToGetRequestPacket302(t *testing.T) {
-	resp := []byte(`HTTP/1.1 302
-	Set-Cookie: test2=34;`)
-	respcookies := ExtractCookieJarFromHTTPResponse(resp)
-	result := UrlToGetRequestPacketWithResponse("https://baidu.com/qwe", []byte(`POST /asd HTTP/1.1
-Host: baidu.com
-Cookie: test=12;`), resp, false, respcookies...)
-	wantResult := `GET /qwe HTTP/1.1
-Host: baidu.com
-User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
-Cookie: test=12
-`
-	CheckResponse(t, result, wantResult)
-}
+func TestUrlToRequestPacketEx(t *testing.T) {
+	t.Run("nil origin request", func(t *testing.T) {
+		result, err := UrlToRequestPacketEx(http.MethodGet, "https://example.com/asd", nil, true, -1)
+		require.NoError(t, err)
 
-func TestUrlToGetRequestPacket307(t *testing.T) {
-	resp := []byte(`HTTP/1.1 307` + "\r\n" + `Set-Cookie: test2=34;` + "\r\n\r\n")
-	respcookies := ExtractCookieJarFromHTTPResponse(resp)
-	result := UrlToGetRequestPacketWithResponse("https://baidu.com/qwe", []byte(`POST /asd HTTP/1.1
-Host: baidu.com
+		wantResult := `GET /asd HTTP/1.1
+Host: example.com
+
+`
+		CheckRequest(t, result, wantResult)
+	})
+	t.Run("referer", func(t *testing.T) {
+		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
+Host: example.com
+AAA: BBB
 Cookie: test=12;
-Content-Length: 4
 
-ab
-`), resp, false, respcookies...)
+aaa`), false, 302, nil)
+		require.NoError(t, err)
 
-	wantResult := `POST /qwe HTTP/1.1
-Host: baidu.com
-Cookie: test=12; test2=34
-Content-Length: 4
+		wantResult := `GET /qwe HTTP/1.1
+Host: example.com
+AAA: BBB
+Referer: http://example.com/asd
+		`
+		CheckRequest(t, result, wantResult)
+	})
+	t.Run("302", func(t *testing.T) {
+		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
+Host: example.com
+AAA: BBB
+Cookie: test=12;
 
-ab
+aaa`), true, 302, nil)
+		require.NoError(t, err)
+
+		wantResult := `GET /qwe HTTP/1.1
+Host: example.com
+AAA: BBB
+Referer: https://example.com/asd
 `
-	CheckResponse(t, result, wantResult)
+		CheckRequest(t, result, wantResult)
+	})
+	t.Run("307", func(t *testing.T) {
+		result, err := UrlToRequestPacketEx("", "https://example.com/qwe", []byte(`POST /asd HTTP/1.1
+Host: example.com
+AAA: BBB
+Cookie: test=12;
+
+aaa`), true, 307, nil)
+		require.NoError(t, err)
+
+		wantResult := `POST /qwe HTTP/1.1
+Host: example.com
+AAA: BBB
+Referer: https://example.com/asd
+
+aaa`
+		CheckRequest(t, result, wantResult)
+	})
 }
 
 func TestUrlToHTTPRequest(t *testing.T) {
@@ -159,18 +209,18 @@ func TestUrlToHTTPRequest(t *testing.T) {
 
 func TestFixURL(t *testing.T) {
 	t.Run("no scheme 80 port", func(t *testing.T) {
-		require.Equal(t, "http://baidu.com", FixURLScheme("baidu.com:80"))
+		require.Equal(t, "http://example.com", FixURLScheme("example.com:80"))
 	})
 	t.Run("no scheme 443 port", func(t *testing.T) {
-		require.Equal(t, "https://baidu.com", FixURLScheme("baidu.com:443"))
+		require.Equal(t, "https://example.com", FixURLScheme("example.com:443"))
 	})
 	t.Run("no scheme not normal port", func(t *testing.T) {
-		require.Equal(t, "http://baidu.com:11111", FixURLScheme("baidu.com:11111"))
+		require.Equal(t, "http://example.com:11111", FixURLScheme("example.com:11111"))
 	})
 	t.Run("normal http", func(t *testing.T) {
-		require.Equal(t, "http://baidu.com:80", FixURLScheme("http://baidu.com:80"))
+		require.Equal(t, "http://example.com:80", FixURLScheme("http://example.com:80"))
 	})
 	t.Run("normal https", func(t *testing.T) {
-		require.Equal(t, "http://baidu.com:8443", FixURLScheme("http://baidu.com:8443"))
+		require.Equal(t, "http://example.com:8443", FixURLScheme("http://example.com:8443"))
 	})
 }

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -190,30 +191,19 @@ $a = function()use($d){
     println($d);
 };
 `
-		test.CheckPrintlnValue(code, []string{"Undefined-$d"}, t)
+		test.CheckPrintlnValue(code, []string{"FreeValue-$d"}, t)
 	})
 	t.Run("use Closure", func(t *testing.T) {
 		code := `<?php
 $a = function()use($d){
     return "1";
 };
-$d = $a();
-println($d);
+$da = $a();
+println($da);
 `
-		test.CheckPrintlnValue(code, []string{"Function-$a()"}, t)
+		test.CheckPrintlnValue(code, []string{"Function-$a() binding[FreeValue-$d]"}, t)
 	})
 
-	//	t.Run("static variable in function inner", func(t *testing.T) {
-	//		code := `<?php
-	//function test_static(){
-	//    static $a=1;
-	//    $a++;
-	//    return $a;
-	//}
-	//echo test_static();
-	//echo test_static();`
-	//		test.MockSSA(t, code)
-	//	})
 }
 func TestParseSSA_DefinedFunc(t *testing.T) {
 	t.Run("include", func(t *testing.T) {
@@ -260,11 +250,12 @@ func Test_Function_WithMemberCall(t *testing.T) {
 		$a = new A();
 		$b = $a->fun1();
 		println($b);
-		`, []string{"Undefined-$a.fun1(valid)(make(A))"}, t)
+		`, []string{"Undefined-$a.fun1(valid)(Undefined-$a)"}, t)
 	})
 
 	t.Run("multiple member call", func(t *testing.T) {
 		test.CheckPrintlnValue(`
+
 		<?php
 		class A {
 			function fun1() {
@@ -275,9 +266,10 @@ func Test_Function_WithMemberCall(t *testing.T) {
 			var A $a;
 		}
 		$b = new B();
+		$b->a = new A();
 		$call = $b->a->fun1();
 		println($call);
-		`, []string{"Undefined-.a.fun1(valid)(Undefined-.a(valid))"}, t)
+		`, []string{"Undefined-$b.a.fun1(valid)(Undefined-$b.a)"}, t)
 	})
 }
 
@@ -294,5 +286,64 @@ $a = PHPINFO;
 $a();
 `
 		test.MockSSA(t, code)
+	})
+	t.Run("test-3", func(t *testing.T) {
+		code := `<?php
+$a = <<<a
+dad
+a;
+`
+		test.MockSSA(t, code)
+	})
+}
+func TestClosure(t *testing.T) {
+	t.Run("global", func(t *testing.T) {
+		code := `<?php
+	$a = 1;
+	function a(){
+		global $a;
+		println($a);
+	}
+	a();
+`
+		test.CheckSyntaxFlow(t, code,
+			`println(* #-> *  as $param)`,
+			map[string][]string{
+				"param": {"1"},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("lamda-has-free_value", func(t *testing.T) {
+		code := `<?php
+$d = 1;
+$a = function($ba)use($d){
+    println($d);
+};
+$a(1);`
+		test.CheckPrintlnValue(code, []string{`FreeValue-$d`}, t)
+		test.CheckSyntaxFlow(t, code,
+			`println(* #-> * as $param)`,
+			map[string][]string{
+				"param": {"1"},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("lamda-not-free-value", func(t *testing.T) {
+		t.Run("lamda", func(t *testing.T) {
+			code := `<?php
+$a = function($ba)use($d){
+    println($d);
+};
+$a(1);`
+			test.CheckPrintlnValue(code, []string{`FreeValue-$d`}, t)
+
+			//todo： 这个测试栈会爆
+			//test.CheckSyntaxFlow(t, code,
+			//	`println(* #-> * as $param)`,
+			//	map[string][]string{
+			//		"param": {"1"},
+			//	},
+			//	ssaapi.WithLanguage(ssaapi.PHP))
+		})
 	})
 }

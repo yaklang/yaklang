@@ -326,6 +326,10 @@ func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
 
 func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len, Cap Value) *Make {
 	if f.CurrentBlock.finish {
+		log.Errorf("BUG: current block is finish, can't emit make")
+		log.Errorf("BUG: current block is finish, can't emit make")
+		log.Errorf("BUG: current block is finish, can't emit make")
+		log.Errorf("BUG: current block is finish, can't emit make")
 		return nil
 	}
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
@@ -368,9 +372,9 @@ func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
-	if f.CurrentBlock.finish {
-		return nil
-	}
+	// if f.CurrentBlock.finish {
+	// 	return nil
+	// }
 	ci := NewConst(i)
 	f.emit(ci)
 	return ci
@@ -391,6 +395,7 @@ func (f *FunctionBuilder) EmitTypeValue(typ Type) *TypeValue {
 	}
 	t := NewTypeValue(typ)
 	f.emit(t)
+	t.SetType(typ)
 	return t
 }
 

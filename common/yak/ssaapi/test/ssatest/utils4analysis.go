@@ -2,10 +2,14 @@ package ssatest
 
 import (
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -22,6 +26,47 @@ import (
 )
 
 type checkFunction func(*ssaapi.Program) error
+
+func CheckWithFS(fs filesys.FileSystem, t *testing.T, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+	// only in memory
+	{
+		prog, err := ssaapi.ParseProject(fs, opt...)
+		assert.Nil(t, err)
+
+		log.Infof("only in memory ")
+		err = handler(prog)
+		assert.Nil(t, err)
+	}
+
+	programID := uuid.NewString()
+	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
+	log.Info("Program ID: ", programID)
+	ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	fmt.Println("-----------------------------------------------------------------------------")
+	// parse with database
+	{
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		prog, err := ssaapi.ParseProject(fs, opt...)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		}()
+		assert.Nil(t, err)
+
+		log.Infof("with database ")
+		err = handler(prog)
+		assert.Nil(t, err)
+	}
+
+	// just use database
+	{
+		prog, err := ssaapi.FromDatabase(programID)
+		assert.Nil(t, err)
+
+		log.Infof("only use database ")
+		err = handler([]*ssaapi.Program{prog})
+		assert.Nil(t, err)
+	}
+}
 
 func CheckWithName(
 	name string,
@@ -83,6 +128,52 @@ func Check(
 	CheckWithName("", t, code, handler, opt...)
 }
 
+func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, prog *ssaapi.Program, start time.Time) error, opt ...ssaapi.Option) {
+	opt = append(opt, ssaapi.WithLanguage(ssaapi.JAVA))
+
+	{
+		start := time.Now()
+		errListener := antlr4util.NewErrorListener()
+		lexer := javaparser.NewJavaLexer(antlr.NewInputStream(code))
+		lexer.RemoveErrorListeners()
+		lexer.AddErrorListener(errListener)
+		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+		parser := javaparser.NewJavaParser(tokenStream)
+		parser.RemoveErrorListeners()
+		parser.AddErrorListener(errListener)
+		parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+		ast := parser.CompilationUnit()
+		_ = ast
+		assert.NoError(t, handler(true, nil, start))
+	}
+
+	// only in memory
+	{
+
+		start := time.Now()
+		prog, err := ssaapi.Parse(code, opt...)
+		assert.Nil(t, err)
+
+		log.Infof("only in memory ")
+		err = handler(true, prog, start)
+		assert.Nil(t, err)
+	}
+
+	programID := uuid.NewString()
+	ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	// parse with database
+	{
+		start := time.Now()
+		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		prog, err := ssaapi.Parse(code, opt...)
+		assert.Nil(t, err)
+		log.Infof("with database ")
+		err = handler(false, prog, start)
+		assert.Nil(t, err)
+	}
+}
+
 func CheckFSWithProgram(
 	t *testing.T, programName string,
 	codeFS, ruleFS filesys.FileSystem, opt ...ssaapi.Option) {
@@ -132,6 +223,15 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
 
+func CheckSyntaxFlowWithFS(t *testing.T, fs filesys.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
+	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
+		results, err := p.SyntaxFlowWithError(sf)
+		assert.Nil(t, err)
+		assert.NotNil(t, results)
+		CompareResult(t, contain, results, wants)
+		return nil
+	}, opt...)
+}
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }
@@ -146,32 +246,33 @@ func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map
 
 func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []sfvm.Option) {
 	Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
 		sfOpt = append(sfOpt, sfvm.WithEnableDebug(true))
 		results, err := prog.SyntaxFlowWithError(sf, sfOpt...)
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
-		for key, value := range results.GetAllValues() {
-			log.Infof("\nkey: %s", key)
-			value.Show()
-		}
-
-		for k, want := range wants {
-			gotVs := results.GetValues(k)
-			assert.Greater(t, len(gotVs), 0, "key[%s] not found", k)
-			got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
-			sort.Strings(got)
-			sort.Strings(want)
-			if contain {
-				if !utils.ContainsAll(got, want...) {
-					t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
-				}
-			} else {
-				assert.Equal(t, len(want), len(gotVs))
-				assert.Equal(t, want, got)
-			}
-		}
+		CompareResult(t, contain, results, wants)
 		return nil
 	}, ssaOpt...)
+}
+
+func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult, wants map[string][]string) {
+	results.Show()
+	for k, want := range wants {
+		gotVs := results.GetValues(k)
+		assert.Greater(t, len(gotVs), 0, "key[%s] not found", k)
+		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+		sort.Strings(got)
+		sort.Strings(want)
+		if contain {
+			if !utils.ContainsAll(got, want...) {
+				t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
+			}
+		} else {
+			assert.Equal(t, len(want), len(gotVs))
+			assert.Equal(t, want, got)
+		}
+	}
 }
 
 func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {

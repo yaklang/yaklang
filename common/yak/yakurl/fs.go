@@ -2,20 +2,24 @@ package yakurl
 
 import (
 	"fmt"
+	"io/fs"
 	"net/url"
-	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type fileSystemAction struct{}
+type fileSystemAction struct {
+	fs filesys.FileSystem
+}
 
-func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
-	newParam := &ypb.YakURL{
+func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url.Values, info fs.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
+	fs := f.fs
+	yakURL := &ypb.YakURL{
 		Schema:   originParam.Schema,
 		User:     originParam.GetUser(),
 		Pass:     originParam.GetPass(),
@@ -24,7 +28,7 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath s
 		Query:    originParam.GetQuery(),
 	}
 	if !inDir {
-		newParam.Path = originParam.GetPath()
+		yakURL.Path = originParam.GetPath()
 	}
 
 	src := &ypb.YakURLResource{
@@ -33,18 +37,18 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath s
 		ModifiedTimestamp: info.ModTime().Unix(),
 		Path:              currentPath,
 		YakURLVerbose:     "",
-		Url:               newParam,
+		Url:               yakURL,
 	}
 	if info.IsDir() {
 		src.ResourceType = "dir"
 		src.VerboseType = "filesystem-directory"
-		infos, err := os.ReadDir(currentPath)
+		infos, err := fs.ReadDir(currentPath)
 		if err == nil {
 			src.HaveChildrenNodes = len(infos) > 0
 		}
 	}
 
-	dirName, fileName := filepath.Split(currentPath)
+	dirName, fileName := fs.PathSplit(currentPath)
 	src.ResourceName = fileName
 	if !info.IsDir() && info.Size() > 0 {
 		src.VerboseName = fmt.Sprintf("%v [%v]", fileName, src.SizeVerbose)
@@ -55,17 +59,42 @@ func fileInfoToResource(originParam *ypb.YakURL, info os.FileInfo, currentPath s
 		Key:   "Directory-Name",
 		Value: utils.EscapeInvalidUTF8Byte([]byte(dirName)),
 	})
+	if !info.IsDir() && strings.ToLower(query.Get("detectPlainText")) == "true" {
+		// read first 514 bytes to check if it is a plain text file
+		fh, err := fs.Open(currentPath)
+		if err == nil {
+			defer fh.Close()
+			size := src.Size
+			if size > 514 {
+				size = 514
+			}
+
+			buf := make([]byte, size)
+			n, err := fh.Read(buf)
+			if err == nil {
+				buf = buf[:n]
+				src.Extra = append(src.Extra, &ypb.KVPair{
+					Key:   "IsPlainText",
+					Value: utils.AsDebugString(utils.IsPlainText(buf)),
+				})
+			}
+		}
+	}
 	return src
 }
 
 func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	// available query:
+	// op=list # list directory
+	// detectPlainText=true # detect if file is plain text, return: IsPlainText:true/false
 	u := params.GetUrl()
-	absPath, _, _, err := FormatPath(params)
+	fs := f.fs
+	absPath, _, _, err := f.FormatPath(params)
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := os.Stat(absPath)
+	info, err := fs.Stat(absPath)
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
 	}
@@ -79,7 +108,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	switch query.Get("op") {
 	case "list":
 		if info.IsDir() {
-			infos, err := os.ReadDir(absPath)
+			infos, err := fs.ReadDir(absPath)
 			if err != nil {
 				return nil, utils.Errorf("cannot read dir[%s]: %s", u.GetPath(), err)
 			}
@@ -88,12 +117,12 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 				if info == nil {
 					continue
 				}
-				currentPath := filepath.Join(params.GetUrl().Path, info.Name())
-				res = append(res, fileInfoToResource(params.GetUrl(), info, currentPath, true))
+				currentPath := fs.Join(params.GetUrl().Path, info.Name())
+				res = append(res, f.fileInfoToResource(params.GetUrl(), query, info, currentPath, true))
 			}
 		}
 	default:
-		res = append(res, fileInfoToResource(params.GetUrl(), info, absPath, false))
+		res = append(res, f.fileInfoToResource(params.GetUrl(), query, info, absPath, false))
 	}
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
@@ -105,12 +134,14 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 
 func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
-	absPath, dirname, _, err := FormatPath(params)
+	fs := f.fs
+
+	absPath, dirname, _, err := f.FormatPath(params)
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := os.Stat(absPath)
+	info, err := fs.Stat(absPath)
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
 	}
@@ -127,20 +158,25 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 			return nil, utils.Errorf("newname is required")
 		}
 
-		if !filepath.IsAbs(newName) { // Compatible abs path and relative path
-			newName = filepath.Join(dirname, newName)
+		if !fs.IsAbs(newName) { // Compatible abs path and relative path
+			newName = fs.Join(dirname, newName)
 		}
-		if ok, err := utils.PathExists(newName); ok {
+
+		if ok, err := fs.Exists(newName); ok {
 			return nil, utils.Errorf("file or directory is exists: %s", newName)
 		} else if err != nil {
 			return nil, utils.Errorf("cannot check file or directory exists: %s", newName)
 		}
 
-		err := os.Rename(absPath, newName)
+		err := fs.Rename(absPath, newName)
 		if err != nil {
-			relOldPath, _ := filepath.Rel(dirname, absPath)
-			relNewPath, _ := filepath.Rel(dirname, newName)
-			return nil, utils.Errorf("cannot rename %s to %s", relOldPath, relNewPath)
+			relOldPath, relErr := fs.Rel(dirname, absPath)
+			relNewPath, relErr2 := fs.Rel(dirname, newName)
+			if relErr == nil && relErr2 == nil {
+				return nil, utils.Errorf("cannot rename %s to %s", relOldPath, relNewPath)
+			} else {
+				return nil, utils.Errorf("cannot rename %s to %s", absPath, newName)
+			}
 		}
 
 		absPath = newName
@@ -150,7 +186,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		if info.IsDir() {
 			return nil, utils.Errorf("cannot post to a directory: %s", u.GetPath())
 		}
-		err = os.WriteFile(absPath, params.GetBody(), 0o644)
+		err = fs.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
 			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
 		}
@@ -163,11 +199,11 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 	}
 
-	currentInfo, err := os.Stat(absPath)
+	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
 	}
-	res := fileInfoToResource(params.GetUrl(), currentInfo, absPath, false)
+	res := f.fileInfoToResource(params.GetUrl(), query, currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
@@ -177,37 +213,58 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 }
 
 func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	// available query:
+	// type=dir # create directory
+	// type=file # create file
+	// paste=true # paste, auto rename if file exist
 	u := params.GetUrl()
-	absPath, _, _, err := FormatPath(params)
+	fs := f.fs
+
+	absPath, _, _, err := f.FormatPath(params)
 	if err != nil {
 		return nil, err
-	}
-	exists, err := utils.PathExists(absPath)
-	if exists {
-		return nil, utils.Error("file exists") //  if file exists can't use put
-	} else if err != nil {
-		return nil, utils.Errorf("file exists check error: %v", err)
 	}
 
 	query := make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
+	isPaste := strings.ToLower(query.Get("paste")) == "true"
+
+	exists, err := fs.Exists(absPath)
+	if exists {
+		if !isPaste {
+			return nil, utils.Error("file exists") //  if file exists can't use put
+		}
+		dirPath, name := fs.PathSplit(absPath)
+		filenameWithoutExt, ext := name, fs.Ext(name)
+		if len(ext) > 0 {
+			filenameWithoutExt = strings.TrimSuffix(name, ext)
+		}
+		i := 1
+		for {
+			newName := fmt.Sprintf("%s(%d)%s", filenameWithoutExt, i, ext)
+			newAbsPath := fs.Join(dirPath, newName)
+			if found, _ := fs.Exists(newAbsPath); !found {
+				absPath = newAbsPath
+				break
+			}
+			i++
+		}
+	} else if err != nil {
+		return nil, utils.Errorf("file exists check error: %v", err)
+	}
+
 	switch query.Get("type") {
 	case "dir":
-		err := os.MkdirAll(absPath, 0o755)
+		err := fs.MkdirAll(absPath, 0o755)
 		if err != nil {
 			return nil, err
 		}
 	case "file":
 		fallthrough
 	default:
-		fileCreate, err := os.Create(absPath)
-		if err != nil {
-			return nil, err
-		}
-		defer fileCreate.Close()
-		_, err = fileCreate.Write(params.GetBody())
+		err = fs.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
 			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
 		}
@@ -220,11 +277,11 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 		}
 	}
 
-	currentInfo, err := os.Stat(absPath)
+	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
 		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err) // check file / dir
 	}
-	res := fileInfoToResource(params.GetUrl(), currentInfo, absPath, false)
+	res := f.fileInfoToResource(params.GetUrl(), query, currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
@@ -235,16 +292,17 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 
 func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
-	absPath, _, _, err := FormatPath(params)
+	fs := f.fs
+	absPath, _, _, err := f.FormatPath(params)
 	if err != nil {
 		return nil, err
 	}
 
-	exists, err := utils.PathExists(absPath)
+	exists, err := fs.Exists(absPath)
 	if !exists {
 		return nil, utils.Errorf("file [%s] exists check error: %s", u.GetPath(), err)
 	}
-	err = os.RemoveAll(absPath)
+	err = fs.Delete(absPath)
 	if err != nil {
 		return nil, err
 	}
@@ -272,20 +330,24 @@ func (f fileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 	return nil, utils.Error("not implemented")
 }
 
-func FormatPath(params *ypb.RequestYakURLParams) (string, string, string, error) {
-	u := params.GetUrl()
-	var absPath string
-	var dirname, filename string
-	if filepath.IsAbs(u.GetPath()) {
-		dirname, filename = filepath.Split(u.GetPath())
+func (f *fileSystemAction) FormatPath(params *ypb.RequestYakURLParams) (string, string, string, error) {
+	var (
+		u                 = params.GetUrl()
+		fs                = f.fs
+		absPath           string
+		dirname, filename string
+	)
+
+	if fs.IsAbs(u.GetPath()) {
+		dirname, filename = fs.PathSplit(u.GetPath())
 		absPath = u.GetPath()
 	} else {
-		wd, err := os.Getwd()
+		wd, err := fs.Getwd()
 		if err != nil {
 			return "", "", "", utils.Errorf("cannot get current working directory: %s", err)
 		}
-		absPath = filepath.Join(wd, u.GetPath())
-		dirname, filename = filepath.Split(absPath)
+		absPath = fs.Join(wd, u.GetPath())
+		dirname, filename = fs.PathSplit(absPath)
 	}
 	if params.GetUrl() != nil {
 		params.Url.Path = absPath

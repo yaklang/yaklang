@@ -6,7 +6,8 @@ import (
 )
 
 type PathForest struct {
-	roots map[string]*PathNode
+	roots    map[string]*PathNode
+	readOnly bool
 }
 
 type PathNodes []*PathNode
@@ -34,6 +35,8 @@ type PathNode struct {
 	childrenMap   map[string]*PathNode
 	Children      []*PathNode `json:"children"`
 	Depth         int         `json:"depth"`
+	Value         any         `json:"-"`
+	ReadOnly      bool        `json:"-"`
 }
 
 func (p *PathNode) recursive(f func(node2 *PathNode)) {
@@ -43,7 +46,7 @@ func (p *PathNode) recursive(f func(node2 *PathNode)) {
 	}
 }
 
-func (p *PathForest) addPath(path string) error {
+func (p *PathForest) addPath(path string, v ...any) error {
 	l := StringArrayFilterEmpty(strings.Split(path, "/"))
 	if len(l) <= 0 {
 		_, err := p.getRootNodeOrCreate("")
@@ -53,12 +56,18 @@ func (p *PathForest) addPath(path string) error {
 		return nil
 	}
 
+	var val any
+	if len(v) >= 1 {
+		val = v[0]
+	}
+
 	rootNode, err := p.getRootNodeOrCreate(l[0])
 	if err != nil {
 		return err
 	}
 
 	if len(l) == 1 {
+		rootNode.Value = val
 		rootNode.RelativePaths = append(rootNode.RelativePaths, path)
 		return nil
 	}
@@ -67,8 +76,15 @@ func (p *PathForest) addPath(path string) error {
 	if err != nil {
 		return err
 	}
+	node.Value = val
 	node.RelativePaths = append(node.RelativePaths, path)
 	return nil
+}
+
+func (w *PathForest) ReadOnly() {
+	w.Recursive(func(node2 *PathNode) {
+		node2.ReadOnly = true
+	})
 }
 
 func (w *PathForest) getRootNodeOrCreate(s string) (*PathNode, error) {
@@ -83,6 +99,11 @@ func (w *PathForest) getRootNodeOrCreate(s string) (*PathNode, error) {
 	} else {
 		path = filepath.Join("/", s)
 	}
+
+	if w.readOnly {
+		return nil, Errorf("path forest is read only")
+	}
+
 	root := &PathNode{
 		Path:        path,
 		Name:        s,
@@ -90,6 +111,12 @@ func (w *PathForest) getRootNodeOrCreate(s string) (*PathNode, error) {
 	}
 	w.roots[s] = root
 	return root, nil
+}
+
+func (p *PathNode) Existed(i string) bool {
+
+	_, ok := p.childrenMap[i]
+	return ok
 }
 
 func (p *PathNode) getNodeOrCreate(path string) (*PathNode, error) {
@@ -109,6 +136,9 @@ func (p *PathNode) getNodeOrCreate(path string) (*PathNode, error) {
 		}
 
 		lastNode = lastNode.getOrCreateChildByNodeName(b, strings.Join(buf, "/"))
+		if lastNode == nil {
+			return nil, Errorf("create child node failed: %s", path)
+		}
 	}
 
 	return lastNode, nil
@@ -118,6 +148,10 @@ func (p *PathNode) getOrCreateChildByNodeName(nodeName, path string) *PathNode {
 	n, ok := p.childrenMap[nodeName]
 	if ok {
 		return n
+	}
+
+	if p.ReadOnly {
+		return nil
 	}
 
 	n = &PathNode{
@@ -157,9 +191,30 @@ func GeneratePathTrees(l ...string) (*PathForest, error) {
 	return forest, nil
 }
 
+func (p *PathForest) AddPath(path string, f any) error {
+	return p.addPath(path, f)
+}
+
+func (p *PathForest) Get(path string) (*PathNode, error) {
+	node, err := p.getRootNodeOrCreate(p.getRoot(path))
+	if err != nil {
+		return nil, err
+	}
+	_, after, _ := strings.Cut(path, "/")
+	if after != "" {
+		return node.getNodeOrCreate(path)
+	}
+	return node, nil
+}
+
 func (n *PathNode) GetDepth() int {
 	if n.Parent == nil {
 		return 0
 	}
 	return n.Parent.GetDepth() + 1
+}
+
+func (p *PathForest) getRoot(path string) string {
+	before, _, _ := strings.Cut(path, "/")
+	return before
 }

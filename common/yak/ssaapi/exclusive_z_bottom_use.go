@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 
 	"github.com/samber/lo"
@@ -37,9 +38,12 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 			undefineMember = true
 		}
 	}
-	if v.IsMember() && !undefineMember && actx.TheMemberShouldBeVisited(v) {
+	if v.IsMember() && !undefineMember {
 		obj := v.GetObject()
-		actx.PushObject(obj, v.GetKey(), v)
+		if err := actx.PushObject(obj, v.GetKey(), v); err != nil {
+			log.Errorf("%v", err)
+			return v.visitedDefsDefault(actx)
+		}
 		vals = append(vals, obj.getBottomUses(actx)...)
 		actx.PopObject()
 	}
@@ -52,6 +56,19 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Values {
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
+	}
+
+	actx.EnterRecursive()
+	defer func() {
+		actx.ExitRecursive()
+	}()
+
+	// 1w recursive call check
+	if !utils.InGithubActions() {
+		if actx.GetRecursiveCounter() > 10000 {
+			log.Warnf("recursive call is over 10000, stop it")
+			return nil
+		}
 	}
 
 	actx.depth++
@@ -94,7 +111,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// the phi is existed, visited in the same stack.
 			return Values{}
 		}
-		actx.VisitPhi(v)
 		return v.visitUserFallback(actx)
 	case *ssa.Call:
 		if !actx.TheCallShouldBeVisited(ins) {

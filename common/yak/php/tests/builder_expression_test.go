@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -25,6 +26,20 @@ $PHP_EOL=1;
 println($PHP_EOL);`
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
+}
+
+func TestMemberAdd(t *testing.T) {
+	code := `<?php
+
+class test{
+    public $a=0;
+}
+
+$a = new test;
+$a->a++;
+println($a->a);
+`
+	ssatest.CheckPrintlnValue(code, []string{"add(Undefined-$a.a(valid), 1)"}, t)
 }
 
 func TestExperssion_PHP_Scope(t *testing.T) {
@@ -507,4 +522,67 @@ include('syntax/include/include.php');
 		ssatest.MockSSA(t, code)
 	})
 
+}
+
+func TestVariables(t *testing.T) {
+	code := `<?php 
+$a = &$c;
+$fields_meta{1}->a;
+$fields_meta[1]->a;
+$fields_meta{1}{1}->a;
+$fields_meta{1}{1}->a=1;
+$this->{$kind} = [$address, $name];
+$this->{$kind}[] = [$address, $name];
+$d->getMockBuilder();
+a::c()->c();
+a::c()->b;
+$stub = $this->getMockBuilder(SMTP::class)->getMock();
+$a = <<<EOT 
+ac
+EOT;
+`
+	ssatest.CheckPrintlnValue(code, []string{}, t)
+}
+func TestSyntaxClassStatic(t *testing.T) {
+	code := `<?php
+$a = $c::$c;
+$c = $c::${$c->c};
+$a = c::$c;
+$a = c::${$c->c};
+$a = "test"::$c;
+$a = "test"::${$c->c};
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+}
+
+func Test_Array(t *testing.T) {
+	t.Run("array assign1", func(t *testing.T) {
+		code := `<?php
+$validate = "1.2";
+[$validate,$scene]=explode('.',$validate);
+eval($validate);
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`eval(* #-> *  as $param)`,
+			map[string][]string{
+				"param": {"Function-explode", `"."`, `"1.2"`},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("array assign2", func(t *testing.T) {
+		code := `<?php
+	$a = array("1","2");
+	[$validate,$scene]=$a;
+	eval($validate);
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`eval(* #-> *  as $param)`,
+			map[string][]string{
+				"param": {"Function-array", `"2"`, `"1"`},
+			},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }

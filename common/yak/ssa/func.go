@@ -24,7 +24,6 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		anValue:     NewValue(),
-		prog:        p,
 		Params:      make([]Value, 0),
 		hasEllipsis: false,
 		Blocks:      make([]Instruction, 0),
@@ -37,6 +36,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		builder:     nil,
 	}
 	f.SetName(name)
+	f.SetProgram(p)
 
 	if parent != nil {
 		parent.addAnonymous(f)
@@ -55,7 +55,9 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		// }
 	}
 
-	f.EnterBlock = f.NewBasicBlock("entry")
+	enter := f.NewBasicBlock("entry")
+	enter.SetScope(NewScope(f, p.GetProgramName()))
+	f.EnterBlock = enter
 	return f
 }
 
@@ -81,13 +83,6 @@ func (f *Function) SetGeneric(b bool) {
 
 func (f *Function) IsGeneric() bool {
 	return f.isGeneric
-}
-
-func (f *Function) GetProgram() *Program {
-	if f.prog == nil {
-		return nil
-	}
-	return f.prog
 }
 
 func (f *Function) GetFunc() *Function {

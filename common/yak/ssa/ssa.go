@@ -35,6 +35,7 @@ type Instruction interface {
 	SetBlock(*BasicBlock)
 	// program
 	GetProgram() *Program
+	SetProgram(*Program)
 
 	GetName() string
 	SetName(variable string)
@@ -168,9 +169,13 @@ type Program struct {
 	Name        string
 	Version     string
 	ProgramKind ProgramKind // is library or application
+	Language    string
 
+	// from pom.xml file
 	SCAPackages []*dxtypes.Package
+	ExtraFile   map[string]string // filename and data
 
+	Application *Program // current Application
 	// program relationship
 	DownStream map[string]*Program
 	UpStream   map[string]*Program
@@ -218,9 +223,6 @@ type Function struct {
 	isMethod   bool
 	methodName string
 
-	// package, double link
-	prog *Program
-
 	// Type
 	Type *FunctionType
 
@@ -255,6 +257,8 @@ type Function struct {
 	errComment ErrorComment
 
 	// ================  for build
+	// scope id
+	scopeId int
 	// builder
 	builder *FunctionBuilder
 	// this function is variadic parameter, for function type create
@@ -521,6 +525,9 @@ func (p *Parameter) GetDefault() Value {
 }
 
 func (p *Parameter) SetDefault(v Value) {
+	if p == nil {
+		return
+	}
 	p.defaultValue = v
 	v.AddReference(p)
 }

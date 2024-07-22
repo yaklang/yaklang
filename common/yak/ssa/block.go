@@ -2,21 +2,25 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
 func (f *Function) GetDeferBlock() *BasicBlock {
-	if f.DeferBlock == nil {
+	newDefer := func() *BasicBlock {
 		block := f.NewBasicBlockNotAddBlocks("defer")
 		f.DeferBlock = block
+		// TODO: this Scope should be child Scope of other scope in function
+		block.SetScope(NewScope(f, f.GetProgram().GetProgramName()))
 		return block
+	}
+	if f.DeferBlock == nil {
+		return newDefer()
 	}
 	block, ok := f.DeferBlock.(*BasicBlock)
 	if !ok {
 		log.Warnf("defer block is not a basic block")
-		result := f.NewBasicBlockNotAddBlocks("defer")
-		f.DeferBlock = result
-		return result
+		return newDefer()
 	}
 	return block
 }
@@ -37,14 +41,13 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	b := &BasicBlock{
-		anValue:    NewValue(),
-		Preds:      make([]Value, 0),
-		Succs:      make([]Value, 0),
-		Insts:      make([]Instruction, 0),
-		Phis:       make([]Value, 0),
-		Handler:    nil,
-		finish:     false,
-		ScopeTable: NewScope(f.GetProgram().GetProgramName()),
+		anValue: NewValue(),
+		Preds:   make([]Value, 0),
+		Succs:   make([]Value, 0),
+		Insts:   make([]Instruction, 0),
+		Phis:    make([]Value, 0),
+		Handler: nil,
+		finish:  false,
 	}
 	b.SetName(name)
 	b.SetFunc(f)
@@ -75,6 +78,13 @@ func addToBlocks(block *BasicBlock) {
 	block.Index = index
 	f.Blocks = append(f.Blocks, block)
 	block.GetProgram().SetVirtualRegister(block)
+}
+
+func (b *BasicBlock) SetScope(s ScopeIF) {
+	if b.ScopeTable != nil {
+		log.Errorf("block %v already has a scope", b.GetName())
+	}
+	b.ScopeTable = s
 }
 
 /*

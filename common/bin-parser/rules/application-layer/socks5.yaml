@@ -1,0 +1,71 @@
+Package:
+  ClientNegotiation:
+    Version: uint8
+    NMethods: uint8
+    Methods:
+      list: true
+      list-length-from-field: "../NMethods"
+      Method: uint8
+  ServerNegotiation:
+    Version: uint8
+    Method: uint8
+  AuthRequest:
+    Version: uint8
+    ULen: uint8
+    UNAME:
+      type: string
+      length-from-field: ../ULen
+    PLen: uint8
+    PASSWD:
+      type: string
+      length-from-field: ../PLen
+  AuthReply:
+    Version: uint8
+    Status: uint8
+  Request:
+    Version: uint8
+    Command: uint8
+    Reserved: uint8
+    AddressType: uint8
+    DstAddress:
+      operator: |
+        type = getNodeResult("../AddressType").Value
+        switch type{
+          case 0x1:
+            this.ProcessByType("IPV4")
+          case 0x3:
+            this.ProcessByType("Domain")
+          case 0x4:
+            this.ProcessByType("IPV6")
+        }
+    DstPort: uint16
+  Replies:
+    Version: uint8
+    Reply: uint8
+    Reserved: uint8
+    AddressType: uint8
+    BndAddress:
+      operator: |
+        type = getNodeResult("../AddressType").Value
+        switch type{
+          case 0x1:
+            this.ProcessByType("IPV4")
+          case 0x3:
+            this.ProcessByType("Domain")
+          case 0x4:
+            this.ProcessByType("IPV6")
+        }
+    BndPort: uint16
+IPV4:
+  type: raw
+  length: 32
+
+IPV6:
+  type: raw
+  length: 128
+
+Domain:
+  Length: uint8
+  DomainName:
+    type: string
+    length-from-field: ../Length

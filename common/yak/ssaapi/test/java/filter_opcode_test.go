@@ -2,15 +2,17 @@ package java
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestFilterOpcode(t *testing.T) {
 	ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
-		if prog.SyntaxFlowChain(`stream #-> *?{opcode: param}`).Show(false).Len() <= 0 {
+		// prog.SyntaxFlow(`stream #-> $res; res ?{opcode: param} as $param;`).Show()
+		if prog.SyntaxFlowChain(`stream #-> *?{opcode: param}`).Show().Len() <= 0 {
 			t.Fatal("FilterOpcode not found")
 		}
 

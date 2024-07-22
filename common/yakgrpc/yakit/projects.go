@@ -338,7 +338,8 @@ func GetDefaultProject(db *gorm.DB) (*schema.Project, error) {
 }
 
 func GetProjectDetail(db *gorm.DB, id int64) (*schema.BackProject, error) {
-	var req schema.BackProject
+	//var req schema.BackProject
+	var req schema.Project
 	db = db.Model(&schema.Project{})
 	db = db.Select("projects.*, F.project_name as folder_name, C.project_name as child_folder_name")
 	db = db.Where("projects.id = ? and (projects.type = ? or projects.type IS NULL)", id, TypeProject)
@@ -349,7 +350,9 @@ func GetProjectDetail(db *gorm.DB, id int64) (*schema.BackProject, error) {
 		return nil, utils.Errorf("get Project failed: %s", db.Error)
 	}
 
-	return &req, nil
+	return &schema.BackProject{
+		Project: req,
+	}, nil
 }
 
 func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, Type string, id int64) (*schema.Project, error) {
@@ -372,8 +375,15 @@ func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, 
 }
 
 func UpdateProject(db *gorm.DB, id int64, i schema.Project) error {
-	db = db.Model(&schema.Project{}).Where("id = ?", id).Update(i)
-	if db.Error != nil {
+	db = db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
+		"ProjectName":   i.ProjectName,
+		"Description":   i.Description,
+		"DatabasePath":  i.DatabasePath,
+		"Type":          i.Type,
+		"FolderID":      i.FolderID,
+		"ChildFolderID": i.ChildFolderID,
+	})
+	if db.Error != nil || db.RowsAffected == 0 {
 		return utils.Errorf("update project: %s", db.Error)
 	}
 	return nil

@@ -3,11 +3,15 @@ package httptpl
 import (
 	"bufio"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -37,7 +41,7 @@ func _ParseNucleiTag(raw string) []*NucleiTagData {
 	scanner.Split(bufio.ScanBytes)
 	var data []*NucleiTagData
 	var last string
-	var status = "raw"
+	status := "raw"
 	var currentTagContent string
 	var currentContent string
 	handle := func(s string) {
@@ -107,7 +111,26 @@ func CreateYakTemplateFromYakScript(s *schema.YakScript) (*YakTemplate, error) {
 }
 
 func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error) {
-	// 渲染了randstr
+	// 渲染randstr
+	randStrMap := new(sync.Map)
+	randStrVarGenerator := func(varName string) string {
+		if randStrMap == nil {
+		}
+
+		if value, ok := randStrMap.Load(varName); ok {
+			return value.(string)
+		} else {
+			value := uuid.NewString()
+			randStrMap.Store(varName, value)
+			return value
+		}
+	}
+
+	pattern := regexp.MustCompile(`\{\{randstr(_\d+)?\}\}`)
+	tplRaw = pattern.ReplaceAllStringFunc(tplRaw, func(raw string) string {
+		return randStrVarGenerator(raw)
+	})
+
 	//if strings.Contains(tplRaw, "{{") {
 	//	tplRaw = ExpandPreprocessor(tplRaw)
 	//}
@@ -117,7 +140,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			yakTemp.ReverseConnectionNeed = true
 		}
 	}
-	var mid = map[string]interface{}{}
+	mid := map[string]interface{}{}
 	err := yaml.Unmarshal([]byte(tplRaw), &mid)
 	if err != nil {
 		return nil, utils.Errorf("unmarshal nuclei template failed: %v", err)
@@ -208,7 +231,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		reqIns := &YakRequestBulkConfig{
 			Headers: map[string]string{},
 		}
-		//extractConfig(&reqIns.RequestConfig, utils.InterfaceToMapInterface(i))
+		// extractConfig(&reqIns.RequestConfig, utils.InterfaceToMapInterface(i))
 		req := utils.InterfaceToMapInterface(i)
 		matcher, err := generateYakMatcher(req)
 		if err != nil {
@@ -248,7 +271,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		reqIns.AfterRequested = utils.MapGetBool(req, "req-condition")
 		reqIns.AttackMode = utils.MapGetString(req, "attack-mode")
 		reqIns.InheritVariables = utils.MapGetBool(req, "inherit-variables")
-		//reqIns.HotPatchCode = utils.MapGetString(req, "hot-patch-code")
+		// reqIns.HotPatchCode = utils.MapGetString(req, "hot-patch-code")
 
 		reqIns.EnableRedirect, _ = strconv.ParseBool(utils.InterfaceToString(utils.MapGetFirstRaw(req, "host-redirects", "redirects")))
 		reqIns.MaxRedirects = utils.MapGetInt(req, "max-redirects")
@@ -277,7 +300,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	//	return nil, utils.Error("matcher and extractor are both empty")
 	//}
 	yakTemp.HTTPRequestSequences = reqSeq
-	//extractConfig(&yakTemp.RequestConfig, mid)
+	// extractConfig(&yakTemp.RequestConfig, mid)
 	if yakTemp.NoMatcherAndExtractor() {
 		for _, i := range yakTemp.HTTPRequestSequences {
 			if i.Matcher == nil {

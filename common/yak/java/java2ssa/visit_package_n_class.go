@@ -171,7 +171,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		field := ret.(*javaparser.FieldDeclarationContext)
 
 		var fieldType ssa.Type
-		if field.TypeType() == nil {
+		if field.TypeType() != nil {
 			fieldType = y.VisitTypeType(field.TypeType())
 		}
 		_ = fieldType
@@ -180,6 +180,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		for _, variableDeclarator := range variableDeclarators {
 			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
 			name, value := y.VisitVariableDeclarator(v)
+			value.SetType(fieldType)
 			setMember(name, value)
 		}
 
@@ -216,8 +217,7 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 		return nil
 	}
 
-	log.Infof("start to handle type type: %v", i.GetText())
-
+	//log.Infof("start to handle type type: %v", i.GetText())
 	for _, annotation := range i.AllAnnotation() {
 		y.VisitAnnotation(annotation)
 	}
@@ -236,6 +236,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	if y == nil || raw == nil {
 		return nil
 	}
+	log.Infof("class/interface: %v", raw.ToStringTree(raw.GetParser().GetRuleNames(), raw.GetParser()))
 	// todo 类和接口的类型声明
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
@@ -243,6 +244,13 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	if i == nil {
 		return nil
 	}
+	// if len(i.AllIdentifier()) == 1 {
+	// 	// only one type
+	className := i.TypeIdentifier().GetText()
+	if class := y.GetClassBluePrint(className); class != nil {
+		return class
+	}
+	// }
 
 	return nil
 }
@@ -489,6 +497,7 @@ func (y *builder) VisitMethodDeclaration(
 			for _, def := range defCallback {
 				def(newFunction)
 			}
+			class.AddStaticMethod(key, newFunction)
 			//y.AddToPackage(funcName)
 		}
 
@@ -704,6 +713,9 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 }
 
 func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext) (typeCallback, insCallback func(ssa.Value)) {
+	typeCallback = func(ssa.Value) {}
+	insCallback = func(ssa.Value) {}
+
 	if y == nil || raw == nil {
 		return
 	}

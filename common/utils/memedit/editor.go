@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -44,7 +45,27 @@ func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
 
-func (ve *MemEditor) GetUrl() string {
+func (ve *MemEditor) GetFormatedUrl() string {
+	u := ve.fileUrl
+	if strings.HasPrefix(u, "file://") {
+		return u
+	}
+
+	if filepath.IsAbs(ve.fileUrl) {
+		return "file://" + ve.fileUrl
+	}
+
+	raw, err := filepath.Abs(ve.fileUrl)
+	if err != nil {
+		if strings.HasPrefix(ve.fileUrl, "./") {
+			return ve.fileUrl
+		}
+		return "./" + ve.fileUrl
+	}
+	return "file://" + raw
+}
+
+func (ve *MemEditor) GetFilename() string {
 	return ve.fileUrl
 }
 

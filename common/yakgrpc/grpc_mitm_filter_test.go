@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
@@ -31,25 +30,43 @@ func RunMITMTestServer(
 	req *ypb.MITMRequest,
 	onLoad func(mitmClient ypb.Yak_MITMClient),
 ) (host, port string) {
+	return RunMITMTestServerEx(client, ctx, func(mitmClient ypb.Yak_MITMClient) {
+		mitmClient.Send(req)
+	}, onLoad, nil)
+}
+
+func RunMITMTestServerEx(
+	client ypb.YakClient,
+	ctx context.Context,
+	onInit func(mitmClient ypb.Yak_MITMClient),
+	onLoad func(mitmClient ypb.Yak_MITMClient),
+	onRecv func(mitmClient ypb.Yak_MITMClient, msg *ypb.MITMResponse),
+) (host, port string) {
 	stream, err := client.MITM(ctx)
 	if err != nil {
 		panic(err)
 	}
-	stream.Send(req)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	onInit(stream)
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
 			break
 		}
-		msgStr := spew.Sdump(msg)
-		// fmt.Println("MTIM CLIENT RECV: " + msgStr)
-		if strings.Contains(msgStr, `MITM 服务器已启动`) {
-			go func() {
-				defer wg.Done()
-				onLoad(stream)
-			}()
+		if msg.GetHaveMessage() {
+			msgStr := string(msg.GetMessage().GetMessage())
+			if strings.Contains(msgStr, `starting mitm serve`) {
+				if onLoad != nil {
+					go func() {
+						defer wg.Done()
+						onLoad(stream)
+					}()
+				}
+			}
+		}
+		if onRecv != nil {
+			onRecv(stream, msg)
 		}
 	}
 	wg.Wait()
@@ -71,8 +88,8 @@ func Test_ForExcludeBadCase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mitmPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
@@ -87,7 +104,7 @@ func Test_ForExcludeBadCase(t *testing.T) {
 			ExcludeSuffix: []string{".gif"},
 			UpdateFilter:  true,
 		})
-		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
@@ -146,8 +163,8 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mitmPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
@@ -163,7 +180,7 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 			ExcludeUri:    []string{"abc"},
 			UpdateFilter:  true,
 		})
-		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
@@ -218,8 +235,8 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	var mitmPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
@@ -234,7 +251,7 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 			ExcludeSuffix: []string{".aaac", ".zip", ".js"},
 			UpdateFilter:  true,
 		})
-		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.png.zip?ab=1", 0},
@@ -277,7 +294,7 @@ sleep(0.3)
 			IncludeUri:          nil,
 			UpdateFilter:        true,
 		})
-		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
@@ -290,12 +307,12 @@ sleep(0.3)
 			{"cccc", 0},
 			{"ccc", 0},
 			{"cc", 0},
-			{"text/plain", 0},     //text 命中 前半部分
-			{"textplain/test", 1}, //text 无法命中
+			{"text/plain", 0},     // text 命中 前半部分
+			{"textplain/test", 1}, // text 无法命中
 			{"textplain/text", 0}, // text 命中 后半部分
 		} {
-			var path = "/"
-			var contentType = utils.InterfaceToString(ct[0])
+			path := "/"
+			contentType := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
 			token = ksuid.New().String()
 			packet = []byte("GET " + path + "?ct=" + codec.QueryEscape(contentType) + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
@@ -326,7 +343,7 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 		Send   [][]any
 		Count  int
 	}
-	var cases = []Case{
+	cases := []Case{
 		{
 			Filter: &MITMFilterManager{
 				IncludeUri: []string{"abc"},
@@ -363,7 +380,6 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 		}
 		assert.Equal(t, c.Count, count)
 	}
-
 }
 
 func TestGRPCMUSTPASS_WebSocket_Filter_RSP(t *testing.T) {
@@ -381,8 +397,8 @@ func TestGRPCMUSTPASS_WebSocket_Filter_RSP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mitmPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
@@ -390,12 +406,11 @@ func TestGRPCMUSTPASS_WebSocket_Filter_RSP(t *testing.T) {
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMClient) {
-
 		mitmClient.Send(&ypb.MITMRequest{
 			FilterWebsocket:       true,
 			UpdateFilterWebsocket: true,
 		})
-		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		_, err = lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /?%s HTTP/1.1
 Host: %s
 Connection: Upgrade
@@ -410,7 +425,7 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 		case <-sendCompleteCh:
 		}
 		count := yakit.SearchWebsocketFlow(token)
-		//fmt.Println(count)
+		// fmt.Println(count)
 		if count != 0 {
 			cancel()
 			t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
@@ -436,8 +451,8 @@ func TestGRPCMUSTPASS_WebSocket_Filter_REQ(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var mitmPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
@@ -449,7 +464,7 @@ func TestGRPCMUSTPASS_WebSocket_Filter_REQ(t *testing.T) {
 			FilterWebsocket:       true,
 			UpdateFilterWebsocket: true,
 		})
-		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /?%s HTTP/1.1
 Host: %s
 Connection: Upgrade

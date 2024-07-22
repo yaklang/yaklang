@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/antchfx/xmlquery"
 	"github.com/asaskevich/govalidator"
@@ -44,6 +45,7 @@ type FuzzHTTPRequest struct {
 	queryParams            *lowhttp.QueryParams
 	position               lowhttp.HttpParamPositionType
 	mode                   int
+	mutex                  sync.Mutex
 }
 
 func (f *FuzzHTTPRequest) NoAutoEncode() bool {
@@ -452,18 +454,20 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 		opt(config)
 	}
 
-	req := &FuzzHTTPRequest{}
-	req.originRequest = originHttpRequest
-	req.isHttps = config.IsHttps
-	req.source = config.Source
-	req.runtimeId = config.RuntimeId
-	req.proxy = config.Proxy
-	req.noAutoEncode = config.NoAutoEncode
-	req.friendlyDisplay = config.FriendlyDisplay
-	req.queryParams = config.QueryParams
-	req.ctx = config.Ctx
-	req.opts = opts
-	req.mode = packetFuzz
+	req := &FuzzHTTPRequest{
+		originRequest:   originHttpRequest,
+		isHttps:         config.IsHttps,
+		source:          config.Source,
+		runtimeId:       config.RuntimeId,
+		proxy:           config.Proxy,
+		noAutoEncode:    config.NoAutoEncode,
+		friendlyDisplay: config.FriendlyDisplay,
+		queryParams:     config.QueryParams,
+		ctx:             config.Ctx,
+		opts:            opts,
+		mode:            packetFuzz,
+	}
+
 	return req, nil
 }
 

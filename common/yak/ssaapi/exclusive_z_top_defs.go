@@ -87,7 +87,21 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		actx = NewAnalyzeContext(opt...)
 	}
 
+	actx.EnterRecursive()
+	defer func() {
+		actx.ExitRecursive()
+	}()
+
+	// 1w recursive call check
+	if !utils.InGithubActions() {
+		if actx.GetRecursiveCounter() > 10000 {
+			log.Warnf("recursive call is over 10000, stop it")
+			return nil
+		}
+	}
+
 	actx.depth--
+	// log.Infof("depth: %d vs minDepth: %d vs maxDepth: %d", actx.depth, actx.config.MinDepth, actx.config.MaxDepth)
 	defer func() {
 		actx.depth++
 	}()
@@ -120,9 +134,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return m.getTopDefs(actx, opt...)
 			}
 		}
-	}
-	if i.IsMember() && !actx.TheMemberShouldBeVisited(i) {
-		return Values{}
 	}
 
 	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
@@ -163,17 +174,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			// phi is visited...
 			return Values{}
 		}
-		actx.VisitPhi(i)
 
 		conds := inst.GetControlFlowConditions()
 		result := getMemberCall(inst, actx)
 		for _, cond := range conds {
 			v := i.NewValue(cond)
-			ret := v.getTopDefs(actx, opt...)
+			ret := v.AppendEffectOn(i).getTopDefs(actx, opt...)
 			result = append(result, v)
 			result = append(result, ret...)
 		}
-		_ = conds
 		return result
 	case *ssa.Call:
 		caller := inst.Method
@@ -185,77 +194,77 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		callerValue := i.NewValue(caller)
 		_, isFunc := ssa.ToFunction(caller)
 		funcType, isFuncTyp := ssa.ToFunctionType(caller.GetType())
-		if callerValue.IsExtern() {
-			i.AppendDependOn(callerValue)
-			nodes := Values{callerValue}
-			for _, val := range inst.Args {
-				arg := i.NewValue(val)
-				i.AppendDependOn(arg)
-				nodes = append(nodes, arg)
-			}
-			for _, value := range inst.Binding {
-				arg := i.NewValue(value)
-				i.AppendDependOn(arg)
-				nodes = append(nodes, arg)
-			}
-			var results Values
-			for _, subNode := range nodes {
-				if subNode == nil {
-					continue
+		if !callerValue.IsExtern() {
+			switch {
+			case isFunc:
+				callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
+				callerValue.AppendEffectOn(i)
+				err := actx.PushCall(i)
+				if err != nil {
+					log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
+					return Values{i}
 				}
-				// getTopDefs(nil,opt...)第一个参数指定为nil
-				// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
-				vals := subNode.GetTopDefs(opt...).AppendEffectOn(subNode)
-				//vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
-				results = append(results, vals...)
-			}
-			return results
-		}
-		switch {
-		case isFunc:
-			callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-			callerValue.AppendEffectOn(i)
-			err := actx.PushCall(i)
-			if err != nil {
-				log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-				return Values{i}
-			}
-			defer actx.PopCall()
-			// inherit return index
-			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
-			if ok {
-				callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
-			}
-			return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
-		case isFuncTyp:
-			// funcType.ReturnType
-			// string literal member
-			err := actx.PushCall(i)
-			if err != nil {
-				log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-				return Values{i}
-			}
-			defer actx.PopCall()
+				defer actx.PopCall()
+				// inherit return index
+				val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
+				if ok {
+					callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
+				}
+				return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
+			case isFuncTyp:
+				// funcType.ReturnType
+				// string literal member
+				err := actx.PushCall(i)
+				if err != nil {
+					log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
+					return Values{i}
+				}
+				defer actx.PopCall()
 
-			var res Values
-			for _, retIns := range funcType.ReturnValue {
-				for _, traceVal := range retIns.Results {
-					// val, ok := traceVal.GetStringMember(retIndexRawStr)
-					// if ok {
+				var res Values
+				for _, retIns := range funcType.ReturnValue {
+					for _, traceVal := range retIns.Results {
+						// val, ok := traceVal.GetStringMember(retIndexRawStr)
+						// if ok {
+						res = append(res,
+							i.NewValue(traceVal).AppendEffectOn(i).getTopDefs(actx, opt...)...,
+						)
+					}
+				}
+				if len(res) == 0 {
+					// the result from the return value is empty,
+					// get the topDef by the callee
 					res = append(res,
-						i.NewValue(traceVal).AppendEffectOn(i).getTopDefs(actx, opt...)...,
+						callerValue.AppendDependOn(i).getTopDefs(actx, opt...)...,
 					)
 				}
+				return res
 			}
-			if len(res) == 0 {
-				// the result from the return value is empty,
-				// get the topDef by the callee
-				res = append(res,
-					callerValue.AppendDependOn(i).getTopDefs(actx, opt...)...,
-				)
-			}
-			return res
 		}
+		i.AppendDependOn(callerValue)
+		nodes := Values{callerValue}
+		for _, val := range inst.Args {
+			arg := i.NewValue(val)
+			i.AppendDependOn(arg)
+			nodes = append(nodes, arg)
+		}
+		for _, value := range inst.Binding {
+			arg := i.NewValue(value)
+			i.AppendDependOn(arg)
+			nodes = append(nodes, arg)
+		}
+		var results Values
+		for _, subNode := range nodes {
+			if subNode == nil {
+				continue
+			}
+			// getTopDefs(nil,opt...)第一个参数指定为nil
+			// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
+			vals := subNode.GetTopDefs(opt...).AppendEffectOn(subNode)
+			//vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
+			results = append(results, vals...)
+		}
+		return results
 	case *ssa.Function:
 		var vals Values
 		// handle return
@@ -327,48 +336,63 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.ParameterMember:
-		// log.Info("ParameterMember")
-		called := actx.GetCurrentCall()
-		if called == nil {
-			// log.Info("parent function is not called by any other function, skip")
-			var vals Values
-			vals = append(vals, i)
-			// 获取ParameterMember的形参定义
-			obj := inst.GetObject()
-			if obj != nil {
-				if inst.MemberCallKind == ssa.ParameterMemberCall {
-					objValue := i.NewValue(obj)
-					val := objValue.GetFunction().GetParameter(inst.MemberCallObjectIndex)
-					if val != nil {
-						vals = append(vals, val)
-					}
-				} else if inst.MemberCallKind == ssa.FreeValueMemberCall {
-					param := inst.GetFunc().FreeValues[obj.GetName()]
-					val := i.NewValue(param)
-					vals = append(vals, val)
+		var vals Values
+		getParameter := func() Values {
+			log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+			fun := i.GetFunction()
+			switch inst.MemberCallKind {
+			case ssa.ParameterMemberCall:
+				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
+					return para.getTopDefs(actx)
+				}
+			case ssa.FreeValueMemberCall:
+				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
+					return fv.getTopDefs(actx)
 				}
 			}
-			return vals
-		}
-		calledInstance, ok := ssa.ToCall(called.node)
-		if !ok {
-			log.Infof("parent function is not called by any other function, skip (%T)", called)
 			return Values{i}
 		}
-
-		// parameter
-		if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
-			log.Infof("formal parameter member index: %d is out of range", inst.FormalParameterIndex)
-			return getMemberCall(i.node, actx)
+		getCalledByValue := func(called *Value) Values {
+			calledInstance, ok := ssa.ToCall(called.node)
+			if !ok {
+				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
+				return Values{}
+			}
+			var actualParam ssa.Value
+			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
+				return getParameter()
+			}
+			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
+			traced := i.NewValue(actualParam).AppendEffectOn(called)
+			call := actx.PopCall()
+			ret := traced.getTopDefs(actx)
+			if call != nil {
+				actx.PushCall(call)
+			}
+			if len(ret) > 0 {
+				return ret
+			} else {
+				return Values{traced}
+			}
 		}
-		actualParam := calledInstance.ArgMember[inst.FormalParameterIndex]
-		traced := i.NewValue(actualParam).AppendEffectOn(called)
-		if ret := traced.getTopDefs(actx); len(ret) > 0 {
-			return ret
-		} else {
-			return Values{traced}
+		// log.Info("ParameterMember")
+		called := actx.GetCurrentCall()
+		if called != nil {
+			calledByValue := getCalledByValue(called)
+			vals = append(vals, calledByValue...)
 		}
-
+		if actx.config.AllowIgnoreCallStack {
+			if fun := i.GetFunction(); fun != nil {
+				fun.GetCalledBy().ForEach(func(value *Value) {
+					val := getCalledByValue(value)
+					vals = append(vals, val...)
+				})
+			}
+		}
+		if len(vals) == 0 {
+			return getParameter()
+		}
+		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
 		// 查找被调用函数的TopDef
 		getCalledByValue := func(called *Value) Values {
@@ -461,29 +485,20 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}
 	case *ssa.Make:
-		// 根据make的参数查看TopDef
-		// 比如:new String(data)
-		// 会继续往上找data的TopDef
-		getMakeParamTopDef := func() Values {
-			var vals Values
-			params := i.GetFunction().GetParameters()
-			for _, param := range params {
-				if param.GetName() == "this" || param.GetName() == "$this" {
-					continue
-				}
-				vals = append(vals, param.getTopDefs(actx, opt...)...)
-			}
-			return vals
-		}
-
 		var values Values
 		values = append(values, i)
-		for _, member := range inst.GetAllMember() {
+		for key, member := range inst.GetAllMember() {
+			// if key.String() == "__ref__" {
+			// 	continue
+			// }
 			value := i.NewValue(member)
+			if err := actx.PushObject(i, i.NewValue(key), value); err != nil {
+				log.Errorf("push object failed: %v", err)
+				continue
+			}
 			values = append(values, value.getTopDefs(actx, opt...)...)
+			actx.PopObject()
 		}
-		paramVals := getMakeParamTopDef()
-		values = append(values, paramVals...)
 		return values
 	}
 	return getMemberCall(i.node, actx)

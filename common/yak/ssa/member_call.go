@@ -264,6 +264,24 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 }
 
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
+	if utils.IsNil(value) {
+		log.Errorf("BUG: ReadMemberCallVariable from nil ssa.Value: %v", value)
+	}
+	if utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallVariable from nil ssa.Value: %v", key)
+	}
+
+	if utils.IsNil(value) && utils.IsNil(key) {
+		log.Error("BUG: ReadMemberCallVariable's value and key is all nil...")
+		return b.EmitUndefined("")
+	} else if utils.IsNil(value) && !utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallVariable's value is nil, key: %v", key)
+		return b.EmitUndefined("")
+	} else if !utils.IsNil(value) && utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallVariable's key is nil, value: %v", value)
+		return b.EmitUndefined("")
+	}
+
 	program := b.GetProgram()
 
 	// to extern lib
@@ -302,6 +320,7 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		p.SetExtern(true)
 		return p
 	}
+
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
 		name, typ := checkCanMemberCall(value, key)
 		member := b.getOriginMember(name, typ, value, key)
@@ -322,6 +341,9 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 }
 
 func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
+	if object.GetId() == -1 {
+		log.Infof("CreateMemberCallVariable: %v, %v", object.GetName(), key)
+	}
 	if _, ok := ToExternLib(object); ok {
 		name := b.getExternLibMemberCall(object, key)
 		return b.CreateVariable(name)
@@ -342,6 +364,33 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	return ret
 }
 
+// ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员和方法。
+// 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
+func (b *FunctionBuilder) ReadSelfMember(name string) Value {
+	if class := b.MarkedThisClassBlueprint; class != nil {
+		variable := b.GetStaticMember(class.Name, name)
+		if value := b.PeekValueByVariable(variable); value != nil {
+			return value
+		}
+		value, ok := class.StaticMember[name]
+		if ok {
+			return value
+		}
+		member, ok := class.NormalMember[name]
+		if ok {
+			if member.Value != nil {
+				return member.Value
+			}
+		}
+		haveMethod, ok := class.Method[name]
+		if ok {
+			return haveMethod
+		}
+
+	}
+	return nil
+}
+
 func (b *FunctionBuilder) getFieldName(object, key Value) string {
 	name, typ := checkCanMemberCall(object, key)
 	b.getOriginMember(name, typ, object, key) // create undefine member
@@ -349,21 +398,44 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 }
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
-	if b.SupportGetStaticMember {
+	if b.SupportClassStaticModifier {
 		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
+				if b.MarkedIsStaticMethod {
+					if value, ok := blueprint.StaticMethod[key.String()]; ok {
+						return value
+					}
+				}
 				if value, ok := blueprint.StaticMember[key.String()]; ok {
-					object.SelfDelete()
 					return value
+				}
+
+			}
+		}
+		//用于没有实例化类的时候获取静态方法或成员
+		//此时这个这个类为不可用undefined类型（UndefinedValueInValid）
+		if u, ok := object.(*Undefined); ok {
+			if u.Kind == UndefinedValueInValid {
+				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
+					if b.MarkedIsStaticMethod {
+						if value, ok := blueprint.StaticMethod[key.String()]; ok {
+							return value
+						}
+					}
+					if value, ok := blueprint.StaticMember[key.String()]; ok {
+						return value
+					}
 				}
 			}
 		}
+
 	}
 	name, typ := checkCanMemberCall(object, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
 	return b.getOriginMember(name, typ, object, key)
+
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {

@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 )
 
@@ -26,83 +25,55 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 	if y == nil || raw == nil {
 		return ""
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.QualifiedNamespaceNameContext)
 	if i == nil {
 		return ""
 	}
-
-	if i.Namespace() != nil {
-		// declare namespace mode
-		list := i.NamespaceNameList().(*phpparser.NamespaceNameListContext)
-		if ret := list.NamespaceNameTail(); ret != nil {
-
-		}
-		// return y.EmitConstInst(nil)
-		return ""
-	}
-
-	if nameList := i.NamespaceNameList(); nameList != nil {
-		// use namespace mode
-		return y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
-	}
-
-	return ""
+	return raw.GetText()
 }
 
-func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) string {
+func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) []string {
 	if y == nil || raw == nil {
-		return ""
+		return []string{}
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.NamespaceNameListContext)
 	if i == nil {
-		return ""
+		return []string{}
 	}
-
-	// ir := y
-	var lastValue string
-	lastValue = i.GetText()
-	// for _, id := range i.AllIdentifier() {
-	// name := id.GetText()
-	// val := ir.ReadOrCreateVariable(name)
-	// if lastValue != nil {
-	// lastValue = ir.CreateMemberCallVariable(lastValue, val).GetValue()
-	// lastValue =
-	// } else {
-	// 	lastValue = val
-	// }
-	// }
-	// if i.NamespaceNameTail() != nil {
-	// 	log.Warn("namespace tail build unfinished")
-	// }
-	return lastValue
+	var pkg []string
+	for _, identifierContext := range i.AllIdentifier() {
+		pkg = append(pkg, y.VisitIdentifier(identifierContext))
+	}
+	if i.NamespaceNameTail() != nil {
+		pkg = append(pkg, y.VisitNamespaceNameTail(i.NamespaceNameTail()))
+	}
+	return pkg
 }
 
-func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext) interface{} {
+func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext) (c string) {
 	if y == nil || raw == nil {
-		return nil
+		return ""
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.NamespaceNameTailContext)
 	if i == nil {
-		return nil
+		return ""
 	}
-
 	if i.OpenCurlyBracket() != nil {
 		// check {...}
 		for _, tail := range i.AllNamespaceNameTail() {
-			y.VisitNamespaceNameTail(tail)
+			return y.VisitNamespaceNameTail(tail)
 		}
-	} else {
-		// check ... as?
-		for _, id := range i.AllIdentifier() {
-			if ret := y.VisitIdentifier(id); ret != "" {
-				log.Warnf("fetch identifier: %v", ret)
-			}
-		}
-	}
 
-	return nil
+		//todo as 操作
+	} else {
+		return y.VisitIdentifier(i.Identifier(0))
+	}
+	return ""
 }

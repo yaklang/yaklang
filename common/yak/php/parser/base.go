@@ -17,14 +17,18 @@ type PHPLexerBase struct {
 	GrammarFileName string
 
 	// inline
-	_scriptTag         bool
-	_styleTag          bool
-	_phpScript         bool
-	_insideString      bool
-	_htmlNameText      string
-	_prevTokenType     int
+	_scriptTag     bool
+	_styleTag      bool
+	_phpScript     bool
+	_insideString  bool
+	_htmlNameText  string
+	_prevTokenType int
+
+	_startIdentifier   int
+	_endIdentifier     int
 	_heredocIdentifier string
 	_astTags           bool
+	_isVariable        bool
 }
 
 func reflectGetInt(i any, field string) (finalRet int) {
@@ -103,31 +107,62 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 		}
 	default:
 		mode := reflectGetInt(p.BaseLexer, "mode")
-		if mode == PHPLexerHereDoc {
-			if token.GetTokenType() == PHPLexerStartHereDoc || token.GetTokenType() == PHPLexerStartNowDoc {
-				p._heredocIdentifier = strings.ReplaceAll(strings.TrimSpace(token.GetText()[3:]), "'", "")
-			} else if token.GetTokenType() == PHPLexerHereDocText {
-				p.PopMode()
-				var heredocIdentifier = p.GetHeredocEnd(token.GetText())
-				if strings.HasSuffix(strings.TrimSpace(token.GetText()), ";") {
-					var text = heredocIdentifier + ";\n"
-					reflectSetInt(token, "tokenType", PHPLexerSemiColon)
-					token.SetText(text)
-				} else {
-					token = p.BaseLexer.NextToken()
-					token.SetText(heredocIdentifier + ";\n")
-				}
-			}
-		} else if mode == PHPLexerPHP {
+		if mode == PHPLexerPHP {
 			if reflectGetInt(p.BaseLexer, "channel") == antlr.TokenHiddenChannel {
 				p._prevTokenType = token.GetTokenType()
 			}
 		}
+		//if mode == PHPLexerHereDoc {
+		//	if token.GetTokenType() == PHPLexerStartNowDoc {
+		//		p._heredocIdentifier = strings.ReplaceAll(strings.TrimSpace(token.GetText()[3:]), "'", "")
+		//	} else if token.GetTokenType() == PHPLexerHereDocText {
+		//		var heredocIdentifier = p.GetHeredocEnd(token.GetText())
+		//		if strings.HasSuffix(strings.TrimSpace(token.GetText()), ";") {
+		//			var text = heredocIdentifier + ";\n"
+		//			reflectSetInt(token, "tokenType", PHPLexerSemiColon)
+		//			token.SetText(text)
+		//		} else {
+		//			token = p.BaseLexer.NextToken()
+		//			token.SetText(heredocIdentifier + ";\n")
+		//		}
+		//	}
+		//} else{}
 
 	}
 	return token
 }
 
+func (p *PHPLexerBase) startRecordHereDocLabel() {
+	stream := p.GetInputStream()
+	p._startIdentifier = stream.Index()
+}
+
+func (p *PHPLexerBase) endRecordHereDocLabel() {
+	stream := p.GetInputStream()
+	p._endIdentifier = stream.Index()
+	if p._endIdentifier > 1 {
+		p._endIdentifier -= 1
+	}
+	p._heredocIdentifier = stream.GetText(p._startIdentifier, p._endIdentifier)
+	p._startIdentifier = 0
+	p._endIdentifier = 0
+}
+
+func (p *PHPLexerBase) DocIsEnd() bool {
+	if p._heredocIdentifier == "" {
+		return false
+	}
+	count := len(p._heredocIdentifier) - 1
+	stream := p.GetInputStream()
+	end := stream.Index() - 1
+	if end <= count {
+		return false
+	}
+	start := end - count
+	text := stream.GetText(start, end)
+	result := strings.TrimSpace(text) == p._heredocIdentifier
+	return result
+}
 func (p *PHPLexerBase) GetHeredocEnd(i string) string {
 	return strings.TrimRight(strings.TrimSpace(i), ";")
 }
@@ -177,6 +212,16 @@ func (p *PHPLexerBase) ShouldPushHereDocMode(i int) bool {
 	return t == '\r' || t == '\n'
 }
 
+func (p *PHPLexerBase) PushVariables() {
+	p._isVariable = true
+}
+
+func (p *PHPLexerBase) IsVariables() bool {
+	return p._isVariable
+}
+func (p *PHPLexerBase) PopVariables() {
+	p._isVariable = false
+}
 func (p *PHPLexerBase) IsCurlyDollar(i int) bool {
 	return p.GetInputStream().LA(i) == '$'
 }

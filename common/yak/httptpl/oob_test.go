@@ -56,7 +56,7 @@ tcp:
 		WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 			return "adf.dnslog.mock", "adf", nil
 		}),
-		WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
+		WithOOBRequireCheckingTrigger(func(s string, runtimeID string, f ...float64) (string, []byte) {
 			if s == "adf" {
 				return "dns", []byte("")
 			}

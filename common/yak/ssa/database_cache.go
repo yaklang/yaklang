@@ -3,10 +3,7 @@ package ssa
 import (
 	"time"
 
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
-
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -43,7 +40,7 @@ type Cache struct {
 	DB               *gorm.DB
 	id               *atomic.Int64
 	InstructionCache *utils.CacheWithKey[int64, instructionIrCode] // instructionID to instruction
-	VariableCache    *utils.CacheWithKey[string, []Instruction]    // variable(name:string) to []instruction
+	VariableCache    map[string][]Instruction                      // variable(name:string) to []instruction
 	Class2InstIndex  map[string][]Instruction
 }
 
@@ -55,28 +52,27 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		ttl = time.Second * 8
 	}
 
-	instructionCache := utils.NewTTLCacheWithKey[int64, instructionIrCode](ttl)
-	variableCache := utils.NewTTLCacheWithKey[string, []Instruction](ttl)
 	cache := &Cache{
 		ProgramName:      programName,
-		InstructionCache: instructionCache,
-		VariableCache:    variableCache,
+		InstructionCache: utils.NewTTLCacheWithKey[int64, instructionIrCode](ttl),
+		VariableCache:    make(map[string][]Instruction),
 		Class2InstIndex:  make(map[string][]Instruction),
 	}
 
 	if databaseEnable {
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
-		instructionCache.SetCheckExpirationCallback(func(key int64, inst instructionIrCode) bool {
+		cache.InstructionCache.SetCheckExpirationCallback(func(key int64, inst instructionIrCode) bool {
 			return cache.saveInstruction(inst)
-		})
-		variableCache.SetCheckExpirationCallback(func(key string, value []Instruction) bool {
-			return cache.saveVariable(key, value)
 		})
 	} else {
 		cache.id = atomic.NewInt64(0)
 	}
 
 	return cache
+}
+
+func (c *Cache) HaveDatabaseBackend() bool {
+	return c.DB != nil && c.ProgramName != ""
 }
 
 // =============================================== Instruction =======================================================
@@ -89,7 +85,7 @@ func (c *Cache) SetInstruction(inst Instruction) {
 
 	var id int64
 	var instIr instructionIrCode
-	if c.DB != nil {
+	if c.HaveDatabaseBackend() {
 		// use database
 		rawID, irCode := ssadb.RequireIrCode(c.DB, c.ProgramName)
 		id = int64(rawID)
@@ -116,7 +112,7 @@ func (c *Cache) DeleteInstruction(inst Instruction) {
 // GetInstruction : get instruction from cache.
 func (c *Cache) GetInstruction(id int64) Instruction {
 	ret, ok := c.InstructionCache.Get(id)
-	if !ok && c.DB != nil {
+	if !ok && c.HaveDatabaseBackend() {
 		// if no in cache, get from database
 		// if found in database, create a new lazy instruction
 		return c.newLazyInstruction(id)
@@ -127,78 +123,46 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 
 // =============================================== Variable =======================================================
 
-func (c *Cache) HaveDatabaseBackend() bool {
-	return c.DB != nil && c.ProgramName != ""
-}
-
 func (c *Cache) GetByVariable(name string) []Instruction {
-	ret, ok := c.VariableCache.Get(name)
-	if !ok && c.DB != nil {
+	ret, ok := c.VariableCache[name]
+	if !ok && c.HaveDatabaseBackend() {
 		// get from database
-		irVariable, err := ssadb.GetVariable(c.DB, c.ProgramName, name)
-		if err != nil {
-			return ret
+		// TODO: this code should be need?
+		ret = make([]Instruction, 0)
+		for i := range ssadb.ExactSearchVariable(c.DB, ssadb.NameMatch, name) {
+			ret = append(ret, c.newLazyInstruction(i))
 		}
-		ret = lo.Map(irVariable.InstructionID, func(id int64, _ int) Instruction {
-			return c.newLazyInstruction(id)
-		})
-		c.VariableCache.Set(name, ret)
+		c.VariableCache[name] = ret
 	}
 	return ret
 }
 
-func (c *Cache) SetVariable(name string, instructions []Instruction) {
-	c.VariableCache.Set(name, instructions)
-}
-
 func (c *Cache) AddVariable(name string, inst Instruction) {
-	c.VariableCache.Set(name, append(c.GetByVariable(name), inst))
+	data := c.GetByVariable(name)
+	data = append(data, inst)
+	c.VariableCache[name] = data
+	if c.HaveDatabaseBackend() {
+		SaveVariableIndex(inst, name)
+	}
 }
 
 func (c *Cache) RemoveVariable(name string, inst Instruction) {
 	insts := c.GetByVariable(name)
 	insts = utils.RemoveSliceItem(insts, inst)
-	c.SetVariable(name, insts)
-}
-
-func (c *Cache) ForEachVariable(handle func(string, []Instruction)) {
-	c.VariableCache.ForEach(handle)
+	c.VariableCache[name] = insts
 }
 
 func (c *Cache) AddClassInstance(name string, inst Instruction) {
-	// log.Errorf("AddClassInstance: %s : %v", name, inst)
-	// if _, ok := c.Class2InstIndex[name]; !ok {
-	// 	c.Class2InstIndex[name] = make([]Instruction, 0, 1)
-	// }
 	c.Class2InstIndex[name] = append(c.Class2InstIndex[name], inst)
-}
-
-func (c *Cache) GetClassInstance(name string) []Instruction {
-	return c.Class2InstIndex[name]
-}
-
-var (
-	_SSASaveIrCodeCost uint64
-)
-
-func GetSSASaveIrCodeCost() time.Duration {
-	return time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeCost))
-}
-
-func ShowDatabaseCacheCost() {
-	log.Infof("SSA Database SaveIrCode Cost: %v", GetSSASaveIrCodeCost())
-	log.Infof("SSA Database SaveVariable Cost: %v", ssadb.GetSSAVariableCost())
-	log.Infof("SSA Database SaveSourceCode Cost: %v", ssadb.GetSSASourceCodeCost())
-	log.Infof("SSA Database SaveType Cost: %v", ssadb.GetSSASaveTypeCost())
-	log.Infof("SSA Database SaveScope Cost: %v", ssautil.GetSSAScopeTimeCost())
-	log.Infof("SSA Database CacheToDatabase Cost: %v", GetSSACacheToDatabaseCost())
-	log.Infof("SSA DB Cache DEBUG Cost: %v", GetSSACacheIterationCost())
+	if c.HaveDatabaseBackend() {
+		SaveClassIndex(inst, name)
+	}
 }
 
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
 func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
-	if c.DB == nil {
+	if !c.HaveDatabaseBackend() {
 		log.Errorf("BUG: saveInstruction called when DB is nil")
 		return false
 	}
@@ -235,38 +199,6 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	return true
 }
 
-func (c *Cache) saveVariable(variable string, insts []Instruction) bool {
-	if c.DB == nil {
-		log.Errorf("BUG: saveVariable called when DB is nil")
-		return false
-	}
-	if err := ssadb.SaveVariable(c.DB, c.ProgramName, variable, lo.Map(insts, func(ins Instruction, _ int) ssadb.SSAValue {
-		return ins
-	})); err != nil {
-		log.Errorf("SaveVariable error: %v", err)
-		return false
-	}
-	return true
-}
-
-func (c *Cache) saveClassInstance(name string, insts []Instruction) {
-	if c.DB == nil {
-		log.Errorf("BUG: saveClassInstance called when DB is nil")
-		return
-	}
-	if err := ssadb.SaveClassInstance(c.DB, c.ProgramName, name,
-		lo.Map(insts, func(inst Instruction, _ int) int64 {
-			if inst == nil {
-				log.Errorf("BUG: saveClassInstance called with nil instruction %v", name)
-				return -1
-			}
-			return inst.GetId()
-		}),
-	); err != nil {
-		log.Errorf("SaveClassInstance error: %v", err)
-	}
-}
-
 var (
 	_SSACacheToDatabaseCost uint64
 	_SSACacheIterationCost  uint64
@@ -281,7 +213,7 @@ func GetSSACacheIterationCost() time.Duration {
 }
 
 func (c *Cache) SaveToDatabase() {
-	if c.DB == nil {
+	if !c.HaveDatabaseBackend() {
 		return
 	}
 
@@ -295,19 +227,6 @@ func (c *Cache) SaveToDatabase() {
 
 	for _, instIR := range insturctionCache {
 		c.saveInstruction(instIR)
-	}
-
-	variableCache := c.VariableCache.GetAll()
-	c.VariableCache.Close()
-
-	insIterStart := time.Now()
-	for variable, insts := range variableCache {
-		c.saveVariable(variable, insts)
-	}
-	syncAtomic.AddUint64(&_SSACacheIterationCost, uint64(time.Now().Sub(insIterStart).Nanoseconds()))
-
-	for name, insts := range c.Class2InstIndex {
-		c.saveClassInstance(name, insts)
 	}
 }
 

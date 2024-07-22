@@ -89,7 +89,7 @@ func (s *SFFrameResult) String() string {
 					if ssaRange != nil {
 						start, end := ssaRange.GetStart(), ssaRange.GetEnd()
 						editor := ssaRange.GetEditor()
-						fileName := editor.GetUrl()
+						fileName := editor.GetFilename()
 						if fileName == "" {
 							var err error
 							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
@@ -97,7 +97,7 @@ func (s *SFFrameResult) String() string {
 								log.Warn(err)
 							}
 							if editor != nil {
-								fileName = editor.GetUrl()
+								fileName = editor.GetFilename()
 								if fileName == "" {
 									fileName = `[md5:` + editor.SourceCodeMd5() + `]`
 								}
@@ -121,4 +121,30 @@ func (s *SFFrameResult) Copy() *SFFrameResult {
 	ret.SymbolTable = s.SymbolTable.Copy()
 	ret.AlertSymbolTable = s.AlertSymbolTable
 	return ret
+}
+
+func (s *SFFrameResult) Name() string {
+	for _, name := range []string{
+		"title", "name", "desc", "description",
+	} {
+		result, ok := s.Description.Get(name)
+		if !ok {
+			continue
+		}
+		return result
+	}
+	return utils.ShrinkString(s.String(), 40)
+}
+
+func (s *SFFrameResult) GetDescription() string {
+	for _, name := range []string{
+		"desc", "description", "help",
+	} {
+		result, ok := s.Description.Get(name)
+		if !ok {
+			continue
+		}
+		return result
+	}
+	return "no description field set"
 }

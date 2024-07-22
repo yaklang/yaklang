@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
 func NewCall(target Value, args []Value, binding map[string]Value, block *BasicBlock) *Call {
@@ -73,8 +74,8 @@ func (c *Call) handlerGeneric() {
 
 	// binding generic type
 	isVariadic := fType.IsVariadic
-	genericTypeMap := make(map[string]Type, len(genericTypes))
-	paramsType := make([]Type, fType.ParameterLen)
+	instanceTypeMap := make(map[string]Type, len(genericTypes))
+	paramsType := slices.Clone(fType.Parameter)
 	returnType := fType.ReturnType
 
 	hasError := false
@@ -99,21 +100,34 @@ func (c *Call) handlerGeneric() {
 			}
 		}
 
-		errMsg := BindingGenericTypeWithRealType(argTyp, fType.Parameter[index], genericTypeMap)
+		errMsg := BindingGenericTypeWithRealType(argTyp, fType.Parameter[index], instanceTypeMap)
 		if errMsg != "" && !hasError {
 			hasError = true
 			c.NewError(Error, SSATAG, errMsg)
+		}
+	}
+	// fallback
+	for typ := range genericTypes {
+		if _, ok := instanceTypeMap[typ.String()]; !ok {
+			instanceTypeMap[typ.String()] = GetAnyType()
+		}
+	}
+
+	// if not enough parameter, apply generic type as any type
+	if len(c.Args) < fType.ParameterLen {
+		for i := len(c.Args); i < fType.ParameterLen; i++ {
+			paramsType[i] = ApplyGenericType(paramsType[i], instanceTypeMap)
 		}
 	}
 
 	// calculate cache name
 	var nameBuilder strings.Builder
 	nameBuilder.WriteString(newMethod.GetName())
-	keys := lo.Keys(genericTypeMap)
+	keys := lo.Keys(instanceTypeMap)
 	sort.Strings(keys)
 	for _, k := range keys {
 		nameBuilder.WriteRune('-')
-		nameBuilder.WriteString(genericTypeMap[k].String())
+		nameBuilder.WriteString(instanceTypeMap[k].String())
 	}
 	name := nameBuilder.String()
 
@@ -125,7 +139,7 @@ func (c *Call) handlerGeneric() {
 
 	if value, ok := prog.GetCacheExternInstance(name); !ok {
 		// apply generic type
-		returnType = ApplyGenericType(returnType, genericTypeMap)
+		returnType = ApplyGenericType(returnType, instanceTypeMap)
 		// create new function type and set cache
 		newFuncTyp := NewFunctionType(newMethod.GetName(), paramsType, returnType, fType.IsVariadic)
 		newMethod = NewFunctionWithType(newMethod.GetName(), newFuncTyp)

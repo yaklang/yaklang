@@ -127,4 +127,7 @@ type ValueOperator interface {
 	Remove(...ValueOperator) (ValueOperator, error)
 
 	AppendPredecessor(ValueOperator, ...AnalysisContextOption) error
+
+	// fileFilter
+	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
 }

@@ -4,19 +4,21 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"net/http"
-	"net/url"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestMockTest_SmokingTest(t *testing.T) {
@@ -1202,6 +1204,71 @@ requests:
 	}
 }
 
+func TestMockTest_Extractor_BasicCase_Matcher_RandStr(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	hasToken1, hasToken2 := false, false
+	token := ""
+	server, port := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(req)
+		if err == nil {
+			token = reqIns.URL.Query().Get("token")
+			if len(token) > 0 {
+				hasToken1 = true
+			}
+			token2 := reqIns.URL.Query().Get("token2")
+			if len(token) > 0 {
+				hasToken2 = true
+				token = token + token2
+			}
+		}
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(token), token))
+	})
+	spew.Dump(server, port)
+
+	tpl := `id: test1
+info:
+  name: test1
+  author: v1ll4n
+
+requests:
+  - raw:
+    - |
+      GET /?token={{randstr}}&token2={{randstr_1}} HTTP/1.1
+      Host: {{Hostname}}
+
+    req-condition: true
+    matchers:
+      - type: word
+        words:
+          - "{{randstr}}"
+          - "123"
+      - type: status
+        status:    
+          - 200
+`
+	expected := true
+
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tpl)
+	if err != nil {
+		panic(err)
+	}
+
+	checked := false
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		checked = true
+	}))
+	_, err = ytpl.Exec(
+		config, false,
+		[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
+	)
+
+	require.Equal(t, expected, checked)
+	require.True(t, hasToken1, "no randstr token")
+	require.True(t, hasToken2, "no randstr_1 token")
+}
+
 func TestMockTest_Extractor_BasicCase_Matcher_StatusCode(t *testing.T) {
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
@@ -1238,7 +1305,7 @@ requests:
         words:
           - ">aaa</"
       - type: status
-        status:	
+        status:    
           - 200
           - 500
 
@@ -1292,7 +1359,7 @@ func TestMockTest_Extractor_BasicCase_Matcher_Raw(t *testing.T) {
 	/*
 
 
-		# Enhanced by mp on 2022/05/11
+	   # Enhanced by mp on 2022/05/11
 
 	*/
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
@@ -1405,6 +1472,7 @@ requests:
 		}
 	}
 }
+
 func TestRenderPackage(t *testing.T) {
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
@@ -1518,6 +1586,7 @@ User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 	}
 }
+
 func TestMockTest_OOB(t *testing.T) {
 	dnsserver := facades.MockDNSServer(context.Background(), "aaa.asdgiqwfkbas.com", 8901, func(record string, domain string) string {
 		return "1.1.1.1"
@@ -1582,7 +1651,7 @@ http:
 	ok := false
 	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 		return "a.aaa.asdgiqwfkbas.com", "token", nil
-	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
+	}), WithOOBRequireCheckingTrigger(func(s string, runtimeID string, f ...float64) (string, []byte) {
 		if s == "token" {
 			ok = true
 			return "dns", []byte("")
@@ -1594,6 +1663,7 @@ http:
 		t.Error("test oob error")
 	}
 }
+
 func TestMockTest_Body(t *testing.T) {
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
@@ -1674,6 +1744,7 @@ http:
 		}
 	}
 }
+
 func TestMockTest_StopAtFirstMatch(t *testing.T) {
 	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
@@ -1772,14 +1843,15 @@ func TestMockTest_interactsh(t *testing.T) {
 	interactshProtocol := make(map[string]string)
 	interactshRequest := make(map[string][][]byte)
 
-	dnsServer := facades.MockDNSServer(context.Background(), rootDomain, 8902, func(record string, domain string) string {
+	port := utils.GetRandomAvailableUDPPort()
+	dnsServer := facades.MockDNSServer(context.Background(), rootDomain, port, func(record string, domain string) string {
 		if strings.Contains(domain, token) {
 			interactshProtocol[token] = "dns"
 		}
 		return "127.0.0.1"
 	})
 
-	_, httpServerPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	httpServerHost, httpServerPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, token) {
 			interactshProtocol[token] = "http"
@@ -1853,7 +1925,8 @@ http:
 	ok := false
 	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 		return fmt.Sprintf("%s:%d", tokenDomain, httpServerPort), token, nil
-	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) (string, []byte) {
+	}), WithOOBRequireCheckingTrigger(func(s string, runtimeID string, f ...float64) (string, []byte) {
+		log.Infof("interactsh protocol:%v\n", interactshProtocol[s])
 		if interactshProtocol[s] == "http" {
 			for _, request := range interactshRequest[s] {
 				if strings.Contains(string(request), sendToken) {
@@ -1865,77 +1938,11 @@ http:
 		ok = false
 		return "", []byte("")
 	}))
+	log.Infof("vul http server:%s:%d\n", server, port)
+	log.Infof("interactsh http server:%s:%d\n", httpServerHost, httpServerPort)
+	log.Infof("interactsh dns server:%s\n", dnsServer)
 	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
 	if !ok {
 		t.Error("test oob error")
 	}
 }
-
-//
-//func TestMockTest_OOBAAAA(t *testing.T) {
-//
-//	server, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-//		writer.Write([]byte("ok"))
-//		u := request.URL.Query().Get("consumerUri")
-//		urlIns, err := url.Parse(u)
-//		if err != nil {
-//			t.Fatal(err)
-//			return
-//		}
-//		//netx.LookupFirst(urlIns.Host, netx.WithTimeout(time.Second), netx.WithDNSDisableSystemResolver(true))
-//		poc.DoGET(urlIns.String())
-//	})
-//	tmp := `id: CVE-2017-9506
-//
-//info:
-//  name: Atlassian Jira IconURIServlet - Cross-Site Scripting/Server-Side Request Forgery
-//  author: pdteam
-//  severity: medium
-//  description: The Atlassian Jira IconUriServlet of the OAuth Plugin from version 1.3.0 before version 1.9.12 and from version 2.0.0 before version 2.0.4 contains a cross-site scripting vulnerability which allows remote attackers to access the content of internal network resources and/or perform an attack via Server Side Request Forgery.
-//  remediation: |
-//    Apply the latest security patches provided by Atlassian to mitigate these vulnerabilities.
-//  reference:
-//    - http://dontpanic.42.nl/2017/12/there-is-proxy-in-your-atlassian.html
-//    - https://ecosystem.atlassian.net/browse/OAUTH-344
-//    - https://medium.com/bugbountywriteup/piercing-the-veil-server-side-request-forgery-to-niprnet-access-171018bca2c3
-//    - https://nvd.nist.gov/vuln/detail/CVE-2017-9506
-//  classification:
-//    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
-//    cvss-score: 6.1
-//    cve-id: CVE-2017-9506
-//    cwe-id: CWE-918
-//    epss-score: 0.00575
-//    epss-percentile: 0.75469
-//    cpe: cpe:2.3:a:atlassian:oauth:1.3.0:*:*:*:*:*:*:*
-//  metadata:
-//    max-request: 1
-//    vendor: atlassian
-//    product: oauth
-//    shodan-query: http.component:"Atlassian Jira"
-//  tags: cve,cve2017,atlassian,jira,ssrf,oast
-//
-//http:
-//  - raw:
-//      - |
-//        GET /plugins/servlet/oauth/users/icon-uri?consumerUri=http://{{interactsh-url}} HTTP/1.1
-//        Host: {{Hostname}}
-//        Origin: {{BaseURL}}
-//
-//    matchers:
-//      - type: word
-//        part: interactsh_protocol # Confirms the HTTP Interaction
-//        words:
-//          - "http"
-//
-//# digest: 4a0a0047304502203f149b24ebd177d43629ee418d28fc0878939ccdd4283537cbaced55a753b59f0221008b8e75e9de7c7ddd6fd2ffe85e574fc9b523f0980011ed7a71df7e6d8475ec4a:922c64590222798bb761d5b6d8e72950`
-//	tmpIns, err := CreateYakTemplateFromNucleiTemplateRaw(tmp)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	ok := false
-//	config := NewConfig()
-//	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
-//	if !ok {
-//		t.Error("test oob error")
-//	}
-//}

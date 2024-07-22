@@ -17,6 +17,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/matchers"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -1265,4 +1267,35 @@ func ToJavaOverLongString(str []byte, l int) []byte {
 	default:
 		return str
 	}
+}
+
+func IsPlainText(raw []byte) bool {
+	typ, _ := filetype.Match(raw)
+	if typ == filetype.Unknown {
+		return true
+	}
+
+	if _, ok := matchers.Application[typ]; ok {
+		return false
+	}
+	if _, ok := matchers.Archive[typ]; ok {
+		return false
+	}
+	if _, ok := matchers.Video[typ]; ok {
+		return false
+	}
+	if _, ok := matchers.Audio[typ]; ok {
+		return false
+	}
+	if _, ok := matchers.Image[typ]; ok {
+		return false
+	}
+	if _, ok := matchers.Document[typ]; ok {
+		return false
+	}
+	if _, ok := matchers.Font[typ]; ok {
+		return false
+	}
+
+	return true
 }

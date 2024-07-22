@@ -3,6 +3,10 @@ package tests
 import (
 	"embed"
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +20,52 @@ var syntaxFs embed.FS
 
 func validateSource(t *testing.T, filename string, src string) {
 	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
+		errListener := antlr4util.NewErrorListener()
+		lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
+		lexer.RemoveErrorListeners()
+		lexer.AddErrorListener(errListener)
+		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+		source := tokenStream.GetTokenSource()
+		for {
+			t := source.NextToken()
+			if t == nil || t.GetTokenType() == antlr.TokenEOF {
+				break
+			}
+			ty := t.GetTokenType()
+			switch t.GetText() {
+			case "=":
+				fmt.Print("ASSIGN ")
+				switch ty {
+				case phpparser.PHPLexerEq:
+					fmt.Print("EQ ")
+				case phpparser.PHPLexerHtmlEquals:
+					fmt.Print("HTML_EQ ")
+				}
+			case "<<<":
+				fmt.Print("HEREDOC ")
+				if ty != phpparser.PHPLexerStartNowDoc {
+					fmt.Print("NOT_START_NOWDOC BAD... ")
+				}
+			case "EOF":
+				fmt.Print("EOF ")
+				switch ty {
+				case phpparser.PHPLexerHereDocIdentiferName:
+					fmt.Print("HERE_DOC_NAME ")
+				}
+			case "\nEOF":
+				fmt.Print("HERE DOC END ")
+				if ty != phpparser.PHPLexerEndDoc {
+					fmt.Print("NOT_END_NOWDOC BAD... ")
+				}
+			}
+			fmt.Println(t)
+		}
+
+		if errListener.GetErrorString() != "" {
+			t.Fatalf("Lexer failed: %v", errListener.GetErrorString())
+		}
+		spew.Dump(errListener.GetErrors())
+
 		_, err := php2ssa.FrondEnd(src, false)
 		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
 	})
@@ -160,4 +210,35 @@ echo "Script execution completed.\n";
 `
 	_ = code
 	// ssatest.MockSSA(t, code)
+}
+
+func TestValidatePHPHereDoc(t *testing.T) {
+	validateSource(t, "", `<?php
+
+
+	$abb = <<<EOF
+Hello World
+EOF."CCCCCCCC";
+
+
+
+?>
+`)
+}
+
+func TestValidatePHPHereDoc_1(t *testing.T) {
+	validateSource(t, "", `<?php
+ $aaa=<<<EOT 
+ac
+EOT;
+`)
+}
+
+func TestValidatePHPHereWithVariableDoc(t *testing.T) {
+	validateSource(t, "", `<?php
+	$var=<<<EOF
+Hello World $var1
+EOF;
+?>
+`)
 }

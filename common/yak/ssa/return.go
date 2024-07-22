@@ -101,11 +101,7 @@ func (b *FunctionBuilder) Finish() {
 		deferBlock := b.GetDeferBlock()
 		b.CurrentBlock = deferBlock
 		for _, i := range b.deferExpr {
-			if len(deferBlock.Insts) == 0 {
-				deferBlock.Insts = append(deferBlock.Insts, i)
-			} else {
-				deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, Instruction(i), 0)
-			}
+			b.EmitCall(i)
 		}
 		b.deferExpr = []*Call{}
 

@@ -6,7 +6,76 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/score_rules"
 )
+
+func TestScoreRulesDefineFunction(t *testing.T) {
+	t.Run("test implement define function in mitm, but empty ", func(t *testing.T) {
+		checkScore(t,
+			`
+			mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+			}
+			`,
+			[]string{
+				score_rules.FunctionEmpty("mirrorHTTPFlow"),
+				"empty block",
+			},
+			0,
+			"mitm")
+	})
+
+	t.Run("test no implement define function in mitm", func(t *testing.T) {
+		funcs := []string{
+			"hijackSaveHTTPFlow",
+			"hijackHTTPResponse",
+			"hijackHTTPResponseEx",
+			"hijackHTTPRequest",
+			"mirrorNewWebsitePathParams",
+			"mirrorNewWebsitePath",
+			"mirrorNewWebsite",
+			"mirrorFilteredHTTPFlow",
+			"mirrorHTTPFlow",
+		}
+
+		checkScore(t,
+			` a= 1`,
+			[]string{
+				score_rules.LeastImplementOneFunctions(funcs),
+			},
+			0,
+			"mitm")
+	})
+
+	t.Run("test implement define function in mitm", func(t *testing.T) {
+		checkScore(t,
+			` 
+			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
+				a = 1
+			}
+			`,
+			[]string{},
+			100,
+			"mitm")
+	})
+
+	t.Run("test duplicate define function in mitm", func(t *testing.T) {
+		checkScore(t,
+			` 
+			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
+				a = 1
+			}
+			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
+				b = 1
+			}
+			`,
+			[]string{
+				rules.DuplicateFunction("hijackSaveHTTPFlow"),
+				rules.DuplicateFunction("hijackSaveHTTPFlow"),
+			},
+			0,
+			"mitm")
+	})
+}
 
 func TestRulesDefineFunction(t *testing.T) {
 	t.Run("test no implement define function in codec", func(t *testing.T) {
@@ -33,68 +102,6 @@ func TestRulesDefineFunction(t *testing.T) {
 			"codec",
 		)
 	})
-	t.Run("test implement define function in mitm, but empty ", func(t *testing.T) {
-		check(t,
-			`
-			mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-			}
-			`,
-			[]string{
-				rules.FunctionEmpty("mirrorHTTPFlow"),
-				"empty block",
-			},
-			"mitm")
-	})
-
-	t.Run("test no implement define function in mitm", func(t *testing.T) {
-		funcs := []string{
-			"hijackSaveHTTPFlow",
-			"hijackHTTPResponse",
-			"hijackHTTPResponseEx",
-			"hijackHTTPRequest",
-			"mirrorNewWebsitePathParams",
-			"mirrorNewWebsitePath",
-			"mirrorNewWebsite",
-			"mirrorFilteredHTTPFlow",
-			"mirrorHTTPFlow",
-		}
-
-		check(t,
-			` a= 1`,
-			[]string{
-				rules.LeastImplementOneFunctions(funcs),
-			},
-			"mitm")
-	})
-
-	t.Run("test implement define function in mitm", func(t *testing.T) {
-		check(t,
-			` 
-			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
-				a = 1
-			}
-			`,
-			[]string{},
-			"mitm")
-	})
-
-	t.Run("test duplicate define function in mitm", func(t *testing.T) {
-		check(t,
-			` 
-			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
-				a = 1
-			}
-			hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
-				b = 1
-			}
-			`,
-			[]string{
-				rules.DuplicateFunction("hijackSaveHTTPFlow"),
-				rules.DuplicateFunction("hijackSaveHTTPFlow"),
-			},
-			"mitm")
-	})
-
 	t.Run("test use and define function", func(t *testing.T) {
 		check(t, `
 		_test_ = () => {

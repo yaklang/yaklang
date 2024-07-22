@@ -1,10 +1,8 @@
 package php2ssa
 
 import (
-	"strconv"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -51,7 +49,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	defer recoverRange()
 
 	if raw.GetText() == "" {
-		return nil
+		return y.EmitConstInst("")
 	}
 
 	switch ret := raw.(type) {
@@ -59,112 +57,71 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		// 浅拷贝，一个对象
 		// 如果类定义了 __clone，就执行 __clone
 		target := y.VisitExpression(ret.Expression())
-		y.CreateIfBuilder().SetCondition(func() ssa.Value {
-			return y.EmitBinOp(
-				ssa.OpNotEq,
-				y.ReadOrCreateMemberCallVariable(target, y.EmitConstInst("__clone")),
-				y.EmitConstInstNil(),
-			)
-		}, func() {
-			// have __clone
-			calling := y.NewCall(
-				y.ReadOrCreateMemberCallVariable(target, y.EmitConstInst("__clone")),
-				nil,
-			)
-			y.EmitCall(calling)
-		}).Build()
-		return nil
-	case *phpparser.VariableExpressionContext:
-		id := y.VisitVariable(ret.Variable())
-		return y.ReadValue(id)
-	case *phpparser.CodeExecExpressionContext:
-		var code string
-		value := y.VisitExpression(ret.Expression())
-		if value.GetType().GetTypeKind() == ssa.StringTypeKind {
-			if unquote, err := strconv.Unquote(value.String()); err != nil {
-				code = value.String()
-			} else {
-				code = unquote
-			}
-			// 应该考虑更多情况
-			code = `<?php ` + code + ";"
-			if err := y.GetProgram().Build("Exec-"+uuid.NewString(), memedit.NewMemEditor(code), y.FunctionBuilder); err != nil {
-				log.Errorf("execute code %v failed", code)
-			}
-		} else {
-			var execFunction string
-			if ret.Assert() != nil {
-				execFunction = "assert"
-			} else {
-				execFunction = "eval"
-			}
-			readValue := y.ReadValue(execFunction)
-			call := y.NewCall(readValue, []ssa.Value{value})
-			return y.EmitCall(call)
+		val, ok := target.GetStringMember("__clone")
+		if !ok {
+			return target
 		}
-		return y.EmitConstInstNil()
+		return y.EmitCall(y.NewCall(val, nil))
+	case *phpparser.VariableExpressionContext:
+		return y.VisitRightValue(ret.FlexiVariable())
+	case *phpparser.MemerCallExpressionContext:
+		obj := y.VisitExpression(ret.Expression())
+		key := y.VisitMemberCallKey(ret.MemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	//case *phpparser.CodeExecExpressionContext:
+	//	var code string
+	//	value := y.VisitExpression(ret.Expression())
+	//	if value.GetType().GetTypeKind() == ssa.StringTypeKind {
+	//		if unquote, err := strconv.Unquote(value.String()); err != nil {
+	//			code = value.String()
+	//		} else {
+	//			code = unquote
+	//		}
+	//		// 应该考虑更多情况
+	//		code = `<?php ` + code + ";"
+	//		if err := y.GetProgram().Build("Exec-"+uuid.NewString(), memedit.NewMemEditor(code), y.FunctionBuilder); err != nil {
+	//			log.Errorf("execute code %v failed", code)
+	//		}
+	//	} else {
+	//		var execFunction string
+	//		if ret.Assert() != nil {
+	//			execFunction = "assert"
+	//		} else {
+	//			execFunction = "eval"
+	//		}
+	//		readValue := y.ReadValue(execFunction)
+	//		call := y.NewCall(readValue, []ssa.Value{value})
+	//		return y.EmitCall(call)
+	//	}
+	//	return y.EmitConstInstNil()
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.IndexCallExpressionContext: // $a[1]
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		if key == nil {
+			return obj
+		}
 		return y.ReadMemberCallVariable(obj, key)
 	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		if key == nil {
+			return obj
+		}
 		return y.ReadMemberCallVariable(obj, key)
-	case *phpparser.MemberCallExpressionContext: // $a->b
-		obj := y.VisitExpression(ret.Expression())
-		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
-	case *phpparser.SliceCallAssignmentExpressionContext: // $a[1] = expr
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
-		member := y.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(1))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.AssignVariable(member, rightValue)
-		return rightValue
-	case *phpparser.SliceCallAutoAssignmentExpressionContext: // $a[] = expr
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		//key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
-		key := y.EmitUndefined("-1")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		log.Warn("TBD: $a[] = expr; auto assign for slice")
-		member := y.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(1))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.AssignVariable(member, rightValue)
-		return rightValue
-	case *phpparser.FieldMemberCallAssignmentExpressionContext: // $a->b = expr
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		member := y.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(1))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.AssignVariable(member, rightValue)
-		return rightValue
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction
 		y.isFunction = true
 		defer func() {
 			y.isFunction = tmp
 		}()
-
 		fname := y.VisitExpression(ret.Expression())
 		if ret, isConst := ssa.ToConst(fname); isConst {
-			funcName := ret.VarString()
-			fname = y.ReadValue(funcName)
+			if ret != nil {
+				funcName := ret.VarString()
+				fname = y.ReadValue(funcName)
+			}
 		}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
 		callInst := y.NewCall(fname, args)
@@ -203,7 +160,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.PrefixIncDecExpressionContext:
 		// variable := y.variable
 		// val := y.VisitExpression(ret.Expression())
-		variable := y.VisitLeftVariable(ret.LeftVariable())
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
 		val := y.ReadValueByVariable(variable)
 		if ret.Inc() != nil {
 			after := y.EmitBinOp(ssa.OpAdd, val, y.EmitConstInst(1))
@@ -217,7 +174,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return y.EmitConstInstNil()
 	case *phpparser.PostfixIncDecExpressionContext:
-		variable := y.VisitLeftVariable(ret.LeftVariable())
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
 		val := y.ReadValueByVariable(variable)
 		if ret.Inc() != nil {
 			after := y.EmitBinOp(ssa.OpAdd, val, y.EmitConstInst(1))
@@ -235,8 +192,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		callInst := y.NewCall(caller, []ssa.Value{args})
 		return y.EmitCall(callInst)
 	case *phpparser.ArrayCreationExpressionContext:
-		// arrayCreation
-		return y.VisitArrayCreation(ret.ArrayCreation())
+		creation, i := y.VisitArrayCreation(ret.ArrayCreation())
+		obj := y.EmitMakeWithoutType(y.EmitConstInst(i), y.EmitConstInst(i))
+		for _, values := range creation {
+			key, value := values[0], values[1]
+			variable := y.ReadOrCreateMemberCallVariable(obj, key).GetLastVariable()
+			y.AssignVariable(variable, value)
+		}
+		return obj
 	case *phpparser.ScalarExpressionContext: // constant / string / label / php literal
 		if i := ret.Constant(); i != nil {
 			return y.VisitConstant(i)
@@ -312,12 +275,15 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			o = ssa.OpAdd
 		default:
 			log.Errorf("unexpected op: %v", opStr)
-			return nil
+			return y.EmitUndefined("")
 		}
 		return y.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
 		// instanceof
-		panic("NOT IMPL")
+		log.Error("InstanceOfExpressionContext unfinished")
+		log.Error("InstanceOfExpressionContext unfinished")
+		log.Error("InstanceOfExpressionContext unfinished")
+		y.EmitUndefined("")
 	case *phpparser.ComparisonExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "<<":
@@ -409,7 +375,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if leftValue := y.VisitExpression(ret.Expression(0)); leftValue.IsUndefined() {
 			return y.VisitExpression(ret.Expression(1)) // 如果是undefined就返回1
 		} else {
-			return nil
+			return leftValue
 		}
 	case *phpparser.DefinedOrScanDefinedExpressionContext:
 		return y.VisitDefineExpr(ret.DefineExpr())
@@ -432,11 +398,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.ArrayCreationUnpackExpressionContext:
 		// [$1, $2, $3] = $arr;
 		// unpacking
-		log.Errorf("unpack unfinished")
-		return nil
-
+		creation := y.VisitLeftArrayCreation(ret.LeftArrayCreation())
+		expression := y.VisitExpression(ret.Expression())
+		for _, variable := range creation {
+			y.AssignVariable(variable, expression) //连接上数据流
+		}
+		return y.EmitConstInstNil()
 	case *phpparser.OrdinaryAssignmentExpressionContext:
-		variable := y.VisitLeftVariable(ret.LeftVariable())
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.AssignVariable(variable, rightValue)
@@ -505,42 +474,23 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 
 	// TODO: static class member
+	// 静态方法调用
 	case *phpparser.StaticClassAccessExpressionContext:
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
+		variable, _, _ := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
+		//return y.ReadValueByVariable(member)
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.AssignVariable(variable, rightValue)
 		return rightValue
 	}
-	raw.GetText()
-	log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
-	return nil
-}
-
-func (y *builder) VisitAssignable(raw phpparser.IAssignableContext) ssa.Value {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.AssignableContext)
-	if i == nil {
-		return nil
-	}
-
-	if i.Chain() != nil {
-		return y.VisitChain(i.Chain())
-	} else if i.ArrayCreation() != nil {
-		return y.VisitArrayCreation(i.ArrayCreation())
-	} else {
-		log.Errorf("cannot build leftValue Assignable with: %v", i.Chain().GetText())
-		return nil
-	}
+	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
+	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
+	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
+	return y.EmitConstInstNil()
 }
 
 func (y *builder) VisitChainList(raw phpparser.IChainListContext) []ssa.Value {
@@ -561,6 +511,27 @@ func (y *builder) VisitChainList(raw phpparser.IChainListContext) []ssa.Value {
 	return tmpValue
 }
 
+func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.ChainContext)
+	if i == nil {
+		return nil
+	}
+	if i.FlexiVariable() != nil {
+		return y.VisitLeftVariable(i.FlexiVariable())
+	}
+	if i.StaticClassExprVariableMember() != nil {
+		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		return member
+	}
+	return nil
+}
+
 func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -572,12 +543,7 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
-
-	origin := y.VisitChainOrigin(i.ChainOrigin())
-	for _, m := range i.AllMemberAccess() {
-		origin = y.VisitMemberAccess(origin, m)
-	}
-	return origin
+	return y.VisitRightValue(i.FlexiVariable())
 }
 
 func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAccessContext) ssa.Value {
@@ -608,18 +574,14 @@ func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	i, _ := raw.(*phpparser.KeyedFieldNameContext)
-	if i == nil {
-		return nil
-	}
+	i := raw.(*phpparser.KeyedFieldNameContext)
 
 	if i.KeyedSimpleFieldName() != nil {
-		y.VisitKeyedSimpleFieldName(i.KeyedSimpleFieldName())
+		return y.VisitKeyedSimpleFieldName(i.KeyedSimpleFieldName())
 	} else if i.KeyedVariable() != nil {
-		y.VisitKeyedVariable(i.KeyedVariable())
+		return y.VisitKeyedVariable(i.KeyedVariable())
 	}
-
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
 func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Value {
@@ -660,7 +622,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 
 	for _, a := range i.AllSquareCurlyExpression() {
 		v := y.VisitSquareCurlyExpression(a)
-		if v == nil {
+		if v != nil {
 			varMain = y.ReadOrCreateMemberCallVariable(varMain, v)
 		}
 	}
@@ -668,7 +630,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	return varMain
 }
 
-func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameContext) interface{} {
+func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -680,19 +642,23 @@ func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameC
 		return nil
 	}
 
+	var val ssa.Value
 	if i.Identifier() != nil {
-		v := y.VisitIdentifier(i.Identifier())
-		_ = v
+		val = y.EmitConstInst(y.VisitIdentifier(i.Identifier()))
 	} else if i.Expression() != nil {
-		v := y.VisitExpression(i.Expression())
-		_ = v
+		val = y.VisitExpression(i.Expression())
+	} else {
+		val = y.EmitEmptyContainer()
 	}
 
 	for _, sce := range i.AllSquareCurlyExpression() {
-		y.VisitSquareCurlyExpression(sce)
+		v := y.VisitSquareCurlyExpression(sce)
+		if v != nil {
+			val = y.ReadOrCreateMemberCallVariable(val, v)
+		}
 	}
 
-	return nil
+	return val
 }
 
 func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressionContext) ssa.Value {
@@ -717,7 +683,12 @@ func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressio
 
 				// 现在，$a 包含 "apple", "banana", "cherry"
 			*/
-			log.Warnf("PHP $a[...] call empty")
+			// call len
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Errorf("UNIMPLEMTED SquareCurlyExpressionContext like a[] = ...: %v", raw.GetText())
+			log.Error("PHP $a[...] call empty")
 			return y.EmitUndefined("$var[]")
 		}
 	} else {
@@ -763,7 +734,8 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 
 	if ret := i.QualifiedNamespaceName(); ret != nil {
 		text := y.VisitQualifiedNamespaceName(ret)
-		return y.ReadValue(text)
+		_ = text
+		//return y.ReadValue(text)
 	} else if ret := i.ChainBase(); ret != nil {
 		return y.VisitChainBase(ret)
 	} else if ret := i.ClassConstant(); ret != nil {
@@ -814,7 +786,9 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 		return nil
 	}
 	if ret := i.QualifiedStaticTypeRef(); ret != nil {
-		panic("NOT IMPL")
+		log.Error(`QualifiedStaticTypeRef unfinished`)
+		log.Error(`QualifiedStaticTypeRef unfinished`)
+		log.Error(`QualifiedStaticTypeRef unfinished`)
 	} else {
 		var ret ssa.Value
 		for _, i := range i.AllKeyedVariable() {
@@ -829,47 +803,30 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 	return nil
 }
 
-func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ssa.Value {
+func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ([][2]ssa.Value, int) {
 	if y == nil || raw == nil {
-		return nil
+		return [][2]ssa.Value{}, 0
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ArrayCreationContext)
 	if i == nil {
-		return nil
+		return [][2]ssa.Value{}, 0
 	}
-
-	var l int
-
-	if ret := i.ArrayItemList(); ret != nil {
-		itemList := ret.(*phpparser.ArrayItemListContext)
-		l = len(itemList.AllArrayItem())
-	}
-
-	obj := y.EmitMakeWithoutType(y.EmitConstInst(l), y.EmitConstInst(l))
-
-	if ret := i.ArrayItemList(); ret != nil {
-		for _, kv := range y.VisitArrayItemList(ret.(*phpparser.ArrayItemListContext)) {
-			k, v := kv[0], kv[1]
-			variable := y.ReadOrCreateMemberCallVariable(obj, k).GetLastVariable()
-			y.AssignVariable(variable, v)
-		}
-	}
-	return obj
+	return y.VisitArrayItemList(i.ArrayItemList())
 }
 
-func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) [][2]ssa.Value {
+func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) ([][2]ssa.Value, int) {
 	if y == nil || raw == nil {
-		return nil
+		return [][2]ssa.Value{}, 0
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ArrayItemListContext)
 	if i == nil {
-		return nil
+		return [][2]ssa.Value{}, 0
 	}
 
 	countIndex := 0
@@ -884,14 +841,15 @@ func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) [][2]s
 		kv := [2]ssa.Value{k, v}
 		results = append(results, kv)
 	}
-	return results
+	return results, countIndex
 }
 
 func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) (ssa.Value, ssa.Value) {
 	if y == nil || raw == nil {
 		return nil, nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*phpparser.ArrayItemContext)
 	if i == nil {
 		return nil, nil
@@ -977,25 +935,44 @@ func (y *builder) VisitAttribute(raw phpparser.IAttributeContext) interface{} {
 	return nil
 }
 
-func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) ssa.Value {
+func (y *builder) VisitLeftArrayCreation(raw phpparser.ILeftArrayCreationContext) []*ssa.Variable {
+	if y == nil || raw == nil {
+		return []*ssa.Variable{}
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	arraycreation := raw.(*phpparser.LeftArrayCreationContext)
+	return y.VisitArrayDestructuring(arraycreation.ArrayDestructuring())
+}
+func (y *builder) VisitArrayDestructuring(raw phpparser.IArrayDestructuringContext) []*ssa.Variable {
+	if y == nil || raw == nil {
+		return []*ssa.Variable{}
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	arrayDest, ok := raw.(*phpparser.ArrayDestructuringContext)
+	if !ok {
+		return []*ssa.Variable{}
+	}
+	var result = make([]*ssa.Variable, 0)
+	for _, itemContext := range arrayDest.AllIndexedDestructItem() {
+		item := y.VisitIndexDestructItem(itemContext)
+		result = append(result, item)
+	}
+	return result
+}
+
+func (y *builder) VisitIndexDestructItem(raw phpparser.IIndexedDestructItemContext) *ssa.Variable {
 	if y == nil || raw == nil {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
-	i, _ := raw.(*phpparser.StringConstantContext)
-	if i == nil {
+	arrayDest, ok := raw.(*phpparser.IndexedDestructItemContext)
+	if !ok {
 		return nil
 	}
-
-	//ret := y.ReadVariable(i.GetText(), false)
-	//if ret == nil {
-	//	return y.EmitConstInst(i.GetText())
-	//}
-
-	// return ret
-	return nil
+	return y.VisitChainLeft(arrayDest.Chain())
 }
 
 type arrayKeyValuePair struct {
@@ -1018,9 +995,14 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	if ret := i.ArrayItemList(); ret != nil {
 		//    | Array '(' (arrayItemList ','?)? ')'
 		//    | '[' (arrayItemList ','?)? ']'
-		results := y.VisitArrayItemList(ret)
-		lnc := len(results)
-		array := y.EmitMakeWithoutType(y.EmitConstInst(lnc), y.EmitConstInst(lnc))
+		results, l := y.VisitArrayItemList(ret)
+		array := y.EmitMakeWithoutType(y.EmitConstInst(l), y.EmitConstInst(l))
+		obj := y.EmitMakeWithoutType(y.EmitConstInst(i), y.EmitConstInst(i))
+		for _, values := range results {
+			k, v := values[0], values[1]
+			variable := y.CreateMemberCallVariable(obj, k)
+			y.AssignVariable(variable, v)
+		}
 		for _, v := range results {
 			key, value := v[0], v[1]
 			variable := y.ReadOrCreateMemberCallVariable(array, key).GetLastVariable()
@@ -1034,6 +1016,8 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 			return y.EmitUnOp(ssa.OpNeg, val)
 		}
 		return y.EmitUnOp(ssa.OpPlus, val)
+	} else if ret := i.Expression(); ret != nil {
+		return y.VisitExpression(ret)
 	} else {
 		var initVal ssa.Value
 		for _, c := range i.AllConstantString() {
@@ -1141,27 +1125,77 @@ func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.V
 	return rightValue
 }
 
-func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Variable {
+// VisitLeftVariable
+func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Variable {
 	if y == nil || raw == nil {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
-	i, ok := raw.(*phpparser.LeftVariableContext)
-	if !ok {
+	//todo $_POST{}、$_POST[] 这两种情况
+	switch i := raw.(type) {
+	case *phpparser.CustomVariableContext:
+		return y.CreateVariable(
+			y.VisitVariable(i.Variable()),
+		)
+	case *phpparser.IndexVariableContext:
+		value := y.VisitRightValue(i.FlexiVariable())
+		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
+			return y.CreateMemberCallVariable(value, key)
+		} else {
+			return y.VisitLeftVariable(i.FlexiVariable())
+		}
+	case *phpparser.IndexLegacyCallVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
+			return y.VisitLeftVariable(i.FlexiVariable())
+		} else {
+			return y.CreateMemberCallVariable(obj, key)
+		}
+	case *phpparser.MemberVariableContext:
+		value := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitMemberCallKey(i.MemberCallKey())
+		member := y.CreateMemberCallVariable(value, key)
+		return member
+	default:
 		return nil
 	}
+}
 
-	return y.CreateVariable(
-		y.VisitVariable(i.Variable()),
-	)
+// flexivariable读右值
+func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	switch i := raw.(type) {
+	case *phpparser.CustomVariableContext:
+		variable := y.VisitVariable(i.Variable())
+		return y.ReadValue(variable)
+	case *phpparser.IndexVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	case *phpparser.IndexLegacyCallVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	case *phpparser.MemberVariableContext:
+		obj := y.VisitRightValue(i.FlexiVariable())
+		key := y.VisitMemberCallKey(i.MemberCallKey())
+		return y.ReadMemberCallVariable(obj, key)
+	default:
+		return nil
+	}
 }
 
 func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	switch ret := raw.(type) {
 	case *phpparser.NormalVariableContext:
 		return ret.VarName().GetText()
@@ -1210,7 +1244,16 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
 		once = true
 	}
-	if value := y.VisitExpression(i.Expression()); value.IsUndefined() {
+	expr := i.Expression()
+	value := y.VisitExpression(expr)
+	if utils.IsNil(value) {
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		return y.EmitUndefined(expr.GetText())
+	}
+	if value.IsUndefined() {
 	} else {
 		file := value.String()
 		if err := y.BuildFilePackage(file, once); err != nil {

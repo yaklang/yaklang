@@ -23,7 +23,7 @@ func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Prog
 	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt(pluginType)...)
 	test.Nil(err)
 	prog.Show()
-	gotErr := yak.StaticAnalyzeYaklang(code, pluginType)
+	gotErr := yak.StaticAnalyzeYaklang(code, yak.WithStaticAnalyzePluginType(pluginType))
 	got := lo.Map(gotErr, func(res *result.StaticAnalyzeResult, _ int) string {
 		return res.Message
 	})
@@ -35,6 +35,32 @@ func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Prog
 	test.Equal(len(want), len(got))
 
 	test.Equal(want, got)
+
+	return prog
+}
+
+func checkScore(t *testing.T, code string, want []string, score int, typ ...string) *ssaapi.Program {
+	pluginType := "yak"
+	if len(typ) != 0 {
+		pluginType = typ[0]
+	}
+	test := assert.New(t)
+
+	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt(pluginType)...)
+	test.Nil(err)
+	prog.Show()
+	results := yak.StaticAnalyzeYaklang(code, yak.WithStaticAnalyzePluginType(pluginType), yak.WithStaticAnalyzeKindScore())
+	got := lo.Map(results, func(res *result.StaticAnalyzeResult, _ int) string {
+		return res.Message
+	})
+
+	sort.Strings(want)
+	log.Info("want: ", want)
+	sort.Strings(got)
+	log.Info("got: ", got)
+	test.Equal(len(want), len(got))
+	test.Equal(want, got)
+	test.Equal(score, result.CalculateScoreFromResults(results))
 
 	return prog
 }

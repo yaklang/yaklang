@@ -2,7 +2,11 @@ package yakcmds
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,11 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
-
-type languageCtx struct {
-	hit     int64
-	matched []string
-}
 
 var SSACompilerCommands = []*cli.Command{
 	{
@@ -142,14 +141,14 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("start to compile file: %v ", target)
 			if input_language != "" {
 				input_language = strings.ToLower(input_language)
-				var language ssaapi.Language
+				var language consts.Language
 				switch strings.ToLower(input_language) {
 				case "javascript", "js":
 					language = ssaapi.JS
 				case "yak", "yaklang":
 					language = ssaapi.Yak
 				default:
-					language = ssaapi.Language(input_language)
+					language = consts.Language(input_language)
 				}
 				log.Infof("start to use language: %v", language)
 				opt = append(opt, ssaapi.WithLanguage(language))
@@ -249,8 +248,126 @@ var SSACompilerCommands = []*cli.Command{
 		},
 	},
 	{
+		Name:    "syntaxflow-export",
+		Aliases: []string{"sf-export", "esf"},
+		Usage:   "export SyntaxFlow rule to file system",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "output,o",
+				Usage: "output file path",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			if c.String("output") == "" {
+				return utils.Error("output file is required")
+			}
+			local := filesys.NewLocalFs()
+			results, _ := io.ReadAll(sfdb.Export())
+			if len(results) <= 0 {
+				return utils.Error("no rule found")
+			}
+			return local.WriteFile(c.String("output"), results, 0o666)
+		},
+	},
+	{
+		Name:    "syntaxflow-import",
+		Usage:   "import SyntaxFlow rule from file system",
+		Aliases: []string{"sf-import", "isf"},
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "file,f,i",
+				Usage: "file path",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			if c.String("file") == "" {
+				return utils.Error("file is required")
+			}
+			file, err := os.Open(c.String("file"))
+			if err != nil {
+				return utils.Wrap(err, "open file failed")
+			}
+			err = sfdb.Import(file)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+	{
+		Name:    "syntaxflow-save",
+		Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
+		Usage:   "save SyntaxFlow rule to database",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "filesystem,f",
+				Usage: "file system for MVP",
+			},
+			cli.StringFlag{
+				Name: "rule,r",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			count := 0
+			err := filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				count++
+				if count > 50 {
+					return utils.Error("too many files")
+				}
+				// size > 2M will be ignored
+				if info.Size() > 2*1024*1024 {
+					return utils.Errorf("file %v size too large", s)
+				}
+				return nil
+			}))
+			if err != nil {
+				return utils.Wrap(err, "read mvp file system failed")
+			}
+
+			memfs := filesys.NewVirtualFs()
+			local := filesys.NewLocalFs()
+			err = filesys.Recursive(c.String("filesystem"), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				raw, err := local.ReadFile(s)
+				if err != nil {
+					return nil
+				}
+				memfs.AddFile(s, string(raw))
+				return nil
+			}))
+			if err != nil {
+				return err
+			}
+
+			contentRaw, _ := local.ReadFile(c.String("rule"))
+			if len(contentRaw) > 0 {
+				err = sfdb.ImportValidRule(memfs, c.String("rule"), string(contentRaw))
+				if err != nil {
+					log.Warnf("import rule failed: %v", err)
+				}
+				return nil
+			}
+
+			entrys, err := utils.ReadDir(c.String("rule"))
+			if err != nil {
+				return err
+			}
+			for _, entry := range entrys {
+				contentRaw, _ := local.ReadFile(entry.Path)
+				if len(contentRaw) <= 0 {
+					continue
+				}
+				err = sfdb.ImportValidRule(memfs, entry.Path, string(contentRaw))
+				if err != nil {
+					log.Warnf("import rule failed: %v", err)
+					continue
+				}
+			}
+			return nil
+		},
+	},
+	{
 		Name:    "ssa-query",
-		Aliases: []string{"sf", "syntaxFlow"},
+		Aliases: []string{"sf", "syntaxFlow", "sf-scan"},
 		Usage:   "Use SyntaxFlow query SSA OpCodes from database",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "log", Usage: "log level"},
@@ -280,6 +397,9 @@ var SSACompilerCommands = []*cli.Command{
 			cli.BoolFlag{
 				Name: "with-code,code", Usage: "show code context",
 			},
+			cli.StringFlag{
+				Name: "sarif,sarif-export,o", Usage: "export SARIF format to files",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -293,20 +413,57 @@ var SSACompilerCommands = []*cli.Command{
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
 
+			sarifFile := c.String("sarif")
+			if sarifFile != "" {
+				if filepath.Ext(sarifFile) != ".sarif" {
+					sarifFile += ".sarif"
+				}
+			}
+
+			haveSarifRequired := false
+			if sarifFile != "" {
+				haveSarifRequired = true
+			}
+			var results []*sfvm.SFFrameResult
+			var sarifCallback func(result *sfvm.SFFrameResult)
+			if haveSarifRequired {
+				sarifCallback = func(result *sfvm.SFFrameResult) {
+					results = append(results, result)
+				}
+			} else {
+				sarifCallback = func(result *sfvm.SFFrameResult) {
+
+				}
+			}
+
+			defer func() {
+				if len(results) > 0 && sarifFile != "" {
+					log.Infof("fetch result: %v, exports sarif to %v", len(results), sarifFile)
+					report, err := ssaapi.ConvertSyntaxFlowResultToSarif(results...)
+					if err != nil {
+						log.Errorf("convert SARIF failed: %v", err)
+						return
+					}
+					if utils.GetFirstExistedFile(sarifFile) != "" {
+						backup := sarifFile + ".bak"
+						os.Rename(sarifFile, backup)
+						os.RemoveAll(sarifFile)
+					}
+					err = report.WriteFile(sarifFile)
+					if err != nil {
+						log.Errorf("write SARIF failed: %v", err)
+					}
+				}
+			}()
+
 			if syntaxFlow != "" {
-				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 			}
 
 			var dirChecking []string
 
-			handleByFilename := func(filename string) error {
-				log.Infof("start to use SyntaxFlow rule: %v", filename)
-				raw, err := os.ReadFile(filename)
-				if err != nil {
-					return utils.Wrapf(err, "read %v failed", filename)
-				}
-				syntaxFlow = string(raw)
-				err = SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
+			handleBySyntaxFlowContent := func(syntaxFlow string) error {
+				err := SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 				if err != nil {
 					return err
 				}
@@ -314,8 +471,18 @@ var SSACompilerCommands = []*cli.Command{
 				return nil
 			}
 
+			handleByFilename := func(filename string) error {
+				log.Infof("start to use SyntaxFlow rule: %v", filename)
+				raw, err := os.ReadFile(filename)
+				if err != nil {
+					return utils.Wrapf(err, "read %v failed", filename)
+				}
+				return handleBySyntaxFlowContent(string(raw))
+			}
+
 			var errs []error
-			for _, originName := range c.Args() {
+			var cmdArgs []string = c.Args()
+			for _, originName := range cmdArgs {
 				name := utils.GetFirstExistedFile(originName)
 				if name == "" {
 					infos, _ := utils.ReadDir(originName)
@@ -359,6 +526,31 @@ var SSACompilerCommands = []*cli.Command{
 				}
 			}
 
+			if len(cmdArgs) <= 0 {
+				prog, err := ssaapi.FromDatabase(programName)
+				if err != nil {
+					log.Errorf("load program [%v] from database failed: %v", programName, err)
+					return err
+				}
+
+				// use database
+				db := consts.GetGormProfileDatabase()
+				expected := []string{""}
+				for _, l := range utils.PrettifyListFromStringSplitEx(prog.GetLanguage(), ",") {
+					if l == "" {
+						continue
+					}
+					expected = append(expected, l)
+				}
+				db = bizhelper.ExactQueryStringArrayOr(db, "language", expected)
+				for result := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
+					err := handleBySyntaxFlowContent(result.Content)
+					if err != nil {
+						errs = append(errs, err)
+					}
+				}
+			}
+
 			if len(errs) > 0 {
 				var buf bytes.Buffer
 				for i, e := range errs {
@@ -378,6 +570,7 @@ func SyntaxFlowQuery(
 	programName, databaseFileRaw string,
 	syntaxFlow string,
 	dbDebug, sfDebug, showDot, withCode bool,
+	callbacks ...func(*sfvm.SFFrameResult),
 ) error {
 	// set database
 	if databaseFileRaw != "" {
@@ -415,6 +608,12 @@ func SyntaxFlowQuery(
 	}
 	if result == nil {
 		return execError
+	}
+
+	if result.SFFrameResult != nil {
+		for _, c := range callbacks {
+			c(result.SFFrameResult)
+		}
 	}
 
 	log.Infof("syntax flow query result:")
@@ -473,7 +672,7 @@ func show(r ssaapi.Values) {
 			},
 		)
 		log.Infof("%s:%s \nIR: %d: %s\n%s\n",
-			editor.GetUrl(), codeRange.String(),
+			editor.GetFilename(), codeRange.String(),
 			v.GetId(), v.String(),
 			ctxText,
 		)

@@ -280,6 +280,11 @@ BooleanAnd       : '&&';
 NullCoalescing      : '??';
 NullCoalescingEqual : '??=';
 
+//StartNowDoc: '<<<' [ \t]* (
+//    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
+//    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
+//  ) '\r'? '\n' -> pushMode(HereDoc);
+StartNowDoc: '<<<' -> pushMode(HereDocIdentifer);
 ShiftLeft          : '<<';
 ShiftRight         : '>>';
 DoubleColon        : '::';
@@ -328,10 +333,10 @@ BackQuoteString   : '`' ~'`'* '`';
 SingleQuoteString : '\'' (~('\'' | '\\') | '\\' .)* '\'';
 DoubleQuote       : '"' -> pushMode(InterpolationString);
 
-StartNowDoc:
-    '<<<' [ \t]* '\'' NameString '\'' { this.ShouldPushHereDocMode(1) }? -> pushMode(HereDoc)
-;
-StartHereDoc : '<<<' [ \t]* NameString { this.ShouldPushHereDocMode(1) }? -> pushMode(HereDoc);
+//StartNowDoc: '<<<' [ \t]* (
+//    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |
+//    ('\'' {this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()} '\'')
+//  ) '\n' -> pushMode(HereDoc);
 ErrorPhp     : .                       -> channel(ErrorLexem);
 
 mode InterpolationString;
@@ -354,10 +359,15 @@ PHPEndSingleLineComment : '?' '>';
 CommentQuestionMark     : '?'    -> type(Comment), channel(PhpComments);
 CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from comment.
 
-mode HereDoc;
-// TODO: interpolation for heredoc strings.
+mode HereDocIdentifer;
+HereDocIdentiferWhite: [ \r\t] -> skip;
+HereDocIdentiferName: ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) | ('\'' ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) '\'');
+HereDocIdentifierBreak: '\n' -> popMode,pushMode(HereDoc);
 
-HereDocText: ~[\r\n]*? ('\r'? '\n' | '\r');
+mode HereDoc;
+EndDoc: '\n' Label {this.DocIsEnd()}? ->popMode;
+HereDocText: '\n' | (~[\n]+) ;
+HereDocVariable: '$' Label;
 
 // fragments.
 // '<?=' will be transformed to 'echo' token.

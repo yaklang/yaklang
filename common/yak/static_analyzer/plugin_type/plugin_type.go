@@ -38,13 +38,14 @@ type (
 )
 
 type PluginTypeAnalyzer struct {
-	SSAOptCollectors map[PluginType]SSAOptCollector
-	CheckRulers      map[PluginType][]CheckRuler
+	SSAOptCollectors              map[PluginType]SSAOptCollector
+	CheckRulers, ScoreCheckRulers map[PluginType][]CheckRuler
 }
 
 var pluginTypeAnalyzer = &PluginTypeAnalyzer{
 	SSAOptCollectors: make(map[PluginType]SSAOptCollector),
 	CheckRulers:      make(map[PluginType][]CheckRuler),
+	ScoreCheckRulers: make(map[PluginType][]CheckRuler),
 }
 
 func RegisterSSAOptCollector(pluginTyp PluginType, f SSAOptCollector) {
@@ -58,6 +59,13 @@ func RegisterCheckRuler(pluginTyp PluginType, f CheckRuler) {
 	pluginTypeAnalyzer.CheckRulers[pluginTyp] = append(pluginTypeAnalyzer.CheckRulers[pluginTyp], f)
 }
 
+func RegisterScoreCheckRuler(pluginTyp PluginType, f CheckRuler) {
+	if _, ok := pluginTypeAnalyzer.ScoreCheckRulers[pluginTyp]; !ok {
+		pluginTypeAnalyzer.ScoreCheckRulers[pluginTyp] = make([]CheckRuler, 0)
+	}
+	pluginTypeAnalyzer.ScoreCheckRulers[pluginTyp] = append(pluginTypeAnalyzer.ScoreCheckRulers[pluginTyp], f)
+}
+
 func GetPluginSSAOpt(pluginType PluginType) []ssaapi.Option {
 	ret := make([]ssaapi.Option, 0)
 	if funcs, ok := pluginTypeAnalyzer.SSAOptCollectors[pluginType]; ok {
@@ -66,7 +74,7 @@ func GetPluginSSAOpt(pluginType PluginType) []ssaapi.Option {
 	return ret
 }
 
-func CheckPluginType(pluginType PluginType, prog *ssaapi.Program) *result.StaticAnalyzeResults {
+func CheckRules(pluginType PluginType, prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults()
 	if funcs, ok := pluginTypeAnalyzer.CheckRulers[pluginType]; ok {
 		for _, f := range funcs {
@@ -74,7 +82,25 @@ func CheckPluginType(pluginType PluginType, prog *ssaapi.Program) *result.Static
 				defer func() {
 					err := recover()
 					if err != nil {
-						log.Errorf("CheckPluginType %s panic: %v", pluginType, err)
+						log.Errorf("check ruls[%s] panic: %v", pluginType, err)
+					}
+				}()
+				ret.Merge(f(prog))
+			}()
+		}
+	}
+	return ret
+}
+
+func CheckScoreRules(pluginType PluginType, prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+	if funcs, ok := pluginTypeAnalyzer.ScoreCheckRulers[pluginType]; ok {
+		for _, f := range funcs {
+			func() {
+				defer func() {
+					err := recover()
+					if err != nil {
+						log.Errorf("check score rules[%s] panic: %v", pluginType, err)
 					}
 				}()
 				ret.Merge(f(prog))

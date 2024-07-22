@@ -1,10 +1,18 @@
 package ssaapi
 
 import (
+	"regexp"
+	"strings"
+
+	"github.com/antchfx/xpath"
+	"github.com/gobwas/glob"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var _ sfvm.ValueOperator = &Program{}
@@ -114,4 +122,89 @@ func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig 
 
 func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
+}
+
+func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+	if p.comeFromDatabase {
+		log.Infof("file filter support with database")
+	}
+	res := []sfvm.ValueOperator{}
+	addRes := func(str string) {
+		res = append(res, p.NewValue(ssa.NewConst(str)))
+	}
+
+	matchFile := false
+	handler := func(data string) {
+		matchFile = true
+		for _, rule := range rule2 {
+			switch match {
+			case "regexp":
+				reg, err := regexp.Compile(rule)
+				if err != nil {
+					log.Errorf("regexp compile error: %s", err)
+					continue
+				}
+				matches := reg.FindAllStringSubmatch(data, -1)
+				// skip first captured group
+				// if "url=(.*)", exclude "url="
+				// match[0] contain "url=", match[1] not contain
+				for _, match := range matches {
+					if len(match) > 1 {
+						addRes(match[1])
+					}
+				}
+			case "xpath":
+				top, err := htmlquery.Parse(strings.NewReader(data))
+				if err != nil {
+					continue
+				}
+
+				xexp, err := xpath.Compile(rule)
+				if err != nil {
+					log.Errorf("xpath compile error: %s", err)
+					continue
+				}
+
+				t := xexp.Evaluate(htmlquery.CreateXPathNavigator(top))
+				switch t := t.(type) {
+				case *xpath.NodeIterator:
+					for t.MoveNext() {
+						nav := t.Current().(*htmlquery.NodeNavigator)
+						node := nav.Current()
+						str := htmlquery.InnerText(node)
+						addRes(str)
+					}
+				default:
+					str := codec.AnyToString(t)
+					addRes(str)
+				}
+			case "json": // json path
+			}
+		}
+	}
+
+	for filename, data := range p.Program.ExtraFile {
+		if reg, err := regexp.Compile(path); err == nil {
+			if reg.Match([]byte(filename)) {
+				handler(data)
+			}
+		}
+
+		if glob, err := glob.Compile(path); err == nil {
+			if glob.Match(filename) {
+				handler(data)
+			}
+		}
+
+		if filename == path {
+			handler(data)
+		}
+	}
+	if len(res) == 0 {
+		if matchFile {
+			return nil, utils.Errorf("no file contain data match rule %v %v", rule, rule2)
+		}
+		return nil, utils.Errorf("no file matched by path %s", path)
+	}
+	return sfvm.NewValues(res), nil
 }

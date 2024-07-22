@@ -3,6 +3,7 @@ package schema
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -24,6 +25,25 @@ const (
 	KEY_SCHEMA_SSA_DATABASE
 )
 
+func KeySchemaToName(i uint8) string {
+	switch i {
+	case KEY_SCHEMA_YAKIT_DATABASE:
+		return "KEY_SCHEMA_YAKIT_DATABASE"
+	case KEY_SCHEMA_PROFILE_DATABASE:
+		return "KEY_SCHEMA_PROFILE_DATABASE"
+	case KEY_SCHEMA_CVE_DATABASE:
+		return "KEY_SCHEMA_CVE_DATABASE"
+	case KEY_SCHEMA_CVE_DESCRIPTION_DATABASE:
+		return "KEY_SCHEMA_CVE_DESCRIPTION_DATABASE"
+	case KEY_SCHEMA_VULINBOX_DATABASE:
+		return "KEY_SCHEMA_VULINBOX_DATABASE"
+	case KEY_SCHEMA_SSA_DATABASE:
+		return "KEY_SCHEMA_SSA_DATABASE"
+	default:
+		return "KEY_SCHEMA_Unknown"
+	}
+}
+
 // ProfileTables 这些表是独立与项目之外的，每一个用户的数据都不一样
 var ProfileTables = []interface{}{
 	&YakScript{}, &Payload{}, &MenuItem{},
@@ -33,6 +53,7 @@ var ProfileTables = []interface{}{
 	&WebFuzzerLabel{},
 	&PluginGroup{},
 	&CodecFlow{},
+	&SyntaxFlowRule{},
 }
 
 var databaseSchemas = map[uint8][]any{
@@ -81,11 +102,12 @@ func RegisterDatabaseSchema(key uint8, schema ...any) {
 func AutoMigrate(db *gorm.DB, key uint8) {
 	if schemas, ok := databaseSchemas[key]; ok {
 		if len(schemas) == 0 {
-			panic("Database schema is empty")
+			log.Errorf("Database schema [%v] is empty", KeySchemaToName(key))
+			return
 		}
 		db.AutoMigrate(schemas...)
 	} else {
-		panic("Database schema key invalid")
+		log.Errorf("Database schema key: %v is %v", key, KeySchemaToName(key))
 	}
 }
 

@@ -21,12 +21,18 @@ type Program struct {
 	comeFromDatabase bool
 }
 
+type Programs []*Program
+
 func (p *Program) GetNames() []string {
 	return []string{p.Program.GetProgramName()}
 }
 
 func (p *Program) GetProgramKind() ssa.ProgramKind {
 	return p.Program.ProgramKind
+}
+
+func (p *Program) GetLanguage() string {
+	return p.Program.Language
 }
 
 func NewProgram(prog *ssa.Program, config *config) *Program {

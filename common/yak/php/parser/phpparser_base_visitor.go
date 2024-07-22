@@ -47,10 +47,6 @@ func (v *BasePHPParserVisitor) VisitUseDeclarationContentList(ctx *UseDeclaratio
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitUseDeclarationContent(ctx *UseDeclarationContentContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitNamespaceDeclaration(ctx *NamespaceDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -259,10 +255,6 @@ func (v *BasePHPParserVisitor) VisitGlobalStatement(ctx *GlobalStatementContext)
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitGlobalVar(ctx *GlobalVarContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitEchoStatement(ctx *EchoStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -419,10 +411,6 @@ func (v *BasePHPParserVisitor) VisitBackQuoteStringExpression(ctx *BackQuoteStri
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -443,15 +431,15 @@ func (v *BasePHPParserVisitor) VisitLogicalExpression(ctx *LogicalExpressionCont
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BasePHPParserVisitor) VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitMemerCallExpression(ctx *MemerCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -463,15 +451,7 @@ func (v *BasePHPParserVisitor) VisitIndexCallExpression(ctx *IndexCallExpression
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitCodeExecExpression(ctx *CodeExecExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitSliceCallAutoAssignmentExpression(ctx *SliceCallAutoAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -492,6 +472,10 @@ func (v *BasePHPParserVisitor) VisitSpaceshipExpression(ctx *SpaceshipExpression
 }
 
 func (v *BasePHPParserVisitor) VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitTemplateExpression(ctx *TemplateExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -516,10 +500,6 @@ func (v *BasePHPParserVisitor) VisitScalarExpression(ctx *ScalarExpressionContex
 }
 
 func (v *BasePHPParserVisitor) VisitPrefixIncDecExpression(ctx *PrefixIncDecExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitFieldMemberCallAssignmentExpression(ctx *FieldMemberCallAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -559,7 +539,19 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+func (v *BasePHPParserVisitor) VisitIndexLegacyCallVariable(ctx *IndexLegacyCallVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitIndexVariable(ctx *IndexVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitCustomVariable(ctx *CustomVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitMemberVariable(ctx *MemberVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -720,6 +712,10 @@ func (v *BasePHPParserVisitor) VisitStringConstant(ctx *StringConstantContext) i
 }
 
 func (v *BasePHPParserVisitor) VisitString(ctx *StringContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitHereDocContent(ctx *HereDocContentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

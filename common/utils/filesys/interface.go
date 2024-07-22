@@ -2,6 +2,7 @@ package filesys
 
 import (
 	"io/fs"
+	"os"
 	"strings"
 )
 
@@ -27,34 +28,32 @@ type FileSystem interface {
 
 	PathSplit(string) (string, string)
 	Ext(string) string
+	IsAbs(string) bool
+	Getwd() (string, error)
+	Exists(string) (bool, error)
+	Rename(string, string) error
+	Rel(string, string) (string, error)
+	WriteFile(string, []byte, os.FileMode) error
+	Delete(string) error
+	MkdirAll(string, os.FileMode) error
 }
 
 func splitWithSeparator(path string, sep rune) (string, string) {
 	if len(path) == 0 {
 		return "", ""
 	}
-	idx := strings.LastIndexFunc(path, func(r rune) bool {
-		if r == sep {
-			return true
-		}
-		return false
-	})
+	idx := strings.LastIndex(path, string(sep))
 	if idx == -1 {
 		return "", path
 	}
-	return path[:idx], path[idx:]
+	return path[:idx], path[idx+1:]
 }
 
 func getExtension(path string) string {
 	if len(path) == 0 {
 		return ""
 	}
-	idx := strings.LastIndexFunc(path, func(r rune) bool {
-		if r == '.' {
-			return true
-		}
-		return false
-	})
+	idx := strings.LastIndex(path, ".")
 	if idx == -1 {
 		return ""
 	}

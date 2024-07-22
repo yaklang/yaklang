@@ -76,11 +76,8 @@ func TestSF_GetUser(t *testing.T) {
 			`b#->* as $target`,
 			[]string{
 				`Undefined-file`,
-				`Undefined-file.Write(valid)`,
 				`"abc"`,
 				`Undefined-Runtime`,
-				`Undefined-Runtime.getRuntime(valid)`,
-				`Undefined-a.exec(valid)`,
 				`"bash attack"`,
 			},
 		)

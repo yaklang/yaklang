@@ -92,6 +92,8 @@ type httpPoolConfig struct {
 
 	// withPayloads 是否查询 payloads
 	WithPayloads bool
+
+	Session string // for cookie jar
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -500,6 +502,12 @@ func _httpPool_withPayloads(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_withSession(session string) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.Session = session
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -748,6 +756,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
+							lowhttp.WithSession(config.Session),
 						}
 
 						if config.OverrideEnableSystemProxyEnv {
@@ -883,19 +892,22 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 				if config.BatchTarget != "" {
 					targetsReplaced := utils.PrettifyListFromStringSplitEx(config.BatchTarget, "\n", ",", "|")
 					for _, newTarget := range targetsReplaced {
-						overrideHttps := config.IsHttps
+						isHTTPS := config.IsHttps
 						var overrideHost string
 						if strings.HasPrefix(strings.ToLower(newTarget), "https://") {
-							overrideHttps = true
+							isHTTPS = true
+						} else if strings.HasPrefix(strings.ToLower(newTarget), "http://") {
+							isHTTPS = false
 						}
 						host, port, _ := utils.ParseStringToHostPort(newTarget)
-						if (overrideHttps && port != 443) || (!overrideHttps && port != 80) {
+						if (isHTTPS && port != 443) || (!isHTTPS && port != 80) {
+							// hide port
 							overrideHost = utils.HostPort(host, port)
 						} else {
-							overrideHost = newTarget
+							overrideHost = host
 						}
-						overrideTarget := lowhttp.ReplaceHTTPPacketHeader(targetRequest, "Host", overrideHost)
-						execSubmitTaskWithoutBatchTarget(overrideHttps, overrideHost, overrideTarget, payloads...)
+						replacedPacket := lowhttp.ReplaceHTTPPacketHeader(targetRequest, "Host", overrideHost)
+						execSubmitTaskWithoutBatchTarget(isHTTPS, overrideHost, replacedPacket, payloads...)
 					}
 				}
 				execSubmitTaskWithoutBatchTarget(false, "", targetRequest, payloads...)
@@ -1041,4 +1053,5 @@ var (
 	WithConnPool                           = _httpPool_withConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
+	WithPoolOpt_Session                    = _httpPool_withSession
 )

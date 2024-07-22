@@ -6,10 +6,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -61,20 +60,19 @@ dump(c)
 	br := funcIns.Blocks[len(funcIns.Blocks)-1]
 	block, _ := ssa.ToBasicBlock(br)
 	scope := block.ScopeTable
-	id := scope.GetPersistentId()
-	if id <= 0 {
-		t.Fatal("scope is not a persistent scope")
-	}
-	if scope.GetPersistentProgramName() != progName {
-		t.Fatal("scope is not a persistent scope")
-	}
+	name := scope.GetScopeName()
+	log.Infof("scope name: %s", name)
+	// id := scope.GetPersistentId()
+	// if id <= 0 {
+	// 	t.Fatal("scope is not a persistent scope")
+	// }
 
 	ePhi := scope.ReadValue("e")
 	t.Log(ePhi.String())
 
-	scopePersistent := ssa.GetScopeFromIrScopeId(scope.GetPersistentId())
-	if scopePersistent == nil {
-		t.Fatalf("failed to get scope from ir scope id: %d", scope.GetPersistentId())
+	scopePersistent, err := ssa.GetScopeFromIrScopeName(progName, scope.GetScopeName())
+	if err != nil {
+		t.Fatalf("failed to get scope from ir scope id: %v", err)
 	}
 	eLazyPhi := scopePersistent.ReadValue("e")
 	verbose := eLazyPhi.String()

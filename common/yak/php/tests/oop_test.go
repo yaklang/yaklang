@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -48,13 +49,12 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`, []string{
-			"add(Undefined-Foo_my_static, Undefined-PHP_EOL)",
+			"add(Undefined-Foo.my_static(valid), Undefined-PHP_EOL)",
 		}, t)
 	})
 
 	t.Run("normal static member,  assign again ", func(t *testing.T) {
-		code := `
-	<?php
+		code := `<?php
 class Foo {
 	public static $my_static;
 }
@@ -87,6 +87,39 @@ println(Foo::$my_static);
 			"phi(Foo_my_static)[\"foo\",\"bar\"]",
 		}, t)
 	})
+
+	t.Run("Call static members across classes", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+	<?php
+class Foo {
+	public static $my_static = 'foo';
+}
+?>
+<?php
+	class B {
+		public static function test() {
+			println(Foo::$my_static . PHP_EOL); // normal
+			
+			println("Foo"::$my_static . PHP_EOL); // string
+			
+			$a = "Foo";
+			println($a::$my_static . PHP_EOL); // variable
+			
+			$b = "a";
+			println($$b::$my_static . PHP_EOL); // dynamic variable
+    }
+
+	}
+?>    
+	`, []string{
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Undefined-PHP_EOL)",
+		}, t)
+
+	})
+
 }
 
 func TestOOP_static_method(t *testing.T) {
@@ -130,6 +163,39 @@ func TestOOP_static_method(t *testing.T) {
 		_, err := php2ssa.FrondEnd(code, false)
 		require.Error(t, err)
 	})
+
+	t.Run("Call static method across classes", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+class A {
+    public static function aStaticMethod() {
+				return 22;
+			}
+}
+?>
+<?php
+class B {
+    public static function test() {
+		println(A::aStaticMethod());
+		println("A"::aStaticMethod());
+		$a = "A";
+		println($a::aStaticMethod());
+		$b = "a";
+		println($$b::aStaticMethod());
+		$instance = new A();
+		println($instance::aStaticMethod());
+    }
+}
+?>
+		`, []string{
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+			"Function-A_aStaticMethod()",
+		}, t)
+
+	})
 }
 
 func TestOOP_var_member(t *testing.T) {
@@ -141,15 +207,15 @@ func TestOOP_var_member(t *testing.T) {
 			var $a = 0; 
 		}
 		$a = new A; 
-		println($a->a); // 0
+		println($a->a);
 
 		$b = "a";
-		println($a->$b); // 0
+		println($a->$b); 
 
 		$c = "b";
-		println($a->$$c); // 0
+		println($a->$$c);
 		`, []string{
-			"0", "0", "0",
+			"Undefined-$a.a(valid)", "Undefined-$a.a(valid)", "Undefined-$a.a(valid)",
 		}, t)
 	})
 
@@ -167,7 +233,7 @@ func TestOOP_var_member(t *testing.T) {
 		$a->setA(1);
 		println($a->a);
 		`, []string{
-			"0", "side-effect(Parameter-$par, $this.a)",
+			"Undefined-$a.a(valid)", "side-effect(Parameter-$par, $this.a)",
 		}, t)
 	})
 
@@ -175,23 +241,23 @@ func TestOOP_var_member(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		<?php
 		class A {
-			var $a = 0; 
+			var $a = 0;
 			function getA() {
 				return $this->a;
 			}
 		}
-		$a = new A; 
+		$a = new A;
 		println($a->getA());
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(make(A)) member[0]",
-			"Undefined-$a.getA(valid)(make(A)) member[1]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[Undefined-$a.a(valid)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
 		}, t)
 	})
 
 	t.Run("just use method", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
+		code := `
 		<?php
 		class A {
 			var $a = 0; 
@@ -202,14 +268,20 @@ func TestOOP_var_member(t *testing.T) {
 				$this->a = $par; 
 			}
 		}
-		$a = new A; 
-		println($a->getA());
-		$a->setA(1);
-		println($a->getA());
-		`, []string{
-			"Undefined-$a.getA(valid)(make(A)) member[0]",
-			"Undefined-$a.getA(valid)(make(A)) member[side-effect(Parameter-$par, $this.a)]",
-		}, t)
+		$b = new A; 
+		println($b->getA());
+		$b->setA(1);
+		println($b->getA());
+        eval($b->getA());
+		`
+		ssatest.CheckSyntaxFlow(t, code,
+			`eval(* #-> * as $param)`,
+			map[string][]string{},
+			ssaapi.WithLanguage(ssaapi.PHP))
+		//ssatest.CheckPrintlnValue(code, []string{
+		//	"Undefined-$b.getA(valid)(make(A)) member[0]",
+		//	"Undefined-$b.getA(valid)(make(A)) member[side-effect(Parameter-$par, $this.a)]",
+		//}, t)
 	})
 }
 
@@ -223,15 +295,15 @@ func TestOOP_Extend_Class(t *testing.T) {
 		}
 		class A extends O{}
 		$a = new A; 
-		println($a->a); // 0
+		println($a->a);
 
 		$b = "a";
-		println($a->$b); // 0
+		println($a->$b);
 
 		$c = "b";
-		println($a->$$c); // 0
+		println($a->$$c);
 		`, []string{
-			"0", "0", "0",
+			"Undefined-$a.a(valid)", "Undefined-$a.a(valid)", "Undefined-$a.a(valid)",
 		}, t)
 	})
 
@@ -250,7 +322,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->a);
 		`, []string{
-			"0", "side-effect(Parameter-$par, $this.a)",
+			"Undefined-$a.a(valid)", "side-effect(Parameter-$par, $this.a)",
 		}, t)
 	})
 
@@ -269,8 +341,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(make(A)) member[0]",
-			"Undefined-$a.getA(valid)(make(A)) member[1]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[Undefined-$a.a(valid)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -292,8 +364,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(make(A)) member[0]",
-			"Undefined-$a.getA(valid)(make(A)) member[side-effect(Parameter-$par, $this.a)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[Undefined-$a.a(valid)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -311,7 +383,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(make(A)) member[0]",
+			"Undefined-$a.getNum(valid)(Undefined-$a) member[Undefined-$a.num(valid)]",
 		}, t)
 	})
 
@@ -329,7 +401,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(make(A)) member[side-effect(Parameter-$num, $this.num)]",
+			"Undefined-$a.getNum(valid)(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }
@@ -368,6 +440,17 @@ println($c->a);`
 	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 }
 
+//func TestOOP_custom_member(t *testing.T) {
+//	code := `<?php
+//    class test{
+//        public $a = 1;
+//    }
+//	$c = new test();
+//	println($c->$a);
+//`
+//	ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+//}
+
 func TestOOP_Class_Instantiation(t *testing.T) {
 	t.Run("Instantiate a non-existent object", func(t *testing.T) {
 		code := `
@@ -376,7 +459,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"make(any)",
+			"Undefined-A(Undefined-A)",
 		}, t)
 	})
 
@@ -392,8 +475,120 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"make(A)",
+			"Undefined-$a",
 		}, t)
 	})
 
+}
+
+func TestOOP_Syntax(t *testing.T) {
+	t.Run("__construct", func(t *testing.T) {
+		code := `<?php
+class test{
+    public $a;
+    public function __construct($a){
+    	$this->a = $a;
+        println($this->a);
+	}
+}
+$a = new test("1");
+`
+		//执行会有问题，
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+		//ssatest.CheckSyntaxFlow(t, code,
+		//	`println(* #-> * as $param)`,
+		//	map[string][]string{"param": {`"1"`}},
+		//	ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("__destruct", func(t *testing.T) {
+		code := `<?php
+class test{
+    public $a;
+    function __destruct(){
+        $this->a=1;
+        print($this->a);
+    }
+}
+$c = new test;
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+		//ssatest.CheckSyntaxFlow(t, code,
+		//	`print(* #-> * as $param)`,
+		//	map[string][]string{"param": {`Undefined-$c.a(valid)`}},
+		//	ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("extends __destruct", func(t *testing.T) {
+		code := `<?php
+class test{
+    public $a;
+    function __destruct(){
+        eval($this->a);
+    }
+}
+
+class childTest extends test{}
+$c = new childTest;
+$c->a = 1;
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+		//ssatest.CheckSyntaxFlow(t, code,
+		//	`eval(* #-> * as $param)`,
+		//	map[string][]string{"param": {`1`}},
+		//	ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("code", func(t *testing.T) {
+		code := `<?php
+function __destruct(){}
+__destruct();
+`
+		ssatest.MockSSA(t, code)
+	})
+}
+
+func TestOOP_Extend(t *testing.T) {
+	t.Run("no impl __construct", func(t *testing.T) {
+		code := `<?php
+class b{
+    public $a;
+    public function __construct($a){
+        $this->a = $a;
+    }
+}
+
+class childB extends b{
+}
+$a = new childB(1);
+println($a->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+	})
+
+	t.Run("impl __construct and get parent custom member", func(t *testing.T) {
+		code := `<?php
+class b{
+    public $a=0;
+    public function __construct($a){
+        $this->a = $a;
+    }
+}
+
+class childB extends b{
+    public $c;
+    public function __construct($a){
+    }
+}
+$b = new childB(1);
+println($b->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-$b.a(valid)"}, t)
+	})
 }

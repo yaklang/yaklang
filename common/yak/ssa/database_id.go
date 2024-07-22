@@ -12,7 +12,7 @@ func (p *Program) DeleteInstruction(inst Instruction) {
 
 	if assignable, ok := inst.(AssignAble); ok {
 		for name := range assignable.GetAllVariables() {
-			p.RemoveInstructionInVariable(name, inst)
+			p.Cache.RemoveVariable(name, inst)
 		}
 	}
 }
@@ -40,11 +40,4 @@ func (p *Program) SetInstructionWithName(name string, i Instruction) {
 	if !strings.Contains(name, ".") {
 		i.SetVerboseName(name)
 	}
-}
-
-func (p *Program) RemoveInstructionInVariable(name string, i Instruction) {
-	if p == nil {
-		return
-	}
-	p.Cache.RemoveVariable(name, i)
 }

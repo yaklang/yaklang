@@ -1,20 +1,22 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strings"
 )
 
 func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if y == nil || raw == nil {
-		return nil
+		return ssa.GetAnyType()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeHintContext)
 	if i == nil {
-		return nil
+		return ssa.GetAnyType()
 	}
 	if r := i.QualifiedStaticTypeRef(); r != nil {
 		//这里类型就行修复
@@ -35,29 +37,45 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	return ssa.GetAnyType()
 }
 
-func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
+func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePrint, string) {
 	if y == nil || raw == nil {
-		return nil
+		log.Errorf("[BUG]: TypeRef is nil")
+		return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeRefContext)
 	if i == nil {
-		return nil
+		return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
 	}
-
+	getLib := func(path string) (*ssa.Program, bool) {
+		program := y.GetProgram()
+		return program.GetLibrary(path)
+	}
 	if i.QualifiedNamespaceName() != nil {
-		y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+		name := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+		path := strings.Split(name, "\\")
+		class := path[len(path)-1]
+		lib := strings.Join(path[:len(path)-1], ".")
+		if lib == "" {
+			return y.GetClassBluePrint(class), class
+		}
+		program, b := getLib(lib)
+		if b {
+			if bluePrint := program.GetClassBluePrint(class); bluePrint != nil {
+				return bluePrint, class
+			}
+		}
 	} else if i.IndirectTypeRef() != nil {
 
 	} else if i.PrimitiveType() != nil {
-		return y.VisitPrimitiveType(i.PrimitiveType())
-	} else if i.Static() != nil {
-		// as class name
-	}
 
-	return nil
+	} else if i.Static() != nil {
+		y.GetClassBluePrint(i.Static().GetText())
+	}
+	log.Warnf("[BUG]: fix it")
+	return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
 }
 
 func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Type {

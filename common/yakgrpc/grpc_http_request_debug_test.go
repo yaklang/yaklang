@@ -950,8 +950,7 @@ func TestDebugPluginRiskCount(t *testing.T) {
 		}
 		code := `
 for i in 10 {
-a = risk.CreateRisk("127.0.0.1")
-yakit.Output(a)
+a = risk.NewRisk("127.0.0.1")
 }
 `
 		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
@@ -965,6 +964,7 @@ yakit.Output(a)
 
 		var cardCount = 0
 		var riskMessageCount = 0
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -972,6 +972,10 @@ yakit.Output(a)
 					t.Fatalf("check YakitPlugin param error:%s", err)
 				}
 				break
+			}
+
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
 			}
 
 			if rsp.GetIsMessage() {
@@ -986,8 +990,10 @@ yakit.Output(a)
 				}
 			}
 		}
-
-		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
+		riskCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
+		require.Equal(t, cardCount, riskCount, "risk count not match")
+		require.Equal(t, cardCount, riskMessageCount, "risk message count not match")
 	})
 
 	t.Run("poc risk count", func(t *testing.T) {
@@ -1049,6 +1055,7 @@ http:
 		}
 
 		var cardCount = 0
+		var runtimeID string
 		var riskMessageCount = 0
 		for {
 			rsp, err := stream.Recv()
@@ -1058,7 +1065,9 @@ http:
 				}
 				break
 			}
-
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
+			}
 			if rsp.GetIsMessage() {
 				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
 				if level == "feature-status-card-data" {
@@ -1072,7 +1081,10 @@ http:
 			}
 		}
 
-		require.Equal(t, cardCount, riskMessageCount, "risk count not match")
+		riskCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
+		require.Equal(t, cardCount, riskCount, "risk count not match")
+		require.Equal(t, cardCount, riskMessageCount, "risk message count not match")
 	})
 }
 
@@ -1150,6 +1162,7 @@ aaa`))
 			t.Fatal(err)
 		}
 
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -1159,16 +1172,16 @@ aaa`))
 				break
 			}
 
-			if rsp.GetIsMessage() {
-				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
-				if level == "json-risk" {
-					var riskIns ypb.Risk
-					err := json.Unmarshal([]byte(gjson.Get(string(rsp.GetMessage()), "content.data").String()), &riskIns)
-					require.NoError(t, err)
-					require.Equal(t, riskIns.GetYakScriptUUID(), nucleiScript.Uuid, "nuclei uuid not match")
-					require.Equal(t, riskIns.GetFromYakScript(), nucleiScript.ScriptName, "nuclei name not match")
-				}
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
 			}
+		}
+
+		risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
+		for _, riskIns := range risks {
+			require.Equal(t, riskIns.YakScriptUUID, nucleiScript.Uuid, "nuclei uuid not match")
+			require.Equal(t, riskIns.FromYakScript, nucleiScript.ScriptName, "nuclei name not match")
 		}
 	})
 
@@ -1183,6 +1196,7 @@ aaa`))
 			t.Fatal(err)
 		}
 
+		var runtimeID string
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -1192,18 +1206,82 @@ aaa`))
 				break
 			}
 
-			if rsp.GetIsMessage() {
-				level := gjson.Get(string(rsp.GetMessage()), "content.level").String()
-				if level == "json-risk" {
-					var riskIns ypb.Risk
-					err := json.Unmarshal([]byte(gjson.Get(string(rsp.GetMessage()), "content.data").String()), &riskIns)
-					spew.Dump(riskIns)
-					require.NoError(t, err)
-					require.Equal(t, riskIns.GetYakScriptUUID(), yakScript.Uuid, "yak uuid not match")
-					require.Equal(t, riskIns.GetFromYakScript(), yakScript.ScriptName, "yak name not match")
-				}
+			if rsp.RuntimeID != "" {
+				runtimeID = rsp.RuntimeID
 			}
+		}
+
+		risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+		require.NoError(t, err)
+		for _, riskIns := range risks {
+			require.Equal(t, riskIns.YakScriptUUID, yakScript.Uuid, "nuclei uuid not match")
+			require.Equal(t, riskIns.FromYakScript, yakScript.ScriptName, "nuclei name not match")
 		}
 	})
 
+}
+
+func TestGRPCMUSTPASS_DebugPlugin_Nuclei_Risk_URL(t *testing.T) {
+	randPath := utils.RandStringBytes(5)
+	token := utils.RandStringBytes(5)
+	nucleiScript, err := yakit.NewTemporaryYakScript("nuclei", fmt.Sprintf(`id: test 
+
+info:
+  name: test 
+  author: god
+  severity: critical
+  description: test
+
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    GET /%s HTTP/1.1
+    Host: {{Hostname}}
+
+  max-redirects: 3
+  matchers-condition: and
+  matchers:
+      - type: word
+        words:
+          - "%s"
+        part: body`, randPath, token))
+	require.NoError(t, err)
+	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName, nucleiScript)
+	require.NoError(t, err)
+	defer yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(token))
+	})
+	targetUrl := fmt.Sprintf("http://%s:%d/%s", host, port, randPath)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		PluginName: nucleiScript.ScriptName,
+		PluginType: "nuclei",
+		ExecParams: []*ypb.KVPair{},
+		Input:      targetUrl,
+	})
+	require.NoError(t, err)
+
+	var runtimeID string
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatalf("check YakitPlugin param error:%s", err)
+			}
+			break
+		}
+		if rsp.RuntimeID != "" {
+			runtimeID = rsp.RuntimeID
+		}
+	}
+
+	risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+	require.NoError(t, err)
+	require.Len(t, risks, 1)
+	for _, risk := range risks {
+		require.Equal(t, risk.Url, targetUrl)
+	}
 }

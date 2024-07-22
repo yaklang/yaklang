@@ -170,6 +170,7 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 		}
 	}
 	value.SetExtern(true)
+	value.SetProgram(prog)
 	prog.SetVirtualRegister(value)
 	prog.SetInstructionWithName(str, value)
 	return

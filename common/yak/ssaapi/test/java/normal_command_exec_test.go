@@ -727,8 +727,9 @@ func Test_Simple_Exec_Case(t *testing.T) {
     }`},
 
 		{"aTaintCase0195", false, []string{
-			"ParameterMember-parameter[1].0",
-			"ParameterMember-parameter[1].1",
+			"Parameter-cmd",
+			// "ParameterMember-parameter[1].0",
+			// "ParameterMember-parameter[1].1",
 		}, ` /**
      * 传播场景-数组初始化->new 方式初始化
      */

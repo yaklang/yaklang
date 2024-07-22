@@ -253,3 +253,23 @@ func (v *ValueList) RegexpMatch(mod int, regexp string) (bool, ValueOperator, er
 	}
 	return len(res) > 0, NewValues(res), nil
 }
+
+func (v *ValueList) FileFilter(path string, mode string, rule1 map[string]string, rule2 []string) (ValueOperator, error) {
+	var res []ValueOperator
+	var errs error
+	for _, value := range v.values {
+		filtered, err := value.FileFilter(path, mode, rule1, rule2)
+		if err != nil {
+			errs = utils.JoinErrors(errs, err)
+			// return nil, err
+			continue
+		}
+		if filtered != nil {
+			res = append(res, filtered)
+		}
+	}
+	if errs != nil {
+		return nil, errs
+	}
+	return NewValues(res), nil
+}

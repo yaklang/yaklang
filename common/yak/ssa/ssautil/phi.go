@@ -4,7 +4,7 @@ package ssautil
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
 	base ScopedVersionedTableIF[T],
-	handler CaptureVariableHandler[T],
+	handler VariableHandler[T],
 ) {
 	scope.ForEachCapturedVariable(func(name string, ver VersionedIF[T]) {
 		if ver.CanCaptureInScope(base) {
@@ -87,22 +87,21 @@ func (base *ScopedVersionedTable[T]) Merge(
 }
 
 // this handler merge [origin, last] to phi
-func (s *ScopedVersionedTable[T]) Spin(
+func (condition *ScopedVersionedTable[T]) Spin(
 	header, latch ScopedVersionedTableIF[T],
 	handler SpinHandle[T],
 ) {
-	s.spin = false
-	s.createEmptyPhi = nil
-	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
+	condition.spin = false
+	condition.createEmptyPhi = nil
+	for name, ver := range condition.linkIncomingPhi {
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
 		for name, value := range res {
-			v := s.CreateVariable(name, false)
-			s.AssignVariable(v, value)
+			v := condition.CreateVariable(name, false)
+			condition.AssignVariable(v, value)
 		}
-		return true
-	})
+	}
 }
 
 func (s *ScopedVersionedTable[T]) SetSpin(create func(string) T) {

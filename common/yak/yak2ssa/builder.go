@@ -1,6 +1,7 @@
 package yak2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -31,6 +32,10 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 
 func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".yak"
+}
+
+func (*SSABuilder) GetLanguage() consts.Language {
+	return consts.Yak
 }
 
 type astbuilder struct {

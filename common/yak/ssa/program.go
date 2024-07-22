@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -33,6 +34,9 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
 	}
+	if kind == Application {
+		prog.Application = prog
+	}
 	prog.EnableDatabase = enableDatabase
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
@@ -42,9 +46,15 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 }
 
 func (prog *Program) GetLibrary(name string) (*Program, bool) {
+	if prog == nil || utils.IsNil(prog) || prog.Application == nil || utils.IsNil(prog.Application) {
+		return nil, false
+	}
+	// get lib from application
+	app := prog.Application
 	currentEditor := prog.GetCurrentEditor()
+	// this program has current file
 	hasFile := func(p *Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
 			if hash == currentEditor.SourceCodeMd5() {
 				return true
 			}
@@ -53,19 +63,25 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	}
 
 	// contain in memory
-	if p, ok := prog.UpStream[name]; ok {
+	if p, ok := app.UpStream[name]; ok {
 		return p, hasFile(p)
 	}
 
-	if !prog.EnableDatabase {
+	if p, ok := prog.UpStream[name]; ok {
+		app.UpStream[name] = p
+		return p, hasFile(p)
+	}
+
+	if !app.EnableDatabase {
 		return nil, false
 	}
 
 	// library in  database, load and set relation
 	p, err := GetProgram(name, Library)
 	if err != nil {
-		return p, false
+		return nil, false
 	}
+	app.UpStream[name] = p
 	if !slices.Contains(p.irProgram.UpStream, name) {
 		// update up-down stream
 		prog.UpStream[name] = p
@@ -78,8 +94,10 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	// create lib
 	fs := prog.Loader.GetFilesysFileSystem()
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
+	lib.Language = prog.Language
 	prog.UpStream[name] = lib
 	lib.DownStream[prog.Name] = prog
+	lib.Application = prog.Application
 	return lib
 }
 
@@ -191,8 +209,8 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
-	p.editorMap.Set(e.GetUrl(), e)
-	p.FileList[e.GetUrl()] = e.SourceCodeMd5()
+	p.editorMap.Set(e.GetFilename(), e)
+	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
 }
 
 func (p *Program) GetIncludeFiles() []string {

@@ -753,3 +753,90 @@ func testParse(data []byte, rule string) (*base.Node, error) {
 	}
 	return res, nil
 }
+
+func TestSocks5(t *testing.T) {
+	t.Run("socks5 client negotiation", func(t *testing.T) {
+		data := `050100`
+		payload, err := codec.DecodeHex(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "application-layer.socks5", "ClientNegotiation")
+		if err != nil {
+			t.Fatal(err)
+		}
+		DumpNode(res)
+	})
+
+	t.Run("socks5 server negotiation", func(t *testing.T) {
+		data := `0500`
+		payload, err := codec.DecodeHex(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "application-layer.socks5", "ServerNegotiation")
+		if err != nil {
+			t.Fatal(err)
+		}
+		DumpNode(res)
+	})
+
+	t.Run("socks5 auth req", func(t *testing.T) {
+		data := `0104010203040401020304`
+		payload, err := codec.DecodeHex(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "application-layer.socks5", "AuthRequest")
+		if err != nil {
+			t.Fatal(err)
+		}
+		DumpNode(res)
+	})
+
+	t.Run("socks5 auth reply", func(t *testing.T) {
+		data := `0100`
+		payload, err := codec.DecodeHex(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "application-layer.socks5", "AuthReply")
+		if err != nil {
+			t.Fatal(err)
+		}
+		DumpNode(res)
+	})
+
+	t.Run("socks5 Request", func(t *testing.T) {
+		data := `050100030e7777772e676f6f676c652e636f6d0050`
+		payload, err := codec.DecodeHex(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "application-layer.socks5", "Request")
+		if err != nil {
+			t.Fatal(err)
+		}
+		DumpNode(res)
+	})
+
+	t.Run("socks5 Replies", func(t *testing.T) {
+		data := `050000010a0000020050`
+		payload, err := codec.DecodeHex(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "application-layer.socks5", "Replies")
+		if err != nil {
+			t.Fatal(err)
+		}
+		DumpNode(res)
+	})
+
+}

@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils/filesys"
+import (
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+)
 
 type ExtraFileAnalyzer interface {
 	EnableExtraFileAnalyzer() bool
@@ -10,6 +13,7 @@ type ExtraFileAnalyzer interface {
 type Builder interface {
 	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
+	GetLanguage() consts.Language
 
 	ExtraFileAnalyzer
 }

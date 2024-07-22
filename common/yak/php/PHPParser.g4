@@ -91,26 +91,23 @@ importStatement
     ;
 
 topStatement
-    : statement
-    | useDeclaration
+    : useDeclaration
     | namespaceDeclaration
     | functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
     | enumDeclaration
+    | statement
     ;
 
 useDeclaration
-    : Use (Function_ | Const)? useDeclarationContentList SemiColon
+    : Use (Function_ | Const)? useDeclarationContentList  SemiColon
     ;
 
 useDeclarationContentList
-    : '\\'? useDeclarationContent (',' '\\'? useDeclarationContent)*
+    : '\\'? namespaceNameList (',' '\\'? namespaceNameList)*
     ;
 
-useDeclarationContent
-    : namespaceNameList
-    ;
 
 namespaceDeclaration
     : Namespace (
@@ -120,11 +117,11 @@ namespaceDeclaration
     ;
 
 namespaceStatement
-    : statement
-    | useDeclaration
+    : useDeclaration
     | functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
+    | statement
     ;
 
 functionDeclaration
@@ -381,13 +378,7 @@ typeHint
     ;
 
 globalStatement
-    : Global globalVar (',' globalVar)* SemiColon
-    ;
-
-globalVar
-    : VarName
-    | Dollar chain
-    | Dollar OpenCurlyBracket expression CloseCurlyBracket
+    : Global chain (',' chain)* SemiColon
     ;
 
 echoStatement
@@ -480,7 +471,7 @@ parentheses
     : '(' expression ')'
     ;
 
-fullyQualifiedNamespaceExpr: identifier '\\' (identifier '\\')* identifier;
+fullyQualifiedNamespaceExpr: '\\'? identifier '\\' (identifier '\\')* identifier;
 
 staticClassExpr
     : staticClassExprFunctionMember
@@ -495,10 +486,10 @@ staticClassExprFunctionMember
     ;
 
 staticClassExprVariableMember
-    : fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
-    | identifier '::' VarName                     # ClassDirectStaticVariable
-    | string '::' VarName                         # StringAsIndirectClassStaticVariable
-    | variable '::' VarName                       # VariableAsIndirectClassStaticVariable
+    : fullyQualifiedNamespaceExpr '::' flexiVariable    # ClassStaticVariable
+    | identifier '::' flexiVariable                     # ClassDirectStaticVariable
+    | string '::' flexiVariable                         # StringAsIndirectClassStaticVariable
+    | variable '::' flexiVariable                       # VariableAsIndirectClassStaticVariable
     ;
 
 
@@ -506,6 +497,7 @@ memberCallKey
     : identifier
     | string
     | variable
+    | OpenCurlyBracket expression CloseCurlyBracket
     ;
 
 indexMemberCallKey
@@ -520,13 +512,14 @@ expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
+    | expression ObjectOperator memberCallKey                               #MemerCallExpression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
-    | expression OpenCurlyBracket indexMemberCallKey CloseCurlyBracket    # IndexLegacyCallExpression
+    | expression ObjectOperator?  OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket  # IndexLegacyCallExpression
     | expression arguments                                        # FunctionCallExpression
-    | expression '->' memberCallKey                               # MemberCallExpression
     | identifier                                                  # ShortQualifiedNameExpression
-    | staticClassExpr                                             # StaticClassAccessExpression
-    | variable                                                    # VariableExpression
+    | '\\' identifier                                             # ShortQualifiedNameExpression
+    | '\\'? staticClassExpr                                        # StaticClassAccessExpression
+    | '&'? flexiVariable                                          # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
@@ -541,18 +534,18 @@ expression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression
     | Empty '(' chain ')'                                         # SpecialWordExpression
-    | (Exit|Die)  '(' expression? ')'                             # SpecialWordExpression
-    | (Eval|Assert) expression                                    # CodeExecExpression
+    | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
+//    | (Eval|Assert) expression                                    # CodeExecExpression
     | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
     | '(' castOperation ')' expression                            # CastExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
-    | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
+    | ('++' | '--') flexiVariable                                      # PrefixIncDecExpression
+    | flexiVariable ('++' | '--')                                      # PostfixIncDecExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
-    | expression InstanceOf typeRef                               # InstanceOfExpression
+    | expression InstanceOf                                # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
     | expression op = ('+' | '-' | '.') expression                # ArithmeticExpression
     | expression op = ('<<' | '>>') expression                    # ComparisonExpression
@@ -568,22 +561,23 @@ expression
     | expression op = '<=>' expression                            # SpaceshipExpression
     //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
-    | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
-    | expression '[' ']' assignmentOperator expression # SliceCallAutoAssignmentExpression
-    | expression '->' memberCallKey assignmentOperator expression    # FieldMemberCallAssignmentExpression
-    | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
-    | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
+    | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression
+    | flexiVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression
     | expression op = LogicalXor expression                       # LogicalExpression
     | expression op = LogicalOr expression                        # LogicalExpression
+    | DoubleQuote OpenCurlyBracket expression CloseCurlyBracket DoubleQuote #TemplateExpression
     ;
 
 
-leftVariable
-    : variable
+//即能当左值又能当右值
+flexiVariable
+    : variable                                    #CustomVariable
+    | flexiVariable '[' indexMemberCallKey? ']'    #IndexVariable
+    | flexiVariable OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket    # IndexLegacyCallVariable
+    | flexiVariable ObjectOperator memberCallKey            #MemberVariable
     ;
-
 
 defineExpr
     : Define '(' constantString ',' expression ')'
@@ -690,7 +684,8 @@ qualifiedStaticTypeRef
     ;
 
 typeRef
-    : (qualifiedNamespaceName | indirectTypeRef) // genericDynamicArgs?
+    : indirectTypeRef // genericDynamicArgs?
+    | qualifiedNamespaceName
     | primitiveType
     | Static
     | anonymousClass
@@ -706,7 +701,7 @@ anonymousClass
     ;
 
 indirectTypeRef
-    : chainBase ('->' keyedFieldName)*
+    : expression ObjectOperator memberCallKey
     ;
 
 qualifiedNamespaceName
@@ -714,8 +709,8 @@ qualifiedNamespaceName
     ;
 
 namespaceNameList
-    : identifier
-    | identifier ('\\' identifier)+ ('\\' namespaceNameTail)?
+    : namespaceNameTail
+    | identifier ('\\' identifier)* ('\\' namespaceNameTail)?
     ;
 
 namespaceNameTail
@@ -733,6 +728,7 @@ arguments
 
 actualArgument
     : argumentName? '...'? expression
+    |  OpenCurlyBracket flexiVariable CloseCurlyBracket
     | '&' chain
     ;
 
@@ -745,6 +741,7 @@ constantInitializer
     | Array '(' (arrayItemList ','?)? ')'
     | '[' (arrayItemList ','?)? ']'
     | ('+' | '-') constantInitializer
+    | expression
     ;
 
 constantString: string | constant;
@@ -783,11 +780,12 @@ stringConstant
     ;
 
 string
-    : StartHereDoc HereDocText+
-    | StartNowDoc HereDocText+
+    : StartNowDoc HereDocIdentiferName HereDocIdentifierBreak hereDocContent? EndDoc
     | SingleQuoteString
     | DoubleQuote interpolatedStringPart* DoubleQuote
     ;
+
+hereDocContent: HereDocText+;
 
 interpolatedStringPart
     : StringPart
@@ -800,8 +798,8 @@ chainList
     ;
 
 chain
-    : chainOrigin memberAccess*
-    | arrayCreation // [$a,$b]=$c
+    : flexiVariable
+    | staticClassExprVariableMember
     ;
 
 chainOrigin
@@ -811,7 +809,7 @@ chainOrigin
     ;
 
 memberAccess
-    : '->' keyedFieldName actualArguments?
+    : ObjectOperator keyedFieldName actualArguments?
     ;
 
 functionCall
@@ -877,6 +875,7 @@ identifier
 key
     : Abstract
     | Array
+    | Assert
     | As
     | BinaryCast
     | BoolType
@@ -904,7 +903,7 @@ key
     | EndIf
     | EndSwitch
     | EndWhile
-//    | Eval
+    | Eval
 //    | Exit
     | Extends
     | Final

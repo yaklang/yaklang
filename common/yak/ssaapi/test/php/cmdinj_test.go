@@ -46,6 +46,29 @@ system($c);`
 	)
 }
 
+func TestPHP_OOP(t *testing.T) {
+	t.Run("no impl __construct", func(t *testing.T) {
+		code := `<?php
+class b{
+public $a;
+public function __construct($a){
+$this->a = $a;
+}
+}
+
+class ob extends b{
+}
+
+$ob = new ob($_GET[1]);
+eval($ob->a);
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`eval(* #-> * as $param)`,
+			map[string][]string{"param": {"Undefined-$_GET", "Undefined-$_GET.1(valid)"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}
+
 func TestPHP_CMD(t *testing.T) {
 	code := `<?php
 $a = $_GET[1];

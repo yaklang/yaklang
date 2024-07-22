@@ -291,7 +291,16 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseBodySize             = "ResponseBodySize"
 	REQUEST_CONTEXT_KEY_MatchedRules                 = "MatchedRules"
 	REQUEST_CONTEXT_KEY_WebsocketRequestHash         = "websocketRequestHash"
+	REQUEST_CONTEXT_KEY_RequestProxyProtocol         = "requestProxyProtocol"
 )
+
+func SetRequestProxyProtocol(req *http.Request, p string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestProxyProtocol, p)
+}
+
+func GetRequestProxyProtocol(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestProxyProtocol)
+}
 
 func SetResponseBodySize(req *http.Request, i int64) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseBodySize, i)

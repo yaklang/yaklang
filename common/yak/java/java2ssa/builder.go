@@ -2,14 +2,14 @@ package java2ssa
 
 import (
 	"fmt"
-	"path/filepath"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"path/filepath"
 )
 
 // ========================================== For SSAAPI ==========================================
@@ -35,6 +35,10 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 
 func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".java"
+}
+
+func (*SSABuilder) GetLanguage() consts.Language {
+	return consts.JAVA
 }
 
 // ========================================== Build Front End ==========================================

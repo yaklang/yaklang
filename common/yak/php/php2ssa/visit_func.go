@@ -115,6 +115,9 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 	_ = allowNull
 
 	typeHint := y.VisitTypeHint(i.TypeHint())
+	if typeHint.RawString() == "" {
+		typeHint = ssa.GetAnyType()
+	}
 	isRef := i.Ampersand() != nil
 	isVariadic := i.Ellipsis()
 	_, _, _ = typeHint, isRef, isVariadic
@@ -153,6 +156,7 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 	newFunc := y.NewFunc(funcName)
 	y.FunctionBuilder = y.PushFunction(newFunc)
 	{
+		y.VisitLambdaFunctionUseVars(i.LambdaFunctionUseVars())
 		y.VisitFormalParameterList(i.FormalParameterList())
 		y.SetType(y.VisitTypeHint(i.TypeHint()))
 		y.VisitBlockStatement(i.BlockStatement())
@@ -161,4 +165,47 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 	}
 	y.FunctionBuilder = y.PopFunction()
 	return newFunc
+}
+func (y *builder) VisitLambdaFunctionUseVars(raw phpparser.ILambdaFunctionUseVarsContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.LambdaFunctionUseVarsContext)
+	if i == nil {
+		return nil
+	}
+	for _, lambda := range i.AllLambdaFunctionUseVar() {
+		y.VisitLambdaFunctionUseVar(lambda)
+	}
+	return nil
+}
+func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.LambdaFunctionUseVarContext)
+	if i == nil {
+		return nil
+	}
+	if i.Ampersand() != nil {
+		y.ReferenceParameter(i.VarName().GetText())
+	}
+	y.SupportClosure = true
+	defer func() {
+		if !y.SupportClosure {
+			y.SupportClosure = false
+		}
+	}()
+	if value := y.ReadValue(i.VarName().GetText()); value != nil {
+		freeValue := y.BuildFreeValue(i.VarName().GetText())
+		freeValue.SetDefault(value)
+		freeValue.SetType(value.GetType())
+	}
+	return nil
 }

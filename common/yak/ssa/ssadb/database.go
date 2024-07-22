@@ -9,10 +9,7 @@ import (
 var SSAProjectTables = []any{
 	// instruction
 	&IrCode{},
-	// instruction index by name or class-name
-	&IrVariable{},
-	// scope
-	&IrScopeNode{},
+	&IrIndex{},
 	// source code
 	&IrSource{},
 	// type
@@ -27,4 +24,11 @@ func init() {
 
 func GetDB() *gorm.DB {
 	return consts.GetGormDefaultSSADataBase()
+}
+
+func DeleteDB(db *gorm.DB, program string) {
+	// delete the program
+	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
+	db.Model(&IrIndex{}).Where("program_name = ?", program).Unscoped().Delete(&IrIndex{})
+	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
 }

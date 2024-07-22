@@ -51,7 +51,8 @@ func WithHookEveryNode(hookNode func(*Value) error) OperationOption {
 
 func NewOperations(opt ...OperationOption) *OperationConfig {
 	config := &OperationConfig{
-		MaxDepth:             -1,
+		MaxDepth:             500,
+		MinDepth:             -500,
 		AllowIgnoreCallStack: true,
 	}
 

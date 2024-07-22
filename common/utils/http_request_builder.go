@@ -448,7 +448,9 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 		host = hostInHeader
 	}
 	req.Host = host
-
+	if req.URL.Host == "" {
+		req.URL.Host = hostInHeader
+	}
 	bodyRawBuf := new(bytes.Buffer)
 	if fixContentLength {
 		// by reader

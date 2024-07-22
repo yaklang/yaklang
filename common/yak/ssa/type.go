@@ -1096,6 +1096,10 @@ func isGenericType(t Type) bool {
 func GetGenericTypeFromType(t Type) []Type {
 	typs := make([]Type, 0)
 	switch t.GetTypeKind() {
+	case OrTypeKind:
+		for _, typ := range t.(*OrType).types {
+			typs = append(typs, GetGenericTypeFromType(typ)...)
+		}
 	case GenericTypeKind:
 		typs = append(typs, t)
 	case ChanTypeKind:
@@ -1121,7 +1125,7 @@ func GetGenericTypeFromType(t Type) []Type {
 	return typs
 }
 
-// Shallow copy
+// Deep copy
 func CloneType(t Type) (Type, bool) {
 	switch t.GetTypeKind() {
 	case GenericTypeKind,
@@ -1130,21 +1134,65 @@ func CloneType(t Type) (Type, bool) {
 		return t, true
 	case ChanTypeKind:
 		old := t.(*ChanType)
-		return NewChanType(old.Elem), true
+		clonedElem, ok := CloneType(old.Elem)
+		if !ok {
+			return nil, false
+		}
+		return NewChanType(clonedElem), true
 	case SliceTypeKind:
 		old := t.(*ObjectType)
-		return NewSliceType(old.FieldType), true
+		clonedField, ok := CloneType(old.FieldType)
+		if !ok {
+			return nil, false
+		}
+		return NewSliceType(clonedField), true
 	case MapTypeKind:
 		old := t.(*ObjectType)
-		return NewMapType(old.KeyTyp, old.FieldType), true
+		clonedKey, ok := CloneType(old.KeyTyp)
+		if !ok {
+			return nil, false
+		}
+		clonedField, ok := CloneType(old.FieldType)
+		if !ok {
+			return nil, false
+		}
+		return NewMapType(clonedKey, clonedField), true
 	case TupleTypeKind:
 		old := t.(*ObjectType)
-		return CalculateType(old.FieldTypes), true
+		clonedSlices := make([]Type, 0, len(old.FieldTypes))
+		for _, t := range old.FieldTypes {
+			cloned, ok := CloneType(t)
+			if !ok {
+				return nil, false
+			}
+			clonedSlices = append(clonedSlices, cloned)
+		}
+		return CalculateType(clonedSlices), true
 	case FunctionTypeKind:
 		old := t.(*FunctionType)
-		return NewFunctionType(old.Name, old.Parameter, old.ReturnType, old.IsVariadic), true
+		clonedParameter := make([]Type, 0, len(old.Parameter))
+		for _, t := range old.Parameter {
+			cloned, ok := CloneType(t)
+			if !ok {
+				return nil, false
+			}
+			clonedParameter = append(clonedParameter, cloned)
+		}
+		clonedReturn, ok := CloneType(old.ReturnType)
+		if !ok {
+			return nil, false
+		}
+		return NewFunctionType(old.Name, clonedParameter, clonedReturn, old.IsVariadic), true
 	case OrTypeKind:
-		return NewOrType(t.(*OrType).types...), true
+		old := t.(*OrType)
+		clonedTypes := make([]Type, 0, len(old.types))
+		for _, typ := range old.types {
+			if _, ok := CloneType(typ); !ok {
+				return nil, false
+			}
+			clonedTypes = append(clonedTypes, typ)
+		}
+		return NewOrType(clonedTypes...), true
 	}
 	return nil, false
 }

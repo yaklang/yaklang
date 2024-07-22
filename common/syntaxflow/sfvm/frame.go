@@ -13,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
-
-	_ "github.com/yaklang/yaklang/common/sarif"
 )
 
 type filterExprContext struct {
@@ -25,6 +23,10 @@ type filterExprContext struct {
 
 type SFFrame struct {
 	config *Config
+
+	Title       string
+	Description string
+	Purpose     string
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -228,6 +230,49 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			}
 			s.debugSubLog("<< push condition results[len: %v]", results)
 			s.conditionStack.Push(results)
+		case OpFileFilterJsonPath:
+			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+			name := i.UnaryStr
+			if name == "" {
+				return utils.Errorf("file filter failed: file name is empty")
+			}
+			paramList := i.Values
+			paramMap := i.FileFilterMethodItem
+			res, err := input.FileFilter(name, "jsonpath", paramMap, paramList)
+			if err != nil {
+				return utils.Errorf("file filter failed: %v", err)
+			}
+			s.stack.Push(res)
+		case OpFileFilterXpath:
+			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+			name := i.UnaryStr
+			if name == "" {
+				return utils.Errorf("file filter failed: file name is empty")
+			}
+			paramList := i.Values
+			paramMap := i.FileFilterMethodItem
+			res, err := input.FileFilter(name, "xpath", paramMap, paramList)
+			if err != nil {
+				return utils.Errorf("file filter failed: %v", err)
+			}
+			s.stack.Push(res)
+			_ = paramList
+			_ = paramMap
+		case OpFileFilterReg:
+			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+			name := i.UnaryStr
+			if name == "" {
+				return utils.Errorf("file filter failed: file name is empty")
+			}
+			paramList := i.Values
+			paramMap := i.FileFilterMethodItem
+			res, err := input.FileFilter(name, "regexp", paramMap, paramList)
+			if err != nil {
+				return utils.Errorf("file filter failed: %v", err)
+			}
+			s.stack.Push(res)
+			// _ = paramList
+			// _ = paramMap
 		default:
 			if err := s.execStatement(i); err != nil {
 				if errors.Is(err, CriticalError) {
@@ -692,14 +737,25 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		result, ok := s.GetSymbolTable().Get(i.UnaryStr)
 		if ok {
-			om := omap.NewEmptyOrderedMap[int64, ValueOperator]()
+			res := make([]ValueOperator, 0, valuesLen(result))
+			tmp := make(map[int64]struct{})
 			_ = result.Recursive(func(operator ValueOperator) error {
 				if i, ok := operator.(ssa.GetIdIF); ok {
-					om.Set(i.GetId(), operator)
+					if i.GetId() == -1 {
+						// syntax-flow  runtime will create new template value
+						// the "fileFilter" function will create.
+						res = append(res, operator)
+					} else {
+						_, ok := tmp[i.GetId()]
+						if !ok {
+							res = append(res, operator)
+							tmp[i.GetId()] = struct{}{}
+						}
+					}
 				}
 				return nil
 			})
-			s.GetSymbolTable().Set(i.UnaryStr, NewValues(om.Values()))
+			s.GetSymbolTable().Set(i.UnaryStr, NewValues(res))
 		}
 
 		s.debugSubLog(" -> save $" + i.UnaryStr)
@@ -924,6 +980,39 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return err
 		}
 		s.stack.Push(ret)
+	case OpFileFilterJsonPath:
+		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+		name := i.UnaryStr
+		if name == "" {
+			return utils.Errorf("file filter failed: file name is empty")
+		}
+		paramList := i.Values
+		paramMap := i.FileFilterMethodItem
+		_ = paramList
+		_ = paramMap
+	case OpFileFilterXpath:
+		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+		name := i.UnaryStr
+		if name == "" {
+			return utils.Errorf("file filter failed: file name is empty")
+		}
+		paramList := i.Values
+		paramMap := i.FileFilterMethodItem
+		_ = paramList
+		_ = paramMap
+	case OpFileFilterReg:
+		// TODO: 调用FileFilter接口并实现具体功能
+		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
+		name := i.UnaryStr
+		if name == "" {
+			return utils.Errorf("file filter failed: file name is empty")
+		}
+		paramList := i.Values
+		paramMap := i.FileFilterMethodItem
+		_ = paramList
+		_ = paramMap
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

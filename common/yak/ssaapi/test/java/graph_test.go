@@ -2,6 +2,7 @@ package java
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -10,6 +11,7 @@ import (
 
 func TestGraphFrom_XXE(t *testing.T) {
 	ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
+		assert.Equal(t, prog.GetLanguage(), "java")
 		results := prog.SyntaxFlowChain(`
 desc("Description": 'checking setFeature/setXIncludeAware/setExpandEntityReferences in DocumentBuilderFactory.newInstance()')
 
