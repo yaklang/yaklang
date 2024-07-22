@@ -291,18 +291,31 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 }
 
 func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	// available query:
+	// trash=true # move to trash if supported
 	u := params.GetUrl()
 	fs := f.fs
 	absPath, _, _, err := f.FormatPath(params)
 	if err != nil {
 		return nil, err
 	}
+	query := make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
 
 	exists, err := fs.Exists(absPath)
 	if !exists {
 		return nil, utils.Errorf("file [%s] exists check error: %s", u.GetPath(), err)
 	}
-	err = fs.Delete(absPath)
+	if trash, ok := fs.(filesys.Trash); ok && query.Get("trash") == "true" {
+		err = trash.Throw(absPath)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = fs.Delete(absPath)
+	}
 	if err != nil {
 		return nil, err
 	}
