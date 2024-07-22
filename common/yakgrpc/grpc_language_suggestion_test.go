@@ -373,6 +373,21 @@ rsp.`,
 			labelsNotContainsCallback(t, []string{"del"}),
 		)
 	})
+
+	t.Run("completion with multi-bytes chars before", func(t *testing.T) {
+		t.Parallel()
+
+		res := getCompletion(t, "//前面是一些注释，用于测试\ncli.\n//后面也是一些注释，用于测试", &ypb.Range{
+			Code:        "cli.",
+			StartLine:   2,
+			StartColumn: 1,
+			EndLine:     2,
+			EndColumn:   5,
+		})
+		if len(res.SuggestionMessage) == 0 {
+			t.Fatal("code `cli.` should get completion but not")
+		}
+	})
 }
 
 var local ypb.YakClient = nil

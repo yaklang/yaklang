@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -48,18 +47,14 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 			// fix for hover or signature
 			fixRange = false
 			shouldTrim = true
-			rangeWordText = editor.GetWordTextFromOffset(startOffset, endOffset+1)
+			endOffset++
+			rangeWordText = editor.GetWordTextFromOffset(startOffset, endOffset)
 		}
 
 		// try to remove content after point
 		if shouldTrim {
-			offset := startOffset - 1
-			if offset < 0 {
-				offset = 0
-			}
-			lastIndex := strings.LastIndex(rangeWordText, ".")
-			before, after := rangeWordText[:lastIndex], rangeWordText[lastIndex+1:]
-			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
+			trimCode := editor.GetTextFromOffset(0, endOffset-1)
+			trimCode += editor.GetTextFromOffset(endOffset, editor.CodeLength())
 
 			prog, err = static_analyzer.SSAParse(trimCode, scriptType)
 			if err == nil {
@@ -68,9 +63,8 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 				if !ok {
 					newEditor = memedit.NewMemEditor(trimCode)
 				}
-				// end use old editor to get position
 				if fixRange {
-					ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-len(after)-1))
+					ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-1))
 				}
 				editor = newEditor
 
