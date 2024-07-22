@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -12,13 +13,13 @@ import (
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 )
 
-type SSABuild struct {
+type SSABuilder struct {
 	ssa.DummyExtraFileAnalyzer
 }
 
-var Builder = &SSABuild{}
+var Builder = &SSABuilder{}
 
-func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
+func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
@@ -34,7 +35,7 @@ func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) err
 	return nil
 }
 
-func (*SSABuild) FilterFile(path string) bool {
+func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".go"
 }
 
@@ -84,4 +85,8 @@ func (b *astbuilder) GetFromLmap(key string) bool {
 	} else {
 		return false
 	}
+}
+
+func (*SSABuilder) GetLanguage() consts.Language {
+	return consts.GO
 }
