@@ -5748,7 +5748,7 @@ func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext
 	_parentState := p.GetState()
 	localctx = NewSingleExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx ISingleExpressionContext = localctx
-	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
+	var _ antlr.ParserRuleContext = _prevctx // TODO: ToOpcode prevent unused variable warning.
 	_startState := 40
 	p.EnterRecursionRule(localctx, 40, NaslParserRULE_singleExpression, _p)
 	var _la int

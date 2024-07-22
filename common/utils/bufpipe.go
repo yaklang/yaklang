@@ -61,7 +61,7 @@ func (p *PipeReader) BytesBuffer() *bytes.Buffer {
 // The new pipe takes ownership of buf, and the caller should not use buf after
 // this call. New is intended to prepare a PipeReader to read existing data. It
 // can also be used to set the initial size of the internal buffer for writing.
-// To do that, buf should have the desired capacity but a length of zero.
+// ToOpcode do that, buf should have the desired capacity but a length of zero.
 func NewBufPipe(buf []byte) (*PipeReader, *PipeWriter) {
 	p := &pipe{
 		buf:  bytes.NewBuffer(buf),

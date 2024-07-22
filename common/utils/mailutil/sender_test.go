@@ -24,7 +24,7 @@ func TestNewSMTPMailSender(t *testing.T) {
 
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", "tFrom Who")
-	msg.SetHeader("To", "The One")
+	msg.SetHeader("ToOpcode", "The One")
 	msg.SetHeader("Subject", "This is Subject")
 	msg.SetBody("text/html", "<h2>Hello World<h2>")
 
