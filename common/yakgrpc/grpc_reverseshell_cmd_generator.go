@@ -24,6 +24,9 @@ func (s *Server) GetReverseShellProgramList(ctx context.Context, req *ypb.GetRev
 		res.ShellList = append(res.ShellList, shell.String())
 	}
 	for _, reverseShellCommandCfg := range reverseShellCommands.Array() {
+		if reverseShellCommandCfg.Get("command").String() == "" {
+			continue
+		}
 		metas := reverseShellCommandCfg.Get("meta").Array()
 		lastMeta := ""
 		premetas := []string{}
