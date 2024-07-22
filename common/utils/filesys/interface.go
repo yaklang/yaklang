@@ -38,6 +38,10 @@ type FileSystem interface {
 	MkdirAll(string, os.FileMode) error
 }
 
+type Trash interface {
+	Throw(filenames ...string) error
+}
+
 func splitWithSeparator(path string, sep rune) (string, string) {
 	if len(path) == 0 {
 		return "", ""
