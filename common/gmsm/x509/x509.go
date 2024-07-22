@@ -1941,7 +1941,7 @@ func ParseDERCRL(derBytes []byte) (*pkix.CertificateList, error) {
 // contains the given list of revoked certificates.
 //
 // Note: this method does not generate an RFC 5280 conformant X.509 v2 CRL.
-// To generate a standards compliant CRL, use CreateRevocationList instead.
+// ToOpcode generate a standards compliant CRL, use CreateRevocationList instead.
 func (c *Certificate) CreateCRL(rand io.Reader, priv interface{}, revokedCerts []pkix.RevokedCertificate, now, expiry time.Time) (crlBytes []byte, err error) {
 	key, ok := priv.(crypto.Signer)
 	if !ok {

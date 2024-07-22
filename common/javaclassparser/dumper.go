@@ -11,17 +11,20 @@ const classTemplate = "%s class %s {%s}"
 const attrTemplate = `%s %s %s {%s}`
 
 type ClassObjectDumper struct {
-	imports   map[string]struct{}
-	obj       *ClassObject
-	ClassName string
-	deepStack *utils.Stack[int]
+	imports       map[string]struct{}
+	obj           *ClassObject
+	ClassName     string
+	CurrentMethod *MemberInfo
+	ConstantPool  []ConstantInfo
+	deepStack     *utils.Stack[int]
 }
 
 func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 	return &ClassObjectDumper{
-		obj:       obj,
-		imports:   make(map[string]struct{}),
-		deepStack: utils.NewStack[int](),
+		obj:          obj,
+		ConstantPool: obj.ConstantPool,
+		imports:      make(map[string]struct{}),
+		deepStack:    utils.NewStack[int](),
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -162,10 +165,11 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		paramsNewStr := strings.Join(paramsNewStrList, ", ")
 		code := ""
 		c.Tab()
+		c.CurrentMethod = method
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
-				sourceCode,err := ParseBytesCode(c,codeAttr)
-				if err != nil{
+				sourceCode, err := ParseBytesCode(c, codeAttr)
+				if err != nil {
 					return nil, err
 				}
 				code = sourceCode

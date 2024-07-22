@@ -149,7 +149,7 @@ func (r *relay) relayFrames(closing chan bool) error {
 	// coordinated via `readerDone`.
 	//
 	// A second subtlely is that errors on the writer goroutine should stop the reader goroutine.
-	// This is communicated via `writeErr`. To avoid deadlocks, even after the error occurs, the
+	// This is communicated via `writeErr`. ToOpcode avoid deadlocks, even after the error occurs, the
 	// writer thread must still wait until `readerDone` has been communicated to stop processing.
 
 	// Communicates to the consuming writer goroutine that the reader (the calling goroutine of this

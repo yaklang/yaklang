@@ -2893,7 +2893,7 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 	_parentState := p.GetState()
 	localctx = NewExpContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IExpContext = localctx
-	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
+	var _ antlr.ParserRuleContext = _prevctx // TODO: ToOpcode prevent unused variable warning.
 	_startState := 22
 	p.EnterRecursionRule(localctx, 22, LuaParserRULE_exp, _p)
 
