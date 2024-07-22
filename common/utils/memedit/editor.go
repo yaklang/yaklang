@@ -41,6 +41,10 @@ func NewMemEditor(sourceCode string) *MemEditor {
 	return editor
 }
 
+func (ve *MemEditor) CodeLength() int {
+	return ve.safeSourceCode.Len()
+}
+
 func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
