@@ -56,13 +56,6 @@ func TestStmt_switch(t *testing.T) {
 		}
 		`, []string{"phi(a)[2,3,4,0]"}, t)
 	})
-
-	t.Run("type switch", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
-		func main(){
-		}
-		`, []string{""}, t)
-	})
 }
 
 func TestStmt_for(t *testing.T) {
