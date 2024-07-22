@@ -592,18 +592,18 @@ func (lz *LazyInstruction) ReplaceValue(v1, v2 Value) {
 	lz.User.ReplaceValue(v1, v2)
 }
 
-func (lz *LazyInstruction) Reference() Values {
+func (lz *LazyInstruction) GetPointer() Values {
 	lz.check()
 	if lz.Value == nil {
 		return nil
 	}
-	return lz.Value.Reference()
+	return lz.Value.GetPointer()
 }
 
-func (lz *LazyInstruction) AddReference(v Value) {
+func (lz *LazyInstruction) AddPointer(v Value) {
 	lz.check()
 	if lz.Value == nil {
 		return
 	}
-	lz.Value.AddReference(v)
+	lz.Value.AddPointer(v)
 }

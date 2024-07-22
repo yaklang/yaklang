@@ -904,7 +904,6 @@ type FunctionType struct {
 	pkgPath         string
 	This            *Function
 	ReturnType      Type
-	ReturnValue     []*Return
 	Parameter       Types
 	ParameterLen    int
 	ParameterValue  []*Parameter

@@ -200,7 +200,8 @@ type anValue struct {
 	// it record the variable is masked by closure function or some scope changed
 	mask *omap.OrderedMap[string, Value]
 
-	reference Values
+	pointer Values // the pointer is point to this value
+	pointed Value  // the value is pointed by this value
 }
 
 func NewValue() anValue {
@@ -331,7 +332,8 @@ func (n *anValue) SetType(typ Type) {
 			return
 		}
 		if fun := t.This; fun != nil {
-			fun.AddReference(this)
+			fun.AddPointer(this)
+			this.SetPoint(fun)
 		}
 		for _, f := range t.AnnotationFunc {
 			f(this)
@@ -376,9 +378,16 @@ func (i *anValue) Masked() bool {
 	return i.mask.Len() != 0
 }
 
-func (i *anValue) AddReference(v Value) {
-	i.reference = append(i.reference, v)
+func (i *anValue) SetPoint(v Value) {
+	i.pointed = v
 }
-func (i *anValue) Reference() Values {
-	return i.reference
+func (i *anValue) GetPoint() Value {
+	return i.pointed
+}
+
+func (i *anValue) AddPointer(v Value) {
+	i.pointer = append(i.pointer, v)
+}
+func (i *anValue) GetPointer() Values {
+	return i.pointer
 }

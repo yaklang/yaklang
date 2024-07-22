@@ -185,86 +185,63 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return result
 	case *ssa.Call:
-		caller := inst.Method
-		if caller == nil {
+		calleeInst := inst.Method
+		if calleeInst == nil {
 			return Values{i} // return self
 		}
 
 		// TODO: trace the specific return-values
-		callerValue := i.NewValue(caller)
-		_, isFunc := ssa.ToFunction(caller)
-		funcType, isFuncTyp := ssa.ToFunctionType(caller.GetType())
-		if !callerValue.IsExtern() {
-			switch {
-			case isFunc:
-				callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-				callerValue.AppendEffectOn(i)
-				err := actx.PushCall(i)
-				if err != nil {
-					log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-					return Values{i}
-				}
-				defer actx.PopCall()
-				// inherit return index
-				val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
-				if ok {
-					callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
-				}
-				return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
-			case isFuncTyp:
-				// funcType.ReturnType
-				// string literal member
-				err := actx.PushCall(i)
-				if err != nil {
-					log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-					return Values{i}
-				}
-				defer actx.PopCall()
+		fun, isFunc := ssa.ToFunction(calleeInst)
+		// callee := i.NewValue(fun)
+		if !isFunc && calleeInst.GetPoint() != nil {
+			fun, isFunc = ssa.ToFunction(calleeInst.GetPoint())
+			// callee = i.NewValue(fun)
+		}
 
-				var res Values
-				for _, retIns := range funcType.ReturnValue {
-					for _, traceVal := range retIns.Results {
-						// val, ok := traceVal.GetStringMember(retIndexRawStr)
-						// if ok {
-						res = append(res,
-							i.NewValue(traceVal).AppendEffectOn(i).getTopDefs(actx, opt...)...,
-						)
-					}
-				}
-				if len(res) == 0 {
-					// the result from the return value is empty,
-					// get the topDef by the callee
-					res = append(res,
-						callerValue.AppendDependOn(i).getTopDefs(actx, opt...)...,
-					)
-				}
-				return res
+		switch {
+		case isFunc && !fun.IsExtern():
+			callee := i.NewValue(fun)
+			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
+			callee.AppendEffectOn(i)
+			err := actx.PushCall(i)
+			if err != nil {
+				log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
+				return Values{i}
 			}
-		}
-		i.AppendDependOn(callerValue)
-		nodes := Values{callerValue}
-		for _, val := range inst.Args {
-			arg := i.NewValue(val)
-			i.AppendDependOn(arg)
-			nodes = append(nodes, arg)
-		}
-		for _, value := range inst.Binding {
-			arg := i.NewValue(value)
-			i.AppendDependOn(arg)
-			nodes = append(nodes, arg)
-		}
-		var results Values
-		for _, subNode := range nodes {
-			if subNode == nil {
-				continue
+			defer actx.PopCall()
+			// inherit return index
+			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
+			if ok {
+				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
 			}
-			// getTopDefs(nil,opt...)第一个参数指定为nil
-			// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
-			vals := subNode.GetTopDefs(opt...).AppendEffectOn(subNode)
-			//vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
-			results = append(results, vals...)
+			return callee.getTopDefs(actx, opt...).AppendEffectOn(callee)
+		default:
+			callee := i.NewValue(calleeInst)
+			i.AppendDependOn(callee)
+			nodes := Values{callee}
+			for _, val := range inst.Args {
+				arg := i.NewValue(val)
+				i.AppendDependOn(arg)
+				nodes = append(nodes, arg)
+			}
+			for _, value := range inst.Binding {
+				arg := i.NewValue(value)
+				i.AppendDependOn(arg)
+				nodes = append(nodes, arg)
+			}
+			var results Values
+			for _, subNode := range nodes {
+				if subNode == nil {
+					continue
+				}
+				// getTopDefs(nil,opt...)第一个参数指定为nil
+				// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
+				vals := subNode.GetTopDefs(opt...).AppendEffectOn(subNode)
+				//vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
+				results = append(results, vals...)
+			}
+			return results
 		}
-		return results
 	case *ssa.Function:
 		var vals Values
 		// handle return
