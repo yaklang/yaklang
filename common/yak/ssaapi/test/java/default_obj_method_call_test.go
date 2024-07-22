@@ -116,3 +116,52 @@ class B {
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
+
+func TestDefaultOBJFieldCall4(t *testing.T) {
+	ssatest.Check(t, `
+class A {
+	static String staticValue = "abc";
+
+	static {
+		if (outterCondition) {
+			staticValue = "eee";
+        }
+	}
+
+	public static String hello() {
+		staticValue = "ddd";
+	}
+}
+
+`, func(prog *ssaapi.Program) error {
+		result := prog.SyntaxFlow(`staticValue as $entry;`)
+		rets := result.GetValues("entry")
+		if rets.Len() <= 0 {
+			t.Fatal("no entry")
+		}
+		if rets.Len() != 4 {
+			t.Fatal("staticValue should be 4")
+		}
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestDefaultOBJNoExistedMethodCall5(t *testing.T) {
+	ssatest.Check(t, `
+class A {
+	public static String hello() {
+		noExisted();
+	}
+}
+
+`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		result := prog.SyntaxFlow(`noExisted(* as $entry)`)
+		rets := result.GetValues("entry")
+		if rets.Len() <= 0 {
+			t.Fatal("no entry")
+		}
+		rets.Show()
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
