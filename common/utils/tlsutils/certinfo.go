@@ -36,7 +36,7 @@ type publicKeyInfo struct {
 	PublicKey asn1.BitString
 }
 
-// tbsCertificate allows unmarshaling of the "To-Be-Signed" principle portion
+// tbsCertificate allows unmarshaling of the "ToOpcode-Be-Signed" principle portion
 // of the certificate
 type tbsCertificate struct {
 	Version            int `asn1:"optional,explicit,default:1,tag:0"`

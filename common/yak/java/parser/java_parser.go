@@ -24504,7 +24504,7 @@ func (p *JavaParser) expression(_p int) (localctx IExpressionContext) {
 	_parentState := p.GetState()
 	localctx = NewExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IExpressionContext = localctx
-	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
+	var _ antlr.ParserRuleContext = _prevctx // TODO: ToOpcode prevent unused variable warning.
 	_startState := 216
 	p.EnterRecursionRule(localctx, 216, JavaParserRULE_expression, _p)
 	var _la int
@@ -27638,7 +27638,7 @@ func (p *JavaParser) guardedPattern(_p int) (localctx IGuardedPatternContext) {
 	_parentState := p.GetState()
 	localctx = NewGuardedPatternContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IGuardedPatternContext = localctx
-	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
+	var _ antlr.ParserRuleContext = _prevctx // TODO: ToOpcode prevent unused variable warning.
 	_startState := 238
 	p.EnterRecursionRule(localctx, 238, JavaParserRULE_guardedPattern, _p)
 

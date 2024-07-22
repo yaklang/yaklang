@@ -132,14 +132,14 @@ type WriteResetter interface {
 // method has been called.
 // NOTE: msgWriter uses compressor constructor function instead of field to
 // reach these goals:
-//  1. To shrink Compressor interface and make it easier to be implemented.
+//  1. ToOpcode shrink Compressor interface and make it easier to be implemented.
 //  2. If used as a field (and argument to the NewWriter()), Compressor object
 //     will probably be initialized twice - first time to pass into msgWriter, and
 //     second time during msgWriter initialization (which does Reset() internally).
-//  3. To get rid of wrappers if Reset() would be a part of	Compressor.
+//  3. ToOpcode get rid of wrappers if Reset() would be a part of	Compressor.
 //     E.g. non conformant implementations would have to provide it somehow,
 //     probably making a wrapper with the same constructor function.
-//  4. To make Reader and msgWriter API the same. That is, there is no Reset()
+//  4. ToOpcode make Reader and msgWriter API the same. That is, there is no Reset()
 //     method for flate.Reader already, so we need to provide it as a wrapper
 //     (see point #3), or drop the Reader.Reset() method.
 type msgWriter struct {

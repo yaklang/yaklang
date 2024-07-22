@@ -123,7 +123,7 @@ func (f *Filter) Delete(item []byte) bool {
 // ItemCount ...
 //
 // Get an estimate of the total items in the Filter. Could be drastically off
-// if using Insert with many duplicate items. To get a more accurate total
+// if using Insert with many duplicate items. ToOpcode get a more accurate total
 // using InsertUnique can be used
 //
 // Example:
