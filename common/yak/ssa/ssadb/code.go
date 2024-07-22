@@ -89,10 +89,11 @@ type IrCode struct {
 	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
 
 	// type
-	TypeId int `json:"type_id"`
+	TypeID int `json:"type_id"`
 
 	// reference
-	Reference Int64Slice `json:"reference" gorm:"type:text"`
+	Point   int64      `json:"point" gorm:"type:text"`
+	Pointer Int64Slice `json:"pointer" gorm:"type:text"`
 
 	// not important information
 	ExtraInformation string `json:"extra_information"`

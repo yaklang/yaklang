@@ -184,9 +184,6 @@ func (f *Function) Finish() {
 	}))
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
-	funType.ReturnValue = lo.FilterMap(f.Return, func(i Value, _ int) (*Return, bool) {
-		return ToReturn(i)
-	})
 	funType.ParameterLen = f.ParamLength
 	funType.ParameterValue = lo.FilterMap(f.Params, func(i Value, _ int) (*Parameter, bool) {
 		return ToParameter(i)

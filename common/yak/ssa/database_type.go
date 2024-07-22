@@ -2,11 +2,7 @@ package ssa
 
 import (
 	"encoding/json"
-	"fmt"
-	"strconv"
-	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -24,9 +20,6 @@ func SaveTypeToDB(typ Type) int {
 	switch t := typ.(type) {
 	case *FunctionType:
 		param["name"] = t.Name
-		param["return_value"] = strings.Join(lo.Map(t.ReturnValue, func(v *Return, _ int) string {
-			return fmt.Sprintf("%d", v.GetId())
-		}), ",")
 	case *ObjectType:
 		param["name"] = t.Name
 	default:
@@ -57,17 +50,18 @@ func GetTypeFromDB(id int) Type {
 	case FunctionTypeKind:
 		typ := &FunctionType{}
 		if raw, ok := params["return_value"].(string); ok {
-			typ.ReturnValue = lo.FilterMap(strings.Split(raw, ","), func(s string, _ int) (*Return, bool) {
-				id, err := strconv.ParseInt(s, 10, 64)
-				if err != nil {
-					return nil, false
-				}
-				r, err := NewInstructionFromLazy(id, ToReturn)
-				if err != nil {
-					return nil, false
-				}
-				return r, true
-			})
+			_ = raw
+			// typ.ReturnValue = lo.FilterMap(strings.Split(raw, ","), func(s string, _ int) (*Return, bool) {
+			// 	id, err := strconv.ParseInt(s, 10, 64)
+			// 	if err != nil {
+			// 		return nil, false
+			// 	}
+			// 	r, err := NewInstructionFromLazy(id, ToReturn)
+			// 	if err != nil {
+			// 		return nil, false
+			// 	}
+			// 	return r, true
+			// })
 		}
 		return typ
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
