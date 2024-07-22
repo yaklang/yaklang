@@ -20,10 +20,6 @@ func GetSSASaveTypeCost() time.Duration {
 	return time.Duration(atomic.LoadUint64(&_SSASaveTypeCost))
 }
 
-func GetSSAVariableCost() time.Duration {
-	return time.Duration(atomic.LoadUint64(&_SSAVariableCost))
-}
-
 func GetSSASourceCodeCost() time.Duration {
 	return time.Duration(atomic.LoadUint64(&_SSASourceCodeCost))
 }
