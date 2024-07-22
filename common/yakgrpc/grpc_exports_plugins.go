@@ -5,18 +5,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 func (s *Server) ImportYakScriptStream(
@@ -62,7 +64,7 @@ func (s *Server) ImportYakScriptStream(
 	if err != nil {
 		return utils.Wrap(err, "open meta.json failed")
 	}
-	var results = make([]map[string]interface{}, 0, 0)
+	results := make([]map[string]interface{}, 0, 0)
 	if err := json.NewDecoder(metaReader).Decode(&results); err != nil {
 		return utils.Wrap(err, "decode meta.json failed")
 	}
@@ -115,8 +117,11 @@ func (s *Server) ExportYakScriptStream(
 	client := yaklib.NewVirtualYakitClient(stream.Send)
 	client.YakitSetProgress(0.1)
 
-	var total int64
-	if err := db.Count(&total).Error; err != nil {
+	var (
+		total int64
+		err   error
+	)
+	if total, err = bizhelper.QueryCount(db, nil); err != nil {
 		return err
 	}
 
@@ -127,7 +132,7 @@ func (s *Server) ExportYakScriptStream(
 	step := 0.8 / float64(total)
 	var buf bytes.Buffer
 	zipWriter := zip.NewWriter(&buf)
-	var output = make([]map[string]interface{}, 0, 64)
+	output := make([]map[string]interface{}, 0, 64)
 	for script := range yakit.YieldYakScripts(db, stream.Context()) {
 		select {
 		case <-stream.Context().Done():
@@ -161,7 +166,7 @@ func (s *Server) ExportYakScriptStream(
 		})
 		client.YakitSetProgress(step + 0.1)
 	}
-	err := zipWriter.Flush()
+	err = zipWriter.Flush()
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -83,7 +84,7 @@ func (s *Server) QueryPorts(ctx context.Context, req *ypb.QueryPortsRequest) (*y
 	var results []*ypb.Port
 	if req.GetAll() {
 		db := yakit.FilterPort(s.GetProjectDatabase(), req)
-		count := bizhelper.QueryCount(db, &schema.Port{}, nil)
+		count, _ := bizhelper.QueryCount(db, &schema.Port{})
 		db = bizhelper.QueryOrder(db, req.GetOrderBy(), req.GetOrder())
 		data := yakit.YieldPorts(db, context.Background())
 		for r := range data {
@@ -182,7 +183,7 @@ func (s *Server) DeleteHosts(ctx context.Context, req *ypb.DeleteHostsRequest) (
 		return &ypb.Empty{}, nil
 	}
 
-	var db = s.GetProjectDatabase().Model(&schema.Host{}).Unscoped()
+	db := s.GetProjectDatabase().Model(&schema.Host{}).Unscoped()
 	if req.DomainKeyword != "" {
 		bizhelper.FuzzQueryLike(db, "domain", req.DomainKeyword).Delete(&schema.Host{})
 		return &ypb.Empty{}, nil
@@ -244,7 +245,7 @@ func (s *Server) DeleteDomains(ctx context.Context, req *ypb.DeleteDomainsReques
 		return &ypb.Empty{}, nil
 	}
 
-	var db = s.GetProjectDatabase().Model(&schema.Domain{}).Unscoped()
+	db := s.GetProjectDatabase().Model(&schema.Domain{}).Unscoped()
 	if req.DomainKeyword != "" {
 		bizhelper.FuzzQueryLike(db, "domain", req.DomainKeyword).Delete(&schema.Domain{})
 		return &ypb.Empty{}, nil
@@ -441,9 +442,7 @@ func severityVerbose(i string) string {
 	}
 }
 
-var (
-	fixRiskOnce = new(sync.Once)
-)
+var fixRiskOnce = new(sync.Once)
 
 func (s *Server) QueryAvailableRiskLevel(ctx context.Context, _ *ypb.Empty) (*ypb.Fields, error) {
 	severities, err := AvailableRiskLevel(s.GetProjectDatabase())
@@ -650,7 +649,7 @@ func (s *Server) DownloadReport(ctx context.Context, req *ypb.DownloadReportRequ
 	}
 	dataPath := filepath.Join(req.FileDir, req.FileName)
 	os.RemoveAll(dataPath)
-	err := ioutil.WriteFile(dataPath, []byte(req.FileData), 0666)
+	err := ioutil.WriteFile(dataPath, []byte(req.FileData), 0o666)
 	if err != nil {
 		return nil, utils.Errorf("write script failed: %s", err)
 	}
@@ -834,7 +833,6 @@ func (s *Server) QueryRiskTags(ctx context.Context, req *ypb.Empty) (*ypb.QueryR
 			Name:  k,
 			Total: int32(v),
 		})
-
 	}
 	return &ypb.QueryRiskTagsResponse{RiskTags: riskTags}, nil
 }
@@ -893,7 +891,7 @@ func AvailableRiskLevel(db *gorm.DB) (map[string]*ypb.FieldName, error) {
 	fixRiskOnce.Do(func() {
 		yakit.FixRiskType(db)
 	})
-	var severities = make(map[string]*ypb.FieldName)
+	severities := make(map[string]*ypb.FieldName)
 	if rows, err := db.Raw(
 		`select distinct severity, count(*) as total from risks where waiting_verified = false group by severity;`,
 	).Rows(); err != nil {
@@ -956,9 +954,9 @@ func AvailableRiskType(db *gorm.DB) (map[string]*ypb.FieldName, error) {
 		}
 	}
 
-	var riskTypes = make(map[string]*ypb.FieldName)
+	riskTypes := make(map[string]*ypb.FieldName)
 	for _, t := range types {
-		var typeStr = t.RiskType
+		typeStr := t.RiskType
 		for _, prefix := range riskTypeGroup {
 			if strings.HasPrefix(t.RiskType, prefix) {
 				typeStr = prefix

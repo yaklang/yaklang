@@ -869,20 +869,16 @@ func MergeOrGormWhereBlocks(blocks []*GormWhereBlock) *GormWhereBlock {
 	return nil
 }
 
-func QueryCount(db *gorm.DB, m interface{}, items *GormWhereBlock) int {
-	var count int
+func QueryCount(db *gorm.DB, m interface{}) (int64, error) {
+	var count int64
 	if m != nil {
 		db = db.Model(m)
 	}
 
-	if items != nil {
-		db = db.Where(items.Cond, items.Items...)
+	if db := db.Select("count(1)").Count(&count); db.Error != nil {
+		return 0, db.Error
 	}
-	if db := db.Count(&count); db.Error != nil {
-		log.Error("query count failed: %s", db.Error)
-		return 0
-	}
-	return count
+	return count, nil
 }
 
 func QueryByJsonKey(db *gorm.DB, field string, filter map[string]interface{}) *gorm.DB {

@@ -539,16 +539,16 @@ func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) 
 }
 
 func CountYakScriptByWhere(db *gorm.DB, isGroup bool, req *ypb.QueryYakScriptGroupRequest) (total int64, err error) {
-	db = db.Model(&schema.YakScript{})
-	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", req.ExcludeType)
+	ndb := db.Model(&schema.YakScript{})
+	ndb = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", req.ExcludeType)
 	if isGroup {
-		db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
+		ndb = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
 	}
-	db = db.Count(&total)
-	if db.Error != nil {
-		return 0, utils.Errorf("get YakScript failed: %s", db.Error)
+	total, err = bizhelper.QueryCount(ndb, nil)
+	if err != nil {
+		err = utils.Wrap(err, "get YakScript count failed")
 	}
-	return total, nil
+	return
 }
 
 func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) *gorm.DB {

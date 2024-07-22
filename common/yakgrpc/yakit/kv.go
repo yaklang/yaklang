@@ -30,7 +30,7 @@ func MigrateLegacyDatabase() error {
 	log.Info("Start migrate general storage")
 	if projectDB.HasTable(&schema.GeneralStorage{}) {
 		var count int64
-		projectDB.Model(&schema.GeneralStorage{}).Count(&count)
+		count, _ = bizhelper.QueryCount(projectDB, &schema.GeneralStorage{})
 		if count > 0 {
 			log.Infof("start auto migrate kv user cache: %v", count)
 			for i := range YieldGeneralStorages(projectDB.Model(&schema.GeneralStorage{}), context.Background()) {
@@ -51,7 +51,7 @@ func MigrateLegacyDatabase() error {
 	log.Info("start to migrate yakscript")
 	if projectDB.HasTable(&schema.YakScript{}) {
 		var count int64
-		projectDB.Model(&schema.YakScript{}).Count(&count)
+		count, _ = bizhelper.QueryCount(projectDB, &schema.YakScript{})
 		if count > 0 {
 			log.Infof("start auto migrate yakscript cache: %v", count)
 			for i := range YieldYakScripts(projectDB.Model(&schema.YakScript{}), context.Background()) {

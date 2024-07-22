@@ -380,8 +380,7 @@ var hybridScanCommand = &cli.Command{
 func ShowHistoryHTTPFlowByRuntimeId(last int64, runtimeId string) int64 {
 	db := consts.GetGormProjectDatabase()
 	db = db.Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeId)
-	var count int64
-	if db.Count(&count).Error == nil {
+	if count, err := bizhelper.QueryCount(db, nil); err == nil {
 		if count != last {
 			log.Infof("runtime_id: %v cause %v http flows", runtimeId, count)
 			return count

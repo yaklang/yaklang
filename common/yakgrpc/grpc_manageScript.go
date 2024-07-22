@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/filter"
-	"github.com/yaklang/yaklang/common/schema"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,6 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/copier"
@@ -1132,13 +1133,16 @@ func (s *Server) ExportLocalYakScriptStream(req *ypb.ExportLocalYakScriptRequest
 	var (
 		progress                 float64
 		count                    int
-		total                    int
+		total                    int64
 		message                  string
 		errorCount, successCount int
+		err                      error
 	)
 	db := yakit.QueryExportYakScript(s.GetProfileDatabase(), req)
 	scripts := yakit.YieldYakScripts(db, context.Background())
-	db.Count(&total)
+	if total, err = bizhelper.QueryCount(db, nil); err != nil {
+		return utils.Wrap(err, "query yak script count failed")
+	}
 
 	dir := req.GetOutputDir()
 	messageType := "success"

@@ -6,6 +6,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"go.uber.org/atomic"
@@ -235,13 +236,17 @@ func (c *Cache) IsExistedSourceCodeHash(programName string, hashString string) b
 		return false
 	}
 
-	var count int
-	if ret := c.DB.Model(&ssadb.IrCode{}).Where(
+	var (
+		count int64
+		err   error
+	)
+	db := c.DB.Model(&ssadb.IrCode{}).Where(
 		"source_code_hash = ?", hashString,
 	).Where(
 		"program_name = ?", programName,
-	).Count(&count).Error; ret != nil {
-		log.Warnf("IsExistedSourceCodeHash error: %v", ret)
+	)
+	if count, err = bizhelper.QueryCount(db, nil); err != nil {
+		log.Warnf("IsExistedSourceCodeHash error: %v", err)
 	}
 	return count > 0
 }
