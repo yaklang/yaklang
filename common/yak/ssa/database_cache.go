@@ -162,6 +162,7 @@ func (c *Cache) AddClassInstance(name string, inst Instruction) {
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
 func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
+	start := time.Now()
 	if !c.HaveDatabaseBackend() {
 		log.Errorf("BUG: saveInstruction called when DB is nil")
 		return false
@@ -187,29 +188,15 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}
+	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 
-	start := time.Now()
 	if r := instIr.inst.GetRange(); r != nil {
 		err := ssadb.SaveIrSource(r.GetEditor(), instIr.irCode.SourceCodeHash)
 		if err != nil {
 			log.Warnf("save source error: %v", err)
 		}
 	}
-	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	return true
-}
-
-var (
-	_SSACacheToDatabaseCost uint64
-	_SSACacheIterationCost  uint64
-)
-
-func GetSSACacheToDatabaseCost() time.Duration {
-	return time.Duration(syncAtomic.LoadUint64(&_SSACacheToDatabaseCost))
-}
-
-func GetSSACacheIterationCost() time.Duration {
-	return time.Duration(syncAtomic.LoadUint64(&_SSACacheIterationCost))
 }
 
 func (c *Cache) SaveToDatabase() {
