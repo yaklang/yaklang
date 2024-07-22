@@ -4,12 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -880,6 +881,16 @@ func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *schema.HTTPFlow, reject func(
 	}
 	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow) {
 		m.callers.CallByName(HOOK_hijackSaveHTTPFlow, flow, reject, drop)
+	}
+}
+
+func (m *MixPluginCaller) HijackSaveHTTPFlowWithCallback(flow *schema.HTTPFlow, callback func(), reject func(httpFlow *schema.HTTPFlow), drop func()) {
+	if !m.IsPassed(flow.Url) {
+		log.Infof("call HijackSaveHTTPFlow error: url[%v] not passed", flow.Url)
+		return
+	}
+	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow) {
+		m.callers.CallByNameWithCallback(HOOK_hijackSaveHTTPFlow, callback, flow, reject, drop)
 	}
 }
 
