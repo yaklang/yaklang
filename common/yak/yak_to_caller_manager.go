@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -139,7 +140,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 	// engine.HookOsExit()
 	// timeoutCtx, cancel := context.WithTimeout(ctx, loadTimeout)
 	// defer func() { cancel() }()
-	var scriptName = ""
+	scriptName := ""
 	if script != nil {
 		scriptName = script.ScriptName
 	}
@@ -647,7 +648,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		})
 	}
 
-	//db http flow
+	// db http flow
 	nIns.GetVM().RegisterMapMemberCallHandler("db", "SaveHTTPFlowFromRawWithOption", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error)
 		if ok {
@@ -1165,7 +1166,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 	}()
 
 	var engine *antlr4yak.Engine
-	var id = script.ScriptName
+	id := script.ScriptName
 	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
 		if v, ok := y.table.Load(HOOK_LoadNaslScriptByNameFunc); ok {
 			v.(func(string))(id)
@@ -1276,46 +1277,54 @@ func (y *YakToCallerManager) CallByName(name string, items ...interface{}) {
 }
 
 func (y *YakToCallerManager) CallByNameSync(name string, items ...interface{}) {
-	y.CallPluginKeyByNameSync("", name, items...)
+	y.CallPluginKeyByNameSyncWithCallback("", name, nil, items...)
+}
+
+func (y *YakToCallerManager) CallByNameWithCallback(name string, callback func(), items ...interface{}) {
+	y.CallPluginKeyByNameWithCallback("", name, callback, items...)
 }
 
 func (y *YakToCallerManager) CallByNameEx(name string, items ...func() interface{}) {
-	y.CallPluginKeyByNameEx("", name, items...)
+	y.CallPluginKeyByNameEx("", name, nil, items...)
 }
 
 func (y *YakToCallerManager) CallByNameExSync(name string, items ...func() interface{}) {
-	y.SyncCallPluginKeyByNameEx("", name, items...)
+	y.SyncCallPluginKeyByNameEx("", name, nil, items...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByName(pluginId string, name string, items ...interface{}) {
+	y.CallPluginKeyByNameWithCallback(pluginId, name, nil, items...)
+}
+
+func (y *YakToCallerManager) CallPluginKeyByNameWithCallback(pluginId string, name string, callback func(), items ...interface{}) {
 	interfaceToClojure := func(i interface{}) func() interface{} {
 		return func() interface{} {
 			return i
 		}
 	}
 	itemsFunc := funk.Map(items, interfaceToClojure).([]func() interface{})
-	y.CallPluginKeyByNameEx(pluginId, name, itemsFunc...)
+	y.CallPluginKeyByNameEx(pluginId, name, callback, itemsFunc...)
 }
 
-func (y *YakToCallerManager) CallPluginKeyByNameSync(pluginId string, name string, items ...interface{}) {
+func (y *YakToCallerManager) CallPluginKeyByNameSyncWithCallback(pluginId string, name string, callback func(), items ...interface{}) {
 	interfaceToClojure := func(i interface{}) func() interface{} {
 		return func() interface{} {
 			return i
 		}
 	}
 	itemsFunc := funk.Map(items, interfaceToClojure).([]func() interface{})
-	y.SyncCallPluginKeyByNameEx(pluginId, name, itemsFunc...)
+	y.SyncCallPluginKeyByNameEx(pluginId, name, callback, itemsFunc...)
 }
 
-func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name string, itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(true, pluginId, name, itemsFuncs...)
+func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
+	y.CallPluginKeyByNameExWithAsync(true, pluginId, name, callback, itemsFuncs...)
 }
 
-func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(false, pluginId, name, itemsFuncs...)
+func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
+	y.CallPluginKeyByNameExWithAsync(false, pluginId, name, nil, itemsFuncs...)
 }
 
-func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, pluginId string, name string, itemsFuncs ...func() interface{}) {
+func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
 	if y.table == nil {
 		y.table = new(sync.Map)
 		return
@@ -1333,6 +1342,9 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 	y.baseWaitGroup.Add(1)
 	defer func() {
 		y.baseWaitGroup.Done()
+		if callback != nil {
+			callback()
+		}
 	}()
 
 	caller, ok := y.table.Load(name)
@@ -1376,7 +1388,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 		}
 		// println(fmt.Sprintf("hook.Caller call [%v]'s %v", verbose, name))
 
-		// 没有设置并发控制，就直接顺序执行
+		// 没有设置并发控制，就直接顺序执行，需要处理上下文
 		if y.swg == nil || forceSync {
 			log.Debugf("Start Call Plugin: %v", verbose)
 			call(iRaw)

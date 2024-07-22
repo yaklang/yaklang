@@ -1455,6 +1455,35 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return
 		}
 
+		saveBarePacketHandler := func(id uint) {
+			// 存储KV，将flow ID作为key，bare request和bare response作为value
+			if httpctx.GetRequestIsModified(req) {
+				bareReq := httpctx.GetPlainRequestBytes(req)
+				if len(bareReq) == 0 {
+					bareReq = httpctx.GetBareRequestBytes(req)
+				}
+				log.Debugf("[KV] save bare Request(%d)", id)
+
+				if len(bareReq) > 0 && id > 0 {
+					keyStr := strconv.FormatUint(uint64(id), 10) + "_request"
+					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
+				}
+			}
+
+			if httpctx.GetResponseIsModified(req) || isResponseDropped {
+				bareRsp := httpctx.GetPlainResponseBytes(req)
+				if len(bareRsp) == 0 {
+					bareRsp = httpctx.GetBareResponseBytes(req)
+				}
+				log.Debugf("[KV] save bare Response(%d)", id)
+
+				if len(bareRsp) > 0 && id > 0 {
+					keyStr := strconv.FormatUint(uint64(id), 10) + "_response"
+					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
+				}
+			}
+		}
+
 		// 保存到数据库
 		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
 		startCreateFlow := time.Now()
@@ -1494,8 +1523,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
-		mitmPluginCaller.HijackSaveHTTPFlow(
+
+		pluginFinishCh := make(chan struct{})
+		mitmPluginCaller.HijackSaveHTTPFlowWithCallback(
 			flow,
+			func() {
+				close(pluginFinishCh)
+			},
 			func(replaced *schema.HTTPFlow) {
 				if replaced == nil {
 					return
@@ -1511,71 +1545,50 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		)
 		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 
-		saveBarePacketHandler := func() {
-			// 存储KV，将flow ID作为key，bare request和bare response作为value
-			if httpctx.GetRequestIsModified(req) {
-				bareReq := httpctx.GetPlainRequestBytes(req)
-				if len(bareReq) == 0 {
-					bareReq = httpctx.GetBareRequestBytes(req)
-				}
-				log.Debugf("[KV] save bare Request(%d)", flow.ID)
+		// storage
+		flow.Hash = flow.CalcHash()
+		startCreateFlow = time.Now()
+		colorOK := make(chan struct{})
 
-				if len(bareReq) > 0 && flow.ID > 0 {
-					keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
-					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareReq, yakit.BARE_REQUEST_GROUP)
+		var extracted []*schema.ExtractedData
+		// replacer hook color
+		if replacer != nil {
+			go func() {
+				extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
+				close(colorOK)
+				for _, e := range extracted {
+					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
+					if err != nil {
+						log.Errorf("save hookcolor error: %s", err)
+					}
 				}
-			}
-
-			if httpctx.GetResponseIsModified(req) || isResponseDropped {
-				bareRsp := httpctx.GetPlainResponseBytes(req)
-				if len(bareRsp) == 0 {
-					bareRsp = httpctx.GetBareResponseBytes(req)
-				}
-				log.Debugf("[KV] save bare Response(%d)", flow.ID)
-
-				if len(bareRsp) > 0 && flow.ID > 0 {
-					keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_response"
-					yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
-				}
-			}
+			}()
+		} else {
+			close(colorOK)
 		}
 
-		// storage
-		if flow != nil && !isDroppedSaveFlow.IsSet() {
-			flow.Hash = flow.CalcHash()
-			startCreateFlow = time.Now()
-			colorOK := make(chan struct{})
+		var needUpdate bool
+		timeout := time.After(300 * time.Millisecond)
+		select {
+		case <-colorOK:
+		case <-timeout: // wait for max 300ms
+			needUpdate = true
+		}
 
-			var extracted []*schema.ExtractedData
+		select {
+		case <-pluginFinishCh:
+		case <-timeout: // wait for max 300ms
+			needUpdate = true
+		}
 
-			if replacer != nil {
-				go func() {
-					extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
-					close(colorOK)
-					for _, e := range extracted {
-						err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
-						if err != nil {
-							log.Errorf("save hookcolor error: %s", err)
-						}
-					}
-				}()
-			} else {
-				close(colorOK)
-			}
-
-			var needUpdate bool
-			select {
-			case <-colorOK:
-			case <-time.After(time.Millisecond * 300): // wait for max 300ms
-				needUpdate = true
-			}
-
-			err := yakit.InsertHTTPFlowEx(flow, saveBarePacketHandler)
+		if !isDroppedSaveFlow.IsSet() {
+			err := yakit.InsertHTTPFlowEx(flow, func() {
+				saveBarePacketHandler(flow.ID)
+			})
 			if err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else if needUpdate {
 				go func() {
-					<-colorOK
 					err := yakit.UpdateHTTPFlowTagsEx(flow)
 					if err != nil {
 						log.Errorf("update http flow tags error: %s", err)
@@ -1584,8 +1597,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
-		} else {
-			saveBarePacketHandler()
 		}
 	}
 	// 核心 MITM 服务器
