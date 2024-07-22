@@ -35,8 +35,12 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 
 		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
 		if builder != nil {
-			builder.SupportClass = true
+			builder.SetBuildSupport(y.FunctionBuilder)
+			currentBuilder := y.FunctionBuilder
 			y.FunctionBuilder = builder
+			defer func() {
+				y.FunctionBuilder = currentBuilder
+			}()
 		}
 	}
 	y.VisitAllImport(i)

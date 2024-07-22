@@ -1,10 +1,11 @@
 package php2ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
@@ -101,8 +102,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		lib.PushEditor(program.GetCurrentEditor())
 		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
 		if builder != nil {
-			builder.SupportClass = true
-			builder.SupportClassStaticModifier = true
+			builder.SetBuildSupport(y.FunctionBuilder)
 			currentBuilder := y.FunctionBuilder
 			y.FunctionBuilder = builder
 			defer func() {

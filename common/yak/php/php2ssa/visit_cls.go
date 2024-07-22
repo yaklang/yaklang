@@ -782,7 +782,6 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 }
 
 func (y *builder) ResolveValue(name string) ssa.Value {
-	y.SupportClassStaticModifier = true
 	if value := y.PeekValue(name); value != nil {
 		// found
 		return value
