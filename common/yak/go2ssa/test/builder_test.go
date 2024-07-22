@@ -18,27 +18,3 @@ func TestBuilder(t *testing.T) {
 		}, t)
 	})
 }
-
-
-func TestTemp(t *testing.T) {
-	t.Run("temp", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
-
-		func main(){
-			var x = 10
-			x += 100
-			
-			switch x.(type) {
-			case type1:
-			case type2:
-			default:
-			}
-		}
-
-		`, []string{
-			``,
-		}, t)
-	})
-}
-
-

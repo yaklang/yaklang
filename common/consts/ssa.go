@@ -17,6 +17,7 @@ const (
 	JS   Language = "js"
 	PHP  Language = "php"
 	JAVA Language = "java"
+	GO   Language = "go"
 )
 
 var (
