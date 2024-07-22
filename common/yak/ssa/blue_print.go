@@ -96,6 +96,7 @@ func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 	} else {
 		log.Warnf("class %v's ref container is nil", c.Name)
 	}
+	fun.SetMethod(true, c)
 	c.Method[key] = fun
 }
 func (c *ClassBluePrint) GetMethod() map[string]*Function {
