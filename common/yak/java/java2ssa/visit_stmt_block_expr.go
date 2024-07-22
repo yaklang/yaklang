@@ -1048,13 +1048,23 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 			if ft, ok := y.fullTypeNameMap[typName]; ok {
 				typ := value.GetType()
 				if b, ok := typ.(*ssa.BasicType); ok && b.IsAny() {
-					sca := y.GetProgram().GetApplication().GetSCAPackageByName(ft)
-					if sca != nil {
-						ft = fmt.Sprintf("%s:%s", ft, sca.Version)
-					}
+					ftRaw := strings.Join(ft, ".")
 					newTyp := ssa.NewBasicType(b.Kind, b.GetName())
-					newTyp.SetFullTypeName(ft)
-					value.SetType(newTyp)
+					haveVersion := false
+					// try to get sca and set full type name's version
+					for i := len(ft) - 1; i > 0; i-- {
+						if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
+							version := sca.Version
+							newTyp.SetFullTypeName(fmt.Sprintf("%s:%s", ftRaw, version))
+							value.SetType(newTyp)
+							haveVersion = true
+							break
+						}
+					}
+					if !haveVersion {
+						newTyp.SetFullTypeName(ftRaw)
+						value.SetType(newTyp)
+					}
 				}
 			}
 			y.AssignVariable(variable, value)

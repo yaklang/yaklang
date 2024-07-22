@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"sort"
 	"strings"
 
@@ -249,4 +250,23 @@ func (p *Program) PopEditor() {
 		return
 	}
 	p.editorStack.Pop()
+}
+
+func (p *Program) GetSCAPackageByName(name string) *dxtypes.Package {
+	if p == nil {
+		return nil
+	}
+	for _, pkg := range p.SCAPackages {
+		if strings.Contains(pkg.Name, name) {
+			return pkg
+		}
+	}
+	return nil
+}
+
+func (p *Program) GetApplication() *Program {
+	if p == nil {
+		return nil
+	}
+	return p.Application
 }

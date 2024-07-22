@@ -78,6 +78,12 @@ func init() {
 			} else {
 				if b, ok := t.t.(*ssa.BasicType); ok {
 					typeStr := b.GetFullTypeName()
+					// remove version if it exists
+					index := strings.Index(typeStr, ":")
+					if index != -1 {
+						typeStr = typeStr[:index]
+					}
+					// get type name
 					lastIndex := strings.LastIndex(typeStr, ".")
 					if lastIndex != -1 && len(typeStr) > lastIndex+1 {
 						typeStr = typeStr[lastIndex+1:]
@@ -111,7 +117,6 @@ func init() {
 					typeStr := b.GetFullTypeName()
 					results := val.NewValue(ssa.NewConst(typeStr))
 					vals = append(vals, results)
-
 				}
 			}
 			return nil

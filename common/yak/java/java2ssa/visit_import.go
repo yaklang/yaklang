@@ -19,7 +19,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 	for _, pkgImport := range i.AllImportDeclaration() {
 		pkgPath, _, all := y.VisitImportDeclaration(pkgImport)
 		if !all && len(pkgPath) > 0 {
-			y.fullTypeNameMap[pkgPath[len(pkgPath)-1]] = strings.Join(pkgPath, ".")
+			y.fullTypeNameMap[pkgPath[len(pkgPath)-1]] = pkgPath
 		}
 	}
 	for _, pkgImport := range i.AllImportDeclaration() {
