@@ -232,15 +232,18 @@ func _jsNewEngine(opts ...jsRunOpts) *goja.Runtime {
 // Run 创建新的JS引擎并运行传入的代码并返回JS引擎结构体引用，运行值和错误
 // 第一个参数为运行的代码字符串
 // 后续参数为零个到多个运行选项，用于对此次运行进行配置，例如嵌入常用的JS第三方库等
+// 现在会尝试自动导入代码中使用到的库, CryptoJS会导入V4版本
 // Example:
 // ```
 // _, value = js.Run(`CryptoJS.HmacSHA256("Message", "secret").toString();`, js.libCryptoJSV3())~
 // println(value.String())
 // ```
 func _run(src any, opts ...jsRunOpts) (*goja.Runtime, goja.Value, error) {
+	code := utils.InterfaceToString(src)
+	opts = append(opts, autoImportLib(code)...)
 	vm := _jsNewEngine(opts...)
 
-	value, err := vm.RunString(utils.InterfaceToString(src))
+	value, err := vm.RunString(code)
 	return vm, value, err
 }
 
@@ -274,4 +277,17 @@ func _jsCallFuncFromCode(src any, funcName string, params ...interface{}) (goja.
 		}
 		return f(goja.Undefined(), vmParams...)
 	}
+}
+
+func autoImportLib(code string) (opts []jsRunOpts) {
+	if strings.Contains(code, "CryptoJS()") || strings.Contains(code, "CryptoJS.") {
+		opts = append(opts, _libCryptoJSV4())
+	}
+	if strings.Contains(code, "KEYUTIL()") || strings.Contains(code, "KEYUTIL.") || strings.Contains(code, "KJUR.") {
+		opts = append(opts, _libJSRSASign())
+	}
+	if strings.Contains(code, "JSEncrypt()") {
+		opts = append(opts, _libJsEncrypt())
+	}
+	return
 }
