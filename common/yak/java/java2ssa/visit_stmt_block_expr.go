@@ -663,7 +663,10 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		y.MarkedIsStaticMethod = false
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
-			args = y.VisitArguments(i.Arguments())
+			if _, ok := ssa.ToParameter(object); ok {
+				args = append(args, object)
+			}
+			args = append(args, y.VisitArguments(i.Arguments())...)
 			c := y.NewCall(methodCall, args)
 			return y.EmitCall(c)
 		}
