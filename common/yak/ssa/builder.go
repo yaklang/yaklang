@@ -74,12 +74,15 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	}
 	if parent != nil {
 		b.DefineFunc = parent.DefineFunc
+		b.MarkedThisObject = parent.MarkedThisObject
 		// sub scope
 		// b.parentScope = parent.CurrentBlock.ScopeTable
 		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
+		b.SetBuildSupport(parent)
+
 		b.SupportClosure = parent.SupportClosure
+		b.SupportClassStaticModifier = parent.SupportClassStaticModifier
 		b.SupportClass = parent.SupportClass
-		b.MarkedThisObject = parent.MarkedThisObject
 	}
 
 	// b.ScopeStart()
@@ -91,6 +94,15 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	}
 	f.builder = b
 	return b
+}
+
+func (b *FunctionBuilder) SetBuildSupport(parent *FunctionBuilder) {
+	if parent == nil {
+		return
+	}
+	b.SupportClass = parent.SupportClass
+	b.SupportClassStaticModifier = parent.SupportClassStaticModifier
+	b.SupportClosure = parent.SupportClosure
 }
 
 func (b *FunctionBuilder) SetEditor(editor *memedit.MemEditor) {
