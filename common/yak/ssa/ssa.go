@@ -133,13 +133,19 @@ type Value interface {
 	Typed
 	Maskable
 	AssignAble
+	PointerIF
 	AddUser(User)
 	RemoveUser(User)
+}
 
-	// reference, this value same as other value
-	// in use-def chain, this value use contain other value
-	AddReference(Value)
-	Reference() Values
+type PointerIF interface {
+	// pointer to value
+	GetPoint() Value
+	SetPoint(Value)
+
+	// value get Pointers
+	AddPointer(Value)
+	GetPointer() Values
 }
 
 type Maskable interface {
@@ -529,7 +535,7 @@ func (p *Parameter) SetDefault(v Value) {
 		return
 	}
 	p.defaultValue = v
-	v.AddReference(p)
+	v.AddPointer(p)
 }
 
 var (

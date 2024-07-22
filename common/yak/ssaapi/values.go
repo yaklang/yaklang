@@ -51,7 +51,7 @@ func ValueCompare(v1, v2 *Value) bool {
 	} else if v1IsNil || v2IsNil {
 		return false
 	}
-	for _, v := range v1.node.Reference() {
+	for _, v := range v1.node.GetPointer() {
 		if v.GetId() == v2.GetId() {
 			return true
 		}
@@ -254,7 +254,7 @@ func (v *Value) GetUsers() Values {
 
 	if v.users == nil {
 		appendUser(v.node)
-		for _, reference := range v.node.Reference() {
+		for _, reference := range v.node.GetPointer() {
 			appendUser(reference)
 		}
 	}
@@ -266,7 +266,7 @@ func (v *Value) GetReferences() Values {
 		return nil
 	}
 
-	return lo.Map(v.node.Reference(), func(item ssa.Value, index int) *Value {
+	return lo.Map(v.node.GetPointer(), func(item ssa.Value, index int) *Value {
 		return v.NewValue(item)
 	})
 }
@@ -672,7 +672,7 @@ func (v *Value) GetCalledBy() Values {
 		}
 	}
 	add(v.node)
-	for _, ref := range v.node.Reference() {
+	for _, ref := range v.node.GetPointer() {
 		add(ref)
 	}
 	return vs
