@@ -2,14 +2,15 @@ package filesys
 
 import (
 	"archive/zip"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memfile"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memfile"
 )
 
 type ZipFS struct {
@@ -108,6 +109,10 @@ func (z *ZipFS) Open(name string) (fs.File, error) {
 	return memfile.New(raw), nil
 }
 
+func (z *ZipFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	return z.Open(name)
+}
+
 func (z *ZipFS) Stat(name string) (fs.FileInfo, error) {
 	name = z.Clean(name)
 	f, err := z.forest.Get(name)
@@ -190,7 +195,7 @@ func (z *ZipDirEntry) Type() fs.FileMode {
 	if z.info.IsDir() {
 		return fs.ModeDir
 	}
-	return 0666
+	return 0o666
 }
 
 func (z *ZipDirEntry) Info() (fs.FileInfo, error) {

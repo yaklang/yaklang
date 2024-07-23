@@ -81,6 +81,28 @@ func (f *VirtualFS) Open(name string) (fs.File, error) {
 	return NewVirtualFile(file.name, file.content), nil
 }
 
+func (f *VirtualFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	isCreate := flag&os.O_CREATE == os.O_CREATE
+	vf, fileName, err := f.get(false, f.splite(name)...)
+	if err != nil {
+		return nil, err
+	}
+	file, exist := vf.files[fileName]
+	if !exist {
+		if isCreate {
+			vf.AddFile(fileName, "")
+			file, exist = vf.files[fileName]
+		}
+	}
+	if !exist {
+		return nil, fmt.Errorf("file [%v] not exist", name)
+	}
+	if file.fs != nil {
+		return nil, fmt.Errorf("file [%v] is a dir", name)
+	}
+	return file, nil
+}
+
 func (f *VirtualFS) Stat(name string) (fs.FileInfo, error) {
 	vf, fileName, err := f.get(false, f.splite(name)...)
 	if err != nil {

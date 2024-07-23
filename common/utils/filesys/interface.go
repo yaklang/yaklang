@@ -11,6 +11,7 @@ type FileSystem interface {
 	ReadFile(name string) ([]byte, error)
 
 	Open(name string) (fs.File, error)
+	OpenFile(name string, flag int, perm os.FileMode) (fs.File, error)
 	// RelOpen(name string) (fs.File, error)
 
 	// Stat returns a FileInfo describing the file.
