@@ -449,3 +449,58 @@ Host: ` + utils.HostPort(mockHost, mockPort) + `
 	require.True(t, mirrorCheck, "mirrorHttpFlow hook yakit.output fail")
 	require.True(t, beforeRequestCheck, "beforeRequest hook yakit.output fail")
 }
+
+func TestGRPCMUSTPASS_MITM_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
+	defer cancel()
+
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandStringBytes(16)
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			SetYakScript:     true,
+			YakScriptContent: `hijackSaveHTTPFlow = func(flow, modify, drop) {flow.Blue();modify(flow)}`,
+		})
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+		if msg.GetCurrentHook && len(msg.GetHooks()) > 0 {
+			// send packet
+			_, err := yak.Execute(`
+			for i in 10 {
+				url = f"${target}?token=${token}&randstr=${str.RandStr(10)}"
+				rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy))
+			}
+			`, map[string]any{
+				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+				"target":    `http://` + utils.HostPort(mockHost, mockPort),
+				"token":     token,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cancel()
+		}
+	})
+
+	rsp, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword:    token,
+		SourceType: "mitm",
+	}, 10)
+	require.NoError(t, err)
+	for _, flow := range rsp.GetData() {
+		require.Containsf(t, flow.Tags, "YAKIT_COLOR_BLUE", "flow tags not contains COLOR_BLUE")
+	}
+}
