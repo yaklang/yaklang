@@ -2,12 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"testing"
 )
 
 func TestQueryYakScriptRiskDetailByCWE(t *testing.T) {
@@ -74,8 +73,11 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
     poc.Get(target)~
 }
 `,
-			ScriptName: "plugin3",
+			ScriptName: "query_plugins",
 		})
+	if err != nil {
+		panic(err)
+	}
 	id, err := client.GetYakScriptById(context.Background(), &ypb.GetYakScriptByIdRequest{Id: script.Id})
 	if err != nil {
 		panic(err)
@@ -83,8 +85,9 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 	client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{
 		Id: script.Id,
 	})
-	assert.True(t, id.ParamLength == 1)
+	assert.True(t, len(id.Params) == 1)
 }
+
 func TestExportLocalYakScriptStream(t *testing.T) {
 	test := assert.New(t)
 

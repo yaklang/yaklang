@@ -249,8 +249,8 @@ func NewYakToCallerManager() *YakToCallerManager {
 	return caller
 }
 
-func (y *YakToCallerManager) WithDefaultFilter(filter *filter.StringFilter) *YakToCallerManager {
-	y.defaultFilter = filter
+func (y *YakToCallerManager) WithVulFilter(filter filter.Filterable) *YakToCallerManager {
+	y.vulFilter = filter
 	return y
 }
 
@@ -347,7 +347,6 @@ func (y *YakToCallerManager) SetForYakit(
 			},
 			"yakit": yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)),
 		})
-		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
 		return nil
 	}, hooks...)
 }
@@ -765,7 +764,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if streamContext != nil {
 					opts = append(opts, httptpl.WithContext(streamContext))
 				}
-				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
+				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
@@ -1159,7 +1158,6 @@ func (y *YakToCallerManager) AddForYakit(
 				})
 			},
 		})
-		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
 		return nil
 	}, hooks...)
 }
