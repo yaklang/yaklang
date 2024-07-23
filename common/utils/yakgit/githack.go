@@ -252,7 +252,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	}
 
 	// 复制临时目录到目标目录
-	if err = utils.ConcurrentCopyDirectory(tempDirPath, localPath, c.Threads); err != nil {
+	if err = utils.ConcurrentCopyDirectory(tempDirPath, localPath, c.Threads, true); err != nil {
 		return utils.Wrapf(err, "copy temp git repo to %s error", localPath)
 	}
 
@@ -393,7 +393,6 @@ func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *g
 			o.addTask(ch, "pack-objects", taskURL)
 		}
 	}
-
 }
 
 func (o *GitHackObject) addBasicTask(ch chan string, defaultGitFiles []string) {
@@ -796,14 +795,14 @@ func saveToFile(path string, content []byte) error {
 	// 判断目录是否存在
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		// 创建目录
-		err = os.MkdirAll(dir, 0755)
+		err = os.MkdirAll(dir, 0o755)
 		if err != nil {
 			return err
 		}
 	}
 
 	// 将内容写入文件
-	err := ioutil.WriteFile(path, content, 0644)
+	err := ioutil.WriteFile(path, content, 0o644)
 	if err != nil {
 		return err
 	}
