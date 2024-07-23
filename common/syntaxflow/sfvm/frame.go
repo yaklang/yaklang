@@ -24,9 +24,10 @@ type filterExprContext struct {
 type SFFrame struct {
 	config *Config
 
-	Title       string
-	Description string
-	Purpose     string
+	Title         string
+	Description   string
+	AllowIncluded string
+	Purpose       string
 
 	// install meta info and result info
 	result *SFFrameResult
