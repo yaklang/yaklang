@@ -101,6 +101,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	frame.debug = s.config.debug
 	frame.Title = result.title
 	frame.Description = result.description
+	frame.AllowIncluded = result.allowIncluded
 	frame.Purpose = result.purpose
 	s.frames = append(s.frames, frame)
 
