@@ -124,16 +124,7 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 // =============================================== Variable =======================================================
 
 func (c *Cache) GetByVariable(name string) []Instruction {
-	ret, ok := c.VariableCache[name]
-	if !ok && c.HaveDatabaseBackend() {
-		// get from database
-		// TODO: this code should be need?
-		ret = make([]Instruction, 0)
-		for i := range ssadb.ExactSearchVariable(c.DB, ssadb.NameMatch, name) {
-			ret = append(ret, c.newLazyInstruction(i))
-		}
-		c.VariableCache[name] = ret
-	}
+	ret, _ := c.VariableCache[name]
 	return ret
 }
 
