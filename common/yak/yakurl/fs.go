@@ -96,7 +96,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 
 	info, err := fs.Stat(absPath)
 	if err != nil {
-		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
+		return nil, utils.Wrapf(err, "cannot stat path[%s]: %s", u.GetPath())
 	}
 
 	query := make(url.Values)
@@ -110,7 +110,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 		if info.IsDir() {
 			infos, err := fs.ReadDir(absPath)
 			if err != nil {
-				return nil, utils.Errorf("cannot read dir[%s]: %s", u.GetPath(), err)
+				return nil, utils.Wrapf(err, "cannot read dir[%s]", u.GetPath())
 			}
 			for _, i := range infos {
 				info, _ := i.Info()
@@ -143,7 +143,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 
 	info, err := fs.Stat(absPath)
 	if err != nil {
-		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
+		return nil, utils.Wrapf(err, "cannot stat path[%s]", u.GetPath())
 	}
 
 	query := make(url.Values)
@@ -188,7 +188,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 		err = fs.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
-			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
+			return nil, utils.Wrapf(err, "cannot write file[%s]: %s", u.GetPath())
 		}
 	}
 
@@ -201,7 +201,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 
 	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
-		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err)
+		return nil, utils.Wrapf(err, "cannot stat path[%s]", u.GetPath())
 	}
 	res := f.fileInfoToResource(params.GetUrl(), query, currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
@@ -230,11 +230,10 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 		query.Add(v.GetKey(), v.GetValue())
 	}
 	isPaste := strings.ToLower(query.Get("paste")) == "true"
-
 	exists, err := fs.Exists(absPath)
 	if exists {
 		if !isPaste {
-			return nil, utils.Error("file exists") //  if file exists can't use put
+			return nil, utils.Error("path exists") //  if path exists can't use put
 		}
 		dirPath, name := fs.PathSplit(absPath)
 		filenameWithoutExt, ext := name, fs.Ext(name)
@@ -252,21 +251,43 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 			i++
 		}
 	} else if err != nil {
-		return nil, utils.Errorf("file exists check error: %v", err)
+		return nil, utils.Wrap(err, "file exists check error")
 	}
 
 	switch query.Get("type") {
 	case "dir":
-		err := fs.MkdirAll(absPath, 0o755)
-		if err != nil {
-			return nil, err
+		if !isPaste {
+			if err := fs.MkdirAll(absPath, 0o755); err != nil {
+				return nil, utils.Wrap(err, "cannot create directory")
+			}
+		} else {
+			sourcePath := query.Get("src")
+			if sourcePath == "" {
+				return nil, utils.Error("source path is required")
+			}
+			sourceAbsPath, err := f.FormatPathRaw(sourcePath)
+			if err != nil {
+				return nil, err
+			}
+			exists, err := fs.Exists(sourcePath)
+			if err != nil {
+				return nil, utils.Wrap(err, "cannot check source path exists")
+			}
+			if !exists {
+				return nil, utils.Errorf("source path not exists: %s", sourcePath)
+			}
+			err = utils.CopyDirectoryEx(
+				sourceAbsPath, absPath, fs.Rel, fs.Join, fs.MkdirAll, fs.Delete, fs.OpenFile, fs.WriteFile)
+			if err != nil {
+				return nil, utils.Wrap(err, "cannot paste directory")
+			}
 		}
 	case "file":
 		fallthrough
 	default:
 		err = fs.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
-			return nil, utils.Errorf("cannot write file[%s]: %s", u.GetPath(), err)
+			return nil, utils.Wrapf(err, "cannot write file[%s]", u.GetPath())
 		}
 	}
 
@@ -279,7 +300,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 
 	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
-		return nil, utils.Errorf("cannot stat path[%s]: %s", u.GetPath(), err) // check file / dir
+		return nil, utils.Wrapf(err, "cannot stat path[%s]", u.GetPath()) // check file / dir
 	}
 	res := f.fileInfoToResource(params.GetUrl(), query, currentInfo, absPath, false)
 	return &ypb.RequestYakURLResponse{
@@ -357,7 +378,7 @@ func (f *fileSystemAction) FormatPath(params *ypb.RequestYakURLParams) (string, 
 	} else {
 		wd, err := fs.Getwd()
 		if err != nil {
-			return "", "", "", utils.Errorf("cannot get current working directory: %s", err)
+			return "", "", "", utils.Wrap(err, "cannot get current working directory")
 		}
 		absPath = fs.Join(wd, u.GetPath())
 		dirname, filename = fs.PathSplit(absPath)
@@ -366,4 +387,22 @@ func (f *fileSystemAction) FormatPath(params *ypb.RequestYakURLParams) (string, 
 		params.Url.Path = absPath
 	}
 	return absPath, dirname, filename, nil
+}
+
+func (f *fileSystemAction) FormatPathRaw(path string) (string, error) {
+	var (
+		fs      = f.fs
+		absPath string
+	)
+
+	if fs.IsAbs(path) {
+		absPath = path
+	} else {
+		wd, err := fs.Getwd()
+		if err != nil {
+			return "", utils.Wrap(err, "cannot get current working directory")
+		}
+		absPath = fs.Join(wd, path)
+	}
+	return absPath, nil
 }
