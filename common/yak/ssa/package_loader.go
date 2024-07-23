@@ -47,7 +47,16 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			log.Errorf("Build with file loader failed: %s", err)
 			continue
 		}
-		err = p.Build(v.FileName, memedit.NewMemEditor(string(raw)), b)
+		// var build
+		build := p.Build
+		if build == nil && p.Application != nil {
+			build = p.Application.Build
+		}
+		if build != nil {
+			err = build(v.FileName, memedit.NewMemEditor(string(raw)), b)
+		} else {
+			log.Errorf("BUG: Build function is nil in package %s", p.Name)
+		}
 		p.Loader.SetCurrentPath(_path)
 
 		if err != nil {
@@ -56,9 +65,9 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 		}
 	}
 	// TODO: get program from name, but in some case, package name not same with path
-	if prog, err := GetProgram(strings.Join(name, "."), Library); err == nil {
-		// prog.Finish()
-		return prog, nil
+	if lib, _ := p.GetLibrary(strings.Join(name, ".")); lib != nil {
+		lib.Finish()
+		return lib, nil
 	}
 	return nil, utils.Errorf("Build package %v failed", name)
 }

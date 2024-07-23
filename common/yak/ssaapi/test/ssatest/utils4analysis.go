@@ -2,14 +2,15 @@ package ssatest
 
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/yak/antlr4util"
-	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -225,6 +226,9 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 
 func CheckSyntaxFlowWithFS(t *testing.T, fs filesys.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
 	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
+		for _, p := range p {
+			p.Show()
+		}
 		results, err := p.SyntaxFlowWithError(sf)
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
