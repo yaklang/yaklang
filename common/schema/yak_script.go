@@ -14,15 +14,16 @@ import (
 type YakScript struct {
 	gorm.Model
 
-	ScriptName string `json:"script_name" gorm:"unique_index"`
-	Type       string `json:"type" gorm:"index"`
-	Content    string `json:"content"`
-	Level      string `json:"level"`
-	Params     string `json:"params"`
-	Help       string `json:"help"`
-	Author     string `json:"author"`
-	Tags       string `json:"tags,omitempty"`
-	Ignored    bool   `json:"ignore"`
+	ScriptName   string `json:"script_name" gorm:"unique_index"`
+	Type         string `json:"type" gorm:"index"`
+	Content      string `json:"content"`
+	Level        string `json:"level"`
+	Params       string `json:"params"`
+	ParamsNumber int    `json:"params_number"`
+	Help         string `json:"help"`
+	Author       string `json:"author"`
+	Tags         string `json:"tags,omitempty"`
+	Ignored      bool   `json:"ignore"`
 
 	// 加载本地的数据
 	FromLocal bool   `json:"from_local"`
@@ -196,6 +197,7 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		RiskAnnotation:       s.RiskAnnotation,
 		RiskInfo:             riskDetail,
 		IsCorePlugin:         s.IsCorePlugin,
+		ParamLength:          int64(s.ParamsNumber),
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins

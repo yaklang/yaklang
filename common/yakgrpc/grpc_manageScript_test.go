@@ -45,6 +45,46 @@ func TestImportYakScript(t *testing.T) {
 	_ = s
 }
 
+func TestServer_QueryYakScript(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	script, err := client.SaveNewYakScript(context.Background(),
+		&ypb.SaveNewYakScriptRequest{
+			Params: []*ypb.YakScriptParam{{
+				Field:        "target",
+				DefaultValue: "1",
+				TypeVerbose:  "text",
+				FieldVerbose: "",
+				Help:         "",
+				Required:     true,
+				Group:        "",
+				ExtraSetting: "",
+				MethodType:   "",
+			}},
+			Type: "mitm",
+			Content: `target = cli.String("target")
+cli.check()
+
+
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    dump(target)
+    yakit_output(target)
+    poc.Get(target)~
+}
+`,
+			ScriptName: "plugin3",
+		})
+	id, err := client.GetYakScriptById(context.Background(), &ypb.GetYakScriptByIdRequest{Id: script.Id})
+	if err != nil {
+		panic(err)
+	}
+	client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{
+		Id: script.Id,
+	})
+	assert.True(t, id.ParamLength == 1)
+}
 func TestExportLocalYakScriptStream(t *testing.T) {
 	test := assert.New(t)
 

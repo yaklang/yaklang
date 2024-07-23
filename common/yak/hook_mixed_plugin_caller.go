@@ -4,13 +4,14 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -366,9 +367,16 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 		err  error
 		code string
 	)
-
 	if len(codes) > 0 {
 		code = codes[0]
+	}
+	parse := func(code string) ([]*information.CliParameter, error) {
+		prog, err := static_analyzer.SSAParse(code, "mitm")
+		if err != nil {
+			return nil, utils.Error("ssa parse error")
+		}
+		parameters, _ := information.ParseCliParameter(prog)
+		return parameters, nil
 	}
 	if code == "" {
 		db := consts.GetGormProfileDatabase()
@@ -380,7 +388,6 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 		if err != nil {
 			return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
 		}
-
 		if ins.Type == "yak" || ins.Type == "codec" {
 			return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
 		}
@@ -389,15 +396,21 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 			log.Infof("script[%v] is interactive, skip load", name)
 			return nil
 		}
-		return m.LoadPluginEx(ctx, ins)
 	} else {
+		parameters, err := parse(code)
+		if err != nil {
+			return err
+		}
 		ins = &schema.YakScript{
-			ScriptName: name,
-			Content:    code,
+			ScriptName:   name,
+			Content:      code,
+			ParamsNumber: len(parameters),
 		}
 	}
-
-	return m.LoadPluginEx(ctx, ins)
+	if ins.ParamsNumber != len(params) {
+		return utils.Errorf("invalid param number,want %v,get %v", ins.ParamsNumber, len(params))
+	}
+	return m.LoadPluginEx(ctx, ins, params...)
 }
 
 func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakScript, params ...*ypb.ExecParamItem) error {

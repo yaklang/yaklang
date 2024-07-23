@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
@@ -1337,6 +1338,105 @@ Host: example.com
 	}
 }
 
+func TestMiTMPlugins(t *testing.T) {
+	check := false
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/notify" {
+			check = true
+		}
+		writer.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
+	})
+	target := fmt.Sprintf("http://%s:%v/notify", host, port)
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100))
+	script, err := client.SaveNewYakScript(ctx,
+		&ypb.SaveNewYakScriptRequest{
+			Params: []*ypb.YakScriptParam{{
+				Field:        "target",
+				DefaultValue: "1",
+				TypeVerbose:  "text",
+				FieldVerbose: "",
+				Help:         "",
+				Required:     true,
+				Group:        "",
+				ExtraSetting: "",
+				MethodType:   "",
+			}},
+			Type: "mitm",
+			Content: `target = cli.String("target")
+cli.check()
+
+
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    dump(target)
+    yakit_output(target)
+    poc.Get(target)~
+}
+`,
+			ScriptName: "plugin3",
+		})
+	defer func() {
+		time.Sleep(1 * time.Second)
+		cancel()
+		if !check {
+			t.Fatalf("hook url check failed")
+		}
+		client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{
+			Id: script.Id,
+		})
+	}()
+	if err != nil {
+		panic(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	_ = mitmPort
+	err = stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	if err != nil {
+		panic(err)
+	}
+	for {
+		recv, err := stream.Recv()
+		if err != nil {
+			panic(err)
+		}
+		if strings.Contains(string(recv.GetMessage().GetMessage()), `starting mitm server`) {
+			err = stream.Send(&ypb.MITMRequest{
+				SetYakScript:    true,
+				YakScriptID:     script.Id,
+				YakScriptParams: []*ypb.ExecParamItem{{Key: "target", Value: target}},
+			})
+			if err != nil {
+				panic(err)
+			}
+		} else if recv.GetCurrentHook && len(recv.GetHooks()) > 0 {
+			packet := `GET /origin HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+
+`
+			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
+			_, err = yak.Execute(`
+rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
+`, map[string]any{
+				"packet":    string(packetBytes),
+				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+}
 func TestGRPCMUSTPASS_MITM_ForceHTTPClose(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
