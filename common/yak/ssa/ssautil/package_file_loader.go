@@ -76,6 +76,10 @@ func (p *PackageFileLoader) AddIncludePath(s ...string) {
 	p.includePath = append(p.includePath, s...)
 }
 
+func (p *PackageFileLoader) GetIncludeFiles() []string {
+	return p.includePath
+}
+
 func (p *PackageFileLoader) FilePath(wantPath string, once bool) (string, error) {
 	return p.getPath(wantPath, once,
 		func(fi fs.FileInfo) bool { return !fi.IsDir() },
@@ -143,6 +147,7 @@ func (p *PackageFileLoader) LoadDirectoryPackage(packageName string, once bool) 
 		defer close(ch)
 		err = filesys.Recursive(
 			absDir,
+			filesys.WithFileSystem(p.fs),
 			filesys.WithRecursiveDirectory(false),
 			filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				ch <- FileDescriptor{

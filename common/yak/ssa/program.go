@@ -1,8 +1,10 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/exp/slices"
@@ -93,7 +95,11 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 func (prog *Program) NewLibrary(name string, path []string) *Program {
 	// create lib
 	fs := prog.Loader.GetFilesysFileSystem()
-	lib := NewProgram(name, prog.EnableDatabase, Library, fs, fs.Join(path...))
+	fullPath := prog.GetCurrentEditor().GetFilename()
+	endPath := fs.Join(path...)
+	programPath, _, _ := strings.Cut(fullPath, endPath)
+	lib := NewProgram(name, prog.EnableDatabase, Library, fs, programPath)
+	lib.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
 	lib.Language = prog.Language
 	prog.UpStream[name] = lib
 	lib.DownStream[prog.Name] = prog
