@@ -1180,15 +1180,20 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		ctx = context.WithValue(ctx, "cancel", cancel)
 		y.ContextCancelFuncs.Store(id, cancel)
 	}
-
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), script, code, func(e *antlr4yak.Engine) error {
+	args := []string{}
+	for key, value := range paramMap {
+		args = append(args, "--"+key, fmt.Sprintf("%s", value))
+	}
+	app := cli.NewCliApp()
+	app.SetArgs(args)
+	pluginContext := y.getYakitPluginContext(ctx).WithCliApp(app)
+	cTable, err := FetchFunctionFromSourceCode(y, pluginContext, script, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
-
-		e.SetVar("MITM_PARAMS", paramMap)
+		e.SetVar("cli", cli.GetCliExportMapByCliApp(app))
+		//e.SetVar("MITM_PARAMS", paramMap)
 		e.SetVar("MITM_PLUGIN", id)
-
 		if hook != nil {
 			return hook(e)
 		}

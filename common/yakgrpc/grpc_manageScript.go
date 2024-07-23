@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -239,6 +241,7 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		Content:              script.Content,
 		Level:                script.Level,
 		Params:               strconv.Quote(string(raw)),
+		ParamsNumber:         len(script.Params),
 		Help:                 script.Help,
 		Author:               script.Author,
 		Tags:                 script.Tags,
@@ -261,6 +264,14 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
+		}
+		if script.Type == "mitm" {
+			prog, err := static_analyzer.SSAParse(script.Content, script.Type)
+			if err != nil {
+				return nil, utils.Error("ssa parse error")
+			}
+			parameters, _ := information.ParseCliParameter(prog)
+			script.Params = cliParam2grpc(parameters)
 		}
 	}
 
@@ -938,6 +949,7 @@ func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]in
 		"general_module_verbose": script.GeneralModuleVerbose,
 		"enable_plugin_selector": script.EnablePluginSelector,
 		"plugin_selector_types":  script.PluginSelectorTypes,
+		"params_number":          len(script.Params),
 	}
 	if len(script.Params) > 0 {
 		raw, _ := json.Marshal(script.Params)
@@ -964,6 +976,14 @@ func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScr
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
+		}
+		if script.Type == "mitm" {
+			prog, err := static_analyzer.SSAParse(script.Content, script.Type)
+			if err != nil {
+				return nil, utils.Error("ssa parse error")
+			}
+			parameters, _ := information.ParseCliParameter(prog)
+			script.Params = cliParam2grpc(parameters)
 		}
 	}
 	script.ScriptName = strings.TrimSpace(script.ScriptName)

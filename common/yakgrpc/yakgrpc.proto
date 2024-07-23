@@ -3884,6 +3884,7 @@ message YakScript {
   repeated Collaborator CollaboratorInfo = 35;
   repeated YakRiskInfo RiskInfo = 36;
   bool IsUpdate = 37;
+  int64 ParamLength = 38;
 }
 
 message Collaborator {
@@ -5251,6 +5252,6 @@ message GenerateReverseShellCommandRequest{
 }
 
 message GenerateReverseShellCommandResponse{
-    GeneralResponse Status = 1;
-    string Result =2;
+  GeneralResponse Status = 1;
+  string Result = 2;
 }
