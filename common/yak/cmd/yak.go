@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"time"
 
@@ -97,6 +98,10 @@ func init() {
 	// 取消掉 0022 的限制，让用户可以创建别人也能写的文件夹
 	umask.Umask(0)
 	systemLog.Default().SetOutput(io.Discard)
+
+	result := debug.SetGCPercent(8)
+	result = debug.SetGCPercent(8)
+	log.Infof("GC Percent: %v", result)
 
 	/*
 		进行一些必要初始化，永远不要再 init 中直接调用数据库，不然会破坏数据库加载的顺序

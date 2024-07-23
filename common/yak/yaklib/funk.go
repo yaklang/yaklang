@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -131,7 +132,13 @@ var FunkExports = map[string]interface{}{
 	"ConvertToMap": func(i interface{}) map[string][]string {
 		return utils.InterfaceToMap(i)
 	},
-	"GC": runtime.GC,
+	"GC": func() {
+		debug.SetGCPercent(8)
+		runtime.GC()
+		debug.FreeOSMemory()
+		debug.SetGCPercent(8)
+	},
+	"GCPercent": debug.SetGCPercent,
 }
 
 func min(i interface{}) interface{} {
