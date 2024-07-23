@@ -73,6 +73,10 @@ type SyntaxFlowRule struct {
 	TypicalHitFileSystem []byte
 	Verified             bool
 
+	// AllowIncluded is the rule can be included by other rules.
+	// If the rule is included by other rules, the rule will not be shown in the result.
+	AllowIncluded bool
+
 	Hash string `json:"hash" gorm:"unique_index"`
 }
 

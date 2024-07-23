@@ -77,6 +77,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 					y.description = value
 				case "type", "purpose":
 					y.purpose = value
+				case "allow_include", "as_library", "as_lib", "library_name":
+					y.allowIncluded = value
 				}
 				y.EmitAddDescription(key, value)
 			} else {
