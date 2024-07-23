@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -87,6 +88,17 @@ func (c *ClassBluePrint) GetMemberAndStaticMember(key string, supportStatic bool
 	return member
 }
 
+func (c *ClassBluePrint) GetConst(key string) Value {
+	var cst Value
+	c.GetConstEx(key, func(c *ClassBluePrint) bool {
+		if value, ok := c.ConstMember[key]; ok {
+			cst = value
+			return true
+		}
+		return false
+	})
+	return cst
+}
 func (c *ClassBluePrint) GetConstEx(key string, get func(c *ClassBluePrint) bool) bool {
 	if b := get(c); b {
 		return true
@@ -126,11 +138,6 @@ func (c *ClassBluePrint) getMethodEx(name string, get func(bluePrint *ClassBlueP
 	}
 	return false
 }
-
-func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
-	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
-}
-
 func (c *ClassBluePrint) GetMemberEx(key string, get func(*ClassBluePrint) bool) bool {
 	if ok := get(c); ok {
 		return true

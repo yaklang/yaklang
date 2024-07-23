@@ -26,6 +26,7 @@ type ClassBluePrint struct {
 
 	NormalMember map[string]*BluePrintMember
 	StaticMember map[string]Value
+	ConstMember  map[string]Value
 
 	CallBack []func()
 

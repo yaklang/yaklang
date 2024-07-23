@@ -192,8 +192,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				// static member only type
 			case isStatic && !isNilValue:
 				// static member
-				variable := y.GetStaticMember(class.Name, name)
-				y.AssignVariable(variable, value)
+				//variable := y.GetStaticMember(class.Name, name)
+				//y.AssignVariable(variable, value)
 				class.AddStaticMember(name, value)
 			case !isStatic && isNilValue:
 				// normal member only type
@@ -253,8 +253,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		default:
 			newFunction := createFunction()
 			if isStatic {
-				variable := y.GetStaticMember(class.Name, newFunction.GetName())
-				y.AssignVariable(variable, newFunction)
 				class.AddStaticMethod(funcName, newFunction)
 			} else {
 				defer func() {
@@ -476,14 +474,14 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 			}
 		}
 		// function
-		variable := y.GetStaticMember(class, key)
-		v := y.ReadValueByVariable(variable)
-		if u, ok := v.(*ssa.Undefined); ok && u.Kind == ssa.UndefinedValueInValid {
-			class := y.ResolveValue(class)
-			key := y.EmitConstInst(key)
-			v = y.ReadMemberCallVariable(class, key)
+		if bluePrint := y.GetClassBluePrint(class); !utils.IsNil(bluePrint) {
+			return bluePrint.GetMemberAndStaticMember(key, true)
+		} else {
+			log.Warnf("undefind")
+			return y.EmitUndefined(class)
 		}
-		return v
+		//variable := y.GetStaticMember(class, key)
+		//v := y.ReadValueByVariable(variable)
 	}
 
 	// var class, key string
@@ -560,8 +558,9 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 		key = y.VisitRightValue(i.FlexiVariable()).GetName()
 		exprName := y.VisitVariable(i.Variable())
 		v := y.ReadValue(exprName)
+		class = v.GetName()
 		if v.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-			return y.GetStaticMember(v.GetName(), key[1:]), class, key
+			return y.CreateMemberCallVariable(v, y.EmitConstInst(key)), class, key
 		} else {
 			class = v.String()
 		}
@@ -572,13 +571,19 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	if class == "" {
 		return nil, "", ""
 	}
+	var obj ssa.Value
+	bluePrint := y.GetClassBluePrint(class)
+	if utils.IsNil(bluePrint) {
+		obj = y.EmitUndefined(class)
+	} else {
+		obj = y.EmitTypeValue(bluePrint)
+	}
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]
-		return y.GetStaticMember(class, key), class, key
 	}
 	// function
-	return y.GetStaticMember(class, key), class, key
+	return y.CreateMemberCallVariable(obj, y.EmitConstInst(key)), class, key
 }
 
 func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {

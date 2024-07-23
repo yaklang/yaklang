@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/google/uuid"
@@ -1233,34 +1232,25 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	if !ok {
 		return nil
 	}
-	/*
-			不支持
-		<?php
-		$b = "231.php";
-		$a = include("$b");
-		var_dump($a);
-	*/
-	var flag, once bool
+	var once, flag bool
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
 		once = true
 	}
 	expr := i.Expression()
 	value := y.VisitExpression(expr)
-	if utils.IsNil(value) {
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		return y.EmitUndefined(expr.GetText())
-	}
-	if value.IsUndefined() {
+	if value.GetType().GetTypeKind() == ssa.UndefinedTypeKind {
+		log.Warnf("include path is undefind")
 	} else {
-		file := value.String()
-		if err := y.BuildFilePackage(file, once); err != nil {
-			log.Errorf("include: %v failed: %v", file, err)
-		} else {
+		y.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return y.EmitConstInst("true")
+		}, func() {
+			file := value.String()
+			if err := y.BuildFilePackage(file, once); err != nil {
+				log.Errorf("include %s failed: %v", file, err)
+				return
+			}
 			flag = true
-		}
+		}).Build()
 	}
 	return y.EmitConstInst(flag)
 }

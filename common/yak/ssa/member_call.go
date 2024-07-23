@@ -468,25 +468,12 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 // 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
 func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 	if class := b.MarkedThisClassBlueprint; class != nil {
-		variable := b.GetStaticMember(class.Name, name)
-		if value := b.PeekValueByVariable(variable); value != nil {
-			return value
+		if member := class.GetMemberAndStaticMember(name, b.SupportClassStaticModifier); !utils.IsNil(member) {
+			return member
 		}
-		value, ok := class.StaticMember[name]
-		if ok {
-			return value
+		if staticMethod := class.GetMethodAndStaticMethod(name, b.MarkedIsStaticMethod); !utils.IsNil(staticMethod) {
+			return staticMethod
 		}
-		member, ok := class.NormalMember[name]
-		if ok {
-			if member.Value != nil {
-				return member.Value
-			}
-		}
-		haveMethod, ok := class.Method[name]
-		if ok {
-			return haveMethod
-		}
-
 	}
 	return nil
 }
@@ -498,18 +485,25 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 }
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
+	if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
+		if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
+			if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(_method) {
+				return _method
+			}
+			if member := blueprint.GetMemberAndStaticMember(key.String(), b.SupportClassStaticModifier); !utils.IsNil(member) {
+				return member
+			}
+		}
+	}
 	if b.SupportClassStaticModifier {
 		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
-				if b.MarkedMemberCallWantMethod {
-					if value, ok := blueprint.StaticMethod[key.String()]; ok {
-						return value
-					}
+				if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(_method) {
+					return _method
 				}
-				if value, ok := blueprint.StaticMember[key.String()]; ok {
-					return value
+				if member := blueprint.GetMemberAndStaticMember(key.String(), b.SupportClassStaticModifier); !utils.IsNil(member) {
+					return member
 				}
-
 			}
 		}
 		//用于没有实例化类的时候获取静态方法或成员
@@ -517,13 +511,11 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		if u, ok := object.(*Undefined); ok {
 			if u.Kind == UndefinedValueInValid {
 				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
-					if b.MarkedMemberCallWantMethod {
-						if value, ok := blueprint.StaticMethod[key.String()]; ok {
-							return value
-						}
+					if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(_method) {
+						return _method
 					}
-					if value, ok := blueprint.StaticMember[key.String()]; ok {
-						return value
+					if member := blueprint.GetMemberAndStaticMember(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(member) {
+						return member
 					}
 				}
 			}

@@ -150,20 +150,30 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
-	var constValue string
+	var constValue ssa.Value
 	if len(i.AllInterpolatedStringPart()) != 0 {
-		for _, part := range i.AllInterpolatedStringPart() {
-			constValue += y.VisitInterpolatedStringPart(part)
+		for j, part := range i.AllInterpolatedStringPart() {
+			if j == 0 {
+				constValue = y.VisitInterpolatedStringPart(part)
+			} else {
+				op := y.EmitBinOp(ssa.OpAdd, constValue, y.VisitInterpolatedStringPart(part))
+				constValue = op
+			}
 		}
 	} else {
-		constValue = i.GetText()
+		_s := strings.Trim(i.GetText(), "'")
+		if unquote, err := strconv.Unquote(_s); err != nil {
+			return y.EmitConstInst(_s)
+		} else {
+			return y.EmitConstInst(unquote)
+		}
 	}
-	constValue = strings.Trim(constValue, "'")
-	if unquote, err := strconv.Unquote(constValue); err != nil {
-		return y.EmitConstInst(constValue)
-	} else {
-		return y.EmitConstInst(unquote)
-	}
+	return constValue
+	//if unquote, err := strconv.Unquote(constValue); err != nil {
+	//	return y.EmitConstInst(constValue)
+	//} else {
+	//	return y.EmitConstInst(unquote)
+	//}
 
 	//return y.EmitConstInst(constValue)
 	//y.EmitConstInst(constValue)
@@ -186,18 +196,19 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 	return r
 }
 
-func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) string {
+func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) ssa.Value {
 	if y == nil || raw == nil {
-		return ""
+		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*phpparser.InterpolatedStringPartContext)
 	if i == nil {
-		return ""
+		return nil
 	}
 	if i.Chain() != nil {
-		return y.VisitChain(i.Chain()).String()
+		return y.VisitChain(i.Chain())
 	}
-	return i.GetText()
+	trim := strings.Trim(i.GetText(), "'")
+	return y.EmitConstInst(trim)
 }
