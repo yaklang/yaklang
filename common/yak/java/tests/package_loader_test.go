@@ -4,12 +4,16 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestPackageLoader(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
+		ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
+		ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
+
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
 		package com.example.apackage; 
