@@ -28,9 +28,11 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 				prog = lib
 				break
 			}
-			if p, err := y.BuildDirectoryPackage(pkgNames[:i], true); err != nil {
+			if p, err := y.BuildDirectoryPackage(pkgNames[:i], true); err == nil {
 				prog = p
 				break
+			} else {
+				log.Infof("Dependencies Missed: Import package not found(%v)", err)
 			}
 		}
 		if prog == nil {

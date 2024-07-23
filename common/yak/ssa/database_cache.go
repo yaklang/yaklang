@@ -218,7 +218,7 @@ func (c *Cache) SaveToDatabase() {
 }
 
 func (c *Cache) IsExistedSourceCodeHash(programName string, hashString string) bool {
-	if programName == "" {
+	if programName == "" || !c.HaveDatabaseBackend() {
 		return false
 	}
 
