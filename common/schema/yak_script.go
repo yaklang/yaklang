@@ -197,7 +197,6 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		RiskAnnotation:       s.RiskAnnotation,
 		RiskInfo:             riskDetail,
 		IsCorePlugin:         s.IsCorePlugin,
-		ParamLength:          int64(s.ParamsNumber),
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins

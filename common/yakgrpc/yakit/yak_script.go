@@ -352,7 +352,6 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	if len(tags) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "tags", tags)
 	}
-
 	// 判断是不是通用模块
 	if params.GetIsGeneralModule() {
 		db = bizhelper.QueryByBool(db, "is_general_module", true)
@@ -361,7 +360,12 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	if params.GetIsBatch() {
 		db = bizhelper.QueryByBool(db, "is_batch_script", true)
 	}
-
+	switch params.IsMITMParamPlugins {
+	case 1:
+		db = db.Where("params!='\"null\"' and params is not null and LENGTH(params)>0")
+	case 2:
+		db = db.Where("(params='\"null\"' or params is null or LENGTH(params)<=0) or type='port-scan'")
+	}
 	// 排除 workflow
 	if params.GetExcludeNucleiWorkflow() {
 		db = db.Where(

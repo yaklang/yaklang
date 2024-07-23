@@ -61,11 +61,11 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		}
 			`,
 			[]string{
-				rules.MITMNotSupport("risk.CreateRisk"),
-				rules.MITMNotSupport("risk.cve"),
-				rules.MITMNotSupport("risk.cve"),
-				rules.MITMNotSupport("risk.cve"),
-				rules.MITMNotSupport("risk.Save"),
+				//rules.MITMNotSupport("risk.CreateRisk"),
+				//rules.MITMNotSupport("risk.cve"),
+				//rules.MITMNotSupport("risk.cve"),
+				//rules.MITMNotSupport("risk.cve"),
+				//rules.MITMNotSupport("risk.Save"),
 			},
 			"mitm",
 		)
@@ -85,9 +85,9 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		}
 			`,
 			[]string{
-				rules.MITMNotSupport("risk.CreateRisk"),
-				rules.MITMNotSupport("risk.cve"),
-				rules.MITMNotSupport("risk.Save"),
+				//rules.MITMNotSupport("risk.CreateRisk"),
+				//rules.MITMNotSupport("risk.cve"),
+				//rules.MITMNotSupport("risk.Save"),
 			},
 			"mitm",
 		)

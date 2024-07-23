@@ -1376,8 +1376,11 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
     poc.Get(target)~
 }
 `,
-			ScriptName: "plugin3",
+			ScriptName: "mitm_plugins",
 		})
+	if err != nil {
+		panic(err)
+	}
 	defer func() {
 		time.Sleep(1 * time.Second)
 		cancel()
@@ -1388,9 +1391,6 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 			Id: script.Id,
 		})
 	}()
-	if err != nil {
-		panic(err)
-	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
 		t.Fatal(err)
