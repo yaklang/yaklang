@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
@@ -193,6 +194,50 @@ func CopyDirectory(source string, destination string, isMove bool) error {
 	})
 }
 
+func CopyDirectoryEx(source string,
+	destination string,
+	rel func(string, string) (string, error),
+	join func(...string) string,
+	mkdir func(string, os.FileMode) error,
+	remove func(string) error,
+	openFile func(string, int, os.FileMode) (fs.File, error),
+	writeFile func(string, []byte, os.FileMode) error,
+) error {
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 构建新路径
+		refPath, err := rel(source, path)
+		if err != nil {
+			return err
+		}
+		newPath := join(destination, refPath)
+
+		if info.IsDir() {
+			// 创建新的文件夹
+			err := mkdir(newPath, info.Mode())
+			if err != nil {
+				return err
+			}
+		} else {
+			// 复制文件
+			err := CopyFileEx(path, newPath, openFile, writeFile)
+			if err != nil {
+				return err
+			}
+			// 删除源文件
+			err = remove(path)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 type copyFileTask struct {
 	path    string
 	newPath string
@@ -263,6 +308,29 @@ func CopyFile(source, destination string) error {
 	}
 
 	err = destFile.Sync()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ! WARN: will read all source file content into memory
+func CopyFileEx(
+	source string,
+	destination string,
+	openFile func(string, int, os.FileMode) (fs.File, error),
+	writeFile func(string, []byte, os.FileMode) error,
+) error {
+	srcFile, err := openFile(source, os.O_RDONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	bytes, err := io.ReadAll(srcFile)
+
+	err = writeFile(destination, bytes, 0o644)
 	if err != nil {
 		return err
 	}
