@@ -459,7 +459,7 @@ func _lsDirAll(i string) []*utils.FileInfo {
 // file.Cp("/tmp/test", "/root/tmp/test")
 // ```
 func _fileCopy(src, dst string) error {
-	return utils.CopyDirectory(src, dst)
+	return utils.CopyDirectory(src, dst, false)
 }
 
 // Ls 列出一个目录下的所有文件和目录，返回一个文件信息切片

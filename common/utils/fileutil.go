@@ -154,13 +154,10 @@ func GetExecutableFromEnv(cmd string) (string, error) {
 	return "", Errorf("command %s not found in PATH", cmd)
 }
 
-func CopyDirectory(source string, destination string) error {
+func CopyDirectory(source string, destination string, isMove bool) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
-		}
-		if source == path {
-			return nil
 		}
 
 		// 构建新路径
@@ -183,10 +180,12 @@ func CopyDirectory(source string, destination string) error {
 				return err
 			}
 
-			// 删除源文件
-			err = os.Remove(path)
-			if err != nil {
-				return err
+			if isMove {
+				// 删除源文件
+				err = os.Remove(path)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -199,7 +198,7 @@ type copyFileTask struct {
 	newPath string
 }
 
-func ConcurrentCopyDirectory(source string, destination string, threads int) error {
+func ConcurrentCopyDirectory(source string, destination string, threads int, isMove bool) error {
 	wg := &sync.WaitGroup{}
 	ch := make(chan copyFileTask)
 	for i := 0; i < threads; i++ {
@@ -208,7 +207,9 @@ func ConcurrentCopyDirectory(source string, destination string, threads int) err
 			defer wg.Done()
 			for task := range ch {
 				CopyFile(task.path, task.newPath)
-				os.Remove(task.path)
+				if isMove {
+					os.Remove(task.path)
+				}
 			}
 		}()
 	}
