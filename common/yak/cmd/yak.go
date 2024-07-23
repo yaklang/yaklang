@@ -99,10 +99,9 @@ func init() {
 	umask.Umask(0)
 	systemLog.Default().SetOutput(io.Discard)
 
-	result := debug.SetGCPercent(8)
-	result = debug.SetGCPercent(8)
-	log.Infof("GC Percent: %v", result)
-
+	// set double
+	const GCPercentDefault = 8
+	log.Debugf("GC Percent Origin: %v -> %v", debug.SetGCPercent(GCPercentDefault), GCPercentDefault)
 	/*
 		进行一些必要初始化，永远不要再 init 中直接调用数据库，不然会破坏数据库加载的顺序
 	*/
