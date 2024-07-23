@@ -37,6 +37,10 @@ func (f *embedFs) ReadFile(name string) ([]byte, error) {
 }
 func (f *embedFs) ReadDir(dirname string) ([]fs.DirEntry, error) { return f.f.ReadDir(dirname) }
 func (f *embedFs) Open(name string) (fs.File, error)             { return f.f.Open(name) }
+func (f *embedFs) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	return f.f.Open(name)
+}
+
 func (f *embedFs) Stat(name string) (fs.FileInfo, error) {
 	fn, err := f.f.Open(name)
 	if err != nil {
@@ -94,7 +98,10 @@ func (f *LocalFs) ReadFile(name string) ([]byte, error) {
 	}
 	return data, err
 }
-func (f *LocalFs) Open(name string) (fs.File, error)              { return os.Open(name) }
+func (f *LocalFs) Open(name string) (fs.File, error) { return os.Open(name) }
+func (f *LocalFs) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
 func (f *LocalFs) Stat(name string) (fs.FileInfo, error)          { return os.Stat(name) }
 func (f *LocalFs) ReadDir(dirname string) ([]fs.DirEntry, error)  { return os.ReadDir(dirname) }
 func (f *LocalFs) GetSeparators() rune                            { return filepath.Separator }
