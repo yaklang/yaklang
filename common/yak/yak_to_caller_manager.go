@@ -249,8 +249,8 @@ func NewYakToCallerManager() *YakToCallerManager {
 	return caller
 }
 
-func (y *YakToCallerManager) WithVulFilter(filter filter.Filterable) *YakToCallerManager {
-	y.vulFilter = filter
+func (y *YakToCallerManager) WithDefaultFilter(filter *filter.StringFilter) *YakToCallerManager {
+	y.defaultFilter = filter
 	return y
 }
 
@@ -347,6 +347,7 @@ func (y *YakToCallerManager) SetForYakit(
 			},
 			"yakit": yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)),
 		})
+		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
 		return nil
 	}, hooks...)
 }
@@ -764,7 +765,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if streamContext != nil {
 					opts = append(opts, httptpl.WithContext(streamContext))
 				}
-				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
+				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
@@ -1158,6 +1159,7 @@ func (y *YakToCallerManager) AddForYakit(
 				})
 			},
 		})
+		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
 		return nil
 	}, hooks...)
 }
@@ -1198,12 +1200,18 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		ctx = context.WithValue(ctx, "cancel", cancel)
 		y.ContextCancelFuncs.Store(id, cancel)
 	}
-
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), script, code, func(e *antlr4yak.Engine) error {
+	args := []string{}
+	for key, value := range paramMap {
+		args = append(args, "--"+key, fmt.Sprintf("%s", value))
+	}
+	app := cli.NewCliApp()
+	app.SetArgs(args)
+	pluginContext := y.getYakitPluginContext(ctx).WithCliApp(app)
+	cTable, err := FetchFunctionFromSourceCode(y, pluginContext, script, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
-
+		HookCliArgs(e, args)
 		e.SetVars(map[string]any{
 			"MITM_PARAMS": paramMap,
 			"MITM_PLUGIN": id,
