@@ -40,6 +40,7 @@ func updateToDatabase(prog *Program) {
 	ir := prog.irProgram
 	if ir == nil {
 		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)
+		prog.irProgram = ir
 	}
 	ir.Language = prog.Language
 	ir.ProgramKind = string(prog.ProgramKind)

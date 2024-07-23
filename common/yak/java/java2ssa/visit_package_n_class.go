@@ -236,7 +236,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	if y == nil || raw == nil {
 		return nil
 	}
-	log.Infof("class/interface: %v", raw.ToStringTree(raw.GetParser().GetRuleNames(), raw.GetParser()))
+	// log.Infof("class/interface: %v", raw.ToStringTree(raw.GetParser().GetRuleNames(), raw.GetParser()))
 	// todo 类和接口的类型声明
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
