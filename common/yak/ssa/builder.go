@@ -56,8 +56,8 @@ type FunctionBuilder struct {
 	MarkedThisObject         Value
 	MarkedThisClassBlueprint *ClassBluePrint
 
-	MarkedIsStaticMethod bool
-	parentBuilder        *FunctionBuilder
+	MarkedMemberCallWantMethod bool
+	parentBuilder              *FunctionBuilder
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {

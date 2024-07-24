@@ -331,7 +331,14 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	if para, ok := ToParameter(value); ok {
 		name, typ := checkCanMemberCall(para, key)
 		newParamterMember := b.NewParameterMember(name, para, key)
-		newParamterMember.SetType(typ)
+		if b.MarkedMemberCallWantMethod {
+			// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
+			t := NewFunctionTypeDefine(name, nil, nil, false)
+			t.IsMethod = true
+			newParamterMember.SetType(t)
+		} else {
+			newParamterMember.SetType(typ)
+		}
 		SetMemberCall(para, key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
 		return newParamterMember
@@ -401,7 +408,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	if b.SupportClassStaticModifier {
 		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
-				if b.MarkedIsStaticMethod {
+				if b.MarkedMemberCallWantMethod {
 					if value, ok := blueprint.StaticMethod[key.String()]; ok {
 						return value
 					}
@@ -417,7 +424,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		if u, ok := object.(*Undefined); ok {
 			if u.Kind == UndefinedValueInValid {
 				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
-					if b.MarkedIsStaticMethod {
+					if b.MarkedMemberCallWantMethod {
 						if value, ok := blueprint.StaticMethod[key.String()]; ok {
 							return value
 						}
@@ -442,15 +449,40 @@ func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Valu
 	recoverScope := b.SetCurrent(value, true)
 	origin := b.ReadValueInThisFunction(name)
 	recoverScope()
+
 	if undefine, ok := ToUndefined(origin); ok {
 		undefine.SetRange(b.CurrentRange)
-		// undefine.SetName(b.setMember(key))
+
 		if typ != nil {
 			undefine.Kind = UndefinedMemberValid
 			undefine.SetType(typ)
 		} else {
 			undefine.Kind = UndefinedMemberInValid
 		}
+
+		if b.MarkedMemberCallWantMethod {
+			var t *FunctionType
+			t, ok = typ.(*FunctionType)
+			if !ok {
+				t = NewFunctionTypeDefine(name, nil, nil, false)
+			}
+			t.IsMethod = true
+			undefine.SetType(t)
+		}
+
+		// undefine.SetName(b.setMember(key))
+		// if b.MarkedMemberCallWantMethod {
+		// 	t := NewFunctionTypeDefine(name, nil, nil, false)
+		// 	t.IsMethod = true
+		// 	undefine.SetType(t)
+		// } else {
+		// 	if typ != nil {
+		// 		undefine.Kind = UndefinedMemberValid
+		// 		undefine.SetType(typ)
+		// 	} else {
+		// 		undefine.Kind = UndefinedMemberInValid
+		// 	}
+		// }
 		SetMemberCall(value, key, undefine)
 	}
 	setMemberVerboseName(origin)

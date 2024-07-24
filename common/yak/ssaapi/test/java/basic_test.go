@@ -36,7 +36,7 @@ func Test_Class_Member(t *testing.T) {
 			`,
 			SF: `B.b(* as $target)`,
 			Expect: map[string][]string{
-				"target": {"1", "2"},
+				"target": {"1", "2", "Undefined-B"},
 			},
 		})
 	})
