@@ -104,11 +104,15 @@ func NewStringFilter(config *Config, container *cuckoo.Filter) *StringFilter {
 	}
 }
 
-func NewFilter() *StringFilter {
+func NewFilter() Filterable {
+	return NewMapFilter()
+}
+
+func NewCuckooFilter() Filterable {
 	return DefaultFilterManager.DequeueFilter()
 }
 
-func NewBigFilter() *StringFilter {
+func NewBigFilter() Filterable {
 	return BigFilterManager.DequeueFilter()
 }
 

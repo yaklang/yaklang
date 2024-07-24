@@ -661,7 +661,7 @@ func init() {
 			}
 			ch := yieldPayloads(db.Table("payloads").Select("content, is_file").Order("hit_count desc"), ctx)
 
-			f := filter.NewFilter()
+			f := filter.NewBigFilter()
 			defer f.Close()
 			for payload := range ch {
 				if payload.Content == nil || payload.IsFile == nil {

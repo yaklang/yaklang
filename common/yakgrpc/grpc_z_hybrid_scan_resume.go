@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -102,7 +103,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	swg := utils.NewSizedWaitGroup(int(scanConfig.Concurrent))                                                                     // 设置并发数
 	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(scanConfig.TotalTimeoutSecond)*time.Second) // 设置总超时
 	// init some config
-	var resumeFilterManager = NewFilterManager(12, 1<<15, 30)
+	var resumeFilterManager = filter.NewFilterManager(12, 1<<15, 30)
 	var hasUnavailableTarget = false
 
 	countRiskClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {

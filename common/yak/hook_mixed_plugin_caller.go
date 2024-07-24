@@ -91,11 +91,11 @@ var MITMAndPortScanHooks = []string{
 type MixPluginCaller struct {
 	ctx context.Context // 整个 mix plugin caller 的上下文
 
-	websiteFilter       *filter.StringFilter
-	websitePathFilter   *filter.StringFilter
-	websiteParamsFilter *filter.StringFilter
+	websiteFilter       filter.Filterable
+	websitePathFilter   filter.Filterable
+	websiteParamsFilter filter.Filterable
 
-	rawQuestFilter *filter.StringFilter
+	rawQuestFilter filter.Filterable
 
 	runtimeId string
 	proxy     string
@@ -222,7 +222,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
-	webFilter := filter.NewFilter()
+	webFilter := filter.NewCuckooFilter()
 	callerFilter := filter.NewMapFilter()
 	c := &MixPluginCaller{
 		websiteFilter:       webFilter,
@@ -247,7 +247,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	return c, nil
 }
 
-func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCaller, error) {
+func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
@@ -313,7 +313,7 @@ func (c *MixPluginCaller) ResetFilter() {
 	defer resetFilterLock.Unlock()
 	c.websiteFilter.Close()
 
-	webFilter := filter.NewFilter()
+	webFilter := filter.NewCuckooFilter()
 	c.websiteParamsFilter = webFilter
 	c.websitePathFilter = webFilter
 	c.websiteFilter = webFilter

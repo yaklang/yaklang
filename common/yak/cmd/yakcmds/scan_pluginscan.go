@@ -323,7 +323,7 @@ var hybridScanCommand = &cli.Command{
 			thread = 50
 		}
 		swg := utils.NewSizedWaitGroup(thread)
-		publicFilter := filter.NewFilter()
+		publicFilter := filter.NewCuckooFilter()
 		public := yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
 			if risk, ok := yakit.IsRiskExecResult(i); ok {
 				log.Infof("risk: %s", risk.Title)
