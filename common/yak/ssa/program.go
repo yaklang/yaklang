@@ -70,7 +70,7 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	}
 
 	if p, ok := prog.UpStream[name]; ok {
-		app.UpStream[name] = p
+		app.AddUpStream(p)
 		return p, hasFile(p)
 	}
 
@@ -83,26 +83,34 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	if err != nil {
 		return nil, false
 	}
-	app.UpStream[name] = p
+	app.AddUpStream(p)
 	if !slices.Contains(p.irProgram.UpStream, name) {
 		// update up-down stream
-		prog.UpStream[name] = p
-		p.DownStream[prog.Name] = prog
+		prog.AddUpStream(p)
 	}
 	return p, hasFile(p)
 }
 
+func (prog *Program) AddUpStream(p *Program) {
+	prog.UpStream[p.Name] = p
+	p.DownStream[prog.Name] = prog
+}
+
 func (prog *Program) NewLibrary(name string, path []string) *Program {
 	// create lib
+	// get program Path
 	fs := prog.Loader.GetFilesysFileSystem()
 	fullPath := prog.GetCurrentEditor().GetFilename()
 	endPath := fs.Join(path...)
 	programPath, _, _ := strings.Cut(fullPath, endPath)
+
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, programPath)
 	lib.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
 	lib.Language = prog.Language
-	prog.UpStream[name] = lib
-	lib.DownStream[prog.Name] = prog
+
+	// up-down stream and application
+	prog.AddUpStream(lib)
+	prog.Application.AddUpStream(lib)
 	lib.Application = prog.Application
 	return lib
 }
@@ -174,13 +182,15 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 }
 
 func (prog *Program) Finish() {
-	for _, up := range prog.UpStream {
-		up.Finish()
-	}
-	prog.Cache.SaveToDatabase()
-	if prog.EnableDatabase {
-		updateToDatabase(prog)
-	}
+	prog.finishOnce.Do(func() {
+		for _, up := range prog.UpStream {
+			up.Finish()
+		}
+		prog.Cache.SaveToDatabase()
+		if prog.EnableDatabase {
+			updateToDatabase(prog)
+		}
+	})
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
