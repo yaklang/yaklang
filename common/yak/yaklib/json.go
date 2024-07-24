@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -103,25 +104,25 @@ func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 	var i interface{}
 	defaultValue := make(map[string]interface{})
 
-	str := utils.InterfaceToString(raw)
-	str = strings.TrimSpace(str)
-	err := json.Unmarshal([]byte(str), &i)
+	b := utils.InterfaceToBytes(raw)
+	b = bytes.TrimSpace(b)
+	err := json.Unmarshal(b, &i)
 	if err != nil {
 		// 尝试解码
 		if strings.Contains(err.Error(), `character 'x'`) {
-			fixed := string(jsonextractor.FixJson([]byte(str)))
-			if fixed != "" {
-				str = fixed
+			fixed := jsonextractor.FixJson([]byte(b))
+			if len(fixed) > 0 {
+				b = fixed
 			}
-			err := json.Unmarshal([]byte(str), &i)
+			err := json.Unmarshal([]byte(b), &i)
 			if err == nil {
 				return i
 			}
 		}
 
 		// 如果 JSON 解码失败则尝试修复一下
-		if strings.HasPrefix(str, "{") {
-			fixed, ok := jsonextractor.JsonValidObject([]byte(str))
+		if bytes.HasPrefix(b, []byte("{")) {
+			fixed, ok := jsonextractor.JsonValidObject([]byte(b))
 			if ok {
 				err := json.Unmarshal([]byte(fixed), &i)
 				if err == nil {
