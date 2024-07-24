@@ -158,7 +158,7 @@ func BuildPluginTestingJunkData() []byte {
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
 	defer pluginTestingServer.ClearRequestsHistory()
 	host, port := pluginTestingServer.Host, pluginTestingServer.Port
-	testDomain := utils.RandStringBytes(5) + ".com"
+	testDomain := utils.RandStringBytes(60) + ".com"
 	netx.AddHost(testDomain, host)
 	defer netx.DeleteHost(testDomain)
 	target := fmt.Sprintf("http://%s:%d", testDomain, port)
