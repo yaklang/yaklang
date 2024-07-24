@@ -366,13 +366,6 @@ func ScanHybridTargetWithPlugin(
 			"CALLER_FILTER": callerFilter,
 			"PROXY":         proxy,
 		})
-		//engine.SetVars("REQUEST", target.Request)
-		//engine.SetVars("RESPONSE", target.Response)
-		//engine.SetVars("HTTPS", target.IsHttps)
-		//engine.SetVars("PLUGIN", plugin)
-		//engine.SetVars("CTX", ctx)
-		//engine.SetVars("CALLER_FILTER", callerFilter)
-		//engine.SetVars("PROXY", proxy)
 		return nil
 	})
 	err := engine.ExecuteWithContext(ctx, execTargetWithPluginScript)

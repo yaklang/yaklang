@@ -118,10 +118,12 @@ func testCaseCheck(base base) func(t *testing.T) {
 		engine := yaklang.New()
 		data := base
 
-		engine.SetVars("request", data.inputPacket)
-		engine.SetVars("keywords", data.expectKeywordInOutputPacket)
-		engine.SetVars("regexps", data.expectRegexpInOutputPacket)
-		engine.SetVars("debug", data.debug)
+		engine.SetVars(map[string]any{
+			"request":  data.inputPacket,
+			"keywords": data.expectKeywordInOutputPacket,
+			"regexps":  data.expectRegexpInOutputPacket,
+			"debug":    data.debug,
+		})
 
 		if data.code != "" {
 			data.code = "." + strings.TrimLeft(data.code, ".")
