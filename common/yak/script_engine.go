@@ -580,36 +580,40 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	client.SetYakLog(*e.logger)
 	yaklib.SetEngineClient(engine, client)
 	if iaiLib, ok := engine.GetVar("ai"); ok {
-		if aiLib, ok := iaiLib.(map[string]interface{}); ok {
-			aiLib["FunctionCall"] = func(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
-				iruntimeId, err := engine.RuntimeInfo("runtimeId")
-				if err != nil {
-					return nil, utils.Errorf("build output stream failed: get runtime id failed: %s", err)
-				}
-				runtimeId := utils.InterfaceToString(iruntimeId)
-				opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
-					engine.GetVar("yakit")
-					client.Stream("ai", runtimeId, reader, map[string]any{
-						"ai-type":  cfg.Type,
-						"ai-model": cfg.Model,
-					})
-				})}, opts...)
-				return ai.FunctionCall(input, funcs, opts...)
-			}
-			aiLib["Chat"] = func(msg string, opts ...aispec.AIConfigOption) (string, error) {
-				iruntimeId, err := engine.RuntimeInfo("runtimeId")
-				if err != nil {
-					return "", utils.Errorf("build output stream failed: get runtime id failed: %s", err)
-				}
-				runtimeId := utils.InterfaceToString(iruntimeId)
-				opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
-					client.Stream("ai", runtimeId, reader, map[string]any{
-						"ai-type":  cfg.Type,
-						"ai-model": cfg.Model,
-					})
-				})}, opts...)
-				return ai.Chat(msg, opts...)
-			}
+		if _, ok := iaiLib.(map[string]interface{}); ok {
+			engine.SetVars(map[string]any{
+				"ai": map[string]any{
+					"FunctionCall": func(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+						iruntimeId, err := engine.RuntimeInfo("runtimeId")
+						if err != nil {
+							return nil, utils.Errorf("build output stream failed: get runtime id failed: %s", err)
+						}
+						runtimeId := utils.InterfaceToString(iruntimeId)
+						opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
+							engine.GetVar("yakit")
+							client.Stream("ai", runtimeId, reader, map[string]any{
+								"ai-type":  cfg.Type,
+								"ai-model": cfg.Model,
+							})
+						})}, opts...)
+						return ai.FunctionCall(input, funcs, opts...)
+					},
+					"Chat": func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+						iruntimeId, err := engine.RuntimeInfo("runtimeId")
+						if err != nil {
+							return "", utils.Errorf("build output stream failed: get runtime id failed: %s", err)
+						}
+						runtimeId := utils.InterfaceToString(iruntimeId)
+						opts = append([]aispec.AIConfigOption{aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
+							client.Stream("ai", runtimeId, reader, map[string]any{
+								"ai-type":  cfg.Type,
+								"ai-model": cfg.Model,
+							})
+						})}, opts...)
+						return ai.Chat(msg, opts...)
+					},
+				},
+			})
 		}
 	}
 	for _, hook := range e.engineHooks {

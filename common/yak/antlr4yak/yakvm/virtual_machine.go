@@ -171,12 +171,12 @@ func New() *VirtualMachine {
 
 // ImportLibs 导入库到引擎的全局变量中
 func (n *VirtualMachine) ImportLibs(libs map[string]interface{}) {
-	n.globalVar.Link(libs)
+	n.globalVar = n.globalVar.Link(libs)
 }
 
 // SetVars 导入变量到引擎的全局变量中
 func (n *VirtualMachine) SetVars(m map[string]any) {
-	n.runtimeGlobalVar.Link(m)
+	n.runtimeGlobalVar = n.runtimeGlobalVar.Link(m)
 }
 
 func (n *VirtualMachine) GetNaslGlobalVarTable() (map[int]*Value, error) {
