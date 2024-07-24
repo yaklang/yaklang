@@ -18,3 +18,18 @@ func TestBuilder(t *testing.T) {
 		}, t)
 	})
 }
+
+
+func TestTemp(t *testing.T) {
+	t.Run("temp", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		var a = 2
+		func main(){
+			println(a)
+		}
+		`, []string{
+			"1",
+		}, t)
+	})
+}	

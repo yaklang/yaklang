@@ -40,11 +40,11 @@ options {
 }
 
 sourceFile
-    : packageClause (importDecl eos)* (( methodDecl | functionDecl | declaration) eos)* EOF
+    : eos* packageClause (importDecl eos*)* (( methodDecl | functionDecl | declaration) eos*)* EOF
     ;
 
 packageClause
-    : PACKAGE packageName
+    : PACKAGE packageName eos*
     ;
 
 packageName
@@ -52,7 +52,7 @@ packageName
     ;
 
 importDecl
-    : IMPORT (importSpec | L_PAREN (importSpec eos)* R_PAREN)
+    : IMPORT (importSpec | L_PAREN eos? (importSpec eos?)* R_PAREN)
     ;
 
 importSpec
@@ -70,7 +70,7 @@ declaration
     ;
 
 constDecl
-    : CONST (constSpec | L_PAREN (constSpec eos)* R_PAREN)
+    : CONST (constSpec | L_PAREN eos? (constSpec eos)* R_PAREN)
     ;
 
 constSpec
@@ -86,7 +86,7 @@ expressionList
     ;
 
 typeDecl
-    : TYPE (typeSpec | L_PAREN (typeSpec eos)* R_PAREN)
+    : TYPE (typeSpec | L_PAREN eos? (typeSpec eos?)* eos? R_PAREN)
     ;
 
 typeSpec
@@ -121,11 +121,11 @@ typeTerm
 // Function declarations
 
 functionDecl
-    : FUNC IDENTIFIER typeParameters? signature block?
+    : FUNC IDENTIFIER typeParameters? signature eos? block?
     ;
 
 methodDecl
-    : FUNC receiver IDENTIFIER signature block?
+    : FUNC receiver IDENTIFIER signature eos? block?
     ;
 
 receiver
@@ -133,7 +133,7 @@ receiver
     ;
 
 varDecl
-    : VAR (varSpec | L_PAREN (varSpec eos)* R_PAREN)
+    : VAR (varSpec | L_PAREN eos? (varSpec eos)* R_PAREN)
     ;
 
 varSpec
@@ -141,11 +141,11 @@ varSpec
     ;
 
 block
-    : L_CURLY statementList? R_CURLY
+    : L_CURLY eos* statementList? R_CURLY
     ;
 
 statementList
-    : ((SEMI? | EOS? | {this.closingBracket()}?) statement eos)+
+    : (statement eos*)+
     ;
 
 statement
@@ -199,7 +199,7 @@ shortVarDecl
     ;
 
 labeledStmt
-    : IDENTIFIER COLON statement?
+    : IDENTIFIER COLON eos* statement?
     ;
 
 returnStmt
@@ -236,11 +236,11 @@ switchStmt
     ;
 
 exprSwitchStmt
-    : SWITCH (expression? | simpleStmt? eos expression?) L_CURLY exprCaseClause* R_CURLY
+    : SWITCH (expression? | simpleStmt? eos? expression?) L_CURLY eos? exprCaseClause* eos? R_CURLY
     ;
 
 exprCaseClause
-    : exprSwitchCase COLON statementList?
+    : exprSwitchCase COLON eos* statementList?
     ;
 
 exprSwitchCase
@@ -249,7 +249,7 @@ exprSwitchCase
     ;
 
 typeSwitchStmt
-    : SWITCH (typeSwitchGuard | eos typeSwitchGuard | simpleStmt eos typeSwitchGuard) L_CURLY typeCaseClause* R_CURLY
+    : SWITCH (typeSwitchGuard | eos typeSwitchGuard | simpleStmt eos typeSwitchGuard) L_CURLY eos? typeCaseClause* eos? R_CURLY
     ;
 
 typeSwitchGuard
@@ -257,7 +257,7 @@ typeSwitchGuard
     ;
 
 typeCaseClause
-    : typeSwitchCase COLON statementList?
+    : typeSwitchCase COLON eos* statementList?
     ;
 
 typeSwitchCase
@@ -270,11 +270,11 @@ typeList
     ;
 
 selectStmt
-    : SELECT L_CURLY commClause* R_CURLY
+    : SELECT L_CURLY eos? commClause* eos? R_CURLY
     ;
 
 commClause
-    : commCase COLON statementList?
+    : commCase COLON eos* statementList?
     ;
 
 commCase
@@ -291,7 +291,7 @@ forStmt
     ;
 
 forClause
-    : initStmt = simpleStmt? eos expression? eos postStmt = simpleStmt?
+    : initStmt = simpleStmt? eos? expression? eos? postStmt = simpleStmt?
     ;
 
 rangeClause
@@ -305,7 +305,7 @@ goStmt
 type_
     : typeName typeArgs?
     | typeLit
-    | L_PAREN type_ R_PAREN
+    | L_PAREN eos? type_ eos? R_PAREN
     ;
 
 typeArgs
@@ -345,7 +345,7 @@ pointerType
     ;
 
 interfaceType
-    : INTERFACE L_CURLY ((methodSpec | typeElement) eos)* R_CURLY
+    : INTERFACE L_CURLY eos? ((methodSpec | typeElement) eos?)* eos? R_CURLY
     ;
 
 sliceType
@@ -465,7 +465,7 @@ literalType
     ;
 
 literalValue
-    : L_CURLY (elementList COMMA?)? R_CURLY
+    : L_CURLY eos? (elementList COMMA?)? eos? R_CURLY
     ;
 
 elementList
@@ -487,7 +487,7 @@ element
     ;
 
 structType
-    : STRUCT L_CURLY (fieldDecl eos)* R_CURLY
+    : STRUCT L_CURLY eos* (fieldDecl eos*)* R_CURLY
     ;
 
 fieldDecl
@@ -533,6 +533,5 @@ methodExpr
 
 eos
     : SEMI
-    | EOF
-    | EOS?
+    | EOS
     ;
