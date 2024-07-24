@@ -186,6 +186,11 @@ func RankFind(source string, targets []string) Ranks {
 	return rankFind(source, targets, noopTransformer())
 }
 
+func RankFindEx(source string, targets []string, f func(string, string) float64) Ranks {
+	return rankFindEx(source, targets, noopTransformer(), f)
+}
+
+
 func RankFindTextSubString(source string, targets []string) Ranks {
 	return rankFindEx(source, targets, noopTransformer(), func(s1, s2 string) float64 {
 		f, err := utils.CalcTextSubStringStability([]byte(s1), []byte(s2))
