@@ -178,4 +178,20 @@ http:
 			zeroScore: false,
 		})
 	})
+
+	t.Run("test localhost bypass", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    if str.Contains(url, '127.0.0.1') {
+        return
+    }
+    risk.NewRisk(url, risk.solution("b"),risk.description("a"))
+}`,
+			err:       "误报",
+			codeTyp:   "mitm",
+			zeroScore: false,
+		})
+	})
 }
