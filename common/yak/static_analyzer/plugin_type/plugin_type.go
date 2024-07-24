@@ -11,6 +11,7 @@ type PluginType string
 const (
 	// plugin type : "yak" "mitm" "port-scan" "codec"
 	PluginTypeYak      PluginType = "yak"
+	PluginTypeGo   PluginType = "go" 
 	PluginTypeMitm     PluginType = "mitm"
 	PluginTypePortScan PluginType = "port-scan"
 	PluginTypeCodec    PluginType = "codec"
@@ -20,6 +21,8 @@ func ToPluginType(plugin string) PluginType {
 	switch plugin {
 	case "yak":
 		return PluginTypeYak
+	case "go":
+		return PluginTypeGo
 	case "mitm":
 		return PluginTypeMitm
 	case "port-scan":

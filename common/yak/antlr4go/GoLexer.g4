@@ -84,7 +84,7 @@ L_BRACKET      : '[';
 R_BRACKET      : ']';
 ASSIGN         : '=';
 COMMA          : ',';
-SEMI           : ';' -> channel(HIDDEN);
+SEMI           : ';';
 COLON          : ':';
 DOT            : '.';
 PLUS_PLUS      : '++';
@@ -170,11 +170,11 @@ RAW_CHAR_LIT           : '\'' (~['\\] | ESCAPED_VALUE)? '\'';
 
 // Hidden tokens
 
-WSI:                     [ \t]+ -> skip;
-EOS:                    ([\r\n]+ | [;]+ | '/*' .*? '*/' | EOF) -> channel(HIDDEN);
+WSI:                     [ \t\r]+ -> skip;
+EOS:                    ([\t\r\n ;]+);
 
-COMMENT_NLSEMI      : '/*' ~[\r\n]*? '*/' -> channel(HIDDEN);
-LINE_COMMENT_NLSEMI : '//' ~[\r\n]*       -> channel(HIDDEN);
+COMMENT      : '/*' .*? '*/' ->skip;
+LINE_COMMENT : '//' ~[\r\n]* ->skip;
 
 // Fragments
 
