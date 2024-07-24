@@ -110,6 +110,7 @@ func NewWithContext() *Executor {
 		}
 		return nil, nil
 	}
+	vm.SetVars(m)
 	vm.ImportLibs(lib.NaslBuildInNativeMethod)
 	executor.ImportLibs(lib.NaslBuildInNativeMethod)
 	executor.ImportLibs(lib.BuildInVars)
