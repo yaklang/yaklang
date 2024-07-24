@@ -322,4 +322,34 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
+	t.Run("static method  chain  call ", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/java/Runtime.java", `
+	class Runtime {
+		private static final Runtime currentRuntime = new Runtime()
+		public static Runtime getRuntime() {
+        	return currentRuntime;
+      	}
+		public Process exec(String command) throws IOException {
+        	return exec(command, null, null);
+    	}
+	}
+	`)
+		vf.AddFile("src/main/java/B.java", `
+	package B; 
+	import A.A;
+	class B {
+		public static void main(String[] args) {
+			Runtime.getRuntime().exec();
+		}
+	}
+	`)
+
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		System.out.println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"11", "22"},
+		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
 }
