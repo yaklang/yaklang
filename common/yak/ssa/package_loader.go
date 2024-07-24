@@ -66,7 +66,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 	}
 	// TODO: get program from name, but in some case, package name not same with path
 	if lib, _ := p.GetLibrary(strings.Join(name, ".")); lib != nil {
-		lib.Finish()
+		// lib.Finish()
 		return lib, nil
 	}
 	return nil, utils.Errorf("Build package %v failed", name)
