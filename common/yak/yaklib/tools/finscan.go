@@ -32,7 +32,7 @@ type _yakFinPortScanConfig struct {
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
 
 	excludeHosts *hostsparser.HostsParser
-	excludePorts *filter.StringFilter
+	excludePorts filter.Filterable
 
 	callback           func(result *finscan.FinScanResult)
 	submitTaskCallback func(i string)
@@ -170,7 +170,7 @@ func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanCon
 	closeResult := make(chan *finscan.FinScanResult, 10000)
 
 	go func() {
-		var stringFilter *filter.StringFilter
+		var stringFilter filter.Filterable
 
 		defer func() {
 			close(closeResult)

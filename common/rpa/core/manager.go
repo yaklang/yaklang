@@ -32,7 +32,7 @@ type Manager struct {
 
 	StartUrls []string
 	hijacked  *StringFilterwithCount
-	visited   *filter.StringFilter
+	visited   filter.Filterable
 
 	// visitedUrl *filter.StringFilter
 	mainDomain string
@@ -261,7 +261,7 @@ func NewManager(urls string, ch chan RequestIf, opts ...ConfigOpt) (*Manager, er
 		rootContext:      ctx,
 		rootCancel:       cancel,
 		hijacked:         NewFilterwithCount(),
-		visited:          filter.NewFilter(),
+		visited:          filter.NewCuckooFilter(),
 		excludedSuffix:   defaultExcludedSuffix,
 		excludedFileName: defaultExcludedFileName,
 

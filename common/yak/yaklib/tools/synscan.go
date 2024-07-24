@@ -37,7 +37,7 @@ type _yakPortScanConfig struct {
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
 
 	excludeHosts *hostsparser.HostsParser
-	excludePorts *filter.StringFilter
+	excludePorts filter.Filterable
 
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
@@ -440,7 +440,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	var (
 		synScanOptions []synscan.ConfigOption
 		err            error
-		stringFilter   *filter.StringFilter
+		stringFilter   filter.Filterable
 	)
 	if config.netInterface != "" {
 		synScanOptions, err = synscan.CreateConfigOptionsByIfaceName(config.netInterface)

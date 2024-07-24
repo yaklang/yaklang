@@ -512,7 +512,7 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 	//}
 
 	var subReqs []*Req
-	urlFilter := filter.NewFilter()
+	urlFilter := filter.NewCuckooFilter()
 	handleReqResultEx(rootReq, func(nReq *Req) bool {
 		subReqs = append(subReqs, nReq)
 		return true
