@@ -157,3 +157,16 @@ func TestResetYakScriptGroup(t *testing.T) {
 		})
 	}
 }
+
+func TestSetGroup(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("SetGroup", func(t *testing.T) {
+		_, err = client.SetGroup(context.Background(), &ypb.SetGroupRequest{GroupName: "测试组"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}

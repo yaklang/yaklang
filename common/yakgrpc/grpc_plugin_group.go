@@ -20,24 +20,6 @@ import (
 func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptGroupRequest) (*ypb.QueryYakScriptGroupResponse, error) {
 	var groupCount ypb.QueryYakScriptGroupResponse
 
-	if req.GetAll() {
-		countAll, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), false, req)
-		if err == nil {
-			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
-				Value:   "全部",
-				Total:   int32(countAll),
-				Default: true,
-			})
-		}
-		countGroup, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), true, req)
-		if err == nil {
-			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
-				Value:   "未分组",
-				Total:   int32(countGroup),
-				Default: true,
-			})
-		}
-	}
 	groups, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), req.ExcludeType)
 	filterGroup := filter.NewFilter()
 	for _, group := range groups {
@@ -107,10 +89,6 @@ func (s *Server) SaveYakScriptGroup(ctx context.Context, req *ypb.SaveYakScriptG
 	db = yakit.FilterYakScript(db, req.Filter)
 	yakScripts := yakit.YieldYakScripts(db, context.Background())
 	for yakScript := range yakScripts {
-		res, _ := yakit.GetYakScriptByName(s.GetProfileDatabase(), yakScript.ScriptName)
-		if res == nil || res.Type == "yak" || res.Type == "codec" {
-			continue
-		}
 		if len(req.SaveGroup) > 0 {
 			for _, group := range req.SaveGroup {
 				saveData := &schema.PluginGroup{
@@ -195,7 +173,7 @@ func (s *Server) DeleteYakScriptGroup(ctx context.Context, req *ypb.DeleteYakScr
 
 func (s *Server) GetYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptRequest) (*ypb.GetYakScriptGroupResponse, error) {
 	var data ypb.GetYakScriptGroupResponse
-	allGroup, _ := yakit.GetGroup(s.GetProfileDatabase(), nil)
+	allGroup, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), []string{})
 
 	db := s.GetProfileDatabase().Model(&schema.YakScript{})
 	db = yakit.FilterYakScript(db, req)
@@ -221,18 +199,30 @@ func (s *Server) GetYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptR
 		}
 	}
 
-	for _, group := range allGroup {
+	filterGroup := filter.NewFilter()
+	for _, v := range allGroup {
+		if filterGroup.Exist(v.Value) {
+			continue
+		}
 		found := false
 		for _, setGroup := range data.SetGroup {
-			if group.Group == setGroup {
+			if v.Value == setGroup {
 				found = true
 				continue
 			}
 		}
-		if !found {
-			data.AllGroup = append(data.AllGroup, group.Group)
+		if v.IsPocBuiltIn {
+			continue
 		}
+		if len(v.TemporaryId) > 0 {
+			continue
+		}
+		if !found {
+			data.AllGroup = append(data.AllGroup, v.Value)
+		}
+		filterGroup.Insert(v.Value)
 	}
+
 	return &data, nil
 }
 
@@ -260,5 +250,21 @@ func (s *Server) ResetYakScriptGroup(ctx context.Context, req *ypb.ResetYakScrip
 		}
 		return &ypb.Empty{}, nil
 	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) SetGroup(ctx context.Context, req *ypb.SetGroupRequest) (*ypb.Empty, error) {
+	if req.GroupName == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+	saveData := &schema.PluginGroup{
+		Group: req.GetGroupName(),
+	}
+	saveData.Hash = saveData.CalcHash()
+	err := yakit.CreateOrUpdatePluginGroup(s.GetProfileDatabase(), saveData.Hash, saveData)
+	if err != nil {
+		return nil, utils.Errorf("Save YakScriptGroup [%v] err %s", req.GroupName, err.Error())
+	}
+
 	return &ypb.Empty{}, nil
 }
