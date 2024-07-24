@@ -81,7 +81,7 @@ func (v *VirtualMachine) AddBreakPoint(fun BreakPointFactoryFun) {
 func (n *VirtualMachine) GetExternalVariableNames() []string {
 	vs := []string{}
 	var result = make(map[string]struct{})
-	n.runtimeGlobalVar.ForEach(func(_ *limitedmap.SafeMap, key string, value any) error {
+	n.globalVar.ForEachKey(func(_ *limitedmap.SafeMap, key string) error {
 		_, existed := result[key]
 		if existed {
 			return nil
@@ -90,7 +90,7 @@ func (n *VirtualMachine) GetExternalVariableNames() []string {
 		vs = append(vs, key)
 		return nil
 	})
-	n.globalVar.ForEach(func(_ *limitedmap.SafeMap, key string, value any) error {
+	n.runtimeGlobalVar.ForEachKey(func(_ *limitedmap.SafeMap, key string) error {
 		_, existed := result[key]
 		if existed {
 			return nil
