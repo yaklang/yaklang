@@ -32,7 +32,7 @@ var DistYakCommand = cli.Command{
 				}
 
 				engine := yak.NewScriptEngine(100)
-				engine.HookOsExit()
+				//engine.HookOsExit()
 				engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 					return nil
 				})
@@ -49,7 +49,7 @@ var DistYakCommand = cli.Command{
 
 		code := c.String("code")
 		engine := yak.NewScriptEngine(100)
-		engine.HookOsExit()
+		//engine.HookOsExit()
 		err = engine.Execute(code)
 		if err != nil {
 			return err
