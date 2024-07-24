@@ -171,12 +171,12 @@ func New() *VirtualMachine {
 
 // ImportLibs 导入库到引擎的全局变量中
 func (n *VirtualMachine) ImportLibs(libs map[string]interface{}) {
-	n.globalVar = n.globalVar.Link(libs)
+	n.globalVar = n.globalVar.Append(libs)
 }
 
 // SetVars 导入变量到引擎的全局变量中
 func (n *VirtualMachine) SetVars(m map[string]any) {
-	n.runtimeGlobalVar = n.runtimeGlobalVar.Link(m)
+	n.runtimeGlobalVar = n.runtimeGlobalVar.Append(m)
 }
 
 func (n *VirtualMachine) GetNaslGlobalVarTable() (map[int]*Value, error) {
@@ -361,20 +361,14 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		codes := frame.codes
 		p := frame.codePointer
 
-		v.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
-			frame.GlobalVariables[key] = value
-			return nil
-		})
+		frame.GlobalVariables = frame.GlobalVariables.Append(v.globalVar.Raw()).Append(v.runtimeGlobalVar.Raw())
 		defer func() {
 			frame.codes = codes
 			frame.codePointer = p
 		}()
 	} else {
 		frame = NewFrame(v)
-		v.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
-			frame.GlobalVariables[key] = value
-			return nil
-		})
+		frame.GlobalVariables = frame.GlobalVariables.Append(v.globalVar.Raw()).Append(v.runtimeGlobalVar.Raw())
 	}
 
 	if flag&Asnyc == Asnyc {

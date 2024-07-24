@@ -724,7 +724,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		// 不是赋值的符号，一般来说，这应该是外部注入的变量或者函数
 		// 通过 GlobalVariables 可以很棒的处理这个问题
 		name := c.Op1.String()
-		value, ok := v.GlobalVariables[name]
+		value, ok := v.GlobalVariables.Load(name)
 		if ok {
 			val := &Value{
 				TypeVerbose: "global",
@@ -1231,7 +1231,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					Value:       val,
 				})
 			} else {
-				if v1, ok := v.GlobalVariables["__OpCallCallBack__"]; ok {
+				if v1, ok := v.GlobalVariables.Load("__OpCallCallBack__"); ok {
 					if v2, ok := v1.(func(string)); ok {
 						if v3, ok := idValue.Value.(*Function); ok {
 							if idValue.GetExtraInfo("getOne") != nil {

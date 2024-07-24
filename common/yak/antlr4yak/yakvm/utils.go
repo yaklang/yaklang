@@ -29,7 +29,7 @@ func GetNaslValueBySymbolId(symbol int, frame *Frame) *Value {
 		name, ok1 := frame.CurrentScope().GetSymTable().GetNameByVariableId(id)
 		if ok1 {
 			// 使用名字在全局变量中查找
-			if v1, ok1 := frame.GlobalVariables[name]; ok1 {
+			if v1, ok1 := frame.GlobalVariables.Load(name); ok1 {
 				val = NewValue("function", v1, name)
 				ok = true
 			} else if v1, ok2 := frame.CurrentScope().GetValueByName(name + "s"); ok2 && v1.IsYakFunction() {
