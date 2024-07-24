@@ -11,9 +11,9 @@ var runtimeLib = map[string]func(frame *Frame) interface{}{
 			case "line":
 				return frame.CurrentCode().StartLineNumber, nil
 			case "runtimeId":
-				result, ok := frame.vm.GetVar("runtimeId")
+				result, ok := frame.GlobalVariables.Load("runtimeId")
 				if !ok {
-					return nil, fmt.Errorf("runtimeId not found")
+					return "", nil
 				}
 				return result, nil
 			default:
@@ -28,7 +28,5 @@ func ImportRuntimeLib(frame *Frame) {
 	for k, v := range runtimeLib {
 		lib[k] = v(frame)
 	}
-	frame.vm.SetVars(map[string]any{
-		"runtime": lib,
-	})
+	frame.GlobalVariables.Store("runtime", lib)
 }

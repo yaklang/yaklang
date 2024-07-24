@@ -93,7 +93,13 @@ func (sm *SafeMap) Existed(p *SafeMap) bool {
 	if sm == p {
 		return true
 	}
-	return sm.parent.Existed(p)
+	for sm.parent != nil {
+		if sm.parent == p {
+			return true
+		}
+		sm = sm.parent
+	}
+	return false
 }
 
 func (sm *SafeMap) SetPred(p *SafeMap) *SafeMap {
@@ -103,4 +109,10 @@ func (sm *SafeMap) SetPred(p *SafeMap) *SafeMap {
 	root := sm.GetRoot()
 	root.parent = p
 	return sm
+}
+
+func (sm *SafeMap) Store(key string, value any) {
+	sm.lock.Lock()
+	defer sm.lock.Unlock()
+	sm.m[key] = value
 }
