@@ -207,7 +207,7 @@ func EngineToHelper(engine *antlr4yak.Engine) *PalmScriptEngineHelper {
 	}
 
 	var extLibs []*PalmScriptLib
-	engine.GetFntable().ForEach(func(m *limitedmap.SafeMap[any], name string, item any) error {
+	engine.GetFntable().ForEach(func(m *limitedmap.SafeMap, name string, item any) error {
 		iTy := reflect.TypeOf(item)
 		iVl := reflect.ValueOf(item)
 		_, _ = iTy, iVl

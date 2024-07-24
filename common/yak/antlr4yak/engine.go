@@ -211,7 +211,7 @@ func (n *Engine) LoadCode(ctx context.Context, code string, table map[string]int
 	return n.vm.ExecYakCode(ctx, code, codes, yakvm.Trace)
 }
 
-func (n *Engine) GetFntable() *limitedmap.SafeMap[any] {
+func (n *Engine) GetFntable() *limitedmap.SafeMap {
 	return n.vm.GetGlobalVar()
 }
 
