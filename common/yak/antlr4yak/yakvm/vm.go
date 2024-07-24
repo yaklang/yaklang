@@ -24,7 +24,7 @@ type Frame struct {
 	UnaryOperatorTable  map[OpcodeFlag]func(*Value) *Value
 
 	// yak函数, 内置函数，乃至变量聚集地
-	GlobalVariables map[string]interface{}
+	GlobalVariables *limitedmap.SafeMap[any]
 
 	//yak函数
 	// YakGlobalFunctions map[string]*Function
@@ -147,7 +147,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		codePointer:         0,
 		BinaryOperatorTable: make(map[OpcodeFlag]func(*Value, *Value) *Value),
 		UnaryOperatorTable:  make(map[OpcodeFlag]func(*Value) *Value),
-		GlobalVariables:     make(map[string]interface{}),
+		GlobalVariables:     limitedmap.NewSafeMap(map[string]any{}),
 		tryStack:            vmstack.New(),
 		// YakGlobalFunctions:  make(map[string]*Function),
 		stack:         vmstack.New(),
@@ -169,15 +169,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		}
 	}
 
-	vm.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
-		frame.GlobalVariables[key] = value
-		return nil
-	})
-	vm.runtimeGlobalVar.ForEach(func(m *limitedmap.SafeMap[any], key string, value any) error {
-		frame.GlobalVariables[key] = value
-		return nil
-	})
-
+	frame.GlobalVariables = frame.GlobalVariables.Append(vm.globalVar.Raw()).Append(vm.runtimeGlobalVar.Raw())
 	vm.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
 		return true
