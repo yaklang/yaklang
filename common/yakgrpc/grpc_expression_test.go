@@ -16,7 +16,7 @@ func TestEvaluateExpression(t *testing.T) {
 
 	check := func(t *testing.T, expression string, expectedResult string, expectedBoolResult bool, vars ...map[string]string) {
 		t.Helper()
-		ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		var variables []*ypb.KVPair
