@@ -17,3 +17,11 @@ func IsNil(input any) bool {
 		return false
 	}
 }
+
+func IsMap(input any) bool {
+	switch input.(type) {
+	case map[string]any:
+		return true
+	}
+	return false
+}
