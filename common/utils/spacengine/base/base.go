@@ -38,6 +38,7 @@ func (c *BaseSpaceEngineClient) Do(method, path string, opts ...poc.PocConfigOpt
 	if err != nil {
 		return nil, err
 	}
+	opts = append([]poc.PocConfigOption{poc.WithTimeout(60)}, opts...)
 
 	rsp, req, err := poc.Do(method, urlStr, opts...)
 	if err != nil {
