@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
 	"strings"
@@ -154,8 +156,12 @@ func BuildPluginTestingJunkData() []byte {
 
 // 只在评分中使用
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
-	host, port := pluginTestingServer.Host, pluginTestingServer.Port
 	defer pluginTestingServer.ClearRequestsHistory()
+	host, port := pluginTestingServer.Host, pluginTestingServer.Port
+	testDomain := utils.RandStringBytes(5) + ".com"
+	netx.AddHost(testDomain, host)
+	defer netx.DeleteHost(testDomain)
+	target := fmt.Sprintf("http://%s:%d", testDomain, port)
 	var results []*ypb.SmokingEvaluateResult
 	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, i ...[]byte) {
 		var buf bytes.Buffer
@@ -216,7 +222,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 		log.Info("start to echo debug script")
 		runtimeId := uuid.New().String()
-		err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+		err := s.debugScript(target, pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 			if result.IsMessage {
 				m := make(map[string]any)
 				err := json.Unmarshal(result.Message, &m)
