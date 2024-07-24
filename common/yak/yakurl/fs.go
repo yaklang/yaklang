@@ -95,7 +95,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 
 	info, err := fs.Stat(absPath)
 	if err != nil {
-		return nil, utils.Wrapf(err, "cannot stat path[%s]: %s", u.GetPath())
+		return nil, utils.Wrapf(err, "cannot stat path[%s]", u.GetPath())
 	}
 
 	query := make(url.Values)
@@ -187,7 +187,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 		err = fs.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
-			return nil, utils.Wrapf(err, "cannot write file[%s]: %s", u.GetPath())
+			return nil, utils.Wrapf(err, "cannot write file[%s]", u.GetPath())
 		}
 	}
 
@@ -229,11 +229,9 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 		query.Add(v.GetKey(), v.GetValue())
 	}
 	isPaste := strings.ToLower(query.Get("paste")) == "true"
-	exists, err := fs.Exists(absPath)
-	if exists {
-		if !isPaste {
-			return nil, utils.Error("path exists") //  if path exists can't use put
-		}
+
+	pasteFixPath := func(absPath string) string {
+		newAbsPath := absPath
 		dirPath, name := fs.PathSplit(absPath)
 		filenameWithoutExt, ext := name, fs.Ext(name)
 		if len(ext) > 0 {
@@ -242,15 +240,13 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 		i := 1
 		for {
 			newName := fmt.Sprintf("%s(%d)%s", filenameWithoutExt, i, ext)
-			newAbsPath := fs.Join(dirPath, newName)
+			newAbsPath = fs.Join(dirPath, newName)
 			if found, _ := fs.Exists(newAbsPath); !found {
-				absPath = newAbsPath
 				break
 			}
 			i++
 		}
-	} else if err != nil {
-		return nil, utils.Wrap(err, "file exists check error")
+		return newAbsPath
 	}
 
 	switch query.Get("type") {
@@ -275,8 +271,11 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 			if !exists {
 				return nil, utils.Errorf("source path not exists: %s", sourcePath)
 			}
+
+			_, sourceName := fs.PathSplit(sourceAbsPath)
+			dstAbsPath := pasteFixPath(fs.Join(absPath, sourceName))
 			err = utils.CopyDirectoryEx(
-				sourceAbsPath, absPath, false, fs)
+				sourceAbsPath, dstAbsPath, false, fs)
 			if err != nil {
 				return nil, utils.Wrap(err, "cannot paste directory")
 			}
@@ -284,6 +283,16 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	case "file":
 		fallthrough
 	default:
+		exists, err := fs.Exists(absPath)
+		if exists {
+			if !isPaste {
+				return nil, utils.Error("path exists") //  if path exists can't use put
+			}
+			absPath = pasteFixPath(absPath)
+		} else if err != nil {
+			return nil, utils.Wrap(err, "file exists check error")
+		}
+
 		err = fs.WriteFile(absPath, params.GetBody(), 0o644)
 		if err != nil {
 			return nil, utils.Wrapf(err, "cannot write file[%s]", u.GetPath())
