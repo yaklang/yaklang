@@ -184,7 +184,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 	return DocumentHelperWithVerboseInfo(engine.GetFntable())
 }
 
-func DocumentHelperWithVerboseInfo(funcMap *limitedmap.SafeMap[any]) *yakdoc.DocumentHelper {
+func DocumentHelperWithVerboseInfo(funcMap *limitedmap.SafeMap) *yakdoc.DocumentHelper {
 	helper := &yakdoc.DocumentHelper{
 		Libs:          make(map[string]*yakdoc.ScriptLib),
 		Functions:     make(map[string]*yakdoc.FuncDecl),
@@ -201,7 +201,7 @@ func DocumentHelperWithVerboseInfo(funcMap *limitedmap.SafeMap[any]) *yakdoc.Doc
 
 	var extLibs []*yakdoc.ScriptLib
 	// 标准库导出的函数
-	funcMap.ForEach(func(m *limitedmap.SafeMap[any], name string, item any) error {
+	funcMap.ForEach(func(m *limitedmap.SafeMap, name string, item any) error {
 		itemType := reflect.TypeOf(item)
 		itemValue := reflect.ValueOf(item)
 		_, _ = itemType, itemValue
@@ -608,7 +608,7 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 	}
 
 	fnTable := engine.GetFntable()
-	fnTable.ForEach(func(m *limitedmap.SafeMap[any], libName string, item any) error {
+	fnTable.ForEach(func(m *limitedmap.SafeMap, libName string, item any) error {
 		iTy := reflect.TypeOf(item)
 		iVl := reflect.ValueOf(item)
 		_, _ = iTy, iVl

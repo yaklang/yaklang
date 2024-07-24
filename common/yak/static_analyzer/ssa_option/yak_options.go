@@ -21,7 +21,7 @@ func YakGetTypeSSAOpt() []ssaapi.Option {
 	valueTable := make(map[string]interface{})
 	// libTable := make(map[string]interface{})
 	tmp := reflect.TypeOf(make(map[string]interface{}))
-	symbol.ForEach(func(m *limitedmap.SafeMap[any], name string, item any) error {
+	symbol.ForEach(func(m *limitedmap.SafeMap, name string, item any) error {
 		itype := reflect.TypeOf(item)
 		if itype == tmp {
 			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))

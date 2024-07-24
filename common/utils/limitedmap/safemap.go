@@ -5,84 +5,63 @@ import (
 	"sync"
 )
 
-type SafeMap[T any] struct {
-	m    map[string]T
-	lock *sync.RWMutex
+type SafeMap struct {
+	parent *SafeMap
+	m      map[string]any
+	lock   *sync.RWMutex
 }
 
-func NewSafeMap[T any](a map[string]T) *SafeMap[T] {
+func NewSafeMap(a map[string]any) *SafeMap {
 	if utils.IsNil(a) {
-		a = make(map[string]T)
+		a = make(map[string]any)
 	}
-	return &SafeMap[T]{
+	return &SafeMap{
 		m:    a,
 		lock: new(sync.RWMutex),
 	}
 }
 
-func (sm *SafeMap[T]) Append(l map[string]T) *SafeMap[T] {
+func (sm *SafeMap) Append(l map[string]any) *SafeMap {
 	if utils.IsNil(l) {
 		return sm
 	}
-
 	sm.lock.RLock()
 	defer sm.lock.RUnlock()
-
-	res := make(map[string]T)
-
-	// Function to merge maps
-	mergeMaps := func(src map[string]T) {
-		for k, vT := range src {
-			existedRaw, ok := res[k]
-			if ok {
-				var existed any = existedRaw
-				newResLib := make(map[string]T)
-				lib, ok := existed.(map[string]T)
-				if ok {
-					var v any = vT
-					if newLib, ok := v.(map[string]T); ok && len(newLib) > 0 {
-						for k, v := range lib {
-							newResLib[k] = v
-						}
-						for k1, v1 := range newLib {
-							newResLib[k1] = v1
-						}
-						var a any = newResLib
-						res[k] = a.(T)
-						continue
-					}
-				}
-			}
-			res[k] = vT
-		}
-	}
-
-	// Merge all maps in the SafeMap chain
-	origin := sm
-	if origin != nil {
-		mergeMaps(origin.m)
-	}
-
-	// Merge the new map
-	mergeMaps(l)
-
-	return &SafeMap[T]{
-		m:    res,
-		lock: sm.lock,
+	return &SafeMap{
+		parent: sm,
+		m:      l,
+		lock:   new(sync.RWMutex),
 	}
 }
 
-func (sm *SafeMap[T]) Load(key string) (value T, ok bool) {
+func (sm *SafeMap) Load(key string) (value any, ok bool) {
 	sm.lock.RLock()
 	defer sm.lock.RUnlock()
 	value, ok = sm.m[key]
 	if ok {
+		if raw, ok := value.(map[string]any); ok && sm.parent != nil {
+			if ext, ok2 := sm.parent.Load(key); ok2 {
+				if extMap, typeOk := ext.(map[string]any); typeOk {
+					for k, v := range extMap {
+						_, existed := raw[k]
+						if !existed {
+							raw[k] = v
+						}
+					}
+					return raw, true
+				}
+			}
+		}
 		return
+	}
+
+	if sm.parent != nil {
+		return sm.parent.Load(key)
 	}
 	return
 }
 
-func (sm *SafeMap[T]) ForEach(h func(m *SafeMap[T], key string, value T) error) {
+func (sm *SafeMap) ForEach(h func(m *SafeMap, key string, value any) error) {
 	sm.lock.RLock()
 	defer sm.lock.RUnlock()
 
@@ -93,6 +72,35 @@ func (sm *SafeMap[T]) ForEach(h func(m *SafeMap[T], key string, value T) error) 
 	}
 }
 
-func (sm *SafeMap[T]) Raw() map[string]T {
+func (sm *SafeMap) Raw() map[string]any {
 	return sm.m
+}
+
+func (sm *SafeMap) GetRoot() *SafeMap {
+	if sm.parent == nil {
+		return sm
+	}
+	return sm.parent.GetRoot()
+}
+
+func (sm *SafeMap) Existed(p *SafeMap) bool {
+	if p == nil {
+		return false
+	}
+	if sm == nil {
+		return false
+	}
+	if sm == p {
+		return true
+	}
+	return sm.parent.Existed(p)
+}
+
+func (sm *SafeMap) SetPred(p *SafeMap) *SafeMap {
+	if sm.Existed(p) {
+		return sm
+	}
+	root := sm.GetRoot()
+	root.parent = p
+	return sm
 }

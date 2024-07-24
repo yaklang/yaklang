@@ -35,8 +35,8 @@ type (
 	BreakPointFactoryFun func(v *VirtualMachine) bool
 	VirtualMachine       struct {
 		// globalVar 是当前引擎的全局变量，属于引擎
-		globalVar        *limitedmap.SafeMap[any]
-		runtimeGlobalVar *limitedmap.SafeMap[any]
+		globalVar        *limitedmap.SafeMap
+		runtimeGlobalVar *limitedmap.SafeMap
 
 		VMStack   *vmstack.Stack
 		rootScope *Scope
@@ -81,7 +81,7 @@ func (v *VirtualMachine) AddBreakPoint(fun BreakPointFactoryFun) {
 func (n *VirtualMachine) GetExternalVariableNames() []string {
 	vs := []string{}
 	var result = make(map[string]struct{})
-	n.runtimeGlobalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+	n.runtimeGlobalVar.ForEach(func(_ *limitedmap.SafeMap, key string, value any) error {
 		_, existed := result[key]
 		if existed {
 			return nil
@@ -90,7 +90,7 @@ func (n *VirtualMachine) GetExternalVariableNames() []string {
 		vs = append(vs, key)
 		return nil
 	})
-	n.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+	n.globalVar.ForEach(func(_ *limitedmap.SafeMap, key string, value any) error {
 		_, existed := result[key]
 		if existed {
 			return nil
@@ -231,11 +231,11 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 	return n.GetVarWithoutFrame(name)
 }
 
-func (n *VirtualMachine) GetGlobalVar() *limitedmap.SafeMap[any] {
+func (n *VirtualMachine) GetGlobalVar() *limitedmap.SafeMap {
 	return n.globalVar
 }
 
-func (n *VirtualMachine) GetRuntimeGlobalVar() *limitedmap.SafeMap[any] {
+func (n *VirtualMachine) GetRuntimeGlobalVar() *limitedmap.SafeMap {
 	return n.runtimeGlobalVar
 }
 
@@ -361,14 +361,14 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		codes := frame.codes
 		p := frame.codePointer
 
-		frame.GlobalVariables = frame.GlobalVariables.Append(v.globalVar.Raw()).Append(v.runtimeGlobalVar.Raw())
+		frame.GlobalVariables = v.runtimeGlobalVar.SetPred(v.globalVar)
 		defer func() {
 			frame.codes = codes
 			frame.codePointer = p
 		}()
 	} else {
 		frame = NewFrame(v)
-		frame.GlobalVariables = frame.GlobalVariables.Append(v.globalVar.Raw()).Append(v.runtimeGlobalVar.Raw())
+		frame.GlobalVariables = v.runtimeGlobalVar.SetPred(v.globalVar)
 	}
 
 	if flag&Asnyc == Asnyc {
