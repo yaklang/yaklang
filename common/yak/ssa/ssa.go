@@ -212,7 +212,7 @@ type Program struct {
 	errors SSAErrors
 
 	// for build
-	buildOnce sync.Once
+	finishOnce sync.Once
 
 	// extern lib
 	cacheExternInstance     map[string]Value // lib and value
