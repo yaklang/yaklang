@@ -5,17 +5,20 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-type compileMethod func(string, io.Reader) ([]string, error)
-type Config struct {
-	entryFiles []string
+type (
+	compileMethod func(string, io.Reader) ([]string, error)
+	Config        struct {
+		entryFiles []string
 
-	fs filesys.FileSystem
+		fs fi.FileSystem
 
-	compileMethod      compileMethod
-	stopAtCompileError bool
-}
+		compileMethod      compileMethod
+		stopAtCompileError bool
+	}
+)
 
 func NewConfig(opt ...Option) *Config {
 	c := &Config{
@@ -31,7 +34,7 @@ func NewConfig(opt ...Option) *Config {
 
 type Option func(config *Config)
 
-func WithFileSystem(fs filesys.FileSystem) Option {
+func WithFileSystem(fs fi.FileSystem) Option {
 	return func(config *Config) {
 		config.fs = fs
 	}

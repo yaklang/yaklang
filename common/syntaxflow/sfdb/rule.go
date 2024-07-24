@@ -2,15 +2,17 @@ package sfdb
 
 import (
 	"encoding/json"
+	"io/fs"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"io/fs"
-	"strconv"
 )
 
-func LoadFileSystem(s *schema.SyntaxFlowRule, system filesys.FileSystem) error {
+func LoadFileSystem(s *schema.SyntaxFlowRule, system fi.FileSystem) error {
 	f := make(map[string]string)
 	filesys.Recursive(".", filesys.WithFileSystem(system), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		raw, err := system.ReadFile(s)
@@ -29,7 +31,7 @@ func LoadFileSystem(s *schema.SyntaxFlowRule, system filesys.FileSystem) error {
 	return nil
 }
 
-func BuildFileSystem(s *schema.SyntaxFlowRule) (filesys.FileSystem, error) {
+func BuildFileSystem(s *schema.SyntaxFlowRule) (fi.FileSystem, error) {
 	f := make(map[string]string)
 	raw, _ := utils.GzipDeCompress(s.TypicalHitFileSystem)
 	err := json.Unmarshal(raw, &f)

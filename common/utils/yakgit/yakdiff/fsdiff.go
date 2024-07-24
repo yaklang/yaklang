@@ -3,6 +3,10 @@ package yakdiff
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"time"
+
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -10,12 +14,10 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"io"
-	"os"
-	"time"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-func FileSystemDiffContext(ctx context.Context, fs1 filesys.FileSystem, fs2 filesys.FileSystem, handler ...DiffHandler) error {
+func FileSystemDiffContext(ctx context.Context, fs1 fi.FileSystem, fs2 fi.FileSystem, handler ...DiffHandler) error {
 	if len(handler) == 0 {
 		handler = append(handler, _defaultPatchHandler)
 	}
@@ -33,15 +35,15 @@ func FileSystemDiffContext(ctx context.Context, fs1 filesys.FileSystem, fs2 file
 		return utils.Wrap(err, `repo.Worktree()`)
 	}
 
-	copyFs := func(wt *git.Worktree, gitFS billy.Filesystem, originFS filesys.FileSystem) (retCommit *object.Commit, retTree *object.Tree, retErr error) {
+	copyFs := func(wt *git.Worktree, gitFS billy.Filesystem, originFS fi.FileSystem) (retCommit *object.Commit, retTree *object.Tree, retErr error) {
 		err = filesys.Recursive(".", filesys.WithFileSystem(originFS), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 			defer func() {
 				wt.Add(pathname)
 			}()
 			if isDir {
-				return gitFS.MkdirAll(pathname, 0755)
+				return gitFS.MkdirAll(pathname, 0o755)
 			}
-			f, err := gitFS.OpenFile(pathname, os.O_CREATE|os.O_RDWR, 0755)
+			f, err := gitFS.OpenFile(pathname, os.O_CREATE|os.O_RDWR, 0o755)
 			if err != nil {
 				return utils.Wrapf(err, `gitfs open %v`, pathname)
 			}

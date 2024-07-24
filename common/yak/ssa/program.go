@@ -1,19 +1,20 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/exp/slices"
 
-	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs filesys.FileSystem, programPath string) *Program {
+func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
 	prog := &Program{
 		Name:                    ProgramName,
 		ProgramKind:             kind,

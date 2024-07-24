@@ -2,14 +2,15 @@ package ssatest
 
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/yak/antlr4util"
-	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -23,11 +24,12 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type checkFunction func(*ssaapi.Program) error
 
-func CheckWithFS(fs filesys.FileSystem, t *testing.T, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+func CheckWithFS(fs fi.FileSystem, t *testing.T, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
 		prog, err := ssaapi.ParseProject(fs, opt...)
@@ -176,8 +178,8 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 
 func CheckFSWithProgram(
 	t *testing.T, programName string,
-	codeFS, ruleFS filesys.FileSystem, opt ...ssaapi.Option) {
-
+	codeFS, ruleFS fi.FileSystem, opt ...ssaapi.Option,
+) {
 	if programName == "" {
 		programName = "test-" + uuid.New().String()
 	}
@@ -223,7 +225,7 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
 
-func CheckSyntaxFlowWithFS(t *testing.T, fs filesys.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
+func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
 	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
 		results, err := p.SyntaxFlowWithError(sf)
 		assert.Nil(t, err)
@@ -232,6 +234,7 @@ func CheckSyntaxFlowWithFS(t *testing.T, fs filesys.FileSystem, sf string, wants
 		return nil
 	}, opt...)
 }
+
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }

@@ -8,11 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type PackageLoaderOption func(*PackageFileLoader)
 
-func WithFileSystem(fs filesys.FileSystem) PackageLoaderOption {
+func WithFileSystem(fs fi.FileSystem) PackageLoaderOption {
 	return func(loader *PackageFileLoader) {
 		loader.fs = fs
 	}
@@ -23,21 +24,22 @@ func WithIncludePath(paths ...string) PackageLoaderOption {
 		loader.includePath = paths
 	}
 }
+
 func WithCurrentPath(path string) PackageLoaderOption {
 	return func(loader *PackageFileLoader) {
-		loader.currentPath = path //当前路径
+		loader.currentPath = path // 当前路径
 	}
 }
 
 type PackageFileLoader struct {
-	fs           filesys.FileSystem
+	fs           fi.FileSystem
 	currentPath  string
 	includePath  []string
 	includedPath map[string]struct{} // for include once
 	packagePath  []string
 }
 
-func (p *PackageFileLoader) GetFilesysFileSystem() filesys.FileSystem {
+func (p *PackageFileLoader) GetFilesysFileSystem() fi.FileSystem {
 	return p.fs
 }
 

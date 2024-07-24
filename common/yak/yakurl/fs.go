@@ -7,14 +7,13 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type fileSystemAction struct {
-	fs filesys.FileSystem
+	fs fi.FileSystem
 }
 
 func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url.Values, info fs.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
@@ -277,7 +276,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 				return nil, utils.Errorf("source path not exists: %s", sourcePath)
 			}
 			err = utils.CopyDirectoryEx(
-				sourceAbsPath, absPath, fs.Rel, fs.Join, fs.MkdirAll, fs.Delete, fs.OpenFile, fs.WriteFile)
+				sourceAbsPath, absPath, fs)
 			if err != nil {
 				return nil, utils.Wrap(err, "cannot paste directory")
 			}
@@ -329,7 +328,7 @@ func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestY
 	if !exists {
 		return nil, utils.Errorf("file [%s] exists check error: %s", u.GetPath(), err)
 	}
-	if trash, ok := fs.(filesys.Trash); ok && query.Get("trash") == "true" {
+	if trash, ok := fs.(fi.TrashFS); ok && query.Get("trash") == "true" {
 		err = trash.Throw(absPath)
 		if err != nil {
 			return nil, err

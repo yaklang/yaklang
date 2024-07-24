@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 func PathExists(path string) (bool, error) {
@@ -196,12 +196,7 @@ func CopyDirectory(source string, destination string, isMove bool) error {
 
 func CopyDirectoryEx(source string,
 	destination string,
-	rel func(string, string) (string, error),
-	join func(...string) string,
-	mkdir func(string, os.FileMode) error,
-	remove func(string) error,
-	openFile func(string, int, os.FileMode) (fs.File, error),
-	writeFile func(string, []byte, os.FileMode) error,
+	fs fi.FileSystem,
 ) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -209,26 +204,26 @@ func CopyDirectoryEx(source string,
 		}
 
 		// 构建新路径
-		refPath, err := rel(source, path)
+		refPath, err := fs.Rel(source, path)
 		if err != nil {
 			return err
 		}
-		newPath := join(destination, refPath)
+		newPath := fs.Join(destination, refPath)
 
 		if info.IsDir() {
 			// 创建新的文件夹
-			err := mkdir(newPath, info.Mode())
+			err := fs.MkdirAll(newPath, info.Mode())
 			if err != nil {
 				return err
 			}
 		} else {
 			// 复制文件
-			err := CopyFileEx(path, newPath, openFile, writeFile)
+			err := CopyFileEx(path, newPath, fs)
 			if err != nil {
 				return err
 			}
 			// 删除源文件
-			err = remove(path)
+			err = fs.Delete(path)
 			if err != nil {
 				return err
 			}
@@ -315,24 +310,42 @@ func CopyFile(source, destination string) error {
 	return nil
 }
 
-// ! WARN: will read all source file content into memory
 func CopyFileEx(
 	source string,
 	destination string,
-	openFile func(string, int, os.FileMode) (fs.File, error),
-	writeFile func(string, []byte, os.FileMode) error,
+	fs fi.FileSystem,
 ) error {
-	srcFile, err := openFile(source, os.O_RDONLY, 0o644)
+	srcFh, err := fs.OpenFile(source, os.O_RDONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer srcFh.Close()
 
-	bytes, err := io.ReadAll(srcFile)
-
-	err = writeFile(destination, bytes, 0o644)
-	if err != nil {
-		return err
+	if _, ok := srcFh.(io.Writer); ok {
+		// fs.OpenFile return a io.Writer, so use io.Copy
+		dstFile, err := fs.OpenFile(destination, os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+		if dstW, ok := dstFile.(io.Writer); ok {
+			if _, err := io.Copy(dstW, srcFh); err != nil {
+				return err
+			}
+			if syncW, ok := dstFile.(fi.SyncFile); ok {
+				return syncW.Sync()
+			}
+		} else {
+			return errors.Errorf("Write error: file is not a io.Writer")
+		}
+	} else {
+		// use WriteFile to write
+		// ! WARN: io.ReadAll will read all file content into memory
+		bytes, err := io.ReadAll(srcFh)
+		err = fs.WriteFile(destination, bytes, 0o644)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

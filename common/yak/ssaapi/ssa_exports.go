@@ -1,16 +1,18 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -23,7 +25,7 @@ type config struct {
 	// input, code or project path
 	originEditor *memedit.MemEditor
 	// project
-	fs          filesys.FileSystem
+	fs          fi.FileSystem
 	entryFile   []string
 	programPath string
 	includePath []string
@@ -188,7 +190,7 @@ func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
 	return ParseProject(filesys.NewLocalFs(), opts...)
 }
 
-func ParseProject(fs filesys.FileSystem, opts ...Option) (Programs, error) {
+func ParseProject(fs fi.FileSystem, opts ...Option) (Programs, error) {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)

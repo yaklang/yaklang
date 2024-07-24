@@ -62,6 +62,12 @@ func TestCopyDirectory(t *testing.T) {
 		})
 	})
 
+	// t.Run("CopyDirectoryEx", func(t *testing.T) {
+	// 	test(t, func(src, dst string) error {
+	// 		return CopyDirectoryEx(src, dst, )
+	// 	})
+	// })
+
 	t.Run("ConcurrentCopyDirectory", func(t *testing.T) {
 		test(t, func(src, dst string) error {
 			return ConcurrentCopyDirectory(src, dst, 10, false)
