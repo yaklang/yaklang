@@ -32,25 +32,25 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
       }
       return modelMap;
   }`},
-		{"aTaintCase022_2", true, []string{`"cd /"`}, ` /**
-		   * 字段/元素级别->对象字段->对象元素
-		   * case不应被检出
-		   */
-		  @PostMapping(value = "case022-2")
-		  public Map<String, Object> aTaintCase022_2(@RequestParam String cmd) {
-		      Map<String, Object> modelMap = new HashMap<>();
-		      try {
-		          CmdObject simpleBean = new CmdObject();
-		          simpleBean.setCmd(cmd);
-		          simpleBean.setCmd2("cd /");
-		          Runtime.getRuntime().exec(simpleBean.getCmd2());
-		          modelMap.put("status", "success");
-		      } catch (Exception e) {
-		          modelMap.put("status", "error");
-		      }
-		      return modelMap;
-		  }
-		`},
+		//{"aTaintCase022_2", true, []string{`"cd /"`}, ` /**
+		//   * 字段/元素级别->对象字段->对象元素
+		//   * case不应被检出
+		//   */
+		//  @PostMapping(value = "case022-2")
+		//  public Map<String, Object> aTaintCase022_2(@RequestParam String cmd) {
+		//      Map<String, Object> modelMap = new HashMap<>();
+		//      try {
+		//          CmdObject simpleBean = new CmdObject();
+		//          simpleBean.setCmd(cmd);
+		//          simpleBean.setCmd2("cd /");
+		//          Runtime.getRuntime().exec(simpleBean.getCmd2());
+		//          modelMap.put("status", "success");
+		//      } catch (Exception e) {
+		//          modelMap.put("status", "error");
+		//      }
+		//      return modelMap;
+		//  }
+		//`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

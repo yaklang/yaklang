@@ -658,15 +658,14 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			memberKey = y.EmitConstInst(ret.GetText())
 			// get parent class
 		}
-		y.MarkedIsStaticMethod = true
+		y.MarkedMemberCallWantMethod = true
+		defer func() {
+			y.MarkedMemberCallWantMethod = false
+		}()
 		methodCall := y.ReadMemberCallVariable(object, memberKey)
-		y.MarkedIsStaticMethod = false
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
-			if _, ok := ssa.ToParameter(object); ok {
-				args = append(args, object)
-			}
-			args = append(args, y.VisitArguments(i.Arguments())...)
+			args = y.VisitArguments(i.Arguments())
 			c := y.NewCall(methodCall, args)
 			return y.EmitCall(c)
 		}

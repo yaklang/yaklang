@@ -462,9 +462,9 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 	if y == nil || raw == nil {
 		return nil
 	}
-	y.MarkedIsStaticMethod = true
+	y.MarkedMemberCallWantMethod = true
 	defer func() {
-		y.MarkedIsStaticMethod = false
+		y.MarkedMemberCallWantMethod = false
 	}()
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()

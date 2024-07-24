@@ -19,7 +19,7 @@ func TestFastjson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := prog.SyntaxFlowWithError("deserializers.put(,* as $deserializer) as $call", sfvm.WithEnableDebug(false))
+	res, err := prog.SyntaxFlowWithError("deserializers.put(,,* as $deserializer) as $call", sfvm.WithEnableDebug(false))
 	if err != nil {
 		t.Fatal(err)
 	}
