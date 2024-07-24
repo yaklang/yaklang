@@ -101,22 +101,16 @@ class B {
 
 
 `, func(prog *ssaapi.Program) error {
-		result := prog.SyntaxFlow(`C.println() as $entry;`)
-		rets := result.GetValues("entry")
+		result := prog.SyntaxFlow(`dump(* as $param);`)
+		rets := result.GetValues("param")
+		rets.Show()
 		if rets.Len() <= 0 {
 			t.Fatal("no entry")
 		}
-		step1Args := rets[0].GetCallArgs()
-		arg0 := step1Args[0]
-		if arg0.GetConst() != nil {
-			arg0.Show()
-			t.Error("C.println(* as $params); params cannot be const")
-		}
-		//arg1 := step1Args[1]
+
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
-
 func TestDefaultOBJFieldCall4(t *testing.T) {
 	ssatest.Check(t, `
 class A {
@@ -164,4 +158,80 @@ class A {
 		rets.Show()
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestDefaultOBJParamAsCaller(t *testing.T) {
+	ssatest.Check(t, `
+class A {
+	public void A(int p){
+	p.Call("hello");
+	}
+}
+`, func(prog *ssaapi.Program) error {
+		result := prog.SyntaxFlow(`.Call(*?{!opcode: const} as $param,);`)
+		rets := result.GetValues("param")
+		if rets.Len() <= 0 {
+			t.Fatal("no param")
+		}
+		if rets.Len() != 0 {
+			t.Fatal("param should be 1 ")
+		}
+		rets.Show()
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+
+}
+
+func TestDefaultOBJWithTypeTransform(t *testing.T) {
+	ssatest.Check(t, `
+class A {
+	public void A(){
+	input = "ls";
+	cmd = (String) method.invoke(clazz.newInstance(), ls);
+	}
+}
+`, func(prog *ssaapi.Program) error {
+		result := prog.SyntaxFlow(`method.invoke(* #-> as $target);`)
+		rets := result.GetValues("target")
+		if rets.Len() <= 0 {
+			t.Fatal("no target")
+		}
+		rets.Show()
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+
+}
+
+func TestAAA3(t *testing.T) {
+	code := `
+public class A{
+	public int num;
+	public void setNum(int n){
+	this.num=n;
+}
+	public int getNum(){
+		return this.num;
+}
+
+}
+
+public class B{
+	public static void main(){
+		A a =new A();
+		a.setNum(22);
+		int target = a.getNum();
+	}
+}
+
+
+`
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage("java"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
+	result := prog.SyntaxFlow(`target #-> as $a;`)
+
+	result.Show()
+
 }
