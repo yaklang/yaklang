@@ -172,13 +172,23 @@ func (c *YakitClient) SendRaw(y *YakitLog) error {
 
 func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	//修改yakit库的客户端
-	e.ImportSubLibs("yakit", GetExtYakitLibByClient(client))
-	e.ImportSubLibs("risk", map[string]interface{}{
-		"NewRisk":                   YakitNewRiskBuilder(client),
-		"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(client.runtimeID),
-		"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(client.runtimeID),
-		"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(client.runtimeID),
-		"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(client.runtimeID),
+	//e.OverrideRuntimeGlobalVariables("yakit", GetExtYakitLibByClient(client))
+	//e.OverrideRuntimeGlobalVariables("risk", map[string]interface{}{
+	//	"NewRisk":                   YakitNewRiskBuilder(client),
+	//	"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(client.runtimeID),
+	//	"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(client.runtimeID),
+	//	"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(client.runtimeID),
+	//	"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(client.runtimeID),
+	//})
+	e.OverrideRuntimeGlobalVariables(map[string]any{
+		"yakit": GetExtYakitLibByClient(client),
+		"risk": map[string]any{
+			"NewRisk":                   YakitNewRiskBuilder(client),
+			"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(client.runtimeID),
+			"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(client.runtimeID),
+			"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(client.runtimeID),
+			"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(client.runtimeID),
+		},
 	})
 
 	//修改全局默认客户端

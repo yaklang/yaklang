@@ -36,15 +36,16 @@ func MutateHookCaller(raw string, caller YakitCallerIf) (func(https bool, origin
 	if caller != nil { // hook yakit lib.
 		client := yaklib.NewVirtualYakitClient(caller)
 		db := consts.GetGormProjectDatabase()
-		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))
-		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, "default"))
-		engine.SetVar("yakit_status", func(id string, i interface{}) {
-			FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
-				Id:   id,
-				Data: fmt.Sprint(i),
-			})
+		engine.OverrideRuntimeGlobalVariables(map[string]any{
+			"yakit_output": FeedbackFactory(db, caller, false, "default"),
+			"yakit_save":   FeedbackFactory(db, caller, true, "default"),
+			"yakit_status": func(id string, i interface{}) {
+				FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
+					Id: id, Data: fmt.Sprint(i),
+				})
+			},
+			"yakit": yaklib.GetExtYakitLibByClient(client),
 		})
-		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(client))
 	}
 
 	before, beforeRequestOk := engine.GetVar("beforeRequest")

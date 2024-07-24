@@ -50,7 +50,9 @@ func (t *TextParser) ParseLine(r io.Reader, handler func(line string, r map[stri
 		}
 		line := strings.TrimSpace(string(lineBytes))
 
-		t.engine.SetVar("FILE_LINE", line)
+		t.engine.SetVars(map[string]any{
+			"FILE_LINE": line,
+		})
 
 		// 自动选择合适的规则来解析
 		if matchedRule == "" {

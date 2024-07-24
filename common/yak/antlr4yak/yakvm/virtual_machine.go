@@ -3,6 +3,7 @@ package yakvm
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -34,7 +35,9 @@ type (
 	BreakPointFactoryFun func(v *VirtualMachine) bool
 	VirtualMachine       struct {
 		// globalVar 是当前引擎的全局变量，属于引擎
-		globalVar map[string]interface{}
+		globalVar        *limitedmap.SafeMap[any]
+		runtimeGlobalVar *limitedmap.SafeMap[any]
+
 		VMStack   *vmstack.Stack
 		rootScope *Scope
 
@@ -77,9 +80,25 @@ func (v *VirtualMachine) AddBreakPoint(fun BreakPointFactoryFun) {
 
 func (n *VirtualMachine) GetExternalVariableNames() []string {
 	vs := []string{}
-	for k := range n.globalVar {
-		vs = append(vs, k)
-	}
+	var result = make(map[string]struct{})
+	n.runtimeGlobalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+		_, existed := result[key]
+		if existed {
+			return nil
+		}
+		result[key] = struct{}{}
+		vs = append(vs, key)
+		return nil
+	})
+	n.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+		_, existed := result[key]
+		if existed {
+			return nil
+		}
+		result[key] = struct{}{}
+		vs = append(vs, key)
+		return nil
+	})
 	return vs
 }
 
@@ -120,10 +139,11 @@ func (v *VirtualMachine) AsyncWait() {
 func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 	v := &VirtualMachine{
 		// rootSymbol: table,
-		rootScope: NewScope(table),
-		VMStack:   vmstack.New(),
-		globalVar: make(map[string]interface{}),
-		config:    NewVMConfig(),
+		rootScope:        NewScope(table),
+		VMStack:          vmstack.New(),
+		globalVar:        limitedmap.NewSafeMap(map[string]any{}),
+		runtimeGlobalVar: limitedmap.NewSafeMap(map[string]any{}),
+		config:           NewVMConfig(),
 		// asyncWaitGroup
 		asyncWaitGroup: new(sync.WaitGroup),
 		// debug
@@ -137,28 +157,61 @@ func New() *VirtualMachine {
 }
 
 // deepCopyLib 拷贝yaklang依赖，防止多个engine并行运行时对lib进行hook导致concurrent write map error
-func deepCopyLib(libs map[string]interface{}) map[string]interface{} {
-	newLib := map[string]interface{}{}
-	for k, v := range libs {
-		if v1, ok := v.(map[string]interface{}); ok {
-			newLib[k] = deepCopyLib(v1)
-		} else {
-			newLib[k] = v
-		}
-	}
-	return newLib
-}
+//func deepCopyLib(libs map[string]interface{}) map[string]interface{} {
+//	newLib := map[string]interface{}{}
+//	for k, v := range libs {
+//		if v1, ok := v.(map[string]interface{}); ok {
+//			newLib[k] = deepCopyLib(v1)
+//		} else {
+//			newLib[k] = v
+//		}
+//	}
+//	return newLib
+//}
 
 // ImportLibs 导入库到引擎的全局变量中
 func (n *VirtualMachine) ImportLibs(libs map[string]interface{}) {
-	for k, v := range deepCopyLib(libs) {
-		n.globalVar[k] = v
-	}
+	n.globalVar.Link(libs)
 }
 
-// SetVar 导入变量到引擎的全局变量中
-func (n *VirtualMachine) SetVar(k string, v interface{}) {
-	n.globalVar[k] = v
+// SetVars 导入变量到引擎的全局变量中
+func (n *VirtualMachine) SetVars(m map[string]any) {
+	n.runtimeGlobalVar.Link(m)
+}
+
+func (n *VirtualMachine) GetNaslGlobalVarTable() (map[int]*Value, error) {
+	tableRaw, ok := n.GetVarWithoutFrame("__nasl_global_var_table")
+	if !ok {
+		return nil, utils.Error("BUG: __nasl_global_var_table cannot be found")
+	}
+	table, ok := tableRaw.(map[int]*Value)
+	if !ok {
+		return nil, utils.Error("BUG: __nasl_global_var_table is not a map")
+	}
+	return table, nil
+}
+
+func (n *VirtualMachine) GetVarWithoutFrame(name string) (any, bool) {
+	// 和引擎绑定的用于覆盖 global var 的 fake lib 层
+	var_, ok := n.runtimeGlobalVar.Load(name)
+	if ok {
+		return var_, true
+	}
+
+	// 如果不存在，根也找不到，那么就直接全局找
+	var_, ok = n.globalVar.Load(name)
+	if ok {
+		return var_, true
+	}
+
+	if n.globalVarFallback != nil {
+		hijackedGlobal := n.globalVarFallback(name)
+		if hijackedGlobal != nil {
+			return hijackedGlobal, true
+		}
+	}
+
+	return undefined, false
 }
 
 func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
@@ -175,24 +228,15 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 			return val.Value, true
 		}
 	}
-	// 如果不存在，根也找不到，那么就直接全局找
-	var_, ok := n.globalVar[name]
-	if ok {
-		return var_, true
-	}
-
-	if n.globalVarFallback != nil {
-		hijackedGlobal := n.globalVarFallback(name)
-		if hijackedGlobal != nil {
-			return hijackedGlobal, true
-		}
-	}
-
-	return undefined, false
+	return n.GetVarWithoutFrame(name)
 }
 
-func (n *VirtualMachine) GetGlobalVar() map[string]interface{} {
+func (n *VirtualMachine) GetGlobalVar() *limitedmap.SafeMap[any] {
 	return n.globalVar
+}
+
+func (n *VirtualMachine) GetRuntimeGlobalVar() *limitedmap.SafeMap[any] {
+	return n.runtimeGlobalVar
 }
 
 func (n *VirtualMachine) GetDebugger() *Debugger {
@@ -317,19 +361,20 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		codes := frame.codes
 		p := frame.codePointer
 
-		// set vm global var to frame
-		for k, val := range v.globalVar {
-			frame.GlobalVariables[k] = val
-		}
+		v.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+			frame.GlobalVariables[key] = value
+			return nil
+		})
 		defer func() {
 			frame.codes = codes
 			frame.codePointer = p
 		}()
 	} else {
 		frame = NewFrame(v)
-		for k, val := range v.globalVar {
-			frame.GlobalVariables[k] = val
-		}
+		v.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+			frame.GlobalVariables[key] = value
+			return nil
+		})
 	}
 
 	if flag&Asnyc == Asnyc {

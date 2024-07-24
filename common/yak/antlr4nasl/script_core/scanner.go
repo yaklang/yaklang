@@ -103,13 +103,13 @@ func ServiceScan(ctx *ExecContext) {
 	os.Setenv("YAKMODE", "vm")
 	yakEngine := yaklang.New()
 
-	yakEngine.SetVar("addRes", func(res *fp.MatchResult) {
-		result = append(result, res)
+	yakEngine.SetVars(map[string]any{
+		"addRes": func(res *fp.MatchResult) {
+			result = append(result, res)
+		},
+		"hosts": hosts,
+		"ports": ports,
 	})
-
-	yakEngine.SetVar("hosts", hosts)
-	yakEngine.SetVar("ports", ports)
-
 	err := yakEngine.SafeEval(context.Background(), `
 
 getPingScan = func() {
