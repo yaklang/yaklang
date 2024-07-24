@@ -36,13 +36,19 @@ func (sm *SafeMap[T]) Append(l map[string]T) *SafeMap[T] {
 			existedRaw, ok := res[k]
 			if ok {
 				var existed any = existedRaw
+				newResLib := make(map[string]T)
 				lib, ok := existed.(map[string]T)
 				if ok {
 					var v any = vT
-					if newLib, ok := v.(map[string]T); ok {
-						for k1, v1 := range newLib {
-							lib[k1] = v1
+					if newLib, ok := v.(map[string]T); ok && len(newLib) > 0 {
+						for k, v := range lib {
+							newResLib[k] = v
 						}
+						for k1, v1 := range newLib {
+							newResLib[k1] = v1
+						}
+						var a any = newResLib
+						res[k] = a.(T)
 						continue
 					}
 				}
