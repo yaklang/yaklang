@@ -1,7 +1,6 @@
 package ssa_option
 
 import (
-	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -21,15 +20,14 @@ func YakGetTypeSSAOpt() []ssaapi.Option {
 	valueTable := make(map[string]interface{})
 	// libTable := make(map[string]interface{})
 	tmp := reflect.TypeOf(make(map[string]interface{}))
-	symbol.ForEach(func(m *limitedmap.SafeMap, name string, item any) error {
+	for name, item := range symbol {
 		itype := reflect.TypeOf(item)
 		if itype == tmp {
 			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
 		} else {
 			valueTable[name] = item
 		}
-		return nil
-	})
+	}
 
 	// yak-main
 	valueTable["YAK_DIR"] = ""

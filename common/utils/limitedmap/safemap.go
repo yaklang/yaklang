@@ -61,19 +61,52 @@ func (sm *SafeMap) Load(key string) (value any, ok bool) {
 	return
 }
 
-func (sm *SafeMap) ForEach(h func(m *SafeMap, key string, value any) error) {
+func (sm *SafeMap) ForEachKey(h func(m *SafeMap, key string) error) {
 	sm.lock.RLock()
 	defer sm.lock.RUnlock()
 
+	visited := make(map[string]struct{})
+	wrapper := func(safeMap *SafeMap, key string, value any) error {
+		_, ok := visited[key]
+		if ok {
+			return nil
+		}
+		visited[key] = struct{}{}
+
+		err := h(safeMap, key)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	sm.forEachKey(wrapper)
+}
+
+func (sm *SafeMap) forEachKey(wrapper func(m *SafeMap, key string, value any) error) {
 	for k, v := range sm.m {
-		if err := h(sm, k, v); err != nil {
+		if err := wrapper(sm, k, v); err != nil {
 			return
 		}
 	}
+	if sm.parent != nil {
+		sm.parent.forEachKey(wrapper)
+	}
 }
 
-func (sm *SafeMap) Raw() map[string]any {
-	return sm.m
+func (sm *SafeMap) Flat() map[string]any {
+	var item []string
+	sm.ForEachKey(func(m *SafeMap, key string) error {
+		item = append(item, key)
+		return nil
+	})
+	var m = make(map[string]any)
+	for _, k := range item {
+		raw, ok := sm.Load(k)
+		if ok {
+			m[k] = raw
+		}
+	}
+	return m
 }
 
 func (sm *SafeMap) GetRoot() *SafeMap {
@@ -109,6 +142,19 @@ func (sm *SafeMap) SetPred(p *SafeMap) *SafeMap {
 	root := sm.GetRoot()
 	root.parent = p
 	return sm
+}
+
+func (sm *SafeMap) Unlink(p *SafeMap) {
+	if sm.Existed(p) {
+		origin := sm.parent
+		for origin.parent != nil {
+			if origin.parent == p {
+				origin.parent = nil
+				return
+			}
+			origin = origin.parent
+		}
+	}
 }
 
 func (sm *SafeMap) Store(key string, value any) {
