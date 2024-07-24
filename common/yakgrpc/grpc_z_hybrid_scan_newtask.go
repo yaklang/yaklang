@@ -353,6 +353,10 @@ func ScanHybridTargetWithPlugin(
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVars(map[string]any{
+			"RUNTIME_ID": runtimeId,
+		})
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx).WithContextCancel(cancel))
+		engine.SetVars(map[string]any{
 			"RUNTIME_ID":    runtimeId,
 			"REQUEST":       target.Request,
 			"RESPONSE":      target.Response,
@@ -362,7 +366,6 @@ func ScanHybridTargetWithPlugin(
 			"CALLER_FILTER": callerFilter,
 			"PROXY":         proxy,
 		})
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx).WithContextCancel(cancel))
 		//engine.SetVars("REQUEST", target.Request)
 		//engine.SetVars("RESPONSE", target.Response)
 		//engine.SetVars("HTTPS", target.IsHttps)

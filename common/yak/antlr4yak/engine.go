@@ -281,7 +281,7 @@ func (n *Engine) GetScopeInspects() ([]*ScopeValue, error) {
 }
 
 func (n *Engine) OverrideRuntimeGlobalVariables(parent map[string]any) {
-	n.vm.GetRuntimeGlobalVar().Link(parent)
+	n.vm.SetVars(parent)
 
 	//var parentLib map[string]interface{}
 	//
