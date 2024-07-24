@@ -196,6 +196,7 @@ func CopyDirectory(source string, destination string, isMove bool) error {
 
 func CopyDirectoryEx(source string,
 	destination string,
+	isMove bool,
 	fs fi.FileSystem,
 ) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
@@ -223,9 +224,11 @@ func CopyDirectoryEx(source string,
 				return err
 			}
 			// 删除源文件
-			err = fs.Delete(path)
-			if err != nil {
-				return err
+			if isMove {
+				err = fs.Delete(path)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -323,16 +326,16 @@ func CopyFileEx(
 
 	if _, ok := srcFh.(io.Writer); ok {
 		// fs.OpenFile return a io.Writer, so use io.Copy
-		dstFile, err := fs.OpenFile(destination, os.O_CREATE|os.O_WRONLY, 0o644)
+		dstFh, err := fs.OpenFile(destination, os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			return err
 		}
-		defer dstFile.Close()
-		if dstW, ok := dstFile.(io.Writer); ok {
+		defer dstFh.Close()
+		if dstW, ok := dstFh.(io.Writer); ok {
 			if _, err := io.Copy(dstW, srcFh); err != nil {
 				return err
 			}
-			if syncW, ok := dstFile.(fi.SyncFile); ok {
+			if syncW, ok := dstFh.(fi.SyncFile); ok {
 				return syncW.Sync()
 			}
 		} else {

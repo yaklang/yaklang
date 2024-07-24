@@ -276,7 +276,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 				return nil, utils.Errorf("source path not exists: %s", sourcePath)
 			}
 			err = utils.CopyDirectoryEx(
-				sourceAbsPath, absPath, fs)
+				sourceAbsPath, absPath, false, fs)
 			if err != nil {
 				return nil, utils.Wrap(err, "cannot paste directory")
 			}
