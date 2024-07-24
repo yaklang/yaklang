@@ -173,6 +173,10 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		frame.GlobalVariables[key] = value
 		return nil
 	})
+	vm.runtimeGlobalVar.ForEach(func(m *limitedmap.SafeMap[any], key string, value any) error {
+		frame.GlobalVariables[key] = value
+		return nil
+	})
 
 	vm.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
