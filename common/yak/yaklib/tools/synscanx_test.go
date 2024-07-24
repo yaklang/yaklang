@@ -7,22 +7,13 @@ import (
 )
 
 func Test__scanx(t *testing.T) {
-	//nmapRuleConfig := fp.NewConfig(
-	//	fp.WithActiveMode(true),
-	//	fp.WithTransportProtos(fp.UDP),
-	//	fp.WithProbesMax(3),
-	//)
-	//firstBlock, blocks, bestMode := fp.GetRuleBlockByConfig(53, nmapRuleConfig)
-	//if bestMode {
-	//}
-	//t.Log(firstBlock, blocks, bestMode)
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
 		synPacketCounter++
 	}
 
 	res, err := _scanx(
-		"192.168.124.51/24",
+		"192.168.3.4-255",
 		//"47.52.100.35/24",
 		//"U:137",
 		"21,22,23,80,443",
