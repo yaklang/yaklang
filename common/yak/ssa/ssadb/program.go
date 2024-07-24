@@ -63,6 +63,7 @@ func GetProgram(name, kind string) (*IrProgram, error) {
 
 func UpdateProgram(prog *IrProgram) {
 	GetDB().Model(&IrProgram{}).
+		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).
 		Where("program_kind = ?", prog.ProgramKind).
 		Update(prog)
@@ -79,37 +80,63 @@ func GetDBInProgram(program string) *gorm.DB {
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	this, err := GetProgram(program, "")
+	// reuse the program object, avoid multiple db operation in short time
+	progs := make(map[string]*IrProgram)
+	getProgram := func(name string) (*IrProgram, error) {
+		if p, ok := progs[name]; ok {
+			return p, nil
+		}
+		p, err := GetProgram(name, "")
+		if err != nil {
+			return nil, err
+		}
+		progs[name] = p
+		return p, nil
+	}
+	updateProgram := func(prog *IrProgram) {
+		progs[prog.ProgramName] = prog
+	}
+	defer func() {
+		for _, p := range progs {
+			UpdateProgram(p)
+		}
+	}()
+
+	var handlerUpstream func(this *IrProgram)
+	handlerUpstream = func(this *IrProgram) {
+		// update the down-stream programs
+		for _, upStream := range this.UpStream {
+			up, err := getProgram(upStream)
+			if err != nil {
+				log.Infof("get program %s error : %v", upStream, err)
+				continue
+			}
+			up.DownStream = utils.RemoveSliceItem(up.DownStream, this.ProgramName)
+			// if the up-stream program is not used by other programs, delete it
+			if len(up.DownStream) == 0 {
+				handlerUpstream(up)
+			} else {
+				updateProgram(up)
+			}
+		}
+		// handler down-stream programs
+		for _, downStream := range this.DownStream {
+			down, err := getProgram(downStream)
+			if err != nil {
+				log.Infof("get program %s error : %v", downStream, err)
+				continue
+			}
+			down.UpStream = utils.RemoveSliceItem(down.UpStream, this.ProgramName)
+			updateProgram(down)
+		}
+		deleteProgramDBOnly(db, this.ProgramName)
+	}
+	this, err := getProgram(program)
 	if err != nil {
 		log.Errorf("get program %s error : %v", program, err)
 		return
 	}
-	// update the down-stream programs
-	for _, upStream := range this.UpStream {
-		up, err := GetProgram(upStream, "")
-		if err != nil {
-			log.Infof("get program %s error : %v", upStream, err)
-			continue
-		}
-		up.DownStream = utils.RemoveSliceItem(up.DownStream, program)
-		// if the up-stream program is not used by other programs, delete it
-		if len(up.DownStream) == 0 {
-			DeleteProgram(db, upStream)
-		} else {
-			UpdateProgram(up)
-		}
-	}
-	// handler down-stream programs
-	for _, downStream := range this.DownStream {
-		down, err := GetProgram(downStream, "")
-		if err != nil {
-			log.Infof("get program %s error : %v", downStream, err)
-			continue
-		}
-		down.UpStream = utils.RemoveSliceItem(down.UpStream, program)
-		UpdateProgram(down)
-	}
-	DeleteDB(db, program)
+	handlerUpstream(this)
 }
 
 func AllPrograms(db *gorm.DB) []string {

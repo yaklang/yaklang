@@ -7,6 +7,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -131,5 +132,58 @@ func TestSyncFromDatabase(t *testing.T) {
 		require.NotNil(t, user)
 		require.Equal(t, ssa.SSAOpcodeCall, user.GetOpcode())
 	})
+
+}
+
+func TestProgramRelation(t *testing.T) {
+	/*
+
+		in program:
+			a -> b -> c
+
+		in up-down stream:
+			a  -> b, c
+			b  -> c
+	*/
+	ssadb.DeleteProgram(ssadb.GetDB(), "a")
+	ssadb.DeleteProgram(ssadb.GetDB(), "b")
+	ssadb.DeleteProgram(ssadb.GetDB(), "c")
+
+	addStream := func(down, up *ssadb.IrProgram) {
+		up.DownStream = append(up.DownStream, down.ProgramName)
+		down.UpStream = append(down.UpStream, up.ProgramName)
+	}
+	a := ssadb.CreateProgram("a", "Application", "")
+	b := ssadb.CreateProgram("b", "Library", "")
+	c := ssadb.CreateProgram("c", "Library", "")
+	/*
+		a -> b, c
+		b -> c
+	*/
+	addStream(a, b)
+	addStream(a, c)
+	addStream(b, c)
+	ssadb.UpdateProgram(a)
+	ssadb.UpdateProgram(b)
+	ssadb.UpdateProgram(c)
+
+	ssadb.DeleteProgram(ssadb.GetDB(), "a")
+
+	// check all program should deleted
+	{
+		irProg, err := ssadb.GetProgram("a", "")
+		assert.NotNilf(t, err, "a should be deleted")
+		assert.Nilf(t, irProg, "a should be deleted")
+	}
+	{
+		irProg, err := ssadb.GetProgram("b", "")
+		assert.NotNilf(t, err, "b should be deleted")
+		assert.Nilf(t, irProg, "b should be deleted")
+	}
+	{
+		irProg, err := ssadb.GetProgram("c", "")
+		assert.NotNilf(t, err, "b should be deleted")
+		assert.Nilf(t, irProg, "b should be deleted")
+	}
 
 }
