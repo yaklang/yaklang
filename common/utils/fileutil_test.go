@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"os"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func TestCopyDirectory(t *testing.T) {
@@ -58,19 +60,19 @@ func TestCopyDirectory(t *testing.T) {
 
 	t.Run("CopyDirectory", func(t *testing.T) {
 		test(t, func(src, dst string) error {
-			return CopyDirectory(src, dst, false)
+			return utils.CopyDirectory(src, dst, false)
 		})
 	})
 
-	// t.Run("CopyDirectoryEx", func(t *testing.T) {
-	// 	test(t, func(src, dst string) error {
-	// 		return CopyDirectoryEx(src, dst, )
-	// 	})
-	// })
+	t.Run("CopyDirectoryEx", func(t *testing.T) {
+		test(t, func(src, dst string) error {
+			return utils.CopyDirectoryEx(src, dst, false, filesys.NewLocalFs())
+		})
+	})
 
 	t.Run("ConcurrentCopyDirectory", func(t *testing.T) {
 		test(t, func(src, dst string) error {
-			return ConcurrentCopyDirectory(src, dst, 10, false)
+			return utils.ConcurrentCopyDirectory(src, dst, 10, false)
 		})
 	})
 }
