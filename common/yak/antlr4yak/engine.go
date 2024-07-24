@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"os"
@@ -211,8 +210,14 @@ func (n *Engine) LoadCode(ctx context.Context, code string, table map[string]int
 	return n.vm.ExecYakCode(ctx, code, codes, yakvm.Trace)
 }
 
-func (n *Engine) GetFntable() *limitedmap.SafeMap {
-	return n.vm.GetGlobalVar()
+func (n *Engine) GetFntable() map[string]any {
+	g := n.vm.GetGlobalVar()
+	r := n.vm.GetRuntimeGlobalVar()
+	runtimeRoot := r.GetRoot()
+	runtimeRoot.SetPred(g)
+	results := runtimeRoot.Flat()
+	runtimeRoot.Unlink(g)
+	return results
 }
 
 func (n *Engine) GetCurrentScope() (*yakvm.Scope, error) {

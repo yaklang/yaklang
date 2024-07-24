@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"
-	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 	"sort"
@@ -207,7 +206,7 @@ func EngineToHelper(engine *antlr4yak.Engine) *PalmScriptEngineHelper {
 	}
 
 	var extLibs []*PalmScriptLib
-	engine.GetFntable().ForEach(func(m *limitedmap.SafeMap, name string, item any) error {
+	for name, item := range engine.GetFntable() {
 		iTy := reflect.TypeOf(item)
 		iVl := reflect.ValueOf(item)
 		_, _ = iTy, iVl
@@ -216,7 +215,7 @@ func EngineToHelper(engine *antlr4yak.Engine) *PalmScriptEngineHelper {
 		case reflect.TypeOf(make(map[string]interface{})):
 			res := item.(map[string]interface{})
 			if res == nil && len(res) <= 0 {
-				return nil
+				continue
 			}
 
 			extLib := &PalmScriptLib{
@@ -247,7 +246,7 @@ func EngineToHelper(engine *antlr4yak.Engine) *PalmScriptEngineHelper {
 			}
 		default:
 			if iTy == nil {
-				return nil
+				continue
 			}
 
 			globalBanner := "__GLOBAL__"
@@ -262,7 +261,6 @@ func EngineToHelper(engine *antlr4yak.Engine) *PalmScriptEngineHelper {
 				helper.Instances[name] = anyTypeToPalmScriptLibInstance(globalBanner, name, iTy)
 			}
 		}
-		return nil
-	})
+	}
 	return helper
 }
