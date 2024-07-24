@@ -26,6 +26,11 @@ func AddHost(host string, ip string) {
 	hosts.Store(host, ip)
 }
 
+func DeleteHost(host string) {
+	log.Debugf("delete hostfile: %24s", host)
+	hosts.Delete(host)
+}
+
 func GetHost(host string) (ip string, ok bool) {
 	ipRaw, ok := hosts.Load(host)
 	if ok {
