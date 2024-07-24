@@ -98,10 +98,10 @@ type Config struct {
 	// onTempalteLoaded
 	OnTemplateLoaded  func(*YakTemplate) bool
 	BeforeSendPackage func(data []byte, isHttps bool) []byte
-	defaultFilter     *filter.StringFilter
+	defaultFilter     filter.Filterable
 }
 
-func WithCustomVulnFilter(f *filter.StringFilter) ConfigOption {
+func WithCustomVulnFilter(f filter.Filterable) ConfigOption {
 	return func(config *Config) {
 		if f == nil {
 			return
@@ -395,8 +395,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 				}
 			}()
 
-			scriptFilter := filter.NewFilter()
-			defer scriptFilter.Close()
+			scriptNameFilter := make(map[string]struct{})
 			feedback := func(t *YakTemplate) {
 				if t == nil {
 					return
@@ -406,10 +405,11 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 					return
 				}
 
-				if scriptFilter.Exist(t.Name) {
+				_, ok := scriptNameFilter[t.Name]
+				if ok {
 					return
 				}
-				scriptFilter.Insert(t.Name)
+				scriptNameFilter[t.Name] = struct{}{}
 				ch <- t
 			}
 

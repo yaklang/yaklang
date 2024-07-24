@@ -334,7 +334,7 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 
 func WithOnRisk(target string, onRisk func(i *schema.Risk)) ConfigOption {
 	vCh := make(chan *tools.PocVul)
-	filterVul := filter.NewFilter()
+	filterVul := filter.NewMapFilter()
 	i := processVulnerability(target, filterVul, vCh, onRisk)
 
 	return func(config *Config) {
@@ -347,7 +347,7 @@ func WithOnRisk(target string, onRisk func(i *schema.Risk)) ConfigOption {
 	}
 }
 
-func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *tools.PocVul, handlers ...func(i *schema.Risk)) func(i map[string]interface{}) {
+func processVulnerability(target any, filterVul filter.Filterable, vCh chan *tools.PocVul, handlers ...func(i *schema.Risk)) func(i map[string]interface{}) {
 	return func(i map[string]interface{}) {
 		if i["match"].(bool) {
 			tpl := i["template"].(*YakTemplate)
@@ -450,7 +450,7 @@ func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 	return ScanLegacyWithFilter(target, NewConfig(opts...).defaultFilter, opt...)
 }
 
-func ScanLegacyWithFilter(target any, filterVul *filter.StringFilter, opt ...interface{}) (chan *tools.PocVul, error) {
+func ScanLegacyWithFilter(target any, filterVul filter.Filterable, opt ...interface{}) (chan *tools.PocVul, error) {
 	if filterVul == nil {
 		filterVul = defaultFilter
 	}
