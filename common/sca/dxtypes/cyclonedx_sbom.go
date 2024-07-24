@@ -40,7 +40,7 @@ func normalCyloneDXHashType(i string) (cdx.HashAlgorithm, bool) {
 	return "", false
 }
 
-func dxPackagesToCycloneDXComponent(pkgFilter *filter.StringFilter, pkgs []*Package) []cdx.Component {
+func dxPackagesToCycloneDXComponent(pkgFilter filter.Filterable, pkgs []*Package) []cdx.Component {
 	ret := make([]cdx.Component, 0, len(pkgs))
 	for _, pkg := range pkgs {
 		id := fmt.Sprintf("%v-%v", pkg.Name, pkg.Version)

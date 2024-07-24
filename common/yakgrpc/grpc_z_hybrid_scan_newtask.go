@@ -157,7 +157,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	// init some config
 	hasUnavailableTarget := false
-	scanFilterManager := NewFilterManager(12, 1<<15, 30)
+	scanFilterManager := filter.NewFilterManager(12, 1<<15, 30)
 
 	countRiskClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		result.RuntimeID = taskId
@@ -347,7 +347,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 var execTargetWithPluginScript string
 
 func ScanHybridTargetWithPlugin(
-	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *schema.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
+	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *schema.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter filter.Filterable,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
@@ -593,47 +593,4 @@ func TargetGenerator(ctx context.Context, db *gorm.DB, targetConfig *ypb.HybridS
 	//	//}
 	//}()
 	//return outTarget, nil
-}
-
-type FilterManager struct {
-	size                       int
-	capacity                   int
-	filterPool                 *sync.Pool
-	filterEntries, filterTotal uint
-	cond                       *sync.Cond
-}
-
-func (m *FilterManager) DequeueFilter() *filter.StringFilter {
-	return m.filterPool.Get().(*filter.StringFilter)
-}
-
-func (m *FilterManager) EnqueueFilter(f *filter.StringFilter) {
-	m.cond.L.Lock()
-	defer m.cond.L.Unlock()
-	f.Clear()
-	m.filterPool.Put(f)
-	m.cond.Signal()
-}
-
-func NewFilterManager(filterEntries, filterTotal uint, capacity int) *FilterManager {
-	m := &FilterManager{
-		capacity:      capacity,
-		filterEntries: filterEntries,
-		filterTotal:   filterTotal,
-	}
-	condMutex := new(sync.Mutex)
-	m.cond = sync.NewCond(condMutex)
-	filterPool := &sync.Pool{
-		New: func() interface{} {
-			if m.size < m.capacity {
-				return filter.NewFilterWithSize(filterEntries, filterTotal)
-			}
-			m.cond.L.Lock()
-			defer m.cond.L.Unlock()
-			m.cond.Wait()
-			return m.filterPool.Get()
-		},
-	}
-	m.filterPool = filterPool
-	return m
 }
