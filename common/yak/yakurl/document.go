@@ -2,6 +2,7 @@ package yakurl
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"sort"
 	"strings"
@@ -100,8 +101,7 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 					totalName := fmt.Sprintf("%s.%s", lib.Name, rsc.ResourceName)
 					docMap[totalName] = []*ypb.YakURLResource{rsc}
 
-					_ = extrasStr
-					fuzzyKey := fmt.Sprintf("%s.%s|%s", lib.Name, rsc.ResourceName, extrasStr)
+					fuzzyKey := strings.ToLower(fmt.Sprintf("%s.%s|%s", lib.Name, rsc.ResourceName, extrasStr))
 					cloned := cloneResource(rsc)
 					cloned.ResourceName = totalName
 					fuzzySearchMap[fuzzyKey] = cloned
@@ -118,13 +118,32 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 	resources, ok := docMap[exactWord]
 	if !ok {
 		// fuzzy search
-		fuzzyResults := fuzzy.RankFind(word, fuzzySearchKeys)
+		fuzzyResults := fuzzy.RankFindEx(
+			strings.ToLower(word),
+			fuzzySearchKeys,
+			func(s1, s2 string) float64 {
+				var i, counter float64
+				splited := strings.Split(s1, " ")
+				for _, word := range splited {
+					if strings.Contains(s2, word) {
+						counter++
+						i += fuzzy.LevenshteinDistance(word, s2)
+					}
+				}
+				if i > 0 {
+					return i / counter
+				}
+				return math.MaxFloat64
+			})
 		sort.Sort(fuzzyResults)
 		maxLen := len(fuzzyResults)
 		if maxLen > maxFuzzyLength {
 			maxLen = maxFuzzyLength
 		}
 		for i := 0; i < maxLen; i++ {
+			if fuzzyResults[i].Distance == math.MaxFloat64 {
+				continue
+			}
 			resources = append(resources, fuzzySearchMap[fuzzyResults[i].Target])
 		}
 	}
