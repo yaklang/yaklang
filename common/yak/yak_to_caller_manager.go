@@ -215,7 +215,7 @@ type YakToCallerManager struct {
 	callTimeout        time.Duration
 	runtimeId          string
 	proxy              string
-	defaultFilter      *filter.StringFilter
+	vulFilter          filter.Filterable
 	ContextCancelFuncs *sync.Map
 }
 
@@ -249,8 +249,8 @@ func NewYakToCallerManager() *YakToCallerManager {
 	return caller
 }
 
-func (y *YakToCallerManager) WithDefaultFilter(filter *filter.StringFilter) *YakToCallerManager {
-	y.defaultFilter = filter
+func (y *YakToCallerManager) WithVulFilter(filter filter.Filterable) *YakToCallerManager {
+	y.vulFilter = filter
 	return y
 }
 
@@ -361,7 +361,7 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 		finalCtx = context.WithValue(finalCtx, "cancel", canFunc) // 维护一个 cancel
 	}
 
-	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithDefaultFilter(y.getDefaultFilter()).WithContextCancel(canFunc)
+	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithVulFilter(y.getVulFilter()).WithContextCancel(canFunc)
 }
 
 func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
@@ -739,7 +739,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if streamContext != nil {
 					opts = append(opts, httptpl.WithContext(streamContext))
 				}
-				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
+				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
@@ -759,7 +759,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if streamContext != nil {
 					opts = append(opts, httptpl.WithContext(streamContext))
 				}
-				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
+				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
@@ -1145,15 +1145,14 @@ func (y *YakToCallerManager) AddForYakit(
 
 var fetchFilterMutex = new(sync.Mutex)
 
-func (y *YakToCallerManager) getDefaultFilter() *filter.StringFilter {
+func (y *YakToCallerManager) getVulFilter() filter.Filterable {
 	fetchFilterMutex.Lock()
 	defer fetchFilterMutex.Unlock()
-
-	if y.defaultFilter != nil {
-		return y.defaultFilter
+	if y.vulFilter != nil {
+		return y.vulFilter
 	}
-	y.defaultFilter = filter.NewFilter()
-	return y.defaultFilter
+	y.vulFilter = filter.NewMapFilter()
+	return y.vulFilter
 }
 
 func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, paramMap map[string]any, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
@@ -1425,7 +1424,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 }
 
 func (y *YakToCallerManager) Wait() {
-	defer y.defaultFilter.Close()
+	defer y.vulFilter.Close()
 	if y.swg == nil {
 		return
 	}

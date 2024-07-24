@@ -223,14 +223,14 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
 	webFilter := filter.NewFilter()
-	callerFilter := filter.NewFilter()
+	callerFilter := filter.NewMapFilter()
 	c := &MixPluginCaller{
 		websiteFilter:       webFilter,
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
 		rawQuestFilter:      webFilter,
 		pluginScanFilter:    yakit.GlobalPluginScanFilter,
-		callers:             NewYakToCallerManager().WithDefaultFilter(callerFilter),
+		callers:             NewYakToCallerManager().WithVulFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
@@ -251,13 +251,13 @@ func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCal
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
-	callerFilter := filter.NewFilter()
+	callerFilter := filter.NewMapFilter()
 	c := &MixPluginCaller{
 		websiteFilter:       webFilter,
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
 		pluginScanFilter:    yakit.GlobalPluginScanFilter,
-		callers:             NewYakToCallerManager().WithDefaultFilter(callerFilter),
+		callers:             NewYakToCallerManager().WithVulFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},

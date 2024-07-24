@@ -7,14 +7,14 @@ import (
 )
 
 type YakitPluginContext struct {
-	PluginName    string
-	PluginUUID    string
-	RuntimeId     string
-	Proxy         string
-	Ctx           context.Context
-	CliApp        *cli.CliApp
-	Cancel        context.CancelFunc
-	defaultFilter *filter.StringFilter
+	PluginName string
+	PluginUUID string
+	RuntimeId  string
+	Proxy      string
+	Ctx        context.Context
+	CliApp     *cli.CliApp
+	Cancel     context.CancelFunc
+	vulFilter  filter.Filterable
 }
 
 func (y *YakitPluginContext) WithContextCancel(cancel context.CancelFunc) *YakitPluginContext {
@@ -37,8 +37,8 @@ func (y *YakitPluginContext) WithProxy(proxy string) *YakitPluginContext {
 	return y
 }
 
-func (y *YakitPluginContext) WithDefaultFilter(filter *filter.StringFilter) *YakitPluginContext {
-	y.defaultFilter = filter
+func (y *YakitPluginContext) WithVulFilter(filter filter.Filterable) *YakitPluginContext {
+	y.vulFilter = filter
 	return y
 }
 
