@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"go/ast"
 	"go/token"
 	"reflect"
@@ -183,7 +184,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 	return DocumentHelperWithVerboseInfo(engine.GetFntable())
 }
 
-func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.DocumentHelper {
+func DocumentHelperWithVerboseInfo(funcMap *limitedmap.SafeMap[any]) *yakdoc.DocumentHelper {
 	helper := &yakdoc.DocumentHelper{
 		Libs:          make(map[string]*yakdoc.ScriptLib),
 		Functions:     make(map[string]*yakdoc.FuncDecl),
@@ -200,7 +201,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 
 	var extLibs []*yakdoc.ScriptLib
 	// 标准库导出的函数
-	for name, item := range funcMap {
+	funcMap.ForEach(func(m *limitedmap.SafeMap[any], name string, item any) error {
 		itemType := reflect.TypeOf(item)
 		itemValue := reflect.ValueOf(item)
 		_, _ = itemType, itemValue
@@ -209,7 +210,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 		case reflect.TypeOf(make(map[string]interface{})):
 			res := item.(map[string]interface{})
 			if res == nil && len(res) <= 0 {
-				continue
+				return nil
 			}
 
 			extLib := &yakdoc.ScriptLib{
@@ -249,7 +250,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 			sort.Strings(extLib.ElementDocs)
 		default:
 			if itemType == nil {
-				continue
+				return nil
 			}
 
 			switch itemType.Kind() {
@@ -273,7 +274,9 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 				helper.Instances[name] = yakdoc.AnyTypeToLibInstance(globalBanner, name, itemType, item)
 			}
 		}
-	}
+		return nil
+	})
+
 	// 标准库函数可能会返回结构体，我们也需要拿到结构体的成员，方法签名与文档
 	handleTypes := make([]reflect.Type, 0)
 
@@ -605,7 +608,7 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 	}
 
 	fnTable := engine.GetFntable()
-	for libName, item := range fnTable {
+	fnTable.ForEach(func(m *limitedmap.SafeMap[any], libName string, item any) error {
 		iTy := reflect.TypeOf(item)
 		iVl := reflect.ValueOf(item)
 		_, _ = iTy, iVl
@@ -614,7 +617,7 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 		case reflect.TypeOf(make(map[string]interface{})):
 			res := item.(map[string]interface{})
 			if res == nil && len(res) <= 0 {
-				continue
+				return nil
 			}
 
 			libDoc := yakdocument.LibDoc{
@@ -661,20 +664,20 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 			libs = append(libs, libDoc)
 		default:
 			if iTy == nil {
-				continue
+				return nil
 			}
 
 			key := libName
 			value := item
 			_, _ = key, value
 			if strings.HasPrefix(libName, "$") || strings.HasPrefix(libName, "_") {
-				continue
+				return nil
 			}
 			switch iTy.Kind() {
 			case reflect.Func:
 				fDoc, err := yakdocument.ReflectFuncToFunctionDoc(libName, iTy)
 				if err != nil {
-					continue
+					return nil
 				}
 				fDoc.LibName = globalDoc.Name
 				fDoc.Name = key
@@ -693,7 +696,8 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 				})
 			}
 		}
-	}
+		return nil
+	})
 	libs = append(libs, globalDoc)
 	return libs
 }

@@ -1,12 +1,18 @@
 package yakvm
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 )
 
 func GetNaslValueBySymbolId(symbol int, frame *Frame) *Value {
 	id := symbol
-	table := frame.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+	//table := frame.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+	table, err := frame.vm.GetNaslGlobalVarTable()
+	if err != nil {
+		log.Error(err)
+		return GetUndefined()
+	}
 	if val, ok := table[id]; ok {
 		return val
 	}

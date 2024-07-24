@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"os"
@@ -174,7 +175,7 @@ func (n *Engine) CallYakFunction(ctx context.Context, funcName string, params []
 	//paramStrList := []string{}
 	//for index, param := range params {
 	//	paramName := fmt.Sprintf("__global_param_%d__", index)
-	//	n.vm.SetVar(paramName, param)
+	//	n.vm.SetVars(paramName, param)
 	//	paramStrList = append(paramStrList, paramName)
 	//}
 	//
@@ -210,7 +211,7 @@ func (n *Engine) LoadCode(ctx context.Context, code string, table map[string]int
 	return n.vm.ExecYakCode(ctx, code, codes, yakvm.Trace)
 }
 
-func (n *Engine) GetFntable() map[string]interface{} {
+func (n *Engine) GetFntable() *limitedmap.SafeMap[any] {
 	return n.vm.GetGlobalVar()
 }
 
@@ -279,19 +280,22 @@ func (n *Engine) GetScopeInspects() ([]*ScopeValue, error) {
 	return vals, nil
 }
 
-func (n *Engine) ImportSubLibs(parent string, libs map[string]interface{}) {
-	var parentLib map[string]interface{}
-	if v, ok := n.vm.GetGlobalVar()[parent]; ok {
-		if v1, ok := v.(map[string]interface{}); ok {
-			parentLib = v1
-		}
-	} else {
-		parentLib = make(map[string]interface{})
-		n.vm.GetGlobalVar()[parent] = parentLib
-	}
-	for k, v2 := range libs {
-		parentLib[k] = v2
-	}
+func (n *Engine) OverrideRuntimeGlobalVariables(parent map[string]any) {
+	n.vm.GetRuntimeGlobalVar().Link(parent)
+
+	//var parentLib map[string]interface{}
+	//
+	//if v, ok := n.vm.GetGlobalVar()[parent]; ok {
+	//	if v1, ok := v.(map[string]interface{}); ok {
+	//		parentLib = v1
+	//	}
+	//} else {
+	//	parentLib = make(map[string]interface{})
+	//	n.vm.GetGlobalVar()[parent] = parentLib
+	//}
+	//for k, v2 := range libs {
+	//	parentLib[k] = v2
+	//}
 }
 
 func (n *Engine) ImportLibs(libs map[string]interface{}) {
@@ -307,8 +311,8 @@ func (n *Engine) GetVar(name string) (interface{}, bool) {
 	return n.vm.GetVar(name)
 }
 
-func (n *Engine) SetVar(k string, v interface{}) {
-	n.vm.SetVar(k, v)
+func (n *Engine) SetVars(m map[string]any) {
+	n.vm.SetVars(m)
 }
 
 func (n *Engine) Compile(code string) ([]*yakvm.Code, error) {

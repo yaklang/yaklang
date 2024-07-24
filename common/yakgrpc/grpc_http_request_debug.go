@@ -73,7 +73,9 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVar("RUNTIME_ID", runtimeId)
+		engine.SetVars(map[string]any{
+			"RUNTIME_ID": runtimeId,
+		})
 		app := cli.DefaultCliApp
 		// 额外处理 cli，新建 cli app
 		if strings.ToLower(scriptType) == "yak" {
@@ -246,7 +248,9 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVar("RUNTIME_ID", runtimeId)
+		engine.SetVars(map[string]any{
+			"RUNTIME_ID": runtimeId,
+		})
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithContextCancel(cancel))
 		return nil
 	})

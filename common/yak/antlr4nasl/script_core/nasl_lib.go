@@ -1695,7 +1695,9 @@ func init() {
 				}
 			})
 			yakEngine := yaklang.New()
-			yakEngine.SetVar("params", args)
+			yakEngine.SetVars(map[string]any{
+				"params": args,
+			})
 			code := fmt.Sprintf("result = %s(params...)", methodName)
 			err := yakEngine.SafeEval(context.Background(), code)
 			if err != nil {

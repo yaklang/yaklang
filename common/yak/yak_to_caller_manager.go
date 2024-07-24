@@ -336,15 +336,17 @@ func (y *YakToCallerManager) SetForYakit(
 	}
 	db := consts.GetGormProjectDatabase()
 	return y.Set(ctx, code, func(engine *antlr4yak.Engine) error {
-		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, "default"))
-		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, "default"))
-		engine.SetVar("yakit_status", func(id string, i interface{}) {
-			FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
-				Id:   id,
-				Data: fmt.Sprint(i),
-			})
+		engine.OverrideRuntimeGlobalVariables(map[string]any{
+			"yakit_output": FeedbackFactory(db, caller, false, "default"),
+			"yakit_save":   FeedbackFactory(db, caller, true, "default"),
+			"yakit_status": func(id string, i interface{}) {
+				FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
+					Id:   id,
+					Data: fmt.Sprint(i),
+				})
+			},
+			"yakit": yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)),
 		})
-		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
 		return nil
 	}, hooks...)
 }
@@ -558,7 +560,9 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 func HookCliArgs(nIns *antlr4yak.Engine, tempArgs []string) *cli.CliApp {
 	app := cli.NewCliApp()
 	app.SetArgs(tempArgs)
-	nIns.GetVM().SetVar("cli", cli.GetCliExportMapByCliApp(app))
+	nIns.GetVM().SetVars(map[string]any{
+		"cli": cli.GetCliExportMapByCliApp(app),
+	})
 	return app
 	// nIns.GetVM().RegisterGlobalVariableFallback(h func(string) interface{})
 	// hook := func(f interface{}) interface{} {
@@ -1128,17 +1132,19 @@ func (y *YakToCallerManager) AddForYakit(
 	db := consts.GetGormProjectDatabase()
 	return y.Add(ctx, script, paramMap, code, func(engine *antlr4yak.Engine) error {
 		scriptName := script.ScriptName
-		engine.SetVar("RUNTIME_ID", y.runtimeId)
-		engine.SetVar("YAKIT_PLUGIN_ID", scriptName)
-		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, scriptName))
-		engine.SetVar("yakit_save", FeedbackFactory(db, caller, true, scriptName))
-		engine.SetVar("yakit_status", func(id string, i interface{}) {
-			FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
-				Id:   id,
-				Data: fmt.Sprint(i),
-			})
+		engine.OverrideRuntimeGlobalVariables(map[string]any{
+			"yakit":           yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)),
+			"RUNTIME_ID":      y.runtimeId,
+			"YAKIT_PLUGIN_ID": scriptName,
+			"yakit_output":    FeedbackFactory(db, caller, false, scriptName),
+			"yakit_save":      FeedbackFactory(db, caller, true, scriptName),
+			"yakit_status": func(id string, i interface{}) {
+				FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
+					Id:   id,
+					Data: fmt.Sprint(i),
+				})
+			},
 		})
-		engine.ImportSubLibs("yakit", yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)))
 		return nil
 	}, hooks...)
 }
@@ -1185,8 +1191,10 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 			engine = e
 		}
 
-		e.SetVar("MITM_PARAMS", paramMap)
-		e.SetVar("MITM_PLUGIN", id)
+		e.SetVars(map[string]any{
+			"MITM_PARAMS": paramMap,
+			"MITM_PLUGIN": id,
+		})
 
 		if hook != nil {
 			return hook(e)
@@ -1614,8 +1622,10 @@ func init() {
 
 		engineRoot := NewScriptEngine(1)
 		engineRoot.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-			engine.SetVar("scriptName", script.ScriptName)
-			engine.SetVar("param", utils.InterfaceToString(s))
+			engine.SetVars(map[string]any{
+				"scriptName": script.ScriptName,
+				"param":      utils.InterfaceToString(s),
+			})
 			return nil
 		})
 		engineRoot.HookOsExit()
