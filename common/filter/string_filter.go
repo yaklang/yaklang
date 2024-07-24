@@ -19,6 +19,7 @@ type StringFilter struct {
 	conf        *Config
 	manager     *FilterManager
 	lastUpdated int64
+	prefix      string
 }
 
 var DefaultFilterManager = NewFilterManager(12, 1<<15, 80)
