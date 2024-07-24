@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type VirtualFS struct {
@@ -42,7 +43,7 @@ func (f *VirtualFS) MkdirAll(path string, mode os.FileMode) error {
 	return nil
 }
 
-var _ FileSystem = (*VirtualFS)(nil)
+var _ fi.FileSystem = (*VirtualFS)(nil)
 
 func NewVirtualFs() *VirtualFS {
 	vs := &VirtualFS{
@@ -202,7 +203,7 @@ type VirtualFile struct {
 	index   int
 }
 
-func (f *VirtualFile) FS() FileSystem {
+func (f *VirtualFile) FS() fi.FileSystem {
 	return f.fs
 }
 

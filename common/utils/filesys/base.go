@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type embedFs struct {
@@ -25,7 +26,7 @@ func (f *embedFs) Ext(s string) string {
 	return getExtension(s)
 }
 
-var _ FileSystem = (*embedFs)(nil)
+var _ fi.FileSystem = (*embedFs)(nil)
 
 func (f *embedFs) ReadFile(name string) ([]byte, error) {
 	fn, err := f.f.Open(name)
@@ -60,11 +61,11 @@ func (f *embedFs) WriteFile(string, []byte, os.FileMode) error { return utils.Er
 func (f *embedFs) Delete(string) error                         { return utils.Error("implement me") }
 func (f *embedFs) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 
-func NewEmbedFS(fs embed.FS) FileSystem {
+func NewEmbedFS(fs embed.FS) fi.FileSystem {
 	return &embedFs{fs}
 }
 
-// local filesystem
+// local FileSystem
 type LocalFs struct {
 	cache *utils.CacheWithKey[string, *bytes.Buffer]
 }
@@ -83,7 +84,7 @@ func NewLocalFs() *LocalFs {
 	}
 }
 
-var _ FileSystem = (*LocalFs)(nil)
+var _ fi.FileSystem = (*LocalFs)(nil)
 
 func (f *LocalFs) ReadFile(name string) ([]byte, error) {
 	if f.cache == nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type dirResult struct {
@@ -21,27 +22,29 @@ type dirMatch struct {
 	opts []Option
 }
 
-type FileStat func(string, fs.FileInfo) error
-type DirStat func(string, fs.FileInfo) error
-type Config struct {
-	onStart      func(base string, isDir bool) error
-	onStat       func(isDir bool, pathname string, info os.FileInfo) error
-	onDirStat    DirStat
-	onFileStat   FileStat
-	onDirWalkEnd func(string) error
+type (
+	FileStat func(string, fs.FileInfo) error
+	DirStat  func(string, fs.FileInfo) error
+	Config   struct {
+		onStart      func(base string, isDir bool) error
+		onStat       func(isDir bool, pathname string, info os.FileInfo) error
+		onDirStat    DirStat
+		onFileStat   FileStat
+		onDirWalkEnd func(string) error
 
-	noStopWhenErr bool
+		noStopWhenErr bool
 
-	RecursiveDirectory bool
+		RecursiveDirectory bool
 
-	fileLimit  int64
-	dirLimit   int64
-	totalLimit int64
+		fileLimit  int64
+		dirLimit   int64
+		totalLimit int64
 
-	fileSystem FileSystem
+		fileSystem fi.FileSystem
 
-	dirMatch []*dirMatch
-}
+		dirMatch []*dirMatch
+	}
+)
 
 func NewConfig() *Config {
 	return &Config{
@@ -117,7 +120,7 @@ func WithDir(globDir string, opts ...Option) Option {
 	}
 }
 
-func WithFileSystem(f FileSystem) Option {
+func WithFileSystem(f fi.FileSystem) Option {
 	return func(config *Config) {
 		config.fileSystem = f
 	}

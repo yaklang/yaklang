@@ -5,6 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"path"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,11 +16,8 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"io"
-	"path"
-	"strings"
 )
 
 func Export() io.ReadCloser {
@@ -83,7 +84,7 @@ func CreateOrUpdateSyntaxFlow(hash string, i any) error {
 	return db.Model(&rule).Updates(i).Error
 }
 
-func ImportValidRule(system filesys.FileSystem, ruleName string, content string) error {
+func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
 	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	switch strings.TrimSpace(strings.ToLower(languageRaw)) {

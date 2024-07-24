@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memfile"
 )
 
@@ -132,7 +133,7 @@ func (z *ZipFS) Stat(name string) (fs.FileInfo, error) {
 	return v.FileInfo(), nil
 }
 
-var _ FileSystem = (*ZipFS)(nil)
+var _ fi.FileSystem = (*ZipFS)(nil)
 
 func (z *ZipFS) Clean(name string) string {
 	return zipPathClean(name)

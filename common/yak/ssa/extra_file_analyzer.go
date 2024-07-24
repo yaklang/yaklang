@@ -2,12 +2,12 @@ package ssa
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type ExtraFileAnalyzer interface {
 	EnableExtraFileAnalyzer() bool
-	ExtraFileAnalyze(filesys.FileSystem, *Program, string) error
+	ExtraFileAnalyze(fi.FileSystem, *Program, string) error
 }
 
 type Builder interface {
@@ -20,13 +20,12 @@ type Builder interface {
 
 var _ ExtraFileAnalyzer = &DummyExtraFileAnalyzer{}
 
-type DummyExtraFileAnalyzer struct {
-}
+type DummyExtraFileAnalyzer struct{}
 
 func (d *DummyExtraFileAnalyzer) EnableExtraFileAnalyzer() bool {
 	return false
 }
 
-func (d *DummyExtraFileAnalyzer) ExtraFileAnalyze(filesys.FileSystem, *Program, string) error {
+func (d *DummyExtraFileAnalyzer) ExtraFileAnalyze(fi.FileSystem, *Program, string) error {
 	return nil
 }

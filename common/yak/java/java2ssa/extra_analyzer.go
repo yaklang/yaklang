@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -16,7 +17,7 @@ func (*SSABuilder) EnableExtraFileAnalyzer() bool {
 	return true
 }
 
-func (s *SSABuilder) ExtraFileAnalyze(fileSystem filesys.FileSystem, prog *ssa.Program, base string) error {
+func (s *SSABuilder) ExtraFileAnalyze(fileSystem fi.FileSystem, prog *ssa.Program, base string) error {
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
 	}
