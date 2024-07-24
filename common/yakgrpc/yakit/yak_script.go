@@ -393,12 +393,24 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 
 	if params.Group != nil {
 		if params.Group.UnSetGroup {
-			db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
+			query := "script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups"
+			if params.Group.IsPocBuiltIn == "false" {
+				query += " WHERE is_poc_built_in = false"
+			} else if params.Group.IsPocBuiltIn == "true" {
+				query += " AND is_poc_built_in = true"
+			}
+			query += ")"
+			db = db.Not(query)
 		} else {
+			query := "yak_scripts.script_name IN (SELECT yak_script_name FROM plugin_groups WHERE `group` IN (?)"
+			if params.Group.IsPocBuiltIn == "false" {
+				query += " AND is_poc_built_in = false"
+			} else if params.Group.IsPocBuiltIn == "true" {
+				query += " AND is_poc_built_in = true"
+			}
+			query += ")"
 			if len(params.Group.Group) > 0 {
-				db = db.Where("yak_scripts.script_name in  (select yak_script_name from plugin_groups where `group` in (?) )", params.Group.Group)
-				// db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
-				// db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Group.Group)
+				db = db.Where(query, params.Group.Group)
 			}
 		}
 	}
