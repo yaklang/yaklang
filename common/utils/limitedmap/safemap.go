@@ -53,7 +53,7 @@ func (sm *SafeMap[T]) Append(l map[string]T) *SafeMap[T] {
 
 	// Merge all maps in the SafeMap chain
 	origin := sm
-	for origin != nil {
+	if origin != nil {
 		mergeMaps(origin.m)
 	}
 
