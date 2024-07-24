@@ -1245,3 +1245,15 @@ func (c OrType) PkgPathString() string {
 func (c OrType) RawString() string {
 	return strings.Join(lo.Map(c.types, func(t Type, _ int) string { return t.RawString() }), "|")
 }
+
+
+// ====================== Object type
+var ObjectTypes = map[string]*ObjectType{}
+
+func AddObject(name string, t *ObjectType) {
+	ObjectTypes[name] = t
+}
+
+func GetObjectByStr(name string) *ObjectType {
+	return ObjectTypes[name]
+}
