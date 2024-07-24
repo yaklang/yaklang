@@ -2,6 +2,7 @@ package yakvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
@@ -168,9 +169,10 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		}
 	}
 
-	for k, v := range vm.globalVar {
-		frame.GlobalVariables[k] = v
-	}
+	vm.globalVar.ForEach(func(_ *limitedmap.SafeMap[any], key string, value any) error {
+		frame.GlobalVariables[key] = value
+		return nil
+	})
 
 	vm.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)

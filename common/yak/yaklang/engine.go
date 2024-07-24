@@ -37,13 +37,14 @@ func NewAntlrEngine() *antlr4yak.Engine {
 		engine.EnableStrictMode()
 	}
 	engine.ImportLibs(yaklangLibs)
-	engine.ImportSubLibs("yakit", map[string]interface{}{
-		"AutoInitYakit": func() {
-			if client := yaklib.AutoInitYakit(); client != nil {
-				yaklib.SetEngineClient(engine, client)
-			}
-		},
-	})
+	engine.OverrideRuntimeGlobalVariables(map[string]any{
+		"yakit": map[string]interface{}{
+			"AutoInitYakit": func() {
+				if client := yaklib.AutoInitYakit(); client != nil {
+					yaklib.SetEngineClient(engine, client)
+				}
+			},
+		}})
 	yaklib.SetEngineClient(engine, yaklib.GetYakitClientInstance())
 	return engine
 }

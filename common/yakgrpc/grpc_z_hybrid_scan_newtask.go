@@ -352,15 +352,24 @@ func ScanHybridTargetWithPlugin(
 	ctx, cancel := context.WithCancel(ctx)
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVar("RUNTIME_ID", runtimeId)
+		engine.SetVars(map[string]any{
+			"RUNTIME_ID":    runtimeId,
+			"REQUEST":       target.Request,
+			"RESPONSE":      target.Response,
+			"HTTPS":         target.IsHttps,
+			"PLUGIN":        plugin,
+			"CTX":           ctx,
+			"CALLER_FILTER": callerFilter,
+			"PROXY":         proxy,
+		})
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx).WithContextCancel(cancel))
-		engine.SetVar("REQUEST", target.Request)
-		engine.SetVar("RESPONSE", target.Response)
-		engine.SetVar("HTTPS", target.IsHttps)
-		engine.SetVar("PLUGIN", plugin)
-		engine.SetVar("CTX", ctx)
-		engine.SetVar("CALLER_FILTER", callerFilter)
-		engine.SetVar("PROXY", proxy)
+		//engine.SetVars("REQUEST", target.Request)
+		//engine.SetVars("RESPONSE", target.Response)
+		//engine.SetVars("HTTPS", target.IsHttps)
+		//engine.SetVars("PLUGIN", plugin)
+		//engine.SetVars("CTX", ctx)
+		//engine.SetVars("CALLER_FILTER", callerFilter)
+		//engine.SetVars("PROXY", proxy)
 		return nil
 	})
 	err := engine.ExecuteWithContext(ctx, execTargetWithPluginScript)

@@ -384,7 +384,9 @@ func (engine *ScriptEngine) DescriptionExec(code, name string) (*NaslScriptInfo,
 	ctx.ScriptObj.OriginFileName = name
 	ctx.ScriptObj.Script = code
 	e := engine.NewExecEngine(ctx)
-	e.SetVar("description", true)
+	e.SetVars(map[string]any{
+		"description": true,
+	})
 	err := e.Exec(code, name)
 	if err != nil {
 		return nil, err

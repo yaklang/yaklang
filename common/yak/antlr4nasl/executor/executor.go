@@ -63,7 +63,8 @@ func NewWithContext() *Executor {
 			c.SetStopPosition(end.GetLine(), end.GetColumn())
 		}
 	})
-	vm.SetVar("__method_proxy__", func(params [][]interface{}) interface{} {
+	m := make(map[string]any)
+	m["__method_proxy__"] = func(params [][]interface{}) interface{} {
 		var funName string
 		if params != nil && len(params) > 0 && len(params[0]) == 1 {
 			if v, ok := params[0][0].(int); ok {
@@ -88,28 +89,27 @@ func NewWithContext() *Executor {
 			panic(fmt.Sprintf("not found buildin method %s", funName))
 		}
 		return fn(naslParams)
-		//panic("call build in method error: not found symbol id")
-	})
-	vm.SetVar("__OpCallCallBack__", func(name string) {
+	}
+	m["__OpCallCallBack__"] = func(name string) {
 		// 做一些函数调试的工作
 		if name == "http_recv_headers2" {
 			print()
 		}
-	})
-	vm.SetVar("__nasl_global_var_table", make(map[int]*yakvm.Value))
-	vm.SetVar("__function__include", func(name string) (interface{}, error) {
+	}
+	m["__nasl_global_var_table"] = make(map[int]*yakvm.Value)
+	m["__function__include"] = func(name string) (interface{}, error) {
 		if !strings.HasSuffix(name, ".inc") {
 			panic(fmt.Sprintf("include file name must end with .inc"))
 		}
 		return nil, executor.EvalInclude(name)
-	})
-	vm.SetVar("__function__assert", func(n int, msg string) (interface{}, error) {
+	}
+	m["__function__assert"] = func(n int, msg string) (interface{}, error) {
 		b := n != 0
 		if !b {
 			panic(msg)
 		}
 		return nil, nil
-	})
+	}
 	vm.ImportLibs(lib.NaslBuildInNativeMethod)
 	executor.ImportLibs(lib.NaslBuildInNativeMethod)
 	executor.ImportLibs(lib.BuildInVars)

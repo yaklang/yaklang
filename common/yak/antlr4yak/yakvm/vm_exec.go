@@ -342,7 +342,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		switch v.vm.GetConfig().vmMode {
 		case NASL:
 			if c.Op1 != nil && c.Op1.IsString() && c.Op1.String() == "nasl_global_declare" {
-				table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+				table, err := v.vm.GetNaslGlobalVarTable()
+				if err != nil {
+					log.Error(err)
+					return
+				}
 				valId := v.pop()
 				v1, ok := v.CurrentScope().GetValueByID(valId.SymbolId)
 				table[valId.SymbolId] = v1
@@ -363,7 +367,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			arg1 := v.pop()
 
 			if arg1.IsLeftValueRef() {
-				table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+				table, err := v.vm.GetNaslGlobalVarTable()
+				if err != nil {
+					log.Error(err)
+					return
+				}
 				if _, ok := table[arg1.SymbolId]; ok {
 					table[arg1.SymbolId] = arg2
 					v.push(arg2)
@@ -384,7 +392,11 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						val := GetNaslValueBySymbolId(v1[0].SymbolId, v)
 						if val.Value == nil {
 							array := NewAutoValue(nasl_type.NewEmptyNaslArray())
-							table := v.vm.globalVar["__nasl_global_var_table"].(map[int]*Value)
+							table, err := v.vm.GetNaslGlobalVarTable()
+							if err != nil {
+								log.Error(err)
+								return
+							}
 							table[v1[0].SymbolId] = array
 							//v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
 							val = array

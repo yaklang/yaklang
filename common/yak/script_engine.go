@@ -509,10 +509,11 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	engine.SetDebugCallback(e.debugCallback)
 	engine.SetDebugInit(e.debugInit)
 
-	engine.SetVar("id", id)
-	engine.SetVar("YAK_MAIN", false)
-	engine.SetVar("YAK_FILENAME", "")
-	engine.SetVar("YAK_DIR", "")
+	vars := make(map[string]any)
+	vars["id"] = id
+	vars["YAK_MAIN"] = false
+	vars["YAK_FILENAME"] = ""
+	vars["YAK_DIR"] = ""
 
 	// 设置参数获取函数
 	paramGetter := func(key string) interface{} {
@@ -531,28 +532,29 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	if ok {
 		res, _ := yakMainFlag.(bool)
 		if res {
-			engine.SetVar("YAK_MAIN", true)
+			vars["YAK_MAIN"] = true
 		}
 	}
 
 	yakAbsFile, _ := params["YAK_FILENAME"]
 	if yakAbsFile != nil {
 		engine.SetSourceFilePath(fmt.Sprint(yakAbsFile))
-		engine.SetVar("YAK_FILENAME", fmt.Sprint(yakAbsFile))
-		engine.SetVar("YAK_DIR", filepath.Dir(fmt.Sprint(yakAbsFile)))
+		vars["YAK_FILENAME"] = fmt.Sprint(yakAbsFile)
+		vars["YAK_DIR"] = filepath.Dir(fmt.Sprint(yakAbsFile))
 	}
 
 	// getParam 和 param 获取参数内容
-	engine.SetVar("getParam", paramGetter)
-	engine.SetVar("getParams", paramGetter)
-	engine.SetVar("param", paramGetter)
+	vars["getParam"] = paramGetter
+	vars["getParams"] = paramGetter
+	vars["param"] = paramGetter
+
 	yakFileAbsPath := "temporay_script.yak"
 	if yakAbsFile != nil {
 		yakFileAbsPath = fmt.Sprint(yakAbsFile)
 	}
 	*e.logger = yaklib.CreateYakLogger(yakFileAbsPath)
 	logger := *e.logger
-	engine.SetVar("log", map[string]interface{}{
+	vars["log"] = map[string]interface{}{
 		"info":     logger.Infof,
 		"setLevel": logger.SetLevel,
 		"debug":    logger.Debugf,
@@ -564,7 +566,9 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		"Debug":    logger.Debugf,
 		"Warn":     logger.Warnf,
 		"Error":    logger.Errorf,
-	}) // 设置 log 库
+	}
+	engine.SetVars(vars)
+
 	(*e.logger).SetEngine(engine)
 	var client *yaklib.YakitClient
 	if e.client != nil {
@@ -737,9 +741,7 @@ func Execute(code string, params ...map[string]any) (*antlr4yak.Engine, error) {
 	engine := NewScriptEngine(1)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		if mergedParams != nil {
-			for k, v := range mergedParams {
-				engine.SetVar(k, v)
-			}
+			engine.SetVars(mergedParams)
 		}
 		return nil
 	})
