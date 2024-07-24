@@ -40,7 +40,7 @@ func (e *Engine) RuntimeInfo(infoType string, params ...any) (res any, err error
 		return nil, fmt.Errorf("not found runtime.GetInfo")
 	}
 	runtimeLib, ok := frame.(*yakvm.Frame).GlobalVariables.Load("runtime")
-	if ok || runtimeLib == nil {
+	if !ok || runtimeLib == nil {
 		return nil, fmt.Errorf("current frame not import runtime lib")
 	}
 	getInfoFun := runtimeLib.(map[string]any)["GetInfo"]
