@@ -81,7 +81,7 @@ func init() {
 						continue
 
 					}
-					if res == nil || res.Type == "yak" || res.Type == "codec" {
+					if res == nil {
 						continue
 					}
 
@@ -163,15 +163,12 @@ func GroupCount(db *gorm.DB) (req []*TagAndTypeValue, err error) {
 }
 
 func GetGroup(db *gorm.DB, scriptNames []string) (req []*schema.PluginGroup, err error) {
-	db = db.Model(&schema.PluginGroup{}).Select(" `group`")
+	db = db.Model(&schema.PluginGroup{}).Select(" DISTINCT(`group`)")
 	if len(scriptNames) > 0 {
 		db = db.Joins("inner join yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 		db = bizhelper.ExactQueryStringArrayOr(db, "plugin_groups.yak_script_name", scriptNames)
 		db = db.Group(" `group` ").Having("COUNT(DISTINCT yak_script_name) = ?", len(scriptNames))
 		db = db.Scan(&req)
-	} else {
-		db = db.Joins("inner join yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
-		db = db.Group(" `group` ").Scan(&req)
 	}
 	if db.Error != nil {
 		return nil, utils.Errorf("GetGroup failed: %s", db.Error)
@@ -190,9 +187,8 @@ func DeletePluginGroupByScriptName(db *gorm.DB, scriptName []string) error {
 }
 
 func QueryGroupCount(db *gorm.DB, excludeType []string) (req []*TagAndTypeValue, err error) {
-	db = db.Model(&schema.PluginGroup{}).Select(" `group` as value, count(*) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
-	db = db.Joins("INNER JOIN yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
-	//db = db.Where("yak_script_name IN (SELECT DISTINCT(script_name) FROM yak_scripts)")
+	db = db.Model(&schema.PluginGroup{}).Select(" `group` as value, COUNT(Y.script_name) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
+	db = db.Joins("LEFT JOIN yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "Y.type", excludeType)
 	db = db.Group(" `group`,`temporary_id`,`is_poc_built_in` ").Order(`count desc`).Scan(&req)
 	if db.Error != nil {
