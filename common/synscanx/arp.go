@@ -39,7 +39,8 @@ func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
 	s.macCacheTable.Store(ip.String(), hw)
 }
 
-func (s *Scannerx) arpScan() {
+// getInterfaceNetworks 获取网络接口的 IPv4 和 IPv6 网络范围
+func (s *Scannerx) getInterfaceNetworks() (*net.IPNet, *net.IPNet) {
 	addrs, _ := s.config.Iface.Addrs()
 
 	var ifaceIPNetV4 *net.IPNet
@@ -56,18 +57,29 @@ func (s *Scannerx) arpScan() {
 			ifaceIPNetV6 = ipNet
 		}
 	}
+
+	return ifaceIPNetV4, ifaceIPNetV6
+}
+
+// isInternalAddress 判断目标 IP 是否为内网地址
+func (s *Scannerx) isInternalAddress(target string, ifaceIPNetV4, ifaceIPNetV6 *net.IPNet) bool {
+	targetIP := net.ParseIP(target)
+	if targetIP == nil || targetIP.IsLoopback() || targetIP.IsLinkLocalUnicast() || targetIP.IsLinkLocalMulticast() {
+		return false
+	}
+	return (targetIP.To4() != nil && ifaceIPNetV4 != nil && ifaceIPNetV4.Contains(targetIP)) ||
+		(targetIP.To16() != nil && ifaceIPNetV6 != nil && ifaceIPNetV6.Contains(targetIP))
+}
+
+func (s *Scannerx) arpScan() {
+	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
 	for target := range s.hosts.Hosts() {
 		s.rateLimit()
 		select {
 		case <-s.ctx.Done():
 			return
 		default:
-			targetIP := net.ParseIP(target)
-			if targetIP == nil || targetIP.IsLoopback() || targetIP.IsLinkLocalUnicast() || targetIP.IsLinkLocalMulticast() {
-				continue
-			}
-			if (targetIP.To4() != nil && ifaceIPNetV4 != nil && ifaceIPNetV4.Contains(targetIP)) ||
-				(targetIP.To16() != nil && ifaceIPNetV6 != nil && ifaceIPNetV6.Contains(targetIP)) {
+			if s.isInternalAddress(target, ifaceIPNetV4, ifaceIPNetV6) {
 				s.arp(target)
 			}
 		}
