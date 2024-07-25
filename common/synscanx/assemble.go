@@ -70,7 +70,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 		pcapx.WithTCP_DstPort(port),
 		pcapx.WithTCP_Flags(pcapx.TCP_FLAG_SYN),
 		pcapx.WithTCP_Window(1024),
-		pcapx.WithTCP_Options(layers.TCPOptionKindMSS, []byte{5, 0xb4}),
+		//pcapx.WithTCP_Options(layers.TCPOptionKindMSS, []byte{5, 0xb4}),
 		pcapx.WithTCP_Seq(500000+rand.Intn(10000)),
 	)
 
