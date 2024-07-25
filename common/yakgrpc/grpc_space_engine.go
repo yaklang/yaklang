@@ -275,10 +275,11 @@ var spaceEngineExecCode string
 func (s *Server) FetchPortAssetFromSpaceEngine(req *ypb.FetchPortAssetFromSpaceEngineRequest, stream ypb.Yak_FetchPortAssetFromSpaceEngineServer) error {
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	runtimeId := uuid.New().String()
-	engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+	client := yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
 		i.RuntimeID = runtimeId
 		return stream.Send(i)
-	}))
+	})
+	engine := yak.NewYakitVirtualClientScriptEngine(client)
 	stream.Send(&ypb.ExecResult{
 		RuntimeID: runtimeId,
 	})
@@ -305,7 +306,10 @@ func (s *Server) FetchPortAssetFromSpaceEngine(req *ypb.FetchPortAssetFromSpaceE
 			engine,
 			yak.CreateYakitPluginContext(runtimeId).
 				WithPluginName(`space-engine`).
-				WithProxy(req.GetProxy()).WithContext(streamCtx).WithContextCancel(cancel),
+				WithProxy(req.GetProxy()).
+				WithContext(streamCtx).
+				WithContextCancel(cancel).
+				WithYakitClient(client),
 		)
 		return nil
 	})
