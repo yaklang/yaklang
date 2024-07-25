@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
@@ -24,7 +25,17 @@ func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*Recursi
 		value := item.RecursiveConfigItemValue().(*sf.RecursiveConfigItemValueContext)
 		if rule := value.FilterStatement(); rule != nil {
 			configItem.SyntaxFlowRule = true
-			configItem.Value = rule.GetText()
+
+			{
+				start := rule.GetStart()
+				end := rule.GetStop()
+				input := rule.GetStart().GetInputStream()
+				text := input.GetTextFromInterval(antlr.NewInterval(
+					start.GetStart(), end.GetStop(),
+				))
+				configItem.Value = text
+			}
+
 		} else {
 			configItem.Value = value.GetText()
 		}
