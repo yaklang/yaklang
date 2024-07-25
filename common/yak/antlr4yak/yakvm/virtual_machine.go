@@ -49,9 +49,7 @@ type (
 		debugger      *Debugger
 		BreakPoint    []BreakPointFactoryFun
 		ThreadIDCount uint64
-		//
-		yakitFeedbacker YakitFeedbacker
-		config          *VirtualMachineConfig
+		config        *VirtualMachineConfig
 		// map[sha1(caller, callee)]func(any)any
 		hijackMapMemberCallHandlers sync.Map
 		globalVarFallback           func(string) interface{}
@@ -68,10 +66,6 @@ func (n *VirtualMachine) RegisterMapMemberCallHandler(caller, callee string, h f
 
 func (n *VirtualMachine) RegisterGlobalVariableFallback(h func(string) interface{}) {
 	n.globalVarFallback = h
-}
-
-func (n *VirtualMachine) SetYaiktFeedbacker(i YakitFeedbacker) {
-	n.yakitFeedbacker = i
 }
 
 func (v *VirtualMachine) AddBreakPoint(fun BreakPointFactoryFun) {
@@ -192,14 +186,11 @@ func (n *VirtualMachine) GetNaslGlobalVarTable() (map[int]*Value, error) {
 }
 
 func (n *VirtualMachine) GetVarWithoutFrame(name string) (any, bool) {
+	if !n.runtimeGlobalVar.Existed(n.globalVar) {
+		n.runtimeGlobalVar.SetPred(n.globalVar)
+	}
 	// 和引擎绑定的用于覆盖 global var 的 fake lib 层
 	var_, ok := n.runtimeGlobalVar.Load(name)
-	if ok {
-		return var_, true
-	}
-
-	// 如果不存在，根也找不到，那么就直接全局找
-	var_, ok = n.globalVar.Load(name)
 	if ok {
 		return var_, true
 	}
@@ -221,14 +212,16 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 		if ok {
 			return val.Value, true
 		}
-	} else {
-		// ivm 存在的时候，从 frame 中找变量
-		val, ok := ivm.(*Frame).CurrentScope().GetValueByName(name)
-		if ok {
-			return val.Value, true
-		}
+		return n.GetVarWithoutFrame(name)
 	}
-	return n.GetVarWithoutFrame(name)
+
+	// ivm 存在的时候，从 frame 中找变量
+	frame := ivm.(*Frame)
+	val, ok := frame.CurrentScope().GetValueByName(name)
+	if ok {
+		return val.Value, true
+	}
+	return frame.GlobalVariables.Load(name)
 }
 
 func (n *VirtualMachine) GetGlobalVar() *limitedmap.SafeMap {
