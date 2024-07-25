@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -13,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -199,6 +201,8 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				log.Errorf("check socks5 handle shake failed: %s", err)
 				return
 			}
+			isTls := firstByte == 0x16
+
 			defer func() {
 				removeConns(uidStr, handledConnection)
 			}()
@@ -228,13 +232,42 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 server reply failed: %v", err)
 					return
 				}
-				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(string(req.DstHost), req.DstPort))
-				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, host)
-				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, host)
+				dstPort := binary.BigEndian.Uint16(req.DstPort)
+				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(string(req.DstHost), dstPort))
+				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, string(req.DstHost))
+				subCtx = context.WithValue(subCtx, S5_CONNECT_PORT, strconv.Itoa(int(dstPort)))
+				handledConnection, isTls, err = IsTlsHandleShake(handledConnection)
+				if err != nil {
+					log.Errorf("check tls handle shake failed: %s", err)
+					return
+				}
 			}
-			p.handleLoop(firstByte == 0x16, handledConnection, subCtx)
+			p.handleLoop(isTls, handledConnection, subCtx)
 		}(uid, conn)
 	}
+}
+
+func IsTlsHandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ error) {
+	peekable := utils.NewPeekableNetConn(conn)
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Infof("peekable failed: %s", err)
+			fConn = peekable
+		}
+	}()
+
+	raw, err := peekable.Peek(2)
+	if err != nil {
+		if err == io.EOF {
+			return peekable, false, nil
+		}
+		return nil, false, utils.Errorf("peek failed: %s", err)
+	}
+	if len(raw) != 2 {
+		return nil, false, utils.Errorf("check s5 failed: %v", raw)
+	}
+	return peekable, raw[0] == 0x16, nil
 }
 
 var cachedTLSConfig *tls.Config
@@ -283,22 +316,6 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 		}
 	}()
 
-	/* TLS */
-	if isTLSConn {
-		conn = tls.Server(conn, p.mitm.TLSForHost("127.0.0.1", false))
-		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
-			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
-			if err != nil {
-				log.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
-				return
-			}
-			conn = tlsConn
-		}
-		p.handleLoop(false, conn, rootCtx)
-		return
-	}
-
-	/* handle cleaning proxy! */
 	brw := bufio.NewReadWriter(bufio.NewReader(ctxio.NewReader(rootCtx, conn)), bufio.NewWriter(ctxio.NewWriter(rootCtx, conn)))
 	s, err := newSession(conn, brw)
 	if err != nil {
@@ -316,16 +333,82 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 	// s5 proxy needs to have higher priority than http proxy
 	if s5ProxyAddr, ok := rootCtx.Value(S5_CONNECT_ADDR).(string); ok && s5ProxyAddr != "" {
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, s5ProxyAddr)
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, rootCtx.Value(S5_CONNECT_HOST).(string))
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, rootCtx.Value(S5_CONNECT_PORT).(string))
+		if s5ProxyHost, ok := rootCtx.Value(S5_CONNECT_HOST).(string); ok && s5ProxyHost != "" {
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, rootCtx.Value(S5_CONNECT_HOST).(string))
+		}
+		if s5ProxyPort, ok := rootCtx.Value(S5_CONNECT_PORT).(string); ok && s5ProxyPort != "" {
+			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, rootCtx.Value(S5_CONNECT_PORT).(string))
+		}
 		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol, "socks5")
 		ctx.Session().Set(AUTH_FINISH, true)
 	}
 
+	/* TLS */
+	if isTLSConn {
+		ctx.Session().MarkSecure()
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
+		var serverUseH2 bool
+		if p.http2 {
+			// does remote server use h2?
+			var proxyStr string
+			if p.proxyURL != nil {
+				proxyStr = p.proxyURL.String()
+			}
+
+			// Check the cache first.
+			cacheKey := utils.HostPort(ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost), ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort))
+			if cached, ok := p.h2Cache.Load(cacheKey); ok {
+				log.Infof("use cached h2 %v", cacheKey)
+				serverUseH2 = cached.(bool)
+			} else {
+				// TODO: should connect every connection?
+				netConn, _ := netx.DialX(
+					cacheKey,
+					netx.DialX_WithTimeout(10*time.Second),
+					netx.DialX_WithProxy(proxyStr),
+					netx.DialX_WithForceProxy(proxyStr != ""),
+					netx.DialX_WithTLSNextProto("h2"),
+					netx.DialX_WithTLS(true),
+				)
+				if netConn != nil {
+					switch ret := netConn.(type) {
+					case *tls.Conn:
+						if ret.ConnectionState().NegotiatedProtocol == "h2" {
+							serverUseH2 = true
+						}
+					}
+					netConn.Close()
+				}
+
+				// Store the result in the cache.
+				p.h2Cache.Store(cacheKey, serverUseH2)
+			}
+		}
+		conn = tls.Server(conn, p.mitm.TLSForHost("127.0.0.1", p.http2 && serverUseH2))
+		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
+			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
+			if err != nil {
+				log.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
+				return
+			}
+			if tlsConn.ConnectionState().NegotiatedProtocol == "h2" {
+				err := p.proxyH2(p.closing, tlsConn, nil, ctx)
+				if err != nil {
+					log.Errorf("mitm proxy h2 failed: %v", err)
+				}
+				return
+			}
+			brw.Writer.Reset(tlsConn)
+			brw.Reader.Reset(tlsConn)
+			conn = tlsConn
+		}
+	}
+
+	/* handle cleaning proxy! */
+
 	timerInterval := time.Second * 10
 	var timer *time.Timer
 	for {
-
 		conn.SetDeadline(time.Time{})
 		log.Debugf("waiting conn: %v", conn.RemoteAddr())
 		err := p.handle(ctx, timer, conn, brw)
@@ -487,7 +570,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		nextProto := tlsconn.ConnectionState().NegotiatedProtocol
 		log.Debugf("connect from browser: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
 		if nextProto == "h2" {
-			return p.proxyH2(p.closing, tlsconn, req.URL)
+			return p.proxyH2(p.closing, tlsconn, req.URL, ctx)
 		}
 
 		brw.Writer.Reset(tlsconn)
