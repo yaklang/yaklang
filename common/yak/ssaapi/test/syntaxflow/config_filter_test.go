@@ -1,8 +1,9 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestSF_Config_Filter(t *testing.T) {
@@ -15,6 +16,18 @@ func TestSF_Config_Filter(t *testing.T) {
 			"a* -{until:`* ?{opcode:const} `}-> * as $result",
 			map[string][]string{
 				"result": {"1"},
+			})
+	})
+
+	t.Run("test rule text", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a = 11
+		b = f(a,1)
+		b= 22
+		`,
+			"b #{hook:`* as $num`}-> as $result",
+			map[string][]string{
+				"num": {"1", "11", "22", "Undefined-f", "Undefined-f(11,1)"},
 			})
 	})
 
