@@ -266,14 +266,6 @@ func (cs *http2ClientStream) doRequest() error {
 	}
 
 	addH2Header(":authority", "") // 占位
-	if connectedPort := httpctx.GetContextIntInfoFromRequest(cs.req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
-		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
-		if !portValid {
-			if host := httpctx.GetContextStringInfoFromRequest(cs.req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
-				addH2Header(":authority", utils.HostPort(host, portValid))
-			}
-		}
-	}
 
 	var hPackBuf bytes.Buffer
 	hPackEnc := hpack.NewEncoder(&hPackBuf)
@@ -298,7 +290,6 @@ func (cs *http2ClientStream) doRequest() error {
 			value := strings.TrimLeft(result[1], " ")
 			switch key {
 			case "host": // :authority
-
 				for index, h := range requestHeaders {
 					if h.Name == ":authority" {
 						requestHeaders[index].Value = value
