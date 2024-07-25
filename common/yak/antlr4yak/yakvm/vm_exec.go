@@ -3,19 +3,18 @@ package yakvm
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
-	"reflect"
-	"strconv"
-	"strings"
-	"sync/atomic"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
+	"reflect"
+	"strconv"
+	"strings"
+	"sync/atomic"
 )
 
 type ExitCodeType int
@@ -2065,6 +2064,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					return
 				}
 			default:
+				if findGolangBuiltinMemberMethod() {
+					return
+				}
 			}
 			panic(fmt.Sprintf("cannot find built-in method %s of %s type", memberName, callerTypeName))
 			// v.push(undefined)
