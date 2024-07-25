@@ -81,30 +81,55 @@ func WithModes(modes ...int) ConfigOption {
 	}
 }
 
+// recursive 是一个选项参数，设置是否递归扫描子域名，如果不递归扫描，那么只会扫描一层子域名，默认为false
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.recursive(true))
+// ```
 func WithAllowToRecursive(b bool) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.AllowToRecursive = b
 	}
 }
 
+// workerConcurrent 是一个选项参数，设置总的工作线程数量，默认为 50
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.workerConcurrent(10))
+// ```
 func WithWorkerCount(c int) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.WorkerCount = c
 	}
 }
 
+// dnsServer 是一个选项参数，设置用于解析域名的 DNS 服务器，默认为 114.114.114.114 和 8.8.8.8
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.dnsServer("1.1.1.1"))
+// ```
 func WithDNSServers(servers []string) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.DNSServers = servers
 	}
 }
 
+// maxDepth 是一个选项参数，设置子域名遍历的最大深度，默认为 5，通常与 recursive 一起使用
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.maxDepth(10), subdomain.recursive(true))
+// ```
 func WithMaxDepth(d int) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.MaxDepth = d
 	}
 }
 
+// targetConcurrent 是一个选项参数，设置每个目标的最大线程数量，默认为 10
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.targetConcurrent(5))
+// ```
 func WithParallelismTasksCount(c int) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.ParallelismTasksCount = c
@@ -123,6 +148,7 @@ func WithMainDictionary(raw []byte) ConfigOption {
 	}
 }
 
+// recursiveDict
 func WithSubDictionary(raw []byte) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.SubDictionary = raw
@@ -135,6 +161,11 @@ func WithTimeoutForEachQuery(timeout time.Duration) ConfigOption {
 	}
 }
 
+// wildcardToStop 是一个选项参数，遇到泛解析的情况，是否马上停止解析，默认为 false
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.wildcardToStop(true))
+// ```
 func WithWildCardToStop(t bool) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.WildCardToStop = t
