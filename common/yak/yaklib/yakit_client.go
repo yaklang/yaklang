@@ -32,7 +32,7 @@ func YakitOutputToExecResult(i interface{}) *ypb.ExecResult {
 	case *ypb.ExecResult:
 		return ret
 	default:
-		log.Warn("YakitOutputToExecResult unknown type: %v", i)
+		log.Warnf("YakitOutputToExecResult unknown type: %T", i)
 	}
 	return nil
 }
