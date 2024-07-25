@@ -213,10 +213,9 @@ func (n *Engine) LoadCode(ctx context.Context, code string, table map[string]int
 func (n *Engine) GetFntable() map[string]any {
 	g := n.vm.GetGlobalVar()
 	r := n.vm.GetRuntimeGlobalVar()
-	runtimeRoot := r.GetRoot()
-	runtimeRoot.SetPred(g)
-	results := runtimeRoot.Flat()
-	runtimeRoot.Unlink(g)
+	r.SetPred(g)
+	results := r.Flat()
+	r.Unlink(g)
 	return results
 }
 
