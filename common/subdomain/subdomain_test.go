@@ -1,10 +1,13 @@
 package subdomain
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestNewSubdomainScanner(t *testing.T) {
 	scanner, err := NewSubdomainScanner(NewSubdomainScannerConfig(
-		WithDNSServers([]string{"10.3.0.3"}),
+		// WithDNSServers([]string{""}),
+		WithModes(SEARCH),
 	))
 	if err != nil {
 		t.Logf("build subdomain scanner failed: %s", err)
@@ -20,8 +23,7 @@ func TestNewSubdomainScanner(t *testing.T) {
 
 	err = scanner.Run()
 	if err != nil {
-		t.Logf("scan subdomain failed: %s", err)
-		t.FailNow()
+		t.Fatalf("scan subdomain failed: %s", err)
 	}
 
 	if !flag {

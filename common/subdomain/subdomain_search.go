@@ -12,10 +12,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
-type SearchRequestBuilder func(target string) (*http.Request, error)
-type SearchAction func(ctx context.Context, target string) ([]*SubdomainResult, error)
+type (
+	SearchRequestBuilder func(target string) (url string, reqRaw []byte, options []poc.PocConfigOption, err error)
+	SearchAction         func(ctx context.Context, target string) ([]*SubdomainResult, error)
+)
 
 func timeoutFromContext(ctx context.Context, timeout time.Duration) time.Duration {
 	ddl, ok := ctx.Deadline()
@@ -24,6 +30,7 @@ func timeoutFromContext(ctx context.Context, timeout time.Duration) time.Duratio
 	}
 	return timeout
 }
+
 func virustotalVisit(ctx context.Context, url string) (result []string, err error) {
 	var m struct {
 		Data []struct {
@@ -87,45 +94,50 @@ var (
 	// https://searchdns.netcraft.com/?restriction=site+ends+with&host=%s 需要解析页面，处理分页
 
 	// https://api.hackertarget.com/hostsearch/?q=%s
-	HackerTarget SearchRequestBuilder = func(target string) (*http.Request, error) {
+	HackerTarget SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
 		url := fmt.Sprintf("https://api.hackertarget.com/hostsearch/?q=%s", target)
-		return http.NewRequest("GET", url, nil)
+		packet := lowhttp.UrlToRequestPacket("GET", fmt.Sprintf("https://api.hackertarget.com/hostsearch/?q=%s", target), nil, true)
+		return url, packet, nil, nil
 	}
 
 	// http://ce.baidu.com/index/getRelatedSites?site_address=%s
-	BaiduCe SearchRequestBuilder = func(target string) (request *http.Request, e error) {
+	BaiduCe SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
 		url := fmt.Sprintf("http://ce.baidu.com/index/getRelatedSites?site_address=%s", target)
-		return http.NewRequest("GET", url, nil)
+		packet := lowhttp.UrlToRequestPacket("GET", url, nil, true)
+		return url, packet, nil, nil
 	}
 
 	// https://api.sublist3r.com/search.php?domain=%s
-	Sublist3r SearchRequestBuilder = func(target string) (request *http.Request, e error) {
+	Sublist3r SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
 		url := fmt.Sprintf("https://api.sublist3r.com/search.php?domain=%s", target)
-		return http.NewRequest("GET", url, nil)
+		packet := lowhttp.UrlToRequestPacket("GET", url, nil, true)
+		return url, packet, nil, nil
 	}
 
 	// https://crt.sh/?q=%25.%s
-	CrtSh SearchRequestBuilder = func(target string) (request *http.Request, e error) {
+	CrtSh SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
 		url := fmt.Sprintf("https://crt.sh/?q=%%25.%s", target)
-		return http.NewRequest("GET", url, nil)
+		packet := lowhttp.UrlToRequestPacket("GET", url, nil, true)
+		return url, packet, nil, nil
 	}
 
 	// https://api.certspotter.com/v1/issuances
-	CertsPotter SearchRequestBuilder = func(target string) (request *http.Request, e error) {
-		u, _ := url.Parse("https://api.certspotter.com/v1/issuances")
+	CertsPotter SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
+		u := utils.ParseStringToUrl("https://api.certspotter.com/v1/issuances")
 		u.RawQuery = url.Values{
 			"domain":             {target},
 			"include_subdomains": {"true"},
 			"match_wildcards":    {"true"},
 			"expand":             {"dns_names"},
 		}.Encode()
-		return http.NewRequest("GET", u.String(), nil)
+		packet := lowhttp.UrlToRequestPacket("GET", u.String(), nil, true)
+		return u.String(), packet, nil, nil
 	}
 
 	// https://ctsearch.entrust.com/api/v1/certificates
 	// /u003d需要被特殊处理
-	Entrust SearchRequestBuilder = func(target string) (request *http.Request, e error) {
-		u, _ := url.Parse("https://ctsearch.entrust.com/api/v1/certificates")
+	Entrust SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
+		u := utils.ParseStringToUrl("https://ctsearch.entrust.com/api/v1/certificates")
 		u.RawQuery = url.Values{
 			"fields":         {"subjectO,issuerDN,subjectDN,signAlg,san,sn,subjectCNReversed,cert"},
 			"domain":         {target},
@@ -133,7 +145,8 @@ var (
 			"exactMatch":     {"false"},
 			"limit":          {"5000"},
 		}.Encode()
-		return http.NewRequest("GET", u.String(), nil)
+		packet := lowhttp.UrlToRequestPacket("GET", u.String(), nil, true)
+		return u.String(), packet, nil, nil
 	}
 
 	// https://www.virustotal.com/gui/domain/%s/relations
@@ -157,60 +170,52 @@ var (
 	}
 
 	GeneralAction SearchAction = func(ctx context.Context, target string) (result []*SubdomainResult, e error) {
-		client := http.Client{
-			Transport: &http.Transport{TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-				MaxVersion:         tls.VersionTLS13,
-			}},
-			Timeout: timeoutFromContext(ctx, 15*time.Second),
-		}
 		wg := sync.WaitGroup{}
 		wg.Add(len(SearchSource))
 
 		var results sync.Map
 		for _, source := range SearchSource {
-			req, err := source(target)
+			url, reqRaw, options, err := source(target)
 			if err != nil {
-				//log.Warnf("%s", err)
+				// log.Warnf("%s", err)
 				continue
 			}
-			go func(request *http.Request) {
+			go func() {
 				defer wg.Done()
 
-				rsp, err := client.Do(request)
+				rsp, _, err := poc.HTTP(reqRaw, options...)
 				if err != nil {
-					//log.Warnf("request %s failed: %s", request.URL.String(), err)
+					// log.Warnf("request %s failed: %s", request.URL.String(), err)
 					return
 				}
 
-				if rsp.Body == nil {
-					//log.Infof("emtpy body %s", request.URL.String())
+				if len(rsp) == 0 {
+					// log.Infof("emtpy body %s", request.URL.String())
 					return
 				}
 
-				raw, err := ioutil.ReadAll(rsp.Body)
+				_, raw := lowhttp.SplitHTTPPacketFast(rsp)
 				if err != nil {
-					//log.Infof("read [%s] body failed: %s", request.URL.String(), err)
+					// log.Infof("read [%s] body failed: %s", request.URL.String(), err)
 					return
 				}
 
 				r := fmt.Sprintf(`[0-9a-zA-Z\.-]*\.%s`, regexp.QuoteMeta(target))
 				re, err := regexp.Compile(r)
 				if err != nil {
-					//log.Errorf("compile %s failed: %s", r, err)
+					// log.Errorf("compile %s failed: %s", r, err)
 					return
 				}
 
 				// 针对ctsearch.entrust.com做特殊处理处理
-				if req.Host == "ctsearch.entrust.com" {
+				host := lowhttp.GetHTTPPacketHeader(reqRaw, "Host")
+				if host == "ctsearch.entrust.com" {
 					raw = []byte(strings.ReplaceAll(string(raw), "\\u003d", "="))
 				}
-				//log.Debugf("body: %s", string(raw))
 				for _, match := range re.FindAll(raw, -1) {
-					results.Store(string(match), request.URL.String())
+					results.Store(string(match), url)
 				}
-			}(req)
+			}()
 		}
 		wg.Wait()
 
