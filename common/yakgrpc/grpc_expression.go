@@ -9,12 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var defaultSandbox *yak.Sandbox
-
 func (s *Server) EvaluateMultiExpression(ctx context.Context, req *ypb.EvaluateMultiExpressionRequest) (*ypb.EvaluateMultiExpressionResponse, error) {
-	if defaultSandbox == nil {
-		defaultSandbox = yak.NewSandbox()
-	}
+	defaultSandbox := yak.NewSandbox()
 	var deps map[string]any
 	if len(req.GetVariables()) > 0 {
 		deps = make(map[string]any)
@@ -49,9 +45,7 @@ func (s *Server) EvaluateMultiExpression(ctx context.Context, req *ypb.EvaluateM
 }
 
 func (s *Server) EvaluateExpression(ctx context.Context, req *ypb.EvaluateExpressionRequest) (*ypb.EvaluateExpressionResponse, error) {
-	if defaultSandbox == nil {
-		defaultSandbox = yak.NewSandbox()
-	}
+	defaultSandbox := yak.NewSandbox()
 	var deps map[string]any
 	if len(req.GetVariables()) > 0 {
 		deps = make(map[string]any)
