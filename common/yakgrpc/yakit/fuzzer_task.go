@@ -3,9 +3,10 @@ package yakit
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/consts"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -261,11 +262,15 @@ func SaveWebFuzzerResponseEx(taskId int, hiddenIndex string, rsp *ypb.FuzzerResp
 }
 
 func CountWebFuzzerResponses(db *gorm.DB, id int) (int, error) {
-	var count int
-	if db := db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id).Count(&count); db.Error != nil {
+	var (
+		count int64
+		err   error
+	)
+	ndb := db.Model(&schema.WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id)
+	if count, err = bizhelper.QueryCount(ndb, nil); err != nil {
 		return 0, utils.Errorf("count webfuzzer response error %s", db.Error)
 	}
-	return count, nil
+	return int(count), nil
 }
 
 func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *schema.WebFuzzerResponse {

@@ -3,6 +3,13 @@ package yakit
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,12 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func init() {
@@ -28,7 +29,6 @@ func init() {
 		RegisterLowHTTPSaveCallback()
 		return nil
 	})
-
 }
 
 func RegisterLowHTTPSaveCallback() {
@@ -61,7 +61,7 @@ func RegisterLowHTTPSaveCallback() {
 			reqIns = r.MultiResponseInstances[0].Request
 		}
 
-		//db := consts.GetGormProjectDatabase()
+		// db := consts.GetGormProjectDatabase()
 		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
@@ -763,26 +763,28 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 
 func QuickSearchHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
-	var count int
-	db.Model(&schema.HTTPFlow{}).Where(
+	var count int64
+	db = db.Model(&schema.HTTPFlow{}).Where(
 		"(request like ?) OR (response like ?) OR (url like ?)",
 		"%"+token+"%",
 		"%"+token+"%",
 		"%"+token+"%",
-	).Count(&count)
-	return count
+	)
+	count, _ = bizhelper.QueryCount(db, nil)
+	return int(count)
 }
 
 func QuickSearchMITMHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
-	var count int
-	db.Model(&schema.HTTPFlow{}).Where(
+	var count int64
+	db = db.Model(&schema.HTTPFlow{}).Where(
 		"(request like ?) OR (response like ?) OR (url like ?)",
 		"%"+token+"%",
 		"%"+token+"%",
 		"%"+token+"%",
-	).Where("source_type = ?", "mitm").Count(&count)
-	return count
+	).Where("source_type = ?", "mitm")
+	count, _ = bizhelper.QueryCount(db, nil)
+	return int(count)
 }
 
 // BuildHTTPFlowQuery 构建带有过滤条件的查询

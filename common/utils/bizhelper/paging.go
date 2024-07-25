@@ -1,9 +1,10 @@
 package bizhelper
 
 import (
+	"math"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"math"
 )
 
 type Param struct {
@@ -45,12 +46,15 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 		}
 	}
 
-	var paginator Paginator
-	var count int
-	var offset int
+	var (
+		paginator Paginator
+		count     int64
+		offset    int
+		err       error
+	)
 
 	db = utils.GormTransactionReturnDb(db, func(tx *gorm.DB) {
-		if tx.Model(result).Count(&count); tx.Error != nil {
+		if count, err = QueryCount(tx, result); err != nil {
 			return
 		}
 		if p.Limit == -1 {
@@ -66,17 +70,17 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	})
 
 	if p.Limit == -1 {
-		paginator.TotalRecord = count
+		paginator.TotalRecord = int(count)
 		paginator.Records = result
 		paginator.Page = 1
 		paginator.NextPage = 1
 		paginator.Offset = 0
-		paginator.Limit = count
+		paginator.Limit = int(count)
 		paginator.TotalPage = int(math.Ceil(float64(count) / float64(p.Limit)))
 		return &paginator, db
 	}
 
-	paginator.TotalRecord = count
+	paginator.TotalRecord = int(count)
 	paginator.Records = result
 	paginator.Page = p.Page
 
@@ -99,6 +103,8 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 }
 
 func countRecords(db *gorm.DB, anyType interface{}, done chan bool, count *int) {
-	db.Model(anyType).Count(count)
+	n, _ := QueryCount(db, anyType)
+	i := int(n)
+	count = &i
 	done <- true
 }

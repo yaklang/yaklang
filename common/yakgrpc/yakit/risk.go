@@ -2,6 +2,8 @@ package yakit
 
 import (
 	"context"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
@@ -72,11 +73,15 @@ func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*schema.Risk, error) 
 }
 
 func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (int, error) {
-	var count int
-	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Count(&count); db.Error != nil {
+	var (
+		count int64
+		err   error
+	)
+	ndb := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId)
+	if count, err = bizhelper.QueryCount(ndb, nil); err != nil {
 		return 0, utils.Errorf("get Risks count failed: %s", db.Error)
 	}
-	return count, nil
+	return int(count), nil
 }
 
 func GetRiskByHash(db *gorm.DB, hash string) (*schema.Risk, error) {
@@ -146,7 +151,7 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 		"title", "title_verbose",
 	}, params.GetTitle(), false)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetIds())
-	//db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
+	// db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
 	return db, nil
 }
 
@@ -451,9 +456,12 @@ func QueryRiskCount(db *gorm.DB, isRead string) (int64, error) {
 		db = db.Where("is_read = false OR is_read IS NULL ")
 	}
 	db = db.Where("waiting_verified = false")
-	var count int64
-	db.Count(&count)
-	if db.Error != nil {
+	var (
+		count int64
+		err   error
+	)
+	count, err = bizhelper.QueryCount(db, nil)
+	if err != nil {
 		return 0, utils.Errorf("QueryRiskCount failed: %s", db.Error)
 	}
 	return count, nil

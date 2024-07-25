@@ -101,13 +101,13 @@ func GetWebsocketFlow(db *gorm.DB, id int64) (*schema.WebsocketFlow, error) {
 }
 
 func SearchWebsocketFlow(keyword string) int {
-	db := consts.GetGormProjectDatabase()
-	var count int
-	db.Model(&schema.WebsocketFlow{}).Where(
+	db := consts.GetGormProjectDatabase().Model(&schema.WebsocketFlow{}).Where(
 		"quoted_data like ?",
 		"%"+keyword+"%",
-	).Count(&count)
-	return count
+	)
+	var count int64
+	count, _ = bizhelper.QueryCount(db, nil)
+	return int(count)
 }
 
 func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit int) (*bizhelper.Paginator, []*schema.WebsocketFlow, error) {

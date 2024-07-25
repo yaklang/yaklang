@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"os"
 	"strconv"
@@ -13,6 +12,9 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -494,27 +496,31 @@ func HaveReverseRisk(token string) bool {
 	if token == "" {
 		return false
 	}
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase().Model(&schema.Risk{}).Where("reverse_token = ?", token)
 	if db == nil {
 		return false
 	}
+	var (
+		count int64
+		err   error
+	)
 
 	retryCount := 0
-	for {
+	lo.AttemptWithDelay(5, time.Second, func(index int, duration time.Duration) error {
 		retryCount++
-		var count int
-		if db := db.Model(&schema.Risk{}).Where(
-			"reverse_token LIKE ?", "%"+token+"%",
-		).Where("waiting_verified = ?", false).Count(&count); db.Error != nil {
+
+		if count, err = bizhelper.QueryCount(db, nil); err != nil {
+			return err
 		}
 		if count > 0 {
-			return true
+			return nil
 		}
 		if retryCount > 5 {
-			return false
+			return utils.Errorf("no risk found for token: %v", token)
 		}
-		time.Sleep(1 * time.Second)
-	}
+		return utils.Errorf("retry")
+	})
+	return count > 0
 }
 
 func ExtractTokenFromUrl(tokenUrl string) string {
@@ -622,7 +628,7 @@ func CheckHTTPLogByToken(token string, runtimeId string, timeout ...float64) ([]
 			if err != nil {
 				continue
 			}
-			var details = make(map[string]any)
+			details := make(map[string]any)
 			json.Unmarshal(req, &details)
 			if _, ok := details["Request"]; ok {
 				details["Request"] = utils.EscapeInvalidUTF8Byte(i.GetRequest())

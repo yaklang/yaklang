@@ -1171,10 +1171,12 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	size, total := int64(0), int64(0)
+	var (
+		size, total int64
+		err         error
+	)
 	// 计算payload总数
-	err := s.GetProfileDatabase().Model(&schema.Payload{}).Count(&total).Error
-	if err != nil {
+	if total, err = bizhelper.QueryCount(s.GetProfileDatabase(), &schema.Payload{}); err != nil {
 		return utils.Wrap(err, "migrate payload error: get payload count error")
 	}
 

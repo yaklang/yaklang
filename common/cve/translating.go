@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
 func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) error {
@@ -53,8 +54,7 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 	if concurrent <= 0 {
 		concurrent = 10
 	}
-	var count int64
-	db.Count(&count)
+	count, _ := bizhelper.QueryCount(db, nil)
 	if count > 0 {
 		log.Infof("rest total: %v", count)
 	}
@@ -134,8 +134,7 @@ func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResou
 	} else {
 		db = db.Order("published_date asc")
 	}
-	var count int64
-	db.Count(&count)
+	count, _ := bizhelper.QueryCount(db, nil)
 	if count > 0 {
 		log.Infof("rest total: %v", count)
 	}

@@ -37,7 +37,8 @@ func QueryPayloadWithCallBack(db *gorm.DB, p *schema.Payload, notExistCallback, 
 		count int64
 		err   error
 	)
-	if db.Where("`hash` = ?", p.Hash).Count(&count); count > 0 {
+	ndb := db.Where("`hash` = ?", p.Hash)
+	if count, err = bizhelper.QueryCount(ndb, nil); count > 0 {
 		err = existCallback(db, p)
 	} else {
 		err = notExistCallback(db, p)
@@ -92,8 +93,12 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 }
 
 func CheckExistGroup(db *gorm.DB, group string) (bool, error) {
-	var count int64
-	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).Count(&count); db.Error != nil {
+	var (
+		count int64
+		err   error
+	)
+	ndb := db.Model(&schema.Payload{}).Where("`group` = ?", group)
+	if count, err = bizhelper.QueryCount(ndb, nil); err != nil {
 		return false, db.Error
 	}
 	return count > 0, nil
@@ -240,11 +245,15 @@ func GetPayloadGroupFileName(db *gorm.DB, group string) (string, error) {
 }
 
 func GetPayloadCountInGroup(db *gorm.DB, group string) int64 {
-	var i int64
-	if db := db.Model(&schema.Payload{}).Where("`group` = ?", group).Count(&i); db.Error != nil {
+	var (
+		count int64
+		err   error
+	)
+	ndb := db.Model(&schema.Payload{}).Where("`group` = ?", group)
+	if count, err = bizhelper.QueryCount(ndb, nil); err != nil {
 		return 0
 	}
-	return i
+	return count
 }
 
 func DeletePayloadByID(db *gorm.DB, id int64) error {
