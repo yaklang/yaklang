@@ -81,6 +81,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return newFacadeServerAction()
 	case "yakshell":
 		return &wsm.YakShellResourceAction{}
+	case "syntaxflow":
+		return NewSyntaxFlowAction()
 	default:
 		return nil
 	}
