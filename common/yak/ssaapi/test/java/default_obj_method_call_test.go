@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"strings"
 	"testing"
 )
 
@@ -80,11 +81,11 @@ class A {
 
 class B {
 	public static void main() {
-		dump(A.value); // 这个表达式 A.value 不可能是常量，他一定是个 phi;
+		dump1(A.value); // 这个表达式 A.value 不可能是常量，他一定是个 phi;
 
 		A obj = new A();  //  
 		obj.hello();      // 在执行  A.hello() 或者 obj.hello() 之后，此时 A.value 为 "ddd";
-
+		dump2(A.value);
 		// 这个语句的审计要求是：
         //   1. objMethod 必须有一个参数，就是 obj 自身
         //   2. 跨过程必须成功，obj 和 result 数据流上没有任何关系，obj --> * 不可能经过 result;
@@ -101,12 +102,48 @@ class B {
 
 
 `, func(prog *ssaapi.Program) error {
-		result := prog.SyntaxFlow(`dump(* as $param);`)
-		rets := result.GetValues("param")
-		rets.Show()
-		if rets.Len() <= 0 {
-			t.Fatal("no entry")
+		dump1 := prog.SyntaxFlow(`dump1(* as $param);`)
+		d1 := dump1.GetValues("param")
+		if d1.Show().Len() == 0 {
+			t.Fatal("have not dump1")
 		}
+		if !strings.Contains(d1.String(), "abc") {
+			t.Fatalf("dump1's parma error.want \"abc\",but got %s", d1.String())
+		}
+
+		//dump2 := prog.SyntaxFlow(`dump2(* as $param);`)
+		//d2 := dump2.GetValues("param")
+		//if d2.Show().Len() == 0 {
+		//	t.Fatal("have not dump2")
+		//}
+		//if !strings.Contains(d2.String(), "\"ggg\"") {
+		//	t.Fatalf("dump2's parma error,want \"ggg\",but got %s", d2.String())
+		//}
+
+		res1 := prog.SyntaxFlow(`result #-> as $result;`).GetValues("result")
+		param1 := prog.SyntaxFlow(` obj.objMethod(* as $param1);`).GetValues("param1")
+		if res1.Show().Len() == 0 {
+			t.Fatal("result have no value")
+		}
+		if !strings.Contains(res1.String(), "world") {
+			t.Fatalf("get result value error.want \"world\",but got %s", res1.String())
+		}
+		if param1.Show().Len() != 1 {
+			t.Fatal("obj.ObjMethod() should have receiver as param")
+		}
+
+		res2 := prog.SyntaxFlow(`result2 #-> as $result;`).GetValues("result2")
+		if res2.Show().Len() != 0 {
+			t.Fatal("result2 get top def value do not equal 0")
+		}
+		param2 := prog.SyntaxFlow(` obj.objMethod(* as $param2);`).GetValues("param2")
+		if param2.Show().Len() != 1 {
+			t.Fatal("obj.objNoExistedMethod should have receiver as param")
+		}
+
+		target := prog.SyntaxFlow("obj-->* as $target;").GetValues("target")
+		println("target")
+		target.Show()
 
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -205,12 +242,12 @@ class A {
 func TestAAA3(t *testing.T) {
 	code := `
 public class A{
-	public int num;
+	public static  int num;
 	public void setNum(int n){
-	this.num=n;
+	  A.num=666;
 }
 	public int getNum(){
-		return this.num;
+		return A.num;
 }
 
 }
@@ -218,8 +255,7 @@ public class A{
 public class B{
 	public static void main(){
 		A a =new A();
-		a.setNum(22);
-		int target = a.getNum();
+		b.exec(a);
 	}
 }
 
@@ -230,7 +266,7 @@ public class B{
 		t.Fatal(err)
 	}
 	prog.Show()
-	result := prog.SyntaxFlow(`target #-> as $a;`)
+	result := prog.SyntaxFlow(`a -->* as $a;`).GetValues("a")
 
 	result.Show()
 

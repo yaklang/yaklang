@@ -263,6 +263,144 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 	return fmt.Sprintf("%s.%s", value.GetName(), key.String())
 }
 
+func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
+	if utils.IsNil(value) {
+		log.Errorf("BUG: ReadMemberCallMethodVariable from nil ssa.Value: %v", value)
+	}
+	if utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallMethodVariable from nil ssa.Value: %v", key)
+	}
+
+	if utils.IsNil(value) && utils.IsNil(key) {
+		log.Error("BUG: ReadMemberCallMethodVariable's value and key is all nil...")
+		return b.EmitUndefined("")
+	} else if utils.IsNil(value) && !utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallMethodVariable's value is nil, key: %v", key)
+		return b.EmitUndefined("")
+	} else if !utils.IsNil(value) && utils.IsNil(key) {
+		log.Errorf("BUG: ReadMemberCallMethodVariable's key is nil, value: %v", value)
+		return b.EmitUndefined("")
+	}
+
+	program := b.GetProgram()
+
+	// to extern lib
+	if extern, ok := ToExternLib(value); ok {
+		// write to extern Lib
+		name := b.getExternLibMemberCall(value, key)
+		// if ret := b.PeekValue(name); ret != nil {
+		// 	return ret
+		// }
+		if ret := ReadVariableFromScope(b.CurrentBlock.ScopeTable, name); ret != nil {
+			return ret.Value
+		}
+
+		if ret := extern.BuildField(key.String()); ret != nil {
+			// set program offsetMap for extern value
+			program.SetOffsetValue(ret, b.CurrentRange)
+
+			// create variable for extern value
+			variable := ret.GetVariable(name)
+			if variable == nil {
+				ret.AddVariable(b.CreateMemberCallVariable(value, key))
+			} else {
+				variable.AddRange(b.CurrentRange, true)
+			}
+
+			// set member call
+			SetMemberCall(value, key, ret)
+			return ret
+		}
+
+		// handler
+		// want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
+		want := b.TryGetSimilarityKey(extern.GetName(), key.String())
+		b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
+		p := NewParam(name, false, b)
+		p.SetExtern(true)
+		return p
+	}
+
+	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
+		name, typ := checkCanMemberCall(value, key)
+		member := b.getOriginMember(name, typ, value, key)
+		return member
+	}
+
+	if para, ok := ToParameter(value); ok {
+		name, _ := checkCanMemberCall(para, key)
+		newParamterMember := b.NewParameterMember(name, para, key)
+		t := NewFunctionTypeDefine(name, nil, nil, false)
+		t.IsMethod = true
+		newParamterMember.SetType(t)
+		SetMemberCall(para, key, newParamterMember)
+		setMemberVerboseName(newParamterMember)
+		return newParamterMember
+	}
+
+	if value.GetType().GetTypeKind() == ClassBluePrintTypeKind {
+		if blueprint := value.GetType().(*ClassBluePrint); blueprint != nil {
+			if v, ok := blueprint.StaticMethod[key.String()]; ok {
+				return v
+			}
+		}
+
+	}
+	if u, ok := value.(*Undefined); ok {
+		if u.Kind == UndefinedValueInValid {
+			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
+				if v, ok := blueprint.StaticMethod[key.String()]; ok {
+					return v
+				}
+			}
+		}
+	}
+	name, typ := checkCanMemberCall(value, key)
+	if ret := b.PeekValueInThisFunction(name); ret != nil {
+		return ret
+	}
+
+	origin := b.ReadValueInThisFunction(name)
+	if undefine, ok := ToUndefined(origin); ok {
+		undefine.SetRange(b.CurrentRange)
+
+		if typ != nil {
+			undefine.Kind = UndefinedMemberValid
+			undefine.SetType(typ)
+		} else {
+			undefine.Kind = UndefinedMemberInValid
+		}
+
+		if b.MarkedMemberCallWantMethod {
+			var t *FunctionType
+			t, ok = typ.(*FunctionType)
+			if !ok {
+				t = NewFunctionTypeDefine(name, nil, nil, false)
+			}
+			t.IsMethod = true
+			undefine.SetType(t)
+		}
+
+		// undefine.SetName(b.setMember(key))
+		// if b.MarkedMemberCallWantMethod {
+		// 	t := NewFunctionTypeDefine(name, nil, nil, false)
+		// 	t.IsMethod = true
+		// 	undefine.SetType(t)
+		// } else {
+		// 	if typ != nil {
+		// 		undefine.Kind = UndefinedMemberValid
+		// 		undefine.SetType(typ)
+		// 	} else {
+		// 		undefine.Kind = UndefinedMemberInValid
+		// 	}
+		// }
+		SetMemberCall(value, key, undefine)
+	}
+	setMemberVerboseName(origin)
+	return origin
+
+}
+
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	if utils.IsNil(value) {
 		log.Errorf("BUG: ReadMemberCallVariable from nil ssa.Value: %v", value)
@@ -449,40 +587,15 @@ func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Valu
 	recoverScope := b.SetCurrent(value, true)
 	origin := b.ReadValueInThisFunction(name)
 	recoverScope()
-
 	if undefine, ok := ToUndefined(origin); ok {
 		undefine.SetRange(b.CurrentRange)
-
+		// undefine.SetName(b.setMember(key))
 		if typ != nil {
 			undefine.Kind = UndefinedMemberValid
 			undefine.SetType(typ)
 		} else {
 			undefine.Kind = UndefinedMemberInValid
 		}
-
-		if b.MarkedMemberCallWantMethod {
-			var t *FunctionType
-			t, ok = typ.(*FunctionType)
-			if !ok {
-				t = NewFunctionTypeDefine(name, nil, nil, false)
-			}
-			t.IsMethod = true
-			undefine.SetType(t)
-		}
-
-		// undefine.SetName(b.setMember(key))
-		// if b.MarkedMemberCallWantMethod {
-		// 	t := NewFunctionTypeDefine(name, nil, nil, false)
-		// 	t.IsMethod = true
-		// 	undefine.SetType(t)
-		// } else {
-		// 	if typ != nil {
-		// 		undefine.Kind = UndefinedMemberValid
-		// 		undefine.SetType(typ)
-		// 	} else {
-		// 		undefine.Kind = UndefinedMemberInValid
-		// 	}
-		// }
 		SetMemberCall(value, key, undefine)
 	}
 	setMemberVerboseName(origin)
