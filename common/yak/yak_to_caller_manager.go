@@ -490,8 +490,9 @@ func FeedbackFactory(db *gorm.DB, caller func(result *ypb.ExecResult) error, sav
 			// mitmSaveToDBLock.Unlock()
 		}
 
-		caller(result)
+		err = caller(result)
 		if err != nil {
+			log.Warn(err)
 			return
 		}
 		return
@@ -864,21 +865,27 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				manager.SetRuntimeId(runtimeId)
 				manager.SetProxy(proxy)
 				manager.SetCtx(streamContext)
-				manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
-					yakitLib, ok := nIns.GetVar("yakit")
-					if ok && yakitLib != nil {
-						if v, ok := yakitLib.(map[string]interface{}); ok {
-							if v2, ok := v["Output"]; ok {
-								if v3, ok := v2.(func(i interface{}) error); ok {
-									return v3(result)
-								} else {
-									return fmt.Errorf("yakit.Output is not func(i interface{}) error")
+				if pluginContext.YakitClient != nil {
+					manager.SetFeedback(func(i *ypb.ExecResult) error {
+						return pluginContext.YakitClient.RawSend(i)
+					})
+				} else {
+					manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
+						yakitLib, ok := nIns.GetVar("yakit")
+						if ok && yakitLib != nil {
+							if v, ok := yakitLib.(map[string]interface{}); ok {
+								if v2, ok := v["Output"]; ok {
+									if v3, ok := v2.(func(i interface{}) error); ok {
+										return v3(result)
+									} else {
+										return fmt.Errorf("yakit.Output is not func(i interface{}) error")
+									}
 								}
 							}
 						}
-					}
-					return fmt.Errorf("not found current engine yakit.Output")
-				})
+						return fmt.Errorf("not found current engine yakit.Output")
+					})
+				}
 				return manager, nil
 			}
 		}
@@ -886,10 +893,10 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	})
 
 	nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewMixPluginCallerWithFilter", func(i interface{}) interface{} {
-		origin, ok := i.(func(*filter.StringFilter) (*MixPluginCaller, error))
+		origin, ok := i.(func(filterable filter.Filterable) (*MixPluginCaller, error))
 		if ok {
-			return func(webFilter *filter.StringFilter) (*MixPluginCaller, error) {
-				manager, err := origin(webFilter)
+			return func(filterable filter.Filterable) (*MixPluginCaller, error) {
+				manager, err := origin(filterable)
 				if err != nil {
 					return nil, err
 				}
@@ -897,21 +904,27 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				manager.SetRuntimeId(runtimeId)
 				manager.SetProxy(proxy)
 				manager.SetCtx(streamContext)
-				manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
-					yakitLib, ok := nIns.GetVar("yakit")
-					if ok && yakitLib != nil {
-						if v, ok := yakitLib.(map[string]interface{}); ok {
-							if v2, ok := v["Output"]; ok {
-								if v3, ok := v2.(func(i interface{}) error); ok {
-									return v3(result)
-								} else {
-									return fmt.Errorf("yakit.Output is not func(i interface{}) error")
+				if pluginContext.YakitClient != nil {
+					manager.SetFeedback(func(i *ypb.ExecResult) error {
+						return pluginContext.YakitClient.RawSend(i)
+					})
+				} else {
+					manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
+						yakitLib, ok := nIns.GetVar("yakit")
+						if ok && yakitLib != nil {
+							if v, ok := yakitLib.(map[string]interface{}); ok {
+								if v2, ok := v["Output"]; ok {
+									if v3, ok := v2.(func(i interface{}) error); ok {
+										return v3(result)
+									} else {
+										return fmt.Errorf("yakit.Output is not func(i interface{}) error")
+									}
 								}
 							}
 						}
-					}
-					return fmt.Errorf("not found current engine yakit.Output")
-				})
+						return fmt.Errorf("not found current engine yakit.Output")
+					})
+				}
 				return manager, nil
 			}
 		}

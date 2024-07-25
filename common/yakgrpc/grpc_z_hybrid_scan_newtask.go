@@ -350,13 +350,18 @@ func ScanHybridTargetWithPlugin(
 	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *schema.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter filter.Filterable,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
-	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
+	engine := yak.NewScriptEngine(20)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVars(map[string]any{
-			"RUNTIME_ID": runtimeId,
-		})
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx).WithContextCancel(cancel))
-		engine.SetVars(map[string]any{
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(
+			runtimeId,
+		).WithPluginName(
+			plugin.ScriptName,
+		).WithProxy(
+			proxy,
+		).WithContext(ctx).WithContextCancel(
+			cancel,
+		).WithYakitClient(feedbackClient))
+		vars := map[string]any{
 			"RUNTIME_ID":    runtimeId,
 			"REQUEST":       target.Request,
 			"RESPONSE":      target.Response,
@@ -365,7 +370,8 @@ func ScanHybridTargetWithPlugin(
 			"CTX":           ctx,
 			"CALLER_FILTER": callerFilter,
 			"PROXY":         proxy,
-		})
+		}
+		engine.SetVars(vars)
 		return nil
 	})
 	err := engine.ExecuteWithContext(ctx, execTargetWithPluginScript)

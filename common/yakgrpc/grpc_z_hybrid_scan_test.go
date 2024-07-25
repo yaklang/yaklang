@@ -306,7 +306,11 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 	packet := fmt.Sprintf("POST /\r\nHost: %s\r\n\r\n"+
 		"%s", target, token)
 	for i := 0; i < 3; i++ {
-		lowhttp.HTTPWithoutRedirect(lowhttp.WithRequest(packet))
+		rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithRequest(packet))
+		if err != nil {
+			spew.Dump(err)
+			_ = rsp
+		}
 	}
 	var flows []*schema.HTTPFlow
 	err = utils.AttemptWithDelayFast(func() error {
@@ -365,7 +369,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 				checkCount++
 			}
 		}
-		spew.Dump(rsp)
+		spew.Dump("Data From Recv: ", rsp)
 	}
 	spew.Dump(checkCount)
 	if checkCount != 3 {

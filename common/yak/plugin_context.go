@@ -4,21 +4,31 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils/cli"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 type YakitPluginContext struct {
-	PluginName string
-	PluginUUID string
-	RuntimeId  string
-	Proxy      string
-	Ctx        context.Context
-	CliApp     *cli.CliApp
-	Cancel     context.CancelFunc
-	vulFilter  filter.Filterable
+	PluginName  string
+	PluginUUID  string
+	RuntimeId   string
+	Proxy       string
+	Ctx         context.Context
+	CliApp      *cli.CliApp
+	Cancel      context.CancelFunc
+	vulFilter   filter.Filterable
+	YakitClient *yaklib.YakitClient
 }
 
 func (y *YakitPluginContext) WithContextCancel(cancel context.CancelFunc) *YakitPluginContext {
 	y.Cancel = cancel
+	return y
+}
+
+func (y *YakitPluginContext) WithYakitClient(yakitClient *yaklib.YakitClient) *YakitPluginContext {
+	if yakitClient == nil {
+		return y
+	}
+	y.YakitClient = yakitClient
 	return y
 }
 
