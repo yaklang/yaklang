@@ -110,7 +110,15 @@ func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginato
 	if params == nil {
 		return nil, nil, utils.Errorf("empty params")
 	}
-	db = db.Model(&schema.Port{}) // .Debug()
+	db = db.Model(&schema.Port{}) // .Debug(
+	db = db.Select(`id,created_at,updated_at,cpe,host,port,proto,service_type,task_name,html_title,` + "`from`" + `,hash,state,ip_integer,
+--when fingerprint length <=20kb return self
+case when 
+	length(fingerprint) <= 20480 then fingerprint
+--else return substring 
+else
+	substr(fingerprint, 1, 20480) 
+end as fingerprint`)
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
 			Page:    1,
@@ -119,7 +127,6 @@ func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginato
 			Order:   "desc",
 		}
 	}
-
 	if params.GetAfterUpdatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
 	}
@@ -132,7 +139,6 @@ func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginato
 	if params.GetBeforeId() > 0 {
 		db = db.Where("id < ?", params.GetBeforeId())
 	}
-
 	p := params.Pagination
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = FilterPort(db, params)
