@@ -3893,7 +3893,7 @@ sleep(1)
 t2 = timeNow()
 try {
 	sub = t2.Sub(t)
-	printf("duration: %s\n",sub)
+	printf("duration: %s\n",sub.String())
 	assert typeof(sub) != int
 } catch e {
 	panic("time.Duration force convert to int")
