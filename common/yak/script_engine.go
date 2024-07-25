@@ -567,7 +567,6 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		"Warn":     logger.Warnf,
 		"Error":    logger.Errorf,
 	}
-	engine.SetVars(vars)
 
 	(*e.logger).SetEngine(engine)
 	var client *yaklib.YakitClient
@@ -579,6 +578,8 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	}
 	client.SetYakLog(*e.logger)
 	yaklib.SetEngineClient(engine, client)
+	vars["yakit"] = yaklib.GetExtYakitLibByClient(client)
+	engine.SetVars(vars)
 	if iaiLib, ok := engine.GetVar("ai"); ok {
 		if _, ok := iaiLib.(map[string]interface{}); ok {
 			engine.SetVars(map[string]any{
@@ -729,7 +730,10 @@ func (e *ScriptEngine) ExecuteWithTemplate(codeTmp string, i map[string][]string
 
 func NewYakitVirtualClientScriptEngine(client *yaklib.YakitClient) *ScriptEngine {
 	e := NewScriptEngine(20)
-	e.SetYakitClient(client)
+	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		engine.SetVars(yaklib.GetExtYakitLibByClient(client))
+		return nil
+	})
 	return e
 }
 

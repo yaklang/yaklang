@@ -29,6 +29,10 @@ func YakitOutputToExecResult(i interface{}) *ypb.ExecResult {
 				Message:   raw,
 			}
 		}
+	case *ypb.ExecResult:
+		return ret
+	default:
+		log.Warn("YakitOutputToExecResult unknown type: %v", i)
 	}
 	return nil
 }
@@ -122,6 +126,13 @@ func (c *YakitClient) SetYakLog(logger *YakLogger) {
 	c.yakLogger = logger
 }
 
+func (c *YakitClient) RawSend(i any) error {
+	if c.send == nil {
+		return nil
+	}
+	return c.send(i)
+}
+
 // 输入
 func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) error {
 	var data = tmp
@@ -171,15 +182,6 @@ func (c *YakitClient) SendRaw(y *YakitLog) error {
 }
 
 func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
-	//修改yakit库的客户端
-	//e.OverrideRuntimeGlobalVariables("yakit", GetExtYakitLibByClient(client))
-	//e.OverrideRuntimeGlobalVariables("risk", map[string]interface{}{
-	//	"NewRisk":                   YakitNewRiskBuilder(client),
-	//	"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(client.runtimeID),
-	//	"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(client.runtimeID),
-	//	"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(client.runtimeID),
-	//	"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(client.runtimeID),
-	//})
 	e.OverrideRuntimeGlobalVariables(map[string]any{
 		"yakit": GetExtYakitLibByClient(client),
 		"risk": map[string]any{
