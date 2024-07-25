@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"strings"
 	"testing"
@@ -189,6 +190,126 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 
 	if !downstreamPassed {
 		t.Fatalf("Downstream proxy not passed")
+	}
+
+	if !networkIsPassed {
+		t.Fatalf("Network not passed")
+	}
+}
+
+func TestGRPCMUSTPASS_MITM_S5Proxy(t *testing.T) {
+	var (
+		networkIsPassed bool
+		token           = utils.RandNumberStringBytes(10)
+		rspToken        = utils.RandStringBytes(10)
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("u") == token {
+			networkIsPassed = true
+		}
+		writer.Write([]byte(rspToken))
+	})
+	mockUrl := "http://" + utils.HostPort(mockHost, mockPort)
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			fmt.Println(msg)
+			if strings.Contains(msg, "starting mitm server") {
+				if _, err := yak.Execute(
+					`
+ rsp,_ = poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~
+assert str.Contains(rsp.RawPacket,rspToken)`,
+					map[string]any{
+						"mockUrl":   mockUrl,
+						"mitmProxy": "socks5://" + utils.HostPort("127.0.0.1", mitmPort),
+						"token":     token,
+						"rspToken":  rspToken,
+					}); err != nil {
+					t.Fatalf("execute script failed: %v", err)
+				}
+			}
+		}
+	}
+
+	if !networkIsPassed {
+		t.Fatalf("Network not passed")
+	}
+}
+
+func TestGRPCMUSTPASS_MITM_S5Proxy_https(t *testing.T) {
+	var (
+		networkIsPassed bool
+		token           = utils.RandNumberStringBytes(10)
+		rspToken        = utils.RandStringBytes(10)
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+		if lowhttp.GetHTTPRequestQueryParam(req, "u") == token {
+			networkIsPassed = true
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-length: 10\r\n\r\n" + rspToken)
+	})
+	mockUrl := "https://" + utils.HostPort(mockHost, mockPort)
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			fmt.Println(msg)
+			if strings.Contains(msg, "starting mitm server") {
+				if _, err := yak.Execute(
+					`
+ rsp,_ = poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token),poc.https(true))~
+assert str.Contains(rsp.RawPacket,rspToken)`,
+					map[string]any{
+						"mockUrl":   mockUrl,
+						"mitmProxy": "socks5://" + utils.HostPort("127.0.0.1", mitmPort),
+						"token":     token,
+						"rspToken":  rspToken,
+					}); err != nil {
+					t.Fatalf("execute script failed: %v", err)
+				}
+			}
+		}
 	}
 
 	if !networkIsPassed {
