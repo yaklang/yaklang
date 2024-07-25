@@ -35,8 +35,8 @@ func (sm *SafeMap) Append(l map[string]any) *SafeMap {
 }
 
 func (sm *SafeMap) Load(key string) (value any, ok bool) {
-	sm.lock.RLock()
-	defer sm.lock.RUnlock()
+	sm.lock.Lock()
+	defer sm.lock.Unlock()
 	value, ok = sm.m[key]
 	if ok {
 		if raw, ok := value.(map[string]any); ok && sm.parent != nil {
