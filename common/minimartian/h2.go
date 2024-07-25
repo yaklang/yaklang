@@ -2,8 +2,8 @@ package minimartian
 
 import (
 	"bytes"
-	"crypto/tls"
 	"io"
+	"net"
 	"net/url"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -16,7 +16,7 @@ import (
 // proxyH2 proxies HTTP/2 traffic between a client connection, `cc`, and the HTTP/2 `url` assuming
 // h2 is being used. Since no browsers use h2c, it's safe to assume all traffic uses TLS.
 // Revision this func from martian h2 package since it was not compatible with martian modifier style
-func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
+func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Context) error {
 	log.Debugf("Proxying %v with HTTP/2", url)
 	go func() {
 		select {
@@ -33,6 +33,12 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 		if err != nil {
 			return nil, nil, err
 		}
+		inherit := func(i string) {
+			httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
+		}
+		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
+		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 		httpctx.SetRequestHTTPS(req, true)
 		if req.URL != nil {
 			req.URL.Scheme = "https"
