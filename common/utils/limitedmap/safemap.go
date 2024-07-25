@@ -1,12 +1,13 @@
 package limitedmap
 
 import (
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 )
 
 type SafeMap struct {
-	parent *SafeMap
+	parent *ReadOnlyMap
 	m      map[string]any
 	lock   *sync.RWMutex
 }
@@ -25,13 +26,25 @@ func (sm *SafeMap) Append(l map[string]any) *SafeMap {
 	if utils.IsNil(l) {
 		return sm
 	}
-	sm.lock.RLock()
-	defer sm.lock.RUnlock()
-	return &SafeMap{
-		parent: sm,
-		m:      l,
-		lock:   new(sync.RWMutex),
+	sm.lock.Lock()
+	defer sm.lock.Unlock()
+
+	for k, v := range l {
+		origin, existed := sm.m[k]
+		if !existed {
+			sm.m[k] = v
+			continue
+		}
+		if isMapKeyString(v) && isMapKeyString(origin) {
+			funk.ForEach(v, func(key, value any) {
+				keyStr := key.(string)
+				setMapKeyValue(origin, keyStr, value)
+			})
+			continue
+		}
+		sm.m[k] = v
 	}
+	return sm
 }
 
 func (sm *SafeMap) Load(key string) (value any, ok bool) {
@@ -61,12 +74,12 @@ func (sm *SafeMap) Load(key string) (value any, ok bool) {
 	return
 }
 
-func (sm *SafeMap) ForEachKey(h func(m *SafeMap, key string) error) {
+func (sm *SafeMap) ForEachKey(h func(m any, key string) error) {
 	sm.lock.RLock()
 	defer sm.lock.RUnlock()
 
 	visited := make(map[string]struct{})
-	wrapper := func(safeMap *SafeMap, key string, value any) error {
+	wrapper := func(safeMap any, key string, value any) error {
 		_, ok := visited[key]
 		if ok {
 			return nil
@@ -82,7 +95,7 @@ func (sm *SafeMap) ForEachKey(h func(m *SafeMap, key string) error) {
 	sm.forEachKey(wrapper)
 }
 
-func (sm *SafeMap) forEachKey(wrapper func(m *SafeMap, key string, value any) error) {
+func (sm *SafeMap) forEachKey(wrapper func(m any, key string, value any) error) {
 	for k, v := range sm.m {
 		if err := wrapper(sm, k, v); err != nil {
 			return
@@ -95,7 +108,7 @@ func (sm *SafeMap) forEachKey(wrapper func(m *SafeMap, key string, value any) er
 
 func (sm *SafeMap) Flat() map[string]any {
 	var item []string
-	sm.ForEachKey(func(m *SafeMap, key string) error {
+	sm.ForEachKey(func(m any, key string) error {
 		item = append(item, key)
 		return nil
 	})
@@ -109,52 +122,33 @@ func (sm *SafeMap) Flat() map[string]any {
 	return m
 }
 
-func (sm *SafeMap) GetRoot() *SafeMap {
+func (sm *SafeMap) GetRoot() *ReadOnlyMap {
 	if sm.parent == nil {
-		return sm
+		return nil
 	}
 	return sm.parent.GetRoot()
 }
 
-func (sm *SafeMap) Existed(p *SafeMap) bool {
+func (sm *SafeMap) Existed(p *ReadOnlyMap) bool {
 	if p == nil {
 		return false
 	}
 	if sm == nil {
 		return false
 	}
-	if sm == p {
-		return true
+	if sm.parent == nil {
+		return false
 	}
-	for sm.parent != nil {
-		if sm.parent == p {
-			return true
-		}
-		sm = sm.parent
-	}
-	return false
+	return sm.parent.Existed(p)
 }
 
-func (sm *SafeMap) SetPred(p *SafeMap) *SafeMap {
-	if sm.Existed(p) {
-		return sm
-	}
-	root := sm.GetRoot()
-	root.parent = p
+func (sm *SafeMap) SetPred(p *ReadOnlyMap) *SafeMap {
+	sm.parent = p
 	return sm
 }
 
-func (sm *SafeMap) Unlink(p *SafeMap) {
-	if sm.Existed(p) {
-		origin := sm.parent
-		for origin.parent != nil {
-			if origin.parent == p {
-				origin.parent = nil
-				return
-			}
-			origin = origin.parent
-		}
-	}
+func (sm *SafeMap) Unlink() {
+	sm.parent = nil
 }
 
 func (sm *SafeMap) Store(key string, value any) {
