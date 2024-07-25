@@ -52,21 +52,22 @@ func (s *Scannerx) initHandle() error {
 	if err != nil {
 		return s.handleError(err)
 	}
+	log.Infof("pcap open live success: %s", s.config.Iface.Name)
+	var bpf string
 	if s.config.Iface.Flags&net.FlagLoopback == 0 {
 		// Interface is not loopback, set the filter.
-		err = handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String()))
-		if err != nil {
-			return utils.Errorf("SetBPFFilter failed: %v", err)
-		}
+		bpf = fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())
 	} else {
 		// Interface is loopback, set a different filter.
 		// Replace the following line with the appropriate filter for your use case.
-		err = handle.SetBPFFilter("udp || tcp[tcpflags] == tcp-syn|tcp-ack")
-		if err != nil {
-			return utils.Errorf("Loopback SetBPFFilter failed: %v", err)
-		}
+		bpf = "udp || tcp[tcpflags] == tcp-syn|tcp-ack"
+	}
+	err = handle.SetBPFFilter(bpf)
+	if err != nil {
+		return utils.Errorf("SetBPFFilter failed: %v", err)
 	}
 
+	log.Infof("pcap set filter success: %s", bpf)
 	s.Handle = handle
 	return nil
 }
