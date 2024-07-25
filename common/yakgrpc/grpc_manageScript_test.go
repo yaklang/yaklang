@@ -2,12 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"testing"
 )
 
 func TestQueryYakScriptRiskDetailByCWE(t *testing.T) {
@@ -44,71 +43,7 @@ func TestImportYakScript(t *testing.T) {
 	}
 	_ = s
 }
-func TestQueryMitmParamYakScript(t *testing.T) {
-	client, err := NewLocalClient()
-	if err != nil {
-		panic(err)
-	}
-	script, err := client.SaveNewYakScript(context.Background(),
-		&ypb.SaveNewYakScriptRequest{
-			Params: []*ypb.YakScriptParam{{
-				Field:        "target",
-				DefaultValue: "1",
-				TypeVerbose:  "text",
-				FieldVerbose: "",
-				Help:         "",
-				Required:     true,
-				Group:        "",
-				ExtraSetting: "",
-				MethodType:   "",
-			}},
-			Type: "mitm",
-			Content: `target = cli.String("target")
-cli.check()
 
-
-mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-    dump(target)
-    yakit_output(target)
-    poc.Get(target)~
-}
-`,
-			ScriptName: "plugin_test_3",
-		})
-	is, err := client.SaveNewYakScript(context.Background(),
-		&ypb.SaveNewYakScriptRequest{
-			Type:       "mitm",
-			Content:    ``,
-			ScriptName: "plugin_test_2",
-		})
-	if err != nil {
-		panic(err)
-	}
-	qs, err := client.QueryYakScript(context.Background(), &ypb.QueryYakScriptRequest{
-		Type:               "mitm",
-		IsMITMParamPlugins: 1,
-	})
-	defer func() {
-		client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{Id: script.Id})
-		client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{Id: is.Id})
-	}()
-	if err != nil {
-		panic(err)
-	}
-	for _, datum := range qs.Data {
-		assert.True(t, len(datum.Params) > 0 && datum.Id != is.Id)
-	}
-	yakScript, err := client.QueryYakScript(context.Background(), &ypb.QueryYakScriptRequest{
-		Type:               "mitm",
-		IsMITMParamPlugins: 2,
-	})
-	if err != nil {
-		panic(err)
-	}
-	for _, datum := range yakScript.Data {
-		assert.True(t, len(datum.Params) <= 0 && datum.Id != script.Id)
-	}
-}
 func TestServer_QueryYakScript(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {

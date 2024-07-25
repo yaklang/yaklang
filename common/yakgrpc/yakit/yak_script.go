@@ -362,9 +362,9 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	}
 	switch params.IsMITMParamPlugins {
 	case 1:
-		db = db.Where(`params!="null" and params is not null and params!=""`)
+		db = db.Where(`params!='\"null\"' and params is not null and LENGTH(params)>0`)
 	case 2:
-		db = db.Where(`params="null" or params is null or params=""`)
+		db = db.Where(`(params='\"null\"' or params is null or LENGTH(params)<=0) or type='port-scan'`)
 	}
 	// 排除 workflow
 	if params.GetExcludeNucleiWorkflow() {
