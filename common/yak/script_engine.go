@@ -447,17 +447,13 @@ func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 
 func (e *ScriptEngine) HookOsExit() {
 	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		val, ok := engine.GetVar("os")
-		if !ok {
-			return nil
-		}
-		osLib, ok := val.(map[string]interface{})
-		if !ok {
-			return nil
-		}
-		osLib["Exit"] = func(i ...interface{}) {
-			panic(fmt.Sprintf("exit current yak context with: %v", spew.Sdump(i)))
-		}
+		engine.SetVars(map[string]any{
+			"os": map[string]any{
+				"Exit": func(i ...interface{}) {
+					panic(fmt.Sprintf("exit current yak context with: %v", spew.Sdump(i)))
+				},
+			},
+		})
 		return nil
 	})
 }
