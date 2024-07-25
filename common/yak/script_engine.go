@@ -730,10 +730,7 @@ func (e *ScriptEngine) ExecuteWithTemplate(codeTmp string, i map[string][]string
 
 func NewYakitVirtualClientScriptEngine(client *yaklib.YakitClient) *ScriptEngine {
 	e := NewScriptEngine(20)
-	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVars(yaklib.GetExtYakitLibByClient(client))
-		return nil
-	})
+	e.SetYakitClient(client)
 	return e
 }
 

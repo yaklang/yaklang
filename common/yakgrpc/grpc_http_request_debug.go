@@ -82,7 +82,19 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 			tempArgs := makeArgs(streamCtx, params, script.Content)
 			app = yak.HookCliArgs(engine, tempArgs)
 		}
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithCliApp(app).WithContextCancel(cancel).WithPluginUUID(script.Uuid))
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(
+			runtimeId,
+		).WithPluginName(
+			scriptName,
+		).WithContext(
+			streamCtx,
+		).WithCliApp(
+			app,
+		).WithContextCancel(
+			cancel,
+		).WithPluginUUID(
+			script.Uuid,
+		).WithYakitClient(feedbackClient))
 
 		return nil
 	})
@@ -251,7 +263,14 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		engine.SetVars(map[string]any{
 			"RUNTIME_ID": runtimeId,
 		})
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithContextCancel(cancel))
+		yak.BindYakitPluginContextToEngine(
+			engine,
+			yak.CreateYakitPluginContext(runtimeId).
+				WithPluginName(scriptName).
+				WithContext(streamCtx).
+				WithContextCancel(cancel).
+				WithYakitClient(feedbackClient),
+		)
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(streamCtx, debugScriptCode, map[string]any{
