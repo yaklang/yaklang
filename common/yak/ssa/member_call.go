@@ -250,10 +250,12 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 		return name, BasicTypes[AnyTypeKind]
 	case ClassBluePrintTypeKind:
 		class := value.GetType().(*ClassBluePrint)
-		if member := class.GetMember(key.String()); member != nil {
-			return name, member.Type
+		if member := class.GetMemberAndStaticMember(key.String(), true); member != nil {
+			return name, member.GetType()
 		}
-		// TODO: handler static member
+	//TODO: handler static member
+	case NullTypeKind:
+		return name, nil
 	default:
 	}
 	return name, nil
@@ -264,41 +266,20 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 }
 
 func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
-	if utils.IsNil(value) {
-		log.Errorf("BUG: ReadMemberCallMethodVariable from nil ssa.Value: %v", value)
+	if res := b.CheckMemberCallNilValue(value, key, "ReadMemberCallMethodVariable"); res != nil {
+		return res
 	}
-	if utils.IsNil(key) {
-		log.Errorf("BUG: ReadMemberCallMethodVariable from nil ssa.Value: %v", key)
-	}
-
-	if utils.IsNil(value) && utils.IsNil(key) {
-		log.Error("BUG: ReadMemberCallMethodVariable's value and key is all nil...")
-		return b.EmitUndefined("")
-	} else if utils.IsNil(value) && !utils.IsNil(key) {
-		log.Errorf("BUG: ReadMemberCallMethodVariable's value is nil, key: %v", key)
-		return b.EmitUndefined("")
-	} else if !utils.IsNil(value) && utils.IsNil(key) {
-		log.Errorf("BUG: ReadMemberCallMethodVariable's key is nil, value: %v", value)
-		return b.EmitUndefined("")
-	}
-
 	program := b.GetProgram()
-
-	// to extern lib
+	// step1 try to get from extern
 	if extern, ok := ToExternLib(value); ok {
 		// write to extern Lib
 		name := b.getExternLibMemberCall(value, key)
-		// if ret := b.PeekValue(name); ret != nil {
-		// 	return ret
-		// }
 		if ret := ReadVariableFromScope(b.CurrentBlock.ScopeTable, name); ret != nil {
 			return ret.Value
 		}
-
 		if ret := extern.BuildField(key.String()); ret != nil {
 			// set program offsetMap for extern value
 			program.SetOffsetValue(ret, b.CurrentRange)
-
 			// create variable for extern value
 			variable := ret.GetVariable(name)
 			if variable == nil {
@@ -306,7 +287,6 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 			} else {
 				variable.AddRange(b.CurrentRange, true)
 			}
-
 			// set member call
 			SetMemberCall(value, key, ret)
 			return ret
@@ -320,24 +300,13 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 		p.SetExtern(true)
 		return p
 	}
-
+	// step2 try to get from method
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
 		name, typ := checkCanMemberCall(value, key)
 		member := b.getOriginMember(name, typ, value, key)
 		return member
 	}
-
-	if para, ok := ToParameter(value); ok {
-		name, _ := checkCanMemberCall(para, key)
-		newParamterMember := b.NewParameterMember(name, para, key)
-		t := NewFunctionTypeDefine(name, nil, nil, false)
-		t.IsMethod = true
-		newParamterMember.SetType(t)
-		SetMemberCall(para, key, newParamterMember)
-		setMemberVerboseName(newParamterMember)
-		return newParamterMember
-	}
-
+	// step3 try to get from normal method or static method
 	if value.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 		if blueprint := value.GetType().(*ClassBluePrint); blueprint != nil {
 			if v, ok := blueprint.StaticMethod[key.String()]; ok {
@@ -356,49 +325,29 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 		}
 	}
 	name, typ := checkCanMemberCall(value, key)
+	// step4 try to peek value from this function
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
-
-	origin := b.ReadValueInThisFunction(name)
-	if undefine, ok := ToUndefined(origin); ok {
-		undefine.SetRange(b.CurrentRange)
-
+	// step5 create undefined memberCall value if the value can not be peeked
+	origin := b.writeUndefine(name)
+	// step6 Determine the type of member call.
+	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
+	if u, ok := ToUndefined(origin); ok {
+		u.SetRange(b.CurrentRange)
 		if typ != nil {
-			undefine.Kind = UndefinedMemberValid
-			undefine.SetType(typ)
+			u.Kind = UndefinedMemberValid
+			u.SetType(typ)
 		} else {
-			undefine.Kind = UndefinedMemberInValid
-		}
-
-		if b.MarkedMemberCallWantMethod {
-			var t *FunctionType
-			t, ok = typ.(*FunctionType)
-			if !ok {
-				t = NewFunctionTypeDefine(name, nil, nil, false)
-			}
+			u.Kind = UndefinedMemberInValid
+			t := NewFunctionTypeDefine(name, nil, nil, false)
 			t.IsMethod = true
-			undefine.SetType(t)
+			u.SetType(t)
 		}
-
-		// undefine.SetName(b.setMember(key))
-		// if b.MarkedMemberCallWantMethod {
-		// 	t := NewFunctionTypeDefine(name, nil, nil, false)
-		// 	t.IsMethod = true
-		// 	undefine.SetType(t)
-		// } else {
-		// 	if typ != nil {
-		// 		undefine.Kind = UndefinedMemberValid
-		// 		undefine.SetType(typ)
-		// 	} else {
-		// 		undefine.Kind = UndefinedMemberInValid
-		// 	}
-		// }
-		SetMemberCall(value, key, undefine)
+		SetMemberCall(value, key, u)
 	}
 	setMemberVerboseName(origin)
 	return origin
-
 }
 
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
@@ -637,4 +586,24 @@ func GetKeyString(key Value) string {
 		//}
 	}
 	return text
+}
+
+func (b *FunctionBuilder) CheckMemberCallNilValue(value, key Value, funcName string) Value {
+	if utils.IsNil(value) {
+		log.Errorf("BUG: %s from nil ssa.Value: %v", funcName, value)
+	}
+	if utils.IsNil(key) {
+		log.Errorf("BUG: %s from nil ssa.Value: %v", funcName, key)
+	}
+	if utils.IsNil(value) && utils.IsNil(key) {
+		log.Error("BUG: ReadMemberCallMethodVariable's value and key is all nil...")
+		return b.EmitUndefined("")
+	} else if utils.IsNil(value) && !utils.IsNil(key) {
+		log.Errorf("BUG:%s's value is nil, key: %v", funcName, key)
+		return b.EmitUndefined("")
+	} else if !utils.IsNil(value) && utils.IsNil(key) {
+		log.Errorf("BUG: %s's key is nil, value: %v", funcName, value)
+		return b.EmitUndefined("")
+	}
+	return nil
 }
