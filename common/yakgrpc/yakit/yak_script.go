@@ -397,24 +397,10 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 
 	if params.Group != nil {
 		if params.Group.UnSetGroup {
-			query := "script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups"
-			if params.Group.IsPocBuiltIn == "false" {
-				query += " WHERE is_poc_built_in = false"
-			} else if params.Group.IsPocBuiltIn == "true" {
-				query += " AND is_poc_built_in = true"
-			}
-			query += ")"
-			db = db.Not(query)
+			db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
 		} else {
-			query := "script_name IN (SELECT yak_script_name FROM plugin_groups WHERE `group` IN (?)"
-			if params.Group.IsPocBuiltIn == "false" {
-				//query += " AND is_poc_built_in = 0"
-			} else if params.Group.IsPocBuiltIn == "true" {
-				//query += " AND is_poc_built_in = 1"
-			}
-			query += ")"
 			if len(params.Group.Group) > 0 {
-				db = db.Where(query, params.Group.Group)
+				db = db.Where("yak_scripts.script_name in  (select yak_script_name from plugin_groups where `group` in (?) )", params.Group.Group)
 			}
 		}
 	}
