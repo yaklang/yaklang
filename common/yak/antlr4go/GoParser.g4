@@ -179,7 +179,7 @@ expressionStmt
     ;
 
 sendStmt
-    : channel = expression RECEIVE expression
+    : channel = expression RECEIVE data = expression
     ;
 
 incDecStmt

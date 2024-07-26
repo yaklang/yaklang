@@ -19,17 +19,23 @@ func TestBuilder(t *testing.T) {
 	})
 }
 
-
 func TestTemp(t *testing.T) {
 	t.Run("temp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 
-		var a = 2
+		type mystruct struct{
+		    a int 
+			b string
+		}
+
 		func main(){
-			println(a)
+			t := mystruct{a:1,b:"hello",c:[]int{1,2,3}}
+			println(t.a)
+			println(t.b)
+			println(t.c[2])
 		}
 		`, []string{
-			"1",
+			``,
 		}, t)
 	})
-}	
+}

@@ -6107,8 +6107,14 @@ type ISendStmtContext interface {
 	// GetChannel returns the channel rule contexts.
 	GetChannel() IExpressionContext
 
+	// GetData returns the data rule contexts.
+	GetData() IExpressionContext
+
 	// SetChannel sets the channel rule contexts.
 	SetChannel(IExpressionContext)
+
+	// SetData sets the data rule contexts.
+	SetData(IExpressionContext)
 
 	// IsSendStmtContext differentiates from other interfaces.
 	IsSendStmtContext()
@@ -6118,6 +6124,7 @@ type SendStmtContext struct {
 	*antlr.BaseParserRuleContext
 	parser  antlr.Parser
 	channel IExpressionContext
+	data    IExpressionContext
 }
 
 func NewEmptySendStmtContext() *SendStmtContext {
@@ -6144,7 +6151,11 @@ func (s *SendStmtContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *SendStmtContext) GetChannel() IExpressionContext { return s.channel }
 
+func (s *SendStmtContext) GetData() IExpressionContext { return s.data }
+
 func (s *SendStmtContext) SetChannel(v IExpressionContext) { s.channel = v }
+
+func (s *SendStmtContext) SetData(v IExpressionContext) { s.data = v }
 
 func (s *SendStmtContext) RECEIVE() antlr.TerminalNode {
 	return s.GetToken(GoParserRECEIVE, 0)
@@ -6246,7 +6257,10 @@ func (p *GoParser) SendStmt() (localctx ISendStmtContext) {
 	}
 	{
 		p.SetState(492)
-		p.expression(0)
+
+		var _x = p.expression(0)
+
+		localctx.(*SendStmtContext).data = _x
 	}
 
 	return localctx
