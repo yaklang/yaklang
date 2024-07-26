@@ -162,6 +162,19 @@ func TestSFURl(t *testing.T) {
 			assert.NoError(t, err)
 			spew.Dump(res)
 		}
+	})
 
+	t.Run("check syntaxflow information", func(t *testing.T) {
+		query := fmt.Sprintf(`
+		target* as $target 
+		$target (* #{
+			hook: %s
+		}-> as $para_top_def)
+		`, "`*  as $a`")
+		{
+			res, err := SendURL(local, progID, "/a/0", query)
+			assert.NoError(t, err)
+			spew.Dump(res)
+		}
 	})
 }
