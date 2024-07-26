@@ -3,55 +3,58 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
-	"sync"
 )
 
-func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
-	_, ok := m.Load(t.GetId())
-	if ok {
-		return
+type ValueGraph struct {
+	*dot.Graph
+
+	RootValue map[*Value]int // root value to graph node id
+	NodeInfo  map[int]*Value // graph node id to value
+}
+
+func NewValueGraph(v ...*Value) *ValueGraph {
+	graph := dot.New()
+	graph.MakeDirected()
+	graph.GraphAttribute("rankdir", "BT")
+	vg := &ValueGraph{
+		Graph:     graph,
+		RootValue: make(map[*Value]int),
+		NodeInfo:  make(map[int]*Value),
 	}
-	m.Store(t.GetId(), t)
+	for _, value := range v {
+		n := graph.AddNode(value.GetVerboseName())
+		vg.RootValue[value] = n
+		vg._marshal(n, value)
+	}
+	return vg
+}
+
+func (g *ValueGraph) _marshal(self int, t *Value) {
+	g.NodeInfo[self] = t
 
 	if len(t.DependOn) == 0 && len(t.EffectOn) == 0 && len(t.Predecessors) == 0 {
 		return
 	}
 
-	var deps []int
-	var depsMap = make(map[int]*Value)
-	for _, node := range t.DependOn {
+	createNode := func(node *Value) int {
 		id := g.GetOrCreateNode(node.GetVerboseName())
-		deps = append(deps)
-		depsMap[id] = node
+		if _, ok := g.NodeInfo[id]; !ok {
+			g._marshal(id, node)
+		}
+		return id
 	}
 
-	var effects []int
-	var effectsMap = make(map[int]*Value)
+	for _, node := range t.DependOn {
+		id := createNode(node)
+		g.AddEdge(self, id, "")
+	}
 	for _, node := range t.EffectOn {
-		id := g.GetOrCreateNode(node.GetVerboseName())
-		effects = append(effects, id)
-		effectsMap[id] = node
-	}
-	for _, dep := range deps {
-		direct := fmt.Sprintf(`%v->%v`, self, dep)
-		_ = direct
-		g.AddEdge(self, dep, "")
-	}
-	for _, effect := range effects {
-		direct := fmt.Sprintf(`%v->%v`, effect, self)
-		_ = direct
-		// log.Infof("found edge: %v", direct)
-		g.AddEdge(effect, self, "")
-	}
-	for id, node := range depsMap {
-		_marshal(m, g, id, node)
-	}
-	for id, node := range effectsMap {
-		_marshal(m, g, id, node)
+		id := createNode(node)
+		g.AddEdge(id, self, "")
 	}
 
 	for _, predecessor := range t.Predecessors {
@@ -59,10 +62,8 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 			continue
 		}
 
-		name := predecessor.Node.GetVerboseName()
-		predecessorNodeId := g.GetOrCreateNode(name)
-		log.Infof("add predecessor nodeId(%v): %v", predecessorNodeId, name)
-		edges := g.GetEdges(predecessorNodeId, self)
+		predecessorNodeID := createNode(predecessor.Node)
+		edges := g.GetEdges(predecessorNodeID, self)
 
 		edgeLabel := predecessor.Info.Label
 		if predecessor.Info.Step > 0 {
@@ -77,25 +78,18 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 				g.EdgeAttribute(edge, "label", edgeLabel)
 			}
 		} else {
-			edgeId := g.AddEdge(predecessorNodeId, self, edgeLabel)
+			edgeId := g.AddEdge(predecessorNodeID, self, edgeLabel)
 			g.EdgeAttribute(edgeId, "color", "red")
 			g.EdgeAttribute(edgeId, "fontcolor", "red")
 			g.EdgeAttribute(edgeId, "penwidth", "3.0")
 		}
-		_marshal(m, g, predecessorNodeId, predecessor.Node)
 	}
 }
 
 func (v *Value) DotGraph() string {
-	g := dot.New()
-	g.MakeDirected()
-	g.GraphAttribute("rankdir", "BT")
-
-	visisted := new(sync.Map)
-	n := g.AddNode(v.GetVerboseName())
-	_marshal(visisted, g, n, v)
+	vg := NewValueGraph(v)
 	var buf bytes.Buffer
-	g.GenerateDOT(&buf)
+	vg.GenerateDOT(&buf)
 	return buf.String()
 }
 
