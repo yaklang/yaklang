@@ -252,7 +252,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	}
 	// }
 
-	return nil
+	return ssa.GetNullType()
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
