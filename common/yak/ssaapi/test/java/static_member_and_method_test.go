@@ -249,7 +249,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	class B {
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.a);
+			println(a.a);
 		}
 	}
 	`)
@@ -286,7 +286,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	`)
 
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),

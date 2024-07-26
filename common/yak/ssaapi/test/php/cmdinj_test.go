@@ -17,7 +17,7 @@ system($command); //system函数特性 执行结果会自动打印
 	ssatest.CheckSyntaxFlow(t, code,
 		`system( * as $command)`,
 		map[string][]string{
-			"command": {`add("ping -c 1 ", Undefined-$_GET.'ip'(valid))`},
+			"command": {"add(\"ping -c 1 \", Undefined-$_GET.'ip')"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -64,7 +64,7 @@ eval($ob->a);
 `
 		ssatest.CheckSyntaxFlow(t, code,
 			`eval(* #-> * as $param)`,
-			map[string][]string{"param": {"Undefined-$_GET", "Undefined-$_GET.1(valid)"}},
+			map[string][]string{"param": {"Undefined-$_GET", "Undefined-$_GET.1"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
@@ -91,7 +91,7 @@ function test($a){
 
 test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code, `eval(* #-> * as $command)`, map[string][]string{
-		"command": {"Undefined-$_GET", "Undefined-$_GET.1(valid)"},
+		"command": {"Undefined-$_GET", "Undefined-$_GET.1"},
 	},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
