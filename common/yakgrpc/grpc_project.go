@@ -70,6 +70,9 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 		consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
 		consts.SetGormProjectDatabase(projectDatabase)
 		return &ypb.Empty{}, nil
+	} else {
+		//传入CurrentProject id为空，默认关闭当前的currentProject数据库
+		consts.GetGormProjectDatabase().Close()
 	}
 	return nil, utils.Errorf("params is empty")
 }
