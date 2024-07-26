@@ -2,6 +2,11 @@ package yakcmds
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yakdocument"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var DocCommands = []*cli.Command{
@@ -35,7 +36,7 @@ var DocCommands = []*cli.Command{
 			},
 		},
 		Action: func(c *cli.Context) error {
-			helper := doc.DefaultDocumentHelper
+			helper := doc.GetDefaultDocumentHelper()
 
 			if c.Bool("all-lib") {
 				for _, libName := range helper.GetAllLibs() {
