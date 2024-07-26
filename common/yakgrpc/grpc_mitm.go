@@ -1568,16 +1568,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		var needUpdate bool
-		timeout := time.After(300 * time.Millisecond)
+		timeoutCtx, timeCancel := context.WithTimeout(ctx, 300*time.Millisecond)
+		defer timeCancel()
 		select {
 		case <-colorOK:
-		case <-timeout: // wait for max 300ms
+		case <-timeoutCtx.Done(): // wait for max 300ms
 			needUpdate = true
 		}
 
 		select {
 		case <-pluginFinishCh:
-		case <-timeout: // wait for max 300ms
+		case <-timeoutCtx.Done(): // wait for max 300ms
 			needUpdate = true
 		}
 
