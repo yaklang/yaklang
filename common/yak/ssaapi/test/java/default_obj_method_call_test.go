@@ -1,7 +1,9 @@
 package java
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"strings"
@@ -102,6 +104,7 @@ class B {
 
 
 `, func(prog *ssaapi.Program) error {
+		prog.Show()
 		dump1 := prog.SyntaxFlow(`dump1(* as $param);`)
 		d1 := dump1.GetValues("param")
 		if d1.Show().Len() == 0 {
@@ -110,7 +113,7 @@ class B {
 		if !strings.Contains(d1.String(), "abc") {
 			t.Fatalf("dump1's parma error.want \"abc\",but got %s", d1.String())
 		}
-
+		// Todo：A.value的设置读取应该为phi
 		//dump2 := prog.SyntaxFlow(`dump2(* as $param);`)
 		//d2 := dump2.GetValues("param")
 		//if d2.Show().Len() == 0 {
@@ -140,10 +143,12 @@ class B {
 		if param2.Show().Len() != 1 {
 			t.Fatal("obj.objNoExistedMethod should have receiver as param")
 		}
-
-		target := prog.SyntaxFlow("obj-->* as $target;").GetValues("target")
-		println("target")
-		target.Show()
+		// TODO: 跨过程，obj --> * 必须和 result2 ,需要修复ssaapi
+		//target := prog.SyntaxFlow("obj-->* as $target;").GetValues("target")
+		//target.Show()
+		//if !strings.Contains(target.String(), "obj.objNoExistedMethod") {
+		//	t.Fatal("obj-->* should contain obj.objNoExistedMethod")
+		//}
 
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -199,75 +204,199 @@ class A {
 
 func TestDefaultOBJParamAsCaller(t *testing.T) {
 	ssatest.Check(t, `
+class Cat{}
 class A {
-	public void A(int p){
-	p.Call("hello");
+	public void A(Dog p){
+		// 参数类型为null
+		p.CallA("hello");
 	}
+	public void B(Cat p){
+		// 参数类型存在
+		p.CallB("hello");
+	}
+	public void C(int p){
+		//参数类型为基础类型
+		p.CallC("hello");
+ }
 }
 `, func(prog *ssaapi.Program) error {
-		result := prog.SyntaxFlow(`.Call(*?{!opcode: const} as $param,);`)
-		rets := result.GetValues("param")
-		if rets.Len() <= 0 {
-			t.Fatal("no param")
-		}
-		if rets.Len() != 0 {
-			t.Fatal("param should be 1 ")
-		}
-		rets.Show()
+		callA := prog.SyntaxFlow(`p.CallA(* as $param,)`).GetValues("param")
+		assert.Contains(t, callA.String(), "Parameter-p")
+		callB := prog.SyntaxFlow(`p.CallB(* as $param,)`).GetValues("param")
+		assert.Contains(t, callB.String(), "Parameter-p")
+		callC := prog.SyntaxFlow(`p.CallC(* as $param,)`).GetValues("param")
+		assert.Contains(t, callC.String(), "Parameter-p")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
-
 }
 
-func TestDefaultOBJWithTypeTransform(t *testing.T) {
+func TestDefaultOBJ_Type_Transform(t *testing.T) {
 	ssatest.Check(t, `
+class cat{}
 class A {
-	public void A(){
-	input = "ls";
-	cmd = (String) method.invoke(clazz.newInstance(), ls);
+	public void A(Dog p){
+		p += 2; // 转化为二元运算符
+		p.CallA("hello");
 	}
+	public void B(Dog p){
+		p > 2;
+		p.CallB("hello");
+	}
+	public void C(Dog p){
+		Cat p = (Cat) p;
+		p.CallC("hello");
+ }
+	
 }
 `, func(prog *ssaapi.Program) error {
-		result := prog.SyntaxFlow(`method.invoke(* #-> as $target);`)
-		rets := result.GetValues("target")
-		if rets.Len() <= 0 {
-			t.Fatal("no target")
-		}
-		rets.Show()
+		prog.Show()
+		callA := prog.SyntaxFlow(`p.CallA(* as $param,)`, sfvm.WithEnableDebug(true)).GetValues("param")
+		callA.Show()
+		assert.Contains(t, callA.String(), "add(Parameter-p, 2)")
+		callB := prog.SyntaxFlow(`p.CallB(* as $param,)`).GetValues("param")
+		assert.Contains(t, callB.String(), "Parameter-p")
+		callC := prog.SyntaxFlow(`p.CallC(* as $param,)`).GetValues("param")
+		callC.Show()
+		assert.Contains(t, callC.String(), "Parameter-p")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 
 }
 
-func TestAAA3(t *testing.T) {
-	code := `
-public class A{
-	public static  int num;
-	public void setNum(int n){
-	  A.num=666;
+func TestDefaultOBJMemberCallAsCaller(t *testing.T) {
+	ssatest.Check(t, `
+class B{
+	public string getBody(Dog p){
+		return "hello";
+	}
 }
-	public int getNum(){
-		return A.num;
+class A {
+	public void A(Dog p){
+		string body = foo.getBody(p);
+		body.toString1(); // body 为any类型，这是静态调用，不应该有this
+	}
+	public void B(Dog p){
+		B b = new B();
+		string body = b.getBody(p);
+		body.toString2(); //应该有this
+	}
+}
+`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		callA := prog.SyntaxFlow(`.toString1(* as $param)`).GetValues("param")
+		assert.Equal(t, 0, callA.Len())
+		callB := prog.SyntaxFlow(`.toString2(* as $param)`).GetValues("param")
+		assert.Equal(t, 1, callB.Len())
+		assert.Contains(t, callB.String(), "Undefined-b.getBody(valid)(Undefined-B(Undefined-B),Parameter-p)")
+		callB.Show()
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+
 }
 
+func TestDefaultObjForPeekValue(t *testing.T) {
+	ssatest.Check(t, `
+public class A{
+	public void a(){};
 }
 
 public class B{
 	public static void main(){
 		A a =new A();
-		b.exec(a);
+		a.a(); // 有类型，前面没有出现过，会自动添加this
+		a.b(); // 没有类型，前面没有出现过，不应该创建，应该添加this
+		a.a(); // 前面已经出现过，所以直接拿并返回
+		a.b(); // 前面已经出现过，直接拿并返回
 	}
 }
+`, func(prog *ssaapi.Program) error {
+		prog.Show()
 
+		result1 := prog.SyntaxFlow(`a.a() as $a;`).GetValues("a")
+		result1.Show()
+		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[0].String())
+		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[1].String())
+		result2 := prog.SyntaxFlow(`a.b() as $b;`).GetValues("b")
+		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[0].String())
+		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[1].String())
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
 
-`
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage("java"))
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestDefaultObjForNormalMethod(t *testing.T) {
+	ssatest.Check(t, `
+public class A{
+	public static int a(){
+	return 666;
+};
+}
+
+public class B{
+	public static void main(){
+		int a1=A.a(); //不应该有this
+		int b1=A.b(); // A的Type为any，不应该有this
+		int a2=A.a(); // 前面已经出现过，直接拿并返回
+		int b2=A.b(); // 前面已经出现过，直接拿并返回
 	}
-	prog.Show()
-	result := prog.SyntaxFlow(`a -->* as $a;`).GetValues("a")
+}
+`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
+		assert.Equal(t, "Function-A_a()", result1[0].String())
+		assert.Equal(t, "Function-A_a()", result1[1].String())
+		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
+		assert.Equal(t, "Undefined-A.b(valid)", result2[0].String())
+		assert.Equal(t, "Undefined-A.b(valid)()", result2[1].String())
+		assert.Equal(t, "Undefined-A.b(valid)()", result2[2].String())
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
 
-	result.Show()
+}
 
+func TestDefaultObjForStaticMethod(t *testing.T) {
+	ssatest.Check(t, `
+public class A{
+	public static int a(){
+	return 666;
+};
+}
+
+public class B{
+	public static void main(){
+		A object =new A();
+		int a1=object.a(); // 会直接拿到a并返回
+		int b1=object.b(); // typ应该为nil,所以有this
+		int a2=object.a(); // 前面已经出现过，直接拿并返回
+		int b2=object.b(); // 前面已经出现过，直接拿并返回
+	}
+}
+`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		result1 := prog.SyntaxFlow(`a* as $a;`).GetValues("a")
+		assert.Equal(t, "Function-A_a()", result1[0].String())
+		assert.Equal(t, "Function-A_a()", result1[1].String())
+		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
+		assert.Equal(t, "Undefined-object.b", result2[0].String())
+		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[1].String())
+		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[2].String())
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
+func TestDefaultObjForUndefinedCaller(t *testing.T) {
+	ssatest.Check(t, `
+
+
+public class B{
+	public static void main(param cmd){
+		exec(String.valueOf(cmd)); //String在以前都不存在,type应为null
+	}
+}
+`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		result := prog.SyntaxFlow(`exec(* as $a)`).GetValues("a")
+		result.Show()
+		assert.Contains(t, result.String(), "Undefined-String.valueOf(Undefined-String,Parameter-cmd)")
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
 }
