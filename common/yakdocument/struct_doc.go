@@ -253,12 +253,12 @@ func (e *ExportsFunctionDoc) Fragment() string {
 }
 
 func (e *ExportsFunctionDoc) DefinitionStr() string {
-	if def := doc.DefaultDocumentHelper.LibFuncDefinitionStr(e.LibName, e.Name); def != "" {
+	if def := doc.GetDefaultDocumentHelper().LibFuncDefinitionStr(e.LibName, e.Name); def != "" {
 		return def
 	}
 
 	if strings.HasPrefix(e.Name, e.LibName+".") {
-		if ret := doc.DefaultDocumentHelper.LibFuncDefinitionStr(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
+		if ret := doc.GetDefaultDocumentHelper().LibFuncDefinitionStr(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
 			return ret
 		}
 	}
@@ -313,12 +313,12 @@ func typeStrFix(raw string, isVariadic bool) string {
 }
 
 func (e *ExportsFunctionDoc) CompletionStr() string {
-	if ret := doc.DefaultDocumentHelper.LibFuncAutoCompletion(e.LibName, e.Name); ret != "" {
+	if ret := doc.GetDefaultDocumentHelper().LibFuncAutoCompletion(e.LibName, e.Name); ret != "" {
 		return ret
 	}
 
 	if strings.HasPrefix(e.Name, e.LibName+".") {
-		if ret := doc.DefaultDocumentHelper.LibFuncAutoCompletion(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
+		if ret := doc.GetDefaultDocumentHelper().LibFuncAutoCompletion(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
 			return ret
 		}
 	}

@@ -67,11 +67,11 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 	if len(docMap) <= 0 {
 		docMapOnce.Do(func() {
 			// all lib
-			resources := make([]*ypb.YakURLResource, 0, len(doc.DefaultDocumentHelper.Libs))
-			keys := lo.Keys(doc.DefaultDocumentHelper.Libs)
+			resources := make([]*ypb.YakURLResource, 0, len(doc.GetDefaultDocumentHelper().Libs))
+			keys := lo.Keys(doc.GetDefaultDocumentHelper().Libs)
 			sort.Strings(keys)
 			for _, key := range keys {
-				lib := doc.DefaultDocumentHelper.Libs[key]
+				lib := doc.GetDefaultDocumentHelper().Libs[key]
 				resources = append(resources, &ypb.YakURLResource{
 					ResourceType:      "document",
 					VerboseType:       "Document",
@@ -85,7 +85,7 @@ func (d *documentAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 			docMap[""] = resources
 
 			// each lib
-			for _, lib := range doc.DefaultDocumentHelper.Libs {
+			for _, lib := range doc.GetDefaultDocumentHelper().Libs {
 				resources = generateResourceFromLib(lib)
 				sort.SliceStable(resources, func(i, j int) bool {
 					if resources[i].ResourceType != resources[j].ResourceType {
