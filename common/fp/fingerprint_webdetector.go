@@ -3,6 +3,12 @@ package fp
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/fp/fingerprint"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/utils"
@@ -10,11 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
@@ -84,7 +85,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	}
 
 	var (
-		//wg                      = new(sync.WaitGroup)
+		// wg                      = new(sync.WaitGroup)
 		results     = new(sync.Map)
 		cpeAnalyzer = utils.NewCPEAnalyzer()
 		httpflows   []*HTTPFlow
@@ -100,7 +101,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 
 			var currentCPE []*rule.CPE
 			if !f.Config.DisableDefaultIotFingerprint {
-				var iotdevResults = iotdevfp.MatchAll(i.Response)
+				iotdevResults := iotdevfp.MatchAll(i.Response)
 				for _, iotdevResult := range iotdevResults {
 					result.Fingerprint.CPEs = append(result.Fingerprint.CPEs, iotdevResult.GetCPE())
 					cpeIns, _ := webfingerprint.ParseToCPE(iotdevResult.GetCPE())
@@ -165,7 +166,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 				f := utils2.GetLastElement(flow)
 				return f.Response, nil
 			}
-			cpes := f.matcher.MatchResource(iotDetectCtx, func(path string) (*rule.MatchResource, error) {
+			cpes := f.matcher.MatchResource(iotDetectCtx, f.Config.GetWebFingerprintRules(), func(path string) (*rule.MatchResource, error) {
 				res := &rule.MatchResource{
 					Protocol: "http",
 					Port:     port,

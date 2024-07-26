@@ -1,9 +1,10 @@
 package fp
 
 import (
+	"sort"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
-	"sort"
 )
 
 type byRarity []*RuleBlock
@@ -20,7 +21,7 @@ func (a byName) Less(i, j int) bool { return a[i].Probe.Name > a[j].Probe.Name }
 
 func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBlock, blocks []*RuleBlock, ok bool) {
 	var bestBlocks []*RuleBlock
-	for probe, matches := range config.FingerprintRules {
+	for probe, matches := range config.GetFingerprintRules() {
 
 		// 只有 TCP 才能匹配 TCP
 		if probe.Payload == "" && config.CanScanTCP() {
@@ -50,25 +51,25 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 				}
 			}
 			if !isFitProto {
-				//log.Debugf("skip [%v] %s for config[%#v]", probe.Proto, probe.Name, config.TransportProtos)
+				// log.Debugf("skip [%v] %s for config[%#v]", probe.Proto, probe.Name, config.TransportProtos)
 				continue
 			}
 
 			// 根据是否是主动模式规律规则
 			if !config.ActiveMode {
 				if len(probe.Payload) > 0 {
-					//log.Debugf("skipped [%v] %s for active sending payload", probe.Proto, probe.Name)
+					// log.Debugf("skipped [%v] %s for active sending payload", probe.Proto, probe.Name)
 					continue
 				}
 			}
 
 			// 过滤稀有度
 			if probe.Rarity > config.RarityMax {
-				//log.Debugf("Probe %s is skipped for rarity is %v (config %v)", probe.Name, probe.Rarity, config.RarityMax)
+				// log.Debugf("Probe %s is skipped for rarity is %v (config %v)", probe.Name, probe.Rarity, config.RarityMax)
 				continue
 			}
 
-			//log.Debugf("use probe [%v]%s all %v match rules", probe.Proto, probe.Name, len(matches))
+			// log.Debugf("use probe [%v]%s all %v match rules", probe.Proto, probe.Name, len(matches))
 			blocks = append(blocks, &RuleBlock{
 				Probe:   probe,
 				Matched: matches,
@@ -116,7 +117,7 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 func GetRuleBlockByServiceName(serviceName string, config *Config) (blocks []*RuleBlock) {
 	blockMap := make(map[string]*RuleBlock)
 	// 遍历所有指纹规则
-	for probe, matches := range config.FingerprintRules {
+	for probe, matches := range config.GetFingerprintRules() {
 		// 在每个规则块中查找符合条件的服务名
 		for _, match := range matches {
 			// 如果服务名包含指定的 serviceName

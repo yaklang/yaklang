@@ -3,15 +3,14 @@ package fp
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fp/fingerprint"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"net"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/fp/fingerprint"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
@@ -405,42 +404,9 @@ func NewFingerprintMatcher(rules map[*NmapProbe][]*NmapMatch, config *Config) (*
 		config = NewConfig()
 	}
 
-	// use default rules
-	var err error
-	if len(config.FingerprintRules) <= 0 {
-		if len(rules) <= 0 {
-			rules, err = GetDefaultNmapServiceProbeRules()
-			if err != nil {
-				return nil, errors.Errorf("get default probe rules failed: %s", err)
-			}
-			return nil, errors.New("empty rules is not allowed")
-		}
-		config.FingerprintRules = rules
-	}
-
-	var webfingerprintRules []*rule.FingerPrintRule
-	if len(config.WebFingerprintRules) <= 0 {
-		webfingerprintRules, err = GetDefaultWebFingerprintRules()
-		if err != nil {
-			return nil, errors.Errorf("get default web fingerprint rules failed: %s", err)
-		}
-	} else {
-		webfingerprintRules = config.WebFingerprintRules
-	}
-
-	//webMatcher, err := webfingerprint.NewWebFingerprintMatcher(
-	//	webfingerprintRules,
-	//	config.ActiveMode,
-	//	config.WebFingerprintUseAllRules,
-	//)
-	//matcher := fingerprint.NewMatcher()
-	//if err != nil {
-	//	return nil, errors.Errorf("build web fingerprint matcher failed: %s", err)
-	//}
-
 	matcher := &Matcher{
 		Config:  config,
-		matcher: fingerprint.NewMatcher(webfingerprintRules...),
+		matcher: fingerprint.NewMatcher(),
 	}
 
 	return matcher, nil

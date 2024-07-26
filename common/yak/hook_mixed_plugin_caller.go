@@ -101,13 +101,14 @@ type MixPluginCaller struct {
 	runtimeId string
 	proxy     string
 
-	feedbackHandler    func(*ypb.ExecResult) error
-	ordinaryFeedback   func(i interface{}, item ...interface{})
-	callers            *YakToCallerManager
-	fingerprintMatcher *fp.Matcher
-	swg                *utils.SizedWaitGroup
-	cache              bool
-	pluginScanFilter   *yakit.PluginScanFilter // 插件扫描黑白名单，现在直接使用yakit全局网络配置
+	feedbackHandler        func(*ypb.ExecResult) error
+	ordinaryFeedback       func(i interface{}, item ...interface{})
+	callers                *YakToCallerManager
+	fingerprintMatcherOnce sync.Once
+	fingerprintMatcher     *fp.Matcher
+	swg                    *utils.SizedWaitGroup
+	cache                  bool
+	pluginScanFilter       *yakit.PluginScanFilter // 插件扫描黑白名单，现在直接使用yakit全局网络配置
 }
 
 func (m *MixPluginCaller) SetCache(b bool) {
@@ -240,7 +241,6 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	c.SetLoadPluginTimeout(10)
 	c.SetCallPluginTimeout(60)
 	var err error
-	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
 		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
 	}
@@ -267,7 +267,6 @@ func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller
 	c.SetLoadPluginTimeout(10)
 	c.SetCallPluginTimeout(60)
 	var err error
-	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
 		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
 	}
@@ -603,6 +602,13 @@ func calcNewWebsiteHash(urlIns *url.URL, host, port interface{}, req []byte) str
 	return utils.CalcSha1(urlIns.Scheme, host, port, freq.GetMethod(), "new-website")
 }
 
+func (m *MixPluginCaller) GetFingerprintMatcher() *fp.Matcher {
+	m.fingerprintMatcherOnce.Do(func() {
+		m.fingerprintMatcher, _ = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
+	})
+	return m.fingerprintMatcher
+}
+
 func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -716,7 +722,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowExSync(
 						if scanPort {
 							addr := utils.HostPort(host, port)
 							log.Debugf("(port/mitm) start to match %v", addr)
-							matchResult, err = m.fingerprintMatcher.Match(
+							matchResult, err = m.GetFingerprintMatcher().Match(
 								host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
 								fp.WithProxy(m.proxy),
 							)
@@ -831,7 +837,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 						if scanPort {
 							addr := utils.HostPort(host, port)
 							log.Debugf("(port/mitm) start to match %v", addr)
-							matchResult, err = m.fingerprintMatcher.Match(
+							matchResult, err = m.GetFingerprintMatcher().Match(
 								host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
 								fp.WithProxy(m.proxy),
 							)
