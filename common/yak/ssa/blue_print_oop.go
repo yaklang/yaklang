@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -70,20 +69,16 @@ func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
 	return p.GetClassBluePrint(name)
 }
 
-func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
-	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
-}
-
-func (c *ClassBluePrint) GetMember(key string) *BluePrintMember {
-	var member *BluePrintMember
+func (c *ClassBluePrint) GetMemberAndStaticMember(key string, supportStatic bool) Value {
+	var member Value
 	c.GetMemberEx(key, func(c *ClassBluePrint) bool {
 		if m, ok := c.NormalMember[key]; ok {
-			member = m
+			member = m.Value
 			return true
 		}
-		for _, class := range c.ParentClass {
-			if m, ok := class.NormalMember[key]; ok {
-				member = m
+		if supportStatic {
+			if value, ok := c.StaticMember[key]; ok {
+				member = value
 				return true
 			}
 		}
@@ -91,6 +86,51 @@ func (c *ClassBluePrint) GetMember(key string) *BluePrintMember {
 	})
 	return member
 }
+
+func (c *ClassBluePrint) GetConstEx(key string, get func(c *ClassBluePrint) bool) bool {
+	if b := get(c); b {
+		return true
+	} else {
+		for _, class := range c.ParentClass {
+			if ex := class.GetConstEx(key, get); ex {
+				return true
+			}
+		}
+	}
+	return false
+}
+func (c *ClassBluePrint) GetMethodAndStaticMethod(name string, supportStatic bool) *Function {
+	var _func *Function
+	c.getMethodEx(name, func(bluePrint *ClassBluePrint) bool {
+		if function, ok := bluePrint.Method[name]; ok {
+			_func = function
+			return true
+		} else if supportStatic {
+			if f, ok := bluePrint.StaticMethod[name]; ok {
+				_func = f
+				return true
+			}
+		}
+		return false
+	})
+	return _func
+}
+func (c *ClassBluePrint) getMethodEx(name string, get func(bluePrint *ClassBluePrint) bool) bool {
+	if b := get(c); b {
+		return true
+	}
+	for _, class := range c.ParentClass {
+		if ex := class.getMethodEx(name, get); ex {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
+	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
+}
+
 func (c *ClassBluePrint) GetMemberEx(key string, get func(*ClassBluePrint) bool) bool {
 	if ok := get(c); ok {
 		return true
