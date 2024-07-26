@@ -1,11 +1,12 @@
 package aispec
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"os"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type AIConfig struct {
@@ -37,7 +38,7 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	}
 	err := consts.GetThirdPartyApplicationConfig(c.Type, c)
 	if err != nil {
-		log.Errorf("load third party application config failed: %v", err)
+		log.Debug(err)
 	}
 	return c
 }

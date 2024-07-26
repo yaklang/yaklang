@@ -3,10 +3,11 @@ package openai
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
@@ -99,7 +100,7 @@ func NewOpenAIClient(opts ...ConfigOption) *Client {
 	config := &aispec.AIConfig{}
 	err := consts.GetThirdPartyApplicationConfig("openai", config)
 	if err != nil {
-		log.Errorf("load third party application config failed: %v", err)
+		log.Debug(err)
 	}
 	if config.APIKey != "" && c.APIKey == "" {
 		verbose := "sk-...."

@@ -48,7 +48,7 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 	return func(c *_spaceEngineConfig) {
 		defaultConfig := &base.BaseSpaceEngineConfig{}
 		if err := consts.GetThirdPartyApplicationConfig(i, defaultConfig); err != nil {
-			log.Warnf("load third party application config failed: %v", err)
+			log.Debug(err)
 		} else {
 			c.apiKey = defaultConfig.APIKey
 			c.user = defaultConfig.UserIdentifier
@@ -75,7 +75,7 @@ func withUseZoomeye(api ...string) _spaceEngineConfigOpt {
 		cfg := &base.BaseSpaceEngineConfig{}
 		err := consts.GetThirdPartyApplicationConfig("zoomeye", cfg)
 		if err != nil {
-			log.Errorf("load third party application config failed: %v", err)
+			log.Debug(err)
 		}
 		if len(api) > 0 {
 			c.apiKey = api[0]
@@ -92,7 +92,7 @@ func withUseShodan(api ...string) _spaceEngineConfigOpt {
 		cfg := &base.BaseSpaceEngineConfig{}
 		err := consts.GetThirdPartyApplicationConfig("shodan", cfg)
 		if err != nil {
-			log.Errorf("load third party application config failed: %v", err)
+			log.Debug(err)
 		}
 		if len(api) > 0 {
 			c.apiKey = api[0]
@@ -109,7 +109,7 @@ func withUseQuake(api ...string) _spaceEngineConfigOpt {
 		cfg := &base.BaseSpaceEngineConfig{}
 		err := consts.GetThirdPartyApplicationConfig("quake", cfg)
 		if err != nil {
-			log.Errorf("load third party application config failed: %v", err)
+			log.Debug(err)
 		}
 		if len(api) > 0 {
 			c.apiKey = api[0]
@@ -126,7 +126,7 @@ func withUseHunter(auth ...string) _spaceEngineConfigOpt {
 		cfg := &base.BaseSpaceEngineConfig{}
 		err := consts.GetThirdPartyApplicationConfig("hunter", cfg)
 		if err != nil {
-			log.Errorf("load third party application config failed: %v", err)
+			log.Debug(err)
 		}
 		if len(auth) > 0 {
 			c.apiKey = auth[0]
@@ -143,7 +143,7 @@ func withUseFofa(auth ...string) _spaceEngineConfigOpt {
 		cfg := &base.BaseSpaceEngineConfig{}
 		err := consts.GetThirdPartyApplicationConfig("fofa", cfg)
 		if err != nil {
-			log.Errorf("load third party application config failed: %v", err)
+			log.Debug(err)
 		}
 		if len(auth) > 1 {
 			c.user = auth[0]
