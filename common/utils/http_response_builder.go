@@ -335,3 +335,14 @@ func FlushWriter(writer io.Writer) {
 		}
 	}
 }
+
+func TCPNoDelay(i net.Conn) {
+	if i == nil {
+		return
+	}
+	if tcpConn, ok := i.(*net.TCPConn); ok {
+		_ = tcpConn.SetNoDelay(true)
+		// disable write buffer
+		_ = tcpConn.SetWriteBuffer(0)
+	}
+}
