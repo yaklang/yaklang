@@ -406,11 +406,11 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 			query += ")"
 			db = db.Not(query)
 		} else {
-			query := "yak_scripts.script_name IN (SELECT yak_script_name FROM plugin_groups WHERE `group` IN (?)"
+			query := "script_name IN (SELECT yak_script_name FROM plugin_groups WHERE `group` IN (?)"
 			if params.Group.IsPocBuiltIn == "false" {
-				query += " AND is_poc_built_in = false"
+				//query += " AND is_poc_built_in = 0"
 			} else if params.Group.IsPocBuiltIn == "true" {
-				query += " AND is_poc_built_in = true"
+				//query += " AND is_poc_built_in = 1"
 			}
 			query += ")"
 			if len(params.Group.Group) > 0 {
