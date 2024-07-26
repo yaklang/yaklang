@@ -75,7 +75,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	log.Infof("start to exec websocket hijack %v", localConn.RemoteAddr())
 
 	addr := ""
-	isTLS := false
+	isTLS := ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps)
 	hostname := req.URL.Hostname()
 	portStr := req.URL.Port()
 	scheme := req.URL.Scheme
@@ -86,12 +86,12 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			break
 		case "https", "HTTPS":
 			portStr = "443"
-			isTLS = true
 			break
 		default:
 			return utils.Errorf("unknown schema: %v", scheme)
 		}
 	}
+
 	if strings.Contains(hostname, ":") {
 		addr = fmt.Sprintf("[%s]:%s", hostname, portStr)
 	} else {
