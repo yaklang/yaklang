@@ -134,7 +134,12 @@ func WithIPv4_Version(i any) IPv4Option {
 
 func WithIPv4_Flags(i any) IPv4Option {
 	return func(pv4 *layers.IPv4) error {
-		pv4.Flags = layers.IPv4Flag(utils.InterfaceToInt(i))
+		switch f := i.(type) {
+		case layers.IPv4Flag:
+			pv4.Flags = f
+		case int:
+			pv4.Flags = layers.IPv4Flag(f)
+		}
 		return nil
 	}
 }
