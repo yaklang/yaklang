@@ -2,6 +2,9 @@ package fingerprint
 
 import (
 	"context"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/embed"
-	"strings"
-	"testing"
 )
 
 func TestMatch(t *testing.T) {
@@ -23,11 +24,11 @@ func TestMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := []byte("")
-	matcher := NewMatcher(rules...)
+	matcher := NewMatcher()
 	matcher.ErrorHandle = func(err error) {
 		log.Error(err)
 	}
-	matchRes := matcher.Match(context.Background(), raw)
+	matchRes := matcher.Match(context.Background(), raw, rules)
 	_ = matchRes
 }
 
@@ -43,7 +44,7 @@ func TestExpressionMatch(t *testing.T) {
 		return &rule.GeneralRule{MatchExpression: splits[1], CPE: &rule.CPE{Product: splits[0]}}
 	})
 	rules, _ := parsers.ParseExpRule(ruleInfos.([]*rule.GeneralRule)...)
-	matcher := NewMatcher(rules...)
+	matcher := NewMatcher()
 	info := matcher.Match(context.Background(), []byte(`HTTP/1.1 200 OK
 Tag: --- VIDEO WEB SERVER ---
 
@@ -52,6 +53,6 @@ Tag: --- VIDEO WEB SERVER ---
 <html>
 /AV732E/setup.exe
 </html>
-`))
+`), rules)
 	assert.Equal(t, info[0].Product, "AVTech-Video-Web-Server")
 }

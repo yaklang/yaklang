@@ -3,13 +3,14 @@ package fp
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"net"
-	"strings"
 )
 
 func (f *Matcher) Match(host string, port int, options ...ConfigOption) (result *MatchResult, err error) {
@@ -26,7 +27,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	}
 
 	// 是否需要适配 ConfigOption
-	var config = NewConfig()
+	config := NewConfig()
 	if len(options) > 0 {
 		err := copier.Copy(config, f.Config)
 		if err != nil {
@@ -106,7 +107,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 				return result, nil
 			}
 			if err != nil {
-				//log.Errorf("web detector exec failed: %s", err)
+				// log.Errorf("web detector exec failed: %s", err)
 				return nil, err
 			}
 
