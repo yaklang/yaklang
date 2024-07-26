@@ -4,11 +4,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	uuid "github.com/google/uuid"
 	"github.com/tidwall/gjson"
@@ -137,6 +138,7 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 	}
 	return result, nil
 }
+
 func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.ThirdPartyApplicationConfig) (result *ypb.SpaceEngineStatus, err error) {
 	consts.ConvertCompatibleConfig(req)
 	params := map[string]string{}
@@ -259,7 +261,7 @@ func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.Thi
 func (s *Server) GetSpaceEngineStatus(ctx context.Context, req *ypb.GetSpaceEngineStatusRequest) (*ypb.SpaceEngineStatus, error) {
 	config, err := consts.GetCommonThirdPartyApplicationConfig(req.GetType())
 	if err != nil {
-		log.Errorf("load third party application config failed: %v", err)
+		log.Debug(err)
 		return &ypb.SpaceEngineStatus{
 			Type:   req.GetType(),
 			Status: SPACE_ENGINE_STATUS_ERROR,
