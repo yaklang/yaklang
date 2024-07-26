@@ -295,4 +295,37 @@ func TestType_normol(t *testing.T) {
 			
 		`, []string{"\"1\"","1","make(map[string]string)"}, t)
 	})
+
+	t.Run("chan", func(t *testing.T) {
+	    
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			ch1 := make(chan int)
+			ch2 := make(chan string)
+
+			println(ch1)
+			println(ch2)
+		}
+			
+		`, []string{"Function-make(typeValue(chan number))", "Function-make(typeValue(chan string))"}, t)
+	})
+
+	t.Run("struct", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		type mystruct struct{
+		    a int 
+			b string
+		}
+
+		func main(){
+			t := mystruct{a:1,b:"hello",c:[]int{1,2,3}}
+			println(t.a)
+			println(t.b)
+			println(t.c[2])
+		}
+			
+		`, []string{"1","\"hello\"","3"}, t)
+	})
 }

@@ -60,20 +60,11 @@ type Container[] struct {
 func TestExample(t *testing.T) {
     code := `package main
 
-func main() {
-	a := 1
-	label1:
-	for i := 0; i < 10; i++ {
-		for j := 0; j < 10; j++ {
-			break label1
-		}
-		a = 2
-		println(a)
-	}
-	println(a)
-}
-	`
+    import "fmt"
 
+    func main() { 
+		fmt.Println("Hello, world!") 
+	}`
 	_,err := SyntaxBase(code,true)
 	if err != nil {
 		t.Fatal(err)
