@@ -128,6 +128,12 @@ func TestGRPCMUSTPASS_MITM_WebSocket_EmptyRequestOrResponse(t *testing.T) {
 
 	host, port := utils.DebugMockEchoWs("test_empty")
 	log.Infof("addr: %s:%d", host, port)
+
+	err := utils.WaitConnect(utils.HostPort(host, port), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +185,7 @@ Accept: */*
 		}
 	}
 
-	_, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
+	_, err = QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
 	require.NoError(t, err)
 }
 
