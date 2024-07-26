@@ -6,14 +6,13 @@ import (
 )
 
 func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
-	t.Skip()
 	tests := []struct {
 		name   string
 		equal  bool
 		expect []string
 		code   string
 	}{
-		{"aTaintCase022", false, []string{"Parameter-cmd"},
+		{"aTaintCase022", false, []string{"Parameter-cmd", "Undefined-Runtime"},
 			`/**
    * 字段/元素级别->对象字段->对象元素
    * case应该被检出
@@ -32,7 +31,7 @@ func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
       }
       return modelMap;
   }`},
-		{"aTaintCase022_2", true, []string{`"cd /"`}, ` /**
+		{"aTaintCase022_2", true, []string{`"cd /"`, "Undefined-Runtime"}, ` /**
 		  * 字段/元素级别->对象字段->对象元素
 		  * case不应被检出
 		  */

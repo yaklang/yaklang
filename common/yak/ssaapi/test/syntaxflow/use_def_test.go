@@ -37,7 +37,7 @@ func TestSF_GetUser(t *testing.T) {
 		check(t,
 			`Runtime.getRuntime().exec-->* as $target`,
 			[]string{
-				`Undefined-dump(Undefined-file.Write(valid)("abc",Undefined-a.exec(valid)("bash attack")))`,
+				`Undefined-dump(Undefined-file.Write("abc",Undefined-a.exec(valid)("bash attack")))`,
 			},
 		)
 	})
@@ -46,7 +46,7 @@ func TestSF_GetUser(t *testing.T) {
 		check(t,
 			`a.exec-->* as $target`,
 			[]string{
-				`Undefined-dump(Undefined-file.Write(valid)("abc",Undefined-a.exec(valid)("bash attack")))`,
+				`Undefined-dump(Undefined-file.Write("abc",Undefined-a.exec(valid)("bash attack")))`,
 			},
 		)
 	})

@@ -23,11 +23,11 @@ func TestProgramSyntaxFlow_Match(t *testing.T) {
 	})
 
 	t.Run("Match MemberCallMember", func(t *testing.T) {
-		check(t, `Runtime.getRuntime as $target`, `Undefined-Runtime.getRuntime(valid)`)
+		check(t, `Runtime.getRuntime as $target`, `Undefined-Runtime.getRuntime`)
 	})
 
 	t.Run("Match MemberCallMember with Call", func(t *testing.T) {
-		check(t, `Runtime.getRuntime() as $target`, `Undefined-Runtime.getRuntime(valid)()`)
+		check(t, `Runtime.getRuntime() as $target`, `Undefined-Runtime.getRuntime()`)
 	})
 
 	t.Run("Match MemberCallMember with Call nest", func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestProgramSyntaxFlow_Match(t *testing.T) {
 	})
 
 	t.Run("only Match member call ", func(t *testing.T) {
-		check(t, `.getRuntime as $target`, `Undefined-Runtime.getRuntime(valid)`)
+		check(t, `.getRuntime as $target`, `Undefined-Runtime.getRuntime`)
 	})
 }
 

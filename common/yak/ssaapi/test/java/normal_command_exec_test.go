@@ -683,23 +683,23 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		//{"aTaintCase0167", false, []string{"Parameter-cmd", `" "`, `"-la"`},
-		//	`/**
-		//    * 69 传播场景->String操作->join
-		//    */
-		//   @PostMapping(value = "case0167")
-		//   public Map<String, Object> aTaintCase0167(@RequestParam String cmd ) {
-		//       Map<String, Object> modelMap = new HashMap<>();
-		//       try {
-		//           cmd=String.join(" ",cmd,"-la");
-		//           Runtime.getRuntime().exec(cmd);
-		//           modelMap.put("status", "success");
-		//       } catch (Exception e) {
-		//           modelMap.put("status", "error");
-		//       }
-		//       return modelMap;
-		//   }
-		//`},
+		{"aTaintCase0167", false, []string{"Parameter-cmd", `" "`, `"-la"`, "Undefined-Runtime"},
+			`/**
+		   * 69 传播场景->String操作->join
+		   */
+		  @PostMapping(value = "case0167")
+		  public Map<String, Object> aTaintCase0167(@RequestParam String cmd ) {
+		      Map<String, Object> modelMap = new HashMap<>();
+		      try {
+		          cmd=String.join(" ",cmd,"-la");
+		          Runtime.getRuntime().exec(cmd);
+		          modelMap.put("status", "success");
+		      } catch (Exception e) {
+		          modelMap.put("status", "error");
+		      }
+		      return modelMap;
+		  }
+		`},
 
 		{"aTaintCase0177", false, []string{"Parameter-cmd", "Undefined-Runtime"}, ` /**
      * 78 传播场景->String操作->toString
