@@ -1,11 +1,13 @@
 package yakurl
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -54,9 +56,25 @@ func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlow
 
 var _ Action = (*SyntaxFlowAction)(nil)
 
+/*
+Get SyntaxFlowAction
+
+	Request :
+		url : "syntaxflow://program_id/variable/index"
+		body: syntaxflow code
+	Response:
+		1. "syntaxflow://program_id/" :
+			* ResourceType: message / variable
+			all variable names
+		2. "syntaxflow://program_id/variable_name" :
+			* ResourceType: value
+			all values in this variable
+		3. "syntaxflow://program_id/variable_name/index" :
+			* ResourceType: information
+			this value information, contain message && graph && node-info
+*/
 func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	url := params.GetUrl()
-	// "syntaxflow://program_id/variable/index" body:syntaxflow code
 	programID := url.GetLocation()
 	syntaxFlowCode := string(params.GetBody())
 	path := url.Path
@@ -97,8 +115,9 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		for index, v := range values {
 			_ = v
 			_ = index
-			res := createNewRes(url, 0, map[string]string{
-				"index": strconv.Itoa(index),
+			res := createNewRes(url, 0, map[string]any{
+				"index":      index,
+				"code_range": coverCodeRange(v.GetRange()),
 			})
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
@@ -112,9 +131,11 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 			return nil, utils.Errorf("index out of range: %d", index)
 		}
 		value := vs[index]
+		res := Value2Response(value, url)
 		if msg := result.AlertMsgTable[variable]; msg != "" {
+			res.VerboseName = msg
 		}
-		_ = value
+		resources = append(resources, res)
 	}
 
 	// res.CheckParams
@@ -180,7 +201,57 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	return resources
 }
 
-func createNewRes(originParam *ypb.YakURL, size int, extra ...map[string]string) *ypb.YakURLResource {
+type CodeRange struct {
+	URL         string `json:"url"`
+	StartLine   int64  `json:"start_line"`
+	StartColumn int64  `json:"start_column"`
+	EndLine     int64  `json:"end_line"`
+	EndColumn   int64  `json:"end_column"`
+}
+
+func coverCodeRange(r *ssa.Range) *CodeRange {
+	return &CodeRange{
+		URL:         r.GetEditor().GetFormatedUrl(),
+		StartLine:   int64(r.GetStart().GetLine()),
+		StartColumn: int64(r.GetStart().GetColumn()),
+		EndLine:     int64(r.GetEnd().GetLine()),
+		EndColumn:   int64(r.GetEnd().GetColumn()),
+	}
+}
+
+type NodeInfo struct {
+	NodeID    int        `json:"node_id"`
+	IRCode    string     `json:"ir_code"`
+	CodeRange *CodeRange `json:"code_range"`
+}
+
+func Value2Response(value *ssaapi.Value, url *ypb.YakURL) *ypb.YakURLResource {
+	valueGraph := ssaapi.NewValueGraph(value)
+	var buf bytes.Buffer
+	valueGraph.GenerateDOT(&buf)
+
+	id := valueGraph.RootValue[value]
+	nodeInfos := make([]*NodeInfo, 0, len(valueGraph.NodeInfo))
+	for id, nodeValue := range valueGraph.NodeInfo {
+		ni := &NodeInfo{
+			NodeID:    id,
+			IRCode:    nodeValue.String(),
+			CodeRange: coverCodeRange(nodeValue.GetRange()),
+		}
+		nodeInfos = append(nodeInfos, ni)
+	}
+
+	res := createNewRes(url, 0, map[string]any{
+		"node_id":    id,
+		"graph":      buf.String(), // string
+		"graph_info": nodeInfos,
+	})
+	res.ResourceType = "information"
+	res.ResourceName = value.String()
+	return res
+}
+
+func createNewRes(originParam *ypb.YakURL, size int, extra ...map[string]any) *ypb.YakURLResource {
 	yakURL := &ypb.YakURL{
 		Schema:   originParam.Schema,
 		User:     originParam.GetUser(),
@@ -201,7 +272,7 @@ func createNewRes(originParam *ypb.YakURL, size int, extra ...map[string]string)
 		for k, v := range extra[0] {
 			res.Extra = append(res.Extra, &ypb.KVPair{
 				Key:   k,
-				Value: v,
+				Value: codec.AnyToString(v),
 			})
 		}
 	}
