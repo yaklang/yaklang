@@ -252,6 +252,7 @@ func DebugMockTCPHandlerFuncContext(ctx context.Context, handlerFunc handleTCPFu
 				return
 			default:
 				conn, err := lis.Accept()
+				TCPNoDelay(conn)
 				if err != nil {
 					log.Errorf("mock tcp server accept failed: %v", err)
 					return
@@ -515,6 +516,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 		// http / tls
 		for {
 			conn, err := lis.Accept()
+			TCPNoDelay(conn)
 			if err != nil {
 				log.Error(err)
 				break
@@ -572,6 +574,7 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 
 		for {
 			conn, err := lis.Accept()
+			TCPNoDelay(conn)
 			if err != nil {
 				return
 			}
