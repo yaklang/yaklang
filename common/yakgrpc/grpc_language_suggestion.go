@@ -49,7 +49,7 @@ var (
 		"any",
 	}
 
-	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.DefaultDocumentHelper.Libs))
+	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0)
 	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
 	yakTypeSuggestions         = make([]*ypb.SuggestionDescription, 0)
 	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
@@ -169,7 +169,8 @@ func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	// 懒加载
 	if len(standardLibrarySuggestions) == 0 {
-		for libName := range doc.DefaultDocumentHelper.Libs {
+		standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.GetDefaultDocumentHelper().Libs))
+		for libName := range doc.GetDefaultDocumentHelper().Libs {
 			standardLibrarySuggestions = append(standardLibrarySuggestions, &ypb.SuggestionDescription{
 				Label:       libName,
 				InsertText:  libName,
@@ -226,9 +227,9 @@ func getVscodeSnippetsBySSAValue(funcName string, v *ssaapi.Value) string {
 }
 
 func getFuncDeclByName(libName, funcName string) *yakdoc.FuncDecl {
-	funcDecls := doc.DefaultDocumentHelper.Functions
+	funcDecls := doc.GetDefaultDocumentHelper().Functions
 	if libName != "" {
-		lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+		lib, ok := doc.GetDefaultDocumentHelper().Libs[libName]
 		if !ok {
 			return nil
 		}
@@ -244,10 +245,10 @@ func getFuncDeclByName(libName, funcName string) *yakdoc.FuncDecl {
 }
 
 func getInstanceByName(libName, instanceName string) *yakdoc.LibInstance {
-	instances := doc.DefaultDocumentHelper.Instances
+	instances := doc.GetDefaultDocumentHelper().Instances
 
 	if libName != "" {
-		lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+		lib, ok := doc.GetDefaultDocumentHelper().Libs[libName]
 		if !ok {
 			return nil
 		}
@@ -387,11 +388,11 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 
 func getInstancesAndFuncDecls(v *ssaapi.Value, containPoint bool) (map[string]*yakdoc.LibInstance, map[string]*yakdoc.FuncDecl) {
 	if !containPoint || v.IsNil() {
-		return nil, doc.DefaultDocumentHelper.Functions
+		return nil, doc.GetDefaultDocumentHelper().Functions
 	}
 
 	libName := v.GetName()
-	lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+	lib, ok := doc.GetDefaultDocumentHelper().Libs[libName]
 	if ok {
 		return lib.Instances, lib.Functions
 	} else {
@@ -411,7 +412,7 @@ func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(dec
 }
 
 func getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) string {
-	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
+	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[typStr]
 	if !ok {
 		return ""
 	}
@@ -511,7 +512,7 @@ func getFuncLabelAndDocBySSAValue(name string, v *ssaapi.Value) (label string, d
 	}
 
 	// 结构体 / 接口方法
-	lib, ok := doc.DefaultDocumentHelper.StructMethods[parentTypStr]
+	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[parentTypStr]
 	if ok {
 		funcDecl, ok := lib.Functions[lastName]
 		if ok {
@@ -534,7 +535,7 @@ func getFuncLabelAndDocBySSAValue(name string, v *ssaapi.Value) (label string, d
 
 func getExternLibDesc(name string) string {
 	// 标准库
-	lib, ok := doc.DefaultDocumentHelper.Libs[name]
+	lib, ok := doc.GetDefaultDocumentHelper().Libs[name]
 	if !ok {
 		// break
 		return ""
@@ -650,7 +651,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 		if parentV != nil {
 			parentBareTyp := ssaapi.GetBareType(parentV.GetType())
 			parentTypStr := getGolangTypeStringBySSAType(parentBareTyp)
-			lib, ok := doc.DefaultDocumentHelper.StructMethods[parentTypStr]
+			lib, ok := doc.GetDefaultDocumentHelper().StructMethods[parentTypStr]
 			if ok {
 				instance, ok := lib.Instances[lastName]
 				if ok {
@@ -825,10 +826,10 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng *ssa.Range) (ret []
 		v := prog.NewValue(bareValue)
 
 		// 不应该再补全标准库函数和标准库
-		if _, ok := doc.DefaultDocumentHelper.Functions[varName]; ok {
+		if _, ok := doc.GetDefaultDocumentHelper().Functions[varName]; ok {
 			continue
 		}
-		if _, ok := doc.DefaultDocumentHelper.Libs[varName]; ok {
+		if _, ok := doc.GetDefaultDocumentHelper().Libs[varName]; ok {
 			continue
 		}
 		// 不应该再补全包含.或#的符号
@@ -853,9 +854,9 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng *ssa.Range) (ret []
 }
 
 func completionYakGlobalFunctions() (ret []*ypb.SuggestionDescription) {
-	ret = make([]*ypb.SuggestionDescription, 0, len(doc.DefaultDocumentHelper.Functions))
+	ret = make([]*ypb.SuggestionDescription, 0, len(doc.GetDefaultDocumentHelper().Functions))
 	// 全局函数补全
-	for funcName, funcDecl := range doc.DefaultDocumentHelper.Functions {
+	for funcName, funcDecl := range doc.GetDefaultDocumentHelper().Functions {
 		ret = append(ret, &ypb.SuggestionDescription{
 			Label:       funcName,
 			Description: funcDecl.Document,
@@ -868,7 +869,7 @@ func completionYakGlobalFunctions() (ret []*ypb.SuggestionDescription) {
 
 func completionYakStandardLibraryChildren(v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	libName := v.GetName()
-	lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+	lib, ok := doc.GetDefaultDocumentHelper().Libs[libName]
 	if !ok {
 		return
 	}
@@ -982,7 +983,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 
 	typStr := getGolangTypeStringBySSAType(bareTyp)
 	// 接口方法，结构体成员与方法，定义类型方法
-	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
+	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[typStr]
 	if !ok {
 		return ret
 	}

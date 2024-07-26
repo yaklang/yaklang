@@ -22,7 +22,7 @@ func Deprecated(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		})
 	}
 
-	funcs := doc.DefaultDocumentHelper.DeprecatedFunctions
+	funcs := doc.GetDefaultDocumentHelper().DeprecatedFunctions
 	for _, fun := range funcs {
 		handler(fun.Name, fun.Msg)
 	}
