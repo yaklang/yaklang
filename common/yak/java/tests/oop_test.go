@@ -445,8 +445,8 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1()",
-			"Undefined-a.getNum2()",
+			"Undefined-a.getNum1(Function-com.example.A_A_A(Undefined-A,1,2))",
+			"Undefined-a.getNum2(Function-com.example.A_A_A(Undefined-A,1,2))",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)

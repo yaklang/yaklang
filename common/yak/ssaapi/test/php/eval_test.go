@@ -21,7 +21,7 @@ $c($fun);
 	_ = code
 	ssatest.CheckSyntaxFlow(t, code,
 		"*_GET[*] -{until: `* ?{opcode:call}`}-> * as $func",
-		map[string][]string{"func": {`add("as", Undefined-$_GET."func2"(valid))(Function-base64_decode(Undefined-$_GET.'func'(valid)))`, `Function-base64_decode(Undefined-$_GET.'func'(valid))`}},
+		map[string][]string{"func": {`Function-base64_decode(Undefined-$_GET.'func')`, `add("as", Undefined-$_GET."func2")(Function-base64_decode(Undefined-$_GET.'func'))`}},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
 }

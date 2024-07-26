@@ -24,13 +24,13 @@ func TestImport(t *testing.T) {
 	class B {
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.get());
+			println(a.get());
 		}
 	}
 	`)
 
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1"},
 	}, false, ssaapi.WithLanguage(ssaapi.JAVA),

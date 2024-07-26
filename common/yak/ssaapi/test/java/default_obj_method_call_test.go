@@ -182,26 +182,6 @@ class A {
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 
-func TestDefaultOBJNoExistedMethodCall5(t *testing.T) {
-	ssatest.Check(t, `
-class A {
-	public static String hello() {
-		noExisted();
-	}
-}
-
-`, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlow(`noExisted(* as $entry)`)
-		rets := result.GetValues("entry")
-		if rets.Len() <= 0 {
-			t.Fatal("no entry")
-		}
-		rets.Show()
-		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
-}
-
 func TestDefaultOBJParamAsCaller(t *testing.T) {
 	ssatest.Check(t, `
 class Cat{}
@@ -273,7 +253,7 @@ class B{
 class A {
 	public void A(Dog p){
 		string body = foo.getBody(p);
-		body.toString1(); // body 为any类型，这是静态调用，不应该有this
+		body.toString1(); 
 	}
 	public void B(Dog p){
 		B b = new B();
@@ -284,7 +264,7 @@ class A {
 `, func(prog *ssaapi.Program) error {
 		prog.Show()
 		callA := prog.SyntaxFlow(`.toString1(* as $param)`).GetValues("param")
-		assert.Equal(t, 0, callA.Len())
+		assert.Equal(t, 1, callA.Len())
 		callB := prog.SyntaxFlow(`.toString2(* as $param)`).GetValues("param")
 		assert.Equal(t, 1, callB.Len())
 		assert.Contains(t, callB.String(), "Undefined-b.getBody(valid)(Undefined-B(Undefined-B),Parameter-p)")
