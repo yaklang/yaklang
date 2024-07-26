@@ -49,6 +49,17 @@ func GetTypeFromDB(id int) Type {
 	if err := json.Unmarshal(utils.UnsafeStringToBytes(extra), &params); err != nil {
 		log.Errorf("GetTypeFromDB: %v: extra: %v", err, extra)
 	}
+	getParamStr := func(name string) string {
+		v, ok := params[name]
+		if !ok {
+			return ""
+		}
+		str, ok := v.(string)
+		if !ok {
+			return ""
+		}
+		return str
+	}
 
 	switch TypeKind(kind) {
 	case FunctionTypeKind:
@@ -70,15 +81,15 @@ func GetTypeFromDB(id int) Type {
 		return typ
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
 		typ := &ObjectType{}
-		typ.Name = params["name"].(string)
+		typ.Name = getParamStr("name")
 		typ.Kind = TypeKind(kind)
 		return typ
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
 		typ := &BasicType{}
-		typ.name = params["name"].(string)
+		typ.name = getParamStr("name")
 		typ.Kind = TypeKind(kind)
-		typ.fullTypeName = params["fullTypeName"].(string)
+		typ.fullTypeName = getParamStr("fullTypeName")
 		return typ
 	default:
 
