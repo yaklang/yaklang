@@ -40,9 +40,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	token := utils.RandStringBytes(10)
 	target := utils.HostPort(host, port)
 	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request:     "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		Request:     "GET /?token=" + token + " HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
 		ForceFuzz:   true,
 		RepeatTimes: 10,
 	})
@@ -58,6 +59,11 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 		spew.Dump(resp.ResponseRaw)
 		taskID = resp.TaskId
 	}
+
+	_, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword: token,
+	}, 10)
+	require.NoError(t, err)
 
 	matcher := &ypb.HTTPResponseMatcher{
 		MatcherType: "word",
