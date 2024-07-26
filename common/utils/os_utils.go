@@ -553,7 +553,11 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 		}
 		lis.Close()
 	}()
-	_ = WaitConnect(addr, 3.0)
+
+	err := WaitConnect(addr, 3)
+	if err != nil {
+		panic(err)
+	}
 	return host, port
 }
 
@@ -589,7 +593,10 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 		lis.Close()
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	err := WaitConnect(addr, 3)
+	if err != nil {
+		panic(err)
+	}
 	return host, port
 }
 
@@ -639,6 +646,11 @@ func DebugMockEchoWs(point string) (string, int) {
 			log.Fatal(err)
 		}
 	}()
+
+	err := WaitConnect(addr, 3)
+	if err != nil {
+		panic(err)
+	}
 
 	return host, port
 }
