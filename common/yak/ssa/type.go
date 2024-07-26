@@ -587,6 +587,8 @@ type InterfaceType struct {
 	method  map[string]*Function
 	name    string
 	pkgPath string
+	parents  []*InterfaceType
+	childs   []*InterfaceType
 }
 
 func NewInterfaceType(name, pkgPath string) *InterfaceType {
@@ -642,6 +644,14 @@ func (i *InterfaceType) RawString() string {
 	return fmt.Sprintf("type %s interface{}", i.name)
 }
 
+func (i *InterfaceType) AddFatherInterfaceType(parent *InterfaceType) {
+    i.parents = append(i.parents, parent)
+	parent.AddChildInterfaceType(i)
+}
+
+func (i *InterfaceType) AddChildInterfaceType(child *InterfaceType) {
+    i.childs = append(i.childs, child)
+}
 // ====================== chan type
 type ChanType struct {
 	Elem   Type
@@ -1283,4 +1293,15 @@ func AddObject(name string, t *ObjectType) {
 
 func GetObjectByStr(name string) *ObjectType {
 	return ObjectTypes[name]
+}
+
+// ====================== Alias type
+var AliasTypes = map[string]*AliasType{}
+
+func AddAlias(name string, t *AliasType) {
+	AliasTypes[name] = t 
+}
+
+func GetAliasByStr(name string) *AliasType {
+	return AliasTypes[name]
 }
