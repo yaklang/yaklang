@@ -515,10 +515,10 @@ func generateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
 
 func generateYakVariables(req map[string]interface{}) *YakVariables {
 	data := utils.MapGetMapRaw(req, "variables")
-	if data == nil {
-		return nil
-	}
 	vars := NewVars()
+	if data == nil {
+		return vars
+	}
 	for k, v := range utils.InterfaceToMapInterface(data) {
 		//tags := ParseNucleiTag(toString(v))
 		//if len(tags) == 0 {
