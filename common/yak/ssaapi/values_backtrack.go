@@ -3,9 +3,7 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -244,18 +242,8 @@ func (v Values) DotGraphs() []string {
 }
 
 func (v Values) DotGraph() string {
-	g := dot.New()
-	g.MakeDirected()
-	g.GraphAttribute("rankdir", "BT")
-
-	visisted := new(sync.Map)
-	for _, subValue := range v {
-		n := g.GetOrCreateNode(subValue.GetVerboseName())
-		log.Infof("add or create node: %v", subValue.GetVerboseName())
-		_marshal(visisted, g, n, subValue)
-	}
-
+	vg := NewValueGraph(v...)
 	var buf bytes.Buffer
-	g.GenerateDOT(&buf)
+	vg.GenerateDOT(&buf)
 	return buf.String()
 }
