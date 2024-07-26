@@ -35,7 +35,7 @@ type (
 	BreakPointFactoryFun func(v *VirtualMachine) bool
 	VirtualMachine       struct {
 		// globalVar 是当前引擎的全局变量，属于引擎
-		globalVar        *limitedmap.SafeMap
+		globalVar        *limitedmap.ReadOnlyMap
 		runtimeGlobalVar *limitedmap.SafeMap
 
 		VMStack   *vmstack.Stack
@@ -75,7 +75,7 @@ func (v *VirtualMachine) AddBreakPoint(fun BreakPointFactoryFun) {
 func (n *VirtualMachine) GetExternalVariableNames() []string {
 	vs := []string{}
 	var result = make(map[string]struct{})
-	n.globalVar.ForEachKey(func(_ *limitedmap.SafeMap, key string) error {
+	n.globalVar.ForEachKey(func(_ any, key string) error {
 		_, existed := result[key]
 		if existed {
 			return nil
@@ -84,7 +84,7 @@ func (n *VirtualMachine) GetExternalVariableNames() []string {
 		vs = append(vs, key)
 		return nil
 	})
-	n.runtimeGlobalVar.ForEachKey(func(_ *limitedmap.SafeMap, key string) error {
+	n.runtimeGlobalVar.ForEachKey(func(_ any, key string) error {
 		_, existed := result[key]
 		if existed {
 			return nil
@@ -135,7 +135,7 @@ func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 		// rootSymbol: table,
 		rootScope:        NewScope(table),
 		VMStack:          vmstack.New(),
-		globalVar:        limitedmap.NewSafeMap(map[string]any{}),
+		globalVar:        limitedmap.NewReadOnlyMap(map[string]any{}),
 		runtimeGlobalVar: limitedmap.NewSafeMap(map[string]any{}),
 		config:           NewVMConfig(),
 		// asyncWaitGroup
@@ -166,6 +166,7 @@ func New() *VirtualMachine {
 // ImportLibs 导入库到引擎的全局变量中
 func (n *VirtualMachine) ImportLibs(libs map[string]interface{}) {
 	n.globalVar = n.globalVar.Append(libs)
+	n.runtimeGlobalVar.SetPred(n.globalVar)
 }
 
 // SetVars 导入变量到引擎的全局变量中
@@ -224,7 +225,7 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 	return frame.GlobalVariables.Load(name)
 }
 
-func (n *VirtualMachine) GetGlobalVar() *limitedmap.SafeMap {
+func (n *VirtualMachine) GetGlobalVar() *limitedmap.ReadOnlyMap {
 	return n.globalVar
 }
 
