@@ -3,12 +3,14 @@ package fp
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
-	"io/ioutil"
-	"time"
 )
 
 type ConfigOption func(config *Config)
@@ -89,12 +91,16 @@ type Config struct {
 	// Runtime id
 	RuntimeId string
 
-	//ctx
+	// ctx
 	Ctx context.Context
 
-	//Disable default fingerprint
+	// Disable default fingerprint
 	DisableDefaultFingerprint    bool
 	DisableDefaultIotFingerprint bool
+
+	// once
+	fingerprintRulesOnce    sync.Once
+	webFingerprintRulesOnce sync.Once
 }
 
 func (c *Config) IsFiltered(host string, port int) bool {
@@ -264,7 +270,6 @@ func NewConfig(options ...ConfigOption) *Config {
 		p(config)
 	}
 
-	config.lazyInit()
 	return config
 }
 
@@ -292,14 +297,25 @@ func (c *Config) init() {
 	c.Ctx = context.Background()
 }
 
-func (c *Config) lazyInit() {
-	if !c.DisableDefaultFingerprint {
-		webFingerprintRules, _ := GetDefaultWebFingerprintRules()
-		c.WebFingerprintRules = append(webFingerprintRules, c.WebFingerprintRules...)
-	}
-	if len(c.FingerprintRules) <= 0 {
-		c.FingerprintRules, _ = GetDefaultNmapServiceProbeRules()
-	}
+func (c *Config) GetWebFingerprintRules() []*rule.FingerPrintRule {
+	c.webFingerprintRulesOnce.Do(func() {
+		if !c.DisableDefaultFingerprint {
+			webFingerprintRules, _ := GetDefaultWebFingerprintRules()
+			c.WebFingerprintRules = append(webFingerprintRules, c.WebFingerprintRules...)
+		}
+	})
+
+	return c.WebFingerprintRules
+}
+
+func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
+	c.fingerprintRulesOnce.Do(func() {
+		if len(c.FingerprintRules) <= 0 {
+			c.FingerprintRules, _ = GetDefaultNmapServiceProbeRules()
+		}
+	})
+
+	return c.FingerprintRules
 }
 
 // maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的最大探测包数量，默认值为 5

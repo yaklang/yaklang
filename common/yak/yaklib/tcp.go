@@ -194,9 +194,11 @@ var TcpExports = map[string]interface{}{
 	"Forward": _tcpPortForward,
 }
 
-var Tcp_Server_Callback = _tcpServeCallback
-var Tcp_Server_Context = _tcpServeContext
-var Tcp_Server_Tls = _tcpServerTls
+var (
+	Tcp_Server_Callback = _tcpServeCallback
+	Tcp_Server_Context  = _tcpServeContext
+	Tcp_Server_Tls      = _tcpServerTls
+)
 
 func DebugMockTCPProtocol(name string) (string, int) {
 	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"tcp"}...)...))
@@ -221,12 +223,16 @@ func DebugMockTCPProtocol(name string) (string, int) {
 }
 
 func DebugMockTCPFromScan(du time.Duration, responses map[string][][]byte) (string, int) {
+	var (
+		listener net.Listener
+		err      error
+	)
 	addr := utils.GetRandomLocalAddr()
 	time.Sleep(time.Millisecond * 300)
 	host, port, _ := utils.ParseStringToHostPort(addr)
 
 	go func() {
-		listener, err := net.Listen("tcp", addr)
+		listener, err = net.Listen("tcp", addr)
 		if err != nil {
 			panic(err)
 		}

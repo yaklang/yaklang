@@ -2,34 +2,33 @@ package fingerprint
 
 import (
 	"context"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/log"
-	"regexp"
 )
 
-type MatchFun func(data []byte) (bool, error)
-type Matcher struct {
-	regexpCache map[string]*regexp.Regexp
-	ErrorHandle func(error)
-	Route       func(ctx context.Context, webPath string) ([]byte, error)
-	rules       []*rule.FingerPrintRule
-}
+type (
+	MatchFun func(data []byte) (bool, error)
+	Matcher  struct {
+		regexpCache map[string]*regexp.Regexp
+		ErrorHandle func(error)
+		Route       func(ctx context.Context, webPath string) ([]byte, error)
+		// rules       []*rule.FingerPrintRule
+	}
+)
 
-func NewMatcher(rules ...*rule.FingerPrintRule) *Matcher {
+func NewMatcher() *Matcher {
 	matcher := &Matcher{
 		ErrorHandle: func(err error) {},
 		regexpCache: map[string]*regexp.Regexp{},
 	}
-	matcher.AddRules(rules)
 	return matcher
 }
 
-func (m *Matcher) AddRules(rules []*rule.FingerPrintRule) {
-	m.rules = append(m.rules, rules...)
-}
-func (m *Matcher) MatchResource(ctx context.Context, getter func(path string) (*rule.MatchResource, error)) []*rule.CPE {
+func (m *Matcher) MatchResource(ctx context.Context, rules []*rule.FingerPrintRule, getter func(path string) (*rule.MatchResource, error)) []*rule.CPE {
 	var result []*rule.CPE
-	for i, r := range m.rules {
+	for i, r := range rules {
 		_ = i
 		select {
 		case <-ctx.Done():
@@ -47,8 +46,9 @@ func (m *Matcher) MatchResource(ctx context.Context, getter func(path string) (*
 	}
 	return result
 }
-func (m *Matcher) Match(ctx context.Context, data []byte) []*rule.CPE {
-	return m.MatchResource(ctx, func(path string) (*rule.MatchResource, error) {
+
+func (m *Matcher) Match(ctx context.Context, data []byte, rules []*rule.FingerPrintRule) []*rule.CPE {
+	return m.MatchResource(ctx, rules, func(path string) (*rule.MatchResource, error) {
 		cached := map[string][]byte{}
 		if path == "" || path == "/" {
 			return rule.NewHttpResource(data), nil

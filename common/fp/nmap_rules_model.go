@@ -4,16 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
-)
 
-import (
-	"fmt"
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+
 	regexp "github.com/dlclark/regexp2"
 )
 
@@ -38,11 +37,58 @@ type NmapProbe struct {
 	Raw          string         `json:"raw"`
 }
 
+type lazyRegexpInterface interface {
+	FindRunesMatch(runes []rune) (*regexp.Match, error)
+	FindStringMatch(s string) (*regexp.Match, error)
+	String() string
+}
+
+type lazyRegexp struct {
+	raw     string
+	options regexp.RegexOptions
+	regexp  *regexp.Regexp
+}
+
+func newLazyRegexp(raw string, options regexp.RegexOptions) *lazyRegexp {
+	return &lazyRegexp{
+		raw:     raw,
+		options: options,
+	}
+}
+
+var _ lazyRegexpInterface = (*lazyRegexp)(nil)
+
+func (l *lazyRegexp) lazyInit() {
+	if l.regexp == nil {
+		reg, err := regexp.Compile(l.raw, l.options)
+		if err != nil {
+			log.Errorf("compile %s failed: %s", l.raw, err)
+			return
+		}
+		l.regexp = reg
+	}
+}
+
+func (l *lazyRegexp) FindRunesMatch(runes []rune) (*regexp.Match, error) {
+	l.lazyInit()
+	return l.regexp.FindRunesMatch(runes)
+}
+
+func (l *lazyRegexp) FindStringMatch(s string) (*regexp.Match, error) {
+	l.lazyInit()
+	return l.regexp.FindStringMatch(s)
+}
+
+func (l *lazyRegexp) String() string {
+	l.lazyInit()
+	return l.regexp.String()
+}
+
 type NmapMatch struct {
 	ServiceName string `json:"service_name"`
 
 	// m//
-	MatchRule *regexp.Regexp `json:"match_rule"`
+	MatchRule lazyRegexpInterface `json:"match_rule"`
 
 	// p//
 	ProductVerbose string `json:"product_verbose"`
@@ -79,7 +125,7 @@ func UnquoteCStyleString(raw string) (string, error) {
 	index := 0
 	for scanner.Scan() {
 		index++
-		//log.Infof("index: %d", index)
+		// log.Infof("index: %d", index)
 
 		b := scanner.Bytes()[0]
 		if b == '\\' && state != "charStart" {
@@ -90,7 +136,7 @@ func UnquoteCStyleString(raw string) (string, error) {
 		switch state {
 		case "hex":
 			if len(hexBuffer) < 2 {
-				//log.Infof("hex: %s", string(b))
+				// log.Infof("hex: %s", string(b))
 				hexBuffer += string(b)
 			}
 
@@ -291,7 +337,7 @@ func parseNmapProbe(line string) (*NmapProbe, error) {
 	if err != nil {
 		return nil, errors.Errorf("unquote payload[%v] failed: %s", RealPayload, err)
 	}
-	//log.Debugf("fetch probe[%s] with:%s", line, payload)
+	// log.Debugf("fetch probe[%s] with:%s", line, payload)
 
 	return &NmapProbe{
 		Proto:   proto,
@@ -346,10 +392,8 @@ func parseNmapMatch(line string) (*NmapMatch, error) {
 
 		raw := string(b.Content)
 		raw = strings.ReplaceAll(raw, `\0`, `\x00`)
-		match.MatchRule, err = regexp.Compile(raw, options)
-		if err != nil {
-			return nil, errors.Errorf("compile %s failed: %s", string(b.Content), err)
-		}
+		// lazy compile
+		match.MatchRule = newLazyRegexp(raw, options)
 	}
 
 	for _, b := range rule.CpeBlocks {
