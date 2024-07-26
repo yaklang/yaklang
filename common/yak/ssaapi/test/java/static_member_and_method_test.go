@@ -15,12 +15,12 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		}
 	class B {
 		public static void main(String[] args) {
-			System.out.println(A.a);
+			println(A.a);
 		}
 	}
 	`
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -32,12 +32,12 @@ func Test_Static_Member_And_Method(t *testing.T) {
 			return 	 22;
 		}
 		public static void main(String[] args) {
-			System.out.println(A.get());
+			println(A.get());
 		}
 	}`
 
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"22"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -51,11 +51,11 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		}
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.get());
+			println(a.get());
 		}
 	}`
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"22"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -73,14 +73,14 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		class B {
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.get());
-			System.out.println(a.get);
+			println(a.get());
+			println(a.get);
 			
 		}
 	}
 `
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -96,14 +96,14 @@ func Test_Static_Member_And_Method(t *testing.T) {
 	}
 		class B {
 		public static void main(String[] args) {
-			System.out.println(A.get());
-			System.out.println(A.get);
+			println(A.get());
+			println(A.get);
 			
 		}
 	}
 `
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -119,12 +119,12 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		class B {
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.get());
+			println(a.get());
 		}
 		}
 	`
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -139,12 +139,12 @@ func Test_Static_Member_And_Method(t *testing.T) {
 }
 		class B {
 		public static void main(String[] args) {
-			System.out.println(A.get());
+			println(A.get());
 		}
 	
 	}`
 		ssatest.CheckSyntaxFlow(t, code, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -170,13 +170,13 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	class B {
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.get());
+			println(a.get());
 		}
 	}
 	`)
 
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -197,13 +197,13 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	import A.A;
 	class B {
 		public static void main(String[] args) {
-			System.out.println(A.get());
+			println(A.get());
 		}
 	}
 	`)
 
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -223,13 +223,13 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	class B {
 		public static void main(String[] args) {
 			
-			System.out.println(A.a);
+			println(A.a);
 		}
 	}
 	`)
 
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11"},
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -255,7 +255,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	`)
 
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11"},
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
@@ -278,8 +278,8 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	class B {
 		public static void main(String[] args) {
 			A a = new A();
-			System.out.println(a.get());
-			System.out.println(a.get);
+			println(a.get());
+			println(a.get);
 			
 		}
 	}
@@ -308,45 +308,15 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 	import A.A;
 	class B {
 		public static void main(String[] args) {
-			System.out.println(A.get());
-			System.out.println(A.get);
+			println(A.get());
+			println(A.get);
 			
 		}
 	}
 	`)
 
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
-		`, map[string][]string{
-			"a": {"11", "22"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
-		)
-	})
-	t.Run("static method  chain  call ", func(t *testing.T) {
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("src/main/java/Runtime.java", `
-	class Runtime {
-		private static final Runtime currentRuntime = new Runtime()
-		public static Runtime getRuntime() {
-        	return currentRuntime;
-      	}
-		public Process exec(String command) throws IOException {
-        	return exec(command, null, null);
-    	}
-	}
-	`)
-		vf.AddFile("src/main/java/B.java", `
-	package B; 
-	import A.A;
-	class B {
-		public static void main(String[] args) {
-			Runtime.getRuntime().exec();
-		}
-	}
-	`)
-
-		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		System.out.println(* #-> as $a)
+		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
 		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
