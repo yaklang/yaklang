@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -232,10 +231,11 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					log.Errorf("socks5 server reply failed: %v", err)
 					return
 				}
-				dstPort := binary.BigEndian.Uint16(req.DstPort)
-				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(string(req.DstHost), dstPort))
-				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, string(req.DstHost))
-				subCtx = context.WithValue(subCtx, S5_CONNECT_PORT, strconv.Itoa(int(dstPort)))
+				dstPort := req.GetDstPort()
+				dstHost := req.GetDstHost()
+				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(dstHost, dstPort))
+				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, string(dstHost))
+				subCtx = context.WithValue(subCtx, S5_CONNECT_PORT, strconv.Itoa(dstPort))
 				handledConnection, isTls, err = IsTlsHandleShake(handledConnection)
 				if err != nil {
 					log.Errorf("check tls handle shake failed: %s", err)
