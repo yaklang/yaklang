@@ -211,6 +211,23 @@ type S5Request struct {
 	DstPort []byte // 2 bytes
 }
 
+func (r *S5Request) GetDstHost() string {
+	switch r.Atyp {
+	case addrTypeIPv4:
+		return net.IP(r.DstHost).String()
+	case addrTypeIPv6:
+		return net.IP(r.DstHost).String()
+	case addrTypeFQDN:
+		return string(r.DstHost)
+	default:
+		return ""
+	}
+}
+
+func (r *S5Request) GetDstPort() int {
+	return int(binary.BigEndian.Uint16(r.DstPort))
+}
+
 func (c *S5Config) HandleS5RequestHeader(conn net.Conn) (*S5Request, error) {
 	conn.SetDeadline(time.Now().Add(c.S5RequestTimeout))
 	defer conn.SetDeadline(time.Time{})
