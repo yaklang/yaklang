@@ -234,7 +234,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				dstPort := req.GetDstPort()
 				dstHost := req.GetDstHost()
 				subCtx = context.WithValue(subCtx, S5_CONNECT_ADDR, utils.HostPort(dstHost, dstPort))
-				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, string(dstHost))
+				subCtx = context.WithValue(subCtx, S5_CONNECT_HOST, dstHost)
 				subCtx = context.WithValue(subCtx, S5_CONNECT_PORT, strconv.Itoa(dstPort))
 				handledConnection, isTls, err = IsTlsHandleShake(handledConnection)
 				if err != nil {

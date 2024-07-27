@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"net/url"
 	"strconv"
@@ -220,15 +221,29 @@ RECON:
 	if err != nil {
 		return nil, err
 	}
+	aType := 0x3
+	if utils.IsIPv4(host) {
+		aType = 0x1
+	} else if utils.IsIPv6(host) {
+		aType = 0x4
+	}
+
 	req.Reset()
 	req.add(
-		5,               // version number
-		1,               // connect command
-		0,               // reserved, must be zero
-		3,               // address type, 3 means domain name
-		byte(len(host)), // address length
+		5,           // version number
+		1,           // connect command
+		0,           // reserved, must be zero
+		byte(aType), // address type, 3 means domain name
 	)
-	req.add([]byte(host)...)
+	if aType == 0x1 {
+		req.add(net.ParseIP(host).To4()...)
+	} else if aType == 0x4 {
+		req.add(net.ParseIP(host).To16()...)
+	} else {
+		req.add(byte(len(host))) // length of domain name
+		req.add([]byte(host)...)
+	}
+
 	req.add(
 		byte(port>>8), // higher byte of destination port
 		byte(port),    // lower byte of destination port (big endian)
