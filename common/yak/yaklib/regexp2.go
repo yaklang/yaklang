@@ -33,7 +33,7 @@ func re2FindAll(data interface{}, text string) []string {
 	var results []string
 	for {
 		results = append(results, match.String())
-		if nextMatch, err := re.FindNextMatch(match); err == nil {
+		if nextMatch, err := re.FindNextMatch(match); err == nil && nextMatch != nil {
 			match = nextMatch
 		} else {
 			break
@@ -76,7 +76,7 @@ func re2FindSubmatchAll(i interface{}, raw string) [][]string {
 		results = append(results, funk.Map(match.Groups(), func(i regexp2.Group) string {
 			return i.String()
 		}).([]string))
-		if nextMatch, err := re.FindNextMatch(match); err == nil {
+		if nextMatch, err := re.FindNextMatch(match); err == nil && nextMatch != nil {
 			match = nextMatch
 		} else {
 			break
@@ -168,7 +168,7 @@ func re2ExtractGroupsAll(i interface{}, raw string) []map[string]string {
 		}
 		results = append(results, result)
 
-		if nextMatch, err := re.FindNextMatch(match); err == nil {
+		if nextMatch, err := re.FindNextMatch(match); err == nil && nextMatch != nil {
 			match = nextMatch
 		} else {
 			break
