@@ -108,13 +108,8 @@ func init() {
 					val.GetName(),
 					val.GetVerboseName(),
 					val.ShortString(),
-				}
-
-				if val.getOpcode() == ssa.SSAOpcodeFunction {
-					fu, ok := ssa.ToFunction(val.GetSSAValue())
-					if ok {
-						names = append(names, fu.GetMethodName())
-					}
+					val.GetSSAValue().GetVerboseName(),
+					val.GetSSAValue().GetShortVerboseName(),
 				}
 
 				if val.IsMember() {
@@ -126,6 +121,7 @@ func init() {
 
 				if udef, ok := ssa.ToFunction(val.GetSSAValue()); ok {
 					names = append(names, udef.GetShortVerboseName())
+					names = append(names, udef.GetMethodName())
 				}
 
 				filter := make(map[string]struct{})
