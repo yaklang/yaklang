@@ -91,5 +91,5 @@ tcp:
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.False(t, check, "result callback is called")
+	assert.True(t, check, "result callback is called")
 }
