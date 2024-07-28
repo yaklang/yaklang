@@ -139,6 +139,10 @@ func (v *BaseSyntaxFlowVisitor) VisitFieldCallFilter(ctx *FieldCallFilterContext
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFirst(ctx *FirstContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -180,10 +184,6 @@ func (v *BaseSyntaxFlowVisitor) VisitTopDefFilter(ctx *TopDefFilterContext) inte
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitTopDefConfigFilter(ctx *TopDefConfigFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

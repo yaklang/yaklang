@@ -84,6 +84,7 @@ refVariable
 filterItemFirst
     : nameFilter                                 # NamedFilter
     | '.' lines? nameFilter                      # FieldCallFilter
+    | nativeCall                                 # NativeCallFilter
     ;
 
 filterItem
@@ -98,7 +99,6 @@ filterItem
     | '-{' (config)? '}->'                       # DeepNextConfigFilter
     | '#->'                                      # TopDefFilter
     | '#{' (config)? '}->'                       # TopDefConfigFilter
-    | nativeCall                                 # NativeCallFilter
     | '+' refVariable                            # MergeRefFilter
     | '-' refVariable                            # RemoveRefFilter
     ;
