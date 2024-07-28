@@ -1775,6 +1775,7 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 		if value, ok := y.ReadClassConst(class.Name, name); ok {
 			return value
 		}
+
 		value := y.ReadSelfMember(name)
 		if value != nil {
 			return value
@@ -1783,6 +1784,14 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 	if value, ok := y.ReadConst(name); ok {
 		return value
 	}
+
 	// just undefined
-	return y.ReadValue(name)
+	val := y.ReadValue(name)
+	importedName, haveImportedName := y.fullTypeNameMap[name]
+	if haveImportedName {
+		newType := ssa.NewBasicType(ssa.AnyTypeKind, name)
+		newType.SetFullTypeName(strings.Join(importedName, "."))
+		val.SetType(newType)
+	}
+	return val
 }

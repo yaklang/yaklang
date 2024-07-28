@@ -86,19 +86,6 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			config = y.VisitRecursiveConfig(i.(*sf.ConfigContext))
 		}
 		y.EmitGetTopDefs(config...)
-	case *sf.NativeCallFilterContext:
-		var varname string
-		if nc, ok := filter.NativeCall().(*sf.NativeCallContext); ok {
-			if identify, ok := nc.UseNativeCall().(*sf.UseNativeCallContext); ok {
-				varname = identify.GetText()
-			}
-		}
-		if utils.MatchAnyOfSubString(varname, "/", "*", `"`, "`") {
-			err := utils.Errorf("Syntax ERROR: invalid native call name: %s", varname)
-			log.Errorf("%v", err)
-			return err
-		}
-		y.EmitNativaCall(varname)
 	case *sf.MergeRefFilterContext:
 		y.EmitMergeRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.RemoveRefFilterContext:
@@ -116,9 +103,22 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 	}
 	switch i := raw.(type) {
 	case *sf.NamedFilterContext:
-		y.VisitNameFilter(false, i.NameFilter())
+		return y.VisitNameFilter(false, i.NameFilter())
 	case *sf.FieldCallFilterContext:
-		y.VisitNameFilter(true, i.NameFilter())
+		return y.VisitNameFilter(true, i.NameFilter())
+	case *sf.NativeCallFilterContext:
+		var varname string
+		if nc, ok := i.NativeCall().(*sf.NativeCallContext); ok {
+			if identify, ok := nc.UseNativeCall().(*sf.UseNativeCallContext); ok {
+				varname = identify.Identifier().GetText()
+			}
+		}
+		if utils.MatchAnyOfSubString(varname, "/", "*", `"`, "`") {
+			err := utils.Errorf("Syntax ERROR: invalid native call name: %s", varname)
+			log.Errorf("%v", err)
+			return err
+		}
+		y.EmitNativaCall(varname)
 	default:
 		panic("BUG: in filter first")
 	}

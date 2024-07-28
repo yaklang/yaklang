@@ -54,7 +54,7 @@ func TestAnnotation_Postive_FormalParam_2(t *testing.T) {
 }
 
 func TestAnnotation_Positive_Basic2(t *testing.T) {
-	ssatest.CheckWithName("annotation-basic-1", t, `
+	ssatest.CheckWithName("annotation-basic-TestAnnotation_Positive_Basic2", t, `
 package com.vuln.controller;
 
 public class DemoABCEntryClass {
@@ -64,13 +64,28 @@ public class DemoABCEntryClass {
     }
 }
 `, func(prog *ssaapi.Program) error {
+		t.Log("checking xmlStr?{opcode: param}.annotation.*Param.value as $ref")
 		assert.Greater(t, prog.SyntaxFlowChain("xmlStr?{opcode: param}.annotation.*Param.value as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+
+		t.Log("checking .annotation.*Param.value as $ref")
 		assert.Greater(t, prog.SyntaxFlowChain(".annotation.*Param.value as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+
+		t.Log("checking *Param.value as $ref")
 		assert.Greater(t, prog.SyntaxFlowChain("*Param.value as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+
+		t.Log("checking *Param.__ref__?{const} as $ref")
 		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: const} as $ref", sf.WithEnableDebug(false)).Show().Len(), 0)
+
+		t.Log("checking *Param.__ref__?{opcode: param} as $ref")
 		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: param} as $ref", sf.WithEnableDebug(false)).Show().Len(), 1)
+
+		t.Log("checking *Param.__ref__?{opcode: param && .annotation} as $ref")
 		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && .annotation} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
+
+		t.Log("checking *Param.__ref__?{opcode: param && !have: this} as $ref")
 		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && !have: this} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
+
+		t.Log("checking *Param.__ref__?{have: this} as $ref")
 		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{have: this} as $ref )", sf.WithEnableDebug(false)).Show().Len(), 1)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
