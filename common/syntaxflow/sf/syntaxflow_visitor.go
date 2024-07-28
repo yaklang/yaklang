@@ -160,6 +160,18 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#useDefCalcParams.
 	VisitUseDefCalcParams(ctx *UseDefCalcParamsContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#nativeCallActualParams.
+	VisitNativeCallActualParams(ctx *NativeCallActualParamsContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#nativeCallActualParam.
+	VisitNativeCallActualParam(ctx *NativeCallActualParamContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#nativeCallActualParamKey.
+	VisitNativeCallActualParamKey(ctx *NativeCallActualParamKeyContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#nativeCallActualParamValue.
+	VisitNativeCallActualParamValue(ctx *NativeCallActualParamValueContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#AllParam.
 	VisitAllParam(ctx *AllParamContext) interface{}
 

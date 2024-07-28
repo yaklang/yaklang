@@ -259,10 +259,11 @@ func (y *SyntaxFlowVisitor) EmitMergeRef(i string) {
 	})
 }
 
-func (y *SyntaxFlowVisitor) EmitNativaCall(i string, results ...any) {
+func (y *SyntaxFlowVisitor) EmitNativeCall(i string, results ...*RecursiveConfigItem) {
 	y.codes = append(y.codes, &SFI{
-		OpCode:   OpNativeCall,
-		UnaryStr: i,
+		OpCode:           OpNativeCall,
+		UnaryStr:         i,
+		SyntaxFlowConfig: results,
 	})
 }
 

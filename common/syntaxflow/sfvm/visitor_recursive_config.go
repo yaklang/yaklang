@@ -1,9 +1,12 @@
 package sfvm
 
 import (
+	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"regexp"
 )
 
 func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*RecursiveConfigItem {
@@ -21,7 +24,7 @@ func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*Recursi
 		if configKey == RecursiveConfig_NULL {
 			log.Warnf("invalid recursive config key: %s", key.GetText())
 		}
-		configItem := &RecursiveConfigItem{Key: configKey}
+		configItem := &RecursiveConfigItem{Key: string(configKey)}
 		value := item.RecursiveConfigItemValue().(*sf.RecursiveConfigItemValueContext)
 		if rule := value.FilterStatement(); rule != nil {
 			configItem.SyntaxFlowRule = true
@@ -37,8 +40,47 @@ func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*Recursi
 			}
 
 		} else {
-			configItem.Value = value.GetText()
+			configItem.Value = yakunquote.TryUnquote(value.GetText())
 		}
+		res = append(res, configItem)
+	}
+	return res
+}
+
+var configKeyRegexp = regexp.MustCompile(`[a-zA-Z_][-a-zA-Z0-9_]*`)
+
+func (v *SyntaxFlowVisitor) VisitNativeCallActualParams(i *sf.NativeCallActualParamsContext) []*RecursiveConfigItem {
+	if i == nil {
+		return nil
+	}
+	var res []*RecursiveConfigItem
+	var count = 0
+	for _, i := range i.AllNativeCallActualParam() {
+		item, ok := i.(*sf.NativeCallActualParamContext)
+		if !ok {
+			continue
+		}
+		var configKey string
+		if item.NativeCallActualParamKey() != nil {
+			key := item.NativeCallActualParamKey()
+			origin := key.GetText()
+			configKey, _ = yakunquote.Unquote(origin)
+			if configKey == "" {
+				configKey = origin
+			}
+			if !configKeyRegexp.MatchString(configKey) {
+				log.Infof("invalid native call key: %s", configKey)
+				configKey = fmt.Sprint(count)
+				count++
+			}
+		} else {
+			configKey = fmt.Sprint(count)
+			count++
+		}
+
+		configItem := &RecursiveConfigItem{Key: configKey}
+		value := item.NativeCallActualParamValue()
+		configItem.Value = yakunquote.TryUnquote(value.GetText())
 		res = append(res, configItem)
 	}
 	return res

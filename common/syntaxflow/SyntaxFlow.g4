@@ -114,9 +114,15 @@ useNativeCall
     ;
 
 useDefCalcParams
-    : '{' config? '}'
-    | '(' config? ')'
+    : '{' nativeCallActualParams? '}'
+    | '(' nativeCallActualParams? ')'
     ;
+nativeCallActualParams: lines? nativeCallActualParam (',' lines? nativeCallActualParam)* ','? lines?;
+nativeCallActualParam
+    : (nativeCallActualParamKey ':')?  nativeCallActualParamValue
+    ;
+nativeCallActualParamKey: identifier;
+nativeCallActualParamValue: identifier | numberLiteral | '`' ~'`'* '`';
 
 actualParam
     : singleParam    lines?                   # AllParam

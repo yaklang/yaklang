@@ -976,7 +976,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return err
 		}
-		ok, ret, err := call(value, s)
+
+		ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 		if err != nil || !ok {
 			return err
 		}

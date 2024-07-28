@@ -1,10 +1,10 @@
 package java
 
 import (
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -155,15 +155,38 @@ func TestNativeCall_GetCall_Then_GetFunc(t *testing.T) {
 	ssatest.Check(t, NativeCallTest,
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
-aArgs <getCall> <getFunc> as $sink; 
+yourMethod()<getCaller> as $sink; 
 `, sfvm.WithEnableDebug(true))
 			sink := results.GetValues("sink")
+			sink.Show()
+			if sink.Len() < 2 {
+				t.Fatal("sink.Len() != 1")
+			}
+			for _, val := range sink {
+				if !strings.Contains(val.String(), "yourMethod") {
+					t.Fatal("sink[0].GetName() != yourMethod")
+				}
+			}
+			return nil
+		},
+		ssaapi.WithLanguage(ssaapi.JAVA),
+	)
+}
+
+func TestNativeCall_GetCaller(t *testing.T) {
+	ssatest.Check(t, NativeCallTest,
+		func(prog *ssaapi.Program) error {
+			results := prog.SyntaxFlow(`
+aArgs <getCall> <getCaller> as $sink; 
+`, sfvm.WithEnableDebug(true))
+			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
 			}
-			spew.Dump(sink[0].GetName())
-			if !strings.HasSuffix(sink[0].GetName(), "yourMethod") {
-				t.Fatal("sink[0].GetName() != yourMethod")
+			sink[0].Show()
+
+			if !strings.Contains(sink[0].String(), "yourMethod") {
+				t.Fatal("sink[0].String() != yourMethod")
 			}
 
 			return nil
@@ -173,23 +196,30 @@ aArgs <getCall> <getFunc> as $sink;
 }
 
 func TestNativeCall_GetFunc(t *testing.T) {
-	ssatest.Check(t, NativeCallTest,
+	ssatest.Check(t, `
+
+yourMethod = () => {
+	c(aArgs);
+}
+
+`,
 		func(prog *ssaapi.Program) error {
 			results := prog.SyntaxFlow(`
 aArgs <getFunc> as $sink; 
 `, sfvm.WithEnableDebug(true))
-			sink := results.GetValues("sink")
+			sink := results.GetValues("sink").Show()
 			if sink.Len() != 1 {
 				t.Fatal("sink.Len() != 1")
 			}
-			spew.Dump(sink[0].GetName())
-			if !strings.HasSuffix(sink[0].GetName(), "yourMethod") {
-				t.Fatal("sink[0].GetName() != yourMethod")
+			sink[0].Show()
+
+			if !strings.HasSuffix(sink[0].String(), "yourMethod") {
+				t.Fatal("sink[0].String() != yourMethod")
 			}
 
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaapi.Yak),
 	)
 }
 
@@ -206,4 +236,36 @@ func TestNativeCall_SearchFormalParams(t *testing.T) {
 		},
 		ssaapi.WithLanguage(ssaapi.JAVA),
 	)
+}
+
+func TestNativeCall_FuncName(t *testing.T) {
+	ssatest.Check(t, `
+funcA = () => {
+	return "abc";
+}
+`, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`funcA<name> as $sink`).Show()
+		haveFuncA := false
+		for _, v := range sinks {
+			if strings.Contains(v.String(), "funcA") {
+				haveFuncA = true
+			}
+		}
+		assert.True(t, haveFuncA)
+		return nil
+	})
+}
+
+func TestNativeCall_Java_FuncName(t *testing.T) {
+	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`aArgs<getCall><getCaller><name> as $sink`).Show()
+		haveFuncName := false
+		for _, v := range sinks {
+			if strings.Contains(v.String(), "yourMethod") {
+				haveFuncName = true
+			}
+		}
+		assert.True(t, haveFuncName)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

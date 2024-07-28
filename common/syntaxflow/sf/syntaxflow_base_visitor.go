@@ -211,6 +211,22 @@ func (v *BaseSyntaxFlowVisitor) VisitUseDefCalcParams(ctx *UseDefCalcParamsConte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitNativeCallActualParams(ctx *NativeCallActualParamsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNativeCallActualParam(ctx *NativeCallActualParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNativeCallActualParamKey(ctx *NativeCallActualParamKeyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitNativeCallActualParamValue(ctx *NativeCallActualParamValueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitAllParam(ctx *AllParamContext) interface{} {
 	return v.VisitChildren(ctx)
 }
