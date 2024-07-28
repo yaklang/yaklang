@@ -162,6 +162,8 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	}
 	yakTemp.CVE = utils.MapGetString(cveInfo, "cve-id")
 
+	yakTemp.Variables = generateYakVariables(mid)
+
 	reqs := utils.MapGetFirstRaw(mid, "requests", "http")
 	if reqs == nil || (reqs != nil && reflect.TypeOf(reqs).Kind() != reflect.Slice) {
 		if ret := utils.MapGetFirstRaw(mid, "network", "tcp"); ret != nil {
@@ -185,8 +187,6 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			return nil, utils.Errorf("nuclei template requests is not slice")
 		}
 	}
-
-	yakTemp.Variables = generateYakVariables(mid)
 
 	// parse req seqs
 	var reqSeq []*YakRequestBulkConfig

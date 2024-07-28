@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"testing"
@@ -11,6 +12,18 @@ func TestOOB(t *testing.T) {
 	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
 TestDebug: 111`))
 	spew.Dump(server, port)
+	swg := utils.NewSizedWaitGroup(20)
+	for i := 0; i < 40; i++ {
+		swg.Add()
+		go func() {
+			defer swg.Done()
+			tryTestOOB(server, port, t)
+		}()
+	}
+	swg.Wait()
+}
+
+func tryTestOOB(server string, port int, t *testing.T) {
 
 	var demo = `id: CVE-2016-3510
 
@@ -49,9 +62,11 @@ tcp:
 `
 	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
 	if err != nil {
-		panic(err)
+		t.Error(err)
+		t.FailNow()
 	}
 
+	check := false
 	config := NewConfig(
 		WithOOBRequireCallback(func(f ...float64) (string, string, error) {
 			return "adf.dnslog.mock", "adf", nil
@@ -62,12 +77,19 @@ tcp:
 			}
 			return "", []byte("")
 		}),
+		WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{}) {
+			if result {
+				check = true
+			}
+			return
+		}),
 		WithDebug(true), WithDebugRequest(true), WithDebugResponse(true),
 	)
 	_, err = tpl.Exec(config, false, []byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
 		lowhttp.WithHost(server), lowhttp.WithPort(port),
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
+	assert.False(t, check, "result callback is called")
 }
