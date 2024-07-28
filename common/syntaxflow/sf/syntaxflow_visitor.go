@@ -106,6 +106,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FieldCallFilter.
 	VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#NativeCallFilter.
+	VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#First.
 	VisitFirst(ctx *FirstContext) interface{}
 
@@ -138,9 +141,6 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#TopDefConfigFilter.
 	VisitTopDefConfigFilter(ctx *TopDefConfigFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#NativeCallFilter.
-	VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#MergeRefFilter.
 	VisitMergeRefFilter(ctx *MergeRefFilterContext) interface{}

@@ -163,9 +163,9 @@ func (v *Value) GetVerboseName() string {
 	return fmt.Sprintf(`t%d: %v`, v.GetId(), v.ShortString())
 }
 
-func (i *Value) Show()               { fmt.Println(i) }
-func (i *Value) ShowWithRange()      { fmt.Println(i.StringWithRange()) }
-func (i *Value) ShowWithSourceCode() { fmt.Println(i.StringWithSourceCode()) }
+func (i *Value) Show() *Value               { fmt.Println(i); return i }
+func (i *Value) ShowWithRange() *Value      { fmt.Println(i.StringWithRange()); return i }
+func (i *Value) ShowWithSourceCode() *Value { fmt.Println(i.StringWithSourceCode()); return i }
 
 func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
@@ -717,9 +717,9 @@ func (v Values) StringEx(flag int) string {
 	for i, v := range v {
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("\t%d: %s\n", i, v)
+			ret += fmt.Sprintf("\t%d (t%d): %s\n", i, v.GetId(), v)
 		case 1:
-			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithRange())
+			ret += fmt.Sprintf("\t%d (t%d): %s\n", i, v.GetId(), v.StringWithRange())
 		}
 	}
 	return ret
