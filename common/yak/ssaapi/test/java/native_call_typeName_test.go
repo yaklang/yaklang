@@ -79,7 +79,7 @@ public class FastJSONDemoController {
 		obj = prog.SyntaxFlowChain(`parse*?{<getObject><fullTypeName>?{have: 'alibaba.fastjson'} } as $obj`).Show(false)
 		assert.NotNil(t, obj)
 
-		obj = prog.SyntaxFlowChain(`ok()?{<getFunc><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
+		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
 		assert.NotNil(t, obj)
 
 		typeName := prog.SyntaxFlowChain(`a<typeName> as $id;`)[0]

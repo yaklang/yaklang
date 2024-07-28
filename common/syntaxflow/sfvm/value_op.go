@@ -39,7 +39,7 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 }
 
 type RecursiveConfigItem struct {
-	Key            RecursiveConfigKey
+	Key            string
 	Value          string
 	SyntaxFlowRule bool
 }

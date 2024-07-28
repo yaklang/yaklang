@@ -137,6 +137,15 @@ func TestSyntaxInOne(t *testing.T) {
 		"${application.properties}.re(aaa)",
 		"${application.properties}.re(aaa) as $a",
 		`${application.properties}.xpath("//ar/*[contain(., '#{') and @id]/@id") as $a`,
+		`<nativeCall(a: 1)>`,
+		`<nativeCall(a: 1, "ccc")>`,
+		`<nativeCall{a: 1, "ccc"}>`,
+		`<nativeCall{
+
+a: 1,
+
+"ccc"}>`,
+		`<nativeCall(a: 1, "ccc", ` + "`a asdf asdf asdf asdf asdf ${ asdf asd f} sdfasdfasdfasdf`" + `)>`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)

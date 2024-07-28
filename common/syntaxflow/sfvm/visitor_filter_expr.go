@@ -108,17 +108,22 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 		return y.VisitNameFilter(true, i.NameFilter())
 	case *sf.NativeCallFilterContext:
 		var varname string
+		var items []*RecursiveConfigItem
+
 		if nc, ok := i.NativeCall().(*sf.NativeCallContext); ok {
 			if identify, ok := nc.UseNativeCall().(*sf.UseNativeCallContext); ok {
 				varname = identify.Identifier().GetText()
+
+				if identify.UseDefCalcParams() != nil {
+					if configable, ok := identify.UseDefCalcParams().(*sf.UseDefCalcParamsContext); ok {
+						if configable.NativeCallActualParams() != nil {
+							items = y.VisitNativeCallActualParams(configable.NativeCallActualParams().(*sf.NativeCallActualParamsContext))
+						}
+					}
+				}
 			}
 		}
-		if utils.MatchAnyOfSubString(varname, "/", "*", `"`, "`") {
-			err := utils.Errorf("Syntax ERROR: invalid native call name: %s", varname)
-			log.Errorf("%v", err)
-			return err
-		}
-		y.EmitNativaCall(varname)
+		y.EmitNativeCall(varname, items...)
 	default:
 		panic("BUG: in filter first")
 	}
