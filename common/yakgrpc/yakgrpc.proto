@@ -4850,9 +4850,9 @@ message MITMRequest {
   bool preferGMTLS = 48;
 
   // 代理用户名和密码
-  bool enableProxyAuth = 51;
   string proxyUsername = 49;
   string proxyPassword = 50;
+  bool enableProxyAuth = 51;
   repeated string dnsServers = 52;
   repeated KVPair hosts = 53;
 
@@ -4871,6 +4871,9 @@ message MITMRequest {
 
   // runtime change proxy
   bool SetDownstreamProxy = 60;
+
+  // disable MITM CA Cert Page
+  bool DisableCACertPage = 61;
 }
 
 message Certificate {
