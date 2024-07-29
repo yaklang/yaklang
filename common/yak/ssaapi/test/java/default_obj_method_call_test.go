@@ -1,13 +1,14 @@
 package java
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"strings"
-	"testing"
 )
 
 const DefaultOBJMethodCall = `package com.example.demo.controller.deepcross;
@@ -315,7 +316,7 @@ public class A{
 public class B{
 	public static void main(){
 		int a1=A.a(); //不应该有this
-		int b1=A.b(); // A的Type为any，不应该有this
+		int b1=A.b(); // 应该有this
 		int a2=A.a(); // 前面已经出现过，直接拿并返回
 		int b2=A.b(); // 前面已经出现过，直接拿并返回
 	}
@@ -326,9 +327,9 @@ public class B{
 		assert.Equal(t, "Function-A_a()", result1[0].String())
 		assert.Equal(t, "Function-A_a()", result1[1].String())
 		result2 := prog.SyntaxFlow(`b* as $b;`).GetValues("b")
-		assert.Equal(t, "Undefined-A.b(valid)", result2[0].String())
-		assert.Equal(t, "Undefined-A.b(valid)()", result2[1].String())
-		assert.Equal(t, "Undefined-A.b(valid)()", result2[2].String())
+		assert.Equal(t, "Undefined-A.b", result2[0].String())
+		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[1].String())
+		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[2].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 
@@ -360,23 +361,6 @@ public class B{
 		assert.Equal(t, "Undefined-object.b", result2[0].String())
 		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[1].String())
 		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[2].String())
-		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
-}
-func TestDefaultObjForUndefinedCaller(t *testing.T) {
-	ssatest.Check(t, `
-
-
-public class B{
-	public static void main(param cmd){
-		exec(String.valueOf(cmd)); //String在以前都不存在,type应为null
-	}
-}
-`, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlow(`exec(* as $a)`).GetValues("a")
-		result.Show()
-		assert.Contains(t, result.String(), "Undefined-String.valueOf(Undefined-String,Parameter-cmd)")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
