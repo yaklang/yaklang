@@ -24,11 +24,19 @@ func (n *NativeCallActualParams) Existed(index any) bool {
 	return ok
 }
 
-func (n *NativeCallActualParams) GetString(index any) string {
+func (n *NativeCallActualParams) GetString(index any, extra ...any) string {
 	raw, ok := n.m[codec.AnyToString(index)]
 	if ok {
 		return codec.AnyToString(raw)
 	}
+
+	for _, name := range extra {
+		raw, ok = n.m[codec.AnyToString(name)]
+		if ok {
+			return codec.AnyToString(raw)
+		}
+	}
+
 	return ""
 }
 
