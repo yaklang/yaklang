@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

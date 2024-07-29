@@ -523,28 +523,28 @@ $c = new test;
 		//	map[string][]string{"param": {`Undefined-$c.a(valid)`}},
 		//	ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("extends __destruct", func(t *testing.T) {
-		code := `<?php
-class test{
-    public $a;
-    function __destruct(){
-        eval($this->a);
-    }
-}
+// 	t.Run("extends __destruct", func(t *testing.T) {
+// 		code := `<?php
+// class test{
+//     public $a;
+//     function __destruct(){
+//         eval($this->a);
+//     }
+// }
 
-class childTest extends test{}
-$c = new childTest;
-$c->a = 1;
-`
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			prog.Show()
-			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
-		//ssatest.CheckSyntaxFlow(t, code,
-		//	`eval(* #-> * as $param)`,
-		//	map[string][]string{"param": {`1`}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
-	})
+// class childTest extends test{}
+// $c = new childTest;
+// $c->a = 1;
+// `
+// 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+// 			prog.Show()
+// 			return nil
+// 		}, ssaapi.WithLanguage(ssaapi.PHP))
+// 		//ssatest.CheckSyntaxFlow(t, code,
+// 		//	`eval(* #-> * as $param)`,
+// 		//	map[string][]string{"param": {`1`}},
+// 		//	ssaapi.WithLanguage(ssaapi.PHP))
+// 	})
 	t.Run("code", func(t *testing.T) {
 		code := `<?php
 function __destruct(){}

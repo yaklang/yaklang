@@ -144,7 +144,7 @@ func TestJs_JQuery(t *testing.T) {
 			map[string][]string{
 				"url":         {"\"https://jsonplaceholder.typicode.com/posts\"", "\"https://tests.com\""},
 				"contentType": {"\"application/json\"", "\"application/json\""},
-				"data":        {"Undefined-JSON.stringify(Undefined-formData)", "\"aaa\""},
+				"data":        {"Undefined-JSON.stringify(valid)(Undefined-formData)", "\"aaa\""},
 			},
 			ssaapi.WithLanguage(ssaapi.JS))
 	})
