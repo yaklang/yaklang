@@ -1,11 +1,12 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestNativeCallTypeName(t *testing.T) {
