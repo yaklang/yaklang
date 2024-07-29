@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"io"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -16,11 +18,9 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-func Export() io.ReadCloser {
+func ExportDatabase() io.ReadCloser {
 	r, w := utils.NewBufPipe(nil)
 	go func() {
 		defer func() {
@@ -45,7 +45,7 @@ func Export() io.ReadCloser {
 	return r
 }
 
-func Import(reader io.Reader) error {
+func ImportDatabase(reader io.Reader) error {
 	scanner := bufio.NewReader(reader)
 	for {
 		line, err := utils.BufioReadLine(scanner)
@@ -84,18 +84,77 @@ func CreateOrUpdateSyntaxFlow(hash string, i any) error {
 	return db.Model(&rule).Updates(i).Error
 }
 
+func DeleteRuleByRuleName(name string) error {
+	db := consts.GetGormProfileDatabase()
+	return db.Where("rule_name = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+}
+
+func DeleteRuleByTitle(name string) error {
+	db := consts.GetGormProfileDatabase()
+	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+}
+
+func ImportRuleWithoutValid(ruleName string, content string) error {
+	var language consts.Language
+	languageRaw, _, _ := strings.Cut(ruleName, "-")
+	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
+	case "yak", "yaklang":
+		language = consts.Yak
+	case "java":
+		language = consts.JAVA
+	case "php":
+		language = consts.PHP
+	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
+		language = consts.JS
+	}
+
+	var ruleType schema.SyntaxFlowRuleType
+	switch path.Ext(ruleName) {
+	case ".sf", ".syntaxflow":
+		ruleType = schema.SFR_RULE_TYPE_SF
+	default:
+		log.Errorf("invalid rule type: %v is not supported yet, treat it as syntaxflow(.sf, .syntaxflow)", ruleName)
+	}
+
+	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
+	if err != nil {
+		return err
+	}
+
+	rule := &schema.SyntaxFlowRule{
+		Language:    string(language),
+		Title:       frame.Title,
+		RuleName:    ruleName,
+		Description: frame.Description,
+		Type:        ruleType,
+		Content:     content,
+		Purpose:     schema.ValidPurpose(frame.Purpose),
+	}
+
+	if frame.AllowIncluded != "" {
+		rule.AllowIncluded = true
+		rule.IncludedName = frame.AllowIncluded
+		rule.Title = frame.AllowIncluded
+	}
+	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
+	if err != nil {
+		return utils.Wrap(err, "create or update syntax flow rule error")
+	}
+	return nil
+}
+
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
 	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
 	case "yak", "yaklang":
-		language = ssaapi.Yak
+		language = consts.Yak
 	case "java":
-		language = ssaapi.JAVA
+		language = consts.JAVA
 	case "php":
-		language = ssaapi.PHP
+		language = consts.PHP
 	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
-		language = ssaapi.JS
+		language = consts.JS
 	}
 
 	var ruleType schema.SyntaxFlowRuleType
@@ -121,14 +180,22 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		Purpose:     schema.ValidPurpose(frame.Purpose),
 	}
 
+	if frame.AllowIncluded != "" {
+		rule.AllowIncluded = true
+		rule.IncludedName = frame.AllowIncluded
+		rule.Title = frame.AllowIncluded
+	}
+
 	err = LoadFileSystem(rule, system)
 	if err != nil {
 		return utils.Wrap(err, "load file system error")
 	}
 
-	err = Valid(rule)
-	if err != nil {
-		return utils.Wrap(err, "valid rule error")
+	if valid != nil {
+		err = valid(rule)
+		if err != nil {
+			return utils.Wrap(err, "valid rule error")
+		}
 	}
 
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
@@ -136,6 +203,24 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
 	return nil
+}
+
+var valid func(rule *schema.SyntaxFlowRule) error
+var registerOnce = new(sync.Once)
+
+func RegisterValid(f func(rule *schema.SyntaxFlowRule) error) {
+	registerOnce.Do(func() {
+		valid = f
+	})
+}
+
+func GetLibrary(libname string) (*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	var rule schema.SyntaxFlowRule
+	if err := db.Where("(title = ?) or (included_name = ?)", libname, libname).First(&rule).Error; err != nil {
+		return nil, err
+	}
+	return &rule, nil
 }
 
 func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {

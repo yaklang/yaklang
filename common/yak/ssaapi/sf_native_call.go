@@ -55,6 +55,9 @@ const (
 
 	// NativeCall_String is used to get the function name of a value
 	NativeCall_String = "string"
+
+	// NativeCall_Include is used to include a syntaxflow-rule
+	NativeCall_Include = "include"
 )
 
 func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
@@ -72,6 +75,12 @@ func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
 }
 
 func init() {
+	registerNativeCall(
+		NativeCall_Include,
+		nc_func(nativeCallInclude),
+		nc_desc(`include a syntaxflow-rule`),
+	)
+
 	registerNativeCall(
 		NativeCall_String,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {

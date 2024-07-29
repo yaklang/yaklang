@@ -262,7 +262,7 @@ var SSACompilerCommands = []*cli.Command{
 				return utils.Error("output file is required")
 			}
 			local := filesys.NewLocalFs()
-			results, _ := io.ReadAll(sfdb.Export())
+			results, _ := io.ReadAll(sfdb.ExportDatabase())
 			if len(results) <= 0 {
 				return utils.Error("no rule found")
 			}
@@ -287,7 +287,7 @@ var SSACompilerCommands = []*cli.Command{
 			if err != nil {
 				return utils.Wrap(err, "open file failed")
 			}
-			err = sfdb.Import(file)
+			err = sfdb.ImportDatabase(file)
 			if err != nil {
 				return err
 			}

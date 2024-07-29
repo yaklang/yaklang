@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func LoadFileSystem(s *schema.SyntaxFlowRule, system fi.FileSystem) error {
@@ -47,24 +46,4 @@ func BuildFileSystem(s *schema.SyntaxFlowRule) (fi.FileSystem, error) {
 		fs.AddFile(filename, raw)
 	}
 	return fs, nil
-}
-
-func Valid(s *schema.SyntaxFlowRule) error {
-	fs, err := BuildFileSystem(s)
-	if err != nil {
-		return err
-	}
-	prog, err := ssaapi.ParseProject(fs)
-	if err != nil {
-		return err
-	}
-	result, err := prog.SyntaxFlowWithError(s.Content)
-	if err != nil {
-		return err
-	}
-	if len(result.Errors) > 0 {
-		return utils.Errorf(`runtime error: %v`, result.Errors)
-	}
-	s.Verified = true
-	return nil
 }
