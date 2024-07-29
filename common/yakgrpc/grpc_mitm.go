@@ -526,7 +526,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
 					// appendCallers(script.Content, script.ScriptName, reqInstance.YakScriptParams)
 					ctx := stream.Context()
-					err = mitmPluginCaller.LoadPluginByName(ctx, script.ScriptName, reqInstance.YakScriptParams, script.Content)
+					err = mitmPluginCaller.LoadPluginByName(ctx, script.ScriptName, reqInstance.YakScriptParams)
 					if err != nil {
 						_ = stream.Send(&ypb.MITMResponse{
 							HaveNotification:    true,

@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
@@ -1535,5 +1537,57 @@ dump(res)
 	})
 	if err != nil {
 		panic(err)
+	}
+}
+
+// 插件测试返回值
+func TestMitm_test(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	database := consts.GetGormProfileDatabase()
+	name := uuid.NewString()
+	yakScript := &ypb.YakScript{
+		ScriptName: name,
+		Content: `
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    dump(target)
+    yakit_output(target)
+    poc.Get(target)~
+}
+`,
+		Type: "mitm",
+	}
+	err = yakit.CreateOrUpdateYakScriptByName(database, yakScript.ScriptName, yakScript)
+	require.NoError(t, err)
+	byName, err := yakit.GetYakScriptByName(database, name)
+	require.NoError(t, err)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer func() {
+		cancelFunc()
+		err2 := yakit.DeleteYakScriptByID(database, yakScript.Id)
+		require.NoError(t, err2)
+	}()
+	stream, err := client.MITM(ctx)
+	require.NoError(t, err)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	_ = mitmPort
+	err = stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	require.NoError(t, err)
+	for {
+		recv, err := stream.Recv()
+		require.NoError(t, err)
+		if strings.Contains(string(recv.GetMessage().GetMessage()), `starting mitm server`) {
+			err = stream.Send(&ypb.MITMRequest{
+				SetYakScript: true,
+				YakScriptID:  int64(byName.ID),
+			})
+			require.NoError(t, err)
+		} else if recv.GetCurrentHook && len(recv.GetHooks()) > 0 {
+			assert.True(t, recv.GetHooks()[0].Hooks[0].YakScriptId == int64(byName.ID))
+			break
+		}
 	}
 }

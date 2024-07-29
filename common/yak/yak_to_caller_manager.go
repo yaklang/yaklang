@@ -200,7 +200,7 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 type Caller struct {
 	Core    *YakFunctionCaller
 	Hash    string
-	Id      string
+	Id      int
 	Verbose string
 	Engine  *antlr4yak.Engine
 	// NativeFunction *exec.Function
@@ -273,7 +273,7 @@ type CallerHooks struct {
 
 type CallerHookDescription struct {
 	// 这两个是
-	YakScriptId   string
+	YakScriptId   int
 	YakScriptName string
 	VerboseName   string
 }
@@ -286,6 +286,7 @@ func (y *YakToCallerManager) GetCurrentHooksGRPCModel() []*ypb.YakScriptHooks {
 		}
 		for _, hook := range i.Hooks {
 			ins.Hooks = append(ins.Hooks, &ypb.YakScriptHookItem{
+				YakScriptId:   int64(hook.YakScriptId),
 				YakScriptName: hook.YakScriptName,
 				Verbose:       hook.VerboseName,
 			})
@@ -311,6 +312,7 @@ func (y *YakToCallerManager) GetCurrentHooks() []*CallerHooks {
 				verbose = "default"
 			}
 			hooksInstance.Hooks = append(hooksInstance.Hooks, &CallerHookDescription{
+				YakScriptId:   h.Id,
 				YakScriptName: h.Verbose,
 				VerboseName:   verbose,
 			})
@@ -430,9 +432,9 @@ func (y *YakToCallerManager) Remove(params *ypb.RemoveHookParams) {
 		var existedCallers []*Caller
 		list := res.([]*Caller)
 		for _, l := range list {
-			if params.ClearAll || utils.StringArrayContains(params.RemoveHookID, l.Id) {
+			if params.ClearAll || utils.StringArrayContains(params.RemoveHookID, l.Verbose) {
 				if k == HOOK_CLAER {
-					y.CallPluginKeyByName(l.Id, HOOK_CLAER)
+					y.CallPluginKeyByName(l.Verbose, HOOK_CLAER)
 				}
 				if iCancelFunc, ok := y.ContextCancelFuncs.Load(l.Id); ok {
 					if cancelFunc, ok := iCancelFunc.(context.CancelFunc); ok {
@@ -534,7 +536,7 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 			// NativeYakFunction: nil,
 		},
 		Hash: utils.CalcSha1(name, id),
-		Id:   id,
+		//Id:   id,
 		// NativeFunction: caller.NativeYakFunction,
 		Verbose: id,
 	}
@@ -1184,10 +1186,11 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 	}()
 
 	var engine *antlr4yak.Engine
-	id := script.ScriptName
+	id := script.ID
+	scriptname := script.ScriptName
 	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
 		if v, ok := y.table.Load(HOOK_LoadNaslScriptByNameFunc); ok {
-			v.(func(string))(id)
+			v.(func(string))(scriptname)
 			return nil
 		}
 	}
@@ -1212,7 +1215,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		HookCliArgs(e, args)
 		e.SetVars(map[string]any{
 			"MITM_PARAMS": paramMap,
-			"MITM_PLUGIN": id,
+			"MITM_PLUGIN": scriptname,
 		})
 
 		if hook != nil {
@@ -1242,7 +1245,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 				log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 			}
 		}
-		f(id)
+		f(scriptname)
 		y.table.Store(HOOK_LoadNaslScriptByNameFunc, f)
 	}
 	if y.table == nil {
@@ -1253,10 +1256,10 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		ins := &Caller{
 			Core:   caller,
 			Hash:   utils.CalcSha1(code, name, id),
-			Id:     id,
+			Id:     int(id),
 			Engine: engine,
 			// NativeFunction: caller.NativeYakFunction,
-			Verbose: id,
+			Verbose: scriptname,
 		}
 
 		res, ok := y.table.Load(name)
@@ -1268,7 +1271,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		callerList := res.([]*Caller)
 		currentIndex := -1
 		for index, existed := range callerList {
-			if existed.Id == id {
+			if existed.Id == int(id) {
 				currentIndex = index
 				break
 			}
@@ -1395,7 +1398,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 				log.Errorf("call failed: \n%v", err)
 			}
 		}()
-		if (pluginId == "" /*执行所有该类型的插件*/) || (i.Id == pluginId /*执行当前插件*/) {
+		if (pluginId == "" /*执行所有该类型的插件*/) || (i.Verbose == pluginId /*执行当前插件*/) {
 			var items []interface{}
 			for _, i := range itemsFuncs {
 				i := i
@@ -1409,9 +1412,9 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 
 	for _, iRaw := range ins {
 		verbose := iRaw.Verbose
-		if iRaw.Id != verbose {
-			verbose = fmt.Sprintf("%v[%v]", iRaw.Id, iRaw.Verbose)
-		}
+		//if iRaw.Id != verbose {
+		//	verbose = fmt.Sprintf("%v[%v]", iRaw.Id, iRaw.Verbose)
+		//}
 		// println(fmt.Sprintf("hook.Caller call [%v]'s %v", verbose, name))
 
 		// 没有设置并发控制，就直接顺序执行，需要处理上下文
