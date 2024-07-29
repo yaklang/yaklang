@@ -55,6 +55,7 @@ type SyntaxFlowRule struct {
 	// if the rule is not set, all languages will be used.
 	Language string
 
+	RuleName    string
 	Title       string
 	TitleZh     string
 	Description string
@@ -76,6 +77,7 @@ type SyntaxFlowRule struct {
 	// AllowIncluded is the rule can be included by other rules.
 	// If the rule is included by other rules, the rule will not be shown in the result.
 	AllowIncluded bool
+	IncludedName  string
 
 	Hash string `json:"hash" gorm:"unique_index"`
 }

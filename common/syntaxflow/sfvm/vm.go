@@ -103,6 +103,8 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	frame.Description = result.description
 	frame.AllowIncluded = result.allowIncluded
 	frame.Purpose = result.purpose
+	frame.vm = s
+
 	s.frames = append(s.frames, frame)
 
 	return frame, nil
@@ -137,4 +139,8 @@ func (s *SyntaxFlowVirtualMachine) SetConfig(config *Config) {
 func (frame *SFFrame) Feed(i ValueOperator) (*SFFrameResult, error) {
 	err := frame.exec(i)
 	return frame.result, err
+}
+
+func (s *SyntaxFlowVirtualMachine) GetConfig() *Config {
+	return s.config
 }

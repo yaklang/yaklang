@@ -22,6 +22,8 @@ type filterExprContext struct {
 }
 
 type SFFrame struct {
+	vm *SyntaxFlowVirtualMachine
+
 	config *Config
 
 	Title         string
@@ -1092,4 +1094,15 @@ func (s *SFFrame) debugSubLog(i string, item ...any) {
 
 func (s *SFFrame) SetSFResult(sfResult *SFFrameResult) {
 	s.result = sfResult
+}
+
+func (s *SFFrame) GetSFResult() (*SFFrameResult, error) {
+	if s.result == nil {
+		return nil, utils.Error("BUG: result is nil")
+	}
+	return s.result, nil
+}
+
+func (s *SFFrame) GetVM() *SyntaxFlowVirtualMachine {
+	return s.vm
 }
