@@ -49,6 +49,13 @@ func (r *responseModifierFunc) ModifyResponse(req *http.Response) error {
 // config
 type MITMConfig func(server *MITMServer) error
 
+func MITM_EnableMITMCACertPage(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.enableMITMCACertPage = b
+		return nil
+	}
+}
+
 func MITM_SetHijackedMaxContentLength(i int) MITMConfig {
 	return func(server *MITMServer) error {
 		server.hijackedMaxContentLength = i

@@ -11,13 +11,6 @@ import (
 	_ "embed"
 	"encoding/pem"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/minimartian"
-	"github.com/yaklang/yaklang/common/minimartian/mitm"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -27,6 +20,14 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/minimartian/mitm"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 var (
@@ -75,7 +76,6 @@ func GetDefaultMITMCAAndPriv() (*x509.Certificate, *rsa.PrivateKey, error) {
 	ca, key, err := GetDefaultCaAndKey()
 	if err != nil {
 		return nil, nil, err
-
 	}
 	p, _ := pem.Decode(ca)
 	caCert, err := x509.ParseCertificate(p.Bytes)
@@ -109,12 +109,12 @@ func InitMITMCert() {
 			return
 		}
 
-		_ = os.MkdirAll(consts.GetDefaultYakitBaseDir(), 0777)
-		err = ioutil.WriteFile(defaultCAFile, defaultCA, 0444)
+		_ = os.MkdirAll(consts.GetDefaultYakitBaseDir(), 0o777)
+		err = ioutil.WriteFile(defaultCAFile, defaultCA, 0o444)
 		if err != nil {
 			log.Error("write default ca failed")
 		}
-		err = ioutil.WriteFile(defaultKeyFile, defaultKey, 0444)
+		err = ioutil.WriteFile(defaultKeyFile, defaultKey, 0o444)
 		if err != nil {
 			log.Error("write default key failed")
 		}
@@ -262,6 +262,9 @@ type MITMServer struct {
 	websocketResponseMirror        func(rsp []byte)
 
 	maxContentLength int
+
+	// disable mitm ca cert page
+	enableMITMCACertPage bool
 }
 
 func (m *MITMServer) GetMaxContentLength() int {
@@ -294,7 +297,7 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 		return utils.Errorf("mitm config empty")
 	}
 
-	//m.proxy.SetDownstreamProxy(m.proxyUrl)
+	// m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
 	if m.proxyAuth != nil {
 		m.proxy.SetAuth(m.proxyAuth.Username, m.proxyAuth.Password)
@@ -352,7 +355,7 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 }
 
 var (
-	defaultBuildinDomains = []string{
+	defaultBuiltinDomains = []string{
 		"download-mitm-ca.com",
 		"download-mitm-cert.yaklang.io",
 		"mitm",
