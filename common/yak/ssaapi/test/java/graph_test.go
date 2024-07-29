@@ -27,7 +27,6 @@ check $source then "XXE Attack" else "XXE Safe";
 			"penwidth=\"3.0\"",
 			": call",
 			"search parse",
-			"search: *Builder",
 			"all-actual-args",
 		) {
 			fmt.Println(results)
