@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/dlclark/regexp2"
-	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func re2Find(data interface{}, text string) string {
-	re, err := re2Compile(text)
+func re2Find(data interface{}, pattern string) string {
+	re, err := re2Compile(pattern)
 	if err != nil {
 		return ""
 	}
@@ -21,8 +21,8 @@ func re2Find(data interface{}, text string) string {
 	return match.String()
 }
 
-func re2FindAll(data interface{}, text string) []string {
-	re, err := re2Compile(text)
+func re2FindAll(data interface{}, pattern string) []string {
+	re, err := re2Compile(pattern)
 	if err != nil {
 		return nil
 	}
@@ -42,8 +42,8 @@ func re2FindAll(data interface{}, text string) []string {
 	return results
 }
 
-func re2FindSubmatch(i interface{}, rule string) []string {
-	re, err := re2Compile(rule)
+func re2FindSubmatch(i interface{}, pattern string) []string {
+	re, err := re2Compile(pattern)
 	if err != nil {
 		log.Error(err)
 		return nil
@@ -60,8 +60,8 @@ func re2FindSubmatch(i interface{}, rule string) []string {
 	return result
 }
 
-func re2FindSubmatchAll(i interface{}, raw string) [][]string {
-	re, err := re2Compile(raw)
+func re2FindSubmatchAll(i interface{}, pattern string) [][]string {
+	re, err := re2Compile(pattern)
 	if err != nil {
 		log.Errorf("re2 compile failed: %s", err)
 		return nil
@@ -73,9 +73,9 @@ func re2FindSubmatchAll(i interface{}, raw string) [][]string {
 		return nil
 	}
 	for {
-		results = append(results, funk.Map(match.Groups(), func(i regexp2.Group) string {
-			return i.String()
-		}).([]string))
+		results = append(results, lo.Map(match.Groups(), func(item regexp2.Group, index int) string {
+			return item.String()
+		}))
 		if nextMatch, err := re.FindNextMatch(match); err == nil && nextMatch != nil {
 			match = nextMatch
 		} else {
@@ -85,9 +85,9 @@ func re2FindSubmatchAll(i interface{}, raw string) [][]string {
 	return results
 }
 
-func re2Compile(rawRule string) (*regexp2.Regexp, error) {
-	_, _, pattern, err := utils.Regexp2Compile(rawRule)
-	return pattern, err
+func re2Compile(pattern string) (*regexp2.Regexp, error) {
+	_, _, re, err := utils.Regexp2Compile(pattern)
+	return re, err
 }
 
 func re2ReplaceAll(i interface{}, pattern string, target string) string {
@@ -120,8 +120,8 @@ func re2ReplaceAllFunc(i interface{}, pattern string, target func(string) string
 	return m
 }
 
-func re2ExtractGroups(i interface{}, raw string) map[string]string {
-	re, err := re2Compile(raw)
+func re2ExtractGroups(i interface{}, pattern string) map[string]string {
+	re, err := re2Compile(pattern)
 	if err != nil {
 		log.Error(err)
 		return make(map[string]string)
@@ -143,8 +143,8 @@ func re2ExtractGroups(i interface{}, raw string) map[string]string {
 	return result
 }
 
-func re2ExtractGroupsAll(i interface{}, raw string) []map[string]string {
-	re, err := re2Compile(raw)
+func re2ExtractGroupsAll(i interface{}, pattern string) []map[string]string {
+	re, err := re2Compile(pattern)
 	if err != nil {
 		log.Error(err)
 		return nil

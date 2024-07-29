@@ -1,17 +1,19 @@
 package yaklib
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dlclark/regexp2"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 var jsonExtractRe2 = regexp2.MustCompile(`(\{(?:(?>[^{}"'\/]+)|(?>"(?:(?>[^\\"]+)|\\.)*")|(?>'(?:(?>[^\\']+)|\\.)*')|(?>\/\/.*\n)|(?>\/\*.*?\*\/))*\})`, regexp2.ECMAScript|regexp2.Multiline)
 
 func extractAllJson(raw string) []string {
-	var originRaw = raw
+	originRaw := raw
 	var lastResultMd5 string
 
 	_ = originRaw
@@ -59,4 +61,51 @@ func TestRegexpES(t *testing.T) {
         "password": "abc123"
     }
 }`)
+}
+
+func TestSmoking(t *testing.T) {
+	t.Run("compile", func(t *testing.T) {
+		re, err := re2Compile(`((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?`)
+		require.NotNil(t, re)
+		require.NoError(t, err)
+	})
+	t.Run("find", func(t *testing.T) {
+		require.Equal(t, "a", re2Find("abc", "a"))
+	})
+	t.Run("findAll", func(t *testing.T) {
+		require.ElementsMatch(t, re2FindAll("abc", "a"), []string{"a"})
+	})
+	t.Run("findSubmatch", func(t *testing.T) {
+		require.ElementsMatch(t, re2FindSubmatch("abc", "(a)"), []string{"a", "a"})
+	})
+	t.Run("findSubmatchAll", func(t *testing.T) {
+		require.ElementsMatch(t, re2FindSubmatchAll("abc", "(a)"), [][]string{{"a", "a"}})
+	})
+	t.Run("replaceAll", func(t *testing.T) {
+		require.Equal(t, re2ReplaceAll("abc", "a", "b"), "bbc")
+	})
+	t.Run("replaceAllFunc", func(t *testing.T) {
+		require.Equal(t, re2ReplaceAllFunc("abc", "a", func(s string) string {
+			return "b"
+		}), "bbc")
+	})
+	t.Run("ExtractGroups", func(t *testing.T) {
+		require.Equal(t, re2ExtractGroups("abc", "(a)(b)"), map[string]string{
+			"__all__": "ab",
+			"0":       "ab",
+			"1":       "a",
+			"2":       "b",
+		})
+	})
+
+	t.Run("ExtractGroupsAll", func(t *testing.T) {
+		require.Equal(t, re2ExtractGroupsAll("abc", "(a)(b)"), []map[string]string{
+			{
+				"__all__": "ab",
+				"0":       "ab",
+				"1":       "a",
+				"2":       "b",
+			},
+		})
+	})
 }
