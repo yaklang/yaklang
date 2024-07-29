@@ -159,7 +159,6 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 						packetOpt,
 						lowhttp.WithPacketBytes(raw),
 						lowhttp.WithHttps(req.IsHttps),
-						lowhttp.WithSaveHTTPFlow(true),
 						lowhttp.WithSource(y.Name),
 						lowhttp.WithNoFixContentLength(ret.RequestConfig.NoFixContentLength),
 						lowhttp.WithRedirectTimes(redictTimes),
