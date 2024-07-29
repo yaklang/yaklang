@@ -306,7 +306,9 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 		member := b.getOriginMember(name, typ, value, key)
 		return member
 	}
+
 	// step3 try to get from normal method or static method
+	name, typ := checkCanMemberCall(value, key)
 	if value.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 		if blueprint := value.GetType().(*ClassBluePrint); blueprint != nil {
 			if v, ok := blueprint.StaticMethod[key.String()]; ok {
@@ -315,8 +317,9 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 		}
 
 	}
-	if u, ok := value.(*Undefined); ok {
+	if u, ok := ToUndefined(value); ok {
 		if u.Kind == UndefinedValueInValid {
+			typ = nil // 设置typ为nil，当没有找到静态方法的时候，step 6将会创建一个默认的方法
 			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
 				if v, ok := blueprint.StaticMethod[key.String()]; ok {
 					return v
@@ -324,14 +327,13 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 			}
 		}
 	}
-	name, typ := checkCanMemberCall(value, key)
 	// step4 try to peek value from this function
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
-	// step6 Determine the type of member call.
+	//step6 Determine the type of member call.
 	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
 	if u, ok := ToUndefined(origin); ok {
 		u.SetRange(b.CurrentRange)
