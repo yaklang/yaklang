@@ -929,7 +929,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				ExtractedResults:           extractorResults,
 				MatchedByMatcher:           httpTPLmatchersResult,
 				HitColor:                   req.GetHitColor(),
-				IsTooLargeResponse:         lowhttpResponse.TooLarge,
+				IsTooLargeResponse:         tooLarge,
 				TooLargeResponseBodyFile:   tooLargeBodyFile,
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
