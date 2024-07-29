@@ -677,7 +677,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				poc.WithSource(pluginName),
 				poc.WithFromPlugin(pluginName),
 				poc.WithRuntimeId(runtimeId),
-				poc.WithSave(true),
 				poc.WithProxy(proxy),
 				poc.WithContext(streamContext),
 			}
@@ -710,7 +709,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				yakhttp.WithSource(pluginName),
 				yakhttp.WithFromPlugin(pluginName),
 				yakhttp.WithRuntimeID(runtimeId),
-				yakhttp.WithSave(true),
 				yakhttp.WithProxy(proxy),
 				yakhttp.WithContext(streamContext),
 			}
@@ -746,7 +744,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
-				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
 				return originFunc(target, opts...)
 			}
@@ -766,7 +763,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
-				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
 				originFunc(target, opts...)
 			}
