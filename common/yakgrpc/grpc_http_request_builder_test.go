@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strings"
 	"testing"
@@ -703,4 +704,82 @@ for i in res {
 	require.Condition(t, func() (success bool) {
 		return len(flow) > 0
 	}, "flow set runtime error")
+}
+
+func TestGRPCMUSTPASS_HTTP_DebugPlugin_Global_SaveHTTPFlow(t *testing.T) {
+	client, err := NewLocalClient(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("a"))
+	})
+
+	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	require.NoError(t, err)
+	config.SkipSaveHTTPFlow = true
+	client.SetGlobalNetworkConfig(context.Background(), config)
+
+	target := "http://" + utils.HostPort(host, port)
+	testTemplate := `id: WebFuzzer-Template-gPdWZhvP
+
+info:
+  name: WebFuzzer Template gPdWZhvP
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: a948d87b1972d786c871bb68ef43b6b6
+
+http:
+- method: POST
+  path:
+  - '{{RootURL}}/'
+  headers:
+    Content-Type: application/json
+  body: '{"key": "value"}'
+
+  max-redirects: 3
+  matchers-condition: and
+
+`
+
+	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(4), &ypb.DebugPluginRequest{
+		Code: fmt.Sprintf(`
+target := "%s"
+poc.Get(target)
+http.Get(target)
+nuclei.Scan(target, nuclei.rawTemplate(codec.DecodeBase64("%s")~))
+`, target, codec.EncodeBase64([]byte(testTemplate))),
+		PluginType: "yak",
+	})
+	if err != nil {
+		return
+	}
+	var runtimeID string
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.RuntimeID != "" {
+			runtimeID = data.RuntimeID
+		}
+	}
+
+	time.Sleep(2 * time.Second)
+	out, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		RuntimeId: runtimeID,
+	})
+	require.NoError(t, err)
+	require.Len(t, out.Data, 0)
+
 }
