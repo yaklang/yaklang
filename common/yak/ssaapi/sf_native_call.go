@@ -87,6 +87,43 @@ const (
 )
 
 func init() {
+	sfvm.RegisterNativeCall(NativeCall_TypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
+		var vals []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			t := val.GetType()
+			if b, ok := t.t.(*ssa.BasicType); ok {
+				typeStr := b.GetFullTypeName()
+				if typeStr == ""{
+					typeStr := t.String()
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}else{
+					// remove version if it exists
+				index := strings.Index(typeStr, ":")
+				if index != -1 {
+					typeStr = typeStr[:index]
+				}
+				// get type name
+				lastIndex := strings.LastIndex(typeStr, ".")
+				if lastIndex != -1 && len(typeStr) > lastIndex+1 {
+					typeStr = typeStr[lastIndex+1:]
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}
+				}
+			}
+
+			return nil
+		})
+		if len(vals) > 0 {
+			return true, sfvm.NewValues(vals), nil
+		}
+		return false, nil, utils.Error("no value found")
+	})
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
 	registerNativeCall(NativeCall_As, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
@@ -220,11 +257,11 @@ func init() {
 				t := val.GetType()
 				if b, ok := t.t.(*ssa.BasicType); ok {
 					typeStr := b.GetFullTypeName()
-					if typeStr == "" {
+					if typeStr == ""{
 						typeStr := t.String()
 						results := val.NewValue(ssa.NewConst(typeStr))
 						vals = append(vals, results)
-					} else {
+					}else{
 						typeStr := b.GetFullTypeName()
 						results := val.NewValue(ssa.NewConst(typeStr))
 						vals = append(vals, results)
