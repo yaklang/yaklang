@@ -57,21 +57,44 @@ const (
 	NativeCall_String = "string"
 )
 
-func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
-	if name == "" {
-		return
-	}
-	n := &NativeCallDocument{
-		Name: name,
-	}
-	for _, o := range options {
-		o(n)
-	}
-	NativeCallDocuments[name] = n
-	sfvm.RegisterNativeCall(n.Name, n.Function)
-}
-
 func init() {
+	sfvm.RegisterNativeCall(NativeCall_TypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
+		var vals []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			t := val.GetType()
+			if b, ok := t.t.(*ssa.BasicType); ok {
+				typeStr := b.GetFullTypeName()
+				if typeStr == ""{
+					typeStr := t.String()
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}else{
+					// remove version if it exists
+				index := strings.Index(typeStr, ":")
+				if index != -1 {
+					typeStr = typeStr[:index]
+				}
+				// get type name
+				lastIndex := strings.LastIndex(typeStr, ".")
+				if lastIndex != -1 && len(typeStr) > lastIndex+1 {
+					typeStr = typeStr[lastIndex+1:]
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}
+				}
+			}
+			
+			return nil
+		})
+		if len(vals) > 0 {
+			return true, sfvm.NewValues(vals), nil
+		}
+		return false, nil, utils.Error("no value found")
+	})
 	registerNativeCall(
 		NativeCall_String,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -199,6 +222,34 @@ func init() {
 		}),
 		nc_desc(`获取输入指令的类型名称表示，例如int，string，或者自定义类型等：
 
+	sfvm.RegisterNativeCall(NativeCall_FullTypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
+		var vals []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			t := val.GetType()
+			if b, ok := t.t.(*ssa.BasicType); ok {
+				typeStr := b.GetFullTypeName()
+				if typeStr == ""{
+					typeStr := t.String()
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}else{
+					typeStr := b.GetFullTypeName()
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}
+			}
+			
+			return nil
+		})
+		if len(vals) > 0 {
+			return true, sfvm.NewValues(vals), nil
+		}
+		return false, nil, utils.Error("no value found")
+	})
 在 Java 中，会尽可能关联到类名或导入名称，可以根据这个确定使用的类行为。
 `),
 	)
