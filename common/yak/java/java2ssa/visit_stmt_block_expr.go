@@ -1045,7 +1045,7 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		} else {
 			if ft, ok := y.fullTypeNameMap[typName]; ok {
 				typ := value.GetType()
-				if b, ok := typ.(*ssa.BasicType); ok && b.IsAny() {
+				if b, ok := typ.(*ssa.BasicType);ok{
 					ftRaw := strings.Join(ft, ".")
 					newTyp := ssa.NewBasicType(b.Kind, b.GetName())
 					haveVersion := false
