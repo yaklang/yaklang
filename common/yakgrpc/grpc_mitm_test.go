@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/davecgh/go-spew/spew"
@@ -23,6 +23,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -30,9 +31,9 @@ import (
 )
 
 func TestTestGRPCMUSTPASS_MITM_CHUNKED(t *testing.T) {
-	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
-		//Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
+		// Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
 		rsp := []byte(`HTTP/1.1 200 OK
 Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n")
 		return rsp
@@ -42,8 +43,8 @@ Content-Type: application/json
 Host: www.example.com
 
 {"key": "value"}`)
-	//fmt.Printf("%v:%v\n", mockHost, mockPort)
-	//time.Sleep(time.Hour)
+	// fmt.Printf("%v:%v\n", mockHost, mockPort)
+	// time.Sleep(time.Hour)
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -72,8 +73,9 @@ Host: www.example.com
 	proxyBody := rsp.GetBody()
 	assert.Equal(t, originBody, proxyBody)
 }
+
 func TestGRPCMUSTPASS_MITM_WITH_REPLACE_RULE_GZIP_NCHUNKED(t *testing.T) {
-	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Length: 3
@@ -81,8 +83,8 @@ Content-Length: 3
 111`))
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
 		req = lowhttp.FixHTTPRequest(req)
-		var reqIsGzip = lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
-		var reqIsChunked = lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
+		reqIsGzip := lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
+		reqIsChunked := lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
 
 		if reqIsChunked {
 			body, _ = codec.HTTPChunkedDecode(body)
@@ -124,7 +126,7 @@ Content-Length: 3
 	})
 	var wg sync.WaitGroup
 	wg.Add(1)
-	var started = false
+	started := false
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -135,8 +137,8 @@ Content-Length: 3
 
 			token := ksuid.New().String()
 			body, _ := utils.GzipCompress(token)
-			var packet = "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
-			var packetBytes = lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
+			packet := "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
+			packetBytes := lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
 			packetBytes = lowhttp.ReplaceHTTPPacketHeader(packetBytes, "Transfer-Encoding", "chunked")
 			_, err := yak.Execute(`
 proxy = "http://"+str.HostPort(mitmHost, mitmPort)
@@ -170,7 +172,7 @@ func TestGRPCMUSTPASS_MITM_ALL(t *testing.T) {
 		h2Test            bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
 	)
 
-	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		passthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
@@ -179,8 +181,8 @@ Content-Length: 3
 111`))
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
 		req = lowhttp.FixHTTPRequest(req)
-		var reqIsGzip = lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
-		var reqIsChunked = lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
+		reqIsGzip := lowhttp.GetHTTPPacketHeader(req, "Content-Encoding") == "gzip"
+		reqIsChunked := lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding") == "chunked"
 
 		if reqIsChunked {
 			body, err = codec.HTTPChunkedDecode(body)
@@ -207,8 +209,8 @@ Content-Length: 3
 	})
 
 	log.Infof("start to mock server: %v", utils.HostPort(mockHost, mockPort))
-	var rPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+	rPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(rPort)
 	_ = proxy
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -270,8 +272,8 @@ Host: ` + h2Addr,
 					wg.Done()
 					cancel()
 				}()
-				var token = utils.RandStringBytes(100)
-				var params = map[string]any{
+				token := utils.RandStringBytes(100)
+				params := map[string]any{
 					"packet": lowhttp.FixHTTPRequest(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
 Host: www.example.com
 
@@ -298,7 +300,7 @@ if rsp.Contains(getParam("token")) {
 				}
 				echoTested = true
 
-				var tokenRaw, _ = utils.GzipCompress([]byte(token))
+				tokenRaw, _ := utils.GzipCompress([]byte(token))
 				params["packet"] = "GET /gziptestted HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
@@ -442,7 +444,7 @@ func TestGRPCMUSTPASS_MITM_GM(t *testing.T) {
 		gmTest                 bool // 将开启了GM支持的MITM作为代理向mock的GM-HTTPS服务器发包 这个过程成功说明 MITM开启GM支持的情况下 能够正确处理GM-HTTPS请求和响应
 	)
 
-	var mockGMHost, mockGMPort = utils.DebugMockGMHTTP(context.Background(), func(req []byte) []byte {
+	mockGMHost, mockGMPort := utils.DebugMockGMHTTP(context.Background(), func(req []byte) []byte {
 		gmPassthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
@@ -459,7 +461,7 @@ Content-Length: 3
 		}
 		return rsp
 	})
-	var mockHost, mockPort = utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		httpPassthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK\n
 Content-Type: text/html
@@ -476,7 +478,7 @@ Content-Length: 3
 		}
 		return rsp
 	})
-	var mockHttpsHost, mockHttpsPort = utils.DebugMockHTTPSEx(func(req []byte) []byte {
+	mockHttpsHost, mockHttpsPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
 		httpsPassthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK\n
 Content-Type: text/html
@@ -499,8 +501,8 @@ Content-Length: 3
 		cancel()
 	}()
 
-	var rPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+	rPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(rPort)
 	_ = proxy
 
 	// 启动MITM服务器
@@ -530,8 +532,8 @@ Content-Length: 3
 
 			started = true
 
-			var token = utils.RandStringBytes(100)
-			var params = map[string]any{
+			token := utils.RandStringBytes(100)
+			params := map[string]any{
 				"packet": lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /GMTLS`+token+` HTTP/1.1
 Host: www.example.com
 
@@ -671,7 +673,6 @@ if rsp.Contains(getParam("token")) {
 	if !httpTest {
 		panic("HTTP TEST FAILED")
 	}
-
 }
 
 // TestGRPCMUSTPASS_MITM_Drop 测试MITM设置手动劫持并丢弃响应后MITM响应的行为和HTTP History的记录是否符合预期
@@ -699,8 +700,8 @@ func TestGRPCMUSTPASS_MITM_Drop(t *testing.T) {
 	})
 	h2Addr := utils.HostPort(h2Host, h2Port)
 	log.Infof("start to mock h2 server: %v", utils.HostPort(h2Host, h2Port))
-	var rPort = utils.GetRandomAvailableTCPPort()
-	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
+	rPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(rPort)
 	// 测试我们的h2 mock服务器是否正常工作
 	_, err = yak.NewScriptEngine(10).ExecuteEx(`
 rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true),poc.save(false))~
@@ -741,7 +742,7 @@ Host: ` + h2Addr,
 			})
 			stream.Send(&ypb.MITMRequest{
 				SetAutoForward:   true,
-				AutoForwardValue: false, //手动劫持
+				AutoForwardValue: false, // 手动劫持
 			})
 			time.Sleep(time.Second * 3)
 			manual = true
@@ -750,8 +751,8 @@ Host: ` + h2Addr,
 					wg.Done()
 					cancel()
 				}()
-				var token = utils.RandStringBytes(100)
-				var params = map[string]any{
+				token := utils.RandStringBytes(100)
+				params := map[string]any{
 					"proxy": proxy,
 					"token": token,
 				}
@@ -771,7 +772,6 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 `, params)
 				if err != nil {
 					t.Fatal(err)
-
 				}
 				defer cancel()
 				if utils.Spinlock(15, func() bool {
@@ -793,7 +793,6 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 						t.Fatal("unknown err")
 					}
 				}
-
 			}()
 		}
 
@@ -846,7 +845,7 @@ func TestGRPCMUSTPASS_MITM_DnsAndHosts(t *testing.T) {
 	hostForHost := utils.RandStringBytes(10) + ".com"
 	dnsRecordCount := 0
 	// mock dns server
-	var dnsServer = facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
+	dnsServer := facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
 		dnsRecordCount++
 		return "127.0.0.1"
 	})
@@ -1152,7 +1151,6 @@ func TestGRPCMUSTPASS_MITM_CancelHijackResponse(t *testing.T) {
 		}
 		rspMsg := string(rcpResponse.GetMessage().GetMessage())
 		if rcpResponse.GetHaveMessage() {
-
 		} else if len(rcpResponse.GetRequest()) > 0 {
 
 			// 模拟用户点击切换劫持响应为从不
@@ -1198,7 +1196,6 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 			}()
 		}
 	}
-
 }
 
 func TestGRPCMUSTPASS_MITM_LegacyProxy(t *testing.T) {
@@ -1219,8 +1216,8 @@ func TestGRPCMUSTPASS_MITM_LegacyProxy(t *testing.T) {
 		Port: uint32(mitmPort),
 	})
 
-	var token = utils.RandSecret(100)
-	var pass = false
+	token := utils.RandSecret(100)
+	pass := false
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/abc" {
 			pass = true
@@ -1291,8 +1288,8 @@ func TestGRPCMUSTPASS_MITM_LegacyProxyLowhttp(t *testing.T) {
 		Port: uint32(mitmPort),
 	})
 
-	var token = utils.RandSecret(100)
-	var pass = false
+	token := utils.RandSecret(100)
+	pass := false
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/abc" {
 			pass = true
@@ -1324,7 +1321,7 @@ Host: example.com
 				spew.Dump(err)
 				t.Fatal("lowhttp mitm proxy failed")
 			}
-			var raw = rsp.RawPacket
+			raw := rsp.RawPacket
 			if !bytes.Contains(raw, []byte(token)) {
 				t.Fatal("no token found")
 			}
@@ -1437,6 +1434,7 @@ rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
 		}
 	}
 }
+
 func TestGRPCMUSTPASS_MITM_ForceHTTPClose(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -1480,7 +1478,7 @@ Host: example.com
 			if err != nil {
 				t.Fatal(err)
 			}
-			var raw = rsp.RawPacket
+			raw := rsp.RawPacket
 			if !bytes.Contains(raw, []byte("Connection: close")) {
 				t.Fatal("connection not close")
 			}
@@ -1490,50 +1488,53 @@ Host: example.com
 	}
 }
 
-func TestServer_QueryPorts(t *testing.T) {
-	client, err := NewLocalClient()
-	if err != nil {
-		panic(err)
-	}
-	testScehma := &schema.Port{
-		Host:        "127.0.0.1",
-		Port:        12312,
-		Proto:       "http",
-		ServiceType: "test",
-		State:       "open",
-		Fingerprint: strings.Repeat("\"HTTP/1.1 200 200 OK\\r\\nServer: nginx\\r\\nLast-Modified: Wed, 26 Apr 2017 08:03:47 GMT\\r\\nConnection: keep-alive\\r\\nAccept-Ranges: bytes\\r\\nDate: Mon, 29 Apr 2024 13:09:38 GMT\\r\\nContent-Type: text/html\\r\\nVary: Accept-Encoding\\r\\nEtag: \\\"59005463-52e\\\"\\r\\nContent-Length: 1326\\r\\n\\r\\n<!doctype html>\\n<html>\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>没有找到站点</title>\\n<style>\\n*{margin:0;padding:0;color:#444}\\nbody{font-size:14px;font-family:\\\"宋体\\\"}\\n.main{width:600px;margin:10% auto;}\\n.title{background: #20a53a;color: #fff;font-size: 16px;height: 40px;line-height: 40px;padding-left: 20px;}\\n.content{background-color:#f3f7f9; height:300px;border:1px dashed #c6d9b6;padding:20px}\\n.t1{border-bottom: 1px dashed #c6d9b6;color: #ff4000;font-weight: bold; margin: 0 0 20px; padding-bottom: 18px;}\\n.t2{margin-bottom:8px; font-weight:bold}\\nol{margin:0 0 20px 22px;padding:0;}\\nol li{line-height:30px}\\n</style>\\n</head>\\n\\n<body>\\n\\t<div class=\\\"main\\\">\\n\\t\\t<div class=\\\"title\\\">没有找到站点</div>\\n\\t\\t<div class=\\\"content\\\">\\n\\t\\t\\t<p class=\\\"t1\\\">您的请求在Web服务器中没有找到对应的站点！</p>\\n\\t\\t\\t<p class=\\\"t2\\\">可能原因：</p>\\n\\t\\t\\t<ol>\\n\\t\\t\\t\\t<li>您没有将此域名或IP绑定到对应站点!</li>\\n\\t\\t\\t\\t<li>配置文件未生效!</li>\\n\\t\\t\\t</ol>\\n\\t\\t\\t<p class=\\\"t2\\\">如何解决：</p>\\n\\t\\t\\t<ol>\\n\\t\\t\\t\\t<li>检查是否已经绑定到对应站点，若确认已绑定，请尝试重载Web服务；</li>\\n\\t\\t\\t\\t<li>检查端口是否正确；</li>\\n\\t\\t\\t\\t<li>若您使用了CDN产品，请尝试清除CDN缓存；</li>\\n\\t\\t\\t\\t<li>普通网站访客，请联系网站管理员；</li>\\n\\t\\t\\t</ol>\\n\\t\\t</div>\\n\\t</div>\\n</body>\\n</html>\\n\"", 20000),
-		HtmlTitle:   "test-title",
-		RuntimeId:   "",
-		TaskName:    "test-taskname",
-		From:        "111",
-	}
-	_, err = yak.Execute(`
-res = db.SavePortFromResult(struct)~
-dump(res)
-`, map[string]any{
-		"struct": testScehma,
+func TestGRPCMUSTTPASS_MITM_CAPages(t *testing.T) {
+	t.Run("disable", func(t *testing.T) {
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+		mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+		proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+		RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+			stream.Send(&ypb.MITMRequest{
+				Host:              mitmHost,
+				Port:              uint32(mitmPort),
+				DisableCACertPage: true,
+			})
+		}, func(stream ypb.Yak_MITMClient) {
+			rsp, _, err := poc.DoGET("http://mitm", poc.WithProxy(proxy))
+			require.NoError(t, err)
+			headers := lowhttp.GetHTTPPacketHeaders(rsp.RawPacket)
+			code := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
+			require.Equal(t, 502, code)
+			require.Equal(t, map[string]string{"Content-Type": "text/html;charset=utf-8", "Content-Length": "0"}, headers)
+
+			defer cancel()
+		}, nil)
 	})
-	if err != nil {
-		panic(err)
-	}
-	_ = client
-	ports, err := client.QueryPorts(context.Background(), &ypb.QueryPortsRequest{
-		Hosts: testScehma.Host,
-		Ports: fmt.Sprintf("%v", testScehma.Port),
+	t.Run("enable", func(t *testing.T) {
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+		mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+		proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+		RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+			stream.Send(&ypb.MITMRequest{
+				Host: mitmHost,
+				Port: uint32(mitmPort),
+			})
+		}, func(stream ypb.Yak_MITMClient) {
+			rsp, _, err := poc.DoGET("http://mitm", poc.WithProxy(proxy))
+			require.NoError(t, err)
+
+			code := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
+			_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+			require.Equal(t, 200, code)
+			require.Greater(t, len(body), 0, "body should not be empty")
+
+			defer cancel()
+		}, nil)
 	})
-	if err != nil {
-		panic(err)
-	}
-	for _, port := range ports.Data {
-		if port.TaskName == testScehma.TaskName {
-			assert.True(t, len([]byte(port.Fingerprint)) <= 30000)
-		}
-	}
-	_, err = client.DeletePorts(context.Background(), &ypb.DeletePortsRequest{
-		Hosts: testScehma.Host,
-		Ports: fmt.Sprintf("%v", testScehma.Port),
-	})
-	if err != nil {
-		panic(err)
-	}
 }
