@@ -3,9 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
@@ -93,26 +96,32 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 }
 
 func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
-	var port int
+	// use debug Mock HTTP instead of vulinbox, because debug Mock HTTP will close connection immediately after response
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
-	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
-	require.NoError(t, err)
-	host, port, _ := utils.ParseStringToHostPort(addr)
-	vulinboxAddr := utils.HostPort(host, port)
 
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	token := ksuid.New().String()
+	token := uuid.NewString()
 	expectedCL := 4 * 1000 * 1000
+	largeText := strings.Repeat("a", expectedCL)
+	// start Mock HTTP server
+	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(`HTTP/1.1?token=%s 200 OK
+Server: test
+Content-Length: %d
+
+%s`, token, len(largeText), largeText)))
+
+	// start fuzz
 	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
-		Request: `GET /misc/response/content_length?cl=` + codec.Itoa(expectedCL) + `&c=` + token + ` HTTP/1.1
-Host: ` + vulinboxAddr + "\r\n\r\n",
+		Request: `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port),
 		MaxBodySize: int64(expectedCL - 1),
 	})
 	require.NoError(t, err)
-	var httpflowID int64
+	httpflowID := int64(0)
+	// delete httpflow after test
 	defer func() {
 		if httpflowID == 0 {
 			return
@@ -124,23 +133,29 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 	// check return
 	rsp, err := stream.Recv()
 	require.NoError(t, err)
-	require.True(t, rsp.IsTooLargeResponse)
 
 	fuzzerBody := lowhttp.GetHTTPPacketBody(rsp.ResponseRaw)
+	// check fuzzerBody
 	require.Equal(t, len(fuzzerBody), expectedCL-1, "response is not right")
+	// check large response
+	require.True(t, rsp.IsTooLargeResponse)
 	require.NotEmpty(t, rsp.TooLargeResponseBodyFile)
 	require.NotEmpty(t, rsp.TooLargeResponseHeaderFile)
 
+	// check large response file
 	raw, _ := os.ReadFile(rsp.TooLargeResponseBodyFile)
 	require.GreaterOrEqual(t, len(raw), expectedCL, "too-large-response body file not right")
 
 	// check database
-	dataResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token})
+	dataResponse, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
 	require.NoError(t, err)
-	require.Len(t, dataResponse.Data, 1, "query flow failed(count is not right)")
+	// get httpflowID
 	httpflowID = int64(dataResponse.Data[0].Id)
+	// check response length
 	require.LessOrEqual(t, len(dataResponse.Data[0].Response), expectedCL-10, "response is too large")
+	// check response truncated
 	require.Contains(t, string(dataResponse.Data[0].Response), `[[response too large`)
+	// check large response
 	require.True(t, dataResponse.Data[0].IsTooLargeResponse)
 	require.Equal(t, rsp.TooLargeResponseHeaderFile, dataResponse.Data[0].TooLargeResponseHeaderFile)
 	require.Equal(t, rsp.TooLargeResponseBodyFile, dataResponse.Data[0].TooLargeResponseBodyFile)
@@ -156,7 +171,7 @@ func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE_NEGATIVE(t *testing.T) {
 	}
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	vulinboxAddr := utils.HostPort(host, port)
-	token := ksuid.New().String()
+	token := uuid.NewString()
 	NewMITMTestCase(
 		t,
 		CaseWithMaxContentLength(5*1000*1000),

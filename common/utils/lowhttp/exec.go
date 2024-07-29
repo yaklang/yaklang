@@ -858,6 +858,10 @@ RECONNECT:
 		if firstResponse != nil {
 			respClose = firstResponse.Close
 		}
+		if firstResponse != nil {
+			multiResponses = append(multiResponses, firstResponse)
+		}
+
 		if firstResponse == nil || respClose {
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")
@@ -876,7 +880,6 @@ RECONNECT:
 			}
 		} else {
 			firstResponse.Request = reqIns
-			multiResponses = append(multiResponses, firstResponse)
 
 			// handle response
 			for noFixContentLength { // 尝试读取pipeline/smuggle响应包
@@ -911,8 +914,8 @@ RECONNECT:
 					response.MultiResponse = true
 				}
 			}
-			response.MultiResponseInstances = multiResponses
 		}
+		response.MultiResponseInstances = multiResponses
 
 		rawBytes = responseRaw.Bytes()
 		if option.EnableMaxContentLength && maxContentLength > 0 {
