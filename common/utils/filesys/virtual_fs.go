@@ -132,7 +132,7 @@ func (f *VirtualFS) Join(name ...string) string { return path.Join(name...) }
 func (f *VirtualFS) GetSeparators() rune        { return '/' }
 
 func (f *VirtualFS) AddFile(name, content string) {
-	v, filename, _ := f.get(true, strings.Split(name, "/")...)
+	v, filename, _ := f.get(true, f.splite(name)...)
 	vf := NewVirtualFile(filename, content)
 	v.addFileByVirtualFile(vf)
 }
@@ -143,7 +143,7 @@ func (f *VirtualFS) addFileByVirtualFile(vf *VirtualFile) {
 }
 
 func (f *VirtualFS) RemoveFileOrDir(name string) error {
-	vf, filename, err := f.get(false, strings.Split(name, "/")...)
+	vf, filename, err := f.get(true, f.splite(name)...)
 	if err != nil {
 		return err
 	}
@@ -155,9 +155,15 @@ func (f *VirtualFS) RemoveFileOrDir(name string) error {
 }
 
 func (f *VirtualFS) AddDir(dirName string) *VirtualFile {
-	dir := NewVirtualFileDirectory(dirName, NewVirtualFs())
-	f.files[dirName] = dir
-	f.dirEntry = append(f.dirEntry, dir.info)
+	v, filename, _ := f.get(true, f.splite(dirName)...)
+	var dir *VirtualFile
+	if filename == "" {
+		dir = NewVirtualFileDirectory("", f)
+		v.files[""] = dir
+	} else {
+		dir = NewVirtualFileDirectory(filename, NewVirtualFs())
+		v.addFileByVirtualFile(dir)
+	}
 	return dir
 }
 

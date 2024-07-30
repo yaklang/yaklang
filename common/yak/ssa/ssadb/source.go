@@ -1,71 +1,109 @@
 package ssadb
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
-	"net/url"
 	"path"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
 
 type IrSource struct {
+	ProgramName    string `json:"program_name" gorm:"index"`
 	SourceCodeHash string `json:"source_code_hash" gorm:"unique_index"` // default md5
-	QuotedCode     string `json:"quoted_code"`
-	FileUrl        string `json:"file_url"`
-	Filename       string `json:"filename"`
-	Filepath       string `json:"filepath"`
+
+	// file path
+	FolderPath string `json:"folder_path"`
+	FileName   string `json:"file_name"`
+
+	// file content
+	QuotedCode string `json:"quoted_code"`
+	IsBigFile  bool   `json:"is_big_file"` // if set this flag, the source code is too big, QuotedCode contain this file path
 }
 
-func SaveIrSource(editor *memedit.MemEditor, hash string) error {
+func GetIrSourceByPath(path string) ([]*IrSource, error) {
 	db := GetDB()
-
-	if editor.GetSourceCode() == "" {
-		return utils.Errorf("source code is empty")
+	var sources []*IrSource
+	if err := db.Where("folder_path = ?", path).Find(&sources).Error; err != nil {
+		return nil, utils.Wrapf(err, "query source via path: %v failed", path)
 	}
+	return sources, nil
+}
 
-	_, ok := irSourceCache.Get(hash)
-	if ok {
-		return nil
+func GetIrSourceByPathAndName(path, name string) (*IrSource, error) {
+	db := GetDB()
+	var source IrSource
+	if err := db.Where("folder_path = ? and file_name = ?", path, name).First(&source).Error; err != nil {
+		return nil, utils.Wrapf(err, "query source via path: %v failed", path)
 	}
-	irSourceCache.Set(hash, editor)
+	return &source, nil
+}
 
+func SaveFile(filename, content string, folderPath []string) string {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
+	}()
+	if len(folderPath) == 0 {
+		// return utils.Errorf("folder path is empty")
+		return ""
+	}
+	programName := folderPath[0]
+	hash := codec.Sha256(programName + content)
+	irSource := &IrSource{
+		ProgramName:    programName,
+		SourceCodeHash: hash,
+		QuotedCode:     strconv.Quote(content),
+		FileName:       filename,
+		FolderPath:     path.Join(folderPath...),
+		IsBigFile:      false,
+	}
+	irSource.save()
+	return hash
+}
+
+func SaveFolder(folderName string, folderPaths []string) error {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
-	var fileUrl string
-	var filename, filepath string
-	if editor.GetFilename() != "" {
-		fileUrl = editor.GetFilename()
-		urlIns, err := url.Parse(fileUrl)
-		if err != nil {
-			log.Warnf("parse url %s failed: %v", fileUrl, err)
-		}
-		if urlIns != nil {
-			filename, filepath = path.Split(urlIns.Path)
-		}
+	if len(folderPaths) == 0 {
+		return utils.Errorf("folder path is empty")
 	}
+	programName := folderPaths[0]
+	folderPath := path.Join(folderPaths...)
 
 	irSource := &IrSource{
-		SourceCodeHash: hash,
-		QuotedCode:     strconv.Quote(editor.GetSourceCode()),
-		FileUrl:        fileUrl,
-		Filename:       filename,
-		Filepath:       filepath,
+		ProgramName:    programName,
+		SourceCodeHash: codec.Md5(programName + folderPath + folderName),
+		QuotedCode:     "",
+		FileName:       folderName,
+		FolderPath:     folderPath,
+		IsBigFile:      false,
 	}
+	irSource.save()
+	return nil
+}
+
+func (irSource *IrSource) save() error {
+	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
+		irSource.FolderPath = "/" + irSource.FolderPath
+	}
+	log.Infof("save source: %v", irSource)
 	// check existed
+	db := GetDB()
 	var existed IrSource
-	if db.Where("source_code_hash = ?", hash).First(&existed).RecordNotFound() {
+	if db.Where("source_code_hash = ?", irSource.SourceCodeHash).First(&existed).RecordNotFound() {
 		if err := db.Create(irSource).Error; err != nil {
 			return utils.Wrapf(err, "save ir source failed")
 		}
-		return nil
 	}
 	return nil
 }
@@ -91,8 +129,8 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 		code = source.QuotedCode
 	}
 	editor := memedit.NewMemEditor(code)
-	if source.FileUrl != "" {
-		editor.SetUrl(source.FileUrl)
-	}
+	// if source.FileURL != "" {
+	// 	editor.SetUrl(source.FileURL)
+	// }
 	return editor, nil
 }

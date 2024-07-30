@@ -2,9 +2,10 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"io"
+	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
@@ -46,6 +48,8 @@ func (c *config) parseProject() (Programs, error) {
 	programPath := c.programPath
 	prog, builder, err := c.init()
 
+	ssadb.SaveFolder(prog.Name, []string{"/"})
+
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
 
 	if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
@@ -56,8 +60,9 @@ func (c *config) parseProject() (Programs, error) {
 	err = ssareducer.ReducerCompile(
 		programPath, // base
 		ssareducer.WithFileSystem(c.fs),
+		ssareducer.WithProgramName(c.DatabaseProgramName),
 		ssareducer.WithEntryFiles(c.entryFile...),
-		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
+		ssareducer.WithCompileMethod(func(path string, raw string) (includeFiles []string, err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					// ret = nil
@@ -70,18 +75,13 @@ func (c *config) parseProject() (Programs, error) {
 			log.Debugf("start to compile from: %v", path)
 			startTime := time.Now()
 
-			raw, err := io.ReadAll(f)
-			if err != nil {
-				return nil, err
-			}
-
 			// check
 			if err := c.checkLanguage(path); err != nil {
 				return nil, err
 			}
 
 			// build
-			if err := prog.Build(path, memedit.NewMemEditor(string(raw)), builder); err != nil {
+			if err := prog.Build(path, memedit.NewMemEditor((raw)), builder); err != nil {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
@@ -207,6 +207,14 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 
+		{
+			folderName, fileName := c.fs.PathSplit(filePath)
+			folders := []string{programName}
+			folders = append(folders,
+				strings.Split(folderName, string(c.fs.GetSeparators()))...,
+			)
+			ssadb.SaveFile(fileName, src.GetSourceCode(), folders)
+		}
 		// include source code will change the context of the origin editor
 		newCodeEditor := src
 		newCodeEditor.SetUrl(filePath)
