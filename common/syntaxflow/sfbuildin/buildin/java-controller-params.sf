@@ -1,0 +1,21 @@
+desc(
+  title: 'checking [spring controller source parameter]',
+  type: audit,
+  lib: 'spring-param'
+)
+
+*Mapping.__ref__?{opcode: function} as $start;
+
+// annotation method' formal params.
+$start(*?{opcode: param && !have: this} as $formalParams);
+
+// fetching getParameter
+.getParameter()?{<getFunc>.annotation.*Mapping} as $dynamicParams;
+
+// merge start and output
+$formalParams + $dynamicParams as $output;
+
+
+
+// output lib params
+alert $output;
