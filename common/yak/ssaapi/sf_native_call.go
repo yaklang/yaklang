@@ -9,8 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-
-	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 )
 
 const (
@@ -85,6 +83,20 @@ const (
 
 	NativeCall_MyBatisSink = "mybatisSink"
 )
+
+func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
+	if name == "" {
+		return
+	}
+	n := &NativeCallDocument{
+		Name: name,
+	}
+	for _, o := range options {
+		o(n)
+	}
+	NativeCallDocuments[name] = n
+	sfvm.RegisterNativeCall(n.Name, n.Function)
+}
 
 func init() {
 	sfvm.RegisterNativeCall(NativeCall_TypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
