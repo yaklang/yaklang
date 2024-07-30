@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"io/fs"
 	"strings"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
@@ -52,9 +54,17 @@ func (c *config) parseProject() (Programs, error) {
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
 
-	if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
-		language.ExtraFileAnalyze(c.fs, prog, programPath)
-	}
+	totalSize := 0
+	filesys.Recursive(programPath,
+		filesys.WithFileSystem(c.fs),
+		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
+			if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
+				language.ExtraFileAnalyze(c.fs, prog, path)
+			}
+			totalSize++
+			return nil
+		}),
+	)
 
 	// parse project
 	err = ssareducer.ReducerCompile(
@@ -213,6 +223,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 			folders = append(folders,
 				strings.Split(folderName, string(c.fs.GetSeparators()))...,
 			)
+			src.ResetSourceCodeHash()
 			ssadb.SaveFile(fileName, src.GetSourceCode(), folders)
 		}
 		// include source code will change the context of the origin editor
