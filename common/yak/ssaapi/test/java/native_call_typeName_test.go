@@ -3,9 +3,8 @@ package java
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -145,7 +144,6 @@ func TestTypeNamePriority(t *testing.T){
 	`)
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
-		prog.Show()
 		typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
 		assert.Contains(t, typeName.String(), "string")
 		typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
