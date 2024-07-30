@@ -177,6 +177,10 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
+	identifier := raw.(*phpparser.IdentifierContext)
+	if identifier.Key() != nil {
+		//todo: hook __dir__
+	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	r := raw.GetText()

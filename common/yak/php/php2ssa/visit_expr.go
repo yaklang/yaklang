@@ -986,56 +986,42 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
-	i, _ := raw.(*phpparser.ConstantInitializerContext)
-	if i == nil {
-		return nil
-	}
-
-	if ret := i.ArrayItemList(); ret != nil {
-		//    | Array '(' (arrayItemList ','?)? ')'
-		//    | '[' (arrayItemList ','?)? ']'
-		results, l := y.VisitArrayItemList(ret)
-		array := y.EmitMakeWithoutType(y.EmitConstInst(l), y.EmitConstInst(l))
-		obj := y.EmitMakeWithoutType(y.EmitConstInst(i), y.EmitConstInst(i))
-		for _, values := range results {
-			k, v := values[0], values[1]
-			variable := y.CreateMemberCallVariable(obj, k)
-			y.AssignVariable(variable, v)
-		}
-		for _, v := range results {
-			key, value := v[0], v[1]
-			variable := y.ReadOrCreateMemberCallVariable(array, key).GetLastVariable()
-			y.AssignVariable(variable, value)
-		}
-		return array
-	} else if ret := i.ConstantInitializer(); ret != nil {
-		// op = ('+' | '-') constantInitializer
-		val := y.VisitConstantInitializer(ret)
-		if i.Minus() != nil {
-			return y.EmitUnOp(ssa.OpNeg, val)
-		}
-		return y.EmitUnOp(ssa.OpPlus, val)
-	} else if ret := i.Expression(); ret != nil {
-		return y.VisitExpression(ret)
-	} else {
+	switch ret := raw.(type) {
+	case *phpparser.ConstantStringitializerContext:
 		var initVal ssa.Value
-		for _, c := range i.AllConstantString() {
+		for _, c := range ret.AllConstantString() {
 			if initVal == nil {
 				initVal = y.VisitConstantString(c)
 				continue
 			}
 			initVal = y.EmitBinOp(ssa.OpAdd, initVal, y.VisitConstantString(c))
 		}
-		if initVal == nil {
-			if i.GetText() == "array()" {
-				log.Warnf("create an emtpy make via `array()`")
-				return y.EmitMakeWithoutType(y.EmitConstInst(0), y.EmitConstInst(0))
-			}
-			log.Errorf("unhandled constant initializer: %v", i.GetText())
-			return y.EmitConstInstNil()
-		}
 		return initVal
+	case *phpparser.ArrayInitializerContext:
+		if ret.ArrayItemList() != nil {
+			results, l := y.VisitArrayItemList(ret.ArrayItemList())
+			array := y.EmitMakeWithoutType(y.EmitConstInst(l), y.EmitConstInst(l))
+			for _, values := range results {
+				k, v := values[0], values[1]
+				variable := y.CreateMemberCallVariable(array, k)
+				y.AssignVariable(variable, v)
+			}
+			return array
+		} else {
+			array := y.EmitMakeWithoutType(y.EmitConstInst(0), y.EmitConstInst(0))
+			return array
+		}
+	case *phpparser.ExpressionitializerContext:
+		return y.VisitExpression(ret.Expression())
+	case *phpparser.UnitializerContext:
+		initializer := y.VisitConstantInitializer(ret.ConstantInitializer())
+		if ret.Minus() != nil {
+			return y.EmitUnOp(ssa.OpNeg, initializer)
+		}
+		return y.EmitUnOp(ssa.OpPlus, initializer)
+	default:
+		log.Errorf("emit undefined")
+		return y.EmitUndefined(ret.GetText())
 	}
 }
 
@@ -1234,35 +1220,44 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 		return nil
 	}
 	/*
-			不支持
-		<?php
-		$b = "231.php";
-		$a = include("$b");
-		var_dump($a);
+			if(true){
+
+		}
+				不支持
+			<?php
+			$b = "231.php";
+			$a = include("$b");
+			var_dump($a);
 	*/
-	var flag, once bool
+	var once bool
+	var flag ssa.Value
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
 		once = true
 	}
-	expr := i.Expression()
-	value := y.VisitExpression(expr)
-	if utils.IsNil(value) {
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		return y.EmitUndefined(expr.GetText())
-	}
-	if value.IsUndefined() {
-	} else {
-		file := value.String()
-		if err := y.BuildFilePackage(file, once); err != nil {
-			log.Errorf("include: %v failed: %v", file, err)
-		} else {
-			flag = true
+	y.CreateIfBuilder().SetCondition(func() ssa.Value {
+		return ssa.NewConst(true)
+	}, func() {
+		expr := i.Expression()
+		value := y.VisitExpression(expr)
+		if utils.IsNil(value) {
+			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+			flag = ssa.NewUndefined(expr.GetText())
 		}
-	}
-	return y.EmitConstInst(flag)
+		if value.IsUndefined() {
+			log.Warnf("include statement expression is undefined")
+		} else {
+			file := value.String()
+			if err := y.BuildFilePackage(file, once); err != nil {
+				log.Errorf("include: %v failed: %v", file, err)
+			} else {
+				flag = ssa.NewConst(true)
+			}
+		}
+	}).Build()
+	return flag
 }
 
 func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {

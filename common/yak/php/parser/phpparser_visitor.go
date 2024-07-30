@@ -514,8 +514,17 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#argumentName.
 	VisitArgumentName(ctx *ArgumentNameContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#constantInitializer.
-	VisitConstantInitializer(ctx *ConstantInitializerContext) interface{}
+	// Visit a parse tree produced by PHPParser#ConstantStringitializer.
+	VisitConstantStringitializer(ctx *ConstantStringitializerContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ArrayInitializer.
+	VisitArrayInitializer(ctx *ArrayInitializerContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#Unitializer.
+	VisitUnitializer(ctx *UnitializerContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#Expressionitializer.
+	VisitExpressionitializer(ctx *ExpressionitializerContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#constantString.
 	VisitConstantString(ctx *ConstantStringContext) interface{}

@@ -62,6 +62,9 @@ func (p *PackageFileLoader) SetCurrentPath(currentPath string) {
 	p.currentPath = currentPath
 }
 
+func (p *PackageFileLoader) SetIncludePaths(paths []string) {
+	p.includePath = paths
+}
 func (p *PackageFileLoader) GetCurrentPath() string {
 	return p.currentPath
 }
@@ -78,6 +81,7 @@ func (p *PackageFileLoader) AddIncludePath(s ...string) {
 	p.includePath = append(p.includePath, s...)
 }
 
+// GetIncludeFiles get include path
 func (p *PackageFileLoader) GetIncludeFiles() []string {
 	return p.includePath
 }
