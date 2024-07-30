@@ -27,8 +27,9 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 	builder.SupportClosure = true
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
-		lmap:            make(map[string]struct{}),
-		cmap:            make(map[string]struct{}),
+		cmap:            []map[string]struct{}{},
+		structTypes:     map[string]*ssa.ObjectType{},
+		aliasTypes:      map[string]*ssa.AliasType{},
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
@@ -42,8 +43,9 @@ func (*SSABuilder) FilterFile(path string) bool {
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
-	lmap map[string]struct{}
-	cmap map[string]struct{}
+	cmap []map[string]struct{}
+	structTypes map[string]*ssa.ObjectType
+	aliasTypes map[string]*ssa.AliasType
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
@@ -64,29 +66,50 @@ func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
 }
 
 func (b *astbuilder) AddToCmap(key string) {
-	b.cmap[key] = struct{}{}
+	b.cmap[len(b.cmap)-1][key] = struct{}{}
 }
 
 func (b *astbuilder) GetFromCmap(key string) bool {
-	if _, ok := b.cmap[key]; ok {
-		return true
-	} else {
-		return false
+	for _, m := range b.cmap {
+		if _, ok := m[key]; ok {
+			return true
+		} 
 	}
+	return false
 }
 
-func (b *astbuilder) AddToLmap(key string) {
-	b.lmap[key] = struct{}{}
+func (b *astbuilder) InCmapLevel() {
+	b.cmap = append(b.cmap, make(map[string]struct{}))
 }
 
-func (b *astbuilder) GetFromLmap(key string) bool {
-	if _, ok := b.lmap[key]; ok {
-		return true
-	} else {
-		return false
-	}
+func (b *astbuilder) OutCmapLevel() {
+    b.cmap = b.cmap[:len(b.cmap)-1]
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
+}
+
+// ====================== Object type
+func (b *astbuilder) AddStruct(name string, t *ssa.ObjectType) {
+	b.structTypes[name] = t
+}
+
+func (b *astbuilder) GetStructByStr(name string) *ssa.ObjectType {
+	if b.structTypes[name] == nil {
+		return nil
+	}
+	return b.structTypes[name]
+}
+
+// ====================== Alias type
+func (b *astbuilder) AddAlias(name string, t *ssa.AliasType) {
+	b.aliasTypes[name] = t 
+}
+
+func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
+	if b.aliasTypes[name] == nil {
+		return nil
+	}
+	return b.aliasTypes[name]
 }

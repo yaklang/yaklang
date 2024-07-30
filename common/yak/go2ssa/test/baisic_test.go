@@ -200,26 +200,46 @@ func TestFuntion_normol(t *testing.T) {
 	t.Run("multiple return", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 
-		func ret(a,b int) (int,int,int){
-			return a+b,a-b,a*b
+		func ret(a,b,c int) (int,int,int){
+			return a,b,c
 		}
 
 		func main(){
-		 	var a = 1
-			var b = 2
-			var r1,r2,r3 = ret(a,b)
-			var c = r1+r2+r3
-			println(c)
+			println(ret(1,2,3))
 		}
-		`, []string{"add(add(Undefined-r1(valid), Undefined-r2(valid)), Undefined-r3(valid))"}, t)
+		`, []string{"FreeValue-ret(1,2,3)"}, t)
 	})
 
-	t.Run("make test", func(t *testing.T) {
+	t.Run("make", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
 			mapt := make(map[string]string)
 			println(mapt)
 		}`, []string{"Function-make(typeValue(map[string]string))"}, t)
+	})
+
+	t.Run("memcall", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+		
+			type test struct{
+				a int
+				b int
+			}
+
+			func (t* test)add() (int,int) {
+				return t.a, t.b
+			}
+
+			func add(t* test) (int,int) {
+				return t.a, t.b
+			}
+
+			func main(){
+				a := test{a: 6, b: 7}
+				println(add(a))
+				println(a.add())
+			}
+			`, []string{"FreeValue-add(make(struct {number,number})) member[6,7]","Undefined-a.add(valid)(make(struct {number,number})) member[6,7]"}, t)
 	})
 }
 
@@ -327,5 +347,76 @@ func TestType_normol(t *testing.T) {
 		}
 			
 		`, []string{"1","\"hello\"","3"}, t)
+	})
+
+	t.Run("closure", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func newCounter() func() int {
+			count := 1
+			return func() int {
+				count++
+				return count
+			}
+		}
+
+		func main(){
+			counter := newCounter()
+			println(counter())
+		}
+		`, []string{
+			"FreeValue-newCounter()() binding[1]",
+		}, t)
+	})
+
+	t.Run("closure side-effect", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			a := 1
+			f := func() {
+				a = 2
+			}
+			println(a)
+			f() 
+			println(a)
+		}
+		`, []string{
+			"1","side-effect(2, a)",
+		}, t)
+	})
+
+	t.Run("interface", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+		
+		type s struct {
+			a, b int
+		}
+
+		type i interface {
+			Add() int
+			Sub() int
+		}
+
+		func (i *s) Add() int {
+			return i.a + i.b
+		}
+
+		func (i *s) Sub() int {
+			return i.a - i.b
+		}
+
+		func do(i i) {
+			println(i.Add())
+			println(i.Sub())
+		}
+
+		func main(){
+			b := &s{a: 3, b: 3}
+			do(b)
+		}
+		`, []string{
+			"ParameterMember-parameter[0].Add()","ParameterMember-parameter[0].Sub()",
+		}, t)
 	})
 }
