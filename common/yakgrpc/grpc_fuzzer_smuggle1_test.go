@@ -4,16 +4,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/gorilla/mux"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"net"
 	"net/http"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestFuzzer_LowhttpFixRequest(t *testing.T) {
@@ -105,15 +107,10 @@ func TestFuzzer_LowhttpFixRequest5(t *testing.T) {
 		"Transfer-Encoding: chunked\r\n\r\n" +
 		"60\r\naaa\r\n" +
 		"0\r\n\r\nabc")
-	if ret := lowhttp.FixHTTPRequest(req); bytes.Contains(ret, []byte("33")) {
-		t.Fatal("fix request failed")
-	} else {
-		spew.Dump(ret)
-		if !bytes.HasSuffix(ret, []byte("\r\n60\r\naaa\r\n0\r\n\r\nabc")) {
-			t.Fatal("fix request failed")
-		}
-		fmt.Println(string(ret))
-	}
+	fixed := lowhttp.FixHTTPRequest(req)
+	require.NotContains(t, fixed, []byte("33"), "fix request failed")
+	spew.Dump(fixed)
+	require.True(t, bytes.HasSuffix(fixed, []byte("\r\n60\r\naaa\r\n0\r\n\r\nabc")), "fix request failed")
 }
 
 func TestFuzzer_Smuggle(t *testing.T) {

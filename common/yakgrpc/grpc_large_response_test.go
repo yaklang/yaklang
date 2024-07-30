@@ -1,9 +1,12 @@
 package yakgrpc
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -141,6 +144,82 @@ Host: ` + utils.HostPort(host, port),
 	require.True(t, rsp.IsTooLargeResponse)
 	require.NotEmpty(t, rsp.TooLargeResponseBodyFile)
 	require.NotEmpty(t, rsp.TooLargeResponseHeaderFile)
+
+	// check large response file
+	raw, _ := os.ReadFile(rsp.TooLargeResponseBodyFile)
+	require.GreaterOrEqual(t, len(raw), expectedCL, "too-large-response body file not right")
+
+	// check database
+	dataResponse, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
+	require.NoError(t, err)
+	// get httpflowID
+	httpflowID = int64(dataResponse.Data[0].Id)
+	// check response length
+	require.LessOrEqual(t, len(dataResponse.Data[0].Response), expectedCL-10, "response is too large")
+	// check response truncated
+	require.Contains(t, string(dataResponse.Data[0].Response), `[[response too large`)
+	// check large response
+	require.True(t, dataResponse.Data[0].IsTooLargeResponse)
+	require.Equal(t, rsp.TooLargeResponseHeaderFile, dataResponse.Data[0].TooLargeResponseHeaderFile)
+	require.Equal(t, rsp.TooLargeResponseBodyFile, dataResponse.Data[0].TooLargeResponseBodyFile)
+}
+
+func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_CHUNKED_POSITIVE(t *testing.T) {
+	// use debug Mock HTTP instead of vulinbox, because debug Mock HTTP will close connection immediately after response
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
+	defer cancel()
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	token := uuid.NewString()
+	expectedCL := 4 * 1000 * 1000
+	largeText := bytes.Repeat([]byte("z"), expectedCL)
+	// start Mock HTTP server
+	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(`HTTP/1.1?token=%s 200 OK
+Server: test
+Transfer-Encoding: chunked
+
+%s`, token, codec.HTTPChunkedEncode([]byte(largeText)))))
+
+	// start fuzz
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port),
+		MaxBodySize: int64(expectedCL - 1),
+	})
+	require.NoError(t, err)
+	httpflowID := int64(0)
+	// delete httpflow after test
+	defer func() {
+		if httpflowID == 0 {
+			return
+		}
+		client.DeleteHTTPFlows(ctx, &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{httpflowID},
+		})
+	}()
+	// check return
+	rsp, err := stream.Recv()
+	require.NoError(t, err)
+
+	fuzzerBody := lowhttp.GetHTTPPacketBody(rsp.ResponseRaw)
+	// check fuzzerBody
+	require.NotEmpty(t, fuzzerBody, "response is empty")
+	// check no chunked
+	chunkedHeader := lowhttp.GetHTTPPacketHeaders(rsp.ResponseRaw)
+	require.NotContains(t, chunkedHeader, "transfer-encoding", "response is chunked")
+	require.NotContains(t, chunkedHeader, "Transfer-Encoding", "response is chunked")
+	reader := bufio.NewReader(bytes.NewReader([]byte(fuzzerBody)))
+	bodyFirstLine, _, err := reader.ReadLine()
+	require.NoError(t, err)
+	i, err := strconv.ParseInt(string(bodyFirstLine), 16, 64)
+	require.Error(t, err, "response is chunked")
+	require.EqualValues(t, i, 0, "response is chunked")
+	// check large response
+	require.True(t, rsp.IsTooLargeResponse)
+	require.NotEmpty(t, rsp.TooLargeResponseHeaderFile, "too-large-response header file not found")
+	require.NotEmpty(t, rsp.TooLargeResponseBodyFile, "too-large-response body file not found")
 
 	// check large response file
 	raw, _ := os.ReadFile(rsp.TooLargeResponseBodyFile)

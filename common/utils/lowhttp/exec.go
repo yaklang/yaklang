@@ -920,7 +920,7 @@ RECONNECT:
 		rawBytes = responseRaw.Bytes()
 		if option.EnableMaxContentLength && maxContentLength > 0 {
 			if body := GetHTTPPacketBody(rawBytes); len(body) > maxContentLength {
-				rawBytes = ReplaceHTTPPacketBodyFast(rawBytes, body[:maxContentLength])
+				rawBytes = ReplaceHTTPPacketBodyRaw(rawBytes, body[:maxContentLength], true)
 			}
 		}
 		if haveNativeHTTPRequestInstance {

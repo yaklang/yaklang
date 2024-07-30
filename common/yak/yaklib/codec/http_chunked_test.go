@@ -1,10 +1,21 @@
 package codec
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/google/uuid"
-	"testing"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNotFullHTTPChunkedRead(t *testing.T) {
+	bytes, rest := readHTTPChunkedData([]byte(`5
+aaaaa
+6
+bbb`))
+	require.Equal(t, "aaaaabbb", string(bytes))
+	require.Len(t, rest, 0)
+}
 
 func TestHTTPChunkedRead(t *testing.T) {
 	block, data := readHTTPChunkedData([]byte(`1
