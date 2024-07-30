@@ -179,7 +179,7 @@ func TestBasic_Variable_Inblock(t *testing.T) {
 	})
 }
 
-func TestYaklangBasic_Variable_InIf(t *testing.T) {
+func TestBasic_Variable_InIf(t *testing.T) {
 	t.Run("test simple if", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -382,7 +382,7 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 	})
 }
 
-func TestYaklangBasic_Variable_If_Logical(t *testing.T) {
+func TestBasic_Variable_If_Logical(t *testing.T) {
 	t.Run("test simple", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -410,7 +410,7 @@ func TestYaklangBasic_Variable_If_Logical(t *testing.T) {
 	})
 }
 
-func TestYaklangBasic_Variable_Loop(t *testing.T) {
+func TestBasic_Variable_Loop(t *testing.T) {
 	t.Run("simple loop not change", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -506,7 +506,7 @@ func TestYaklangBasic_Variable_Loop(t *testing.T) {
 	})
 }
 
-func TestYaklangBasic_Variable_Switch(t *testing.T) {
+func TestBasic_Variable_Switch(t *testing.T) {
 	t.Run("simple switch, no default", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -572,7 +572,7 @@ func TestYaklangBasic_Variable_Switch(t *testing.T) {
 	})
 }
 
-func TestYaklangBasic_CFG_Break(t *testing.T) {
+func TestBasic_CFG_Break(t *testing.T) {
 	t.Run("simple break in loop", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		func main(){
@@ -646,6 +646,7 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 
 	t.Run("simple break in switch", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
+
 		func main(){
 			a := 1
 			switch a {
@@ -662,6 +663,67 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 		}
 		`, []string{
 			"phi(a)[2,4,3,1]",
+		}, t)
+	})
+
+	t.Run("simple fallthrough in switch", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a = 1
+			switch a {
+			case 1:
+				a = 2
+				fallthrough
+			case 2:
+				println(a) // 1 2
+				a = 3
+			default: 
+				a = 4
+			}
+			println(a) // 3 4
+		}
+		`, []string{
+			"phi(a)[2,1]",
+			"phi(a)[3,4]",
+		}, t)
+	})
+}
+
+func TestBasic_CFG_Defer(t *testing.T) {
+	t.Run("simple defer", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+		    a := 1
+			defer func(){
+				a = 2
+				println(a)
+			}()
+
+			println(a)
+		}
+		`, []string{
+			"2", "1",
+		}, t)
+	})
+}
+
+func TestBasic_CFG_Go(t *testing.T) {
+	t.Run("simple go", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+		    a := 1
+			go func(){
+				a = 2
+				println(a)
+			}()
+
+			println(a)
+		}
+		`, []string{
+			"2", "side-effect(2, a)",
 		}, t)
 	})
 }
