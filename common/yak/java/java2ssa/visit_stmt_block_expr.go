@@ -1010,21 +1010,21 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		value := y.VisitExpression(i.Expression())
 		y.AssignVariable(variable, value)
 	} else if ret := i.VariableDeclarators(); ret != nil {
-		var typName string
+		var typ ssa.Type
 		if i.TypeType() != nil {
-			typName = i.TypeType().GetText()
+			typ = y.VisitTypeType(i.TypeType())
 		}
 		//log.Infof("visit local variable declaration: %v,type:%v", ret.GetText(), typName)
 		decls := ret.(*javaparser.VariableDeclaratorsContext)
 		for _, decl := range decls.AllVariableDeclarator() {
-			y.VisitVariableDeclarator(decl, typName)
+			y.VisitVariableDeclarator(decl,typ)
 		}
 	}
 
 	return nil
 }
 
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typName string) (name string, value ssa.Value) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext,typ ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -1043,32 +1043,14 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		if utils.IsNil(value) {
 			return name, nil
 		} else {
-			if ft, ok := y.fullTypeNameMap[typName]; ok {
-				typ := value.GetType()
-				if b, ok := typ.(*ssa.BasicType);ok{
-					ftRaw := strings.Join(ft, ".")
-					newTyp := ssa.NewBasicType(b.Kind, b.GetName())
-					haveVersion := false
-					// try to get sca and set full type name's version
-					for i := len(ft) - 1; i > 0; i-- {
-						if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
-							version := sca.Version
-							newTyp.SetFullTypeName(fmt.Sprintf("%s:%s", ftRaw, version))
-							value.SetType(newTyp)
-							haveVersion = true
-							break
-						}
-					}
-					if !haveVersion {
-						newTyp.SetFullTypeName(ftRaw)
-						value.SetType(newTyp)
-					}
+				rightValueTyp := value.GetType()
+				if rightValueTyp.GetFullTypeName() == ""{
+					rightValueTyp.SetFullTypeName(typ.GetFullTypeName())
 				}
+				y.AssignVariable(variable, value)
+				return name, value
 			}
-			y.AssignVariable(variable, value)
-			return name, value
-		}
-	} else {
+		}else{
 		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(name)
 		value := y.EmitValueOnlyDeclare(name)

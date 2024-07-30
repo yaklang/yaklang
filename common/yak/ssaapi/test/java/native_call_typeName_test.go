@@ -1,8 +1,9 @@
 package java
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -89,4 +90,94 @@ public class FastJSONDemoController {
 		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestNativeCallTypeNameWithNewCreator(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("A.java",
+		`package com.org.A;
+		class A{};
+
+`)
+	vf.AddFile("B.java",
+		`package com.example.B;
+		import com.org.A.A;
+		class B{
+        	public static void main(String[] args){
+				Dog a = new A();
+			}
+		};	
+`)
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+		typeName := prog.SyntaxFlowChain(`a<typeName> as $id;`)
+		typeName.Show()
+		
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}	
+
+
+
+func TestNativeCallTypeNameWithFunctionType1(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("A.java",
+		`package com.org.A;
+		class A{
+			public static A a(){};
+		};
+
+`)
+	vf.AddFile("B.java",
+		`package com.example.B;
+		import com.org.A.A;
+		class B{
+        	public static void main(String[] args){
+				A a = A.a();
+			}
+		};	
+`)
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+		typeName := prog.SyntaxFlowChain(`a<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "A")
+		typeName = prog.SyntaxFlowChain(`a<fullTypeName> as $id`)[0]
+		assert.Contains(t, typeName.String(), "com.org.A.A")
+		
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}	
+
+
+func TestTypeNamePriority(t *testing.T){
+	t.Run("test variable declarator",func(t *testing.T) {
+			vf := filesys.NewVirtualFs()
+			vf.AddFile("A.java",
+				`package com.org.A;
+				class A{
+					};
+
+		    `)
+		vf.AddFile("B.java",
+			`package com.example.B;
+			import com.org.A.A;
+			public static int num = 6;
+			class B{
+				public static void main(StAring[] args){
+					A res1 = A.noExistMethod();  // res1 fullTypeName应为com.org.A.A
+					A res2 = 1;  				 //res2 fullTypeName应为int
+					var res3 = A.noExistMethod();  // res3 fullTypeName应为com.org.A.A
+					var res4 = 1;                //res4 fullTypeName应为int
+					B res5 = A.noExistMethod();  // res5 fullTypeName应为com.org.A.A
+				}
+			};	
+	`)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			
+			
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }

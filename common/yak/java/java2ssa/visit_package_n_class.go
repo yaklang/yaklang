@@ -179,7 +179,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
 		for _, variableDeclarator := range variableDeclarators {
 			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
-			name, value := y.VisitVariableDeclarator(v, "")
+			name, value := y.VisitVariableDeclarator(v)
 			value.SetType(fieldType)
 			setMember(name, value)
 		}
@@ -228,7 +228,7 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	} else {
 		t = y.VisitPrimitiveType(i.PrimitiveType())
 	}
-
+	
 	return t
 }
 
@@ -248,7 +248,8 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	// 	// only one type
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
-		return class
+		// set full type name
+		return y.SetFullTypeName(className, class)
 	}
 	// }
 
@@ -265,16 +266,19 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	if i == nil {
 		return nil
 	}
+	var t ssa.Type
 	switch i.GetText() {
 	case "boolean":
-		return ssa.GetBooleanType()
+		t = ssa.GetBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		return ssa.GetNumberType()
+		t= ssa.GetNumberType()
 	case "byte":
-		return ssa.GetBytesType()
+		t=  ssa.GetBytesType()
 	default:
-		return ssa.GetAnyType()
+		t=ssa.GetAnyType()
 	}
+	t.SetFullTypeName(i.GetText())
+	return t
 }
 
 func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.ClassBluePrint) interface{} {
@@ -782,4 +786,24 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	newFunction := createFunction()
 	class.Constructor = newFunction
 
+}
+
+func (y *builder)SetFullTypeName(typName string,typ ssa.Type)ssa.Type {
+	if ft, ok := y.fullTypeNameMap[typName]; ok {
+		ftRaw := strings.Join(ft, ".")
+		haveVersion := false
+		// try to get sca and set full type name's version
+		for i := len(ft) - 1; i > 0; i-- {
+			if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
+				version := sca.Version
+				typ.SetFullTypeName(fmt.Sprintf("%s:%s", ftRaw, version))
+				haveVersion = true
+				break
+			}
+		}
+		if !haveVersion {
+			typ.SetFullTypeName(ftRaw)
+		}
+	}
+	return typ
 }
