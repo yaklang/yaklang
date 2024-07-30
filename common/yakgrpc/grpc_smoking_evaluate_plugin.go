@@ -151,6 +151,8 @@ func BuildPluginTestingJunkData() []byte {
 	junkData = append(junkData, passwd...)
 	commonWord, _ := embed.Asset("data/plugin-testing-data/common_word.txt.gz") //website common word
 	junkData = append(junkData, commonWord...)
+	commonWebSite, _ := embed.Asset("data/plugin-testing-data/common_website.txt.gz") //common website page baidu/bilibili/taobao
+	junkData = append(junkData, commonWebSite...)
 	return junkData
 }
 
@@ -235,7 +237,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				log.Info("debugScript recv: ", string(result.Message))
 			}
 			return nil
-		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}, {Key: "Mode", Value: "Strict"}}, runtimeId)
+		}), []*ypb.KVPair{{Key: "Mode", Value: "Strict"}}, runtimeId)
 		if err != nil {
 			score -= 60
 			log.Errorf("debugScript failed: %v", err)
