@@ -1,40 +1,27 @@
 package codec
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
-	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestHTTPChunkedDecode(t *testing.T) {
-	test := assert.New(t)
-
-	// hellowasdfnasdjkfaskdklasdfkaskodfpoasfpoasdofpasdfasdfaa
-	// hellowasdfnasdjkfaskdklasdfkaskodfpoasfpoasdofpasdfasdfaa
-
-	// hellowasdfnasdjkfaskdklasdfkaskodfpoasdfpoasdofpasdfasdfaa
 	text := "hellowasdfnasdjkfaskdklasdfkaskodfpoasdfpoasdofpasdfasdfaa"
 	afterChunked := string(HTTPChunkedEncode([]byte(text)))
-
 	println(afterChunked)
+
 	res, err := HTTPChunkedDecode([]byte(afterChunked))
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
-	if text != string(res) {
-		println(string(res))
-		test.FailNow("chunked decode failed")
-		return
-	}
+	require.NoError(t, err)
+	require.Equal(t, text, string(res), "chunked decode failed")
 }
 
 func TestZeroPadding(t *testing.T) {
-	println(strconv.Quote(string(ZeroPadding([]byte("asdfasdfasdf123123123asaaa"), 8))))
-	println(strconv.Quote(string(ZeroUnPadding(ZeroPadding([]byte("asdfasdfasdf123123123asaaa"), 8)))))
+	require.Equal(t, "asdfasdfasdf123123123asaaa\x00\x00\x00\x00\x00\x00", string(ZeroPadding([]byte("asdfasdfasdf123123123asaaa"), 8)), "zero padding failed")
+	require.Equal(t, "asdfasdfasdf123123123asaaa", string(ZeroUnPadding(ZeroPadding([]byte("asdfasdfasdf123123123asaaa"), 8))), "zero unpadding failed")
 }
 
 func TestHmacSha512(t *testing.T) {
-	spew.Dump(EncodeToHex(HmacSha512("abc", "aaa")))
+	expected := "c4c9648c334666029bec087e085fcecdca34b1ee85626dac0337761f322599081f85b96ac919b85bb0b5357821d9fcf5ed02bc432129e6e7679d1e61643aef3d"
+	require.Equal(t, expected, EncodeToHex(HmacSha512("abc", "aaa")), "HMAC-SHA512 encoding failed")
 }
