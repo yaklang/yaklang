@@ -110,6 +110,10 @@ type MixPluginCaller struct {
 	pluginScanFilter   *yakit.PluginScanFilter // 插件扫描黑白名单，现在直接使用yakit全局网络配置
 }
 
+func (m *MixPluginCaller) LastErr() error {
+	return m.callers.Err
+}
+
 func (m *MixPluginCaller) SetCache(b bool) {
 	m.cache = b
 }

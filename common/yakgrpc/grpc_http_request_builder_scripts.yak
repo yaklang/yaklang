@@ -10,6 +10,7 @@ Host: www.example.com
 
 pluginType = "mitm"
 isSmoking = false
+isStrict = false
 runtimeId = ""
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
@@ -20,6 +21,7 @@ if getParams("REQUESTS") != undefined {
     pluginType = getParams("PLUGIN_TYPE")
     isSmoking = getParams("IS_SMOKING")
     runtimeId = getParams("RUNTIME_ID")
+    isStrict = getParams("IS_STRICT")
 }
 
 /*
@@ -87,3 +89,8 @@ for req in reqs {
 }
 swg.Wait()
 caller.Wait()
+if isStrict {
+    if caller.LastErr() != nil {
+        die(caller.LastErr())
+    }
+}

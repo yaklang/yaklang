@@ -231,13 +231,14 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 
 	// smoking
 	isSmoking := false
+	isStrict := false
 	if len(execParams) > 0 {
 		for _, p := range execParams {
-			if p.Key != "State" {
-				continue
-			}
-			if p.Value == "Smoking" {
+			if p.Key == "State" && p.Value == "Smoking" {
 				isSmoking = true
+			}
+			if p.Key == "Mode" && p.Value == "Strict" {
+				isStrict = true
 			}
 		}
 	}
@@ -281,6 +282,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		"PLUGIN_NAME": scriptName,
 		"PLUGIN_TYPE": strings.ToLower(scriptType),
 		"IS_SMOKING":  isSmoking,
+		"IS_STRICT":   isStrict,
 		"RUNTIME_ID":  runtimeId,
 	})
 	if err != nil {
