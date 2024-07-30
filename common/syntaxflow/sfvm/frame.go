@@ -150,7 +150,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				s.stack.PopN(s.stack.Len() - checkLen)
 			}
 		case OpCreateIter:
-			s.debugSubLog(">> pop")
+			s.debugSubLog(">> peek")
 			vs := s.stack.Peek()
 			if vs == nil {
 				return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
@@ -184,8 +184,8 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				continue
 			}
 			s.debugLog("next value: %v", valuesLen(val))
-			s.debugLog(">> push")
 			s.stack.Push(val)
+			s.debugLog(">> push " + fmt.Sprint(s.stack.Len()))
 		case OpIterEnd:
 			if i.iter == nil {
 				return utils.Error("BUG: iterContext is nil")
@@ -974,15 +974,23 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if value == nil {
 			return utils.Wrap(CriticalError, "native call failed: stack top is empty")
 		}
+
+		s.debugSubLog("native call: [%v]", i.UnaryStr)
 		call, err := GetNativeCall(i.UnaryStr)
 		if err != nil {
-			return err
+			s.debugSubLog("Err: %v", err)
+			log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
+			s.stack.Push(NewValues(nil))
+			return utils.Errorf("get native call failed: %v, err")
 		}
 
 		ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 		if err != nil || !ok {
-			return err
+			s.debugSubLog("No Result in [%v]", i.UnaryStr)
+			s.stack.Push(NewValues(nil))
+			return utils.Errorf("get native call failed: %v, err")
 		}
+		s.debugSubLog("<< push: %v", ret)
 		s.stack.Push(ret)
 	case OpFileFilterJsonPath:
 		// TODO: 调用FileFilter接口并实现具体功能
