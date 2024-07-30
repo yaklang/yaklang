@@ -585,6 +585,7 @@ func (a *AliasType) GetTypeKind() TypeKind {
 // ====================== interface type
 type InterfaceType struct {
 	method  map[string]*Function
+	object  map[string]*ObjectType
 	name    string
 	pkgPath string
 	parents  []*InterfaceType
@@ -614,6 +615,17 @@ func (b *InterfaceType) AddMethod(id string, f *Function) {
 
 func (i *InterfaceType) GetMethod() map[string]*Function {
 	return i.method
+}
+
+func (i *InterfaceType) AddStructure(name string, o *ObjectType) {
+	if i.object == nil {
+		i.object = make(map[string]*ObjectType)
+	}
+	i.object[name] = o
+}
+
+func (b *InterfaceType) GetStructure() map[string]*ObjectType {
+	return b.object
 }
 
 // func (b *InterfaceType) GetAllKey() []string {
@@ -1281,27 +1293,4 @@ func (c OrType) PkgPathString() string {
 
 func (c OrType) RawString() string {
 	return strings.Join(lo.Map(c.types, func(t Type, _ int) string { return t.RawString() }), "|")
-}
-
-
-// ====================== Object type
-var ObjectTypes = map[string]*ObjectType{}
-
-func AddObject(name string, t *ObjectType) {
-	ObjectTypes[name] = t
-}
-
-func GetObjectByStr(name string) *ObjectType {
-	return ObjectTypes[name]
-}
-
-// ====================== Alias type
-var AliasTypes = map[string]*AliasType{}
-
-func AddAlias(name string, t *AliasType) {
-	AliasTypes[name] = t 
-}
-
-func GetAliasByStr(name string) *AliasType {
-	return AliasTypes[name]
 }
