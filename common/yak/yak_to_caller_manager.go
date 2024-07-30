@@ -176,7 +176,8 @@ func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPlug
 			Handler: func(args ...interface{}) {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
+						y.Err = utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
+						log.Error(y.Err)
 						fmt.Println()
 						if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
 							utils.PrintCurrentGoroutineRuntimeStack()
@@ -217,6 +218,7 @@ type YakToCallerManager struct {
 	proxy              string
 	vulFilter          filter.Filterable
 	ContextCancelFuncs *sync.Map
+	Err                error
 }
 
 func (c *YakToCallerManager) GetWaitingEventCount() int {
