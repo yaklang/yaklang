@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -183,7 +184,13 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		}
 	}
 
-	for filename, data := range p.Program.ExtraFile {
+	for filename, hash := range p.Program.ExtraFile {
+		editor, err := ssadb.GetIrSourceFromHash(hash)
+		if err != nil {
+			log.Errorf("get ir source from hash error: %s", err)
+			continue
+		}
+		data := editor.GetSourceCode()
 		if reg, err := regexp.Compile(path); err == nil {
 			if reg.Match([]byte(filename)) {
 				handler(data)
