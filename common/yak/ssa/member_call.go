@@ -333,6 +333,10 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 	}
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
+	// step6 hook binOp type value to make sure type is nil
+	if _,ok:=ToBinOp(value); ok {
+		typ = nil
+	}
 	//step6 Determine the type of member call.
 	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
 	if u, ok := ToUndefined(origin); ok {
