@@ -3,6 +3,13 @@ package yakit
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,12 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"os"
-	"runtime/debug"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func init() {
@@ -28,7 +29,6 @@ func init() {
 		RegisterLowHTTPSaveCallback()
 		return nil
 	})
-
 }
 
 func RegisterLowHTTPSaveCallback() {
@@ -57,11 +57,9 @@ func RegisterLowHTTPSaveCallback() {
 		if rsp == nil || len(rsp) == 0 {
 			return
 		}
-		if len(r.MultiResponseInstances) > 0 {
-			reqIns = r.MultiResponseInstances[0].Request
-		}
+		reqIns = r.RequestInstance
 
-		//db := consts.GetGormProjectDatabase()
+		// db := consts.GetGormProjectDatabase()
 		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
