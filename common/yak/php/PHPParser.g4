@@ -535,17 +535,16 @@ expression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression
     | Empty '(' chain ')'                                         # SpecialWordExpression
     | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
-//    | (Eval|Assert) expression                                    # CodeExecExpression
     | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
     | '(' castOperation ')' expression                            # CastExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') flexiVariable                                      # PrefixIncDecExpression
-    | flexiVariable ('++' | '--')                                      # PostfixIncDecExpression
+    | ('++' | '--') flexiVariable                                 # PrefixIncDecExpression
+    | flexiVariable ('++' | '--')                                 # PostfixIncDecExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
-    | expression InstanceOf                                # InstanceOfExpression
+    | expression InstanceOf expression                            # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
     | expression op = ('+' | '-' | '.') expression                # ArithmeticExpression
     | expression op = ('<<' | '>>') expression                    # ComparisonExpression
@@ -737,11 +736,11 @@ argumentName
     ;
 
 constantInitializer
-    : constantString ('.' constantString)*
-    | Array '(' (arrayItemList ','?)? ')'
-    | '[' (arrayItemList ','?)? ']'
-    | ('+' | '-') constantInitializer
-    | expression
+    : constantString ('.' constantString)*#ConstantStringitializer
+    | Array '(' (arrayItemList ','?)? ')' #ArrayInitializer
+    | '[' (arrayItemList ','?)? ']'       #ArrayInitializer
+    | ('+' | '-') constantInitializer     #Unitializer
+    | expression                          #Expressionitializer
     ;
 
 constantString: string | constant;
