@@ -910,8 +910,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			tooLargeHeaderFile, tooLargeBodyFile := "", ""
 			if lowhttpResponse != nil {
 				tooLarge = lowhttpResponse.TooLarge
-				if tooLarge && len(lowhttpResponse.MultiResponseInstances) > 0 {
-					reqIns := lowhttpResponse.MultiResponseInstances[0].Request
+				if tooLarge {
+					reqIns := lowhttpResponse.RequestInstance
 					tooLargeHeaderFile = httpctx.GetResponseTooLargeHeaderFile(reqIns)
 					tooLargeBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
 				}
