@@ -181,12 +181,6 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	}
 	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 
-	if r := instIr.inst.GetRange(); r != nil {
-		err := ssadb.SaveIrSource(r.GetEditor(), instIr.irCode.SourceCodeHash)
-		if err != nil {
-			log.Warnf("save source error: %v", err)
-		}
-	}
 	return true
 }
 

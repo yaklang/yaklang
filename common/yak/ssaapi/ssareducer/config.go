@@ -2,16 +2,17 @@ package ssareducer
 
 import (
 	"embed"
-	"io"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type (
-	compileMethod func(string, io.Reader) ([]string, error)
+	compileMethod func(string, string) ([]string, error)
 	Config        struct {
 		entryFiles []string
+
+		ProgramName string
 
 		fs fi.FileSystem
 
@@ -34,6 +35,11 @@ func NewConfig(opt ...Option) *Config {
 
 type Option func(config *Config)
 
+func WithProgramName(name string) Option {
+	return func(config *Config) {
+		config.ProgramName = name
+	}
+}
 func WithFileSystem(fs fi.FileSystem) Option {
 	return func(config *Config) {
 		config.fs = fs

@@ -141,6 +141,6 @@ func DeleteProgram(db *gorm.DB, program string) {
 
 func AllPrograms(db *gorm.DB) []string {
 	var programs []string
-	db.Model(&IrCode{}).Select("DISTINCT(program_name)").Pluck("program_name", &programs)
+	db.Model(&IrProgram{}).Select("DISTINCT(program_name)").Pluck("program_name", &programs)
 	return programs
 }
