@@ -468,7 +468,8 @@ func HTTPChunkedDecode(raw []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	results, _, _, err := ReadHTTPChunkedDataWithFixedError(raw)
+	results, _, rest, err := ReadHTTPChunkedDataWithFixedError(raw)
+	_ = rest
 	if len(results) > 0 {
 		return results, nil
 	}
@@ -603,29 +604,26 @@ func HTTPChunkedEncode(raw []byte) []byte {
 	var buf bytes.Buffer
 	writer := httputil.NewChunkedWriter(&buf)
 
-	scanner := bufio.NewScanner(bytes.NewBuffer(raw))
-	scanner.Split(bufio.ScanBytes)
-
 	maxSplit := len(raw) / 2
 	if maxSplit <= 0 {
 		maxSplit = 47
 	}
 
-	var bufBytes []byte
+	offset := 0
 	maxBuffer := 3 + rand.Intn(maxSplit)
-	for scanner.Scan() {
-		bufBytes = append(bufBytes, scanner.Bytes()...)
-		if len(bufBytes) >= maxBuffer {
-			writer.Write(bufBytes[:])
-			bufBytes = nil
-			maxBuffer = 3 + rand.Intn(maxSplit)
+	for offset < len(raw) {
+		end := offset + maxBuffer
+		if end > len(raw) {
+			end = len(raw)
 		}
+		chunk := raw[offset:end]
+		writer.Write(chunk)
+		offset = end
+		maxBuffer = 3 + rand.Intn(maxSplit)
 	}
-	if len(bufBytes) > 0 {
-		writer.Write(bufBytes[:])
-	}
+
 	writer.Close()
-	buf.Write([]byte{'\r', '\n'})
+	buf.WriteString("\r\n")
 	return buf.Bytes()
 }
 
