@@ -683,7 +683,19 @@ func (v *BasePHPParserVisitor) VisitArgumentName(ctx *ArgumentNameContext) inter
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitConstantInitializer(ctx *ConstantInitializerContext) interface{} {
+func (v *BasePHPParserVisitor) VisitConstantStringitializer(ctx *ConstantStringitializerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitArrayInitializer(ctx *ArrayInitializerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitUnitializer(ctx *UnitializerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitExpressionitializer(ctx *ExpressionitializerContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
