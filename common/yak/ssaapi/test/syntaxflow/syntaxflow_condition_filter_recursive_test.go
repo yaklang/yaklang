@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -35,11 +36,10 @@ public class FastJSONDemoController {
 }`)
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results := prog.SyntaxFlowChain(`
-.getParameter()?{<getObject><fullTypeName>?{have: servlet} && <getFunc>.annotation.*Mapping} as $dynamicParams;
-
-`, sfvm.WithEnableDebug(true))
+		results := prog.SyntaxFlowChain(`.getParameter()?{<getObject><fullTypeName>?{have: servlet} && <getFunc>.annotation.*Mapping} as $dynamicParams`, sfvm.WithEnableDebug(false))
+		results = prog.SyntaxFlowChain(`.getParameter()?{<getCaller><getObject><fullTypeName>?{have: servlet} && <getFunc>.annotation.*Mapping} as $dynamicParams`, sfvm.WithEnableDebug(true))
 		results.Show()
+		assert.Equal(t, 1, len(results))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 
