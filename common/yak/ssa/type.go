@@ -440,6 +440,16 @@ func (b *BasicType) IsAny() bool {
 	return false
 }
 
+func (b *BasicType) IsNull() bool {
+	if b == nil {
+		return true
+	}
+	if b.Kind == NullTypeKind {
+		return true
+	}
+	return false
+}
+
 func (b *BasicType) GetName() string {
 	return b.name
 }

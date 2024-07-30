@@ -1044,16 +1044,15 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 			return name, nil
 		} else {
 				rightValueTyp := value.GetType()
-				if rightValueTyp.GetFullTypeName() == "" && typ !=nil {
-					// 因为basicType是共用的，因此需要单独hook处理
-					if b,ok := ssa.ToBasicType(rightValueTyp); ok {
+				if b,ok := ssa.ToBasicType(rightValueTyp); ok{
+						if b.IsAny() || b.IsNull(){
 							newTyp := ssa.NewBasicType(b.Kind,b.GetName())
 							newTyp.SetFullTypeName(typ.GetFullTypeName())
 							value.SetType(newTyp)
-					}else {
-						rightValueTyp.SetFullTypeName(typ.GetFullTypeName())
-						value.SetType(rightValueTyp)
-					}
+						}
+				}else {
+					rightValueTyp.SetFullTypeName(typ.GetFullTypeName())
+					value.SetType(rightValueTyp)
 				}
 				y.AssignVariable(variable, value)
 				return name, value
