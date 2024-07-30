@@ -74,6 +74,7 @@ func ImportDatabase(reader io.Reader) error {
 func CreateOrUpdateSyntaxFlow(hash string, i any) error {
 	db := consts.GetGormProfileDatabase()
 	var rule schema.SyntaxFlowRule
+
 	if err := db.Where("hash = ?", hash).First(&rule).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(i).Error
@@ -87,6 +88,14 @@ func CreateOrUpdateSyntaxFlow(hash string, i any) error {
 func DeleteRuleByRuleName(name string) error {
 	db := consts.GetGormProfileDatabase()
 	return db.Where("rule_name = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+}
+
+func DeleteRuleByLibName(name string) error {
+	if name == "" {
+		return nil
+	}
+	db := consts.GetGormProfileDatabase()
+	return db.Where("included_name = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
 func DeleteRuleByTitle(name string) error {
@@ -135,6 +144,7 @@ func ImportRuleWithoutValid(ruleName string, content string) error {
 		rule.AllowIncluded = true
 		rule.IncludedName = frame.AllowIncluded
 		rule.Title = frame.AllowIncluded
+		_ = DeleteRuleByLibName(frame.AllowIncluded)
 	}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {

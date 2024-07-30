@@ -9,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+
+	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 )
 
 const (
