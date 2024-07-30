@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strconv"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func bufioReadLine(reader *bufio.Reader) ([]byte, []byte, error) {
@@ -28,49 +29,40 @@ func bufioReadLine(reader *bufio.Reader) ([]byte, []byte, error) {
 		}
 	}
 
-	var lines = lineBuffer.Bytes()
+	lines := lineBuffer.Bytes()
 	if bytes.HasSuffix(lines, []byte{'\r', '\n'}) {
 		return lines[:len(lines)-2], []byte{'\r', '\n'}, nil
 	}
 	return lines[:len(lines)-1], []byte{'\n'}, nil
 }
 
-func ReadHTTPChunkedDataWithFixed(ret []byte) (data []byte, fixedChunked []byte, rest []byte) {
-	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
-	if err != nil {
-		raw, _ := io.ReadAll(reader)
-		return nil, nil, raw
-	}
-	rest, err = io.ReadAll(reader)
-	if err != nil {
-		log.Errorf("read chunked data error: %v", err)
-	}
+func ReadHTTPChunkedDataWithFixed(raw []byte) (data []byte, fixedChunked []byte, rest []byte) {
+	blocks, fixed, rest, _ := ReadHTTPChunkedDataWithFixedError(raw)
 	return blocks, fixed, rest
 }
 
-func ReadHTTPChunkedDataWithFixedError(ret []byte) (data []byte, fixedChunked []byte, rest []byte, _ error) {
-	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
-	if err != nil {
-		raw, _ := io.ReadAll(reader)
-		return nil, nil, raw, err
+func ReadHTTPChunkedDataWithFixedError(raw []byte) (data []byte, fixedChunked []byte, rest []byte, _ error) {
+	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(raw))
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, nil, rest, err
 	}
 	rest, err = io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("read chunked data error: %v", err)
 	}
+
 	return blocks, fixed, rest, nil
 }
 
 func readHTTPChunkedData(ret []byte) (data []byte, rest []byte) {
-	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
-	if err != nil {
+	blocks, _, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 		rest, err = io.ReadAll(reader)
 		if err != nil {
 			log.Errorf("read chunked data error: %v", err)
 		}
 		return rest, nil
 	}
-	_ = fixed
 	rest, err = io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("read chunked data error: %v", err)
@@ -79,7 +71,7 @@ func readHTTPChunkedData(ret []byte) (data []byte, rest []byte) {
 }
 
 func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
-	var haveRead = new(bytes.Buffer)
+	haveRead := new(bytes.Buffer)
 	var reader *bufio.Reader
 	switch r.(type) {
 	case *bufio.Reader:
@@ -143,7 +135,7 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 			return results.Bytes(), fixedResults.Bytes(), reader, nil
 		}
 
-		var buf = make([]byte, size)
+		buf := make([]byte, size)
 		blockN, err := io.ReadFull(reader, buf)
 		results.Write(buf[:blockN])
 		haveRead.Write(buf[:blockN])
@@ -157,7 +149,11 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 		fixedResults.Write(buf[:blockN])
 		fixedResults.WriteString("\r\n")
 		if err != nil {
-			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("read chunked data error: %v", err)
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				return results.Bytes(), bytes.TrimSpace(fixedResults.Bytes()), reader, err
+			} else {
+				return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("read chunked data error: %v", err)
+			}
 		}
 
 		endBlock, delim, _ := bufioReadLine(reader)

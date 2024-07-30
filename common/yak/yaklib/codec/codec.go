@@ -12,9 +12,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/samber/lo"
-	"golang.org/x/net/html/charset"
-	"golang.org/x/text/encoding"
 	"html"
 	"io"
 	"io/ioutil"
@@ -28,6 +25,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/samber/lo"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
+
 	"github.com/DataDog/mmh3"
 	"github.com/pkg/errors"
 	"github.com/saintfish/chardet"
@@ -38,7 +39,7 @@ import (
 )
 
 func ForceQueryUnescape(s string) string {
-	var val, err = url.QueryUnescape(UrlUnicodeDecode(s))
+	val, err := url.QueryUnescape(UrlUnicodeDecode(s))
 	if err != nil {
 		return s
 	}
@@ -71,27 +72,29 @@ func QueryEscape(s string) string {
 	return url.QueryEscape(s)
 }
 
-var EscapeHtmlString = html.EscapeString
-var UnescapeHtmlString = html.UnescapeString
-var StrConvQuote = func(s string) string {
-	raw := []byte(s)
-	var buf bytes.Buffer
-	buf.WriteString("\"")
-	for _, b := range raw {
-		switch true {
-		case b >= 'a' && b <= 'z':
-			fallthrough
-		case b >= 'A' && b <= 'Z':
-			fallthrough
-		case b >= '0' && b <= '9':
-			buf.WriteByte(b)
-		default:
-			buf.WriteString(fmt.Sprintf(`\x%02x`, b))
+var (
+	EscapeHtmlString   = html.EscapeString
+	UnescapeHtmlString = html.UnescapeString
+	StrConvQuote       = func(s string) string {
+		raw := []byte(s)
+		var buf bytes.Buffer
+		buf.WriteString("\"")
+		for _, b := range raw {
+			switch true {
+			case b >= 'a' && b <= 'z':
+				fallthrough
+			case b >= 'A' && b <= 'Z':
+				fallthrough
+			case b >= '0' && b <= '9':
+				buf.WriteByte(b)
+			default:
+				buf.WriteString(fmt.Sprintf(`\x%02x`, b))
+			}
 		}
+		buf.WriteString("\"")
+		return buf.String()
 	}
-	buf.WriteString("\"")
-	return buf.String()
-}
+)
 
 func StrConvUnquoteForce(s string) []byte {
 	raw, err := StrConvUnquote(s)
@@ -248,7 +251,7 @@ func HmacMD5(key, data interface{}) []byte {
 }
 
 func Sha224(i interface{}) string {
-	var raw = sha256.Sum224(interfaceToBytes(i))
+	raw := sha256.Sum224(interfaceToBytes(i))
 	return EncodeToHex(raw[:])
 }
 
@@ -333,8 +336,8 @@ func EncodeHtmlEntityEx(i interface{}, encodeType string, fullEncode bool) strin
 		return res
 	}
 
-	var namedChar = []string{`&`, `'`, `<`, `>`, `"`}
-	var formatString = "&#%d;"
+	namedChar := []string{`&`, `'`, `<`, `>`, `"`}
+	formatString := "&#%d;"
 	if encodeType == "hex" {
 		formatString = "&#x%x;"
 	}
@@ -346,7 +349,6 @@ func EncodeHtmlEntityEx(i interface{}, encodeType string, fullEncode bool) strin
 				res += namedHtmlEntity.Replace(string(char))
 				continue
 			}
-
 		}
 		res += fmt.Sprintf(formatString, char)
 	}
@@ -466,15 +468,20 @@ func HTTPChunkedDecode(raw []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	var results, _ = readHTTPChunkedData(raw)
+	results, _, _, err := ReadHTTPChunkedDataWithFixedError(raw)
 	if len(results) > 0 {
 		return results, nil
 	}
-	return nil, errors.Errorf("parse %v to http chunked failed", strconv.Quote(string(raw)))
+	if len(raw) > 128 {
+		raw = append(raw[:128], []byte("...")...)
+	}
+	return nil, errors.Errorf("parse %v to http chunked failed: %v", strconv.Quote(string(raw)), err)
 }
 
-var gb18030encoding encoding.Encoding
-var gb18030encodingMutex = new(sync.Mutex)
+var (
+	gb18030encoding      encoding.Encoding
+	gb18030encodingMutex = new(sync.Mutex)
+)
 
 func GB18030ToUtf8(s []byte) ([]byte, error) {
 	if gb18030encoding != nil {
@@ -605,7 +612,7 @@ func HTTPChunkedEncode(raw []byte) []byte {
 	}
 
 	var bufBytes []byte
-	var maxBuffer = 3 + rand.Intn(maxSplit)
+	maxBuffer := 3 + rand.Intn(maxSplit)
 	for scanner.Scan() {
 		bufBytes = append(bufBytes, scanner.Bytes()...)
 		if len(bufBytes) >= maxBuffer {
@@ -631,6 +638,7 @@ func RandomUpperAndLower(s string) string {
 	}
 	return last
 }
+
 func _RandomUpperAndLower(s string) string {
 	bs := []byte(s)
 	for i := 0; i < len(bs); i++ {
