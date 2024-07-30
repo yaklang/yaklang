@@ -235,7 +235,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				log.Info("debugScript recv: ", string(result.Message))
 			}
 			return nil
-		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}}, runtimeId)
+		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}, {Key: "Mode", Value: "Strict"}}, runtimeId)
 		if err != nil {
 			score -= 60
 			log.Errorf("debugScript failed: %v", err)
