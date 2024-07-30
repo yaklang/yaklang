@@ -200,6 +200,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		// create new request instance for httpctx
 		reqIns, _ = utils.ReadHTTPRequestFromBytes(requestPacket)
 	}
+	response.RequestInstance = reqIns
 
 	defer func() {
 		if response == nil || !saveHTTPFlow {
@@ -929,7 +930,7 @@ RECONNECT:
 	}
 
 	// 更新cookiejar中的cookie
-	if session != nil {
+	if session != nil && firstResponse != nil {
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
 

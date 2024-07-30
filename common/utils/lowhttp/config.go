@@ -94,6 +94,7 @@ type LowhttpResponse struct {
 	FromPlugin             string
 	MultiResponse          bool
 	MultiResponseInstances []*http.Response
+	RequestInstance        *http.Request
 
 	// if TooLarge, the database will drop some response data
 	TooLarge         bool
