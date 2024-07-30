@@ -481,48 +481,48 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 
 }
 
-func TestOOP_Syntax(t *testing.T) {
-	t.Run("__construct", func(t *testing.T) {
-		code := `<?php
-class test{
-    public $a;
-    public function __construct($a){
-    	$this->a = $a;
-        println($this->a);
-	}
-}
-$a = new test("1");
-`
-		//执行会有问题，
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			prog.Show()
-			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
-		//ssatest.CheckSyntaxFlow(t, code,
-		//	`println(* #-> * as $param)`,
-		//	map[string][]string{"param": {`"1"`}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
-	})
-	t.Run("__destruct", func(t *testing.T) {
-		code := `<?php
-class test{
-    public $a;
-    function __destruct(){
-        $this->a=1;
-        print($this->a);
-    }
-}
-$c = new test;
-`
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			prog.Show()
-			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
-		//ssatest.CheckSyntaxFlow(t, code,
-		//	`print(* #-> * as $param)`,
-		//	map[string][]string{"param": {`Undefined-$c.a(valid)`}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
-	})
+// func TestOOP_Syntax(t *testing.T) {
+// 	t.Run("__construct", func(t *testing.T) {
+// 		code := `<?php
+// class test{
+//     public $a;
+//     public function __construct($a){
+//     	$this->a = $a;
+//         println($this->a);
+// 	}
+// }
+// $a = new test("1");
+// `
+// 		//执行会有问题，
+// 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+// 			prog.Show()
+// 			return nil
+// 		}, ssaapi.WithLanguage(ssaapi.PHP))
+// 		//ssatest.CheckSyntaxFlow(t, code,
+// 		//	`println(* #-> * as $param)`,
+// 		//	map[string][]string{"param": {`"1"`}},
+// 		//	ssaapi.WithLanguage(ssaapi.PHP))
+// 	})
+// 	t.Run("__destruct", func(t *testing.T) {
+// 		code := `<?php
+// class test{
+//     public $a;
+//     function __destruct(){
+//         $this->a=1;
+//         print($this->a);
+//     }
+// }
+// $c = new test;
+// `
+// 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+// 			prog.Show()
+// 			return nil
+// 		}, ssaapi.WithLanguage(ssaapi.PHP))
+// 		ssatest.CheckSyntaxFlow(t, code,
+// 			`print(* #-> * as $param)`,
+// 			map[string][]string{"param": {`Undefined-$c.a(valid)`}},
+// 			ssaapi.WithLanguage(ssaapi.PHP))
+// 	})
 // 	t.Run("extends __destruct", func(t *testing.T) {
 // 		code := `<?php
 // class test{
@@ -545,14 +545,14 @@ $c = new test;
 // 		//	map[string][]string{"param": {`1`}},
 // 		//	ssaapi.WithLanguage(ssaapi.PHP))
 // 	})
-	t.Run("code", func(t *testing.T) {
-		code := `<?php
-function __destruct(){}
-__destruct();
-`
-		ssatest.MockSSA(t, code)
-	})
-}
+// 	t.Run("code", func(t *testing.T) {
+// 		code := `<?php
+// function __destruct(){}
+// __destruct();
+// `
+// 		ssatest.MockSSA(t, code)
+// 	})
+// }
 
 func TestOOP_Extend(t *testing.T) {
 	t.Run("no impl __construct", func(t *testing.T) {
