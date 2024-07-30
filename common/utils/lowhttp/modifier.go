@@ -527,7 +527,6 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	var firstLine string
 	var header []string
 	var handled bool
-	isChunked := IsChunkedHeaderLine(headerKey + ": " + utils.InterfaceToString(headerValue))
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -539,9 +538,6 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 		}
 		return nil
 	}, func(line string) string {
-		if !isChunked {
-			isChunked = IsChunkedHeaderLine(line)
-		}
 		if k, _ := SplitHTTPHeader(line); k == headerKey {
 			handled = true
 			header = append(header, headerKey+": "+utils.InterfaceToString(headerValue))
@@ -560,7 +556,7 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 		buf.WriteString(line)
 		buf.WriteString(CRLF)
 	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyRaw(buf.Bytes(), body, true)
 }
 
 // ReplaceAllHTTPPacketHeaders 是一个辅助函数，用于改变请求报文，修改所有请求头
@@ -629,7 +625,6 @@ func ReplaceHTTPPacketBasicAuth(packet []byte, username, password string) []byte
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
-	var isChunked bool
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -641,9 +636,6 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 		}
 		return nil
 	}, func(line string) string {
-		if !isChunked {
-			isChunked = IsChunkedHeaderLine(line)
-		}
 		header = append(header, line)
 		return line
 	})
@@ -652,7 +644,7 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
 	buf.WriteString(strings.Join(header, CRLF))
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+	return ReplaceHTTPPacketBodyRaw(buf.Bytes(), body, true)
 }
 
 // DeleteHTTPPacketHeader 是一个辅助函数，用于改变请求报文，删除请求头
@@ -668,7 +660,6 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	var firstLine string
 	var header []string
-	var isChunked bool
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -680,10 +671,6 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 		}
 		return nil
 	}, func(line string) string {
-		if !isChunked {
-			isChunked = IsChunkedHeaderLine(line)
-		}
-
 		if k, _ := SplitHTTPHeader(line); k == headerKey {
 			return ""
 		}
@@ -694,7 +681,7 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	buf.WriteString(firstLine)
 	buf.WriteString(CRLF)
 	buf.WriteString(strings.Join(header, CRLF))
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	return ReplaceHTTPPacketBodyRaw(buf.Bytes(), body, true)
 }
 
 // ReplaceHTTPPacketCookie 是一个辅助函数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加

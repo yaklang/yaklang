@@ -99,152 +99,230 @@ Host: www.baidu.com`,
 }
 
 func TestAppendHTTPPacketHeader(t *testing.T) {
-	for _, c := range [][]string{
+	type testcase struct {
+		packet   string
+		key      string
+		value    string
+		expected string
+	}
+
+	testcases := []testcase{
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com`,
-			"CCC", "ddd",
+			key:      "CCC",
+			value:    "ddd",
+			expected: "CCC: ddd",
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa`,
-			"CCC", "ddd",
-			"CCC: aaa",
+			key:      "CCC",
+			value:    "ddd",
+			expected: `CCC: aaa`,
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa
 DDDD: 11`,
-			"CCC", "ddd",
-			"aaa",
+			key:      "CCC",
+			value:    "ddd",
+			expected: `CCC: aaa`,
 		},
-	} {
-		byteResult := AppendHTTPPacketHeader([]byte(c[0]), c[1], c[2])
-		spew.Dump(byteResult)
-		if !bytes.Contains(byteResult, []byte(CRLF+c[1]+": "+c[2]+CRLF)) {
-			t.Fatalf("ReplaceHTTPPacketHeader failed: %s", string(byteResult))
-		}
+		{
+			packet: `GET / HTTP/1.1
+Host: www.baidu.com`,
+			key:      "Transfer-Encoding",
+			value:    "chunked",
+			expected: "Transfer-Encoding: chunked",
+		},
+	}
 
-		if len(c) > 3 {
-			if !bytes.Contains(byteResult, []byte(c[3])) {
-				t.Fatalf("ReplaceHTTPPacketHeader failed: %s", string(byteResult))
-			}
+	for _, c := range testcases {
+		byteResult := AppendHTTPPacketHeader([]byte(c.packet), c.key, c.value)
+		spew.Dump(byteResult)
+		require.Contains(t, string(byteResult), fmt.Sprintf("\r\n%s: %s", c.key, c.value), "AppendHTTPPacketHeader failed")
+
+		if len(c.expected) > 0 {
+			require.Contains(t, string(byteResult), c.expected, "AppendHTTPPacketHeader failed")
 		}
 	}
 }
 
 func TestAppendHTTPPacketHeaderIfNotExist(t *testing.T) {
-	for _, c := range [][4]string{
+	type testcase struct {
+		packet   string
+		key      string
+		value    string
+		expected string
+		black    string
+	}
+
+	testcases := []testcase{
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com`,
-			"CCC", "ddd",
-			"CCC: ddd",
+			key:      "CCC",
+			value:    "ddd",
+			expected: "CCC: ddd",
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa`,
-			"CCC", "ddd",
-			"CCC: aaa",
+			key:      "CCC",
+			value:    "ddd",
+			expected: "CCC: aaa",
+			black:    "CCC: ddd",
 		},
-	} {
-		byteResult := AppendHTTPPacketHeaderIfNotExist([]byte(c[0]), c[1], c[2])
+	}
+
+	for _, c := range testcases {
+		byteResult := AppendHTTPPacketHeaderIfNotExist([]byte(c.packet), c.key, c.value)
 		spew.Dump(byteResult)
-		if !bytes.Contains(byteResult, []byte(c[3])) {
-			t.Fatalf("ReplaceHTTPPacketHeader failed: %s", string(byteResult))
+		require.Contains(t, string(byteResult), c.expected, "AppendHTTPPacketHeaderIfNotExist failed")
+		if len(c.black) > 0 {
+			require.NotContains(t, string(byteResult), c.black, "AppendHTTPPacketHeaderIfNotExist failed")
 		}
 	}
 }
 
 func TestReplaceHTTPPacketHeader(t *testing.T) {
-	for _, c := range [][]string{
+	type testcase struct {
+		packet string
+		key    string
+		value  string
+		black  string
+		whites []string
+	}
+	testcases := []testcase{
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com`,
-			"CCC", "ddd",
+			key:    "CCC",
+			value:  "ddd",
+			whites: []string{"CCC: ddd"},
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa`,
-			"CCC", "ddd",
-			"aaa",
+			key:    "CCC",
+			value:  "ddd",
+			black:  "aaa",
+			whites: []string{"CCC: ddd"},
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa
 DDDD: 11`,
-			"CCC", "ddd",
-			"aaa",
+			key:    "CCC",
+			value:  "ddd",
+			black:  "aaa",
+			whites: []string{"DDDD: 11", "CCC: ddd"},
 		},
-	} {
-		byteResult := ReplaceHTTPPacketHeader([]byte(c[0]), c[1], c[2])
-		spew.Dump(byteResult)
-		if !bytes.Contains(byteResult, []byte(CRLF+c[1]+": "+c[2]+CRLF)) {
-			t.Fatalf("ReplaceHTTPPacketHeader failed: %s", string(byteResult))
-		}
+		{
+			packet: `GET / HTTP/1.1
+Host: www.baidu.com`,
+			key:    "Transfer-Encoding",
+			value:  "chunked",
+			whites: []string{"Transfer-Encoding: chunked"},
+		},
+		{
+			packet: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Length: 123
 
-		if len(c) > 3 {
-			if bytes.Contains(byteResult, []byte(c[3])) {
-				t.Fatalf("ReplaceHTTPPacketHeader failed: %s", string(byteResult))
+123`,
+			key:    "c",
+			value:  "123",
+			whites: []string{"Content-Length: 3", "c: 123"},
+		},
+	}
+
+	for _, c := range testcases {
+		byteResult := ReplaceHTTPPacketHeader([]byte(c.packet), c.key, c.value)
+		spew.Dump(byteResult)
+		require.Contains(t, string(byteResult), c.key, "ReplaceHTTPPacketHeader failed")
+
+		if c.black != "" {
+			require.NotContains(t, string(byteResult), c.black, "ReplaceHTTPPacketHeader failed")
+		}
+		if len(c.whites) > 0 {
+			for _, white := range c.whites {
+				require.Contains(t, string(byteResult), white, "ReplaceHTTPPacketHeader failed")
 			}
 		}
 	}
 }
 
 func TestDeleteHTTPPacketHeader(t *testing.T) {
-	for _, c := range [][]string{
+	type testcase struct {
+		packet string
+		key    string
+		black  string
+		white  string
+	}
+
+	for _, c := range []testcase{
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com`,
-			"CCC", "CCC",
+			key:   "CCC",
+			black: "CCC",
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa`,
-			"CCC", "aaa",
+			key:   "CCC",
+			black: "aaa",
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa
 DDDD: 11`,
-			"CCC", "aaa", "Host: www.baidu.com",
+			key:   "CCC",
+			black: "aaa",
+			white: "Host: www.baidu.com",
 		},
 		{
-			`GET / HTTP/1.1
+			packet: `GET / HTTP/1.1
 Host: www.baidu.com
 CCC: aaa
 DDDD: 11`,
-			"CCC", "aaa", "DDDD: 11",
+			key:   "CCC",
+			black: "aaa",
+			white: "DDDD: 11",
 		},
 		{
-			`HTTP/1.1 200 OK
+			packet: `HTTP/1.1 200 OK
 RefererenceA: www.baidu.com
 CCC: aaa
 DDDD: 11`,
-			"CCC", "aaa", "DDDD: 11",
+			key:   "CCC",
+			black: "aaa",
+			white: "DDDD: 11",
+		},
+		{
+			packet: `GET / HTTP/1.1
+Host: www.baidu.com
+Transfer-Encoding: chunked`,
+			key:   "Transfer-Encoding",
+			black: "chunked",
 		},
 	} {
-		black := []byte(c[2])
-		var white string
-		if len(c) > 3 {
-			white = c[3]
-		}
-		byteResult := DeleteHTTPPacketHeader([]byte(c[0]), c[1])
+		black := []byte(c.black)
+		white := c.white
+		byteResult := DeleteHTTPPacketHeader([]byte(c.packet), c.key)
 		spew.Dump(byteResult)
-		if bytes.Contains(byteResult, black) {
-			t.Fatalf("DeleteHTTPPacketHeader failed: %s", string(byteResult))
-		}
+		require.NotContains(t, string(byteResult), black, "DeleteHTTPPacketHeader failed")
 		if white != "" {
-			if !bytes.Contains(byteResult, []byte(white)) {
-				t.Fatalf("DeleteHTTPPacketHeader failed: %s", string(byteResult))
-			}
+			require.Contains(t, string(byteResult), white, "DeleteHTTPPacketHeader failed")
 		}
 	}
 }
