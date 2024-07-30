@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/wsm"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -83,6 +84,10 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &wsm.YakShellResourceAction{}
 	case "syntaxflow":
 		return NewSyntaxFlowAction()
+	case "ssa":
+		return &fileSystemAction{
+			fs: ssadb.NewIrSourceFs(),
+		}
 	default:
 		return nil
 	}

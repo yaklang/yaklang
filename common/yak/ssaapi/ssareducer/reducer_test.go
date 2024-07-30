@@ -3,7 +3,6 @@ package ssareducer
 import (
 	"embed"
 	"fmt"
-	"io"
 	"io/fs"
 	"strings"
 	"testing"
@@ -42,7 +41,7 @@ func TestReducerCompiling_NORMAL(t *testing.T) {
 	err = ReducerCompile(
 		"testlib",
 		WithEmbedFS(lib),
-		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+		WithCompileMethod(func(s string, r string) ([]string, error) {
 			if !strings.HasSuffix(s, ".yak") {
 				return []string{s}, nil
 			}
@@ -94,7 +93,7 @@ func TestReducerCompiling2_CompileFailed(t *testing.T) {
 	count = 0
 	err = ReducerCompile("testlib",
 		WithEmbedFS(lib),
-		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+		WithCompileMethod(func(s string, r string) ([]string, error) {
 			count++
 			log.Infof("start to Compile %s", s)
 			return []string{"testlib/aa/a3.yak", "testlib/dd/a1.yak", "testlib/dd/a2.yak"}, nil
@@ -127,7 +126,7 @@ func TestReducerCompiling2_NOLIMIT(t *testing.T) {
 	count = 0
 	err = ReducerCompile("testlib",
 		WithEmbedFS(lib),
-		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+		WithCompileMethod(func(s string, r string) ([]string, error) {
 			count++
 			log.Infof("start to Compile %s", s)
 			return []string{}, nil
@@ -153,7 +152,7 @@ func TestReducerCompiling2_VirtualFile(t *testing.T) {
 	err := ReducerCompile(
 		"a",
 		WithFileSystem(vfs),
-		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+		WithCompileMethod(func(s string, r string) ([]string, error) {
 			log.Infof("start to Compile %s", s)
 			count++
 			return []string{}, nil
@@ -166,7 +165,7 @@ func TestReducerCompiling2_VirtualFile(t *testing.T) {
 	err = ReducerCompile(
 		"a",
 		WithFileSystem(vfs),
-		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+		WithCompileMethod(func(s string, r string) ([]string, error) {
 			log.Infof("start to Compile %s", s)
 			count++
 			return []string{"a/b.txt"}, nil
