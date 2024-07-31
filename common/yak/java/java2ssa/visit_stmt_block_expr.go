@@ -1010,21 +1010,21 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		value := y.VisitExpression(i.Expression())
 		y.AssignVariable(variable, value)
 	} else if ret := i.VariableDeclarators(); ret != nil {
-		var typName string
+		var typ ssa.Type
 		if i.TypeType() != nil {
-			typName = i.TypeType().GetText()
+			typ = y.VisitTypeType(i.TypeType())
 		}
 		//log.Infof("visit local variable declaration: %v,type:%v", ret.GetText(), typName)
 		decls := ret.(*javaparser.VariableDeclaratorsContext)
 		for _, decl := range decls.AllVariableDeclarator() {
-			y.VisitVariableDeclarator(decl, typName)
+			y.VisitVariableDeclarator(decl,typ)
 		}
 	}
 
 	return nil
 }
 
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typName string) (name string, value ssa.Value) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext,typ ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -1043,32 +1043,22 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		if utils.IsNil(value) {
 			return name, nil
 		} else {
-			if ft, ok := y.fullTypeNameMap[typName]; ok {
-				typ := value.GetType()
-				if b, ok := typ.(*ssa.BasicType);ok{
-					ftRaw := strings.Join(ft, ".")
-					newTyp := ssa.NewBasicType(b.Kind, b.GetName())
-					haveVersion := false
-					// try to get sca and set full type name's version
-					for i := len(ft) - 1; i > 0; i-- {
-						if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
-							version := sca.Version
-							newTyp.SetFullTypeName(fmt.Sprintf("%s:%s", ftRaw, version))
+				rightValueTyp := value.GetType()
+				if rightValueTyp.GetFullTypeName() == "" && typ !=nil {
+					// 因为basicType是共用的，因此需要单独hook处理
+					if b,ok := ssa.ToBasicType(rightValueTyp); ok {
+							newTyp := ssa.NewBasicType(b.Kind,b.GetName())
+							newTyp.SetFullTypeName(typ.GetFullTypeName())
 							value.SetType(newTyp)
-							haveVersion = true
-							break
-						}
-					}
-					if !haveVersion {
-						newTyp.SetFullTypeName(ftRaw)
-						value.SetType(newTyp)
+					}else {
+						rightValueTyp.SetFullTypeName(typ.GetFullTypeName())
+						value.SetType(rightValueTyp)
 					}
 				}
+				y.AssignVariable(variable, value)
+				return name, value
 			}
-			y.AssignVariable(variable, value)
-			return name, value
-		}
-	} else {
+		}else{
 		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(name)
 		value := y.EmitValueOnlyDeclare(name)
@@ -1785,11 +1775,21 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 
 	// just undefined
 	val := y.ReadValue(name)
+	// set full type name
 	importedName, haveImportedName := y.fullTypeNameMap[name]
+	importedRawName := strings.Join(importedName, ".")
 	if haveImportedName {
 		newType := ssa.NewBasicType(ssa.AnyTypeKind, name)
-		newType.SetFullTypeName(strings.Join(importedName, "."))
+		for i := len(importedName) - 1; i > 0; i-- {
+			if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(importedName[:i], ".")); sca != nil {
+				newType.SetFullTypeName(fmt.Sprintf("%s:%s",importedRawName,sca.Version))
+				val.SetType(newType)
+				return val
+			}
+		}
+		newType.SetFullTypeName(importedRawName)
 		val.SetType(newType)
 	}
+
 	return val
 }

@@ -1,8 +1,9 @@
 package java
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -89,4 +90,86 @@ public class FastJSONDemoController {
 		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestNativeCallTypeNameWithNewCreator(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("A.java",
+		`package com.org.A;
+		class A{};
+
+`)
+	vf.AddFile("B.java",
+		`package com.example.B;
+		import com.org.A.A;
+		class B{
+        	public static void main(String[] args){
+				Dog a = new A();
+			}
+		};	
+`)
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+		typeName := prog.SyntaxFlowChain(`a<typeName> as $id;`)
+		typeName.Show()
+		
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}	
+
+
+
+
+
+func TestTypeNamePriority(t *testing.T){
+	t.Run("test variable declarator",func(t *testing.T) {
+			vf := filesys.NewVirtualFs()
+			vf.AddFile("A.java",
+				`package com.org.A;
+				class A{
+					};
+
+		    `)
+		vf.AddFile("B.java",
+			`package com.example.B;
+			import com.org.A.A;
+			class B{
+				public static void main(String[] args){
+					A res1 = "aaa";  
+					A res2 = 1;  				
+					var res3 = A;  
+					var res4 ="a";     
+				}
+			};	
+	`)
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+		typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "string")
+		typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "string")
+
+		typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "number")
+		typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "number")
+
+		typeName = prog.SyntaxFlowChain(`res3<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "A")
+		typeName = prog.SyntaxFlowChain(`res3<fullTypeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "com.org.A.A")
+
+		typeName = prog.SyntaxFlowChain(`res4<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "string")
+		typeName = prog.SyntaxFlowChain(`res4<fullTypeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "string")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+		
+	})
+
+
+	
 }
