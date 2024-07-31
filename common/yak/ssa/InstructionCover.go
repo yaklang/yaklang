@@ -132,3 +132,4 @@ func ToMake(v Instruction) (*Make, bool) {
 
 func ToObjectType(t Type) (*ObjectType, bool)     { o, ok := t.(*ObjectType); return o, ok }
 func ToFunctionType(t Type) (*FunctionType, bool) { f, ok := t.(*FunctionType); return f, ok }
+func ToBasicType(t Type)(*BasicType, bool) { b, ok := t.(*BasicType); return b, ok }
