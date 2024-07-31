@@ -857,20 +857,16 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 }
 
 func SelectHTTPFlowFromDB(queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*schema.HTTPFlow, err error) {
-	var limitFlows, fullFlows []*schema.HTTPFlow
+	var limitFlows []*schema.HTTPFlow
 
 	if params.OffsetId > 0 {
-		offsetDB := queryDB
 		if params.Pagination.Order == "desc" {
-			offsetDB = offsetDB.Where("id < ?", params.OffsetId)
+			queryDB = queryDB.Where("id < ?", params.OffsetId)
 		} else {
-			offsetDB = offsetDB.Where("id > ?", params.OffsetId)
+			queryDB = queryDB.Where("id > ?", params.OffsetId)
 		}
-		offsetDB.Limit(int(params.Pagination.Limit)).Offset(0).Scan(&limitFlows)
-		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &fullFlows)
-	} else {
-		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &limitFlows)
 	}
+	paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &limitFlows)
 
 	if queryDB.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", queryDB.Error)
