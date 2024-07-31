@@ -137,9 +137,10 @@ Content-Length: 3
 
 			token := ksuid.New().String()
 			body, _ := utils.GzipCompress(token)
-			packet := "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
-			packetBytes := lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
-			packetBytes = lowhttp.ReplaceHTTPPacketHeader(packetBytes, "Transfer-Encoding", "chunked")
+			var packet = "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
+			var packetBytes = lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
+			// packetBytes = lowhttp.ReplaceHTTPPacketHeader(packetBytes, "Transfer-Encoding", "chunked")
+			packetBytes = lowhttp.HTTPPacketForceChunked(packetBytes)
 			_, err := yak.Execute(`
 proxy = "http://"+str.HostPort(mitmHost, mitmPort)
 rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~

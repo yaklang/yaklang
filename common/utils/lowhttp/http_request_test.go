@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/multipart"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/multipart"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
@@ -314,7 +315,7 @@ Content-Disposition: form-data; name="stream.body"
 		if !strings.Contains(part.GetHeader("Content-Disposition"), "stream.body") {
 			t.Fatal("multipart error")
 		}
-		var body = make([]byte, 100)
+		body := make([]byte, 100)
 		_, err = part.Read(body)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -596,15 +597,14 @@ df`)) != 199 {
 }
 
 func TestGZIPCHUNKED(t *testing.T) {
-	a := ReplaceHTTPPacketHeader([]byte(`GET / HTTP/1.1
+	a := HTTPPacketForceChunked([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
 
-abcdadasdfabcdadasdfabcdadasdfabcdadasdfabcdadasdf`), "Transfer-Encoding", "chunked")
+abcdadasdfabcdadasdfabcdadasdfabcdadasdfabcdadasdf`))
 	fmt.Println(string(a))
 	fmt.Println(strconv.Quote(string(a)))
-	if !strings.HasSuffix(string(a), "\r\n0\r\n\r\n") {
-		t.FailNow()
-	}
+	require.Containsf(t, string(a), "Transfer-Encoding: chunked", "chunked not found")
+	require.Containsf(t, string(a), "\r\n0\r\n\r\n", "chunked not found")
 }
 
 func TestHTTPPacketCRLF_EmptyResult(t *testing.T) {
