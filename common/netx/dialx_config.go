@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	utls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -45,6 +46,9 @@ type dialXConfig struct {
 
 	// DisallowAddress
 	DisallowAddress *utils.HostsFilter
+
+	// ClientHelloSpec
+	ClientHelloSpec *utls.ClientHelloSpec
 }
 
 type DialXOption func(c *dialXConfig)
@@ -222,6 +226,12 @@ func DialX_WithGMTLSSupport(b bool) DialXOption {
 func DialX_WithEnableSystemProxyFromEnv(b bool) DialXOption {
 	return func(c *dialXConfig) {
 		c.EnableSystemProxyFromEnv = b
+	}
+}
+
+func DialX_WithClientHelloSpec(spec *utls.ClientHelloSpec) DialXOption {
+	return func(c *dialXConfig) {
+		c.ClientHelloSpec = spec
 	}
 }
 

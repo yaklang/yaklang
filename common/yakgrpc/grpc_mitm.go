@@ -205,6 +205,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		dnsServers                   = firstReq.GetDnsServers()
 		forceDisableKeepAlive        = firstReq.GetForceDisableKeepAlive()
 		disableCACertPage            = firstReq.GetDisableCACertPage()
+		randomJA3                    = firstReq.GetRandomJA3()
 	)
 	downstreamProxy, err := getDownstreamProxy(firstReq)
 	if err != nil {
@@ -1609,6 +1610,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	mServer, err = crep.NewMITMServer(
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
+		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
 		crep.MITM_SetDownstreamProxy(downstreamProxy),

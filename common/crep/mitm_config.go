@@ -56,6 +56,13 @@ func MITM_EnableMITMCACertPage(b bool) MITMConfig {
 	}
 }
 
+func MITM_RandomJA3(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.randomJA3 = b
+		return nil
+	}
+}
+
 func MITM_SetHijackedMaxContentLength(i int) MITMConfig {
 	return func(server *MITMServer) error {
 		server.hijackedMaxContentLength = i

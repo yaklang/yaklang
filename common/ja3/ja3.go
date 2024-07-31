@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/refraction-networking/utls"
-	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"net/http"
 	"strings"
+
+	tls "github.com/refraction-networking/utls"
+
+	"github.com/yaklang/yaklang/common/netx"
 )
 
 func ParseTLSVersion(version string) *TLSVersion {
