@@ -36,6 +36,9 @@ func ReducerCompile(base string, opts ...Option) error {
 		}
 		// , err := fd.Read()
 		data, err := io.ReadAll(fd)
+		if err != nil {
+			return utils.Wrapf(err, "io.ReadAll(%#v) failed: %v", path, err)
+		}
 		content := utils.UnsafeBytesToString(data)
 		defer func() {
 			fd.Close()
