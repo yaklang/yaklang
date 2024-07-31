@@ -31,6 +31,5 @@ func GetDefaultDocumentHelper() *yakdoc.DocumentHelper {
 			log.Warnf("load embed yak document error: %v", err)
 		}
 	})
-	utils.PrintCurrentGoroutineRuntimeStack()
 	return defaultDocumentHelper
 }
