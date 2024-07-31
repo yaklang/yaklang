@@ -185,12 +185,19 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	for filename, hash := range p.Program.ExtraFile {
-		editor, err := ssadb.GetIrSourceFromHash(hash)
-		if err != nil {
-			log.Errorf("get ir source from hash error: %s", err)
-			continue
+		var data string
+		if p.Program.EnableDatabase {
+			// if have database, get source code from database
+			editor, err := ssadb.GetIrSourceFromHash(hash)
+			if err != nil {
+				log.Errorf("get ir source from hash error: %s", err)
+				continue
+			}
+			data = editor.GetSourceCode()
+		} else {
+			// if no database, get source code from memory
+			data = hash
 		}
-		data := editor.GetSourceCode()
 		if reg, err := regexp.Compile(path); err == nil {
 			if reg.Match([]byte(filename)) {
 				handler(data)

@@ -16,7 +16,7 @@ var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
 
 type IrSource struct {
 	ProgramName    string `json:"program_name" gorm:"index"`
-	SourceCodeHash string `json:"source_code_hash" gorm:"unique_index"` // default md5
+	SourceCodeHash string `json:"source_code_hash" gorm:"index"` // default md5
 
 	// file path
 	FolderPath string `json:"folder_path"`
@@ -50,12 +50,12 @@ func SaveFile(filename, content string, folderPath []string) string {
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
-	if len(folderPath) == 0 {
-		// return utils.Errorf("folder path is empty")
-		return ""
+	if len(folderPath) == 0 || folderPath[0] == "" {
+		// only use memory
+		return content
 	}
 	programName := folderPath[0]
-	hash := codec.Sha256(programName + content)
+	hash := codec.Sha256(content)
 	irSource := &IrSource{
 		ProgramName:    programName,
 		SourceCodeHash: hash,
@@ -74,7 +74,7 @@ func SaveFolder(folderName string, folderPaths []string) error {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
 
-	if len(folderPaths) == 0 {
+	if len(folderPaths) == 0 || folderPaths[0] == "" {
 		return utils.Errorf("folder path is empty")
 	}
 	programName := folderPaths[0]

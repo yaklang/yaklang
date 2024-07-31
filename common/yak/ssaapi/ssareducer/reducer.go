@@ -79,7 +79,7 @@ func ReducerCompile(base string, opts ...Option) error {
 		if visited.Exist(path) {
 			return nil
 		}
-		if isDir {
+		if isDir && c.ProgramName != "" {
 			folder, name := c.fs.PathSplit(path)
 			folders := []string{c.ProgramName}
 			folders = append(folders,
