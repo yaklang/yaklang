@@ -16,6 +16,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
+	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -195,6 +196,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		firstAuth            = true
 		reqIns               = option.NativeHTTPRequestInstance
 		maxContentLength     = option.MaxContentLength
+		randomJA3FingerPrint = option.RandomJA3FingerPrint
+		clientHelloSpec      = option.ClientHelloSpec
 	)
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -500,6 +503,17 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			}))
 		}
 		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https))
+
+		if clientHelloSpec != nil {
+			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
+		} else if randomJA3FingerPrint {
+			spec, err := utls.UTLSIdToSpec(utls.HelloRandomizedALPN)
+			if err == nil {
+				dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(&spec))
+			} else {
+				log.Debugf("generate random JA3 fingerprint failed: %v", err)
+			}
+		}
 		if sni != "" {
 			dialopts = append(dialopts, netx.DialX_WithSNI(sni))
 		}

@@ -11,7 +11,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/alfg/mp4 v0.0.0-20210728035756-55ea58c08aeb
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
-	github.com/andybalholm/brotli v1.0.4
+	github.com/andybalholm/brotli v1.0.6
 	github.com/antchfx/xmlquery v1.3.1
 	github.com/antchfx/xpath v1.2.1
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
@@ -70,7 +70,7 @@ require (
 	github.com/kataras/golog v0.0.10
 	github.com/kataras/pio v0.0.2
 	github.com/kevinburke/ssh_config v1.2.0
-	github.com/klauspost/compress v1.16.5
+	github.com/klauspost/compress v1.17.4
 	github.com/knqyf263/go-rpmdb v0.1.0
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/liamg/jfather v0.0.7
@@ -91,7 +91,7 @@ require (
 	github.com/pkg/sftp v1.11.0
 	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
 	github.com/rabbitmq/amqp091-go v1.9.0
-	github.com/refraction-networking/utls v1.3.2
+	github.com/refraction-networking/utls v1.6.7
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/samber/lo v1.38.1
 	github.com/segmentio/ksuid v1.0.4
@@ -138,7 +138,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect
-	github.com/cloudflare/circl v1.3.3 // indirect
+	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
@@ -152,7 +152,6 @@ require (
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/gaukas/godicttls v0.0.3 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

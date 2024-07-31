@@ -265,6 +265,9 @@ type MITMServer struct {
 
 	// disable mitm ca cert page
 	enableMITMCACertPage bool
+
+	// random JA3 fingerprint
+	randomJA3 bool
 }
 
 func (m *MITMServer) GetMaxContentLength() int {
@@ -317,6 +320,9 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	}
 	if len(m.HostMapping) > 0 {
 		config = append(config, lowhttp.WithETCHosts(m.HostMapping))
+	}
+	if m.randomJA3 {
+		config = append(config, lowhttp.WithRandomJA3FingerPrint(true))
 	}
 
 	m.proxy.SetLowhttpConfig(config)

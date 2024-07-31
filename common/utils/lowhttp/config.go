@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	utls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -75,6 +76,9 @@ type LowhttpExecConfig struct {
 
 	// payloads (web fuzzer)
 	Payloads []string
+
+	RandomJA3FingerPrint bool
+	ClientHelloSpec      *utls.ClientHelloSpec
 }
 
 type LowhttpResponse struct {
@@ -483,5 +487,17 @@ func WithSNI(sni string) LowhttpOpt {
 func WithPayloads(payloads []string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Payloads = payloads
+	}
+}
+
+func WithRandomJA3FingerPrint(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.RandomJA3FingerPrint = b
+	}
+}
+
+func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ClientHelloSpec = spec
 	}
 }
