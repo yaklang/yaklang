@@ -129,7 +129,9 @@ func FixRiskType(db *gorm.DB) {
 
 func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB, _ error) {
 	db = db.Model(&schema.Risk{})
-	db = db.Where("runtime_id = ?", params.GetRuntimeId())
+	if runtimeId := params.GetRuntimeId(); runtimeId != "" {
+		db = db.Where("runtime_id = ?", runtimeId)
+	}
 	db = db.Where("waiting_verified = ?", params.GetWaitingVerified())
 	db = bizhelper.QueryBySpecificPorts(db, "port", params.GetPorts())
 	db = bizhelper.QueryBySpecificAddress(db, "ip_integer", params.GetNetwork())
@@ -175,7 +177,7 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 			Order:   "desc",
 		}
 	}
-
+	db = db.Debug()
 	p := params.Pagination
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 
