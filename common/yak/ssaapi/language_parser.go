@@ -130,6 +130,9 @@ func (c *config) parseFile() (ret *Program, err error) {
 		return nil, err
 	}
 	prog.Finish()
+	if prog.ChildApplication != nil && len(prog.ChildApplication) > 0 {
+		return NewProgram(prog.ChildApplication[0], c), err
+	}
 	return NewProgram(prog, c), nil
 }
 
@@ -168,7 +171,9 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
-	// prog.Finish()
+	for _, program := range prog.ChildApplication {
+		ssa4analyze.RunAnalyzer(program)
+	}
 	return prog, nil
 }
 
