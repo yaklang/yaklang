@@ -53,7 +53,6 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	require.Nil(t, err, "parse error")
 
 	prog.Show()
-	// prog.Program.ShowWithSource()
 	fmt.Println(prog.GetErrors().String())
 
 	if tc.Want == nil {
