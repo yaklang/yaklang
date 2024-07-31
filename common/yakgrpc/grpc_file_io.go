@@ -3,9 +3,11 @@ package yakgrpc
 import (
 	"errors"
 	"io"
-	"os"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -21,7 +23,18 @@ func (s *Server) ReadFile(req *ypb.ReadFileRequest, stream ypb.Yak_ReadFileServe
 		return utils.Error("bufSize must be positive")
 	}
 
-	fh, err := os.Open(filePath)
+	var fs filesys_interface.FileSystem
+	if req.GetFileSystem() == "local" {
+		fs = filesys.NewLocalFs()
+	} else if req.GetFileSystem() == "ssadb" {
+		// return utils.Error("unsupported file system")
+		fs = ssadb.NewIrSourceFs()
+	} else {
+		// default
+		fs = filesys.NewLocalFs()
+	}
+
+	fh, err := fs.Open(filePath)
 	if err != nil {
 		return utils.Wrap(err, "read file error")
 	}
