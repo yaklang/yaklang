@@ -46,6 +46,7 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 	// p := b.GetProgram()
 	p := b.prog
 	c := NewClassBluePrint()
+	c.Program = p
 	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("CreateClassBluePrint: this class redeclare")
 	}

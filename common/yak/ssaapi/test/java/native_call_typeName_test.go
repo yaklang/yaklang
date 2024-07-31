@@ -91,38 +91,7 @@ public class FastJSONDemoController {
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 
-func TestNativeCallTypeNameWithNewCreator(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("A.java",
-		`package com.org.A;
-		class A{};
-
-`)
-	vf.AddFile("B.java",
-		`package com.example.B;
-		import com.org.A.A;
-		class B{
-        	public static void main(String[] args){
-				Dog a = new A();
-			}
-		};	
-`)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
-		prog.Show()
-		typeName := prog.SyntaxFlowChain(`a<typeName> as $id;`)
-		typeName.Show()
-		
-		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
-}	
-
-
-
-
-
-func TestTypeNamePriority(t *testing.T){
-	t.Run("test variable declarator",func(t *testing.T) {
+func TestLocalVariableDeclareTypeName(t *testing.T){
 			vf := filesys.NewVirtualFs()
 			vf.AddFile("A.java",
 				`package com.org.A;
@@ -139,11 +108,13 @@ func TestTypeNamePriority(t *testing.T){
 					A res2 = 1;  				
 					var res3 = A;  
 					var res4 ="a";     
+					A res5 = Dog(); 
 				}
 			};	
 	`)
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
+		prog.Show()
 		typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
 		assert.Contains(t, typeName.String(), "string")
 		typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
@@ -163,11 +134,72 @@ func TestTypeNamePriority(t *testing.T){
 		assert.Contains(t, typeName.String(), "string")
 		typeName = prog.SyntaxFlowChain(`res4<fullTypeName> as $id;`)[0]
 		assert.Contains(t, typeName.String(), "string")
+
+		typeName = prog.SyntaxFlowChain(`res5<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "A")
+		typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "com.org.A.A")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 		
-	})
+}
 
+func TestMemberCallTypeName(t *testing.T){
+	vf := filesys.NewVirtualFs()
+		vf.AddFile("A.java",
+			`package com.org.A;
+				class A{
+					public String existMethod(){return null;}
+					public static void staticMethod();
+					};
+		    `)
+		vf.AddFile("B.java",
+			`package com.example.B;
+			import com.org.A.A;
+			class B{
+				public static void main(String[] args){
+					A object = new A();
+					var res1 = object.noExistMethod();  // fulltypeName 应该和object一样
+					var res2 = object.existMethod();  // fulltypeName 应该和object一样
+					var res3 = object.Runtime().exec();  // fulltypeName 应该和object一样
+					var res4 = A.staticMethod();  // fulltypeName 应该找到A
+					var res5 = A.noExistMethod();  // fulltypeName 应该找到A
+				}
+			};	
+	`)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			prog := progs[0]
+			prog.Show()
 
-	
+			typeName := prog.SyntaxFlowChain(`object<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`object<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`res3<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res3<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`res4<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res4<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`res5<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
 }
