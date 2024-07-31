@@ -237,7 +237,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
 		for _, variableDeclarator := range variableDeclarators {
 			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
-			name, value := y.VisitVariableDeclarator(v,nil)
+			name, value := y.VisitVariableDeclarator(v, nil)
 			value.SetType(fieldType)
 			setMember(name, value)
 		}
@@ -286,7 +286,7 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	} else {
 		t = y.VisitPrimitiveType(i.PrimitiveType())
 	}
-	
+
 	return t
 }
 
@@ -307,11 +307,11 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
 		// set full type name
-		return y.SetFullTypeNameForType(className, class)
+		return y.SetFullTypeNameForType(className, class,false)
 	}
 	// }
 
-	return ssa.NewBasicType(ssa.NullTypeKind,"null")
+	return ssa.NewBasicType(ssa.NullTypeKind, "null")
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
@@ -843,22 +843,30 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 
 }
 
-func (y *builder)SetFullTypeNameForType(typName string,typ ssa.Type)ssa.Type {
-	if ft, ok := y.fullTypeNameMap[typName]; ok {
-		ftRaw := strings.Join(ft, ".")
-		haveVersion := false
-		// try to get sca and set full type name's version
-		for i := len(ft) - 1; i > 0; i-- {
-			if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
-				version := sca.Version
-				typ.SetFullTypeName(fmt.Sprintf("%s:%s", ftRaw, version))
-				haveVersion = true
-				break
+// SetFullTypeNameForType用于将FullTypeName设置到Type中。其中当Type是BasicType时，会创建新的Type，避免修改原来的Type。
+// isFullName表示是否是完整的FullTypeName，如果不是，则会从fullTypeNameMap寻找完整的FullTypeName。
+func (y *builder) SetFullTypeNameForType(typName string, typ ssa.Type,isFullName bool ) ssa.Type {
+	if b,ok:=ssa.ToBasicType(typ);ok{
+		typ = ssa.NewBasicType(b.Kind,b.GetName())
+	} 
+	
+	if typ == nil {
+		return ssa.GetAnyType()
+	}
+
+	typStr := typName 
+	if !isFullName {
+		if ft, ok := y.fullTypeNameMap[typName]; ok {
+			typStr = strings.Join(ft, ".")
+			for i := len(ft) - 1; i > 0; i-- {
+				if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
+					version := sca.Version
+					typStr = (fmt.Sprintf("%s:%s", typStr, version))
+					break
+				}
 			}
 		}
-		if !haveVersion {
-			typ.SetFullTypeName(ftRaw)
-		}
 	}
+	typ.SetFullTypeName(typStr)
 	return typ
 }

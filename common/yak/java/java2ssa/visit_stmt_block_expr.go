@@ -1,7 +1,6 @@
 package java2ssa
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -129,10 +128,11 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			return nil
 		}
 		var key ssa.Value
+		var res ssa.Value
 		if id := ret.Identifier(); id != nil {
 			key = y.EmitConstInst(id.GetText())
 		} else if method := ret.MethodCall(); method != nil {
-			return y.VisitMethodCall(method, obj)
+			res= y.VisitMethodCall(method, obj)
 		} else if this := ret.THIS(); this != nil {
 			key = y.EmitConstInst(this.GetText())
 		} else if super := ret.SUPER(); super != nil {
@@ -142,12 +142,20 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			if ret.NonWildcardTypeArguments() != nil {
 				// todo:泛型
 			}
-			return y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
+			res= y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
 		} else if explicit := ret.ExplicitGenericInvocation(); explicit != nil {
 			//todo : 显式泛型调用
 			key = y.EmitConstInst(explicit.GetText())
 		}
-		return y.ReadMemberCallVariable(obj, key)
+		if res == nil {
+			res = y.ReadMemberCallVariable(obj, key)
+		}
+		t := obj.GetType()
+		if ftRaw := t.GetFullTypeName(); ftRaw!= "" {
+			newTyp := y.SetFullTypeNameForType(ftRaw,res.GetType(),true)
+			res.SetType(newTyp)
+		}
+		return res
 	case *javaparser.FunctionCallExpressionContext:
 		// 处理函数调用表达式
 		if s := ret.MethodCall(); s != nil {
@@ -1043,17 +1051,13 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		if utils.IsNil(value) {
 			return name, nil
 		} else {
-				rightValueTyp := value.GetType()
-				if b,ok := ssa.ToBasicType(rightValueTyp); ok{
-						if b.IsAny() || b.IsNull(){
-							newTyp := ssa.NewBasicType(b.Kind,b.GetName())
-							newTyp.SetFullTypeName(typ.GetFullTypeName())
-							value.SetType(newTyp)
-						}
-				}else {
-					rightValueTyp.SetFullTypeName(typ.GetFullTypeName())
-					value.SetType(rightValueTyp)
+			rightValueTyp := value.GetType()
+			if b,ok := ssa.ToBasicType(rightValueTyp); ok && typ!=nil{
+				if b.GetFullTypeName() == ""{
+					newTyp := y.SetFullTypeNameForType(typ.GetFullTypeName(), rightValueTyp, true)
+					value.SetType(newTyp)
 				}
+			}
 				y.AssignVariable(variable, value)
 				return name, value
 			}
@@ -1624,7 +1628,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
 			return obj, y.EmitCall(y.NewCall(defaultClassFullback, args))
 		}
-		obj.SetType(class)
+		obj.SetType(y.SetFullTypeNameForType(className, class,false))
 		constructor := class.Constructor
 		if constructor == nil {
 			log.Warnf("class %v is not found constructor, "+
@@ -1753,42 +1757,34 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 }
 
 func (y *builder) VisitIdentifier(name string) ssa.Value {
+	var res ssa.Value
 	if value := y.PeekValue(name); value != nil {
 		// found
-		return value
+		res =  value
 	}
 	//if in this class, return
 	if class := y.MarkedThisClassBlueprint; class != nil {
 		if value, ok := y.ReadClassConst(class.Name, name); ok {
-			return value
+			res  =  value
 		}
 
 		value := y.ReadSelfMember(name)
 		if value != nil {
-			return value
+			res= value
 		}
 	}
 	if value, ok := y.ReadConst(name); ok {
-		return value
+		res= value
 	}
-
-	// just undefined
-	val := y.ReadValue(name)
+	 
+	if res == nil {
+		// just undefined
+		res= y.ReadValue(name)
+	}	
 	// set full type name
-	importedName, haveImportedName := y.fullTypeNameMap[name]
-	importedRawName := strings.Join(importedName, ".")
-	if haveImportedName {
-		newType := ssa.NewBasicType(ssa.AnyTypeKind, name)
-		for i := len(importedName) - 1; i > 0; i-- {
-			if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(importedName[:i], ".")); sca != nil {
-				newType.SetFullTypeName(fmt.Sprintf("%s:%s",importedRawName,sca.Version))
-				val.SetType(newType)
-				return val
-			}
-		}
-		newType.SetFullTypeName(importedRawName)
-		val.SetType(newType)
+	if res.GetType().GetFullTypeName() == ""{
+		newType := y.SetFullTypeNameForType(name, res.GetType(),false)
+		res.SetType(newType)
 	}
-
-	return val
+	return res
 }

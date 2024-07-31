@@ -376,7 +376,6 @@ func NewBasicType(kind TypeKind, name string) *BasicType {
 		name:    name,
 		pkgPath: name,
 		method:  make(map[string]*Function),
-		fullTypeName: name,
 	}
 }
 
