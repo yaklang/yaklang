@@ -334,7 +334,7 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
 	// step6 hook binOp type value to make sure type is nil
-	if _,ok:=ToBinOp(value); ok {
+	if _, ok := ToBinOp(value); ok {
 		typ = nil
 	}
 	//step6 Determine the type of member call.
@@ -424,14 +424,7 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	if para, ok := ToParameter(value); ok {
 		name, typ := checkCanMemberCall(para, key)
 		newParamterMember := b.NewParameterMember(name, para, key)
-		if b.MarkedMemberCallWantMethod {
-			// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
-			t := NewFunctionTypeDefine(name, nil, nil, false)
-			t.IsMethod = true
-			newParamterMember.SetType(t)
-		} else {
-			newParamterMember.SetType(typ)
-		}
+		newParamterMember.SetType(typ)
 		SetMemberCall(para, key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
 		return newParamterMember
@@ -471,7 +464,7 @@ func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 		if member := class.GetMemberAndStaticMember(name, b.SupportClassStaticModifier); !utils.IsNil(member) {
 			return member
 		}
-		if staticMethod := class.GetMethodAndStaticMethod(name, b.MarkedIsStaticMethod); !utils.IsNil(staticMethod) {
+		if staticMethod := class.GetMethodAndStaticMethod(name, b.MarkedMemberCallWantMethod); !utils.IsNil(staticMethod) {
 			return staticMethod
 		}
 	}
@@ -487,7 +480,7 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 		if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
-			if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(_method) {
+			if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedMemberCallWantMethod); !utils.IsNil(_method) {
 				return _method
 			}
 			if member := blueprint.GetMemberAndStaticMember(key.String(), b.SupportClassStaticModifier); !utils.IsNil(member) {
@@ -495,10 +488,12 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 			}
 		}
 	}
-	if b.SupportClassStaticModifier {
-		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
-			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
-				if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(_method) {
+	//用于没有实例化类的时候获取静态方法或成员
+	//此时这个这个类为不可用undefined类型（UndefinedValueInValid）
+	if u, ok := object.(*Undefined); ok {
+		if u.Kind == UndefinedValueInValid {
+			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
+				if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedMemberCallWantMethod); !utils.IsNil(_method) {
 					return _method
 				}
 				if member := blueprint.GetMemberAndStaticMember(key.String(), b.SupportClassStaticModifier); !utils.IsNil(member) {
@@ -506,22 +501,8 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 				}
 			}
 		}
-		//用于没有实例化类的时候获取静态方法或成员
-		//此时这个这个类为不可用undefined类型（UndefinedValueInValid）
-		if u, ok := object.(*Undefined); ok {
-			if u.Kind == UndefinedValueInValid {
-				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
-					if _method := blueprint.GetMethodAndStaticMethod(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(_method) {
-						return _method
-					}
-					if member := blueprint.GetMemberAndStaticMember(key.String(), b.MarkedIsStaticMethod); !utils.IsNil(member) {
-						return member
-					}
-				}
-			}
-		}
-
 	}
+
 	name, typ := checkCanMemberCall(object, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
