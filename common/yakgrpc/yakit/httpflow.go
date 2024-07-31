@@ -785,6 +785,12 @@ func QuickSearchMITMHTTPFlowCount(token string) int {
 	return count
 }
 
+func CountHTTPFlowByRuntimeID(db *gorm.DB, runtimeId string) int {
+	var count int
+	db.Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeId).Count(&count)
+	return count
+}
+
 // BuildHTTPFlowQuery 构建带有过滤条件的查询
 func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	// 应用所有过滤条件
