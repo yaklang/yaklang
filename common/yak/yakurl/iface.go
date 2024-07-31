@@ -84,7 +84,7 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &wsm.YakShellResourceAction{}
 	case "syntaxflow":
 		return NewSyntaxFlowAction()
-	case "ssa":
+	case "ssadb":
 		return &fileSystemAction{
 			fs: ssadb.NewIrSourceFs(),
 		}
