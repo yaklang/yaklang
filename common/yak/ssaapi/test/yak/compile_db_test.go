@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -169,7 +168,7 @@ c("d")
 
 	haveIncluded := false
 	includeFile := omap.NewOrderedMap(make(map[string]any))
-	includeHash := utils.CalcMd5(includeCode)
+	includeHash := codec.Sha256(includeCode)
 	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
 		if result.IsEmptySourceCodeHash() {
 			panic("source code hash is empty")

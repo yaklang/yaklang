@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 const (
@@ -177,8 +178,6 @@ func (c *config) checkLanguage(path string) error {
 		return nil, utils.Wrapf(ssareducer.SkippedError, "file[%s] is not supported by any language builder, skip this file", path)
 	}
 
-	// TODO: whether to use the same programName for all program ?? when call ParseProject
-	// programName += "-" + path
 	var err error
 	if LanguageBuilder != nil {
 		LanguageBuilder, err = processBuilders(LanguageBuilder)
@@ -217,7 +216,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 
-		{
+		if programName != "" {
 			folderName, fileName := c.fs.PathSplit(filePath)
 			folders := []string{programName}
 			folders = append(folders,
@@ -245,7 +244,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		if ret := fb.GetEditor(); ret != nil {
 			prog := fb.GetProgram()
 			cache := prog.Cache
-			progName, hash := prog.GetProgramName(), ret.SourceCodeMd5()
+			progName, hash := prog.GetProgramName(), codec.Sha256(ret.GetSourceCode())
 			if cache.IsExistedSourceCodeHash(progName, hash) {
 				c.DatabaseProgramCacheHitter(fb)
 			}
