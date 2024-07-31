@@ -236,7 +236,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 
 	})
 
-	t.Run("test localhost bypass", func(t *testing.T) {
+	t.Run("test httpflow check", func(t *testing.T) {
 		TestSmokingEvaluatePlugin(testCase{
 			code: `
 yakit.AutoInitYakit()

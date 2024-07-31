@@ -254,9 +254,13 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if riskCount > 0 {
 			score -= 50
 			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error)
-		} else {
+		} else { //  if not negative alarm, check plugin sent request
+			wantCount := 1
+			if pluginType == "mitm" {
+				wantCount = 2 // mitm plugin need rsp, so there will have a default request
+			}
 			count := yakit.CountHTTPFlowByRuntimeID(s.GetProjectDatabase(), runtimeId)
-			if count < 2 {
+			if count < wantCount {
 				score -= 50
 				pushSuggestion("逻辑测试失败[logic Test]", `请检查插件是否正常发起请求`, nil, Error)
 			}
