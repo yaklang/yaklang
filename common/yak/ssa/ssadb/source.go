@@ -52,7 +52,7 @@ func SaveFile(filename, content string, folderPath []string) string {
 	}()
 	if len(folderPath) == 0 || folderPath[0] == "" {
 		// only use memory
-		return content
+		return ""
 	}
 	programName := folderPath[0]
 	hash := codec.Sha256(content)
@@ -99,12 +99,15 @@ func (irSource *IrSource) save() error {
 	log.Infof("save source: %v", irSource)
 	// check existed
 	db := GetDB()
-	var existed IrSource
-	if db.Where("source_code_hash = ?", irSource.SourceCodeHash).First(&existed).RecordNotFound() {
-		if err := db.Create(irSource).Error; err != nil {
-			return utils.Wrapf(err, "save ir source failed")
-		}
+	if err := db.Save(irSource).Error; err != nil {
+		return utils.Wrapf(err, "save ir source failed")
 	}
+	// var existed IrSource
+	// if db.Where("source_code_hash = ?", irSource.SourceCodeHash).First(&existed).RecordNotFound() {
+	// 	if err := db.Create(irSource).Error; err != nil {
+	// 		return utils.Wrapf(err, "save ir source failed")
+	// 	}
+	// }
 	return nil
 }
 

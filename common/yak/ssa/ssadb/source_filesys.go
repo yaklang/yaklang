@@ -39,8 +39,8 @@ func (fs *irSourceFS) addFile(source *IrSource) {
 	}
 }
 
-func (fs *irSourceFS) loadFile(path string) error {
-	path, name := fs.PathSplit(path)
+func (fs *irSourceFS) loadFile(fullPath string) error {
+	path, name := fs.PathSplit(fullPath)
 	if name == "" {
 		fs.loadFolder(path)
 	} else {
@@ -118,7 +118,11 @@ func (fs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 }
 
 func (fs *irSourceFS) PathSplit(p string) (string, string) {
-	return path.Split(p)
+	dir, name := path.Split(p)
+	if len(dir) != 1 && dir[len(dir)-1] == '/' {
+		dir = dir[:len(dir)-1]
+	}
+	return dir, name
 }
 
 func (fs *irSourceFS) Ext(string) string {
