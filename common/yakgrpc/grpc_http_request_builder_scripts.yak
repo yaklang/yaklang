@@ -69,10 +69,10 @@ for req in reqs {
                     if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
                         reqRaw = firstReq
                     }
-                    println("---------------------")
-                    println(string(reqRaw))
-                    println(string(rsp))
-                    println("---------------------")
+                    //println("---------------------")
+                    //println(string(reqRaw))
+                    //println(string(rsp))
+                    //println("---------------------")
                     isHttps = req.IsHttps
 
                     u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~

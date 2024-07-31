@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
+	"golang.org/x/exp/slices"
 	"strings"
 	"sync"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/google/uuid"
 
@@ -81,6 +82,7 @@ type PluginTestingEchoServer struct {
 	Port                int
 	RequestsHistory     []byte
 	RequestHistoryMutex *sync.Mutex
+	RawHeader           []byte
 
 	JunkData []byte
 	Ctx      context.Context
@@ -98,6 +100,20 @@ func NewPluginTestingEchoServer(ctx context.Context) *PluginTestingEchoServer {
 		RequestHistoryMutex: new(sync.Mutex),
 		JunkData:            BuildPluginTestingJunkData(),
 		Ctx:                 ctx,
+		RawHeader: []byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Type: text/plain
+Content-Type: text/xml
+Content-Type: image/gif
+Content-Type: image/jpeg 
+Content-Type: image/png
+Content-Type: application/xhtml+xml
+Content-Type: application/xml
+Content-Type: application/atom+xml
+Content-Type: application/pdf
+Content-Type: application/msword
+Content-Type: application/octet-stream
+Content-Type: application/json`),
 	}
 
 	decodeReq := func(req []byte) []byte {
@@ -117,21 +133,7 @@ func NewPluginTestingEchoServer(ctx context.Context) *PluginTestingEchoServer {
 		echoServer.RequestsHistory = append(echoServer.RequestsHistory, decodeReq(req)...)
 		body := append(echoServer.JunkData, echoServer.RequestsHistory...)
 
-		return lowhttp.ReplaceHTTPPacketBodyFast([]byte(`HTTP/1.1 200 OK
-Content-Type: text/html
-Content-Type: text/plain
-Content-Type: text/xml
-Content-Type: image/gif
-Content-Type: image/jpeg 
-Content-Type: image/png
-Content-Type: application/xhtml+xml
-Content-Type: application/xml
-Content-Type: application/atom+xml
-Content-Type: application/pdf
-Content-Type: application/msword
-Content-Type: application/octet-stream
-Content-Type: application/json
-`), body)
+		return lowhttp.ReplaceHTTPPacketBodyFast(echoServer.RawHeader, body)
 	})
 
 	return echoServer
@@ -178,6 +180,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			Severity:   severity,
 		})
 	}
+	fp.SetMatchResultCache(utils.HostPort(testDomain, port), MockPluginTestingFpResult(testDomain, pluginTestingServer))
 
 	score := 100
 
@@ -231,9 +234,9 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				if err != nil {
 					return err
 				}
-				spew.Dump(m)
-				spew.Dump(m["request"])
-				spew.Dump(m["response"])
+				//spew.Dump(m)
+				//spew.Dump(m["request"])
+				//spew.Dump(m["response"])
 				log.Info("debugScript recv: ", string(result.Message))
 			}
 			return nil
@@ -251,6 +254,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if riskCount > 0 {
 			score -= 50
 			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error)
+		} else {
+			count := yakit.CountHTTPFlowByRuntimeID(s.GetProjectDatabase(), runtimeId)
+			if count < 2 {
+				score -= 50
+				pushSuggestion("逻辑测试失败[logic Test]", `请检查插件是否正常发起请求`, nil, Error)
+			}
 		}
 	}
 
@@ -262,4 +271,32 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		Score:   int64(score),
 		Results: results,
 	}, nil
+}
+
+func MockPluginTestingFpResult(testDomain string, pluginTestingServer *PluginTestingEchoServer) *fp.MatchResult {
+	port := pluginTestingServer.Port
+	return &fp.MatchResult{
+		Target: testDomain,
+		Port:   port,
+		State:  fp.OPEN,
+		Reason: "",
+		Fingerprint: &fp.FingerprintInfo{
+			IP:          testDomain,
+			Port:        port,
+			Proto:       "tcp",
+			ServiceName: "http",
+			Banner:      "",
+			CPEFromUrls: make(map[string][]*rule.CPE),
+			HttpFlows: []*fp.HTTPFlow{
+				{
+					StatusCode:     200,
+					IsHTTPS:        false,
+					RequestHeader:  []byte("GET / HTTP/1.1\r\nHost: " + testDomain + "\r\n\r\n"),
+					RequestBody:    nil,
+					ResponseHeader: pluginTestingServer.RawHeader,
+					ResponseBody:   pluginTestingServer.JunkData,
+				},
+			},
+		},
+	}
 }
