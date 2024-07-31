@@ -19,17 +19,18 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	p := b.GetProgram()
 	includePaths := p.GetIncludeFiles()
 	p.Loader.AddIncludePath(filepath.Dir(b.GetEditor().GetFilename()))
+	currentMode := b.Included
 	defer func() {
+		b.Included = currentMode
 		p.Loader.SetIncludePaths(includePaths)
 	}()
 	file, data, err := p.Loader.LoadFilePackage(filename, once)
 	if err != nil {
 		return err
 	}
-
+	b.Included = true
 	_path := p.Loader.GetCurrentPath()
 	p.Loader.SetCurrentPath(path.Dir(file))
-
 	err = p.Build(file, data, b)
 
 	p.Loader.SetCurrentPath(_path)

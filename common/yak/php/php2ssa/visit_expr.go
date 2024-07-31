@@ -1234,29 +1234,25 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
 		once = true
 	}
-	y.CreateIfBuilder().SetCondition(func() ssa.Value {
-		return ssa.NewConst(true)
-	}, func() {
-		expr := i.Expression()
-		value := y.VisitExpression(expr)
-		if utils.IsNil(value) {
-			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-			log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-			flag = ssa.NewUndefined(expr.GetText())
-		}
-		if value.IsUndefined() {
-			log.Warnf("include statement expression is undefined")
+	expr := i.Expression()
+	value := y.VisitExpression(expr)
+	if utils.IsNil(value) {
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
+		flag = ssa.NewUndefined(expr.GetText())
+	}
+	if value.IsUndefined() {
+		log.Warnf("include statement expression is undefined")
+	} else {
+		file := value.String()
+		if err := y.BuildFilePackage(file, once); err != nil {
+			log.Errorf("include: %v failed: %v", file, err)
 		} else {
-			file := value.String()
-			if err := y.BuildFilePackage(file, once); err != nil {
-				log.Errorf("include: %v failed: %v", file, err)
-			} else {
-				flag = ssa.NewConst(true)
-			}
+			flag = ssa.NewConst(true)
 		}
-	}).Build()
+	}
 	return flag
 }
 
