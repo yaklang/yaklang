@@ -153,9 +153,9 @@ func TestProgramRelation(t *testing.T) {
 		up.DownStream = append(up.DownStream, down.ProgramName)
 		down.UpStream = append(down.UpStream, up.ProgramName)
 	}
-	a := ssadb.CreateProgram("a", "Application", "")
-	b := ssadb.CreateProgram("b", "Library", "")
-	c := ssadb.CreateProgram("c", "Library", "")
+	a := ssadb.CreateProgram("a", "Application", "", []string{})
+	b := ssadb.CreateProgram("b", "Library", "", []string{})
+	c := ssadb.CreateProgram("c", "Library", "", []string{})
 	/*
 		a -> b, c
 		b -> c

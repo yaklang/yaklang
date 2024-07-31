@@ -267,6 +267,7 @@ func FromDatabase(programName string, opts ...Option) (*Program, error) {
 		opt(config)
 	}
 	config.DatabaseProgramName = programName
+
 	return config.fromDatabase()
 }
 

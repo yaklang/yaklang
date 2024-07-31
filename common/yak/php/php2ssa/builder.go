@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"os"
 	"path/filepath"
@@ -25,14 +26,24 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
-	b.SupportClassStaticModifier = true
-	b.SupportClass = true
-	build := builder{
-		constMap:        make(map[string]ssa.Value),
-		FunctionBuilder: b,
+	startParse := func(functionBuilder *ssa.FunctionBuilder) {
+		functionBuilder.SupportClassStaticModifier = true
+		functionBuilder.SupportClass = true
+		build := builder{
+			constMap:        make(map[string]ssa.Value),
+			FunctionBuilder: functionBuilder,
+		}
+		build.WithExternValue(phpBuildIn)
+		build.VisitHtmlDocument(ast)
 	}
-	b.WithExternValue(phpBuildIn)
-	build.VisitHtmlDocument(ast)
+
+	if !b.Included {
+		program := ssa.NewChildProgram(b.GetProgram(), uuid.NewString())
+		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
+		startParse(functionBuilder)
+	} else {
+		startParse(b)
+	}
 	return nil
 }
 

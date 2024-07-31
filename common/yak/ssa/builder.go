@@ -33,6 +33,8 @@ type FunctionBuilder struct {
 	SupportClassStaticModifier bool
 	SupportClass               bool
 
+	Included bool
+
 	RefParameter map[string]struct{}
 
 	target *target // for break and continue
