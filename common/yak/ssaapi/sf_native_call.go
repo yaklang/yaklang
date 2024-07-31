@@ -201,35 +201,64 @@ func init() {
 					return nil
 				}
 				t := val.GetType()
-				if b, ok := t.t.(*ssa.BasicType); ok {
-					typeStr := b.GetFullTypeName()
-					if typeStr == "" {
-						typeStr := t.String()
-						results := val.NewValue(ssa.NewConst(typeStr))
-						vals = append(vals, results)
-					} else {
+				typeStr := t.t.GetFullTypeName()
+				if typeStr == "" {
+					typeStr := t.String()
+					results := val.NewValue(ssa.NewConst(typeStr))
+					vals = append(vals, results)
+				}else{
+					results := val.NewValue(ssa.NewConst(typeStr))
+					results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+					vals = append(vals, results)
+
+					// remove version if it exists
+					index := strings.Index(typeStr, ":")
+					if index != -1 {
+						typeStr = typeStr[:index]
 						results := val.NewValue(ssa.NewConst(typeStr))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 						vals = append(vals, results)
-
-						// remove version if it exists
-						index := strings.Index(typeStr, ":")
-						if index != -1 {
-							typeStr = typeStr[:index]
-							results := val.NewValue(ssa.NewConst(typeStr))
-							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-							vals = append(vals, results)
-						}
-
-						// get type name
-						lastIndex := strings.LastIndex(typeStr, ".")
-						if lastIndex != -1 && len(typeStr) > lastIndex+1 {
-							typeStr = typeStr[lastIndex+1:]
-							results := val.NewValue(ssa.NewConst(typeStr))
-							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-							vals = append(vals, results)
-						}
 					}
+
+					// get type name
+					lastIndex := strings.LastIndex(typeStr, ".")
+					if lastIndex != -1 && len(typeStr) > lastIndex+1 {
+						typeStr = typeStr[lastIndex+1:]
+						results := val.NewValue(ssa.NewConst(typeStr))
+						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+						vals = append(vals, results)
+					}
+
+
+					// if b, ok := t.t.(*ssa.BasicType); ok {
+					// 	typeStr := b.GetFullTypeName()
+					// 	if typeStr == ""{
+					// 		typeStr := t.String()
+					// 		results := val.NewValue(ssa.NewConst(typeStr))
+					// 		vals = append(vals, results)
+					// 	}else{
+					// 		results := val.NewValue(ssa.NewConst(typeStr))
+					// 		results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+					// 		vals = append(vals, results)
+
+					// 		// remove version if it exists
+					// 		index := strings.Index(typeStr, ":")
+					// 		if index != -1 {
+					// 			typeStr = typeStr[:index]
+					// 			results := val.NewValue(ssa.NewConst(typeStr))
+					// 			results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+					// 			vals = append(vals, results)
+					// 		}
+
+					// 		// get type name
+					// 		lastIndex := strings.LastIndex(typeStr, ".")
+					// 		if lastIndex != -1 && len(typeStr) > lastIndex+1 {
+					// 			typeStr = typeStr[lastIndex+1:]
+					// 			results := val.NewValue(ssa.NewConst(typeStr))
+					// 			results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+					// 			vals = append(vals, results)
+					// 		}
+					// 	}
 				}
 
 				return nil
