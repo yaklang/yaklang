@@ -105,6 +105,17 @@ func DeleteRiskByID(db *gorm.DB, ids ...int64) error {
 	return nil
 }
 
+func DeleteRisk(db *gorm.DB, request *ypb.QueryRisksRequest) error {
+	filterDb, err := FilterByQueryRisks(db, request)
+	if err != nil {
+		return err
+	}
+	if db := filterDb.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
 func FixRiskType(db *gorm.DB) {
 	db.Model(&schema.Risk{}).Where("(severity = ?) OR (severity is null)", "").Updates(map[string]interface{}{
 		"severity": "default",
@@ -118,6 +129,7 @@ func FixRiskType(db *gorm.DB) {
 
 func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB, _ error) {
 	db = db.Model(&schema.Risk{})
+	db = db.Where("runtime_id = ?", params.GetRuntimeId())
 	db = db.Where("waiting_verified = ?", params.GetWaitingVerified())
 	db = bizhelper.QueryBySpecificPorts(db, "port", params.GetPorts())
 	db = bizhelper.QueryBySpecificAddress(db, "ip_integer", params.GetNetwork())
