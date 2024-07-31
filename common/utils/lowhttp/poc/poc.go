@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/corpix/uarand"
+	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/cli"
 
@@ -86,6 +87,9 @@ type PocConfig struct {
 	DNSNoCache bool
 
 	BodyStreamHandler func([]byte, io.ReadCloser)
+
+	ClientHelloSpec *utls.ClientHelloSpec
+	RandomJA3       bool
 }
 
 func (c *PocConfig) IsHTTPS() bool {
@@ -186,6 +190,14 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	if c.Password != nil {
 		opts = append(opts, lowhttp.WithPassword(*c.Password))
+	}
+
+	if c.ClientHelloSpec != nil {
+		opts = append(opts, lowhttp.WithClientHelloSpec(c.ClientHelloSpec))
+	}
+
+	if c.RandomJA3 {
+		opts = append(opts, lowhttp.WithRandomJA3FingerPrint(c.RandomJA3))
 	}
 	return opts
 }
@@ -455,6 +467,19 @@ func WithRuntimeId(r string) PocConfigOption {
 func WithFromPlugin(b string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.FromPlugin = b
+	}
+}
+
+func WithRandomJA3(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.RandomJA3 = b
+	}
+}
+
+// not export
+func WithClientHelloSpec(spec *utls.ClientHelloSpec) PocConfigOption {
+	return func(c *PocConfig) {
+		c.ClientHelloSpec = spec
 	}
 }
 
@@ -1657,6 +1682,7 @@ var PoCExports = map[string]interface{}{
 	"websocketStrictMode":  WithWebsocketStrictMode,
 	"username":             WithUsername,
 	"password":             WithPassword,
+	"randomJA3":            WithRandomJA3,
 
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,

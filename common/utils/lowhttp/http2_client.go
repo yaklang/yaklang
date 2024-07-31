@@ -2,13 +2,8 @@ package lowhttp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
 	"io"
 	"net"
 	"net/http"
@@ -17,6 +12,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 )
 
 var errH2ConnClosed = utils.Error("http2 client conn closed")
@@ -67,11 +69,11 @@ type http2ClientStream struct {
 	bodyBuffer *bytes.Buffer
 	respPacket []byte
 
-	//read hPack
+	// read hPack
 	hPackByte *bytes.Buffer
 
 	sentHeaders   bool
-	sentEndStream bool //send END_STREAM flag
+	sentEndStream bool // send END_STREAM flag
 
 	readEndStream bool // peer send END_STREAM flag or RST_STREAM flag
 	readHeaderEnd bool
@@ -208,7 +210,9 @@ func (h2Conn *http2ClientConn) readLoop() {
 			t.Reset(readIdleTimeout)
 		}
 		if err != nil {
-			log.Errorf("http2: Transport readFrame error on conn %p: (%T) %v", rl.h2Conn.conn, err, err)
+			if !errors.Is(err, io.EOF) {
+				log.Errorf("http2: Transport readFrame error on conn %p: %v", rl.h2Conn.conn, err)
+			}
 			h2Conn.setClose()
 			return
 		}
@@ -221,7 +225,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 			gotSettings = true
 		}
 
-		//log.Infof("h2 stream-id %v found frame: %v", frame.Header().StreamID, frame)
+		// log.Infof("h2 stream-id %v found frame: %v", frame.Header().StreamID, frame)
 
 		switch f := frame.(type) {
 		case *http2.HeadersFrame:
@@ -270,7 +274,7 @@ func (cs *http2ClientStream) doRequest() error {
 	var hPackBuf bytes.Buffer
 	hPackEnc := hpack.NewEncoder(&hPackBuf)
 
-	var methodReq = http.MethodGet
+	methodReq := http.MethodGet
 	_, body := SplitHTTPHeadersAndBodyFromPacketEx(cs.reqPacket, func(method string, requestUri string, proto string) error {
 		if method != "" {
 			methodReq = method
@@ -297,7 +301,7 @@ func (cs *http2ClientStream) doRequest() error {
 					}
 				}
 
-			case "content-length", "connection", "proxy-connection", //todo cl问题是否处理
+			case "content-length", "connection", "proxy-connection", // todo cl问题是否处理
 				"transfer-encoding", "upgrade",
 				"keep-alive": // H2不应该存在的头
 			default:
@@ -430,10 +434,10 @@ func (rl *http2ClientConnReadLoop) processHeaders(f *http2.HeadersFrame) {
 		return
 	}
 
-	cs.hPackByte.Write(f.HeaderBlockFragment()) //存入 hPack缓冲区
+	cs.hPackByte.Write(f.HeaderBlockFragment()) // 存入 hPack缓冲区
 
-	if f.HeadersEnded() { //当头部结束时才开始解析
-		var respInstance = cs.resp
+	if f.HeadersEnded() { // 当头部结束时才开始解析
+		respInstance := cs.resp
 		parsedHeaders, err := cs.h2Conn.hDec.DecodeFull(cs.hPackByte.Bytes())
 		cs.hPackByte.Reset()
 		if err != nil {
@@ -474,10 +478,10 @@ func (rl *http2ClientConnReadLoop) processContinuation(f *http2.ContinuationFram
 		return
 	}
 
-	cs.hPackByte.Write(f.HeaderBlockFragment()) //存入 hPack缓冲区
+	cs.hPackByte.Write(f.HeaderBlockFragment()) // 存入 hPack缓冲区
 
-	if f.HeadersEnded() { //当头部结束时才开始解析
-		var respInstance = cs.resp
+	if f.HeadersEnded() { // 当头部结束时才开始解析
+		respInstance := cs.resp
 		parsedHeaders, err := cs.h2Conn.hDec.DecodeFull(cs.hPackByte.Bytes())
 		cs.hPackByte.Reset()
 		if err != nil {
@@ -547,7 +551,7 @@ func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) {
 	}
 
 	f.ForeachSetting(func(setting http2.Setting) error {
-		//log.Infof("h2 stream found server setting: %v", setting.String())
+		// log.Infof("h2 stream found server setting: %v", setting.String())
 		switch setting.ID {
 		case http2.SettingMaxHeaderListSize:
 			rl.h2Conn.headerListMaxSize = setting.Val

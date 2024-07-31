@@ -209,7 +209,7 @@ func isHTTPConnectWork(c net.Conn) error {
 					return utils.Error("Content-Length should be 0")
 				}
 			case "transfer-encoding":
-				return utils.Error("Transfer-Encoding response header should not exist")
+				// return utils.Error("Transfer-Encoding response header should not exist")
 			}
 		}
 		if strings.TrimSuffix(lineStr, "\r\n") == "" || strings.TrimSuffix(lineStr, "\n") == "" {
