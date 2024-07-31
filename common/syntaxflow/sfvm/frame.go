@@ -981,14 +981,14 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("Err: %v", err)
 			log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
 			s.stack.Push(NewValues(nil))
-			return utils.Errorf("get native call failed: %v, err")
+			return utils.Errorf("get native call failed: %v", err)
 		}
 
 		ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 		if err != nil || !ok {
 			s.debugSubLog("No Result in [%v]", i.UnaryStr)
 			s.stack.Push(NewValues(nil))
-			return utils.Errorf("get native call failed: %v, err")
+			return utils.Errorf("get native call failed: %v", err)
 		}
 		s.debugSubLog("<< push: %v", ret)
 		s.stack.Push(ret)
