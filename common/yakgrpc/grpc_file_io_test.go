@@ -1,12 +1,19 @@
 package yakgrpc
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -35,4 +42,35 @@ func TestReadFile(t *testing.T) {
 	}
 
 	require.Equal(t, token, string(buf))
+}
+
+func TestReadFileWith_SSADB(t *testing.T) {
+	code := `
+	print("a")
+	`
+	programName := uuid.NewString()
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("a/b/c.yak", code)
+	_, err := ssaapi.ParseProject(vf,
+		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithDatabaseProgramName(programName),
+	)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	assert.NoError(t, err)
+
+	local, err := NewLocalClient()
+	assert.NoError(t, err)
+	stream, err := local.ReadFile(context.Background(), &ypb.ReadFileRequest{
+		FilePath:   fmt.Sprintf("/%s/a/b/c.yak", programName),
+		BufSize:    128,
+		FileSystem: "ssadb",
+	})
+	assert.NoError(t, err)
+
+	res, err := stream.Recv()
+	if err != nil {
+		assert.ErrorIs(t, err, io.EOF, "unexpected error: %v", err)
+	} else {
+		assert.Equal(t, code, string(res.Data))
+	}
 }
