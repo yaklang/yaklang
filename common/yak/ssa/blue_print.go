@@ -18,6 +18,7 @@ type BluePrintMember struct {
 
 // ClassBluePrint is a class blue print, it is used to create a new class
 type ClassBluePrint struct {
+	Program *Program
 	Name string
 
 	Method       map[string]*Function
