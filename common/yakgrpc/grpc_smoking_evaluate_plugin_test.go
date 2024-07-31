@@ -194,4 +194,77 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			zeroScore: false,
 		})
 	})
+
+	t.Run("test loose conditions", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+   if rsp.Contains("HTTP/1.1 200") && len(body) > 0{
+	risk.NewRisk(url, risk.solution("b"),risk.description("a"))
+	}
+}`,
+			err:       "误报",
+			codeTyp:   "mitm",
+			zeroScore: false,
+		})
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	if str.MatchAllOfSubString(rsp, "121"){
+		risk.NewRisk(url, risk.solution("b"),risk.description("a"))
+	}
+}`,
+			err:       "误报",
+			codeTyp:   "mitm",
+			zeroScore: false,
+		})
+
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	if str.MatchAllOfSubString(rsp, "application/json"){
+		risk.NewRisk(url, risk.solution("b"),risk.description("a"))
+	}
+}`,
+			err:       "误报",
+			codeTyp:   "mitm",
+			zeroScore: false,
+		})
+
+	})
+
+	t.Run("test localhost bypass", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	a.c
+}`,
+			err:       "冒烟测试失败",
+			codeTyp:   "mitm",
+			zeroScore: true,
+		})
+	})
+
+	t.Run("test http flow count", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: fmt.Sprintf(`
+yakit.AutoInitYakit()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	packet1 = %s 
+	begin_time=time.now()
+    rsp,req,_ = poc.HTTP(packet1, 
+    poc.params({"target":"127.0.0.1"}),
+    poc.https(isHttps),
+    poc.redirectTimes(0),
+    )
+}`, "`GET / HTTP/1.1\nHost: `"),
+			err:       "逻辑测试失败",
+			codeTyp:   "mitm",
+			zeroScore: false,
+		})
+	})
 }
