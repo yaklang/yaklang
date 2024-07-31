@@ -17,10 +17,28 @@ func (s *Server) Echo(ctx context.Context, req *ypb.EchoRequest) (*ypb.EchoRespo
 	return &ypb.EchoResposne{Result: req.GetText()}, nil
 }
 
-func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.VerifySystemCertificateResponse, error) {
+var verifyFunction = verifySystemCertificate
 
+var VerifySystemCertificateCD = utils.NewCoolDown(10 * time.Second)
+var resp *ypb.VerifySystemCertificateResponse
+
+func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.VerifySystemCertificateResponse, error) {
+	var err error
+	VerifySystemCertificateCD.DoOr(func() {
+		resp, err = verifyFunction()
+	}, func() {
+		utils.Spinlock(10, func() bool {
+			if resp != nil {
+				return false
+			}
+			return true
+		})
+	})
+	if resp == nil {
+		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: "Timeout"}, nil
+	}
 	//return verifySystemCertificateByURL()
-	return verifySystemCertificate()
+	return resp, err
 }
 
 func verifySystemCertificateByURL() (*ypb.VerifySystemCertificateResponse, error) {
