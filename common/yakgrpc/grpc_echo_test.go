@@ -1,10 +1,14 @@
 package yakgrpc
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync"
 	"testing"
+	"time"
 )
 
 func Test_verify(t *testing.T) {
@@ -90,4 +94,39 @@ func Test_verify(t *testing.T) {
 			}
 		})
 	}
+}
+
+var callCount int
+var mu sync.Mutex
+
+func mockVerifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
+	mu.Lock()
+	callCount++
+	mu.Unlock()
+	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+}
+
+func TestVerifySystemCertificateCooldown(t *testing.T) {
+	callCount = 0
+	resp = nil
+
+	// mock
+	verifyFunction = mockVerifySystemCertificate
+
+	server := &Server{}
+
+	for i := 0; i < 5; i++ {
+		go server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
+		time.Sleep(1 * time.Second) // 确保调用间隔小于冷却时间
+	}
+
+	// 等待足够的时间以确保所有协程都已完成
+	time.Sleep(12 * time.Second)
+
+	// 检查 mockVerifySystemCertificate 是否只被调用了一次
+	mu.Lock()
+	if callCount != 1 {
+		t.Errorf("verifySystemCertificate was called %d times; want 1", callCount)
+	}
+	mu.Unlock()
 }
