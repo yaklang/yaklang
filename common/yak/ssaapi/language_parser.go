@@ -2,8 +2,8 @@ package ssaapi
 
 import (
 	"fmt"
-	"io/fs"
-	"strings"
+	"github.com/yaklang/yaklang/common/consts"
+	"io"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -117,9 +117,11 @@ func (c *config) parseProject() (Programs, error) {
 		return nil, utils.Wrap(err, "parse project error")
 	}
 	prog.Finish()
-	return []*Program{
-		NewProgram(prog, c),
-	}, nil
+	var progs = []*Program{NewProgram(prog, c)}
+	for _, program := range prog.ChildApplication {
+		progs = append(progs, NewProgram(program, c))
+	}
+	return progs, nil
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
@@ -184,6 +186,8 @@ func (c *config) checkLanguage(path string) error {
 		return nil, utils.Wrapf(ssareducer.SkippedError, "file[%s] is not supported by any language builder, skip this file", path)
 	}
 
+	// TODO: whether to use the same programName for all program ?? when call ParseProject
+	// programName += "-" + path
 	var err error
 	if LanguageBuilder != nil {
 		LanguageBuilder, err = processBuilders(LanguageBuilder)

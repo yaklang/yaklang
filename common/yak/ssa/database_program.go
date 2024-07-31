@@ -38,8 +38,12 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 
 func updateToDatabase(prog *Program) {
 	ir := prog.irProgram
+	var childApplicationName []string
+	for _, program := range prog.ChildApplication {
+		childApplicationName = append(childApplicationName, program.Name)
+	}
 	if ir == nil {
-		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)
+		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version, childApplicationName)
 		prog.irProgram = ir
 	}
 	ir.Language = prog.Language

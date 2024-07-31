@@ -20,8 +20,8 @@ type IrProgram struct {
 	Language string `json:"language" gorm:"index"`
 
 	// application / library
-	ProgramKind string `json:"program_kind" gorm:"index"`
-
+	ProgramKind          string      `json:"program_kind" gorm:"index"`
+	ChildApplicationName StringSlice `json:"child_application_name" gorm:"type:text"`
 	// up-stream program is the program that this program depends on
 	UpStream StringSlice `json:"up_stream_programs" gorm:"type:text"`
 	// down-stream program is the program that depends on this program
@@ -34,12 +34,13 @@ type IrProgram struct {
 	ExtraFile StringMap `json:"extra_file" gorm:"type:text"`
 }
 
-func CreateProgram(name, kind, version string) *IrProgram {
+func CreateProgram(name, kind, version string, childName []string) *IrProgram {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{
-		ProgramName: name,
-		Version:     version,
-		ProgramKind: kind,
+		ProgramName:          name,
+		Version:              version,
+		ProgramKind:          kind,
+		ChildApplicationName: childName,
 	}
 	db.Save(out)
 	return out
@@ -60,7 +61,17 @@ func GetProgram(name, kind string) (*IrProgram, error) {
 	}
 	return &p, nil
 }
-
+func GetPrograms(name string) ([]*IrProgram, error) {
+	var p []*IrProgram
+	db := GetDB().Model(&IrProgram{})
+	if name == "" {
+		return nil, utils.Errorf("program name is empty")
+	}
+	if find := db.Where("program_name in (?)", name).Find(p); find.Error != nil {
+		return nil, find.Error
+	}
+	return p, nil
+}
 func UpdateProgram(prog *IrProgram) {
 	GetDB().Model(&IrProgram{}).
 		Where("id = ?", prog.ID).
@@ -76,6 +87,7 @@ func GetDBInProgram(program string) *gorm.DB {
 		return GetDB().Where("program_name = ?", program)
 	}
 	res := append(this.UpStream, program)
+	res = append(res, this.ChildApplicationName...)
 	return bizhelper.ExactOrQueryStringArrayOr(GetDB(), "program_name", res)
 }
 

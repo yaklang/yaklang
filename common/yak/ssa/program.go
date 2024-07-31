@@ -1,14 +1,12 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 	"sort"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/utils"
-
-	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/exp/slices"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -16,8 +14,37 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
+func NewChildProgram(prog *Program, name string) *Program {
+	childProg := &Program{
+		Name:                    name,
+		ProgramKind:             ChildAPP,
+		Language:                prog.Language,
+		Application:             prog,
+		DownStream:              make(map[string]*Program),
+		UpStream:                make(map[string]*Program),
+		EnableDatabase:          prog.EnableDatabase,
+		FileList:                prog.FileList,
+		editorStack:             prog.editorStack,
+		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		Cache:                   NewDBCache(name, prog.EnableDatabase),
+		Funcs:                   make(map[string]*Function),
+		ClassBluePrint:          make(map[string]*ClassBluePrint),
+		OffsetMap:               make(map[int]*OffsetItem),
+		OffsetSortedSlice:       make([]int, 0),
+		Loader:                  prog.Loader,
+		Build:                   prog.Build,
+		cacheExternInstance:     make(map[string]Value),
+		externType:              prog.externType,
+		externBuildValueHandler: prog.externBuildValueHandler,
+		ExternInstance:          prog.ExternInstance,
+		ExternLib:               prog.ExternLib,
+	}
+	prog.ChildApplication = append(prog.ChildApplication, childProg)
+	return childProg
+}
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
 	prog := &Program{
+		ChildApplication:        make([]*Program, 0),
 		Name:                    ProgramName,
 		ProgramKind:             kind,
 		UpStream:                make(map[string]*Program),
@@ -183,7 +210,10 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 }
 
 func (prog *Program) Finish() {
-	prog.finishOnce.Do(func() {
+	finishOnce := func() {
+		for _, program := range prog.ChildApplication {
+			program.Finish()
+		}
 		for _, up := range prog.UpStream {
 			up.Finish()
 		}
@@ -191,7 +221,8 @@ func (prog *Program) Finish() {
 		if prog.EnableDatabase {
 			updateToDatabase(prog)
 		}
-	})
+	}
+	prog.finishOnce.Do(finishOnce)
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
