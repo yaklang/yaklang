@@ -179,7 +179,10 @@ type Program struct {
 
 	// from pom.xml file
 	SCAPackages []*dxtypes.Package
-	ExtraFile   map[string]string // filename and data
+	// filename and data,
+	// if database exist, this is filename and hash, can use this hash to fetch source code
+	// if no database, this is filename and file content
+	ExtraFile map[string]string
 
 	Application *Program // current Application
 	// program relationship

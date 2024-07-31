@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
@@ -38,7 +39,7 @@ func fitRange(c *ssadb.IrCode, rangeIns *Range) {
 		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
 		return
 	}
-	c.SourceCodeHash = rangeIns.GetEditor().SourceCodeMd5()
+	c.SourceCodeHash = codec.Sha256(rangeIns.GetEditor().GetSourceCode())
 	start, end := rangeIns.GetOffsetRange()
 	c.SourceCodeStartOffset = int64(start)
 	c.SourceCodeEndOffset = int64(end)
