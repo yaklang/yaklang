@@ -82,15 +82,23 @@ func ReducerCompile(base string, opts ...Option) error {
 		if visited.Exist(path) {
 			return nil
 		}
-		if isDir && c.ProgramName != "" {
+		if !isDir {
+			// file
+			handler(path)
+			return nil
+		}
+		// if test or .git, skip
+		if path == "test" || path == ".git" {
+			return filesys.SkipDir
+		}
+		// if have Database, save folder
+		if c.ProgramName != "" {
 			folder, name := c.fs.PathSplit(path)
 			folders := []string{c.ProgramName}
 			folders = append(folders,
 				strings.Split(folder, string(c.fs.GetSeparators()))...,
 			)
 			ssadb.SaveFolder(name, folders)
-		} else {
-			handler(path)
 		}
 		return nil
 	}))
