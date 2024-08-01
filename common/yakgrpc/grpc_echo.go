@@ -25,13 +25,12 @@ var resp *ypb.VerifySystemCertificateResponse
 func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.VerifySystemCertificateResponse, error) {
 	var err error
 	VerifySystemCertificateCD.DoOr(func() {
+		resp = nil
 		resp, err = verifyFunction()
 	}, func() {
-		utils.Spinlock(10, func() bool {
-			if resp != nil {
-				return false
-			}
-			return true
+		_ = utils.Spinlock(10, func() bool {
+			// 拿到结果，解除自旋
+			return resp != nil
 		})
 	})
 	if resp == nil {
