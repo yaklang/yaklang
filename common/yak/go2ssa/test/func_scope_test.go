@@ -6,64 +6,130 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestClosure_FreeValue_Value(t *testing.T) {
+func TestFunction_Value(t *testing.T) {
 
-	t.Run("normal function", func(t *testing.T) {
+	t.Run("function", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
-		func a(){
+		func test(){
 			a := 1
 			println(a)
 		}
 		func main(){
-			a()
+			test()
 		}
 		`, []string{
 			"1",
 		}, t)
 	})
 
-	t.Run("normal function freeValue", func(t *testing.T) {
+	t.Run("function call", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
-		func a(){
-			println(a)
+		func add(a,b int) int {
+			return a+b
 		}
+
 		func main(){
-			a()
+			println(add)
+			println(add(1,2))
 		}
 		`, []string{
-			"FreeValue-a",
+			"Function-add","Function-add(1,2)",
 		}, t)
 	})
 
-	t.Run("golbal value", func(t *testing.T) {
+	t.Run("function call latency definition", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
-
-		var a = 1
-		func a(){
-			println(a)
-		}
 		func main(){
-			a()
+			var c = add(1,2)
+			println(c)
+		}
+
+		func add(a,b int) int {
+			return a+b
 		}
 		`, []string{
-			"FreeValue-a",
+			"Function-add(1,2)",
 		}, t)
 	})
 
-	t.Run("golbal loval value", func(t *testing.T) {
+	t.Run("global value", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var count = 1
+
+		func f(){
+			count = 2
+			println(count)
+		}
+
+		func main(){
+			println(count)
+			f()
+			println(count)
+		}
+		`, []string{
+			"2","1","1",
+		}, t)
+	})
+}
+
+func TestClosu_Value(t *testing.T) {
+	t.Run("closu freevalue", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			f := func() {
+				println(a)
+			}
+			println(a)
+		}
+		`, []string{
+			"FreeValue-a","1",
+		}, t)
+	})
+
+	t.Run("closu side-effect", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			f := func() {
+				a = 2
+				println(a)
+			}
+			println(a)
+			f()
+			println(a)
+		}
+		`, []string{
+			"2","1","side-effect(2, a)",
+		}, t)
+	})
+
+	t.Run("closu freevalue and global", func(t *testing.T) {
+
 		test.CheckPrintlnValue(`package main
 		
-		var a = 1
-		func a(){
-			var a = 2
-			println(a)
+		var count = 1
+
+		func newCounter() func() {
+			return func() {
+				println(count)
+				count = 2
+			}
 		}
+
 		func main(){
-			a()
-			println(a)
+			f := newCounter()
+			println(count)
+			f()
+			println(count)
 		}
+
 		`, []string{
-			"2","FreeValue-a",
+			"1","1","1",
 		}, t)
 	})
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
+	"github.com/yaklang/yaklang/common/yak/go2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -28,6 +29,7 @@ const (
 	JS   = consts.JS
 	PHP  = consts.PHP
 	JAVA = consts.JAVA
+	GO   = consts.GO
 )
 
 var LanguageBuilders = map[consts.Language]ssa.Builder{
@@ -35,6 +37,7 @@ var LanguageBuilders = map[consts.Language]ssa.Builder{
 	JS:   js2ssa.Builder,
 	PHP:  php2ssa.Builder,
 	JAVA: java2ssa.Builder,
+	GO:   go2ssa.Builder,
 }
 
 var AllLanguageBuilders = []ssa.Builder{
@@ -43,6 +46,7 @@ var AllLanguageBuilders = []ssa.Builder{
 
 	yak2ssa.Builder,
 	js2ssa.Builder,
+	go2ssa.Builder,
 }
 
 func (c *config) parseProject() (Programs, error) {
