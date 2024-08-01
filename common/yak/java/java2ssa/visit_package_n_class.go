@@ -311,7 +311,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	}
 	// }
 
-	return ssa.NewBasicType(ssa.NullTypeKind, "null")
+	return ssa.CreateNullType()
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
@@ -326,13 +326,13 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	}
 	switch i.GetText() {
 	case "boolean":
-		return ssa.GetBooleanType()
+		return ssa.CreateBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		return ssa.GetNumberType()
+		return ssa.CreateNumberType()
 	case "byte":
-		return ssa.GetBytesType()
+		return ssa.CreateByteType()
 	default:
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 }
 
@@ -695,6 +695,10 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 		insCallbacks = append(insCallbacks, insCallback)
 	}
 	typeType := y.VisitTypeType(i.TypeType())
+	// set full type name
+	if typeType.GetFullTypeName() == "" {
+		typeType = y.SetFullTypeNameForType(typeType.String(),typeType, true)
+	}
 	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
 	param := y.NewParam(formalParams)
 	if typeType != nil {
@@ -865,8 +869,10 @@ func (y *builder) SetFullTypeNameForType(typName string, typ ssa.Type,isFullName
 					break
 				}
 			}
+			typ.SetFullTypeName(typStr)
 		}
+	}else {
+		typ.SetFullTypeName(typStr)
 	}
-	typ.SetFullTypeName(typStr)
 	return typ
 }
