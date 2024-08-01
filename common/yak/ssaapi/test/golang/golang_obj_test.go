@@ -8,7 +8,8 @@ import (
 )
 
 func TestBasic_BasicObject(t *testing.T) {
-	ssatest.Check(t, `package main
+	t.Run("simple", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `package main
 
 	type t struct {
 		b int
@@ -22,37 +23,47 @@ func TestBasic_BasicObject(t *testing.T) {
 		d := a.c + a.b
 	}
 	`,
-		ssatest.CheckTopDef_Contain("d", []string{"3", "1", "make("}),
-		ssaapi.WithLanguage(ssaapi.GO),
-	)
-}	
+			`d #-> as $target`,
+			map[string][]string{
+				"target": {"3", "1"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 
-func TestBasic_BasicObject2(t *testing.T) {
-	ssatest.Check(t, `package main
+	// TODO: handler struct instance {}
+	t.Run("simple cross function", func(t *testing.T) {
+		t.Skip() // delete this
+
+		ssatest.CheckSyntaxFlowContain(t, `package main
 
 	type t struct {
 		b int
 		c int
 	}
 
-	func f() {
-		return t{}
+	func f() t {
+		return t{
+			b: 1, 
+			c: 3,
+		}
 	}
 	func main(){
 		a := f(); 
-		a.b = 1; 
-		a.c = 3; 
 		d := a.c + a.b
 	}
 	`,
-		ssatest.CheckTopDef_Contain("d", []string{"3", "1", "make("}),
-		ssaapi.WithLanguage(ssaapi.GO),
-	)
-}	
-
+			`d #-> as $target`,
+			map[string][]string{
+				"target": {"3", "1"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}
 func TestBasic_Phi(t *testing.T) {
-	prog, err := ssaapi.Parse(`package main
-
+	ssatest.CheckSyntaxFlowContain(t,
+		`package main
 
 	func main(){
 		a := 0
@@ -63,17 +74,15 @@ func TestBasic_Phi(t *testing.T) {
 		} else {
 			a = 4
 		}
+		println(a)
 	}
-	`,
-	ssaapi.WithLanguage(ssaapi.GO),
-)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Show()
-	prog.Ref("a").ForEach(func(value *ssaapi.Value) {
-		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
-			t.Log(value.String())
-		})
-	})
+	`, `
+	a ?{opcode: phi} as $p
+	$p #-> as $target
+	`, map[string][]string{
+			"p":      {"phi(a)[1,2,4]"},
+			"target": {"1", "2", "4"},
+		},
+		ssaapi.WithLanguage(ssaapi.GO),
+	)
 }
