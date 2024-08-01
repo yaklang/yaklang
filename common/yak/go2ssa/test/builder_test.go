@@ -18,26 +18,3 @@ func TestBuilder(t *testing.T) {
 		}, t)
 	})
 }
-
-func TestTemp(t *testing.T) {
-	t.Run("temp", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
-
-		func b() int{
-			return 3
-		}
-
-		func main(){
-			a := 6
-		 	if a = 1; a > 1 {
-		 	}else{
-				a = 7
-		 	}
-		 	println(a)
-		}
-
-		`, []string{
-			"3",
-		}, t)
-	})
-}		
