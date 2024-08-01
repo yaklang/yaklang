@@ -742,7 +742,7 @@ func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*
 		}
 	}
 
-	group, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), []string{})
+	group, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), []string{}, 0)
 	filterGroup := filter.NewFilter()
 	for _, v := range group {
 		if filterGroup.Exist(v.Value) {

@@ -20,7 +20,7 @@ import (
 func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptGroupRequest) (*ypb.QueryYakScriptGroupResponse, error) {
 	var groupCount ypb.QueryYakScriptGroupResponse
 
-	groups, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), req.ExcludeType)
+	groups, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), req.ExcludeType, req.IsMITMParamPlugins)
 	filterGroup := filter.NewFilter()
 	for _, group := range groups {
 		if filterGroup.Exist(group.Value) {
@@ -173,7 +173,7 @@ func (s *Server) DeleteYakScriptGroup(ctx context.Context, req *ypb.DeleteYakScr
 
 func (s *Server) GetYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptRequest) (*ypb.GetYakScriptGroupResponse, error) {
 	var data ypb.GetYakScriptGroupResponse
-	allGroup, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), []string{})
+	allGroup, _ := yakit.QueryGroupCount(s.GetProfileDatabase(), []string{}, req.IsMITMParamPlugins)
 
 	db := s.GetProfileDatabase().Model(&schema.YakScript{})
 	db = yakit.FilterYakScript(db, req)
