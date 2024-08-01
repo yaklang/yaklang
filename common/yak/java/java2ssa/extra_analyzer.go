@@ -56,11 +56,15 @@ func (s *SSABuilder) ExtraFileAnalyze(fileSystem fi.FileSystem, prog *ssa.Progra
 			return nil
 		}
 		// log.Infof("scan xml file: %v", path)
-		folders := []string{prog.GetProgramName()}
-		folders = append(folders,
-			strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-		)
-		prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+		if prog.GetProgramName() == "" {
+			prog.ExtraFile[path] = string(raw)
+		} else {
+			folders := []string{prog.GetProgramName()}
+			folders = append(folders,
+				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
+			)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+		}
 	case ".properties":
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
@@ -68,11 +72,15 @@ func (s *SSABuilder) ExtraFileAnalyze(fileSystem fi.FileSystem, prog *ssa.Progra
 			return nil
 		}
 
-		folders := []string{prog.GetProgramName()}
-		folders = append(folders,
-			strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-		)
-		prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+		if prog.GetProgramName() == "" {
+			prog.ExtraFile[path] = string(raw)
+		} else {
+			folders := []string{prog.GetProgramName()}
+			folders = append(folders,
+				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
+			)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+		}
 	}
 	// }
 	return nil
