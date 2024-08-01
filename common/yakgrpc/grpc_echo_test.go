@@ -102,8 +102,17 @@ var mu sync.Mutex
 func mockVerifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
 	mu.Lock()
 	callCount++
+	time.Sleep(1000 * time.Millisecond)
 	mu.Unlock()
 	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+}
+
+func mockVerifySystemCertificateNil() (*ypb.VerifySystemCertificateResponse, error) {
+	mu.Lock()
+	callCount++
+	time.Sleep(1000 * time.Millisecond)
+	mu.Unlock()
+	return nil, nil
 }
 
 func TestVerifySystemCertificateCooldown(t *testing.T) {
@@ -114,18 +123,59 @@ func TestVerifySystemCertificateCooldown(t *testing.T) {
 	verifyFunction = mockVerifySystemCertificate
 
 	server := &Server{}
-
+	sw := sync.WaitGroup{}
 	for i := 0; i < 5; i++ {
-		go server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
-		time.Sleep(1 * time.Second) // 确保调用间隔小于冷却时间
+		sw.Add(1)
+		go func() {
+			defer sw.Done()
+			_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
+		}()
+		time.Sleep(1 * time.Second)
 	}
 
 	// 等待足够的时间以确保所有协程都已完成
-	time.Sleep(12 * time.Second)
+	sw.Wait()
+
+	time.Sleep(2 * time.Second)
+	verifyFunction = mockVerifySystemCertificateNil
+	// spinlock 结束，cooldown 时间内，不会增加count
+	_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
 
 	// 检查 mockVerifySystemCertificate 是否只被调用了一次
 	mu.Lock()
 	if callCount != 1 {
+		t.Errorf("verifySystemCertificate was called %d times; want 1", callCount)
+	}
+	mu.Unlock()
+}
+
+func TestVerifySystemCertificateCooldown2(t *testing.T) {
+	callCount = 0
+	resp = nil
+
+	// mock
+	verifyFunction = mockVerifySystemCertificateNil
+
+	server := &Server{}
+	sw := sync.WaitGroup{}
+	for i := 0; i < 5; i++ {
+		sw.Add(1)
+		go func() {
+			defer sw.Done()
+			_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
+		}()
+		time.Sleep(1 * time.Second)
+	}
+
+	// 等待足够的时间以确保所有协程都已完成
+	sw.Wait()
+
+	time.Sleep(2 * time.Second)
+	// spinlock 超时，会增加count
+	_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
+
+	mu.Lock()
+	if callCount != 2 {
 		t.Errorf("verifySystemCertificate was called %d times; want 1", callCount)
 	}
 	mu.Unlock()
