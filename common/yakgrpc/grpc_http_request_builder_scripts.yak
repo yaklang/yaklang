@@ -12,6 +12,7 @@ pluginType = "mitm"
 isSmoking = false
 isStrict = false
 runtimeId = ""
+cliParams = {}
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
@@ -22,6 +23,7 @@ if getParams("REQUESTS") != undefined {
     isSmoking = getParams("IS_SMOKING")
     runtimeId = getParams("RUNTIME_ID")
     isStrict = getParams("IS_STRICT")
+    cliParams = getParams("CLI_PARAMS")
 }
 
 /*
@@ -34,7 +36,7 @@ yakit.Info("RuntimeID: %v", runtimeId)
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
 caller.SetRuntimeId(runtimeId)
-err = caller.LoadPluginEx(ctx, plugin)
+err = caller.LoadPluginEx(ctx, plugin,cliParams...)
 if err != nil { die(err) }
 caller.SetCache(false)
 caller.SetConcurrent(len(reqs))
