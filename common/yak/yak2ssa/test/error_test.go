@@ -1112,6 +1112,7 @@ func TestExternInstance(t *testing.T) {
 				// ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),
 				ssa.ContAssignExtern("print"),
+				ssa.ContAssignExtern("print"),
 			},
 			ExternValue: map[string]any{
 				"print": func(any) {},

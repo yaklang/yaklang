@@ -329,4 +329,17 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 		`,
 		)
 	})
+
+	t.Run("first use freevalue and then define it", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		a = func(){
+			b()
+		}
+
+		b = func(){
+			a() 
+		}
+		a()
+		`)
+	})
 }
