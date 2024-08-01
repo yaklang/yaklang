@@ -49,6 +49,7 @@ type FunctionBuilder struct {
 
 	DefineFunc map[string]any
 
+	MarkedFuncName  string
 	MarkedFuncType  *FunctionType
 	MarkedFunctions []*Function
 
@@ -174,7 +175,15 @@ func (b *FunctionBuilder) AddDefer(call *Call) {
 	b.deferExpr = append(b.deferExpr, call)
 }
 
-func (b *FunctionBuilder) SetMarkedFunction(name string) {
+func (b *FunctionBuilder) SetMarkedFunction(name string) (ret func()) {
+	originName := b.MarkedFuncName
+	originType := b.MarkedFuncType
+	ret = func() {
+		b.MarkedFuncName = originName
+		b.MarkedFuncType = originType
+	}
+
+	b.MarkedFuncName = name
 	i, ok := b.DefineFunc[name]
 	if !ok {
 		return
@@ -187,6 +196,7 @@ func (b *FunctionBuilder) SetMarkedFunction(name string) {
 	}
 	funTyp := b.CoverReflectFunctionType(typ, 0)
 	b.MarkedFuncType = funTyp
+	return
 }
 
 func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
