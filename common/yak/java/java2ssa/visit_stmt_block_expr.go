@@ -294,7 +294,18 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 	case *javaparser.CastExpressionContext:
 		// 处理类型转换表达式
-		return y.VisitExpression(ret.Expression())
+		var castType ssa.Type
+		if len(ret.AllBITAND())==0 {
+			castType = y.VisitTypeType(ret.TypeType(0))
+		}else {
+			// TODO:处理类型交集语句
+		}
+
+	    v := y.VisitExpression(ret.Expression())
+		if castType != nil {
+			v.SetType(castType)
+		}
+		return v
 	case *javaparser.NewCreatorExpressionContext:
 		// 处理创建对象的表达式
 		obj, call := y.VisitCreator(ret.Creator())

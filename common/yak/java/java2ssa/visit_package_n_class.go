@@ -304,14 +304,15 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	}
 	// if len(i.AllIdentifier()) == 1 {
 	// 	// only one type
+	var typ ssa.Type
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
-		// set full type name
-		return y.SetFullTypeNameForType(className, class,false)
+		typ = class
+	}else {
+		typ = ssa.CreateNullType()
 	}
-	// }
+	return y.SetFullTypeNameForType(className,typ,false)
 
-	return ssa.CreateNullType()
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
@@ -324,16 +325,19 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	if i == nil {
 		return nil
 	}
+	var t ssa.Type
 	switch i.GetText() {
 	case "boolean":
-		return ssa.CreateBooleanType()
+		t= ssa.CreateBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		return ssa.CreateNumberType()
+		t= ssa.CreateNumberType()
 	case "byte":
-		return ssa.CreateByteType()
+		t=  ssa.CreateByteType()
 	default:
-		return ssa.CreateAnyType()
+		t = ssa.CreateAnyType()
 	}
+	t.SetFullTypeName(t.String())
+	return t
 }
 
 func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.ClassBluePrint) interface{} {
@@ -632,7 +636,7 @@ func (y *builder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa
 	if ret := i.TypeType(); ret != nil {
 		return y.VisitTypeType(ret)
 	} else {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 
 }
@@ -695,10 +699,6 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 		insCallbacks = append(insCallbacks, insCallback)
 	}
 	typeType := y.VisitTypeType(i.TypeType())
-	// set full type name
-	if typeType.GetFullTypeName() == "" {
-		typeType = y.SetFullTypeNameForType(typeType.String(),typeType, true)
-	}
 	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
 	param := y.NewParam(formalParams)
 	if typeType != nil {
