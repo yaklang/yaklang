@@ -587,10 +587,8 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 
 			// is function define
 			if _, ok := right.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {
-				b.SetMarkedFunction(leftVariables[0].GetName())
-				return func() {
-					b.MarkedFuncType = nil
-				}
+				recoverFunc := b.SetMarkedFunction(leftVariables[0].GetName())
+				return recoverFunc
 			}
 
 			{ // is object define
@@ -603,9 +601,10 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 				_, isSliceLiteral := literal.SliceLiteral().(*yak.SliceLiteralContext)
 				_, isSliceTypeLiteral := literal.SliceTypedLiteral().(*yak.SliceTypedLiteralContext)
 				if isMapLiteral || isSliceLiteral || isSliceTypeLiteral {
+					origin := b.MarkedVariable
 					b.MarkedVariable = left
 					return func() {
-						b.MarkedVariable = nil
+						b.MarkedVariable = origin
 					}
 				}
 			}
@@ -1359,7 +1358,18 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 		funcName = name.GetText()
 		b.SetMarkedFunction(funcName)
 	}
+	if funcName == "" {
+		funcName = b.MarkedFuncName
+	}
 	newFunc := b.NewFunc(funcName)
+	if funcName != "" {
+		if stmt.FunctionNameDecl() != nil {
+			recoverRange := b.SetRange(stmt.FunctionNameDecl())
+			defer recoverRange()
+		}
+		variable := b.CreateVariable(funcName)
+		b.AssignVariable(variable, newFunc)
+	}
 
 	hitDefinedFunction := false
 	// save Current function builder marked FunctionType
@@ -1443,13 +1453,6 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 
 	// b.AddSubFunction(buildFunc)
 
-	if funcName != "" {
-		recoverRange := b.SetRange(stmt.FunctionNameDecl())
-		defer recoverRange()
-
-		variable := b.CreateVariable(funcName)
-		b.AssignVariable(variable, newFunc)
-	}
 	return newFunc
 }
 
