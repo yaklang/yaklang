@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-
 func Test_Express(t *testing.T) {
 	t.Run("add", func(t *testing.T) {
 		code := `package main
@@ -16,9 +15,10 @@ func Test_Express(t *testing.T) {
 				a := 1 + 2
 			}
 		`
-		ssatest.Check(t, code,
-			ssatest.CheckTopDef_Equal("a", []string{"1"},) ,
-			ssaapi.WithLanguage(ssaapi.GO),
-		)
+		ssatest.CheckSyntaxFlow(t, code, `
+		a #-> as $target
+		`, map[string][]string{
+			"target": {"1", "2"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
