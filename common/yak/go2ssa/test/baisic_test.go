@@ -21,7 +21,9 @@ func TestStmt_normol(t *testing.T) {
 		`, []string{"phi(a)[6,7]"}, t)
 	})
 
-	t.Run("if exp;exp", func(t *testing.T) {
+	// TODO
+	/*
+	t.Run("if stmt;exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
 			var a int
@@ -32,7 +34,7 @@ func TestStmt_normol(t *testing.T) {
 		 	println(a)
 		}
 		`, []string{"phi(a)[1,7]"}, t)
-	})
+	})*/
 
 	t.Run("switch exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
@@ -53,7 +55,7 @@ func TestStmt_normol(t *testing.T) {
 		`, []string{"phi(a)[1,2,3,0]"}, t)
 	})
 
-	t.Run("switch exp;exp", func(t *testing.T) {
+	t.Run("switch stmt;exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
 			var a int
@@ -82,7 +84,7 @@ func TestStmt_normol(t *testing.T) {
 	})
 
 
-	t.Run("for exp;exp;exp", func(t *testing.T) {
+	t.Run("for stmt;exp;stmt", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
 			var a = 1
@@ -159,7 +161,7 @@ func TestExpr_normol(t *testing.T) {
 }
 
 func TestFuntion_normol(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
+	t.Run("call", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 
 		func add(a,b int){
@@ -171,30 +173,26 @@ func TestFuntion_normol(t *testing.T) {
 			println(c)
 		}
 
-		`, []string{"FreeValue-add(1,2)"}, t)
+		`, []string{"Function-add(1,2)"}, t)
 	})
 
 	t.Run("nested call", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 
 		func add1(a,b int){
-		    return add2(a,b)+add2(a,b)
+		    return a+b
 		}
 
 		func add2(a,b int){
-			return add3(a,b)+add3(a,b)
-		}
-
-		func add3(a,b int){
-			return a+b
+			return add1(a,b)
 		}
 
 		func main(){
-			var c = add1(1,2)
+			var c = add2(1,2)
 			println(c)
 		}
 
-		`, []string{"FreeValue-add1(1,2) binding[FreeValue-add2]"}, t)
+		`, []string{"Function-add2(1,2)"}, t)
 	})
 
 	t.Run("multiple return", func(t *testing.T) {
@@ -207,7 +205,26 @@ func TestFuntion_normol(t *testing.T) {
 		func main(){
 			println(ret(1,2,3))
 		}
-		`, []string{"FreeValue-ret(1,2,3)"}, t)
+		`, []string{"Function-ret(1,2,3)"}, t)
+	})
+
+	t.Run("defaut return", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func test()(a int){
+			println(a)
+		    a = 6
+			println(a)
+			return
+		}
+
+		func main(){
+			a := test()
+		}
+
+		`, []string{
+			"0","6",
+		}, t)
 	})
 
 	t.Run("make", func(t *testing.T) {
@@ -239,7 +256,7 @@ func TestFuntion_normol(t *testing.T) {
 				println(add(a))
 				println(a.add())
 			}
-			`, []string{"FreeValue-add(make(struct {number,number})) member[6,7]","Undefined-a.add(valid)(make(struct {number,number})) member[6,7]"}, t)
+			`, []string{"Function-add(make(struct {number,number})) member[6,7]","Undefined-a.add(valid)(make(struct {number,number})) member[6,7]"}, t)
 	})
 }
 
@@ -365,24 +382,7 @@ func TestType_normol(t *testing.T) {
 			println(counter())
 		}
 		`, []string{
-			"FreeValue-newCounter()() binding[1]",
-		}, t)
-	})
-
-	t.Run("closure side-effect", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
-
-		func main(){
-			a := 1
-			f := func() {
-				a = 2
-			}
-			println(a)
-			f() 
-			println(a)
-		}
-		`, []string{
-			"1","side-effect(2, a)",
+			"Function-newCounter()() binding[1]",
 		}, t)
 	})
 

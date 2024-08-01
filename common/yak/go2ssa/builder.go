@@ -28,8 +28,10 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 		cmap:            []map[string]struct{}{},
+		globalv:         map[string]ssa.Value{},
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
+		result:          []string{},
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
@@ -44,8 +46,10 @@ func (*SSABuilder) FilterFile(path string) bool {
 type astbuilder struct {
 	*ssa.FunctionBuilder
 	cmap []map[string]struct{}
+	globalv		map[string]ssa.Value
 	structTypes map[string]*ssa.ObjectType
-	aliasTypes map[string]*ssa.AliasType
+	aliasTypes  map[string]*ssa.AliasType
+	result      []string
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
@@ -88,6 +92,29 @@ func (b *astbuilder) OutCmapLevel() {
 
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
+}
+
+func (b* astbuilder) AddGlobalVariable(name string, v ssa.Value){
+	b.globalv[name] = v
+}
+
+func (b* astbuilder) GetGlobalVariable(name string) ssa.Value {
+	if b.globalv[name] == nil {
+		return nil
+	}
+	return b.globalv[name]
+}
+
+func (b *astbuilder) AddResultDefault(name string){
+	b.result = append(b.result, name)
+}
+
+func (b *astbuilder) GetResultDefault() []string {
+	return b.result
+}
+
+func (b *astbuilder) CleanResultDefault() {
+    b.result = []string{}
 }
 
 // ====================== Object type
