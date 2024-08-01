@@ -170,3 +170,15 @@ handle = r => {
 		)
 	})
 }
+
+func TestScoreRulesForbidLib(t *testing.T) {
+	t.Run("test forbid exec lib", func(t *testing.T) {
+		checkScore(t,
+			` exec.Command("")`,
+			[]string{
+				score_rules.LibForbid("exec"),
+			},
+			0,
+			"yak")
+	})
+}
