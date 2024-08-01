@@ -49,6 +49,9 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePri
 	if i == nil {
 		return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
 	}
+	if i.FlexiVariable() != nil {
+		//todo: flexivariable
+	}
 	getLib := func(path string) (*ssa.Program, bool) {
 		program := y.GetProgram()
 		return program.GetLibrary(path)
