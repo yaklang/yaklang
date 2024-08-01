@@ -468,6 +468,42 @@ var BasicTypes = map[TypeKind]*BasicType{
 	AnyTypeKind:       NewBasicType(AnyTypeKind, "any"),
 	ErrorTypeKind:     NewBasicType(ErrorTypeKind, "error"),
 }
+func CreateNumberType() Type {
+	return NewBasicType(NumberTypeKind, "number")
+}
+
+func CreateStringType() Type {
+	return NewBasicType(StringTypeKind, "string")
+}
+
+func CreateByteType() Type {
+	return NewBasicType(ByteTypeKind, "byte")
+}
+
+func CreateBytesType() Type {
+	return NewBasicType(BytesTypeKind, "bytes")
+}
+
+func CreateBooleanType() Type {
+	return NewBasicType(BooleanTypeKind, "boolean")
+}
+
+func CreateUndefinedType() Type {
+	return NewBasicType(UndefinedTypeKind, "undefined")
+}
+
+func CreateNullType() Type {
+	return NewBasicType(NullTypeKind, "null")
+}
+
+func CreateAnyType() Type {
+	return NewBasicType(AnyTypeKind, "any")
+}
+
+func CreateErrorType() Type {
+	return NewBasicType(ErrorTypeKind, "error")
+}
+
 
 func GetNumberType() Type {
 	return BasicTypes[NumberTypeKind]

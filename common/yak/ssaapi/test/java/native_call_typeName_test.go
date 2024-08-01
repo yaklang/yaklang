@@ -109,6 +109,7 @@ func TestLocalVariableDeclareTypeName(t *testing.T){
 					var res3 = A;  
 					var res4 ="a";     
 					A res5 = Dog(); 
+					A test1 ,test2 = Dog();
 				}
 			};	
 	`)
@@ -138,6 +139,11 @@ func TestLocalVariableDeclareTypeName(t *testing.T){
 		typeName = prog.SyntaxFlowChain(`res5<typeName> as $id;`)[0]
 		assert.Contains(t, typeName.String(), "A")
 		typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "com.org.A.A")
+
+		typeName = prog.SyntaxFlowChain(`test2<typeName> as $id;`)[0]
+		assert.Contains(t, typeName.String(), "A")
+		typeName = prog.SyntaxFlowChain(`test2<fullTypeName> as $id;`)[0]
 		assert.Contains(t, typeName.String(), "com.org.A.A")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
@@ -200,6 +206,50 @@ func TestMemberCallTypeName(t *testing.T){
 			assert.Contains(t, typeName.String(), "A")
 			typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
 			assert.Contains(t, typeName.String(), "com.org.A.A")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestParamTypeName(t *testing.T){
+	vf := filesys.NewVirtualFs()
+		vf.AddFile("A.java",
+			`package com.org.A;
+				class A{
+					};
+		    `)
+		vf.AddFile("B.java",
+			`package com.example.B;
+			import com.org.A.A;
+			class B{
+				public void hello(int param1,A param2,Dog param3){
+					var res1 = param1;
+					var res2 = param2;
+					var res3 = param3;
+					var res4 = a;
+				}
+			};	
+	`)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			prog := progs[0]
+			prog.Show()
+
+			typeName := prog.SyntaxFlowChain(`param1<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "number")
+			typeName = prog.SyntaxFlowChain(`param1<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "number")
+
+			typeName = prog.SyntaxFlowChain(`param2<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`param2<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`param3<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "null")
+			typeName = prog.SyntaxFlowChain(`param3<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "null")
+
+			
+
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
