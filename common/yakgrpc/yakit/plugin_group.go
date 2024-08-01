@@ -167,6 +167,7 @@ func GetGroup(db *gorm.DB, scriptNames []string) (req []*schema.PluginGroup, err
 	if len(scriptNames) > 0 {
 		db = db.Joins("inner join yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 		db = bizhelper.ExactQueryStringArrayOr(db, "plugin_groups.yak_script_name", scriptNames)
+		db = db.Where("is_poc_built_in = false")
 		db = db.Group(" `group` ").Having("COUNT(DISTINCT yak_script_name) = ?", len(scriptNames))
 		db = db.Scan(&req)
 	}
@@ -186,10 +187,16 @@ func DeletePluginGroupByScriptName(db *gorm.DB, scriptName []string) error {
 	return nil
 }
 
-func QueryGroupCount(db *gorm.DB, excludeType []string) (req []*TagAndTypeValue, err error) {
+func QueryGroupCount(db *gorm.DB, excludeType []string, isMITMParamPlugins int64) (req []*TagAndTypeValue, err error) {
 	db = db.Model(&schema.PluginGroup{}).Select(" `group` as value, COUNT(Y.script_name) as count, `temporary_id` as temporary_id, `is_poc_built_in` as is_poc_built_in")
 	db = db.Joins("LEFT JOIN yak_scripts Y on Y.script_name = plugin_groups.yak_script_name ")
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "Y.type", excludeType)
+	switch isMITMParamPlugins {
+	case 1:
+		db = db.Where("Y.params!='\"null\"' and Y.params is not null and LENGTH(Y.params)>0")
+	case 2:
+		db = db.Where("(Y.params='\"null\"' or Y.params is null or LENGTH(Y.params)<=0) or Y.type='port-scan'")
+	}
 	db = db.Group(" `group`,`temporary_id`,`is_poc_built_in` ").Order(`count desc`).Scan(&req)
 	if db.Error != nil {
 		return nil, utils.Wrap(db.Error, "GroupCount failed")
