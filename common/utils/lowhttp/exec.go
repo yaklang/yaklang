@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -162,6 +163,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
 	for _, opt := range opts {
 		opt(option)
+	}
+
+	if os.Getenv("RANDOM_JA3") == "true" {
+		option.RandomJA3FingerPrint = true
 	}
 
 	var (
