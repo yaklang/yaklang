@@ -2,9 +2,11 @@ package httptpl
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 )
 
 type TemplateVarTypePrefix string
@@ -43,6 +45,7 @@ func NewVar(v string) *Var {
 	}
 	return val
 }
+
 func (v *Var) GetValue() string {
 	switch v.Type {
 	case FuzztagType:
@@ -66,6 +69,11 @@ type YakVariables struct {
 func (v *YakVariables) Set(key string, value string) {
 	v.SetWithType(key, value, string(RawType))
 }
+
+func (v *YakVariables) SetRaw(key string, variable *Var) {
+	v.raw[key] = variable
+}
+
 func (v *YakVariables) SetWithType(key string, value string, typeName string) error {
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
@@ -107,6 +115,7 @@ func (v *YakVariables) SetNucleiDSL(key string, value string) {
 		Data: value,
 	}
 }
+
 func (v *YakVariables) GetRaw() map[string]*Var {
 	return v.raw
 }
@@ -122,6 +131,13 @@ func (v *YakVariables) ToMap() map[string]any {
 	var getVar, getVarAndWriteCache func(v *Var) (any, error)
 	getVar = func(s *Var) (any, error) {
 		switch s.Type {
+		case FuzztagType:
+			results := mutate.MutateQuick(s.Data)
+			if len(results) == 0 {
+				return s.Data, nil
+			} else {
+				return results[0], nil
+			}
 		case NucleiDslType:
 			res, err := execNucleiTag(s.Data, nil, func(s string) (string, error) {
 				if v, ok := res[s]; ok {
@@ -140,7 +156,6 @@ func (v *YakVariables) ToMap() map[string]any {
 				} else {
 					return "", errors.New("not found var " + s)
 				}
-
 			}, "")
 			if err != nil {
 				return nil, err

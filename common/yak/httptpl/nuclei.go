@@ -520,16 +520,8 @@ func generateYakVariables(req map[string]interface{}) *YakVariables {
 		return vars
 	}
 	for k, v := range utils.InterfaceToMapInterface(data) {
-		//tags := ParseNucleiTag(toString(v))
-		//if len(tags) == 0 {
-		//	vars.Set(k, toString(v))
-		//	continue
-		//}
-		//if len(tags) == 1 && !tags[0].IsExpr {
-		//	vars.Set(k, tags[0].Content)
-		//	continue
-		//}
-		vars.SetNucleiDSL(k, toString(v))
+		variable := NewVar(toString(v))
+		vars.SetRaw(k, variable)
 	}
 	return vars
 }
