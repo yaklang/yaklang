@@ -11,6 +11,18 @@ import (
 
 func init() {
 	plugin_type.RegisterScoreCheckRuler(plugin_type.PluginTypeMitm, CheckDefineFunctionMitm)
+	plugin_type.RegisterScoreCheckRuler(plugin_type.PluginTypeYak, ForbidExecLib)
+}
+
+func ForbidExecLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults("forbid command exec library")
+	prog.Ref("exec").ForEach(func(value *ssaapi.Value) {
+		if value.IsExternLib() {
+			newErr := ret.NewError(LibForbid("exec"), value)
+			newErr.SetNegativeScore(100)
+		}
+	})
+	return ret
 }
 
 func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults {
@@ -83,4 +95,8 @@ func LeastImplementOneFunctions(name []string) string {
 
 func FunctionEmpty(name string) string {
 	return fmt.Sprintf("Function [%s] is empty, should implement this function", name)
+}
+
+func LibForbid(name string) string {
+	return fmt.Sprintf("Library [%s] is forbidden", name)
 }
