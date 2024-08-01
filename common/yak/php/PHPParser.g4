@@ -391,7 +391,7 @@ staticVariableStatement
 
 classStatement
     : Use qualifiedNamespaceNameList traitAdaptations #TraitUse
-    | attributes? propertyModifiers typeHint? variableInitializer (',' variableInitializer)* SemiColon  #propertyModifiersVariable
+    | attributes? propertyModifiers QuestionMark? typeHint? variableInitializer (',' variableInitializer)* SemiColon  #propertyModifiersVariable
     | attributes? memberModifiers? Const typeHint? identifierInitializer (',' identifierInitializer)* SemiColon #Const
     | attributes? memberModifiers? Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (baseCtorCall | returnTypeDecl)? methodBody #Function
     
@@ -605,7 +605,7 @@ assignable
 arrayCreation
     : Array '(' arrayItemList? ')'
     | List '(' arrayItemList? ')'
-    | '[' arrayItemList? ']'
+    | '['('...')? arrayItemList? ']'
     ;
 
 arrayDestructuring
@@ -687,6 +687,7 @@ typeRef
     | qualifiedNamespaceName
     | primitiveType
     | Static
+    | flexiVariable
     | anonymousClass
     ;
 
