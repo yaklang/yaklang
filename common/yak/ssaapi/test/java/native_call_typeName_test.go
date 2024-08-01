@@ -83,9 +83,9 @@ public class FastJSONDemoController {
 		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
 		assert.NotNil(t, obj)
 
-		typeName := prog.SyntaxFlowChain(`a<typeName> as $id;`)[0]
+		typeName := prog.SyntaxFlowChain(`anyJSON<typeName> as $id;`)[0]
 		assert.Contains(t, typeName.String(), "JSON")
-		typeName = prog.SyntaxFlowChain(`a<fullTypeName> as $id`)[0]
+		typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName> as $id`)[0]
 		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -249,6 +249,42 @@ func TestParamTypeName(t *testing.T){
 			assert.Contains(t, typeName.String(), "null")
 
 			
+
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+
+func TestTypeNamePriority(t *testing.T){
+	vf := filesys.NewVirtualFs()
+		vf.AddFile("A.java",
+			`package com.org.A;
+				class A{
+					};
+		    `)
+		vf.AddFile("B.java",
+			`package com.example.B;
+			import com.org.A.A;
+			class B{
+				public void hello(int param1,A param2){
+					Object res1 = (A)param1;
+					A res2 = (int)param2;
+				}
+			};	
+	`)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			prog := progs[0]
+			prog.Show()
+
+			typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "number")
+			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "number")
 
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
