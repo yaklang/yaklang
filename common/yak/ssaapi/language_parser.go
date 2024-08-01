@@ -51,7 +51,9 @@ func (c *config) parseProject() (Programs, error) {
 	programPath := c.programPath
 	prog, builder, err := c.init()
 
-	ssadb.SaveFolder(prog.Name, []string{"/"})
+	if prog.Name != "" {
+		ssadb.SaveFolder(prog.Name, []string{"/"})
+	}
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
 
