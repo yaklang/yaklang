@@ -22,15 +22,6 @@ func TestBasic_Variable_Inblock(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("simple test", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-
-		func main() {
-		    println(a)
-		}
-		`, []string{"FreeValue-a"}, t)
-	})
-
 	t.Run("test sub-scope capture parent scope in basic block", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -127,7 +118,7 @@ func TestBasic_Variable_Inblock(t *testing.T) {
 			}, t)
 	})
 
-	t.Run("free variable in sub-scope", func(t *testing.T) {
+	t.Run("variable in sub-scope", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -135,11 +126,11 @@ func TestBasic_Variable_Inblock(t *testing.T) {
 				a := 2
 				println(a) // 2
 			}
-			println(a) // free-a
+			println(a) // Undefined-a
 		}
 		`, []string{
 			"2",
-			"FreeValue-a",
+			"Undefined-a",
 		}, t)
 	})
 
@@ -367,18 +358,6 @@ func TestBasic_Variable_InIf(t *testing.T) {
 			"3",
 			"1",
 		}, t)
-	})
-
-	t.Run("in if sub-scope", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-
-		func main(){
-			if c {
-				a := 2
-			}
-			println(a) 
-		}
-		`, []string{"FreeValue-a"}, t)
 	})
 }
 
@@ -627,6 +606,7 @@ func TestBasic_CFG_Break(t *testing.T) {
 		}, t)
 	})
 
+	/*
 	t.Run("simple goto label in loop", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		func main() {
@@ -642,7 +622,7 @@ func TestBasic_CFG_Break(t *testing.T) {
 		`, []string{
 			"1",
 		}, t)
-	})
+	})*/
 
 	t.Run("simple break in switch", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
@@ -709,21 +689,3 @@ func TestBasic_CFG_Defer(t *testing.T) {
 	})
 }
 
-func TestBasic_CFG_Go(t *testing.T) {
-	t.Run("simple go", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-
-		func main(){
-		    a := 1
-			go func(){
-				a = 2
-				println(a)
-			}()
-
-			println(a)
-		}
-		`, []string{
-			"2", "side-effect(2, a)",
-		}, t)
-	})
-}

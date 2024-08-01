@@ -22,35 +22,22 @@ func TestBuilder(t *testing.T) {
 func TestTemp(t *testing.T) {
 	t.Run("temp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
-		
-		type s struct {
-			a, b int
-		}
 
-		type i interface {
-			Add() int
-			Sub() int
-		}
-
-		func (i *s) Add() int {
-			return i.a + i.b
-		}
-
-		func (i *s) Sub() int {
-			return i.a - i.b
-		}
-
-		func do(i i) {
-			println(i.Add())
-			println(i.Sub())
+		func b() int{
+			return 3
 		}
 
 		func main(){
-			b := &s{a: 3, b: 3}
-			do(b)
+			a := 6
+		 	if a = 1; a > 1 {
+		 	}else{
+				a = 7
+		 	}
+		 	println(a)
 		}
+
 		`, []string{
-			"6",
+			"3",
 		}, t)
 	})
-}
+}		

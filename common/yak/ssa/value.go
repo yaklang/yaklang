@@ -110,7 +110,7 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if enableClosureFreeValue {
+	if enableClosureFreeValue  && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
