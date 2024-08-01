@@ -1285,3 +1285,40 @@ http:
 		require.Equal(t, risk.Url, targetUrl)
 	}
 }
+
+func TestGRPCMUSTPASS_DebugPlugin_MITM_Cli(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	targetUrl := "http://" + utils.HostPort(host, port)
+
+	token := utils.RandStringBytes(20)
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: `token = ` + strconv.Quote(token) + `;
+test = cli.String("test", cli.setRequired(true))
+cli.check()
+mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+    yakit.Output(test)
+}`,
+		PluginType: "mitm",
+		Input:      targetUrl,
+		ExecParams: []*ypb.KVPair{{Key: "test", Value: token}},
+	})
+	require.NoError(t, err)
+	var tokenCheck bool
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if rsp.IsMessage {
+			if bytes.Contains(rsp.Message, []byte(token)) {
+				tokenCheck = true
+			}
+		}
+	}
+	require.True(t, tokenCheck, "debug plugin mitm cli fail")
+}
