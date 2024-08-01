@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
 	"golang.org/x/exp/slices"
+	"math/rand"
 	"strings"
 	"sync"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
+	_ "github.com/yaklang/yaklang/common/yak/static_analyzer/score_rules"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -220,7 +222,16 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	if slices.Contains([]string{
 		"mitm", "port-scan", "nuclei",
 	}, pluginType) { // echo debug script
-
+		getMockParam := func() []*ypb.KVPair {
+			var params []*ypb.KVPair
+			for i := 0; i < rand.Intn(4)+1; i++ {
+				params = append(params, &ypb.KVPair{
+					Key:   utils.RandStringBytes(5),
+					Value: utils.RandStringBytes(5),
+				})
+			}
+			return params
+		}
 		if host == "" || port <= 0 {
 			return nil, utils.Error("debug echo server start failed")
 		}
@@ -240,7 +251,9 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				log.Info("debugScript recv: ", string(result.Message))
 			}
 			return nil
-		}), []*ypb.KVPair{{Key: "Mode", Value: "Strict"}}, runtimeId)
+		}), []*ypb.KVPair{{Key: "Mode", Value: "Strict"}}, runtimeId, &ypb.HTTPRequestBuilderParams{
+			GetParams: getMockParam(), PostParams: getMockParam(), Cookie: getMockParam(),
+		})
 		if err != nil {
 			score -= 60
 			log.Errorf("debugScript failed: %v", err)
