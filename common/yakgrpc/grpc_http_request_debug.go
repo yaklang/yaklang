@@ -284,6 +284,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		"IS_SMOKING":  isSmoking,
 		"IS_STRICT":   isStrict,
 		"RUNTIME_ID":  runtimeId,
+		"CLI_PARAMS":  KVPairToParamItem(execParams),
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)
