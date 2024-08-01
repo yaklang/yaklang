@@ -3,17 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/model"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
@@ -75,23 +72,20 @@ Content-Disposition: form-data; name="files"; filename="1.xlsx"
 			break
 		}
 	}
-	_, rets, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(3), client, &ypb.QueryHTTPFlowRequest{
 		Keyword: token,
 		Pagination: &ypb.Paging{
 			Page:  1,
 			Limit: 1,
 		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rets) == 0 {
+	}, 1)
+	require.NoError(t, err)
+
+	if len(flows.Data) == 0 {
 		t.Fatal("httpflow not found")
 	}
-	
-	if flow, err := model.ToHTTPFlowGRPCModel(rets[0], true); err != nil {
-		t.Fatal(err)
-	} else if !strings.Contains(flow.SafeHTTPRequest, `{{unquote("\xff\xff\xff\xff")}}`) {
-		t.Fatalf("safe HTTP request not found quote tags: %#v", flow.SafeHTTPRequest)
+
+	if !strings.Contains(flows.Data[0].SafeHTTPRequest, `{{unquote("\xff\xff\xff\xff")}}`) {
+		t.Fatalf("safe HTTP request not found quote tags: %#v", flows.Data[0].SafeHTTPRequest)
 	}
 }
