@@ -22,9 +22,7 @@ import (
 )
 
 var (
-	_contentLengthRE    = regexp.MustCompile(`(?i)Content-Length:(\s+)?(\d+)?\r?\n?`)
 	_transferEncodingRE = regexp.MustCompile(`(?i)Transfer-Encoding:(\s+)?.*?(chunked).*?\r?\n?`)
-	fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
 )
 
 // HTTPPacketForceChunked 将一个HTTP报文的body强制转换为chunked编码
