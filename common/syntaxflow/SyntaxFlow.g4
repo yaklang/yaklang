@@ -119,10 +119,10 @@ useDefCalcParams
     ;
 nativeCallActualParams: lines? nativeCallActualParam (',' lines? nativeCallActualParam)* ','? lines?;
 nativeCallActualParam
-    : (nativeCallActualParamKey ':')?  nativeCallActualParamValue
+    : (nativeCallActualParamKey (':' | '='))?  nativeCallActualParamValue
     ;
 nativeCallActualParamKey: identifier;
-nativeCallActualParamValue: identifier | numberLiteral | '`' ~'`'* '`';
+nativeCallActualParamValue: identifier | numberLiteral | '`' ~'`'* '`' | '$' identifier;
 
 actualParam
     : singleParam    lines?                   # AllParam
