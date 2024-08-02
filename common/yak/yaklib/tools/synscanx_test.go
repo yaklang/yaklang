@@ -13,12 +13,13 @@ func Test__scanx(t *testing.T) {
 	}
 
 	res, err := _scanx(
-		"192.168.3.2,192.168.3.3",
+		"192.168.3.2/24",
 		//"47.52.100.35/24",
 		//"U:137",
-		"22",
+		"22,21,80,443",
 		//synscanx.WithInitFilterPorts("443"),
-		synscanx.WithConcurrent(1000),
+		synscanx.WithWaiting(5),
+		synscanx.WithConcurrent(2000),
 		synscanx.WithSubmitTaskCallback(func(i string) {
 			addSynPacketCounter()
 		}),

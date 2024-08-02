@@ -86,7 +86,7 @@ func (s *Scannerx) arpScan() {
 	}
 }
 func (s *Scannerx) arp(target string) {
-	_, packet, err := s.assemblePacket(target, 0, ARP)
+	packet, err := s.assemblePacket(target, 0, ARP)
 	if err != nil {
 		log.Errorf("assemble packet failed: %v", err)
 		return

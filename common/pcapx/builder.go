@@ -235,7 +235,7 @@ func PacketBuilder(opts ...any) ([]byte, error) {
 		var buf = gopacket.NewSerializeBuffer()
 		err = gopacket.SerializeLayers(
 			buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true},
-			 transportLayer, gopacket.Payload(baseConfig.Payload),
+			linkLayer, networkLayer, transportLayer, gopacket.Payload(baseConfig.Payload),
 		)
 		if err != nil {
 			return nil, utils.Errorf(`gopacket.SerializeLayers failed: %s`, err)
