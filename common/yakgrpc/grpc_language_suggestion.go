@@ -262,15 +262,15 @@ func getInstanceByName(libName, instanceName string) *yakdoc.LibInstance {
 	return nil
 }
 
-func getGolangTypeStringBySSAType(typ ssa.Type) string {
+func _getGolangTypeStringBySSAType(typ ssa.Type) string {
 	typStr := typ.PkgPathString()
 	if typStr == "" {
 		typStr = typ.String()
 	}
-	return getGolangTypeStringByTypeStr(typStr)
+	return _getGolangTypeStringByTypeStr(typStr)
 }
 
-func getGolangTypeStringByTypeStr(typStr string) string {
+func _getGolangTypeStringByTypeStr(typStr string) string {
 	switch typStr {
 	case "boolean":
 		return "bool"
@@ -280,16 +280,17 @@ func getGolangTypeStringByTypeStr(typStr string) string {
 	return typStr
 }
 
-func shouldExport(key string) bool {
+func _shouldExport(key string) bool {
 	return (key[0] >= 'A' && key[0] <= 'Z')
 }
 
-func markdownWrapper(desc string) string {
+func _markdownWrapper(desc string) string {
 	return yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("```go\n%s\n```", desc))
 }
 
 func getFuncDeclDesc(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
-	return markdownWrapper(getFuncDeclLabel(v, funcDecl))
+	label, doc := getFuncDeclLabel(v, funcDecl), funcDecl.Document
+	return _getFuncDescFromLabelAndDoc(label, doc)
 }
 
 func getFuncDeclLabel(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
@@ -348,11 +349,11 @@ func getFuncDeclLabel(v *ssaapi.Value, funcDecl *yakdoc.FuncDecl) string {
 }
 
 func getConstInstanceDesc(instance *yakdoc.LibInstance) string {
-	desc := markdownWrapper(fmt.Sprintf("const %s = %s", instance.InstanceName, instance.ValueStr))
+	desc := _markdownWrapper(fmt.Sprintf("const %s = %s", instance.InstanceName, instance.ValueStr))
 	return desc
 }
 
-func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
+func _getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 	lenOfParams := len(funcTyp.Parameter)
 	params := funcTyp.Parameter
 	if funcTyp.IsMethod {
@@ -386,21 +387,7 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 	return desc
 }
 
-func getInstancesAndFuncDecls(v *ssaapi.Value, containPoint bool) (map[string]*yakdoc.LibInstance, map[string]*yakdoc.FuncDecl) {
-	if !containPoint || v.IsNil() {
-		return nil, doc.GetDefaultDocumentHelper().Functions
-	}
-
-	libName := v.GetName()
-	lib, ok := doc.GetDefaultDocumentHelper().Libs[libName]
-	if ok {
-		return lib.Instances, lib.Functions
-	} else {
-		return nil, nil
-	}
-}
-
-func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(decl *yakdoc.FuncDecl) string) string {
+func _getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(decl *yakdoc.FuncDecl) string) string {
 	desc := ""
 	methodNames := utils.GetSortedMapKeys(funcDecls)
 
@@ -411,13 +398,13 @@ func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(dec
 	return desc
 }
 
-func getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) string {
+func _getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) string {
 	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[typStr]
 	if !ok {
 		return ""
 	}
 
-	return getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
+	return _getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
 		funcDesc := ""
 		if isStruct {
 			funcDesc = fmt.Sprintf("func (%s) %s\n", typName, strings.TrimPrefix(decl.Decl, "func"))
@@ -431,7 +418,7 @@ func getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) str
 	})
 }
 
-func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc string) {
+func _getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc string) {
 	var m map[string]*ypb.SuggestionDescription
 	if utils.IsNil(bareTyp) {
 		return
@@ -490,7 +477,7 @@ func getFuncLabelAndDocBySSAValue(name string, v *ssaapi.Value) (label string, d
 	parentV := v.GetObject()
 	if parentV != nil {
 		parentBareTyp = ssaapi.GetBareType(parentV.GetType())
-		parentTypStr = getGolangTypeStringBySSAType(parentBareTyp)
+		parentTypStr = _getGolangTypeStringBySSAType(parentBareTyp)
 	}
 
 	bareTyp := ssaapi.GetBareType(v.GetType())
@@ -522,11 +509,11 @@ func getFuncLabelAndDocBySSAValue(name string, v *ssaapi.Value) (label string, d
 
 	// 类型内置方法, 方法签名现在用 SSA Value 获取
 	funcObjectType := v.GetFunctionObjectType()
-	_, document = getBuiltinFuncDeclAndDoc(lastName, funcObjectType)
+	_, document = _getBuiltinFuncDeclAndDoc(lastName, funcObjectType)
 
 	// 用户自定义函数
 	if funcTyp != nil {
-		label = getFuncTypeDesc(funcTyp, lastName)
+		label = _getFuncTypeDesc(funcTyp, lastName)
 		return
 	}
 
@@ -547,13 +534,20 @@ func getExternLibDesc(name string) string {
 	instanceKeys := utils.GetSortedMapKeys(lib.Instances)
 	for _, key := range instanceKeys {
 		instance := lib.Instances[key]
-		builder.WriteString(fmt.Sprintf("const %s %s = %s\n", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr))
+		builder.WriteString(fmt.Sprintf("const %s %s = %s\n", instance.InstanceName, _getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr))
 	}
 	builder.WriteRune('\n')
-	builder.WriteString(getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
+	builder.WriteString(_getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
 		return fmt.Sprintf("func %s\n", decl.Decl)
 	}))
-	return markdownWrapper(builder.String())
+	return _markdownWrapper(builder.String())
+}
+
+func _getFuncDescFromLabelAndDoc(desc, doc string) string {
+	if doc == "" {
+		return _markdownWrapper(desc)
+	}
+	return _markdownWrapper(desc) + "\n\n" + doc
 }
 
 func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v *ssaapi.Value) string {
@@ -570,7 +564,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 
 	varname := v.GetName()
 	bareTyp := ssaapi.GetBareType(v.GetType())
-	typStr := getGolangTypeStringBySSAType(bareTyp)
+	typStr := _getGolangTypeStringBySSAType(bareTyp)
 	typKind := bareTyp.GetTypeKind()
 	shortTypName := typStr
 	if strings.Contains(shortTypName, ".") {
@@ -592,6 +586,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 				// 标准库函数
 				funcDecl := getFuncDeclByName(libName, lastName)
 				if funcDecl != nil {
+					// doc := funcDecl.Document
 					desc = getFuncDeclDesc(v, funcDecl)
 				}
 			} else {
@@ -610,39 +605,39 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 
 	switch typKind {
 	case ssa.FunctionTypeKind:
-		label, _ := getFuncLabelAndDocBySSAValue(name, v)
-		desc = markdownWrapper(label)
+		label, doc := getFuncLabelAndDocBySSAValue(name, v)
+		desc = _getFuncDescFromLabelAndDoc(label, doc)
 	case ssa.StructTypeKind:
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
 		if !ok {
 			break
 		}
 		if rTyp.Combination {
-			desc = markdownWrapper(fmt.Sprintf("%s (%s)", name, typStr))
+			desc = _markdownWrapper(fmt.Sprintf("%s (%s)", name, typStr))
 			break
 		}
 		desc = fmt.Sprintf("type %s struct {\n", shortTypName)
 		for _, key := range rTyp.Keys {
 			// 过滤掉非导出字段
-			if !shouldExport(key.String()) {
+			if !_shouldExport(key.String()) {
 				continue
 			}
 			fieldType := rTyp.GetField(key)
-			desc += fmt.Sprintf("    %-20s %s\n", key, getGolangTypeStringBySSAType(fieldType))
+			desc += fmt.Sprintf("    %-20s %s\n", key, _getGolangTypeStringBySSAType(fieldType))
 		}
 		desc += "}"
-		methodDescriptions := getFuncDescBytypeStr(typStr, shortTypName, true, false)
+		methodDescriptions := _getFuncDescBytypeStr(typStr, shortTypName, true, false)
 		if methodDescriptions != "" {
 			desc += "\n\n"
 			desc += methodDescriptions
 		}
-		desc = markdownWrapper(desc)
+		desc = _markdownWrapper(desc)
 	case ssa.InterfaceTypeKind:
 		desc = fmt.Sprintf("type %s interface {\n", shortTypName)
-		methodDescriptions := getFuncDescBytypeStr(typStr, shortTypName, false, true)
+		methodDescriptions := _getFuncDescBytypeStr(typStr, shortTypName, false, true)
 		desc += methodDescriptions
 		desc += "}"
-		desc = markdownWrapper(desc)
+		desc = _markdownWrapper(desc)
 	}
 
 	// 结构体成员
@@ -650,22 +645,22 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 		parentV := v.GetObject()
 		if parentV != nil {
 			parentBareTyp := ssaapi.GetBareType(parentV.GetType())
-			parentTypStr := getGolangTypeStringBySSAType(parentBareTyp)
+			parentTypStr := _getGolangTypeStringBySSAType(parentBareTyp)
 			lib, ok := doc.GetDefaultDocumentHelper().StructMethods[parentTypStr]
 			if ok {
 				instance, ok := lib.Instances[lastName]
 				if ok {
-					desc = markdownWrapper(
+					desc = _markdownWrapper(
 						fmt.Sprintf("field %s %s",
 							instance.InstanceName,
-							getGolangTypeStringByTypeStr(instance.Type)))
+							_getGolangTypeStringByTypeStr(instance.Type)))
 				}
 			}
 		}
 	}
 
 	if desc == "" {
-		desc = markdownWrapper(fmt.Sprintf("type %s %s", lastName, typStr))
+		desc = _markdownWrapper(fmt.Sprintf("type %s %s", lastName, typStr))
 	}
 	return desc
 }
@@ -981,7 +976,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 		return
 	}
 
-	typStr := getGolangTypeStringBySSAType(bareTyp)
+	typStr := _getGolangTypeStringBySSAType(bareTyp)
 	// 接口方法，结构体成员与方法，定义类型方法
 	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[typStr]
 	if !ok {
@@ -990,7 +985,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 
 	for _, instance := range lib.Instances {
 		// 过滤掉非导出字段
-		if !shouldExport(instance.InstanceName) {
+		if !_shouldExport(instance.InstanceName) {
 			continue
 		}
 		keyStr := instance.InstanceName
