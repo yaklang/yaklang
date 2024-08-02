@@ -1,12 +1,13 @@
 package ssa
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
-	"sort"
-	"strings"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -109,8 +110,14 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 		return nil, false
 	}
 
+	version := ""
+	if p := app.GetSCAPackageByName(name); p != nil {
+		version = p.Version
+	} else {
+		return nil, false
+	}
 	// library in  database, load and set relation
-	p, err := GetProgram(name, Library)
+	p, err := GetLibrary(name, version)
 	if err != nil {
 		return nil, false
 	}
