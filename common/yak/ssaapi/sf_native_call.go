@@ -218,11 +218,8 @@ func init() {
 					results := val.NewValue(ssa.NewConst(t.String()))
 					vals = append(vals, results)
 				}else{
-					for _, ft := range fts {
-						results := val.NewValue(ssa.NewConst(ft))
-						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-						vals = append(vals, results)
-
+					if len(fts) != 0 {
+						ft := fts[0]
 						// remove version if it exists
 						index := strings.Index(ft, ":")
 						if index != -1 {
@@ -241,9 +238,13 @@ func init() {
 							vals = append(vals, results)
 						}
 					}
-					
-				}
 
+					for _, ft := range fts {
+						results := val.NewValue(ssa.NewConst(ft))
+						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+						vals = append(vals, results)
+					}
+				}
 				return nil
 			})
 			if len(vals) > 0 {

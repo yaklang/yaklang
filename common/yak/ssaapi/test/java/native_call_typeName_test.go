@@ -302,3 +302,41 @@ func TestTypeNamePriority(t *testing.T){
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
+
+
+func TestTypeNameForImportStar(t *testing.T){
+	vf := filesys.NewVirtualFs()
+		vf.AddFile("A.java",
+			`package com.org.A;
+				class A{
+					};
+		    `)
+		vf.AddFile("B.java",
+			`package com.example.B;
+			import com.org.A.A;
+			import com.yak.*;
+			class B{
+				public void hello(int param1,Dog param2){
+					var res1 = param2; 
+					Cat res2 = Cat();
+					var res3 = new Cat();
+				}
+			};	
+	`)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			prog := progs[0]
+			prog.Show()
+
+			typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)
+			assert.Equal(t,3,typeName.Show().Len())
+			typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)
+			assert.Equal(t,2,typeName.Show().Len())
+			
+			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)
+			assert.Equal(t,3,typeName.Show().Len())
+			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)
+			assert.Equal(t,2,typeName.Show().Len())
+
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+}

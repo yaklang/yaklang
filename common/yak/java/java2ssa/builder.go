@@ -31,6 +31,7 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		ast:             ast,
 		constMap:        make(map[string]ssa.Value),
 		fullTypeNameMap: make(map[string][]string),
+		allImportPkgSlice: make([][]string, 0),
 	}
 	build.SupportClassStaticModifier = true
 	build.VisitCompilationUnit(ast)
@@ -53,7 +54,10 @@ type builder struct {
 	constMap map[string]ssa.Value
 
 	bluePrintStack  *utils.Stack[*ssa.ClassBluePrint]
+
+	// for full type name
 	fullTypeNameMap map[string][]string
+	allImportPkgSlice [][]string
 }
 
 func (b *builder) PushBluePrint(bp *ssa.ClassBluePrint) {
