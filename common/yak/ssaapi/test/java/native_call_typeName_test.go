@@ -152,11 +152,14 @@ func TestLocalVariableDeclareTypeName(t *testing.T){
 
 func TestMemberCallTypeName(t *testing.T){
 	vf := filesys.NewVirtualFs()
+		vf.AddFile("Dog.java",`package com.org.Dog; class Dog{};`)
 		vf.AddFile("A.java",
 			`package com.org.A;
+			 import com.org.Dog.Dog;
 				class A{
-					public String existMethod(){return null;}
-					public static void staticMethod();
+					public int existMethod(){return 666;}
+					public Dog getDog(){return new Dog();}
+					public static Dog staticMethod(){return new Dog();};
 					};
 		    `)
 		vf.AddFile("B.java",
@@ -166,13 +169,15 @@ func TestMemberCallTypeName(t *testing.T){
 				public static void main(String[] args){
 					A object = new A();
 					var res1 = object.noExistMethod();  // fulltypeName 应该和object一样
-					var res2 = object.existMethod();  // fulltypeName 应该和object一样
-					var res3 = object.Runtime().exec();  // fulltypeName 应该和object一样
-					var res4 = A.staticMethod();  // fulltypeName 应该找到A
-					var res5 = A.noExistMethod();  // fulltypeName 应该找到A
+					var res2 = object.existMethod();  // fulltypeName 应该为number
+					var res3 = object.getDog();  // fulltypeName 应为com.org.Dog.Dog
+					var res4 = object.Runtime().exec();  // fulltypeName 应该和object一样
+					var res5 = A.staticMethod();  // fulltypeName 应该找到A
+					var res6 = A.noExistMethod();  // fulltypeName 应该找到A
 				}
 			};	
 	`)
+		
 		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 			prog := progs[0]
 			prog.Show()
@@ -188,14 +193,14 @@ func TestMemberCallTypeName(t *testing.T){
 			assert.Contains(t, typeName.String(), "com.org.A.A")
 
 			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
+			assert.Contains(t, typeName.String(), "number")
 			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
+			assert.Contains(t, typeName.String(), "number")
 
 			typeName = prog.SyntaxFlowChain(`res3<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
+			assert.Contains(t, typeName.String(), "Dog")
 			typeName = prog.SyntaxFlowChain(`res3<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
+			assert.Contains(t, typeName.String(), "com.org.Dog.Dog")
 
 			typeName = prog.SyntaxFlowChain(`res4<typeName> as $id;`)[0]
 			assert.Contains(t, typeName.String(), "A")
@@ -203,9 +208,17 @@ func TestMemberCallTypeName(t *testing.T){
 			assert.Contains(t, typeName.String(), "com.org.A.A")
 
 			typeName = prog.SyntaxFlowChain(`res5<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
+			assert.Contains(t, typeName.String(), "Dog")
 			typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "com.org.Dog.Dog")
+
+			
+			typeName = prog.SyntaxFlowChain(`res6<typeName> as $id;`)[0]
+			assert.Contains(t, typeName.String(), "A")
+			typeName = prog.SyntaxFlowChain(`res6<fullTypeName> as $id;`)[0]
 			assert.Contains(t, typeName.String(), "com.org.A.A")
+
+			
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
@@ -224,7 +237,7 @@ func TestParamTypeName(t *testing.T){
 				public void hello(int param1,A param2,Dog param3){
 					var res1 = param1;
 					var res2 = param2;
-					var res3 = param3;
+					var res3 = param3; //Dog()为找不到的类，使用自身作为fullTypeName
 					var res4 = a;
 				}
 			};	
@@ -244,9 +257,9 @@ func TestParamTypeName(t *testing.T){
 			assert.Contains(t, typeName.String(), "com.org.A.A")
 
 			typeName = prog.SyntaxFlowChain(`param3<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "null")
+			assert.Contains(t, typeName.String(), "Dog")
 			typeName = prog.SyntaxFlowChain(`param3<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "null")
+			assert.Contains(t, typeName.String(), "Dog")
 
 			
 
