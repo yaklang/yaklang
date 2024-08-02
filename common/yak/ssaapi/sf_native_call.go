@@ -69,6 +69,9 @@ const (
 
 	// NativeCall_Show just show the value, do nothing
 	NativeCall_Show = "show"
+
+	// NativeCall_Slice just show the value, do nothing
+	NativeCall_Slice = "slice"
 )
 
 func init() {
@@ -76,7 +79,7 @@ func init() {
 		idx := 0
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 			if ret, ok := operator.(*Value); ok {
-				fmt.Printf("%-3d: %v\n", idx, ret.String())
+				fmt.Printf("-%3d: %v\n", idx, ret.String())
 				idx++
 			}
 			return nil
