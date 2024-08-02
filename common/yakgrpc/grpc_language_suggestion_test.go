@@ -878,22 +878,41 @@ rsp.Data()`
 	})
 }
 
-func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_FunctionReturns(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Function(t *testing.T) {
 	t.Parallel()
 
-	check := CheckHover(t)
-	check(t,
-		`r = poc.Get("123")~`,
-		"yak",
-		&ypb.Range{
-			Code:        "r",
-			StartLine:   1,
-			StartColumn: 1,
-			EndLine:     1,
-			EndColumn:   2,
-		},
-		"```go\ntype r [lowhttp.LowhttpResponse,http.Request]\n```",
-	)
+	t.Run("function", func(t *testing.T) {
+		check := CheckHover(t)
+		check(t,
+			`r = poc.Get("123")~`,
+			"yak",
+			&ypb.Range{
+				Code:        "poc.Get",
+				StartLine:   1,
+				StartColumn: 5,
+				EndLine:     1,
+				EndColumn:   12,
+			},
+			`Get 向指定 URL 发送 GET 请求并且返回响应结构体`,
+			true,
+		)
+	})
+
+	t.Run("function return", func(t *testing.T) {
+		check := CheckHover(t)
+		check(t,
+			`r = poc.Get("123")~`,
+			"yak",
+			&ypb.Range{
+				Code:        "r",
+				StartLine:   1,
+				StartColumn: 1,
+				EndLine:     1,
+				EndColumn:   2,
+			},
+			"```go\ntype r [lowhttp.LowhttpResponse,http.Request]\n```",
+		)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ForPhi(t *testing.T) {
