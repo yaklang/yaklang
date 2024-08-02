@@ -3,18 +3,19 @@ package mutate
 import (
 	"bytes"
 	"fmt"
-	"github.com/h2non/filetype"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/mixer"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
-	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/h2non/filetype"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mixer"
+	"github.com/yaklang/yaklang/common/utils/multipart"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type multipartData struct {
@@ -146,9 +147,11 @@ type formItem struct {
 	FileContent []byte               `json:"file_content"`
 }
 
-var fetchFieldNameRegexp = regexp.MustCompile(`^name\s?=\s?"(.*)"`)
-var fetchFileNameRegexp = regexp.MustCompile(`^filename\s?=\s?"(.*)"`)
-var fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
+var (
+	fetchFieldNameRegexp = regexp.MustCompile(`^name\s?=\s?"(.*)"`)
+	fetchFileNameRegexp  = regexp.MustCompile(`^filename\s?=\s?"(.*)"`)
+	fetchBoundaryRegexp  = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
+)
 
 func _fetchBoundaryRegexp(s string) string {
 	res := fetchBoundaryRegexp.FindStringSubmatch(s)

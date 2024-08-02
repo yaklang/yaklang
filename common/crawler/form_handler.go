@@ -3,14 +3,15 @@ package crawler
 import (
 	"bytes"
 	"fmt"
+	"net/url"
+	"strings"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pkg/errors"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/multipart"
 	"golang.org/x/net/html"
-	"mime/multipart"
-	"net/url"
-	"strings"
 )
 
 var (
