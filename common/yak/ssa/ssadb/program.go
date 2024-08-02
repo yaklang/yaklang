@@ -46,6 +46,21 @@ func CreateProgram(name, kind, version string, childName []string) *IrProgram {
 	return out
 }
 
+func GetLibrary(name, version string) (*IrProgram, error) {
+	var p IrProgram
+	db := GetDB().Model(&IrProgram{})
+	if name == "" {
+		return nil, utils.Errorf("program name is empty")
+	}
+	db = db.Where("program_name = ?", name)
+	db = db.Where("program_kind = ?", "library")
+	db = db.Where("version = ?", version)
+	if err := db.First(&p).Error; err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 func GetProgram(name, kind string) (*IrProgram, error) {
 	var p IrProgram
 	db := GetDB().Model(&IrProgram{})
