@@ -61,7 +61,19 @@ func (c *config) parseProject() (Programs, error) {
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
 
-	totalSize := 0
+	totalSize := 1
+	handled := 0
+	prog.ProcessInfof = func(s string, v ...any) {
+		msg := fmt.Sprintf(s, v...)
+		if c.process != nil {
+			c.process(msg, float64(handled)/float64(totalSize))
+		} else {
+			log.Info(msg)
+		}
+	}
+	_ = totalSize
+	_ = handled
+
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
@@ -89,8 +101,6 @@ func (c *config) parseProject() (Programs, error) {
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			log.Debugf("start to compile from: %v", path)
-			startTime := time.Now()
 
 			// check
 			if err := c.checkLanguage(path); err != nil {
@@ -102,21 +112,22 @@ func (c *config) parseProject() (Programs, error) {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
-
-			endTime := time.Now()
-			log.Infof("compile %s cost: %v", path, endTime.Sub(startTime))
 			// ret = append(ret, prog)
 			exclude := prog.GetIncludeFiles()
 			if len(exclude) > 0 {
 				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
 			}
+			handled = len(exclude)
 			return exclude, nil
 		}),
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")
 	}
+	prog.ProcessInfof("program %s finishing", prog.Name)
 	prog.Finish()
+	handled = totalSize
+	prog.ProcessInfof("program %s finish", prog.Name)
 	var progs = []*Program{NewProgram(prog, c)}
 	for _, program := range prog.ChildApplication {
 		progs = append(progs, NewProgram(program, c))
@@ -213,7 +224,23 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	prog := ssa.NewProgram(programName, c.DatabaseProgramName != "", ssa.Application, c.fs, c.programPath)
 	prog.Language = string(c.language)
 
-	prog.Build = func(filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder) error {
+	prog.ProcessInfof = func(s string, v ...any) {
+		msg := fmt.Sprintf(s, v...)
+		log.Info(msg)
+	}
+
+	prog.Build = func(
+		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
+	) error {
+		prog.ProcessInfof("start to compile from: %v", filePath)
+		start := time.Now()
+		defer func() {
+			prog.ProcessInfof(
+				"compile finish file: %s, cost: %v",
+				filePath, time.Since(start),
+			)
+		}()
+
 		LanguageBuilder := c.LanguageBuilder
 		// check builder
 		if LanguageBuilder == nil {
