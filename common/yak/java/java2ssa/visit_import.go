@@ -17,9 +17,13 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 
 	// 用于遍历所有import的类，并添加到fullTypeNameMap中
 	for _, pkgImport := range i.AllImportDeclaration() {
-		pkgPath, _, all := y.VisitImportDeclaration(pkgImport)
-		if !all && len(pkgPath) > 0 {
-			y.fullTypeNameMap[pkgPath[len(pkgPath)-1]] = pkgPath
+		pkgPath, _, haveStar := y.VisitImportDeclaration(pkgImport)
+		if len(pkgPath) > 0 {
+			if haveStar{
+				y.allImportPkgSlice = append(y.allImportPkgSlice, pkgPath)
+			}else{
+				y.fullTypeNameMap[pkgPath[len(pkgPath)-1]] = pkgPath
+			}
 		}
 	}
 	for _, pkgImport := range i.AllImportDeclaration() {
