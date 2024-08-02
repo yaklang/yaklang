@@ -101,18 +101,20 @@ topStatement
     ;
 
 useDeclaration
-    : Use (Function_ | Const)? useDeclarationContentList  SemiColon
+    : Use opmode=(Function_ | Const)? useDeclarationContentList  SemiColon
     ;
 
 useDeclarationContentList
     : '\\'? namespaceNameList (',' '\\'? namespaceNameList)*
     ;
 
-
+namespacePath
+    : '\\'? identifier ('\\' identifier '\\'?)*
+    ;
 namespaceDeclaration
     : Namespace (
-        namespaceNameList? OpenCurlyBracket namespaceStatement* CloseCurlyBracket
-        | namespaceNameList SemiColon
+        namespacePath? OpenCurlyBracket namespaceStatement* CloseCurlyBracket
+        | namespacePath SemiColon
     )
     ;
 
@@ -709,8 +711,8 @@ qualifiedNamespaceName
     ;
 
 namespaceNameList
-    : namespaceNameTail
-    | identifier ('\\' identifier)* ('\\' namespaceNameTail)?
+    : namespacePath (As identifier)?       #NamespaceIdentifier //这里
+    | namespacePath namespaceNameTail   #NamespaceListNameTail
     ;
 
 namespaceNameTail

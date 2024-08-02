@@ -2,17 +2,19 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
-	"os"
-	"path/filepath"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
+	"io"
+	"os"
+	"path/filepath"
 )
 
 type SSABuild struct {
@@ -22,6 +24,73 @@ type SSABuild struct {
 var Builder = &SSABuild{}
 
 func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	//todo： 测试会有问题，给fs加一个walkfile的接口
+	b.GetProgram().Loader.GetFilesysFileSystem()
+	funcMoreParseCallback := func() error {
+		builders := builder{
+			namespaceTable:  make(map[string]struct{}),
+			constMap:        make(map[string]ssa.Value),
+			aliasTable:      make(map[string]ssa.Value),
+			FunctionBuilder: b,
+		}
+		builders.callback = func(str string, filename string) {
+			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
+			if ok {
+				files = append(files, filename)
+			} else {
+				files = []string{filename}
+			}
+			builders.GetProgram().GetApplication().LibraryFile[str] = files
+		}
+		err := ssareducer.ReducerCompile(
+			b.GetProgram().Loader.GetBasePath(), // base
+			ssareducer.WithFileSystem(b.GetProgram().Loader.GetFilesysFileSystem()),
+			ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						// ret = nil
+						includeFiles = nil
+						err = utils.Errorf("parse error with panic : %v", r)
+						log.Errorf("parse [%s] error %v  ", path, err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				raw, err := io.ReadAll(f)
+				if err != nil {
+					return nil, err
+				}
+
+				// check
+				if flag := Builder.FilterFile(path); !flag {
+					return nil, nil
+				}
+				originEditor := b.GetEditor()
+				newCodeEditor := memedit.NewMemEditor(string(raw))
+				newCodeEditor.SetUrl(path)
+				b.SetEditor(newCodeEditor)
+				defer func() {
+					b.SetEditor(originEditor)
+				}()
+				ast, err := FrondEnd(string(raw), force)
+				if err != nil {
+					return nil, err
+				}
+				builders.VisitHtmlDocument(ast)
+				exclude := builders.GetProgram().GetIncludeFiles()
+				return exclude, nil
+			}),
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	if b.MoreParse {
+		if err := funcMoreParseCallback(); err != nil {
+			return err
+		}
+	}
+	b.MoreParse = false
 	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
@@ -30,13 +99,15 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		functionBuilder.SupportClassStaticModifier = true
 		functionBuilder.SupportClass = true
 		build := builder{
+			namespaceTable:  make(map[string]struct{}),
 			constMap:        make(map[string]ssa.Value),
+			aliasTable:      make(map[string]ssa.Value),
 			FunctionBuilder: functionBuilder,
 		}
 		build.WithExternValue(phpBuildIn)
+		build.FunctionBuilder = functionBuilder
 		build.VisitHtmlDocument(ast)
 	}
-
 	if !b.Included {
 		program := ssa.NewChildProgram(b.GetProgram(), uuid.NewString())
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
@@ -58,8 +129,12 @@ func (*SSABuild) GetLanguage() consts.Language {
 
 type builder struct {
 	*ssa.FunctionBuilder
-	constMap   map[string]ssa.Value
-	isFunction bool
+	constMap       map[string]ssa.Value
+	isFunction     bool
+	namespaceTable map[string]struct{} //namespace表
+	aliasTable     map[string]ssa.Value
+
+	callback func(str string, filename string)
 }
 
 func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {

@@ -32,6 +32,7 @@ type FunctionBuilder struct {
 	// Support obtaining static members and static method, even if the class is not instantiated.
 	SupportClassStaticModifier bool
 	SupportClass               bool
+	MoreParse                  bool
 
 	Included bool
 
@@ -207,4 +208,8 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 
 func (b *FunctionBuilder) ReferenceParameter(name string) {
 	b.RefParameter[name] = struct{}{}
+}
+
+func (b *FunctionBuilder) name() {
+
 }

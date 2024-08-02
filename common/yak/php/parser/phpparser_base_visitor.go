@@ -47,6 +47,10 @@ func (v *BasePHPParserVisitor) VisitUseDeclarationContentList(ctx *UseDeclaratio
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitNamespacePath(ctx *NamespacePathContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitNamespaceDeclaration(ctx *NamespaceDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -659,7 +663,11 @@ func (v *BasePHPParserVisitor) VisitQualifiedNamespaceName(ctx *QualifiedNamespa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitNamespaceNameList(ctx *NamespaceNameListContext) interface{} {
+func (v *BasePHPParserVisitor) VisitNamespaceIdentifier(ctx *NamespaceIdentifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitNamespaceListNameTail(ctx *NamespaceListNameTailContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
