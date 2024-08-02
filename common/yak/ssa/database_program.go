@@ -16,14 +16,20 @@ import (
 // 	programCachePool.Delete(program)
 // }
 
-func GetProgram(program string, kind ProgramKind) (*Program, error) {
-	// rebuild in database
-	p, err := ssadb.GetProgram(program, string(kind))
-	if err != nil {
+func GetLibrary(program, version string) (*Program, error) {
+	if p, err := ssadb.GetLibrary(program, version); err == nil {
+		return NewProgramFromDB(p), nil
+	} else {
 		return nil, utils.Errorf("program %s have err: %v", program, err)
 	}
-	prog := NewProgramFromDB(p)
-	return prog, nil
+}
+func GetProgram(program string, kind ProgramKind) (*Program, error) {
+	// rebuild in database
+	if p, err := ssadb.GetProgram(program, string(kind)); err == nil {
+		return NewProgramFromDB(p), nil
+	} else {
+		return nil, utils.Errorf("program %s have err: %v", program, err)
+	}
 }
 
 func NewProgramFromDB(p *ssadb.IrProgram) *Program {
