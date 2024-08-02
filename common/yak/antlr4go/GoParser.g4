@@ -82,7 +82,7 @@ identifierList
     ;
 
 expressionList
-    : expression (COMMA expression)*
+    : eos* expression eos* (COMMA eos* expression eos*)*
     ;
 
 typeDecl
@@ -465,7 +465,7 @@ literalType
     ;
 
 literalValue
-    : L_CURLY eos? (elementList COMMA?)? eos? R_CURLY
+    : L_CURLY eos* (elementList eos* COMMA?)? eos* R_CURLY
     ;
 
 elementList
@@ -473,7 +473,7 @@ elementList
     ;
 
 keyedElement
-    : (key COLON)? element
+    : eos* (key eos* COLON eos*)? element eos*
     ;
 
 key
