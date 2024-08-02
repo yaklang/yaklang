@@ -120,7 +120,7 @@ jobs:
               # lowhttp
               go test -timeout 1m ./common/utils/lowhttp
               # DNSX
-              go test -timeout 20s -skip "TestNewDNSServer|TestPortListener" ./common/facades
+              go test -timeout 20s ./common/facades/...
 
           - name: Test HttpTpl(YakTemplate)
             run: go test -timeout 1m ./common/yak/httptpl
