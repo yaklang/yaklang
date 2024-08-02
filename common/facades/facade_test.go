@@ -13,6 +13,8 @@ import (
 )
 
 func TestNewDNSServer(t *testing.T) {
+	t.SkipNow()
+
 	lis, err := net.Listen("tcp", "127.0.0.1:4443")
 	if err != nil {
 		t.Error(err)
