@@ -270,6 +270,15 @@ func _getGolangTypeStringBySSAType(typ ssa.Type) string {
 	return _getGolangTypeStringByTypeStr(typStr)
 }
 
+func _prettyGolangTypeStringBySSAType(typ ssa.Type) string {
+	typStr := _getGolangTypeStringBySSAType(typ)
+	if strings.Contains(typStr, "/") {
+		splited := strings.Split(typStr, "/")
+		typStr = splited[len(splited)-1]
+	}
+	return typStr
+}
+
 func _getGolangTypeStringByTypeStr(typStr string) string {
 	switch typStr {
 	case "boolean":
@@ -398,7 +407,7 @@ func _getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(de
 	return desc
 }
 
-func _getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) string {
+func _getFuncDescByTypeStr(typStr string, typName string, isStruct, tab bool) string {
 	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[typStr]
 	if !ok {
 		return ""
@@ -623,10 +632,10 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 				continue
 			}
 			fieldType := rTyp.GetField(key)
-			desc += fmt.Sprintf("    %-20s %s\n", key, _getGolangTypeStringBySSAType(fieldType))
+			desc += fmt.Sprintf("    %-20s %s\n", key, _prettyGolangTypeStringBySSAType(fieldType))
 		}
 		desc += "}"
-		methodDescriptions := _getFuncDescBytypeStr(typStr, shortTypName, true, false)
+		methodDescriptions := _getFuncDescByTypeStr(typStr, shortTypName, true, false)
 		if methodDescriptions != "" {
 			desc += "\n\n"
 			desc += methodDescriptions
@@ -634,7 +643,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 		desc = _markdownWrapper(desc)
 	case ssa.InterfaceTypeKind:
 		desc = fmt.Sprintf("type %s interface {\n", shortTypName)
-		methodDescriptions := _getFuncDescBytypeStr(typStr, shortTypName, false, true)
+		methodDescriptions := _getFuncDescByTypeStr(typStr, shortTypName, false, true)
 		desc += methodDescriptions
 		desc += "}"
 		desc = _markdownWrapper(desc)
