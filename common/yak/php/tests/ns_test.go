@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
@@ -108,5 +109,46 @@ namespace {
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 		//ssatest.MockSSA(t, code)
+	})
+	t.Run("more namespace", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("src/main/1.php", `<?php
+
+namespace a\b\c {
+	function testt(){
+		return 1;
+	}
+    class test
+    {
+        public static $a;
+    }
+}
+
+namespace c\b {
+    class b
+    {
+        public $a;
+    }
+}
+
+`)
+		fs.AddFile("src/main/2.php", `<?php
+namespace a\b\c {
+    class c
+    {
+        public static $a;
+    }
+}
+namespace {
+    use function \a\b\c\testt;
+    $a = testt();
+	println($a);
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs,
+			`println(* #-> * as $param)`,
+			map[string][]string{"param": {"1"}},
+			false,
+			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
