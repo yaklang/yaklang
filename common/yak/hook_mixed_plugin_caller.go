@@ -5,8 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"net/url"
 	"sort"
 	"strings"
@@ -366,49 +364,26 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
 	var (
-		ins  *schema.YakScript
-		err  error
-		code string
+		ins *schema.YakScript
+		err error
 	)
-	if len(codes) > 0 {
-		code = codes[0]
-	}
-	parse := func(code string) ([]*information.CliParameter, error) {
-		prog, err := static_analyzer.SSAParse(code, "mitm")
-		if err != nil {
-			return nil, utils.Error("ssa parse error")
-		}
-		parameters, _ := information.ParseCliParameter(prog)
-		return parameters, nil
-	}
-	if code == "" {
-		db := consts.GetGormProfileDatabase()
-		// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
-		if db == nil {
-			return utils.Error("no database conn is set / no code set")
-		}
-		ins, err = yakit.GetYakScriptByName(db, name)
-		if err != nil {
-			return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
-		}
-		if ins.Type == "yak" || ins.Type == "codec" {
-			return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
-		}
 
-		if ins.ForceInteractive {
-			log.Infof("script[%v] is interactive, skip load", name)
-			return nil
-		}
-	} else {
-		parameters, err := parse(code)
-		if err != nil {
-			return err
-		}
-		ins = &schema.YakScript{
-			ScriptName:   name,
-			Content:      code,
-			ParamsNumber: len(parameters),
-		}
+	db := consts.GetGormProfileDatabase()
+	// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
+	if db == nil {
+		return utils.Error("no database conn is set / no code set")
+	}
+	ins, err = yakit.GetYakScriptByName(db, name)
+	if err != nil {
+		return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
+	}
+	if ins.Type == "yak" || ins.Type == "codec" {
+		return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
+	}
+
+	if ins.ForceInteractive {
+		log.Infof("script[%v] is interactive, skip load", name)
+		return nil
 	}
 	if ins.ParamsNumber != len(params) {
 		return utils.Errorf("invalid param number,want %v,get %v", ins.ParamsNumber, len(params))
