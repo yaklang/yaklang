@@ -509,6 +509,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		} else if randomJA3FingerPrint {
 			spec, err := utls.UTLSIdToSpec(utls.HelloRandomizedALPN)
 			if err == nil {
+				clientHelloSpec = &spec
 				dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(&spec))
 			} else {
 				log.Debugf("generate random JA3 fingerprint failed: %v", err)
@@ -551,13 +552,13 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if option.OverrideEnableSystemProxyFromEnv {
 		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))
 	}
-
 	cacheKey := connectKey{
-		proxy:  proxy,
-		scheme: reqSchema,
-		addr:   originAddr,
-		https:  option.Https,
-		gmTls:  option.GmTLS,
+		proxy:           proxy,
+		scheme:          reqSchema,
+		addr:            originAddr,
+		https:           option.Https,
+		gmTls:           option.GmTLS,
+		clientHelloSpec: clientHelloSpec,
 	}
 	haveNativeHTTPRequestInstance := reqIns != nil
 RECONNECT:
