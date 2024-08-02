@@ -6,16 +6,17 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"github.com/go-rod/rod"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/multipart"
 )
 
 func (starter *BrowserStarter) HttpPostFile(element *rod.Element) error {
@@ -142,7 +143,7 @@ func (request *HttpRequest) Request() error {
 }
 
 func (request *HttpRequest) GetRequest() error {
-	//paramsToStr(request.params)
+	// paramsToStr(request.params)
 	req, err := http.NewRequest("GET", request.url, nil)
 	if err != nil {
 		return utils.Errorf("[get request]create http new request error: %s", err)

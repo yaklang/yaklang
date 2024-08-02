@@ -4,20 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
-	"mime/multipart"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/multipart"
 )
 
 type ScreenRecordersUploadToOnlineRequest struct {
-	//Filename 	string	 `json:"filename"`
+	// Filename 	string	 `json:"filename"`
 	NoteInfo                 string  `json:"note_info"`
 	Project                  string  `json:"project"`
 	Hash                     string  `json:"hash"`
@@ -49,7 +50,8 @@ func (s *OnlineClient) UploadScreenRecordersWithToken(ctx context.Context, token
 }
 
 func (s *OnlineClient) UploadScreenRecordersToOnline(ctx context.Context,
-	token string, file os.File, noteInfo string, project string, hash string, videoName string, cover string, screenRecordersCreatedAt int64, filePath string) error {
+	token string, file os.File, noteInfo string, project string, hash string, videoName string, cover string, screenRecordersCreatedAt int64, filePath string,
+) error {
 	urlIns, err := url.Parse(s.genUrl("/api/upload/screen/recorders"))
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)

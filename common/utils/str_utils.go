@@ -915,8 +915,6 @@ func ToNsServer(server string) string {
 	return server
 }
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
 // RandStringBytes 返回在大小写字母表中随机挑选 n 个字符组成的字符串
 // Example:
 // ```
@@ -925,7 +923,7 @@ const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		b[i] = LetterChar[rand.Intn(len(LetterChar))]
 	}
 	return string(b)
 }
@@ -938,15 +936,24 @@ func RandNumberStringBytes(n int) string {
 	return string(b)
 }
 
+func RandAlphaNumStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = AlphaNumChar[rand.Intn(len(AlphaNumChar))]
+	}
+	return string(b)
+}
+
 const (
 	passwordSepcialChars = ",.<>?;:[]{}~!@#$%^&*()_+-="
 	AllSepcialChars      = ",./<>?;':\"[]{}`~!@#$%^&*()_+-=\\|"
 	LittleChar           = "abcdefghijklmnopqrstuvwxyz"
 	BigChar              = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	NumberChar           = "1234567890"
+	LetterChar           = LittleChar + BigChar
+	AlphaNumChar         = LittleChar + BigChar + NumberChar
+	PasswordChar         = passwordSepcialChars + LittleChar + BigChar + NumberChar
 )
-
-var passwordBase = passwordSepcialChars + LittleChar + BigChar + NumberChar
 
 // IsStrongPassword 判断字符串是否为强密码，强密码的定义为：长度大于8，同时包含特殊字符、小写字母、大写字母、数字
 // Example:
@@ -997,7 +1004,7 @@ func RandSecret(n int) string {
 	for {
 		b := make([]byte, n)
 		for i := range b {
-			b[i] = passwordBase[rand.Intn(len(passwordBase))]
+			b[i] = PasswordChar[rand.Intn(len(PasswordChar))]
 		}
 
 		result := IsStrongPassword(string(b))
