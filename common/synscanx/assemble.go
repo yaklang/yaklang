@@ -1,17 +1,15 @@
 package synscanx
 
 import (
-	"encoding/hex"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
 )
 
-func (s *Scannerx) assembleSynPacket(host string, port int) (bool, []byte, error) {
+func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	isLoopback := utils.IsLoopback(host)
 
 	var packetBytes []byte
@@ -30,7 +28,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) (bool, []byte, error
 			// 外网扫描时，目标机器的 MAC 地址就是网关的 MAC 地址
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
-				return isLoopback, nil, utils.Errorf("get gateway mac failed: %s", err)
+				return  nil, utils.Errorf("get gateway mac failed: %s", err)
 			}
 			// Ethernet
 			opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
@@ -78,14 +76,14 @@ func (s *Scannerx) assembleSynPacket(host string, port int) (bool, []byte, error
 
 	packetBytes, err = pcapx.PacketBuilder(opts...)
 	if err != nil {
-		return isLoopback, nil, utils.Wrapf(err, "assembleSynPacket failed")
+		return  nil, utils.Wrapf(err, "assembleSynPacket failed")
 	}
-	log.Infof("assembleSynPacket: %s", hex.EncodeToString(packetBytes))
+	//log.Infof("assembleSynPacket: %s", hex.EncodeToString(packetBytes))
 	//0200000045000030baa640004006821f7f0000017f000001206900160007b64f0000000070020400a5470000020405b403030700
-	return isLoopback, packetBytes, nil
+	return  packetBytes, nil
 }
 
-func (s *Scannerx) assembleUdpPacket(host string, port int) (bool, []byte, error) {
+func (s *Scannerx) assembleUdpPacket(host string, port int) ( []byte, error) {
 	isLoopback := utils.IsLoopback(host)
 
 	var packetBytes []byte
@@ -102,7 +100,7 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) (bool, []byte, error
 		if !isLoopback {
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
-				return isLoopback, nil, utils.Errorf("get gateway mac failed: %s", err)
+				return  nil, utils.Errorf("get gateway mac failed: %s", err)
 			}
 			// Ethernet
 			opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
@@ -158,12 +156,12 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) (bool, []byte, error
 
 	packetBytes, err = pcapx.PacketBuilder(opts...)
 	if err != nil {
-		return isLoopback, nil, utils.Wrapf(err, "assembleUdpPacket failed")
+		return  nil, utils.Wrapf(err, "assembleUdpPacket failed")
 	}
-	return isLoopback, packetBytes, nil
+	return  packetBytes, nil
 }
 
-func (s *Scannerx) assembleArpPacket(host string) (bool, []byte, error) {
+func (s *Scannerx) assembleArpPacket(host string) ( []byte, error) {
 	var opts []any
 	srcMac := s.config.SourceMac.String()
 	srcIP := s.config.SourceIP.String()
@@ -175,7 +173,7 @@ func (s *Scannerx) assembleArpPacket(host string) (bool, []byte, error) {
 
 	packetBytes, err := pcapx.PacketBuilder(opts...)
 	if err != nil {
-		return false, nil, err
+		return  nil, err
 	}
-	return false, packetBytes, nil
+	return  packetBytes, nil
 }

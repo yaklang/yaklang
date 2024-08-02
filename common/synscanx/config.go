@@ -120,9 +120,12 @@ func WithOutputFilePrefix(prefix string) SynxConfigOption {
 	}
 }
 
-func WithWaiting(d time.Duration) SynxConfigOption {
+func WithWaiting(sec float64) SynxConfigOption {
 	return func(config *SynxConfig) {
-		config.waiting = d
+		config.waiting = utils.FloatSecondDuration(sec)
+		if config.waiting <= 0 {
+			config.waiting = 5 * time.Second
+		}
 	}
 }
 

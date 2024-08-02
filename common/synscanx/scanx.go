@@ -15,7 +15,6 @@ import (
 	"golang.org/x/time/rate"
 	"net"
 	"os"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -330,9 +329,16 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 		}
 	}
 
-	wCtx, wCancel := context.WithCancel(context.Background())
+	// recv packet 的总时长
+	deadline := time.Now().Add(s.config.waiting)
+	wCtx, wCancel := context.WithDeadline(context.Background(), deadline)
+	defer func() {
+		wCancel()
+		endTime := time.Now()
+		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
+	}()
+
 	go s.HandlerZeroCopyReadPacket(wCtx, resultCh)
-	time.Sleep(100 * time.Millisecond)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -344,15 +350,14 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	}()
 	wg.Wait()
 
-	time.Sleep(s.config.waiting)
+	log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
 
-	wCancel()
+	<-wCtx.Done()
+
+	done <- struct{}{}
 
 	s.Close()
 
-	done <- struct{}{}
-	endTime := time.Now()
-	log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
 	return nil
 }
 
@@ -371,43 +376,21 @@ func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
 			host := target.Host
 			port := target.Port
 			proto := target.Mode
-			isLoopback, packet, err := s.assemblePacket(host, port, proto)
+			packet, err := s.assemblePacket(host, port, proto)
 			if err != nil {
 				log.Errorf("assemble packet failed: %v", err)
 				continue
 			}
-
-			if (isLoopback && runtime.GOOS == "linux") || (isLoopback && s.hosts.Size() > 1) {
-				log.Infof("loopback use net conn: %s", host)
-				//tcpLayer := packet[20:]
-				tcpConn4, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", 12345))})
-				if err != nil {
-					log.Errorf("Error listening: %v", err)
-					break
-				}
-				s.ConnHandle = tcpConn4
-				tcpLayer := packet
-
-				tcpConn4.SetDeadline(time.Now().Add(500 * time.Millisecond))
-				// 发送数据
-				_, err = tcpConn4.WriteTo(tcpLayer, &net.IPAddr{IP: net.ParseIP(host)})
-				if err != nil {
-					log.Errorf("Error sending data: %v", err)
-					break
-				}
-
-			} else {
-				err = s.Handle.WritePacketData(packet)
-				if err != nil {
-					log.Errorf("write to device syn failed: %v", s.handleError(err))
-					break
-				}
+			err = s.Handle.WritePacketData(packet)
+			if err != nil {
+				log.Errorf("write to device syn failed: %v", s.handleError(err))
+				return
 			}
 		}
 	}
 }
 
-func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) (bool, []byte, error) {
+func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) ([]byte, error) {
 	switch proto {
 	case TCP:
 		return s.assembleSynPacket(host, port)
@@ -417,7 +400,7 @@ func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) (bo
 	case ARP:
 		return s.assembleArpPacket(host)
 	}
-	return false, nil, nil
+	return nil, nil
 }
 
 func (s *Scannerx) Close() {
