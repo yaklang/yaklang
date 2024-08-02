@@ -308,11 +308,11 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
 		typ = class
+		return y.SetFullTypeNameForType(className,typ,false)
 	}else {
-		typ = ssa.CreateNullType()
+		typ = ssa.NewClassBluePrint()
+		return y.SetFullTypeNameForType(className,typ,true)
 	}
-	return y.SetFullTypeNameForType(className,typ,false)
-
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
