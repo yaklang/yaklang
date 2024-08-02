@@ -314,6 +314,7 @@ func (t *TryStmt[T]) Build() ScopedVersionedTableIF[T] {
 
 type SwitchStmt[T versionedValue] struct {
 	global           ScopedVersionedTableIF[T]
+	condition        ScopedVersionedTableIF[T]
 	mergeToSwitchEnd []ScopedVersionedTableIF[T]
 	mergeToNextBody  ScopedVersionedTableIF[T]
 	AutoBreak        bool
@@ -344,7 +345,7 @@ func (s *SwitchStmt[T]) BuildBody(
 	body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
 	merge func(string, []T) T,
 ) {
-	sub := s.global.CreateSubScope()
+	sub := s.condition.CreateSubScope()
 	if s.mergeToNextBody != nil {
 		sub.Merge(true, merge, s.mergeToNextBody)
 		s.mergeToNextBody = nil
@@ -363,6 +364,21 @@ func (s *SwitchStmt[T]) BuildBody(
 		}
 	}
 }
+
+func (s *SwitchStmt[T]) BuildCondition(
+	body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
+) ScopedVersionedTableIF[T] {
+	sub := s.global.CreateSubScope()
+	s.condition = sub
+	return body(sub)
+}
+
+func (s *SwitchStmt[T]) BuildConditionWithoutExprsion(
+) {
+	sub := s.global.CreateSubScope()
+	s.condition = sub
+}
+
 
 func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T] {
 	end := s.global.CreateSubScope()
