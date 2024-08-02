@@ -356,7 +356,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 
 	done <- struct{}{}
 
-	s.Close()
+	defer s.Close()
 
 	return nil
 }
