@@ -647,14 +647,15 @@ func (e connPoolReadFromServerError) Error() string {
 }
 
 type connectKey struct {
-	proxy        []string // 可以使用的代理
-	scheme, addr string   // 协议和目标地址
-	https        bool
-	gmTls        bool
+	proxy           []string // 可以使用的代理
+	scheme, addr    string   // 协议和目标地址
+	https           bool
+	gmTls           bool
+	clientHelloSpec *utls.ClientHelloSpec
 }
 
 func (c connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec)
 }
 
 type connLRU struct {
