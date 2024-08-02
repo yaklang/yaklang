@@ -57,12 +57,18 @@ type Scanner struct {
 
 	// onSubmitTaskCallback: 每提交一个数据包的时候，这个 callback 调用一次
 	onSubmitTaskCallback func(string, int)
+
+	onScanPublicLookup func(ip net.IP)
 }
 
 func (s *Scanner) SetRateLimit(ms float64, count int) {
 	// ms 为
 	s.delayMs = ms
 	s.delayGapCount = count
+}
+
+func (s *Scanner) SetOnScanPublicLookup(f func(ip net.IP)) {
+	s.onScanPublicLookup = f
 }
 
 func (s *Scanner) getLoopbackLinkLayer() gopacket.SerializableLayer {

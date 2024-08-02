@@ -91,6 +91,9 @@ func (s *Scanner) scanPublic(publicHosts []string, ports []int, random bool) err
 				ip := netx.LookupFirst(dstTarget)
 				if ip != "" {
 					if dstIp := net.ParseIP(ip); dstIp != nil {
+						if s.onScanPublicLookup != nil {
+							s.onScanPublicLookup(dstIp)
+						}
 						layers, loopback, err := s.createSynTCP(dstIp, i.port, nil, s.defaultGatewayIp.String())
 						if err != nil {
 							log.Warnf("cannot create syn-tcp packet for %s:%v: %v", dstIp.String(), i.port, err)
