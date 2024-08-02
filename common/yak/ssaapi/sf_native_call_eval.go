@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,6 +14,46 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 	contextResult, err := frame.GetSFResult()
 	if err != nil {
 		return false, nil, err
+	}
+
+	program, err := fetchProgram(v)
+	if err != nil {
+		return false, nil, err
+	}
+
+	exec := func(codeRaw string) (bool, sfvm.ValueOperator, error) {
+		newResult, err := SyntaxFlowWithVMContext(program, codeRaw, contextResult, frame.GetVM().GetConfig())
+		if err != nil {
+			return false, nil, err
+		}
+
+		if newResult != nil && newResult.SFFrameResult != nil {
+			frame.SetSFResult(newResult.SFFrameResult)
+		}
+		return true, v, nil
+	}
+
+	fromProgram := false
+	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+		_, fromProgram = operator.(*Program)
+		return utils.Error("normal exit")
+	})
+	if !fromProgram {
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			if val.IsConstInst() {
+				code := codec.AnyToString(val.GetConstValue())
+				_, _, err := exec(code)
+				if err != nil {
+					log.Warnf("eval code: %v failed: %v", code, err)
+				}
+			}
+			return nil
+		})
+		return true, v, nil
 	}
 
 	var codes string
@@ -46,18 +87,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 	if codes == "" {
 		return false, nil, utils.Error("no code found in <eval(...)>")
 	}
-
-	newResult, err := SyntaxFlowWithVMContext(v, codes, contextResult, frame.GetVM().GetConfig())
-	if err != nil {
-		return false, nil, err
-	}
-
-	var newval = v
-	if newResult != nil && newResult.SFFrameResult != nil {
-		frame.SetSFResult(newResult.SFFrameResult)
-	}
-
-	return true, newval, nil
+	return exec(codes)
 }
 
 var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {

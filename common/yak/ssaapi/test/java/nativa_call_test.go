@@ -320,3 +320,33 @@ check $sink;
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestNativeCall_Java_FuzztagThenEval_Basic(t *testing.T) {
+	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`
+<fuzztag("<getCaller>")> as $accccc;
+<fuzztag('aArgs<getCall>{{accccc}}<name> as $sink')> as $code;
+<eval($code)><show>
+check $sink;
+`).Show()
+		haveFuncName := false
+		for _, v := range sinks {
+			if strings.Contains(v.String(), "yourMethod") {
+				haveFuncName = true
+			}
+		}
+		assert.True(t, haveFuncName)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestNativeCall_Java_FuzztagThenEval(t *testing.T) {
+	ssatest.Check(t, `a1=1;a2=2;a3=3;`, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`
+<fuzztag('a{{int(1-3)}} as $sink')><eval><show>;
+check $sink;
+`).Show()
+		assert.Len(t, sinks, 3)
+		return nil
+	})
+}
