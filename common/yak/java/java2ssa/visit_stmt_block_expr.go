@@ -150,14 +150,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if res == nil {
 			res = y.ReadMemberCallVariable(obj, key)
 		}
-		t := obj.GetType()
-
+		
 		resTyp := res.GetType()
-		if resTyp != nil && resTyp.GetFullTypeName() != "" {
+		if resTyp != nil && len(resTyp.GetFullTypeNames())!= 0 {
 			return res
 		}
-		if ftRaw := t.GetFullTypeName(); ftRaw!= "" {
-			newTyp := y.SetFullTypeNameForType(ftRaw,res.GetType(),true)
+
+		t := obj.GetType()
+		if ftName := t.GetFullTypeNames(); len(ftName)!= 0 {
+			newTyp := y.CopyFullTypeNameForType(ftName,res.GetType())
 			res.SetType(newTyp)
 		}
 		return res
@@ -1069,8 +1070,8 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		} else {
 			rightValueTyp := value.GetType()
 			if b,ok := ssa.ToBasicType(rightValueTyp); ok && typ!=nil{
-				if b.GetFullTypeName() == ""{
-					newTyp := y.SetFullTypeNameForType(typ.GetFullTypeName(), rightValueTyp, true)
+				if len(b.GetFullTypeNames()) == 0{
+					newTyp := y.CopyFullTypeNameForType(typ.GetFullTypeNames(), rightValueTyp)
 					value.SetType(newTyp)
 				}
 			}
@@ -1644,7 +1645,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
 			return obj, y.EmitCall(y.NewCall(defaultClassFullback, args))
 		}
-		obj.SetType(y.SetFullTypeNameForType(className, class,false))
+		obj.SetType(y.AddFullTypeNameFromMap(className,class))
 		constructor := class.Constructor
 		if constructor == nil {
 			log.Warnf("class %v is not found constructor, "+
@@ -1798,8 +1799,8 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 		res= y.ReadValue(name)
 	}	
 	// set full type name
-	if res.GetType().GetFullTypeName() == ""{
-		newType := y.SetFullTypeNameForType(name, res.GetType(),false)
+	if len(res.GetType().GetFullTypeNames()) == 0{
+		newType := y.AddFullTypeNameFromMap(name, res.GetType())
 		res.SetType(newType)
 	}
 	return res

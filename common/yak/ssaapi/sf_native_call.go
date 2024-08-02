@@ -213,33 +213,35 @@ func init() {
 					return nil
 				}
 				t := val.GetType()
-				typeStr := t.t.GetFullTypeName()
-				if typeStr == "" {
-					typeStr := t.String()
-					results := val.NewValue(ssa.NewConst(typeStr))
+				fts := t.t.GetFullTypeNames()
+				if len(fts) == 0{
+					results := val.NewValue(ssa.NewConst(t.String()))
 					vals = append(vals, results)
 				}else{
-					results := val.NewValue(ssa.NewConst(typeStr))
-					results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-					vals = append(vals, results)
-
-					// remove version if it exists
-					index := strings.Index(typeStr, ":")
-					if index != -1 {
-						typeStr = typeStr[:index]
-						results := val.NewValue(ssa.NewConst(typeStr))
+					for _, ft := range fts {
+						results := val.NewValue(ssa.NewConst(ft))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 						vals = append(vals, results)
-					}
 
-					// get type name
-					lastIndex := strings.LastIndex(typeStr, ".")
-					if lastIndex != -1 && len(typeStr) > lastIndex+1 {
-						typeStr = typeStr[lastIndex+1:]
-						results := val.NewValue(ssa.NewConst(typeStr))
-						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-						vals = append(vals, results)
+						// remove version if it exists
+						index := strings.Index(ft, ":")
+						if index != -1 {
+							ft = ft[:index]
+							results := val.NewValue(ssa.NewConst(ft))
+							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+							vals = append(vals, results)
+						}
+
+						// get type name
+						lastIndex := strings.LastIndex(ft, ".")
+						if lastIndex != -1 && len(ft) > lastIndex+1 {
+							ft = ft[lastIndex+1:]
+							results := val.NewValue(ssa.NewConst(ft))
+							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+							vals = append(vals, results)
+						}
 					}
+					
 				}
 
 				return nil
@@ -265,14 +267,16 @@ func init() {
 					return nil
 				}
 				t := val.GetType()
-				typeStr := t.t.GetFullTypeName()
-				if typeStr == ""{
-					typeStr := t.String()
-					results := val.NewValue(ssa.NewConst(typeStr))
+				fts := t.t.GetFullTypeNames()
+				if len(fts) == 0{
+					results := val.NewValue(ssa.NewConst(t.String()))
 					vals = append(vals, results)
 				}else{
-					results := val.NewValue(ssa.NewConst(typeStr))
-					vals = append(vals, results)
+					for _,ft := range fts{
+						results := val.NewValue(ssa.NewConst(ft))
+						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
+						vals = append(vals, results)
+					}
 				}
 				
 				return nil

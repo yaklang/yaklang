@@ -308,10 +308,10 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
 		typ = class
-		return y.SetFullTypeNameForType(className,typ,false)
+		return y.AddFullTypeNameFromMap(className,typ)
 	}else {
 		typ = ssa.NewClassBluePrint()
-		return y.SetFullTypeNameForType(className,typ,true)
+		return y.AddFullTypeNameRaw(className,typ)
 	}
 }
 
@@ -328,15 +328,15 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	var t ssa.Type
 	switch i.GetText() {
 	case "boolean":
-		t= ssa.CreateBooleanType()
+		t= ssa.GetBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		t= ssa.CreateNumberType()
+		t= ssa.GetNumberType()
 	case "byte":
-		t=  ssa.CreateByteType()
+		t=  ssa.GetByteType()
 	default:
 		t = ssa.CreateAnyType()
 	}
-	t.SetFullTypeName(t.String())
+	t.AddFullTypeName(t.String())
 	return t
 }
 
@@ -847,9 +847,18 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 
 }
 
-// SetFullTypeNameForType用于将FullTypeName设置到Type中。其中当Type是BasicType时，会创建新的Type，避免修改原来的Type。
+func (y *builder)AddFullTypeNameRaw(typName string, typ ssa.Type)ssa.Type{
+	return y.AddFullTypeNameForType(typName,typ,true)
+}
+
+func (y *builder)AddFullTypeNameFromMap(typName string, typ ssa.Type)ssa.Type{
+	return y.AddFullTypeNameForType(typName,typ,false)
+}
+
+
+// AddFullTypeNameForType用于将FullTypeName设置到Type中。其中当Type是BasicType时，会创建新的Type，避免修改原来的Type。
 // isFullName表示是否是完整的FullTypeName，如果不是，则会从fullTypeNameMap寻找完整的FullTypeName。
-func (y *builder) SetFullTypeNameForType(typName string, typ ssa.Type,isFullName bool ) ssa.Type {
+func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type,isFullName bool ) ssa.Type {
 	if b,ok:=ssa.ToBasicType(typ);ok{
 		typ = ssa.NewBasicType(b.Kind,b.GetName())
 	} 
@@ -869,10 +878,24 @@ func (y *builder) SetFullTypeNameForType(typName string, typ ssa.Type,isFullName
 					break
 				}
 			}
-			typ.SetFullTypeName(typStr)
+			typ.AddFullTypeName(typStr)
 		}
 	}else {
-		typ.SetFullTypeName(typStr)
+		typ.AddFullTypeName(typStr)
 	}
+	return typ
+}
+
+func (y *builder) CopyFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {
+	if b,ok:=ssa.ToBasicType(typ);ok{
+		typ = ssa.NewBasicType(b.Kind,b.GetName())
+	} 
+	
+	if typ == nil {
+		return ssa.GetAnyType()
+	}
+	for _,typStr := range allTypName{
+		typ.AddFullTypeName(typStr)
+	} 
 	return typ
 }
