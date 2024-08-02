@@ -54,12 +54,16 @@ func (c *config) parseProject() (Programs, error) {
 
 	programPath := c.programPath
 	prog, builder, err := c.init()
+	builder.MoreParse = true
 
 	if prog.Name != "" {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
+	if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
+		language.ExtraFileAnalyze(c.fs, prog, programPath)
+	}
 
 	totalSize := 0
 	filesys.Recursive(programPath,
@@ -161,6 +165,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		// log.Infof("use default language [%s] for empty path", Yak)
 	}
 	prog, builder, err := c.init()
+	builder.MoreParse = false
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err

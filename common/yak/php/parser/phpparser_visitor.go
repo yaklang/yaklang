@@ -37,6 +37,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#useDeclarationContentList.
 	VisitUseDeclarationContentList(ctx *UseDeclarationContentListContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#namespacePath.
+	VisitNamespacePath(ctx *NamespacePathContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#namespaceDeclaration.
 	VisitNamespaceDeclaration(ctx *NamespaceDeclarationContext) interface{}
 
@@ -496,8 +499,11 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#qualifiedNamespaceName.
 	VisitQualifiedNamespaceName(ctx *QualifiedNamespaceNameContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#namespaceNameList.
-	VisitNamespaceNameList(ctx *NamespaceNameListContext) interface{}
+	// Visit a parse tree produced by PHPParser#NamespaceIdentifier.
+	VisitNamespaceIdentifier(ctx *NamespaceIdentifierContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#NamespaceListNameTail.
+	VisitNamespaceListNameTail(ctx *NamespaceListNameTailContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#namespaceNameTail.
 	VisitNamespaceNameTail(ctx *NamespaceNameTailContext) interface{}

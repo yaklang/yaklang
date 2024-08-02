@@ -19,6 +19,11 @@ func WithFileSystem(fs fi.FileSystem) PackageLoaderOption {
 	}
 }
 
+func WithBasePath(path string) PackageLoaderOption {
+	return func(loader *PackageFileLoader) {
+		loader.basePath = path
+	}
+}
 func WithIncludePath(paths ...string) PackageLoaderOption {
 	return func(loader *PackageFileLoader) {
 		loader.includePath = paths
@@ -37,6 +42,7 @@ type PackageFileLoader struct {
 	includePath  []string
 	includedPath map[string]struct{} // for include once
 	packagePath  []string
+	basePath     string
 }
 
 func (p *PackageFileLoader) GetFilesysFileSystem() fi.FileSystem {
@@ -75,6 +81,9 @@ func (p *PackageFileLoader) AddPackagePath(path []string) {
 
 func (p *PackageFileLoader) GetPackagePath() []string {
 	return p.packagePath
+}
+func (p *PackageFileLoader) GetBasePath() string {
+	return p.basePath
 }
 
 func (p *PackageFileLoader) AddIncludePath(s ...string) {

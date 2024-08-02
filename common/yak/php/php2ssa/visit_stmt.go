@@ -1,11 +1,10 @@
 package php2ssa
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strings"
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
@@ -20,24 +19,16 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 		return nil
 	}
 
-	if ret := i.Statement(); ret != nil {
-		y.VisitStatement(ret)
-	} else if ret := i.UseDeclaration(); ret != nil {
-		y.VisitUseDeclaration(ret)
-	} else if ret := i.NamespaceDeclaration(); ret != nil {
-		y.VisitNamespaceDeclaration(ret)
-	} else if ret := i.FunctionDeclaration(); ret != nil {
-		y.VisitFunctionDeclaration(ret)
-	} else if ret := i.ClassDeclaration(); ret != nil {
-		y.VisitClassDeclaration(ret)
-	} else if ret := i.GlobalConstantDeclaration(); ret != nil {
-		y.VisitGlobalConstantDeclaration(ret)
-	} else if ret := i.EnumDeclaration(); ret != nil {
-		y.VisitEnumDeclaration(ret)
-	} else {
-		log.Infof("unknown top statement: %v", i.GetText())
+	if y.MoreParse {
+		y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
+		return nil
 	}
-
+	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
+	y.VisitUseDeclaration(i.UseDeclaration())
+	y.VisitStatement(i.Statement())
+	y.VisitFunctionDeclaration(i.FunctionDeclaration())
+	y.VisitEnumDeclaration(i.EnumDeclaration())
+	y.VisitClassDeclaration(i.ClassDeclaration())
 	return nil
 }
 
@@ -86,37 +77,39 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	if i == nil {
 		return nil
 	}
-	list := y.VisitNamespaceNameList(i.NamespaceNameList())
-	pkgName := strings.Join(list, ".")
-	if len(list) > 0 {
+	beforfunc := func() {
 		for _, statementContext := range i.AllNamespaceStatement() {
 			y.BeforeVisitNamespaceStatement(statementContext)
 		}
 	}
-	if pkgName != "" {
-		program := y.GetProgram()
-		lib, _ := program.GetLibrary(pkgName)
-		if lib == nil {
-			lib = program.NewLibrary(pkgName, list)
+	//compose child app
+	if i.NamespacePath() != nil {
+		beforfunc()
+		//namespace
+		pkgpath := y.VisitNamespacePath(i.NamespacePath())
+		pkgname := strings.Join(pkgpath, ".")
+		y.callback(pkgname, y.FunctionBuilder.GetEditor().GetFilename())
+		prog := y.GetProgram().GetApplication() //拿到主app
+		library, _ := prog.GetLibrary(pkgname)
+		if library == nil {
+			library = prog.NewLibrary(pkgname, []string{prog.Loader.GetBasePath()})
 		}
-		lib.PushEditor(program.GetCurrentEditor())
-		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
-		if builder != nil {
-			builder.SetBuildSupport(y.FunctionBuilder)
+		library.PushEditor(prog.GetCurrentEditor())
+		functionBuilder := library.GetAndCreateFunctionBuilder(pkgname, "init")
+		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
+		if functionBuilder != nil {
+			functionBuilder.SetBuildSupport(y.FunctionBuilder)
 			currentBuilder := y.FunctionBuilder
-			y.FunctionBuilder = builder
+			y.FunctionBuilder = functionBuilder
 			defer func() {
 				y.FunctionBuilder = currentBuilder
 			}()
 		}
+	} else {
+		beforfunc()
 	}
-	for _, statement := range i.AllNamespaceStatement() {
-		y.VisitNamesPaceStatement(statement)
-	}
-	if len(list) == 0 {
-		for _, statementContext := range i.AllNamespaceStatement() {
-			y.BeforeVisitNamespaceStatement(statementContext)
-		}
+	for _, statementContext := range i.AllNamespaceStatement() {
+		y.VisitNamesPaceStatement(statementContext)
 	}
 	return nil
 }
@@ -132,8 +125,8 @@ func (y *builder) VisitNamesPaceStatement(raw phpparser.INamespaceStatementConte
 	if i == nil {
 		return nil
 	}
-	//y.VisitStatement(i.Statement()) //statement有问题
 	y.VisitUseDeclaration(i.UseDeclaration())
+	//y.VisitStatement(i.Statement())
 	y.VisitFunctionDeclaration(i.FunctionDeclaration())
 	y.VisitClassDeclaration(i.ClassDeclaration())
 	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
@@ -150,6 +143,7 @@ func (y *builder) BeforeVisitNamespaceStatement(raw phpparser.INamespaceStatemen
 	if i == nil {
 		return nil
 	}
+	y.VisitUseDeclaration(i.UseDeclaration())
 	y.VisitStatement(i.Statement())
 	return nil
 }
@@ -164,10 +158,40 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	if i == nil {
 		return nil
 	}
-	y.VisitUseDeclarationContentList(i.UseDeclarationContentList())
+	opmode := strings.TrimSpace(i.GetOpmode().GetText())
+	prog := y.GetProgram().GetApplication()
+	y.VisitUseDeclarationContentList(i.UseDeclarationContentList(), func(path []string, aliasMap map[string]string) {
+		defer func() {
+			if msg := recover(); msg != nil {
+				log.Errorf("visit use decl fail: %s", msg)
+			}
+		}()
+		for old, alias := range aliasMap {
+			if function := y.GetProgram().GetFunction(alias); !utils.IsNil(function) {
+				log.Warnf("current builder has function: %s", function.GetName())
+				continue
+			}
+			switch opmode {
+			case "const":
+			//todo:
+			case "function":
+				if library, _ := prog.GetLibrary(strings.Join(path, ".")); !utils.IsNil(library) {
+					if function := library.GetFunction(old); function == nil {
+						log.Errorf("get lib function fail,name: %s,namespace path: %s", old, strings.Join(path, "."))
+						continue
+					} else {
+						y.AssignVariable(y.CreateVariable(alias), function)
+					}
+				}
+			default:
+			}
+		}
+	})
 	return nil
 }
-func (y *builder) VisitUseDeclarationContentList(raw phpparser.IUseDeclarationContentListContext) interface{} {
+func (y *builder) VisitUseDeclarationContentList(
+	raw phpparser.IUseDeclarationContentListContext,
+	callback func(path []string, aliasMap map[string]string)) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -178,26 +202,9 @@ func (y *builder) VisitUseDeclarationContentList(raw phpparser.IUseDeclarationCo
 	if i == nil {
 		return nil
 	}
-	for _, list := range i.AllNamespaceNameList() {
-		pkgNames := y.VisitNamespaceNameList(list)
-		var prog *ssa.Program
-		lib := strings.Join(pkgNames, ".")
-		if library, _ := y.GetProgram().GetLibrary(lib); library != nil {
-			//import all
-			for _, class := range prog.ClassBluePrint {
-				y.SetClassBluePrint(class.Name, class)
-			}
-		} else {
-			//import class
-			lib := strings.Join(pkgNames[:len(pkgNames)-1], ".")
-			if library, _ := y.GetProgram().GetLibrary(lib); library != nil {
-				if bluePrint := library.GetClassBluePrint(pkgNames[len(pkgNames)-1]); bluePrint != nil {
-					y.SetClassBluePrint(pkgNames[len(pkgNames)-1], bluePrint)
-				}
-			} else {
-				log.Warnf("get namespace lib fail: %v", lib)
-			}
-		}
+	for _, listContext := range i.AllNamespaceNameList() {
+		list, m := y.VisitNamespaceNameList(listContext)
+		callback(list, m)
 	}
 	return nil
 }

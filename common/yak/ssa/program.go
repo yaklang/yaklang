@@ -18,6 +18,7 @@ func NewChildProgram(prog *Program, name string) *Program {
 	childProg := &Program{
 		Name:                    name,
 		ProgramKind:             ChildAPP,
+		LibraryFile:             prog.LibraryFile,
 		Language:                prog.Language,
 		Application:             prog,
 		DownStream:              make(map[string]*Program),
@@ -47,6 +48,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ChildApplication:        make([]*Program, 0),
 		Name:                    ProgramName,
 		ProgramKind:             kind,
+		LibraryFile:             make(map[string][]string),
 		UpStream:                make(map[string]*Program),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
@@ -71,6 +73,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
 		ssautil.WithIncludePath(programPath),
+		ssautil.WithBasePath(programPath),
 	)
 	return prog
 }
@@ -140,6 +143,8 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	prog.AddUpStream(lib)
 	prog.Application.AddUpStream(lib)
 	lib.Application = prog.Application
+	lib.ExternLib = prog.ExternLib
+	lib.ExternInstance = prog.ExternInstance
 	return lib
 }
 
