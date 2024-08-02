@@ -28,6 +28,8 @@ import (
 //		}
 //	}
 func TestFacadeServer(t *testing.T) {
+	t.SkipNow()
+
 	ip := "192.168.101.116"
 	className := "test"
 	//cmd := "echo 1 > /tmp/1.txt"

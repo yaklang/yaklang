@@ -2,8 +2,8 @@ package facades
 
 import (
 	"context"
-	"fmt"
 	"github.com/miekg/dns"
+	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
@@ -22,11 +22,11 @@ type DNSServer struct {
 	//ns2Domain string
 
 	// smtp mail.
-	mxDomain string
+	//mxDomain string
 
 	// .domain for A/AAAA
-	dotDomain string
-	ipAddr    net.IP
+	// dotDomain string
+	ipAddr net.IP
 
 	// txt
 	txtRecordHandler func() []string
@@ -64,10 +64,10 @@ func NewDNSServer(domain, dnsLogIP, serveIPRaw string, port int) (*DNSServer, er
 
 	domain = dns.Fqdn(domain)
 	ins := &DNSServer{
-		mxDomain:  fmt.Sprintf("mail.%v", domain),
-		dotDomain: fmt.Sprintf(".%v", domain),
-		ipAddr:    ipAddr,
-		ttl:       3600,
+		// mxDomain:  fmt.Sprintf("mail.%v", domain),
+		// dotDomain: fmt.Sprintf(".%v", domain),
+		ipAddr: ipAddr,
+		ttl:    3600,
 	}
 
 	addr := utils.HostPort(serveIP.String(), port)
@@ -84,18 +84,19 @@ func NewDNSServer(domain, dnsLogIP, serveIPRaw string, port int) (*DNSServer, er
 	return ins, nil
 }
 
-func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("panic serve dns: %s", err)
-		}
-	}()
+func (d *DNSServer) handleQuestion(question dns.Question, w dns.ResponseWriter, r *dns.Msg) {
+
+	rootDomain := domainextractor.ExtractRootDomain(question.Name)
+	dotDomain := fqdn(rootDomain)
+	if !strings.HasPrefix(dotDomain, ".") {
+		dotDomain = "." + dotDomain
+	}
 
 	visitorLog := NewVisitorLog("dns")
 	visitorLog.Set("remote-addr", w.RemoteAddr())
 	visitorLog.SetTimestampNow()
 	visitorLog.Set("external-ip", d.ipAddr.String())
-	visitorLog.Set("root-domain", d.dotDomain)
+	visitorLog.Set("root-domain", dotDomain)
 	if d.addrConvertor != nil {
 		visitorLog.SetRemoteIP(d.addrConvertor(w.RemoteAddr().String()))
 	} else {
@@ -106,18 +107,14 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	m.SetReply(r)
 	m.Authoritative = true
 
-	// bail early for no queries.
-	if len(r.Question) == 0 {
-		return
-	}
 	requestMsg := r.String()
 	//log.Infof("NEW DNS Req: %v", requestMsg)
 	visitorLog.Set("raw", requestMsg)
 	domain := m.Question[0].Name
 	visitorLog.SetDomain(domain)
-	log.Infof("dns req for: %s [%v]", domain, d.dotDomain)
-	if strings.HasSuffix(strings.ToLower(domain), strings.ToLower(d.dotDomain)) {
-		payload := domain[:len(domain)-len(d.dotDomain)]
+	log.Infof("dns req for: %s [%v]", domain, dotDomain)
+	if strings.HasSuffix(strings.ToLower(domain), strings.ToLower(dotDomain)) {
+		payload := domain[:len(domain)-len(dotDomain)]
 		visitorLog.Set("payload", payload)
 		if index := strings.LastIndex(payload, "."); index > 0 {
 			token := payload[index:]
@@ -184,9 +181,9 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			_ = handleAppWithCname
 
 			switch {
-			case strings.EqualFold(domain, "aws"+d.dotDomain):
+			case strings.EqualFold(domain, "aws"+dotDomain):
 				handleCloud(net.ParseIP("169.254.169.254"))
-			case strings.EqualFold(domain, "alibaba"+d.dotDomain):
+			case strings.EqualFold(domain, "alibaba"+dotDomain):
 				handleCloud(net.ParseIP("100.100.100.200"))
 			//case strings.EqualFold(domain, "app"+h.dotDomain):
 			//	handleAppWithCname("projectdiscovery.github.io", net.ParseIP("185.199.108.153"), net.ParseIP("185.199.110.153"), net.ParseIP("185.199.111.153"), net.ParseIP("185.199.108.153"))
@@ -198,16 +195,16 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	//	visitorLog.SetDNSType("SOA")
 	//	hostmaster := "admin" + d.dotDomain
 	//	m.Answer = append(m.Answer, &dns.SOA{Hdr: dns.RR_Header{Name: dns.Fqdn(domain), Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: ttl}, Ns: d.ns1Domain, Mbox: hostmaster})
-	case dns.TypeMX:
-		if d.hijackCallback != nil {
-			mx := d.hijackCallback("MX", domain)
-			if mx != "" {
-				m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: mx, Preference: 1})
-			}
-		} else {
-			visitorLog.SetDNSType("MX")
-			m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: d.mxDomain, Preference: 1})
-		}
+	//case dns.TypeMX:
+	//	if d.hijackCallback != nil {
+	//		mx := d.hijackCallback("MX", domain)
+	//		if mx != "" {
+	//			m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: mx, Preference: 1})
+	//		}
+	//	} else {
+	//		visitorLog.SetDNSType("MX")
+	//		m.Answer = append(m.Answer, &dns.MX{Hdr: dns.RR_Header{Name: fqdn(domain), Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: ttl}, Mx: d.mxDomain, Preference: 1})
+	//	}
 	case dns.TypeNS:
 		visitorLog.SetDNSType("NS")
 		if d.hijackCallback != nil {
@@ -260,8 +257,8 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	//	}
 	//}
 
-	if strings.HasSuffix(domain, d.dotDomain) {
-		fullID = strings.ReplaceAll(domain, d.dotDomain, "")
+	if strings.HasSuffix(domain, dotDomain) {
+		fullID = strings.ReplaceAll(domain, dotDomain, "")
 		//parts := strings.Split(domain, ".")
 		//for i, part := range parts {
 		//	if len(part) == 33 {
@@ -297,7 +294,22 @@ func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	//		}
 	//	}
 	//}
+}
 
+func (d *DNSServer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic serve dns: %s", err)
+		}
+	}()
+
+	// bail early for no queries.
+	if len(r.Question) == 0 {
+		return
+	}
+	for _, q := range r.Question {
+		d.handleQuestion(q, w, r)
+	}
 }
 
 func (d *DNSServer) Serve(ctx context.Context) error {
