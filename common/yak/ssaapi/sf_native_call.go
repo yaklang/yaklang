@@ -60,23 +60,42 @@ const (
 
 	// NativeCall_Include is used to include a syntaxflow-rule
 	NativeCall_Include = "include"
+
+	// NativeCall_Eval is used to eval a new syntaxflow rule
+	NativeCall_Eval = "eval"
+
+	// NativeCall_Fuzztag is used to eval a new yaklang fuzztag template, the variables is in SFFrameResult
+	NativeCall_Fuzztag = "fuzztag"
+
+	// NativeCall_Show just show the value, do nothing
+	NativeCall_Show = "show"
 )
 
-func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
-	if name == "" {
-		return
-	}
-	n := &NativeCallDocument{
-		Name: name,
-	}
-	for _, o := range options {
-		o(n)
-	}
-	NativeCallDocuments[name] = n
-	sfvm.RegisterNativeCall(n.Name, n.Function)
-}
-
 func init() {
+	registerNativeCall(NativeCall_Show, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		idx := 0
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			if ret, ok := operator.(*Value); ok {
+				fmt.Printf("%-3d: %v\n", idx, ret.String())
+				idx++
+			}
+			return nil
+		})
+		return true, v, nil
+	}), nc_desc(`show the value, do nothing`))
+
+	registerNativeCall(
+		NativeCall_Eval,
+		nc_func(nativeCallEval),
+		nc_desc(`eval a new syntaxflow rule, you can use this to eval dynamic rule`),
+	)
+
+	registerNativeCall(
+		NativeCall_Fuzztag,
+		nc_func(nativeCallFuzztag),
+		nc_desc(`eval a new yaklang fuzztag template, the variables is in SFFrameResult`),
+	)
+
 	registerNativeCall(
 		NativeCall_Include,
 		nc_func(nativeCallInclude),
@@ -107,55 +126,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_Name,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-
-				var names = []string{
-					val.GetName(),
-					val.GetVerboseName(),
-					val.ShortString(),
-					val.GetSSAValue().GetVerboseName(),
-					val.GetSSAValue().GetShortVerboseName(),
-				}
-
-				if val.IsMember() {
-					constVal, ok := ssa.ToConst(val.GetKey().GetSSAValue())
-					if ok {
-						names = append(names, constVal.VarString())
-					}
-				}
-
-				if udef, ok := ssa.ToFunction(val.GetSSAValue()); ok {
-					names = append(names, udef.GetShortVerboseName())
-					names = append(names, udef.GetMethodName())
-				}
-
-				filter := make(map[string]struct{})
-				for _, name := range names {
-					if name == "" {
-						continue
-					}
-					_, existed := filter[name]
-					if !existed {
-						filter[name] = struct{}{}
-						results := val.NewValue(ssa.NewConst(name))
-						results.AppendPredecessor(v, frame.WithPredecessorContext("getFuncName"))
-						vals = append(vals, results)
-					}
-				}
-
-				return nil
-			})
-			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
-			}
-			return false, nil, utils.Error("no value found")
-		}),
+		nc_func(nativeCallName),
 		nc_desc(`获取输入指令的名称表示，例如函数名，变量名，或者字段名等`),
 	)
 
@@ -169,37 +140,37 @@ func init() {
 					return nil
 				}
 				t := val.GetType()
-					if b, ok := t.t.(*ssa.BasicType); ok {
-						typeStr := b.GetFullTypeName()
-						if typeStr == ""{
-							typeStr := t.String()
-							results := val.NewValue(ssa.NewConst(typeStr))
-							vals = append(vals, results)
-						}else{
+				if b, ok := t.t.(*ssa.BasicType); ok {
+					typeStr := b.GetFullTypeName()
+					if typeStr == "" {
+						typeStr := t.String()
+						results := val.NewValue(ssa.NewConst(typeStr))
+						vals = append(vals, results)
+					} else {
+						results := val.NewValue(ssa.NewConst(typeStr))
+						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+						vals = append(vals, results)
+
+						// remove version if it exists
+						index := strings.Index(typeStr, ":")
+						if index != -1 {
+							typeStr = typeStr[:index]
 							results := val.NewValue(ssa.NewConst(typeStr))
 							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 							vals = append(vals, results)
-
-							// remove version if it exists
-							index := strings.Index(typeStr, ":")
-							if index != -1 {
-								typeStr = typeStr[:index]
-								results := val.NewValue(ssa.NewConst(typeStr))
-								results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-								vals = append(vals, results)
-							}
-
-							// get type name
-							lastIndex := strings.LastIndex(typeStr, ".")
-							if lastIndex != -1 && len(typeStr) > lastIndex+1 {
-								typeStr = typeStr[lastIndex+1:]
-								results := val.NewValue(ssa.NewConst(typeStr))
-								results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-								vals = append(vals, results)
-							}
 						}
+
+						// get type name
+						lastIndex := strings.LastIndex(typeStr, ".")
+						if lastIndex != -1 && len(typeStr) > lastIndex+1 {
+							typeStr = typeStr[lastIndex+1:]
+							results := val.NewValue(ssa.NewConst(typeStr))
+							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+							vals = append(vals, results)
+						}
+					}
 				}
-				
+
 				return nil
 			})
 			if len(vals) > 0 {
@@ -225,11 +196,11 @@ func init() {
 				t := val.GetType()
 				if b, ok := t.t.(*ssa.BasicType); ok {
 					typeStr := b.GetFullTypeName()
-					if typeStr == ""{
+					if typeStr == "" {
 						typeStr := t.String()
 						results := val.NewValue(ssa.NewConst(typeStr))
 						vals = append(vals, results)
-					}else{
+					} else {
 						typeStr := b.GetFullTypeName()
 						results := val.NewValue(ssa.NewConst(typeStr))
 						vals = append(vals, results)
@@ -565,4 +536,37 @@ func init() {
 		}),
 		nc_desc(`搜索输入指令的调用指令，输入可以是任何指令，但是会尽可能搜索到调用这个指令的调用指令`),
 	)
+}
+
+func fetchProgram(v sfvm.ValueOperator) (*Program, error) {
+	var parent *Program
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		switch ret := operator.(type) {
+		case *Value:
+			parent = ret.ParentProgram
+			return utils.Error("normal abort")
+		case *Program:
+			parent = ret
+			return utils.Error("normal abort")
+		}
+		return nil
+	})
+	if parent == nil {
+		return nil, utils.Error("no parent program found")
+	}
+	return parent, nil
+}
+
+func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
+	if name == "" {
+		return
+	}
+	n := &NativeCallDocument{
+		Name: name,
+	}
+	for _, o := range options {
+		o(n)
+	}
+	NativeCallDocuments[name] = n
+	sfvm.RegisterNativeCall(n.Name, n.Function)
 }

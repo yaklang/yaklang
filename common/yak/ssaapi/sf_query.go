@@ -99,7 +99,7 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Optio
 	}, err
 }
 
-func SyntaxFlowWithOldEnv(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
+func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
 	if utils.IsNil(p) {
 		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
 	}

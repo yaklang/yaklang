@@ -269,3 +269,54 @@ func TestNativeCall_Java_FuncName(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestNativeCall_Java_Eval(t *testing.T) {
+	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`
+<eval('aArgs<getCall><getCaller><name> as $sink')>
+`).Show()
+		haveFuncName := false
+		for _, v := range sinks {
+			if strings.Contains(v.String(), "yourMethod") {
+				haveFuncName = true
+			}
+		}
+		assert.True(t, haveFuncName)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestNativeCall_Java_Eval_Show(t *testing.T) {
+	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`
+<eval('aArgs<getCall><getCaller><show><name> as $sink')>
+`).Show()
+		haveFuncName := false
+		for _, v := range sinks {
+			if strings.Contains(v.String(), "yourMethod") {
+				haveFuncName = true
+			}
+		}
+		assert.True(t, haveFuncName)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestNativeCall_Java_FuzztagNEval(t *testing.T) {
+	ssatest.Check(t, NativeCallTest, func(prog *ssaapi.Program) error {
+		sinks := prog.SyntaxFlowChain(`
+<fuzztag("<getCaller>")> as $accccc;
+<fuzztag('aArgs<getCall>{{accccc}}<name> as $sink')> as $code;
+<eval($code)><show>
+check $sink;
+`).Show()
+		haveFuncName := false
+		for _, v := range sinks {
+			if strings.Contains(v.String(), "yourMethod") {
+				haveFuncName = true
+			}
+		}
+		assert.True(t, haveFuncName)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
