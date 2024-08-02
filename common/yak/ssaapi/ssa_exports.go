@@ -16,6 +16,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+type ProcessFunc func(msg string, process float64)
+
 type config struct {
 	language        consts.Language
 	LanguageBuilder ssa.Builder
@@ -29,6 +31,9 @@ type config struct {
 	entryFile   []string
 	programPath string
 	includePath []string
+
+	// process
+	process ProcessFunc
 
 	externLib               map[string]map[string]any
 	externValue             map[string]any
@@ -63,6 +68,12 @@ func (c *config) CalcHash() string {
 }
 
 type Option func(*config)
+
+func WithProcess(process ProcessFunc) Option {
+	return func(c *config) {
+		c.process = process
+	}
+}
 
 func WithLanguage(language consts.Language) Option {
 	return func(c *config) {

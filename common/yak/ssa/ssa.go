@@ -220,6 +220,9 @@ type Program struct {
 	// for build
 	finishOnce sync.Once
 
+	// process
+	ProcessInfof func(string, ...any)
+
 	// extern lib
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type

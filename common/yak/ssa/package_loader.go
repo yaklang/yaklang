@@ -45,6 +45,8 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 	if err != nil {
 		return nil, err
 	}
+	app := p.GetApplication()
+	app.ProcessInfof("Build package %v", name)
 	for v := range ch {
 		_path := p.Loader.GetCurrentPath()
 		p.Loader.SetCurrentPath(path)
@@ -55,10 +57,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			continue
 		}
 		// var build
-		build := p.Build
-		if build == nil && p.Application != nil {
-			build = p.Application.Build
-		}
+		build := app.Build
 		if build != nil {
 			err = build(v.FileName, memedit.NewMemEditor(string(raw)), b)
 		} else {
