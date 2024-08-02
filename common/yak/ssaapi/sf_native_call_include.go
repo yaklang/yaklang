@@ -63,7 +63,7 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return false, nil, err
 	}
 
-	result, err := SyntaxFlowWithOldEnv(parent, rule.Content, sfvm.NewSFResult(rule.Content), frame.GetVM().GetConfig())
+	result, err := SyntaxFlowWithVMContext(parent, rule.Content, sfvm.NewSFResult(rule.Content), frame.GetVM().GetConfig())
 	if err != nil {
 		return false, nil, err
 	}
