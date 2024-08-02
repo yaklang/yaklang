@@ -151,6 +151,11 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			res = y.ReadMemberCallVariable(obj, key)
 		}
 		t := obj.GetType()
+
+		resTyp := res.GetType()
+		if resTyp != nil && resTyp.GetFullTypeName() != "" {
+			return res
+		}
 		if ftRaw := t.GetFullTypeName(); ftRaw!= "" {
 			newTyp := y.SetFullTypeNameForType(ftRaw,res.GetType(),true)
 			res.SetType(newTyp)
