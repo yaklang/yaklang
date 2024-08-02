@@ -311,7 +311,8 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		return y.AddFullTypeNameFromMap(className,typ)
 	}else {
 		typ = ssa.NewClassBluePrint()
-		return y.AddFullTypeNameRaw(className,typ)
+		typ = y.AddFullTypeNameForAllImport(className,typ)
+		return typ
 	}
 }
 
@@ -872,11 +873,11 @@ func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type,isFullName
 		if ft, ok := y.fullTypeNameMap[typName]; ok {
 			typStr = strings.Join(ft, ".")
 			for i := len(ft) - 1; i > 0; i-- {
-				if sca := y.GetProgram().GetApplication().GetSCAPackageByName(strings.Join(ft[:i], ".")); sca != nil {
-					version := sca.Version
+				version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
+				if version != "" {
 					typStr = (fmt.Sprintf("%s:%s", typStr, version))
 					break
-				}
+				}	
 			}
 			typ.AddFullTypeName(typStr)
 		}
@@ -898,4 +899,28 @@ func (y *builder) CopyFullTypeNameForType(allTypName []string, typ ssa.Type) ssa
 		typ.AddFullTypeName(typStr)
 	} 
 	return typ
+}
+
+func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.Type {
+	for _,ft := range y.allImportPkgSlice{
+		typStr := strings.Join(ft[:len(ft)-1], ".")
+		for i := len(ft) - 1; i > 0; i-- {
+			version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
+			if version != "" {
+				typStr = (fmt.Sprintf("%s.%s:%s", typStr, typName,version))
+				break
+			}	
+		}
+		typStr = fmt.Sprintf("%s.%s", typStr, typName)
+		typ.AddFullTypeName(typStr)
+	}
+	return typ
+}
+
+func (y *builder)GetPkgSCAVersion(pkgName string)string{
+	sca := y.GetProgram().GetApplication().GetSCAPackageByName(pkgName)
+	if sca != nil{
+		return sca.Version
+	}
+	return ""
 }
