@@ -72,6 +72,11 @@ func (h *HyperScanCenter) Scan(
 	utils.Debug(func() {
 		log.Infof("start to submit tasks for synscanner: %s port: %s", target, port)
 	})
+
+	h.synScanner.SetOnScanPublicLookup(func(ip net.IP) {
+		hostFilter.Add(ip.String())
+	})
+
 	if shuffle {
 		err = h.synScanner.RandomScan(target, port, noWait)
 	} else {
