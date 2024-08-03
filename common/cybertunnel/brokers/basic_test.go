@@ -8,6 +8,7 @@ import (
 )
 
 func TestDIGPM1(t *testing.T) {
+	t.SkipNow()
 	domain, token, err := defaultDigPm1433.Require(utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
@@ -22,6 +23,7 @@ func TestDIGPM1(t *testing.T) {
 }
 
 func TestDIGPM2(t *testing.T) {
+	t.SkipNow()
 	domain, token, err := defaultDigPMBYPASS.Require(utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
@@ -36,6 +38,7 @@ func TestDIGPM2(t *testing.T) {
 }
 
 func TestDNSLOGCN(t *testing.T) {
+	t.SkipNow()
 	domain, token, err := defaultDNSLogCN.Require(utils.FloatSecondDuration(5))
 	if err != nil {
 		panic(err)
