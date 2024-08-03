@@ -43,6 +43,7 @@ jobs:
         cp -rf web_doc/* websize/docs/api
 
     - name: Add tag and Push
+      continue-on-error: true
       run: |
         cd websize
         git config user.name "GitHub Actions"
