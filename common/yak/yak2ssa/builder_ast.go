@@ -273,14 +273,14 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 		if s, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
 			c := b.buildInstanceCode(s)
 			b.SetInstructionPosition(c)
-			b.AddDefer(c)
+			b.EmitDefer(c)
 		}
 
 		// function call
 		if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
 			if c := b.buildFunctionCallWarp(stmt, s); c != nil {
 				b.SetInstructionPosition(c)
-				b.AddDefer(c)
+				b.EmitDefer(c)
 			}
 		}
 	}

@@ -7,14 +7,13 @@ import (
 
 type ExtraFileAnalyzer interface {
 	EnableExtraFileAnalyzer() bool
-	ExtraFileAnalyze(fi.FileSystem, *Program, string) error
+	ProgramHandler(fi.FileSystem, *FunctionBuilder, string) error
 }
 
 type Builder interface {
 	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
-
 	ExtraFileAnalyzer
 }
 
@@ -26,6 +25,6 @@ func (d *DummyExtraFileAnalyzer) EnableExtraFileAnalyzer() bool {
 	return false
 }
 
-func (d *DummyExtraFileAnalyzer) ExtraFileAnalyze(fi.FileSystem, *Program, string) error {
+func (d *DummyExtraFileAnalyzer) ProgramHandler(fi.FileSystem, *FunctionBuilder, string) error {
 	return nil
 }

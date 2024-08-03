@@ -19,44 +19,44 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	}
 
 	for _, impo := range ast.AllImportDecl() {
-		if impo,ok := impo.(*gol.ImportDeclContext); ok {
+		if impo, ok := impo.(*gol.ImportDeclContext); ok {
 			b.buildImportDecl(impo)
 		}
 	}
 
 	for _, decl := range ast.AllDeclaration() {
-		if decl,ok := decl.(*gol.DeclarationContext); ok {
+		if decl, ok := decl.(*gol.DeclarationContext); ok {
 			b.buildDeclaration(decl, true)
 		}
 	}
 
 	for _, meth := range ast.AllMethodDecl() {
-		if meth,ok := meth.(*gol.MethodDeclContext); ok {
+		if meth, ok := meth.(*gol.MethodDeclContext); ok {
 			methlist = append(methlist, b.buildMethodDeclFront(meth))
 		}
 	}
 
 	for _, fun := range ast.AllFunctionDecl() {
-		if fun,ok := fun.(*gol.FunctionDeclContext); ok {
-			funclist = append(funclist, b.buildFunctionDeclFront(fun)) 
+		if fun, ok := fun.(*gol.FunctionDeclContext); ok {
+			funclist = append(funclist, b.buildFunctionDeclFront(fun))
 		}
-	}	
+	}
 
 	for i, meth := range ast.AllMethodDecl() {
-		if meth,ok := meth.(*gol.MethodDeclContext); ok {
-		    b.buildMethodDeclFinish(meth,methlist[i])
+		if meth, ok := meth.(*gol.MethodDeclContext); ok {
+			b.buildMethodDeclFinish(meth, methlist[i])
 		}
 	}
 
 	for i, fun := range ast.AllFunctionDecl() {
-		if fun,ok := fun.(*gol.FunctionDeclContext); ok {
-			b.buildFunctionDeclFinish(fun,funclist[i])
+		if fun, ok := fun.(*gol.FunctionDeclContext); ok {
+			b.buildFunctionDeclFinish(fun, funclist[i])
 		}
-	}	
+	}
 }
 
 func (b *astbuilder) buildPackage(packag *gol.PackageClauseContext) {
-    recoverRange := b.SetRange(packag.BaseParserRuleContext)
+	recoverRange := b.SetRange(packag.BaseParserRuleContext)
 	defer recoverRange()
 
 	// TODO
@@ -85,8 +85,8 @@ func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal boo
 func (b *astbuilder) buildConstDecl(constDecl *gol.ConstDeclContext) {
 	recoverRange := b.SetRange(constDecl.BaseParserRuleContext)
 	defer recoverRange()
-	for _,v := range constDecl.AllConstSpec() {
-	    b.buildConstSpec(v.(*gol.ConstSpecContext))
+	for _, v := range constDecl.AllConstSpec() {
+		b.buildConstSpec(v.(*gol.ConstSpecContext))
 	}
 }
 
@@ -97,15 +97,15 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext) {
 	var leftvl []*ssa.Variable
 	var rightvl []ssa.Value
 
-	leftList := constSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER();
-	rightList := constSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression();
+	leftList := constSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+	rightList := constSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 	for _, value := range leftList {
 		leftv := b.CreateLocalVariable(value.GetText())
-		leftvl = append(leftvl,leftv)
+		leftvl = append(leftvl, leftv)
 		b.AddToCmap(value.GetText())
 	}
 	for _, value := range rightList {
-		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext),false)
+		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 		rightvl = append(rightvl, rightv)
 	}
 	b.AssignList(leftvl, rightvl)
@@ -114,13 +114,13 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext) {
 func (b *astbuilder) buildVarDecl(varDecl *gol.VarDeclContext, isglobal bool) {
 	recoverRange := b.SetRange(varDecl.BaseParserRuleContext)
 	defer recoverRange()
-	for _,v := range varDecl.AllVarSpec() {
-	    b.buildVarSpec(v.(*gol.VarSpecContext), isglobal)
+	for _, v := range varDecl.AllVarSpec() {
+		b.buildVarSpec(v.(*gol.VarSpecContext), isglobal)
 	}
 }
 
 func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
-    recoverRange := b.SetRange(varSpec.BaseParserRuleContext)
+	recoverRange := b.SetRange(varSpec.BaseParserRuleContext)
 	defer recoverRange()
 
 	var leftvl []*ssa.Variable
@@ -128,15 +128,15 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 	var ssaTyp ssa.Type
 
 	if typ := varSpec.Type_(); typ != nil {
-	    ssaTyp = b.buildType(typ.(*gol.Type_Context))
+		ssaTyp = b.buildType(typ.(*gol.Type_Context))
 	}
 
 	_ = ssaTyp
 	a := varSpec.ASSIGN()
 
 	if isglobal {
-		if a == nil { 
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER();
+		if a == nil {
+			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
 			for _, value := range leftList {
 				recoverRange := b.SetRangeFromTerminalNode(value)
 				id := value.GetText()
@@ -146,49 +146,49 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				b.AddGlobalVariable(id, b.EmitConstInst(0))
 				recoverRange()
 			}
-		}else{
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER();
-			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression();
+		} else {
+			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 			for _, value := range leftList {
 				if b.GetFromCmap(value.GetText()) {
 					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
 				}
 			}
 			for i, value := range rightList {
-				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext),false)
+				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 				rightvl = append(rightvl, rightv)
 				b.AddGlobalVariable(leftList[i].GetText(), rightv)
 			}
 			b.AssignList(leftvl, rightvl)
 		}
-	}else{
-		if a == nil { 
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER();
+	} else {
+		if a == nil {
+			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
 			for _, value := range leftList {
 				recoverRange := b.SetRangeFromTerminalNode(value)
 				id := value.GetText()
 				if b.GetFromCmap(id) {
 					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
 				}
-			
+
 				leftv := b.CreateLocalVariable(id)
 				b.AssignVariable(leftv, b.EmitConstInst(0))
-				leftvl = append(leftvl,leftv)
+				leftvl = append(leftvl, leftv)
 				recoverRange()
 			}
-		}else{
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER();
-			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression();
+		} else {
+			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 			for _, value := range leftList {
 				if b.GetFromCmap(value.GetText()) {
 					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
 				}
-	
+
 				leftv := b.CreateLocalVariable(value.GetText())
-				leftvl = append(leftvl,leftv)
+				leftvl = append(leftvl, leftv)
 			}
 			for _, value := range rightList {
-				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext),false)
+				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 				rightvl = append(rightvl, rightv)
 			}
 			b.AssignList(leftvl, rightvl)
@@ -196,7 +196,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 	}
 }
 
-func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []ssa.Value)  {
+func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []ssa.Value) {
 	leftlen := len(leftVariables)
 	rightlen := len(rightVariables)
 
@@ -255,12 +255,12 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 		for i, _ := range leftVariables {
 			b.AssignVariable(leftVariables[i], rightVariables[i])
 		}
-	}else if(rightlen == 1){
+	} else if rightlen == 1 {
 		inter := rightVariables[0]
 		if c, ok := inter.(*ssa.Call); ok {
 			GetCallField(c, leftVariables)
 		}
-	}else{
+	} else {
 		b.NewError(ssa.Error, TAG, MultipleAssignFailed(leftlen, rightlen))
 		return
 	}
@@ -282,10 +282,10 @@ func (b *astbuilder) buildTypeSpec(ts *gol.TypeSpecContext) {
 	defer recoverRange()
 
 	if alias := ts.AliasDecl(); alias != nil {
-	    b.buildAliasDecl(alias.(*gol.AliasDeclContext))
+		b.buildAliasDecl(alias.(*gol.AliasDeclContext))
 	}
 	if typ := ts.TypeDef(); typ != nil {
-	    b.buildTypeDef(typ.(*gol.TypeDefContext))
+		b.buildTypeDef(typ.(*gol.TypeDefContext))
 	}
 }
 
@@ -296,7 +296,7 @@ func (b *astbuilder) buildAliasDecl(alias *gol.AliasDeclContext) {
 	name := alias.IDENTIFIER().GetText()
 	ssatyp := b.buildType(alias.Type_().(*gol.Type_Context))
 
-	aliast := ssa.NewAliasType(name,ssatyp.PkgPathString(),ssatyp)
+	aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
 	b.AddAlias(name, aliast)
 }
 
@@ -309,29 +309,29 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 
 	switch ssatyp.GetTypeKind() {
 	case ssa.StructTypeKind:
-		if it,ok := ssa.ToObjectType(ssatyp); ok {
+		if it, ok := ssa.ToObjectType(ssatyp); ok {
 			b.AddStruct(name, it)
 		}
 	default:
-		aliast := ssa.NewAliasType(name,ssatyp.PkgPathString(),ssatyp)
+		aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
 		b.AddAlias(name, aliast)
 	}
 }
 
-func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext){
+func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext) {
 	recoverRange := b.SetRange(typ.BaseParserRuleContext)
 	defer recoverRange()
 	var alias []*ssa.AliasType
 
 	// TODO
 
-	for _,t := range typ.AllTypeParameterDecl() {
+	for _, t := range typ.AllTypeParameterDecl() {
 		aliast := b.buildTypeParameterDecl(t.(*gol.TypeParameterDeclContext))
 		alias = append(alias, aliast...)
 	}
 }
 
-func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) []*ssa.AliasType{
+func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) []*ssa.AliasType {
 	recoverRange := b.SetRange(typ.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -345,7 +345,7 @@ func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) [
 	if idl, ok := typ.IdentifierList().(*gol.IdentifierListContext); ok {
 		for _, id := range idl.AllIDENTIFIER() {
 			name := id.GetText()
-			aliast := ssa.NewAliasType(name,ssatyp.PkgPathString(),ssatyp)
+			aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
 			alias = append(alias, aliast)
 		}
 	}
@@ -385,15 +385,15 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 	{
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
-		
+
 		if typeps := fun.TypeParameters(); typeps != nil {
 			b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
 		}
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
-			params,result = b.buildSignature(para)
+			params, result = b.buildSignature(para)
 		}
-		
+
 		handleFunctionType(b.Function)
 
 		b.FunctionBuilder = b.PopFunction()
@@ -434,7 +434,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 	if Name := fun.IDENTIFIER(); Name != nil {
 		funcName = Name.GetText()
 	}
-	
+
 	b.SupportClosure = false
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(funcName)
@@ -460,20 +460,20 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 	{
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
-		
+
 		if recove := fun.Receiver(); recove != nil {
 			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))
-			for _,t := range ssatyp {
-				if it,ok := ssa.ToObjectType(t); ok {
+			for _, t := range ssatyp {
+				if it, ok := ssa.ToObjectType(t); ok {
 					it.AddMethod(funcName, newFunc)
 				}
 			}
 		}
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
-			params,result = b.buildSignature(para)
+			params, result = b.buildSignature(para)
 		}
-		
+
 		handleFunctionType(b.Function)
 
 		b.FunctionBuilder = b.PopFunction()
@@ -506,12 +506,12 @@ func (b *astbuilder) buildMethodDeclFinish(fun *gol.MethodDeclContext, newFunc *
 	b.FunctionBuilder = b.PopFunction()
 }
 
-func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) ([]ssa.Type){
+func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if parameters := stmt.Parameters(); parameters != nil {
-	    return b.buildReceiverParameter(parameters.(*gol.ParametersContext))
+		return b.buildReceiverParameter(parameters.(*gol.ParametersContext))
 	}
 	return nil
 }
@@ -523,8 +523,8 @@ func (b *astbuilder) buildReceiverParameter(parms *gol.ParametersContext) []ssa.
 
 	if f := parms.AllParameterDecl(); f != nil {
 		for _, i := range f {
-			types = append(types,b.buildReceiverDecl(i.(*gol.ParameterDeclContext)) )
-		} 
+			types = append(types, b.buildReceiverDecl(i.(*gol.ParameterDeclContext)))
+		}
 	}
 
 	return types
@@ -540,7 +540,7 @@ func (b *astbuilder) buildReceiverDecl(para *gol.ParameterDeclContext) ssa.Type 
 	}
 
 	if idlist := para.IdentifierList(); idlist != nil {
-	    pList := b.buildParamList(idlist.(*gol.IdentifierListContext))
+		pList := b.buildParamList(idlist.(*gol.IdentifierListContext))
 		if typeType != nil {
 			for _, p := range pList {
 				p.SetType(typeType)
@@ -548,10 +548,10 @@ func (b *astbuilder) buildReceiverDecl(para *gol.ParameterDeclContext) ssa.Type 
 		}
 	}
 
-	return typeType 
+	return typeType
 }
 
-func (b *astbuilder) buildSignature(stmt *gol.SignatureContext) ([]ssa.Type,ssa.Type) {
+func (b *astbuilder) buildSignature(stmt *gol.SignatureContext) ([]ssa.Type, ssa.Type) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -559,19 +559,18 @@ func (b *astbuilder) buildSignature(stmt *gol.SignatureContext) ([]ssa.Type,ssa.
 	var rett ssa.Type
 
 	if paras := stmt.Parameters(); paras != nil {
-	    paramt = b.buildParameters(paras.(*gol.ParametersContext))
+		paramt = b.buildParameters(paras.(*gol.ParametersContext))
 	}
 
 	if rety := stmt.Result(); rety != nil {
-	    rett = b.buildResult(rety.(*gol.ResultContext))
+		rett = b.buildResult(rety.(*gol.ResultContext))
 	}
 
-	return paramt,rett
+	return paramt, rett
 }
 
-
 func (b *astbuilder) buildParameters(parms *gol.ParametersContext) []ssa.Type {
-    recoverRange := b.SetRange(parms.BaseParserRuleContext)
+	recoverRange := b.SetRange(parms.BaseParserRuleContext)
 	defer recoverRange()
 
 	var paramt []ssa.Type
@@ -579,10 +578,10 @@ func (b *astbuilder) buildParameters(parms *gol.ParametersContext) []ssa.Type {
 	if f := parms.AllParameterDecl(); f != nil {
 		for _, i := range f {
 			if a, ok := i.(*gol.ParameterDeclContext); ok {
-				paramt = append(paramt,  b.buildParameterDecl(a)...)
+				paramt = append(paramt, b.buildParameterDecl(a)...)
 			}
-		} 
-	}else{
+		}
+	} else {
 		b.NewError(ssa.Error, TAG, ArrowFunctionNeedExpressionOrBlock())
 	}
 
@@ -593,14 +592,14 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 	recoverRange := b.SetRange(para.BaseParserRuleContext)
 	defer recoverRange()
 
-	var typeType ssa.Type 
+	var typeType ssa.Type
 	var typeTypes []ssa.Type
 	if typ := para.Type_(); typ != nil {
 		typeType = b.buildType(typ.(*gol.Type_Context))
 	}
 
 	if idlist := para.IdentifierList(); idlist != nil {
-	    pList := b.buildParamList(idlist.(*gol.IdentifierListContext))
+		pList := b.buildParamList(idlist.(*gol.IdentifierListContext))
 		if typeType != nil {
 			for _, p := range pList {
 				typeTypes = append(typeTypes, typeType)
@@ -612,7 +611,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 	return []ssa.Type{typeType}
 }
 
-func (b *astbuilder) buildParamList(idList *gol.IdentifierListContext) []*ssa.Parameter{
+func (b *astbuilder) buildParamList(idList *gol.IdentifierListContext) []*ssa.Parameter {
 	recoverRange := b.SetRange(idList.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -622,25 +621,25 @@ func (b *astbuilder) buildParamList(idList *gol.IdentifierListContext) []*ssa.Pa
 		p := b.NewParam(id.GetText())
 		pList = append(pList, p)
 	}
-	
+
 	return pList
 }
 
-func (b *astbuilder) buildStructList(idList *gol.IdentifierListContext) []ssa.Value{
+func (b *astbuilder) buildStructList(idList *gol.IdentifierListContext) []ssa.Value {
 	recoverRange := b.SetRange(idList.BaseParserRuleContext)
 	defer recoverRange()
 
 	var pList []ssa.Value
 
 	for _, id := range idList.AllIDENTIFIER() {
-	    p := b.EmitConstInst(id.GetText())
+		p := b.EmitConstInst(id.GetText())
 		pList = append(pList, p)
 	}
 
 	return pList
 }
 
-func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext,isLocal bool) []*ssa.Variable { 
+func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext, isLocal bool) []*ssa.Variable {
 	recoverRange := b.SetRange(idList.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -649,9 +648,9 @@ func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext,isLoc
 	for _, id := range idList.AllIDENTIFIER() {
 		text := id.GetText()
 		if isLocal {
-			vList = append(vList, b.CreateLocalVariable(text)) 
+			vList = append(vList, b.CreateLocalVariable(text))
 		} else {
-			vList = append(vList, b.CreateVariable(text)) 
+			vList = append(vList, b.CreateVariable(text))
 		}
 	}
 
@@ -659,11 +658,11 @@ func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext,isLoc
 }
 
 func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
-    recoverRange := b.SetRange(rety.BaseParserRuleContext)
+	recoverRange := b.SetRange(rety.BaseParserRuleContext)
 	defer recoverRange()
-	var typeType ssa.Type 
+	var typeType ssa.Type
 	if typ := rety.Type_(); typ != nil {
-	    typeType = b.buildType(typ.(*gol.Type_Context))
+		typeType = b.buildType(typ.(*gol.Type_Context))
 	}
 
 	if paras := rety.Parameters(); paras != nil {
@@ -671,7 +670,7 @@ func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
 		obj := ssa.NewObjectType()
 		obj.SetTypeKind(ssa.TupleTypeKind)
 		for i := range field {
-		    obj.AddField(key[i], field[i])
+			obj.AddField(key[i], field[i])
 		}
 		return obj
 	}
@@ -679,7 +678,7 @@ func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
 	return typeType
 }
 
-func (b *astbuilder) buildResultParameters(parms *gol.ParametersContext) ([]ssa.Value,[]ssa.Type)  {
+func (b *astbuilder) buildResultParameters(parms *gol.ParametersContext) ([]ssa.Value, []ssa.Type) {
 	recoverRange := b.SetRange(parms.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -692,8 +691,8 @@ func (b *astbuilder) buildResultParameters(parms *gol.ParametersContext) ([]ssa.
 				key = append(key, keyt...)
 				field = append(field, fieldt...)
 			}
-		} 
-	}else{
+		}
+	} else {
 		b.NewError(ssa.Error, TAG, ArrowFunctionNeedExpressionOrBlock())
 	}
 
@@ -729,7 +728,7 @@ func (b *astbuilder) buildResultParameterDecl(para *gol.ParameterDeclContext) ([
 	return []ssa.Value{zero}, []ssa.Type{ssatyp}
 }
 
-func (b *astbuilder) buildBlock(block *gol.BlockContext,syntaxBlocks ...bool) {
+func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 	syntaxBlock := false
 	if len(syntaxBlocks) > 0 {
 		syntaxBlock = syntaxBlocks[0]
@@ -741,15 +740,15 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext,syntaxBlocks ...bool) {
 	b.InCmapLevel()
 	defer b.OutCmapLevel()
 
-	s, ok := block.StatementList().(*gol.StatementListContext);
-		
-	if (!ok) {
+	s, ok := block.StatementList().(*gol.StatementListContext)
+
+	if !ok {
 		b.NewError(ssa.Warn, TAG, "empty block")
 		return
 	}
 
 	if syntaxBlock {
-		b.BuildSyntaxBlock(func(){
+		b.BuildSyntaxBlock(func() {
 			b.buildStatementList(s)
 		})
 	} else {
@@ -757,7 +756,7 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext,syntaxBlocks ...bool) {
 	}
 }
 
-func (b* astbuilder) buildStatementList(stmt *gol.StatementListContext) {
+func (b *astbuilder) buildStatementList(stmt *gol.StatementListContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	allstmt := stmt.AllStatement()
@@ -793,31 +792,31 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 	}
 
 	if s, ok := stmt.IfStmt().(*gol.IfStmtContext); ok {
-	    b.buildIfStmt(s)
+		b.buildIfStmt(s)
 	}
 
 	if s, ok := stmt.ForStmt().(*gol.ForStmtContext); ok {
-	    b.buildForStmt(s)
+		b.buildForStmt(s)
 	}
 
 	if s, ok := stmt.SwitchStmt().(*gol.SwitchStmtContext); ok {
-	    b.buildSwitchStmt(s)
+		b.buildSwitchStmt(s)
 	}
 
 	if s, ok := stmt.SelectStmt().(*gol.SelectStmtContext); ok {
-	    b.buildSelectStmt(s)
+		b.buildSelectStmt(s)
 	}
-	
+
 	if s, ok := stmt.Block().(*gol.BlockContext); ok {
-	    b.buildBlock(s,true)
+		b.buildBlock(s, true)
 	}
 
 	if s, ok := stmt.BreakStmt().(*gol.BreakStmtContext); ok {
-	    b.buildBreakStmt(s)
+		b.buildBreakStmt(s)
 	}
 
 	if s, ok := stmt.ContinueStmt().(*gol.ContinueStmtContext); ok {
-	    b.buildContinueStmt(s)
+		b.buildContinueStmt(s)
 	}
 
 	if s, ok := stmt.FallthroughStmt().(*gol.FallthroughStmtContext); ok {
@@ -825,15 +824,15 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 	}
 
 	if s, ok := stmt.LabeledStmt().(*gol.LabeledStmtContext); ok {
-	    b.buildLabeledStmt(s)
+		b.buildLabeledStmt(s)
 	}
 
 	if s, ok := stmt.GotoStmt().(*gol.GotoStmtContext); ok {
-	    b.buildGotoStmt(s)
+		b.buildGotoStmt(s)
 	}
 
 	if s, ok := stmt.DeferStmt().(*gol.DeferStmtContext); ok {
-	    b.buildDeferStmt(s)
+		b.buildDeferStmt(s)
 	}
 
 	if s, ok := stmt.GoStmt().(*gol.GoStmtContext); ok {
@@ -841,12 +840,12 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 	}
 }
 
-func (b* astbuilder) buildGoStmt(stmt *gol.GoStmtContext){
+func (b *astbuilder) buildGoStmt(stmt *gol.GoStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if stmt, ok := stmt.Expression().(*gol.ExpressionContext); ok {
-	    rightv := b.buildDeferGoExpression(stmt)
+		rightv := b.buildDeferGoExpression(stmt)
 		switch t := rightv.(type) {
 		case *ssa.Call:
 			t.Async = true
@@ -857,7 +856,7 @@ func (b* astbuilder) buildGoStmt(stmt *gol.GoStmtContext){
 	}
 }
 
-func (b* astbuilder) buildFallthroughStmt(stmt *gol.FallthroughStmtContext){
+func (b *astbuilder) buildFallthroughStmt(stmt *gol.FallthroughStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -866,30 +865,30 @@ func (b* astbuilder) buildFallthroughStmt(stmt *gol.FallthroughStmtContext){
 	}
 }
 
-func (b* astbuilder) buildDeferStmt(stmt *gol.DeferStmtContext){
+func (b *astbuilder) buildDeferStmt(stmt *gol.DeferStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	
+
 	if stmt, ok := stmt.Expression().(*gol.ExpressionContext); ok {
-	    rightv := b.buildDeferGoExpression(stmt)
+		rightv := b.buildDeferGoExpression(stmt)
 		switch t := rightv.(type) {
 		case *ssa.Call:
 			b.SetInstructionPosition(t)
-			b.AddDefer(t)
+			b.EmitDefer(t)
 		default:
 			b.NewError(ssa.Error, TAG, "defer statement error")
 		}
 	}
 }
 
-func (b* astbuilder) buildDeferGoExpression(stmt *gol.ExpressionContext) ssa.Value {
+func (b *astbuilder) buildDeferGoExpression(stmt *gol.ExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var rv ssa.Value
 	if p := stmt.PrimaryExpr(); p != nil {
 		if p := p.(*gol.PrimaryExprContext).PrimaryExpr(); p != nil {
-			rv,_ = b.buildPrimaryExpression(p.(*gol.PrimaryExprContext),false)
+			rv, _ = b.buildPrimaryExpression(p.(*gol.PrimaryExprContext), false)
 		}
 		if a := p.(*gol.PrimaryExprContext).Arguments(); a != nil {
 			args := b.buildArgumentsExpression(a.(*gol.ArgumentsContext))
@@ -899,26 +898,26 @@ func (b* astbuilder) buildDeferGoExpression(stmt *gol.ExpressionContext) ssa.Val
 	return nil
 }
 
-func (b* astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
+func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// TODO
 	/*
-	var _goto *ssa.BasicBlock
-	if id := stmt.IDENTIFIER(); id != nil {
-		text := id.GetText()
-		if _goto = b.GetLabel(text); _goto != nil {
-			b.EmitJump(_goto)
-		} else {
-			b.NewError(ssa.Error, TAG, UndefineLabelstmt())
+		var _goto *ssa.BasicBlock
+		if id := stmt.IDENTIFIER(); id != nil {
+			text := id.GetText()
+			if _goto = b.GetLabel(text); _goto != nil {
+				b.EmitJump(_goto)
+			} else {
+				b.NewError(ssa.Error, TAG, UndefineLabelstmt())
+			}
+			return
 		}
-		return
-	}
 	*/
 }
 
-func (b* astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
+func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	// TODO: Label not defined
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
@@ -939,7 +938,7 @@ func (b* astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	b.DeleteLabel(text)
 }
 
-func (b* astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
+func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -947,7 +946,6 @@ func (b* astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
 		b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
 	}
 }
-
 
 func (b *astbuilder) buildBreakStmt(stmt *gol.BreakStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
@@ -980,15 +978,15 @@ func (b *astbuilder) buildSelectStmt(stmt *gol.SelectStmtContext) {
 	var casepList []*gol.CommClauseContext
 	var defaultp *gol.CommClauseContext
 
-	for _, commCase := range  stmt.AllCommClause() {
-	    if commSwitchCase := commCase.(*gol.CommClauseContext).CommCase(); commSwitchCase != nil {
-	        if commSwitchCase.(*gol.CommCaseContext).DEFAULT() != nil {
+	for _, commCase := range stmt.AllCommClause() {
+		if commSwitchCase := commCase.(*gol.CommClauseContext).CommCase(); commSwitchCase != nil {
+			if commSwitchCase.(*gol.CommCaseContext).DEFAULT() != nil {
 				defaultp = commCase.(*gol.CommClauseContext)
 			}
 			if commSwitchCase.(*gol.CommCaseContext).CASE() != nil {
-			    casepList = append(casepList, commCase.(*gol.CommClauseContext))
+				casepList = append(casepList, commCase.(*gol.CommClauseContext))
 			}
-	    }
+		}
 	}
 
 	SwitchBuilder.BuildCaseSize(len(casepList))
@@ -996,7 +994,7 @@ func (b *astbuilder) buildSelectStmt(stmt *gol.SelectStmtContext) {
 		if commcList := casepList[i].CommCase(); commcList != nil {
 			if sendList := commcList.(*gol.CommCaseContext).SendStmt(); sendList != nil {
 				values = b.buildSendStmt(sendList.(*gol.SendStmtContext))
-			}else if recvList := commcList.(*gol.CommCaseContext).RecvStmt(); recvList != nil {
+			} else if recvList := commcList.(*gol.CommCaseContext).RecvStmt(); recvList != nil {
 				values = b.buildRecvStmt(recvList.(*gol.RecvStmtContext))
 			}
 		}
@@ -1021,19 +1019,19 @@ func (b *astbuilder) buildSelectStmt(stmt *gol.SelectStmtContext) {
 	SwitchBuilder.Finish()
 }
 
-func (b* astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
-    recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+func (b *astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var channv ssa.Value
 	var datav ssa.Value
 
 	if chann := stmt.GetChannel(); chann != nil {
-		channv,_ = b.buildExpression(chann.(*gol.ExpressionContext), false)
+		channv, _ = b.buildExpression(chann.(*gol.ExpressionContext), false)
 	}
 
 	if data := stmt.GetData(); data != nil {
-		datav,_ = b.buildExpression(data.(*gol.ExpressionContext), false)
+		datav, _ = b.buildExpression(data.(*gol.ExpressionContext), false)
 	}
 
 	// TODO handler "<-"
@@ -1043,48 +1041,47 @@ func (b* astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
 	return nil
 }
 
-func (b* astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
-    recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+func (b *astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var recvv ssa.Value
 
 	if exp := stmt.GetRecvExpr(); exp != nil {
-	    recvv,_ = b.buildExpression(exp.(*gol.ExpressionContext), false)
+		recvv, _ = b.buildExpression(exp.(*gol.ExpressionContext), false)
 	}
 
 	if expl := stmt.ExpressionList(); expl != nil {
 		for _, exp := range expl.(*gol.ExpressionListContext).AllExpression() {
 			_, leftv := b.buildExpression(exp.(*gol.ExpressionContext), false)
-			b.AssignVariable(leftv,recvv)
+			b.AssignVariable(leftv, recvv)
 		}
 	}
 
 	if idl := stmt.IdentifierList(); idl != nil {
 		for _, id := range idl.(*gol.IdentifierListContext).AllIDENTIFIER() {
 			leftv := b.CreateLocalVariable(id.GetText())
-			b.AssignVariable(leftv,recvv)
+			b.AssignVariable(leftv, recvv)
 		}
 	}
 
 	return []ssa.Value{recvv}
 }
 
-
 func (b *astbuilder) buildSwitchStmt(stmt *gol.SwitchStmtContext) {
-    recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.ExprSwitchStmt().(*gol.ExprSwitchStmtContext); ok {
-	    b.buildExprSwitchStmt(s)
+		b.buildExprSwitchStmt(s)
 	}
 	if s, ok := stmt.TypeSwitchStmt().(*gol.TypeSwitchStmtContext); ok {
-	    b.buildTypeSwitchStmt(s)
+		b.buildTypeSwitchStmt(s)
 	}
 }
 
 func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
-    recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	SwitchBuilder := b.BuildSwitch()
@@ -1097,24 +1094,24 @@ func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
 			if expr, ok := stmt.SimpleStmt().(*gol.SimpleStmtContext); ok {
 				b.buildSimpleStmt(expr)
 			}
-			cond,_ = b.buildExpression(expr,false)
+			cond, _ = b.buildExpression(expr, false)
 			return cond
 		})
-	} 
+	}
 
 	var values []ssa.Value
 	var casepList []*gol.ExprCaseClauseContext
 	var defaultp *gol.ExprCaseClauseContext
 
-	for _, exprCase := range  stmt.AllExprCaseClause() {
-	    if exprSwitchCase := exprCase.(*gol.ExprCaseClauseContext).ExprSwitchCase(); exprSwitchCase != nil {
-	        if exprSwitchCase.(*gol.ExprSwitchCaseContext).DEFAULT() != nil {
+	for _, exprCase := range stmt.AllExprCaseClause() {
+		if exprSwitchCase := exprCase.(*gol.ExprCaseClauseContext).ExprSwitchCase(); exprSwitchCase != nil {
+			if exprSwitchCase.(*gol.ExprSwitchCaseContext).DEFAULT() != nil {
 				defaultp = exprCase.(*gol.ExprCaseClauseContext)
 			}
 			if exprSwitchCase.(*gol.ExprSwitchCaseContext).CASE() != nil {
-			    casepList = append(casepList, exprCase.(*gol.ExprCaseClauseContext))
+				casepList = append(casepList, exprCase.(*gol.ExprCaseClauseContext))
 			}
-	    }
+		}
 	}
 
 	SwitchBuilder.BuildCaseSize(len(casepList))
@@ -1122,7 +1119,7 @@ func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
 		if exprcList := casepList[i].ExprSwitchCase(); exprcList != nil {
 			if exprList := exprcList.(*gol.ExprSwitchCaseContext).ExpressionList(); exprList != nil {
 				for _, expr := range exprList.(*gol.ExpressionListContext).AllExpression() {
-				    rightv, _ := b.buildExpression(expr.(*gol.ExpressionContext),false)
+					rightv, _ := b.buildExpression(expr.(*gol.ExpressionContext), false)
 					values = append(values, rightv)
 				}
 			}
@@ -1165,15 +1162,15 @@ func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
 	if sg, ok := stmt.TypeSwitchGuard().(*gol.TypeSwitchGuardContext); ok {
 		if expr, ok := sg.PrimaryExpr().(*gol.PrimaryExprContext); ok {
 			SwitchBuilder.BuildCondition(func() ssa.Value {
-				cond,_ = b.buildPrimaryExpression(expr,false)
+				cond, _ = b.buildPrimaryExpression(expr, false)
 				return b.EmitTypeValue(cond.GetType())
 			})
-		} 
-	
+		}
+
 		var values []ssa.Value
 		var casepList []*gol.TypeCaseClauseContext
 		var defaultp *gol.TypeCaseClauseContext
-	
+
 		for _, typeCase := range stmt.AllTypeCaseClause() {
 			if typeSwitchCase := typeCase.(*gol.TypeCaseClauseContext).TypeSwitchCase(); typeSwitchCase != nil {
 				if typeSwitchCase.(*gol.TypeSwitchCaseContext).DEFAULT() != nil {
@@ -1184,7 +1181,7 @@ func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
 				}
 			}
 		}
-	
+
 		SwitchBuilder.BuildCaseSize(len(casepList))
 		SwitchBuilder.SetCase(func(i int) []ssa.Value {
 			if typecList := casepList[i].TypeSwitchCase(); typecList != nil {
@@ -1197,13 +1194,13 @@ func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
 			}
 			return values
 		})
-	
+
 		SwitchBuilder.BuildBody(func(i int) {
 			if stmtList := casepList[i].StatementList(); stmtList != nil {
 				b.buildStatementList(stmtList.(*gol.StatementListContext))
 			}
 		})
-	
+
 		// default
 		if defaultp != nil {
 			SwitchBuilder.BuildDefault(func() {
@@ -1216,7 +1213,6 @@ func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
 
 	SwitchBuilder.Finish()
 }
-
 
 func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
@@ -1260,7 +1256,7 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			} else {
 				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 				// defer recoverRange()
-				condition,_ = b.buildExpression(cond,false)
+				condition, _ = b.buildExpression(cond, false)
 				if condition == nil {
 					condition = b.EmitConstInst(true)
 					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
@@ -1282,10 +1278,10 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	loop.Finish()
 }
 
-func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext,loop *ssa.LoopBuilder) {
+func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext, loop *ssa.LoopBuilder) {
 	var value ssa.Value
 	loop.SetFirst(func() []ssa.Value {
-		value,_ = b.buildExpression(stmt.Expression().(*gol.ExpressionContext), false)
+		value, _ = b.buildExpression(stmt.Expression().(*gol.ExpressionContext), false)
 		return []ssa.Value{value}
 	})
 
@@ -1293,7 +1289,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext,loop *ssa.Lo
 		var lefts []*ssa.Variable
 
 		if leftList, ok := stmt.IdentifierList().(*gol.IdentifierListContext); ok {
-			lefts = b.buildIdentifierList(leftList,true)
+			lefts = b.buildIdentifierList(leftList, true)
 		}
 
 		key, field, ok := b.EmitNext(value, stmt.ASSIGN() != nil)
@@ -1316,7 +1312,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext,loop *ssa.Lo
 }
 
 func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
-    recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	builder := b.CreateIfBuilder()
@@ -1329,7 +1325,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 					if s, ok := stmt.SimpleStmt().(*gol.SimpleStmtContext); ok {
 						b.buildSimpleStmt(s)
 					}
-				
+
 					expressionStmt, ok := expression.(*gol.ExpressionContext)
 					if !ok {
 						return nil
@@ -1339,7 +1335,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 					b.AppendBlockRange()
 					recoverRange()
 
-					rvalue,_ := b.buildExpression(expressionStmt,false)
+					rvalue, _ := b.buildExpression(expressionStmt, false)
 					return rvalue
 				},
 				func() {
@@ -1347,7 +1343,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 				},
 			)
 		}
-		
+
 		if stmt.ELSE() != nil {
 			if elseBlock, ok := stmt.Block(1).(*gol.BlockContext); ok {
 				return func() {
@@ -1366,7 +1362,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 	elseBlock := build(stmt)
 	builder.SetElse(elseBlock)
 	builder.Build()
-}	
+}
 
 func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
@@ -1375,7 +1371,7 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 	var values []ssa.Value
 
 	if expl, ok := stmt.ExpressionList().(*gol.ExpressionListContext); ok {
-		for s := range expl.AllExpression(){
+		for s := range expl.AllExpression() {
 			rightv, _ := b.buildExpression(expl.Expression(s).(*gol.ExpressionContext), false)
 			values = append(values, rightv)
 		}
@@ -1383,9 +1379,9 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 	} else {
 		results := b.GetResultDefault()
 		if results != nil {
-		   	for _,result := range results {
+			for _, result := range results {
 				values = append(values, b.PeekValue(result))
-		   	}
+			}
 			b.EmitReturn(values)
 		} else {
 			b.NewError(ssa.Warn, TAG, "cannot return nil")
@@ -1395,28 +1391,28 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 }
 
 func (b *astbuilder) buildSimpleStmt(stmt *gol.SimpleStmtContext) []ssa.Value {
-    
+
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.ExpressionStmt().(*gol.ExpressionStmtContext); ok {
 		return b.buildExpressionStmt(s)
 	}
-	
+
 	if s, ok := stmt.ShortVarDecl().(*gol.ShortVarDeclContext); ok {
-	    return b.buildShortVarDecl(s)
+		return b.buildShortVarDecl(s)
 	}
 
 	if s, ok := stmt.Assignment().(*gol.AssignmentContext); ok {
-	    return b.buildAssignment(s)
+		return b.buildAssignment(s)
 	}
 
 	if s, ok := stmt.IncDecStmt().(*gol.IncDecStmtContext); ok {
-	    return b.buildIncDecStmt(s)
+		return b.buildIncDecStmt(s)
 	}
 
 	if s, ok := stmt.SendStmt().(*gol.SendStmtContext); ok {
-	    return b.buildSendStmt(s)
+		return b.buildSendStmt(s)
 	}
 
 	return nil
@@ -1425,29 +1421,28 @@ func (b *astbuilder) buildSimpleStmt(stmt *gol.SimpleStmtContext) []ssa.Value {
 func (b *astbuilder) buildIncDecStmt(stmt *gol.IncDecStmtContext) []ssa.Value {
 	var values []ssa.Value
 
-    if exp := stmt.Expression(); exp != nil {
-        _,leftv := b.buildExpression(exp.(*gol.ExpressionContext), true)
+	if exp := stmt.Expression(); exp != nil {
+		_, leftv := b.buildExpression(exp.(*gol.ExpressionContext), true)
 
-		if stmt.PLUS_PLUS() != nil{
+		if stmt.PLUS_PLUS() != nil {
 			value := b.EmitBinOp(ssa.OpAdd, b.ReadValueByVariable(leftv), b.EmitConstInst(1))
 			b.AssignVariable(leftv, value)
 			values = []ssa.Value{value}
-		}else if stmt.MINUS_MINUS() != nil{
+		} else if stmt.MINUS_MINUS() != nil {
 			value := b.EmitBinOp(ssa.OpSub, b.ReadValueByVariable(leftv), b.EmitConstInst(1))
 			b.AssignVariable(leftv, value)
 			values = []ssa.Value{value}
-		}else{
+		} else {
 			return nil
 		}
-    }
+	}
 
 	return values
 }
 
-
 func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Value {
-	leftList := stmt.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER();
-	rightList := stmt.ExpressionList().(*gol.ExpressionListContext).AllExpression();
+	leftList := stmt.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+	rightList := stmt.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 
 	var leftvl []*ssa.Variable
 	var rightvl []ssa.Value
@@ -1460,7 +1455,7 @@ func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Valu
 		leftvl = append(leftvl, leftv)
 	}
 	for _, value := range rightList {
-		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext),false)
+		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 		rightvl = append(rightvl, rightv)
 	}
 
@@ -1474,15 +1469,15 @@ func (b *astbuilder) buildAssignment(stmt *gol.AssignmentContext) []ssa.Value {
 	var rightvl []ssa.Value
 	var ssaop ssa.BinaryOpcode
 
-	leftList := stmt.ExpressionList(0).(*gol.ExpressionListContext).AllExpression();
-	rightList := stmt.ExpressionList(1).(*gol.ExpressionListContext).AllExpression();
+	leftList := stmt.ExpressionList(0).(*gol.ExpressionListContext).AllExpression()
+	rightList := stmt.ExpressionList(1).(*gol.ExpressionListContext).AllExpression()
 
 	for _, value := range leftList {
-		_, leftv := b.buildExpression(value.(*gol.ExpressionContext),true)
+		_, leftv := b.buildExpression(value.(*gol.ExpressionContext), true)
 		leftvl = append(leftvl, leftv)
 	}
 	for _, value := range rightList {
-		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext),false)
+		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 		rightvl = append(rightvl, rightv)
 	}
 
@@ -1491,30 +1486,30 @@ func (b *astbuilder) buildAssignment(stmt *gol.AssignmentContext) []ssa.Value {
 	} else {
 		op := stmt.Assign_op()
 		switch op.GetText() {
-			case "+=":
-				ssaop = ssa.OpAdd
-			case "-=":
-				ssaop = ssa.OpSub
-			case "*=":
-				ssaop = ssa.OpMul
-			case "/=":
-				ssaop = ssa.OpDiv
-			case "%=":
-				ssaop = ssa.OpMod
-			case "&=":
-				ssaop = ssa.OpAnd
-			case "|=":
-				ssaop = ssa.OpOr
-			case "^=":
-				ssaop = ssa.OpXor
-			case "<<=":
-				ssaop = ssa.OpShl
-			case ">>=":
-				ssaop = ssa.OpShr
-			case "&^=":
-				ssaop = ssa.OpAndNot
+		case "+=":
+			ssaop = ssa.OpAdd
+		case "-=":
+			ssaop = ssa.OpSub
+		case "*=":
+			ssaop = ssa.OpMul
+		case "/=":
+			ssaop = ssa.OpDiv
+		case "%=":
+			ssaop = ssa.OpMod
+		case "&=":
+			ssaop = ssa.OpAnd
+		case "|=":
+			ssaop = ssa.OpOr
+		case "^=":
+			ssaop = ssa.OpXor
+		case "<<=":
+			ssaop = ssa.OpShl
+		case ">>=":
+			ssaop = ssa.OpShr
+		case "&^=":
+			ssaop = ssa.OpAndNot
 		}
-		retv := b.EmitBinOp(ssaop, b.ReadValueByVariable(leftvl[0]) , rightvl[0])
+		retv := b.EmitBinOp(ssaop, b.ReadValueByVariable(leftvl[0]), rightvl[0])
 		b.AssignList(leftvl, []ssa.Value{retv})
 	}
 
@@ -1528,19 +1523,18 @@ func (b *astbuilder) buildTypeArgs(stmt *gol.TypeArgsContext) {
 	// TODO
 }
 
-
 func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
-    recoverRange := b.SetRange(typ.BaseParserRuleContext)
+	recoverRange := b.SetRange(typ.BaseParserRuleContext)
 	defer recoverRange()
-	var ssatyp ssa.Type 
+	var ssatyp ssa.Type
 
 	if lit := typ.Type_(); lit != nil {
-	    ssatyp = b.buildType(lit.(*gol.Type_Context))
+		ssatyp = b.buildType(lit.(*gol.Type_Context))
 	}
 
-	if name := typ.TypeName();name != nil {
+	if name := typ.TypeName(); name != nil {
 		text := typ.GetText()
-	    ssatyp = ssa.GetTypeByStr(text)
+		ssatyp = ssa.GetTypeByStr(text)
 		if ssatyp == nil {
 			ssatyp = b.GetAliasByStr(text)
 		}
@@ -1549,25 +1543,24 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 		}
 	}
 
-	if args := typ.TypeArgs();args != nil {
-	    b.buildTypeArgs(args.(*gol.TypeArgsContext))
+	if args := typ.TypeArgs(); args != nil {
+		b.buildTypeArgs(args.(*gol.TypeArgsContext))
 	}
 
 	if lit := typ.TypeLit(); lit != nil {
-	    ssatyp,_ = b.buildTypeLit(lit.(*gol.TypeLitContext))
+		ssatyp, _ = b.buildTypeLit(lit.(*gol.TypeLitContext))
 	}
-	
+
 	return ssatyp
 }
-
 
 func (b *astbuilder) buildTypeElement(stmt *gol.TypeElementContext) ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	for _,typt := range stmt.AllTypeTerm() {
+	for _, typt := range stmt.AllTypeTerm() {
 		if typ := typt.(*gol.TypeTermContext).Type_(); typ != nil {
-		    ssatyp := b.buildType(typ.(*gol.Type_Context))
+			ssatyp := b.buildType(typ.(*gol.Type_Context))
 			return ssatyp
 		}
 	}
@@ -1605,7 +1598,6 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 	{
 		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
-		
 
 		if para, ok := stmt.Result().(*gol.ResultContext); ok {
 			b.buildResult(para)

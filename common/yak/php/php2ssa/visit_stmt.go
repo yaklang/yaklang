@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -19,10 +20,7 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 		return nil
 	}
 
-	if y.MoreParse {
-		y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
-		return nil
-	}
+	y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
 	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
 	y.VisitUseDeclaration(i.UseDeclaration())
 	y.VisitStatement(i.Statement())
@@ -75,6 +73,9 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 
 	i, _ := raw.(*phpparser.NamespaceDeclarationContext)
 	if i == nil {
+		return nil
+	}
+	if !y.MoreParse {
 		return nil
 	}
 	beforfunc := func() {
@@ -158,7 +159,12 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	if i == nil {
 		return nil
 	}
-	opmode := strings.TrimSpace(i.GetOpmode().GetText())
+	var opmode string
+	if i.GetOpmode() != nil {
+		opmode = strings.TrimSpace(i.GetOpmode().GetText())
+	} else {
+		opmode = ""
+	}
 	prog := y.GetProgram().GetApplication()
 	y.VisitUseDeclarationContentList(i.UseDeclarationContentList(), func(path []string, aliasMap map[string]string) {
 		defer func() {
@@ -167,14 +173,13 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 			}
 		}()
 		for old, alias := range aliasMap {
-			if function := y.GetProgram().GetFunction(alias); !utils.IsNil(function) {
-				log.Warnf("current builder has function: %s", function.GetName())
-				continue
-			}
 			switch opmode {
-			case "const":
-			//todo:
-			case "function":
+			case "const", "function":
+				//todo const
+				if function := y.GetProgram().GetFunction(alias); !utils.IsNil(function) {
+					log.Warnf("current builder has function: %s", function.GetName())
+					continue
+				}
 				if library, _ := prog.GetLibrary(strings.Join(path, ".")); !utils.IsNil(library) {
 					if function := library.GetFunction(old); function == nil {
 						log.Errorf("get lib function fail,name: %s,namespace path: %s", old, strings.Join(path, "."))
@@ -183,7 +188,29 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 						y.AssignVariable(y.CreateVariable(alias), function)
 					}
 				}
+				//有两种情况，class或者整个命名空间
 			default:
+				if cls := y.GetProgram().GetClassBluePrint(alias); !utils.IsNil(cls) {
+					log.Warnf("current builder has classblue: %s", cls)
+					continue
+				}
+				if library, _ := prog.GetLibrary(strings.Join(path, ".")); library != nil {
+					//一个类的情况
+					if bluePrint := library.GetClassBluePrint(old); !utils.IsNil(bluePrint) {
+						y.SetClassBluePrint(alias, bluePrint)
+					} else {
+						log.Warnf("lib get class: %s fail", old)
+					}
+				}
+				if library, _ := prog.GetLibrary(strings.Join(append(path, old), ".")); library != nil {
+					//todo: 可能会和常量重名
+					for _, bluePrint := range library.ClassBluePrint {
+						y.SetClassBluePrint(fmt.Sprintf("%s\\%s", old, bluePrint.Name), bluePrint)
+					}
+					for _, function := range library.Funcs {
+						y.AssignVariable(y.CreateVariable(fmt.Sprintf("%s\\%s", old, function.GetName())), function)
+					}
+				}
 			}
 		}
 	})

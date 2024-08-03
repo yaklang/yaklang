@@ -83,8 +83,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	constructor, destructor := findConstructorAndDestruct(class)
 	if destructor != nil {
 		call := y.NewCall(destructor, args)
-		_ = call
-		y.AddDefer(call)
+		y.EmitDefer(call)
 	}
 	if constructor == nil {
 		return obj
@@ -558,14 +557,18 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 		key = y.VisitRightValue(i.FlexiVariable()).GetName()
 	case *phpparser.VariableAsIndirectClassStaticVariableContext:
 		key = y.VisitRightValue(i.FlexiVariable()).GetName()
+		if strings.HasPrefix(key, "$") {
+			key = key[1:]
+		}
 		exprName := y.VisitVariable(i.Variable())
 		v := y.ReadValue(exprName)
+		//又可能有全限定名，所以如果找到class的话，直接返回一个class
 		if v.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-			return y.GetStaticMember(v.GetName(), key[1:]), class, key
+			class = v.GetName()
+			return y.GetStaticMember(v.GetName(), key), class, key
 		} else {
 			class = v.String()
 		}
-		//return y.GetStaticMember(class, value.String())
 	default:
 		_ = i
 	}

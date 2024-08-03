@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -41,7 +42,6 @@ type FunctionBuilder struct {
 	target *target // for break and continue
 	labels map[string]*BasicBlock
 	// defer function call
-	deferExpr []*Call // defer function, reverse  for-range
 
 	// for build
 	CurrentBlock *BasicBlock // current block to build
@@ -70,7 +70,6 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		Function:      f,
 		target:        &target{},
 		labels:        make(map[string]*BasicBlock),
-		deferExpr:     make([]*Call, 0),
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
 		parentBuilder: parent,
@@ -174,8 +173,18 @@ func (b FunctionBuilder) HandlerEllipsis() {
 }
 
 // add current function defer function
-func (b *FunctionBuilder) AddDefer(call *Call) {
-	b.deferExpr = append(b.deferExpr, call)
+func (b *FunctionBuilder) EmitDefer(i *Call) {
+	deferBlock := b.GetDeferBlock()
+	endBlock := b.CurrentBlock
+	defer func() {
+		b.CurrentBlock = endBlock
+	}()
+	b.CurrentBlock = deferBlock
+	if len(deferBlock.Insts) == 0 {
+		deferBlock.Insts = append(deferBlock.Insts, i)
+	} else {
+		deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, Instruction(i), 0)
+	}
 }
 
 func (b *FunctionBuilder) SetMarkedFunction(name string) (ret func()) {

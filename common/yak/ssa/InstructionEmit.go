@@ -310,6 +310,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	}
 	r := NewReturn(vs)
 	f.emit(r)
+	f.CurrentBlock.finish = true
 	f.Return = append(f.Return, r)
 	return r
 }
