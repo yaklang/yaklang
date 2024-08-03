@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ type DNSLogGRPCServer struct {
 	tpb.DNSLogServer
 
 	ExternalIP       string
-	domain           string
+	domain           []string
 	cache            *utils.Cache[[]*tpb.DNSLogEvent]
 	tokenToModeCache *utils.Cache[string]
 	core             *facades.DNSServer
@@ -92,11 +93,23 @@ func (D *DNSLogGRPCServer) RequireDomain(ctx context.Context, params *tpb.Requir
 			Mode:   a.Name(),
 		}, nil
 	}
+
+	if len(utils.StringArrayFilterEmpty(D.domain)) == 0 {
+		return nil, utils.Errorf("no domain available")
+	}
+
 	token := utils.RandStringBytes(10)
 	token = strings.ToLower(token)
 	tryRegisterHTTPTrigger(token)
+
+	defaultDomain := D.domain[0]
+	if len(D.domain) > 1 {
+		idx := rand.Intn(len(D.domain))
+		defaultDomain = D.domain[idx]
+	}
+
 	return &tpb.RequireDomainResponse{
-		Domain: fmt.Sprintf("%v.%v", token, D.domain),
+		Domain: fmt.Sprintf("%v.%v", token, defaultDomain),
 		Token:  token,
 		Mode:   "default",
 	}, nil
@@ -182,8 +195,10 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 	rsp := &tpb.QueryExistedDNSLogResponse{Events: mergeResults(events)}
 	return rsp, nil
 }
-
 func NewDNSLogServer(domain string, externalIP string) (*DNSLogGRPCServer, error) {
+	return NewDNSLogServerWithListeningPort(domain, externalIP, 53)
+}
+func NewDNSLogServerWithListeningPort(domain string, externalIP string, port int) (*DNSLogGRPCServer, error) {
 	ip := externalIP
 	if externalIP == "" {
 		ipIns, err := GetExternalIP()
@@ -193,7 +208,10 @@ func NewDNSLogServer(domain string, externalIP string) (*DNSLogGRPCServer, error
 		ip = ipIns.String()
 	}
 
-	coreDNSServer, err := facades.NewDNSServer(domain, ip, "0.0.0.0", 53)
+	if port <= 0 {
+		port = 53
+	}
+	coreDNSServer, err := facades.NewDNSServer(domain, ip, "0.0.0.0", port)
 	if err != nil {
 		return nil, err
 	}
@@ -239,9 +257,10 @@ func NewDNSLogServer(domain string, externalIP string) (*DNSLogGRPCServer, error
 		}
 	})
 
+	domains := utils.PrettifyListFromStringSplitEx(domain, ",", "|")
 	grpcServe := &DNSLogGRPCServer{
 		ExternalIP:       externalIP,
-		domain:           domain,
+		domain:           domains,
 		cache:            cache,
 		tokenToModeCache: tokenToModeCache,
 		core:             coreDNSServer,
