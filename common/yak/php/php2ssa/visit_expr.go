@@ -733,8 +733,8 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 	}
 
 	if ret := i.QualifiedNamespaceName(); ret != nil {
-		text := y.VisitQualifiedNamespaceName(ret)
-		_ = text
+		name, s := y.VisitQualifiedNamespaceName(ret)
+		_, _ = name, s
 		//return y.ReadValue(text)
 	} else if ret := i.ChainBase(); ret != nil {
 		return y.VisitChainBase(ret)

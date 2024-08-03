@@ -2,8 +2,8 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"io"
+	"io/fs"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -54,23 +54,19 @@ func (c *config) parseProject() (Programs, error) {
 
 	programPath := c.programPath
 	prog, builder, err := c.init()
-	builder.MoreParse = true
 
 	if prog.Name != "" {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
 	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
-	if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
-		language.ExtraFileAnalyze(c.fs, prog, programPath)
-	}
 
 	totalSize := 0
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
 			if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
-				language.ExtraFileAnalyze(c.fs, prog, path)
+				language.ProgramHandler(c.fs, builder, path)
 			}
 			totalSize++
 			return nil
@@ -165,7 +161,6 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		// log.Infof("use default language [%s] for empty path", Yak)
 	}
 	prog, builder, err := c.init()
-	builder.MoreParse = false
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
@@ -224,7 +219,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)
 		}
-
 		if prog.Language == "" {
 			prog.Language = string(LanguageBuilder.GetLanguage())
 		}
@@ -282,5 +276,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
+	//todo: 后续做成一个函数
+	builder.MoreParse = true
 	return prog, builder, nil
 }

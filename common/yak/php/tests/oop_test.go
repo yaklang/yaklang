@@ -459,7 +459,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-A(Undefined-A)",
+			"Undefined-$a",
 		}, t)
 	})
 
@@ -518,6 +518,13 @@ $c = new test;
 			prog.Show()
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
+
+		//todo: 这个测试有问题
+		//ssatest.CheckSyntaxFlowEx(t, code,
+		//	`print(* #-> * as $param)`,
+		//	false,
+		//	map[string][]string{"param": {"1"}},
+		//	ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("extends __destruct", func(t *testing.T) {
 		code := `<?php

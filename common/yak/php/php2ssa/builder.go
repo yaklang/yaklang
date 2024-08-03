@@ -7,90 +7,49 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
-	"io"
 	"os"
 	"path/filepath"
 )
 
-type SSABuild struct {
-	ssa.DummyExtraFileAnalyzer
+type SSABuild struct{}
+
+func (b *SSABuild) EnableExtraFileAnalyzer() bool {
+	return true
+}
+
+func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+	prog := builder.GetProgram()
+	if prog == nil {
+		log.Errorf("program is nil")
+		return nil
+	}
+	if prog.ExtraFile == nil {
+		prog.ExtraFile = make(map[string]string)
+	}
+	dirname, filename := fileSystem.PathSplit(path)
+	_ = dirname
+	_ = filename
+	file, err := fileSystem.ReadFile(path)
+	if err != nil {
+		log.Errorf("read file %s error: %v", path, err)
+		return nil
+	}
+	builder.MoreParse = true
+	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
+	defer func() {
+		builder.MoreParse = false
+	}()
+	return nil
 }
 
 var Builder = &SSABuild{}
 
 func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	//todo： 测试会有问题，给fs加一个walkfile的接口
-	b.GetProgram().Loader.GetFilesysFileSystem()
-	funcMoreParseCallback := func() error {
-		builders := builder{
-			namespaceTable:  make(map[string]struct{}),
-			constMap:        make(map[string]ssa.Value),
-			aliasTable:      make(map[string]ssa.Value),
-			FunctionBuilder: b,
-		}
-		builders.callback = func(str string, filename string) {
-			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
-			if ok {
-				files = append(files, filename)
-			} else {
-				files = []string{filename}
-			}
-			builders.GetProgram().GetApplication().LibraryFile[str] = files
-		}
-		err := ssareducer.ReducerCompile(
-			b.GetProgram().Loader.GetBasePath(), // base
-			ssareducer.WithFileSystem(b.GetProgram().Loader.GetFilesysFileSystem()),
-			ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
-				defer func() {
-					if r := recover(); r != nil {
-						// ret = nil
-						includeFiles = nil
-						err = utils.Errorf("parse error with panic : %v", r)
-						log.Errorf("parse [%s] error %v  ", path, err)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-				}()
-				raw, err := io.ReadAll(f)
-				if err != nil {
-					return nil, err
-				}
-
-				// check
-				if flag := Builder.FilterFile(path); !flag {
-					return nil, nil
-				}
-				originEditor := b.GetEditor()
-				newCodeEditor := memedit.NewMemEditor(string(raw))
-				newCodeEditor.SetUrl(path)
-				b.SetEditor(newCodeEditor)
-				defer func() {
-					b.SetEditor(originEditor)
-				}()
-				ast, err := FrondEnd(string(raw), force)
-				if err != nil {
-					return nil, err
-				}
-				builders.VisitHtmlDocument(ast)
-				exclude := builders.GetProgram().GetIncludeFiles()
-				return exclude, nil
-			}),
-		)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	if b.MoreParse {
-		if err := funcMoreParseCallback(); err != nil {
-			return err
-		}
-	}
-	b.MoreParse = false
 	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
@@ -104,11 +63,20 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 			aliasTable:      make(map[string]ssa.Value),
 			FunctionBuilder: functionBuilder,
 		}
+		build.callback = func(str string, filename string) {
+			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
+			if ok {
+				files = append(files, filename)
+			} else {
+				files = []string{filename}
+			}
+			build.GetProgram().GetApplication().LibraryFile[str] = files
+		}
 		build.WithExternValue(phpBuildIn)
 		build.FunctionBuilder = functionBuilder
 		build.VisitHtmlDocument(ast)
 	}
-	if !b.Included {
+	if !b.Included && !b.MoreParse {
 		program := ssa.NewChildProgram(b.GetProgram(), uuid.NewString())
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		startParse(functionBuilder)
