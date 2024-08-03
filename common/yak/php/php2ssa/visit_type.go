@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"strings"
@@ -52,24 +53,21 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePri
 	if i.FlexiVariable() != nil {
 		//todo: flexivariable
 	}
-	getLib := func(path string) (*ssa.Program, bool) {
-		program := y.GetProgram()
-		return program.GetLibrary(path)
-	}
 	if i.QualifiedNamespaceName() != nil {
-		name := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
-		path := strings.Split(name, "\\")
-		class := path[len(path)-1]
-		lib := strings.Join(path[:len(path)-1], ".")
-		if lib == "" {
-			return y.GetClassBluePrint(class), class
+		if bluePrint := y.GetClassBluePrint(strings.TrimSpace(i.QualifiedNamespaceName().GetText())); bluePrint != nil {
+			return bluePrint, i.QualifiedNamespaceName().GetText()
 		}
-		program, b := getLib(lib)
-		if b {
-			if bluePrint := program.GetClassBluePrint(class); bluePrint != nil {
-				return bluePrint, class
+		name, s := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+		if library, _ := y.GetProgram().GetApplication().GetLibrary(strings.Join(name, ".")); !utils.IsNil(library) {
+			if bluePrint := library.GetClassBluePrint(s); !utils.IsNil(bluePrint) {
+				return bluePrint, s
+			} else {
+				log.Errorf("not found this class: %s in namespace", i.QualifiedNamespaceName().GetText())
 			}
+		} else {
+			log.Errorf("not found this class: %s", i.QualifiedNamespaceName().GetText())
 		}
+
 	} else if i.IndirectTypeRef() != nil {
 
 	} else if i.PrimitiveType() != nil {
@@ -162,7 +160,7 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 	if i.Static() != nil {
 		return i.Static().GetText()
 	} else if i.QualifiedNamespaceName() != nil {
-		return y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+		y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 	}
 
 	return ""

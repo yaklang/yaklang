@@ -94,20 +94,6 @@ func (b *FunctionBuilder) Finish() {
 		}
 	}
 
-	// set defer function
-	if deferLen := len(b.deferExpr); deferLen > 0 {
-		endBlock := b.CurrentBlock
-
-		deferBlock := b.GetDeferBlock()
-		b.CurrentBlock = deferBlock
-		for _, i := range b.deferExpr {
-			b.EmitCall(i)
-		}
-		b.deferExpr = []*Call{}
-
-		b.CurrentBlock = endBlock
-	}
-
 	// set program offsetMap
 	// skip const
 	// skip no variable value

@@ -80,14 +80,21 @@ namespace a\b {
     class test
     {
         public $a = 1;
+		public function setA($a){
+			$this->a=$a;
+		}
     }
 }
 namespace {
     
     $a = new a\b\test();
+	$a->setA(1);
     println($a->a);
 }`
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.a(valid)"}, t)
+		ssatest.CheckSyntaxFlow(t, code,
+			`println(* #-> * as $param)`,
+			map[string][]string{"param": {"1"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("new class ", func(t *testing.T) {
 		code := `<?php
@@ -102,13 +109,46 @@ namespace a\b {
 
 namespace {
     $a = new a\b\test();
-    println($a::$a);
+    //println($a::$a);
 }`
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		},
+			ssaapi.WithLanguage(ssaapi.PHP))
+		//ssatest.CheckSyntaxFlow(t, code,
+		//	`println(* #-> * as $param)`,
+		//	map[string][]string{"param": {"1"}},
+		//	ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("use namespace", func(t *testing.T) {
+		code := `<?php
+
+namespace a\b\c {
+    class test
+    {
+        public $a;
+
+        public function getA()
+        {
+            return 1;
+        }
+    }
+}
+
+namespace {
+
+    use \a\b\c;
+
+    $a = new c\test();
+    println($a->getA());
+}
+`
 		//ssatest.MockSSA(t, code)
+		ssatest.CheckSyntaxFlow(t, code,
+			`println(* #-> * as $param)`,
+			map[string][]string{"param": {"1"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("more namespace", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()

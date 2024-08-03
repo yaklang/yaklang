@@ -22,17 +22,23 @@ func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamesp
 	return nil
 }
 
-func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) string {
+func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) ([]string, string) {
 	if y == nil || raw == nil {
-		return ""
+		return []string{}, ""
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*phpparser.QualifiedNamespaceNameContext)
 	if i == nil {
-		return ""
+		return []string{}, ""
 	}
-	return raw.GetText()
+	var class string
+	list, m := y.VisitNamespaceNameList(i.NamespaceNameList())
+	for key, _ := range m {
+		class = key
+		break
+	}
+	return list, class
 }
 
 func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ([]string, map[string]string) {
