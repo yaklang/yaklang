@@ -82,7 +82,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 
 	data := make(map[string]ssa.Value)
 	if ret := i.ElementValue(); ret != nil {
-		log.Infof("element value %s", ret.GetText())
+		data["value"] = y.VisitElementValue(ret)
 	} else if ret, _ := i.ElementValuePairs().(*javaparser.ElementValuePairsContext); ret != nil {
 		for _, elementPair := range ret.AllElementValuePair() {
 			name, v := y.VisitElementValuePair(elementPair)

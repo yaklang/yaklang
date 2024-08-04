@@ -130,6 +130,15 @@ func Check(
 	CheckWithName("", t, code, handler, opt...)
 }
 
+func CheckJava(
+	t *testing.T, code string,
+	handler func(prog *ssaapi.Program) error,
+	opt ...ssaapi.Option,
+) {
+	opt = append(opt, ssaapi.WithLanguage(ssaapi.JAVA))
+	CheckWithName("", t, code, handler, opt...)
+}
+
 func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, prog *ssaapi.Program, start time.Time) error, opt ...ssaapi.Option) {
 	opt = append(opt, ssaapi.WithLanguage(ssaapi.JAVA))
 
