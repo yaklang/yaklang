@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -21,7 +22,10 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	domainMap := map[string]string{}
 	yaklib.RiskExports["NewDNSLogDomain"] = func() (string, string, error) {
 		token := utils.RandStringBytes(10)
-		domainMap[token] = token + ".dnslog.cn"
+		domain := token + ".dnslog.cn"
+		domainMap[token] = domain
+		netx.AddHost(domain, "127.0.0.1")
+		netx.AddHost(strings.ToLower(domain), "127.0.0.1")
 		yakit.RegisterMockedDNSLogDomain(token, func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 			timeout1 := 1.0
 			if len(timeout) > 0 {
