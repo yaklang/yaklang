@@ -20,17 +20,39 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 		return
 	}
 
+	var instanceCallback func(ssa.Value)
+	var defCallbacks func(ssa.Value)
+
 	var modifier []string
 	for _, mod := range i.AllClassOrInterfaceModifier() {
+		raw, ok := mod.(*javaparser.ClassOrInterfaceModifierContext)
+		if !ok {
+			continue
+		}
+		if raw.Annotation() != nil {
+			instanceCallback, defCallbacks = y.VisitAnnotation(raw.Annotation())
+		}
 		modifier = append(modifier, mod.GetText())
 	}
+	_ = instanceCallback
+	_ = defCallbacks
 
 	if ret := i.ClassDeclaration(); ret != nil {
-		y.VisitClassDeclaration(ret, nil)
+		container := y.VisitClassDeclaration(ret, nil)
+		if container != nil {
+			instanceCallback(container)
+			defCallbacks(container)
+		}
 	} else if ret := i.EnumDeclaration(); ret != nil {
 		y.VisitEnumDeclaration(ret, nil)
 	} else if ret := i.InterfaceDeclaration(); ret != nil {
-		y.VisitInterfaceDeclaration(ret)
+		container := y.VisitInterfaceDeclaration(ret)
+		if container != nil {
+			instanceCallback(container)
+			defCallbacks(container)
+		} else {
+			log.Error("BUG: interface container is nil")
+		}
 	} else if ret := i.AnnotationTypeDeclaration(); ret != nil {
 		y.VisitAnnotationTypeDeclaration(ret)
 	} else if ret := i.RecordDeclaration(); ret != nil {
@@ -39,15 +61,15 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 
 }
 
-func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.ClassBluePrint) {
+func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.ClassBluePrint) ssa.Value {
 	if y == nil || raw == nil {
-		return
+		return y.EmitEmptyContainer()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.ClassDeclarationContext)
 	if i == nil {
-		return
+		return y.EmitEmptyContainer()
 	}
 	var mergedTemplate []string
 	// 声明的类为外部类情况
@@ -94,7 +116,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		}
 	}
 	y.VisitClassBody(i.ClassBody(), class)
-
+	return class.GetClassContainer()
 }
 
 func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.ClassBluePrint) interface{} {

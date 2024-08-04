@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -47,6 +46,10 @@ func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
 	}
 	b._container = con
 	return nil
+}
+
+func (b *ClassBluePrint) GetClassContainer() Value {
+	return b._container
 }
 
 func NewClassBluePrint() *ClassBluePrint {
