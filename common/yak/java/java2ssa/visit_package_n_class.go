@@ -2,6 +2,7 @@ package java2ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -20,8 +21,8 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 		return
 	}
 
-	var instanceCallback func(ssa.Value)
-	var defCallbacks func(ssa.Value)
+	var instanceCallback = func(ssa.Value) {}
+	var defCallbacks = func(ssa.Value) {}
 
 	var modifier []string
 	for _, mod := range i.AllClassOrInterfaceModifier() {
@@ -89,14 +90,43 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
 
-	if extend := i.TypeType(); extend != nil {
-		mergedTemplate = append(mergedTemplate, extend.GetText())
+	var classContainerCallback []func(ssa.Value)
+	var classlessParents []string
+	if i.EXTENDS() != nil {
+		if extend := i.TypeType(); extend != nil {
+			parentName := extend.GetText()
+			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
+				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
+				y.AssignVariable(variable, y.EmitConstInst(parentName))
+				classlessParents = append(classlessParents, parentName)
+			})
+			mergedTemplate = append(mergedTemplate, parentName)
+		}
 	}
 
 	//haveImplements := false
 	if i.IMPLEMENTS() != nil {
 		//haveImplements = true
+		var implName []string
+		for _, val := range i.AllTypeList() {
+			implName = append(implName, val.GetText())
+			classlessParents = append(classlessParents, val.GetText())
+		}
+		if len(implName) > 0 {
+			classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
+				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("implements"))
+				y.AssignVariable(variable, y.EmitConstInst(strings.Join(implName, ",")))
+			})
+		}
 		mergedTemplate = append(mergedTemplate, i.TypeList(0).GetText())
+	}
+
+	classlessParents = utils.StringArrayFilterEmpty(classlessParents)
+	if len(classlessParents) > 0 {
+		classContainerCallback = append(classContainerCallback, func(value ssa.Value) {
+			variable := y.CreateMemberCallVariable(value, y.EmitConstInst("inherits"))
+			y.AssignVariable(variable, y.EmitConstInst(strings.Join(classlessParents, ",")))
+		})
 	}
 
 	//if i.PERMITS() != nil {
@@ -116,7 +146,13 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		}
 	}
 	y.VisitClassBody(i.ClassBody(), class)
-	return class.GetClassContainer()
+	container := class.GetClassContainer()
+	defer func() {
+		for _, callback := range classContainerCallback {
+			callback(container)
+		}
+	}()
+	return container
 }
 
 func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.ClassBluePrint) interface{} {

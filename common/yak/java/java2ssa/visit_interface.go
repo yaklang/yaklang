@@ -1,8 +1,10 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strings"
 )
 
 func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) ssa.Value {
@@ -18,8 +20,44 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 
 	ifaceName := i.Identifier().GetText()
 	interfaceClass := y.CreateClassBluePrint(ifaceName)
+
+	var callbacks []func(ssa.Value)
+	var inherits []string
+	if i.EXTENDS() != nil {
+		extends := utils.PrettifyListFromStringSplited(i.TypeList(0).GetText(), ",")
+		if len(extends) > 0 {
+			inherits = append(inherits, extends...)
+			callbacks = append(callbacks, func(value ssa.Value) {
+				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("extends"))
+				y.AssignVariable(variable, y.EmitConstInst(strings.Join(extends, ",")))
+			})
+		}
+	}
+	if i.PERMITS() != nil {
+		permits := utils.PrettifyListFromStringSplited(i.TypeList(1).GetText(), ",")
+		if len(permits) > 0 {
+			inherits = append(inherits, permits...)
+			callbacks = append(callbacks, func(value ssa.Value) {
+				variable := y.CreateMemberCallVariable(value, y.EmitConstInst("permits"))
+				y.AssignVariable(variable, y.EmitConstInst(strings.Join(permits, ",")))
+			})
+		}
+	}
+
+	if len(inherits) > 0 {
+		callbacks = append(callbacks, func(value ssa.Value) {
+			variable := y.CreateMemberCallVariable(value, y.EmitConstInst("inherits"))
+			y.AssignVariable(variable, y.EmitConstInst(strings.Join(inherits, ",")))
+		})
+	}
+
 	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), interfaceClass)
-	return interfaceClass.GetClassContainer()
+
+	container := interfaceClass.GetClassContainer()
+	for _, cb := range callbacks {
+		cb(container)
+	}
+	return container
 }
 
 func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.ClassBluePrint) interface{} {
