@@ -2,6 +2,7 @@ package java
 
 import (
 	"github.com/stretchr/testify/assert"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -347,6 +348,100 @@ func TestNativeCall_Java_FuzztagThenEval(t *testing.T) {
 check $sink;
 `).Show()
 		assert.Len(t, sinks, 3)
+		return nil
+	})
+}
+
+const mybatisTest = `
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.*;
+import java.util.List;
+
+public interface UserMapper extends BaseMapper<User> {
+    @Select("SELECT * FROM users WHERE age = #{age} AND name = #{name} AND email = #{email}")
+    List<User> selectUsersByMultipleFields(int age, String name, String email);
+
+    @Select("SELECT * FROM ${tableName} WHERE age = #{age}")
+    List<User> selectUsersByTableName(String tableName, int age);
+
+    @Delete("DELETE FROM users WHERE id = #{id}")
+    int deleteUserById(Long id);
+
+    @Update("UPDATE users SET email = #{email} WHERE id = #{id}")
+    int updateUserEmailById(Long id, String email);
+
+    @Insert("INSERT INTO users (name, age, email) VALUES (#{name}, #{age}, ${email})")
+    int insertUser(String name, int age, String email);
+
+    @Select("SELECT * FROM users WHERE email LIKE CONCAT('%', #{email}, '%')")
+    List<User> findUsersByEmail(String email);
+
+    // 动态 SQL 使用例子
+    @Select("<script>" +
+            "SELECT * FROM users " +
+            "<where> " +
+            "   <if test='name != null'> AND name = #{name} </if>" +
+            "   <if test='email != null'> AND email = #{email} </if>" +
+            "</where>" +
+            "</script>")
+    List<User> findUsersByOptionalCriteria(@Param("name") String name, @Param("email") String email);
+
+    // 批量删除
+    @Delete("<script>" +
+            "DELETE FROM users WHERE id IN " +
+            "<foreach item='id' collection='ids' open='(' separator=',' close=')'>" +
+            "   #{id}" +
+            "</foreach>" +
+            "</script>")
+    int deleteUsersByIds(@Param("ids") List<Long> ids);
+
+    // 更新多个字段
+    @Update("UPDATE users SET age = #{age}, email = #{email} WHERE id = #{id}")
+    int updateUserById(Long id, int age, String email);
+}
+`
+
+func TestNativeCall_Java_RegexpForMybatisAnnotation(t *testing.T) {
+	ssatest.CheckJava(t, mybatisTest, func(prog *ssaapi.Program) error {
+		var results ssaapi.Values
+		var checked bool
+		results = prog.SyntaxFlowChain(`
+
+.annotation.Select.value<show><regexp(` + strconv.Quote(`\$\{\s*(\w+)\s*\}`) + `,group=1)> as $entry;
+
+`).Show()
+		checked = false
+		if results.Len() >= 1 {
+			results.Recursive(func(operator sfvm.ValueOperator) error {
+				if strings.Contains(operator.String(), "tableName") {
+					checked = true
+					return nil
+				}
+				return nil
+			})
+		}
+		if !checked {
+			t.Fatal("not found tableName")
+		}
+
+		results = prog.SyntaxFlowChain(`
+
+.annotation.Insert.value<show><regexp(` + strconv.Quote(`\$\{\s*(\w+)\s*\}`) + `,group=1)> as $entry;
+
+`).Show()
+		checked = false
+		if results.Len() >= 1 {
+			results.Recursive(func(operator sfvm.ValueOperator) error {
+				if strings.Contains(operator.String(), "email") {
+					checked = true
+					return nil
+				}
+				return nil
+			})
+		}
+		if !checked {
+			t.Fatal("not found tableName")
+		}
 		return nil
 	})
 }
