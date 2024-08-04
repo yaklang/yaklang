@@ -5,22 +5,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) interface{} {
+func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) ssa.Value {
 	if y == nil || raw == nil {
-		return nil
+		return y.EmitEmptyContainer()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.InterfaceDeclarationContext)
 	if i == nil {
-		return nil
+		return y.EmitEmptyContainer()
 	}
 
 	ifaceName := i.Identifier().GetText()
 	interfaceClass := y.CreateClassBluePrint(ifaceName)
 	y.VisitInterfaceBody(i.InterfaceBody().(*javaparser.InterfaceBodyContext), interfaceClass)
-
-	return nil
+	return interfaceClass.GetClassContainer()
 }
 
 func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.ClassBluePrint) interface{} {
