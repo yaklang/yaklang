@@ -113,3 +113,48 @@ public class Demo3 {
 		"target": {`"aaaaaaa"`},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
+
+func TestInterfaceAnnotation(t *testing.T) {
+	ssatest.CheckJava(t, `
+
+@lokjasdgjlkassdfjlkjloasdfijloa("hk;aabbccddeeff;asdljk")
+public class HomeDaoClassABC {
+    List<PmsBrand> aaab(@Param("offset") Integer offset,@Param("limit") Integer limit) {
+		return null;
+	};
+}
+
+@ClassAnnotationTest
+public class HomeDaoClassABC {
+    List<PmsBrand> abasdfasdfasdfbar(@Param("offset") Integer offset,@Param("limit") Integer limit) {
+		return null;
+	};
+}
+
+@TestInterfaceAnno
+public interface HomeDao {
+    List<PmsBrand> getRecommendBrandList(@Param("offset") Integer offset,@Param("limit") Integer limit);
+}
+
+@TestInterfaceAnno2("bb")
+public interface HomeDao3 {
+    List<PmsBrand> getRecommendBrandList(String abc);
+}
+
+`, func(prog *ssaapi.Program) error {
+		var results ssaapi.Values
+
+		results = prog.SyntaxFlowChain(`.annotation.*?{.value<regexp('aabbccddeeff')>}.__ref__.*ab(*?{any: limit,offset} as $params)`).Show()
+		assert.GreaterOrEqual(t, results.Len(), 2)
+
+		results = prog.SyntaxFlowChain(`.annotation.ClassAnnotationTest.__ref__.*bar(*?{any: limit,offset} as $params)`).Show()
+		assert.GreaterOrEqual(t, results.Len(), 2)
+
+		results = prog.SyntaxFlowChain(`.annotation.*Anno.__ref__.*List(*?{any: limit,offset} as $params)`).Show()
+		assert.GreaterOrEqual(t, results.Len(), 2)
+
+		results = prog.SyntaxFlowChain(`.annotation.*Anno2.value<regexp('bb')><show>`)
+		assert.GreaterOrEqual(t, results.Len(), 1)
+		return nil
+	})
+}
