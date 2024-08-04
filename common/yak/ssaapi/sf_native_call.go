@@ -72,9 +72,15 @@ const (
 
 	// NativeCall_Slice just show the value, do nothing
 	NativeCall_Slice = "slice"
+
+	// NativeCall_Regexp is used to regexp, group is available
+	//   you can use <regexp(`...`, group: 1)> to extract
+	NativeCall_Regexp = "regexp"
 )
 
 func init() {
+	registerNativeCall(NativeCall_Regexp, nc_func(nativeCallRegexp), nc_desc(`regexp a string, group is available`))
+
 	registerNativeCall(NativeCall_Show, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		idx := 0
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -107,23 +113,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_String,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-				results := val.NewValue(ssa.NewConst(val.String()))
-				results.AppendPredecessor(val, frame.WithPredecessorContext("string"))
-				vals = append(vals, results)
-				return nil
-			})
-			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
-			}
-			return false, nil, utils.Error("no value found")
-		}),
+		nc_func(nativeCallString),
 		nc_desc(`获取输入指令的字符串表示`),
 	)
 
@@ -558,6 +548,17 @@ func fetchProgram(v sfvm.ValueOperator) (*Program, error) {
 		return nil, utils.Error("no parent program found")
 	}
 	return parent, nil
+}
+
+func isProgram(v sfvm.ValueOperator) bool {
+	_, ok := v.(*Program)
+	if !ok {
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			_, ok = operator.(*Program)
+			return utils.Error("normal abort")
+		})
+	}
+	return ok
 }
 
 func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
