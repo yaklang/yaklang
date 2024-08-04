@@ -652,7 +652,18 @@ func YakitNewCheckHTTPLogByToken(runtimeID string) func(token string, timeout ..
 	}
 }
 
+var dnslogMocked = make(map[string]func(token, runtime string, timeout ...float64) ([]*tpb.DNSLogEvent, error))
+
+func RegisterMockedDNSLogDomain(token string, mock func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error)) {
+	dnslogMocked[token] = mock
+}
+
 func CheckDNSLogByToken(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+	mocked, ok := dnslogMocked[token]
+	if ok {
+		return mocked(token, runtimeId, timeout...)
+	}
+
 	var f float64
 	if len(timeout) > 0 {
 		f = timeout[0]

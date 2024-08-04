@@ -2,11 +2,6 @@ package coreplugin
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,6 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
+	"testing"
+	"time"
 )
 
 func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
@@ -22,36 +22,36 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	yaklib.RiskExports["NewDNSLogDomain"] = func() (string, string, error) {
 		token := utils.RandStringBytes(10)
 		domainMap[token] = token + ".dnslog.cn"
-		return token + ".dnslog.cn", token, nil
-	}
-	yaklib.RiskExports["CheckDNSLogByToken"] = func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
-		timeout1 := 1.0
-		if len(timeout) > 0 {
-			timeout1 = timeout[0]
-		}
-		if v, ok := domainMap[token]; ok {
-			res := []*tpb.DNSLogEvent{}
-			for i := 0; i < 3; i++ {
-				hasRecord := false
-				vulinbox.DnsRecord.Range(func(key, value any) bool {
-					domain := key.(string)
-					if strings.HasSuffix(domain, v) {
-						hasRecord = true
-						res = append(res, &tpb.DNSLogEvent{
-							Domain: domain,
-						})
-						return false
+		yakit.RegisterMockedDNSLogDomain(token, func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+			timeout1 := 1.0
+			if len(timeout) > 0 {
+				timeout1 = timeout[0]
+			}
+			if v, ok := domainMap[token]; ok {
+				res := []*tpb.DNSLogEvent{}
+				for i := 0; i < 3; i++ {
+					hasRecord := false
+					vulinbox.DnsRecord.Range(func(key, value any) bool {
+						domain := key.(string)
+						if strings.HasSuffix(domain, v) {
+							hasRecord = true
+							res = append(res, &tpb.DNSLogEvent{
+								Domain: domain,
+							})
+							return false
+						}
+						return true
+					})
+					if hasRecord {
+						return res, nil
+					} else {
+						time.Sleep(utils.FloatSecondDuration(timeout1))
 					}
-					return true
-				})
-				if hasRecord {
-					return res, nil
-				} else {
-					time.Sleep(utils.FloatSecondDuration(timeout1))
 				}
 			}
-		}
-		return nil, errors.New("not found record")
+			return nil, errors.New("not found record")
+		})
+		return token + ".dnslog.cn", token, nil
 	}
 	yaklang.Import("risk", yaklib.RiskExports)
 	client, err := yakgrpc.NewLocalClient()
@@ -138,6 +138,11 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		},
 		StrictMode: true,
 	}
+
+	_ = vulInForm
+	_ = vulInBodyJson
+	_ = vulInGetServeByJackson
+	_ = vulInGetIntranet
 	addFastjsonTestCase(vulInGet, "Fastjson 综合检测插件对于 json in query 检测结果不符合预期")
 	addFastjsonTestCase(vulInForm, "Fastjson 综合检测插件对于 json in form 检测结果不符合预期")
 	addFastjsonTestCase(vulInBodyJson, "Fastjson 综合检测插件对于 json in body 检测结果不符合预期")
