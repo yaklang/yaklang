@@ -64,10 +64,7 @@ func (v *SyntaxFlowVisitor) VisitNativeCallActualParams(i *sf.NativeCallActualPa
 		if item.NativeCallActualParamKey() != nil {
 			key := item.NativeCallActualParamKey()
 			origin := key.GetText()
-			configKey, _ = yakunquote.Unquote(origin)
-			if configKey == "" {
-				configKey = origin
-			}
+			configKey = yakunquote.TryUnquote(origin)
 			if !configKeyRegexp.MatchString(configKey) {
 				log.Infof("invalid native call key: %s", configKey)
 				configKey = fmt.Sprint(count)
@@ -81,6 +78,7 @@ func (v *SyntaxFlowVisitor) VisitNativeCallActualParams(i *sf.NativeCallActualPa
 		configItem := &RecursiveConfigItem{Key: configKey}
 		value := item.NativeCallActualParamValue()
 		configItem.Value = yakunquote.TryUnquote(value.GetText())
+		fmt.Println(configItem.Value)
 		res = append(res, configItem)
 	}
 	return res
