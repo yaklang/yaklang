@@ -55,7 +55,10 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		})
 		return token + ".dnslog.cn", token, nil
 	})
-	client, err := yakgrpc.NewLocalClient()
+	defer func() {
+		yakit.UnregisterMockedNewDNSLogDomain()
+	}()
+	client, err := yakgrpc.NewLocalClient(true)
 	if err != nil {
 		panic(err)
 	}
