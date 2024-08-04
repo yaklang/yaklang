@@ -7,8 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -20,13 +18,13 @@ import (
 
 func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 	domainMap := map[string]string{}
-	yaklib.RiskExports["NewDNSLogDomain"] = func() (string, string, error) {
-		token := utils.RandStringBytes(10)
+	yakit.RegisterMockedNewDNSLogDomain(func() (string, string, error) {
+		token := strings.ToLower(utils.RandStringBytes(10))
 		domain := token + ".dnslog.cn"
 		domainMap[token] = domain
 		netx.AddHost(domain, "127.0.0.1")
 		netx.AddHost(strings.ToLower(domain), "127.0.0.1")
-		yakit.RegisterMockedDNSLogDomain(token, func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+		yakit.RegisterMockedCheckedDNSLogDomain(token, func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 			timeout1 := 1.0
 			if len(timeout) > 0 {
 				timeout1 = timeout[0]
@@ -56,8 +54,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 			return nil, errors.New("not found record")
 		})
 		return token + ".dnslog.cn", token, nil
-	}
-	yaklang.Import("risk", yaklib.RiskExports)
+	})
 	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		panic(err)
