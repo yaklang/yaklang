@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -57,8 +58,10 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	if dnslog != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		go func() {
+			log.Infof("dnslog action to: %s", dnslog)
 			ip := netx.LookupFirst(dnslog, netx.WithDNSContext(ctx), netx.WithDNSNoCache(true))
 			if ip != "" {
+				log.Infof("dnslog %s resolve to %s", dnslog, ip)
 				DnsRecord.Store(dnslog, ip)
 			}
 			cancel()
