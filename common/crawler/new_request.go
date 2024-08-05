@@ -8,12 +8,15 @@ import (
 	"strings"
 )
 
-func NewHTTPRequest(https bool, req []byte, rsp []byte, url string) (bool, []byte, error) {
+func NewHTTPRequest(https bool, req []byte, rsp []byte, urlString string) (bool, []byte, error) {
+	if !utils.IsLegalHTTPUrl(urlString) {
+		return false, nil, utils.Errorf("illegal url: %s", urlString)
+	}
 	reqBytes := lowhttp.UrlToRequestPacket(
-		"GET", url, req, https,
+		"GET", urlString, req, https,
 		lowhttp.ExtractCookieJarFromHTTPResponse(rsp)...)
-	if utils.IsHttpOrHttpsUrl(url) {
-		return strings.HasPrefix(strings.ToLower(url), "https://"), reqBytes, nil
+	if utils.IsHttpOrHttpsUrl(urlString) {
+		return strings.HasPrefix(strings.ToLower(urlString), "https://"), reqBytes, nil
 	}
 	return https, reqBytes, nil
 }
