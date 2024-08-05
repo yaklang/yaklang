@@ -320,7 +320,10 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		return typ
 	}else {
 		typ = ssa.NewClassBluePrint()
-		typ = y.AddFullTypeNameForAllImport(className,typ)
+		typ = y.AddFullTypeNameFromMap(className,typ)
+		if len(typ.GetFullTypeNames())== 0 {
+			typ = y.AddFullTypeNameForAllImport(className,typ)
+		}
 		return typ
 	}
 }
@@ -857,84 +860,3 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 
 }
 
-func (y *builder)AddFullTypeNameRaw(typName string, typ ssa.Type)ssa.Type{
-	return y.AddFullTypeNameForType(typName,typ,true)
-}
-
-func (y *builder)AddFullTypeNameFromMap(typName string, typ ssa.Type)ssa.Type{
-	return y.AddFullTypeNameForType(typName,typ,false)
-}
-
-
-// AddFullTypeNameForType用于将FullTypeName设置到Type中。其中当Type是BasicType时，会创建新的Type，避免修改原来的Type。
-// isFullName表示是否是完整的FullTypeName，如果不是，则会从fullTypeNameMap寻找完整的FullTypeName。
-func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type,isFullName bool ) ssa.Type {
-	if b,ok:=ssa.ToBasicType(typ);ok{
-		typ = ssa.NewBasicType(b.Kind,b.GetName())
-	} 
-	
-	if typ == nil {
-		return ssa.GetAnyType()
-	}
-
-	typStr := typName 
-	if !isFullName {
-		if ft, ok := y.fullTypeNameMap[typName]; ok {
-			typStr = strings.Join(ft, ".")
-			for i := len(ft) - 1; i > 0; i-- {
-				version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
-				if version != "" {
-					typStr = (fmt.Sprintf("%s:%s", typStr, version))
-					break
-				}	
-			}
-			typ.AddFullTypeName(typStr)
-		}
-	}else {
-		typ.AddFullTypeName(typStr)
-	}
-	return typ
-}
-
-func (y *builder) CopyFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {
-	if b,ok:=ssa.ToBasicType(typ);ok{
-		typ = ssa.NewBasicType(b.Kind,b.GetName())
-	} 
-	
-	if typ == nil {
-		return ssa.GetAnyType()
-	}
-	for _,typStr := range allTypName{
-		typ.AddFullTypeName(typStr)
-	} 
-	return typ
-}
-
-func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.Type {
-	for _,ft := range y.allImportPkgSlice{
-		typStr := strings.Join(ft[:len(ft)-1], ".")
-		for i := len(ft) - 1; i > 0; i-- {
-			version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
-			if version != "" {
-				typStr = (fmt.Sprintf("%s.%s:%s", typStr, typName,version))
-				break
-			}	
-		}
-		typStr = fmt.Sprintf("%s.%s", typStr, typName)
-		typ.AddFullTypeName(typStr)
-	}
-	if len(y.selfPkgPath)!= 0 {
-		typStr := strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], ".")
-		typStr = fmt.Sprintf("%s.%s", typStr, typName)
-		typ.AddFullTypeName(typStr)
-	}
-	return typ
-}
-
-func (y *builder)GetPkgSCAVersion(pkgName string)string{
-	sca := y.GetProgram().GetApplication().GetSCAPackageByName(pkgName)
-	if sca != nil{
-		return sca.Version
-	}
-	return ""
-}
