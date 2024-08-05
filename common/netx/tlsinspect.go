@@ -12,6 +12,10 @@ import (
 )
 
 type TLSInspectResult struct {
+	Version     uint16
+	CipherSuite uint16
+	ServerName  string
+
 	Protocol        string
 	Description     string
 	Raw             []byte
@@ -100,6 +104,9 @@ func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSIns
 				}
 
 				result := TLSInspectResult{
+					Version:         state.Version,
+					CipherSuite:     state.CipherSuite,
+					ServerName:      state.ServerName,
 					Protocol:        state.NegotiatedProtocol,
 					Description:     text,
 					Raw:             cert.Raw,
