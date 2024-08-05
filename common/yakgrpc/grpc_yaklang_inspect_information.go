@@ -207,8 +207,10 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 			}
 		case "file":
 			cliFunction = "File"
-		case "file-name":
+		case "file_names":
 			cliFunction = "FileNames"
+		case "folder_name":
+			cliFunction = "FolderName"
 		case "select":
 			cliFunction = "StringSlice"
 			if para.ExtraSetting != "" {

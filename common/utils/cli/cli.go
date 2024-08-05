@@ -610,6 +610,21 @@ func (c *CliApp) FileNames(name string, opts ...SetCliExtraParam) []string {
 	return utils.PrettifyListFromStringSplited(rawStr, ",")
 }
 
+// FolderName 获取对应名称的命令行参数，获得选中的文件夹路径，并返回 string 类型
+// Example:
+// ```
+// folder = cli.FolderName("folder")
+// // --folder /etc 则 folder 为 "/etc"
+// ```
+func (c *CliApp) FolderName(name string, opts ...SetCliExtraParam) string {
+	rawStr, p := c._cliFromString(name, opts...)
+	p._type = "folder-name"
+	if rawStr == "" {
+		return ""
+	}
+	return rawStr
+}
+
 // FileOrContent 获取对应名称的命令行参数
 // 根据其传入的值尝试读取其对应文件内容，如果无法读取则直接返回，最后返回 []byte 类型
 // Example:
@@ -826,6 +841,7 @@ var CliExports = map[string]interface{}{
 	// 解析文件之类的
 	"File":          DefaultCliApp.File,
 	"FileNames":     DefaultCliApp.FileNames,
+	"FolderName":    DefaultCliApp.FolderName,
 	"FileOrContent": DefaultCliApp.FileOrContent,
 	"LineDict":      DefaultCliApp.LineDict,
 
