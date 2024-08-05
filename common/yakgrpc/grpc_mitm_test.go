@@ -823,7 +823,7 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 }
 
 func TestGRPCMUSTPASS_MITM_DnsAndHosts(t *testing.T) {
-	client, err := NewLocalClient() // 新建一个 yakit client
+	client, err := NewLocalClient(true) // 新建一个 yakit client
 	if err != nil {
 		t.Fatal(err)
 	}

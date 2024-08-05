@@ -76,9 +76,14 @@ const (
 	// NativeCall_Regexp is used to regexp, group is available
 	//   you can use <regexp(`...`, group: 1)> to extract
 	NativeCall_Regexp = "regexp"
+
+	NativeCall_StrLower = "strlower"
+	NativeCall_StrUpper = "strupper"
 )
 
 func init() {
+	registerNativeCall(NativeCall_StrLower, nc_func(nativeCallStrLower), nc_desc(`convert a string to lower case`))
+	registerNativeCall(NativeCall_StrUpper, nc_func(nativeCallStrUpper), nc_desc(`convert a string to upper case`))
 	registerNativeCall(NativeCall_Regexp, nc_func(nativeCallRegexp), nc_desc(`regexp a string, group is available`))
 
 	registerNativeCall(NativeCall_Show, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
