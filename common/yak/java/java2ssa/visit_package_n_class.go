@@ -308,7 +308,10 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
 		typ = class
-		return y.AddFullTypeNameFromMap(className,typ)
+		if len(typ.GetFullTypeNames())== 0 {
+			return y.AddFullTypeNameFromMap(className,typ)
+		}
+		return typ
 	}else {
 		typ = ssa.NewClassBluePrint()
 		typ = y.AddFullTypeNameForAllImport(className,typ)
@@ -329,11 +332,11 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	var t ssa.Type
 	switch i.GetText() {
 	case "boolean":
-		t= ssa.GetBooleanType()
+		t= ssa.CreateBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		t= ssa.GetNumberType()
+		t= ssa.CreateNumberType()
 	case "byte":
-		t=  ssa.GetByteType()
+		t=  ssa.CreateByteType()
 	default:
 		t = ssa.CreateAnyType()
 	}
