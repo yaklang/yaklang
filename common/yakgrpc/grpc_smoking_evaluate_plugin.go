@@ -9,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
 	"golang.org/x/exp/slices"
@@ -191,6 +193,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		Warning = string(result.Warn)
 	)
 
+	prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
+	if err != nil {
+		pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
+	}
+	parameters, _ := information.ParseCliParameter(prog)
+
 	// static analyze
 	if slices.Contains([]string{
 		"mitm", "port-scan", "codec", "yak",
@@ -219,7 +227,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		}
 	}
 
-	if slices.Contains([]string{
+	if len(parameters) <= 0 && slices.Contains([]string{
 		"mitm", "port-scan", "nuclei",
 	}, pluginType) { // echo debug script
 		getMockParam := func() []*ypb.KVPair {
