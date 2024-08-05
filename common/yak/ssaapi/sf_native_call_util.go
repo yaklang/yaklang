@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
+	"strings"
 )
 
 var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -35,6 +36,50 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 	}
 	return false, nil, utils.Error("no value found")
 }
+
+var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	var vals []sfvm.ValueOperator
+	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+		val, ok := operator.(*Value)
+		if !ok {
+			return nil
+		}
+		if val.IsConstInst() {
+			ss := codec.AnyToString(val.GetConstValue())
+			results := val.NewValue(ssa.NewConst(strings.ToLower(ss)))
+			results.AppendPredecessor(val, frame.WithPredecessorContext("str-lower"))
+			vals = append(vals, results)
+			return nil
+		}
+		return nil
+	})
+	if len(vals) > 0 {
+		return true, sfvm.NewValues(vals), nil
+	}
+	return false, nil, utils.Error("no value found")
+})
+
+var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	var vals []sfvm.ValueOperator
+	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+		val, ok := operator.(*Value)
+		if !ok {
+			return nil
+		}
+		if val.IsConstInst() {
+			ss := codec.AnyToString(val.GetConstValue())
+			results := val.NewValue(ssa.NewConst(strings.ToUpper(ss)))
+			results.AppendPredecessor(val, frame.WithPredecessorContext("str-upper"))
+			vals = append(vals, results)
+			return nil
+		}
+		return nil
+	})
+	if len(vals) > 0 {
+		return true, sfvm.NewValues(vals), nil
+	}
+	return false, nil, utils.Error("no value found")
+})
 
 var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	if isProgram(v) {
