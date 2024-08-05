@@ -2,8 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
@@ -44,6 +48,85 @@ func TestImportYakScript(t *testing.T) {
 	_ = s
 }
 
+func TestServer_Cli_YakSript(t *testing.T) {
+	type TestCase struct {
+		param  bool
+		script *schema.YakScript
+	}
+	check := func(t *testing.T, scriptRequest *ypb.QueryYakScriptRequest, want []string, db *gorm.DB) {
+		_, scripts, err := yakit.QueryYakScript(db, scriptRequest)
+		require.NoError(t, err)
+		var names []string
+		for _, script := range scripts {
+			names = append(names, script.ScriptName)
+		}
+		for _, s := range want {
+			require.True(t, lo.Contains(names, s))
+		}
+	}
+	t.Run("test", func(t *testing.T) {
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		_ = client
+		createHandler := func(scripts ...*TestCase) {
+			for _, script := range scripts {
+				err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+				require.NoError(t, err)
+			}
+		}
+		testcases := []*TestCase{
+			{
+				script: &schema.YakScript{
+					ScriptName: "test-nuclei-cli",
+					Type:       "nuclei",
+					Params:     "[{\"Field\":\"scan-url\",\"TypeVerbose\":\"text\",\"FieldVerbose\":\"请输入扫描目标\",\"Required\":true,\"MethodType\":\"text\"},{\"Field\":\"file-path\",\"TypeVerbose\":\"upload-path\",\"FieldVerbose\":\"请输入字典路径\",\"MethodType\":\"file\"}]",
+				},
+				param: false},
+			{script: &schema.YakScript{
+				ScriptName: "test-port-scan-cli",
+				Type:       "port-scan",
+				Params:     "[{\"Field\":\"scan-url\",\"TypeVerbose\":\"text\",\"FieldVerbose\":\"请输入扫描目标\",\"Required\":true,\"MethodType\":\"text\"},{\"Field\":\"file-path\",\"TypeVerbose\":\"upload-path\",\"FieldVerbose\":\"请输入字典路径\",\"MethodType\":\"file\"}]",
+			},
+				param: false},
+			{script: &schema.YakScript{
+				ScriptName: "test-mitm-cli",
+				Type:       "mitm",
+				Params:     "[{\"Field\":\"scan-url\",\"TypeVerbose\":\"text\",\"FieldVerbose\":\"请输入扫描目标\",\"Required\":true,\"MethodType\":\"text\"},{\"Field\":\"file-path\",\"TypeVerbose\":\"upload-path\",\"FieldVerbose\":\"请输入字典路径\",\"MethodType\":\"file\"}]",
+			},
+				param: true},
+			{script: &schema.YakScript{
+				ScriptName: "test-mitm-no-cli",
+				Type:       "mitm",
+				Params:     "",
+			},
+				param: false}}
+		defer func() {
+			lo.ForEach(testcases, func(item *TestCase, index int) {
+				require.NoError(t, yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), item.script.ScriptName))
+			})
+		}()
+		createHandler(testcases...)
+
+		//filter mitm has cli
+		check(t, &ypb.QueryYakScriptRequest{
+			Type:               "mitm,port-scan,nuclei",
+			IsMITMParamPlugins: 2,
+		}, []string{"test-mitm-no-cli", "test-port-scan-cli", "test-nuclei-cli"}, consts.GetGormProfileDatabase())
+
+		check(t, &ypb.QueryYakScriptRequest{
+			Type:               "mitm",
+			IsMITMParamPlugins: 1,
+		},
+			[]string{"test-mitm-cli"}, consts.GetGormProfileDatabase())
+
+		check(t, &ypb.QueryYakScriptRequest{
+			Type:               "mitm,port-scan,nuclei",
+			IsMITMParamPlugins: 0,
+		},
+			[]string{"test-nuclei-cli", "test-port-scan-cli", "test-mitm-cli", "test-mitm-no-cli"}, consts.GetGormProfileDatabase(),
+		)
+	})
+}
 func TestServer_QueryYakScript(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -55,12 +138,7 @@ func TestServer_QueryYakScript(t *testing.T) {
 				Field:        "target",
 				DefaultValue: "1",
 				TypeVerbose:  "text",
-				FieldVerbose: "",
-				Help:         "",
 				Required:     true,
-				Group:        "",
-				ExtraSetting: "",
-				MethodType:   "",
 			}},
 			Type: "mitm",
 			Content: `target = cli.String("target")
