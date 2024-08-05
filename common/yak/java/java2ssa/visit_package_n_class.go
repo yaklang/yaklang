@@ -86,6 +86,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		className := builder.String()
 		class = y.CreateClassBluePrint(className)
 	}
+	// set full type name for class's self
+	ftRaw := fmt.Sprintf("%s.%s",strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
+	class  = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
+
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
@@ -142,6 +146,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 			class.AddParentClass(parent)
 		} else {
 			parentBP := y.CreateClassBluePrint(parentClass)
+			y.AddFullTypeNameForAllImport(parentClass, parentBP)
 			class.AddParentClass(parentBP)
 		}
 	}
@@ -914,6 +919,11 @@ func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.
 				break
 			}	
 		}
+		typStr = fmt.Sprintf("%s.%s", typStr, typName)
+		typ.AddFullTypeName(typStr)
+	}
+	if len(y.selfPkgPath)!= 0 {
+		typStr := strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], ".")
 		typStr = fmt.Sprintf("%s.%s", typStr, typName)
 		typ.AddFullTypeName(typStr)
 	}
