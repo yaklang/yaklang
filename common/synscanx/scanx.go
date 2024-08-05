@@ -26,8 +26,8 @@ type Scannerx struct {
 	// 取样IP
 	sampleIP string
 	// 存放未排除的目标
-	hosts *hostsparser.HostsParser
-	//_hosts *utils.HostsFilter
+	hosts  *hostsparser.HostsParser
+	_hosts *utils.HostsFilter
 	// 存放未排除的端口
 	ports *utils.PortsFilter
 	// loopback 对应的实际IP
@@ -191,57 +191,61 @@ func (s *Scannerx) SubmitTarget(targets, ports string, targetCh chan *SynxTarget
 	}
 }
 
-//func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *SynxTarget) {
-//	nonExcludedPorts := s.GetNonExcludedPorts(ports)
-//
-//	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
-//	s.OnSubmitTask(func(h string, p int) {
-//		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
-//	})
-//
-//	for {
-//		select {
-//		case <-s.ctx.Done():
-//			log.Infof("SubmitTargetFromPing canceled")
-//			return
-//		case host, ok := <-res:
-//			if !ok {
-//				log.Infof("ping result channel closed")
-//				return
-//			}
-//			if s.nonExcludedHost(host) {
-//				return
-//			}
-//			s._hosts.Add(host)
-//			if s.isInternalAddress(host, ifaceIPNetV4, ifaceIPNetV6) {
-//				s.arp(host)
-//			}
-//			for _, port := range nonExcludedPorts {
-//				s.rateLimit()
-//				if s.config.maxOpenPorts > 0 {
-//					v, ok := s.ipOpenPortMap.Load(host)
-//					if ok {
-//						if v.(uint16) >= s.config.maxOpenPorts {
-//							break
-//						}
-//					}
-//				}
-//				s.callOnSubmitTask(host, port)
-//				proto, p := utils.ParsePortToProtoPort(port)
-//				target := &SynxTarget{
-//					Host: host,
-//					Port: p,
-//					Mode: TCP, // 默认 TCP
-//				}
-//				if proto == "udp" {
-//					target.Mode = UDP
-//				}
-//				ch <- target
-//			}
-//		}
-//	}
-//
-//}
+func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *SynxTarget) {
+	nonExcludedPorts := s.GetNonExcludedPorts(ports)
+
+	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
+	s.OnSubmitTask(func(h string, p int) {
+		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
+	})
+	s._hosts = utils.NewHostsFilter()
+	var lock sync.Mutex
+	for {
+		select {
+		case <-s.ctx.Done():
+			log.Infof("SubmitTargetFromPing canceled")
+			return
+		case host, ok := <-res:
+			if !ok {
+				log.Infof("ping result channel closed")
+				return
+			}
+			if s.excludedHost(host) {
+				return
+			}
+			lock.Lock()
+			s._hosts.Add(host)
+			lock.Unlock()
+
+			if s.isInternalAddress(host, ifaceIPNetV4, ifaceIPNetV6) {
+				s.arp(host)
+			}
+			for _, port := range nonExcludedPorts {
+				s.rateLimit()
+				if s.config.maxOpenPorts > 0 {
+					v, ok := s.ipOpenPortMap.Load(host)
+					if ok {
+						if v.(uint16) >= s.config.maxOpenPorts {
+							break
+						}
+					}
+				}
+				s.callOnSubmitTask(host, port)
+				proto, p := utils.ParsePortToProtoPort(port)
+				target := &SynxTarget{
+					Host: host,
+					Port: p,
+					Mode: TCP, // 默认 TCP
+				}
+				if proto == "udp" {
+					target.Mode = UDP
+				}
+				ch <- target
+			}
+		}
+	}
+
+}
 
 func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh chan *synscan.SynScanResult) error {
 	openPortLock := new(sync.Mutex)
@@ -288,9 +292,18 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 			}
 
 			resultFilter.Insert(addr)
+			if s.FromPing {
+				//if !(s._hosts.Contains(ip2int(host)) && s.ports.Contains(port)) {
+				//	return
+				//}
+				if !(s._hosts.Contains(host.String()) && s.ports.Contains(port)) {
+					return
+				}
+			} else {
+				if !(s.hosts.Contains(host.String()) && s.ports.Contains(port)) {
+					return
+				}
 
-			if !(s.hosts.Contains(host.String()) && s.ports.Contains(port)) {
-				return
 			}
 
 			if hostsFilter != nil && !hostsFilter.Contains(host.String()) {
@@ -344,8 +357,10 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s.arpScan()
-		time.Sleep(1 * time.Second)
+		if !s.FromPing {
+			s.arpScan()
+			time.Sleep(1 * time.Second)
+		}
 		s.sendPacket(s.ctx, targetCh)
 	}()
 	wg.Wait()
