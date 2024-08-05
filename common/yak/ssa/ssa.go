@@ -69,6 +69,9 @@ type Instruction interface {
 
 	// IsLazy means this instruction is lazy, not loaded all from db
 	IsLazy() bool
+	// IsFromDB means this instruction is loaded from db
+	IsFromDB() bool
+	SetIsFromDB(bool)
 }
 
 type (
