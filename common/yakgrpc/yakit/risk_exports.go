@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"os"
 	"strconv"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -629,7 +630,7 @@ func CheckHTTPLogByToken(token string, runtimeId string, timeout ...float64) ([]
 			if err != nil {
 				continue
 			}
-			var details = make(map[string]any)
+			details := make(map[string]any)
 			json.Unmarshal(req, &details)
 			if _, ok := details["Request"]; ok {
 				details["Request"] = utils.EscapeInvalidUTF8Byte(i.GetRequest())
@@ -688,34 +689,24 @@ func CheckDNSLogByToken(token string, runtimeId string, timeout ...float64) ([]*
 	if f <= 0 {
 		f = 5.0
 	}
-	counter := 0
-	for {
-		counter++
-		if counter > 3 {
-			return nil, utils.Errorf("cannot found result for dnslog[%v]", token)
-		}
-		events, err := cybertunnel.QueryExistedDNSLogEventsEx(consts.GetDefaultPublicReverseServer(), token, "", f)
-		if err != nil {
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		for _, e := range events {
-			NewRisk(
-				"dnslog://"+e.RemoteAddr,
-				WithRiskParam_Title(fmt.Sprintf(`DNSLOG[%v] - %v from: %v`, e.Type, e.Domain, e.RemoteAddr)),
-				WithRiskParam_TitleVerbose(fmt.Sprintf(`DNSLOG 触发 - %v 源：%v`, e.Domain, e.RemoteAddr)),
-				WithRiskParam_Details(e.Raw),
-				WithRiskParam_RiskType(fmt.Sprintf("dns[%v]", e.Type)),
-				WithRiskParam_RiskType(fmt.Sprint("dnslog")),
-				WithRiskParam_Payload(e.Domain), WithRiskParam_Token(e.Token),
-				WithRiskParam_RuntimeId(runtimeId),
-			)
-		}
-		if len(events) > 0 {
-			return events, nil
-		}
-		time.Sleep(1 * time.Second)
+
+	events, err := cybertunnel.QueryExistedDNSLogEventsEx(consts.GetDefaultPublicReverseServer(), token, "", f)
+	if err != nil {
+		return nil, err
 	}
+	for _, e := range events {
+		NewRisk(
+			"dnslog://"+e.RemoteAddr,
+			WithRiskParam_Title(fmt.Sprintf(`DNSLOG[%v] - %v from: %v`, e.Type, e.Domain, e.RemoteAddr)),
+			WithRiskParam_TitleVerbose(fmt.Sprintf(`DNSLOG 触发 - %v 源：%v`, e.Domain, e.RemoteAddr)),
+			WithRiskParam_Details(e.Raw),
+			WithRiskParam_RiskType(fmt.Sprintf("dns[%v]", e.Type)),
+			WithRiskParam_RiskType(fmt.Sprint("dnslog")),
+			WithRiskParam_Payload(e.Domain), WithRiskParam_Token(e.Token),
+			WithRiskParam_RuntimeId(runtimeId),
+		)
+	}
+	return events, nil
 }
 
 func YakitNewCheckDNSLogByToken(runtimeID string) func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
