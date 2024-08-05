@@ -1,11 +1,12 @@
 package yak
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
-func TestEngineToLibDocuments(t *testing.T) {
-	docs := EngineToLibDocuments(yaklang.New())
+func TestEngineToDocumentHelperWithVerboseInfo(t *testing.T) {
+	docs := EngineToDocumentHelperWithVerboseInfo(yaklang.New())
 	_ = docs
 }
