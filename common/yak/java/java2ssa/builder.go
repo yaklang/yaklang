@@ -19,7 +19,6 @@ type SSABuilder struct{}
 
 var Builder = &SSABuilder{}
 
-
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.SupportClass = true
 	ast, err := Frontend(src, force)
@@ -27,11 +26,12 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		return err
 	}
 	build := &builder{
-		FunctionBuilder: b,
-		ast:             ast,
-		constMap:        make(map[string]ssa.Value),
-		fullTypeNameMap: make(map[string][]string),
+		FunctionBuilder:   b,
+		ast:               ast,
+		constMap:          make(map[string]ssa.Value),
+		fullTypeNameMap:   make(map[string][]string),
 		allImportPkgSlice: make([][]string, 0),
+		selfPkgPath:       make([]string, 0),
 	}
 	build.SupportClassStaticModifier = true
 	build.VisitCompilationUnit(ast)
@@ -53,11 +53,12 @@ type builder struct {
 	ast      javaparser.ICompilationUnitContext
 	constMap map[string]ssa.Value
 
-	bluePrintStack  *utils.Stack[*ssa.ClassBluePrint]
+	bluePrintStack *utils.Stack[*ssa.ClassBluePrint]
 
 	// for full type name
-	fullTypeNameMap map[string][]string
+	fullTypeNameMap   map[string][]string
 	allImportPkgSlice [][]string
+	selfPkgPath       []string
 }
 
 func (b *builder) PushBluePrint(bp *ssa.ClassBluePrint) {
