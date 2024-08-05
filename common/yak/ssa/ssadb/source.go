@@ -3,6 +3,7 @@ package ssadb
 import (
 	"path"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -131,8 +132,8 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 		code = source.QuotedCode
 	}
 	editor := memedit.NewMemEditor(code)
-	// if source.FileURL != "" {
-	// 	editor.SetUrl(source.FileURL)
-	// }
+	// strings.Split( source.FolderPath, sou
+	_, folder, _ := strings.Cut(source.FolderPath, source.ProgramName)
+	editor.SetUrl(path.Join(".", folder, source.FileName))
 	return editor, nil
 }
