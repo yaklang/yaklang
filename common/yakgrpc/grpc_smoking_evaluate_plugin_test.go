@@ -267,4 +267,18 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			zeroScore: false,
 		})
 	})
+
+	t.Run("test cli mitm plugin", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+url = cli.String("url",cli.setRequired(true))
+cli.check()
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	println(url)
+}`,
+			err:       "",
+			codeTyp:   "mitm",
+			zeroScore: false,
+		})
+	})
 }
