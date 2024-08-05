@@ -538,7 +538,13 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]any) *yakdoc.DocumentHelpe
 							}
 							m, ok := fieldTyp.MethodByName(methodName)
 							if !ok {
-								continue
+								ptrFieldTyp := reflect.PointerTo(fieldTyp)
+								m, ok = ptrFieldTyp.MethodByName(methodName)
+								if !ok {
+									continue
+								} else {
+									fieldTyp = ptrFieldTyp
+								}
 							}
 							EmbedFieldAndMethodList.PushBack(&EmbedFieldTypeAndMethod{
 								FieldType: fieldTyp,

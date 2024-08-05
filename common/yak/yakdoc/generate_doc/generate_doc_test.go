@@ -80,6 +80,8 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/ssaapi.Value", "Show")
 	// alias struct
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/ssaapi.Values", "Ref")
+	// embed field pointer methods
+	checkStructMethods("github.com/yaklang/yaklang/common/yak/yaklib.WaitGroupProxy", "Wait")
 	// alias builtin struct
 	checkStructMethods("net.IP", "Equal")
 }
