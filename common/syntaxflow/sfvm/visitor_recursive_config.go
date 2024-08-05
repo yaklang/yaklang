@@ -78,7 +78,6 @@ func (v *SyntaxFlowVisitor) VisitNativeCallActualParams(i *sf.NativeCallActualPa
 		configItem := &RecursiveConfigItem{Key: configKey}
 		value := item.NativeCallActualParamValue()
 		configItem.Value = yakunquote.TryUnquote(value.GetText())
-		fmt.Println(configItem.Value)
 		res = append(res, configItem)
 	}
 	return res
