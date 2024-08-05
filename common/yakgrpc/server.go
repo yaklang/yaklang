@@ -3,9 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
@@ -39,16 +40,19 @@ func WithReverseServerPort(port int) ServerOpts {
 		config.reverseServerPort = port
 	}
 }
+
 func WithInitFacadeServer(init bool) ServerOpts {
 	return func(config *ServerConfig) {
 		config.initFacadeServer = init
 	}
 }
+
 func WithStartCacheLog() ServerOpts {
 	return func(config *ServerConfig) {
 		config.startCacheLog = true
 	}
 }
+
 func (*Server) GetProfileDatabase() *gorm.DB {
 	return consts.GetGormProfileDatabase()
 }
@@ -62,7 +66,7 @@ func NewServer(opts ...ServerOpts) (*Server, error) {
 }
 
 func NewTestServer() (*Server, error) {
-	//return newServerEx(false, startCacheLog)
+	// return newServerEx(false, startCacheLog)
 	return newServerEx(
 		WithStartCacheLog(),
 		WithInitFacadeServer(false),
@@ -70,7 +74,7 @@ func NewTestServer() (*Server, error) {
 }
 
 func NewServerWithLogCache(opts ...ServerOpts) (*Server, error) {
-	//return newServerEx(true, startCacheLog)
+	// return newServerEx(true, startCacheLog)
 	return newServerEx(opts...)
 }
 
@@ -88,23 +92,19 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 	}
 
 	if serverConfig.initFacadeServer {
-		var (
-			port int
-			err  error
-		)
-		if serverConfig.reverseServerPort == 0 {
-			port, err = utils.GetRangeAvailableTCPPort(50000, 65535, 3)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			if utils.IsTCPPortAvailable(serverConfig.reverseServerPort) && !utils.IsTCPPortOpen("127.0.0.1", serverConfig.reverseServerPort) {
-				port = serverConfig.reverseServerPort
-			} else {
-				return nil, utils.Errorf("this port has used: %v", port)
-			}
-		}
-		s.reverseServer = facades.NewFacadeServer("0.0.0.0", port)
+		// if serverConfig.reverseServerPort == 0 {
+		// 	port, err = utils.GetRangeAvailableTCPPort(50000, 65535, 3)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// } else {
+		// 	if utils.IsTCPPortAvailable(serverConfig.reverseServerPort) && !utils.IsTCPPortOpen("127.0.0.1", serverConfig.reverseServerPort) {
+		// 		port = serverConfig.reverseServerPort
+		// 	} else {
+		// 		return nil, utils.Errorf("this port has used: %v", port)
+		// 	}
+		// }
+		s.reverseServer = facades.NewFacadeServer("0.0.0.0", 0)
 	}
 
 	err := s.initDatabase()
@@ -194,7 +194,6 @@ func (s *Server) initFacadeServer() error {
 				}
 			}()
 
-			log.Infof("start to listen reverse(facade) on: %s:%d", s.reverseServer.Host, s.reverseServer.Port)
 			err := s.reverseServer.ServeWithContext(context.Background())
 			if err != nil {
 				log.Error(err)

@@ -5,6 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/lor00x/goldap/message"
 	"github.com/yaklang/yaklang/common/facades/ldap/ldapserver"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,12 +16,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/common/yso"
-	"net"
-	"sync"
 
 	//"palm/common/yak/yaklib"
+
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"time"
 )
 
 const (
@@ -26,8 +28,10 @@ const (
 	RMIHandshakeMsgFlag = "rmi-handshake"
 )
 
-const emptyVerbose = "<empty>"
-const getInfoFailedVerbose = "<get info failed>"
+const (
+	emptyVerbose         = "<empty>"
+	getInfoFailedVerbose = "<get info failed>"
+)
 
 type FacadeResourceType interface {
 	[]byte | map[string]any | *HttpResource
@@ -46,6 +50,7 @@ func NewFacadeServerResource[T FacadeResourceType]() *FacadeServerResource[T] {
 		Resources: map[string]*resourceAndVerbose[T]{},
 	}
 }
+
 func (f *FacadeServerResource[T]) ForEachResource(fun func(token string, resource T, verbose string) error) error {
 	f.lock.Lock()
 	defer func() {
@@ -59,14 +64,15 @@ func (f *FacadeServerResource[T]) ForEachResource(fun func(token string, resourc
 	}
 	return nil
 }
+
 func (f *FacadeServerResource[T]) DeleteResource(token string) {
 	f.lock.Lock()
 	defer func() {
 		f.lock.Unlock()
 	}()
 	delete(f.Resources, token)
-
 }
+
 func (f *FacadeServerResource[T]) GetResource(token string) (T, string, bool) {
 	f.lock.Lock()
 	defer func() {
@@ -99,7 +105,7 @@ type FacadeServer struct {
 	Host         string
 	Port         int
 	ExternalHost string
-	//反连地址
+	// 反连地址
 	ReverseAddr string
 
 	rmiResourceAddrs           *FacadeServerResource[[]byte]
@@ -107,7 +113,7 @@ type FacadeServer struct {
 	httpResource               *FacadeServerResource[*HttpResource]
 	handlers                   []func(notification *Notification)
 	RemoteAddrConvertorHandler func(string) string
-	//resourceName               string
+	// resourceName               string
 	ldapEntry map[string]interface{}
 	httpMux   *sync.Mutex
 }
@@ -153,14 +159,17 @@ func (f *FacadeServer) GetAllResourcesInfo() []*ResourcesInfo {
 	return res
 }
 
-type FactoryFun func() string
-type FacadeServerConfig func(f *FacadeServer)
+type (
+	FactoryFun         func() string
+	FacadeServerConfig func(f *FacadeServer)
+)
 
 func SetLdapResponseEntry(token string, data map[string]any, verbose string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapResourceAddrs.SetResource(token, data, verbose)
 	}
 }
+
 func SetJavaClassName(name string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaClassName"] = name
@@ -177,21 +186,25 @@ func SetLdapResourceAddr(name string, addr string) FacadeServerConfig {
 		}, fmt.Sprintf("codebase: %s", addr))
 	}
 }
+
 func SetJavaCodeBase(codeBase string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaCodeBase"] = codeBase
 	}
 }
+
 func SetObjectClass(obj string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["objectClass"] = obj
 	}
 }
+
 func SetjavaFactory(factory string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaFactory"] = factory
 	}
 }
+
 func SetReverseAddress(address string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ReverseAddr = address
@@ -203,11 +216,13 @@ func (f *FacadeServer) Config(configs ...FacadeServerConfig) {
 		config(f)
 	}
 }
+
 func SetRmiResource(name string, resource []byte, verbose string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.rmiResourceAddrs.SetResource(name, resource, verbose)
 	}
 }
+
 func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		objIns, err := yso.GetJavaObjectArrayIns()
@@ -219,10 +234,10 @@ func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig 
 		payloadBuf.WriteByte(0x51)                       // Return
 		payloadBuf.Write([]byte{0xac, 0xed, 0x00, 0x05}) // stream header
 		payloadBuf.Write([]byte{0x77, 0x0f})             // TC_BLOCKDATA Header,length: 0x0f
-		payloadBuf.WriteByte(0x01)                       //NormalReturn
+		payloadBuf.WriteByte(0x01)                       // NormalReturn
 		payloadBuf.Write(yserx.IntTo4Bytes(0))           // unique
-		payloadBuf.Write(yserx.Uint64To8Bytes(0))        //time
-		payloadBuf.Write(yserx.IntTo2Bytes(0))           //count
+		payloadBuf.Write(yserx.Uint64To8Bytes(0))        // time
+		payloadBuf.Write(yserx.IntTo2Bytes(0))           // count
 		payloadBuf.Write(payload[4:])
 		rmiPayload := payloadBuf.Bytes()
 		f.rmiResourceAddrs.SetResource(name, rmiPayload, fmt.Sprintf("codebase: %s", rmiResourceAddr))
@@ -302,9 +317,11 @@ func NewFacadeServer(host string, port int, configs ...FacadeServerConfig) *Faca
 	}
 	return facadeServer
 }
+
 func (f *FacadeServer) GetAddr() string {
 	return fmt.Sprintf("%s:%d", f.Host, f.Port)
 }
+
 func (f *FacadeServer) OnHandle(h func(n *Notification)) {
 	f.handlers = append(f.handlers, h)
 }
@@ -312,6 +329,7 @@ func (f *FacadeServer) OnHandle(h func(n *Notification)) {
 func (f *FacadeServer) triggerNotification(t string, conn net.Conn, token string, raw []byte) {
 	f.triggerNotificationEx(t, conn, token, raw, "")
 }
+
 func (f *FacadeServer) triggerNotificationEx(t string, conn net.Conn, token string, raw []byte, responseInfo string) {
 	remoteAddr := f.ConvertRemoteAddr(conn.RemoteAddr().String())
 
@@ -328,7 +346,7 @@ func (f *FacadeServer) triggerNotificationEx(t string, conn net.Conn, token stri
 	// 响应内容
 	notif.ResponseInfo = responseInfo
 	if len(f.handlers) <= 0 {
-		//spew.Dump(notif)
+		// spew.Dump(notif)
 	}
 
 	for _, handle := range f.handlers {
@@ -338,6 +356,7 @@ func (f *FacadeServer) triggerNotificationEx(t string, conn net.Conn, token stri
 		handle(notif)
 	}
 }
+
 func (f *FacadeServer) Serve() error {
 	return f.ServeWithContext(context.Background())
 }
@@ -347,11 +366,16 @@ func (f *FacadeServer) CancelServe() {
 		f.cancel()
 	}
 }
+
 func (f *FacadeServer) ServeWithContext(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	f.cancel = cancel
-	log.Debugf("start to handle facade server: for %v", utils.HostPort(f.Host, f.Port))
 	lis, err := net.Listen("tcp", utils.HostPort(f.Host, f.Port))
+	if f.Port == 0 {
+		f.Port = lis.Addr().(*net.TCPAddr).Port
+	}
+	log.Infof("start to listen reverse(facade) on: %s:%d", f.Host, f.Port)
+
 	if err != nil {
 		return utils.Errorf("create listen failed: %s", err)
 	}
@@ -383,20 +407,19 @@ func (f *FacadeServer) ServeWithContext(ctx context.Context) error {
 }
 
 func (f *FacadeServer) handleConn(conn net.Conn) {
-
 	isTls := utils.NewBool(false)
 WRAPPER:
 	peekableConn := utils.NewPeekableNetConn(conn)
 	raw, err := peekableConn.Peek(4)
-	//buff := make([]byte, 7)
-	//typ, err := peekableConn.Read(buff)
-	//typ := utils.StableReaderEx(peekableConn, 5*time.Second, 10240)
-	//println(codec.EncodeToHex(typ))
-	//br := bufio.NewReader(peekableConn)
-	//buf := make([]byte, 12)
-	//br.Read(buf)
-	//println(codec.EncodeToHex(raw))
-	//println(string(raw))
+	// buff := make([]byte, 7)
+	// typ, err := peekableConn.Read(buff)
+	// typ := utils.StableReaderEx(peekableConn, 5*time.Second, 10240)
+	// println(codec.EncodeToHex(typ))
+	// br := bufio.NewReader(peekableConn)
+	// buf := make([]byte, 12)
+	// br.Read(buf)
+	// println(codec.EncodeToHex(raw))
+	// println(string(raw))
 	if err != nil {
 		log.Errorf("peek 4byte failed: %s", err)
 		return
@@ -412,7 +435,7 @@ WRAPPER:
 			return
 		}
 		log.Infof("handshake finished for %v", conn.RemoteAddr())
-		//conn = tlsConn
+		// conn = tlsConn
 		f.triggerNotification("tls", conn, "", nil)
 		isTls.Set()
 		goto WRAPPER
@@ -441,7 +464,7 @@ WRAPPER:
 			peekableConn.Close()
 			return
 		}
-	//48, 12, 2, 1, 1, 96, 7, 2, 1, 3, 4, 0, -128, 0, -128, 0, -128, 0,
+	// 48, 12, 2, 1, 1, 96, 7, 2, 1, 3, 4, 0, -128, 0, -128, 0, -128, 0,
 	//	(48)"Ber.ASN_SEQUENCE | Ber.ASN_CONSTRUCTOR", (12)len, (2,1,1)curMsgId, (97)LdapClient.LDAP_REQ_BIND, (7)len, (2,1,3)isLdapv3, (4)isLdapv3, (...) toServer
 	case 0x30:
 		if err != nil {
@@ -463,8 +486,8 @@ WRAPPER:
 		routes.Search(func(writer ldapserver.ResponseWriter, m *ldapserver.Message) {
 			searchReq := (m.GetSearchRequest())
 			reqResource := string((&searchReq).BaseObject())
-			//className := "cmd_" + randStr(8)
-			//addr := fmt.Sprintf("http://%s/%s.class", peekableConn.RemoteAddr(), f.resourceName)
+			// className := "cmd_" + randStr(8)
+			// addr := fmt.Sprintf("http://%s/%s.class", peekableConn.RemoteAddr(), f.resourceName)
 			e := ldapserver.NewSearchResultEntry(fmt.Sprintf("dc=%s,dc=com", "tmp"))
 			entry, entryVerbose, ok := f.ldapResourceAddrs.GetResource(reqResource)
 			if !ok {
@@ -472,7 +495,7 @@ WRAPPER:
 				return
 			}
 			for k, v := range entry {
-				e.AddAttribute(message.AttributeDescription(k), message.AttributeValue(utils.InterfaceToString(v))) //类名，可以任意
+				e.AddAttribute(message.AttributeDescription(k), message.AttributeValue(utils.InterfaceToString(v))) // 类名，可以任意
 			}
 			writer.Write(e)
 			res := ldapserver.NewSearchResultDoneResponse(ldapserver.LDAPResultSuccess)
