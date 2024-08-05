@@ -227,6 +227,7 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	// type
+	value.SetIsFromDB(true)
 	value.SetType(GetTypeFromDB(ir.TypeID))
 }
 
