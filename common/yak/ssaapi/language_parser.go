@@ -61,8 +61,6 @@ func (c *config) parseProject() (Programs, error) {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
-	log.Infof("parse project in fs: %T, localpath: %v", c.fs, programPath)
-
 	totalSize := 1
 	handled := 0
 	prog.ProcessInfof = func(s string, v ...any) {
@@ -75,6 +73,8 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	_ = totalSize
 	_ = handled
+
+	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, programPath)
 
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),

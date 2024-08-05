@@ -218,8 +218,7 @@ func WithEnableCache(b ...bool) Option {
 }
 
 func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
-	opts = append(opts, WithProgramPath(path))
-	return ParseProject(filesys.NewLocalFs(), opts...)
+	return ParseProject(filesys.NewRelLocalFs(path), opts...)
 }
 
 func ParseProject(fs fi.FileSystem, opts ...Option) (Programs, error) {
