@@ -158,7 +158,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 		t := obj.GetType()
 		if ftName := t.GetFullTypeNames(); len(ftName)!= 0 {
-			newTyp := y.CopyFullTypeNameForType(ftName,res.GetType())
+		newTyp := y.CopyFullTypeNameForType(ftName,res.GetType())
 			res.SetType(newTyp)
 		}
 		return res
@@ -1645,7 +1645,6 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
 			return obj, y.EmitCall(y.NewCall(defaultClassFullback, args))
 		}
-		obj.SetType(y.AddFullTypeNameFromMap(className,class))
 		constructor := class.Constructor
 		if constructor == nil {
 			log.Warnf("class %v is not found constructor, "+

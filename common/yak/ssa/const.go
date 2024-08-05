@@ -22,7 +22,6 @@ func (c *Const) GetType() Type {
 	if t == nil {
 		t = BasicTypes[AnyTypeKind]
 	}
-	t.AddFullTypeName(t.String())
 	return t
 }
 
