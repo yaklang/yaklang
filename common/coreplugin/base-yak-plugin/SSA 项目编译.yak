@@ -1,0 +1,53 @@
+yakit.AutoInitYakit()
+
+programName := cli.String("programName", 
+    cli.setRequired(true),
+    cli.setVerboseName("项目名")
+)
+
+path = cli.FolderName("ProgramPath", 
+    cli.setVerboseName("项目路径"),
+    cli.setRequired(true),
+) 
+
+language = cli.StringSlice("language", 
+    cli.setMultipleSelect(false), 
+    cli.setSelectOption("Java", "java"), 
+    cli.setSelectOption("PHP", "php"), 
+    cli.setSelectOption("Yaklang", "yak"), 
+    cli.setSelectOption("JavaScript", "js"), 
+    cli.setSelectOption("Golang", "go"), 
+    cli.setRequired(true)
+)
+
+
+reCompile := cli.Bool("re-compile", 
+    cli.setVerboseName("是否重新编译"),
+    cli.setDefault(true),
+)
+
+entry := cli.FileNames("entry", 
+    cli.setVerboseName("项目入口文件"),
+)
+
+
+cli.check()
+
+opts = [
+    ssa.withDatabaseProgramName(programName), 
+    ssa.withProcess((msg , process )=>{
+        yakit.SetProgressEx("complile", process)
+        yakit.Info("%s: %f",msg, process)
+    }), 
+    ssa.withLanguage(language[0]), 
+    ssa.withReCompile(reCompile), 
+] 
+if len(entry) != 0{
+    opts = append(opts, ssa.withEntryFile(entry...))
+}
+
+
+progs, err := ssa.ParseLocalProject(path, opts...)
+if err != nil {
+    yakit.Error("ssa compile error: %v", err)
+}

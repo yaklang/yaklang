@@ -1,8 +1,9 @@
 package coreplugin
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -147,6 +148,12 @@ func init() {
 			withPluginHelp("动态开启PPROF采样，用于性能调优"),
 			withPluginAuthors("V1ll4n,Q16G"),
 			withPluginParamRaw(`"[{\"Field\":\"memProfile\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"内存文件路径\",\"Help\":\"设置默认内存的profile文件路径\",\"MethodType\":\"string\"},{\"Field\":\"cpuProfileFile\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"cpu文件路径\",\"Help\":\"设置默认cpu的profile文件路径\",\"MethodType\":\"string\"},{\"Field\":\"timeout\",\"DefaultValue\":\"10\",\"TypeVerbose\":\"float\",\"FieldVerbose\":\"检测时间\",\"Help\":\"检测 timeout 时间\",\"Required\":true,\"MethodType\":\"float\"},{\"Field\":\"startMemory\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否检测内存\",\"Help\":\"开始检测内存\",\"Required\":true,\"MethodType\":\"boolean\"},{\"Field\":\"startCpu\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否检测cpu\",\"Help\":\"开始检测cpu\",\"Required\":true,\"MethodType\":\"boolean\"}]"`),
+		)
+		registerBuildInPlugin(
+			"yak", "SSA 项目编译",
+			withPluginHelp("将选择的项目编译到 SSA 数据库内，用于后续的代码查询和分析。"),
+			withPluginAuthors("Lingze"),
+			withPluginParamRaw(`"[{\"Field\":\"programName\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"项目名\",\"Required\":true,\"MethodType\":\"string\"},{\"Field\":\"ProgramPath\",\"TypeVerbose\":\"upload-folder-path\",\"FieldVerbose\":\"项目路径\",\"Required\":true,\"MethodType\":\"folder_name\"},{\"Field\":\"language\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"language\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":false,\\\"data\\\":[{\\\"key\\\":\\\"Golang\\\",\\\"label\\\":\\\"Golang\\\",\\\"value\\\":\\\"go\\\"},{\\\"key\\\":\\\"Java\\\",\\\"label\\\":\\\"Java\\\",\\\"value\\\":\\\"java\\\"},{\\\"key\\\":\\\"PHP\\\",\\\"label\\\":\\\"PHP\\\",\\\"value\\\":\\\"php\\\"},{\\\"key\\\":\\\"Yaklang\\\",\\\"label\\\":\\\"Yaklang\\\",\\\"value\\\":\\\"yak\\\"},{\\\"key\\\":\\\"JavaScript\\\",\\\"label\\\":\\\"JavaScript\\\",\\\"value\\\":\\\"js\\\"}]}\",\"MethodType\":\"select\"},{\"Field\":\"re-compile\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否重新编译\",\"MethodType\":\"boolean\"},{\"Field\":\"entry\",\"TypeVerbose\":\"multiple-file-path\",\"FieldVerbose\":\"项目入口文件\",\"MethodType\":\"file_names\"}]"`),
 		)
 		return nil
 	})
