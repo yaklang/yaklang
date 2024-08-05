@@ -296,6 +296,12 @@ func (m *MITMServer) GetCaCert() []byte {
 }
 
 func (m *MITMServer) Serve(ctx context.Context, addr string) error {
+	return m.ServeWithListenedCallback(ctx, addr, func() {
+		log.Info("mitm server started")
+	})
+}
+
+func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
 	if m.mitmConfig == nil {
 		return utils.Errorf("mitm config empty")
 	}
@@ -343,6 +349,10 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 		return utils.Errorf("listen port: %v failed: %s", addr, err)
 	}
 	defer lis.Close()
+
+	if callback != nil {
+		callback()
+	}
 
 	go func() {
 		select {
