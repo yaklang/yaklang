@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -116,35 +117,36 @@ func TestLocalVariableDeclareTypeName(t *testing.T){
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-		typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "string")
-		typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "string")
 
-		typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "number")
-		typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "number")
+		obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'string'}as $obj`)
+		assert.Equal(t,1,obj.Len())
+		obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'string'} as $obj`)
+		assert.Equal(t,1,obj.Len())
+		
+		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
+		assert.Equal(t,1,obj.Len())
+		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
+		assert.Equal(t,1,obj.Len())
 
-		typeName = prog.SyntaxFlowChain(`res3<typeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "A")
-		typeName = prog.SyntaxFlowChain(`res3<fullTypeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "com.org.A.A")
+		obj = prog.SyntaxFlowChain(`res3<typeName>?{have:'A'} as $obj`)
+		assert.Equal(t,2,obj.Len())
+		obj = prog.SyntaxFlowChain(`res3<fullTypeName>?{have:'com.org.A.A'} as $obj`)
+		assert.Equal(t,1,obj.Len())
 
-		typeName = prog.SyntaxFlowChain(`res4<typeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "string")
-		typeName = prog.SyntaxFlowChain(`res4<fullTypeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "string")
+		obj = prog.SyntaxFlowChain(`res4<typeName>?{have:'string'} as $obj`)
+		assert.Equal(t,1,obj.Len())
+		obj = prog.SyntaxFlowChain(`res4<fullTypeName>?{have: 'string'}as $obj`)
+		assert.Equal(t,1,obj.Len())
 
-		typeName = prog.SyntaxFlowChain(`res5<typeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "A")
-		typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "com.org.A.A")
+		obj = prog.SyntaxFlowChain(`res5<typeName>?{have:'A'} as $obj`)
+		assert.Equal(t,2,obj.Len())
+		obj = prog.SyntaxFlowChain(`res5<fullTypeName>?{have:'com.org.A.A'} as $obj`)
+		assert.Equal(t,1,obj.Len())
 
-		typeName = prog.SyntaxFlowChain(`test2<typeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "A")
-		typeName = prog.SyntaxFlowChain(`test2<fullTypeName> as $id;`)[0]
-		assert.Contains(t, typeName.String(), "com.org.A.A")
+		obj = prog.SyntaxFlowChain(`test2<typeName>?{have:'A'} as $obj`)
+		assert.Equal(t,2,obj.Len())
+		obj = prog.SyntaxFlowChain(`test2<fullTypeName>?{have:'com.org.A.A'} as $obj`)
+		assert.Equal(t,1,obj.Len())
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 		
@@ -172,7 +174,7 @@ func TestMemberCallTypeName(t *testing.T){
 					var res2 = object.existMethod();  // fulltypeName 应该为number
 					var res3 = object.getDog();  // fulltypeName 应为com.org.Dog.Dog
 					var res4 = object.Runtime().exec();  // fulltypeName 应该和object一样
-					var res5 = A.staticMethod();  // fulltypeName 应该找到A
+					var res5 = A.staticMethod();  // fulltypeName 应该找到Dog
 					var res6 = A.noExistMethod();  // fulltypeName 应该找到A
 				}
 			};	
@@ -182,42 +184,35 @@ func TestMemberCallTypeName(t *testing.T){
 			prog := progs[0]
 			prog.Show()
 
-			typeName := prog.SyntaxFlowChain(`object<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
-			typeName = prog.SyntaxFlowChain(`object<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
-
-			typeName = prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
-			typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
-
-			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "number")
-			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "number")
-
-			typeName = prog.SyntaxFlowChain(`res3<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "Dog")
-			typeName = prog.SyntaxFlowChain(`res3<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.Dog.Dog")
-
-			typeName = prog.SyntaxFlowChain(`res4<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
-			typeName = prog.SyntaxFlowChain(`res4<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
-
-			typeName = prog.SyntaxFlowChain(`res5<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "Dog")
-			typeName = prog.SyntaxFlowChain(`res5<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.Dog.Dog")
-
+			obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'A'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'com.org.A.A'} as $obj`)
+			assert.Equal(t,1,obj.Len())
 			
-			typeName = prog.SyntaxFlowChain(`res6<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
-			typeName = prog.SyntaxFlowChain(`res6<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
+			obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
+			assert.Equal(t,1,obj.Len())
+			obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
+			assert.Equal(t,1,obj.Len())
 
+			obj = prog.SyntaxFlowChain(`res3<typeName>?{have:'Dog'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`res3<fullTypeName>?{have:'com.org.Dog.Dog'} as $obj`)
+			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain(`res4<typeName>?{have:'A'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`res4<fullTypeName>?{have: 'com.org.A.A'}as $obj`)
+			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain(`res5<typeName>?{have:'Dog'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`res5<fullTypeName>?{have: 'com.org.Dog.Dog'}as $obj`)
+			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain(`res6<typeName>?{have:'A'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`res6<fullTypeName>?{have: 'com.org.A.A'}as $obj`)
+			assert.Equal(t,1,obj.Len())
 			
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
@@ -246,21 +241,22 @@ func TestParamTypeName(t *testing.T){
 			prog := progs[0]
 			prog.Show()
 
-			typeName := prog.SyntaxFlowChain(`param1<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "number")
-			typeName = prog.SyntaxFlowChain(`param1<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "number")
+			obj := prog.SyntaxFlowChain(`param1<typeName>?{have: 'number'} as $obj`)
+			assert.Equal(t,1,obj.Len())
+			obj = prog.SyntaxFlowChain(`param1<fullTypeName>?{have: 'number'} as $obj`)
+			assert.Equal(t,1,obj.Len())
+			
+			obj = prog.SyntaxFlowChain(`param2<typeName>?{have:'A'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`param2<fullTypeName>?{have:'com.org.A.A'} as $obj`)
+			assert.Equal(t,1,obj.Len())
 
-			typeName = prog.SyntaxFlowChain(`param2<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
-			typeName = prog.SyntaxFlowChain(`param2<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
+			obj = prog.SyntaxFlowChain(`param3<typeName>?{have:'Dog'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`param3<fullTypeName>?{have:'Dog'} as $obj`)
+			assert.Equal(t,1,obj.Len())
 
-			typeName = prog.SyntaxFlowChain(`param3<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "Dog")
-			typeName = prog.SyntaxFlowChain(`param3<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "Dog")
-
+		
 			
 
 			return nil
@@ -289,15 +285,16 @@ func TestTypeNamePriority(t *testing.T){
 			prog := progs[0]
 			prog.Show()
 
-			typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "A")
-			typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "com.org.A.A")
+			obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'A'} as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'com.org.A.A'} as $obj`)
+			assert.Equal(t,1,obj.Len())
+			
+			obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
+			assert.Equal(t,1,obj.Len())
+			obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
+			assert.Equal(t,1,obj.Len())
 
-			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "number")
-			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)[0]
-			assert.Contains(t, typeName.String(), "number")
 
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
@@ -328,14 +325,31 @@ func TestTypeNameForImportStar(t *testing.T){
 			prog.Show()
 
 			typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)
-			assert.Equal(t,3,typeName.Show().Len())
+			assert.Equal(t,3,typeName.Show(false).Len())
 			typeName = prog.SyntaxFlowChain(`res1<fullTypeName> as $id;`)
-			assert.Equal(t,2,typeName.Show().Len())
+			assert.Equal(t,2,typeName.Show(false).Len())
 			
 			typeName = prog.SyntaxFlowChain(`res2<typeName> as $id;`)
-			assert.Equal(t,3,typeName.Show().Len())
+			assert.Equal(t,3,typeName.Show(false).Len())
 			typeName = prog.SyntaxFlowChain(`res2<fullTypeName> as $id;`)
-			assert.Equal(t,2,typeName.Show().Len())
+			assert.Equal(t,2,typeName.Show(false).Len())
+
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestClassFullTypeName(t *testing.T){
+	vf := filesys.NewVirtualFs()
+		vf.AddFile("A.java",
+			`package com.org.A;
+				class A{
+					};
+		    `)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			prog := progs[0]
+			prog.Show()
+
+			prog.SyntaxFlowChain("A<fullTypeName> as $obj",sfvm.WithEnableDebug(true)).Show()
 
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
