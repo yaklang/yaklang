@@ -97,6 +97,10 @@ func (s *Scannerx) HandlerZeroCopyReadPacket(ctx context.Context, resultCh chan 
 		case <-ctx.Done():
 			return
 		default:
+			if s.Handle == nil {
+				log.Errorf("pcap handle is nil")
+				return
+			}
 			data, _, err := s.Handle.ZeroCopyReadPacketData()
 			if errors.Is(err, pcap.NextErrorTimeoutExpired) || errors.Is(err, pcap.NextErrorReadError) || errors.Is(err, io.EOF) {
 				continue

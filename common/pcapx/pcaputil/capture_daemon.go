@@ -38,7 +38,7 @@ func syncKeepDaemonCache(key string, ctx context.Context) {
 		case <-ctx.Done():
 			log.Debugf("keep daemon cache: %v is stop", key)
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(3 * time.Second):
 			log.Debugf("keep daemon cache: %v", key)
 			getDaemonCache(key)
 		}
