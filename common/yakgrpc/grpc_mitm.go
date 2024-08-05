@@ -1640,7 +1640,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	// 发送第二个来设置 replacer
 	recoverSend()
 
-	feedbackToUser("MITM 服务器已启动 / starting mitm server")
+	go func() {
+		err := utils.WaitConnect(utils.HostPort(host, port), 5)
+		if err != nil {
+			feedbackToUser("MITM 服务器启动失败 / mitm server start failed")
+		} else {
+			feedbackToUser("MITM 服务器已启动 / starting mitm server")
+		}
+	}()
 	log.Infof("start serve mitm server for %s", addr)
 	// err = mServer.Run(ctx)
 	err = mServer.Serve(ctx, utils.HostPort(host, port))
