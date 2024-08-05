@@ -1,6 +1,7 @@
 package ssa
 
 import (
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -73,6 +74,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 			continue
 		}
 		parent.Apply(obj)
+		c.fullTypeName = append(c.fullTypeName, parent.fullTypeName...)
 	}
 
 	if prog != nil || prog.Cache != nil {

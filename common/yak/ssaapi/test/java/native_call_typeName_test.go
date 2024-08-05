@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -23,6 +22,7 @@ func TestNativeCallTypeName(t *testing.T) {
 
 func TestNativeCallTypeNameWithSCAVersion(t *testing.T) {
 	vf := filesys.NewVirtualFs()
+	
 	vf.AddFile("FastJSONDemoController.java",
 		`package com.example.demo.controller.fastjsondemo;
 
@@ -38,7 +38,7 @@ public class FastJSONDemoController {
     public ResponseEntity<Object> loadFromParam(@RequestParam(name = "id") String id) {
         // This is a FASTJSON Vuln typically.
         Object anyJSON = JSON.parse(id);
-        JSON a =(JSON) anyJSON;
+     
         return ResponseEntity.ok(anyJSON);
     }
 }
@@ -338,19 +338,80 @@ func TestTypeNameForImportStar(t *testing.T){
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
 
-func TestClassFullTypeName(t *testing.T){
+func TestFullTypeNameWithParentClass1(t *testing.T){
 	vf := filesys.NewVirtualFs()
-		vf.AddFile("A.java",
-			`package com.org.A;
-				class A{
-					};
-		    `)
+	
+	vf.AddFile("C.java",`
+	package com.yak;
+	class C{};
+	`)
+	vf.AddFile("A.java",
+		`package com.org.A;
+			class A {
+				};
+		`)
+	vf.AddFile("B.java",
+		`package com.example.B;
+		import com.org.A.A;
+		import com.yak.C;
+		class B extends A implements C{
+			public static void main(String[] args){
+				var a = new B();
+			}
+		};	
+`)
 		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 			prog := progs[0]
 			prog.Show()
 
-			prog.SyntaxFlowChain("A<fullTypeName> as $obj",sfvm.WithEnableDebug(true)).Show()
+			obj := prog.SyntaxFlowChain("a<typeName> as $obj").Show()
+			assert.Equal(t,4,obj.Len())
+		
+			obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.example.B.B'} as $obj")
+			assert.Equal(t,1,obj.Len())
 
+			obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.A.A'} as $obj")
+			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.A.A'} as $obj")
+			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain("a<fullTypeName>?{have:'com.yak.C'}as $obj")
+			assert.Equal(t,1,obj.Len())
+		
+			obj = prog.SyntaxFlowChain("a<fullTypeName>?{have:'com.example.B.B'} as $obj")
+			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain("a<fullTypeName>?{have:'com.org.A.A'} as $obj")
+			assert.Equal(t,1,obj.Len())
+			
+			obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.A.A'} as $obj")
+			assert.Equal(t,1,obj.Len())
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestFullTypeNameWithParentClass2(t *testing.T){
+	vf := filesys.NewVirtualFs()
+	
+	vf.AddFile("B.java",
+		`package com.example.B;
+		import com.org.*;
+		class B extends A implements C{
+			public static void main(String[] args){
+				var a = new B();
+			}
+		};	
+`)
+		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+			prog := progs[0]
+			prog.Show()
+
+			obj := prog.SyntaxFlowChain("a<typeName> as $obj").Show()
+			assert.Equal(t,6,obj.Len())
+
+			obj = prog.SyntaxFlowChain("a<fullTypeName> as $obj").Show()
+			assert.Equal(t,5,obj.Len())
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
