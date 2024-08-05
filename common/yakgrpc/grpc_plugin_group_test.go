@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
@@ -169,4 +171,41 @@ func TestSetGroup(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestQueryGroupCount(t *testing.T) {
+	tests := []struct {
+		name               string
+		excludeType        []string
+		isMITMParamPlugins int64
+		expectedError      error
+	}{
+		{
+			name:               "Case 1: isMITMParamPlugins=1",
+			excludeType:        []string{},
+			isMITMParamPlugins: 1,
+			expectedError:      nil,
+		},
+		{
+			name:               "Case 2: isMITMParamPlugins=2",
+			excludeType:        []string{},
+			isMITMParamPlugins: 2,
+			expectedError:      nil,
+		},
+		{
+			name:               "Case 0: No Params Filtering",
+			excludeType:        []string{},
+			isMITMParamPlugins: 0,
+			expectedError:      nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := yakit.QueryGroupCount(consts.GetGormProfileDatabase(), tc.excludeType, tc.isMITMParamPlugins)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+
 }
