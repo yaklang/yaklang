@@ -23,6 +23,7 @@ type config struct {
 	LanguageBuilder ssa.Builder
 	feedCode        bool
 	ignoreSyntaxErr bool
+	reCompile       bool
 
 	// input, code or project path
 	originEditor *memedit.MemEditor
@@ -73,6 +74,26 @@ func WithProcess(process ProcessFunc) Option {
 	return func(c *config) {
 		c.process = process
 	}
+}
+
+func WithReCompile(b bool) Option {
+	return func(c *config) {
+		c.reCompile = b
+	}
+}
+
+func WithRawLanguage(input_language string) Option {
+	input_language = strings.ToLower(input_language)
+	var language consts.Language
+	switch strings.ToLower(input_language) {
+	case "javascript", "js":
+		language = JS
+	case "yak", "yaklang":
+		language = Yak
+	default:
+		language = consts.Language(input_language)
+	}
+	return WithLanguage(language)
 }
 
 func WithLanguage(language consts.Language) Option {
@@ -283,12 +304,17 @@ func FromDatabase(programName string, opts ...Option) (*Program, error) {
 }
 
 var Exports = map[string]any{
-	"Parse": Parse,
+	"Parse":             Parse,
+	"ParseLocalProject": ParseProjectFromPath,
 
-	"withLanguage":            WithLanguage,
+	"withLanguage":            WithRawLanguage,
 	"withExternLib":           WithExternLib,
 	"withExternValue":         WithExternValue,
 	"withDatabaseProgramName": WithDatabaseProgramName,
+	"withProcess":             WithProcess,
+	"withEntryFile":           WithFileSystemEntry,
+	"withReCompile":           WithReCompile,
+	// "": with,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,
