@@ -1,12 +1,13 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestJavaAutoWired_BadType(t *testing.T) {
@@ -26,7 +27,7 @@ public class FastJSONDemoController {
 	@Autowired
     private HttpServletRequest request;
 
-    public ResponseEntity<Object> loadFromParam(@RequestParam(name = "id") String id) {
+    public ResponseEntity<Object> loadFromParam(@RequestParam(name = "id") String id,HttpServletRequest request) {
         // This is a FASTJSON Vuln typically.
         Object anyJSON = JSON.parse(id);
 
@@ -36,8 +37,8 @@ public class FastJSONDemoController {
 }`)
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results := prog.SyntaxFlowChain(`.getParameter()?{<getCaller><getObject><fullTypeName>?{have: servlet} && <getFunc>.annotation.*Mapping} as $dynamicParams`, sfvm.WithEnableDebug(true))
-		results.Show()
+		prog.Show()
+		results := prog.SyntaxFlowChain(`.getParameter()?{<getCaller><getObject><fullTypeName>?{have: servlet} && <getFunc><getObject>.annotation.*Mapping} as $dynamicParams`, sfvm.WithEnableDebug(true))
 		assert.Equal(t, 1, len(results))
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
