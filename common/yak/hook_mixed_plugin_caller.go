@@ -385,9 +385,7 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 		log.Infof("script[%v] is interactive, skip load", name)
 		return nil
 	}
-	if ins.ParamsNumber != len(params) {
-		return utils.Errorf("invalid param number,want %v,get %v", ins.ParamsNumber, len(params))
-	}
+
 	return m.LoadPluginEx(ctx, ins, params...)
 }
 
@@ -459,7 +457,16 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	var hooks []string
 	switch true {
 	case forMitm:
-		hooks = []string{HOOK_MirrorFilteredHTTPFlow, HOOK_MirrorHTTPFlow, HOOK_MirrorNewWebsite, HOOK_MirrorNewWebsitePath, HOOK_MirrorNewWebsitePathParams}
+		hooks = []string{
+			HOOK_MirrorFilteredHTTPFlow,
+			HOOK_MirrorHTTPFlow,
+			HOOK_MirrorNewWebsite,
+			HOOK_MirrorNewWebsitePath,
+			HOOK_MirrorNewWebsitePathParams,
+			HOOK_HijackHTTPRequest,
+			HOOK_HijackHTTPResponse,
+			HOOK_HijackHTTPResponseEx,
+			HOOK_hijackSaveHTTPFlow}
 	case forPortScan:
 		hooks = []string{HOOK_PortScanHandle}
 	default:
