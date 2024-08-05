@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -414,4 +415,62 @@ func TestFullTypeNameWithParentClass2(t *testing.T){
 			assert.Equal(t,5,obj.Len())
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+
+func TestFullTypeNameForAnnotation(t *testing.T){
+	t.Run("test spring framework annotation", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+	vf.AddFile("Test.java",`
+	package com.example;
+import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
+@RequestMapping("/fastjson")
+public class FastJSONDemoController {
+
+    public ResponseEntity<Object> loadFromParam(@RequestParam(name = "id") int id) {
+
+    }
+}`)
+
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+		obj := prog.SyntaxFlowChain("id.annotation<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestParam'} as $obj")
+		assert.Equal(t,1,obj.Len())
+
+		obj = prog.SyntaxFlowChain("FastJSONDemoController.annotation<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestMapping'} as $obj")
+		assert.Equal(t,1,obj.Len())
+
+		obj = prog.SyntaxFlowChain("*Param.__ref__<fullTypeName>?{have:number} as $obj")
+		assert.Equal(t,1,obj.Len())
+
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test no spring framework anntation type name ", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+	vf.AddFile("Test.java",`
+	package com.example;
+import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
+@RequestMapping("/fastjson")
+public class FastJSONDemoController {
+
+    public ResponseEntity<Object> loadFromParam(@Hello(name = "id") int id) {
+
+    }
+}`)
+
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+		obj := prog.SyntaxFlowChain("id.annotation<fullTypeName> as $obj").Show()
+		assert.Equal(t,2,obj.Len())
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	
 }
