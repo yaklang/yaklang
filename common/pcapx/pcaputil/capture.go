@@ -128,8 +128,9 @@ func Start(opt ...CaptureOption) error {
 		// hack: use runtimeId to registerCallback
 		var cancels []func()
 		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
-			c := keepDaemonCache(i, ctx)
-			cancels = append(cancels, c)
+			if conf.EnableCache {
+				cancels = append(cancels, keepDaemonCache(i, ctx))
+			}
 			return true
 		})
 		defer func() {
