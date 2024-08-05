@@ -87,9 +87,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		class = y.CreateClassBluePrint(className)
 	}
 	// set full type name for class's self
-	ftRaw := fmt.Sprintf("%s.%s",strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
-	class  = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
-
+	if len(y.selfPkgPath)!=0{
+		ftRaw := fmt.Sprintf("%s.%s",strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
+		class  = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
+	} 
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
