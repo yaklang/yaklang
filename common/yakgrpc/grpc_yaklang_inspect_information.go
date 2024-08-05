@@ -372,3 +372,19 @@ func (s *Server) YaklangGetCliCodeFromDatabase(ctx context.Context, req *ypb.Yak
 		NeedHandle: len(code) != 0,
 	}, nil
 }
+
+// func GetParameter(code string) (string, error) {
+// 	prog, err := static_analyzer.SSAParse(code, "yak")
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	parameters, _ := information.ParseCliParameter(prog)
+// 	cli := cliParam2grpc(parameters)
+// 	data, err := json.Marshal(cli)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	str := strconv.Quote(string(data))
+// 	return str, nil
+// }
