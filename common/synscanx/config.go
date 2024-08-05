@@ -102,24 +102,73 @@ func WithMaxOpenPorts(max int) SynxConfigOption {
 	}
 }
 
+// shuffle syn scan 的配置选项，设置是否打乱扫描顺序
+// @param {bool} s 是否打乱
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.shuffle(true) // 打乱扫描顺序
+//
+// )
+// die(err)
+// ```
 func WithShuffle(s bool) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.shuffle = s
 	}
 }
 
+// outputFile syn scan 的配置选项，设置本次扫描结果保存到指定的文件
+// @param {string} file 文件路径
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.outputFile("/tmp/open_ports.txt")
+//
+// )
+// die(err)
+// ```
 func WithOutputFile(file string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.outputFile = file
 	}
 }
 
+// outputPrefix syn scan 的配置选项，设置本次扫描结果保存到文件时添加自定义前缀，比如 tcp:// https:// http:// 等，需要配合 outputFile 使用
+// @param {string} prefix 前缀
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	 synscan.outputFile("./open_ports.txt"),
+//		synscan.outputPrefix("tcp://")
+//
+// )
+// die(err)
+// ```
 func WithOutputFilePrefix(prefix string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.outputFilePrefix = prefix
 	}
 }
 
+// wait syn scan 的配置选项，设置等待扫描目标回包的最大时间
+// @param {float64} sec 等待时间，单位秒
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.wait(5) // 等待 5 秒
+//
+// )
+// die(err)
+// ```
 func WithWaiting(sec float64) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.waiting = utils.FloatSecondDuration(sec)
@@ -129,18 +178,55 @@ func WithWaiting(sec float64) SynxConfigOption {
 	}
 }
 
+// initPortFilter syn scan 的配置选项，设置本次扫描的端口过滤器，只展示这些端口的扫描结果
+// @param {string} f 端口，支持逗号、-分割
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.3.1", "1-65535",
+//
+//	synscan.initPortFilter("1-100,200-300")
+//
+// )
+// die(err)
+// ```
 func WithInitFilterPorts(ports string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.initFilterPorts = ports
 	}
 }
 
+// initHostFilter syn scan 的配置选项，设置本次扫描的主机过滤器，只展示这些主机的扫描结果
+// @param {string} f 主机，支持逗号、CIDR、-分割
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.1.1/24", "1-65535",
+//
+//	synscan.initHostFilter("192.168.1.1,192.168.1.2")
+//
+// )
+// die(err)
+// ```
 func WithInitFilterHosts(hosts string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.initFilterHosts = hosts
 	}
 }
 
+// rateLimit syn scan 的配置选项，设置 syn 扫描的速率
+// @param {int} ms 延迟多少毫秒
+// @param {int} count 每隔多少个数据包延迟一次
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.rateLimit(1, 2000) // 每隔 2000 个数据包延迟 1 毫秒
+//
+// )
+// die(err)
+// ```
 func WithRateLimit(ms, count int) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.rateLimitDelayMs = float64(ms)
@@ -148,6 +234,18 @@ func WithRateLimit(ms, count int) SynxConfigOption {
 	}
 }
 
+// concurrent syn scan 的配置选项，设置 syn 扫描的发包速率，和 rateLimit 基本相同
+// @param {int} count 并发数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.concurrent(1000) // 并发 1000
+//
+// )
+// die(err)
+// ```
 func WithConcurrent(count int) SynxConfigOption {
 	return func(config *SynxConfig) {
 		if count <= 0 {
@@ -160,6 +258,18 @@ func WithConcurrent(count int) SynxConfigOption {
 	}
 }
 
+// excludeHosts syn scan 的配置选项，设置本次扫描排除的主机
+// @param {string} hosts 主机，支持逗号分割、CIDR、-的格式
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.1.1/24", "1-65535",
+//
+//	synscan.excludeHosts("192.168.1.1,192.168.1.3-10,192.168.1.1/26")
+//
+// )
+// die(err)
+// ```
 func WithExcludeHosts(hosts string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		if hosts == "" {
@@ -169,6 +279,18 @@ func WithExcludeHosts(hosts string) SynxConfigOption {
 	}
 }
 
+// excludePorts syn scan 的配置选项，设置本次扫描排除的端口
+// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.excludePorts("1-100,200-300") // 排除 1-100 和 200-300 端口
+//
+// )
+// die(err)
+// ```
 func WithExcludePorts(ports string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		if ports == "" {
@@ -178,18 +300,58 @@ func WithExcludePorts(ports string) SynxConfigOption {
 	}
 }
 
+// callback syn scan 的配置选项，设置一个回调函数，每发现一个端口就会调用一次
+// @param {func(i *synscan.SynScanResult)} i 回调函数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.callback(func(i){
+//	   db.SavePortFromResult(i) // 将结果保存到数据库
+//	})
+//
+// )
+// die(err)
+// ```
 func WithCallback(callback func(result *synscan.SynScanResult)) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.callback = callback
 	}
 }
 
+// submitTaskCallback syn scan 的配置选项，设置一个回调函数，每提交一个探测数据包的时候，这个回调会执行一次
+// @param {func(string)} i 回调函数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.submitTaskCallback(func(i){
+//	   println(i) // 打印要探测的目标
+//	})
+//
+// )
+// die(err)
+// ```
 func WithSubmitTaskCallback(callback func(i string)) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.submitTaskCallback = callback
 	}
 }
 
+// iface syn scan 的配置选项，设置 syn 扫描的网卡
+// @param {string} iface 网卡名称
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.1.1/24", "1-65535",
+//
+//	synscan.iface("eth0") // 使用 eth0 网卡
+//
+// )
+// die(err)
+// ```
 func WithIface(iface string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.netInterface = iface
