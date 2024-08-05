@@ -50,7 +50,9 @@ var AllLanguageBuilders = []ssa.Builder{
 }
 
 func (c *config) parseProject() (Programs, error) {
-	// ret := make([]*ssa.Program, 0)
+	if c.reCompile {
+		ssadb.DeleteProgram(ssadb.GetDB(), c.DatabaseProgramName)
+	}
 
 	programPath := c.programPath
 	prog, builder, err := c.init()
@@ -80,7 +82,10 @@ func (c *config) parseProject() (Programs, error) {
 			if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
 				language.ProgramHandler(c.fs, builder, path)
 			}
-			totalSize++
+			// check
+			if err := c.checkLanguage(path); err == nil {
+				totalSize++
+			}
 			return nil
 		}),
 	)
@@ -232,7 +237,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	prog.Build = func(
 		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) error {
-		prog.ProcessInfof("start to compile from: %v", filePath)
+		prog.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
 		defer func() {
 			prog.ProcessInfof(
