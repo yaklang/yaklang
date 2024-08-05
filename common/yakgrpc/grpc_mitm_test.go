@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/google/uuid"
 	"net/http"
 	"strings"
 	"sync"
@@ -1337,18 +1338,26 @@ Host: example.com
 }
 
 func TestMiTMPlugins(t *testing.T) {
-	check := false
+	var (
+		count, _count = 0, 0
+	)
+
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/notify" {
-			check = true
+			count++
+		}
+		writer.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
+	})
+	_host, _port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/notify" {
+			_count++
 		}
 		writer.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
 	})
 	target := fmt.Sprintf("http://%s:%v/notify", host, port)
+	_target := fmt.Sprintf("http://%s:%v/notify", _host, _port)
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100))
 	script, err := client.SaveNewYakScript(ctx,
 		&ypb.SaveNewYakScriptRequest{
@@ -1364,73 +1373,97 @@ func TestMiTMPlugins(t *testing.T) {
 				MethodType:   "",
 			}},
 			Type: "mitm",
-			Content: `target = cli.String("target")
+			Content: fmt.Sprintf(`target = cli.String("target",cli.setDefault("%v"))
 cli.check()
 
 
-mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-    dump(target)
-    yakit_output(target)
-    poc.Get(target)~
+hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
+   dump(target)
+   poc.Get(target)~
+   forward(req)
 }
-`,
-			ScriptName: "mitm_plugins",
+
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	dump(target)
+ 	poc.Get(target)~
+}
+mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	dump(target)
+	poc.Get(target)~
+}
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	dump(target)
+	poc.Get(target)~
+}
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	dump(target)
+	poc.Get(target)~
+}
+hijackHTTPResponse = func(isHttps, url, rsp, forward, drop) {
+	dump(target)
+	poc.Get(target)~
+}
+`, _target),
+			ScriptName: uuid.NewString(),
 		})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	defer func() {
 		time.Sleep(1 * time.Second)
 		cancel()
-		if !check {
-			t.Fatalf("hook url check failed")
-		}
 		client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{
 			Id: script.Id,
 		})
+		require.True(t, count == 6)
+		require.True(t, _count == 6)
 	}()
 	stream, err := client.MITM(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	_ = mitmPort
 	err = stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
 	})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	for {
 		recv, err := stream.Recv()
-		if err != nil {
-			panic(err)
-		}
+		require.NoError(t, err)
 		if strings.Contains(string(recv.GetMessage().GetMessage()), `starting mitm server`) {
 			err = stream.Send(&ypb.MITMRequest{
 				SetYakScript:    true,
 				YakScriptID:     script.Id,
 				YakScriptParams: []*ypb.ExecParamItem{{Key: "target", Value: target}},
 			})
-			if err != nil {
-				panic(err)
-			}
+			require.NoError(t, err)
 		} else if recv.GetCurrentHook && len(recv.GetHooks()) > 0 {
-			packet := `GET /origin HTTP/1.1
+			handler := func() {
+				packet := `GET /origin HTTP/1.1
 Host: ` + utils.HostPort(host, port) + `
 
 `
-			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
-			_, err = yak.Execute(`
+				packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
+				_, err = yak.Execute(`
 rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
 `, map[string]any{
-				"packet":    string(packetBytes),
-				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
-			})
-			if err != nil {
-				t.Fatal(err)
+					"packet":    string(packetBytes),
+					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+				})
+				require.NoError(t, err)
 			}
+			handler()
+			time.Sleep(time.Second * 2)
+			err = stream.Send(&ypb.MITMRequest{
+				RemoveHook: true,
+				RemoveHookParams: &ypb.RemoveHookParams{
+					RemoveHookID: []string{script.ScriptName},
+				},
+			})
+			time.Sleep(time.Second)
+			err = stream.Send(&ypb.MITMRequest{
+				SetYakScript: true,
+				YakScriptID:  script.Id,
+			})
+			handler()
 			break
 		}
 	}

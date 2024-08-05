@@ -241,7 +241,6 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		Content:              script.Content,
 		Level:                script.Level,
 		Params:               strconv.Quote(string(raw)),
-		ParamsNumber:         len(script.Params),
 		Help:                 script.Help,
 		Author:               script.Author,
 		Tags:                 script.Tags,
@@ -255,10 +254,6 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 }
 
 func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb.YakScript, error) {
-	if script.Type == "nuclei" {
-		script.Params = buildinNucleiYakScriptParam
-	}
-
 	switch script.Type {
 	case "yak", "mitm", "port-scan":
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
@@ -949,7 +944,6 @@ func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]in
 		"general_module_verbose": script.GeneralModuleVerbose,
 		"enable_plugin_selector": script.EnablePluginSelector,
 		"plugin_selector_types":  script.PluginSelectorTypes,
-		"params_number":          len(script.Params),
 	}
 	if len(script.Params) > 0 {
 		raw, _ := json.Marshal(script.Params)
