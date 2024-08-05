@@ -87,13 +87,13 @@ func ReducerCompile(base string, opts ...Option) error {
 			handler(path)
 			return nil
 		}
+		folder, name := c.fs.PathSplit(path)
 		// if test or .git, skip
-		if path == "test" || path == ".git" {
+		if name == "test" || name == ".git" {
 			return filesys.SkipDir
 		}
 		// if have Database, save folder
 		if c.ProgramName != "" {
-			folder, name := c.fs.PathSplit(path)
 			folders := []string{c.ProgramName}
 			folders = append(folders,
 				strings.Split(folder, string(c.fs.GetSeparators()))...,
