@@ -244,8 +244,8 @@ handleCrawler = func(result) {
         yakit.Info("Start to Exec Basic Crawler for %v", addr)
         for crawlerReq = range res {
             yakit.Info("found url: %s", crawlerReq.Url())
+            wg.Add()
             go func(){
-                wg.Add()
                 defer wg.Done()
                 handleMITMPluginCaller(crawlerReq)
             } ()
