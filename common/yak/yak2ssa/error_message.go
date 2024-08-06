@@ -23,6 +23,7 @@ func AssignRightSideEmpty() string {
 func UnaryOperatorNotSupport(op string) string {
 	return fmt.Sprintf("unary operator not support: %s", op)
 }
+
 func BinaryOperatorNotSupport(op string) string {
 	return fmt.Sprintf("binary operator not support: %s", op)
 }
@@ -49,6 +50,10 @@ func UnexpectedFallthroughStmt() string {
 
 func UnexpectedAssertStmt() string {
 	return "unexpected assert stmt, this not expression"
+}
+
+func UnexpectedDeferStmt() string {
+	return "defer statement should be instance code or function call"
 }
 
 func SliceCallExpressionTooMuch() string {
