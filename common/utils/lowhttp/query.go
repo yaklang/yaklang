@@ -238,7 +238,7 @@ func (q *QueryParams) Add(key, val string) {
 
 func (q *QueryParams) Set(key, val string) {
 	for i := 0; i < len(q.Items); i++ {
-		if q.Items[i].Key == key {
+		if q.Items[i].Key == key && q.Items[i].Position == q.Position {
 			q.Items[i].Value = val
 			q.Items[i].NoAutoEncode = q.NoAutoEncode
 			q.Items[i].Position = q.Position
