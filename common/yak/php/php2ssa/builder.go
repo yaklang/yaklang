@@ -49,6 +49,13 @@ func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.Functio
 
 var Builder = &SSABuild{}
 
+func (s *SSABuild) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+		builder.MoreParse = true
+		builder.GetProgram().Build("", editor, builder)
+		builder.MoreParse = false
+	}
+}
 func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {
@@ -76,9 +83,17 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		build.FunctionBuilder = functionBuilder
 		build.VisitHtmlDocument(ast)
 	}
-	if !b.Included && !b.MoreParse {
-		program := ssa.NewChildProgram(b.GetProgram(), uuid.NewString())
+	if b.IncludeStack.Len() <= 0 {
+		var program *ssa.Program
+		if b.MoreParse {
+			program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), nil)
+		} else {
+			program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), func(child *ssa.Program) {
+				b.GetProgram().ChildApplication = append(b.GetProgram().ChildApplication, child)
+			})
+		}
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
+		functionBuilder.MoreParse = b.MoreParse
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -34,6 +35,10 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 		return nil
 	}
 
+	if y.IncludeStack.Len() > 0 {
+		log.Info("include stack length > 0,no emit return")
+		return nil
+	}
 	if r := i.Expression(); r != nil {
 		return y.EmitReturn([]ssa.Value{y.VisitExpression(r)})
 	}
