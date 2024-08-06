@@ -69,6 +69,9 @@ func v3_schemaToValue(t openapi3.T, p any) (*openapi3.Schema, error) {
 		}
 		if param.Ref != "" {
 			var ret = strings.TrimPrefix(param.Ref, "#/components/schemas/")
+			if t.Components == nil || len(t.Components.Schemas) <= 0 {
+				return &openapi3.Schema{}, nil
+			}
 			return v3_schemaToValue(t, t.Components.Schemas[ret])
 		}
 		return param.Value, nil
@@ -76,6 +79,9 @@ func v3_schemaToValue(t openapi3.T, p any) (*openapi3.Schema, error) {
 		return param, nil
 	case string:
 		param = strings.TrimPrefix(param, "#/components/schemas/")
+		if t.Components == nil || len(t.Components.Schemas) <= 0 {
+			return &openapi3.Schema{}, nil
+		}
 		return v3_schemaToValue(t, t.Components.Schemas[param])
 	default:
 		return nil, utils.Errorf("unsupported parameter type: %T", p)

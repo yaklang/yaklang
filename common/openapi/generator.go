@@ -18,6 +18,11 @@ import (
 //		dump(flow.Url)
 //	}))
 func GenerateHTTPFlows(doc string, opt ...Option) error {
+	defer func() {
+		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	config := NewDefaultOpenAPIConfig()
 	for _, p := range opt {
 		p(config)
