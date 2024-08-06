@@ -281,6 +281,8 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 				b.EmitDefer(c)
 			}
 		} else {
+			b.buildExpression(stmt)
+			// b.emit
 			b.NewError(ssa.Error, TAG, UnexpectedDeferStmt())
 		}
 	}
