@@ -38,3 +38,4 @@ if err != nil {
     yakit.StatusCard("ERROR", f"${err}")
 }
 println(generateText.String())
+assert len(generateText.String()) > 0
