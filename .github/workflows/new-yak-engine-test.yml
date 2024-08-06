@@ -13,20 +13,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v2
+    - name: Cache YakLang Project
+      uses: actions/cache@v3
+      id: cache-project
       with:
-        go-version: ^1.18
-      id: go
+          path: |
+            ~/yakit-projects
+            ${{ github.workspace }}
+          key: go-${{ github.sha }}
 
     - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      if: steps.cache-project.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: "./go.mod"
+      id: go
 
     - name: Dependence
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+          packages: libpcap-dev
+          version: 1.9.1-3
+
+    - name: Init Module
       run: |
-       sudo apt-get update
-       sudo apt-get install libpcap-dev
-       go mod tidy
+          go mod tidy
 
     - name: Test
       run: go test -timeout 30m -tags ./common/yak/antlr4yak ./common/yak/antlr4yak -v -count=1
