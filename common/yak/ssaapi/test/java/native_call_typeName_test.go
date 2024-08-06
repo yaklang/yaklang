@@ -1,7 +1,6 @@
 package java
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -475,7 +474,7 @@ public class FastJSONDemoController {
 	}, ssaapi.WithLanguage(consts.JAVA))
 	})
 
-	t.Run("test servlet annotation", func(t *testing.T) {
+	t.Run("test servlet annotation1", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 	vf.AddFile("Test.java",`
 	package com.example;
@@ -492,7 +491,31 @@ public class Simple extends HttpServlet {
 }`)
 
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		fmt.Print("aaaaaa")
+		prog := progs[0]
+		prog.Show()
+		obj := prog.SyntaxFlowChain("Simple.annotation<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
+		assert.Equal(t,1,obj.Len())
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test servlet annotation2", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+	vf.AddFile("Test.java",`
+	package com.example;
+
+import javax.servlet.annotation.WebServlet; 
+@WebServlet(value = "/Simple") 
+public class Simple extends HttpServlet {
+
+   private static final long serialVersionUID = 1L; 
+
+   protected void doGet(HttpServletRequest request, HttpServletResponse response)  
+       { 
+   }   
+}`)
+
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
 		obj := prog.SyntaxFlowChain("Simple.annotation<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")

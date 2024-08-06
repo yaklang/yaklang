@@ -55,22 +55,23 @@ var ServletAnnotationMap = map[string]bool{
 }
 
 func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
-	return y.AddFullTypeNameForType(typName, typ, true)
+	newTyp,_ :=y.AddFullTypeNameForType(typName, typ, true)
+	return newTyp
 }
 
-func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type {
+func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) (newTyp ssa.Type, fromMap bool) {
 	return y.AddFullTypeNameForType(typName, typ, false)
 }
 
 // AddFullTypeNameForType用于将FullTypeName设置到Type中。其中当Type是BasicType时，会创建新的Type，避免修改原来的Type。
 // isFullName表示是否是完整的FullTypeName，如果不是，则会从fullTypeNameMap寻找完整的FullTypeName。
-func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type, isFullName bool) ssa.Type {
+func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type, isFullName bool) (newTyp ssa.Type,fromMap bool)  {
 	if b, ok := ssa.ToBasicType(typ); ok {
 		typ = ssa.NewBasicType(b.Kind, b.GetName())
 	}
 
 	if typ == nil {
-		return ssa.GetAnyType()
+		return ssa.GetAnyType(),false
 	}
 
 	typStr := typName
@@ -85,11 +86,12 @@ func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type, isFullNam
 				}
 			}
 			typ.AddFullTypeName(typStr)
+			return typ,true
 		}
 	} else {
 		typ.AddFullTypeName(typStr)
 	}
-	return typ
+	return typ,false
 }
 
 func (y *builder) CopyFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {
