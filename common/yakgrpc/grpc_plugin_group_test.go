@@ -2,7 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
@@ -174,11 +178,47 @@ func TestSetGroup(t *testing.T) {
 }
 
 func TestQueryGroupCount(t *testing.T) {
+	scriptName2, clearFunc, _ := yakit.CreateTemporaryYakScriptEx("mitm", "")
+	defer clearFunc()
+
+	scriptName1 := "[TMP]-" + "-" + ksuid.New().String()
+	content := "passiveScanning = cli.String(\"passiveScanning\",cli.setHelp(\"填写规则:http://127.0.0.1:8080\"),cli.setRequired(true),cli.setVerboseName(\"被动扫描器地址\"))\nwhitelisthostcli = cli.String(\"whitelisthostcli\",cli.setHelp(\"格式:*.yaklang.com;10.0.0.* 中间用;分割\"),cli.setDefault(\"\"),cli.setVerboseName(\"白名单主机列表\"))\nblacklistcli = cli.String(\"blacklistcli\",cli.setHelp(\"默认:*.gov.cn;*.edu.cn 中间用;分割\"),cli.setDefault(\"*.gov.cn;*.edu.cn\"),cli.setVerboseName(\"黑名单主机列表\"))\nblackmethodcli = cli.StringSlice(\"blackmethodcli\",cli.setMultipleSelect(true),\ncli.setSelectOption(\"GET\", \"GET\"),\ncli.setSelectOption(\"POST\", \"POST\"),\ncli.setSelectOption(\"DELETE\", \"DELETE\"),\ncli.setSelectOption(\"PUT\", \"PUT\"),\ncli.setSelectOption(\"OPTIONS\", \"OPTIONS\"),\ncli.setSelectOption(\"TRACE\", \"TRACE\"),\ncli.setSelectOption(\"COPY\", \"COPY\"),cli.setVerboseName(\"禁用方法\")\n)\ncli.check()\n"
+	prog, err := static_analyzer.SSAParse(content, "mitm")
+	if err != nil {
+		t.Fatal("ssa parse error")
+	}
+	parameters, _ := information.ParseCliParameter(prog)
+	params := cliParam2grpc(parameters)
+	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), scriptName1, GRPCYakScriptToYakitScript(&ypb.YakScript{
+		Content:    content,
+		Type:       "mitm",
+		Params:     params,
+		ScriptName: scriptName1,
+	}))
+	if err != nil {
+		t.Fatal("create yakscript error")
+	}
+	group1 := scriptName1 + "-" + "group1"
+	group2 := scriptName2 + "-" + "group2"
+	saveData1 := &schema.PluginGroup{
+		YakScriptName: scriptName1,
+		Group:         group1,
+	}
+	saveData1.Hash = saveData1.CalcHash()
+	saveData2 := &schema.PluginGroup{
+		YakScriptName: scriptName2,
+		Group:         group2,
+	}
+	saveData2.Hash = saveData2.CalcHash()
+	yakit.CreateOrUpdatePluginGroup(consts.GetGormProfileDatabase(), saveData1.Hash, saveData1)
+	yakit.CreateOrUpdatePluginGroup(consts.GetGormProfileDatabase(), saveData2.Hash, saveData2)
+
 	tests := []struct {
 		name               string
 		excludeType        []string
 		isMITMParamPlugins int64
 		expectedError      error
+		yakScriptName      string
 	}{
 		{
 			name:               "Case 1: isMITMParamPlugins=1",
@@ -201,11 +241,35 @@ func TestQueryGroupCount(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := yakit.QueryGroupCount(consts.GetGormProfileDatabase(), tc.excludeType, tc.isMITMParamPlugins)
+			req, err := yakit.QueryGroupCount(consts.GetGormProfileDatabase(), tc.excludeType, tc.isMITMParamPlugins)
 			if err != nil {
 				t.Fatal(err)
 			}
+			var expectedValue string
+			var expectedCount int
+			switch tc.isMITMParamPlugins {
+			case 1:
+				expectedValue = group1
+				expectedCount = 1
+			case 2:
+				expectedValue = group2
+				expectedCount = 1
+			default:
+				return
+			}
+			var valueFound bool
+			for _, v := range req {
+				if v.Value == expectedValue && v.Count == expectedCount {
+					valueFound = true
+					break
+				}
+			}
+			if !valueFound {
+				t.Errorf("Expected group %s with count %d was not found for isMITMParamPlugins=%d", expectedValue, expectedCount, tc.isMITMParamPlugins)
+			}
 		})
-	}
 
+	}
+	yakit.DeletePluginGroupByScriptName(consts.GetGormProfileDatabase(), []string{saveData2.YakScriptName, saveData1.YakScriptName})
+	yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName1)
 }
