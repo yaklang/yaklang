@@ -44,6 +44,7 @@ func NewChildProgram(prog *Program, name string) *Program {
 	prog.ChildApplication = append(prog.ChildApplication, childProg)
 	return childProg
 }
+
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
 	prog := &Program{
 		ChildApplication:        make([]*Program, 0),
@@ -254,7 +255,9 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 	index, offset := prog.SearchIndexAndOffsetByOffset(searchOffset)
 	// 如果二分查找的结果是大于目标值的，那么就需要回退一个
 	if offset > searchOffset {
-		index -= 1
+		if index > 0 {
+			index -= 1
+		}
 		offset = prog.OffsetSortedSlice[index]
 	}
 	if item, ok := prog.OffsetMap[offset]; ok {

@@ -3,6 +3,8 @@ package yaklib
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
@@ -11,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"time"
 )
 
 type CustomDNSLog struct {
@@ -187,7 +188,7 @@ func customCheck(name, token, mode string, timeout ...float64) ([]*tpb.DNSLogEve
 	}
 	for _, v := range utils.InterfaceToSliceInterface(result) {
 		event := utils.InterfaceToMapInterface(v)
-		var raw = []byte(spew.Sdump(event))
+		raw := []byte(spew.Sdump(event))
 		e := &tpb.DNSLogEvent{
 			Type:       utils.MapGetString(event, "Type"),
 			Token:      utils.MapGetString(event, "Token"),
@@ -203,7 +204,6 @@ func customCheck(name, token, mode string, timeout ...float64) ([]*tpb.DNSLogEve
 }
 
 func queryCustomScript() {
-
 }
 
 var DNSLogExports = map[string]interface{}{
@@ -255,3 +255,5 @@ func setScript(name string) _dnslogConfigOpt {
 		config.isLocal = true
 	}
 }
+
+var WithDNSLog_SetScript = setScript

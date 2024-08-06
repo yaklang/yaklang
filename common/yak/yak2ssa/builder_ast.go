@@ -269,19 +269,21 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 	defer recoverRange()
 
 	if stmt, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		// instance code
 		if s, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
+			// instance code
 			c := b.buildInstanceCode(s)
 			b.SetInstructionPosition(c)
 			b.EmitDefer(c)
-		}
-
-		// function call
-		if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
+		} else if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
+			// function calli
 			if c := b.buildFunctionCallWarp(stmt, s); c != nil {
 				b.SetInstructionPosition(c)
 				b.EmitDefer(c)
 			}
+		} else {
+			b.buildExpression(stmt)
+			// b.emit
+			b.NewError(ssa.Error, TAG, UnexpectedDeferStmt())
 		}
 	}
 }
@@ -497,7 +499,6 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 		for index, expression := range stmt.AllExpression() {
 			builder.AppendItem(
 				func() ssa.Value {
-
 					expressionStmt, ok := expression.(*yak.ExpressionContext)
 					if !ok {
 						return nil

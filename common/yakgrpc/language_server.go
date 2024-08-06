@@ -1,9 +1,9 @@
 package yakgrpc
 
 import (
-	"errors"
+	"time"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -21,14 +21,27 @@ const (
 
 type LanguageServerAnalyzerResult struct {
 	Program      *ssaapi.Program
-	Word         string
-	ContainPoint bool
 	Range        *ssa.Range
 	Value        *ssaapi.Value
 	Editor       *memedit.MemEditor
+	Word         string
+	ContainPoint bool
 }
 
-func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, rng *ypb.Range) (*LanguageServerAnalyzerResult, error) {
+func (r *LanguageServerAnalyzerResult) Clone() *LanguageServerAnalyzerResult {
+	return &LanguageServerAnalyzerResult{
+		Program:      r.Program,
+		Range:        r.Range,
+		Value:        r.Value,
+		Editor:       r.Editor,
+		Word:         r.Word,
+		ContainPoint: r.ContainPoint,
+	}
+}
+
+var fallbackAnalyzeCache = utils.NewTTLCache[*LanguageServerAnalyzerResult](30 * time.Second)
+
+func LanguageServerAnalyzeProgram(id, code, inspectType, scriptType string, rng *ypb.Range) (*LanguageServerAnalyzerResult, error) {
 	ssaRange := GrpcRangeToSSARange(code, rng)
 	editor := ssaRange.GetEditor()
 	rangeWordText := ssaRange.GetWordText()
@@ -71,17 +84,22 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 				return prog, nil
 			}
 		}
-
-		// try ignore syntax error
-		prog, err = static_analyzer.SSAParse(code, scriptType, ssaapi.WithIgnoreSyntaxError())
-
 		return prog, err
 	}
 
 	prog, err := getProgram()
 	if err != nil {
-		log.Error(err)
-		return nil, errors.New("ssa parse error")
+		if fallback, ok := fallbackAnalyzeCache.Get(id); ok {
+			cloned := fallback.Clone()
+			cloned.ContainPoint = containPoint
+			cloned.Range = ssaRange
+			cloned.Word = word
+			cloned.Value = nil
+
+			return cloned, nil
+		} else {
+			return nil, utils.Wrap(err, "language server analyze program error")
+		}
 	}
 
 	// prog.Program.ShowOffsetMap()
@@ -92,12 +110,14 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 		v = getSSAValueByPosition(prog, word, ssaRange)
 	}
 
-	return &LanguageServerAnalyzerResult{
+	result := &LanguageServerAnalyzerResult{
 		Program:      prog,
 		Word:         word,
 		ContainPoint: containPoint,
 		Range:        ssaRange,
 		Value:        v,
 		Editor:       editor,
-	}, nil
+	}
+	fallbackAnalyzeCache.Set(id, result)
+	return result, err
 }

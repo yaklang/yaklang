@@ -2,7 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"math/rand"
 	"net/http"
 	"testing"
 	"time"
@@ -194,4 +197,27 @@ func TestRiskFieldGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestQueryRisks(t *testing.T) {
+	testRuntimeId := uuid.New().String()
+	randInt := rand.Intn(10) + 1
+	for i := 0; i < randInt; i++ {
+		err := yakit.SaveRisk(&schema.Risk{
+			RuntimeId: testRuntimeId,
+		})
+		require.NoError(t, err)
+	}
+	defer func() {
+		yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+			RuntimeId: testRuntimeId,
+		})
+	}()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	res, err := client.QueryRisks(context.Background(), &ypb.QueryRisksRequest{
+		RuntimeId: testRuntimeId,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(randInt), res.Total)
 }

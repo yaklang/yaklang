@@ -79,9 +79,35 @@ const (
 
 	NativeCall_StrLower = "strlower"
 	NativeCall_StrUpper = "strupper"
+
+	// NativeCall_As is used to put vars to variables
+	NativeCall_As = "as"
+
+	NativeCall_MyBatisSink = "mybatisSink"
 )
 
 func init() {
+	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
+	registerNativeCall(NativeCall_As, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		varName := params.GetString(0)
+		log.Info("syntax flow native call 'as' to", varName)
+		result, ok := frame.GetSymbolTable().Get(varName)
+		if !ok {
+			frame.GetSymbolTable().Get(varName)
+		} else {
+			var vals []sfvm.ValueOperator
+			result.Recursive(func(operator sfvm.ValueOperator) error {
+				vals = append(vals, operator)
+				return nil
+			})
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				vals = append(vals, operator)
+				return nil
+			})
+			return true, sfvm.NewValues(vals), nil
+		}
+		return true, v, nil
+	}), nc_desc(`put vars to variables`))
 	registerNativeCall(NativeCall_StrLower, nc_func(nativeCallStrLower), nc_desc(`convert a string to lower case`))
 	registerNativeCall(NativeCall_StrUpper, nc_func(nativeCallStrUpper), nc_desc(`convert a string to upper case`))
 	registerNativeCall(NativeCall_Regexp, nc_func(nativeCallRegexp), nc_desc(`regexp a string, group is available`))
