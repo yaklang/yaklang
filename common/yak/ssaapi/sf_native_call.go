@@ -9,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+
+	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 )
 
 const (
@@ -84,58 +86,28 @@ const (
 	NativeCall_MyBatisSink = "mybatisSink"
 )
 
-func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
-	if name == "" {
-		return
-	}
-	n := &NativeCallDocument{
-		Name: name,
-	}
-	for _, o := range options {
-		o(n)
-	}
-	NativeCallDocuments[name] = n
-	sfvm.RegisterNativeCall(n.Name, n.Function)
-}
-
 func init() {
-	sfvm.RegisterNativeCall(NativeCall_TypeName, func(v sfvm.ValueOperator, frame *sfvm.SFFrame) (bool, sfvm.ValueOperator, error) {
-		var vals []sfvm.ValueOperator
-		v.Recursive(func(operator sfvm.ValueOperator) error {
-			val, ok := operator.(*Value)
-			if !ok {
+	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
+	registerNativeCall(NativeCall_As, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		varName := params.GetString(0)
+		log.Info("syntax flow native call 'as' to", varName)
+		result, ok := frame.GetSymbolTable().Get(varName)
+		if !ok {
+			frame.GetSymbolTable().Get(varName)
+		} else {
+			var vals []sfvm.ValueOperator
+			result.Recursive(func(operator sfvm.ValueOperator) error {
+				vals = append(vals, operator)
 				return nil
-			}
-			t := val.GetType()
-			if b, ok := t.t.(*ssa.BasicType); ok {
-				typeStr := b.GetFullTypeName()
-				if typeStr == ""{
-					typeStr := t.String()
-					results := val.NewValue(ssa.NewConst(typeStr))
-					vals = append(vals, results)
-				}else{
-					// remove version if it exists
-				index := strings.Index(typeStr, ":")
-				if index != -1 {
-					typeStr = typeStr[:index]
-				}
-				// get type name
-				lastIndex := strings.LastIndex(typeStr, ".")
-				if lastIndex != -1 && len(typeStr) > lastIndex+1 {
-					typeStr = typeStr[lastIndex+1:]
-					results := val.NewValue(ssa.NewConst(typeStr))
-					vals = append(vals, results)
-				}
-				}
-			}
-
-			return nil
-		})
-		if len(vals) > 0 {
+			})
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				vals = append(vals, operator)
+				return nil
+			})
 			return true, sfvm.NewValues(vals), nil
 		}
-		return false, nil, utils.Error("no value found")
-	})
+		return true, v, nil
+	}), nc_desc(`put vars to variables`))
 	registerNativeCall(NativeCall_StrLower, nc_func(nativeCallStrLower), nc_desc(`convert a string to lower case`))
 	registerNativeCall(NativeCall_StrUpper, nc_func(nativeCallStrUpper), nc_desc(`convert a string to upper case`))
 	registerNativeCall(NativeCall_Regexp, nc_func(nativeCallRegexp), nc_desc(`regexp a string, group is available`))
@@ -258,7 +230,7 @@ func init() {
 						vals = append(vals, results)
 					}
 				}
-				
+
 				return nil
 			})
 			if len(vals) > 0 {
@@ -270,6 +242,7 @@ func init() {
 
 特殊地，在 Java 中，会尽可能使用全限定类名，例如 com.alibaba.fastjson.JSON, 也会尽可能包含 sca 版本`),
 	)
+
 
 	registerNativeCall(
 		NativeCall_GetFormalParams,
