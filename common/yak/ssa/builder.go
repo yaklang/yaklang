@@ -35,6 +35,7 @@ type FunctionBuilder struct {
 	SupportClassStaticModifier bool
 	SupportClass               bool
 	MoreParse                  bool
+	IncludeStack               *utils.Stack[string]
 
 	Included bool
 
@@ -75,6 +76,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		CurrentRange:  nil,
 		parentBuilder: parent,
 		RefParameter:  make(map[string]struct{}),
+		IncludeStack:  utils.NewStack[string](),
 	}
 	if parent != nil {
 		b.DefineFunc = parent.DefineFunc
