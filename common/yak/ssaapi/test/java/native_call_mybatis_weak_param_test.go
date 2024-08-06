@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -50,7 +51,8 @@ public interface UserMapper {
 `)
 	ssatest.CheckWithFS(f, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		prog.SyntaxFlowChain(`<weakMybatisParams>`)
+		vars := prog.SyntaxFlowChain(`<weakMybatisParams> as $params`).Show()
+		assert.GreaterOrEqual(t, vars.Len(), 1)
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
