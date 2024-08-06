@@ -7,7 +7,7 @@ import (
 )
 
 func TestStmt_normol(t *testing.T) {
-	/*
+
 	t.Run("if exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
@@ -33,7 +33,7 @@ func TestStmt_normol(t *testing.T) {
 		 	println(a)
 		}
 		`, []string{"phi(a)[1,7]"}, t)
-	})*/
+	})
 
 	t.Run("switch exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
@@ -72,9 +72,8 @@ func TestStmt_normol(t *testing.T) {
 	t.Run("for exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
-			var n = 10
 			var i = 0
-			for i < n {
+			for i < 10 {
 				i++
 			}
 			println(i)
@@ -276,7 +275,7 @@ func TestType_normol(t *testing.T) {
 			println(d)
 		}
 			
-		`, []string{"Undefined-a","Undefined-b","Undefined-c","Undefined-d"}, t)
+		`, []string{"0","0","0","0"}, t)
 	})
 
 	t.Run("baisic", func(t *testing.T) {

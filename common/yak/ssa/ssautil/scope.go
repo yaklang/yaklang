@@ -43,6 +43,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 
 	// create sub scope
 	CreateSubScope() ScopedVersionedTableIF[T]
+	CreateShadowScope() ScopedVersionedTableIF[T]
 	// get scope level, each scope has a level, the root scope is 0, the sub scope is {parent-scope.level + 1}
 	GetScopeLevel() int
 	GetParent() ScopedVersionedTableIF[T]
@@ -215,6 +216,14 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	return sub
 }
 
+func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
+	sub := v.CreateSubScope()
+	v.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
+		sub.SetCapturedVariable(s, vi)
+	})
+	return sub
+}
+
 func (v *ScopedVersionedTable[T]) GetParent() ScopedVersionedTableIF[T] {
 	if v._parent == nil {
 		if v.parentId <= 0 {
@@ -264,6 +273,7 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	// var parent = v
 	// for parent != nil {
 	var ret VersionedIF[T]
+	var isLocal bool = false
 	if result := scope.getLatestVersionInCurrentLexicalScope(name); result != nil {
 		ret = result
 	} else {
@@ -276,7 +286,10 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	if ret != nil && !scope.Compare(ret.GetScope()) {
 		// not in current scope
 		if scope.spin {
-			t := scope.CreateVariable(name, false)
+			if scope.GetParent() == ret.GetScope() {
+			    isLocal = ret.GetLocal()
+			}
+			t := scope.CreateVariable(name, isLocal)
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
 			scope.linkIncomingPhi[name] = t
