@@ -51,7 +51,7 @@ public interface UserMapper {
 `)
 	ssatest.CheckWithFS(f, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		vars := prog.SyntaxFlowChain(`<weakMybatisParams> as $params`).Show()
+		vars := prog.SyntaxFlowChain(`<mybatisSink> as $params`).Show()
 		assert.GreaterOrEqual(t, vars.Len(), 1)
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
