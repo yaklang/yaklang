@@ -69,6 +69,7 @@ func (s *Scannerx) initHandle() error {
 
 	log.Infof("pcap set filter success: %s", bpf)
 	s.Handle = handle
+
 	return nil
 }
 
