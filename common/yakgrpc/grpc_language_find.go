@@ -181,7 +181,7 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 		ret = &ypb.YaklangLanguageFindResponse{}
 	)
 
-	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
+	result, err := LanguageServerAnalyzeProgram(req.GetModelID(), req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
 
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
 

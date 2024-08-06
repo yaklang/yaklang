@@ -66,6 +66,17 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		}
 	}
 
+	checkCompletionWithIDCallbacks := func(t *testing.T, code string, r *ypb.Range, id string, callbacks ...callbackTyp) {
+		t.Helper()
+		res := getCompletion(t, code, r, id)
+		if len(res.SuggestionMessage) == 0 {
+			t.Fatal("should get completion but not")
+		}
+		for _, callback := range callbacks {
+			callback(res.SuggestionMessage)
+		}
+	}
+
 	labelsContainsCallback := func(t *testing.T, want []string) callbackTyp {
 		return func(suggestions []*ypb.SuggestionDescription) {
 			t.Helper()
@@ -388,6 +399,18 @@ rsp.`,
 			t.Fatal("code `cli.` should get completion but not")
 		}
 	})
+
+	t.Run("defer expression", func(t *testing.T) {
+		t.Parallel()
+
+		id, token := utils.RandStringBytes(16), utils.RandStringBytes(16)
+		checkCompletionWithIDCallbacks(t, fmt.Sprintf(`m = {"%s":"d"}
+defer m.`, token), &ypb.Range{
+			Code: "m.", StartLine: 2, StartColumn: 7, EndLine: 8, EndColumn: 9,
+		}, id,
+			labelsContainsCallback(t, []string{"Delete", "Keys", token}),
+		)
+	})
 }
 
 var local ypb.YakClient = nil
@@ -497,7 +520,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 	data := []CheckItem{
 		{
 			name: "a",
-			want: "```go\ntype a number\n```",
+			want: _markdownWrapper("type a number"),
 			Range: &ypb.Range{
 				Code:        "a",
 				StartLine:   2,
@@ -509,7 +532,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 
 		{
 			name: "b",
-			want: "```go\ntype b number\n```",
+			want: _markdownWrapper("type b number"),
 			Range: &ypb.Range{
 				Code:        "b",
 				StartLine:   3,
@@ -520,7 +543,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "c",
-			want: "```go\ntype c string\n```",
+			want: _markdownWrapper("type c string"),
 			Range: &ypb.Range{
 				Code:        "c",
 				StartLine:   4,
@@ -531,7 +554,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "d",
-			want: "```go\ntype d []byte\n```",
+			want: _markdownWrapper("type d []byte"),
 			Range: &ypb.Range{
 				Code:        "d",
 				StartLine:   5,
@@ -542,7 +565,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "d2",
-			want: "```go\ntype d2 []byte\n```",
+			want: _markdownWrapper("type d2 []byte"),
 			Range: &ypb.Range{
 				Code:        "d2",
 				StartLine:   5,
@@ -553,7 +576,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "e",
-			want: "```go\ntype e map[string]number\n```",
+			want: _markdownWrapper("type e map[string]number"),
 			Range: &ypb.Range{
 				Code:        "e",
 				StartLine:   6,
@@ -564,7 +587,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "f",
-			want: "```go\ntype f []number\n```",
+			want: _markdownWrapper("type f []number"),
 			Range: &ypb.Range{
 				Code:        "f",
 				StartLine:   7,
@@ -575,7 +598,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "g",
-			want: "```go\ntype g chan number\n```",
+			want: _markdownWrapper("type g chan number"),
 			Range: &ypb.Range{
 				Code:        "g",
 				StartLine:   8,
@@ -586,7 +609,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "h",
-			want: "```go\ntype h map[string]number\n```",
+			want: _markdownWrapper("type h map[string]number"),
 			Range: &ypb.Range{
 				Code:        "h",
 				StartLine:   9,
@@ -597,7 +620,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "i",
-			want: "```go\ntype i number\n```",
+			want: _markdownWrapper("type i number"),
 			Range: &ypb.Range{
 				Code:        "i",
 				StartLine:   10,
@@ -608,7 +631,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		},
 		{
 			name: "i",
-			want: "```go\ntype i number\n```",
+			want: _markdownWrapper("type i number"),
 			Range: &ypb.Range{
 				Code:        "i",
 				StartLine:   10,
@@ -823,24 +846,47 @@ a.Parse()`,
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_UnFinish_InputError(t *testing.T) {
-	t.Parallel()
-
 	check := CheckHover(t)
-	check(t, `
+
+	t.Run("library", func(t *testing.T) {
+		t.Parallel()
+
+		check(t, `
 t = ""
 host, port, _ = str.ParseStringToHostPort(t)
 ssa.
 `,
-		"mitm",
-		&ypb.Range{
-			Code:        "ssa",
-			StartLine:   4,
-			StartColumn: 1,
-			EndLine:     4,
-			EndColumn:   4,
-		},
-		getExternLibDesc("ssa"),
-	)
+			"mitm",
+			&ypb.Range{
+				Code:        "ssa",
+				StartLine:   4,
+				StartColumn: 1,
+				EndLine:     4,
+				EndColumn:   4,
+			},
+			getExternLibDesc("ssa"),
+		)
+	})
+
+	t.Run("defer", func(t *testing.T) {
+		t.Parallel()
+
+		check(t, `
+a = 1
+m = {"asd": 1}
+defer m.
+`,
+			"mitm",
+			&ypb.Range{
+				Code:        "m.",
+				StartLine:   4,
+				StartColumn: 7,
+				EndLine:     4,
+				EndColumn:   9,
+			},
+			_markdownWrapper("type m map[string]number"),
+		)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_StructMemberAndMethod(t *testing.T) {
