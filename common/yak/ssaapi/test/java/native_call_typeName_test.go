@@ -435,10 +435,10 @@ public class FastJSONDemoController {
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-		obj := prog.SyntaxFlowChain("id.annotation<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestParam'} as $obj")
+		obj := prog.SyntaxFlowChain("id.annotation.RequestParam<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestParam'} as $obj")
 		assert.Equal(t,1,obj.Len())
 
-		obj = prog.SyntaxFlowChain("FastJSONDemoController.annotation<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestMapping'} as $obj")
+		obj = prog.SyntaxFlowChain("FastJSONDemoController.annotation.RequestMapping<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestMapping'} as $obj")
 		assert.Equal(t,1,obj.Len())
 
 		obj = prog.SyntaxFlowChain("*Param.__ref__<fullTypeName>?{have:number} as $obj")
@@ -454,10 +454,7 @@ public class FastJSONDemoController {
 	package com.example;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
-@WebServlet(value = "/Simple", initParams = { 
-   @WebInitParam(name = "foo", value = "Hello "), 
-   @WebInitParam(name = "bar", value = " World!") 
-}) 
+
 public class FastJSONDemoController {
 
     public ResponseEntity<Object> loadFromParam(@Hello(name = "id") int id) {
@@ -468,7 +465,7 @@ public class FastJSONDemoController {
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-		obj := prog.SyntaxFlowChain("id.annotation<fullTypeName> as $obj").Show()
+		obj := prog.SyntaxFlowChain("id.annotation.Hello<fullTypeName> as $obj").Show()
 		assert.Equal(t,2,obj.Len())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -493,7 +490,7 @@ public class Simple extends HttpServlet {
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-		obj := prog.SyntaxFlowChain("Simple.annotation<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
+		obj := prog.SyntaxFlowChain("Simple.annotation.WebServlet<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
 		assert.Equal(t,1,obj.Len())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -518,7 +515,7 @@ public class Simple extends HttpServlet {
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
 		prog.Show()
-		obj := prog.SyntaxFlowChain("Simple.annotation<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
+		obj := prog.SyntaxFlowChain("Simple.annotation.WebServlet<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
 		assert.Equal(t,1,obj.Len())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
