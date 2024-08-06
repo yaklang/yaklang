@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewChildProgram(prog *Program, name string) *Program {
+func NewChildProgram(prog *Program, name string, handler func(program *Program)) *Program {
 	childProg := &Program{
 		Name:                    name,
 		ProgramKind:             ChildAPP,
@@ -41,7 +41,9 @@ func NewChildProgram(prog *Program, name string) *Program {
 		ExternInstance:          prog.ExternInstance,
 		ExternLib:               prog.ExternLib,
 	}
-	prog.ChildApplication = append(prog.ChildApplication, childProg)
+	if handler != nil {
+		handler(childProg)
+	}
 	return childProg
 }
 
@@ -270,8 +272,10 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }
 
-func (p *Program) PushEditor(e *memedit.MemEditor) {
+func (p *Program) PushEditor(e *memedit.MemEditor, handler func(*omap.OrderedMap[string, *memedit.MemEditor])) {
 	p.editorStack.Push(e)
+	handler(p.editorMap)
+	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
 	p.editorMap.Set(e.GetFilename(), e)
 }
 
@@ -294,8 +298,7 @@ func (p *Program) PopEditor() {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return
 	}
-	e := p.editorStack.Pop()
-	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
+	p.editorStack.Pop()
 }
 
 func (p *Program) GetSCAPackageByName(name string) *dxtypes.Package {

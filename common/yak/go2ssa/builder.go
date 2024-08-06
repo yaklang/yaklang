@@ -1,6 +1,7 @@
 package go2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -62,6 +63,10 @@ func (s *SSABuilder) PreHandler(fileSystem fi.FileSystem, functionBuilder *ssa.F
 	return nil
 }
 
+func (s *SSABuilder) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {}
+}
+
 func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
@@ -90,8 +95,8 @@ func (*SSABuilder) FilterFile(path string) bool {
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
-	cmap []map[string]struct{}
-	globalv		map[string]ssa.Value
+	cmap        []map[string]struct{}
+	globalv     map[string]ssa.Value
 	structTypes map[string]*ssa.ObjectType
 	aliasTypes  map[string]*ssa.AliasType
 	result      []string
