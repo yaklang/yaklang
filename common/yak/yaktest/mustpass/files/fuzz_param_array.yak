@@ -1,0 +1,17 @@
+
+freq = fuzz.HTTPRequest(`POST / HTTP/1.1
+Host: www.example.com
+`)~
+
+
+list = ["a","b","c","d"]
+
+for p in list {
+    freq = freq.FuzzGetParams(p,"get").FuzzPostParams(p,"post")
+}
+
+keyword = ["/?a=get&b=get&c=get&d=get","\r\na=post&b=post&c=post&d=post"]
+
+raw = freq.GetFirstFuzzHTTPRequest()~.GetBytes()
+println(string(raw))
+assert str.MatchAllOfSubString(raw, keyword...)
