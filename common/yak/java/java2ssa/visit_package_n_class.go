@@ -315,12 +315,12 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	if class := y.GetClassBluePrint(className); class != nil {
 		typ = class
 		if len(typ.GetFullTypeNames())== 0 {
-			return y.AddFullTypeNameFromMap(className,typ)
+			 typ,_= y.AddFullTypeNameFromMap(className,typ)
 		}
 		return typ
 	}else {
 		typ = ssa.NewClassBluePrint()
-		typ = y.AddFullTypeNameFromMap(className,typ)
+		typ,_ = y.AddFullTypeNameFromMap(className,typ)
 		if len(typ.GetFullTypeNames())== 0 {
 			typ = y.AddFullTypeNameForAllImport(className,typ)
 		}

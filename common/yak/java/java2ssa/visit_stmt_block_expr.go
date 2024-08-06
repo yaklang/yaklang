@@ -1799,7 +1799,7 @@ func (y *builder) VisitIdentifier(name string) ssa.Value {
 	}	
 	// set full type name
 	if len(res.GetType().GetFullTypeNames()) == 0{
-		newType := y.AddFullTypeNameFromMap(name, res.GetType())
+		newType,_ := y.AddFullTypeNameFromMap(name, res.GetType())
 		res.SetType(newType)
 	}
 	return res
