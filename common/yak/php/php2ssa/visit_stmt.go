@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"strings"
 )
@@ -19,7 +21,10 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 	if i == nil {
 		return nil
 	}
-
+	//custom file not syntax
+	if y.MoreParse && i.NamespaceDeclaration() == nil {
+		return nil
+	}
 	y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
 	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
 	y.VisitUseDeclaration(i.UseDeclaration())
@@ -75,12 +80,15 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	if i == nil {
 		return nil
 	}
-	if !y.MoreParse {
-		return nil
-	}
+	//custom syntax
 	beforfunc := func() {
 		for _, statementContext := range i.AllNamespaceStatement() {
 			y.BeforeVisitNamespaceStatement(statementContext)
+		}
+	}
+	afterFunc := func() {
+		for _, statementContext := range i.AllNamespaceStatement() {
+			y.VisitNamesPaceStatement(statementContext)
 		}
 	}
 	//compose child app
@@ -95,7 +103,14 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		if library == nil {
 			library = prog.NewLibrary(pkgname, []string{prog.Loader.GetBasePath()})
 		}
-		library.PushEditor(prog.GetCurrentEditor())
+		if !y.MoreParse {
+			//if custom syntax, only syntax it
+			afterFunc()
+			return nil
+		}
+		library.PushEditor(prog.GetCurrentEditor(), func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
+			o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
+		})
 		functionBuilder := library.GetAndCreateFunctionBuilder(pkgname, "init")
 		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
 		if functionBuilder != nil {
@@ -107,11 +122,12 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			}()
 		}
 	} else {
+		if y.MoreParse {
+			return nil
+		}
 		beforfunc()
 	}
-	for _, statementContext := range i.AllNamespaceStatement() {
-		y.VisitNamesPaceStatement(statementContext)
-	}
+	afterFunc()
 	return nil
 }
 

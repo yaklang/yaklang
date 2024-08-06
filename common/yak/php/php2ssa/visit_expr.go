@@ -1246,9 +1246,13 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	if value.IsUndefined() {
 		log.Warnf("include statement expression is undefined")
 	} else {
+		//todo： __dir__ 等魔术方法的转换
 		file := value.String()
+		y.IncludeStack.Push(file)
+		defer y.IncludeStack.Pop()
 		if err := y.BuildFilePackage(file, once); err != nil {
-			log.Errorf("include: %v failed: %v", file, err)
+			//todo: 目前拿不到include的返回值
+			flag = ssa.NewConst(false)
 		} else {
 			flag = ssa.NewConst(true)
 		}

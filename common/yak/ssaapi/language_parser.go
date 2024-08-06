@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"io/fs"
 	"strings"
 	"time"
@@ -123,7 +124,7 @@ func (c *config) parseProject() (Programs, error) {
 			}
 
 			// build
-			if err := prog.Build(path, memedit.NewMemEditor((raw)), builder); err != nil {
+			if err := prog.Build(path, memedit.NewMemEditor(raw), builder); err != nil {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
@@ -192,10 +193,12 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		// log.Infof("use default language [%s] for empty path", Yak)
 	}
 	prog, builder, err := c.init()
+
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
 	}
+	c.LanguageBuilder.MoreSyntaxHandler()(r, builder)
 	// parse code
 	if err := prog.Build("", r, builder); err != nil {
 		return nil, err
@@ -295,7 +298,11 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 
 		// push into program for recording what code is compiling
-		prog.PushEditor(newCodeEditor)
+		prog.PushEditor(newCodeEditor, func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
+			if !fb.MoreParse {
+				o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
+			}
+		})
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
@@ -324,6 +331,5 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
 	//todo: 后续做成一个函数
-	builder.MoreParse = true
 	return prog, builder, nil
 }

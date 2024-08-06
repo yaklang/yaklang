@@ -1,6 +1,8 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -33,7 +35,9 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		if lib == nil {
 			lib = prog.NewLibrary(pkgName, pkgPath)
 		}
-		lib.PushEditor(prog.GetCurrentEditor())
+		lib.PushEditor(prog.GetCurrentEditor(), func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
+			o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
+		})
 
 		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
 		if builder != nil {
