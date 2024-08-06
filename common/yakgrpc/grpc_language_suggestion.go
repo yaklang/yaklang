@@ -871,8 +871,11 @@ func completionYakGlobalFunctions() (ret []*ypb.SuggestionDescription) {
 	return
 }
 
-func completionYakStandardLibraryChildren(v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
-	libName := v.GetName()
+func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*ypb.SuggestionDescription) {
+	libName := word
+	if v.IsExternLib() {
+		libName = v.GetName()
+	}
 	lib, ok := doc.GetDefaultDocumentHelper().Libs[libName]
 	if !ok {
 		return
@@ -1030,7 +1033,7 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		ret = append(ret, completionUserDefinedVariable(prog, rng)...)
 		ret = append(ret, completionYakGlobalFunctions()...)
 	} else {
-		ret = append(ret, completionYakStandardLibraryChildren(v)...)
+		ret = append(ret, completionYakStandardLibraryChildren(v, word)...)
 		ret = append(ret, completionYakTypeBuiltinMethod(rng, v)...)
 		ret = append(ret, completionComplexStructMethodAndInstances(v)...)
 	}
@@ -1057,7 +1060,7 @@ func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *ssa.Range {
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 
-	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
+	result, err := LanguageServerAnalyzeProgram(req.GetModelID(), req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
 	if err != nil {
 		return ret, err
 	}
