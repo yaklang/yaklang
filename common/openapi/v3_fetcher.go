@@ -19,6 +19,9 @@ func v3_requestBodyToValue(t openapi3.T, p any) (*openapi3.RequestBody, error) {
 		}
 		if param.Ref != "" {
 			var ret = strings.TrimPrefix(param.Ref, "#/components/requestBodies/")
+			if t.Components == nil || len(t.Components.RequestBodies) <= 0 {
+				return &openapi3.RequestBody{}, nil
+			}
 			return v3_requestBodyToValue(t, t.Components.RequestBodies[ret])
 		}
 		return param.Value, nil
@@ -26,6 +29,9 @@ func v3_requestBodyToValue(t openapi3.T, p any) (*openapi3.RequestBody, error) {
 		return param, nil
 	case string:
 		param = strings.TrimPrefix(param, "#/components/requestBodies/")
+		if t.Components == nil || len(t.Components.RequestBodies) <= 0 {
+			return &openapi3.RequestBody{}, nil
+		}
 		return v3_requestBodyToValue(t, t.Components.RequestBodies[param])
 	default:
 		return nil, utils.Errorf("unsupported parameter type: %T", p)
@@ -44,6 +50,9 @@ func v3_responseToValue(t openapi3.T, p any) (*openapi3.Response, error) {
 		}
 		if param.Ref != "" {
 			var ret = strings.TrimPrefix(param.Ref, "#/components/responses/")
+			if t.Components == nil || len(t.Components.Responses) <= 0 {
+				return &openapi3.Response{}, nil
+			}
 			return v3_responseToValue(t, t.Components.Responses[ret])
 		}
 		return param.Value, nil
@@ -51,6 +60,9 @@ func v3_responseToValue(t openapi3.T, p any) (*openapi3.Response, error) {
 		return param, nil
 	case string:
 		param = strings.TrimPrefix(param, "#/components/responses/")
+		if t.Components == nil || len(t.Components.Responses) <= 0 {
+			return &openapi3.Response{}, nil
+		}
 		return v3_responseToValue(t, t.Components.Responses[param])
 	default:
 		return nil, utils.Errorf("unsupported parameter type: %T", p)
@@ -100,6 +112,9 @@ func v3_parameterToValue(t openapi3.T, p any) (*openapi3.Parameter, error) {
 		}
 		if param.Ref != "" {
 			var ret = strings.TrimPrefix(param.Ref, "#/components/parameters/")
+			if t.Components == nil || len(t.Components.Parameters) <= 0 {
+				return &openapi3.Parameter{}, nil
+			}
 			return v3_parameterToValue(t, t.Components.Parameters[ret])
 		}
 		return param.Value, nil
@@ -107,6 +122,9 @@ func v3_parameterToValue(t openapi3.T, p any) (*openapi3.Parameter, error) {
 		return param, nil
 	case string:
 		param = strings.TrimPrefix(param, "#/components/parameters/")
+		if t.Components == nil || len(t.Components.Parameters) <= 0 {
+			return &openapi3.Parameter{}, nil
+		}
 		return v3_parameterToValue(t, t.Components.Parameters[param])
 	default:
 		return nil, utils.Errorf("unsupported parameter type: %T", p)
@@ -123,9 +141,12 @@ func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string
 		field = fieldName[0]
 	}
 
+	m := omap.NewGeneralOrderedMap()
+	if i.Items != nil {
+		return m
+	}
 	switch i.Type {
 	case "array":
-		m := omap.NewGeneralOrderedMap()
 		if i.Items.Ref != "" {
 			scheme, err := v3_schemaToValue(data, i.Items.Ref)
 			if err != nil {
@@ -138,7 +159,6 @@ func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string
 		m.Add(v3_mockSchemaValue(data, i.Items.Value, field))
 		return m
 	case "object":
-		m := omap.NewGeneralOrderedMap()
 		for field, pt := range i.Properties {
 			if pt.Ref != "" {
 				scheme, err := v3_schemaToValue(data, pt.Ref)
@@ -153,7 +173,6 @@ func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string
 		}
 		return m
 	default:
-		m := omap.NewGeneralOrderedMap()
 		m.SetLiteralValue(ValueViaField(field, i.Type, i.Default))
 		return m
 	}
