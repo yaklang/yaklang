@@ -177,7 +177,6 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 			Order:   "desc",
 		}
 	}
-	db = db.Debug()
 	p := params.Pagination
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 
