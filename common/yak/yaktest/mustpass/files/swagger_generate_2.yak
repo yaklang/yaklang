@@ -1,0 +1,40 @@
+yakit.AutoInitYakit()
+
+text = `openapi: 3.0.1
+servers:
+- url: http://localhost:5000
+info:
+  version: v1
+  title: Products api
+  contact:
+    name: me
+    email: me@github.com
+  description: This is a sample
+paths:
+  /categories:
+    get:
+      summary: Provides the available categories for the store
+      operationId: list-categories
+      responses:
+        '200':
+          description: this is a desc
+          content:
+            application/json:
+              schema:
+                $ref: http://schemas.sentex.io/store/categories.json`
+count = 0
+
+generateText = bufio.NewBuffer()
+err = openapi.GenerateHTTPFlows(text, openapi.flowHandler(flow => {
+    defer recover()
+    count++
+    result = codec.StrconvUnquote(flow.Request)~
+    generateText.Write(string(result))
+    generateText.Write("\n-------------- Divider -----------------\n")
+    response = codec.StrconvUnquote(flow.Response)~
+    db.SaveHTTPFlowFromRawWithOption(flow.Url /*type: string*/, []byte(result) /*type: []byte*/, []byte(response) /*type: []byte*/)
+}))
+if err != nil {
+    yakit.StatusCard("ERROR", f"${err}")
+}
+println(generateText.String())
