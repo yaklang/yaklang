@@ -29,7 +29,7 @@ type mybatisXMLQuery struct {
 	CheckParamName []string
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFirst() string {
+func (m *mybatisXMLQuery) SyntaxFlowFirst(token string) string {
 	if m.mapper == nil {
 		return ""
 	}
@@ -37,11 +37,11 @@ func (m *mybatisXMLQuery) SyntaxFlowFirst() string {
 	builder.WriteString(m.mapper.ClassName)
 	builder.WriteString(".")
 	builder.WriteString(m.Id)
-	builder.WriteString("(*?{!have: this && opcode: param && any: " + strings.Join(m.CheckParamName, ",") + " } as $__output)")
+	builder.WriteString("(*?{!have: this && opcode: param && any: " + strings.Join(m.CheckParamName, ",") + " } as $_" + token + ")")
 	return builder.String()
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFinal() string {
+func (m *mybatisXMLQuery) SyntaxFlowFinal(token string) string {
 	if m.mapper == nil {
 		return ""
 	}
@@ -49,7 +49,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFinal() string {
 	builder.WriteString(m.mapper.ClassName)
 	builder.WriteString(".")
 	builder.WriteString(m.Id)
-	builder.WriteString("(*?{!have: this && opcode: param } as $__output)")
+	builder.WriteString("(*?{!have: this && opcode: param } as $_" + token + ")")
 
 	return builder.String()
 }
@@ -147,8 +147,10 @@ var nativeCallMybatixXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 					query.CheckParamName = append(query.CheckParamName, variableName)
 				}
 				if len(query.CheckParamName) > 0 {
+					token := utils.RandStringBytes(16)
+					token = "a" + token
 					for _, sf := range []string{
-						query.SyntaxFlowFirst(), query.SyntaxFlowFinal(),
+						query.SyntaxFlowFirst(token), query.SyntaxFlowFinal(token),
 					} {
 						if sf == "" {
 							continue
@@ -160,7 +162,7 @@ var nativeCallMybatixXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 						if err != nil {
 							log.Warnf("mybatis-${...}: fetch query: %v, error: %v", sf, err)
 						}
-						results, ok := frame.GetSymbolTable().Get("__output")
+						results, ok := frame.GetSymbolTable().Get("_" + token)
 						haveResult := false
 						if ok {
 							_ = results.Recursive(func(operator sfvm.ValueOperator) error {
@@ -173,6 +175,7 @@ var nativeCallMybatixXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 							break
 						}
 					}
+					frame.GetSymbolTable().Delete("_" + token)
 				}
 			}
 		}))
