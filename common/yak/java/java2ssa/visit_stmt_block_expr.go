@@ -1772,35 +1772,34 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 	// todo lambda表达式
 }
 
-func (y *builder) VisitIdentifier(name string) ssa.Value {
-	var res ssa.Value
+func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
+	defer func ()  {
+		//set full type name
+		if len(value.GetType().GetFullTypeNames()) == 0{
+		newType,_ := y.AddFullTypeNameFromMap(name, value.GetType())
+		value.SetType(newType)
+	}
+	}()
+
 	if value := y.PeekValue(name); value != nil {
 		// found
-		res =  value
+		return value
 	}
 	//if in this class, return
 	if class := y.MarkedThisClassBlueprint; class != nil {
 		if value, ok := y.ReadClassConst(class.Name, name); ok {
-			res  =  value
+			return value
 		}
 
 		value := y.ReadSelfMember(name)
 		if value != nil {
-			res= value
+			return value
 		}
 	}
 	if value, ok := y.ReadConst(name); ok {
-		res= value
+		return value
 	}
 	 
-	if res == nil {
-		// just undefined
-		res= y.ReadValue(name)
-	}	
-	// set full type name
-	if len(res.GetType().GetFullTypeNames()) == 0{
-		newType,_ := y.AddFullTypeNameFromMap(name, res.GetType())
-		res.SetType(newType)
-	}
-	return res
+	
+	return y.ReadValue(name)
 }

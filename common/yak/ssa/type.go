@@ -1106,25 +1106,24 @@ func (b *FunctionType) AddMethod(id string, f *Function) {}
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 
 func CalculateType(ts []Type) Type {
-	var t Type
 	if len(ts) == 0 {
-		t= NewBasicType(NullTypeKind,"null")
+		return BasicTypes[NullTypeKind]
 	} else if len(ts) == 1 {
-		t= ts[0]
+		return ts[0]
 	} else {
-		t := NewObjectType()
+		i := NewObjectType()
 		for index, typ := range ts {
-			t.AddField(NewConst(index), typ)
+			i.AddField(NewConst(index), typ)
 		}
-		t.Finish()
-		t.Combination = true
-		t.Kind = TupleTypeKind
+		i.Finish()
+		i.Combination = true
+		i.Kind = TupleTypeKind
 		// i.SetLen(NewConst(len(ts)))
-		t.Len = len(ts)
-		
+		i.Len = len(ts)
+		return i
 	}
-	return t
 }
+
 
 func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
 	f := &FunctionType{
