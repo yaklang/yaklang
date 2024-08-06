@@ -42,7 +42,7 @@ import (
 
 var (
 	_FuzzerTaskSwitchMap = new(sync.Map)
-	fuzzerSession        = "__FUZZER_SESSION__"
+	fuzzerSessionPreFix  = "__FUZZER_SESSION__"
 )
 
 func Chardet(raw []byte) string {
@@ -746,7 +746,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_MutateWithMethods(req.GetMutateMethods()),
 			mutate.WithPoolOpt_RuntimeId(runtimeID),
 			mutate.WithPoolOpt_WithPayloads(true),
-			mutate.WithPoolOpt_Session(fuzzerSession),
+			mutate.WithPoolOpt_RandomSession(true),
 		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
