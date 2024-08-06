@@ -42,6 +42,18 @@ var SpringFrameworkAnnotationMap = map[string]bool{
 	"ValueConstants":true,
 }
 
+var ServletAnnotationMap = map[string]bool{
+	"HandlesTypes":true,
+	"HttpConstraint":true,
+	"HttpMethodConstraint":true,
+	"MultipartConfig":true,
+	"ServletSecurity":true,
+	"WebFilter":true,
+	"WebInitParam":true,
+	"WebListener":true,
+	"WebServlet":true,
+}
+
 func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
 	return y.AddFullTypeNameForType(typName, typ, true)
 }
@@ -139,6 +151,11 @@ func (y *builder) AddFullTypeNameFromAnnotationMap(typName string, typ ssa.Type)
 		switch str {
 		case "org.springframework.web.bind.annotation":
 			ok := SpringFrameworkAnnotationMap[typName]
+			if ok {
+				return y.AddFullTypeNameRaw(fmt.Sprintf("%s.%s", str, typName), typ)
+			}
+		case "javax.servlet.annotation":
+			ok := ServletAnnotationMap[typName]
 			if ok {
 				return y.AddFullTypeNameRaw(fmt.Sprintf("%s.%s", str, typName), typ)
 			}
