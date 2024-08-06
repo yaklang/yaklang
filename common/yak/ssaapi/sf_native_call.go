@@ -83,11 +83,11 @@ const (
 	// NativeCall_As is used to put vars to variables
 	NativeCall_As = "as"
 
-	NativeCall_WeakMyBatisParams = "weakMybatisParams"
+	NativeCall_MyBatisSink = "mybatisSink"
 )
 
 func init() {
-	registerNativeCall(NativeCall_WeakMyBatisParams, nc_func(nativeCallMybatixXML))
+	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
 	registerNativeCall(NativeCall_As, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
 		log.Info("syntax flow native call 'as' to", varName)
