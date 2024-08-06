@@ -146,7 +146,12 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			//}
 			annotationContainer := y.CreateMemberCallVariable(value, y.EmitConstInst("annotation"))
 			annotationCollector := y.EmitEmptyContainer()
-			t := y.AddFullTypeNameFromAnnotationMap(annotationName, annotationCollector.GetType())
+			// set fullType Name
+			var t ssa.Type
+			t,isFromMap := y.AddFullTypeNameFromMap(annotationName, annotationCollector.GetType())
+			if !isFromMap{
+				t = y.AddFullTypeNameFromAnnotationMap(annotationName, annotationCollector.GetType())
+			}
 			annotationCollector.SetType(t)
 			y.AssignVariable(annotationContainer, annotationCollector)
 			var fieldAnnotationName = annotationName
