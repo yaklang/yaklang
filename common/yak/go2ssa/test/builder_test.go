@@ -57,17 +57,11 @@ func TestTemp(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 
 		func main(){
-			a := 1
-			b := 2
-			{
-				b = 3
-				switch a = 2; a {
-				default:
-					println(a)
-				}
-				
+			i := 10
+			for i := 5; i < 10; i++ {
+				println(i) // phi
 			}
-			println(b) // 3
+			println(i) // 10
 		}
 		`, []string{
 			"2","3",

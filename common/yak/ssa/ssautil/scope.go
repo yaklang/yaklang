@@ -217,7 +217,7 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 }
 
 func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
-	sub := v.CreateSubScope()
+	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
 	v.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
 		sub.SetCapturedVariable(s, vi)
 	})
