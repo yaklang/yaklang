@@ -168,7 +168,8 @@ func TestBlock_Value_If(t *testing.T) {
 			"2","3","3",
 		}, t)
 	})
-
+}
+func TestBlock_Value_Switch(t *testing.T) {
 	t.Run("switch stmt;exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		
@@ -245,6 +246,19 @@ func TestBlock_Value_If(t *testing.T) {
 		}
 		`, []string{"2","3"}, t)
 	})
+}
+func TestBlock_Value_For(t *testing.T) {
+	t.Run("for stmt;exp;", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+		func main(){
+			i := 0
+			for i = 1; i < 10; {
+				println(i) // 1
+			}
+			println(i) // 1
+		}
+		`, []string{"1","1"}, t)
+	})
 
 	t.Run("for stmt;exp;stmt", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
@@ -260,13 +274,55 @@ func TestBlock_Value_If(t *testing.T) {
 	t.Run("for stmt;exp;stmt EX", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 		func main(){
-			i := 0
-			for i = 1; i < 10; {
-				println(i) // 1
+			i := 10
+			for i := 5; i < 10; i++ {
+				println(i) // phi
 			}
-			println(i) // 1
+			println(i) // 10
 		}
-		`, []string{"1","1"}, t)
+		`, []string{"phi(i)[5,add(i, 1)]","10"}, t)
+	})
+
+	t.Run("for stmt;exp;stmt EX2", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+		func main(){
+			i := 10
+			for i := 5; i < 10; i++ {
+				println(i) // phi
+				i = 10
+			}
+			println(i) // 10
+		}
+		`, []string{"phi(i)[5,11]","10"}, t)
+	})
+
+	t.Run("for stmt;exp;stmt EX3", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+		func main(){
+			a := 1
+			i := 10
+			for i := 5; i < 10; i++ {
+				a = 10
+			}
+			println(i) // 10
+			println(a) // phi
+		}
+		`, []string{"10","phi(a)[1,10]"}, t)
+	})
+
+	t.Run("for stmt;exp;stmt EX4", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+		func main(){
+			a := 1
+			i := 10
+			for i = 5; i < 10; i++ {
+				a := 10
+				println(i) // phi
+			}
+			println(i) // phi
+			println(a) // 1
+		}
+		`, []string{"phi(i)[5,add(i, 1)]","phi(i)[5,add(i, 1)]","1"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt and block", func(t *testing.T) {
