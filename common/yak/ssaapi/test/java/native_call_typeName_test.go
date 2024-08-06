@@ -1,11 +1,11 @@
 package java
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -455,7 +455,10 @@ public class FastJSONDemoController {
 	package com.example;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
-@RequestMapping("/fastjson")
+@WebServlet(value = "/Simple", initParams = { 
+   @WebInitParam(name = "foo", value = "Hello "), 
+   @WebInitParam(name = "bar", value = " World!") 
+}) 
 public class FastJSONDemoController {
 
     public ResponseEntity<Object> loadFromParam(@Hello(name = "id") int id) {
@@ -472,5 +475,29 @@ public class FastJSONDemoController {
 	}, ssaapi.WithLanguage(consts.JAVA))
 	})
 
-	
+	t.Run("test servlet annotation", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+	vf.AddFile("Test.java",`
+	package com.example;
+
+import javax.servlet.annotation.*; 
+@WebServlet(value = "/Simple") 
+public class Simple extends HttpServlet {
+
+   private static final long serialVersionUID = 1L; 
+
+   protected void doGet(HttpServletRequest request, HttpServletResponse response)  
+       { 
+   }   
+}`)
+
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		fmt.Print("aaaaaa")
+		prog := progs[0]
+		prog.Show()
+		obj := prog.SyntaxFlowChain("Simple.annotation<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
+		assert.Equal(t,1,obj.Len())
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }
