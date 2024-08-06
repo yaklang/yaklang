@@ -25,6 +25,10 @@ func (n *NativeCallActualParams) Existed(index any) bool {
 }
 
 func (n *NativeCallActualParams) GetString(index any, extra ...any) string {
+	if n == nil {
+		return ""
+	}
+
 	raw, ok := n.m[codec.AnyToString(index)]
 	if ok {
 		return codec.AnyToString(raw)
@@ -41,6 +45,9 @@ func (n *NativeCallActualParams) GetString(index any, extra ...any) string {
 }
 
 func (n *NativeCallActualParams) GetInt(index any) int {
+	if n == nil {
+		return 0
+	}
 	raw, ok := n.m[codec.AnyToString(index)]
 	if ok {
 		return codec.Atoi(codec.AnyToString(raw))
