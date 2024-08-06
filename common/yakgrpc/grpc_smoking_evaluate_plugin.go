@@ -193,12 +193,17 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		Warning = string(result.Warn)
 	)
 
-	prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
-	if err != nil {
-		pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
+	var hasParameter bool
+	if pluginType != "nuclei" {
+		prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
+		if err != nil {
+			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
+		}
+		parameters, _ := information.ParseCliParameter(prog)
+		if len(parameters) > 0 {
+			hasParameter = true
+		}
 	}
-	parameters, _ := information.ParseCliParameter(prog)
-
 	// static analyze
 	if slices.Contains([]string{
 		"mitm", "port-scan", "codec", "yak",
@@ -227,7 +232,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		}
 	}
 
-	if len(parameters) <= 0 && slices.Contains([]string{
+	if !hasParameter && slices.Contains([]string{
 		"mitm", "port-scan", "nuclei",
 	}, pluginType) { // echo debug script
 		getMockParam := func() []*ypb.KVPair {
