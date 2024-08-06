@@ -10,8 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-
-	"github.com/kataras/pio"
 )
 
 type VMPanicSignal struct {
@@ -101,27 +99,8 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 		}
 	}()
 
-	// todo: unicode support
 	editor := memedit.NewMemEditor(codeOrigin)
-	startOffset, err := editor.GetStartOffsetByLine(code.StartLineNumber)
-	if err != nil {
-		panic(err)
-	}
-	startErrorOffset, err := editor.GetOffsetByPositionWithError(code.StartLineNumber, code.StartColumnNumber)
-	if err != nil {
-		panic(err)
-	}
-	endOffset, err := editor.GetEndOffsetByLine(code.EndLineNumber)
-	if err != nil {
-		panic(err)
-	}
-	endErrorOffset, err := editor.GetOffsetByPositionWithError(code.EndLineNumber, code.EndColumnNumber)
-	if err != nil {
-		panic(err)
-	}
-	// 修正偏移量
-	endErrorOffset++
-	codeReview = string([]rune(codeOrigin[startOffset:startErrorOffset])) + pio.Red(string([]rune(codeOrigin[startErrorOffset:endErrorOffset]))) + string([]rune(codeOrigin[endErrorOffset:endOffset]))
+	codeReview = editor.GetTextContextWithPrompt(memedit.NewRange(memedit.NewPosition(code.StartLineNumber, code.StartColumnNumber), memedit.NewPosition(code.EndLineNumber, code.EndColumnNumber)), 3)
 	codeReview = strings.TrimSpace(codeReview)
 	// scanner := bufio.NewScanner(strings.NewReader(codeOrigin))
 	// scanner.Split(bufio.ScanLines)
@@ -182,28 +161,18 @@ func (v *VMPanic) Error() string {
 			break
 		}
 		info := iinfo.(*PanicInfo)
-		code := info.code
 		codeReview := info.codeReview
-		lineReview := ""
-		if code.EndLineNumber == code.StartLineNumber {
-			lineReview = fmt.Sprintf("--> %d", code.StartLineNumber)
-		} else {
-			lineReview = fmt.Sprintf("--> %d-%d", code.StartLineNumber, code.EndLineNumber)
-		}
+
 		if strings.Contains(codeReview, "\n") { // 多行显示
-			lineReviewLen := len(lineReview) + 1
-			codeReview = strings.ReplaceAll(codeReview, "\n", "\n"+strings.Repeat(" ", lineReviewLen))
 			source = append(source, fmt.Sprintf(
-				"%s\n%s %s",
+				"%s\n%s",
 				info.String(),
-				pio.Green(lineReview),
 				codeReview),
 			)
 		} else {
 			source = append(source, fmt.Sprintf(
-				"%s\n%s %s",
+				"%s\n%s",
 				info.String(),
-				pio.Green(lineReview),
 				codeReview),
 			)
 		}
