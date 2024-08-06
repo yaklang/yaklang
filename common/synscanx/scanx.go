@@ -40,7 +40,6 @@ type Scannerx struct {
 	MacHandlers   func(ip net.IP, addr net.HardwareAddr)
 
 	Handle     *pcap.Handle
-	ConnHandle *net.IPConn
 	limiter    *rate.Limiter
 	startTime  time.Time
 	// onSubmitTaskCallback: 每提交一个数据包的时候，这个 callback 调用一次
@@ -54,6 +53,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 		ctx:           ctx,
 		config:        config,
 		startTime:     time.Now(),
+		ports:         utils.NewPortsFilter(),
 		macCacheTable: new(sync.Map),
 		loopbackMap:   make(map[string]string),
 		sampleIP:      sample,
@@ -64,7 +64,9 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 	}
 	// 初始化发包相关的配置
 	err := s.initEssentialInfo()
-
+	if err != nil {
+		return nil, err
+	}
 	err = s.initHandle()
 	if err != nil {
 		return nil, err
@@ -346,9 +348,9 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	deadline := time.Now().Add(s.config.waiting)
 	wCtx, wCancel := context.WithDeadline(context.Background(), deadline)
 	defer func() {
-		wCancel()
 		endTime := time.Now()
 		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
+		wCancel()
 	}()
 
 	go s.HandlerZeroCopyReadPacket(wCtx, resultCh)

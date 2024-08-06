@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	_ "net/http/pprof"
 	"testing"
+	"time"
 )
 
 func Test__scanx(t *testing.T) {
@@ -13,14 +14,25 @@ func Test__scanx(t *testing.T) {
 		synPacketCounter++
 	}
 
+	startSYNPacketCounter := func() {
+		go func() {
+			for {
+				time.Sleep(2 * time.Second)
+				t.Log("SYN 发包数", synPacketCounter)
+			}
+		}()
+	}
+	startSYNPacketCounter()
+
 	res, err := _scanx(
-		//"192.168.3.2/24",
+		"192.168.3.3",
 		//"47.52.100.35/24",
-		"baidu.com",
+		//"baidu.com",
 		//"U:137",
 		"22,21,80,443",
 		//synscanx.WithInitFilterPorts("443"),
 		synscanx.WithWaiting(5),
+		synscanx.WithShuffle(false),
 		synscanx.WithConcurrent(2000),
 		synscanx.WithSubmitTaskCallback(func(i string) {
 			addSynPacketCounter()
@@ -41,13 +53,9 @@ func Test___scanxFromPingUtils(t *testing.T) {
 		synPacketCounter++
 	}
 	list := []string{
-		"47.52.100.35",
-		"47.52.100.228",
-		"47.52.100.30",
-		"47.52.100.24",
-		"47.52.100.33",
-		"47.52.100.123",
-		"47.52.100.75",
+		"192.168.3.1",
+		"192.168.3.116",
+		"192.168.3.122",
 	}
 
 	c := make(chan *pingutil.PingResult)
