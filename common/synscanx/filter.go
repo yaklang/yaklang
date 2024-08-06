@@ -39,7 +39,7 @@ func (s *Scannerx) GetNonExcludedPorts(ports string) []int {
 		fp += strconv.Itoa(port) + ","
 		nonExcludedPorts = append(nonExcludedPorts, port)
 	}
-	s.ports = utils.NewPortsFilter(fp)
+	s.ports.Add(fp)
 	if s.config.shuffle {
 		utils.ShuffleInt(nonExcludedPorts)
 	}
