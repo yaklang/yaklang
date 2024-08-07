@@ -1,6 +1,8 @@
 package go2ssa
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -15,7 +17,29 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	var methlist []*ssa.Function
 
 	if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
-		b.buildPackage(packag)
+		pkgPath := b.buildPackage(packag)
+		pkgName := pkgPath[0]
+		if pkgName != "main" {
+			prog := b.GetProgram()
+			lib, skip := prog.GetLibrary(pkgName)
+			if skip {
+				return
+			}
+			if lib == nil {
+				lib = prog.NewLibrary(pkgName, pkgPath)
+			}
+			lib.PushEditor(prog.GetCurrentEditor())
+	
+			builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
+			if builder != nil {
+				builder.SetBuildSupport(b.FunctionBuilder)
+				currentBuilder := b.FunctionBuilder
+				b.FunctionBuilder = builder
+				defer func() {
+					b.FunctionBuilder = currentBuilder
+				}()
+			}
+		}
 	}
 
 	for _, impo := range ast.AllImportDecl() {
@@ -55,16 +79,73 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	}
 }
 
-func (b *astbuilder) buildPackage(packag *gol.PackageClauseContext) {
-	recoverRange := b.SetRange(packag.BaseParserRuleContext)
+func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
+	recoverRange := b.SetRange(p.BaseParserRuleContext)
 	defer recoverRange()
 
-	// TODO
+	if n := p.PackageName(); n != nil {
+	    re := b.buildPackageName(n.(*gol.PackageNameContext))
+		return []string{re}
+	}
+	return nil
+}
+
+func (b *astbuilder) buildPackageName(packageName *gol.PackageNameContext) string {
+	recoverRange := b.SetRange(packageName.BaseParserRuleContext)
+	defer recoverRange()
+
+	if id := packageName.IDENTIFIER(); id != nil {
+	    return id.GetText()
+	}
+	return ""
 }
 
 func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) {
 	recoverRange := b.SetRange(importDecl.BaseParserRuleContext)
 	defer recoverRange()
+
+	for _,i := range importDecl.AllImportSpec() {
+	    name, pkgPath := b.buildImportSpec(i.(*gol.ImportSpecContext))
+		if len(pkgPath) > 0 {
+			if name != "" {
+				b.AddBuildInPackage(name,pkgPath)
+			} else {
+				b.AddBuildInPackage(pkgPath[len(pkgPath)-1],pkgPath)
+			}
+		}
+	}
+}
+
+func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string,[]string) {
+	recoverRange := b.SetRange(importSpec.BaseParserRuleContext)
+	defer recoverRange()
+	var name string
+
+	if id := importSpec.IDENTIFIER(); id != nil {
+	    name = id.GetText()
+	}
+	if dot := importSpec.DOT(); dot != nil {
+	    name = "."
+	}
+	
+	if path := importSpec.ImportPath(); path != nil {
+	    pkgPath := strings.Split(b.buildImportPath(path.(*gol.ImportPathContext)),"/")
+		return name, pkgPath
+	}
+	return name, nil
+}
+
+func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
+	recoverRange := b.SetRange(importPath.BaseParserRuleContext)
+	defer recoverRange()
+
+	if s := importPath.String_(); s != nil {
+		name := s.GetText()
+		name = name[1:len(name)-1]
+	    return name
+	}
+
+	return ""
 }
 
 func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal bool) {
