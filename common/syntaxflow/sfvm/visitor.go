@@ -18,6 +18,7 @@ type SyntaxFlowVisitor struct {
 	allowIncluded string
 	description   string
 	purpose       string
+	severity      string
 	codes         []*SFI
 }
 

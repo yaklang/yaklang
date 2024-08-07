@@ -103,6 +103,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	frame.Description = result.description
 	frame.AllowIncluded = result.allowIncluded
 	frame.Purpose = result.purpose
+	frame.Severity = result.severity
 	frame.vm = s
 
 	s.frames = append(s.frames, frame)

@@ -274,6 +274,13 @@ func (y *SyntaxFlowVisitor) EmitRemoveRef(i string) {
 	})
 }
 
+func (y *SyntaxFlowVisitor) EmitIntersectionRef(i string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpIntersectionRef,
+		UnaryStr: i,
+	})
+}
+
 func (v *SyntaxFlowVisitor) EmitGetTopDefs(config ...*RecursiveConfigItem) {
 	v.codes = append(v.codes, &SFI{OpCode: OpGetTopDefs, SyntaxFlowConfig: config})
 }

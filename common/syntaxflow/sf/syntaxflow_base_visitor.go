@@ -195,6 +195,10 @@ func (v *BaseSyntaxFlowVisitor) VisitRemoveRefFilter(ctx *RemoveRefFilterContext
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitIntersectionRefFilter(ctx *IntersectionRefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitFilterExpr(ctx *FilterExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }

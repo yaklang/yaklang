@@ -9,12 +9,20 @@ import (
 
 type SyntaxFlowRulePurposeType string
 type SyntaxFlowRuleType string
+type SyntaxFlowSeverity string
 
 const (
 	SFR_PURPOSE_AUDIT    SyntaxFlowRulePurposeType = "audit"
 	SFR_PURPOSE_VULN     SyntaxFlowRulePurposeType = "vuln"
 	SFR_PURPOSE_CONFIG   SyntaxFlowRulePurposeType = "config"
 	SFR_PURPOSE_SECURITY SyntaxFlowRulePurposeType = "securiy"
+)
+
+const (
+	SFR_SEVERITY_LOW      = "info"
+	SFR_SEVERITY_WARNING  = "middle"
+	SFR_SEVERITY_CRITICAL = "critical"
+	SFR_SEVERITY_HIGH     = "high"
 )
 
 const (
@@ -30,6 +38,21 @@ func ValidRuleType(i any) SyntaxFlowRuleType {
 		return SFR_RULE_TYPE_SF
 	default:
 		return SFR_RULE_TYPE_SF
+	}
+}
+
+func ValidSeverityType(i any) SyntaxFlowSeverity {
+	switch strings.ToLower(codec.AnyToString(i)) {
+	case "info", "i", "low", "verbose", "debug", "prompt":
+		return SFR_SEVERITY_LOW
+	case "warning", "w", "middle", "mid", "warn":
+		return SFR_SEVERITY_WARNING
+	case "critical", "c", "fatal", "e", "essential":
+		return SFR_SEVERITY_CRITICAL
+	case "high", "h", "error":
+		return SFR_SEVERITY_HIGH
+	default:
+		return SFR_SEVERITY_LOW
 	}
 }
 
@@ -61,8 +84,9 @@ type SyntaxFlowRule struct {
 	Description string
 
 	// yak or sf
-	Type    SyntaxFlowRuleType
-	Content string
+	Type     SyntaxFlowRuleType
+	Severity SyntaxFlowSeverity
+	Content  string
 
 	// Purpose is the purpose of the rule.
 	// audit / vuln / config / security / information
@@ -91,5 +115,6 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
 	s.Type = ValidRuleType(s.Type)
+	s.Severity = ValidSeverityType(s.Severity)
 	return nil
 }

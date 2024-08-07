@@ -30,6 +30,7 @@ type SFFrame struct {
 	Description   string
 	AllowIncluded string
 	Purpose       string
+	Severity      string
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -968,6 +969,52 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.stack.Push(newVal)
 		s.debugSubLog("<< push")
+	case OpIntersectionRef:
+		s.debugSubLog("fetch: %v", i.UnaryStr)
+		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		if !ok || vs == nil {
+			s.debugLog("cannot find $%v", i.UnaryStr)
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+			}
+			s.stack.Push(NewValues(nil))
+			return nil
+		}
+		s.debugLog(">> pop")
+
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
+		m1 := make(map[int64]ValueOperator)
+		_ = value.Recursive(func(operator ValueOperator) error {
+			id, ok := fetchId(operator)
+			if ok {
+				m1[id] = operator
+			}
+			return nil
+		})
+
+		var buf bytes.Buffer
+		var vals []ValueOperator
+		_ = value.Recursive(func(operator ValueOperator) error {
+			id, ok := fetchId(operator)
+			if ok {
+				if _, ok := m1[id]; ok {
+					buf.WriteString(fmt.Sprintf(" %v", id))
+					vals = append(vals, operator)
+				}
+			}
+			return nil
+		})
+		if len(vals) == 0 {
+			s.debugSubLog("no intersection")
+			s.stack.Push(NewValues(nil))
+		} else {
+			s.debugSubLog("intersection:%v", buf.String())
+			s.stack.Push(NewValues(vals))
+		}
 	case OpNativeCall:
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
@@ -1113,4 +1160,15 @@ func (s *SFFrame) GetSFResult() (*SFFrameResult, error) {
 
 func (s *SFFrame) GetVM() *SyntaxFlowVirtualMachine {
 	return s.vm
+}
+
+func fetchId(i any) (int64, bool) {
+	result, ok := i.(ssa.GetIdIF)
+	if !ok {
+		return 0, false
+	}
+	if result.GetId() > 0 {
+		return result.GetId(), true
+	}
+	return 0, false
 }
