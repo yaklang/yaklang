@@ -54,7 +54,7 @@ func Chardet(raw []byte) string {
 }
 
 func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.ExtractedUrl, error) {
-	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableDangerousTag())
+	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableDangerousTag(), mutate.Fuzz_WithResultLimit(1))
 	if err != nil {
 		return nil, err
 	}
