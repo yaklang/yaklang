@@ -133,3 +133,49 @@ func TestClosu_Value(t *testing.T) {
 		}, t)
 	})
 }
+
+func TestClosu_Value_InFunction(t *testing.T) {
+	t.Run("closu function param", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func test (f func() int) int{
+			return f()
+		}
+
+		func main(){
+			a := 1
+			test(func() int {
+				println(a)
+				return a
+			})
+			println(a)
+		}
+		`, []string{
+			"FreeValue-a","1",
+		}, t)
+	})
+
+	t.Run("closu function return", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+			func test () func() int{
+				var a = 1
+				return func() int {
+					println(a)
+					return a
+				}
+			}
+
+			func main(){
+				f := test()
+				a := f()
+				println(a)
+			}
+		`, []string{
+			"FreeValue-a","Function-test()() binding[1]",
+		}, t)
+	})
+}
+
