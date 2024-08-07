@@ -376,3 +376,13 @@ func TestBigInt(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTagResultLimit(t *testing.T) {
+	res, err := FuzzTagExec("{{int(1-10)}}", Fuzz_WithResultLimit(2))
+	require.NoError(t, err)
+	require.Len(t, res, 2)
+
+	res, err = FuzzTagExec("{{int(1-10)}}")
+	require.NoError(t, err)
+	require.Len(t, res, 10)
+}
