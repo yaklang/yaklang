@@ -130,7 +130,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					}
 					filter.Insert(addr)
 
-					log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
+					//log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
 					result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
 					if err != nil {
 						log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)

@@ -27,8 +27,8 @@ type SynxConfig struct {
 
 	excludePorts *utils.PortsFilter
 
-	maxOpenPorts uint16 // 单个 IP 允许的最大开放端口数
-
+	maxOpenPorts       uint16 // 单个 IP 允许的最大开放端口数
+	targetsCount       uint16
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 
@@ -92,6 +92,12 @@ func NewDefaultConfig() *SynxConfig {
 }
 
 type SynxConfigOption func(config *SynxConfig)
+
+func TargetCount(count int) SynxConfigOption {
+	return func(config *SynxConfig) {
+		config.targetsCount = uint16(count)
+	}
+}
 
 func WithMaxOpenPorts(max int) SynxConfigOption {
 	return func(config *SynxConfig) {

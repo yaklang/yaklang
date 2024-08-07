@@ -28,12 +28,12 @@ import (
 //
 // ```
 func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (chan *synscan.SynScanResult, error) {
+	count := len(utils.ParseStringToHosts(targets))
 	config := synscanx.NewDefaultConfig()
-
+	opts = append(opts, synscanx.TargetCount(count))
 	for _, opt := range opts {
 		opt(config)
 	}
-
 	return do(targets, ports, config)
 }
 
@@ -185,4 +185,5 @@ var SynxPortScanExports = map[string]interface{}{
 	"concurrent":         synscanx.WithConcurrent,
 	"iface":              synscanx.WithIface,
 	"shuffle":            synscanx.WithShuffle,
+	"maxPorts":           synscanx.WithMaxOpenPorts,
 }
