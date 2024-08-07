@@ -19,7 +19,11 @@ import (
 
 type SSABuild struct{}
 
-func (b *SSABuild) PreHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+func (b *SSABuild) EnableExtraFileAnalyzer() bool {
+	return true
+}
+
+func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")

@@ -232,6 +232,7 @@ type Program struct {
 	ProcessInfof func(string, ...any)
 
 	// extern lib
+	GlobalScope             Value            //全局作用域
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
