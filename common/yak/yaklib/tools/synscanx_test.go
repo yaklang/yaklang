@@ -2,8 +2,10 @@ package tools
 
 import (
 	"github.com/yaklang/yaklang/common/synscanx"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	_ "net/http/pprof"
+	"sync"
 	"testing"
 	"time"
 )
@@ -88,4 +90,31 @@ func Test___scanxFromPingUtils(t *testing.T) {
 		t.Log(re.String())
 	}
 	t.Log("synPacketCounter:", synPacketCounter)
+}
+
+func Test___filter(t *testing.T) {
+
+	wg := sync.WaitGroup{}
+	for {
+		filter := utils.NewPortsFilter()
+
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			filter.Add("1-100")
+			filter = nil
+		}()
+		time.Sleep(100 * time.Millisecond)
+
+		go func() {
+			defer wg.Done()
+
+			if filter.Contains(1) {
+				t.Log("contains 1")
+			}
+		}()
+
+		wg.Wait()
+	}
+
 }
