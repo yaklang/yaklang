@@ -9,8 +9,14 @@ import (
 )
 
 func NewHTTPRequest(https bool, req []byte, rsp []byte, urlString string) (bool, []byte, error) {
-	if !utils.IsLegalHTTPUrl(urlString) {
-		return false, nil, utils.Errorf("illegal url: %s", urlString)
+	if strings.HasPrefix(urlString, "//") {
+		if https {
+			urlString = "https:" + urlString
+		} else {
+			urlString = "http:" + urlString
+		}
+	} else if strings.HasPrefix(urlString, "javascript:") {
+		return https, nil, utils.Errorf("javascript schema url cannot build http request: %s", urlString)
 	}
 	reqBytes := lowhttp.UrlToRequestPacket(
 		"GET", urlString, req, https,
