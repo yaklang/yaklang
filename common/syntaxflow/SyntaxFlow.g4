@@ -101,6 +101,7 @@ filterItem
     | '#{' (config)? '}->'                       # TopDefConfigFilter
     | '+' refVariable                            # MergeRefFilter
     | '-' refVariable                            # RemoveRefFilter
+    | '&' refVariable                            # IntersectionRefFilter
     ;
 
 filterExpr: filterItemFirst filterItem* ;

@@ -105,6 +105,7 @@ const (
 
 	OpMergeRef
 	OpRemoveRef
+	OpIntersectionRef
 
 	OpNativeCall
 
@@ -266,6 +267,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "merge$ref", s.UnaryStr)
 	case OpRemoveRef:
 		return fmt.Sprintf(verboseLen+" %v", "remove$ref", s.UnaryStr)
+	case OpIntersectionRef:
+		return fmt.Sprintf(verboseLen+" %v", "intersection$ref", s.UnaryStr)
 	case OpRecursiveSearchRegexp:
 		return fmt.Sprintf(verboseLen+" %v", "recursive$regexp", s.UnaryStr)
 	case OpRecursiveSearchGlob:

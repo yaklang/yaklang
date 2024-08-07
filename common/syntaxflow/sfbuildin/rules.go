@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-//go:embed buildin/*.sf
+//go:embed buildin/***
 var ruleFS embed.FS
 
 func init() {

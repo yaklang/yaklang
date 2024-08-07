@@ -138,6 +138,7 @@ func ImportRuleWithoutValid(ruleName string, content string) error {
 		Type:        ruleType,
 		Content:     content,
 		Purpose:     schema.ValidPurpose(frame.Purpose),
+		Severity:    schema.ValidSeverityType(frame.Severity),
 	}
 
 	if frame.AllowIncluded != "" {

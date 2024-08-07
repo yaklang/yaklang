@@ -146,6 +146,9 @@ a: 1,
 
 "ccc"}>`,
 		`<nativeCall(a: 1, "ccc", ` + "`a asdf asdf asdf asdf asdf ${ asdf asd f} sdfasdfasdfasdf`" + `)>`,
+		"$a + $b",
+		"$a - $b",
+		"$a & $b",
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)
