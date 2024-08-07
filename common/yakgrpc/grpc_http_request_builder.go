@@ -353,8 +353,9 @@ func BuildHttpRequestPacket(db *gorm.DB, baseBuilderParams *ypb.HTTPRequestBuild
 				for _, result := range results {
 					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.Host))
 					tUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, result.IsHttps)
-					if err != nil {
-						log.Error("build request make url error:", err)
+					if err != nil || tUrl == nil {
+						log.Errorf("failed to extract url from request: %v for error: %v", packet, err)
+						continue
 					}
 					builderRes <- &HTTPRequestBuilderRes{IsHttps: result.IsHttps, Request: packet, Url: tUrl.String()}
 				}
