@@ -676,7 +676,7 @@ func init() {
 				}
 
 				if isFile {
-					ch, err := utils.FileLineReader(payloadRaw)
+					ch, err := utils.FileLineReaderWithContext(payloadRaw, ctx)
 					if err != nil {
 						log.Errorf("read payload err: %v", err)
 						continue
@@ -1814,7 +1814,7 @@ func FileTag() []*FuzzTagDescription {
 				s = strings.Trim(s, " ()")
 				empty := true
 				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-					lineChan, err := utils.FileLineReader(lineFile)
+					lineChan, err := utils.FileLineReaderWithContext(lineFile, ctx)
 					if err != nil {
 						log.Errorf("fuzztag read file failed: %s", err)
 						continue
