@@ -40,6 +40,7 @@ func NewChildProgram(prog *Program, name string, handler func(program *Program))
 		externBuildValueHandler: prog.externBuildValueHandler,
 		ExternInstance:          prog.ExternInstance,
 		ExternLib:               prog.ExternLib,
+		GlobalScope:             prog.GlobalScope,
 	}
 	if handler != nil {
 		handler(childProg)
@@ -195,6 +196,7 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	if builder == nil {
 		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)
 	}
+
 	return builder
 }
 

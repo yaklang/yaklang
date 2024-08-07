@@ -330,6 +330,12 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
-	//todo: 后续做成一个函数
+	{
+		container := builder.EmitEmptyContainer()
+		globalVariable := builder.CreateMemberCallVariable(container, ssa.NewConst("global"))
+		global_container := builder.EmitEmptyContainer()
+		builder.AssignVariable(globalVariable, global_container)
+		prog.GlobalScope = global_container
+	}
 	return prog, builder, nil
 }
