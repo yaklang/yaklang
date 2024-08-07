@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"github.com/pkg/errors"
 	"os"
 )
@@ -25,7 +26,7 @@ func RemoveBOMForString(raw string) string {
 	return raw
 }
 
-func FileLineReader(file string) (chan []byte, error) {
+func FileLineReaderWithContext(file string, ctx context.Context) (chan []byte, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, errors.Errorf("failed to read file: %s", err)
@@ -38,6 +39,11 @@ func FileLineReader(file string) (chan []byte, error) {
 		defer close(outC)
 		bomHandled := NewBool(false)
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			lineRaw, err := BufioReadLine(reader)
 			if err != nil {
 				break
@@ -52,4 +58,8 @@ func FileLineReader(file string) (chan []byte, error) {
 	}()
 
 	return outC, nil
+}
+
+func FileLineReader(file string) (chan []byte, error) {
+	return FileLineReaderWithContext(file, context.Background())
 }
