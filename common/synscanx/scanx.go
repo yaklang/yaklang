@@ -39,9 +39,9 @@ type Scannerx struct {
 	macCacheTable *sync.Map
 	MacHandlers   func(ip net.IP, addr net.HardwareAddr)
 
-	Handle     *pcap.Handle
-	limiter    *rate.Limiter
-	startTime  time.Time
+	Handle    *pcap.Handle
+	limiter   *rate.Limiter
+	startTime time.Time
 	// onSubmitTaskCallback: 每提交一个数据包的时候，这个 callback 调用一次
 	onSubmitTaskCallback func(string, int)
 	FromPing             bool
@@ -79,7 +79,7 @@ func (s *Scannerx) initEssentialInfo() error {
 	var srcIP, gatewayIP net.IP
 	var err error
 
-	if utils.IsLoopback(s.sampleIP) {
+	if utils.IsLoopback(s.sampleIP) && s.config.targetsCount == 1 && !s.FromPing {
 		iface, err = pcaputil.GetLoopBackNetInterface()
 		if err != nil {
 			return utils.Errorf("get loopback iface failed: %s", err)
@@ -158,12 +158,21 @@ func generateHostPort(nonExcludedHosts []string, nonExcludedPorts []int) <-chan 
 func (s *Scannerx) SubmitTarget(targets, ports string, targetCh chan *SynxTarget) {
 	nonExcludedHosts := s.GetNonExcludedHosts(targets)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
+	if len(nonExcludedHosts) == 0 || len(nonExcludedPorts) == 0 {
+		log.Error("targets or ports is empty")
+		s.ctx.Done()
+		return
+	}
 	s.OnSubmitTask(func(h string, p int) {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
 	})
 	for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
 		host := hp.Host
 		port := hp.Port
+		// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
+		if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
+			continue
+		}
 		s.rateLimit()
 		if s.config.maxOpenPorts > 0 {
 			v, ok := s.ipOpenPortMap.Load(host)
@@ -211,6 +220,10 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *
 			if !ok {
 				log.Infof("ping result channel closed")
 				return
+			}
+			// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
+			if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
+				continue
 			}
 			if s.excludedHost(host) {
 				return
@@ -348,13 +361,11 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	deadline := time.Now().Add(s.config.waiting)
 	wCtx, wCancel := context.WithDeadline(context.Background(), deadline)
 	defer func() {
-		endTime := time.Now()
-		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
 		wCancel()
 	}()
 
 	go s.HandlerZeroCopyReadPacket(wCtx, resultCh)
-
+	time.Sleep(100 * time.Millisecond)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -373,6 +384,8 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 
 	done <- struct{}{}
 
+	endTime := time.Now()
+	log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
 	defer s.Close()
 
 	return nil
@@ -400,8 +413,8 @@ func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
 			}
 			err = s.Handle.WritePacketData(packet)
 			if err != nil {
-				log.Errorf("write to device syn failed: %v", s.handleError(err))
-				return
+				log.Errorf("write to device syn failed: %v[%s:%d]", s.handleError(err), host, port)
+				continue
 			}
 		}
 	}
