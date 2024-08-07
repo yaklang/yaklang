@@ -13,6 +13,9 @@ func (y *builder) VisitStaticVariableStatement(raw phpparser.IStaticVariableStat
 	if i == nil {
 		return nil
 	}
-
+	for _, initializerContext := range i.AllVariableInitializer() {
+		initializer, value := y.VisitVariableInitializer(initializerContext)
+		y.AssignVariable(y.CreateVariable(initializer), value)
+	}
 	return nil
 }

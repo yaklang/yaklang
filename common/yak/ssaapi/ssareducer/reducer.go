@@ -34,15 +34,18 @@ func ReducerCompile(base string, opts ...Option) error {
 		if err != nil {
 			return utils.Wrapf(err, "c.fs.Open(%#v) failed", path)
 		}
-		// , err := fd.Read()
+		defer func() {
+			fd.Close()
+		}()
 		data, err := io.ReadAll(fd)
 		if err != nil {
 			return utils.Wrapf(err, "io.ReadAll(%#v) failed: %v", path, err)
 		}
+		if len(data) == 0 {
+			log.Errorf("file %s is empty", path)
+			return nil
+		}
 		content := utils.UnsafeBytesToString(data)
-		defer func() {
-			fd.Close()
-		}()
 
 		if c.compileMethod == nil {
 			return utils.Errorf("Compile method is nil for lib: %v", base)

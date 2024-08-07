@@ -96,6 +96,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	//	return y.EmitConstInstNil()
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
+	case *phpparser.FullyQualifiedNamespaceExpressionContext:
+		return y.VisitFullyQualifiedNamespaceExpr(ret.FullyQualifiedNamespaceExpr())
 	case *phpparser.IndexCallExpressionContext: // $a[1]
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
@@ -1230,7 +1232,7 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 			var_dump($a);
 	*/
 	var once bool
-	var flag ssa.Value
+	var flag = y.EmitEmptyContainer()
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
 		once = true
 	}
@@ -1241,7 +1243,7 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
 		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
 		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
-		flag = ssa.NewUndefined(expr.GetText())
+		return flag
 	}
 	if value.IsUndefined() {
 		log.Warnf("include statement expression is undefined")
@@ -1252,9 +1254,9 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 		defer y.IncludeStack.Pop()
 		if err := y.BuildFilePackage(file, once); err != nil {
 			//todo: 目前拿不到include的返回值
-			flag = ssa.NewConst(false)
+			//flag = ssa.NewConst(false)
 		} else {
-			flag = ssa.NewConst(true)
+			//flag = ssa.NewConst(true)
 		}
 	}
 	return flag

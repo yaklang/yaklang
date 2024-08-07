@@ -47,4 +47,30 @@ println($a);
 			false,
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("include file and include", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("var/www/html/1.php", `<?php
+	$a = 1;
+	return;
+`)
+		fs.AddFile("var/www/html/2.php", `<?php
+	include("1.php");
+	$a = 2;
+	function test(){
+		$a = 123;
+		return $a;
+	}
+`)
+		fs.AddFile("var/www/html/3.php", `<?php
+	include("2.php");
+	println($a);
+ 	$a = test();
+	println($a);
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs,
+			`println(* #-> * as $param)`,
+			map[string][]string{"param": {"2", "123"}},
+			false,
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
