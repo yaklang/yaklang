@@ -31,15 +31,16 @@ func (s *Scannerx) excludedPort(port int) bool {
 
 func (s *Scannerx) GetNonExcludedPorts(ports string) []int {
 	var nonExcludedPorts []int
-	var fp string
+	var builder strings.Builder
 	for _, port := range utils.ParseStringToPorts(ports) {
 		if s.excludedPort(port) {
 			continue
 		}
-		fp += strconv.Itoa(port) + ","
+		builder.WriteString(strconv.Itoa(port))
+		builder.WriteString(",")
 		nonExcludedPorts = append(nonExcludedPorts, port)
 	}
-	s.ports.Add(fp)
+	s.ports.Add(builder.String())
 	if s.config.shuffle {
 		utils.ShuffleInt(nonExcludedPorts)
 	}
