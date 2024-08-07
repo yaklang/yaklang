@@ -84,9 +84,12 @@ const (
 	NativeCall_As = "as"
 
 	NativeCall_MyBatisSink = "mybatisSink"
+
+	NativeCall_FreeMarkerSink = "freeMarkerSink"
 )
 
 func init() {
+	registerNativeCall(NativeCall_FreeMarkerSink, nc_func(nativeCallFreeMarker))
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
 	registerNativeCall(NativeCall_As, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
