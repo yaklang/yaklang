@@ -759,7 +759,7 @@ if recordPtr > 0 {
 
 targetBatch = ""
 count := 0
-wgTCP := sync.NewWaitGroup()
+wgTCP := sync.NewSizedWaitGroup(concurrent)
 
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
@@ -772,7 +772,7 @@ for fileReader.Next(){
     count++
     addScanHostCount()
 
-    if count == 20 {
+    if count == concurrent {
         wgTCP.Add(1)
         go func {
             defer wgTCP.Done()
