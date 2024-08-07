@@ -14,11 +14,13 @@ type FuzzTagConfig struct {
 	tagMethodMap      map[string]*parser.TagMethod
 	isSimple          bool
 	syncRootNodeIndex bool
+	resultLimit       int
 }
 
 func NewFuzzTagConfig() *FuzzTagConfig {
 	return &FuzzTagConfig{
 		tagMethodMap: map[string]*parser.TagMethod{},
+		resultLimit:  -1,
 	}
 }
 
@@ -116,6 +118,12 @@ func Fuzz_WithParams(i interface{}) FuzzConfigOpt {
 	})
 }
 
+func Fuzz_WithResultLimit(limit int) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.resultLimit = limit
+	}
+}
+
 func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err error) {
 	config := NewFuzzTagConfig()
 	for k, method := range tagMethodMap {
@@ -142,7 +150,8 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	}
 	defer generator.Cancel()
 	var res []string
-	for generator.Next() {
+	count := 0
+	for count != config.resultLimit && generator.Next() {
 		result := generator.Result()
 		data := result.GetData()
 		res = append(res, string(data))
@@ -152,6 +161,7 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 				return res, nil
 			}
 		}
+		count++
 	}
 	return res, nil
 }
