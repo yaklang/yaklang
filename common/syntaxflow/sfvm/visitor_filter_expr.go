@@ -90,6 +90,8 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitMergeRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.RemoveRefFilterContext:
 		y.EmitRemoveRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
+	case *sf.IntersectionRefFilterContext:
+		y.EmitIntersectionRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	default:
 		panic("BUG: in filterExpr")
 	}

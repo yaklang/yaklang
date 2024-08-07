@@ -1,0 +1,15 @@
+desc(
+  title: 'checking [Directly relative Files.write from MultipartFile]',
+  type: audit,
+  level: warning,
+)
+
+<include('spring-param')>?{<typeName>?{have: MultipartFile}} as $upload;
+Files.write(*?{!opcode: param} as $sink);
+
+$sink #{
+  until: `*?{<typeName>?{have: MultipartFile}} & $upload as $inter`
+}->
+
+check $inter then "Upload and Write Files directly" else "No Upload and Files.write"
+alert $inter
