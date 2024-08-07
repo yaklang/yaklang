@@ -23,6 +23,7 @@ type anInstruction struct {
 
 	isAnnotation bool
 	isExtern     bool
+	isFromDB	bool
 }
 
 func (v *anInstruction) GetSourceCode() string {
@@ -61,6 +62,10 @@ func (i *anInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
 }
 
 func (i *anInstruction) IsLazy() bool { return false }
+
+func (i *anInstruction) IsFromDB() bool { return i.isFromDB}
+
+func (i *anInstruction)SetIsFromDB(b bool){i.isFromDB = b}
 
 func (i *anInstruction) Self() Instruction {
 	return i
@@ -311,6 +316,11 @@ func (n *anValue) GetType() Type {
 }
 func (n *anValue) SetType(typ Type) {
 	if typ == nil {
+		return
+	}
+
+	if n.IsFromDB(){
+		n.typ=typ
 		return
 	}
 

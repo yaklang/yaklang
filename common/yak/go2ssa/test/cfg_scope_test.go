@@ -74,7 +74,7 @@ func TestBasic_Variable_Inblock(t *testing.T) {
 		}
 		`, []string{
 			"1",
-			"Undefined-a",
+			"0",
 			"1",
 		}, t)
 	})

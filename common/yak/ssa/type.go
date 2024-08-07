@@ -261,6 +261,10 @@ type Type interface {
 	PkgPathString() string // package path string
 	RawString() string     // string contain inner information
 	GetTypeKind() TypeKind // type kind
+
+	// full type name
+	AddFullTypeName(string)
+	GetFullTypeNames() []string
 	// set/get method, method is a function
 	SetMethod(map[string]*Function)
 	AddMethod(string, *Function)
@@ -363,7 +367,7 @@ type BasicType struct {
 	pkgPath string
 
 	method       map[string]*Function
-	fullTypeName string
+	fullTypeName []string
 }
 
 func NewBasicType(kind TypeKind, name string) *BasicType {
@@ -372,6 +376,7 @@ func NewBasicType(kind TypeKind, name string) *BasicType {
 		name:    name,
 		pkgPath: name,
 		method:  make(map[string]*Function),
+		fullTypeName: make([]string,0),
 	}
 }
 
@@ -400,16 +405,16 @@ func (b *BasicType) GetTypeKind() TypeKind {
 func (b *BasicType) GetMethod() map[string]*Function {
 	return b.method
 }
-func (b *BasicType) SetFullTypeName(name string) {
+func (b *BasicType) AddFullTypeName(name string) {
 	if b == nil {
 		return
 	}
-	b.fullTypeName = name
+	b.fullTypeName = append(b.fullTypeName,name)
 }
 
-func (b *BasicType) GetFullTypeName() string {
+func (b *BasicType) GetFullTypeNames() []string {
 	if b == nil {
-		return ""
+		return nil
 	}
 	return b.fullTypeName
 }
@@ -435,6 +440,16 @@ func (b *BasicType) IsAny() bool {
 	return false
 }
 
+func (b *BasicType) IsNull() bool {
+	if b == nil {
+		return true
+	}
+	if b.Kind == NullTypeKind {
+		return true
+	}
+	return false
+}
+
 func (b *BasicType) GetName() string {
 	return b.name
 }
@@ -454,6 +469,42 @@ var BasicTypes = map[TypeKind]*BasicType{
 	AnyTypeKind:       NewBasicType(AnyTypeKind, "any"),
 	ErrorTypeKind:     NewBasicType(ErrorTypeKind, "error"),
 }
+func CreateNumberType() Type {
+	return NewBasicType(NumberTypeKind, "number")
+}
+
+func CreateStringType() Type {
+	return NewBasicType(StringTypeKind, "string")
+}
+
+func CreateByteType() Type {
+	return NewBasicType(ByteTypeKind, "byte")
+}
+
+func CreateBytesType() Type {
+	return NewBasicType(BytesTypeKind, "bytes")
+}
+
+func CreateBooleanType() Type {
+	return NewBasicType(BooleanTypeKind, "boolean")
+}
+
+func CreateUndefinedType() Type {
+	return NewBasicType(UndefinedTypeKind, "undefined")
+}
+
+func CreateNullType() Type {
+	return NewBasicType(NullTypeKind, "null")
+}
+
+func CreateAnyType() Type {
+	return NewBasicType(AnyTypeKind, "any")
+}
+
+func CreateErrorType() Type {
+	return NewBasicType(ErrorTypeKind, "error")
+}
+
 
 func GetNumberType() Type {
 	return BasicTypes[NumberTypeKind]
@@ -526,6 +577,7 @@ type AliasType struct {
 	method  map[string]*Function
 	Name    string
 	pkgPath string
+	fullTypeName []string
 }
 
 var _ Type = (*AliasType)(nil)
@@ -539,6 +591,19 @@ func NewAliasType(name, pkg string, elem Type) *AliasType {
 	}
 }
 
+func (a *AliasType) AddFullTypeName(name string) {
+	if a == nil {
+		return
+	}
+	a.fullTypeName = append(a.fullTypeName,name)
+}
+
+func (a *AliasType) GetFullTypeNames() []string {
+	if a == nil {
+		return nil	
+	}
+	return a.fullTypeName
+}
 func (a *AliasType) SetMethod(m map[string]*Function) {
 	a.method = m
 }
@@ -588,6 +653,7 @@ type InterfaceType struct {
 	object  map[string]*ObjectType
 	name    string
 	pkgPath string
+	fullTypeName []string
 	parents  []*InterfaceType
 	childs   []*InterfaceType
 }
@@ -664,13 +730,41 @@ func (i *InterfaceType) AddFatherInterfaceType(parent *InterfaceType) {
 func (i *InterfaceType) AddChildInterfaceType(child *InterfaceType) {
     i.childs = append(i.childs, child)
 }
+func(i *InterfaceType) AddFullTypeName(name string) {
+	if i == nil {
+		return
+	}
+	i.name = name
+}
+
+func(i *InterfaceType) GetFullTypeNames() []string {
+	if i== nil {
+		return nil	
+	}
+	return i.fullTypeName
+}
 // ====================== chan type
 type ChanType struct {
 	Elem   Type
 	method map[string]*Function
+	fullTypeName []string
 }
 
 var _ (Type) = (*ChanType)(nil)
+
+func (c *ChanType)AddFullTypeName(name string){
+	if c == nil {
+		return
+	}
+	c.fullTypeName = append(c.fullTypeName,name)
+}
+
+func (c *ChanType) GetFullTypeNames() []string {
+	if c == nil {
+		return nil	
+	}
+	return c.fullTypeName
+}
 
 func (c *ChanType) SetMethod(m map[string]*Function) {
 	c.method = m
@@ -733,6 +827,8 @@ type ObjectType struct {
 
 	KeyTyp    Type
 	FieldType Type
+
+	fullTypeName []string
 }
 
 var _ (Type) = (*ObjectType)(nil)
@@ -744,6 +840,21 @@ func (i *ObjectType) GetTypeKind() TypeKind {
 func (i *ObjectType) SetTypeKind(t TypeKind) {
 	i.Kind = t
 }
+
+func (i *ObjectType)AddFullTypeName(name string){
+	if i == nil {
+		return
+	}
+	i.fullTypeName = append(i.fullTypeName,name)
+}
+
+func( i *ObjectType) GetFullTypeNames() []string {
+	if i== nil {
+		return nil	
+	}
+	return i.fullTypeName
+}
+
 
 func (i *ObjectType) GetMethod() map[string]*Function {
 	return i.method
@@ -965,9 +1076,25 @@ type FunctionType struct {
 	IsModifySelf    bool // if this is method function
 
 	AnnotationFunc []func(Value)
+
+	fullTypeName []string
 }
 
 var _ Type = (*FunctionType)(nil)
+
+func ( f *FunctionType) AddFullTypeName(name string) { 
+	if f == nil {
+		return
+	}
+	f.fullTypeName = append(f.fullTypeName, name)
+ }
+
+func (f *FunctionType) GetFullTypeNames() []string {
+	if f == nil {
+		return nil
+	}
+	return f.fullTypeName
+}
 
 func (f *FunctionType) GetMethod() map[string]*Function {
 	return nil
@@ -996,6 +1123,7 @@ func CalculateType(ts []Type) Type {
 		return i
 	}
 }
+
 
 func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
 	f := &FunctionType{
@@ -1087,9 +1215,24 @@ func (f *FunctionType) AddAnnotationFunc(handler ...func(Value)) {
 type GenericType struct {
 	method map[string]*Function
 	symbol string
+	fullTypeName []string
 }
 
 var _ (Type) = (*GenericType)(nil)
+
+func (c *GenericType)AddFullTypeName(name string) {
+	if c == nil {
+		return
+	}
+	c.fullTypeName = append(c.fullTypeName,name)
+}
+
+func (c *GenericType) GetFullTypeNames() []string {
+	if c == nil {
+		return nil	
+	}
+	return c.fullTypeName
+}
 
 func (c *GenericType) SetMethod(m map[string]*Function) {
 	c.method = m
@@ -1249,9 +1392,24 @@ func CloneType(t Type) (Type, bool) {
 type OrType struct {
 	method map[string]*Function
 	types  Types
+	fullTypeName []string
 }
 
 var _ (Type) = (*OrType)(nil)
+
+func (c *OrType) GetFullTypeNames() []string {
+	if c==nil {
+		return nil
+	}
+	return c.fullTypeName
+}
+
+func (c *OrType) AddFullTypeName(name string) {
+	if c  == nil {
+		return
+	}
+	c.fullTypeName = append(c.fullTypeName,name)
+}
 
 func (c *OrType) SetMethod(m map[string]*Function) {
 	c.method = m

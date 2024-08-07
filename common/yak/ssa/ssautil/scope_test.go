@@ -367,7 +367,7 @@ func TestIfScope_If_condition_assign_checkMerge(t *testing.T) {
 				})
 			},
 			func(svt ScopedVersionedTableIF[value]) {
-				test.Equal("phi[const(3) const(1)]", svt.ReadValue("a").String())
+				test.Equal("phi[const(3) const(2)]", svt.ReadValue("a").String())
 			},
 		)
 	})

@@ -2794,6 +2794,47 @@ func (s *ExpressionListContext) Expression(i int) IExpressionContext {
 	return t.(IExpressionContext)
 }
 
+func (s *ExpressionListContext) AllEos() []IEosContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IEosContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IEosContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IEosContext); ok {
+			tst[i] = t.(IEosContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *ExpressionListContext) Eos(i int) IEosContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IEosContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IEosContext)
+}
+
 func (s *ExpressionListContext) AllCOMMA() []antlr.TerminalNode {
 	return s.GetTokens(GoParserCOMMA)
 }
@@ -2826,6 +2867,7 @@ func (p *GoParser) ExpressionList() (localctx IExpressionListContext) {
 
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, GoParserRULE_expressionList)
+	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -2860,10 +2902,27 @@ func (p *GoParser) ExpressionList() (localctx IExpressionListContext) {
 				p.SetState(327)
 				p.Match(GoParserCOMMA)
 			}
+			p.SetState(337)
+			p.GetErrorHandler().Sync(p)
+			_la = p.GetTokenStream().LA(1)
+
+			for _la == GoParserSEMI || _la == GoParserEOS {
+				{
+					p.SetState(334)
+					p.Eos()
+				}
+
+				p.SetState(339)
+				p.GetErrorHandler().Sync(p)
+				_la = p.GetTokenStream().LA(1)
+			}
 			{
 				p.SetState(328)
 				p.expression(0)
 			}
+			p.SetState(344)
+			p.GetErrorHandler().Sync(p)
+			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 22, p.GetParserRuleContext())
 
 		}
 		p.SetState(333)
@@ -5146,6 +5205,8 @@ func (p *GoParser) Block() (localctx IBlockContext) {
 		}
 	}()
 
+	var _alt int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(447)
@@ -5153,7 +5214,7 @@ func (p *GoParser) Block() (localctx IBlockContext) {
 	}
 	p.SetState(451)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 44, p.GetParserRuleContext())
 
 	for _la == GoParserSEMI || _la == GoParserEOS {
 		{
@@ -5163,13 +5224,13 @@ func (p *GoParser) Block() (localctx IBlockContext) {
 
 		p.SetState(453)
 		p.GetErrorHandler().Sync(p)
-		_la = p.GetTokenStream().LA(1)
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 44, p.GetParserRuleContext())
 	}
 	p.SetState(455)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230370255065158) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230301535588422) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&377151) != 0 {
 		{
 			p.SetState(454)
 			p.StatementList()
@@ -5328,7 +5389,6 @@ func (p *GoParser) StatementList() (localctx IStatementListContext) {
 
 	localctx = NewStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, GoParserRULE_statementList)
-	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -5377,7 +5437,7 @@ func (p *GoParser) StatementList() (localctx IStatementListContext) {
 
 		p.SetState(468)
 		p.GetErrorHandler().Sync(p)
-		_la = p.GetTokenStream().LA(1)
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 47, p.GetParserRuleContext())
 	}
 
 	return localctx
@@ -8524,7 +8584,6 @@ func (p *GoParser) ExprCaseClause() (localctx IExprCaseClauseContext) {
 
 	localctx = NewExprCaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, GoParserRULE_exprCaseClause)
-	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -8571,9 +8630,8 @@ func (p *GoParser) ExprCaseClause() (localctx IExprCaseClauseContext) {
 	}
 	p.SetState(609)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230370255065158) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 69, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(608)
 			p.StatementList()
@@ -9305,7 +9363,6 @@ func (p *GoParser) TypeCaseClause() (localctx ITypeCaseClauseContext) {
 
 	localctx = NewTypeCaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, GoParserRULE_typeCaseClause)
-	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -9352,9 +9409,8 @@ func (p *GoParser) TypeCaseClause() (localctx ITypeCaseClauseContext) {
 	}
 	p.SetState(661)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230370255065158) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 77, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(660)
 			p.StatementList()
@@ -10059,7 +10115,6 @@ func (p *GoParser) CommClause() (localctx ICommClauseContext) {
 
 	localctx = NewCommClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, GoParserRULE_commClause)
-	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -10106,9 +10161,8 @@ func (p *GoParser) CommClause() (localctx ICommClauseContext) {
 	}
 	p.SetState(707)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230370255065158) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 86, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(706)
 			p.StatementList()
@@ -10641,7 +10695,7 @@ func (p *GoParser) ForStmt() (localctx IForStmtContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230371386454504) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230302666977768) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&377151) != 0 {
 			{
 				p.SetState(732)
 				p.RangeClause()
@@ -10894,9 +10948,8 @@ func (p *GoParser) ForClause() (localctx IForClauseContext) {
 	}
 	p.SetState(749)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
 
-	if _la == GoParserSEMI || _la == GoParserEOS {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 96, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(748)
 			p.Eos()
@@ -10907,7 +10960,7 @@ func (p *GoParser) ForClause() (localctx IForClauseContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230371386978792) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230302667502056) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&377151) != 0 {
 		{
 			p.SetState(751)
 
@@ -16363,6 +16416,8 @@ func (p *GoParser) LiteralValue() (localctx ILiteralValueContext) {
 		}
 	}()
 
+	var _alt int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1004)
@@ -16370,6 +16425,7 @@ func (p *GoParser) LiteralValue() (localctx ILiteralValueContext) {
 	}
 	p.SetState(1006)
 	p.GetErrorHandler().Sync(p)
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 133, p.GetParserRuleContext())
 
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 130, p.GetParserRuleContext()) == 1 {
 		{
@@ -16382,7 +16438,7 @@ func (p *GoParser) LiteralValue() (localctx ILiteralValueContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-288230370313236968) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&115007) != 0 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 136, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1008)
 			p.ElementList()
@@ -16404,12 +16460,15 @@ func (p *GoParser) LiteralValue() (localctx ILiteralValueContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == GoParserSEMI || _la == GoParserEOS {
+	for _la == GoParserSEMI || _la == GoParserEOS {
 		{
 			p.SetState(1014)
 			p.Eos()
 		}
 
+		p.SetState(1046)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1017)
@@ -16632,6 +16691,47 @@ func (s *KeyedElementContext) Element() IElementContext {
 	return t.(IElementContext)
 }
 
+func (s *KeyedElementContext) AllEos() []IEosContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IEosContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IEosContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IEosContext); ok {
+			tst[i] = t.(IEosContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *KeyedElementContext) Eos(i int) IEosContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IEosContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IEosContext)
+}
+
 func (s *KeyedElementContext) Key() IKeyContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -16676,6 +16776,7 @@ func (p *GoParser) KeyedElement() (localctx IKeyedElementContext) {
 
 	localctx = NewKeyedElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 180, GoParserRULE_keyedElement)
+	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -16693,8 +16794,24 @@ func (p *GoParser) KeyedElement() (localctx IKeyedElementContext) {
 		}
 	}()
 
+	var _alt int
+
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1030)
+	p.GetErrorHandler().Sync(p)
+	_la = p.GetTokenStream().LA(1)
+
+	for _la == GoParserSEMI || _la == GoParserEOS {
+		{
+			p.SetState(1057)
+			p.Eos()
+		}
+
+		p.SetState(1062)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+	}
+	p.SetState(1077)
 	p.GetErrorHandler().Sync(p)
 
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 135, p.GetParserRuleContext()) == 1 {
@@ -16702,15 +16819,59 @@ func (p *GoParser) KeyedElement() (localctx IKeyedElementContext) {
 			p.SetState(1027)
 			p.Key()
 		}
+		p.SetState(1067)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+
+		for _la == GoParserSEMI || _la == GoParserEOS {
+			{
+				p.SetState(1064)
+				p.Eos()
+			}
+
+			p.SetState(1069)
+			p.GetErrorHandler().Sync(p)
+			_la = p.GetTokenStream().LA(1)
+		}
 		{
 			p.SetState(1028)
 			p.Match(GoParserCOLON)
+		}
+		p.SetState(1074)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+
+		for _la == GoParserSEMI || _la == GoParserEOS {
+			{
+				p.SetState(1071)
+				p.Eos()
+			}
+
+			p.SetState(1076)
+			p.GetErrorHandler().Sync(p)
+			_la = p.GetTokenStream().LA(1)
 		}
 
 	}
 	{
 		p.SetState(1032)
 		p.Element()
+	}
+	p.SetState(1083)
+	p.GetErrorHandler().Sync(p)
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 143, p.GetParserRuleContext())
+
+	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
+		if _alt == 1 {
+			{
+				p.SetState(1080)
+				p.Eos()
+			}
+
+		}
+		p.SetState(1085)
+		p.GetErrorHandler().Sync(p)
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 143, p.GetParserRuleContext())
 	}
 
 	return localctx

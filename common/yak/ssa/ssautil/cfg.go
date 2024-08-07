@@ -28,10 +28,7 @@ func BuildSyntaxBlock[T versionedValue](
 	body := global.CreateSubScope()
 	bodyEnd := buildBody(body)
 
-	end := global.CreateSubScope()
-	global.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
-		end.SetCapturedVariable(s, vi)
-	})
+	end := global.CreateShadowScope()
 	end.CoverBy(bodyEnd)
 	return end
 }
@@ -73,7 +70,7 @@ func (i *IfStmt[T]) BuildItem(Condition func(ScopedVersionedTableIF[T]), Body fu
 	}
 
 	// create new condition and body scope
-	i.lastConditionScope = i.lastConditionScope.CreateSubScope()
+	i.lastConditionScope = i.lastConditionScope.CreateShadowScope()
 	Condition(i.lastConditionScope)
 
 	bodyScope := i.lastConditionScope.CreateSubScope()
@@ -109,13 +106,16 @@ func (i *IfStmt[T]) BuildFinish(
 		// [phi] from all body and else
 	*/
 
-	endScope := i.global.CreateSubScope()
-
-	endScope.Merge(
+	endScopec := i.lastConditionScope.CreateShadowScope()
+	endScopec.Merge(
 		!i.hasElse, // has base
 		mergeHandler,
 		i.BodyScopes...,
 	)
+
+	endScope := i.global.CreateShadowScope()
+	endScope.CoverBy(endScopec)
+
 	return endScope
 }
 
@@ -141,10 +141,10 @@ func NewLoopStmt[T versionedValue](global ScopedVersionedTableIF[T], NewPhi func
 	l := &LoopStmt[T]{
 		global: global,
 	}
-	l.header = l.global.CreateSubScope()
-	l.condition = l.header.CreateSubScope()
+	l.header = l.global.CreateShadowScope()
+	l.condition = l.header.CreateShadowScope()
 	l.condition.SetSpin(NewPhi)
-	l.body = l.condition.CreateSubScope()
+	l.body = l.condition.CreateShadowScope()
 	l.ThirdBuilder = nil
 	return l
 }
@@ -218,7 +218,7 @@ func (l *LoopStmt[T]) Build(
 	l.condition.Spin(l.header, latch, SpinHandler)
 
 	// end
-	end := l.global.CreateSubScope()
+	end := l.global.CreateShadowScope()
 	l.header.CoverBy(l.condition)
 	end.CoverBy(l.header)
 
@@ -314,6 +314,7 @@ func (t *TryStmt[T]) Build() ScopedVersionedTableIF[T] {
 
 type SwitchStmt[T versionedValue] struct {
 	global           ScopedVersionedTableIF[T]
+	condition        ScopedVersionedTableIF[T]
 	mergeToSwitchEnd []ScopedVersionedTableIF[T]
 	mergeToNextBody  ScopedVersionedTableIF[T]
 	AutoBreak        bool
@@ -344,7 +345,7 @@ func (s *SwitchStmt[T]) BuildBody(
 	body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
 	merge func(string, []T) T,
 ) {
-	sub := s.global.CreateSubScope()
+	sub := s.condition.CreateSubScope()
 	if s.mergeToNextBody != nil {
 		sub.Merge(true, merge, s.mergeToNextBody)
 		s.mergeToNextBody = nil
@@ -364,12 +365,27 @@ func (s *SwitchStmt[T]) BuildBody(
 	}
 }
 
+func (s *SwitchStmt[T]) BuildCondition(
+	body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
+) ScopedVersionedTableIF[T] {
+	sub := s.global.CreateShadowScope()
+	s.condition = sub
+	return body(sub)
+}
+
+func (s *SwitchStmt[T]) BuildConditionWithoutExprsion(
+) {
+	sub := s.global.CreateShadowScope()
+	s.condition = sub
+}
+
+
 func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T] {
-	end := s.global.CreateSubScope()
+	endc := s.condition.CreateShadowScope()
 	if s.AutoBreak {
 		// if switch default break to switch end
 		// just merge
-		end.Merge(
+		endc.Merge(
 			false,
 			merge,
 			s.mergeToSwitchEnd...,
@@ -383,10 +399,14 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 		case 0:
 		case 1:
 			// has default, no break, just cover by default
-			end.CoverBy(s.mergeToSwitchEnd[0])
+			endc.CoverBy(s.mergeToSwitchEnd[0])
 		default:
-			end.Merge(false, merge, s.mergeToSwitchEnd...)
+			endc.Merge(false, merge, s.mergeToSwitchEnd...)
 		}
 	}
+
+	// BuildSyntaxBlock(global ScopedVersionedTableIF[T], buildBody func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T])
+	end := s.global.CreateShadowScope()
+	end.CoverBy(endc)
 	return end
 }

@@ -98,7 +98,7 @@ func (condition *ScopedVersionedTable[T]) Spin(
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
 		for name, value := range res {
-			v := condition.CreateVariable(name, false)
+			v := condition.CreateVariable(name, ver.GetLocal())
 			condition.AssignVariable(v, value)
 		}
 	}

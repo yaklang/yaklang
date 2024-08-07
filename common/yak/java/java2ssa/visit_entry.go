@@ -91,6 +91,9 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 	}
 
 	packagePath := y.VisitPackageName(i.PackageName())
+
+	selfPkgPath := append(packagePath, "*")
+	y.selfPkgPath = selfPkgPath
 	return packagePath
 }
 

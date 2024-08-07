@@ -166,6 +166,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if point := value.GetPoint(); point != nil {
 		ir.Point = point.GetId()
 	}
+
 	ir.TypeID = SaveTypeToDB(value.GetType())
 }
 
@@ -226,6 +227,7 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	// type
+	value.SetIsFromDB(true)
 	value.SetType(GetTypeFromDB(ir.TypeID))
 }
 

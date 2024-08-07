@@ -55,7 +55,10 @@ func LoadSuricataToDatabase(raw string) error {
 
 var (
 	ChaosMakerExports = map[string]any{
-		"SuricataMatcher":              match.New,
+		"NewSuricataMatcherGroup": match.NewGroup,
+		"groupCallback":           match.WithGroupOnMatchedCallback,
+
+		"NewSuricataMatcher":           match.New,
 		"ParseSuricata":                surirule.Parse,
 		"YieldRules":                   yieldRules,
 		"YieldRulesByKeyword":          YieldRulesByKeywords,

@@ -164,37 +164,38 @@ func init() {
 					return nil
 				}
 				t := val.GetType()
-				if b, ok := t.t.(*ssa.BasicType); ok {
-					typeStr := b.GetFullTypeName()
-					if typeStr == "" {
-						typeStr := t.String()
-						results := val.NewValue(ssa.NewConst(typeStr))
-						vals = append(vals, results)
-					} else {
-						results := val.NewValue(ssa.NewConst(typeStr))
-						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-						vals = append(vals, results)
-
+				fts := t.t.GetFullTypeNames()
+				if len(fts) == 0{
+					results := val.NewValue(ssa.NewConst(t.String()))
+					vals = append(vals, results)
+				}else{
+					if len(fts) != 0 {
+						ft := fts[0]
 						// remove version if it exists
-						index := strings.Index(typeStr, ":")
+						index := strings.Index(ft, ":")
 						if index != -1 {
-							typeStr = typeStr[:index]
-							results := val.NewValue(ssa.NewConst(typeStr))
+							ft = ft[:index]
+							results := val.NewValue(ssa.NewConst(ft))
 							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 							vals = append(vals, results)
 						}
 
 						// get type name
-						lastIndex := strings.LastIndex(typeStr, ".")
-						if lastIndex != -1 && len(typeStr) > lastIndex+1 {
-							typeStr = typeStr[lastIndex+1:]
-							results := val.NewValue(ssa.NewConst(typeStr))
+						lastIndex := strings.LastIndex(ft, ".")
+						if lastIndex != -1 && len(ft) > lastIndex+1 {
+							ft = ft[lastIndex+1:]
+							results := val.NewValue(ssa.NewConst(ft))
 							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
 							vals = append(vals, results)
 						}
 					}
-				}
 
+					for _, ft := range fts {
+						results := val.NewValue(ssa.NewConst(ft))
+						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+						vals = append(vals, results)
+					}
+				}
 				return nil
 			})
 			if len(vals) > 0 {
@@ -218,18 +219,18 @@ func init() {
 					return nil
 				}
 				t := val.GetType()
-				if b, ok := t.t.(*ssa.BasicType); ok {
-					typeStr := b.GetFullTypeName()
-					if typeStr == "" {
-						typeStr := t.String()
-						results := val.NewValue(ssa.NewConst(typeStr))
-						vals = append(vals, results)
-					} else {
-						typeStr := b.GetFullTypeName()
-						results := val.NewValue(ssa.NewConst(typeStr))
+				fts := t.t.GetFullTypeNames()
+				if len(fts) == 0{
+					results := val.NewValue(ssa.NewConst(t.String()))
+					vals = append(vals, results)
+				}else{
+					for _,ft := range fts{
+						results := val.NewValue(ssa.NewConst(ft))
+						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 						vals = append(vals, results)
 					}
 				}
+
 				return nil
 			})
 			if len(vals) > 0 {
@@ -241,6 +242,7 @@ func init() {
 
 特殊地，在 Java 中，会尽可能使用全限定类名，例如 com.alibaba.fastjson.JSON, 也会尽可能包含 sca 版本`),
 	)
+
 
 	registerNativeCall(
 		NativeCall_GetFormalParams,

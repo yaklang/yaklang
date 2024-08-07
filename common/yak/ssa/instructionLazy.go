@@ -95,6 +95,13 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error)
 
 func (lz *LazyInstruction) IsLazy() bool { return true }
 
+func (lz *LazyInstruction) IsFromDB() bool{
+	return false
+}
+
+func (lz *LazyInstruction) SetIsFromDB(isFromDB bool) {
+}
+
 func (lz *LazyInstruction) Self() Instruction {
 	if lz.Value == nil {
 		lz.check()

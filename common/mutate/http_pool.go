@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -93,7 +94,7 @@ type httpPoolConfig struct {
 	// withPayloads 是否查询 payloads
 	WithPayloads bool
 
-	Session string // for cookie jar
+	RandomSession bool // for cookie jar
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -502,9 +503,9 @@ func _httpPool_withPayloads(b bool) HttpPoolConfigOption {
 	}
 }
 
-func _httpPool_withSession(session string) HttpPoolConfigOption {
+func _httpPool_withRandomSession(randomSession bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
-		config.Session = session
+		config.RandomSession = randomSession
 	}
 }
 
@@ -756,7 +757,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithConnPool(config.WithConnPool),
-							lowhttp.WithSession(config.Session),
+						}
+						if config.RandomSession {
+							tmpSession := uuid.NewString()
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSession(tmpSession))
 						}
 
 						if config.OverrideEnableSystemProxyEnv {
@@ -1053,5 +1057,5 @@ var (
 	WithConnPool                           = _httpPool_withConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
-	WithPoolOpt_Session                    = _httpPool_withSession
+	WithPoolOpt_RandomSession              = _httpPool_withRandomSession
 )

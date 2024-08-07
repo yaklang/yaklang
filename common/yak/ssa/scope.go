@@ -35,6 +35,19 @@ func (s *ScopeInstance) CreateSubScope() ssautil.ScopedVersionedTableIF[Value] {
 	return scope
 }
 
+func (s *ScopeInstance) CreateShadowScope() ssautil.ScopedVersionedTableIF[Value] {
+	scope := &ScopeInstance{
+		ScopedVersionedTable: s.ScopedVersionedTable.CreateSubScope().(*ssautil.ScopedVersionedTable[Value]),
+		fun:                  s.fun,
+	}
+	scope.SetName()
+	scope.SetThis(scope)
+	s.ForEachCapturedVariable(func(s string, vi ssautil.VersionedIF[Value]) {
+		scope.SetCapturedVariable(s, vi)
+	})
+	return scope
+}
+
 func (s *ScopeInstance) SetName() {
 	if s.fun == nil {
 		return

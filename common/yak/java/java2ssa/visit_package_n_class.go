@@ -86,6 +86,11 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		className := builder.String()
 		class = y.CreateClassBluePrint(className)
 	}
+	// set full type name for class's self
+	if len(y.selfPkgPath)!=0{
+		ftRaw := fmt.Sprintf("%s.%s",strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
+		class  = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
+	} 
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
@@ -142,6 +147,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 			class.AddParentClass(parent)
 		} else {
 			parentBP := y.CreateClassBluePrint(parentClass)
+			y.AddFullTypeNameForAllImport(parentClass, parentBP)
 			class.AddParentClass(parentBP)
 		}
 	}
@@ -237,7 +243,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
 		for _, variableDeclarator := range variableDeclarators {
 			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
-			name, value := y.VisitVariableDeclarator(v, "")
+			name, value := y.VisitVariableDeclarator(v, nil)
 			value.SetType(fieldType)
 			setMember(name, value)
 		}
@@ -304,13 +310,22 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	}
 	// if len(i.AllIdentifier()) == 1 {
 	// 	// only one type
+	var typ ssa.Type
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
-		return class
+		typ = class
+		if len(typ.GetFullTypeNames())== 0 {
+			 typ,_= y.AddFullTypeNameFromMap(className,typ)
+		}
+		return typ
+	}else {
+		typ = ssa.NewClassBluePrint()
+		typ,_ = y.AddFullTypeNameFromMap(className,typ)
+		if len(typ.GetFullTypeNames())== 0 {
+			typ = y.AddFullTypeNameForAllImport(className,typ)
+		}
+		return typ
 	}
-	// }
-
-	return ssa.GetNullType()
 }
 
 func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
@@ -323,16 +338,19 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	if i == nil {
 		return nil
 	}
+	var t ssa.Type
 	switch i.GetText() {
 	case "boolean":
-		return ssa.GetBooleanType()
+		t= ssa.CreateBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		return ssa.GetNumberType()
+		t= ssa.CreateNumberType()
 	case "byte":
-		return ssa.GetBytesType()
+		t=  ssa.CreateByteType()
 	default:
-		return ssa.GetAnyType()
+		t = ssa.CreateAnyType()
 	}
+	t.AddFullTypeName(t.String())
+	return t
 }
 
 func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.ClassBluePrint) interface{} {
@@ -631,7 +649,7 @@ func (y *builder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa
 	if ret := i.TypeType(); ret != nil {
 		return y.VisitTypeType(ret)
 	} else {
-		return ssa.GetAnyType()
+		return ssa.CreateAnyType()
 	}
 
 }
@@ -841,3 +859,4 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	class.Constructor = newFunction
 
 }
+

@@ -38,6 +38,8 @@ type ClassBluePrint struct {
 	_container Value
 
 	ParentClass []*ClassBluePrint
+	//full Type Name
+	fullTypeName []string
 }
 
 func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
@@ -59,8 +61,8 @@ func NewClassBluePrint() *ClassBluePrint {
 
 		Method:       make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
+		fullTypeName: make([]string, 0),
 	}
-
 	return class
 }
 
@@ -104,4 +106,19 @@ func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 }
 func (c *ClassBluePrint) GetMethod() map[string]*Function {
 	return c.Method
+}
+
+func(c *ClassBluePrint)AddFullTypeName(name string){
+	if c== nil {
+		return
+	}
+
+	c.fullTypeName = append(c.fullTypeName, name)
+}
+
+func (c *ClassBluePrint) GetFullTypeNames() []string {
+	if c==nil{
+		return nil
+	}
+	return c.fullTypeName
 }
