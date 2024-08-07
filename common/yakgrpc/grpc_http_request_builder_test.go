@@ -653,6 +653,25 @@ func TestBuild_Http_Request_Packet(t *testing.T) {
 	}
 }
 
+func TestBuild_Http_Request_Packet_Smoking(t *testing.T) {
+	targetInput := "abc:accc"
+	p := &ypb.HTTPRequestBuilderParams{
+		IsHttps:          false,
+		IsRawHTTPRequest: false,
+		Method:           "GET",
+	}
+	packets, err := BuildHttpRequestPacket(consts.GetGormProjectDatabase(), p, targetInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for packet := range packets {
+		spew.Dump(packet)
+		count++
+	}
+	require.Equal(t, 0, count)
+}
+
 func TestGRPCMUSTPASS_DebugPlugin_ServiceScan_RuntimeId(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
