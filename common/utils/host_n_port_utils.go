@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"math/rand"
 	"net"
-	"net/url"
 	"runtime"
 	"sort"
 	"strconv"
@@ -542,17 +541,6 @@ func IsHttpOrHttpsUrl(raw string) bool {
 
 func IsWebsocketUrl(raw string) bool {
 	return strings.HasPrefix(strings.TrimSpace(raw), "ws://") || strings.HasPrefix(strings.TrimSpace(raw), "wss://")
-}
-
-func IsLegalHTTPUrl(raw string) bool {
-	urlIns, err := url.Parse(raw)
-	if urlIns == nil || err != nil {
-		return false
-	}
-	if urlIns.Scheme != "" && urlIns.Scheme != "http" && urlIns.Scheme != "https" {
-		return false
-	}
-	return true
 }
 
 func IsJSON(raw string) (string, bool) {
