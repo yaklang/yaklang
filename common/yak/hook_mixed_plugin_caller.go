@@ -364,32 +364,44 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
 	var (
-		ins *schema.YakScript
-		err error
+		ins  *schema.YakScript
+		err  error
+		code string
 	)
-
-	db := consts.GetGormProfileDatabase()
-	// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
-	if db == nil {
-		return utils.Error("no database conn is set / no code set")
-	}
-	ins, err = yakit.GetYakScriptByName(db, name)
-	if err != nil {
-		return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
-	}
-	if ins.Type == "yak" || ins.Type == "codec" {
-		return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
+	if len(codes) > 0 {
+		code = codes[0]
 	}
 
-	if ins.ForceInteractive {
-		log.Infof("script[%v] is interactive, skip load", name)
-		return nil
+	if code == "" {
+		db := consts.GetGormProfileDatabase()
+		// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
+		if db == nil {
+			return utils.Error("no database conn is set / no code set")
+		}
+		ins, err = yakit.GetYakScriptByName(db, name)
+		if err != nil {
+			return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
+		}
+	} else {
+		ins = &schema.YakScript{
+			ScriptName: name,
+			Content:    code,
+			Type:       "mitm",
+		}
 	}
 
 	return m.LoadPluginEx(ctx, ins, params...)
 }
 
 func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakScript, params ...*ypb.ExecParamItem) error {
+	if script.Type == "yak" || script.Type == "codec" {
+		return utils.Errorf("cannot load yak script[%v] - %v: not supported", script.ScriptName, script.Type)
+	}
+
+	if script.ForceInteractive {
+		log.Infof("script[%v] is interactive, skip load", script.ScriptName)
+		return nil
+	}
 	if m.ctx == nil {
 		m.ctx = context.Background()
 	}
