@@ -2,6 +2,7 @@ package bruteutils
 
 import (
 	"database/sql"
+	"os"
 
 	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/yaklang/yaklang/common/log"
@@ -32,6 +33,10 @@ var oracleAuth = &DefaultServiceAuthInfo{
 		if err != nil {
 			log.Errorf("parse target[%s] failed: %s", i.Target, err)
 			return res
+		}
+
+		if _, ok := os.LookupEnv("USER"); !ok {
+			os.Setenv("USER", "user")
 		}
 
 		for _, service := range oracleServiceNames {
