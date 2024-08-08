@@ -49,7 +49,7 @@ var nativeCallFreeMarker = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame 
 	        }
 	    }
 	    for name,data := range prog.Program.ExtraFile {
-	        if strings.HasSuffix(name,".ftl") {
+	        if strings.HasSuffix(name,suffix) {
 	            if len(data) <= 128 {
 	                editor, _ := ssadb.GetIrSourceFromHash(data)
 	                if editor != nil {
