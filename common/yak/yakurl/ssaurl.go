@@ -230,9 +230,9 @@ func Value2Response(value *ssaapi.Value, url *ypb.YakURL) *ypb.YakURLResource {
 	var buf bytes.Buffer
 	valueGraph.GenerateDOT(&buf)
 
-	id := valueGraph.RootValue[value]
-	nodeInfos := make([]*NodeInfo, 0, len(valueGraph.NodeInfo))
-	for id, nodeValue := range valueGraph.NodeInfo {
+	id := valueGraph.Value2Node[value.GetId()]
+	nodeInfos := make([]*NodeInfo, 0, len(valueGraph.Node2Value))
+	for id, nodeValue := range valueGraph.Node2Value {
 		ni := &NodeInfo{
 			NodeID:    id,
 			IRCode:    nodeValue.String(),
