@@ -328,7 +328,8 @@ func (y *YakToCallerManager) GetCurrentHooks() []*CallerHooks {
 
 func (y *YakToCallerManager) SetForYakit(
 	ctx context.Context,
-	code string, callerIf interface {
+	code string,
+	paramMap map[string]any, callerIf interface {
 		Send(result *ypb.ExecResult) error
 	},
 	hooks ...string,
@@ -337,7 +338,7 @@ func (y *YakToCallerManager) SetForYakit(
 		return callerIf.Send(result)
 	}
 	db := consts.GetGormProjectDatabase()
-	return y.Set(ctx, code, func(engine *antlr4yak.Engine) error {
+	return y.Set(ctx, code, paramMap, func(engine *antlr4yak.Engine) error {
 		engine.OverrideRuntimeGlobalVariables(map[string]any{
 			"yakit_output": FeedbackFactory(db, caller, false, "default"),
 			"yakit_save":   FeedbackFactory(db, caller, true, "default"),
@@ -368,7 +369,7 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithVulFilter(y.getVulFilter()).WithContextCancel(canFunc)
 }
 
-func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
+func (y *YakToCallerManager) Set(ctx context.Context, code string, paramMap map[string]any, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("load caller failed: %v", err)
@@ -377,8 +378,13 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 		}
 	}()
 
+	args := []string{}
+	for key, value := range paramMap {
+		args = append(args, "--"+key, fmt.Sprintf("%s", value))
+	}
+	app := GetHookCliApp(args)
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), nil, code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx).WithCliApp(app), nil, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -560,62 +566,68 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 	y.table.Store(name, callers)
 }
 
-func HookCliArgs(nIns *antlr4yak.Engine, tempArgs []string) *cli.CliApp {
+func GetHookCliApp(tempArg []string) *cli.CliApp {
 	app := cli.NewCliApp()
-	app.SetArgs(tempArgs)
-	nIns.GetVM().SetVars(map[string]any{
-		"cli": cli.GetCliExportMapByCliApp(app),
-	})
+	app.SetArgs(tempArg)
 	return app
-	// nIns.GetVM().RegisterGlobalVariableFallback(h func(string) interface{})
-	// hook := func(f interface{}) interface{} {
-	// 	funcValue := reflect.ValueOf(f)
-	// 	funcType := funcValue.Type()
-	// 	hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-	// 		TempParams := []cli.SetCliExtraParam{cli.SetTempArgs(tempArgs)}
-	// 		index := len(args) - 1 // 获取 option 参数的 index
-	// 		interfaceValue := args[index].Interface()
-	// 		args = args[:index]
-	// 		cliExtraParams, ok := interfaceValue.([]cli.SetCliExtraParam)
-	// 		if ok {
-	// 			TempParams = append(TempParams, cliExtraParams...)
-	// 		}
-	// 		for _, p := range TempParams {
-	// 			args = append(args, reflect.ValueOf(p))
-	// 		}
-	// 		res := funcValue.Call(args)
-	// 		return res
-	// 	})
-	// 	return hookFunc.Interface()
-	// }
-
-	// hookFuncList := []string{
-	// 	"String",
-	// 	"Bool",
-	// 	"Have",
-	// 	"Int",
-	// 	"Integer",
-	// 	"Float",
-	// 	"Double",
-	// 	"YakitPlugin",
-	// 	"Urls",
-	// 	"Url",
-	// 	"Ports",
-	// 	"Port",
-	// 	"Hosts",
-	// 	"Host",
-	// 	"Network",
-	// 	"Net",
-	// 	"File",
-	// 	"FileOrContent",
-	// 	"LineDict",
-	// 	"StringSlice",
-	// 	"FileNames",
-	// }
-	// for _, name := range hookFuncList {
-	// 	nIns.GetVM().RegisterMapMemberCallHandler("cli", name, hook)
-	// }
 }
+
+//func HookCliArgs(nIns *antlr4yak.Engine, tempArgs []string) *cli.CliApp {
+//	app := cli.NewCliApp()
+//	app.SetArgs(tempArgs)
+//	nIns.GetVM().SetVars(map[string]any{
+//		"cli": cli.GetCliExportMapByCliApp(app),
+//	})
+//	return app
+//	// nIns.GetVM().RegisterGlobalVariableFallback(h func(string) interface{})
+//	// hook := func(f interface{}) interface{} {
+//	// 	funcValue := reflect.ValueOf(f)
+//	// 	funcType := funcValue.Type()
+//	// 	hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+//	// 		TempParams := []cli.SetCliExtraParam{cli.SetTempArgs(tempArgs)}
+//	// 		index := len(args) - 1 // 获取 option 参数的 index
+//	// 		interfaceValue := args[index].Interface()
+//	// 		args = args[:index]
+//	// 		cliExtraParams, ok := interfaceValue.([]cli.SetCliExtraParam)
+//	// 		if ok {
+//	// 			TempParams = append(TempParams, cliExtraParams...)
+//	// 		}
+//	// 		for _, p := range TempParams {
+//	// 			args = append(args, reflect.ValueOf(p))
+//	// 		}
+//	// 		res := funcValue.Call(args)
+//	// 		return res
+//	// 	})
+//	// 	return hookFunc.Interface()
+//	// }
+//
+//	// hookFuncList := []string{
+//	// 	"String",
+//	// 	"Bool",
+//	// 	"Have",
+//	// 	"Int",
+//	// 	"Integer",
+//	// 	"Float",
+//	// 	"Double",
+//	// 	"YakitPlugin",
+//	// 	"Urls",
+//	// 	"Url",
+//	// 	"Ports",
+//	// 	"Port",
+//	// 	"Hosts",
+//	// 	"Host",
+//	// 	"Network",
+//	// 	"Net",
+//	// 	"File",
+//	// 	"FileOrContent",
+//	// 	"LineDict",
+//	// 	"StringSlice",
+//	// 	"FileNames",
+//	// }
+//	// for _, name := range hookFuncList {
+//	// 	nIns.GetVM().RegisterMapMemberCallHandler("cli", name, hook)
+//	// }
+//}
 
 func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *YakitPluginContext) {
 	if nIns == nil {
@@ -625,19 +637,29 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	if pluginContext == nil {
 		return
 	}
-	streamContext := context.Background()
-	cliApp := cli.DefaultCliApp
 
 	runtimeId = pluginContext.RuntimeId
 	pluginName = pluginContext.PluginName
 	pluginUUID = pluginContext.PluginUUID
 	proxy = pluginContext.Proxy
+
+	streamContext := context.Background()
 	if pluginContext.Ctx != nil {
 		streamContext = pluginContext.Ctx
 	}
+
+	cancel := pluginContext.Cancel
+	if cancel == nil {
+		streamContext, cancel = context.WithCancel(streamContext)
+	}
+
+	cliApp := cli.DefaultCliApp
 	if pluginContext.CliApp != nil {
 		cliApp = pluginContext.CliApp
 	}
+	cliApp.SetCliCheckCallback(func() {
+		panic("cli check fail")
+	})
 
 	for _, mod := range []string{"db", "yakit"} {
 		nIns.GetVM().RegisterMapMemberCallHandler(mod, "SavePortFromResult", func(i interface{}) interface{} {
@@ -931,10 +953,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	// context hook
 
 	// new context
-	cancel := pluginContext.Cancel
-	if cancel == nil {
-		streamContext, cancel = context.WithCancel(streamContext)
-	}
 	nIns.GetVM().RegisterMapMemberCallHandler("context", "Seconds", func(f interface{}) interface{} {
 		funcValue := reflect.ValueOf(f)
 		funcType := funcValue.Type()
@@ -1094,11 +1112,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 	})
 
-	// hook cli os.exit
-	nIns.GetVM().RegisterMapMemberCallHandler("cli", "check", func(f interface{}) interface{} {
-		return cliApp.CliCheckFactory(func() {
-			cancel()
-		})
+	// cli hook
+	nIns.GetVM().SetVars(map[string]any{
+		"cli": cli.GetCliExportMapByCliApp(cliApp),
 	})
 
 	// hook webservice runtime id
@@ -1200,14 +1216,11 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 	for key, value := range paramMap {
 		args = append(args, "--"+key, fmt.Sprintf("%s", value))
 	}
-	app := cli.NewCliApp()
-	app.SetArgs(args)
-	pluginContext := y.getYakitPluginContext(ctx).WithCliApp(app)
-	cTable, err := FetchFunctionFromSourceCode(y, pluginContext, script, code, func(e *antlr4yak.Engine) error {
+	app := GetHookCliApp(args)
+	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx).WithCliApp(app), script, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
-		HookCliArgs(e, args)
 		e.SetVars(map[string]any{
 			"MITM_PARAMS": paramMap,
 			"MITM_PLUGIN": id,

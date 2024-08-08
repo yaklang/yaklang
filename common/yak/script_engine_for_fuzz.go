@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"reflect"
 	"regexp"
 	"strings"
@@ -21,31 +22,50 @@ import (
 
 var _codeMutateRegexp = regexp.MustCompile(`(?s){{yak\d*(\(.*\))}}`)
 
-func MutateHookCaller(raw string, caller YakitCallerIf) (func(https bool, originReq []byte, req []byte) []byte, func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
+func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, params ...*ypb.ExecParamItem) (func(https bool, originReq []byte, req []byte) []byte, func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
 	// 发送数据包之前的 hook
-	entry := NewScriptEngine(2)
-	entry.HookOsExit()
+	scriptEngine := NewScriptEngine(2)
 	var engine *antlr4yak.Engine
 	var err error
-	engine, err = entry.ExecuteEx(raw, make(map[string]interface{}))
+
+	yakitContext := CreateYakitPluginContext("").WithContext(ctx)
+	if caller != nil {
+		client := yaklib.NewVirtualYakitClient(caller)
+		db := consts.GetGormProjectDatabase()
+		scriptEngine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+			engine.OverrideRuntimeGlobalVariables(map[string]any{
+				"yakit_output": FeedbackFactory(db, caller, false, "default"),
+				"yakit_save":   FeedbackFactory(db, caller, true, "default"),
+				"yakit_status": func(id string, i interface{}) {
+					FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
+						Id: id, Data: fmt.Sprint(i),
+					})
+				},
+				"yakit": yaklib.GetExtYakitLibByClient(client),
+			})
+			return nil
+		})
+		yakitContext = yakitContext.WithYakitClient(client)
+	}
+
+	if len(params) > 0 {
+		args := []string{}
+		for _, param := range params {
+			args = append(args, "--"+param.GetKey(), fmt.Sprintf("%s", param.GetValue()))
+		}
+		app := GetHookCliApp(args)
+		yakitContext.WithCliApp(app)
+	}
+
+	scriptEngine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		BindYakitPluginContextToEngine(engine, yakitContext)
+		return nil
+	})
+
+	engine, err = scriptEngine.ExecuteEx(raw, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("eval hookCode failed: %s", err)
 		return nil, nil, nil
-	}
-
-	if caller != nil { // hook yakit lib.
-		client := yaklib.NewVirtualYakitClient(caller)
-		db := consts.GetGormProjectDatabase()
-		engine.OverrideRuntimeGlobalVariables(map[string]any{
-			"yakit_output": FeedbackFactory(db, caller, false, "default"),
-			"yakit_save":   FeedbackFactory(db, caller, true, "default"),
-			"yakit_status": func(id string, i interface{}) {
-				FeedbackFactory(db, caller, false, id)(&yaklib.YakitStatusCard{
-					Id: id, Data: fmt.Sprint(i),
-				})
-			},
-			"yakit": yaklib.GetExtYakitLibByClient(client),
-		})
 	}
 
 	before, beforeRequestOk := engine.GetVar("beforeRequest")
