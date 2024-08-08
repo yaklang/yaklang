@@ -343,10 +343,15 @@ func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
 	}
 }
 
-func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, code string) error {
+func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, params []*ypb.ExecParamItem, code string) error {
 	c.ResetFilter()
 	c.FeedbackOrdinary("Initializing HotPatched MITM HOOKS")
-	err := c.callers.SetForYakit(ctx, code, YakitCallerIf(c.feedbackHandler), MITMAndPortScanHooks...)
+	paramsMap := make(map[string]any)
+	for _, param := range params {
+		paramsMap[param.GetKey()] = param.GetValue()
+	}
+
+	err := c.callers.SetForYakit(ctx, code, paramsMap, YakitCallerIf(c.feedbackHandler), MITMAndPortScanHooks...)
 	if err != nil {
 		c.FeedbackOrdinary(fmt.Sprintf("Initialized HotPatched MITM HOOKS FAILED: %v", err.Error()))
 		return err
