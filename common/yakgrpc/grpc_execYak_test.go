@@ -71,7 +71,7 @@ func TestMitmInvokeAi(t *testing.T) {
 		return nil
 	})
 	addr := fmt.Sprintf("%s:%d", "127.0.0.1", port)
-	caller.LoadHotPatch(context.Background(), `
+	caller.LoadHotPatch(context.Background(), []*ypb.ExecParamItem{}, `
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
  	res = ai.Chat("你好",ai.domain("`+addr+`"),ai.type("chatglm"))~
 yakit_output(res)
