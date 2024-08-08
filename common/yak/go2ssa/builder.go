@@ -2,11 +2,14 @@ package go2ssa
 
 import (
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
@@ -15,9 +18,53 @@ import (
 
 type SSABuilder struct {
 	ssa.DummyExtraFileAnalyzer
+	goRoot string
 }
 
 var Builder = &SSABuilder{}
+
+func (*SSABuilder) EnableExtraFileAnalyzer() bool {
+	return true
+}
+
+func (s *SSABuilder) ProgramHandler(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+	prog := functionBuilder.GetProgram()
+	if prog == nil {
+		log.Errorf("program is nil")
+		return nil
+	}
+	if prog.ExtraFile == nil {
+		prog.ExtraFile = make(map[string]string)
+	}
+
+	dirname, filename := fileSystem.PathSplit(path)
+	_ = dirname
+	_ = filename
+
+	// go.mod
+	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "go.mod" {
+		raw, err := fileSystem.ReadFile(path)
+		if err != nil {
+			log.Warnf("read go.mod error: %v", err)
+			return nil
+		}
+		text := string(raw)
+		pattern := `module(.*?)\n` 
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			log.Warnf("compile regexp error: %v", err)
+			return nil
+		}
+		matches := re.FindAllString(text, -1)
+		matche := strings.Split(matches[0], " ")
+		if len(matches) > 0 {
+			path := matche[1]
+			prog.ExtraFile["go.mod"] = path[:len(path)-1]
+		}
+	}
+
+	return nil
+}
 
 func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)

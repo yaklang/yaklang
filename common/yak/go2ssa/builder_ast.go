@@ -19,8 +19,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 	if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 		pkgPath := b.buildPackage(packag)
-		pkgNameCurrent = pkgPath[0]
-		if pkgNameCurrent != "main" {
+		if b.GetProgram().ExtraFile["go.mod"] != "" {
+			pkgNameCurrent = b.GetProgram().ExtraFile["go.mod"] + "/" + pkgPath[0]
+		}else{
+			pkgNameCurrent = pkgPath[0]
+		}
+		if pkgPath[0] != "main" {
 			prog := b.GetProgram()
 			lib, skip := prog.GetLibrary(pkgNameCurrent)
 			if skip {
@@ -47,7 +51,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		namel,pkgNamel := b.buildImportDecl(impo.(*gol.ImportDeclContext))
 		for i := range pkgNamel {
 			pkgName := strings.Split(pkgNamel[i], "/")
-			if lib, _ := b.GetProgram().GetLibrary(pkgName[len(pkgName)-1]); lib != nil {
+			if lib, _ := b.GetProgram().GetLibrary(pkgNamel[i]); lib != nil {
 				objt := ssa.NewObjectType()
 				objt.SetTypeKind(ssa.StructTypeKind)
 				if namel[i] != ""{
@@ -488,6 +492,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 	handleFunctionType := func(fun *ssa.Function) {
 		fun.ParamLength = len(fun.Params)
 		fun.SetType(ssa.NewFunctionType("", params, result, false))
+		fun.Type.IsMethod = false
 		if MarkedFunctionType == nil {
 			return
 		}
@@ -563,6 +568,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 	handleFunctionType := func(fun *ssa.Function) {
 		fun.ParamLength = len(fun.Params)
 		fun.SetType(ssa.NewFunctionType("", params, result, false))
+		fun.Type.IsMethod = true
 		if MarkedFunctionType == nil {
 			return
 		}

@@ -52,23 +52,19 @@ func TestImport(t *testing.T) {
 
 func TestImport_alias(t *testing.T) {
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go2/go.mod", `
+	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go2/A/test.go", `
+	vf.AddFile("src/main/go/A/test.go", `
 	package A
 
-	type A1 struct {
-	    a int
-	}
-
-	func (a *A1) get() int {
-	    return a.a
+	func add(a,b int) int {
+	    return a + b
 	}
 	`)
-	vf.AddFile("src/main/go2/B/test.go", `
+	vf.AddFile("src/main/go/B/test.go", `
 	package B
 
 	import alias "github.com/yaklang/yaklang/A"
@@ -78,15 +74,14 @@ func TestImport_alias(t *testing.T) {
 	}
 
 	func test() {
-	    a := &alias.A1{a: 1}
-	    println(a.get())
+	    println(alias.add(1,2))
 	}
 	`)
 
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1"},
+		"a": {"1","2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
@@ -129,8 +124,8 @@ func TestImport_muti(t *testing.T) {
 	}
 
 	func test() {
-	    a := &A.A1{a: 2}
-	    println(B.add(1,a.get()))
+	    a := &A.A1{a: 1}
+	    println(B.add(2,a.get()))
 	}
 	`)
 
