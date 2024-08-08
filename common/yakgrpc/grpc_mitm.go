@@ -530,10 +530,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					ctx := stream.Context()
 					err = mitmPluginCaller.LoadPluginEx(ctx, script, reqInstance.GetYakScriptParams()...)
 					if err != nil {
-						_ = stream.Send(&ypb.MITMResponse{
-							HaveNotification:    true,
-							NotificationContent: []byte(fmt.Sprintf("加载失败[%v]：%v", script.ScriptName, err)),
-						})
+						//_ = stream.Send(&ypb.MITMResponse{
+						//	HaveNotification:    true,
+						//	NotificationContent: []byte(fmt.Sprintf("加载失败[%v]：%v", script.ScriptName, err)),
+						//})
+
+						if len(script.GetParams()) > 0 {
+							yakit.BroadcastData(yakit.ServerPushType_Error, fmt.Sprintf("加载失败[%v]：%v", script.ScriptName, err))
+						}
 						log.Error(err)
 					}
 					_ = stream.Send(&ypb.MITMResponse{
@@ -545,14 +549,24 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				if script == nil && reqInstance.GetYakScriptContent() != "" {
 					hotPatchScript := reqInstance.GetYakScriptContent()
-					beforeRequest, afterRequest, _ = yak.MutateHookCaller(hotPatchScript, feedbacker)
+					beforeRequest, afterRequest, _ = yak.MutateHookCaller(stream.Context(), hotPatchScript, feedbacker, reqInstance.GetYakScriptParams()...)
 
 					log.Info("start to load yakScriptContent content")
-					err = mitmPluginCaller.LoadHotPatch(stream.Context(), hotPatchScript)
+					err := mitmPluginCaller.LoadHotPatch(stream.Context(), reqInstance.GetYakScriptParams(), hotPatchScript)
 					_ = stream.Send(&ypb.MITMResponse{
 						GetCurrentHook: true,
 						Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 					})
+
+					if strings.Contains(err.Error(), "YakVM Panic:") {
+						splitErr := strings.SplitN(err.Error(), "YakVM Panic:", 2)
+						err = utils.Error(splitErr[1])
+					}
+
+					if err != nil {
+						yakit.BroadcastData(yakit.ServerPushType_Error, fmt.Sprintf("mitm load hotpatch script error:%v", err))
+					}
+
 					continue
 				}
 				continue

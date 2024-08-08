@@ -30,6 +30,14 @@ var (
 
 	signalWithTypeMutex   = new(sync.Mutex)
 	signalTypeCallerTable = make(map[string]func(func()))
+
+	ServerPushType_Global       = "global"
+	ServerPushType_HttpFlow     = "httpflow"
+	ServerPushType_YakScript    = "yakscript"
+	ServerPushType_Risk         = "risk"
+	ServerPushType_File_Monitor = "file_monitor"
+	ServerPushType_Error        = "error"
+	ServerPushType_Warning      = "warning"
 )
 
 func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer) {
