@@ -25,10 +25,16 @@ type CliApp struct {
 	args        []string
 	helpParam   *cliExtraParams
 	extraParams []*cliExtraParams
+
+	cliCheckCallback func()
 }
 
 func (c *CliApp) SetArgs(args []string) {
 	c.args = args
+}
+
+func (c *CliApp) SetCliCheckCallback(f func()) {
+	c.cliCheckCallback = f
 }
 
 func NewCliApp() *CliApp {
@@ -42,9 +48,10 @@ func NewCliApp() *CliApp {
 		_type:        "bool",
 	}
 	app := &CliApp{
-		paramInvalid: utils.NewBool(false),
-		helpParam:    helpParam,
-		extraParams:  []*cliExtraParams{helpParam},
+		paramInvalid:     utils.NewBool(false),
+		helpParam:        helpParam,
+		extraParams:      []*cliExtraParams{helpParam},
+		cliCheckCallback: DefaultExitFunc,
 	}
 	helpParam.cliApp = app
 	return app
@@ -231,7 +238,7 @@ func (c *CliApp) CliCheckFactory(callback func()) func() {
 // cli.check()
 // ```
 func (c *CliApp) Check() {
-	c.CliCheckFactory(DefaultExitFunc)()
+	c.CliCheckFactory(c.cliCheckCallback)()
 }
 
 // SetCliName 设置此命令行程序的名称

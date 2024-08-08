@@ -465,7 +465,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					SubMatchers:         httpTplMatcher,
 				}
 
-				_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode(), nil)
+				_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
 				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
 					respModel, err := resp.ToGRPCModel()
@@ -731,7 +731,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			// mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
 			mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
 			mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
-			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode(), nil)),
+			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)),
 			mutate.WithPoolOpt_Source("webfuzzer"),
 			mutate.WithPoolOpt_RetryTimes(int(req.GetMaxRetryTimes())),
 			mutate.WithPoolOpt_MaxContentLength(maxBodySize),
