@@ -48,7 +48,6 @@ var nativeCallFreeMarker = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame 
 	            }
 	        }
 	    }
-	    _=suffix
 	    for name,data := range prog.Program.ExtraFile {
 	        if strings.HasSuffix(name,".ftl") {
 	            if len(data) <= 128 {
