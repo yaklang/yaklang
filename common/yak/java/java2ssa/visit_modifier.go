@@ -14,6 +14,8 @@ func (y *builder) VisitModifiers(raw javaparser.IModifiersContext) (instanceCall
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ModifiersContext)
 	if i == nil {
 		return
@@ -53,6 +55,8 @@ type AnnotationDescription struct {
 func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (instanceCallback func(ssa.Value), defCallback func(ssa.Value)) {
 	start := time.Now()
 	defer deltaAnnotationCostFrom(start)
+	recoverRange := y.SetRange(annotationContext)
+	defer recoverRange()
 
 	instanceCallback = func(ssa.Value) {}
 	defCallback = func(ssa.Value) {}
