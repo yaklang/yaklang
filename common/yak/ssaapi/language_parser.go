@@ -78,9 +78,16 @@ func (c *config) parseProject() (Programs, error) {
 
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
+		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
+			_, name := c.fs.PathSplit(s)
+			if name == "test" || name == ".git" {
+				return filesys.SkipDir
+			}
+			return nil
+		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
-			if language := c.LanguageBuilder; language != nil && language.EnableExtraFileAnalyzer() {
-				language.ProgramHandler(c.fs, builder, path)
+			if language := c.LanguageBuilder; language != nil {
+				language.PreHandler(c.fs, builder, path)
 			}
 			// check
 			if err := c.checkLanguage(path); err == nil {

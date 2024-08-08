@@ -6,8 +6,7 @@ import (
 )
 
 type ExtraFileAnalyzer interface {
-	EnableExtraFileAnalyzer() bool
-	ProgramHandler(fi.FileSystem, *FunctionBuilder, string) error
+	PreHandler(fi.FileSystem, *FunctionBuilder, string) error
 }
 
 type Builder interface {
@@ -21,10 +20,6 @@ var _ ExtraFileAnalyzer = &DummyExtraFileAnalyzer{}
 
 type DummyExtraFileAnalyzer struct{}
 
-func (d *DummyExtraFileAnalyzer) EnableExtraFileAnalyzer() bool {
-	return false
-}
-
-func (d *DummyExtraFileAnalyzer) ProgramHandler(fi.FileSystem, *FunctionBuilder, string) error {
+func (d *DummyExtraFileAnalyzer) PreHandler(fi.FileSystem, *FunctionBuilder, string) error {
 	return nil
 }

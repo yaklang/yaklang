@@ -2,6 +2,9 @@ package php2ssa
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,17 +15,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"os"
-	"path/filepath"
 )
 
 type SSABuild struct{}
 
-func (b *SSABuild) EnableExtraFileAnalyzer() bool {
-	return true
-}
-
-func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+func (b *SSABuild) PreHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
