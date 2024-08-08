@@ -16,7 +16,7 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	yakit.RegisterServerPushCallback(id, stream)
 	defer yakit.UnRegisterServerPushCallback(id)
 
-	yakit.BroadcastData("global", map[string]any{
+	yakit.BroadcastData(yakit.ServerPushType_Global, map[string]any{
 		"config": map[string]any{
 			"enableServerPush": true,
 		},
@@ -42,7 +42,7 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 
 					httpFlowsSeq, changed = WatchDatabaseTableMeta(nil, httpFlowsSeq, stream.Context(), "http_flows")
 					if changed {
-						yakit.BroadcastData("httpflow", "create")
+						yakit.BroadcastData(yakit.ServerPushType_HttpFlow, "create")
 					}
 					time.Sleep(time.Second)
 				}
