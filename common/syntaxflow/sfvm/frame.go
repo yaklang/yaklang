@@ -982,19 +982,20 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		}
 		s.debugLog(">> pop")
-
-		value := s.stack.Pop()
-		if value == nil {
-			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
-		}
 		m1 := make(map[int64]ValueOperator)
-		_ = value.Recursive(func(operator ValueOperator) error {
+		_ = vs.Recursive(func(operator ValueOperator) error {
 			id, ok := fetchId(operator)
 			if ok {
 				m1[id] = operator
 			}
 			return nil
 		})
+		// s.debugSubLog("map: %v", lo.Keys(m1))
+
+		value := s.stack.Pop()
+		if value == nil {
+			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
 
 		var buf bytes.Buffer
 		var vals []ValueOperator
