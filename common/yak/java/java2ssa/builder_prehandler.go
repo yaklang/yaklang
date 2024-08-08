@@ -46,23 +46,22 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".xml":
-		raw, err := fileSystem.ReadFile(path)
+	case ".java",".jpg",".png",".gif",".jpeg",".css",".js",".avi",".mp4",".mp3",".pdf",".doc":
+		return nil
+	default:
+		fs, err := fileSystem.Open(path)
 		if err != nil {
-			log.Warnf("read file %s error: %v", path, err)
+			log.Warnf("open file %s error: %v", path, err)
 			return nil
 		}
-		// log.Infof("scan xml file: %v", path)
-		if prog.GetProgramName() == "" {
-			prog.ExtraFile[path] = string(raw)
-		} else {
-			folders := []string{prog.GetProgramName()}
-			folders = append(folders,
-				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-			)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
+		info,err := fs.Stat()
+		if err != nil {
+			return nil
 		}
-	case ".properties":
+		if info.Size() > 10*1024*1024 {
+			log.Warnf("too large file: %s, skip it.", path)
+		}
+
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			log.Warnf("read file %s error: %v", path, err)
@@ -78,21 +77,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			)
 			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
 		}
-	case  ".ftl":
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read file %s error: %v", path, err)
-			return nil
-		}
-		if prog.GetProgramName() == "" {
-			prog.ExtraFile[path] = string(raw)
-		} else {
-			folders := []string{prog.GetProgramName()}
-			folders = append(folders,
-				strings.Split(dirname, string(fileSystem.GetSeparators()))...,
-			)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
-		}
+		
 	}
 	return nil
 }
