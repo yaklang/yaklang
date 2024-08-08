@@ -466,9 +466,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						script := script
 						go func() {
 							defer swg.Done()
-							err := mitmPluginCaller.LoadPluginByName(
+							err := mitmPluginCaller.LoadPluginEx(
 								ctx,
-								script.ScriptName, reqInstance.GetYakScriptParams(), script.Content,
+								script, reqInstance.GetYakScriptParams()...,
 							)
 							if err != nil {
 								failedScriptNameChan <- script.ScriptName
@@ -528,7 +528,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
 					// appendCallers(script.Content, script.ScriptName, reqInstance.YakScriptParams)
 					ctx := stream.Context()
-					err = mitmPluginCaller.LoadPluginByName(ctx, script.ScriptName, reqInstance.YakScriptParams, script.Content)
+					err = mitmPluginCaller.LoadPluginEx(ctx, script, reqInstance.GetYakScriptParams()...)
 					if err != nil {
 						_ = stream.Send(&ypb.MITMResponse{
 							HaveNotification:    true,
