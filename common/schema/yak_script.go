@@ -129,6 +129,21 @@ func (s *YakScript) AfterDelete(tx *gorm.DB) (err error) {
 	return nil
 }
 
+func (s *YakScript) GetParams() []*ypb.YakScriptParam {
+	var paras []*ypb.YakScriptParam
+	params, err := strconv.Unquote(s.Params)
+	if err != nil {
+		log.Errorf("unquote params string error: %s", err)
+		return nil
+	}
+	err = json.Unmarshal([]byte(params), &paras)
+	if err != nil {
+		log.Errorf("Unmarshal params string error: %s", err)
+		return nil
+	}
+	return paras
+}
+
 func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 	var params []*ypb.YakScriptParam
 	if s.Params != "" && s.Params != `""` {
