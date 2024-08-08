@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -652,29 +653,6 @@ func showValues(name string, vs ssaapi.Values, showDot bool) {
 }
 func show(r ssaapi.Values) {
 	for _, v := range r {
-		codeRange := v.GetRange()
-		if codeRange == nil {
-			log.Infof("IR: %d: %s", v.GetId(), v.String())
-			log.Errorf("IR: %d, code range not found\n", v.GetId())
-			continue
-		}
-		editor := codeRange.GetEditor()
-		ctxText, _ := editor.GetContextAroundRange(
-			codeRange.GetStart(),
-			codeRange.GetStart(),
-			// codeRange.GetEnd(),
-			3,
-			func(i int) string {
-				if i == codeRange.GetStart().GetLine() {
-					return fmt.Sprintf(">>%5s| ", fmt.Sprint(i))
-				}
-				return fmt.Sprintf("%7s| ", fmt.Sprint(i))
-			},
-		)
-		log.Infof("%s:%s \nIR: %d: %s\n%s\n",
-			editor.GetFilename(), codeRange.String(),
-			v.GetId(), v.String(),
-			ctxText,
-		)
+		v.ShowWithSourceCode()
 	}
 }
