@@ -12,58 +12,90 @@ import (
 type ValueGraph struct {
 	*dot.Graph
 
-	RootValue map[*Value]int // root value to graph node id
-	NodeInfo  map[int]*Value // graph node id to value
+	// one ssa.value can be create many ssaapi.Value,
+	// so we use SSA-ID(int64) to graph node-id
+	Value2Node map[int64]int
+
+	// many ssaapi.value can contain different context, even this is same ssa.value
+	// use this map contain node-id to marshaled ssaapi.value
+	// in same node-id, that mean this ssaapi.value is same ssa.value
+	// ! this field just use in graph build
+	marshaledValue map[int]map[*Value]struct{} // node-id ->  ssaapi.value
+
+	// graph node id to value, this value just use bare ssa.value
+	Node2Value map[int]*Value
 }
 
 func NewValueGraph(v ...*Value) *ValueGraph {
 	graph := dot.New()
 	graph.MakeDirected()
 	graph.GraphAttribute("rankdir", "BT")
-	vg := &ValueGraph{
-		Graph:     graph,
-		RootValue: make(map[*Value]int),
-		NodeInfo:  make(map[int]*Value),
+	g := &ValueGraph{
+		Graph:          graph,
+		Value2Node:     make(map[int64]int),
+		marshaledValue: make(map[int]map[*Value]struct{}),
+		Node2Value:     make(map[int]*Value),
 	}
 	for _, value := range v {
-		n := graph.AddNode(value.GetVerboseName())
-		vg.RootValue[value] = n
-		vg._marshal(n, value)
+		// log.Infof("start graph %v", value.GetVerboseName())
+		g.CreateNode(value)
 	}
-	return vg
+	g.marshaledValue = nil
+	return g
 }
 
-func (g *ValueGraph) _marshal(self int, t *Value) {
-	g.NodeInfo[self] = t
+func (g *ValueGraph) CreateNode(value *Value) int {
+	// get node id, if existed, no need to create
+	id, ok := g.Value2Node[value.GetId()]
+	if !ok {
+		// value.getVerboseName can be same in some different value,
+		// so if value not exist, just create, don't use `GetOrCreateNode`
+		id = g.AddNode(value.GetVerboseName())
+		g.Value2Node[value.GetId()] = id
+	}
 
-	if len(t.DependOn) == 0 && len(t.EffectOn) == 0 && len(t.Predecessors) == 0 {
+	// marshal
+	// add node2Value, just use bare ssa.value
+	if _, ok := g.Node2Value[id]; !ok {
+		g.Node2Value[id] = value.NewValue(value.node)
+	}
+
+	if marshaledValue, ok := g.marshaledValue[id]; ok {
+		// if this node-id not contain this ssaapi.value, marshal
+		if _, ok := marshaledValue[value]; !ok {
+			g._marshal(id, value)
+		}
+	} else {
+		// if this node-id not exist, make and marshal
+		g.marshaledValue[id] = make(map[*Value]struct{})
+		g._marshal(id, value)
+	}
+	return id
+}
+
+func (g *ValueGraph) _marshal(selfID int, value *Value) {
+	g.marshaledValue[selfID][value] = struct{}{}
+
+	if len(value.DependOn) == 0 && len(value.EffectOn) == 0 && len(value.Predecessors) == 0 {
 		return
 	}
 
-	createNode := func(node *Value) int {
-		id := g.GetOrCreateNode(node.GetVerboseName())
-		if _, ok := g.NodeInfo[id]; !ok {
-			g._marshal(id, node)
-		}
-		return id
+	for _, node := range value.DependOn {
+		id := g.CreateNode(node)
+		g.AddEdge(selfID, id, "")
+	}
+	for _, node := range value.EffectOn {
+		id := g.CreateNode(node)
+		g.AddEdge(id, selfID, "")
 	}
 
-	for _, node := range t.DependOn {
-		id := createNode(node)
-		g.AddEdge(self, id, "")
-	}
-	for _, node := range t.EffectOn {
-		id := createNode(node)
-		g.AddEdge(id, self, "")
-	}
-
-	for _, predecessor := range t.Predecessors {
+	for _, predecessor := range value.Predecessors {
 		if predecessor.Node == nil {
 			continue
 		}
 
-		predecessorNodeID := createNode(predecessor.Node)
-		edges := g.GetEdges(predecessorNodeID, self)
+		predecessorNodeID := g.CreateNode(predecessor.Node)
+		edges := g.GetEdges(predecessorNodeID, selfID)
 
 		edgeLabel := predecessor.Info.Label
 		if predecessor.Info.Step > 0 {
@@ -78,7 +110,7 @@ func (g *ValueGraph) _marshal(self int, t *Value) {
 				g.EdgeAttribute(edge, "label", edgeLabel)
 			}
 		} else {
-			edgeId := g.AddEdge(predecessorNodeID, self, edgeLabel)
+			edgeId := g.AddEdge(predecessorNodeID, selfID, edgeLabel)
 			g.EdgeAttribute(edgeId, "color", "red")
 			g.EdgeAttribute(edgeId, "fontcolor", "red")
 			g.EdgeAttribute(edgeId, "penwidth", "3.0")
