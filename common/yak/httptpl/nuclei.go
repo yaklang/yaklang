@@ -2,18 +2,15 @@ package httptpl
 
 import (
 	"bufio"
-	"fmt"
-	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -131,109 +128,107 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		return randStrVarGenerator(raw)
 	})
 
-	//if strings.Contains(tplRaw, "{{") {
-	//	tplRaw = ExpandPreprocessor(tplRaw)
-	//}
 	yakTemp := &YakTemplate{}
 	for _, v := range []string{`{{interactsh-url}}`, `{{interactsh}}`, `{{interactsh_url}}`} {
 		if strings.Contains(tplRaw, v) {
 			yakTemp.ReverseConnectionNeed = true
 		}
 	}
-	mid := map[string]interface{}{}
-	err := yaml.Unmarshal([]byte(tplRaw), &mid)
+	rootNode := &yaml.Node{}
+	err := yaml.Unmarshal([]byte(tplRaw), rootNode)
 	if err != nil {
 		return nil, utils.Errorf("unmarshal nuclei template failed: %v", err)
 	}
-	yakTemp.Id = utils.MapGetString(mid, "id")
-	info := utils.InterfaceToMapInterface(utils.MapGetRaw(mid, "info"))
+	yakTemp.Id = nodeGetString(rootNode, "id")
+	info := nodeGetRaw(rootNode, "info")
 
-	yakTemp.SelfContained = utils.MapGetBool(mid, "self-contained")
-	cveInfo := utils.InterfaceToMapInterface(utils.MapGetRaw(info, "classification"))
-	yakTemp.Name = utils.MapGetString(info, "name")
-	yakTemp.Author = utils.MapGetString(info, "author")
-	yakTemp.Severity = utils.MapGetString(info, "severity")
-	yakTemp.Description = utils.MapGetString(info, "description")
-	yakTemp.Reference = utils.InterfaceToStringSlice(utils.MapGetRaw(info, "reference"))
-	yakTemp.Tags = utils.PrettifyListFromStringSplitEx(utils.MapGetString(info, "tags"), ",")
-	yakitInfo := utils.InterfaceToMapInterface(utils.MapGetRaw(info, "yakit-info"))
+	yakTemp.SelfContained = nodeGetBool(rootNode, "self-contained")
+	cveInfo := nodeGetRaw(info, "classification")
+	yakTemp.Name = nodeGetString(info, "name")
+	yakTemp.Author = nodeGetString(info, "author")
+	yakTemp.Severity = nodeGetString(info, "severity")
+	yakTemp.Description = nodeGetString(info, "description")
+	yakTemp.Reference = nodeGetStringSlice(info, "reference")
+	yakTemp.Tags = utils.PrettifyListFromStringSplitEx(nodeGetString(info, "tags"), ",")
+	yakitInfo := nodeGetRaw(info, "yakit-info")
 	if yakitInfo != nil {
-		yakTemp.Sign = utils.MapGetString(yakitInfo, "sign")
+		yakTemp.Sign = nodeGetString(yakitInfo, "sign")
 	}
-	yakTemp.CVE = utils.MapGetString(cveInfo, "cve-id")
+	yakTemp.CVE = nodeGetString(cveInfo, "cve-id")
 
-	yakTemp.Variables = generateYakVariables(mid)
+	yakTemp.Variables = generateYakVariables(rootNode)
 
-	reqs := utils.MapGetFirstRaw(mid, "requests", "http")
-	if reqs == nil || (reqs != nil && reflect.TypeOf(reqs).Kind() != reflect.Slice) {
-		if ret := utils.MapGetFirstRaw(mid, "network", "tcp"); ret != nil {
-			if reflect.TypeOf(ret).Kind() != reflect.Slice {
-				return nil, utils.Error("nuclei template `network` is not slice")
+	reqs := nodeGetFirstRaw(rootNode, "requests", "http")
+	if reqs == nil || reqs.Kind != yaml.SequenceNode {
+		if networkNode := nodeGetFirstRaw(rootNode, "network", "tcp"); networkNode != nil {
+			if networkNode.Kind != yaml.SequenceNode {
+				return nil, utils.Error("nuclei template network is not slice")
 			}
 			// network means tcp packets...
-			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret), yakTemp.ReverseConnectionNeed)
+			yakTemp.TCPRequestSequences, err = parseNetworkBulk(networkNode.Content, yakTemp.ReverseConnectionNeed)
 			if err != nil {
 				return nil, utils.Errorf("parse network bulk failed: %v", err)
 			}
 
 			return yakTemp, nil
-		} else if utils.MapGetFirstRaw(mid, "workflows") != nil {
+		} else if nodeGetFirstRaw(rootNode, "workflows") != nil {
 			return nil, utils.Error("yakit nuclei cannot support workflows now~")
-		} else if utils.MapGetFirstRaw(mid, "headless") != nil {
+		} else if nodeGetFirstRaw(rootNode, "headless") != nil {
 			return nil, utils.Errorf("nuclei template `headless(crawler)` is not supported (*)")
 		} else {
-			log.Warnf("-----------------NUCLEI FORMATTER CANNOT FIX--------------------")
-			fmt.Println(tplRaw)
-			return nil, utils.Errorf("nuclei template requests is not slice")
+			// log.Warnf("-----------------NUCLEI FORMATTER CANNOT FIX--------------------")
+			// fmt.Println(tplRaw)
+			return nil, utils.Errorf("nuclei template unsupported: %s[%s]", yakTemp.Id, yakTemp.Name)
 		}
 	}
 
 	// parse req seqs
 	var reqSeq []*YakRequestBulkConfig
 	hasMatcherOrExtractor := false
-	extractConfig := func(config *RequestConfig, data map[string]interface{}) {
-		config.IsHTTPS = utils.MapGetBool(data, "is-https")
-		config.IsGmTLS = utils.MapGetBool(data, "is-gmtls")
-		config.Host = utils.MapGetString(data, "host")
-		config.Proxy = utils.MapGetString(data, "proxy")
-		config.NoSystemProxy = utils.MapGetBool(data, "no-system-proxy")
-		config.ForceFuzz = utils.MapGetBool(data, "force-fuzz")
-		config.RequestTimeout = utils.MapGetFloat64(data, "request-timeout")
-		config.RepeatTimes = utils.MapGetInt64(data, "repeat-times")
-		config.Concurrent = utils.MapGetInt64(data, "concurrent")
-		config.DelayMinSeconds = utils.MapGetFloat64(data, "delay-min-seconds")
-		config.DelayMaxSeconds = utils.MapGetFloat64(data, "delay-max-seconds")
-		config.MaxRetryTimes = utils.MapGetInt64(data, "max-retry-times")
-		config.RetryInStatusCode = utils.MapGetString(data, "retry-in-status-code")
-		config.RetryNotInStatusCode = utils.MapGetString(data, "retry-not-in-status-code")
-		config.MaxRedirects = utils.MapGetInt(data, "max-redirects")
-		config.JsEnableRedirect = utils.MapGetBool(data, "js-enable-redirect")
-		config.JsMaxRedirects = utils.MapGetInt(data, "js-max-redirect")
-		config.EnableRedirect = utils.MapGetBool(data, "enable-redirect")
-		config.MaxRedirects = utils.MapGetInt(data, "max-redirects")
-		config.DNSServers = utils.MapGetStringSlice(data, "dns-servers")
-		ietcHosts := utils.MapGetRaw(data, "etc-hosts")
-		if etcHosts, ok := ietcHosts.(map[string]interface{}); ok {
+	extractConfig := func(config *RequestConfig, data *yaml.Node) {
+		config.IsHTTPS = nodeGetBool(data, "is-https")
+		config.IsGmTLS = nodeGetBool(data, "is-gmtls")
+		config.Host = nodeGetString(data, "host")
+		config.Proxy = nodeGetString(data, "proxy")
+		config.NoSystemProxy = nodeGetBool(data, "no-system-proxy")
+		config.ForceFuzz = nodeGetBool(data, "force-fuzz")
+		config.RequestTimeout = nodeGetFloat64(data, "request-timeout")
+		config.RepeatTimes = nodeGetInt64(data, "repeat-times")
+		config.Concurrent = nodeGetInt64(data, "concurrent")
+		config.DelayMinSeconds = nodeGetFloat64(data, "delay-min-seconds")
+		config.DelayMaxSeconds = nodeGetFloat64(data, "delay-max-seconds")
+		config.MaxRetryTimes = nodeGetInt64(data, "max-retry-times")
+		config.RetryInStatusCode = nodeGetString(data, "retry-in-status-code")
+		config.RetryNotInStatusCode = nodeGetString(data, "retry-not-in-status-code")
+		config.MaxRedirects = int(nodeGetInt64(data, "max-redirects"))
+		config.JsEnableRedirect = nodeGetBool(data, "js-enable-redirect")
+		config.JsMaxRedirects = int(nodeGetInt64(data, "js-max-redirect"))
+		config.EnableRedirect = nodeGetBool(data, "enable-redirect")
+		config.MaxRedirects = int(nodeGetInt64(data, "max-redirects"))
+		config.DNSServers = nodeGetStringSlice(data, "dns-servers")
+		etcHosts := nodeGetRaw(data, "etc-hosts")
+		if etcHosts.Kind == yaml.MappingNode {
 			hosts := make(map[string]string)
-			for k, v := range etcHosts {
-				hosts[k] = utils.InterfaceToString(v)
-			}
+			mappingNodeForEach(etcHosts, func(key string, node *yaml.Node) error {
+				hosts[key] = node.Value
+				return nil
+			})
 			config.EtcHosts = hosts
 		}
-		vars := utils.MapGetRaw(data, "variables")
+		vars := nodeGetRaw(data, "variables")
 		config.Variables = NewVars()
-		for k, v := range utils.InterfaceToMapInterface(vars) {
-			config.Variables.AutoSet(k, utils.InterfaceToString(v))
-		}
+		mappingNodeForEach(vars, func(key string, node *yaml.Node) error {
+			config.Variables.AutoSet(key, node.Value)
+			return nil
+		})
 	}
 	_ = extractConfig
-	for _, i := range utils.InterfaceToSliceInterface(reqs) {
+	for _, node := range reqs.Content {
+
 		reqIns := &YakRequestBulkConfig{
 			Headers: map[string]string{},
 		}
-		// extractConfig(&reqIns.RequestConfig, utils.InterfaceToMapInterface(i))
-		req := utils.InterfaceToMapInterface(i)
-		matcher, err := generateYakMatcher(req)
+		matcher, err := generateYakMatcher(node)
 		if err != nil {
 			log.Debugf("extractYakExtractor failed: %v", err)
 		} else if matcher != nil {
@@ -243,12 +238,12 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			}
 		}
 
-		payloads, err := generateYakPayloads(req)
+		payloads, err := generateYakPayloads(node)
 		if err != nil {
 			log.Debugf("extractYakPayloads failed: %v", err)
 		}
 		reqIns.Payloads = payloads
-		switch strings.ToLower(strings.TrimSpace(utils.MapGetString(req, "attack"))) {
+		switch strings.ToLower(strings.TrimSpace(nodeGetString(node, "attack"))) {
 		case "pitchfork":
 			reqIns.AttackMode = "sync"
 		default:
@@ -256,7 +251,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		}
 
 		reqIns.Matcher = matcher
-		extractors, err := generateYakExtractors(req)
+		extractors, err := generateYakExtractors(node)
 		if err != nil {
 			log.Errorf("extractYakExtractor failed: %v", err)
 		}
@@ -264,29 +259,31 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		if len(reqIns.Extractor) != 0 {
 			hasMatcherOrExtractor = true
 		}
-		reqIns.StopAtFirstMatch = utils.MapGetBool(req, "stop-at-first-match")
-		reqIns.CookieInherit = utils.MapGetBool(req, "cookie-reuse")
-		reqIns.MaxSize = utils.MapGetInt(req, "max-size")
-		reqIns.NoFixContentLength = utils.MapGetBool(req, "unsafe")
-		reqIns.AfterRequested = utils.MapGetBool(req, "req-condition")
-		reqIns.AttackMode = utils.MapGetString(req, "attack-mode")
-		reqIns.InheritVariables = utils.MapGetBool(req, "inherit-variables")
-		// reqIns.HotPatchCode = utils.MapGetString(req, "hot-patch-code")
+		reqIns.StopAtFirstMatch = nodeGetBool(node, "stop-at-first-match")
+		reqIns.CookieInherit = nodeGetBool(node, "cookie-reuse")
+		reqIns.MaxSize = int(nodeGetInt64(node, "max-size"))
+		reqIns.NoFixContentLength = nodeGetBool(node, "unsafe")
+		reqIns.AfterRequested = nodeGetBool(node, "req-condition")
+		reqIns.AttackMode = nodeGetString(node, "attack-mode")
+		reqIns.InheritVariables = nodeGetBool(node, "inherit-variables")
+		// reqIns.HotPatchCode = nodeGetString(req, "hot-patch-code")
 
-		reqIns.EnableRedirect, _ = strconv.ParseBool(utils.InterfaceToString(utils.MapGetFirstRaw(req, "host-redirects", "redirects")))
-		reqIns.MaxRedirects = utils.MapGetInt(req, "max-redirects")
+		reqIns.EnableRedirect = nodeToBool(nodeGetFirstRaw(node, "host-redirects", "redirects"))
+		reqIns.MaxRedirects = int(nodeGetInt64(node, "max-redirects"))
 
-		if ret := utils.MapGetRaw(req, "raw"); ret != nil {
-			reqIns.HTTPRequests = funk.Map(utils.InterfaceToStringSlice(ret), func(i string) *YakHTTPRequestPacket {
+		if rawNode := nodeGetRaw(node, "raw"); rawNode != nil {
+			raws := nodeToStringSlice(rawNode)
+			reqIns.HTTPRequests = lo.Map(raws, func(i string, _ int) *YakHTTPRequestPacket {
 				return nucleiRawPacketToYakHTTPRequestPacket(i)
-			}).([]*YakHTTPRequestPacket)
+			})
 		} else {
-			reqIns.Method = utils.MapGetString(req, "method")
-			reqIns.Paths = utils.InterfaceToStringSlice(utils.MapGetRaw(req, "path"))
-			for k, v := range utils.InterfaceToMapInterface(utils.MapGetRaw(req, "headers")) {
-				reqIns.Headers[k] = toString(v)
-			}
-			reqIns.Body = utils.MapGetString(req, "body")
+			reqIns.Method = nodeGetString(node, "method")
+			reqIns.Paths = nodeGetStringSlice(node, "path")
+			mappingNodeForEach(nodeGetRaw(node, "headers"), func(key string, value *yaml.Node) error {
+				reqIns.Headers[key] = value.Value
+				return nil
+			})
+			reqIns.Body = nodeGetString(node, "body")
 		}
 
 		if len(reqIns.HTTPRequests) <= 0 && len(reqIns.Paths) == 0 {
@@ -295,12 +292,9 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		}
 		reqSeq = append(reqSeq, reqIns)
 	}
+
 	_ = hasMatcherOrExtractor
-	//if !hasMatcherOrExtractor {
-	//	return nil, utils.Error("matcher and extractor are both empty")
-	//}
 	yakTemp.HTTPRequestSequences = reqSeq
-	// extractConfig(&yakTemp.RequestConfig, mid)
 	if yakTemp.NoMatcherAndExtractor() {
 		for _, i := range yakTemp.HTTPRequestSequences {
 			if i.Matcher == nil {
@@ -375,41 +369,37 @@ func nucleiRawPacketToYakHTTPRequestPacket(i string) *YakHTTPRequestPacket {
 	return packet
 }
 
-func generateYakExtractors(req map[string]interface{}) ([]*YakExtractor, error) {
-	extractorsRaw := utils.MapGetRaw(req, "extractors")
-	if extractorsRaw == nil {
+func generateYakExtractors(rootNode *yaml.Node) ([]*YakExtractor, error) {
+	extractorsNode := nodeGetRaw(rootNode, "extractors")
+	if extractorsNode == nil {
 		return nil, nil
-	}
-	if reflect.TypeOf(extractorsRaw).Kind() != reflect.Slice {
-		return nil, utils.Errorf("nuclei template extractors is not slice")
 	}
 
 	var extractors []*YakExtractor
-	funk.Map(extractorsRaw, func(i interface{}) error {
+	sequenceNodeForEach(extractorsNode, func(node *yaml.Node) error {
 		ext := &YakExtractor{}
-		m := utils.InterfaceToMapInterface(i)
-		ext.Name = utils.MapGetString(m, "name")
-		ext.Scope = utils.MapGetString(m, "scope")
-		ext.Id = utils.MapGetInt(m, "id")
-
-		switch utils.MapGetString(m, "type") {
+		ext.Name = nodeGetString(node, "name")
+		ext.Scope = nodeGetString(node, "part")
+		ext.Id = int(nodeGetInt64(node, "id"))
+		typ := nodeGetString(node, "type")
+		switch typ {
 		case "regex":
 			ext.Type = "regex"
-			ext.Groups = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "regex"))
-			ext.RegexpMatchGroup = []int{utils.MapGetInt(m, "group")}
+			ext.Groups = nodeGetStringSliceFallback(node, "regex")
+			ext.RegexpMatchGroup = []int{int(nodeGetInt64(node, "group"))}
 		case "kval":
 			ext.Type = "key-value"
-			ext.Groups = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "kval"))
+			ext.Groups = nodeGetStringSliceFallback(node, "kval")
 		case "json":
 			ext.Type = "json"
-			ext.Groups = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "json"))
+			ext.Groups = nodeGetStringSliceFallback(node, "json")
 		case "xpath":
 			ext.Type = "xpath"
-			ext.Groups = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "xpath"))
-			ext.XPathAttribute = utils.MapGetString(m, "attribute")
+			ext.Groups = nodeGetStringSliceFallback(node, "xpath")
+			ext.XPathAttribute = nodeGetString(node, "attribute")
 		case "dsl":
 			ext.Type = "dsl"
-			ext.Groups = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "dsl"))
+			ext.Groups = nodeGetStringSliceFallback(node, "dsl")
 		default:
 			log.Errorf("extractYakExtractor failed: %v", utils.Errorf("nuclei template extractors type is not supported"))
 			return utils.Errorf("nuclei template extractors type is not supported")
@@ -420,16 +410,16 @@ func generateYakExtractors(req map[string]interface{}) ([]*YakExtractor, error) 
 	return extractors, nil
 }
 
-func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
-	matchersRaw := utils.MapGetRaw(req, "matchers")
-	if matchersRaw == nil {
+func generateYakMatcher(rootNode *yaml.Node) (*YakMatcher, error) {
+	matchersNode := nodeGetRaw(rootNode, "matchers")
+	if matchersNode == nil {
 		return nil, utils.Errorf("nuclei template matchers is nil")
 	}
-	if reflect.TypeOf(matchersRaw).Kind() != reflect.Slice {
+	if matchersNode.Kind != yaml.SequenceNode {
 		return nil, utils.Errorf("nuclei template matchers is not slice")
 	}
 	var matchers []*YakMatcher
-	funk.Map(matchersRaw, func(i interface{}) error {
+	sequenceNodeForEach(matchersNode, func(node *yaml.Node) error {
 		match := &YakMatcher{
 			MatcherType: "",
 			ExprType:    "",
@@ -437,12 +427,11 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 			Condition:   "",
 			Group:       nil,
 		}
-		m := utils.InterfaceToMapInterface(i)
-		match.Negative = utils.MapGetBool(m, "negative")
-		match.Condition = utils.MapGetString(m, "condition")
-		match.Id = utils.MapGetInt(m, "id")
+		match.Negative = nodeGetBool(node, "negative")
+		match.Condition = nodeGetString(node, "condition")
+		match.Id = int(nodeGetFloat64(node, "id"))
 
-		switch utils.MapGetString(m, "part") {
+		switch nodeGetString(node, "part") {
 		case "body":
 			match.Scope = "body"
 		case "header":
@@ -454,30 +443,30 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 		case "interactsh_protocol", "oob_protocol":
 			match.Scope = "interactsh_protocol"
 		}
-
-		switch utils.MapGetString(m, "type") {
+		typ := nodeGetString(node, "type")
+		switch typ {
 		case "word":
 			match.MatcherType = "word"
-			match.GroupEncoding = utils.InterfaceToString(utils.MapGetRaw(m, "encoding"))
-			match.Group = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "words"))
+			match.GroupEncoding = nodeGetString(node, "encoding")
+			match.Group = nodeGetStringSliceFallback(node, "words")
 		case "status":
 			match.MatcherType = "status_code"
-			match.Group = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "status"))
+			match.Group = nodeGetStringSliceFallback(node, "status")
 		case "size":
 			match.MatcherType = "content_length"
-			match.Group = utils.InterfaceToStringSlice(utils.MapGetFirstRaw(m, "size", "sizes", "content-length"))
+			match.Group = nodeGetStringSliceFallback(node, "size", "sizes", "content-length")
 		case "binary":
 			match.MatcherType = "binary"
-			match.Group = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "binary"))
+			match.Group = nodeGetStringSliceFallback(node, "binary")
 		case "regex":
 			match.MatcherType = "regex"
-			match.Group = utils.InterfaceToStringSlice(utils.MapGetFirstRaw(m, "regex", "regexp"))
+			match.Group = nodeGetStringSliceFallback(node, "regex", "regexp")
 		case "dsl":
 			match.MatcherType = "expr"
 			match.ExprType = "nuclei-dsl"
-			match.Group = utils.InterfaceToStringSlice(utils.MapGetRaw(m, "dsl"))
+			match.Group = nodeGetStringSliceFallback(node, "dsl")
 		default:
-			log.Errorf("parse nuclei template matcher type failed: %v", utils.MapGetString(m, "type"))
+			log.Errorf("parse nuclei template matcher type failed: %v", typ)
 			return nil
 		}
 
@@ -488,7 +477,7 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 	var matchInstance *YakMatcher
 	if len(matchers) > 1 {
 		matchInstance = &YakMatcher{
-			SubMatcherCondition: utils.MapGetString(req, "matchers-condition"),
+			SubMatcherCondition: nodeGetString(rootNode, "matchers-condition"),
 			SubMatchers:         matchers,
 		}
 	} else if len(matchers) == 1 {
@@ -500,36 +489,41 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 	return matchInstance, nil
 }
 
+func generateYakPayloads(node *yaml.Node) (*YakPayloads, error) {
+	subNode := nodeGetRaw(node, "payloads")
+	payloads, _ := NewYakPayloads(nil)
+	if subNode == nil {
+		return payloads, nil
+	}
+	if subNode.Kind != yaml.MappingNode {
+		return nil, utils.Errorf("nuclei template payloads is not map")
+	}
+	payloadDatas := make(map[string]any, len(subNode.Content)/2)
+	mappingNodeForEach(subNode, func(key string, value *yaml.Node) error {
+		payloadDatas[key] = nodeToStringSlice(value)
+		return nil
+	})
+	payloads.AddPayloads(payloadDatas)
+	return payloads, nil
+}
+
 func NewYakPayloads(data map[string]any) (*YakPayloads, error) {
 	payloads := &YakPayloads{raw: map[string]*YakPayload{}}
+	if data == nil {
+		return payloads, nil
+	}
 	return payloads, payloads.AddPayloads(data)
 }
 
-func generateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
-	data := utils.MapGetMapRaw(req, "payloads")
-	if data == nil {
-		return nil, nil
-	}
-	return NewYakPayloads(utils.InterfaceToMapInterface(data))
-}
-
-func generateYakVariables(req map[string]interface{}) *YakVariables {
-	data := utils.MapGetMapRaw(req, "variables")
+func generateYakVariables(node *yaml.Node) *YakVariables {
+	subNode := nodeGetRaw(node, "variables")
 	vars := NewVars()
-	if data == nil {
+	if subNode == nil {
 		return vars
 	}
-	for k, v := range utils.InterfaceToMapInterface(data) {
-		//tags := ParseNucleiTag(toString(v))
-		//if len(tags) == 0 {
-		//	vars.Set(k, toString(v))
-		//	continue
-		//}
-		//if len(tags) == 1 && !tags[0].IsExpr {
-		//	vars.Set(k, tags[0].Content)
-		//	continue
-		//}
-		vars.SetNucleiDSL(k, toString(v))
-	}
+	mappingNodeForEach(subNode, func(key string, valueNode *yaml.Node) error {
+		vars.AutoSet(key, valueNode.Value)
+		return nil
+	})
 	return vars
 }

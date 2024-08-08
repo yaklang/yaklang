@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -938,9 +939,9 @@ requests:
 
 `, "cccabbbcc"},
 		{`
-id: test1
+id: test2
 info:
-  name: test1
+  name: test2
   author: v1ll4n
 
 requests:
@@ -967,9 +968,9 @@ requests:
 
 `, "abbb"},
 		{`
-id: test1
+id: test3
 info:
-  name: test1
+  name: test3
   author: v1ll4n
 
 requests:
@@ -1002,7 +1003,7 @@ requests:
 
 `, "abbb", true},
 		{`
-id: test1
+id: test4
 info:
   name: test1
   author: v1ll4n
@@ -1945,4 +1946,124 @@ http:
 	if !ok {
 		t.Error("test oob error")
 	}
+}
+
+func TestMatcher_KeepDSLReturnType(t *testing.T) {
+	randomKey := utils.RandStringBytes(16)
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		a, b := request.URL.Query().Get("a"), request.URL.Query().Get("b")
+		aInt, err := strconv.Atoi(a)
+		writer.Write([]byte(fmt.Sprintf("a=%s\n", a)))
+		writer.Write([]byte(fmt.Sprintf("b=%s\n", b)))
+		if err != nil {
+			writer.Write([]byte("a not int"))
+			return
+		}
+		bInt, err := strconv.Atoi(b)
+		if err != nil {
+			writer.Write([]byte("b not int"))
+			return
+		}
+		if aInt == bInt {
+			writer.Write([]byte("a should not same as b"))
+			return
+		}
+		writer.Write([]byte(fmt.Sprintf("%s=%s", randomKey, strconv.Itoa(aInt+bInt))))
+	})
+
+	//
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	tmpl := fmt.Sprintf(`
+id: WebFuzzer-Template-rce-hex_decode
+info:
+  name: Struts2 046
+  author: admin
+  severity: high
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: 52dc9bdb52d04dc20036dbd8313ed085
+variables:
+  r1: '{{rand_int(10000)}}'
+  r2: '{{rand_int(10000)}}'
+http:
+- raw:
+  - |
+    @timeout: 30s
+    GET /?a={{r1}}&b={{r2}} HTTP/1.1
+    Host: {{Hostname}}
+    User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36
+  max-redirects: 3
+  matchers-condition: and
+  matchers:
+  - type: dsl
+    part: body
+    dsl:
+    - contains(raw,r1+r2)
+    condition: and
+  extractors:
+  - id: 1
+    name: v
+    scope: raw
+    type: kval
+    kval:
+    - %s
+`, randomKey)
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	if err != nil {
+		panic(err)
+	}
+	var ok bool
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		spew.Dump(extractor)
+		if len(rsp) > 0 {
+			spew.Dump(rsp[0].RawPacket)
+		}
+		ok = result
+	}))
+	_, err = ytpl.ExecWithUrl(addr, config)
+	if !ok {
+		t.FailNow()
+	}
+}
+
+func TestMatcherPathContainsPayload(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(request.Header["A"][0]))
+	})
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	tmpl := `
+variables:
+    flag: "{{md5('{{unix_time(10)}}')}}"
+http:
+- method: POST
+  path:
+  - '{{RootURL}}{{filepath}}'
+  payloads:
+    filepath:
+      - /a
+      - /b
+  headers:
+    a: "{{flag}}"
+  matchers:
+    - type: word
+      part: body
+      words:
+        - "{{flag}}"
+`
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	if err != nil {
+		panic(err)
+	}
+	var ok bool
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		ok = result
+	}))
+	n, err := ytpl.ExecWithUrl(addr, config)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, 2, n)
 }

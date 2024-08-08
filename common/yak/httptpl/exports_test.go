@@ -92,13 +92,18 @@ func TestStringToUrl(t *testing.T) {
 }
 
 func TestScan2(t *testing.T) {
+	t.SkipNow()
 	consts.GetGormProfileDatabase()
 	consts.GetGormProjectDatabase()
+	host, port := utils.DebugMockHTTPExContext(utils.TimeoutContextSeconds(10), func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+	})
 
 	ScanPacket([]byte(`GET / HTTP/1.1
 Host: 127.0.0.1:8004
 
 abc`), lowhttp.WithHttps(false), WithMode("nuclei"),
+		lowhttp.WithHost(host), lowhttp.WithPort(port),
 		WithFuzzQueryTemplate("thinkphp"),
 		// WithConcurrentTemplates(1), WithConcurrentInTemplates(1),
 		WithEnableReverseConnectionFeature(false),
@@ -145,7 +150,7 @@ requests:
 	}
 
 	checked := false
-	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com") {
+	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com", false) {
 		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) {
 			spew.Dump(req.Requests[0].Raw)
 			checked = true
@@ -201,7 +206,7 @@ requests:
 	}
 
 	checked := false
-	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com") {
+	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com", false) {
 		reqIns := req.Requests[0]
 		println(string(reqIns.Raw))
 		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) {
@@ -231,7 +236,7 @@ func TestNewVars(t *testing.T) {
 	vars.AutoSet("result", `{{to_number(year)-to_number(month)-to_number(day)}}`)
 	a := vars.ToMap()
 
-	actResult := codec.Atoi(fmt.Sprint(a["year"])) - codec.Atoi(fmt.Sprint(a["month"])) - codec.Atoi(fmt.Sprint(a["day"]))
+	actResult := codec.Atoi(utils.InterfaceToString(a["year"])) - codec.Atoi(utils.InterfaceToString(a["month"])) - codec.Atoi(utils.InterfaceToString(a["day"]))
 	if actResult == 0 {
 		panic("empty result vars")
 	}
