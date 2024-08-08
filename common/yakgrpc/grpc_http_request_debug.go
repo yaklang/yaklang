@@ -79,8 +79,8 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 		app := cli.DefaultCliApp
 		// 额外处理 cli，新建 cli app
 		if strings.ToLower(scriptType) == "yak" {
-			tempArgs := makeArgs(streamCtx, params, script.Content)
-			app = yak.HookCliArgs(engine, tempArgs)
+			tempArgs := makeArgs(streamCtx, params)
+			app = yak.GetHookCliApp(tempArgs)
 		}
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(
 			runtimeId,
@@ -345,7 +345,7 @@ func (s *Server) execScriptEx(
 	return utils.Error("unsupported plugin type: " + scriptType)
 }
 
-func makeArgs(ctx context.Context, execParams []*ypb.KVPair, yakScript string) []string {
+func makeArgs(ctx context.Context, execParams []*ypb.KVPair) []string {
 	args := []string{"yak"}
 	canFilter := true
 	for _, p := range execParams {
