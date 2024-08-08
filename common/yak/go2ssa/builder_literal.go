@@ -246,7 +246,20 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa
 func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	var ssatyp ssa.Type
+
+	if name := stmt.TypeName(); name != nil {
+	    if qul := name.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
+			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
+				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
+				ssatyp = obj.GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+				return ssatyp,nil
+			}
+		}
+	}
+	
 	text := stmt.GetText()
+
 	// var type name
 	if b := ssa.GetTypeByStr(text); b != nil {
 		return b,nil

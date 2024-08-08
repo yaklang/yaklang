@@ -46,9 +46,11 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 				ssaop = ssa.OpBitwiseNot
 			case "<-":
 				ssaop = ssa.OpChan
+			// TODO
 			case "*":
-				// TODO
+				ssaop = ""
 			case "&":
+				ssaop = ""
 			default:
 				b.NewError(ssa.Error, TAG, UnaryOperatorNotSupport(op.GetText()))
 			}
@@ -57,6 +59,9 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, "in operator need two expression")
 				return nil, nil
+			}
+			if ssaop == "" {
+				return op1, nil
 			}
 			return b.EmitUnOp(ssaop, op1),nil
 		}
@@ -189,8 +194,14 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue
 		if ret := exp.DOT(); ret != nil {
 			if id := exp.IDENTIFIER(); id != nil {
 				test := id.GetText()
-				member :=  b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
-				return member, nil
+				if _,ok := rv.(*ssa.TypeValue); ok {
+					t := rv.GetType().(*ssa.ObjectType)
+					funcs := b.GetExtendFuncs(t.Name)
+					return funcs[test], nil
+				}else{
+					member :=  b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
+					return member, nil
+				}
 			}
 		}
 	}
@@ -316,6 +327,13 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 
 		if v.(*ssa.Function) == nil {
 			v = b.GetGlobalVariable(text)
+		}
+		if v == nil {
+			if t := b.GetStructByStr(text); t != nil{
+				typValue := ssa.NewTypeValue(t)
+				typValue.SetType(t)
+				return typValue
+			}
 		}
 		if v == nil {
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
