@@ -849,9 +849,9 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 		}
 
 		k, cookieRaw := SplitHTTPHeader(line)
-		k = strings.ToLower(k)
+		lowerKey := strings.ToLower(k)
 
-		if (k == "cookie" && isReq) || (k == "set-cookie" && isRsp) {
+		if (lowerKey == "cookie" && isReq) || (lowerKey == "set-cookie" && isRsp) {
 			existed := ParseCookie(k, cookieRaw)
 			existed = funk.Filter(existed, func(cookie *http.Cookie) bool {
 				return cookie.Name != key
