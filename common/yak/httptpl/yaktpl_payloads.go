@@ -1,9 +1,10 @@
 package httptpl
 
 import (
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
 )
 
 type YakPayloads struct {
@@ -16,16 +17,27 @@ type YakPayload struct {
 }
 
 func (y *YakPayloads) GetData() map[string][]string {
+	if y == nil {
+		return map[string][]string{}
+	}
 	res := map[string][]string{}
 	for k, v := range y.raw {
 		res[k] = v.Data
 	}
 	return res
 }
+
 func (y *YakPayloads) GetRawPayloads() map[string]*YakPayload {
+	if y == nil {
+		return map[string]*YakPayload{}
+	}
 	return y.raw
 }
+
 func (y *YakPayloads) GetRawMap() map[string]any {
+	if y == nil {
+		return map[string]any{}
+	}
 	res := map[string]any{}
 	for k, payload := range y.raw {
 		if payload.FromFile != "" {
@@ -36,7 +48,11 @@ func (y *YakPayloads) GetRawMap() map[string]any {
 	}
 	return res
 }
+
 func (y *YakPayloads) AddPayloads(data map[string]any) error {
+	if y == nil {
+		return nil
+	}
 	for k, v := range data {
 		if reflect.TypeOf(v).Kind() == reflect.Slice {
 			y.raw[k] = &YakPayload{
@@ -57,6 +73,7 @@ func (y *YakPayloads) AddPayloads(data map[string]any) error {
 	}
 	return nil
 }
+
 func LoadPayloads(data map[string]any) map[string][]string {
 	res := map[string][]string{}
 	for k, v := range data {

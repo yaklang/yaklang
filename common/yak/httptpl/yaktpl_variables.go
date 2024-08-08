@@ -2,9 +2,13 @@ package httptpl
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"sync"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
 
 type TemplateVarTypePrefix string
@@ -43,6 +47,7 @@ func NewVar(v string) *Var {
 	}
 	return val
 }
+
 func (v *Var) GetValue() string {
 	switch v.Type {
 	case FuzztagType:
@@ -57,16 +62,24 @@ func (v *Var) GetValue() string {
 type YakVariables struct {
 	nucleiSandbox         *NucleiDSL
 	nucleiSandboxInitOnce *sync.Once
-	raw                   map[string]*Var
+	raw                   *orderedmap.OrderedMap
 
-	exprCache   map[string]any
-	outputMutex *sync.Mutex
+	exprKeyCache map[string]struct{}
+	exprCache    map[string]any
+	outputMutex  *sync.Mutex
 }
 
 func (v *YakVariables) Set(key string, value string) {
+	if v == nil {
+		return
+	}
 	v.SetWithType(key, value, string(RawType))
 }
+
 func (v *YakVariables) SetWithType(key string, value string, typeName string) error {
+	if v == nil {
+		return nil
+	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
 	var tempType TemplateVarType
@@ -80,111 +93,166 @@ func (v *YakVariables) SetWithType(key string, value string, typeName string) er
 	default:
 		return errors.New("unknown type")
 	}
-	v.raw[key] = &Var{Data: value, Type: tempType}
+	v.set(key, &Var{Data: value, Type: tempType})
 	return nil
 }
 
 func (v *YakVariables) SetAsNucleiTags(key string, value string) {
+	if v == nil {
+		return
+	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
-	v.raw[key] = &Var{
+	v.set(key, &Var{
 		Type: "nuclei-dsl",
 		Data: value,
-	}
+	})
 }
 
 func (v *YakVariables) AutoSet(key string, value string) {
+	if v == nil {
+		return
+	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
-	v.raw[key] = NewVar(value)
+	v.set(key, NewVar(value))
 }
 
 func (v *YakVariables) SetNucleiDSL(key string, value string) {
-	v.outputMutex.Lock()
-	defer v.outputMutex.Unlock()
-	v.raw[key] = &Var{
-		Type: NucleiDslType,
-		Data: value,
+	if v == nil {
+		return
+	}
+	v.SetAsNucleiTags(key, value)
+}
+
+func (v *YakVariables) set(key string, value *Var) {
+	v.raw.Set(key, value)
+	// remove cache key if exists, so value should be re-calculate
+	if _, ok := v.exprKeyCache[key]; ok {
+		delete(v.exprKeyCache, key)
 	}
 }
+
+func (v *YakVariables) isCacheKey(key string) bool {
+	if v == nil {
+		return false
+	}
+	_, ok := v.exprKeyCache[key]
+	return ok
+}
+
+func (v *YakVariables) Keys() []string {
+	if v == nil {
+		return make([]string, 0)
+	}
+	return v.raw.Keys()
+}
+
 func (v *YakVariables) GetRaw() map[string]*Var {
-	return v.raw
+	if v == nil {
+		return make(map[string]*Var)
+	}
+	retMap := make(map[string]*Var)
+	if v == nil {
+		return retMap
+	}
+	for key, iValue := range v.raw.ToStringMap() {
+		value, ok := iValue.(*Var)
+		if !ok {
+			log.Errorf("BUG: nuclei variables not *Vars, but %T", iValue)
+			continue
+		}
+		retMap[key] = value
+	}
+	return retMap
+}
+
+func (v *YakVariables) Len() int {
+	if v == nil {
+		return 0
+	}
+	return v.raw.Len()
 }
 
 func (v *YakVariables) ToMap() map[string]any {
+	if v == nil {
+		return make(map[string]any)
+	}
 	res := map[string]any{}
 	if v == nil {
 		return res
 	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
-	lockedVars := make(map[string]struct{})
-	var getVar, getVarAndWriteCache func(v *Var) (any, error)
-	getVar = func(s *Var) (any, error) {
+
+	getVar := func(s *Var) (any, error) {
 		switch s.Type {
+		case FuzztagType:
+			results := mutate.MutateQuick(s.Data)
+			if len(results) == 0 {
+				return s.Data, nil
+			} else {
+				return results[0], nil
+			}
 		case NucleiDslType:
-			res, err := execNucleiTag(s.Data, nil, func(s string) (string, error) {
-				if v, ok := res[s]; ok {
-					return toString(v), nil
-				}
-				_, isLocked := lockedVars[s]
-				if v, ok := v.raw[s]; ok && !isLocked {
-					lockedVars[s] = struct{}{}
-					v, err := getVarAndWriteCache(v)
-					delete(lockedVars, s)
-					if err != nil {
-						return "", err
-					}
-					res[s] = toString(v)
-					return toString(v), nil
+			ret, err := execNucleiDSL(s.Data, func(s string) (any, error) {
+				if variable, ok := res[s]; ok {
+					return variable, nil
 				} else {
 					return "", errors.New("not found var " + s)
 				}
-
-			}, "")
-			if err != nil {
-				return nil, err
+			})
+			// fallback to string
+			if ret == nil || err != nil {
+				rets, err := FuzzNucleiTag(s.Data, res, lo.MapEntries(res, func(key string, value any) (string, []string) {
+					return key, []string{toString(value)}
+				}), "")
+				if err != nil {
+					return nil, err
+				}
+				if len(rets) == 1 {
+					return toString(rets[0]), nil
+				}
+				return lo.Map(rets, func(item []byte, index int) string { return toString(item) }), nil
 			}
-			return toString(res[0]), err
+			return ret, err
 		case RawType:
 			return s.Data, nil
 		default:
 			return nil, errors.New("unsupported var type")
 		}
 	}
-	getVarAndWriteCache = func(yakVar *Var) (any, error) {
-		if yakVar.Type == NucleiDslType {
-			if val, ok := v.exprCache[yakVar.Data]; ok {
-				return toBytes(val), nil
-			}
+	v.raw.ForEach(func(key string, iValue any) {
+		value, ok := iValue.(*Var)
+		if !ok {
+			log.Errorf("BUG: nuclei variables not *Vars, but %T", iValue)
+			return
 		}
-		res, err := getVar(yakVar)
-		if yakVar.Type == NucleiDslType {
-			v.exprCache[yakVar.Data] = res
+
+		if v.isCacheKey(key) {
+			res[key] = v.exprCache[key]
+			return
 		}
-		return res, err
-	}
-	for k, v := range v.raw {
-		if _, ok := res[k]; ok {
-			continue
-		}
-		lockedVars[k] = struct{}{}
-		val, err := getVarAndWriteCache(v)
-		delete(lockedVars, k)
+		val, err := getVar(value)
 		if err != nil {
 			log.Error(err)
-			continue
+			return
 		}
-		res[k] = val
-	}
+
+		res[key] = val
+		v.exprCache[key] = val
+		v.exprKeyCache[key] = struct{}{}
+	})
+
 	return res
 }
 
 func NewVars() *YakVariables {
 	return &YakVariables{
-		raw:                   make(map[string]*Var),
+		raw:                   orderedmap.New(),
 		nucleiSandboxInitOnce: new(sync.Once),
 		outputMutex:           new(sync.Mutex),
+		exprKeyCache:          make(map[string]struct{}),
 		exprCache:             make(map[string]any),
 	}
 }

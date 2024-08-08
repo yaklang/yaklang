@@ -2,11 +2,12 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
@@ -134,7 +135,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 		vars["raw"] = availableResponse[0]
 	}
 
-	var haveResponse = len(availableResponse) > 0
+	haveResponse := len(availableResponse) > 0
 	for _, response := range availableResponse {
 		if y.Matcher != nil {
 			matched, err := y.Matcher.ExecuteRawWithConfig(config, response.RawPacket, vars)
@@ -162,7 +163,7 @@ func (y *YakNetworkBulkConfig) Execute(
 
 	var err error
 	for _, host := range y.Hosts {
-		host, err = RenderNucleiTagWithVar(host, utils.InterfaceToMapInterface(params))
+		host, err = QuickFuzzNucleiTag(host, utils.InterfaceToMapInterface(params))
 		if err != nil {
 			log.Error("YakNetworkBulkConfig render host error " + err.Error())
 			continue

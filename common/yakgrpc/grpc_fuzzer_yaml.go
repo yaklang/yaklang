@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"time"
 )
 
 // ImportHTTPFuzzerTaskFromYaml yaml -> yakTemplate -> fuzzerRequest
@@ -35,7 +36,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	extractorMap := map[int][]*ypb.HTTPResponseExtractor{}
 	matcherMap := map[int][]*ypb.HTTPResponseMatcher{}
 	// 转FuzzerRequest
-	seqs := yakTemplate.GenerateRequestSequences("http://www.example.com")
+	seqs := yakTemplate.GenerateRequestSequences("http://www.example.com", false)
 	for _, sequence := range seqs {
 		fuzzerReqs := []*ypb.FuzzerRequest{}
 		for _, request := range sequence.Requests {
@@ -106,7 +107,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				return httpMatcher
 			}).([]*ypb.HTTPResponseMatcher)
 		}
-		//var matchers []*ypb.HTTPResponseMatcher
+		// var matchers []*ypb.HTTPResponseMatcher
 		var matchersCondition string
 		if config.Matcher != nil {
 			if len(config.Matcher.SubMatchers) > 0 {
@@ -159,7 +160,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		//fuzzerReq.DNSServers = sequence.DNSServers
 
 		inheritCookies := config.CookieInherit
-		//inheritVariables := sequence.InheritVariables
+		// inheritVariables := sequence.InheritVariables
 
 		for index, fuzzerReq := range fuzzerReqs {
 			if extractorMap[index+1] != nil {
@@ -243,7 +244,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		}).([]*httptpl.YakMatcher)
 	}
 	// 生成请求桶
-	//requestBulks := []*httptpl.YakRequestBulkConfig{}
+	// requestBulks := []*httptpl.YakRequestBulkConfig{}
 	bulk := &httptpl.YakRequestBulkConfig{}
 	bulk.Matcher = &httptpl.YakMatcher{
 		SubMatcherCondition: "and",
@@ -265,8 +266,8 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			if err != nil {
 				log.Error(err)
 			}
-			//rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
-			//path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
+			// rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
+			// path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
 			bulk.Paths = append(bulk.Paths, url.Path)
 			bulk.Body = string(lowhttp.GetHTTPPacketBody(request.RequestRaw))
 			bulk.Headers = lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
@@ -283,7 +284,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		case "raw":
 			fallthrough
 		default:
-			//generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
+			// generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
 			bulk.HTTPRequests = append(bulk.HTTPRequests, &httptpl.YakHTTPRequestPacket{
 				Request: string(request.RequestRaw),
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
@@ -380,7 +381,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		}
 	}
 	template.Sign = template.SignMainParams()
-	if vars.ToMap() != nil {
+	if vars.Len() > 0 {
 		template.Variables = vars
 	}
 	// 转换为Yaml
@@ -457,7 +458,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	for k, v := range y.Variables.GetRaw() {
 		varMap.Set(k, v.GetValue())
 	}
-	//生成req sequences
+	// 生成req sequences
 	maxRequest := 0
 	//signElements := make([]string, 0)
 	//addSignElements := func(i ...any) {
@@ -491,7 +492,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		isPaths := len(sequence.Paths) > 0
 		var payloadsMap *YamlMapBuilder
 		if isPaths {
-			//addSignElements(sequence.Method, sequence.Paths, sequence.Headers, sequence.Body)
+			// addSignElements(sequence.Method, sequence.Paths, sequence.Headers, sequence.Body)
 			maxRequest += len(sequence.Paths)
 			sequenceItem.Set("method", sequence.Method)
 			sequenceItem.Set("path", sequence.Paths)
@@ -500,7 +501,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			sequenceItem.Set("body", sequence.Body)
 			sequenceItem.AddEmptyLine()
 		} else {
-			//addSignElements(sequence.HTTPRequests)
+			// addSignElements(sequence.HTTPRequests)
 			maxRequest += len(sequence.HTTPRequests)
 			reqArray := []string{}
 			for _, request := range sequence.HTTPRequests {
@@ -543,13 +544,13 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		sequenceItem.Set("unsafe", sequence.NoFixContentLength)
 		sequenceItem.Set("req-condition", sequence.AfterRequested)
 
-		//sequenceItem.Set("attack-mode", sequence.AttackMode)
-		//sequenceItem.Set("inherit-variables", sequence.InheritVariables)
-		//sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
+		// sequenceItem.Set("attack-mode", sequence.AttackMode)
+		// sequenceItem.Set("inherit-variables", sequence.InheritVariables)
+		// sequenceItem.Set("hot-patch-code", sequence.HotPatchCode)
 		// matcher生成
 		if sequence.Matcher != nil {
 			matcher := sequence.Matcher
-			//addSignElements(matcher)
+			// addSignElements(matcher)
 			matcherCondition := matcher.SubMatcherCondition
 			if matcherCondition == "" {
 				matcherCondition = "or"
@@ -599,7 +600,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			}
 		}
 		sequenceItem.Set("attack", sequence.AttackMode)
-		//addSignElements(sequence.Extractor)
+		// addSignElements(sequence.Extractor)
 		// extractor生成
 		extratorsArray := sequenceItem.NewSubArrayBuilder("extractors")
 		for _, extractor := range sequence.Extractor {
@@ -640,7 +641,7 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		}
 
 		// WebFuzzer请求配置
-		//writeConfig(sequenceItem, &sequence.RequestConfig)
+		// writeConfig(sequenceItem, &sequence.RequestConfig)
 
 		reqSequencesArray.Add(sequenceItem)
 	}

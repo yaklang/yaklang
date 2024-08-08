@@ -155,8 +155,8 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars m
 func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
-	var interactsh_protocol = utils.InterfaceToString(vars["interactsh_protocol"])
-	var interactsh_request = utils.InterfaceToString(vars["interactsh_request"])
+	interactsh_protocol := utils.InterfaceToString(vars["interactsh_protocol"])
+	interactsh_request := utils.InterfaceToString(vars["interactsh_request"])
 
 	getMaterial := func() string {
 		if isExpr {
@@ -309,9 +309,9 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 				return strings.Contains(s, sub)
 			} else {
 				if strings.Contains(sub, "{{") && strings.Contains(sub, "}}") {
-					results, err := ExecNucleiTag(sub, vars)
+					result, err := ExecNucleiDSL(sub, vars)
 					if err == nil {
-						return strings.Contains(s, results)
+						return strings.Contains(s, toString(result))
 					}
 				}
 			}

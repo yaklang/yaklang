@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -76,6 +77,7 @@ func CompareNucleiYaml(yaml1, yaml2 string) error {
 	}
 	return nil
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
 	testCases := []struct {
 		content string
@@ -292,7 +294,8 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
           - 'contains(body_1, "FUEL CMS")'
         condition: and`,
 			err: "sign main params not equal",
-		}}
+		},
+	}
 	for _, testCase := range testCases {
 		err := CompareNucleiYaml(testCase.content, testCase.expect)
 		if err != nil {
@@ -306,6 +309,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
 		}
 	}
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_CheckSignParam(t *testing.T) {
 	template := `http:
 - raw:
@@ -318,10 +322,9 @@ func TestGRPCMUSTPASS_HTTPFuzzer_CheckSignParam(t *testing.T) {
 
     {"key": "value"}
 `
-	//对 method, paths, headers, body、raw、matcher、extractor、payloads 签名检查
+	// 对 method, paths, headers, body、raw、matcher、extractor、payloads 签名检查
 	testCase := []func(req *httptpl.YakRequestBulkConfig){
 		func(req *httptpl.YakRequestBulkConfig) {
-
 		},
 		func(req *httptpl.YakRequestBulkConfig) {
 			req.Method = "GET"
@@ -806,6 +809,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
 		})
 	}
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_ExtractWithId(t *testing.T) {
 	tests := []struct{ raw, expect string }{
 		{
@@ -887,8 +891,8 @@ http:
 			assert.Equal(t, test.expect, extractedTitle)
 		})
 	}
-
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_MatchWithId(t *testing.T) {
 	tests := []struct {
 		raw    string
@@ -1095,7 +1099,6 @@ http:
 			assert.Equal(t, 2, sendN)
 		})
 	}
-
 }
 
 func TestMatcherId(t *testing.T) {
@@ -1195,7 +1198,6 @@ Host: www.example.com
 		},
 		TemplateType: "path",
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
