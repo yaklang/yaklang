@@ -2,8 +2,9 @@ package java2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -559,6 +560,8 @@ func (y *builder) VisitMethodDeclaration(
 		newFunction.SetMethodName(methodName)
 
 		build := func() {
+			recoverRange := y.SetRange(raw)
+			defer recoverRange()
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			y.MarkedThisClassBlueprint = class
 			y.VisitFormalParameters(i.FormalParameters())
@@ -589,6 +592,8 @@ func (y *builder) VisitMethodDeclaration(
 	newFunction.SetMethodName(methodName)
 
 	build := func() {
+		recoverRange := y.SetRange(raw)
+		defer recoverRange()
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		y.MarkedThisClassBlueprint = class
 		this := y.NewParam("this", raw)
