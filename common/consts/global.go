@@ -204,3 +204,11 @@ func GetDefaultYakitProjectsDir() string {
 	}
 	return pt
 }
+
+func GetDefaultYakitEngineDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "yak-engine")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
