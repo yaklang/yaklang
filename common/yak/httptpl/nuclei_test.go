@@ -2,8 +2,10 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -98,10 +100,44 @@ http:
 	rawVarMap := tmp.Variables.GetRaw()
 	assert.Equal(t, "{{replace(BaseURL,\"/\",\"_\")}}", rawVarMap["filename"].Data, "parse variables error")
 	assert.Equal(t, "screenshots", rawVarMap["dir"].Data, "parse variables error")
-	assert.NotEqual(t, "", tmp.HTTPRequestSequences[1].Matcher.TemplateName)
+	// matchers
+	matchers := tmp.HTTPRequestSequences[1].Matcher
+	assert.NotNil(t, matchers)
+	assert.NotEqual(t, "", matchers.TemplateName)
+	assert.Len(t, matchers.SubMatchers, 2)
+	// matcher 1
+	matcher1 := matchers.SubMatchers[0]
+	assert.Equal(t, "expr", matcher1.MatcherType)
+	assert.Equal(t, "nuclei-dsl", matcher1.ExprType)
+	assert.Equal(t, "raw", matcher1.Scope)
+	assert.Equal(t, []string{
+		"contains(tolower(body_1), 'welcome to hue')",
+		"contains(tolower(header_2), 'csrftoken=')",
+		"contains(tolower(header_2), 'sessionid=')",
+	}, matcher1.Group)
+	// matcher 2
+	matcher2 := matchers.SubMatchers[1]
+	assert.Equal(t, "status_code", matcher2.MatcherType)
+	assert.Equal(t, "raw", matcher2.Scope)
+	assert.Equal(t, []string{"302"}, matcher2.Group)
+	// extractors
+	extractors := tmp.HTTPRequestSequences[1].Extractor
+	assert.Len(t, extractors, 1)
+	// extractor 1
+	extractor1 := extractors[0]
+	assert.Equal(t, "csrfmiddlewaretoken", extractor1.Name)
+	assert.Equal(t, "body", extractor1.Scope)
+	assert.Equal(t, "regex", extractor1.Type)
+	assert.Equal(t, []string{
+		"name='csrfmiddlewaretoken' value='(.+?)'",
+	}, extractor1.Groups)
+	assert.Equal(t, []int{
+		1,
+	}, extractor1.RegexpMatchGroup)
 }
+
 func TestCreateYakTemplateFromSelfContained(t *testing.T) {
-	var demo = `
+	demo := `
 id: self-contained-file-input
 
 info:
@@ -150,7 +186,7 @@ func TestCreateYakTemplateFromNucleiTemplateRaw(t *testing.T) {
 	server, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 111\r\n" +
 		"Server: nginx\r\n\r\n"))
-	var demo = `id: CVE-2023-24278
+	demo := `id: CVE-2023-24278
 
 info:
   name: Squidex <7.4.0 - Cross-Site Scripting
@@ -178,7 +214,6 @@ variables:
   a3: "{{rand_int(1000,9000)}}{{a1}}"
   a4: "{{rand_int(1000,9000)}}{{a2}}------{{a1+a2}}=={{a1}}+{{a2}}  {{to_number(a1)*to_number(a2)}}=={{a1}}*{{a2}}"
   a5: "{{randstr}}"
-  a6: "{{randstr}}"
 
 requests:
   - method: GET
@@ -220,46 +255,27 @@ requests:
 
 # Enhanced by md on 2023/04/14`
 	data, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
-	if err != nil {
-		panic(err)
-	}
-
+	require.NoError(t, err)
 	if data.Id != "" {
 		t.Logf("id: %v", data.Id)
 	}
 
-	if len(data.HTTPRequestSequences) == 0 {
-		panic("no request sequence")
-	}
+	require.Greater(t, len(data.HTTPRequestSequences), 0, "no request sequence")
 
-	if data.HTTPRequestSequences[0].Matcher == nil {
-		panic("no matcher")
-	}
-
-	if data.Variables == nil {
-		panic("variable failed!")
-	}
-
-	if ret := data.Variables.ToMap(); len(ret) != 6 {
-		spew.Dump(ret)
-		panic("variable failed!111")
-	} else {
-		spew.Dump(ret)
-	}
+	require.NotNil(t, data.HTTPRequestSequences[0].Matcher, "no matcher")
+	require.NotNil(t, data.Variables, "variable failed")
+	vairablesKey := data.Variables.Keys()
+	require.Len(t, vairablesKey, 5)
+	require.Equal(t, []string{"a1", "a2", "a3", "a4", "a5"}, vairablesKey)
 
 	n, err := data.Exec(nil, false, []byte("GET /bai/path HTTP/1.1\r\n"+
 		"Host: www.baidu.com\r\n\r\n"), lowhttp.WithHost(server), lowhttp.WithPort(port))
-	if err != nil {
-		panic(err)
-	}
-	if n != 16 {
-		panic(1)
-	}
-	log.Infof("found N: %v", n)
+	require.NoError(t, err)
+	require.Equal(t, 16, n)
 }
 
 func TestCreateYakTemplateFromNucleiTemplateRaw_AttachSYNC(t *testing.T) {
-	var demo = `
+	demo := `
 id: mocked
 
 info:

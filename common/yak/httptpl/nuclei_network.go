@@ -3,17 +3,20 @@ package httptpl
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gopkg.in/yaml.v3"
 )
 
-func parseNetworkInputs(data map[string]any) []*YakTcpInput {
+func parseNetworkInputs(root *yaml.Node) []*YakTcpInput {
 	var inputs []*YakTcpInput
-	for _, inputItemRaw := range utils.InterfaceToSliceInterface(utils.MapGetFirstRaw(data, "inputs", "input")) {
-		var inputItem = utils.InterfaceToMapInterface(inputItemRaw)
+
+	// must be slice
+	inputNode := nodeGetFirstRaw(root, "inputs", "input")
+	sequenceNodeForEach(inputNode, func(subNode *yaml.Node) error {
 		var (
 			// data / read(int) / type: hex
-			dataRaw = utils.InterfaceToString(utils.MapGetFirstRaw(inputItem, "data"))
-			readInt = utils.MapGetInt(inputItem, "read")
-			typeRaw = utils.MapGetString(inputItem, "type")
+			dataRaw = nodeGetString(subNode, "data")
+			readInt = int(nodeGetInt64(subNode, "read"))
+			typeRaw = nodeGetString(subNode, "type")
 		)
 		if readInt <= 0 {
 			readInt = 2048
@@ -23,32 +26,33 @@ func parseNetworkInputs(data map[string]any) []*YakTcpInput {
 			Read: readInt,
 			Type: typeRaw,
 		})
-	}
+		return nil
+	})
+
 	return inputs
 }
 
-func parseNetworkBulk(ret []any, ReverseConnectionNeed bool) ([]*YakNetworkBulkConfig, error) {
+func parseNetworkBulk(ret []*yaml.Node, ReverseConnectionNeed bool) ([]*YakNetworkBulkConfig, error) {
 	var confs []*YakNetworkBulkConfig
-	for _, i := range utils.InterfaceToSliceInterface(ret) {
-		data := utils.InterfaceToGeneralMap(i)
-		inputs := parseNetworkInputs(data)
-		hosts := utils.InterfaceToStringSlice(utils.MapGetFirstRaw(data, "host", "hosts"))
+	for _, node := range ret {
+		inputs := parseNetworkInputs(node)
+		hosts := nodeToStringSlice(nodeGetFirstRaw(node, "host", "hosts"))
 		network := &YakNetworkBulkConfig{
 			Inputs:                inputs,
 			Hosts:                 hosts,
 			ReadSize:              2048,
 			ReverseConnectionNeed: ReverseConnectionNeed,
 		}
-		_ = network
-		readSize := utils.MapGetIntEx(data, "read-size", "read_size", "readSize", "readsize")
-		network.ReadSize = readSize
-		matcher, err := generateYakMatcher(data)
+		readSizeNode := nodeGetFirstRaw(node, "read-size", "read_size", "readSize", "readsize")
+		readSize := nodeToInt64(readSizeNode)
+		network.ReadSize = int(readSize)
+		matcher, err := generateYakMatcher(node)
 		if err != nil {
 			log.Warnf("build matcher failed: %s", err)
 			continue
 		}
 		network.Matcher = matcher
-		extractors, err := generateYakExtractors(data)
+		extractors, err := generateYakExtractors(node)
 		if err != nil {
 			log.Warnf("build extractor failed: %s", err)
 		}

@@ -1,8 +1,9 @@
 package httptpl
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type TCPRequestBulk struct {
@@ -27,17 +28,16 @@ type YakTcpInput struct {
 	Type string
 }
 
-type YakTcpHosts struct {
-}
+type YakTcpHosts struct{}
 
 func (y *YakTcpInput) BuildPayload(vars map[string]any) {
-	var data = y.Data
+	data := y.Data
 	if strings.Contains(y.Data, `{{`) && strings.Contains(y.Data, "}}") {
-		dataRaw, err := ExecNucleiTag(y.Data, vars)
+		result, err := ExecNucleiDSL(y.Data, vars)
 		if err != nil {
 			log.Warnf(`YakTcpInput.Execute.ExecuteNucleiTags failed: %s`, err)
 		} else {
-			data = dataRaw
+			data = toString(result)
 		}
 	}
 	_ = data

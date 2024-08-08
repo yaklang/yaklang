@@ -35,67 +35,77 @@ type RequestBulk struct {
 	RequestConfig *YakRequestBulkConfig
 }
 
-func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
+func (y *YakTemplate) GenerateRequestSequences(u string, renderPayload bool) []*RequestBulk {
 	vars := utils.InterfaceToMapInterface(utils2.ExtractorVarsFromUrl(u))
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
+		var payloads map[string][]string
 		seq := &RequestBulk{
 			RequestConfig: sequenceCfg,
 		}
+		if renderPayload {
+			payloads = sequenceCfg.Payloads.GetData()
+		}
 		for _, path := range sequenceCfg.Paths {
-			path, err := RenderNucleiTagWithVar(path, vars)
+			pathsRaw, err := FuzzNucleiTag(path, vars, payloads, sequenceCfg.AttackMode)
 			if err != nil {
 				log.Error(err)
 				continue
 			}
-			isHttps := strings.HasPrefix(strings.ToLower(path), "https://")
-			// isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
-			uarlIns, err := url.Parse(path)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-			packetStr := fmt.Sprintf(`%s %s HTTP/1.1
+			for _, pathRaw := range pathsRaw {
+				path := string(pathRaw)
+				isHttps := strings.HasPrefix(strings.ToLower(path), "https://")
+				// isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
+				uarlIns, err := url.Parse(path)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				packetStr := fmt.Sprintf(`%s %s HTTP/1.1
 Host: %s
 User-Agent: %s
 
 `, sequenceCfg.Method, uarlIns.RequestURI(), uarlIns.Host, consts.DefaultUserAgent)
 
-			packet := []byte(packetStr)
-			for k, v := range sequenceCfg.Headers {
-				packet = lowhttp.ReplaceHTTPPacketHeader(packet, k, v)
+				packet := []byte(packetStr)
+				for k, v := range sequenceCfg.Headers {
+					packet = lowhttp.ReplaceHTTPPacketHeader(packet, k, v)
+				}
+				packet = append(packet, sequenceCfg.Body...)
+				packetRaw, err := QuickFuzzNucleiTag(string(packet), vars)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				seq.Requests = append(seq.Requests, &requestRaw{
+					Raw:     []byte(packetRaw),
+					Origin:  sequenceCfg,
+					IsHttps: isHttps,
+				})
 			}
-			packet = append(packet, sequenceCfg.Body...)
-			packetRaw, err := RenderNucleiTagWithVar(string(packet), vars)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-			seq.Requests = append(seq.Requests, &requestRaw{
-				Raw:     []byte(packetRaw),
-				Origin:  sequenceCfg,
-				IsHttps: isHttps,
-			})
 		}
 		for _, request := range sequenceCfg.HTTPRequests {
-			req, err := RenderNucleiTagWithVar(request.Request, vars)
+			reqsRaw, err := FuzzNucleiTag(request.Request, vars, payloads, sequenceCfg.AttackMode)
 			if err != nil {
 				log.Error(err)
 				continue
 			}
-			isHttps := false
-			v, ok := vars["Schema"]
-			if ok {
-				isHttps = v == "https"
+			for _, reqRaw := range reqsRaw {
+				isHttps := false
+				v, ok := vars["Schema"]
+				if ok {
+					isHttps = v == "https"
+				}
+				seq.Requests = append(seq.Requests, &requestRaw{
+					Raw:          reqRaw,
+					SNI:          request.SNI,
+					Timeout:      request.Timeout,
+					OverrideHost: request.OverrideHost,
+					Origin:       sequenceCfg,
+					IsHttps:      isHttps,
+				})
 			}
-			seq.Requests = append(seq.Requests, &requestRaw{
-				Raw:          []byte(req),
-				SNI:          request.SNI,
-				Timeout:      request.Timeout,
-				OverrideHost: request.OverrideHost,
-				Origin:       sequenceCfg,
-				IsHttps:      isHttps,
-			})
+
 		}
 		result = append(result, seq)
 	}
@@ -142,7 +152,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 	tplConcurrent := config.ConcurrentInTemplates
 	if len(y.HTTPRequestSequences) > 0 {
 		swg := utils.NewSizedWaitGroup(tplConcurrent)
-		for _, reqSeq := range y.GenerateRequestSequences(u) {
+		for _, reqSeq := range y.GenerateRequestSequences(u, true) {
 			swg.Add()
 			go func(ret *RequestBulk, payload map[string][]string) {
 				defer swg.Done()
