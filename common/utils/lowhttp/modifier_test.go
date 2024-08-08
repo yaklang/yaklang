@@ -443,7 +443,7 @@ func TestDeleteHTTPRequestCookie(t *testing.T) {
 Host: www.baidu.com
 Cookie: a=1; c=1`,
 			"a",
-			"c=1",
+			"Cookie: c=1",
 			"a=1",
 		},
 		{
@@ -451,7 +451,7 @@ Cookie: a=1; c=1`,
 Host: www.baidu.com
 Cookie: a=1; c=1`,
 			"c",
-			"a=1",
+			"Cookie: a=1",
 			"c=1",
 		},
 		{
@@ -459,7 +459,7 @@ Cookie: a=1; c=1`,
 Host: www.baidu.com
 Cookie: d=1`,
 			"c",
-			"d=1",
+			"Cookie: d=1",
 			"c=",
 		},
 		{
@@ -468,7 +468,7 @@ Host: www.baidu.com
 `,
 			"cfffffffff",
 			"baidu.com",
-			"c=",
+			"Cookie",
 		},
 	} {
 		var (
