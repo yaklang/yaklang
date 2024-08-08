@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type SSABuild struct{}
@@ -23,6 +24,11 @@ func (b *SSABuild) EnableExtraFileAnalyzer() bool {
 }
 
 func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+	if !Builder.FilterFile(path) {
+		return nil
+	}
+	log.Infof("current pre compose %s", path)
+	start := time.Now()
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -42,6 +48,7 @@ func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.Functio
 	builder.MoreParse = true
 	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
 	defer func() {
+		log.Infof("current pre compose: %v end, time: %v", path, time.Now().Sub(start).Seconds())
 		builder.MoreParse = false
 	}()
 	return nil
@@ -49,6 +56,13 @@ func (b *SSABuild) ProgramHandler(fileSystem fi.FileSystem, builder *ssa.Functio
 
 var Builder = &SSABuild{}
 
+func (s *SSABuild) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+		builder.MoreParse = true
+		builder.GetProgram().Build("", editor, builder)
+		builder.MoreParse = false
+	}
+}
 func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {
@@ -76,9 +90,17 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		build.FunctionBuilder = functionBuilder
 		build.VisitHtmlDocument(ast)
 	}
-	if !b.Included && !b.MoreParse {
-		program := ssa.NewChildProgram(b.GetProgram(), uuid.NewString())
+	if b.IncludeStack.Len() <= 0 {
+		var program *ssa.Program
+		if b.MoreParse {
+			program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), nil)
+		} else {
+			program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), func(child *ssa.Program) {
+				b.GetProgram().ChildApplication = append(b.GetProgram().ChildApplication, child)
+			})
+		}
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
+		functionBuilder.MoreParse = b.MoreParse
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

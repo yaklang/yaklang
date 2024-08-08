@@ -1,6 +1,7 @@
 package go2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -18,6 +19,10 @@ type SSABuilder struct {
 }
 
 var Builder = &SSABuilder{}
+
+func (s *SSABuilder) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {}
+}
 
 func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
@@ -42,11 +47,10 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".go"
 }
 
-
 type astbuilder struct {
 	*ssa.FunctionBuilder
-	cmap []map[string]struct{}
-	globalv		map[string]ssa.Value
+	cmap        []map[string]struct{}
+	globalv     map[string]ssa.Value
 	structTypes map[string]*ssa.ObjectType
 	aliasTypes  map[string]*ssa.AliasType
 	result      []string
@@ -77,7 +81,7 @@ func (b *astbuilder) GetFromCmap(key string) bool {
 	for _, m := range b.cmap {
 		if _, ok := m[key]; ok {
 			return true
-		} 
+		}
 	}
 	return false
 }
@@ -87,25 +91,25 @@ func (b *astbuilder) InCmapLevel() {
 }
 
 func (b *astbuilder) OutCmapLevel() {
-    b.cmap = b.cmap[:len(b.cmap)-1]
+	b.cmap = b.cmap[:len(b.cmap)-1]
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
 }
 
-func (b* astbuilder) AddGlobalVariable(name string, v ssa.Value){
+func (b *astbuilder) AddGlobalVariable(name string, v ssa.Value) {
 	b.globalv[name] = v
 }
 
-func (b* astbuilder) GetGlobalVariable(name string) ssa.Value {
+func (b *astbuilder) GetGlobalVariable(name string) ssa.Value {
 	if b.globalv[name] == nil {
 		return nil
 	}
 	return b.globalv[name]
 }
 
-func (b *astbuilder) AddResultDefault(name string){
+func (b *astbuilder) AddResultDefault(name string) {
 	b.result = append(b.result, name)
 }
 
@@ -114,7 +118,7 @@ func (b *astbuilder) GetResultDefault() []string {
 }
 
 func (b *astbuilder) CleanResultDefault() {
-    b.result = []string{}
+	b.result = []string{}
 }
 
 // ====================== Object type
@@ -131,7 +135,7 @@ func (b *astbuilder) GetStructByStr(name string) *ssa.ObjectType {
 
 // ====================== Alias type
 func (b *astbuilder) AddAlias(name string, t *ssa.AliasType) {
-	b.aliasTypes[name] = t 
+	b.aliasTypes[name] = t
 }
 
 func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
