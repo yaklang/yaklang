@@ -3,6 +3,9 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 	"time"
 
@@ -176,4 +179,41 @@ func TestMixCaller_Wait(t *testing.T) {
 	default:
 		t.Fatal("wait timeout")
 	}
+}
+
+func TestMixCaller_load_Plugin_Passing_Code(t *testing.T) {
+	var check bool
+	server, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		check = true
+		return []byte(`HTTP/1.1 200 OK
+
+aaa`)
+	})
+	code := fmt.Sprintf(`
+	mirrorHTTPFlow = func(isHttps, url, req , rsp , body ) {
+		poc.Get("%s")
+	}
+	
+`, fmt.Sprintf("http://%s:%d", server, port))
+	caller, err := NewMixPluginCaller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller.SetLoadPluginTimeout(1)
+	err = caller.LoadPluginByName(context.Background(), "test", []*ypb.ExecParamItem{}, code)
+	require.NoError(t, err)
+
+	callCheckChan := make(chan struct{})
+	go func() {
+		item := []interface{}{false, "http://www.baidu.com", []byte{}, []byte{}, []byte{}}
+		caller.callers.CallByNameSync(HOOK_MirrorHTTPFlow, item...)
+		close(callCheckChan)
+	}()
+
+	select {
+	case <-time.After(4 * time.Second):
+		t.Fatal("time out")
+	case <-callCheckChan:
+	}
+	require.True(t, check)
 }
