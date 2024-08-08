@@ -32,7 +32,7 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
 		result:          []string{},
-		buildInPackage: 	map[string][]string{},
+		ExtendFuncs:     map[string]map[string]*ssa.Function{},
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
@@ -51,7 +51,7 @@ type astbuilder struct {
 	structTypes map[string]*ssa.ObjectType
 	aliasTypes  map[string]*ssa.AliasType
 	result      []string
-	buildInPackage map[string][]string
+	ExtendFuncs map[string]map[string]*ssa.Function
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
@@ -119,16 +119,15 @@ func (b *astbuilder) CleanResultDefault() {
     b.result = []string{}
 }
 
-// TODO: add build in package as a right value
-func (b *astbuilder) AddBuildInPackage(name string, p []string) {
-    b.buildInPackage[name] = p
+func (b *astbuilder) AddExtendFuncs(name string, funcs map[string]*ssa.Function) {
+    b.ExtendFuncs[name] = funcs
 }
 
-func (b *astbuilder) GetBuildInPackage(name string) []string {
-	if b.buildInPackage[name] == nil {
+func (b *astbuilder) GetExtendFuncs(name string) map[string]*ssa.Function {
+	if b.ExtendFuncs[name] == nil {
 		return nil
 	}
-    return b.buildInPackage[name]
+    return b.ExtendFuncs[name]
 }
 
 // ====================== Object type
@@ -141,6 +140,10 @@ func (b *astbuilder) GetStructByStr(name string) *ssa.ObjectType {
 		return nil
 	}
 	return b.structTypes[name]
+}
+
+func (b *astbuilder) GetStructAll() map[string]*ssa.ObjectType {
+	return b.structTypes
 }
 
 // ====================== Alias type

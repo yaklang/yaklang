@@ -15,22 +15,23 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 	var funclist []*ssa.Function
 	var methlist []*ssa.Function
+	var pkgNameCurrent string
 
 	if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 		pkgPath := b.buildPackage(packag)
-		pkgName := pkgPath[0]
-		if pkgName != "main" {
+		pkgNameCurrent = pkgPath[0]
+		if pkgNameCurrent != "main" {
 			prog := b.GetProgram()
-			lib, skip := prog.GetLibrary(pkgName)
+			lib, skip := prog.GetLibrary(pkgNameCurrent)
 			if skip {
 				return
 			}
 			if lib == nil {
-				lib = prog.NewLibrary(pkgName, pkgPath)
+				lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
 			}
 			lib.PushEditor(prog.GetCurrentEditor())
 	
-			builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
+			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "init")
 			if builder != nil {
 				builder.SetBuildSupport(b.FunctionBuilder)
 				currentBuilder := b.FunctionBuilder
@@ -43,8 +44,31 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	}
 
 	for _, impo := range ast.AllImportDecl() {
-		if impo, ok := impo.(*gol.ImportDeclContext); ok {
-			b.buildImportDecl(impo)
+		namel,pkgNamel := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+		for i := range pkgNamel {
+			pkgName := strings.Split(pkgNamel[i], "/")
+			if lib, _ := b.GetProgram().GetLibrary(pkgName[len(pkgName)-1]); lib != nil {
+				objt := ssa.NewObjectType()
+				objt.SetTypeKind(ssa.StructTypeKind)
+				if namel[i] != ""{
+					objt.SetName(namel[i])
+				}else{
+					objt.SetName(pkgName[len(pkgName)-1])
+				}
+			
+				for _, cbp := range lib.ClassBluePrint{ // only once
+					objlib := cbp.StaticMember
+					for mName, m := range objlib {
+						objt.AddField(b.EmitConstInst(mName),m.GetType())
+					}
+					funcs := map[string]*ssa.Function{}
+					for _,f := range cbp.Method {
+						funcs[f.GetName()] = f
+					}
+					b.AddExtendFuncs(objt.Name, funcs)
+				}
+				b.AddStruct(objt.Name, objt)
+			}
 		}
 	}
 
@@ -77,6 +101,22 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			b.buildFunctionDeclFinish(fun, funclist[i])
 		}
 	}
+
+	cbp := ssa.NewClassBluePrint()
+	cbp.Name = pkgNameCurrent
+
+	for structName,structType := range b.GetStructAll() {
+		typValue := ssa.NewTypeValue(structType)
+		typValue.SetType(structType)
+		cbp.AddStaticMember(structName, typValue)
+	}
+	for _,f := range b.GetProgram().Funcs {
+		if !f.IsMethod() && f.GetName() != "init" {
+			cbp.AddMethod(f.GetName(), f)
+		}
+	}
+
+	b.SetClassBluePrint(cbp.Name, cbp)
 }
 
 func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
@@ -100,20 +140,18 @@ func (b *astbuilder) buildPackageName(packageName *gol.PackageNameContext) strin
 	return ""
 }
 
-func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) {
+func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) ([]string, []string) {
 	recoverRange := b.SetRange(importDecl.BaseParserRuleContext)
 	defer recoverRange()
+	var namel, pkgNamel []string
 
 	for _,i := range importDecl.AllImportSpec() {
 	    name, pkgPath := b.buildImportSpec(i.(*gol.ImportSpecContext))
-		if len(pkgPath) > 0 {
-			if name != "" {
-				b.AddBuildInPackage(name,pkgPath)
-			} else {
-				b.AddBuildInPackage(pkgPath[len(pkgPath)-1],pkgPath)
-			}
-		}
+		pkgName := strings.Join(pkgPath, "/")
+		namel = append(namel, name)
+		pkgNamel = append(pkgNamel, pkgName)
 	}
+	return namel, pkgNamel
 }
 
 func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string,[]string) {
@@ -1614,13 +1652,20 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 	}
 
 	if name := typ.TypeName(); name != nil {
-		text := typ.GetText()
-		ssatyp = ssa.GetTypeByStr(text)
-		if ssatyp == nil {
-			ssatyp = b.GetAliasByStr(text)
-		}
-		if ssatyp == nil {
-			ssatyp = b.GetStructByStr(text)
+		if qul := name.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
+			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
+				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
+				ssatyp = obj.GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+			}
+		}else{
+			text := typ.GetText()
+			ssatyp = ssa.GetTypeByStr(text)
+			if ssatyp == nil {
+				ssatyp = b.GetAliasByStr(text)
+			}
+			if ssatyp == nil {
+				ssatyp = b.GetStructByStr(text)
+			}
 		}
 	}
 
