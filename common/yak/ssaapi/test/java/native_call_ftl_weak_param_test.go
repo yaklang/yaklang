@@ -129,4 +129,3 @@ ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
-
