@@ -1,10 +1,11 @@
 package java2ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) ssa.Value {
@@ -81,6 +82,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 			continue
 		}
 		if ret := recv.RecordDeclaration(); ret != nil {
+			recoverRange := y.SetRange(ret)
+			defer recoverRange()
 			record := ret.(*javaparser.RecordDeclarationContext)
 			if name, vals := y.VisitRecordDeclaration(record); name != "" {
 				for _, val := range vals {
@@ -97,6 +100,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 				}
 			}
 		} else if ret := recv.ConstDeclaration(); ret != nil {
+			recoverRange := y.SetRange(ret)
+			defer recoverRange()
 			member := ret.(*javaparser.ConstDeclarationContext)
 			valType := y.VisitTypeType(member.TypeType())
 			if valType != nil {
@@ -122,6 +127,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 				}
 			}
 		} else if ret := recv.InterfaceMethodDeclaration(); ret != nil {
+			recoverRange := y.SetRange(ret)
+			defer recoverRange()
 			raw := ret.(*javaparser.InterfaceMethodDeclarationContext)
 			if raw == nil {
 				continue
@@ -146,6 +153,10 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 			member, ok := raw.InterfaceCommonBodyDeclaration().(*javaparser.InterfaceCommonBodyDeclarationContext)
 			if !ok {
 				continue
+			}
+			{
+				recoverRange := y.SetRange(member)
+				defer recoverRange()
 			}
 
 			fakeFunc := y.NewFunc(member.Identifier().GetText())
@@ -193,6 +204,8 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 			this.AddMethod(memberName, val)
 			// handler(memberName, val)
 		} else if ret := recv.GenericInterfaceMethodDeclaration(); ret != nil {
+			recoverRange := y.SetRange(ret)
+			defer recoverRange()
 			raw, ok := ret.(*javaparser.GenericInterfaceMethodDeclarationContext)
 			if !ok {
 				continue
@@ -235,6 +248,10 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 			member, ok := raw.InterfaceCommonBodyDeclaration().(*javaparser.InterfaceCommonBodyDeclarationContext)
 			if !ok {
 				continue
+			}
+			{
+				recoverRange := y.SetRange(member)
+				defer recoverRange()
 			}
 			for _, anno := range member.AllAnnotation() {
 				ins, def := y.VisitAnnotation(anno)
