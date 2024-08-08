@@ -15,6 +15,7 @@ import (
 	"github.com/aymanbagabas/go-pty"
 	"github.com/google/shlex"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -162,8 +163,12 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		}
 		envs = append(envs, fmt.Sprintf("SHELL=%s", shell))
 		envs = append(envs, fmt.Sprintf("TERM=xterm-256color"))
+		envs = append(envs, fmt.Sprintf("PATH=%s:%s", os.Getenv("PATH"), consts.GetDefaultYakitEngineDir()))
+	} else {
+		envs = append(envs, fmt.Sprintf("PATH=%s;%s", os.Getenv("PATH"), consts.GetDefaultYakitEngineDir()))
 	}
 	envs = append(envs, "TERM_PROGRAM=yaklang")
+
 	if err != nil {
 		return err
 	}
