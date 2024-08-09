@@ -791,6 +791,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		// 可以用于计算相似度
 		var firstHeader, firstBody []byte
 		for result := range res {
+			// 2M
+			if len(result.RequestRaw) > 2*1024*1024 {
+				result.RequestRaw = result.RequestRaw[:2*1024*1024]
+				result.RequestRaw = append(result.RequestRaw, []byte("...(request > 2M) show chunked by yakit web fuzzer")...)
+			}
+
 			var payloads []string
 			task.HTTPFlowTotal++
 
@@ -815,6 +821,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			if result.Error != nil {
+				log.Errorf("http pool error: %s", result.Error)
 				hiddenIndex := ""
 				rsp := &ypb.FuzzerResponse{}
 				rsp.RequestRaw = result.RequestRaw
@@ -901,11 +908,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				result.Response, _ = lowhttp.ParseStringToHTTPResponse(string(result.ResponseRaw))
 			}
 
-			// too large request
-			if len(result.RequestRaw) > 1*1024*1024 {
-				result.RequestRaw = result.RequestRaw[:1*1024*1024]
-				result.RequestRaw = append(result.RequestRaw, []byte("...(request > 1M) chunked by yakit web fuzzer")...)
-			}
 			tooLarge := false
 			tooLargeHeaderFile, tooLargeBodyFile := "", ""
 			if lowhttpResponse != nil {
