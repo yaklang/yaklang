@@ -2,11 +2,13 @@ package yakurl
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -75,7 +77,7 @@ Get SyntaxFlowAction
 */
 func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	url := params.GetUrl()
-	programID := url.GetLocation()
+	programName := url.GetLocation()
 	syntaxFlowCode := string(params.GetBody())
 	path := url.Path
 	// Parse variable and index from path
@@ -96,7 +98,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 	}
 
-	result, err := a.querySF(programID, syntaxFlowCode)
+	result, err := a.querySF(programName, syntaxFlowCode)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +119,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 			_ = index
 			res := createNewRes(url, 0, map[string]any{
 				"index":      index,
-				"code_range": coverCodeRange(v.GetRange()),
+				"code_range": coverCodeRange(programName, v.GetRange()),
 			})
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
@@ -131,10 +133,11 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 			return nil, utils.Errorf("index out of range: %d", index)
 		}
 		value := vs[index]
-		res := Value2Response(value, url)
-		if msg := result.AlertMsgTable[variable]; msg != "" {
-			res.VerboseName = msg
+		msg := ""
+		if m := result.AlertMsgTable[variable]; m != "" {
+			msg = m
 		}
+		res := Value2Response(programName, value, msg, url)
 		resources = append(resources, res)
 	}
 
@@ -209,9 +212,9 @@ type CodeRange struct {
 	EndColumn   int64  `json:"end_column"`
 }
 
-func coverCodeRange(r *ssa.Range) *CodeRange {
+func coverCodeRange(programName string, r *ssa.Range) *CodeRange {
 	return &CodeRange{
-		URL:         r.GetEditor().GetFormatedUrl(),
+		URL:         fmt.Sprintf("/%s/%s", programName, r.GetEditor().GetFilename()),
 		StartLine:   int64(r.GetStart().GetLine()),
 		StartColumn: int64(r.GetStart().GetColumn()),
 		EndLine:     int64(r.GetEnd().GetLine()),
@@ -220,12 +223,12 @@ func coverCodeRange(r *ssa.Range) *CodeRange {
 }
 
 type NodeInfo struct {
-	NodeID    int        `json:"node_id"`
+	NodeID    string     `json:"node_id"`
 	IRCode    string     `json:"ir_code"`
 	CodeRange *CodeRange `json:"code_range"`
 }
 
-func Value2Response(value *ssaapi.Value, url *ypb.YakURL) *ypb.YakURLResource {
+func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
 	valueGraph := ssaapi.NewValueGraph(value)
 	var buf bytes.Buffer
 	valueGraph.GenerateDOT(&buf)
@@ -234,17 +237,18 @@ func Value2Response(value *ssaapi.Value, url *ypb.YakURL) *ypb.YakURLResource {
 	nodeInfos := make([]*NodeInfo, 0, len(valueGraph.Node2Value))
 	for id, nodeValue := range valueGraph.Node2Value {
 		ni := &NodeInfo{
-			NodeID:    id,
+			NodeID:    dot.NodeName(id),
 			IRCode:    nodeValue.String(),
-			CodeRange: coverCodeRange(nodeValue.GetRange()),
+			CodeRange: coverCodeRange(programName, nodeValue.GetRange()),
 		}
 		nodeInfos = append(nodeInfos, ni)
 	}
 
 	res := createNewRes(url, 0, map[string]any{
-		"node_id":    id,
+		"node_id":    dot.NodeName(id),
 		"graph":      buf.String(), // string
 		"graph_info": nodeInfos,
+		"message":    msg,
 	})
 	res.ResourceType = "information"
 	res.ResourceName = value.String()
