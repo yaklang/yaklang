@@ -1,0 +1,19 @@
+key = cli.String("key", cli.setRequired(true), cli.setVerboseName("Cookie Key"))
+val = cli.String("val", cli.setRequired(true), cli.setVerboseName("Cookie Value"))
+
+keyword = cli.String("url-keyword", cli.setRequired(false), cli.setCliGroup("前提条件"), cli.setVerboseName("URL 前提条件"))
+
+cli.check()
+
+
+
+hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
+    skip := false
+    if keyword != "" {
+        skip = !url.Contains(keyword)
+    }
+    if skip {
+        return
+    }
+    forward(poc.ReplaceHTTPPacketCookie(req, key, val))
+}
