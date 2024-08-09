@@ -68,6 +68,14 @@ func (v *BaseYaklangParserVisitor) VisitReturnStmt(ctx *ReturnStmtContext) inter
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseYaklangParserVisitor) VisitCallExpr(ctx *CallExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitFunctionCallExpr(ctx *FunctionCallExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseYaklangParserVisitor) VisitForStmt(ctx *ForStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -89,6 +97,14 @@ func (v *BaseYaklangParserVisitor) VisitForRangeStmt(ctx *ForRangeStmtContext) i
 }
 
 func (v *BaseYaklangParserVisitor) VisitSwitchStmt(ctx *SwitchStmtContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitPanicStmt(ctx *PanicStmtContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitRecoverStmt(ctx *RecoverStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

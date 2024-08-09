@@ -84,6 +84,9 @@ func LanguageServerAnalyzeProgram(id, code, inspectType, scriptType string, rng 
 				return prog, nil
 			}
 		}
+		if err != nil {
+			prog, err = static_analyzer.SSAParse(code, scriptType, ssaapi.WithIgnoreSyntaxError(true))
+		}
 		return prog, err
 	}
 
