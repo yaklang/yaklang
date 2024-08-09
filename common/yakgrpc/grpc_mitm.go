@@ -558,12 +558,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 					})
 
-					if strings.Contains(err.Error(), "YakVM Panic:") {
-						splitErr := strings.SplitN(err.Error(), "YakVM Panic:", 2)
-						err = utils.Error(splitErr[1])
-					}
-
 					if err != nil {
+						if strings.Contains(err.Error(), "YakVM Panic:") {
+							splitErr := strings.SplitN(err.Error(), "YakVM Panic:", 2)
+							err = utils.Error(splitErr[1])
+						}
 						yakit.BroadcastData(yakit.ServerPushType_Error, fmt.Sprintf("mitm load hotpatch script error:%v", err))
 					}
 
