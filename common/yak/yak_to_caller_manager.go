@@ -698,7 +698,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		funcType := funcValue.Type()
 		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
 			pocContextOpt := []poc.PocConfigOption{
-				poc.WithSource(pluginName),
+				//poc.WithSource(pluginName),
 				poc.WithFromPlugin(pluginName),
 				poc.WithRuntimeId(runtimeId),
 				poc.WithProxy(proxy),
@@ -730,7 +730,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		funcType := funcValue.Type()
 		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
 			httpContextOpt := []http_struct.HttpOption{
-				yakhttp.WithSource(pluginName),
+				//yakhttp.WithSource(pluginName),
 				yakhttp.WithFromPlugin(pluginName),
 				yakhttp.WithRuntimeID(runtimeId),
 				yakhttp.WithProxy(proxy),
@@ -798,7 +798,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		if ok {
 			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error) {
 				opts = append([]mutate.BuildFuzzHTTPRequestOption{mutate.OptContext(pluginContext.Ctx)}, opts...)
-				opts = append(opts, mutate.OptSource(pluginName))
+				opts = append(opts, mutate.OptFromPlugin(pluginName))
 				if runtimeId != "" {
 					opts = append(opts, mutate.OptRuntimeId(runtimeId))
 				}
@@ -813,7 +813,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		if ok {
 			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) *mutate.FuzzHTTPRequest {
 				opts = append([]mutate.BuildFuzzHTTPRequestOption{mutate.OptContext(pluginContext.Ctx)}, opts...)
-				opts = append(opts, mutate.OptSource(pluginName))
+				opts = append(opts, mutate.OptFromPlugin(pluginName))
 				opts = append(opts, mutate.OptProxy(proxy))
 				if runtimeId != "" {
 					opts = append(opts, mutate.OptRuntimeId(runtimeId))
