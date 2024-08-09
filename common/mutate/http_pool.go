@@ -95,6 +95,8 @@ type httpPoolConfig struct {
 	WithPayloads bool
 
 	RandomSession bool // for cookie jar
+
+	FromPlugin string
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -461,6 +463,12 @@ func _httpPool_proxies(proxies ...string) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_fromPlugin(plugin string) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.FromPlugin = plugin
+	}
+}
+
 func _httpPool_extraMutateCondition(codes ...*RegexpMutateCondition) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.ExtraRegexpMutateCondition = codes
@@ -763,6 +771,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSession(tmpSession))
 						}
 
+						if config.FromPlugin != "" {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithFromPlugin(config.FromPlugin))
+						}
+
 						if config.OverrideEnableSystemProxyEnv {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableSystemProxyFromEnv(!config.NoSystemProxy))
 						}
@@ -1018,6 +1030,7 @@ var HttpPoolExports = map[string]interface{}{
 var (
 	WithPoolOpt_noFixContentLength         = _httpPool_noFixContentLength
 	WithPoolOpt_Proxy                      = _httpPool_proxies
+	WithPoolOpt_FromPlugin                 = _httpPool_fromPlugin
 	WithPoolOpt_Timeout                    = _httpPool_PerRequestTimeout
 	WithPoolOpt_Concurrent                 = _httpPool_SetSize
 	WithPoolOpt_SizedWaitGroup             = _httpPool_SetSizedWaitGroup

@@ -46,6 +46,7 @@ type FuzzHTTPRequest struct {
 	position               lowhttp.HttpParamPositionType
 	mode                   int
 	mutex                  sync.Mutex
+	fromPlugin             string
 }
 
 func (f *FuzzHTTPRequest) NoAutoEncode() bool {
@@ -242,6 +243,7 @@ type buildFuzzHTTPRequestConfig struct {
 	QueryParams     *lowhttp.QueryParams
 	Proxy           string
 	Ctx             context.Context
+	FromPlugin      string
 }
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
@@ -285,6 +287,12 @@ func OptRuntimeId(r string) BuildFuzzHTTPRequestOption {
 func OptSource(i string) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.Source = i
+	}
+}
+
+func OptFromPlugin(i string) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.FromPlugin = i
 	}
 }
 
@@ -466,6 +474,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 		ctx:             config.Ctx,
 		opts:            opts,
 		mode:            packetFuzz,
+		fromPlugin:      config.FromPlugin,
 	}
 
 	return req, nil
@@ -478,6 +487,9 @@ func (f *FuzzHTTPRequest) GetCurrentOptions() []BuildFuzzHTTPRequestOption {
 	}
 	if f.source != "" {
 		result = append(result, OptSource(f.source))
+	}
+	if f.fromPlugin != "" {
+		result = append(result, OptFromPlugin(f.fromPlugin))
 	}
 	if f.isHttps {
 		result = append(result, OptHTTPS(f.isHttps))
@@ -1036,6 +1048,7 @@ func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *HttpResult, 
 	originOpts[1] = WithPoolOpt_Source(f.source)
 	originOpts[2] = WithPoolOpt_RuntimeId(f.runtimeId)
 	originOpts[3] = WithPoolOpt_Proxy(f.proxy)
+	originOpts[4] = WithPoolOpt_FromPlugin(f.fromPlugin)
 	if f.ctx != nil {
 		originOpts = append(originOpts, WithPoolOpt_Context(f.ctx))
 	}

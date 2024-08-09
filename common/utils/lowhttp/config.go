@@ -80,6 +80,8 @@ type LowhttpExecConfig struct {
 
 	RandomJA3FingerPrint bool
 	ClientHelloSpec      *utls.ClientHelloSpec
+
+	Tags []string
 }
 
 type LowhttpResponse struct {
@@ -112,6 +114,9 @@ type LowhttpResponse struct {
 
 	// payloads (web fuzzer)
 	Payloads []string
+
+	// custom tags
+	Tags []string
 }
 
 func (l *LowhttpResponse) GetBody() []byte {
@@ -188,6 +193,12 @@ func NewLowhttpOption() *LowhttpExecConfig {
 }
 
 type LowhttpOpt func(o *LowhttpExecConfig)
+
+func WithAppendHTTPFlowTag(tag string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.Tags = append(o.Tags)
+	}
+}
 
 func WithMaxContentLength(m int) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
