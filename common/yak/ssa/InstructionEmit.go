@@ -35,7 +35,7 @@ func DeleteInst(i Instruction) {
 			return item.GetId() != phi.GetId()
 		})
 	} else {
-		//b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
+		// b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
 		b.Insts = lo.Filter(b.Insts, func(item Instruction, index int) bool {
 			return item.GetId() != i.GetId()
 		})
@@ -208,7 +208,9 @@ func (f *FunctionBuilder) EmitOnly(i Instruction) {
 func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	fixupUseChain(i)
 	// i.SetScope(f.CurrentScope)
-	i.SetRange(f.CurrentRange)
+	if i.GetRange() == nil {
+		i.SetRange(f.CurrentRange)
+	}
 	i.SetBlock(f.CurrentBlock)
 	i.SetFunc(f.Function)
 	f.GetProgram().SetVirtualRegister(i)
