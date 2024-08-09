@@ -194,6 +194,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		withConnPool         = option.WithConnPool
 		sni                  = option.SNI
 		payloads             = option.Payloads
+		tags                 = option.Tags
 		firstAuth            = true
 		reqIns               = option.NativeHTTPRequestInstance
 		maxContentLength     = option.MaxContentLength
@@ -255,6 +256,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		response.Source = source
 	}
 	response.Payloads = payloads
+	response.Tags = tags
 
 	if option.EnableMaxContentLength && maxContentLength > 0 {
 		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)
