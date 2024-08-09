@@ -263,7 +263,7 @@ func (b *astbuilder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtCon
 
 // TODO: include stmt
 
-func (b *astbuilder) buildCallExprStmt(stmt *yak.CallExprContext) (c *ssa.Call) {
+func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -272,9 +272,6 @@ func (b *astbuilder) buildCallExprStmt(stmt *yak.CallExprContext) (c *ssa.Call) 
 		c = b.buildFunctionCall(funcCallExprStmt.FunctionCall().(*yak.FunctionCallContext), v)
 	} else if instanceCodeStmt, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
 		c = b.buildInstanceCode(instanceCodeStmt)
-	}
-	if c != nil {
-		c.SetRange(b.CurrentRange)
 	}
 	return c
 }
@@ -285,15 +282,19 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 	defer recoverRange()
 
 	var i ssa.Instruction
+	var alreadyEmit bool
 	if s, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
-		i = b.buildCallExprStmt(s)
+		i = b.buildCallExpr(s)
+		alreadyEmit = true
 	} else if s, ok := stmt.RecoverStmt().(*yak.RecoverStmtContext); ok {
 		i = b.buildRecoverStmt(s)
 	} else if s, ok := stmt.PanicStmt().(*yak.PanicStmtContext); ok {
 		i = b.buildPanicStmt(s)
 	}
 	if i != nil {
-		b.SetInstructionPosition(i)
+		if !alreadyEmit {
+			b.SetInstructionPosition(i)
+		}
 		b.EmitDefer(i)
 	}
 }
@@ -305,10 +306,9 @@ func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
 
 	var c *ssa.Call
 	if stmt, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
-		c = b.buildCallExprStmt(stmt)
+		c = b.buildCallExpr(stmt)
 	}
 	c.Async = true
-	b.EmitCall(c)
 	return c
 }
 
