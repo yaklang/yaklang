@@ -1709,6 +1709,8 @@ var PoCExports = map[string]interface{}{
 	"noFixContentLength":   WithNoFixContentLength,
 	"session":              WithSession,
 	"save":                 WithSave,
+	"saveSync":             WithSaveSync,
+	"saveHandler":          WithSaveHandler,
 	"source":               WithSource,
 	"websocket":            WithWebsocket,
 	"websocketFromServer":  WithWebsocketHandler,

@@ -87,7 +87,6 @@ func RegisterLowHTTPSaveCallback() {
 		flow.HiddenIndex = hiddenIndex
 		flow.Payload = strings.Join(payloads, ",")
 		flow.Tags = strings.Join(tags, "|")
-		err = InsertHTTPFlowEx(flow)
 		err = InsertHTTPFlowEx(flow, saveFlowSync)
 		if err != nil {
 			log.Errorf("insert httpflow failed: %s", err)
