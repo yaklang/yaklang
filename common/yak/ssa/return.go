@@ -155,6 +155,9 @@ func handlerReturnType(rs []*Return) Type {
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+	if f.DeferBlock != nil {
+		f.Blocks = append(f.Blocks, f.DeferBlock)
+	}
 
 	if f.Type == nil {
 		f.Type = NewFunctionType("", nil, nil, false)
@@ -177,7 +180,7 @@ func (f *Function) Finish() {
 	funType.ParameterMember = lo.FilterMap(f.ParameterMembers, func(i Value, _ int) (*ParameterMember, bool) {
 		return ToParameterMember(i)
 	})
-	var result = make(map[string]*Parameter)
+	result := make(map[string]*Parameter)
 	for n, p := range f.FreeValues {
 		if param, ok := ToParameter(p); ok {
 			result[n] = param
