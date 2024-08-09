@@ -1237,7 +1237,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if modifiedByRule {
 					return httpctx.GetHijackedRequestBytes(originReqIns)
 				}
-				return plainRequest
+				return getPlainRequestBytes(originReqIns)
 			}, constClujore(func(replaced interface{}) {
 				if dropped.IsSet() {
 					return
