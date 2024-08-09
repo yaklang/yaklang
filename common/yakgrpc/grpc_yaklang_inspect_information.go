@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -373,18 +374,13 @@ func (s *Server) YaklangGetCliCodeFromDatabase(ctx context.Context, req *ypb.Yak
 	}, nil
 }
 
-// func GetParameter(code string) (string, error) {
-// 	prog, err := static_analyzer.SSAParse(code, "yak")
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	parameters, _ := information.ParseCliParameter(prog)
-// 	cli := cliParam2grpc(parameters)
-// 	data, err := json.Marshal(cli)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	str := strconv.Quote(string(data))
-// 	return str, nil
-// }
+func GenerateParameterFromProgram(prog *ssaapi.Program) (string, error) {
+	parameters, _ := information.ParseCliParameter(prog)
+	cli := cliParam2grpc(parameters)
+	data, err := json.Marshal(cli)
+	if err != nil {
+		return "", err
+	}
+	str := strconv.Quote(string(data))
+	return str, nil
+}

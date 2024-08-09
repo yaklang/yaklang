@@ -32,8 +32,10 @@ type VulInfo struct {
 	Id             string
 }
 
-var vulAddr string
-var server VulServerInfo
+var (
+	vulAddr string
+	server  VulServerInfo
+)
 
 func init() {
 	var err error
@@ -74,7 +76,6 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 			Method:           vulInfo.Method,
 		},
 	})
-
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +98,7 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 		panic("NO RUNTIME ID SET")
 	}
 
-	var expected = make(map[string]int)
+	expected := make(map[string]int)
 	for k := range vulInfo.ExpectedResult {
 		expected[k] = 0
 	}
