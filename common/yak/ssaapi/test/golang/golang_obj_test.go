@@ -31,10 +31,7 @@ func TestBasic_BasicObject(t *testing.T) {
 		)
 	})
 
-	// TODO: handler struct instance {}
 	t.Run("simple cross function", func(t *testing.T) {
-		t.Skip() // delete this
-
 		ssatest.CheckSyntaxFlowContain(t, `package main
 
 	type t struct {

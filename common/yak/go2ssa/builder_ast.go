@@ -34,16 +34,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
 			}
 			lib.PushEditor(prog.GetCurrentEditor())
-	
-			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "init")
-			if builder != nil {
-				builder.SetBuildSupport(b.FunctionBuilder)
-				currentBuilder := b.FunctionBuilder
-				b.FunctionBuilder = builder
-				defer func() {
-					b.FunctionBuilder = currentBuilder
-				}()
-			}
 		}
 	}
 
@@ -427,6 +417,11 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	recoverRange := b.SetRange(typedef.BaseParserRuleContext)
 	defer recoverRange()
 
+	if param := typedef.TypeParameters(); param != nil {
+		tpHander := b.buildTypeParameters(param.(*gol.TypeParametersContext))
+		defer tpHander()
+	}
+
 	name := typedef.IDENTIFIER().GetText()
 	ssatyp := b.buildType(typedef.Type_().(*gol.Type_Context))
 
@@ -441,16 +436,23 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	}
 }
 
-func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext) {
+func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext) func(){
 	recoverRange := b.SetRange(typ.BaseParserRuleContext)
 	defer recoverRange()
 	var alias []*ssa.AliasType
 
-	// TODO
-
 	for _, t := range typ.AllTypeParameterDecl() {
 		aliast := b.buildTypeParameterDecl(t.(*gol.TypeParameterDeclContext))
 		alias = append(alias, aliast...)
+	}
+	for _,a := range alias{
+		b.AddAlias(a.Name, a)
+	}
+
+	return func(){
+		for _,a := range alias{
+		    b.DelAliasByStr(a.Name)
+		}
 	}
 }
 
@@ -511,7 +513,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if typeps := fun.TypeParameters(); typeps != nil {
-			b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
+			b.tpHander[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
 		}
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
@@ -539,7 +541,13 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 
 func (b *astbuilder) buildFunctionDeclFinish(fun *gol.FunctionDeclContext, newFunc *ssa.Function) {
 	recoverRange := b.SetRange(fun.BaseParserRuleContext)
-	defer recoverRange()
+	defer func(){
+		recoverRange()
+		if tph := b.tpHander[newFunc.GetName()]; tph != nil {
+			tph()
+			delete(b.tpHander, newFunc.GetName())
+		}
+	}()
 	b.FunctionBuilder = b.PushFunction(newFunc)
 
 	if block, ok := fun.Block().(*gol.BlockContext); ok {
@@ -1641,11 +1649,28 @@ func (b *astbuilder) buildAssignment(stmt *gol.AssignmentContext) []ssa.Value {
 	return rightvl
 }
 
-func (b *astbuilder) buildTypeArgs(stmt *gol.TypeArgsContext) {
+func (b *astbuilder) buildTypeArgs(stmt *gol.TypeArgsContext) func() {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	var alias []*ssa.AliasType
+	var ssatyp ssa.Type
 
-	// TODO
+	if tl := stmt.TypeList(); tl != nil {
+		ssatyp = ssa.CreateAnyType()
+		for _, typ := range tl.(*gol.TypeListContext).AllType_() {
+		    aliast := ssa.NewAliasType(typ.(*gol.Type_Context).GetText(), ssatyp.PkgPathString(), ssatyp)
+		    alias = append(alias, aliast)
+		}
+	}
+	for _,a := range alias{
+		b.AddAlias(a.Name, a)
+	}
+
+	return func() {
+		for _,a := range alias{
+		    b.DelAliasByStr(a.Name)
+		}
+	}
 }
 
 func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
@@ -1657,26 +1682,25 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 		ssatyp = b.buildType(lit.(*gol.Type_Context))
 	}
 
-	if name := typ.TypeName(); name != nil {
-		if qul := name.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
+	if tname := typ.TypeName(); tname != nil {
+		if qul := tname.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
 			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
 				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
 				ssatyp = obj.GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
 			}
 		}else{
-			text := typ.GetText()
-			ssatyp = ssa.GetTypeByStr(text)
+			name := typ.TypeName().(*gol.TypeNameContext).IDENTIFIER().GetText()
+			if a := typ.TypeArgs(); a != nil {
+				b.tpHander[name] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
+			}
+			ssatyp = ssa.GetTypeByStr(name)
 			if ssatyp == nil {
-				ssatyp = b.GetAliasByStr(text)
+				ssatyp = b.GetAliasByStr(name)
 			}
 			if ssatyp == nil {
-				ssatyp = b.GetStructByStr(text)
+				ssatyp = b.GetStructByStr(name)
 			}
 		}
-	}
-
-	if args := typ.TypeArgs(); args != nil {
-		b.buildTypeArgs(args.(*gol.TypeArgsContext))
 	}
 
 	if lit := typ.TypeLit(); lit != nil {
