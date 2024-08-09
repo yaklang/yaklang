@@ -261,7 +261,7 @@ func (v *Value) GetUsers() Values {
 	return v.users
 }
 
-func (v *Value) GetReferences() Values {
+func (v *Value) GetPointer() Values {
 	if v.IsNil() {
 		return nil
 	}

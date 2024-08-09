@@ -193,8 +193,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// TODO: trace the specific return-values
 		fun, isFunc := ssa.ToFunction(calleeInst)
 		// callee := i.NewValue(fun)
-		if !isFunc && calleeInst.GetPoint() != nil {
-			fun, isFunc = ssa.ToFunction(calleeInst.GetPoint())
+		if !isFunc && calleeInst.GetReference() != nil {
+			fun, isFunc = ssa.ToFunction(calleeInst.GetReference())
 			// callee = i.NewValue(fun)
 		}
 
