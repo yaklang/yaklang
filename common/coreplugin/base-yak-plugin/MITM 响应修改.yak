@@ -1,0 +1,61 @@
+inputs = cli.Text("inputs", 
+cli.setHelp(`对响应进行的替换操作，每行两列，第一列为正则表达式,第二列为替换的内容，支持多行
+例子1
+(Server): (cloudflare),$1: example
+`),
+cli.setRequired(true),
+cli.setVerboseName("操作"),
+)
+rawMatchRegexps = cli.StringSlice("rawMatchRegexps", 
+cli.setMultipleSelect(true),
+cli.setHelp("只有原始请求报文匹配到指定内容才进行操作，多个匹配间为或关系，与请求 URL 匹配为且关系，支持正则"),
+cli.setVerboseName("请求报文匹配"),
+)
+urlMatchRegexps = cli.StringSlice("urlMatchRegexps", 
+cli.setMultipleSelect(true),
+cli.setHelp("只有 URL 匹配到指定内容才进行操作，多个匹配间为或关系，与请求报文匹配为且关系，支持正则"),
+cli.setVerboseName("请求URL匹配"),
+)
+cli.check()
+inputActions = str.ParseStringToLines(inputs)
+
+patterns = []
+for line in inputActions {
+    splited = line.SplitN(",", 2)
+    pattern = re2.Compile(splited[0])~
+    patterns = append(patterns, {
+        "pattern": pattern,
+        "replaced": splited[1],
+    })
+}
+
+hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
+    rawShouldHandle, urlShouldHandle = true, true 
+    if len(rawMatchRegexps) > 0 {
+        for m in rawMatchRegexps {
+            pattern = re2.Compile(m)~
+            rawShouldHandle = pattern.MatchString(req)~
+            // or
+            if rawShouldHandle {
+                break 
+            }
+        }
+    }
+    if len(urlMatchRegexps) > 0 {
+        for m in urlMatchRegexps {
+            pattern = re2.Compile(m)~
+            urlShouldHandle = pattern.MatchString(url)~
+            // or
+            if urlShouldHandle {
+                break 
+            }
+        }
+    }
+
+    if rawShouldHandle && urlShouldHandle {
+        for item in patterns {
+            rsp = item.pattern.Replace(string(rsp), item.replaced, -1, -1)~
+        }
+        forward(rsp)
+    }
+}

@@ -4,6 +4,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,17 +15,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-var (
-	buildInPlugin = make(map[string]*schema.YakScript)
-)
+var buildInPlugin = make(map[string]*schema.YakScript)
 
 type pluginConfig struct {
-	Help     string
-	Author   []string
-	ParamRaw string
+	Help                string
+	Author              []string
+	Tags                []string
+	EnableGenerateParam bool
 }
 
 type pluginOption func(*pluginConfig)
+
+func withPluginTags(tags []string) pluginOption {
+	return func(config *pluginConfig) {
+		config.Tags = tags
+	}
+}
 
 func withPluginHelp(pluginHelp string) pluginOption {
 	return func(config *pluginConfig) {
@@ -36,14 +44,14 @@ func withPluginAuthors(authors ...string) pluginOption {
 	}
 }
 
-func withPluginParamRaw(s string) pluginOption {
+func withPluginEnableGenerateParam(b bool) pluginOption {
 	return func(config *pluginConfig) {
-		config.ParamRaw = s
+		config.EnableGenerateParam = b
 	}
 }
 
 func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) {
-	var codes = string(GetCorePluginData(name))
+	codes := string(GetCorePluginData(name))
 	if len(codes) <= 0 {
 		return
 	}
@@ -52,13 +60,15 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 	for _, o := range opt {
 		o(config)
 	}
-	var plugin = &schema.YakScript{
+
+	plugin := &schema.YakScript{
 		ScriptName:         name,
 		Type:               pluginType,
 		Content:            codes,
 		Help:               config.Help,
 		Author:             "yaklang.io",
-		Params:             config.ParamRaw,
+		Params:             "",
+		Tags:               strings.Join(config.Tags, ","),
 		OnlineContributors: strings.Join(config.Author, ","),
 		Uuid:               uuid.New().String(),
 		OnlineOfficial:     true,
@@ -66,7 +76,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,
 	}
 	buildInPlugin[name] = plugin
-	OverWriteYakPlugin(plugin.ScriptName, plugin)
+	OverWriteYakPlugin(plugin.ScriptName, plugin, config.EnableGenerateParam)
 }
 
 func init() {
@@ -144,50 +154,100 @@ func init() {
 			withPluginAuthors("V1ll4n"),
 		)
 		registerBuildInPlugin(
+			"mitm", "MITM 请求修改",
+			withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
+			withPluginAuthors("WaY"),
+			withPluginEnableGenerateParam(true),
+			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+		)
+		registerBuildInPlugin(
+			"mitm", "MITM 响应修改",
+			withPluginHelp("允许用户修改响应：支持正则，支持匹配到响应再操作，支持多个操作"),
+			withPluginAuthors("WaY"),
+			withPluginEnableGenerateParam(true),
+			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+		)
+		registerBuildInPlugin(
 			"yak", "核心引擎性能采样",
 			withPluginHelp("动态开启PPROF采样，用于性能调优"),
 			withPluginAuthors("V1ll4n,Q16G"),
-			withPluginParamRaw(`"[{\"Field\":\"memProfile\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"内存文件路径\",\"Help\":\"设置默认内存的profile文件路径\",\"MethodType\":\"string\"},{\"Field\":\"cpuProfileFile\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"cpu文件路径\",\"Help\":\"设置默认cpu的profile文件路径\",\"MethodType\":\"string\"},{\"Field\":\"timeout\",\"DefaultValue\":\"10\",\"TypeVerbose\":\"float\",\"FieldVerbose\":\"检测时间\",\"Help\":\"检测 timeout 时间\",\"Required\":true,\"MethodType\":\"float\"},{\"Field\":\"startMemory\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否检测内存\",\"Help\":\"开始检测内存\",\"Required\":true,\"MethodType\":\"boolean\"},{\"Field\":\"startCpu\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否检测cpu\",\"Help\":\"开始检测cpu\",\"Required\":true,\"MethodType\":\"boolean\"}]"`),
+			withPluginEnableGenerateParam(true),
 		)
 		registerBuildInPlugin(
 			"yak", "SSA 项目编译",
 			withPluginHelp("将选择的项目编译到 SSA 数据库内，用于后续的代码查询和分析。"),
 			withPluginAuthors("Lingze"),
-			withPluginParamRaw(`"[{\"Field\":\"programName\",\"TypeVerbose\":\"string\",\"FieldVerbose\":\"项目名\",\"Required\":true,\"MethodType\":\"string\"},{\"Field\":\"ProgramPath\",\"TypeVerbose\":\"upload-folder-path\",\"FieldVerbose\":\"项目路径\",\"Required\":true,\"MethodType\":\"folder_name\"},{\"Field\":\"language\",\"TypeVerbose\":\"select\",\"FieldVerbose\":\"language\",\"Required\":true,\"ExtraSetting\":\"{\\\"double\\\":false,\\\"data\\\":[{\\\"key\\\":\\\"Golang\\\",\\\"label\\\":\\\"Golang\\\",\\\"value\\\":\\\"go\\\"},{\\\"key\\\":\\\"Java\\\",\\\"label\\\":\\\"Java\\\",\\\"value\\\":\\\"java\\\"},{\\\"key\\\":\\\"PHP\\\",\\\"label\\\":\\\"PHP\\\",\\\"value\\\":\\\"php\\\"},{\\\"key\\\":\\\"Yaklang\\\",\\\"label\\\":\\\"Yaklang\\\",\\\"value\\\":\\\"yak\\\"},{\\\"key\\\":\\\"JavaScript\\\",\\\"label\\\":\\\"JavaScript\\\",\\\"value\\\":\\\"js\\\"}]}\",\"MethodType\":\"select\"},{\"Field\":\"re-compile\",\"DefaultValue\":\"true\",\"TypeVerbose\":\"boolean\",\"FieldVerbose\":\"是否重新编译\",\"MethodType\":\"boolean\"},{\"Field\":\"entry\",\"TypeVerbose\":\"multiple-file-path\",\"FieldVerbose\":\"项目入口文件\",\"MethodType\":\"file_names\"}]"`),
+			withPluginEnableGenerateParam(true),
 		)
 		return nil
 	})
 }
 
+// only use for test
 func OverWriteCorePluginToLocal() {
 	for pluginName, instance := range buildInPlugin {
-		OverWriteYakPlugin(pluginName, instance)
+		OverWriteYakPlugin(pluginName, instance, true)
 	}
 }
 
-func OverWriteYakPlugin(name string, scriptData *schema.YakScript) {
+func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerateParam bool) {
+	var err error
+	generateParam := func(code, pluginType string) (string, error) {
+		if enableGenerateParam {
+			oldLevel := log.GetLevel()
+			log.SetLevel(log.ErrorLevel)
+			defer log.SetLevel(oldLevel)
+
+			prog, err := static_analyzer.SSAParse(code, pluginType)
+			if err != nil {
+				return "", err
+			}
+			params, err := yakgrpc.GenerateParameterFromProgram(prog)
+			if err != nil {
+				return "", utils.Wrapf(err, "generate param for %s failed", name)
+			}
+			return params, nil
+		}
+		return "", nil
+	}
+	pluginHash := func(code string, headImg string, tags string) string {
+		return utils.CalcSha1(string(code), headImg, tags)
+	}
+
 	codeBytes := GetCorePluginData(name)
+	code := string(codeBytes)
 	if codeBytes == nil {
 		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
-	backendSha1 := utils.CalcSha1(string(codeBytes), scriptData.HeadImg, strings.Trim(scriptData.Params, `"`))
+	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags)
+
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
 		log.Infof("add core plugin %v to plugin database", name)
 		// 添加核心插件字段
 		scriptData.IsCorePlugin = true
-		err := yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
+		// 生成参数
+		scriptData.Params, err = generateParam(code, scriptData.Type)
+		if err != nil {
+			log.Error(err)
+		}
+		err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, scriptData)
 		if err != nil {
 			log.Errorf("create/update yak script[%v] failed: %s", name, err)
 		}
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && utils.CalcSha1(databasePlugin.Content, databasePlugin.HeadImg, strings.Trim(databasePlugin.Params, `"`)) == backendSha1 && databasePlugin.IsCorePlugin {
+	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags) && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
+		// 生成参数
+		scriptData.Params, err = generateParam(string(codeBytes), scriptData.Type)
+		if err != nil {
+			log.Error(err)
+		}
 		err := yakit.DeleteYakScriptByID(consts.GetGormProfileDatabase(), int64(databasePlugin.ID))
 		if err != nil {
 			log.Warnf("delete legacy script reason: overrid")

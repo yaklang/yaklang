@@ -1,0 +1,93 @@
+inputs = cli.Text("inputs", 
+cli.setHelp(`对请求进行的操作，每行四列，第一列为操作方法(append,replace,delete),第二列为操作类型(header,get,post,cookie),第三列为键名，第四列为键值，支持多行
+例子1:
+append,header,AAA,BBB
+例子2:
+replace,post,aaa,ccc
+例子3:
+delete,get,aaa,
+`),
+cli.setRequired(true),
+cli.setVerboseName("操作"),
+)
+rawMatchRegexps = cli.StringSlice("rawMatchRegexps", 
+cli.setMultipleSelect(true),
+cli.setHelp("只有原始请求报文匹配到指定内容才进行操作，多个匹配间为或关系，与请求 URL 匹配为且关系，支持正则"),
+cli.setVerboseName("请求报文匹配"),
+)
+urlMatchRegexps = cli.StringSlice("urlMatchRegexps", 
+cli.setMultipleSelect(true),
+cli.setHelp("只有 URL 匹配到指定内容才进行操作，多个匹配间为或关系，与请求报文匹配为且关系，支持正则"),
+cli.setVerboseName("请求URL匹配"),
+)
+cli.check()
+inputActions = str.ParseStringToLines(inputs)
+
+opts = []
+for line in inputActions {
+    splited = line.SplitN(",", 4)
+    action, typ, key, value = splited[0], splited[1], splited[2], splited[3]
+    funcs = []
+    switch action {
+        case "append":
+            funcs = [poc.appendHeader, poc.appendQueryParam, poc.appendPostParam, poc.appendCookie]
+        case "delete":
+            funcs = [poc.deleteHeader, poc.deleteQueryParam, poc.deletePostParam, poc.deleteCookie]
+        case "replace":
+            funcs = [poc.replaceHeader, poc.replaceQueryParam, poc.replacePostParam, poc.replaceCookie]
+    }
+    if len(funcs) == 0{
+        yakit.Error("错误的 action: %s", action)
+        return 
+    }
+    index = -1
+    switch typ {
+        case "header":
+            index = 0
+        case "get":
+            index = 1
+        case "post":
+            index = 2
+        case "cookie":
+            index = 3
+    }
+    if index == -1 {
+        yakit.Error("错误的 type: %s", typ)
+    }
+    f = funcs[index]
+    if action == "delete" {
+        opts = append(opts, f(key))
+    } else {
+        opts = append(opts, f(key, value))
+    }
+}
+
+hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
+    rawShouldHandle, urlShouldHandle = true, true 
+    if len(rawMatchRegexps) > 0 {
+        for m in rawMatchRegexps {
+            pattern = re2.Compile(m)~
+            rawShouldHandle = pattern.MatchString(req)~
+            // or
+            if rawShouldHandle {
+                break 
+            }
+        }
+    }
+    if len(urlMatchRegexps) > 0 {
+        for m in urlMatchRegexps {
+            pattern = re2.Compile(m)~
+            urlShouldHandle = pattern.MatchString(url)~
+            // or
+            if urlShouldHandle {
+                break 
+            }
+        }
+    }
+
+    if rawShouldHandle && urlShouldHandle {
+        newReq = poc.BuildRequest(req, opts...)
+        forward(newReq)
+    }
+}
+
