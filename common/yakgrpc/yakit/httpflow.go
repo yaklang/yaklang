@@ -32,7 +32,7 @@ func init() {
 }
 
 func RegisterLowHTTPSaveCallback() {
-	lowhttp.RegisterSaveHTTPFlowHandler(func(r *lowhttp.LowhttpResponse) {
+	lowhttp.RegisterSaveHTTPFlowHandler(func(r *lowhttp.LowhttpResponse, saveFlowSync bool) {
 		var (
 			https       = r.Https
 			req         = r.RawRequest
@@ -85,7 +85,7 @@ func RegisterLowHTTPSaveCallback() {
 		flow.RuntimeId = runtimeId
 		flow.HiddenIndex = hiddenIndex
 		flow.Payload = strings.Join(payloads, ",")
-		err = InsertHTTPFlowEx(flow)
+		err = InsertHTTPFlowEx(flow, saveFlowSync)
 		if err != nil {
 			log.Errorf("insert httpflow failed: %s", err)
 		}
@@ -494,8 +494,8 @@ func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
 	}
 }
 
-func InsertHTTPFlowEx(i *schema.HTTPFlow, finishHandler ...func()) error {
-	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
+func InsertHTTPFlowEx(i *schema.HTTPFlow, forceSync bool, finishHandler ...func()) error {
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() || forceSync {
 		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
 	} else {
 		DBSaveAsyncChannel <- func(db *gorm.DB) error {
