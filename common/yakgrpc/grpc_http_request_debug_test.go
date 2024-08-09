@@ -1322,3 +1322,50 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 	require.True(t, tokenCheck, "debug plugin mitm cli fail")
 }
+
+func TestGRPCMUSTPASS_DebugPlugin_MITM_PocSaveHttpFlowHandler(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	targetUrl := "http://" + utils.HostPort(host, port)
+
+	token := utils.RandStringBytes(20)
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: `
+mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+    poc.Get("` + targetUrl + `", poc.saveHandler(func(resp){
+    resp.Tags = append(resp.Tags,"` + token + `")
+}))
+}`,
+		PluginType: "mitm",
+		Input:      targetUrl,
+	})
+	require.NoError(t, err)
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		spew.Dump(rsp)
+	}
+
+	err = utils.AttemptWithDelayFast(func() error {
+		_, httpflow, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 100,
+			},
+			Tags: []string{token},
+		})
+		if err != nil {
+			return err
+		}
+		if len(httpflow) != 1 {
+			return utils.Errorf("flow count error")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
