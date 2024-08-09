@@ -44,6 +44,7 @@ func RegisterLowHTTPSaveCallback() {
 			fromPlugin  = r.FromPlugin
 			hiddenIndex = r.HiddenIndex
 			payloads    = r.Payloads
+			tags        = r.Tags
 			reqIns      *http.Request
 		)
 		// fix some field
@@ -85,6 +86,8 @@ func RegisterLowHTTPSaveCallback() {
 		flow.RuntimeId = runtimeId
 		flow.HiddenIndex = hiddenIndex
 		flow.Payload = strings.Join(payloads, ",")
+		flow.Tags = strings.Join(tags, "|")
+		err = InsertHTTPFlowEx(flow)
 		err = InsertHTTPFlowEx(flow, saveFlowSync)
 		if err != nil {
 			log.Errorf("insert httpflow failed: %s", err)
