@@ -280,6 +280,10 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if riskCount > 0 {
 			score -= 50
 			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error)
+			err := yakit.DeleteRisk(s.GetProjectDatabase(), &ypb.QueryRisksRequest{RuntimeId: runtimeId})
+			if err != nil {
+				log.Errorf("delete plugin testing risk error: %v", err)
+			}
 		} else { //  if not negative alarm, check plugin sent request
 			wantCount := 1
 			if pluginType == "mitm" {
