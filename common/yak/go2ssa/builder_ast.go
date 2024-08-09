@@ -34,6 +34,19 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
 			}
 			lib.PushEditor(prog.GetCurrentEditor())
+
+			init := lib.GetAndCreateFunction(pkgNameCurrent, "init")
+			init.SetType(ssa.NewFunctionType("",[]ssa.Type{ssa.CreateAnyType()},ssa.CreateAnyType() , false))
+			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "init")
+			
+			if builder != nil {
+				builder.SetBuildSupport(b.FunctionBuilder)
+				currentBuilder := b.FunctionBuilder
+				b.FunctionBuilder = builder
+				defer func() {
+					b.FunctionBuilder = currentBuilder
+				}()
+			}
 		}
 	}
 
