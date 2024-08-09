@@ -2,6 +2,7 @@ package yakurl_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -10,9 +11,11 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -175,6 +178,37 @@ func TestSFURl(t *testing.T) {
 			res, err := SendURL(local, progID, "/a/0", query)
 			assert.NoError(t, err)
 			spew.Dump(res)
+			check := func(path string) {
+				log.Infof("check path: %s", path)
+				_, err := ssadb.NewIrSourceFs().Stat(path)
+				assert.NoError(t, err)
+			}
+
+			found := false
+			var node string
+			for _, extra := range res[0].Extra {
+				if extra.Key == "node_id" {
+					node = extra.Value
+					continue
+				}
+
+				if extra.Key != "graph_info" {
+					continue
+				}
+				var graphInfo []*yakurl.NodeInfo
+				if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+					t.Error(err)
+				}
+
+				for _, info := range graphInfo {
+					if info.NodeID == node {
+						found = true
+					}
+
+					check(info.CodeRange.URL)
+				}
+			}
+			assert.True(t, found)
 		}
 	})
 }
