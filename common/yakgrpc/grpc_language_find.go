@@ -68,7 +68,7 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 			for _, user := range value.GetUsers() {
 				handler(user, level)
 			}
-			for _, ref := range value.GetReferences() {
+			for _, ref := range value.GetPointer() {
 				handler(ref, level)
 			}
 			for _, mask := range value.GetMask() {
