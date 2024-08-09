@@ -117,9 +117,9 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		for index, v := range values {
 			_ = v
 			_ = index
-			res := createNewRes(url, 0, map[string]any{
-				"index":      index,
-				"code_range": coverCodeRange(programName, v.GetRange()),
+			res := createNewRes(url, 0, []extra{
+				{"index", index},
+				{"code_range", coverCodeRange(programName, v.GetRange())},
 			})
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
@@ -155,7 +155,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 
 	// if contain check params, add check params
 	for _, msg := range result.Errors {
-		res := createNewRes(url, 0)
+		res := createNewRes(url, 0, nil)
 		res.ResourceType = "message"
 		res.VerboseType = "error"
 		res.VerboseName = msg
@@ -166,7 +166,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 		if !ok {
 			continue
 		}
-		res := createNewRes(url, 0)
+		res := createNewRes(url, 0, nil)
 		res.ResourceType = "message"
 		res.VerboseType = "info"
 		res.VerboseName = msg
@@ -179,7 +179,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 			continue
 		}
 		vs := result.GetValues(name)
-		res := createNewRes(url, len(vs))
+		res := createNewRes(url, len(vs), nil)
 		res.ResourceType = "variable"
 		res.ResourceName = name
 		if msg, ok := result.AlertMsgTable[name]; ok {
@@ -195,7 +195,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 
 	// last add "_"
 	{
-		res := createNewRes(url, len(result.GetValues("_")))
+		res := createNewRes(url, len(result.GetValues("_")), nil)
 		res.ResourceType = "variable"
 		res.VerboseType = "unknown"
 		res.ResourceName = "_"
@@ -244,18 +244,24 @@ func Value2Response(programName string, value *ssaapi.Value, msg string, url *yp
 		nodeInfos = append(nodeInfos, ni)
 	}
 
-	res := createNewRes(url, 0, map[string]any{
-		"node_id":    dot.NodeName(id),
-		"graph":      buf.String(), // string
-		"graph_info": nodeInfos,
-		"message":    msg,
+	res := createNewRes(url, 0, []extra{
+		{"node_id", dot.NodeName(id)},
+		{"graph", buf.String()},
+		{"graph_info", nodeInfos},
+		{"message", msg},
 	})
+
 	res.ResourceType = "information"
 	res.ResourceName = value.String()
 	return res
 }
 
-func createNewRes(originParam *ypb.YakURL, size int, extra ...map[string]any) *ypb.YakURLResource {
+type extra struct {
+	name  string
+	value any
+}
+
+func createNewRes(originParam *ypb.YakURL, size int, extra []extra) *ypb.YakURLResource {
 	yakURL := &ypb.YakURL{
 		Schema:   originParam.Schema,
 		User:     originParam.GetUser(),
@@ -273,10 +279,10 @@ func createNewRes(originParam *ypb.YakURL, size int, extra ...map[string]any) *y
 		Url:               yakURL,
 	}
 	if len(extra) > 0 {
-		for k, v := range extra[0] {
+		for _, v := range extra {
 			res.Extra = append(res.Extra, &ypb.KVPair{
-				Key:   k,
-				Value: codec.AnyToString(v),
+				Key:   v.name,
+				Value: codec.AnyToString(v.value),
 			})
 		}
 	}

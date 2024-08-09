@@ -15,19 +15,17 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		deltaPackageCostFrom(start)
 	}()
 
-	// 用于遍历所有import的类，并添加到fullTypeNameMap中
-	for _, pkgImport := range i.AllImportDeclaration() {
-		pkgPath, _, haveStar := y.VisitImportDeclaration(pkgImport)
-		if len(pkgPath) > 0 {
-			if haveStar{
-				y.allImportPkgSlice = append(y.allImportPkgSlice, pkgPath)
-			}else{
-				y.fullTypeNameMap[pkgPath[len(pkgPath)-1]] = pkgPath
-			}
-		}
-	}
 	for _, pkgImport := range i.AllImportDeclaration() {
 		pkgNames, static, all := y.VisitImportDeclaration(pkgImport)
+		if len(pkgNames) > 0 {
+			// 用于遍历所有import的类，并添加到fullTypeNameMap中
+			if all {
+				y.allImportPkgSlice = append(y.allImportPkgSlice, pkgNames)
+			} else {
+				y.fullTypeNameMap[pkgNames[len(pkgNames)-1]] = pkgNames
+			}
+		}
+
 		_, _, _ = pkgNames, static, all
 
 		var prog *ssa.Program
@@ -48,7 +46,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		}
 		if prog == nil {
 			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
-			return
+			continue
 		}
 
 		// get class

@@ -103,10 +103,7 @@ func (v *Value) GetCallActualParams(i int) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
-	if v.IsCalled() {
-		return v.GetCalledBy(), nil
-	}
-	return nil, utils.Errorf("ssa.Value %v is not called", v.String())
+	return v.GetCalledBy(), nil
 }
 
 func (v *Value) GetFields() (sfvm.ValueOperator, error) {

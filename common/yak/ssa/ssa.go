@@ -142,13 +142,18 @@ type Value interface {
 }
 
 type PointerIF interface {
-	// pointer to value
-	GetPoint() Value
-	SetPoint(Value)
+	// the value is pointed by this value
+	GetReference() Value
+	SetReference(Value)
 
-	// value get Pointers
+	// the value that point to this value
 	AddPointer(Value)
 	GetPointer() Values
+}
+
+func Point(pointer Value, reference Value) {
+	pointer.SetReference(reference)
+	reference.AddPointer(pointer)
 }
 
 type Maskable interface {
