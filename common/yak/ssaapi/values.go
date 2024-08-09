@@ -658,22 +658,45 @@ func (v *Value) GetCalledBy() Values {
 		return nil
 	}
 	vs := make(Values, 0)
-	add := func(node ssa.Value) {
+	addCall := func(node ssa.Value) {
+		if node == nil {
+			return
+		}
+		nodeId := node.GetId()
 		for _, user := range node.GetUsers() {
-			if call, ok := ssa.ToCall(user); ok {
-				if call != nil && call.Method != nil {
-					methodId := call.Method.GetId()
-					nodeId := node.GetId()
-					if methodId == nodeId {
-						vs = append(vs, v.NewValue(call))
-					}
-				}
+			call, ok := ssa.ToCall(user)
+			if !ok {
+				continue
+			}
+			if call == nil && call.Method == nil {
+				continue
+			}
+			if call.Method.GetId() == nodeId {
+				vs = append(vs, v.NewValue(call))
 			}
 		}
 	}
-	add(v.node)
-	for _, ref := range v.node.GetPointer() {
-		add(ref)
+
+	handler := func(node ssa.Value) {
+		if node == nil {
+			return
+		}
+		// self
+		addCall(node)
+		for _, pointer := range node.GetPointer() {
+			// undefine pointer, this is same value
+			if !pointer.IsUndefined() {
+				continue
+			}
+			addCall(pointer)
+		}
+	}
+	// handler self
+	handler(v.node)
+	if v.IsFunction() {
+		// function's reference, like parent-class same name function
+		// this function over-write parent-class function
+		handler(v.node.GetReference())
 	}
 	return vs
 }
