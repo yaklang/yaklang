@@ -95,7 +95,7 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error)
 
 func (lz *LazyInstruction) IsLazy() bool { return true }
 
-func (lz *LazyInstruction) IsFromDB() bool{
+func (lz *LazyInstruction) IsFromDB() bool {
 	return false
 }
 
@@ -613,4 +613,19 @@ func (lz *LazyInstruction) AddPointer(v Value) {
 		return
 	}
 	lz.Value.AddPointer(v)
+}
+func (lz *LazyInstruction) GetReference() Value {
+	lz.check()
+	if lz.Value == nil {
+		return nil
+	}
+	return lz.Value.GetReference()
+}
+
+func (lz *LazyInstruction) SetReference(v Value) {
+	lz.check()
+	if lz.Value == nil {
+		return
+	}
+	lz.Value.SetReference(v)
 }

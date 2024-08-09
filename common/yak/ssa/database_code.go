@@ -163,7 +163,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	for _, r := range value.GetPointer() {
 		ir.Pointer = append(ir.Pointer, r.GetId())
 	}
-	if point := value.GetPoint(); point != nil {
+	if point := value.GetReference(); point != nil {
 		ir.Point = point.GetId()
 	}
 
@@ -223,7 +223,7 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 		value.AddPointer(getValue(r))
 	}
 	if ir.Point != 0 {
-		value.SetPoint(getValue(ir.Point))
+		value.SetReference(getValue(ir.Point))
 	}
 
 	// type
