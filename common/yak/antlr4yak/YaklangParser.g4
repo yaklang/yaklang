@@ -51,13 +51,16 @@ assignExpressionStmt: assignExpression;
 lineCommentStmt: (LINE_COMMENT | COMMENT);
 
 includeStmt: 'include' StringLiteral;
-deferStmt: 'defer' expression;
-goStmt: 'go' ((expression functionCall) | instanceCode);
+deferStmt: 'defer' (recoverStmt | panicStmt | callExpr);
+goStmt: 'go' callExpr;
 assertStmt: 'assert' expression (',' expression)*;
 fallthroughStmt: 'fallthrough';
 breakStmt: 'break';
 continueStmt: 'continue';
 returnStmt: 'return' expressionList?;
+
+callExpr: functionCallExpr | instanceCode;
+functionCallExpr: expression functionCall;
 
 /*
 for statement
@@ -78,6 +81,16 @@ forRangeStmt: 'for' (((leftExpressionList (':=' | '='))? 'range') | ((leftExpres
 switch statement syntax
 */
 switchStmt: 'switch' expression? '{' (ws* 'case' expressionList ':' statementList?)* ( ws* 'default' ':' statementList?)? ws* '}';
+
+/*
+panic statement
+*/
+panicStmt: Panic '(' ws* expression ws* ')';
+
+/*
+recover statement
+*/
+recoverStmt: Recover '(' ')';
 
 /*
 if statement syntax
@@ -165,8 +178,8 @@ expression
     : typeLiteral '(' ws* expression? ws* ')'
     | literal
     | anonymousFunctionDecl
-    | Panic '(' ws* expression ws* ')'
-    | Recover '(' ')'
+    | panicStmt
+    | recoverStmt
     | Identifier
     | expression (memberCall | sliceCall | functionCall)
     | parenExpression

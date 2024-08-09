@@ -53,6 +53,12 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#returnStmt.
 	VisitReturnStmt(ctx *ReturnStmtContext) interface{}
 
+	// Visit a parse tree produced by YaklangParser#callExpr.
+	VisitCallExpr(ctx *CallExprContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#functionCallExpr.
+	VisitFunctionCallExpr(ctx *FunctionCallExprContext) interface{}
+
 	// Visit a parse tree produced by YaklangParser#forStmt.
 	VisitForStmt(ctx *ForStmtContext) interface{}
 
@@ -70,6 +76,12 @@ type YaklangParserVisitor interface {
 
 	// Visit a parse tree produced by YaklangParser#switchStmt.
 	VisitSwitchStmt(ctx *SwitchStmtContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#panicStmt.
+	VisitPanicStmt(ctx *PanicStmtContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#recoverStmt.
+	VisitRecoverStmt(ctx *RecoverStmtContext) interface{}
 
 	// Visit a parse tree produced by YaklangParser#ifStmt.
 	VisitIfStmt(ctx *IfStmtContext) interface{}
