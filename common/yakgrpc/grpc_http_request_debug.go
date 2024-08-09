@@ -60,12 +60,17 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 	}, runtimeId) // set risk count
 	go func() {
 		for {
-			err := s.countRisk(runtimeId, feedbackClient)
-			if err != nil {
-				log.Errorf("count risk failed: %v", err)
+			select {
+			case <-streamCtx.Done():
 				return
+			default:
+				err := s.countRisk(runtimeId, feedbackClient)
+				if err != nil {
+					log.Errorf("count risk failed: %v", err)
+					return
+				}
+				time.Sleep(2 * time.Second)
 			}
-			time.Sleep(2 * time.Second)
 		}
 	}()
 	defer s.countRisk(runtimeId, feedbackClient)
@@ -248,12 +253,17 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 	}, runtimeId) // set risk count
 	go func() {
 		for {
-			err := s.countRisk(runtimeId, feedbackClient)
-			if err != nil {
-				log.Errorf("count risk failed: %v", err)
+			select {
+			case <-streamCtx.Done():
 				return
+			default:
+				err := s.countRisk(runtimeId, feedbackClient)
+				if err != nil {
+					log.Errorf("count risk failed: %v", err)
+					return
+				}
+				time.Sleep(2 * time.Second)
 			}
-			time.Sleep(2 * time.Second)
 		}
 	}()
 	defer s.countRisk(runtimeId, feedbackClient)

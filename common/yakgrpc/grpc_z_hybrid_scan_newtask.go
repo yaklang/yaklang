@@ -167,12 +167,17 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	})
 	go func() {
 		for {
-			err := s.countRisk(taskId, countRiskClient)
-			if err != nil {
-				log.Errorf("count risk failed: %v", err)
+			select {
+			case <-manager.Context().Done():
 				return
+			default:
+				err := s.countRisk(taskId, countRiskClient)
+				if err != nil {
+					log.Errorf("count risk failed: %v", err)
+					return
+				}
+				time.Sleep(2 * time.Second)
 			}
-			time.Sleep(2 * time.Second)
 		}
 	}()
 	defer s.countRisk(taskId, countRiskClient)
