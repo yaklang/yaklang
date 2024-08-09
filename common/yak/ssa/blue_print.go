@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -102,14 +103,18 @@ func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 		log.Warnf("class %v's ref container is nil", c.Name)
 	}
 	fun.SetMethod(true, c)
+	if f, ok := c.Method[key]; ok {
+		Point(fun, f)
+		// log.Infof("method %v is already exist, replace it", key)
+	}
 	c.Method[key] = fun
 }
 func (c *ClassBluePrint) GetMethod() map[string]*Function {
 	return c.Method
 }
 
-func(c *ClassBluePrint)AddFullTypeName(name string){
-	if c== nil {
+func (c *ClassBluePrint) AddFullTypeName(name string) {
+	if c == nil {
 		return
 	}
 
@@ -117,14 +122,14 @@ func(c *ClassBluePrint)AddFullTypeName(name string){
 }
 
 func (c *ClassBluePrint) GetFullTypeNames() []string {
-	if c==nil{
+	if c == nil {
 		return nil
 	}
 	return c.fullTypeName
 }
 
-func (c *ClassBluePrint)SetFullTypeNames(names []string){
-	if c==nil{
+func (c *ClassBluePrint) SetFullTypeNames(names []string) {
+	if c == nil {
 		return
 	}
 	c.fullTypeName = names

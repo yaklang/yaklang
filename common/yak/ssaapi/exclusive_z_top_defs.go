@@ -301,15 +301,27 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 		}
 
-		for _, r := range inst.Return {
-			for _, subVal := range r.GetValues() {
-				if ret := i.NewValue(subVal).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
-					vals = append(vals, ret...)
+		handlerReturn := func(value *Value) {
+			fun, ok := ssa.ToFunction(value.node)
+			if !ok {
+				return
+			}
+			for _, r := range fun.Return {
+				for _, subVal := range r.GetValues() {
+					if ret := value.NewValue(subVal).AppendEffectOn(value).getTopDefs(actx); len(ret) > 0 {
+						vals = append(vals, ret...)
+					}
 				}
 			}
 		}
+
+		handlerReturn(i)
 		if len(vals) == 0 {
-			return Values{i} // no return, use undefined
+			vals = append(vals, i)
+		}
+		// handler child-class function
+		for _, child := range inst.GetPointer() {
+			handlerReturn(i.NewValue(child))
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.ParameterMember:
