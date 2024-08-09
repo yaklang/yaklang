@@ -54,6 +54,7 @@ type PocConfig struct {
 	RedirectHandler      func(bool, []byte, []byte) bool
 	Session              interface{} // session的标识符，可以用任意对象
 	SaveHTTPFlow         *bool
+	SaveHTTPFlowSync     *bool
 	Source               string
 	Username             *string
 	Password             *string
@@ -153,6 +154,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	if c.SaveHTTPFlow != nil {
 		opts = append(opts, lowhttp.WithSaveHTTPFlow(*c.SaveHTTPFlow))
+	}
+	if c.SaveHTTPFlowSync != nil {
+		opts = append(opts, lowhttp.WithSaveHTTPFlowSync(*c.SaveHTTPFlowSync))
 	}
 	opts = append(opts, lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
 		if c.RedirectHandler == nil {
@@ -627,6 +631,17 @@ func WithSession(i interface{}) PocConfigOption {
 func WithSave(b bool) PocConfigOption {
 	return func(c *PocConfig) {
 		c.SaveHTTPFlow = &b
+	}
+}
+
+// saveSync 是一个请求选项参数，用于指定是否将此次请求的记录保存在数据库中，且同步保存，默认为false即会异步保存到数据库
+// Example:
+// ```
+// poc.Get("https://exmaple.com", poc.save(true), poc.saveSync(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中，且同步保存
+// ```
+func WithSaveSync(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.SaveHTTPFlowSync = &b
 	}
 }
 
@@ -1675,6 +1690,7 @@ var PoCExports = map[string]interface{}{
 	"noFixContentLength":   WithNoFixContentLength,
 	"session":              WithSession,
 	"save":                 WithSave,
+	"saveSync":             WithSaveSync,
 	"source":               WithSource,
 	"websocket":            WithWebsocket,
 	"websocketFromServer":  WithWebsocketHandler,

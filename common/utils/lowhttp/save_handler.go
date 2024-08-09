@@ -7,14 +7,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type saveHTTPFlowHandler func(*LowhttpResponse)
+type saveHTTPFlowHandler func(*LowhttpResponse, bool)
 
 var saveHTTPFlowFunc saveHTTPFlowHandler
 
 func RegisterSaveHTTPFlowHandler(h saveHTTPFlowHandler) {
 	m := new(sync.Mutex)
 
-	saveHTTPFlowFunc = func(r *LowhttpResponse) {
+	saveHTTPFlowFunc = func(r *LowhttpResponse, saveFlowSync bool) {
 		m.Lock()
 		defer m.Unlock()
 
@@ -24,11 +24,11 @@ func RegisterSaveHTTPFlowHandler(h saveHTTPFlowHandler) {
 			}
 		}()
 
-		h(r)
+		h(r, saveFlowSync)
 	}
 }
 
-func SaveLowHTTPResponse(r *LowhttpResponse) {
+func SaveLowHTTPResponse(r *LowhttpResponse, saveFlowSync bool) {
 	if saveHTTPFlowFunc == nil {
 		utils.Debug(func() {
 			log.Warn("SaveResponse failed because yakit.RegisterSaveHTTPFlowHandler is not finished")
@@ -36,5 +36,5 @@ func SaveLowHTTPResponse(r *LowhttpResponse) {
 		return
 	}
 
-	saveHTTPFlowFunc(r)
+	saveHTTPFlowFunc(r, saveFlowSync)
 }

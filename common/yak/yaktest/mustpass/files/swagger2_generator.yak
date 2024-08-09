@@ -11,11 +11,11 @@ Content-Length: 0
 
 `)
 
-poc.Get(f`http://${str.HostPort(host, port)}/abc`, poc.save(true))~
-poc.Get(f`http://${str.HostPort(host, port)}/abce`, poc.save(true))~
-poc.Get(f`http://${str.HostPort(host, port)}/abce`, poc.save(true))~
-poc.Get(f`http://${str.HostPort(host, port)}/abce/aaa`, poc.save(true))~
-poc.Get(f`http://${str.HostPort(host, port)}/abce/aaccc`, poc.save(true))~
+poc.Get(f`http://${str.HostPort(host, port)}/abc`, poc.save(true), poc.saveSync(true))~
+poc.Get(f`http://${str.HostPort(host, port)}/abce`, poc.save(true), poc.saveSync(true))~
+poc.Get(f`http://${str.HostPort(host, port)}/abce`, poc.save(true), poc.saveSync(true))~
+poc.Get(f`http://${str.HostPort(host, port)}/abce/aaa`, poc.save(true), poc.saveSync(true))~
+poc.Get(f`http://${str.HostPort(host, port)}/abce/aaccc`, poc.save(true), poc.saveSync(true))~
 
 hostport = str.HostPort(host, port)
 

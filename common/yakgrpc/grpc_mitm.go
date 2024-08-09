@@ -1585,7 +1585,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		if !isDroppedSaveFlow.IsSet() {
-			err := yakit.InsertHTTPFlowEx(flow, func() {
+			err := yakit.InsertHTTPFlowEx(flow, false, func() {
 				saveBarePacketHandler(flow.ID)
 			})
 			if err != nil {

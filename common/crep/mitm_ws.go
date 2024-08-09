@@ -220,7 +220,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 					flow.WebsocketHash = wshash
 					flow.HiddenIndex = wshash
 					flow.Hash = flow.CalcHash()
-					err := yakit.InsertHTTPFlowEx(flow)
+					err := yakit.InsertHTTPFlowEx(flow, false)
 					if err != nil {
 						log.Errorf("create / save httpflow(websocket) error: %s", err)
 					}

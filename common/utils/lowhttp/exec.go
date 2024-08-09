@@ -181,6 +181,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		noFixContentLength   = option.NoFixContentLength
 		proxy                = option.Proxy
 		saveHTTPFlow         = option.SaveHTTPFlow
+		saveHTTPFlowSync     = option.SaveHTTPFlowSync
 		saveHTTPFlowHandler  = option.SaveHTTPFlowHandler
 		session              = option.Session
 		ctx                  = option.Ctx
@@ -233,7 +234,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				saveHTTPFlowHandler(response)
 			}
 
-			SaveLowHTTPResponse(response)
+			SaveLowHTTPResponse(response, saveHTTPFlowSync)
 		}()
 		select {
 		case <-saveCtx.Done():
