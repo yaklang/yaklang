@@ -79,7 +79,8 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
 		result:          []string{},
-		ExtendFuncs:     map[string]map[string]*ssa.Function{},
+		extendFuncs:     map[string]map[string]*ssa.Function{},
+		tpHander:        map[string]func(){},
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
@@ -98,7 +99,8 @@ type astbuilder struct {
 	structTypes map[string]*ssa.ObjectType
 	aliasTypes  map[string]*ssa.AliasType
 	result      []string
-	ExtendFuncs map[string]map[string]*ssa.Function
+	extendFuncs map[string]map[string]*ssa.Function
+	tpHander    map[string]func()
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
@@ -167,14 +169,14 @@ func (b *astbuilder) CleanResultDefault() {
 }
 
 func (b *astbuilder) AddExtendFuncs(name string, funcs map[string]*ssa.Function) {
-    b.ExtendFuncs[name] = funcs
+    b.extendFuncs[name] = funcs
 }
 
 func (b *astbuilder) GetExtendFuncs(name string) map[string]*ssa.Function {
-	if b.ExtendFuncs[name] == nil {
+	if b.extendFuncs[name] == nil {
 		return nil
 	}
-    return b.ExtendFuncs[name]
+    return b.extendFuncs[name]
 }
 
 // ====================== Object type
@@ -196,6 +198,10 @@ func (b *astbuilder) GetStructAll() map[string]*ssa.ObjectType {
 // ====================== Alias type
 func (b *astbuilder) AddAlias(name string, t *ssa.AliasType) {
 	b.aliasTypes[name] = t 
+}
+
+func (b *astbuilder) DelAliasByStr(name string){
+	delete(b.aliasTypes, name)
 }
 
 func (b *astbuilder) GetAliasByStr(name string) ssa.Type {

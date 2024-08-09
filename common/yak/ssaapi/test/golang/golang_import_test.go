@@ -1,4 +1,4 @@
-package test
+package ssaapi
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 )
 
 
-func TestImport(t *testing.T) {
+func Test_Import(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
