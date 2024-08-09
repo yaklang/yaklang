@@ -235,7 +235,7 @@ jobs:
 
       - name: GRPC
         run: |
-          nohup ./yak grpc > /tmp/grpc.log 2&>1 &
+          nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
           sleep 1
 
       - name: ${{ matrix.name }}
