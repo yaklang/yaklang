@@ -87,9 +87,17 @@ const (
 	NativeCall_MyBatisSink = "mybatisSink"
 
 	NativeCall_FreeMarkerSink = "freeMarkerSink"
+
+	NativeCall_OpCodes = "opcodes"
+	NativeCall_SourceCode = "sourceCode"
+	NativeCall_ScanPrevioud = "scanPrevioud"
+	NativeCall_ScanNext = "scanNext"
+
 )
 
 func init() {
+	registerNativeCall(NativeCall_SourceCode, nc_func(nativeCallSourceCode))
+	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
 	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		start := params.GetInt(0, "start")
 		idx := 0
