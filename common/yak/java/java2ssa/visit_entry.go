@@ -26,8 +26,10 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		prog := y.GetProgram()
 		lib, skip := prog.GetLibrary(pkgName)
 		if skip {
+			// log.Infof("package %v skip, file %v", pkgName, prog.GetCurrentEditor().GetFilename())
 			return nil
 		}
+		// log.Infof("package %v parse, file %v", pkgName, prog.GetCurrentEditor().GetFilename())
 		if lib == nil {
 			lib = prog.NewLibrary(pkgName, pkgPath)
 		}
