@@ -362,6 +362,10 @@ type node struct {
 	attributes attributes
 }
 
+func NodeName(id int) string {
+	return fmt.Sprintf("n%v", id)
+}
+
 func (n node) name() string {
 	return fmt.Sprintf("n%v", n.id)
 }
