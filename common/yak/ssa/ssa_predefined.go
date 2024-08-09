@@ -23,7 +23,7 @@ type anInstruction struct {
 
 	isAnnotation bool
 	isExtern     bool
-	isFromDB	bool
+	isFromDB     bool
 }
 
 func (v *anInstruction) GetSourceCode() string {
@@ -63,9 +63,9 @@ func (i *anInstruction) IsCFGEnterBlock() ([]Instruction, bool) {
 
 func (i *anInstruction) IsLazy() bool { return false }
 
-func (i *anInstruction) IsFromDB() bool { return i.isFromDB}
+func (i *anInstruction) IsFromDB() bool { return i.isFromDB }
 
-func (i *anInstruction)SetIsFromDB(b bool){i.isFromDB = b}
+func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
 func (i *anInstruction) Self() Instruction {
 	return i
@@ -205,8 +205,8 @@ type anValue struct {
 	// it record the variable is masked by closure function or some scope changed
 	mask *omap.OrderedMap[string, Value]
 
-	pointer Values // the pointer is point to this value
-	pointed Value  // the value is pointed by this value
+	pointer   Values // the pointer is point to this value
+	reference Value  // the value is pointed by this value
 }
 
 func NewValue() anValue {
@@ -319,8 +319,8 @@ func (n *anValue) SetType(typ Type) {
 		return
 	}
 
-	if n.IsFromDB(){
-		n.typ=typ
+	if n.IsFromDB() {
+		n.typ = typ
 		return
 	}
 
@@ -342,8 +342,7 @@ func (n *anValue) SetType(typ Type) {
 			return
 		}
 		if fun := t.This; fun != nil {
-			fun.AddPointer(this)
-			this.SetPoint(fun)
+			Point(this, fun)
 		}
 		for _, f := range t.AnnotationFunc {
 			f(this)
@@ -388,11 +387,11 @@ func (i *anValue) Masked() bool {
 	return i.mask.Len() != 0
 }
 
-func (i *anValue) SetPoint(v Value) {
-	i.pointed = v
+func (i *anValue) SetReference(v Value) {
+	i.reference = v
 }
-func (i *anValue) GetPoint() Value {
-	return i.pointed
+func (i *anValue) GetReference() Value {
+	return i.reference
 }
 
 func (i *anValue) AddPointer(v Value) {
