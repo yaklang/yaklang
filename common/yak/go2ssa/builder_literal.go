@@ -246,15 +246,30 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa
 func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	text := stmt.GetText()
-	// var type name
-	if b := ssa.GetTypeByStr(text); b != nil {
-		return b,nil
-	}
-	if b := b.GetStructByStr(text); b != nil {
-	    return b,nil
-	}
+	var ssatyp ssa.Type
 
+	if name := stmt.TypeName(); name != nil {
+	    if qul := name.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
+			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
+				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
+				ssatyp = obj.GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+				return ssatyp,nil
+			}
+		}
+		text := name.GetText()
+		/*
+		if s, ok := stmt.TypeArgs().(*gol.TypeArgsContext); ok{
+			b.buildTypeArgs(s)
+		}*/
+
+		// var type name
+		if b := ssa.GetTypeByStr(text); b != nil {
+			return b,nil
+		}
+		if b := b.GetStructByStr(text); b != nil {
+			return b,nil
+		}
+	}
 	// slice type literal
 	if s, ok := stmt.SliceType().(*gol.SliceTypeContext); ok {
 		return b.buildSliceTypeLiteral(s),nil
@@ -262,25 +277,17 @@ func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ss
 
 	// array type literal
 	if s, ok := stmt.ArrayType().(*gol.ArrayTypeContext); ok {
-	    return b.buildArrayTypeLiteral(s)
+		return b.buildArrayTypeLiteral(s)
 	}
 
 	// map type literal
-	if strings.HasPrefix(text, "map") {
-		if s, ok := stmt.MapType().(*gol.MapTypeContext); ok {
-			return b.buildMapTypeLiteral(s),nil
-		}
+	if s, ok := stmt.MapType().(*gol.MapTypeContext); ok {
+		return b.buildMapTypeLiteral(s),nil
 	}
 
 	// struct type literal
-	if strings.HasPrefix(text, "struct") {
-		if s, ok := stmt.StructType().(*gol.StructTypeContext); ok {
-			return b.buildStructTypeLiteral(s),nil
-		}
-	}
-
-	if s, ok := stmt.TypeArgs().(*gol.TypeArgsContext); ok{
-	    b.buildTypeArgs(s)
+	if s, ok := stmt.StructType().(*gol.StructTypeContext); ok {
+		return b.buildStructTypeLiteral(s),nil
 	}
 
 	return nil,nil
@@ -318,9 +325,10 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value)
 
 	// pointer type literal
 	if strings.HasPrefix(text, "*") {
-	    if s := stmt.PointerType(); s != nil {
-			// TEST
-			return b.GetStructByStr(text[1:]),nil
+	    if p := stmt.PointerType(); p != nil {
+			if t := p.(*gol.PointerTypeContext).Type_(); t != nil {
+				return b.buildType(t.(*gol.Type_Context)),nil
+			} 
 		}
 	}
 

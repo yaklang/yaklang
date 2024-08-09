@@ -40,7 +40,7 @@ options {
 }
 
 sourceFile
-    : eos* packageClause (importDecl eos*)* (( methodDecl | functionDecl | declaration) eos*)* EOF
+    : eos* packageClause (eos* importDecl eos*)* (( methodDecl | functionDecl | declaration) eos*)* EOF
     ;
 
 packageClause
