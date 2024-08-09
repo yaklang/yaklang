@@ -19,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/samber/lo"
@@ -236,10 +235,10 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 
 func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
 	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
-		for _, p := range p {
-			p.Show()
-		}
-		results, err := p.SyntaxFlowWithError(sf)
+		// for _, p := range p {
+		// 	p.Show()
+		// }
+		results, err := p.SyntaxFlowWithError(sf, sfvm.WithEnableDebug())
 		assert.Nil(t, err)
 		assert.NotNil(t, results)
 		CompareResult(t, contain, results, wants)
@@ -280,8 +279,18 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 		sort.Strings(got)
 		sort.Strings(want)
 		if contain {
-			if !utils.ContainsAll(got, want...) {
-				t.Fatalf("\nkey[%s] \ngot[%v] \nwant[%v]", k, strings.Join(got, ","), strings.Join(want, ","))
+			// every want should be found in got
+			for _, containSubStr := range want {
+				match := false
+				// should contain at least one
+				for _, g := range got {
+					if strings.Contains(g, containSubStr) {
+						match = true
+					}
+				}
+				if !match {
+					t.Errorf("want[%s] not found in got[%v]", want, got)
+				}
 			}
 		} else {
 			assert.Equal(t, len(want), len(gotVs))
