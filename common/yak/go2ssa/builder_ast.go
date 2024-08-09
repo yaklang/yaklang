@@ -641,7 +641,13 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 
 func (b *astbuilder) buildMethodDeclFinish(fun *gol.MethodDeclContext, newFunc *ssa.Function) {
 	recoverRange := b.SetRange(fun.BaseParserRuleContext)
-	defer recoverRange()
+	defer func(){
+		recoverRange()
+		if tph := b.tpHander[newFunc.GetName()]; tph != nil {
+			tph()
+			delete(b.tpHander, newFunc.GetName())
+		}
+	}()
 	b.FunctionBuilder = b.PushFunction(newFunc)
 
 	if block, ok := fun.Block().(*gol.BlockContext); ok {
@@ -1704,7 +1710,7 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 		}else{
 			name := typ.TypeName().(*gol.TypeNameContext).IDENTIFIER().GetText()
 			if a := typ.TypeArgs(); a != nil {
-				b.tpHander[name] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
+				b.tpHander[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
 			ssatyp = ssa.GetTypeByStr(name)
 			if ssatyp == nil {
