@@ -154,19 +154,33 @@ func init() {
 			withPluginAuthors("V1ll4n"),
 		)
 		registerBuildInPlugin(
-			"mitm", "MITM 请求修改",
-			withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
-			withPluginAuthors("WaY"),
+			"mitm", "修改 HTTP 请求 Header",
+			withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Header，可以设置 URL 关键字作为前提条件"),
+			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
 			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 		)
 		registerBuildInPlugin(
-			"mitm", "MITM 响应修改",
-			withPluginHelp("允许用户修改响应：支持正则，支持匹配到响应再操作，支持多个操作"),
-			withPluginAuthors("WaY"),
+			"mitm", "修改 HTTP 请求 Cookie",
+			withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Cookie，可以设置 URL 关键字作为前提条件"),
+			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
 			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 		)
+		//registerBuildInPlugin(
+		//	"mitm", "MITM 请求修改",
+		//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
+		//	withPluginAuthors("WaY"),
+		//	withPluginEnableGenerateParam(true),
+		//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+		//)
+		//registerBuildInPlugin(
+		//	"mitm", "MITM 响应修改",
+		//	withPluginHelp("允许用户修改响应：支持正则，支持匹配到响应再操作，支持多个操作"),
+		//	withPluginAuthors("WaY"),
+		//	withPluginEnableGenerateParam(true),
+		//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+		//)
 		registerBuildInPlugin(
 			"yak", "核心引擎性能采样",
 			withPluginHelp("动态开启PPROF采样，用于性能调优"),
