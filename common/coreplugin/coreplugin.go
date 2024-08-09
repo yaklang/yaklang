@@ -167,6 +167,12 @@ func init() {
 			withPluginEnableGenerateParam(true),
 			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 		)
+		registerBuildInPlugin(
+			"mitm", "Cookie 平行越权",
+			withPluginHelp("用户可以在此配置多个 Cookie 同时进行替换，并在插件流量中查看内容"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
 		//registerBuildInPlugin(
 		//	"mitm", "MITM 请求修改",
 		//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
