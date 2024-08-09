@@ -275,6 +275,7 @@ func (b *astbuilder) buildCallExprStmt(stmt *yak.CallExprContext) (c *ssa.Call) 
 	}
 	if c != nil {
 		c.SetRange(b.CurrentRange)
+		b.EmitCall(c)
 	}
 	return c
 }
