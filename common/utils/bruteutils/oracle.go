@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"database/sql"
 	"os"
+	"sync"
 
 	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,6 +14,14 @@ var oracleServiceNames = []string{
 	"orcl",
 	"xe",
 	"oracle",
+}
+
+var once sync.Once
+
+func setupUserEnv() {
+	if _, ok := os.LookupEnv("USER"); !ok {
+		os.Setenv("USER", "user")
+	}
 }
 
 var oracleAuth = &DefaultServiceAuthInfo{
@@ -35,9 +44,7 @@ var oracleAuth = &DefaultServiceAuthInfo{
 			return res
 		}
 
-		if _, ok := os.LookupEnv("USER"); !ok {
-			os.Setenv("USER", "user")
-		}
+		once.Do(setupUserEnv)
 
 		for _, service := range oracleServiceNames {
 			dataSourceName := go_ora.BuildUrl(ip, port, service, i.Username, i.Password, urlOptions)
