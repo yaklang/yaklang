@@ -19,7 +19,13 @@ func (y *YakCompiler) VisitDeferStmt(raw yak.IDeferStmtContext) interface{} {
 	y.writeString("defer ")
 
 	finished := y.SwitchCodes()
-	y.VisitExpression(i.Expression())
+	if s := i.CallExpr(); s != nil {
+		y.VisitCallExpr(s)
+	} else if s := i.RecoverStmt(); s != nil {
+		y.VisitRecoverStmt(s)
+	} else if s := i.PanicStmt(); s != nil {
+		y.VisitPanicStmt(s)
+	}
 
 	// defer recover only
 	if len(y.codes) == 1 && y.codes[0].Opcode == yakvm.OpRecover {

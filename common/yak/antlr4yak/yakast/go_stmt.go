@@ -2,6 +2,7 @@ package yakast
 
 import (
 	"fmt"
+
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
@@ -34,13 +35,7 @@ func (y *YakCompiler) VisitGoStmt(raw yak.IGoStmtContext) interface{} {
 	id := fmt.Sprintf("go/%v", uuid.New().String())
 	_ = id
 
-	if code := i.InstanceCode(); code != nil {
-		y.VisitInstanceCode(i.InstanceCode())
-	} else {
-		y.VisitExpression(i.Expression())
-		y.VisitFunctionCall(i.FunctionCall())
-	}
-
+	y.VisitCallExpr(i.CallExpr())
 	/*
 		新建 Go 指令
 	*/

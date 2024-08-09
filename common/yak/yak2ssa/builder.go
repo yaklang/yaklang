@@ -1,8 +1,9 @@
 package yak2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"

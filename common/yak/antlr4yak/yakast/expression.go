@@ -85,14 +85,10 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 			y.writeString(buf)
 			y.pushOperator(yakvm.OpTypeCast)
 		}
-	} else if op := i.Recover(); op != nil {
-		y.writeString(op.GetText() + "()")
-		y.pushOperator(yakvm.OpRecover)
-	} else if op := i.Panic(); op != nil {
-		y.writeString(op.GetText() + "(")
-		y.VisitExpression(i.Expression(0))
-		y.writeString(")")
-		y.pushOperator(yakvm.OpPanic)
+	} else if s := i.RecoverStmt(); s != nil {
+		y.VisitRecoverStmt(s)
+	} else if s := i.PanicStmt(); s != nil {
+		y.VisitPanicStmt(s)
 	} else if s := i.Literal(); s != nil { // 解析单个字面量
 		y.VisitLiteral(s)
 	} else if s := i.Identifier(); s != nil { // 解析变量

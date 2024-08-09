@@ -419,7 +419,7 @@ func TestNewExecutor_DeferFix(t *testing.T) {
 b = 1
 go fn{
 	testFun_a = 1
-	defer fn(){
+	defer fn {
 		assert testFun_a == 1
 		assert b == 1
 		a = 1

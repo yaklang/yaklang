@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -133,7 +134,6 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 	f.SetFunc(b.Function)
 	f.SetBlock(b.CurrentBlock)
 	return f
-
 }
 
 // function stack
@@ -173,7 +173,7 @@ func (b FunctionBuilder) HandlerEllipsis() {
 }
 
 // add current function defer function
-func (b *FunctionBuilder) EmitDefer(i *Call) {
+func (b *FunctionBuilder) EmitDefer(i Instruction) {
 	deferBlock := b.GetDeferBlock()
 	endBlock := b.CurrentBlock
 	defer func() {
@@ -220,5 +220,4 @@ func (b *FunctionBuilder) ReferenceParameter(name string) {
 }
 
 func (b *FunctionBuilder) name() {
-
 }

@@ -9,8 +9,7 @@ import (
 
 const TypeCheckTAG ssa.ErrorTag = "TypeCheck"
 
-type TypeCheck struct {
-}
+type TypeCheck struct{}
 
 func NewTypeCheck(config) Analyzer {
 	return &TypeCheck{}
@@ -162,7 +161,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		lengthError := false
 		switch {
 		case funcTyp.IsVariadic && !c.IsEllipsis:
-			//len:  gotParaLen >=  wantParaLen-1
+			// len:  gotParaLen >=  wantParaLen-1
 			lengthError = gotParaLen < wantParaLen-1
 		case !funcTyp.IsVariadic && c.IsEllipsis:
 			// error, con't use ellipsis in this function
