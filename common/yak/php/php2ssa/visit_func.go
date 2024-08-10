@@ -150,10 +150,13 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 		return nil
 	}
 	if i.Ampersand() != nil {
+
 		//	doSomethings 在闭包中，不需要做其他特殊处理
 	}
 	funcName := ""
 	newFunc := y.NewFunc(funcName)
+
+	//todo: 还有问题，"类"闭包在类中还有问题
 	y.FunctionBuilder = y.PushFunction(newFunc)
 	{
 		y.VisitLambdaFunctionUseVars(i.LambdaFunctionUseVars())
@@ -195,12 +198,12 @@ func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarC
 	}
 	if i.Ampersand() != nil {
 		y.ReferenceParameter(i.VarName().GetText())
+		return nil
 	}
+	current := y.SupportClosure
 	y.SupportClosure = true
 	defer func() {
-		if !y.SupportClosure {
-			y.SupportClosure = false
-		}
+		y.SupportClosure = current
 	}()
 	if value := y.ReadValue(i.VarName().GetText()); value != nil {
 		freeValue := y.BuildFreeValue(i.VarName().GetText())

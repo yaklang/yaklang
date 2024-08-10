@@ -384,9 +384,8 @@ func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} 
 
 	i, _ := raw.(*phpparser.MethodBodyContext)
 	if i.BlockStatement() != nil {
-		y.BuildSyntaxBlock(func() {
-			y.VisitBlockStatement(i.BlockStatement())
-		})
+
+		y.VisitBlockStatement(i.BlockStatement())
 	}
 
 	return nil
@@ -540,6 +539,7 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticVariableContext:
 		// TODO class 命令空间
+		//expr := y.VisitFullyQualifiedNamespaceExpr(i.FullyQualifiedNamespaceExpr())
 		//key = i.VarName().GetText()
 	case *phpparser.ClassDirectStaticVariableContext:
 		//肯定是一个class，
@@ -696,7 +696,7 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 
 	_ = i
 	if i.Identifier() != nil {
-		return y.EmitConstInst(i.Identifier().GetText())
+		return y.EmitConstInst(y.VisitIdentifier(i.Identifier()))
 	}
 
 	if i.Variable() != nil {
@@ -706,7 +706,7 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 	}
 
 	if i.String_() != nil {
-		return y.EmitConstInst(i.String_().GetText())
+		return y.VisitString_(i.String_())
 	}
 
 	if ret := i.Expression(); ret != nil {

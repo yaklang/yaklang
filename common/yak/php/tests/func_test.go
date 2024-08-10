@@ -193,15 +193,26 @@ $a = function()use($d){
 `
 		test.CheckPrintlnValue(code, []string{"FreeValue-$d"}, t)
 	})
-	t.Run("use Closure", func(t *testing.T) {
+	t.Run("use Closure but not use", func(t *testing.T) {
 		code := `<?php
-$a = function()use($d){
-    return "1";
+$d = 1;
+$a = function()use(&$d){
+    $d = 2;
 };
-$da = $a();
-println($da);
+println($d);
 `
-		test.CheckPrintlnValue(code, []string{"Function-$a() binding[FreeValue-$d]"}, t)
+		test.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("use Closure but not use", func(t *testing.T) {
+		code := `<?php
+$d = 1;
+$a = function()use(&$d){
+    $d = 2;
+};
+$a();
+println($d);
+`
+		test.CheckPrintlnValue(code, []string{"side-effect(2, $d)"}, t)
 	})
 
 }
@@ -328,7 +339,7 @@ $a(1);`
 			},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("lamda-not-free-value", func(t *testing.T) {
+	t.Run("lamda-free-value", func(t *testing.T) {
 		t.Run("lamda", func(t *testing.T) {
 			code := `<?php
 $a = function($ba)use($d){
@@ -336,14 +347,21 @@ $a = function($ba)use($d){
 };
 $a(1);`
 			test.CheckPrintlnValue(code, []string{`FreeValue-$d`}, t)
-
-			//todo： 这个测试栈会爆
-			//test.CheckSyntaxFlow(t, code,
-			//	`println(* #-> * as $param)`,
-			//	map[string][]string{
-			//		"param": {"1"},
-			//	},
-			//	ssaapi.WithLanguage(ssaapi.PHP))
 		})
+	})
+	t.Run("test-function", func(t *testing.T) {
+		code := `<?php
+function a(){
+	c("whoami");
+}
+
+function c($cmd){
+	exec($cmd);
+}
+`
+		test.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{},
+			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

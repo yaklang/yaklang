@@ -66,9 +66,7 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		functionBuilder.SupportClassStaticModifier = true
 		functionBuilder.SupportClass = true
 		build := builder{
-			namespaceTable:  make(map[string]struct{}),
 			constMap:        make(map[string]ssa.Value),
-			aliasTable:      make(map[string]ssa.Value),
 			FunctionBuilder: functionBuilder,
 		}
 		build.callback = func(str string, filename string) {
@@ -113,12 +111,9 @@ func (*SSABuild) GetLanguage() consts.Language {
 
 type builder struct {
 	*ssa.FunctionBuilder
-	constMap       map[string]ssa.Value
-	isFunction     bool
-	namespaceTable map[string]struct{} //namespace表
-	aliasTable     map[string]ssa.Value
-
-	callback func(str string, filename string)
+	constMap   map[string]ssa.Value
+	isFunction bool
+	callback   func(str string, filename string)
 }
 
 func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
@@ -163,6 +158,7 @@ func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 }
 
 var phpBuildIn = map[string]any{
+	"include":   func(file any) {},
 	"$_COOKIE":  map[interface{}]interface{}{},
 	"$_SESSION": map[interface{}]interface{}{},
 	"$_SERVER":  map[interface{}]interface{}{},

@@ -122,7 +122,11 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if ret, isConst := ssa.ToConst(fname); isConst {
 			if ret != nil {
 				funcName := ret.VarString()
-				fname = y.ReadValue(funcName)
+				if _func := y.GetProgram().Funcs[funcName]; utils.IsNil(_func) {
+					fname = y.EmitUndefined(funcName)
+				} else {
+					fname = _func
+				}
 			}
 		}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
@@ -350,29 +354,25 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return y.EmitConstInstNil()
 		}
 	case *phpparser.ConditionalExpressionContext:
-		v1 := y.VisitExpression(ret.Expression(0))
-		exprCount := len(ret.AllExpression())
-		var result ssa.Value
-		y.CreateIfBuilder().AppendItem(func() ssa.Value {
-			t1 := y.EmitBinOp(ssa.OpNotEq, v1, y.EmitConstInstNil())
-			t2 := y.EmitBinOp(ssa.OpNotEq, v1, y.EmitConstInst(0))
-			t3 := y.EmitBinOp(ssa.OpNotEq, v1, y.EmitConstInst(false))
-			return y.EmitBinOp(ssa.OpLogicAnd, t1, y.EmitBinOp(ssa.OpLogicAnd, t2, t3))
+		variableName := "unknown-variable"
+		variable := y.CreateVariable(variableName)
+		y.AssignVariable(variable, ssa.NewUndefined(variableName))
+		y.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return y.VisitExpression(ret.Expression(0))
 		}, func() {
-			if exprCount == 2 {
-				result = v1
+			if len(ret.AllExpression()) == 2 {
+				y.AssignVariable(y.CreateVariable(variableName), y.VisitExpression(ret.Expression(0)))
 			} else {
-				// exprCount == 3
-				result = y.VisitExpression(ret.Expression(1))
+				y.AssignVariable(y.CreateVariable(variableName), y.VisitExpression(ret.Expression(1)))
 			}
 		}).SetElse(func() {
-			if exprCount == 2 {
-				result = y.VisitExpression(ret.Expression(1))
+			if len(ret.AllExpression()) == 2 {
+				y.AssignVariable(y.CreateVariable(variableName), y.VisitExpression(ret.Expression(1)))
 			} else {
-				result = y.VisitExpression(ret.Expression(2))
+				y.AssignVariable(y.CreateVariable(variableName), y.VisitExpression(ret.Expression(2)))
 			}
 		}).Build()
-		return result
+		return y.ReadValue(variableName)
 	case *phpparser.NullCoalescingExpressionContext:
 		if leftValue := y.VisitExpression(ret.Expression(0)); leftValue.IsUndefined() {
 			return y.VisitExpression(ret.Expression(1)) // 如果是undefined就返回1
@@ -1160,7 +1160,34 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	switch i := raw.(type) {
 	case *phpparser.CustomVariableContext:
 		variable := y.VisitVariable(i.Variable())
-		return y.ReadValue(variable)
+		var position = ""
+		handler := func() ssa.Value {
+			member, _ := y.GetProgram().Application.GlobalScope.GetStringMember(position)
+			return member
+		}
+		switch strings.ToUpper(variable) {
+		case "$GLOBALS":
+			position = "global"
+		case "$_GET":
+			position = "get"
+		case "$_POST":
+			position = "post"
+		case "$_REQUEST":
+			position = "global"
+		case "$_SERVER":
+			position = "server"
+		case "$_COOKIE":
+			position = "cookie"
+		case "$_ENV":
+			position = "env"
+		case "$_SESSION":
+			position = "session"
+		}
+		if position != "" {
+			return handler()
+		} else {
+			return y.ReadValue(variable)
+		}
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
@@ -1174,7 +1201,7 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		key := y.VisitMemberCallKey(i.MemberCallKey())
 		return y.ReadMemberCallVariable(obj, key)
 	default:
-		return nil
+		return y.EmitUndefined(raw.GetText())
 	}
 }
 
@@ -1238,6 +1265,8 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	}
 	expr := i.Expression()
 	value := y.VisitExpression(expr)
+	call := y.NewCall(y.ReadValue("include"), []ssa.Value{value})
+	y.EmitCall(call)
 	if utils.IsNil(value) {
 		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
 		log.Errorf("_________________BUG___EXPR IS NIL: %v________________", expr.GetText())
