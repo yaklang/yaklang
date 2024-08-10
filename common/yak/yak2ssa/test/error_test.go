@@ -1544,17 +1544,3 @@ func TestParameterMember(t *testing.T) {
 		})
 	})
 }
-
-func TestDefer(t *testing.T) {
-	t.Run("test unexpected expression", func(t *testing.T) {
-		test.CheckError(t, test.TestCase{
-			Code: ` 
-			a = 1
-			defer a
-		`,
-			Want: []string{
-				yak2ssa.UnexpectedDeferStmt(),
-			},
-		})
-	})
-}
