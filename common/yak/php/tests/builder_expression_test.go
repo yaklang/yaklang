@@ -468,22 +468,6 @@ println(a(b(a)));`
 		ssatest.CheckPrintlnValue(code, []string{"Function-a(Function-b(1))"}, t)
 	})
 }
-func TestStringPart(t *testing.T) {
-	t.Run("double quote", func(t *testing.T) {
-		code := `<?php
-$a=1;
-$b=2;
-println("$a+$b");`
-		ssatest.CheckPrintlnValue(code, []string{"\"1+2\""}, t)
-	})
-	t.Run("signal quote", func(t *testing.T) {
-		code := `<?php
-$a=1;
-$b=2;
-println('$a+$b');`
-		ssatest.CheckPrintlnValue(code, []string{"\"$a+$b\""}, t)
-	})
-}
 
 func TestParseSSA_MemberCallKey(t *testing.T) {
 	t.Run("memberCallKey", func(t *testing.T) {

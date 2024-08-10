@@ -13,9 +13,10 @@ func (y *builder) VisitGlobalStatement(raw phpparser.IGlobalStatementContext) in
 	if i == nil {
 		return nil
 	}
+	currentMode := y.SupportClosure
 	y.SupportClosure = true
 	defer func() {
-		y.SupportClosure = false
+		y.SupportClosure = currentMode
 	}()
 	for _, globalVarContext := range i.AllChain() {
 		defaultValue := y.VisitChain(globalVarContext)

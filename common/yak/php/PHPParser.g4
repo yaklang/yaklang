@@ -913,7 +913,7 @@ key
     | FloatCast
     | For
     | Foreach
-    | Function_
+//    | Function_
     | Global
     | Goto
     | If
