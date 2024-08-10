@@ -8,6 +8,12 @@ import (
 )
 
 func TestExpression_If1(t *testing.T) {
+	t.Run("condition", func(t *testing.T) {
+		code := `<?php 
+$cid = !empty($_REQUEST['cid']) ? intval($_REQUEST['cid']) : '';
+println($cid);`
+		ssatest.CheckPrintlnValue(code, []string{`phi($cid)[Undefined-intval(Undefined-.global.cid(valid)),""]`}, t)
+	})
 	t.Run("customIf", func(t *testing.T) {
 		code := `<?php $a = 0;
 println($a);

@@ -616,4 +616,64 @@ class A{
 }`
 		ssatest.MockSSA(t, code)
 	})
+
+	//todo: 待过测试
+
+	//	t.Run("static ++", func(t *testing.T) {
+	//		code := `<?php
+	//$a = self::$readTimes++;
+	//`
+	//		ssatest.MockSSA(t, code)
+	//	})
+
+	t.Run("test-oop-function", func(t *testing.T) {
+		code := `<?php
+
+class test
+{
+    public function aa()
+    {
+        $this->testb("123");
+    }
+	public function testb($cmd)
+    {
+        exec("$cmd" . "cc");
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("test-function", func(t *testing.T) {
+		code := `<?php
+
+class test
+{
+    public $filePath = "";
+
+    public function __construct()
+    {
+        $this->filePath = true ? I("123") : "";
+    }
+
+    public function exec($cmd)
+    {
+        exec("$cmd");
+    }
+
+    public function test1()
+    {
+		$cmd = "$this->filePath"."whoami";
+        $this->exec($cmd);
+    }
+}
+
+new test();`
+		ssatest.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }

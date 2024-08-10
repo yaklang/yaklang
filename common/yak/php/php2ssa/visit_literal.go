@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"math"
 	"strconv"
 	"strings"
@@ -150,21 +151,25 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
-	var constValue string
+	var constValue ssa.Value
 	if len(i.AllInterpolatedStringPart()) != 0 {
 		for _, part := range i.AllInterpolatedStringPart() {
-			constValue += y.VisitInterpolatedStringPart(part)
+			if utils.IsNil(constValue) {
+				constValue = y.VisitInterpolatedStringPart(part)
+			} else {
+				constValue = y.EmitBinOp(ssa.OpAdd, constValue, y.VisitInterpolatedStringPart(part))
+			}
 		}
 	} else {
-		constValue = i.GetText()
+		_value := strings.Trim(i.GetText(), "'")
+		if unquote, err := strconv.Unquote(_value); err != nil {
+			constValue = y.EmitConstInst(_value)
+		} else {
+			constValue = y.EmitConstInst(unquote)
+		}
+		//constValue = ssa.NewConst(i.GetText())
 	}
-	constValue = strings.Trim(constValue, "'")
-	if unquote, err := strconv.Unquote(constValue); err != nil {
-		return y.EmitConstInst(constValue)
-	} else {
-		return y.EmitConstInst(unquote)
-	}
-
+	return constValue
 	//return y.EmitConstInst(constValue)
 	//y.EmitConstInst(constValue)
 	//if unquote, err := yakunquote.Unquote(constValue); err != nil {
@@ -190,18 +195,18 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 	return r
 }
 
-func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) string {
+func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) ssa.Value {
 	if y == nil || raw == nil {
-		return ""
+		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*phpparser.InterpolatedStringPartContext)
 	if i == nil {
-		return ""
+		return nil
 	}
 	if i.Chain() != nil {
-		return y.VisitChain(i.Chain()).String()
+		return y.VisitChain(i.Chain())
 	}
-	return i.GetText()
+	return y.EmitConstInst(i.GetText())
 }

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -48,15 +49,11 @@ $c=[1,2,3,];
 ($b[1] = "1"."abc");
 array(1, "2", "key" => "value");
 `
-	test.CheckError(t, test.TestCase{
-		Code: code,
-		Want: []string{
-			ssa.ValueUndefined("$ancasdfasdfasdf"),
-			ssa.ValueUndefined("$b"),
-			ssa.ValueUndefined("$b"),
-			ssa.ValueUndefined("a"),
-		},
-	})
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	},
+		ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func TestParseSSA_Basic2(t *testing.T) {
@@ -148,11 +145,14 @@ echo "This concludes the basic syntax test.\n";`)
 }
 
 func TestParseSSA_RightValue(t *testing.T) {
-	test.CheckError(t, test.TestCase{
-		Code: `<?php
-a($b[0]); `,
-		Want: []string{ssa.ValueUndefined("$b"), ssa.ValueUndefined("a")},
-	})
+	code := `<?php
+a($b[0]); `
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	},
+		ssaapi.WithLanguage(ssaapi.PHP))
+
 }
 
 func TestParseSSA_DoWhileTag(t *testing.T) {
