@@ -52,10 +52,6 @@ func UnexpectedAssertStmt() string {
 	return "unexpected assert stmt, this not expression"
 }
 
-func UnexpectedDeferStmt() string {
-	return "defer statement should be instance code or function call"
-}
-
 func SliceCallExpressionTooMuch() string {
 	return "slice call expression too much"
 }
