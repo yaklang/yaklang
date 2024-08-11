@@ -1,0 +1,8 @@
+desc(
+    title: "Find Runtime.getRuntime().exec Point",
+    lib: 'runtime-exec',
+    type: audit,
+)
+
+Runtime.getRuntime().exec(*?{!opcode: param && !have: 'getRuntime(', ')'} as $output);
+alert $output;
