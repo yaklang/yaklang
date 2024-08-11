@@ -1,0 +1,47 @@
+desc(
+    title: "Find Thirdparty CommandLine Executing Sink",
+    lib: 'command-exec-misc',
+    type: audit,
+)
+
+// Apache Commons Exec
+// Picocli
+// System-Command-Executor
+// zt-exec
+// NuProcess
+// org.apache.hadoop.util.Shell
+
+NuProcessBuilder(*?{!have: NuProcessBuilder} as $nuprocessParam);
+
+ProcessExecutor?{<getCall>.execute}(*?{!have: ProcessExecutor} as $ztExecParam);
+
+*ShellCommandExecutor(* as $hadoopShellParam);
+
+CommandLine?{<typeName>?{have: 'apache.commons'}}.parse(*?{<typeName>?{!have: 'apache.commons' && !have: 'CommandLine'} } as $apacheCommandLine);
+// $apacheCommandLine
+
+CommandBuilder() as $systemcommandexecutorBuilder;
+$systemcommandexecutorBuilder...forCommandLine(* as $systemcommandexecutorBuilderParam);
+$systemcommandexecutorBuilder...withArgs(* as $systemcommandexecutorBuilderParam);
+// $systemcommandexecutorBuilderParam
+
+
+// check $hadoopShellParam
+// check $systemcommandexecutorBuilderParam;
+// check $apacheCommandLine;
+// check $ztExecParam;
+// check $nuprocessParam
+
+$nuprocessParam as $output;
+$hadoopShellParam as $output;
+$nuprocessParam as $output;
+$systemcommandexecutorBuilderParam as $output;
+$apacheCommandLine as $output;
+$ztExecParam as $output;
+
+alert $output;
+
+
+
+
+

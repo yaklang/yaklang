@@ -1,0 +1,8 @@
+desc(
+    title: "Find ProcessBuilder Sink Point",
+    lib: 'process-builder',
+    type: audit,
+)
+
+ProcessBuilder(*?{!have: ProcessBuilder} as $output);
+alert $output;
