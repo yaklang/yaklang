@@ -265,6 +265,7 @@ type Type interface {
 	// full type name
 	AddFullTypeName(string)
 	GetFullTypeNames() []string
+	SetFullTypeNames([]string)
 	// set/get method, method is a function
 	SetMethod(map[string]*Function)
 	AddMethod(string, *Function)
@@ -417,6 +418,13 @@ func (b *BasicType) GetFullTypeNames() []string {
 		return nil
 	}
 	return b.fullTypeName
+}
+
+func (b *BasicType) SetFullTypeNames(names []string) {
+	if b== nil {
+		return
+	}
+	b.fullTypeName = names
 }
 
 func (b *BasicType) SetMethod(method map[string]*Function) {
@@ -604,6 +612,14 @@ func (a *AliasType) GetFullTypeNames() []string {
 	}
 	return a.fullTypeName
 }
+
+func (a *AliasType) SetFullTypeNames(names []string) {
+	if a == nil {
+		return
+	}
+	a.fullTypeName = names
+}
+
 func (a *AliasType) SetMethod(m map[string]*Function) {
 	a.method = m
 }
@@ -743,6 +759,13 @@ func(i *InterfaceType) GetFullTypeNames() []string {
 	}
 	return i.fullTypeName
 }
+
+func (i *InterfaceType) SetFullTypeNames(names []string) {
+	if i == nil {
+		return
+	}
+	i.fullTypeName = names
+}
 // ====================== chan type
 type ChanType struct {
 	Elem   Type
@@ -766,6 +789,12 @@ func (c *ChanType) GetFullTypeNames() []string {
 	return c.fullTypeName
 }
 
+func (c *ChanType) SetFullTypeNames(names []string) {
+	if c == nil {
+		return
+	}
+	c.fullTypeName = names
+}
 func (c *ChanType) SetMethod(m map[string]*Function) {
 	c.method = m
 }
@@ -855,6 +884,12 @@ func( i *ObjectType) GetFullTypeNames() []string {
 	return i.fullTypeName
 }
 
+func (i *ObjectType) SetFullTypeNames(names []string) {
+	if i == nil {
+		return
+	}
+	i.fullTypeName = names
+}
 
 func (i *ObjectType) GetMethod() map[string]*Function {
 	return i.method
@@ -1095,12 +1130,18 @@ func (f *FunctionType) GetFullTypeNames() []string {
 	}
 	return f.fullTypeName
 }
+func (f *FunctionType) SetFullTypeNames(names []string) {
+	if f ==nil {
+		return
+	}
+	f.fullTypeName = names
+}
 
+func (f *FunctionType) SetMethod(m map[string]*Function) {}
 func (f *FunctionType) GetMethod() map[string]*Function {
 	return nil
 }
 
-func (f *FunctionType) SetMethod(m map[string]*Function) {}
 func (b *FunctionType) AddMethod(id string, f *Function) {}
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
@@ -1234,6 +1275,12 @@ func (c *GenericType) GetFullTypeNames() []string {
 	return c.fullTypeName
 }
 
+func (c *GenericType) SetFullTypeNames(names []string) {
+	if c == nil {
+		return
+	}
+	c.fullTypeName = names
+}
 func (c *GenericType) SetMethod(m map[string]*Function) {
 	c.method = m
 }
@@ -1402,6 +1449,13 @@ func (c *OrType) GetFullTypeNames() []string {
 		return nil
 	}
 	return c.fullTypeName
+}
+
+func (c *OrType) SetFullTypeNames(names []string) {
+	if c  == nil {
+		return
+	}
+	c.fullTypeName = names
 }
 
 func (c *OrType) AddFullTypeName(name string) {

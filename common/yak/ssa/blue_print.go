@@ -122,3 +122,10 @@ func (c *ClassBluePrint) GetFullTypeNames() []string {
 	}
 	return c.fullTypeName
 }
+
+func (c *ClassBluePrint)SetFullTypeNames(names []string){
+	if c==nil{
+		return
+	}
+	c.fullTypeName = names
+}

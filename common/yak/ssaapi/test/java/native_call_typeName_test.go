@@ -84,9 +84,9 @@ public class FastJSONDemoController {
 		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
 		assert.NotNil(t, obj)
 
-		typeName := prog.SyntaxFlowChain(`anyJSON<typeName> as $id;`)[0]
+		typeName := prog.SyntaxFlowChain(`anyJSON<typeName>?{have:'JSON'} as $id;`).Show()
 		assert.Contains(t, typeName.String(), "JSON")
-		typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName> as $id`)[0]
+		typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName>?{have:'JSON'} as $id`)
 		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
@@ -118,15 +118,15 @@ func TestLocalVariableDeclareTypeName(t *testing.T){
 		prog := progs[0]
 		prog.Show()
 
-		obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'string'}as $obj`)
-		assert.Equal(t,1,obj.Len())
-		obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'string'} as $obj`)
-		assert.Equal(t,1,obj.Len())
+		obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'string' || have: 'A'} as $obj`)
+		assert.Equal(t,3,obj.Len())
+		obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'string' || have: 'A'} as $obj`)
+		assert.Equal(t,2,obj.Len())
 		
-		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
-		assert.Equal(t,1,obj.Len())
-		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
-		assert.Equal(t,1,obj.Len())
+		obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number' || have: 'A'}  as $obj`)
+		assert.Equal(t,3,obj.Len())
+		obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number' || have: 'A'}as $obj`)
+		assert.Equal(t,2,obj.Len())
 
 		obj = prog.SyntaxFlowChain(`res3<typeName>?{have:'A'} as $obj`)
 		assert.Equal(t,2,obj.Len())
@@ -138,7 +138,7 @@ func TestLocalVariableDeclareTypeName(t *testing.T){
 		obj = prog.SyntaxFlowChain(`res4<fullTypeName>?{have: 'string'}as $obj`)
 		assert.Equal(t,1,obj.Len())
 
-		obj = prog.SyntaxFlowChain(`res5<typeName>?{have:'A'} as $obj`)
+		obj = prog.SyntaxFlowChain(`res5<typeName>?{have:'A'}as $obj`).Show()
 		assert.Equal(t,2,obj.Len())
 		obj = prog.SyntaxFlowChain(`res5<fullTypeName>?{have:'com.org.A.A'} as $obj`)
 		assert.Equal(t,1,obj.Len())
@@ -175,7 +175,7 @@ func TestMemberCallTypeName(t *testing.T){
 					var res3 = object.getDog();  // fulltypeName 应为com.org.Dog.Dog
 					var res4 = object.Runtime().exec();  // fulltypeName 应该和object一样
 					var res5 = A.staticMethod();  // fulltypeName 应该找到Dog
-					var res6 = A.noExistMethod();  // fulltypeName 应该找到A
+					var res6 = A.noExistMethod();  // fulltypeName 应该找到A	
 				}
 			};	
 	`)
@@ -184,7 +184,7 @@ func TestMemberCallTypeName(t *testing.T){
 			prog := progs[0]
 			prog.Show()
 
-			obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'A'} as $obj`)
+			obj := prog.SyntaxFlowChain(`res1<typeName> as $obj`)
 			assert.Equal(t,2,obj.Len())
 			obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'com.org.A.A'} as $obj`)
 			assert.Equal(t,1,obj.Len())
@@ -289,7 +289,6 @@ func TestTypeNamePriority(t *testing.T){
 			assert.Equal(t,2,obj.Len())
 			obj = prog.SyntaxFlowChain(`res1<fullTypeName>?{have: 'com.org.A.A'} as $obj`)
 			assert.Equal(t,1,obj.Len())
-			
 			obj = prog.SyntaxFlowChain(`res2<typeName>?{have:'number'} as $obj`)
 			assert.Equal(t,1,obj.Len())
 			obj = prog.SyntaxFlowChain(`res2<fullTypeName>?{have:'number'} as $obj`)
@@ -365,7 +364,7 @@ func TestFullTypeNameWithParentClass1(t *testing.T){
 			prog.Show()
 
 			obj := prog.SyntaxFlowChain("a<typeName> as $obj").Show()
-			assert.Equal(t,4,obj.Len())
+			assert.Equal(t,6,obj.Len())
 		
 			obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.example.B.B'} as $obj")
 			assert.Equal(t,1,obj.Len())
@@ -393,10 +392,10 @@ func TestFullTypeNameWithParentClass1(t *testing.T){
 
 func TestFullTypeNameWithParentClass2(t *testing.T){
 	vf := filesys.NewVirtualFs()
-	
+
 	vf.AddFile("B.java",
 		`package com.example.B;
-		import com.org.*;
+	
 		class B extends A implements C{
 			public static void main(String[] args){
 				var a = new B();
@@ -407,11 +406,11 @@ func TestFullTypeNameWithParentClass2(t *testing.T){
 			prog := progs[0]
 			prog.Show()
 
-			obj := prog.SyntaxFlowChain("a<typeName> as $obj").Show()
+			obj := prog.SyntaxFlowChain("a<typeName> as $obj").Show()			
 			assert.Equal(t,6,obj.Len())
 
 			obj = prog.SyntaxFlowChain("a<fullTypeName> as $obj").Show()
-			assert.Equal(t,5,obj.Len())
+			assert.Equal(t,3,obj.Len())
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 }
@@ -520,4 +519,32 @@ public class Simple extends HttpServlet {
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 	})
+}
+
+func TestTypeNameForCreator(t *testing.T){
+	code := `package com.example;
+	import java.io.FileWriter;
+	import java.io.File;
+	class A{
+		public static main(String[] args){
+		FileWriter fw = new FileWriter(new File("a.txt"));
+		}
+	}`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		res := prog.SyntaxFlowChain(`File<typeName>?{have:'File'} as $a;`)
+		assert.Equal(t,2,res.Len())
+
+		res = prog.SyntaxFlowChain(`File<fullTypeName>?{have:'java.io.File'} as $a;`)
+		assert.Equal(t,1,res.Len())
+
+		res = prog.SyntaxFlowChain(`FileWriter<typeName>?{have:'FileWriter'} as $a;`)
+		assert.Equal(t,2,res.Len())
+		res = prog.SyntaxFlowChain(`FileWriter<typeName>?{have:'java.io.FileWriter'} as $a;`)
+		assert.Equal(t,1,res.Len())
+
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+	
+	
 }

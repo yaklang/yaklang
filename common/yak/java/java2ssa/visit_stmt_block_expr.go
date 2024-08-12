@@ -132,7 +132,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if id := ret.Identifier(); id != nil {
 			key = y.EmitConstInst(id.GetText())
 		} else if method := ret.MethodCall(); method != nil {
-			res= y.VisitMethodCall(method, obj)
+			res = y.VisitMethodCall(method, obj)
 		} else if this := ret.THIS(); this != nil {
 			key = y.EmitConstInst(this.GetText())
 		} else if super := ret.SUPER(); super != nil {
@@ -142,7 +142,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			if ret.NonWildcardTypeArguments() != nil {
 				// todo:泛型
 			}
-			res= y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
+			res = y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
 		} else if explicit := ret.ExplicitGenericInvocation(); explicit != nil {
 			//todo : 显式泛型调用
 			key = y.EmitConstInst(explicit.GetText())
@@ -150,15 +150,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if res == nil {
 			res = y.ReadMemberCallVariable(obj, key)
 		}
-		
+
 		resTyp := res.GetType()
-		if resTyp != nil && len(resTyp.GetFullTypeNames())!= 0 {
+		if resTyp != nil && len(resTyp.GetFullTypeNames()) != 0 {
 			return res
 		}
 
 		t := obj.GetType()
-		if ftName := t.GetFullTypeNames(); len(ftName)!= 0 {
-		newTyp := y.CopyFullTypeNameForType(ftName,res.GetType())
+		if ftName := t.GetFullTypeNames(); len(ftName) != 0 {
+			newTyp := y.MergeFullTypeNameForType(ftName, res.GetType())
 			res.SetType(newTyp)
 		}
 		return res
@@ -301,13 +301,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.CastExpressionContext:
 		// 处理类型转换表达式
 		var castType ssa.Type
-		if len(ret.AllBITAND())==0 {
+		if len(ret.AllBITAND()) == 0 {
 			castType = y.VisitTypeType(ret.TypeType(0))
-		}else {
+			typName := utils.InsertSliceItem[string](castType.GetFullTypeNames(), "__castType__", 0)
+			castType.SetFullTypeNames(typName)
+		} else {
 			// TODO:处理类型交集语句
 		}
 
-	    v := y.VisitExpression(ret.Expression())
+		v := y.VisitExpression(ret.Expression())
 		if castType != nil {
 			v.SetType(castType)
 		}
@@ -1042,14 +1044,14 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		//log.Infof("visit local variable declaration: %v,type:%v", ret.GetText(), typName)
 		decls := ret.(*javaparser.VariableDeclaratorsContext)
 		for _, decl := range decls.AllVariableDeclarator() {
-			y.VisitVariableDeclarator(decl,typ)
+			y.VisitVariableDeclarator(decl, typ)
 		}
 	}
 
 	return nil
 }
 
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext,typ ssa.Type) (name string, value ssa.Value) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typ ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -1068,17 +1070,24 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		if utils.IsNil(value) {
 			return name, nil
 		} else {
-			rightValueTyp := value.GetType()
-			if b,ok := ssa.ToBasicType(rightValueTyp); ok && typ!=nil{
-				if len(b.GetFullTypeNames()) == 0{
-					newTyp := y.CopyFullTypeNameForType(typ.GetFullTypeNames(), rightValueTyp)
+			rightValTyp := value.GetType()
+			rightValTypName := rightValTyp.GetFullTypeNames()
+			// 如果有类型转换，就用转换后的typeName
+			if len(rightValTypName) != 0 && rightValTypName[0] == "__castType__" {
+				typName := utils.RemoveSliceItem[string](rightValTypName, "__castType__")
+				rightValTyp.SetFullTypeNames(typName)
+				value.SetType(rightValTyp)
+			} else {
+				// 没有类型转换，就使用在右值的typeName加上typeType的typeName
+				if typ != nil{
+					newTyp := y.MergeFullTypeNameForType(typ.GetFullTypeNames(), rightValTyp)
 					value.SetType(newTyp)
 				}
 			}
-				y.AssignVariable(variable, value)
-				return name, value
-			}
-		}else{
+		}
+			y.AssignVariable(variable, value)
+			return name, value
+	} else {
 		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(name)
 		value := y.EmitValueOnlyDeclare(name)
@@ -1632,18 +1641,29 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 		obj := y.EmitUndefined(className)
 		if class == nil {
 			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
-			obj.SetType(ssa.GetAnyType())
-
 			// create variable now, and auto create function
+			var newTyp ssa.Type
+
 			variable := y.CreateVariable(className)
 			defaultClassFullback := y.EmitUndefined(className)
+			newTyp,isFromMap := y.AddFullTypeNameFromMap(className, defaultClassFullback.GetType())
+			if !isFromMap{
+				newTyp = y.AddFullTypeNameFromAnnotationMap(className,defaultClassFullback.GetType())
+			}
+			defaultClassFullback.SetType(newTyp)
 			y.AssignVariable(variable, defaultClassFullback)
 
+			var newCallTyp ssa.Type
 			args := []ssa.Value{obj}
 			arguments := y.VisitClassCreatorRest(ret, className)
 			args = append(args, arguments...)
-			// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
-			return obj, y.EmitCall(y.NewCall(defaultClassFullback, args))
+			call := y.EmitCall(y.NewCall(defaultClassFullback, args))
+			newCallTyp,isFromMap = y.AddFullTypeNameFromMap(className, call.GetType())
+			if !isFromMap{
+				newCallTyp = y.AddFullTypeNameFromAnnotationMap(className,call.GetType())
+			}
+			call.SetType(newCallTyp)
+			return obj, call
 		}
 		constructor := class.Constructor
 		if constructor == nil {
@@ -1773,12 +1793,12 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 }
 
 func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
-	defer func ()  {
+	defer func() {
 		//set full type name
-		if len(value.GetType().GetFullTypeNames()) == 0{
-		newType,_ := y.AddFullTypeNameFromMap(name, value.GetType())
-		value.SetType(newType)
-	}
+		if len(value.GetType().GetFullTypeNames()) == 0 {
+			newType, _ := y.AddFullTypeNameFromMap(name, value.GetType())
+			value.SetType(newType)
+		}
 	}()
 
 	if value := y.PeekValue(name); value != nil {
@@ -1799,7 +1819,6 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	if value, ok := y.ReadConst(name); ok {
 		return value
 	}
-	 
-	
+
 	return y.ReadValue(name)
 }

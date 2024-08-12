@@ -165,36 +165,31 @@ func init() {
 				}
 				t := val.GetType()
 				fts := t.t.GetFullTypeNames()
+				var results []string
 				if len(fts) == 0{
-					results := val.NewValue(ssa.NewConst(t.String()))
-					vals = append(vals, results)
+					results = append(results, t.t.String())
 				}else{
-					if len(fts) != 0 {
-						ft := fts[0]
-						// remove version if it exists
+					for _, ft := range fts {
+						//remove versioin name
 						index := strings.Index(ft, ":")
 						if index != -1 {
 							ft = ft[:index]
-							results := val.NewValue(ssa.NewConst(ft))
-							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-							vals = append(vals, results)
+							results = append(results, ft)
 						}
 
 						// get type name
 						lastIndex := strings.LastIndex(ft, ".")
 						if lastIndex != -1 && len(ft) > lastIndex+1 {
-							ft = ft[lastIndex+1:]
-							results := val.NewValue(ssa.NewConst(ft))
-							results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-							vals = append(vals, results)
+							results = append(results, ft[lastIndex+1:])
 						}
+						results = append(results, ft)
 					}
-
-					for _, ft := range fts {
-						results := val.NewValue(ssa.NewConst(ft))
-						results.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-						vals = append(vals, results)
-					}
+				}
+				results = utils.RemoveRepeatStringSlice(results)
+				for _, result := range results {
+					v := val.NewValue(ssa.NewConst(result))
+					v.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+					vals = append(vals, v)
 				}
 				return nil
 			})
