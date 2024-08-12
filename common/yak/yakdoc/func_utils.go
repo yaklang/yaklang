@@ -32,12 +32,15 @@ var (
 	ErrIsInstanceMethod    = utils.Error("function is instance method")
 )
 
-func GetDeclAndCompletion(funcName string, params, results []*Field) (string, string) {
+func GetDeclAndCompletion(funcName string, params, results []*Field, funcRefType reflect.Type) (string, string) {
 	// 通用处理params和results
 	paramsStr := make([]string, 0, len(params))
 	for i, p := range params {
 		variadic := strings.HasPrefix(p.Type, "...")
-		_ = variadic
+		if !variadic && i == len(params)-1 && funcRefType != nil && funcRefType.Kind() == reflect.Func {
+			variadic = funcRefType.IsVariadic()
+		}
+
 		if p.Name == "" {
 			p.Name = fmt.Sprintf("v%d", i+1)
 		}
@@ -133,6 +136,9 @@ func ShrinkTypeVerboseName(i string) string {
 	}
 	if i == "[]uint8" {
 		return "[]byte"
+	}
+	if i == "" {
+		return "any"
 	}
 
 	return i
@@ -606,7 +612,7 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 	// 特殊处理params和results
 	// params, results = customHandleParamsAndResults(libName, overideName, params, results)
 
-	declaration, completion = GetDeclAndCompletion(finalName, params, results)
+	declaration, completion = GetDeclAndCompletion(finalName, params, results, funcRefType)
 
 	// 特殊处理Document
 	if document != "" {
@@ -620,6 +626,45 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 		LibName:        libName,
 		MethodName:     finalName,
 		Document:       document,
+		Decl:           declaration,
+		Params:         params,
+		Results:        results,
+		VSCodeSnippets: completion,
+	}, nil
+}
+
+func ForceFuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDecl, error) {
+	funcRefValue := reflect.ValueOf(f)
+	funcRefType := funcRefValue.Type()
+	if funcRefValue.Kind() != reflect.Func {
+		return nil, fmt.Errorf("not a function")
+	}
+	params, results := make([]*Field, funcRefType.NumIn()), make([]*Field, funcRefType.NumOut())
+
+	for i := 0; i < funcRefType.NumIn(); i++ {
+		inType := funcRefType.In(i)
+		params[i] = &Field{
+			Name:    "",
+			Type:    ShrinkTypeVerboseName(inType.String()),
+			RefType: inType,
+		}
+	}
+
+	for i := 0; i < funcRefType.NumOut(); i++ {
+		outType := funcRefType.Out(i)
+		results[i] = &Field{
+			Name:    "",
+			Type:    ShrinkTypeVerboseName(outType.String()),
+			RefType: outType,
+		}
+	}
+
+	declaration, completion := GetDeclAndCompletion(overideName, params, results, funcRefType)
+
+	return &FuncDecl{
+		LibName:        libName,
+		MethodName:     overideName,
+		Document:       "",
 		Decl:           declaration,
 		Params:         params,
 		Results:        results,
