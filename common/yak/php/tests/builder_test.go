@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
-
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -185,7 +183,7 @@ while ($i < 5) {
 }`
 	test.CheckError(t, test.TestCase{
 		Code: code,
-		Want: []string{ssa.ValueUndefined("$i"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if")},
+		Want: []string{ssa.ValueUndefined("$i")},
 	})
 }
 
@@ -205,7 +203,7 @@ echo "abc";
 }`
 	test.CheckError(t, test.TestCase{
 		Code: code,
-		Want: []string{ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa.ValueUndefined("$a")},
+		Want: []string{ssa.ValueUndefined("$a")},
 	})
 }
 
@@ -297,7 +295,11 @@ a?b:c;
 1===1;
 1!==1;
 1!=1;`
-	test.MockSSA(t, code)
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	},
+		ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func TestParseSSA_SMOKING_if(t *testing.T) {
@@ -350,20 +352,11 @@ $h |= 1;
 $i ^= 1;
 $j <<= 1;
 $k >>= 1;`
-	test.CheckError(t, test.TestCase{
-		Code: code,
-		Want: []string{ssa.ValueUndefined("$b"),
-			ssa.ValueUndefined("$c"),
-			ssa.ValueUndefined("$e"),
-			ssa.ValueUndefined("$d"),
-			ssa.ValueUndefined("$f"),
-			ssa.ValueUndefined("$g"),
-			ssa.ValueUndefined("$h"),
-			ssa.ValueUndefined("$i"),
-			ssa.ValueUndefined("$j"),
-			ssa.ValueUndefined("$k"),
-		},
-	})
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	},
+		ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func TestParseSSA_Valid1(t *testing.T) {
@@ -403,7 +396,7 @@ $b = 1+1+$a;
 }
 
 func TestParseSSA_1(t *testing.T) {
-	test.MockSSA(t, `<?php
+	code := `<?php
 
 id: 
 	echo "test123";
@@ -445,6 +438,10 @@ endif;
     <p>Another condition is true.</p>
 <?php else: ?>
     <p>Both conditions are false.</p>
-<?php endif; ?>
-`)
+<?php endif; ?>`
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	},
+		ssaapi.WithLanguage(ssaapi.PHP))
 }

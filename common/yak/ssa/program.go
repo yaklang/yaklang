@@ -278,7 +278,7 @@ func (p *Program) PushEditor(e *memedit.MemEditor, handler func(*omap.OrderedMap
 	p.editorStack.Push(e)
 	handler(p.editorMap)
 	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
-	p.editorMap.Set(e.GetFilename(), e)
+	//p.editorMap.Set(e.GetFilename(), e)
 }
 
 func (p *Program) GetIncludeFiles() []string {
