@@ -1,0 +1,29 @@
+desc(
+    title: "Find Java File I/O Sinks",
+    title_zh: "查找 Java 文件 I/O 接收点",
+    type: audit,
+    lib: "filename-param"
+)
+
+// new File("aaaa.txt")
+File?{<typeName>?{have: 'java.io.File'}}(*?{!have: File} as $javaIOFileParam);
+
+// PrintWriter writer = new PrintWriter("example.txt", "UTF-8");
+PrintWriter(*?{!have: PrintWriter} as $printWriterFilenames);
+
+// FileOutputStream outputStream = new FileOutputStream("example.txt");
+FileOutputStream(*?{!have: FileOutputStream} as $javaIOFileStreamName);
+
+// java.io.FileWriter
+FileWriter(*?{!have: FileWriter} as $javaIOFileName);
+
+// java.nio.file.Files
+Files?{<typeName>?{have: 'java.nio'}}.write(*?{!have: Files } as $nioParam)
+
+
+$javaIOFileParam as $output;
+$printWriterFilenames as $output;
+$javaIOFileStreamName as $output;
+$javaIOFileName as $output;
+$nioParam as $output;
+alert $output;
