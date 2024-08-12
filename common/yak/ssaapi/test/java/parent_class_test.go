@@ -11,7 +11,8 @@ import (
 func TestReal_FromImplToInterface(t *testing.T) {
 
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("ruoyi-system/src/main/resources/mapper/system/SysDeptMapper.xml", `
+	{
+		vf.AddFile("ruoyi-system/src/main/resources/mapper/system/SysDeptMapper.xml", `
 	<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
@@ -35,7 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 </mapper> 
 	`)
-	vf.AddFile("ruoyi-system/src/main/java/com/ruoyi/system/mapper/SysDeptMapper.java", `
+		vf.AddFile("ruoyi-system/src/main/java/com/ruoyi/system/mapper/SysDeptMapper.java", `
 package com.ruoyi.system.mapper;
 
 import java.util.List;
@@ -60,7 +61,7 @@ public interface SysDeptMapper
 }
 	`)
 
-	vf.AddFile("ruoyi-system/src/main/java/com/ruoyi/system/service/ISysDeptService.java", `
+		vf.AddFile("ruoyi-system/src/main/java/com/ruoyi/system/service/ISysDeptService.java", `
 	package com.ruoyi.system.service;
 
 import java.util.List;
@@ -83,7 +84,7 @@ public interface ISysDeptService
 }
 	`)
 
-	vf.AddFile("ruoyi-system/src/main/java/com/ruoyi/system/service/impl/SysDeptServiceImpl.java", `
+		vf.AddFile("ruoyi-system/src/main/java/com/ruoyi/system/service/impl/SysDeptServiceImpl.java", `
 	package com.ruoyi.system.service.impl;
 
 import java.util.List;
@@ -120,7 +121,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 }
 	`)
 
-	vf.AddFile("ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java", `
+		vf.AddFile("ruoyi-admin/src/main/java/com/ruoyi/web/controller/system/SysDeptController.java", `
 	package com.ruoyi.web.controller.system;
 
 import java.util.List;
@@ -156,6 +157,7 @@ public class SysDeptController extends BaseController
     }
 }
 	`)
+	}
 
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 <mybatisSink> as $Param
@@ -164,7 +166,6 @@ $Param #-> as $ParamTopDef
 		"ParamTopDef": {"Parameter-source"},
 	}, true, ssaapi.WithLanguage(ssaapi.JAVA),
 	)
-
 }
 
 func TestInterfaceAndImpl(t *testing.T) {
@@ -173,6 +174,7 @@ func TestInterfaceAndImpl(t *testing.T) {
 package com.a.example;
 class IA {
 	public int get();
+	public void set(int i);
 }
 	`)
 
@@ -184,6 +186,9 @@ class IA {
 			var target  = 11;
 			return target;
 		}
+		public void set(int i) {
+			var target1 = i;
+		}
 	}
 	`)
 
@@ -193,6 +198,9 @@ class IA {
 	class IAImpl2 implements IA {
 		public int get() {
 			return 22;
+		}
+		public void set(int i) {
+			var target2 = i;
 		}
 	}
 	`)
@@ -210,13 +218,17 @@ class User {
 
 	public void ff() {
 		func0(ia.get()); // can get interface/impl1/impl2
+		ia.set(0);
 
 		func1(iai.get()); // impl1
+		iai.set(1);
 		func2(iai2.get()); // impl2
+		iai2.set(2);
 	}
 }
 	`)
 
+	// pointer
 	t.Run("test impl.function pointer with interface.function", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 	IAImpl.get as $func
@@ -227,6 +239,7 @@ class User {
 		)
 	})
 
+	// bottom user
 	t.Run("test from impl to interface", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		target --> as $target
@@ -236,6 +249,7 @@ class User {
 		)
 	})
 
+	// from top to bottom
 	t.Run("test from interface to impl", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		func0(* #-> as $interfaceTarget)
@@ -246,5 +260,30 @@ class User {
 			"impl1Target":     {"11"},
 			"impl2Target":     {"22"},
 		}, true)
+	})
+
+	// form bottom to top
+	t.Run("test interface.function parameter top def", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		IA.set as $func 
+		$func(* #-> ?{opcode: const} as $para) as $call
+		`, map[string][]string{
+			"para": {"0", "1", "2"},
+		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test implement.function parameter top def", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		IAImpl.set(* #-> ?{opcode: const} as $para1) as $call1
+		target1 #-> as $target1
+
+		IAImpl2.set(* #-> ?{opcode: const} as $para2) as $call2
+		target2 #-> as $target1
+		`, map[string][]string{
+			"para1": {"1", "0"},
+			"para2": {"2", "0"},
+		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+		)
 	})
 }
