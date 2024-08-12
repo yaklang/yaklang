@@ -223,7 +223,7 @@ public class Example {
 		`,
 			`BufferedWriter(* as $filename).write() as $sink`,
 			map[string][]string{
-				"sink": {`Undefined-writer.write(valid)("Hello, world!")`},
+				"sink": {"Undefined-writer.write(Undefined-BufferedWriter(Undefined-BufferedWriter,Undefined-FileWriter(Undefined-FileWriter,\"example.txt\")),\"Hello, world!\")"},
 			},
 			ssaapi.WithLanguage(ssaapi.JAVA),
 		)
