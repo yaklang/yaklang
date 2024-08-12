@@ -2,9 +2,11 @@ package buildin_rule
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -18,9 +20,14 @@ import (
 var samples embed.FS
 
 type BuildinRuleTestCase struct {
-	Name           string
-	Rule           string
-	FS             map[string]string
+	Name string
+	Rule string
+	FS   map[string]string
+
+	// if negative test set, the result is empty or error
+	// it means no vuln / result found
+	NegativeTest bool
+
 	ContainsAll    []string
 	NotContainsAny []string
 }
@@ -56,13 +63,29 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 				}
 				for _, prog := range programs {
 					result, err := prog.SyntaxFlowWithError(r.Content)
-					if err != nil || result.Errors != nil {
-						if err != nil {
-							t.Fatal(err)
-						} else {
-							t.Fatal(result.Errors)
+					if !c.NegativeTest {
+						if err != nil || result.Errors != nil {
+							if err != nil {
+								t.Fatal(err)
+							} else {
+								t.Fatal(result.Errors)
+							}
 						}
+					} else {
+						if err == nil && len(result.Errors) == 0 {
+							t.Fatal(err)
+						}
+
+						if errors.Is(err, sfvm.CriticalError) {
+							t.Fatal("cannot accept critical error: " + err.Error())
+						}
+
+						if len(result.AlertSymbolTable) > 0 {
+							t.Fatal("no alert variables should, negative test failed")
+						}
+						return nil
 					}
+
 					if len(result.AlertSymbolTable) >= 0 {
 						for name, val := range result.AlertSymbolTable {
 							msg := fmt.Sprintf("%v\n%s\n%s\n\n", r.Severity, name, val)

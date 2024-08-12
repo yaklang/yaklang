@@ -1,0 +1,12 @@
+desc(
+    title: "Find XStream Unsafe Use in Context Sink",
+    title_zh: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
+    type: vuln,
+    level: warning,
+)
+
+fromXML as $fromXML;
+$fromXML?{ <getObject>?{!.setMode} }() as $vuln;
+
+check $vuln;
+alert $vuln;
