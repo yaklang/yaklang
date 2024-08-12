@@ -32,6 +32,10 @@ func TestBuildInRule(t *testing.T) {
 }
 
 func TestBuildInRule_DEBUG(t *testing.T) {
+	if utils.InGithubActions() {
+		t.SkipNow()
+		return
+	}
 	for i := 0; i < len(Cases); i++ {
 		c := Cases[i]
 		if !utils.MatchAllOfSubString(c.Name, `attachment`) {
