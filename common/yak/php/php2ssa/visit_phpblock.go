@@ -20,10 +20,29 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	if len(i.AllImportStatement()) > 0 {
 		// handle ImportStmt
 	}
-
-	for _, stmt := range i.AllTopStatement() {
-		y.VisitTopStatement(stmt)
+	if y.MoreParse && len(i.AllNamespaceDeclaration()) == 0 {
+		return nil
 	}
-
+	for _, namespace := range i.AllNamespaceDeclaration() {
+		y.VisitNamespaceDeclaration(namespace)
+	}
+	for _, usedecl := range i.AllUseDeclaration() {
+		y.VisitUseDeclaration(usedecl)
+	}
+	for _, global := range i.AllGlobalConstantDeclaration() {
+		y.VisitGlobalConstantDeclaration(global)
+	}
+	for _, functiondecl := range i.AllFunctionDeclaration() {
+		y.VisitFunctionDeclaration(functiondecl)
+	}
+	for _, classdecl := range i.AllClassDeclaration() {
+		y.VisitClassDeclaration(classdecl)
+	}
+	for _, stmt := range i.AllStatement() {
+		y.VisitStatement(stmt)
+	}
+	for _, enum := range i.AllEnumDeclaration() {
+		y.VisitEnumDeclaration(enum)
+	}
 	return nil
 }

@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
@@ -118,14 +119,52 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		defer func() {
 			y.isFunction = tmp
 		}()
-		fname := y.VisitExpression(ret.Expression())
-		if ret, isConst := ssa.ToConst(fname); isConst {
-			if ret != nil {
-				funcName := ret.VarString()
-				if _func := y.GetProgram().Funcs[funcName]; utils.IsNil(_func) {
-					fname = y.EmitUndefined(funcName)
+		functionHandler := func(funcName string, defaultValue ssa.Value) ssa.Value {
+			if y.FuncSyntax.checkSyntaxInCache(funcName) {
+				//return y.GetProgram().GetFunction(funcName)
+			} else if y.FuncSyntax.checkSyntaxInCurrent(funcName) {
+				_, syntaxBuilder := y.FuncSyntax.getSyntaxHandler(funcName)
+				y.FuncSyntax.spin[funcName] = nil
+				b := &builder{
+					FunctionBuilder: y.GetProgram().GetAndCreateFunctionBuilder(fmt.Sprintf("function-%v", funcName), fmt.Sprintf("function-%v", funcName)),
+					constMap:        y.constMap,
+					callback:        y.callback,
+					FuncSyntax:      y.FuncSyntax,
+					ClassSyntax:     y.ClassSyntax,
+				}
+				syntaxBuilder(b)
+				function := b.GetProgram().GetFunction(funcName)
+				y.FuncSyntax.spin[funcName] = function
+				return function
+			} else {
+				funcSyntax, b := y.FuncSyntax.checkAndPush(funcName)
+				if !b {
+					log.Warnf("not found in function stack")
+					return defaultValue
 				} else {
-					fname = _func
+					funcSyntax(nil)
+					y.FuncSyntax.PopAndDel()
+				}
+			}
+			if function := y.GetProgram().GetFunction(funcName); utils.IsNil(function) {
+				return defaultValue
+			} else {
+				return function
+			}
+		}
+		fname := y.VisitExpression(ret.Expression())
+		//todo: 不知道当前调用的方法是类内部方法还是普通方法，得一个flag去区分
+		if !strings.HasPrefix(strings.ToLower(fname.GetName()), "anonymousfunc") && !fname.IsExtern() && !y.FuncSyntax.checkSpin(fname.GetName()) {
+			switch {
+			case fname.GetType().GetTypeKind() == ssa.AnyTypeKind:
+				fname = functionHandler(fname.GetName(), fname)
+			case fname.GetType().GetTypeKind() == ssa.FunctionTypeKind:
+				f := functionHandler(fname.GetName(), fname)
+				fname = f
+			default:
+				if _, ok := fname.(*ssa.Function); ok {
+					f := functionHandler(fname.GetName(), fname)
+					fname = f
 				}
 			}
 		}
@@ -134,6 +173,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if ellipsis {
 			callInst.IsEllipsis = true
 		}
+		//tmps := fname.(*ssa.Function)
+		//_ = tmps
 		return y.EmitCall(callInst)
 	case *phpparser.CastExpressionContext:
 		target := y.VisitExpression(ret.Expression())
@@ -472,11 +513,9 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else if value := y.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
 			return value
 		} else {
-			return y.EmitConstInst(y.VisitIdentifier(ret.Identifier()))
+			return y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
 		}
 
-	// TODO: static class member
-	// 静态方法调用
 	case *phpparser.StaticClassAccessExpressionContext:
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 

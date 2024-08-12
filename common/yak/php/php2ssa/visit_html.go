@@ -44,7 +44,17 @@ func (y *builder) VisitHtmlDocumentElement(raw phpparser.IHtmlDocumentElementCon
 	} else if ret := i.PhpBlock(); ret != nil {
 		y.VisitPhpBlock(ret)
 	}
-
+	for name, _ := range y.FuncSyntax.decls {
+		handler, _ := y.FuncSyntax.checkAndPush(name)
+		handler(nil)
+		y.FuncSyntax.PopAndDel()
+	}
+	y.FuncSyntax.fixSpinUd(y)
+	for name, _ := range y.ClassSyntax.decls {
+		handler, _ := y.ClassSyntax.checkAndPush(name)
+		handler(nil)
+		y.ClassSyntax.PopAndDel()
+	}
 	return nil
 }
 

@@ -351,17 +351,98 @@ $a(1);`
 	})
 	t.Run("test-function", func(t *testing.T) {
 		code := `<?php
+function c($cmd){
+	exec($cmd);
+}
 function a(){
 	c("whoami");
 }
 
-function c($cmd){
-	exec($cmd);
-}
 `
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
-			map[string][]string{},
+			map[string][]string{"param": {`"whoami"`}},
 			ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}
+func TestFunction(t *testing.T) {
+	t.Run("prev function", func(t *testing.T) {
+		code := `<?php
+
+ b("whoami");
+
+function b($cmd)
+{
+    exec("$cmd");
+}`
+		test.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {`"whoami"`}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
+	t.Run("test function in function", func(t *testing.T) {
+		code := `<?php
+function a()
+{
+    b("whoami");
+}
+
+function b($cmd)
+{
+    exec("$cmd");
+}`
+		test.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {`"whoami"`}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
+	t.Run("test function in namespace", func(t *testing.T) {
+		code := `<?php
+
+namespace a {
+    function test($a)
+    {
+        exec("$a");
+    }
+}
+
+namespace {
+
+    use function a\test;
+
+    function teee()
+    {
+        test("whoami");
+    }
+}`
+		test.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {`"whoami"`}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
+	})
+	t.Run("test function spin", func(t *testing.T) {
+		code := `<?php
+
+function a($cmd)
+{
+    b("whoa");
+}
+
+function b($cmd)
+{
+    if ($cmd == "whoami") {
+        exec($cmd);
+    } else {
+        a($cmd . "i");
+    }
+}`
+		test.CheckSyntaxFlow(t, code,
+			`exec(* #-> * as $param)`,
+			map[string][]string{"param": {`Parameter-$cmd`, `"whoa"`}},
+			ssaapi.WithLanguage(ssaapi.PHP),
+		)
 	})
 }

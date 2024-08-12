@@ -28,10 +28,10 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 	y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
 	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
 	y.VisitUseDeclaration(i.UseDeclaration())
-	y.VisitStatement(i.Statement())
 	y.VisitFunctionDeclaration(i.FunctionDeclaration())
 	y.VisitEnumDeclaration(i.EnumDeclaration())
 	y.VisitClassDeclaration(i.ClassDeclaration())
+	y.VisitStatement(i.Statement())
 	return nil
 }
 
@@ -92,7 +92,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		}
 	}
 	//compose child app
-	if i.NamespacePath() != nil {
+	if i.NamespacePath() != nil && y.MoreParse {
 		beforfunc()
 		//namespace
 		pkgpath := y.VisitNamespacePath(i.NamespacePath())
@@ -103,11 +103,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		if library == nil {
 			library = prog.NewLibrary(pkgname, []string{prog.Loader.GetBasePath()})
 		}
-		if !y.MoreParse {
-			//if custom syntax, only syntax it
-			afterFunc()
-			return nil
-		}
+		//if custom syntax, only syntax it
 		library.PushEditor(prog.GetCurrentEditor(), func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
 			o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
 		})

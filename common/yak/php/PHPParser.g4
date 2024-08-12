@@ -40,7 +40,8 @@ htmlDocument
     ;
 
 htmlDocumentElement
-    : inlineHtml | phpBlock
+    : inlineHtml
+    | phpBlock
     ;
 
 inlineHtml
@@ -83,7 +84,7 @@ scriptText
 // PHP
 
 phpBlock
-    : importStatement* topStatement+ (PHPEnd|PHPEndSingleLineComment)?
+    : importStatement* (useDeclaration|namespaceDeclaration|functionDeclaration|classDeclaration|globalConstantDeclaration|enumDeclaration|statement)+ (PHPEnd|PHPEndSingleLineComment)?
     ;
 
 importStatement
