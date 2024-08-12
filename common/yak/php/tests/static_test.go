@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
@@ -9,15 +8,12 @@ import (
 func TestStatic(t *testing.T) {
 	code := `<?php
 function test(){
-    static $a=1;
-    return $a;
+	static $a = 1;
+	return function()use($a){
+	};
 }
 $a = test();
 println($a);
 `
-	ssatest.CheckSyntaxFlow(t, code,
-		`println(* #-> * as $param)`,
-		map[string][]string{},
-		ssaapi.WithLanguage(ssaapi.PHP))
-	//ssatest.CheckPrintlnValue(code, []string{""}, t)
+	ssatest.CheckPrintlnValue(code, []string{"Function-test()"}, t)
 }
