@@ -8,7 +8,7 @@ desc(
 check $params;
 
 $params<getFunc><getReturns>#{
-    until: `*.body(* as $bodyParam)`
+    until: `*.body(*?{<string>?{have: FileSystemResource}} as $bodyParam)`
 }-> as $download;
 check $bodyParam;
 $bodyParam #{

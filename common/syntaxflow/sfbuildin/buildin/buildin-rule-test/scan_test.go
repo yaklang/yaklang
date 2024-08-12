@@ -38,8 +38,8 @@ func TestBuildInRule_DEBUG(t *testing.T) {
 	}
 	for i := 0; i < len(Cases); i++ {
 		c := Cases[i]
-		if !utils.MatchAllOfSubString(c.Name, `attachment`) {
-			t.Log("skip " + c.Name)
+		if !utils.MatchAllOfSubString(c.Rule, `springboot-filedownload`) {
+			t.Log("skip " + c.Rule)
 			continue
 		}
 		run(t, c.Name, c)
