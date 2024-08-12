@@ -65,7 +65,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 					}
 					if len(result.AlertSymbolTable) >= 0 {
 						for name, val := range result.AlertSymbolTable {
-							msg := fmt.Sprintf("%v: %s: %s", r.Severity, name, val)
+							msg := fmt.Sprintf("%v\n%s\n%s\n\n", r.Severity, name, val)
 							t.Logf(msg)
 							if len(c.ContainsAll) > 0 {
 								if !utils.MatchAllOfSubString(msg, c.ContainsAll...) {
