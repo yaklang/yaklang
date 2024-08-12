@@ -3,6 +3,7 @@ package schema
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
@@ -42,7 +43,7 @@ func ValidRuleType(i any) SyntaxFlowRuleType {
 }
 
 func ValidSeverityType(i any) SyntaxFlowSeverity {
-	switch strings.ToLower(codec.AnyToString(i)) {
+	switch strings.ToLower(yakunquote.TryUnquote(codec.AnyToString(i))) {
 	case "info", "i", "low", "verbose", "debug", "prompt":
 		return SFR_SEVERITY_LOW
 	case "warning", "w", "middle", "mid", "warn":
@@ -57,7 +58,8 @@ func ValidSeverityType(i any) SyntaxFlowSeverity {
 }
 
 func ValidPurpose(i any) SyntaxFlowRulePurposeType {
-	switch strings.ToLower(codec.AnyToString(i)) {
+	result := yakunquote.TryUnquote(codec.AnyToString(i))
+	switch strings.ToLower(result) {
 	case "audit", "a", "audition":
 		return SFR_PURPOSE_AUDIT
 	case "vuln", "v", "vulnerability", "vul", "vulnerabilities", "weak", "weakness":
@@ -73,6 +75,8 @@ func ValidPurpose(i any) SyntaxFlowRulePurposeType {
 
 type SyntaxFlowRule struct {
 	gorm.Model
+
+	IsBuildInRule bool
 
 	// Language is the language of the rule.
 	// if the rule is not set, all languages will be used.

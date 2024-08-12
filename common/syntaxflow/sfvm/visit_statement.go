@@ -68,8 +68,6 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			if len(results) >= 2 {
 				key := mustUnquoteSyntaxFlowString(results[0].GetText())
 				value := mustUnquoteSyntaxFlowString(results[1].GetText())
-				key = yakunquote.TryUnquote(key)
-				value = yakunquote.TryUnquote(value)
 				switch strings.ToLower(key) {
 				case "title":
 					y.title = value

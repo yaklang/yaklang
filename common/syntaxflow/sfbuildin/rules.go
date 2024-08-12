@@ -2,7 +2,9 @@ package sfbuildin
 
 import (
 	"embed"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
@@ -14,6 +16,7 @@ var ruleFS embed.FS
 
 func init() {
 	fsInstance := filesys.NewEmbedFS(ruleFS)
+	consts.GetGormProfileDatabase().Where("is_build_in_rule = true").Unscoped().Delete(&schema.SyntaxFlowRule{})
 	err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		_, name := fsInstance.PathSplit(s)
 		if !strings.HasSuffix(name, ".sf") {
@@ -24,7 +27,7 @@ func init() {
 			log.Warnf("read file %s error: %s", s, err)
 			return nil
 		}
-		err = sfdb.ImportRuleWithoutValid(name, string(raw))
+		err = sfdb.ImportRuleWithoutValid(name, string(raw), true)
 		if err != nil {
 			log.Warnf("import rule %s error: %s", name, err)
 			return err

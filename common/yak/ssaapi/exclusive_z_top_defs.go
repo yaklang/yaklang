@@ -117,7 +117,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if len(actx.config.HookEveryNode) > 0 {
 		for _, hook := range actx.config.HookEveryNode {
 			if err := hook(i); err != nil {
-				log.Errorf("hook-every-node error: %v", err)
+				if err.Error() != "abort" {
+					log.Errorf("hook-every-node error: %v", err)
+				}
 				return Values{}
 			}
 		}

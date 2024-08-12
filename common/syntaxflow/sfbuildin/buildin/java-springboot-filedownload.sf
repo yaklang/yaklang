@@ -1,0 +1,20 @@
+desc(
+    title: "checking [File download via Springboot Params]",
+    type: vuln,
+    level: warning,
+)
+
+<include('spring-param')> as $params;
+check $params;
+
+$params<getFunc><getReturns>#{
+    until: `*.body(* as $bodyParam)`
+}-> as $download;
+check $bodyParam;
+$bodyParam #{
+    hook: `* as $path`
+}->
+$path & $params as $met;
+check $met;
+check $download;
+alert $download;
