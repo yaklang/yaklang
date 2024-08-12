@@ -15,7 +15,6 @@ import (
 
 var testGo string
 
-
 func SyntaxBase(code string, info bool) (*gol.SourceFileContext,error){
 	lexer := gol.NewGoLexer(antlr.NewInputStream(code))
 	lexer.RemoveErrorListeners()

@@ -70,7 +70,7 @@ declaration
     ;
 
 constDecl
-    : CONST (constSpec | L_PAREN eos? (constSpec eos)* R_PAREN)
+    : CONST (constSpec | L_PAREN eos* (constSpec eos)* R_PAREN)
     ;
 
 constSpec
@@ -380,7 +380,7 @@ result
     ;
 
 parameters
-    : L_PAREN (parameterDecl (COMMA parameterDecl)* COMMA?)? R_PAREN
+    : L_PAREN eos* (eos* parameterDecl eos* (eos* COMMA eos* parameterDecl eos*)* COMMA?)? eos* R_PAREN
     ;
 
 parameterDecl
@@ -389,19 +389,19 @@ parameterDecl
 
 expression
     : primaryExpr
-    | unary_op = (PLUS | MINUS | EXCLAMATION | CARET | STAR | AMPERSAND | RECEIVE) expression
-    | expression mul_op = (STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR) expression
-    | expression add_op = (PLUS | MINUS | OR | CARET) expression
-    | expression rel_op = (
+    | unary_op = (PLUS | MINUS | EXCLAMATION | CARET | STAR | AMPERSAND | RECEIVE) eos* expression
+    | expression eos* mul_op = (STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR) eos* expression
+    | expression eos* add_op = (PLUS | MINUS | OR | CARET) eos* expression
+    | expression eos* rel_op = (
         EQUALS
         | NOT_EQUALS
         | LESS
         | LESS_OR_EQUALS
         | GREATER
         | GREATER_OR_EQUALS
-    ) expression
-    | expression LOGICAL_AND expression
-    | expression LOGICAL_OR expression
+    ) eos* expression
+    | expression eos* LOGICAL_AND eos* expression
+    | expression eos* LOGICAL_OR eos* expression
     ;
 
 primaryExpr
@@ -524,7 +524,7 @@ typeAssertion
     ;
 
 arguments
-    : L_PAREN ((expressionList | type_ (COMMA expressionList)?) ELLIPSIS? COMMA?)? R_PAREN
+    : L_PAREN eos* ((expressionList | type_ (COMMA expressionList)?) ELLIPSIS? eos* COMMA? eos*)? R_PAREN
     ;
 
 methodExpr
