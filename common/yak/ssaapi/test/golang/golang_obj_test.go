@@ -58,6 +58,34 @@ func TestBasic_BasicObject(t *testing.T) {
 		)
 	})
 }
+
+func TestBasic_BasicObjectEx(t *testing.T) {
+	ssatest.CheckSyntaxFlowContain(t,`
+		package main
+
+		type Queue struct {
+			mu    int
+		}
+
+		func NewQueue() *Queue {
+			return &Queue{
+				mu: 1,
+			}
+		}
+
+		func main(){
+			a := NewQueue()
+			b := a.mu
+		}
+	`, `
+		b #-> as $target
+	`, map[string][]string{
+			"target": {"1"},
+		},
+		ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
+
 func TestBasic_Phi(t *testing.T) {
 	ssatest.CheckSyntaxFlowContain(t,
 		`package main

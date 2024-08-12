@@ -32,9 +32,7 @@ func Test_Import(t *testing.T) {
 
 	import "github.com/yaklang/yaklang/A"
 
-	func println(){
-	
-	}
+	func println(){}
 
 	func test() {
 	    a := &A.A1{a: 1}
@@ -69,9 +67,7 @@ func TestImport_alias(t *testing.T) {
 
 	import alias "github.com/yaklang/yaklang/A"
 
-	func println(){
-	
-	}
+	func println(){}
 
 	func test() {
 	    println(alias.add(1,2))
@@ -119,9 +115,7 @@ func TestImport_muti(t *testing.T) {
 		"github.com/yaklang/yaklang/B"
 	)
 
-	func println(){
-	
-	}
+	func println(){}
 
 	func test() {
 	    a := &A.A1{a: 1}

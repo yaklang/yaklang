@@ -21,6 +21,9 @@ type SSABuilder struct {
 }
 
 var Builder = &SSABuilder{}
+var SpecialTypes = map[string]ssa.Type{
+	"comparable": ssa.CreateAnyType(),
+}
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
@@ -178,7 +181,7 @@ func (b *astbuilder) AddStruct(name string, t *ssa.ObjectType) {
 	b.structTypes[name] = t
 }
 
-func (b *astbuilder) GetStructByStr(name string) *ssa.ObjectType {
+func (b *astbuilder) GetStructByStr(name string) ssa.Type {
 	if b.structTypes[name] == nil {
 		return nil
 	}
@@ -203,4 +206,12 @@ func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
 		return nil
 	}
 	return b.aliasTypes[name]
+}
+
+// ====================== Special type
+func (b *astbuilder) GetSpecialByStr(name string) ssa.Type {
+	if SpecialTypes[name] == nil {
+		return nil
+	}
+	return SpecialTypes[name]
 }
