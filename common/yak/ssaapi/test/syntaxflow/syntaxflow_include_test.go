@@ -17,7 +17,7 @@ func TestSFLib(t *testing.T) {
 desc(lib: "abc");
 abc() as $output;
 alert $output
-`)
+`, false)
 	if err != nil {
 		t.Fatal(err)
 	}

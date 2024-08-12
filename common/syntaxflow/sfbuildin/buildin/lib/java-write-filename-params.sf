@@ -2,7 +2,7 @@ desc(
     title: "Find Java File I/O Sinks",
     title_zh: "查找 Java 文件 I/O 接收点",
     type: audit,
-    lib: "filename-param"
+    lib: "write-filename-sink"
 )
 
 // new File("aaaa.txt")

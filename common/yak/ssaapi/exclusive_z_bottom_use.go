@@ -87,7 +87,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		for _, hook := range actx.config.HookEveryNode {
 			err := hook(v)
 			if err != nil {
-				log.Errorf("hook every node failed: %v", err)
+				if err.Error() != "abort" {
+					log.Errorf("hook every node failed: %v", err)
+				}
 			}
 		}
 	}

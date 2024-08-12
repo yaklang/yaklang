@@ -1,6 +1,6 @@
 desc(
     title: "Find ProcessBuilder Sink Point",
-    lib: 'process-builder',
+    lib: 'process-builder-sink',
     type: audit,
 )
 

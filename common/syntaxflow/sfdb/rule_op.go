@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"io"
 	"path"
@@ -28,7 +29,7 @@ func ExportDatabase() io.ReadCloser {
 		}()
 		for result := range YieldSyntaxFlowRules(consts.GetGormProfileDatabase(), context.Background()) {
 			result.ID = 0
-
+			result.IsBuildInRule = false
 			raw, err := json.Marshal(result)
 			if err != nil {
 				log.Errorf("marshal syntax flow rule error: %s", err)
@@ -61,7 +62,11 @@ func ImportDatabase(reader io.Reader) error {
 			continue
 		}
 
-		err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), &rule)
+		refRule := &rule
+		if refRule.IsBuildInRule {
+			refRule.IsBuildInRule = false
+		}
+		err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), refRule)
 		if err != nil {
 			log.Errorf("create or update syntax flow rule error: %s", err)
 			continue
@@ -103,7 +108,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func ImportRuleWithoutValid(ruleName string, content string) error {
+func ImportRuleWithoutValid(ruleName string, content string, buildin bool) error {
 	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
@@ -131,14 +136,15 @@ func ImportRuleWithoutValid(ruleName string, content string) error {
 	}
 
 	rule := &schema.SyntaxFlowRule{
-		Language:    string(language),
-		Title:       frame.Title,
-		RuleName:    ruleName,
-		Description: frame.Description,
-		Type:        ruleType,
-		Content:     content,
-		Purpose:     schema.ValidPurpose(frame.Purpose),
-		Severity:    schema.ValidSeverityType(frame.Severity),
+		Language:      string(language),
+		Title:         frame.Title,
+		RuleName:      ruleName,
+		Description:   frame.Description,
+		Type:          ruleType,
+		Content:       content,
+		IsBuildInRule: buildin,
+		Purpose:       schema.ValidPurpose(frame.Purpose),
+		Severity:      schema.ValidSeverityType(frame.Severity),
 	}
 
 	if frame.AllowIncluded != "" {
@@ -234,8 +240,123 @@ func GetLibrary(libname string) (*schema.SyntaxFlowRule, error) {
 	return &rule, nil
 }
 
+func GetRule(ruleName string) (*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	var rule schema.SyntaxFlowRule
+	if err := db.Where("(rule_name = ?) and (allow_included = false)", ruleName).First(&rule).Error; err != nil {
+		return nil, err
+	}
+	return &rule, nil
+}
+
+func GetAllRules() ([]*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	db = db.Where("allow_included = false")
+	outC := make(chan *schema.SyntaxFlowRule)
+	go func() {
+		defer close(outC)
+
+		var page = 1
+		for {
+			var items []*schema.SyntaxFlowRule
+			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+
+			for _, d := range items {
+				outC <- d
+			}
+
+			if len(items) < 1000 {
+				return
+			}
+		}
+	}()
+
+	var rules []*schema.SyntaxFlowRule
+	for r := range outC {
+		rules = append(rules, r)
+	}
+	if len(rules) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return rules, nil
+}
+
+func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
+	db := consts.GetGormProfileDatabase()
+	db = db.Where("(rule_name like ?) and (allow_included = false)", "%"+fmt.Sprint(ruleNameGlob)+"%")
+	outC := make(chan *schema.SyntaxFlowRule)
+	go func() {
+		defer close(outC)
+
+		var page = 1
+		for {
+			var items []*schema.SyntaxFlowRule
+			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+
+			for _, d := range items {
+				outC <- d
+			}
+
+			if len(items) < 1000 {
+				return
+			}
+		}
+	}()
+
+	var rules []*schema.SyntaxFlowRule
+	for r := range outC {
+		rules = append(rules, r)
+	}
+	if len(rules) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return rules, nil
+}
+
 func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
 	outC := make(chan *schema.SyntaxFlowRule)
+	go func() {
+		defer close(outC)
+
+		var page = 1
+		for {
+			var items []*schema.SyntaxFlowRule
+			if _, b := bizhelper.Paging(db, page, 1000, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+
+			if len(items) < 1000 {
+				return
+			}
+		}
+	}()
+	return outC
+}
+
+func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
+	outC := make(chan *schema.SyntaxFlowRule)
+	db = db.Where("allow_included = false")
 	go func() {
 		defer close(outC)
 
