@@ -4,9 +4,10 @@ desc(
     level: low,
 )
 
-file.getName()<show>
-
-File() -{
+File().get*() -{
     until: `* #>?{<string>?{have: 'attachment;', 'filename='}} as $flag`
 }->
 check $flag;
+$flag-> as $output;
+check $output;
+alert $output;
