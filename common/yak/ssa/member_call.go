@@ -300,28 +300,12 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 		p.SetExtern(true)
 		return p
 	}
-	// step2 try to get from method
-	if fun := GetMethod(object.GetType(), key.String()); fun != nil {
-		name, typ := checkCanMemberCall(object, key)
-		member := b.getOriginMember(name, typ, object, key)
-		return member
-	}
-
-	// step3 try to get method from blueprint and set typ
-	name, _ := checkCanMemberCall(object, key)
-	var typ Type
-	if object.GetType().GetTypeKind()==ClassBluePrintTypeKind{
-		blueprint := object.GetType().(*ClassBluePrint)
-		//normal
-		if method, ok := blueprint.NormalMember[key.String()]; ok {
-			typ = method.Type
-		}
-		//static
-		if method, ok := blueprint.StaticMethod[key.String()]; ok {
-			return method
-		}
-	}
-
+	// if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+	// 	name, typ := checkCanMemberCall(object, key)
+	// 	member := b.getOriginMember(name, typ, object, key)
+	// 	return member
+	// }
+	//step2 for example:A.b(),if  A is not instantiated,  A is an Undefined ValueInValid. Attempt to obtain its static methods
 	if u, ok := ToUndefined(object); ok {
 		if u.Kind == UndefinedValueInValid {
 			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
@@ -331,28 +315,41 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 			}
 		}
 	}
+
+	// step3 Attempt to obtain instance methods and static methods
+	name, _ := checkCanMemberCall(object, key)
+	var typ Type
+	if object.GetType().GetTypeKind()==ClassBluePrintTypeKind{
+		blueprint := object.GetType().(*ClassBluePrint)
+		//normal
+		if method, ok := blueprint.Method[key.String()]; ok {
+			typ = method.Type
+		}
+		//static
+		if method, ok := blueprint.StaticMethod[key.String()]; ok {
+			return method
+		}
+	}
+
+	
 	// step4 try to peek value from this function
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
-	
 	//step6 Determine the type of member call.
 	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
-	if u, ok := ToUndefined(origin); ok {
-		u.SetRange(b.CurrentRange)
-		if typ != nil {
-			u.Kind = UndefinedMemberValid
-			u.SetType(typ)
-		} else {
-			u.Kind = UndefinedMemberInValid
-			t := NewFunctionTypeDefine(name, nil, nil, false)
-			t.IsMethod = true
-			u.SetType(t)
-		}
-		SetMemberCall(object, key, u)
+	if typ != nil {
+		origin.Kind = UndefinedMemberValid
+		origin.SetType(typ)
+	} else {
+		origin.Kind = UndefinedMemberInValid
+		t := NewFunctionTypeDefine(name, nil, nil, false)
+		t.IsMethod = true
+		origin.SetType(t)
 	}
+	SetMemberCall(object, key, origin)
 	setMemberVerboseName(origin)
 	return origin
 }
