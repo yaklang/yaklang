@@ -78,6 +78,8 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	// struct
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/ssaapi.Program", "Ref")
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/ssaapi.Value", "Show")
+	// auto-generated file struct method
+	checkStructMethods("time.Time", "Add")
 	// alias struct
 	checkStructMethods("github.com/yaklang/yaklang/common/yak/ssaapi.Values", "Ref")
 	// embed field pointer methods
