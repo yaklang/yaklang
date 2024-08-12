@@ -197,7 +197,12 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue
 				if _,ok := rv.(*ssa.TypeValue); ok {
 					t := rv.GetType().(*ssa.ObjectType)
 					funcs := b.GetExtendFuncs(t.Name)
-					return funcs[test], nil
+					if fun := funcs[test]; fun != nil {
+						return fun, nil
+					}
+					nfunc := b.NewFunc(test)
+					nfunc.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()} , ssa.CreateAnyType(), false))
+					return nfunc, nil
 				}else{
 					member :=  b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
 					return member, nil

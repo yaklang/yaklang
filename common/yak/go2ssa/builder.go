@@ -23,6 +23,7 @@ type SSABuilder struct {
 var Builder = &SSABuilder{}
 var SpecialTypes = map[string]ssa.Type{
 	"comparable": ssa.CreateAnyType(),
+	"error":      ssa.CreateErrorType(),
 }
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
