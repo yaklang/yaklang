@@ -117,7 +117,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	)
 	_, _ = isClientClosed, isServerClosed
 
-	serverAllFrameCallbackFactory := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
+	serverAllFrameCallback := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
 		opcode := f.Type()
 		switch opcode {
 		case lowhttp.PingMessage:
@@ -147,7 +147,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		}
 	}
 
-	clientAllFrameCallbackFactory := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
+	clientAllFrameCallback := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
 		opcode := f.Type()
 		switch opcode {
 		case lowhttp.PingMessage:
@@ -229,7 +229,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 
 			return fixRspRaw
 		}),
-		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallbackFactory),
+		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallback),
 	)
 	if err != nil {
 		return err
@@ -245,11 +245,11 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		clientFrameWriter,
 		toServer.Extensions,
 		lowhttp.WithWebsocketDisableReassembly(!isHijack),
-		lowhttp.WithWebsocketAllFrameHandler(clientAllFrameCallbackFactory),
+		lowhttp.WithWebsocketAllFrameHandler(clientAllFrameCallback),
 	)
 
-	toServer.StartFromServer()
-	toClient.StartFromServer()
+	toServer.Start()
+	toClient.Start()
 	toClient.Wait()
 	toServer.Wait()
 	logger.Infof("websocket tunnel for %s closed", addr)

@@ -60,7 +60,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 //		t.FailNow()
 //	}
 //	go func() {
-//		client.StartFromServer()
+//		client.Start()
 //		client.Wait()
 //	}()
 //	time.Sleep(time.Second)
@@ -87,7 +87,7 @@ Upgrade: websocket
 		panic(err)
 	}
 
-	c.StartFromServer()
+	c.Start()
 	c.Wait()
 }
 
@@ -129,7 +129,7 @@ Upgrade: websocket
 		)
 		require.NoError(t, err)
 
-		c.StartFromServer()
+		c.Start()
 		c.Wait()
 		return nil
 	}
@@ -465,7 +465,7 @@ Upgrade: websocket
 //	}
 //	spew.Dump(n)
 //	time.Sleep(time.Second)
-//	c.StartFromServer()
+//	c.Start()
 //	go func() {
 //		time.Sleep(10 * time.Second)
 //		c.Stop()

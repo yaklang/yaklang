@@ -90,7 +90,7 @@ func Connect(addr string, options ...Option) (*Client, error) {
 	}
 
 	// serve
-	c.wsClient.StartFromServer()
+	c.wsClient.Start()
 	go c.sendLoop()
 	log.Info("start to wait for vulinbox ws agent connected")
 
