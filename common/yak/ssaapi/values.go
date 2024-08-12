@@ -44,19 +44,32 @@ func ValueContain(v1 *Value, v2 ...*Value) bool {
 	return false
 }
 
-func ValueCompare(v1, v2 *Value) bool {
-	v1IsNil, v2IsNil := v1.IsNil(), v2.IsNil()
-	if v1IsNil && v2IsNil {
-		return true
-	} else if v1IsNil || v2IsNil {
-		return false
+func ValueCompare(v1raw, v2raw *Value) bool {
+	if v1raw == nil || v2raw == nil {
+		return v1raw == v2raw
 	}
-	for _, v := range v1.node.GetPointer() {
-		if v.GetId() == v2.GetId() {
-			return true
+	v1 := v1raw.node
+	v2 := v2raw.node
+	if v1 == nil || v2 == nil {
+		return v1 == v2
+	}
+
+	same := func(v1, v2 ssa.Value) bool {
+		for _, v := range v1.GetPointer() {
+			if v.GetId() == v2.GetId() {
+				return true
+			}
 		}
+		return v1.GetId() == v2.GetId()
 	}
-	return v1.GetId() == v2.GetId()
+	res := same(v1, v2) || same(v2, v1)
+	if v1Ref := v1.GetReference(); v1Ref != nil {
+		res = res || same(v1Ref, v2) || same(v2, v1Ref)
+	}
+	if v2Ref := v2.GetReference(); v2Ref != nil {
+		res = res || same(v1, v2Ref) || same(v2Ref, v1)
+	}
+	return res
 }
 
 func (p *Program) NewValue(n ssa.Value) *Value {
@@ -684,10 +697,6 @@ func (v *Value) GetCalledBy() Values {
 		// self
 		addCall(node)
 		for _, pointer := range node.GetPointer() {
-			// undefine pointer, this is same value
-			if !pointer.IsUndefined() {
-				continue
-			}
 			addCall(pointer)
 		}
 	}

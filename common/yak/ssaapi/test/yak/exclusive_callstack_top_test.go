@@ -124,6 +124,22 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 		)
 	})
 
+	t.Run("test level3 test call-stack", func(t *testing.T) {
+		ssatest.Check(t, `
+		f = (i) => {
+			return (j) => {
+				return (k) => {
+					return j + i
+				}
+			} 
+		}
+		f1 = f(333333)
+		f2 = f1(444444)
+		a = f2(555555)
+		`, ssatest.CheckTopDef_Equal("a", []string{"333333", "444444"}),
+		)
+	})
+
 	t.Run("test level3", func(t *testing.T) {
 		ssatest.Check(t, `
 		f = (i) => {
