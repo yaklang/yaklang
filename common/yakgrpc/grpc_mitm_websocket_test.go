@@ -80,7 +80,7 @@ Accept: */*
 			if err != nil {
 				t.Fatalf("send websocket request err: %v", err)
 			}
-			wsClient.StartFromServer()
+			wsClient.Start()
 			for i := 0; i < 3; i++ {
 				err = wsClient.WriteText([]byte(token))
 				log.Infof("client send: %s", token)
@@ -294,7 +294,7 @@ Accept: */*
 				}))
 
 				require.NoError(t, err)
-				wsClient.StartFromServer()
+				wsClient.Start()
 				err = wsClient.Write([]byte(token))
 				require.NoError(t, err)
 				defer wsClient.WriteClose()
