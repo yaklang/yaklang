@@ -265,15 +265,15 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 	return fmt.Sprintf("%s.%s", value.GetName(), key.String())
 }
 
-func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
-	if res := b.CheckMemberCallNilValue(value, key, "ReadMemberCallMethodVariable"); res != nil {
+func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value {
+	if res := b.CheckMemberCallNilValue(object, key, "ReadMemberCallMethodVariable"); res != nil {
 		return res
 	}
 	program := b.GetProgram()
 	// step1 try to get from extern
-	if extern, ok := ToExternLib(value); ok {
+	if extern, ok := ToExternLib(object); ok {
 		// write to extern Lib
-		name := b.getExternLibMemberCall(value, key)
+		name := b.getExternLibMemberCall(object, key)
 		if ret := ReadVariableFromScope(b.CurrentBlock.ScopeTable, name); ret != nil {
 			return ret.Value
 		}
@@ -283,12 +283,12 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 			// create variable for extern value
 			variable := ret.GetVariable(name)
 			if variable == nil {
-				ret.AddVariable(b.CreateMemberCallVariable(value, key))
+				ret.AddVariable(b.CreateMemberCallVariable(object, key))
 			} else {
 				variable.AddRange(b.CurrentRange, true)
 			}
 			// set member call
-			SetMemberCall(value, key, ret)
+			SetMemberCall(object, key, ret)
 			return ret
 		}
 
@@ -301,25 +301,29 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 		return p
 	}
 	// step2 try to get from method
-	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
-		name, typ := checkCanMemberCall(value, key)
-		member := b.getOriginMember(name, typ, value, key)
+	if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+		name, typ := checkCanMemberCall(object, key)
+		member := b.getOriginMember(name, typ, object, key)
 		return member
 	}
 
-	// step3 try to get from normal method or static method
-	name, typ := checkCanMemberCall(value, key)
-	if value.GetType().GetTypeKind() == ClassBluePrintTypeKind {
-		if blueprint := value.GetType().(*ClassBluePrint); blueprint != nil {
-			if v, ok := blueprint.StaticMethod[key.String()]; ok {
-				return v
-			}
+	// step3 try to get method from blueprint and set typ
+	name, _ := checkCanMemberCall(object, key)
+	var typ Type
+	if object.GetType().GetTypeKind()==ClassBluePrintTypeKind{
+		blueprint := object.GetType().(*ClassBluePrint)
+		//normal
+		if method, ok := blueprint.NormalMember[key.String()]; ok {
+			typ = method.Type
 		}
-
+		//static
+		if method, ok := blueprint.StaticMethod[key.String()]; ok {
+			return method
+		}
 	}
-	if u, ok := ToUndefined(value); ok {
+
+	if u, ok := ToUndefined(object); ok {
 		if u.Kind == UndefinedValueInValid {
-			typ = nil // 设置typ为nil，当没有找到静态方法的时候，step 6将会创建一个默认的方法
 			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
 				if v, ok := blueprint.StaticMethod[key.String()]; ok {
 					return v
@@ -333,10 +337,7 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 	}
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
-	// step6 hook binOp type value to make sure type is nil
-	if _,ok:=ToBinOp(value); ok {
-		typ = nil
-	}
+	
 	//step6 Determine the type of member call.
 	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
 	if u, ok := ToUndefined(origin); ok {
@@ -350,7 +351,7 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(value, key Value) Value {
 			t.IsMethod = true
 			u.SetType(t)
 		}
-		SetMemberCall(value, key, u)
+		SetMemberCall(object, key, u)
 	}
 	setMemberVerboseName(origin)
 	return origin
