@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -40,8 +41,10 @@ type Cache struct {
 	DB               *gorm.DB
 	id               *atomic.Int64
 	InstructionCache *utils.CacheWithKey[int64, instructionIrCode] // instructionID to instruction
-	VariableCache    map[string][]Instruction                      // variable(name:string) to []instruction
-	Class2InstIndex  map[string][]Instruction
+
+	VariableCache   map[string][]Instruction // variable(name:string) to []instruction
+	MemberCache     map[string][]Instruction
+	Class2InstIndex map[string][]Instruction
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -56,6 +59,7 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		ProgramName:      programName,
 		InstructionCache: utils.NewTTLCacheWithKey[int64, instructionIrCode](ttl),
 		VariableCache:    make(map[string][]Instruction),
+		MemberCache:      make(map[string][]Instruction),
 		Class2InstIndex:  make(map[string][]Instruction),
 	}
 
@@ -123,24 +127,47 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 
 // =============================================== Variable =======================================================
 
-func (c *Cache) GetByVariable(name string) []Instruction {
-	ret, _ := c.VariableCache[name]
-	return ret
-}
-
 func (c *Cache) AddVariable(name string, inst Instruction) {
-	data := c.GetByVariable(name)
-	data = append(data, inst)
-	c.VariableCache[name] = data
+	member := ""
+	// field
+	if strings.HasPrefix(name, "#") { // member-call variable contain #, see common/yak/ssa/member_call.go:checkCanMemberCall
+		if _, memberName, ok := strings.Cut(name, "."); ok {
+			member = memberName
+		}
+
+		if _, memberKey, ok := strings.Cut(name, "["); ok {
+			member, _ = strings.CutSuffix(memberKey, "]")
+		}
+	}
+
+	if member != "" {
+		c.MemberCache[member] = append(c.MemberCache[member], inst)
+	} else {
+		c.VariableCache[name] = append(c.VariableCache[name], inst)
+	}
 	if c.HaveDatabaseBackend() {
-		SaveVariableIndex(inst, name)
+		SaveVariableIndex(inst, name, member)
 	}
 }
 
 func (c *Cache) RemoveVariable(name string, inst Instruction) {
-	insts := c.GetByVariable(name)
-	insts = utils.RemoveSliceItem(insts, inst)
-	c.VariableCache[name] = insts
+	member := ""
+	// field
+	if strings.HasPrefix(name, "#") { // member-call variable contain #, see common/yak/ssa/member_call.go:checkCanMemberCall
+		if _, memberName, ok := strings.Cut(name, "."); ok {
+			member = memberName
+		}
+
+		if _, memberKey, ok := strings.Cut(name, "["); ok {
+			member, _ = strings.CutSuffix(memberKey, "]")
+		}
+	}
+
+	if member != "" {
+		c.MemberCache[member] = utils.RemoveSliceItem(c.MemberCache[member], inst)
+	} else {
+		c.VariableCache[name] = utils.RemoveSliceItem(c.VariableCache[name], inst)
+	}
 }
 
 func (c *Cache) AddClassInstance(name string, inst Instruction) {

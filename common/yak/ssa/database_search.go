@@ -91,20 +91,11 @@ func (c *Cache) _getByVariableEx(
 	var ins []Instruction
 	if mod&ssadb.KeyMatch != 0 {
 		// search all instruction
-		c.InstructionCache.ForEach(func(i int64, iic instructionIrCode) {
-			inst := iic.inst
-			value, ok := ToValue(inst)
-			if !ok {
-				return
+		for member, insts := range c.MemberCache {
+			if checkValue(member) {
+				ins = append(ins, insts...)
 			}
-			if !value.IsMember() {
-				return
-			}
-			str := value.GetKey().String()
-			if checkValue(str) {
-				ins = append(ins, inst)
-			}
-		})
+		}
 	}
 	if mod&ssadb.NameMatch != 0 {
 		// search in variable cache
