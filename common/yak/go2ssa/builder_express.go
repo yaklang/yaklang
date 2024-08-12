@@ -318,29 +318,26 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.buildBoolLiteral(text)
 		}
 		v := b.PeekValue(text)
+		if v == nil {
+			v = b.GetGlobalVariable(text)
+		}
 		if v != nil {
-			return v
+		    return v
+		}
+
+		if t := b.GetStructByStr(text); t != nil{
+			typValue := ssa.NewTypeValue(t)
+			typValue.SetType(t)
+			return typValue
 		}
 
 		funcs := b.GetProgram().Funcs
 		v = funcs[text]
-
 		if v.(*ssa.Function) == nil {
-			v = b.GetGlobalVariable(text)
-		}
-		if v == nil {
-			if t := b.GetStructByStr(text); t != nil{
-				typValue := ssa.NewTypeValue(t)
-				typValue.SetType(t)
-				return typValue
-			}
-		}
-		if v == nil {
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
 			return b.EmitUndefined(text)
 		}
 		return v
-
 	}
 	return nil
 }

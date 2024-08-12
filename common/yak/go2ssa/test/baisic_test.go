@@ -297,6 +297,13 @@ func TestType_normol(t *testing.T) {
 		`, []string{"1","\"hello\"","true","100.5"}, t)
 	})
 
+	t.Run("multi-line string", func(t *testing.T) {
+		test.CheckPrintlnValue( "package main;func main(){println(`hello world`)}",
+		[]string{
+			"\"hello world\"",
+		}, t)
+	})
+
 	t.Run("slice array", func(t *testing.T) {
 	    
 		test.CheckPrintlnValue( `package main
