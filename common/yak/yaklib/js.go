@@ -1,7 +1,11 @@
 package yaklib
 
 import (
+	"crypto/rand"
+	"math"
+	"math/big"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -16,7 +20,17 @@ import (
 	"github.com/yaklang/yaklang/embed"
 )
 
-var defaultJSRuntime = goja.New()
+var (
+	defaultJSRuntime = goja.New()
+	bigMaxIntMap     = map[reflect.Kind]*big.Int{
+		reflect.Int8:   big.NewInt(math.MaxInt8),
+		reflect.Uint8:  big.NewInt(math.MaxUint8),
+		reflect.Int16:  big.NewInt(math.MaxInt16),
+		reflect.Uint16: big.NewInt(math.MaxUint16),
+		reflect.Int32:  big.NewInt(math.MaxInt32),
+		reflect.Uint32: big.NewInt(math.MaxUint32),
+	}
+)
 
 var JSExports = map[string]interface{}{
 	"PoweredBy":            "github.com/dop251/goja",
@@ -217,6 +231,12 @@ func _jsNewEngine(opts ...jsRunOpts) *goja.Runtime {
 	// use custom printer
 	console.Enable(vm)
 	buffer.Enable(vm)
+	// set crypto module for CryptoJS
+	vm.Set(
+		"crypto", map[string]any{
+			"getRandomValues": getRandomValues,
+		},
+	)
 
 	for _, lib := range config.libs {
 		_, err := vm.RunProgram(lib.program)
@@ -290,4 +310,31 @@ func autoImportLib(code string) (opts []jsRunOpts) {
 		opts = append(opts, _libJsEncrypt())
 	}
 	return
+}
+
+func getRandomValues(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
+	arg := call.Argument(0)
+	refArg := reflect.ValueOf(arg.Export())
+	refArgType := refArg.Type()
+	refArgKind := refArgType.Kind()
+	obj := arg.ToObject(runtime)
+	if refArgKind != reflect.Slice && refArgKind == reflect.Array {
+		return runtime.NewGoError(utils.Error("crypto.getRandomValues first arg type not valid"))
+	}
+	elemType := refArgType.Elem()
+	if bigInt, ok := bigMaxIntMap[elemType.Kind()]; !ok {
+		return runtime.NewGoError(utils.Error("crypto.getRandomValues first arg type not valid"))
+	} else {
+		for i := int64(0); i < int64(refArg.Len()); i++ {
+			nBig, err := rand.Int(rand.Reader, bigInt)
+			if err != nil {
+				return runtime.NewGoError(err)
+			}
+			err = obj.Set(strconv.FormatInt(i, 10), uint32(nBig.Int64()))
+			if err != nil {
+				return runtime.NewGoError(err)
+			}
+		}
+		return arg
+	}
 }

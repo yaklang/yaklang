@@ -42,6 +42,25 @@ func TestConsole(t *testing.T) {
 	}
 }
 
+func TestNativeCrypto_getRandomValues(t *testing.T) {
+	t.Run("CryptoJSV3", func(t *testing.T) {
+		code := `iv = CryptoJS.lib.WordArray.random(16); iv.toString();`
+		_, value, err := _run(code, _libCryptoJSV3())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(value.String())
+	})
+	t.Run("CryptoJSV4", func(t *testing.T) {
+		code := `iv = CryptoJS.lib.WordArray.random(16); iv.toString();`
+		_, value, err := _run(code, _libCryptoJSV4())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(value.String())
+	})
+}
+
 func TestRunWithCryptoJSV3(t *testing.T) {
 	code := `CryptoJS.HmacSHA256("Message", "secret").toString();`
 	_, value, err := _run(code, _libCryptoJSV3())
