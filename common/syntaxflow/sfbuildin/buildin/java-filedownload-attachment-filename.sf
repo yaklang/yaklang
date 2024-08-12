@@ -1,0 +1,12 @@
+desc(
+    title: "Checking [Filename Attachment when Filedownloading]",
+    type: vuln,
+    level: low,
+)
+
+file.getName()<show>
+
+File() -{
+    until: `* #>?{<string>?{have: 'attachment;', 'filename='}} as $flag`
+}->
+check $flag;

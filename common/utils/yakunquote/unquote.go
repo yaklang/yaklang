@@ -148,7 +148,11 @@ func Unquote(str string) (string, error) {
 		return "", strconv.ErrSyntax
 	}
 
-	return UnquoteInner(str[1:len(str)-1], quote)
+	switch quote {
+	case '"', '\'', '`':
+		return UnquoteInner(str[1:len(str)-1], quote)
+	}
+	return "", strconv.ErrSyntax
 }
 
 func TryUnquote(str string) string {
