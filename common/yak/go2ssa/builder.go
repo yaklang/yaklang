@@ -18,16 +18,12 @@ import (
 
 type SSABuilder struct {
 	ssa.DummyExtraFileAnalyzer
-	goRoot string
 }
 
 var Builder = &SSABuilder{}
 
-func (*SSABuilder) EnableExtraFileAnalyzer() bool {
-	return true
-}
 
-func (s *SSABuilder) ProgramHandler(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandler(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
