@@ -95,6 +95,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 	var values []ssa.Value
 
 	typ, lenv := b.buildLiteralType(exp.LiteralType().(*gol.LiteralTypeContext))
+	if typ == nil { // 目前还没法识别golang的标准库,这里暂时识别为StructType
+	    typ = ssa.NewStructType()
+	}
 	if value := exp.LiteralValue(); value != nil {
 		if s, ok := value.(*gol.LiteralValueContext); ok {
 			switch t := typ.(type) {
@@ -105,6 +108,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 					keys, values = b.buildLiteralValue(s, false)
 				}
 			default:
+				typ = ssa.CreateAnyType()
 				keys, values = b.buildLiteralValue(s, false)
 			}
 		}
@@ -151,6 +155,16 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 		return obj
 	case ssa.InterfaceTypeKind:
 
+	default:
+		obj := b.InterfaceAddFieldBuild(0,
+		func(i int) ssa.Value { 
+			return b.EmitConstInst(i) 
+		},
+		func(i int) ssa.Value { 
+			return b.EmitConstInst(i) 
+		},)
+		coverType(obj.GetType(), typ)
+		return obj
 	}
 
 	return nil
@@ -252,7 +266,9 @@ func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ss
 	    if qul := name.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
 			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
 				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
-				ssatyp = obj.GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+				if obj != nil {
+					ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+				}
 				return ssatyp,nil
 			}
 		}
@@ -541,7 +557,11 @@ func (b *astbuilder) buildStringLiteral(stmt *gol.String_Context) ssa.Value {
 		}
 		return b.EmitConstInstWithUnary(val, 0)
 	case '`':
-		// TODO
+		val, err := strconv.Unquote(text)
+		if err != nil {
+			b.NewError(ssa.Error, TAG, fmt.Sprintf("cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error()))
+		}
+		return b.EmitConstInstWithUnary(val, 0)
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package go2ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -74,6 +75,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					}
 					b.AddExtendFuncs(objt.Name, funcs)
 				}
+				b.AddStruct(objt.Name, objt)
+			}else{
+				objt := ssa.NewObjectType()
+				objt.SetTypeKind(ssa.StructTypeKind)
+				objt.SetName(pkgName[len(pkgName)-1])
 				b.AddStruct(objt.Name, objt)
 			}
 		}
@@ -1705,7 +1711,12 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 		if qul := tname.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
 			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
 				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
-				ssatyp = obj.GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+				if obj != nil {
+					ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+					if ssatyp == nil {
+						ssatyp = ssa.CreateAnyType()
+					}
+				}
 			}
 		} else {
 			name := typ.TypeName().(*gol.TypeNameContext).IDENTIFIER().GetText()
@@ -1718,6 +1729,12 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 			}
 			if ssatyp == nil {
 				ssatyp = b.GetStructByStr(name)
+			}
+			if ssatyp == nil {
+				ssatyp = b.GetSpecialByStr(name)
+			}
+			if ssatyp == nil {
+			    b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
 			}
 		}
 	}
