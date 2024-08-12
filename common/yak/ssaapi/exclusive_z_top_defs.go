@@ -390,6 +390,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
+			if thisFunc := i.GetFunction(); !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
+				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
+					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
+					thisFunc.GetName(), thisFunc.GetId(),
+				)
+				return Values{}
+			}
 
 			// fun := i.GetFunction()
 			// if !ValueCompare(fun, i.NewValue(calledInstance.Method)) {
@@ -442,7 +449,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			vals = append(vals, calledByValue...)
 		}
 
-		if actx.config.AllowIgnoreCallStack {
+		// if not found in call stack, then find in called-by
+		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			fun := i.GetFunction()
 			if fun != nil {
 				call2fun := fun.GetCalledBy()
@@ -454,7 +462,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		if len(vals) == 0 {
-			// return Values{i} // no return, use undefined
 			vals = append(vals, i)
 		}
 		return vals.AppendEffectOn(i)
