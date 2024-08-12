@@ -1402,7 +1402,7 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 			lowhttp.WithWebsocketPort(config.Port),
 			lowhttp.WithWebsocketStrictMode(config.WebsocketStrictMode),
 		)
-		c.StartFromServer()
+		c.Start()
 		if config.WebsocketClientHandler != nil {
 			config.WebsocketClientHandler(c)
 			c.Wait()

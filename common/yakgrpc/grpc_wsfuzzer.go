@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 	if err != nil {
 		return utils.Errorf("first websocket fuzzer: %s", err)
 	}
-	_ = firstReq
+	ctx, cancel := context.WithCancel(stream.Context())
 
 	var id int64 = 0
 	_requireIndexLock := new(sync.Mutex)
@@ -32,50 +33,60 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 
 	client, err := lowhttp.NewWebsocketClient(
 		firstReq.GetUpgradeRequest(),
-		lowhttp.WithWebsocketWithContext(stream.Context()),
+		lowhttp.WithWebsocketWithContext(ctx),
 		lowhttp.WithWebsocketTLS(firstReq.GetIsTLS()),
 		lowhttp.WithWebsocketTotalTimeout(float64(firstReq.GetTotalTimeoutSeconds())),
 		lowhttp.WithWebsocketProxy(firstReq.GetProxy()),
-		lowhttp.WithWebsocketFromServerHandler(func(fromServer []byte) {
-			var encoded []string
-			if utils.IsGzip(fromServer) {
-				encoded = append(encoded, "gzip")
-			}
-
-			_, isJson := utils.IsJSON(string(fromServer))
-			dataVerbose := utils.EscapeInvalidUTF8Byte(fromServer)
-			if isJson {
-				var buf bytes.Buffer
-				_ = json.Indent(&buf, fromServer, "", "")
-				dataVerbose = strings.ReplaceAll(string(buf.Bytes()), "\n", "")
-				var formattedBuf bytes.Buffer
-				_ = json.Indent(&formattedBuf, fromServer, "", "    ")
-				if formattedBuf.Len() > 0 {
-					fromServer = formattedBuf.Bytes()
+		lowhttp.WithWebsocketAllFrameHandler(func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
+			opcode := f.Type()
+			switch opcode {
+			case lowhttp.PingMessage:
+				c.WritePong(data, true)
+			case lowhttp.TextMessage, lowhttp.BinaryMessage:
+				var encoded []string
+				if utils.IsGzip(data) {
+					encoded = append(encoded, "gzip")
 				}
-			}
-			if dataVerbose == "" {
-				dataVerbose = strings.Trim(strconv.Quote(string(fromServer)), `"`)
-			}
 
-			size := len(fromServer)
-			msg := &ypb.ClientWebsocketResponse{
-				SwitchProtocolSucceeded: true,
-				IsDataFrame:             true,
-				FromServer:              true,
-				Data:                    fromServer,
-				DataVerbose:             dataVerbose,
-				DataLength:              int64(size),
-				DataSizeVerbose:         utils.ByteSize(uint64(size)),
-				IsJson:                  isJson,
-				IsProtobuf:              utils.IsProtobuf(fromServer),
-				DataFrameIndex:          requireDataFrameID(),
+				_, isJson := utils.IsJSON(string(data))
+				dataVerbose := utils.EscapeInvalidUTF8Byte(data)
+				if isJson {
+					var buf bytes.Buffer
+					_ = json.Indent(&buf, data, "", "")
+					dataVerbose = strings.ReplaceAll(string(buf.Bytes()), "\n", "")
+					var formattedBuf bytes.Buffer
+					_ = json.Indent(&formattedBuf, data, "", "    ")
+					if formattedBuf.Len() > 0 {
+						data = formattedBuf.Bytes()
+					}
+				}
+				if dataVerbose == "" {
+					dataVerbose = strings.Trim(strconv.Quote(string(data)), `"`)
+				}
+
+				size := len(data)
+				msg := &ypb.ClientWebsocketResponse{
+					SwitchProtocolSucceeded: true,
+					IsDataFrame:             true,
+					FromServer:              true,
+					Data:                    data,
+					DataVerbose:             dataVerbose,
+					DataLength:              int64(size),
+					DataSizeVerbose:         utils.ByteSize(uint64(size)),
+					IsJson:                  isJson,
+					IsProtobuf:              utils.IsProtobuf(data),
+					DataFrameIndex:          requireDataFrameID(),
+				}
+				stream.Send(msg)
+			case lowhttp.CloseMessage:
+				cancel()
+			default:
+				log.Debugf("[grpc-ws] [>client] write unknown message: %d", f.GetData())
 			}
-			stream.Send(msg)
 		}),
 	)
 	if err != nil {
-		return utils.Errorf("websocket client build tunnel failed: %s", err)
+		return utils.Errorf("websocket client build tunnel failed: %v", err)
 	}
 
 	stream.Send(&ypb.ClientWebsocketResponse{
@@ -83,7 +94,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 		UpgradeResponse:   client.Response,
 	})
 
-	client.StartFromServer()
+	client.Start()
 
 	go func() {
 		defer func() {
@@ -91,9 +102,14 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 		}()
 
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			req, err := stream.Recv()
 			if err != nil {
-				log.Errorf("stream recv wsfuzzer req failed: %s", err)
+				log.Errorf("stream recv wsfuzzer req failed: %v", err)
 				return
 			}
 			raw := req.GetToServer()
@@ -120,7 +136,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 
 				err = client.WriteText(messageBytes)
 				if err != nil {
-					log.Errorf("wsfuzzer write text failed: %s", err)
+					log.Errorf("wsfuzzer write text failed: %v", err)
 					continue
 				}
 
@@ -142,5 +158,5 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 		}
 	}()
 	client.Wait()
-	return utils.Errorf("unexpected error: %s", "unknown")
+	return nil
 }

@@ -199,7 +199,7 @@ func (c *WebsocketClient) Stop() {
 	c.cancel()
 }
 
-func (c *WebsocketClient) StartFromServer() {
+func (c *WebsocketClient) Start() {
 	if c.FromServerOnce == nil {
 		c.FromServerOnce = new(sync.Once)
 	}
