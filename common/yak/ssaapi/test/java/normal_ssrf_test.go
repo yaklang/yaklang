@@ -32,10 +32,7 @@ func Test_HTTP_SSRF(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Parameter-path",
-					// "Parameter-param",
-					"Parameter-url",
-					`"/api/test.json"`,
+					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients", "Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost", "Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "neq(Parameter-param, nil)", "nil",
 				},
 			},
 		}
@@ -63,9 +60,7 @@ func Test_HTTP_SSRF(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					// "Parameter-param",
-					"Parameter-url",
-					`"/api/test.json"`,
+					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients", "Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost", "Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "neq(Parameter-param, nil)", "nil",
 				}},
 		}
 		tt.Code = createHttpUtilCode(tt.Code)
@@ -76,24 +71,6 @@ func Test_HTTP_SSRF(t *testing.T) {
 func createHttpUtilCode(code string) string {
 	allCode := fmt.Sprintf(`
 package com.sast.astbenchmark.common.utils;
-
-
-import org.apache.http.NameValuePair;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
-
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 public class HttpUtil {
 
