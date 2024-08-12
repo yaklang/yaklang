@@ -1,12 +1,10 @@
 package ssa
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveVariableIndex(inst Instruction, name string) {
+func SaveVariableIndex(inst Instruction, name, member string) {
 	if inst.GetId() == -1 {
 		return
 	}
@@ -33,14 +31,8 @@ func SaveVariableIndex(inst Instruction, name string) {
 		index.VersionID = variable.GetVersion()
 
 		// field
-		if strings.HasPrefix(name, "#") {
-			if _, member, ok := strings.Cut(name, "."); ok {
-				index.FieldName = member
-			}
-
-			if _, member, ok := strings.Cut(name, "["); ok {
-				index.FieldName, _ = strings.CutSuffix(member, "]")
-			}
+		if member != "" {
+			index.FieldName = member
 		}
 
 		// TODO : scope ID
