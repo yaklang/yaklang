@@ -538,7 +538,9 @@ func IsSubPath(sub, parent string) bool {
 	if err != nil {
 		return false
 	}
-	if !strings.HasPrefix(rel, up) && rel != ".." {
+	if !strings.HasPrefix(rel, up) && // ../
+		rel != ".." && // `sub` is `parent` parent path
+		rel != "." { // same path
 		return true
 	}
 	return false

@@ -100,9 +100,14 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 			}
 		}
 	}
-
-	if utils.IsDir(path) {
-		os.RemoveAll(path)
+	{
+		if utils.IsDir(path) {
+			if utils.IsSubPath(path, GetDefaultYakitBaseDir()) {
+				os.RemoveAll(path)
+			} else {
+				path = fmt.Sprintf("%s-%s.db", path, utils.RandNumberStringBytes(5))
+			}
+		}
 	}
 	db, err := gorm.Open(driver, fmt.Sprintf("%s?cache=shared&mode=rwc", path))
 	if err != nil {
