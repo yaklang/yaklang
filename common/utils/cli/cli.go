@@ -302,8 +302,18 @@ func (c *CliApp) SetRequired(t bool) SetCliExtraParam {
 }
 
 func (c *CliApp) _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
+	optName, optShortName := name, ""
+	if strings.Contains(name, ",") {
+		optName, optShortName, _ = strings.Cut(name, ",")
+	} else if strings.Contains(name, " ") {
+		optName, optShortName, _ = strings.Cut(name, " ")
+	}
+	if optShortName != "" && len(optShortName) > len(optName) {
+		optName, optShortName = optShortName, optName
+	}
 	param := &cliExtraParams{
-		optName:      name,
+		optName:      optName,
+		optShortName: optShortName,
 		required:     false,
 		defaultValue: nil,
 		helpInfo:     "",
@@ -853,9 +863,10 @@ var CliExports = map[string]interface{}{
 	"LineDict":      DefaultCliApp.LineDict,
 
 	// 设置param属性
-	"setHelp":     DefaultCliApp.SetHelp,
-	"setDefault":  DefaultCliApp.SetDefault,
-	"setRequired": DefaultCliApp.SetRequired,
+	"setHelp":      DefaultCliApp.SetHelp,
+	"setShortName": DefaultCliApp.SetShortName,
+	"setDefault":   DefaultCliApp.SetDefault,
+	"setRequired":  DefaultCliApp.SetRequired,
 	// 设置中文名
 	"setVerboseName": DefaultCliApp.SetVerboseName,
 	// 设置参数组名
