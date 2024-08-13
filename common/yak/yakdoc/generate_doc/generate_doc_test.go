@@ -73,6 +73,8 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 
 	checkNormalFunction("", "eval")
 	checkNormalFunction("", "yakfmt")
+	checkNormalFunction("yakit", "Info")
+	checkNormalFunction("yakit", "Error")
 	// interface
 	checkStructMethods("github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf", "Repeat")
 	// struct
