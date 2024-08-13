@@ -285,9 +285,9 @@ public class B{
 	public static void main(){
 		A a =new A();
 		a.a(); // 有类型，前面没有出现过，会自动添加this
-		// a.b(); // 没有类型，前面没有出现过，不应该创建，应该添加this
-		// a.a(); // 前面已经出现过，所以直接拿并返回
-		// a.b(); // 前面已经出现过，直接拿并返回
+		a.b(); // 没有类型，前面没有出现过，不应该创建，应该添加this
+		a.a(); // 前面已经出现过，所以直接拿并返回
+		a.b(); // 前面已经出现过，直接拿并返回
 	}
 }
 `, func(prog *ssaapi.Program) error {
@@ -295,11 +295,11 @@ public class B{
 
 		result1 := prog.SyntaxFlow(`a.a() as $a;`).GetValues("a")
 		result1.Show()
-		// assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[0].String())
-		// assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[1].String())
-		// result2 := prog.SyntaxFlow(`a.b() as $b;`).GetValues("b")
-		// assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[0].String())
-		// assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[1].String())
+		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[0].String())
+		assert.Equal(t, "Undefined-a.a(valid)(Undefined-A(Undefined-A))", result1[1].String())
+		result2 := prog.SyntaxFlow(`a.b() as $b;`).GetValues("b")
+		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[0].String())
+		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[1].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 
