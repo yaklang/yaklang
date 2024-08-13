@@ -2,9 +2,11 @@ package lowhttp
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -117,6 +119,69 @@ type LowhttpResponse struct {
 
 	// custom tags
 	Tags []string
+}
+
+func (f *LowhttpResponse) RemoveColor() {
+	var newTags = make([]string, 0, len(f.Tags))
+	for _, i := range f.Tags {
+		if strings.HasPrefix(i, schema.COLORPREFIX) {
+			continue
+		}
+		newTags = append(newTags, i)
+	}
+}
+
+func yakitColor(i string) string {
+	return schema.COLORPREFIX + i
+}
+
+func (f *LowhttpResponse) AddTag(i string) {
+	f.Tags = append(f.Tags, i)
+}
+
+func (f *LowhttpResponse) Red() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("RED"))
+}
+
+func (f *LowhttpResponse) Green() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("GREEN"))
+}
+
+func (f *LowhttpResponse) Blue() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("BLUE"))
+}
+
+func (f *LowhttpResponse) Yellow() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("YELLOW"))
+}
+
+func (f *LowhttpResponse) Orange() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("ORANGE"))
+}
+
+func (f *LowhttpResponse) Purple() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("PURPLE"))
+}
+
+func (f *LowhttpResponse) Cyan() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("CYAN"))
+}
+
+func (f *LowhttpResponse) Grey() {
+	f.RemoveColor()
+	f.AddTag(yakitColor("GREY"))
+}
+
+func (f *LowhttpResponse) ColorSharp(rgbHex string) {
+	f.RemoveColor()
+	f.AddTag(yakitColor(rgbHex))
 }
 
 func (l *LowhttpResponse) GetBody() []byte {
