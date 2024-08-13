@@ -168,8 +168,8 @@ func init() {
 			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 		)
 		registerBuildInPlugin(
-			"mitm", "Cookie 平行越权",
-			withPluginHelp("用户可以在此配置多个 Cookie 同时进行替换，并在插件流量中查看内容"),
+			"mitm", "多认证综合越权测试",
+			withPluginHelp("可以设置 Cookie 和 Header 的多个认证信息进行越权测试，结果包含相似度"),
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
 		)
