@@ -54,6 +54,7 @@ var ProfileTables = []interface{}{
 	&PluginGroup{},
 	&CodecFlow{},
 	&SyntaxFlowRule{},
+	&SSAProgram{},
 }
 
 var databaseSchemas = map[uint8][]any{

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -206,4 +207,87 @@ func TestSourceFilesys(t *testing.T) {
 		)
 		assert.Contains(t, dir, programID)
 	})
+}
+
+func TestProgram_ListAndDelete(t *testing.T) {
+
+	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
+	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
+	package com.example.apackage; 
+	import com.example.bpackage.sub.B;
+	class A {
+		public static void main(String[] args) {
+			B b = new B();
+			// for test 1: A->B
+			target1(b.get());
+			// for test 2: B->A
+			b.show(1);
+		}
+	}
+	`)
+
+	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
+	package com.example.bpackage.sub; 
+	class B {
+		public  int get() {
+			return 	 1;
+		}
+		public void show(int a) {
+			target2(a);
+		}
+	}
+	`)
+
+	/*
+		default-ssa.db:
+			programID1
+			programID2
+		tmp/ssa.db:
+			programID3
+	*/
+	dir := fmt.Sprintf("%s/ssa_source_test", os.TempDir())
+	os.Mkdir(dir, os.ModePerm)
+	defer os.RemoveAll(dir)
+	log.Infof("dir: %v", dir)
+	dbPath := fmt.Sprintf("%s/%s", dir, "ssa.db")
+
+	var err error
+	programID1 := uuid.NewString()
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithDatabaseProgramName(programID1))
+	assert.NoErrorf(t, err, "parse project error: %v", err)
+
+	programID2 := uuid.NewString()
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithDatabaseProgramName(programID2))
+	assert.NoErrorf(t, err, "parse project error: %v", err)
+
+	consts.SetSSADataBasePath(dbPath)
+	programID3 := uuid.NewString()
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithDatabaseProgramName(programID3))
+	assert.NoErrorf(t, err, "parse project error: %v", err)
+
+	t.Run("test source file system root path", func(t *testing.T) {
+		dir := make([]string, 0)
+		ssafs := ssadb.NewIrSourceFs()
+		filesys.Recursive(
+			"/",
+			filesys.WithFileSystem(ssafs),
+			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
+				log.Infof("dir: %v", s)
+				paths := strings.Split(s, string(ssafs.GetSeparators()))
+				if len(paths) == 2 && paths[1] != "" {
+					dir = append(dir, paths[1])
+					return filesys.SkipDir
+				}
+				return nil
+			}),
+		)
+		assert.Contains(t, dir, programID1)
+		assert.Contains(t, dir, programID2)
+		assert.Contains(t, dir, programID3)
+	})
+
+
 }

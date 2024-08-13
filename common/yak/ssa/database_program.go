@@ -2,19 +2,10 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
-
-// var programCachePool = omap.NewEmptyOrderedMap[string, *Program]()
-
-// func setProgramCachePool(program string, prog *Program) {
-// 	programCachePool.Set(program, prog)
-// }
-
-// func deleteProgramCachePool(program string) {
-// 	programCachePool.Delete(program)
-// }
 
 func GetLibrary(program, version string) (*Program, error) {
 	if p, err := ssadb.GetLibrary(program, version); err == nil {
@@ -24,6 +15,15 @@ func GetLibrary(program, version string) (*Program, error) {
 	}
 }
 func GetProgram(program string, kind ProgramKind) (*Program, error) {
+	// switch to database
+	if prog := ssadb.GetSSAProgram(program); prog != nil {
+		if prog.DBPath != consts.GetSSADataBasePath() {
+			consts.SetSSADataBasePath(prog.DBPath)
+		}
+	} else {
+		return nil, utils.Errorf("program %s not exist", program)
+	}
+
 	// rebuild in database
 	if p, err := ssadb.GetProgram(program, string(kind)); err == nil {
 		return NewProgramFromDB(p), nil
