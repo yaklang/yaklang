@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/tidwall/gjson"
 	"testing"
 
 	"github.com/google/uuid"
@@ -133,6 +134,8 @@ func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
 		},
 	})
 	var runtimeID string
+	var cardCount int
+	var riskMessageCount int
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -141,14 +144,24 @@ func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
 		}
 		runtimeID = rsp.HybridScanTaskId
 		spew.Dump(rsp)
+		res := rsp.GetExecResult()
+		if res.GetIsMessage() {
+			level := gjson.Get(string(res.GetMessage()), "content.level").String()
+			if level == "feature-status-card-data" {
+				data := gjson.Get(string(res.GetMessage()), "content.data").String()
+				if gjson.Get(data, "id").String() == "漏洞/风险/指纹" {
+					cardCount = int(gjson.Get(data, "data").Int())
+				}
+			} else if level == "json-risk" {
+				riskMessageCount++
+			}
+		}
 	}
-	count, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
-	if err != nil {
-		panic(err)
-	}
-	if count != 1 {
-		t.Fatal("count not match")
-	}
+	riskCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+	require.NoError(t, err)
+	require.Equal(t, 1, riskCount, "data base risk count not match")
+	require.Equal(t, cardCount, riskCount, "risk count and card count not match")
+	require.Equal(t, cardCount, riskMessageCount, "risk message count and card count not match")
 }
 
 func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
