@@ -27,7 +27,7 @@ func Test__scanx(t *testing.T) {
 	startSYNPacketCounter()
 
 	res, err := _scanx(
-		"192.168.3.3",
+		"192.168.3.50",
 		//"47.52.100.35/24",
 		//"baidu.com",
 		//"U:137",
@@ -55,9 +55,9 @@ func Test___scanxFromPingUtils(t *testing.T) {
 		synPacketCounter++
 	}
 	list := []string{
-		"192.168.3.1",
-		"192.168.3.116",
-		"192.168.3.122",
+		"192.168.3.50",
+		//"192.168.3.116",
+		//"192.168.3.122",
 	}
 
 	c := make(chan *pingutil.PingResult)

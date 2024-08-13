@@ -66,17 +66,17 @@ func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...sy
 }
 
 func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
+	processedRes := make(chan string, 16)
+
 	var sample string
 	select {
-	case pingResult := <-res:
-		sample = pingResult
-		go func() {
-			res <- pingResult
-		}()
+	case sample = <-res:
+		processedRes <- sample
 	case <-time.After(15 * time.Second):
-		return nil, utils.Errorf("ping timeout")
+		return nil, utils.Error("ping timeout")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
 		cancel()
@@ -93,7 +93,7 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 
 	go func() {
 		defer wg.Done()
-		scanner.SubmitTargetFromPing(res, ports, targetCh)
+		scanner.SubmitTargetFromPing(processedRes, ports, targetCh)
 		close(targetCh)
 		<-sendDoneSignal
 		close(resultCh)
@@ -110,6 +110,14 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 			close(resultCh)
 			log.Errorf("scan failed: %s", err)
 		}
+	}()
+
+	go func() {
+
+		for pingResult := range res {
+			processedRes <- pingResult
+		}
+		close(processedRes)
 	}()
 
 	go func() {
