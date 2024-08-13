@@ -141,7 +141,7 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
 	var wg sync.WaitGroup
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(config.Ctx)
 	defer func() {
 		go func() {
 			wg.Wait()
