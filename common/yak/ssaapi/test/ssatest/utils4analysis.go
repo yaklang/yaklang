@@ -46,7 +46,7 @@ func CheckWithFS(fs fi.FileSystem, t *testing.T, handler func(ssaapi.Programs) e
 	fmt.Println("-----------------------------------------------------------------------------")
 	// parse with database
 	{
-		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		opt = append(opt, ssaapi.WithProgramName(programID))
 		prog, err := ssaapi.ParseProject(fs, opt...)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -95,7 +95,7 @@ func CheckWithName(
 	fmt.Println("-----------------------------------------------------------------------------")
 	// parse with database
 	{
-		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		opt = append(opt, ssaapi.WithProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
 		defer func() {
 			// if name == "" {
@@ -175,7 +175,7 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 	// parse with database
 	{
 		start := time.Now()
-		opt = append(opt, ssaapi.WithDatabaseProgramName(programID))
+		opt = append(opt, ssaapi.WithProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
 		log.Infof("with database ")
@@ -194,7 +194,7 @@ func CheckFSWithProgram(
 	ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
-	opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
+	opt = append(opt, ssaapi.WithProgramName(programName))
 	_, err := ssaapi.ParseProject(codeFS, opt...)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)

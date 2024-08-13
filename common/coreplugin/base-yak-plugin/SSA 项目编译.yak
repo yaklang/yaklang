@@ -5,11 +5,6 @@ programName := cli.String("programName",
     cli.setVerboseName("项目名")
 )
 
-path = cli.FolderName("ProgramPath", 
-    cli.setVerboseName("项目路径"),
-    cli.setRequired(true),
-) 
-
 language = cli.StringSlice("language", 
     cli.setMultipleSelect(false), 
     cli.setSelectOption("Java", "java"), 
@@ -18,6 +13,21 @@ language = cli.StringSlice("language",
     cli.setSelectOption("JavaScript", "js"), 
     cli.setSelectOption("Golang", "go"), 
     cli.setRequired(true)
+)
+
+path = cli.FolderName("ProgramPath", 
+    cli.setVerboseName("项目路径"),
+    cli.setRequired(true),
+) 
+
+description := cli.Text("description", 
+    cli.setVerboseName("项目描述"),
+    cli.setRequired(false)
+)
+
+dbPath := cli.FileNames("dbPath", 
+    cli.setVerboseName("数据库路径"),
+    cli.setRequired(false),
 )
 
 
@@ -32,15 +42,21 @@ entry := cli.FileNames("entry",
 
 
 cli.check()
+dbPath  = ""
+if len(dbPaths) > 0 {
+    dbPath = dbPaths[0]
+}
 
 opts = [
-    ssa.withDatabaseProgramName(programName), 
+    ssa.withProgramName(programName), 
     ssa.withProcess((msg , process )=>{
         yakit.SetProgressEx("complile", process)
         yakit.Info("%s: %f",msg, process)
     }), 
     ssa.withLanguage(language[0]), 
     ssa.withReCompile(reCompile), 
+    ssa.withDescription(description),
+    ssa.withDatabasePath(dbPath),
 ] 
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))

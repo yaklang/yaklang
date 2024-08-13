@@ -44,6 +44,9 @@ func GetSSADataBasePathDefault() string {
 }
 
 func SetSSADataBasePath(path string) {
+	if path == "" {
+		return
+	}
 	YAK_SSA_PROJECT_DB_PATH = path
 	resetSSADB()
 }

@@ -153,6 +153,7 @@ func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 		m["CreateAt"] = prog.CreatedAt.Unix()
 		m["Language"] = prog.Language
 		m["Path"] = prog.DBPath
+		m["Description"] = prog.Description
 	}
 	return m
 }

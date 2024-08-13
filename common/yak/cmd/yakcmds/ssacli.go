@@ -132,13 +132,13 @@ var SSACompilerCommands = []*cli.Command{
 					return utils.Errorf("database file not found: %v", databaseFileRaw)
 				}
 			}
-			consts.SetSSADataBasePath(databaseFileRaw)
 
 			// compile
 			if target == "" {
 				return utils.Errorf("target file not found: %v", rawFile)
 			}
 			opt := make([]ssaapi.Option, 0, 3)
+			opt = append(opt, ssaapi.WithDatabasePath(databaseFileRaw))
 			log.Infof("start to compile file: %v ", target)
 			if input_language != "" {
 				input_language = strings.ToLower(input_language)
@@ -166,7 +166,7 @@ var SSACompilerCommands = []*cli.Command{
 					programName = "default-" + ksuid.New().String()
 				}
 				log.Infof("compile save to database with program name: %v", programName)
-				opt = append(opt, ssaapi.WithDatabaseProgramName(programName))
+				opt = append(opt, ssaapi.WithProgramName(programName))
 			}
 
 			if !noOverride {
@@ -582,7 +582,6 @@ func SyntaxFlowQuery(
 			return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
 		}
 	}
-	consts.SetSSADataBasePath(databaseFileRaw)
 
 	if programName == "" {
 		return utils.Error("program name is required when using syntax flow query language")

@@ -59,7 +59,7 @@ func TestParseProject(t *testing.T) {
 	msgs := make([]message, 0)
 	programID := uuid.NewString()
 	prog, err := ssaapi.ParseProject(vf,
-		ssaapi.WithDatabaseProgramName(programID),
+		ssaapi.WithProgramName(programID),
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProcess(func(msg string, process float64) {
 			msgs = append(msgs, message{msg, process})
