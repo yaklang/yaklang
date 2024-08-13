@@ -146,7 +146,7 @@ func (c *config) parseProject() (Programs, error) {
 	for _, program := range prog.ChildApplication {
 		progs = append(progs, NewProgram(program, c))
 	}
-	if c.ProgramName != "" {
+	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
 	return progs, nil
@@ -161,7 +161,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 		return nil, err
 	}
 	prog.Finish()
-	if c.ProgramName != "" {
+	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
 	return NewProgram(prog, c), nil

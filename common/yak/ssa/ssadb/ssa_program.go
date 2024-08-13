@@ -9,6 +9,17 @@ import (
 
 var Programs = make(map[string]*schema.SSAProgram)
 
+func CheckAndSwitchDB(name string) {
+	// switch to database
+	prog := GetSSAProgram(name)
+	if prog == nil {
+		return
+	}
+	if prog.DBPath != consts.GetSSADataBasePath() {
+		consts.SetSSADataBasePath(prog.DBPath)
+	}
+}
+
 func GetSSAProgram(name string) *schema.SSAProgram {
 	if prog, ok := Programs[name]; ok {
 		return prog
@@ -40,12 +51,12 @@ func SaveSSAProgram(name, desc, language string) error {
 
 	Programs[name] = prog
 
-	return db.Save(prog).Error
+	return db.Model(&schema.SSAProgram{}).Save(prog).Error
 }
 
 func DeleteSSAProgram(name string) error {
 	db := consts.GetGormProfileDatabase()
-	if err := db.Where("name = ?", name).Delete(&schema.SSAProgram{}).Error; err != nil {
+	if err := db.Model(&schema.SSAProgram{}).Where("name = ?", name).Delete(&schema.SSAProgram{}).Unscoped().Error; err != nil {
 		log.Errorf("delete ssa program [%v] error: %s", name, err)
 		return err
 	}
