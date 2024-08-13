@@ -5,6 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"net/http"
 	"sort"
 	"strings"
@@ -1409,4 +1412,58 @@ Content-Type: image/jpeg
 	if len(flow.Request) < 11000000 {
 		t.Fatal("request is too small, truncated some reason got: " + utils.ByteSize(uint64(len(flow.Request))))
 	}
+}
+
+func TestHTTPRequest_Fuzz_FromPlugin(t *testing.T) {
+	t.Run("Request", func(t *testing.T) {
+		pluginName := utils.RandStringBytes(10)
+		server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+
+aaa`))
+		runtimeId := uuid.New().String()
+		req, err := mutate.NewFuzzHTTPRequest(fmt.Sprintf(`
+GET / HTTP/1.1
+Host: %s:%d
+
+`, server, port), mutate.OptFromPlugin(pluginName), mutate.OptRuntimeId(runtimeId))
+		require.NoError(t, err)
+		_, err = req.ExecFirst()
+		require.NoError(t, err)
+		var httpFlows []*schema.HTTPFlow
+		db := bizhelper.ExactQueryString(consts.GetGormProjectDatabase(), "runtime_id", runtimeId)
+		resDb := db.Find(&httpFlows)
+		require.NoError(t, resDb.Error)
+		for _, flow := range httpFlows {
+			require.Equal(t, pluginName, flow.FromPlugin, "fuzz request form plugin not match")
+		}
+	})
+
+	t.Run("BatchRequest", func(t *testing.T) {
+		pluginName := utils.RandStringBytes(10)
+		server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+
+aaa`))
+		runtimeId := uuid.New().String()
+		req, err := mutate.NewFuzzHTTPRequest(fmt.Sprintf(`
+GET /?a=123&a=46&b=123 HTTP/1.1
+Host: %s:%d
+
+{"abc": "123", "a": 123}
+`, server, port), mutate.OptFromPlugin(pluginName), mutate.OptRuntimeId(runtimeId))
+		require.NoError(t, err)
+		params := req.GetCommonParams()
+
+		for _, p := range params {
+			_, err := p.Fuzz("test").ExecFirst()
+			require.NoError(t, err)
+		}
+		var httpFlows []*schema.HTTPFlow
+		db := bizhelper.ExactQueryString(consts.GetGormProjectDatabase(), "runtime_id", runtimeId)
+		resDb := db.Find(&httpFlows)
+		require.NoError(t, resDb.Error)
+		for _, flow := range httpFlows {
+			require.Equal(t, pluginName, flow.FromPlugin, "fuzz batch request form plugin not match")
+		}
+	})
+
 }
