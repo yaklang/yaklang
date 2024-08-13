@@ -446,6 +446,12 @@ func (y *YakCompiler) VisitStringLiteral(raw yak.IStringLiteralContext) interfac
 	if i == nil {
 		return nil
 	}
+	// start doc <<< Identifier
+	if i.StartNowDoc() != nil {
+		y.VisitDoc(i)
+		return nil
+	}
+
 	recoverRange := y.SetRange(i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString(raw.GetText())
@@ -523,6 +529,37 @@ ParseStrLit:
 			y.panicCompilerError(stringLiteralError, i.GetText())
 		}
 	}
+	return nil
+}
+
+func (y *YakCompiler) VisitDoc(raw yak.IStringLiteralContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*yak.StringLiteralContext)
+	if i == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	defer recoverRange()
+	y.writeString(raw.GetText())
+
+	var text string
+	if nodes := i.AllCRLFHereDocText(); len(nodes) > 0 {
+		var builder strings.Builder
+		for _, node := range nodes {
+			builder.WriteString(node.GetText())
+		}
+		text = builder.String()
+	} else if nodes := i.AllLFHereDocText(); len(nodes) > 0 {
+		var builder strings.Builder
+		for _, node := range nodes {
+			builder.WriteString(node.GetText())
+		}
+		text = builder.String()
+	}
+	y.pushString(text, text)
 	return nil
 }
 

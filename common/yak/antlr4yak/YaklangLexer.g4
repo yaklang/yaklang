@@ -2,6 +2,10 @@ lexer grammar YaklangLexer;
 
 // antlr 4.11.1
 
+options {
+    superClass = YaklangLexerBase;
+}
+
 /*
 定义关键词与变量名
 */
@@ -119,6 +123,7 @@ CommentStart: '/*';
 CommentEnd: '*/';
 BackTickL: '`';
 COMMENT: '/*' .*? '*/';
+StartNowDoc: '<<<' -> pushMode(HereDocIdentifier);
 
 // 定义按行的评论/注释
 LINE_COMMENT         : ('//' | '#') ~[\r\n]*;
@@ -166,8 +171,6 @@ StringLiteral
     | SingleQuoteStringLiteral
     ;
 
-
-
 // 字符，一般定义为 char
 CharacterLiteral
     : '\'' SingleStringCharacter '\''
@@ -203,7 +206,22 @@ mode TEMPLATE_BACKTICK_MODE;
     TemplateBackTickStringStartExpression:  '${' -> pushMode(DEFAULT_MODE);
 
 
+
+mode HereDocIdentifier;
+HereDocIdentifierName: (NameString{this.recordHereDocLabel()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
+CRLFHereDocIdentifierBreak: '\r\n'{this.recordHereDocLF()} -> popMode,pushMode(CRLFHereDoc);
+LFHereDocIdentifierBreak: '\n'{this.recordHereDocLF()} -> popMode,pushMode(LFHereDoc);
+
+mode CRLFHereDoc;
+CRLFEndDoc:  '\r\n' NameString {this.DocEndDistribute()};
+CRLFHereDocText: .;
+
+mode LFHereDoc;
+LFEndDoc:  '\n' NameString {this.DocEndDistribute()};
+LFHereDocText: .;
+
 // Fragment rules
+fragment NameString: [a-zA-Z_\u0080-\ufffe][a-zA-Z0-9_\u0080-\ufffe]*;
 fragment HexIntegerLiteral:              '0' [xX] HexDigit+;
 fragment OctalIntegerLiteral
     : '0' [0-7]+
