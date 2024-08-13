@@ -297,6 +297,11 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+
+	if stmt.StartNowDoc() != nil {
+		text := stmt.HereDocContent().GetText()
+		return b.EmitConstInst(text)
+	}
 	text := stmt.GetText()
 	if text == "" {
 		return b.EmitConstInst(text)

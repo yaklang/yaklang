@@ -2,8 +2,9 @@ package ssatest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"golang.org/x/exp/slices"
 

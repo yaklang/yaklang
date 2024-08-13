@@ -273,7 +273,10 @@ numericLiteral
     ;
 stringLiteral
     : StringLiteral
+    | StartNowDoc HereDocIdentifierName HereDocIdentifierBreak hereDocContent? EndDoc
     ;
+
+hereDocContent: HereDocText+;
 templateSingleQuoteStringLiteral
     : TemplateSingleQuoteStringStart (templateSingleQuoteStringAtom)* TemplateSingleQuoteStringCharacterStringEnd
     ;

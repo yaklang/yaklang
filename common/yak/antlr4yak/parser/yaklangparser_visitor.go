@@ -191,6 +191,9 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 
+	// Visit a parse tree produced by YaklangParser#hereDocContent.
+	VisitHereDocContent(ctx *HereDocContentContext) interface{}
+
 	// Visit a parse tree produced by YaklangParser#templateSingleQuoteStringLiteral.
 	VisitTemplateSingleQuoteStringLiteral(ctx *TemplateSingleQuoteStringLiteralContext) interface{}
 
