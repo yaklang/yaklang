@@ -132,7 +132,7 @@ var SSACompilerCommands = []*cli.Command{
 					return utils.Errorf("database file not found: %v", databaseFileRaw)
 				}
 			}
-			consts.SetSSADataBaseName(databaseFileRaw)
+			consts.SetSSADataBasePath(databaseFileRaw)
 
 			// compile
 			if target == "" {
@@ -582,7 +582,7 @@ func SyntaxFlowQuery(
 			return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
 		}
 	}
-	consts.SetSSADataBaseName(databaseFileRaw)
+	consts.SetSSADataBasePath(databaseFileRaw)
 
 	if programName == "" {
 		return utils.Error("program name is required when using syntax flow query language")
