@@ -228,6 +228,7 @@ func (z *ZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 	return entries, nil
 }
+func (f *ZipFS) ExtraInfo(string) map[string]any { return nil }
 
 func NewZipFSRaw(i io.ReaderAt, size int64) (*ZipFS, error) {
 	reader, err := zip.NewReader(i, size)

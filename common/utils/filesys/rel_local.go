@@ -98,3 +98,5 @@ func (f *RelLocalFs) MkdirAll(name string, perm os.FileMode) error {
 func (f *RelLocalFs) String() string {
 	return fmt.Sprintf("RelLocalFs{rel: %s}", f.rel)
 }
+
+func (f *RelLocalFs) ExtraInfo(string) map[string]any { return nil }

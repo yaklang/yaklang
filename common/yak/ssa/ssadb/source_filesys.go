@@ -140,6 +140,23 @@ func (fs *irSourceFS) getProgram(path string) (string, bool) {
 	return dir[1], len(dir) == 2
 }
 
+func (f *irSourceFS) ExtraInfo(path string) map[string]any {
+	m := make(map[string]any)
+	// if root path ? get program Name
+	programName, programRoot := f.getProgram(path)
+	if !programRoot {
+		return m
+	}
+
+	if prog := GetSSAProgram(programName); prog != nil {
+		m["programName"] = programName
+		m["CreateAt"] = prog.CreatedAt.Unix()
+		m["Language"] = prog.Language
+		m["Path"] = prog.DBPath
+	}
+	return m
+}
+
 func (f *irSourceFS) Delete(path string) error {
 	// if root path ? get program Name
 	programName, programRoot := f.getProgram(path)

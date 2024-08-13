@@ -37,6 +37,7 @@ func (f *VirtualFS) WriteFile(name string, data []byte, mode os.FileMode) error 
 func (f *VirtualFS) Delete(path string) error {
 	return f.RemoveFileOrDir(path)
 }
+func (f *VirtualFS) ExtraInfo(string) map[string]any { return nil }
 
 func (f *VirtualFS) MkdirAll(path string, mode os.FileMode) error {
 	f.AddDir(path)
