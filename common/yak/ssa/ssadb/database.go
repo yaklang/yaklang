@@ -33,4 +33,5 @@ func deleteProgramDBOnly(db *gorm.DB, program string) {
 	db.Model(&IrSource{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrSource{}).Where("folder_path = ? AND file_name = ?", "/", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+	DeleteSSAProgram(program)
 }
