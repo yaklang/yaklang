@@ -126,13 +126,18 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 
 	go func() {
 		for {
-			pingResult, ok := <-res
-			if !ok {
-				break
+			select {
+			case pingResult, ok := <-res:
+				if !ok {
+					close(processedRes)
+					return
+				}
+				processedRes <- pingResult
+			case <-ctx.Done():
+				close(processedRes)
+				return
 			}
-			processedRes <- pingResult
 		}
-		close(processedRes)
 	}()
 
 	return resultCh, nil
