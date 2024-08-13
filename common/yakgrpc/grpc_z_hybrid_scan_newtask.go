@@ -355,7 +355,7 @@ func ScanHybridTargetWithPlugin(
 	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *schema.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter filter.Filterable,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
-	engine := yak.NewScriptEngine(20)
+	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(
 			runtimeId,
