@@ -21,35 +21,48 @@ const (
 )
 
 var (
-	YAK_SSA_PROJECT_DB_NAME = ""
+	YAK_SSA_PROJECT_DB_PATH = ""
 	ssaDatabase             *gorm.DB
-	initSSADatabaseOnce     = new(sync.Once)
+	initSSADatabaseOnce     *sync.Once
 )
 
-func GetSSAProjectDBNameDefault() string {
+func init() {
+	resetSSADB()
+}
+
+func resetSSADB() {
+	if ssaDatabase != nil {
+		ssaDatabase.Close()
+		ssaDatabase = nil
+	}
+	initSSADatabaseOnce = new(sync.Once)
+}
+
+func GetSSADataBasePathDefault() string {
 	filename := "default-yakssa.db"
 	return filepath.Join(GetDefaultYakitBaseDir(), filename)
 }
 
-func SetSSADataBaseName(name string) {
-	YAK_SSA_PROJECT_DB_NAME = name
+func SetSSADataBasePath(path string) {
+	YAK_SSA_PROJECT_DB_PATH = path
+	resetSSADB()
 }
 
-func GetDefaultSSADataBase() string {
-	if YAK_SSA_PROJECT_DB_NAME == "" {
-		return GetSSAProjectDBNameDefault()
+func GetSSADataBasePath() string {
+	if YAK_SSA_PROJECT_DB_PATH == "" {
+		return GetSSADataBasePathDefault()
 	}
-	return YAK_SSA_PROJECT_DB_NAME
+	return YAK_SSA_PROJECT_DB_PATH
 }
 
 func initSSADatabase() {
 	initSSADatabaseOnce.Do(func() {
 		var err error
-		ssaDatabase, err = createAndConfigDatabase(GetDefaultSSADataBase(), SQLiteExtend)
+		ssaDatabase, err = createAndConfigDatabase(GetSSADataBasePath(), SQLiteExtend)
 		if err != nil {
 			log.Errorf("create ssa database err: %v", err)
 		}
-		log.Infof("init ssa database: %s", GetDefaultSSADataBase())
+		log.Infof("init ssa database: %s", GetSSADataBasePath())
 		schema.AutoMigrate(ssaDatabase, schema.KEY_SCHEMA_SSA_DATABASE)
 	})
 }
