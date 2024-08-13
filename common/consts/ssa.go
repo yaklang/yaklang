@@ -19,7 +19,7 @@ const (
 	JS   Language = "js"
 	PHP  Language = "php"
 	JAVA Language = "java"
-	GO   Language = "go"
+	GO   Language = "golang"
 )
 
 func ValidateLanguage(language string) (Language, error) {
