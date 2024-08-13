@@ -7,6 +7,7 @@ import (
 )
 
 func TestEngineToDocumentHelperWithVerboseInfo(t *testing.T) {
-	docs := EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	engine := yaklang.New()
+	docs := EngineToDocumentHelperWithVerboseInfo(engine)
 	_ = docs
 }

@@ -48,8 +48,15 @@ func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 			if err != nil {
 				return err
 			}
-			for _, pkg := range pkgs {
+			for name, pkg := range pkgs {
+				// skip test pkg
+				if strings.HasSuffix(name, "_test") {
+					continue
+				}
 				path, _ = filepath.Rel(rootDir, path)
+				// only path, remove last part, use pkg name instead
+				path, _ = filepath.Split(path)
+				path = filepath.Join(path, name)
 				path = fmt.Sprintf("%s/%s", defaultPackageName, path)
 				path = strings.ReplaceAll(path, string(filepath.Separator), "/")
 				packages[path] = pkg
