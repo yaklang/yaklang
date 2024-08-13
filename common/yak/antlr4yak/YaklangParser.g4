@@ -273,6 +273,8 @@ numericLiteral
     ;
 stringLiteral
     : StringLiteral
+    | StartNowDoc HereDocIdentifierName CRLFHereDocIdentifierBreak CRLFHereDocText* CRLFEndDoc
+    | StartNowDoc HereDocIdentifierName LFHereDocIdentifierBreak LFHereDocText* LFEndDoc
     ;
 templateSingleQuoteStringLiteral
     : TemplateSingleQuoteStringStart (templateSingleQuoteStringAtom)* TemplateSingleQuoteStringCharacterStringEnd
