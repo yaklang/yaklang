@@ -80,8 +80,12 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 	
 			op1 := getValue(exp, 0)
 			op2 := getValue(exp, 1)
-			if op1 == nil || op2 == nil {
-				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
+			if op2 == nil {
+				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2),nil
@@ -110,8 +114,12 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 	
 			op1 := getValue(exp, 0)
 			op2 := getValue(exp, 1)
-			if op1 == nil || op2 == nil {
-				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
+			if op2 == nil {
+				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2),nil
@@ -138,8 +146,12 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 			
 			op1 := getValue(exp, 0)
 			op2 := getValue(exp, 1)
-			if op1 == nil || op2 == nil {
-				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+			if op1 == nil {
+				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+				return b.EmitConstInst(0), b.CreateVariable("")
+			}
+			if op2 == nil {
+				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2),nil
@@ -197,10 +209,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue
 				funcs := b.GetExtendFuncs(t.Name)
 				if fun := funcs[test]; fun != nil {
 					return fun, nil
-				}
+				} // TODO 目前没法识别golang库中的函数
 				b.NewError(ssa.Warn, TAG, "function not found, but create")
-				rightv := b.NewFunc(test)
-				rightv.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()} , ssa.CreateAnyType(), false))
+				rightv = b.EmitUndefined(test)
 			}else{
 				rightv = b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
 			}

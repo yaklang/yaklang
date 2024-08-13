@@ -1,6 +1,7 @@
 package go2ssa
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -83,6 +84,7 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
+	fmt.Printf("Program: %v done\n",astBuilder.GetProgram().Name)
 	return nil
 }
 
@@ -206,7 +208,7 @@ func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
 	if b.aliasTypes[name] == nil {
 		return nil
 	}
-	return b.aliasTypes[name]
+	return b.aliasTypes[name].GetType()
 }
 
 // ====================== Special type

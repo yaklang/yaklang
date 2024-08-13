@@ -76,7 +76,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					b.AddExtendFuncs(objt.Name, funcs)
 				}
 				b.AddStruct(objt.Name, objt)
-			}else{
+			} else {
 				objt := ssa.NewObjectType()
 				objt.SetTypeKind(ssa.StructTypeKind)
 				objt.SetName(pkgName[len(pkgName)-1])
@@ -115,20 +115,29 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		}
 	}
 
-	cbp := ssa.NewClassBluePrint()
-	cbp.Name = pkgNameCurrent
-
-	for structName, structType := range b.GetStructAll() {
-		typValue := ssa.NewTypeValue(structType)
-		typValue.SetType(structType)
-		cbp.AddStaticMember(structName, typValue)
-	}
-	for _, f := range b.GetProgram().Funcs {
-		if !f.IsMethod() && f.GetName() != "init" {
-			cbp.AddMethod(f.GetName(), f)
+	var cbpHander = func(cbp *ssa.ClassBluePrint) {
+		for structName, structType := range b.GetStructAll() {
+			typValue := ssa.NewTypeValue(structType)
+			typValue.SetType(structType)
+			cbp.AddStaticMember(structName, typValue)
+		}
+		for _, f := range b.GetProgram().Funcs {
+			if !f.IsMethod() && f.GetName() != "init" {
+				cbp.AddMethod(f.GetName(), f)
+			}
 		}
 	}
 
+	for _, cbp := range b.GetProgram().ClassBluePrint { // only once
+		if cbp.Name == pkgNameCurrent {
+			cbpHander(cbp)
+			return
+		}
+	}
+
+	cbp := ssa.NewClassBluePrint()
+	cbp.Name = pkgNameCurrent
+	cbpHander(cbp)
 	b.SetClassBluePrint(cbp.Name, cbp)
 }
 
@@ -1737,7 +1746,7 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 				ssatyp = b.GetSpecialByStr(name)
 			}
 			if ssatyp == nil {
-			    b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
+				b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
 				ssatyp = ssa.CreateAnyType()
 			}
 		}
