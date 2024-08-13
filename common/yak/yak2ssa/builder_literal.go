@@ -297,6 +297,24 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+
+	if stmt.StartNowDoc() != nil {
+		var text string
+		if nodes := stmt.AllCRLFHereDocText(); len(nodes) > 0 {
+			var builder strings.Builder
+			for _, node := range nodes {
+				builder.WriteString(node.GetText())
+			}
+			text = builder.String()
+		} else if nodes := stmt.AllLFHereDocText(); len(nodes) > 0 {
+			var builder strings.Builder
+			for _, node := range nodes {
+				builder.WriteString(node.GetText())
+			}
+			text = builder.String()
+		}
+		return b.EmitConstInst(text)
+	}
 	text := stmt.GetText()
 	if text == "" {
 		return b.EmitConstInst(text)

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -927,13 +928,35 @@ func _marshallerTest(i string, debugs ...bool) {
 	_marshallerTestWithCtx(i, context.Background(), debug)
 }
 
-func _formattest(i string) []*yakvm.Code {
+func showAst(i string) {
+	lexer := yak.NewYaklangLexer(antlr.NewInputStream(i))
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := yak.NewYaklangParser(tokenStream)
+	ast := parser.Program()
+	tree := ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser())
+	println(tree)
+}
+
+func _formattest(i string, debugs ...bool) []*yakvm.Code {
+	debug := false
+	if len(debugs) > 0 {
+		debug = debugs[0]
+	}
+
 	e := NewExecutor(i)
+	if errs := e.Compiler.GetErrors(); len(errs) > 0 {
+		spew.Dump(i)
+		panic(errs)
+	}
 	codes1 := e.VM.GetCodes()
 	code2 := e.Compiler.GetFormattedCode()
 	e2 := NewExecutor(code2)
+	if errs := e2.Compiler.GetErrors(); len(errs) > 0 {
+		panic(errs)
+	}
 	codes2 := e2.VM.GetCodes()
-	if len(codes1) != len(codes2) {
+
+	if len(codes1) != len(codes2) || debug {
 		println("------------------------------------")
 		_printWithLine(i)
 		println("------------------------------------")
@@ -942,9 +965,17 @@ func _formattest(i string) []*yakvm.Code {
 		yakvm.ShowOpcodes(codes1)
 		println("---------------CODE2------------------")
 		yakvm.ShowOpcodes(codes2)
+	}
+	if len(codes1) != len(codes2) {
 		panic("code format error, code1-length: " + fmt.Sprint(len(codes1)) + " formatted length: " + fmt.Sprint(len(codes2)))
 	}
-	e.VM.NormalExec()
+
+	if debug {
+		println("-------Runtime Opcode-------------")
+		e2.VM.DebugExec()
+	} else {
+		e2.VM.NormalExec()
+	}
 	return codes1
 }
 
@@ -4120,4 +4151,58 @@ for i in 100 {
 }
 `
 	_marshallerTest(code)
+}
+
+func TestHereDoc(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		testStr := `qwer1234!@#$\r\n\t\v`
+		code := fmt.Sprintf(`
+a = <<<EOF
+%s
+EOF
+b = %s
+assert a == b, a
+`, testStr, strconv.Quote(testStr))
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
+
+	t.Run("CRLF-CRLF", func(t *testing.T) {
+		code := "a=<<<TEST\r\na\r\nTEST; a += \"b\"; dump(a);assert a == \"ab\", a;"
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
+	t.Run("CRLF-LF", func(t *testing.T) {
+		code := "a=<<<TEST\r\na\nTEST\r\nTEST; dump(a);assert a == \"a\\nTEST\", a;"
+		// showAst(code)
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
+	t.Run("LF-LF", func(t *testing.T) {
+		code := "a=<<<TEST\na\nTEST + \"b\"; dump(a);assert a == \"ab\", a;"
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
+	t.Run("LF-CRLF", func(t *testing.T) {
+		code := "a=<<<TEST\na\r\nTEST; dump(a);assert a == \"a\\r\", a;"
+		// showAst(code)
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
+	t.Run("has empty line arround", func(t *testing.T) {
+		code := "a=<<<EOF\n\nasd\n\nEOF; dump(a); assert a == \"\\nasd\\n\", a;"
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
+	t.Run("BUG", func(t *testing.T) {
+		testStr := `qwer1234!@#$%\r\n\t\vCNM;;`
+		code := fmt.Sprintf(`a = <<<NM
+%s
+NM;	
+b = %s
+assert a == b, a
+`, testStr, strconv.Quote(testStr))
+		_marshallerTest(code)
+		_formattest(code, true)
+	})
 }
