@@ -48,4 +48,29 @@ public class PersonController {
         Person person = (Person) xstream.fromXML(xml);
         return new ResponseEntity<>(person, HttpStatus.CREATED);
     }
+
+    static public XStream xstreamInstance = new XStream(new StaxDriver());
+    static public XStream xstreamInstance2 = null;
+
+    static {
+        xstreamInstance.allowTypes(new Class[]{Person.class});
+        xstreamInstance2.setMode(XStream.NO_REFERENCE);
+    }
+
+    @PostMapping("/person3")
+    public ResponseEntity<Person> createPerson3(@RequestBody String xml) {
+        xstreamInstance.alias("person", Person.class);
+        xstreamInstance.alias("phonenumber", PhoneNumber.class);
+        Person person = (Person) xstreamInstance.fromXML(xml);
+        return new ResponseEntity<>(person, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/person4")
+    public ResponseEntity<Person> createPerson4(@RequestBody String xml) {
+        xstreamInstance2.alias("person", Person.class);
+        xstreamInstance2.alias("phonenumber", PhoneNumber.class);
+        Person person = (Person) xstreamInstance2.fromXML(xml);
+        return new ResponseEntity<>(person, HttpStatus.CREATED);
+    }
+
 }

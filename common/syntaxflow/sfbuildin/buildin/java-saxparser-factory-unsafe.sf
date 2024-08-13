@@ -1,0 +1,13 @@
+desc(
+    title: "Find SAXParserFactory() Unsafe Use in Context Sink",
+    title_zh: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
+    type: vuln,
+    level: warning,
+)
+
+SAXParserFactory.newInstance() as $factory;
+check $factory;
+$factory?{!.setFeature}...newSAXParser()...parse() as $vulnCall
+
+check $vulnCall;
+alert $vulnCall;
