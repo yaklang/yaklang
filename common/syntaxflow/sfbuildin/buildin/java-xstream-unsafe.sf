@@ -6,7 +6,7 @@ desc(
 )
 
 fromXML as $fromXML;
-$fromXML?{ <getObject>?{!.setMode && !.allowTypes} }() as $vuln;
+$fromXML?{ <getObject>?{!.setMode && !.allowType* && !.setupDefaultSecurity && !.addPermission && !.allowTypeHierarchy && <typeName>?{have: XStream} } }() as $vuln;
 
 check $vuln;
 alert $vuln;
