@@ -59,10 +59,11 @@ func TestTemp(t *testing.T) {
 
 		func main(){
 			i := 10
-			for i := 5; i < 10; i++ {
-				println(i) // phi
-			}
-			println(i) // 10
+			goto error
+			i = 5
+			println(i)
+		error:
+			println(i)
 		}
 		`, []string{
 			"phi(i)[5,add(i, 1)]", "10",
