@@ -43,6 +43,16 @@ func SaveSSAProgram(name, desc, language string) error {
 	return db.Save(prog).Error
 }
 
+func DeleteSSAProgram(name string) error {
+	db := consts.GetGormProfileDatabase()
+	if err := db.Where("name = ?", name).Delete(&schema.SSAProgram{}).Error; err != nil {
+		log.Errorf("delete ssa program [%v] error: %s", name, err)
+		return err
+	}
+	delete(Programs, name)
+	return nil
+}
+
 func AllSSAPrograms() []*schema.SSAProgram {
 	if len(Programs) > 0 {
 		return lo.Values(Programs)
