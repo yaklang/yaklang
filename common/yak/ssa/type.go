@@ -663,6 +663,10 @@ func (a *AliasType) GetTypeKind() TypeKind {
 	return a.elem.GetTypeKind()
 }
 
+func (a *AliasType) GetType() Type {
+	return a.elem
+}
+
 // ====================== interface type
 type InterfaceType struct {
 	method       map[string]*Function
