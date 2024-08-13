@@ -390,7 +390,7 @@ startSYNPacketCounter = func(){
 if mode == "syn" {
     startSYNPacketCounter()
     synResults, err := synscan.ScanFromPing(
-        getPingScan(), ports, synscan.initHostFilter(hosts), synscan.initPortFilter(ports),
+        getPingScan(), ports,
         synscan.excludeHosts(excludeHosts), synscan.excludePorts(excludePorts),
         synscan.submitTaskCallback(func(i){ addSynPacketCounter() }),
         synscan.concurrent(synConcurrent),
