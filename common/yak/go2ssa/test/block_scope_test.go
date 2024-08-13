@@ -169,6 +169,7 @@ func TestBlock_Value_If(t *testing.T) {
 		}, t)
 	})
 }
+
 func TestBlock_Value_Switch(t *testing.T) {
 	t.Run("switch stmt;exp", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
@@ -247,6 +248,45 @@ func TestBlock_Value_Switch(t *testing.T) {
 		`, []string{"2","3"}, t)
 	})
 }
+
+func TestBlock_Value_Select(t *testing.T) {
+	t.Run("select recv", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			channel1 := make(chan int)
+			channel2 := make(chan int)
+
+		    select {
+			case data1 := <-channel1:
+				println(data1)
+			case data2 := <-channel2:
+				println(data2)
+			default:
+			}
+		}
+		`, []string{"chan(Function-make(typeValue(chan number)))","chan(Function-make(typeValue(chan number)))"}, t)
+	})
+
+	// TODO: select send
+	/*
+	t.Run("select send", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			channel1 := make(chan int)
+			channel2 := make(chan int)
+
+		    select {
+			case channel1 <- 1:
+			case channel2 <- 2:
+			default:
+			}
+		}
+		`, []string{""}, t)
+	})*/
+}
+
 func TestBlock_Value_For(t *testing.T) {
 	t.Run("for stmt;exp;", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main

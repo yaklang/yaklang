@@ -82,3 +82,31 @@ func InvalidChanType(typ string) string {
 func MakeArgumentTooMuch(typ string) string {
 	return fmt.Sprintf("make %s expression argument too much!", typ)
 }
+
+func CannotAssign() string {
+	return "cannot assign to const value"
+}
+
+func CannotParseString(test string, err string) string {
+	return fmt.Sprintf("cannot parse string literal: %s failed: %s", test, err)
+}
+
+func NeedTwoExpression() string {
+	return "in operator need two expression"
+}
+
+func UnhandledBool() string {
+	return "unhandled bool literal"
+}
+
+func Unreachable() string {
+	return "unreachable"
+}
+
+func ToDo() string {
+	return "todo"
+}
+
+func OutofBounds(ml, vl int) string {
+	return fmt.Sprintf("index %d is out of bounds (>= %d)", ml, vl)
+}
