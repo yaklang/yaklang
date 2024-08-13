@@ -1,0 +1,13 @@
+desc(
+    title: "Find SAXBuilder() Unsafe Use in Context Sink",
+    title_zh: "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
+    type: vuln,
+    level: warning,
+)
+
+.build?{<getObject>}<getObject> as $builder
+check $builder;
+
+$builder?{<typeName>?{have: SAXBuilder} && !.setFeature* }./((build*)|(parse*))/() as $vulnCall;
+check $vulnCall;
+alert $vulnCall;
