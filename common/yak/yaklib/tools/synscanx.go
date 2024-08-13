@@ -66,20 +66,33 @@ func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...sy
 }
 
 func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithCancel(config.Ctx)
+	defer func() {
+		go func() {
+			wg.Wait()
+			cancel()
+		}()
+	}()
 	processedRes := make(chan string, 16)
 
 	var sample string
+	var ok bool
 	select {
-	case sample = <-res:
+	case sample, ok = <-res:
+		if !ok {
+			return nil, utils.Error("ping result is empty")
+		}
 		processedRes <- sample
 	case <-time.After(15 * time.Second):
 		return nil, utils.Error("ping timeout")
+	case <-ctx.Done():
+		return nil, utils.Error("ping canceled")
 	}
-	ctx, cancel := context.WithCancel(context.Background())
 
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
-		cancel()
 		return nil, err
 	}
 	scanner.FromPing = true
@@ -88,7 +101,6 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1024)
 
-	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
@@ -113,23 +125,29 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 	}()
 
 	go func() {
-
-		for pingResult := range res {
+		for {
+			pingResult, ok := <-res
+			if !ok {
+				break
+			}
 			processedRes <- pingResult
 		}
 		close(processedRes)
-	}()
-
-	go func() {
-		wg.Wait()
-		cancel()
 	}()
 
 	return resultCh, nil
 }
 
 func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
+	var wg sync.WaitGroup
+
 	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		go func() {
+			wg.Wait()
+			cancel()
+		}()
+	}()
 	log.Infof("targets: %s", targets)
 	sample := utils.ParseStringToHosts(targets)[0]
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
@@ -142,7 +160,6 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1024)
 
-	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
@@ -164,11 +181,6 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 			close(resultCh)
 			log.Errorf("scan failed: %s", err)
 		}
-	}()
-
-	go func() {
-		wg.Wait()
-		cancel()
 	}()
 
 	return resultCh, nil

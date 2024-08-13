@@ -27,11 +27,11 @@ func Test__scanx(t *testing.T) {
 	startSYNPacketCounter()
 
 	res, err := _scanx(
-		"192.168.3.50",
+		"192.168.3.50/24",
 		//"47.52.100.35/24",
 		//"baidu.com",
 		//"U:137",
-		"22,21,80,443",
+		"21,22,443,445,80",
 		//synscanx.WithInitFilterPorts("443"),
 		synscanx.WithWaiting(5),
 		synscanx.WithShuffle(false),
