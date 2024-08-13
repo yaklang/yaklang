@@ -78,7 +78,7 @@ public class A {
 
 	prog, err := ssaapi.Parse(code,
 		ssaapi.WithLanguage(ssaapi.JAVA),
-		ssaapi.WithDatabaseProgramName(programId),
+		ssaapi.WithProgramName(programId),
 	)
 	assert.NoError(t, err)
 
@@ -142,7 +142,7 @@ func TestCompileProgram_OnlyDatabase(t *testing.T) {
 
 		_, err := ssaapi.Parse(code,
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithDatabaseProgramName(programId),
+			ssaapi.WithProgramName(programId),
 		)
 		assert.NoError(t, err)
 
@@ -182,7 +182,7 @@ func TestCompileProgram_Delete(t *testing.T) {
 
 		_, err := ssaapi.Parse(code,
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithDatabaseProgramName(programId),
+			ssaapi.WithProgramName(programId),
 		)
 		assert.NoError(t, err)
 	}
@@ -225,7 +225,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID1)
 		_, err := ssaapi.Parse(code,
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithDatabaseProgramName(programID1),
+			ssaapi.WithProgramName(programID1),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), programID1)
 		assert.NoError(t, err)
@@ -243,7 +243,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
 		_, err := ssaapi.Parse(code,
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithDatabaseProgramName(programID2),
+			ssaapi.WithProgramName(programID2),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), programID2)
 		assert.NoError(t, err)
@@ -344,7 +344,7 @@ func TestCompileProgram_MultipleFileInLibrary(t *testing.T) {
 		prog, err := ssaapi.ParseProject(
 			vf,
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithDatabaseProgramName(programID),
+			ssaapi.WithProgramName(programID),
 		)
 		assert.NoError(t, err)
 		// prog.Show()

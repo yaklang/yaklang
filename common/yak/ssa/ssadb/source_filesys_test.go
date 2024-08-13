@@ -73,7 +73,7 @@ func TestSourceFilesysLocal(t *testing.T) {
 	programID := uuid.NewString()
 	_, err = ssaapi.ParseProjectFromPath(dir,
 		ssaapi.WithLanguage(ssaapi.JAVA),
-		ssaapi.WithDatabaseProgramName(programID),
+		ssaapi.WithProgramName(programID),
 	)
 	// defer func() {
 	// 	ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -150,7 +150,7 @@ func TestSourceFilesys(t *testing.T) {
 	programID := uuid.NewString()
 	_, err := ssaapi.ParseProject(vf,
 		ssaapi.WithLanguage(ssaapi.JAVA),
-		ssaapi.WithDatabaseProgramName(programID),
+		ssaapi.WithProgramName(programID),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -257,16 +257,16 @@ func TestProgram_ListAndDelete(t *testing.T) {
 
 	var err error
 	programID1 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithDatabaseProgramName(programID1))
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1))
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	programID2 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithDatabaseProgramName(programID2))
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2))
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	consts.SetSSADataBasePath(dbPath)
 	programID3 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithDatabaseProgramName(programID3))
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3))
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	t.Run("test source file system root path", func(t *testing.T) {

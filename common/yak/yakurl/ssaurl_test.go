@@ -80,7 +80,7 @@ func TestSFURl(t *testing.T) {
 	prog, err := ssaapi.ParseProject(vf,
 		ssaapi.WithLanguage(consts.JAVA),
 		ssaapi.WithProgramPath("example"),
-		ssaapi.WithDatabaseProgramName(progID),
+		ssaapi.WithProgramName(progID),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progID)

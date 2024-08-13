@@ -51,7 +51,10 @@ var AllLanguageBuilders = []ssa.Builder{
 
 func (c *config) parseProject() (Programs, error) {
 	if c.reCompile {
-		ssadb.DeleteProgram(ssadb.GetDB(), c.DatabaseProgramName)
+		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+	}
+	if c.databasePath != "" {
+		consts.SetSSADataBasePath(c.databasePath)
 	}
 
 	programPath := c.programPath
@@ -101,7 +104,7 @@ func (c *config) parseProject() (Programs, error) {
 	err = ssareducer.ReducerCompile(
 		programPath, // base
 		ssareducer.WithFileSystem(c.fs),
-		ssareducer.WithProgramName(c.DatabaseProgramName),
+		ssareducer.WithProgramName(c.ProgramName),
 		ssareducer.WithEntryFiles(c.entryFile...),
 		ssareducer.WithCompileMethod(func(path string, raw string) (includeFiles []string, err error) {
 			defer func() {
@@ -143,18 +146,23 @@ func (c *config) parseProject() (Programs, error) {
 	for _, program := range prog.ChildApplication {
 		progs = append(progs, NewProgram(program, c))
 	}
-	ssadb.SaveSSAProgram(c.DatabaseProgramName, "", string(c.language))
+	if c.ProgramName != "" {
+		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
+	}
 	return progs, nil
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
+	if c.databasePath != "" {
+		consts.SetSSADataBasePath(c.databasePath)
+	}
 	prog, err := c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
 	}
 	prog.Finish()
-	if prog.ChildApplication != nil && len(prog.ChildApplication) > 0 {
-		return NewProgram(prog.ChildApplication[0], c), err
+	if c.ProgramName != "" {
+		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
 	return NewProgram(prog, c), nil
 }
@@ -231,9 +239,9 @@ func (c *config) checkLanguage(path string) error {
 }
 
 func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
-	programName := c.DatabaseProgramName
+	programName := c.ProgramName
 
-	prog := ssa.NewProgram(programName, c.DatabaseProgramName != "", ssa.Application, c.fs, c.programPath)
+	prog := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, c.fs, c.programPath)
 	prog.Language = string(c.language)
 
 	prog.ProcessInfof = func(s string, v ...any) {

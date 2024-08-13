@@ -53,7 +53,7 @@ func TestReadFileWith_SSADB(t *testing.T) {
 	vf.AddFile("a/b/c.yak", code)
 	_, err := ssaapi.ParseProject(vf,
 		ssaapi.WithLanguage(ssaapi.Yak),
-		ssaapi.WithDatabaseProgramName(programName),
+		ssaapi.WithProgramName(programName),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	assert.NoError(t, err)

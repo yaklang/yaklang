@@ -55,7 +55,7 @@ func TestCheckRuleWithDatabase(t *testing.T) {
 	prog, err := ssaapi.ParseProject(
 		filesys.NewEmbedFS(sample_code),
 		ssaapi.WithLanguage(ssaapi.JAVA),
-		ssaapi.WithDatabaseProgramName(programID),
+		ssaapi.WithProgramName(programID),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -73,7 +73,7 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 		_, err := ssaapi.ParseProject(
 			filesys.NewEmbedFS(sample_code),
 			ssaapi.WithLanguage(ssaapi.JAVA),
-			ssaapi.WithDatabaseProgramName(programID),
+			ssaapi.WithProgramName(programID),
 		)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
