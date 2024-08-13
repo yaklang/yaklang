@@ -32,7 +32,7 @@ a = () => {
 register("/someRoute", a)
 `
 	progName := uuid.NewString()
-	prog, err := ssaapi.Parse(code, ssaapi.WithDatabaseProgramName(progName))
+	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(progName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ if (c > 1) {
 }
 e = a
 dump(c)
-`, ssaapi.WithDatabaseProgramName(progName))
+`, ssaapi.WithProgramName(progName))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
@@ -103,7 +103,7 @@ if (c > 1) {
 	a = 2
 }
 d = a
-`, ssaapi.WithDatabaseProgramName("a"))
+`, ssaapi.WithProgramName("a"))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), "a")
 	if err != nil {
 		panic(err)
@@ -120,7 +120,7 @@ func TestCompileWithDatabase_Big(t *testing.T) {
 include `+strconv.Quote(filename)+`
 
 c("d")
-`, ssaapi.WithDatabaseProgramName(progName))
+`, ssaapi.WithProgramName(progName))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
@@ -159,7 +159,7 @@ func TestCompileWithDatabase_MultiFile(t *testing.T) {
 include `+strconv.Quote(filename)+`
 
 c("d")
-`, ssaapi.WithDatabaseProgramName(progName))
+`, ssaapi.WithProgramName(progName))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
@@ -194,7 +194,7 @@ func TestCompileWithDatabase_SmokingTest(t *testing.T) {
 dump("HJello")
 a = i => i + 1
 dump(a(3))
-`, ssaapi.WithDatabaseProgramName(progName))
+`, ssaapi.WithProgramName(progName))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +236,7 @@ a()
 	matchAtFirst := false
 	matchAtCached := false
 	prog, err := ssaapi.Parse(
-		code, ssaapi.WithDatabaseProgramName(progName),
+		code, ssaapi.WithProgramName(progName),
 		ssaapi.WithDatabaseProgramCacheHitter(func(i any) {
 			matchAtFirst = true
 		}),
@@ -250,7 +250,7 @@ a()
 	ssaapi.ClearCache()
 	prog, err = ssaapi.Parse(
 		code,
-		ssaapi.WithDatabaseProgramName(progName),
+		ssaapi.WithProgramName(progName),
 		ssaapi.WithDatabaseProgramCacheHitter(func(i any) {
 			matchAtCached = true
 		}),

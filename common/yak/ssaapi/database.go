@@ -7,7 +7,7 @@ import (
 func (c *config) fromDatabase() (*Program, error) {
 	// get program from database
 	// packages := ssadb.GetPackageFunction()
-	prog, err := ssa.GetProgram(c.DatabaseProgramName, ssa.Application)
+	prog, err := ssa.GetProgram(c.ProgramName, ssa.Application)
 	if err != nil {
 		return nil, err
 	}

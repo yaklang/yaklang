@@ -15,7 +15,7 @@ var uploadCase1 string
 
 func TestUploadParsing(t *testing.T) {
 	name := uuid.New().String()
-	prog, err := ssaapi.Parse(uploadCase1, ssaapi.WithLanguage(ssaapi.PHP), ssaapi.WithDatabaseProgramName(name))
+	prog, err := ssaapi.Parse(uploadCase1, ssaapi.WithLanguage(ssaapi.PHP), ssaapi.WithProgramName(name))
 	if err != nil {
 		t.Fatal(err)
 	}

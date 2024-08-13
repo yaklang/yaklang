@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,11 +20,19 @@ import (
 type ProcessFunc func(msg string, process float64)
 
 type config struct {
+	// program
+	ProgramName        string
+	ProgramDescription string
+
+	// language
 	language        consts.Language
 	LanguageBuilder ssa.Builder
+
+	// other compile options
 	feedCode        bool
 	ignoreSyntaxErr bool
 	reCompile       bool
+	databasePath    string
 
 	// input, code or project path
 	originEditor *memedit.MemEditor
@@ -36,13 +45,14 @@ type config struct {
 	// process
 	process ProcessFunc
 
+	// for build
 	externLib               map[string]map[string]any
 	externValue             map[string]any
 	defineFunc              map[string]any
 	externMethod            ssa.MethodBuilder
 	externBuildValueHandler map[string]func(b *ssa.FunctionBuilder, id string, v any) (value ssa.Value)
 
-	DatabaseProgramName        string
+	// other build options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
 	// for hash
@@ -194,10 +204,26 @@ func WithFeedCode(b ...bool) Option {
 	}
 }
 
-// save to database, please set the program name
-func WithDatabaseProgramName(name string) Option {
+func WithProgramDescription(desc string) Option {
 	return func(c *config) {
-		c.DatabaseProgramName = name
+		c.ProgramDescription = desc
+	}
+}
+
+func WithDatabasePath(path string) Option {
+	return func(c *config) {
+		if absPath, err := filepath.Abs(path); err != nil {
+			log.Errorf("get abs path error: %v", err)
+		} else {
+			c.databasePath = absPath
+		}
+	}
+}
+
+// save to database, please set the program name
+func WithProgramName(name string) Option {
+	return func(c *config) {
+		c.ProgramName = name
 	}
 }
 
@@ -297,7 +323,7 @@ func FromDatabase(programName string, opts ...Option) (*Program, error) {
 	for _, opt := range opts {
 		opt(config)
 	}
-	config.DatabaseProgramName = programName
+	config.ProgramName = programName
 
 	return config.fromDatabase()
 }
@@ -306,13 +332,15 @@ var Exports = map[string]any{
 	"Parse":             Parse,
 	"ParseLocalProject": ParseProjectFromPath,
 
-	"withLanguage":            WithRawLanguage,
-	"withExternLib":           WithExternLib,
-	"withExternValue":         WithExternValue,
-	"withDatabaseProgramName": WithDatabaseProgramName,
-	"withProcess":             WithProcess,
-	"withEntryFile":           WithFileSystemEntry,
-	"withReCompile":           WithReCompile,
+	"withLanguage":     WithRawLanguage,
+	"withExternLib":    WithExternLib,
+	"withExternValue":  WithExternValue,
+	"withProgramName":  WithProgramName,
+	"withDatabasePath": WithDatabasePath,
+	"withDescription":  WithProgramDescription,
+	"withProcess":      WithProcess,
+	"withEntryFile":    WithFileSystemEntry,
+	"withReCompile":    WithReCompile,
 	// "": with,
 	// language:
 	"Javascript": JS,
