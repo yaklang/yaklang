@@ -218,7 +218,7 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *
 			return
 		case host, ok := <-res:
 			if !ok {
-				log.Infof("ping result channel closed")
+				log.Debugf("ping result channel closed")
 				return
 			}
 			// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
@@ -392,7 +392,6 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 }
 
 func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
-	log.Info("start send packet")
 	for {
 		select {
 		case <-ctx.Done():
