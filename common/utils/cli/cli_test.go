@@ -156,6 +156,25 @@ func TestCliParam(t *testing.T) {
 }
 
 func TestCliParamOpt(t *testing.T) {
+	t.Run("opt-shortName", func(t *testing.T) {
+		test := assert.New(t)
+		app := NewCliApp()
+		token := utils.RandStringBytes(16)
+		app.SetArgs([]string{"-t", token})
+		s := app.String("text", app.SetShortName("t"))
+		test.Equal(s, token)
+	})
+	t.Run("opt-easy-shortName", func(t *testing.T) {
+		test := assert.New(t)
+		app := NewCliApp()
+		token := utils.RandStringBytes(16)
+		app.SetArgs([]string{"-t", token})
+		testcases := []string{"test t", "t test", "test,t", "t,test"}
+		for _, testcase := range testcases {
+			s := app.String(testcase)
+			test.Equal(s, token)
+		}
+	})
 	t.Run("opt-default", func(t *testing.T) {
 		test := assert.New(t)
 		app := NewCliApp()
