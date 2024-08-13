@@ -124,7 +124,6 @@ func (c *config) parseProject() (Programs, error) {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
-			// ret = append(ret, prog)
 			exclude := prog.GetIncludeFiles()
 			if len(exclude) > 0 {
 				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
@@ -144,6 +143,7 @@ func (c *config) parseProject() (Programs, error) {
 	for _, program := range prog.ChildApplication {
 		progs = append(progs, NewProgram(program, c))
 	}
+	ssadb.SaveSSAProgram(c.DatabaseProgramName, "", string(c.language))
 	return progs, nil
 }
 

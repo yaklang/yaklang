@@ -1,11 +1,14 @@
 package ssadb
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -40,6 +43,13 @@ func (fs *irSourceFS) addFile(source *IrSource) {
 }
 
 func (fs *irSourceFS) loadFile(fullPath string) error {
+	if fullPath == "/" {
+		for _, program := range AllSSAPrograms() {
+			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
+		}
+		return nil
+	}
+
 	path, name := fs.PathSplit(fullPath)
 	if name == "" {
 		fs.loadFolder(path)
@@ -125,6 +135,33 @@ func (fs *irSourceFS) PathSplit(p string) (string, string) {
 	return dir, name
 }
 
+func (fs *irSourceFS) getProgram(path string) (string, bool) {
+	dir := strings.Split(path, string(fs.GetSeparators()))
+	return dir[1], len(dir) == 2
+}
+
+func (f *irSourceFS) Delete(path string) error {
+	// if root path ? get program Name
+	programName, programRoot := f.getProgram(path)
+	if !programRoot {
+		return utils.Errorf("path [%v] is not a program root path, can't delete", path)
+	}
+	prog := GetSSAProgram(programName)
+	if prog == nil {
+		return utils.Errorf("program [%v] not exist", programName)
+	}
+	// switch db path
+	origin := consts.GetSSADataBasePath()
+	if origin != prog.DBPath {
+		consts.SetSSADataBasePath(prog.DBPath)
+	}
+
+	// delete program
+	DeleteProgram(GetDB(), programName)
+
+	return utils.Error("implement me")
+}
+
 func (fs *irSourceFS) Ext(string) string {
 	return ""
 }
@@ -142,5 +179,4 @@ func (f *irSourceFS) Exists(path string) (bool, error) {
 func (f *irSourceFS) Rename(string, string) error                 { return utils.Error("implement me") }
 func (f *irSourceFS) Rel(string, string) (string, error)          { return "", utils.Error("implement me") }
 func (f *irSourceFS) WriteFile(string, []byte, os.FileMode) error { return utils.Error("implement me") }
-func (f *irSourceFS) Delete(string) error                         { return utils.Error("implement me") }
 func (f *irSourceFS) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
