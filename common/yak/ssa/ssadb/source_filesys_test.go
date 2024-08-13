@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yakurl"
 )
 
 func TestSourceFilesysLocal(t *testing.T) {
@@ -289,5 +290,37 @@ func TestProgram_ListAndDelete(t *testing.T) {
 		assert.Contains(t, dir, programID3)
 	})
 
+	t.Run("program list and extra info  ", func(t *testing.T) {
+		res, err := yakurl.LoadGetResource("ssadb:///?op=list")
+		assert.NoErrorf(t, err, "load resource error: %v", err)
+		// log.Infof("res: %v", res)
+		match := map[string]bool{
+			fmt.Sprintf("/%s", programID1): false,
+			fmt.Sprintf("/%s", programID2): false,
+			fmt.Sprintf("/%s", programID3): false,
+		}
+		for _, res := range res.Resources {
+			if _, ok := match[res.Path]; ok {
+				log.Infof("res: %v", res.Path)
+				matchExtra := false
+				for _, info := range res.Extra {
+					if info.Key == "Language" {
+						if info.Value == string(ssaapi.JAVA) {
+							matchExtra = true
+						}
+					}
+					log.Infof("extra: %v", info)
+				}
+				if !matchExtra {
+					t.Fatalf("not found Language")
+				}
+				match[res.Path] = true
+			}
+		}
+
+		for k, v := range match {
+			assert.Truef(t, v, "not found: %v", k)
+		}
+	})
 
 }

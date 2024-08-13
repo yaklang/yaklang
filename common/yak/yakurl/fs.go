@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -58,6 +59,14 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 		Key:   "Directory-Name",
 		Value: utils.EscapeInvalidUTF8Byte([]byte(dirName)),
 	})
+	if m := fs.ExtraInfo(currentPath); m != nil {
+		for k, v := range m {
+			src.Extra = append(src.Extra, &ypb.KVPair{
+				Key:   k,
+				Value: codec.AnyToString(v),
+			})
+		}
+	}
 	if !info.IsDir() && strings.ToLower(query.Get("detectPlainText")) == "true" {
 		// read first 514 bytes to check if it is a plain text file
 		fh, err := fs.Open(currentPath)

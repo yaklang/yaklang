@@ -36,6 +36,7 @@ type FileSystem interface {
 	WriteFile(string, []byte, os.FileMode) error
 	Delete(string) error
 	MkdirAll(string, os.FileMode) error
+	ExtraInfo(string) map[string]any
 }
 
 type TrashFS interface {
