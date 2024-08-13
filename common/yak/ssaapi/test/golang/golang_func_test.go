@@ -56,19 +56,20 @@ func Test_Cross_Function(t *testing.T) {
 	})
 }
 
-/*
+
 func Test_Function_Global(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		ssatest.Check(t, `package main
 		var a = 1
 
 		func main(){
+			b := a
 		}
-		`, ssatest.CheckTopDef_Equal("a", []string{"1"}),
+		`, ssatest.CheckTopDef_Equal("b", []string{"1"}),
 		ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
-}*/
+}
 
 func Test_Closure(t *testing.T) {
 	t.Run("freevalue", func(t *testing.T) {

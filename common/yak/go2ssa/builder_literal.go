@@ -14,7 +14,7 @@ import (
 func (b* astbuilder) buildBoolLiteral(name string) (ssa.Value) {
 	boolLit, err := strconv.ParseBool(name)
 	if err != nil {
-		b.NewError(ssa.Error, TAG, "Unhandled bool literal")
+		b.NewError(ssa.Error, TAG, UnhandledBool())
 	}
 	return b.EmitConstInst(boolLit)
 }
@@ -34,7 +34,9 @@ func (b *astbuilder) buildLiteral(exp* gol.LiteralContext) (ssa.Value) {
 	if lit := exp.FunctionLit(); lit != nil {
 	    return b.buildFunctionLit(lit.(*gol.FunctionLitContext))
 	}
-	return nil
+
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.EmitConstInst(0)
 }
 
 func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) (ssa.Value) {
@@ -117,8 +119,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 	if lenv != nil {
 	    maxlen , _ := strconv.ParseInt(lenv.String(), 10, 64)
 		if int(maxlen) < len(values) {
-		    b.NewError(ssa.Error, TAG, fmt.Sprintf("index %d is out of bounds (>= %d)", int(maxlen),len(values)))
-			return nil
+		    b.NewError(ssa.Error, TAG, OutofBounds(int(maxlen),len(values)))
+			return b.EmitConstInst(0)
 		}
 	}
 
@@ -167,7 +169,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 		return obj
 	}
 
-	return nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.EmitConstInst(0)
 }
 
 func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bool) ([]ssa.Value,[]ssa.Value) {
@@ -238,7 +241,8 @@ func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) ([]ssa.Value,[
 	    return b.buildLiteralValue(e.(*gol.LiteralValueContext), iscreate)
 	}
 
-	return nil,nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return []ssa.Value{b.EmitConstInst(0)},[]ssa.Value{b.EmitConstInst(0)}
 }
 
 func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa.Value,[]ssa.Value) {
@@ -254,7 +258,8 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa
 	    return b.buildLiteralValue(e.(*gol.LiteralValueContext), iscreate)
 	}
 
-	return nil,nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return []ssa.Value{b.EmitConstInst(0)},[]ssa.Value{b.EmitConstInst(0)}
 }
 
 func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
@@ -306,7 +311,8 @@ func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ss
 		return b.buildStructTypeLiteral(s),nil
 	}
 
-	return nil,nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return ssa.CreateAnyType(),b.EmitConstInst(0)
 }
 
 
@@ -371,7 +377,8 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value)
 		}
 	}
 
-	return nil,nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return ssa.CreateAnyType(),b.EmitConstInst(0)
 }
 
 func (b* astbuilder) buildFunctionTypeLiteral(stmt *gol.FunctionTypeContext) (ssa.Type) {
@@ -383,7 +390,8 @@ func (b* astbuilder) buildFunctionTypeLiteral(stmt *gol.FunctionTypeContext) (ss
 		return ssa.NewFunctionType("", paramt, rett, false)
 	}
 
-	return nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return ssa.CreateAnyType()
 }
 
 func (b* astbuilder) buildInterfaceTypeLiteral(stmt *gol.InterfaceTypeContext) ssa.Type {
@@ -421,7 +429,8 @@ func (b* astbuilder) buildChanTypeLiteral(stmt *gol.ChannelTypeContext) ssa.Type
 		}
 	}
 
-	return nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return ssa.CreateAnyType()
 }
 
 func (b *astbuilder) buildMapTypeLiteral(stmt *gol.MapTypeContext) ssa.Type {
@@ -442,21 +451,24 @@ func (b *astbuilder) buildMapTypeLiteral(stmt *gol.MapTypeContext) ssa.Type {
 		return ssa.NewMapType(keyTyp, valueTyp)
 	}
 
-    return nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return ssa.CreateAnyType()
 }
 
 func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+
+	var ssatyp ssa.Type
 	if stmt.GetText() == "[]byte" || stmt.GetText() == "[]uint8" {
 		return ssa.BasicTypes[ssa.BytesTypeKind]
 	}
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
-			return ssa.NewSliceType(eleTyp)
+			ssatyp = ssa.NewSliceType(eleTyp)
 		}
 	}
-	return nil
+	return ssatyp
 }
 
 
@@ -477,7 +489,8 @@ func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) (ssa.Type
 			return ssa.NewSliceType(eleTyp),value
 		}
 	}
-	return nil,nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return ssa.CreateAnyType(), b.EmitConstInst(0)
 }
 
 
@@ -540,7 +553,8 @@ func (b *astbuilder) buildBasicLit(exp *gol.BasicLitContext) (ssa.Value) {
 	    return b.buildCharLiteral(lit.(*gol.Char_Context))
 	}
 
-	return nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.EmitConstInst(0)
 }
 
 func (b *astbuilder) buildStringLiteral(stmt *gol.String_Context) ssa.Value {
@@ -553,18 +567,19 @@ func (b *astbuilder) buildStringLiteral(stmt *gol.String_Context) ssa.Value {
 	case '"':
 		val, err := strconv.Unquote(text)
 		if err != nil {
-			b.NewError(ssa.Error, TAG, fmt.Sprintf("cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error()))
+			b.NewError(ssa.Error, TAG, CannotParseString(stmt.GetText(),err.Error()))
 		}
 		return b.EmitConstInstWithUnary(val, 0)
 	case '`':
 		val, err := strconv.Unquote(text)
 		if err != nil {
-			b.NewError(ssa.Error, TAG, fmt.Sprintf("cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error()))
+			b.NewError(ssa.Error, TAG,  CannotParseString(stmt.GetText(),err.Error()))
 		}
 		return b.EmitConstInstWithUnary(val, 0)
 	}
 
-	return nil
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.EmitConstInst(0)
 }
 
 func (b *astbuilder) buildCharLiteral(stmt *gol.Char_Context) ssa.Value {
@@ -581,7 +596,7 @@ func (b *astbuilder) buildCharLiteral(stmt *gol.Char_Context) ssa.Value {
 		s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
 		if err != nil {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("unquote error %s", err))
-			return nil
+			return b.EmitConstInst(0)
 		}
 	}
 	runeChar := []rune(s)[0]
@@ -621,12 +636,12 @@ func (b *astbuilder) buildIntegerLiteral(stmt *gol.IntegerContext) ssa.Value {
 			resultInt64, err = strconv.ParseInt(intStr[2:], 8, 64)
 		} else {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("cannot parse num for literal: %s", stmt.GetText()))
-			return nil
+			return b.EmitConstInst(0)
 		}
 
 		if err != nil {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("const parse %s as integer literal... is to large for int64: %v", originStr, err))
-			return nil
+			return b.EmitConstInst(0)
 		}
 
 		if resultInt64 > math.MaxInt {

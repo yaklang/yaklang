@@ -140,7 +140,7 @@ func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
 		re := b.buildPackageName(n.(*gol.PackageNameContext))
 		return []string{re}
 	}
-	return nil
+	return []string{""}
 }
 
 func (b *astbuilder) buildPackageName(packageName *gol.PackageNameContext) string {
@@ -273,7 +273,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				recoverRange := b.SetRangeFromTerminalNode(value)
 				id := value.GetText()
 				if b.GetFromCmap(id) {
-					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
+					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
 				b.AddGlobalVariable(id, b.EmitConstInst(0))
 				recoverRange()
@@ -283,7 +283,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 			for _, value := range leftList {
 				if b.GetFromCmap(value.GetText()) {
-					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
+					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
 			}
 			for i, value := range rightList {
@@ -300,7 +300,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				recoverRange := b.SetRangeFromTerminalNode(value)
 				id := value.GetText()
 				if b.GetFromCmap(id) {
-					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
+					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
 
 				leftv := b.CreateLocalVariable(id)
@@ -313,7 +313,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 			for _, value := range leftList {
 				if b.GetFromCmap(value.GetText()) {
-					b.NewError(ssa.Warn, TAG, "cannot assign to const value")
+					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
 
 				leftv := b.CreateLocalVariable(value.GetText())
@@ -667,11 +667,12 @@ func (b *astbuilder) buildMethodDeclFinish(fun *gol.MethodDeclContext, newFunc *
 func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	var ssatyp []ssa.Type
 
 	if parameters := stmt.Parameters(); parameters != nil {
-		return b.buildReceiverParameter(parameters.(*gol.ParametersContext))
+		ssatyp = b.buildReceiverParameter(parameters.(*gol.ParametersContext))
 	}
-	return nil
+	return ssatyp
 }
 
 func (b *astbuilder) buildReceiverParameter(parms *gol.ParametersContext) []ssa.Type {
@@ -741,6 +742,7 @@ func (b *astbuilder) buildParameters(parms *gol.ParametersContext) []ssa.Type {
 		}
 	} else {
 		b.NewError(ssa.Error, TAG, ArrowFunctionNeedExpressionOrBlock())
+		paramt = append(paramt, ssa.CreateAnyType())
 	}
 
 	return paramt
@@ -852,6 +854,8 @@ func (b *astbuilder) buildResultParameters(parms *gol.ParametersContext) ([]ssa.
 		}
 	} else {
 		b.NewError(ssa.Error, TAG, ArrowFunctionNeedExpressionOrBlock())
+		key = append(key, b.EmitConstInst(0))
+		field = append(field, ssa.CreateAnyType())
 	}
 
 	return key, field
@@ -1044,16 +1048,16 @@ func (b *astbuilder) buildDeferGoExpression(stmt *gol.ExpressionContext) ssa.Val
 	defer recoverRange()
 
 	var rv ssa.Value
+	var args []ssa.Value
 	if p := stmt.PrimaryExpr(); p != nil {
 		if p := p.(*gol.PrimaryExprContext).PrimaryExpr(); p != nil {
 			rv, _ = b.buildPrimaryExpression(p.(*gol.PrimaryExprContext), false)
 		}
 		if a := p.(*gol.PrimaryExprContext).Arguments(); a != nil {
-			args := b.buildArgumentsExpression(a.(*gol.ArgumentsContext))
-			return b.NewCall(rv, args)
+			args = b.buildArgumentsExpression(a.(*gol.ArgumentsContext))
 		}
 	}
-	return nil
+	return b.NewCall(rv, args)
 }
 
 func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
@@ -1073,6 +1077,7 @@ func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
 			return
 		}
 	*/
+	b.NewError(ssa.Error, TAG, ToDo())
 }
 
 func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
@@ -1195,8 +1200,8 @@ func (b *astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
 	// TODO handler "<-"
 	_ = channv
 	_ = datav
-
-	return nil
+	b.NewError(ssa.Error, TAG, ToDo())
+	return []ssa.Value{b.EmitConstInst(0)}
 }
 
 func (b *astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
@@ -1549,31 +1554,31 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 }
 
 func (b *astbuilder) buildSimpleStmt(stmt *gol.SimpleStmtContext) []ssa.Value {
-
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	var rightv []ssa.Value
 
 	if s, ok := stmt.ExpressionStmt().(*gol.ExpressionStmtContext); ok {
-		return b.buildExpressionStmt(s)
+		rightv = b.buildExpressionStmt(s)
 	}
 
 	if s, ok := stmt.ShortVarDecl().(*gol.ShortVarDeclContext); ok {
-		return b.buildShortVarDecl(s)
+		rightv = b.buildShortVarDecl(s)
 	}
 
 	if s, ok := stmt.Assignment().(*gol.AssignmentContext); ok {
-		return b.buildAssignment(s)
+		rightv = b.buildAssignment(s)
 	}
 
 	if s, ok := stmt.IncDecStmt().(*gol.IncDecStmtContext); ok {
-		return b.buildIncDecStmt(s)
+		rightv = b.buildIncDecStmt(s)
 	}
 
 	if s, ok := stmt.SendStmt().(*gol.SendStmtContext); ok {
-		return b.buildSendStmt(s)
+		rightv = b.buildSendStmt(s)
 	}
 
-	return nil
+	return rightv
 }
 
 func (b *astbuilder) buildIncDecStmt(stmt *gol.IncDecStmtContext) []ssa.Value {
@@ -1590,8 +1595,6 @@ func (b *astbuilder) buildIncDecStmt(stmt *gol.IncDecStmtContext) []ssa.Value {
 			value := b.EmitBinOp(ssa.OpSub, b.ReadValueByVariable(leftv), b.EmitConstInst(1))
 			b.AssignVariable(leftv, value)
 			values = []ssa.Value{value}
-		} else {
-			return nil
 		}
 	}
 
@@ -1607,7 +1610,7 @@ func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Valu
 
 	for _, value := range leftList {
 		if b.GetFromCmap(value.GetText()) {
-			b.NewError(ssa.Warn, TAG, "cannot assign to const value")
+			b.NewError(ssa.Error, TAG, CannotAssign())
 		}
 		leftv := b.CreateLocalVariable(value.GetText())
 		leftvl = append(leftvl, leftv)
@@ -1735,6 +1738,7 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 			}
 			if ssatyp == nil {
 			    b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
+				ssatyp = ssa.CreateAnyType()
 			}
 		}
 	}
@@ -1749,14 +1753,14 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 func (b *astbuilder) buildTypeElement(stmt *gol.TypeElementContext) ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	var ssatyp ssa.Type
 
 	for _, typt := range stmt.AllTypeTerm() {
 		if typ := typt.(*gol.TypeTermContext).Type_(); typ != nil {
-			ssatyp := b.buildType(typ.(*gol.Type_Context))
-			return ssatyp
+			ssatyp = b.buildType(typ.(*gol.Type_Context))
 		}
 	}
-	return nil
+	return ssatyp
 }
 
 func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *ssa.InterfaceType) {

@@ -12,16 +12,13 @@ type getSingleExpr interface {
 }
 
 func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (ssa.Value, *ssa.Variable) {
-	if exp == nil {
-		return nil, nil
-	}
-
 	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.Expression(i); s != nil {
 			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext),IslValue)
 			return rightv
 		} else {
-			return nil
+			b.NewError(ssa.Error, TAG, "can't get expression")
+			return b.EmitConstInst(0)
 		}
 	}
 
@@ -57,8 +54,8 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 	
 			op1 := getValue(exp, 0)
 			if op1 == nil {
-				b.NewError(ssa.Error, TAG, "in operator need two expression")
-				return nil, nil
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			if ssaop == "" {
 				return op1, nil
@@ -84,8 +81,8 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 			op1 := getValue(exp, 0)
 			op2 := getValue(exp, 1)
 			if op1 == nil || op2 == nil {
-				b.NewError(ssa.Error, TAG, "in operator need two expression")
-				return nil, nil
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2),nil
 		}
@@ -114,8 +111,8 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 			op1 := getValue(exp, 0)
 			op2 := getValue(exp, 1)
 			if op1 == nil || op2 == nil {
-				b.NewError(ssa.Error, TAG, "in operator need two expression")
-				return nil, nil
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2),nil
 		}
@@ -142,8 +139,8 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 			op1 := getValue(exp, 0)
 			op2 := getValue(exp, 1)
 			if op1 == nil || op2 == nil {
-				b.NewError(ssa.Error, TAG, "in operator need two expression")
-				return nil, nil
+				b.NewError(ssa.Error, TAG, NeedTwoExpression())
+				return b.EmitConstInst(0), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2),nil
 		}
@@ -151,7 +148,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 
 	}
 
-	return nil, nil
+	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
 func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue bool) (ssa.Value, *ssa.Variable) {
@@ -159,59 +156,57 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue
 		return b.buildOperandExpression(ret.(*gol.OperandContext), IslValue)
 	}
 
+	var leftv *ssa.Variable = nil
+	var rightv ssa.Value = nil
+
 	if IslValue {
 		rv,_ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext),false)
 		
 		if ret := exp.Index(); ret != nil {
 		    index := b.buildIndexExpression(ret.(*gol.IndexContext))
-			return nil, b.CreateMemberCallVariable(rv, index)
+			leftv = b.CreateMemberCallVariable(rv, index)
 		}
 
 		if ret := exp.DOT(); ret != nil {
 			if id := exp.IDENTIFIER(); id != nil {
-				return nil, b.CreateMemberCallVariable(rv, b.EmitConstInst(id.GetText()))
+				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(id.GetText()))
 			}
 		}
-	}
-
-	if !IslValue {
+	} else {
 		rv,_ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext),false)
 		if ret := exp.Arguments(); ret != nil {
 			args := b.buildArgumentsExpression(ret.(*gol.ArgumentsContext))
-			return b.EmitCall(b.NewCall(rv, args)),nil
+			rightv = b.EmitCall(b.NewCall(rv, args))
 		}
 
 		if ret := exp.Index(); ret != nil {
 		    index := b.buildIndexExpression(ret.(*gol.IndexContext))
-			return b.ReadMemberCallVariable(rv, index), nil
+			rightv = b.ReadMemberCallVariable(rv, index)
 		}
 
 		if ret := exp.Slice_(); ret != nil {
 		    values := b.buildSliceExpression(ret.(*gol.Slice_Context))
-			return b.EmitMakeSlice(rv, values[0], values[1], values[2]), nil
+			rightv = b.EmitMakeSlice(rv, values[0], values[1], values[2])
 		}
 
 		if ret := exp.DOT(); ret != nil {
-			if id := exp.IDENTIFIER(); id != nil {
-				test := id.GetText()
-				if _,ok := rv.(*ssa.TypeValue); ok {
-					t := rv.GetType().(*ssa.ObjectType)
-					funcs := b.GetExtendFuncs(t.Name)
-					if fun := funcs[test]; fun != nil {
-						return fun, nil
-					}
-					nfunc := b.NewFunc(test)
-					nfunc.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()} , ssa.CreateAnyType(), false))
-					return nfunc, nil
-				}else{
-					member :=  b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
-					return member, nil
+			id := exp.IDENTIFIER()
+			test := id.GetText()
+			if _,ok := rv.(*ssa.TypeValue); ok {
+				t := rv.GetType().(*ssa.ObjectType)
+				funcs := b.GetExtendFuncs(t.Name)
+				if fun := funcs[test]; fun != nil {
+					return fun, nil
 				}
+				b.NewError(ssa.Warn, TAG, "function not found, but create")
+				rightv := b.NewFunc(test)
+				rightv.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()} , ssa.CreateAnyType(), false))
+			}else{
+				rightv = b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
 			}
 		}
 	}
-
-	return nil, nil
+	return rightv, leftv
 }
 
 func (b *astbuilder) buildSliceExpression(exp *gol.Slice_Context) ([3]ssa.Value) {
@@ -234,11 +229,11 @@ func (b *astbuilder) buildSliceExpression(exp *gol.Slice_Context) ([3]ssa.Value)
 }
 
 func (b *astbuilder) buildIndexExpression(arg *gol.IndexContext) (ssa.Value) {
+	var rv ssa.Value
 	if exp := arg.Expression(); exp != nil {
-		rv, _ := b.buildExpression(exp.(*gol.ExpressionContext), false)
-		return rv
+		rv, _ = b.buildExpression(exp.(*gol.ExpressionContext), false)
 	}
-	return nil
+	return rv
 }
 
 func (b *astbuilder) buildArgumentsExpression(arg *gol.ArgumentsContext) ([]ssa.Value) {
@@ -260,33 +255,35 @@ func (b *astbuilder) buildArgumentsExpression(arg *gol.ArgumentsContext) ([]ssa.
 }
 
 func (b *astbuilder) buildExpressionStmt(stmt *gol.ExpressionStmtContext) []ssa.Value {
-    if exp := stmt.Expression(); exp != nil {
-        rightv,_ := b.buildExpression(exp.(*gol.ExpressionContext),false)
-		return []ssa.Value{rightv}
+    var rightv ssa.Value
+	if exp := stmt.Expression(); exp != nil {
+        rightv,_ = b.buildExpression(exp.(*gol.ExpressionContext),false)
     }
-	return nil
+	return []ssa.Value{rightv}
 }
 
 func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
+	var rightv ssa.Value
+	var leftv *ssa.Variable
 
 	if !IslValue { // right
 		if literal := exp.Literal(); literal != nil {
-			return b.buildLiteral(literal.(*gol.LiteralContext)), nil
+			rightv = b.buildLiteral(literal.(*gol.LiteralContext))
 		}
 		if id := exp.OperandName(); id != nil {
-			return b.buildOperandNameR(id.(*gol.OperandNameContext)), nil
+			rightv = b.buildOperandNameR(id.(*gol.OperandNameContext))
 		}
 		if e := exp.Expression(); e != nil {
 			return b.buildExpression(e.(*gol.ExpressionContext), false)
 		}
 	} else { // left
 		if id := exp.OperandName(); id != nil {
-			return nil, b.buildOperandNameL(id.(*gol.OperandNameContext), false)
+			leftv = b.buildOperandNameL(id.(*gol.OperandNameContext), false)
 		}
 	}
-	return nil, nil
+	return rightv, leftv
 }
 
 func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal bool) *ssa.Variable {
@@ -307,7 +304,9 @@ func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal boo
 			return b.CreateVariable(text)
 		}
 	}
-	return nil
+
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.CreateVariable("")
 }
 
 func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
@@ -344,5 +343,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 		}
 		return v
 	}
-	return nil
+
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.EmitConstInst(0)
 }
