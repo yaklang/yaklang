@@ -33,9 +33,9 @@ var SSACompilerCommands = []*cli.Command{
 		Action: func(c *cli.Context) {
 			for _, name := range c.Args() {
 				if name == "*" {
-					for _, i := range ssadb.AllPrograms(ssadb.GetDB()) {
-						log.Infof("Start to delete program: %v", i)
-						ssadb.DeleteProgram(ssadb.GetDB(), i)
+					for _, name := range ssadb.AllPrograms(ssadb.GetDB()) {
+						log.Infof("Start to delete program: %v", name)
+						ssadb.DeleteProgram(ssadb.GetDB(), name)
 					}
 					break
 				}

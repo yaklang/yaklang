@@ -25,7 +25,7 @@ description := cli.Text("description",
     cli.setRequired(false)
 )
 
-dbPath := cli.FileNames("dbPath", 
+dbPaths := cli.FileNames("dbPath", 
     cli.setVerboseName("数据库路径"),
     cli.setRequired(false),
 )
@@ -57,6 +57,7 @@ opts = [
     ssa.withReCompile(reCompile), 
     ssa.withDescription(description),
     ssa.withDatabasePath(dbPath),
+    ssa.withSaveToProfile(true),
 ] 
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))

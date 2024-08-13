@@ -55,6 +55,7 @@ type config struct {
 	// other build options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
+	SaveToProfile              bool
 	// for hash
 	externInfo string
 }
@@ -70,6 +71,7 @@ func defaultConfig() *config {
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),
 		defineFunc:                 make(map[string]any),
+		SaveToProfile:              false,
 		DatabaseProgramCacheHitter: func(any) {},
 	}
 }
@@ -212,6 +214,9 @@ func WithProgramDescription(desc string) Option {
 
 func WithDatabasePath(path string) Option {
 	return func(c *config) {
+		if utils.GetFirstExistedFile(path) == "" {
+			return
+		}
 		if absPath, err := filepath.Abs(path); err != nil {
 			log.Errorf("get abs path error: %v", err)
 		} else {
@@ -230,6 +235,16 @@ func WithProgramName(name string) Option {
 func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 	return func(c *config) {
 		c.DatabaseProgramCacheHitter = h
+	}
+}
+
+func WithSaveToProfile(b ...bool) Option {
+	return func(c *config) {
+		if len(b) > 0 {
+			c.SaveToProfile = b[0]
+		} else {
+			c.SaveToProfile = true
+		}
 	}
 }
 
@@ -332,15 +347,16 @@ var Exports = map[string]any{
 	"Parse":             Parse,
 	"ParseLocalProject": ParseProjectFromPath,
 
-	"withLanguage":     WithRawLanguage,
-	"withExternLib":    WithExternLib,
-	"withExternValue":  WithExternValue,
-	"withProgramName":  WithProgramName,
-	"withDatabasePath": WithDatabasePath,
-	"withDescription":  WithProgramDescription,
-	"withProcess":      WithProcess,
-	"withEntryFile":    WithFileSystemEntry,
-	"withReCompile":    WithReCompile,
+	"withLanguage":      WithRawLanguage,
+	"withExternLib":     WithExternLib,
+	"withExternValue":   WithExternValue,
+	"withProgramName":   WithProgramName,
+	"withDatabasePath":  WithDatabasePath,
+	"withDescription":   WithProgramDescription,
+	"withProcess":       WithProcess,
+	"withEntryFile":     WithFileSystemEntry,
+	"withReCompile":     WithReCompile,
+	"withSaveToProfile": WithSaveToProfile,
 	// "": with,
 	// language:
 	"Javascript": JS,

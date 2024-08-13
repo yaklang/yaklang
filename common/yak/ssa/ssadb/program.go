@@ -62,6 +62,7 @@ func GetLibrary(name, version string) (*IrProgram, error) {
 }
 
 func GetProgram(name, kind string) (*IrProgram, error) {
+
 	var p IrProgram
 	db := GetDB().Model(&IrProgram{})
 	if name == "" {
@@ -76,17 +77,7 @@ func GetProgram(name, kind string) (*IrProgram, error) {
 	}
 	return &p, nil
 }
-func GetPrograms(name string) ([]*IrProgram, error) {
-	var p []*IrProgram
-	db := GetDB().Model(&IrProgram{})
-	if name == "" {
-		return nil, utils.Errorf("program name is empty")
-	}
-	if find := db.Where("program_name in (?)", name).Find(p); find.Error != nil {
-		return nil, find.Error
-	}
-	return p, nil
-}
+
 func UpdateProgram(prog *IrProgram) {
 	GetDB().Model(&IrProgram{}).
 		Where("id = ?", prog.ID).

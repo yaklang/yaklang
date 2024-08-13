@@ -49,6 +49,8 @@ func (fs *irSourceFS) loadFile(fullPath string) error {
 		}
 		return nil
 	}
+	programName, _ := fs.getProgram(fullPath)
+	CheckAndSwitchDB(programName)
 
 	path, name := fs.PathSplit(fullPath)
 	if name == "" {
@@ -65,6 +67,9 @@ func (fs *irSourceFS) loadFile(fullPath string) error {
 }
 
 func (fs *irSourceFS) loadFolder(path string) error {
+	programName, _ := fs.getProgram(path)
+	CheckAndSwitchDB(programName)
+
 	// just folder
 	sources, err := GetIrSourceByPath(path)
 	if err != nil {
@@ -176,8 +181,10 @@ func (f *irSourceFS) Delete(path string) error {
 
 	// delete program
 	DeleteProgram(GetDB(), programName)
+	DeleteSSAProgram(programName)
+	f.virtual.Delete(path)
 
-	return utils.Error("implement me")
+	return nil
 }
 
 func (fs *irSourceFS) Ext(string) string {
@@ -191,7 +198,7 @@ func (f *irSourceFS) IsAbs(name string) bool {
 }
 func (f *irSourceFS) Getwd() (string, error) { return "", nil }
 func (f *irSourceFS) Exists(path string) (bool, error) {
-	_, err := f.Open(path)
+	_, err := f.Stat(path)
 	return err == nil, err
 }
 func (f *irSourceFS) Rename(string, string) error                 { return utils.Error("implement me") }
