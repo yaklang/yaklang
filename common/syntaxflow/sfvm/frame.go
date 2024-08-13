@@ -229,6 +229,8 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			}
 
 			results := i.iter.results
+			i.iter.results = nil
+			i.iter._counter = 0
 			if len(results) == 0 {
 				return utils.Errorf("iter results is empty")
 			}
