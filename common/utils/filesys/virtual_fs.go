@@ -148,8 +148,9 @@ func (f *VirtualFS) RemoveFileOrDir(name string) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := vf.files[filename]; ok {
+	if f, ok := vf.files[filename]; ok {
 		delete(vf.files, filename)
+		vf.dirEntry = utils.RemoveSliceItem(vf.dirEntry, fs.DirEntry(f.info))
 		return nil
 	}
 	return fmt.Errorf("file [%v] not exist", name)

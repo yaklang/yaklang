@@ -1,6 +1,7 @@
 package ssadb_test
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -14,7 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/yakurl"
+	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestSourceFilesysLocal(t *testing.T) {
@@ -74,8 +76,12 @@ func TestSourceFilesysLocal(t *testing.T) {
 	_, err = ssaapi.ParseProjectFromPath(dir,
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProgramName(programID),
+		ssaapi.WithSaveToProfile(),
 	)
-	defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		ssadb.DeleteSSAProgram(programID)
+	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 	dirs := make([]string, 0)
 	file := make([]string, 0)
@@ -149,9 +155,11 @@ func TestSourceFilesys(t *testing.T) {
 	_, err := ssaapi.ParseProject(vf,
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProgramName(programID),
+		ssaapi.WithSaveToProfile(),
 	)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		ssadb.DeleteSSAProgram(programID)
 	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 	dir := make([]string, 0)
@@ -255,19 +263,31 @@ func TestProgram_ListAndDelete(t *testing.T) {
 
 	var err error
 	programID1 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1))
-	defer ssadb.DeleteProgram(ssadb.GetDB(), programID1)
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1), ssaapi.WithSaveToProfile())
+	defer func() {
+		ssadb.CheckAndSwitchDB(programID1)
+		ssadb.DeleteProgram(ssadb.GetDB(), programID1)
+		ssadb.DeleteSSAProgram(programID1)
+	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	programID2 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2))
-	defer ssadb.DeleteProgram(ssadb.GetDB(), programID2)
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2), ssaapi.WithSaveToProfile())
+	defer func() {
+		ssadb.CheckAndSwitchDB(programID2)
+		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
+		ssadb.DeleteSSAProgram(programID2)
+	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	consts.SetSSADataBasePath(dbPath)
 	programID3 := uuid.NewString()
-	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3))
-	defer ssadb.DeleteProgram(ssadb.GetDB(), programID3)
+	_, err = ssaapi.ParseProject(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID3), ssaapi.WithSaveToProfile())
+	defer func() {
+		ssadb.CheckAndSwitchDB(programID3)
+		ssadb.DeleteProgram(ssadb.GetDB(), programID3)
+		ssadb.DeleteSSAProgram(programID3)
+	}()
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	t.Run("test source file system root path", func(t *testing.T) {
@@ -279,7 +299,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
 				log.Infof("dir: %v", s)
 				paths := strings.Split(s, string(ssafs.GetSeparators()))
-				if len(paths) == 2 && paths[1] != "" {
+				if len(paths) <= 3 && paths[1] != "" {
 					dir = append(dir, paths[1])
 					return filesys.SkipDir
 				}
@@ -291,8 +311,23 @@ func TestProgram_ListAndDelete(t *testing.T) {
 		assert.Contains(t, dir, programID3)
 	})
 
+	local, err := yakgrpc.NewLocalClient()
+	assert.NoError(t, err)
+
 	t.Run("program list and extra info  ", func(t *testing.T) {
-		res, err := yakurl.LoadGetResource("ssadb:///?op=list")
+		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssadb",
+				Path:   "/",
+				Query: []*ypb.KVPair{
+					{
+						Key:   "op",
+						Value: "list",
+					},
+				},
+			},
+		})
 		assert.NoErrorf(t, err, "load resource error: %v", err)
 		// log.Infof("res: %v", res)
 		match := map[string]bool{
@@ -321,6 +356,39 @@ func TestProgram_ListAndDelete(t *testing.T) {
 
 		for k, v := range match {
 			assert.Truef(t, v, "not found: %v", k)
+		}
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		deletePath := fmt.Sprintf("/%s", programID1)
+		_, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "DELETE",
+			Url: &ypb.YakURL{
+				Schema: "ssadb",
+				Path:   deletePath,
+			},
+		})
+		assert.NoErrorf(t, err, "delete error %v", err)
+
+		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssadb",
+				Path:   "/",
+				Query: []*ypb.KVPair{
+					{
+						Key:   "op",
+						Value: "list",
+					},
+				},
+			},
+		})
+		assert.NoErrorf(t, err, "load resource error: %v", err)
+		// log.Infof("res: %v", res)
+		for _, info := range res.Resources {
+			if info.Path == deletePath {
+				t.Fatal("path deleted, but contain in all program ")
+			}
 		}
 	})
 
