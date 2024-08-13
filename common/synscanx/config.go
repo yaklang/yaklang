@@ -23,6 +23,10 @@ type SynxConfig struct {
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
 
+	RuntimeId string
+
+	Ctx context.Context
+
 	excludeHosts *hostsparser.HostsParser
 
 	excludePorts *utils.PortsFilter
@@ -88,6 +92,7 @@ func NewDefaultConfig() *SynxConfig {
 		rateLimitDelayGap:                  150,
 		shuffle:                            true,
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
+		Ctx: context.Background(),
 	}
 }
 
@@ -362,4 +367,17 @@ func WithIface(iface string) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.netInterface = iface
 	}
+}
+
+func WithRuntimeId(id string) SynxConfigOption {
+	return func(config *SynxConfig) {
+		config.outputFilePrefix = id
+	}
+}
+
+func WithCtx(ctx context.Context) SynxConfigOption {
+	return func(config *SynxConfig) {
+		config.Ctx = ctx
+	}
+
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/synscanx"
 	"os"
 	"reflect"
 	"strings"
@@ -1143,6 +1144,61 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	for _, funcName := range ServiceScanFuncList {
 		nIns.GetVM().RegisterMapMemberCallHandler("servicescan", funcName, hookServiceScanFunc)
 	}
+
+	//hook synscan runtime id
+	hookSynScanFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			synScanOpt := []synscanx.SynxConfigOption{synscanx.WithRuntimeId(runtimeId), synscanx.WithCtx(streamContext)}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			synScanExtraOpts, ok := interfaceValue.([]synscanx.SynxConfigOption)
+			if ok {
+				synScanExtraOpts = append(synScanOpt, synScanExtraOpts...)
+			}
+			for _, p := range synScanExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+
+	SynScanFuncList := []string{"Scan", "ScanFromPing"}
+	for _, funcName := range SynScanFuncList {
+		nIns.GetVM().RegisterMapMemberCallHandler("synscan", funcName, hookSynScanFunc)
+	}
+
+	// TODO
+	//hookPingScanFunc := func(f interface{}) interface{} {
+	//	funcValue := reflect.ValueOf(f)
+	//	funcType := funcValue.Type()
+	//	hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+	//		pingScanOpt := []yaklib.PingOpt{yaklib.WithRuntimeId(runtimeId), yaklib.WithCtx(streamContext)}
+	//		index := len(args) - 1 // 获取 option 参数的 index
+	//		interfaceValue := args[index].Interface()
+	//		args = args[:index]
+	//		pingScanExtraOpts, ok := interfaceValue.([]yaklib.PingOpt)
+	//		if ok {
+	//			pingScanExtraOpts = append(pingScanOpt, pingScanExtraOpts...)
+	//		}
+	//		for _, p := range pingScanExtraOpts {
+	//			args = append(args, reflect.ValueOf(p))
+	//		}
+	//		res := funcValue.Call(args)
+	//		return res
+	//	})
+	//	return hookFunc.Interface()
+	//}
+	//
+	//PingScanFuncList := []string{"Scan", "ScanFromPing"}
+	//for _, funcName := range PingScanFuncList {
+	//	nIns.GetVM().RegisterMapMemberCallHandler("ping", funcName, hookPingScanFunc)
+	//}
+
 }
 
 func (y *YakToCallerManager) AddForYakit(
