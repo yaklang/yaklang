@@ -81,7 +81,16 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 						}
 
 						if len(result.AlertSymbolTable) > 0 {
-							t.Fatal("no alert variables should, negative test failed")
+							count := 0
+							for _, i := range result.AlertSymbolTable {
+								i.Recursive(func(operator sfvm.ValueOperator) error {
+									count++
+									return nil
+								})
+							}
+							if count > 0 {
+								t.Fatal("no alert variables should, negative test failed")
+							}
 						}
 						return nil
 					}

@@ -6,7 +6,7 @@ desc(
 )
 
 fromXML as $fromXML;
-$fromXML?{ <getObject>?{!.setMode} }() as $vuln;
+$fromXML?{ <getObject>?{!.setMode && !.allowTypes} }() as $vuln;
 
 check $vuln;
 alert $vuln;
