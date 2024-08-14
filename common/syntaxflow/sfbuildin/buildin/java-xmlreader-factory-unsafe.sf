@@ -1,0 +1,10 @@
+desc(
+    title: "Checking XMLReaderFactory.createXMLReader() Unsafe Use",
+    title_zh: "检查 XMLReaderFactory.createXMLReader() 不安全使用",
+    type: vuln,
+    level: warning,
+)
+
+XMLReaderFactory.createXMLReader()?{!.setFeature* && !.setProp* && !.allowT* }./((parse*)|(read*))/() as $vulCall;
+check $vulCall;
+alert $vulCall;
