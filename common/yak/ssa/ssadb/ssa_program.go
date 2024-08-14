@@ -71,7 +71,7 @@ func AllSSAPrograms() []*schema.SSAProgram {
 
 	db := consts.GetGormProfileDatabase()
 	var programs []*schema.SSAProgram
-	db.Model(&schema.SSAProgram{}).Find(&programs)
+	db.Model(&schema.SSAProgram{}).Order("created_at DESC").Find(&programs)
 	for _, p := range programs {
 		Programs[p.Name] = p
 	}
