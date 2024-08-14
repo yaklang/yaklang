@@ -191,41 +191,41 @@ namespace {
 			false,
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	//	t.Run("all namespace use static member", func(t *testing.T) {
-	//		code := `<?php
+	//t.Run("all namespace use static member", func(t *testing.T) {
+	//	code := `<?php
 	//
 	//namespace a\b\c {
-	//    class test
-	//    {
-	//        public static $a = 1;
-	//    }
+	//   class test
+	//   {
+	//       public static $a = 1;
+	//   }
 	//}
 	//
 	//namespace {
-	//    println(\a\b\c\test::$a);
+	//   println(\a\b\c\test::$a);
 	//}`
-	//		ssatest.CheckPrintlnValue(code, []string{}, t)
-	//	})
-	//	t.Run("namespace function call", func(t *testing.T) {
-	//		code := `<?php
+	//	ssatest.CheckPrintlnValue(code, []string{}, t)
+	//})
+	//t.Run("namespace function call", func(t *testing.T) {
+	//	code := `<?php
 	//
 	//namespace a\b\c\d {
-	//    class t
-	//    {
-	//        public static $abc = 1;
-	//    }
+	//   class t
+	//   {
+	//       public static $abc = 1;
+	//   }
 	//
-	//    function test($a)
-	//    {
-	//        return $a;
-	//    }
+	//   function test($a)
+	//   {
+	//       return $a;
+	//   }
 	//}
 	//
 	//namespace {
-	//    $a = \a\b\c\d\test(\a\b\c\d\t::$abc);
-	//    println($a);
+	//   $a = \a\b\c\d\test(\a\b\c\d\t::$abc);
+	//   println($a);
 	//}
 	//`
-	//		ssatest.CheckPrintlnValue(code, []string{}, t)
-	//	})
+	//	ssatest.CheckPrintlnValue(code, []string{}, t)
+	//})
 }

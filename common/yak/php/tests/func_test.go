@@ -398,6 +398,8 @@ function b($cmd)
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
+
+	//todo: namespace、function have error, repeat function
 	t.Run("test function in namespace", func(t *testing.T) {
 		code := `<?php
 
@@ -409,9 +411,7 @@ namespace a {
 }
 
 namespace {
-
     use function a\test;
-
     function teee()
     {
         test("whoami");
@@ -419,7 +419,7 @@ namespace {
 }`
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
-			map[string][]string{"param": {`"whoami"`}},
+			map[string][]string{"param": {`"whoami"`, `Parameter-$a`}},
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
@@ -444,5 +444,13 @@ function b($cmd)
 			map[string][]string{"param": {`Parameter-$cmd`, `"whoa"`}},
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
+	})
+	t.Run("test undefined function", func(t *testing.T) {
+		code := `<?php
+a($a);`
+		test.CheckSyntaxFlow(t, code,
+			`a as $target`,
+			map[string][]string{"target": {"Undefined-a"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

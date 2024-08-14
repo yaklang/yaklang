@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"io/fs"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -323,10 +324,27 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
-
+		globalScopeOnce.Do(func() {
+			{
+				container := fb.EmitEmptyContainer()
+				variable := fb.CreateMemberCallVariable(container, ssa.NewConst("global"))
+				fb.AssignVariable(variable, fb.EmitEmptyContainer())
+				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("get"))
+				fb.AssignVariable(variable, fb.EmitEmptyContainer())
+				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("post"))
+				fb.AssignVariable(variable, fb.EmitEmptyContainer())
+				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("cookie"))
+				fb.AssignVariable(variable, fb.EmitEmptyContainer())
+				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("env"))
+				fb.AssignVariable(variable, fb.EmitEmptyContainer())
+				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("session"))
+				fb.AssignVariable(variable, fb.EmitEmptyContainer())
+				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("server"))
+				prog.GlobalScope = container
+			}
+		})
 		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
-
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	// TODO: this extern info should be set in program
 	builder.WithExternLib(c.externLib)
@@ -334,12 +352,5 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
-	{
-		container := builder.EmitEmptyContainer()
-		globalVariable := builder.CreateMemberCallVariable(container, ssa.NewConst("global"))
-		global_container := builder.EmitEmptyContainer()
-		builder.AssignVariable(globalVariable, global_container)
-		prog.GlobalScope = global_container
-	}
 	return prog, builder, nil
 }

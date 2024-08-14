@@ -1,6 +1,7 @@
 package php
 
 import (
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -631,9 +632,18 @@ class Ueditor extends Base
 	 * @return bool | name.jpg
 	 */
 }`
-		ssatest.CheckSyntaxFlow(t, code,
-			`exec(* #-> * as $param)`,
-			map[string][]string{},
-			ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			results, err := prog.SyntaxFlowWithError(`exec(* #-> * as $param)`)
+			require.NoError(t, err)
+			var flag bool
+			values := results.GetValues("param")
+			values.ForEach(func(value *ssaapi.Value) {
+				if strings.Contains(value.String(), "request") {
+					flag = true
+				}
+			})
+			require.True(t, flag)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

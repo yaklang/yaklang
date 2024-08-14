@@ -39,6 +39,12 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 		}
 		_builder.SetMarkedFunction(funcName)
 		_builder.FunctionBuilder = _builder.PushFunction(newFunction)
+		for _, value := range _builder.FunctionBuilder.GetProgram().GlobalScope.GetAllMember() {
+			for globals, v := range value.GetAllMember() {
+				variable := _builder.CreateMemberCallVariable(value, globals)
+				_builder.AssignVariable(variable, v)
+			}
+		}
 		tmp := i.FormalParameterList()
 		{
 			_builder.VisitFormalParameterList(tmp)
@@ -173,6 +179,12 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 
 	//todo: 还有问题，"类"闭包在类中还有问题
 	y.FunctionBuilder = y.PushFunction(newFunc)
+	for _, value := range y.FunctionBuilder.GetProgram().GlobalScope.GetAllMember() {
+		for globals, v := range value.GetAllMember() {
+			variable := y.CreateMemberCallVariable(value, globals)
+			y.AssignVariable(variable, v)
+		}
+	}
 	{
 		y.VisitLambdaFunctionUseVars(i.LambdaFunctionUseVars())
 		y.VisitFormalParameterList(i.FormalParameterList())
