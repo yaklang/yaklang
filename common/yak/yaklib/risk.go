@@ -58,6 +58,9 @@ var (
 		"YieldRiskByCreateAt": func(timestamp int64) chan *schema.Risk {
 			return yakit.YieldRisksByCreateAt(consts.GetGormProjectDatabase(), context.Background(), timestamp)
 		},
+		"YieldRiskByScriptName": func(scriptName string) chan *schema.Risk {
+			return yakit.YieldRisksByScriptName(consts.GetGormProjectDatabase(), context.Background(), scriptName)
+		},
 		"DeleteRiskByTarget": func(addr string) {
 			yakit.DeleteRiskByTarget(consts.GetGormProjectDatabase(), addr)
 		},
