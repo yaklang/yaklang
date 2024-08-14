@@ -56,7 +56,6 @@ func Test_Cross_Function(t *testing.T) {
 	})
 }
 
-
 func Test_Function_Global(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		ssatest.Check(t, `package main
