@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"io/fs"
 	"path"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +47,15 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 			filesys.Recursive(".", filesys.WithEmbedFS(samples), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				_, name := path.Split(s)
 				if utils.MatchAllOfGlob(name, v) {
+					raw, err := samples.ReadFile(s)
+					if err != nil {
+						log.Warnf("read file %s error: %s", s, err)
+						t.Fatal("load file error: " + v)
+					}
+					vfs.AddFile(k, string(raw))
+				}
+
+				if strings.HasSuffix(s, v) {
 					raw, err := samples.ReadFile(s)
 					if err != nil {
 						log.Warnf("read file %s error: %s", s, err)
