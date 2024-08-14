@@ -1,10 +1,9 @@
 package yak2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,14 +13,11 @@ import (
 )
 
 type SSABuilder struct {
-	ssa.DummyExtraFileAnalyzer
+	ssa.DummyPreHandler
 }
 
 var Builder = &SSABuilder{}
 
-func (s *SSABuilder) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {}
-}
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrontEnd(src, force)
 	if err != nil {

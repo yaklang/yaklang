@@ -2,7 +2,6 @@ package java2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -16,13 +15,12 @@ import (
 
 // ========================================== For SSAAPI ==========================================
 
-type SSABuilder struct{}
+type SSABuilder struct {
+	ssa.DummyPreHandler
+}
 
 var Builder = &SSABuilder{}
 
-func (s *SSABuilder) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {}
-}
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.SupportClass = true
 	ast, err := Frontend(src, force)

@@ -1,8 +1,6 @@
 package go2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"strings"
 
 	"github.com/google/uuid"
@@ -35,9 +33,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if lib == nil {
 				lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
 			}
-			lib.PushEditor(prog.GetCurrentEditor(), func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
-				o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
-			})
+			lib.PushEditor(prog.GetCurrentEditor())
 
 			init := lib.GetAndCreateFunction(pkgNameCurrent, "init")
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))

@@ -2,10 +2,8 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"io/fs"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -61,7 +59,10 @@ func (c *config) parseProject() (Programs, error) {
 
 	programPath := c.programPath
 	prog, builder, err := c.init()
-
+	if err != nil {
+		return nil, err
+	}
+	c.LanguageBuilder.InitHandler(builder)
 	if prog.Name != "" {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
@@ -92,7 +93,7 @@ func (c *config) parseProject() (Programs, error) {
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
 			if language := c.LanguageBuilder; language != nil {
-				language.PreHandler(c.fs, builder, path)
+				language.PreHandlerProject(c.fs, builder, path)
 			}
 			// check
 			if err := c.checkLanguage(path); err == nil {
@@ -167,9 +168,6 @@ func (c *config) parseFile() (ret *Program, err error) {
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
-	if prog.ChildApplication != nil && len(prog.ChildApplication) > 0 {
-		return NewProgram(prog.ChildApplication[0], c), err
-	}
 	return NewProgram(prog, c), nil
 }
 
@@ -203,7 +201,8 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if err != nil {
 		return nil, err
 	}
-	c.LanguageBuilder.MoreSyntaxHandler()(r, builder)
+	c.LanguageBuilder.InitHandler(builder)
+	c.LanguageBuilder.PreHandlerFile(r, builder)
 	// parse code
 	if err := prog.Build("", r, builder); err != nil {
 		return nil, err
@@ -248,7 +247,6 @@ func (c *config) checkLanguage(path string) error {
 
 func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
-
 	prog := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, c.fs, c.programPath)
 	prog.Language = string(c.language)
 
@@ -303,11 +301,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 
 		// push into program for recording what code is compiling
-		prog.PushEditor(newCodeEditor, func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
-			if !fb.MoreParse {
-				o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
-			}
-		})
+		prog.PushEditorex(newCodeEditor, !fb.MoreParse)
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
@@ -324,25 +318,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
-		globalScopeOnce.Do(func() {
-			{
-				container := fb.EmitEmptyContainer()
-				variable := fb.CreateMemberCallVariable(container, ssa.NewConst("global"))
-				fb.AssignVariable(variable, fb.EmitEmptyContainer())
-				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("get"))
-				fb.AssignVariable(variable, fb.EmitEmptyContainer())
-				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("post"))
-				fb.AssignVariable(variable, fb.EmitEmptyContainer())
-				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("cookie"))
-				fb.AssignVariable(variable, fb.EmitEmptyContainer())
-				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("env"))
-				fb.AssignVariable(variable, fb.EmitEmptyContainer())
-				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("session"))
-				fb.AssignVariable(variable, fb.EmitEmptyContainer())
-				variable = fb.CreateMemberCallVariable(container, ssa.NewConst("server"))
-				prog.GlobalScope = container
-			}
-		})
 		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
