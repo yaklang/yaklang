@@ -150,6 +150,9 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	lib.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
 	lib.Language = prog.Language
 
+	//todo: 这里需要加一个测试
+	lib.GlobalScope = prog.GlobalScope
+
 	// up-down stream and application
 	prog.AddUpStream(lib)
 	prog.Application.AddUpStream(lib)

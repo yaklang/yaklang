@@ -41,6 +41,9 @@ func (p *Program) Show() *Program {
 	for _, up := range p.UpStream {
 		up.show(DisAsmDefault)
 	}
+	for _, child := range p.ChildApplication {
+		child.show(DisAsmDefault)
+	}
 	return p
 }
 

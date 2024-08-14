@@ -232,6 +232,12 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			newFunction := y.NewFunc(funcName)
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
+				for _, value := range y.FunctionBuilder.GetProgram().GlobalScope.GetAllMember() {
+					for globals, v := range value.GetAllMember() {
+						variable := y.CreateMemberCallVariable(value, globals)
+						y.AssignVariable(variable, v)
+					}
+				}
 				this := y.NewParam("$this")
 				this.SetType(class)
 				y.VisitFormalParameterList(ret.FormalParameterList())

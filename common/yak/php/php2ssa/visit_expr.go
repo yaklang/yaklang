@@ -157,7 +157,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if !strings.HasPrefix(strings.ToLower(fname.GetName()), "anonymousfunc") && !fname.IsExtern() && !y.FuncSyntax.checkSpin(fname.GetName()) {
 			switch {
 			case fname.GetType().GetTypeKind() == ssa.AnyTypeKind:
-				fname = functionHandler(fname.GetName(), fname)
+				f := functionHandler(fname.GetName(), fname)
+				if f == fname {
+					fname = y.ReadValue(fname.GetName())
+				} else {
+					fname = f
+				}
 			case fname.GetType().GetTypeKind() == ssa.FunctionTypeKind:
 				f := functionHandler(fname.GetName(), fname)
 				fname = f
@@ -397,7 +402,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.ConditionalExpressionContext:
 		variableName := "unknown-variable"
 		variable := y.CreateVariable(variableName)
-		y.AssignVariable(variable, ssa.NewUndefined(variableName))
+		y.AssignVariable(variable, y.EmitUndefined(variableName))
 		y.CreateIfBuilder().SetCondition(func() ssa.Value {
 			return y.VisitExpression(ret.Expression(0))
 		}, func() {
@@ -513,7 +518,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else if value := y.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
 			return value
 		} else {
-			return y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
+			val := y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
+			return val
 		}
 
 	case *phpparser.StaticClassAccessExpressionContext:
@@ -1159,12 +1165,10 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	//todo $_POST{}、$_POST[] 这两种情况
 	switch i := raw.(type) {
 	case *phpparser.CustomVariableContext:
-		return y.CreateVariable(
-			y.VisitVariable(i.Variable()),
-		)
+		variable := y.VisitVariable(i.Variable())
+		return y.CreateVariable(variable)
 	case *phpparser.IndexVariableContext:
 		value := y.VisitRightValue(i.FlexiVariable())
 		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
