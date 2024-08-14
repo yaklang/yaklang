@@ -4204,6 +4204,7 @@ message HTTPResponseMatcher {
   string ExprType = 9;
 
   string HitColor = 10;
+  string Action = 11;
 }
 
 message RenderVariablesRequest {
