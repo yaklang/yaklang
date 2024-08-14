@@ -921,6 +921,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			task.HTTPFlowSuccessCount++
 			rsp := &ypb.FuzzerResponse{
+				Ok:                         true,
 				Url:                        utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
 				Method:                     utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
 				ResponseRaw:                result.ResponseRaw,
@@ -959,6 +960,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Proxy = result.LowhttpResponse.Proxy
 				rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
 			}
+			if len(rsp.ResponseRaw) == 0 { // 只有在http pool请求、解析未出错，但响应为空时才会进入此分支
+				rsp.Ok = false
+				rsp.Reason = "empty response"
+			}
 			if rsp.ResponseRaw != nil {
 				// 处理结果，相似度
 				header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
@@ -989,7 +994,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(utils.ParseStringToVisible(result.Request.Host)))
 
 			if result.Response != nil {
-				rsp.Ok = true
 				rsp.StatusCode = int32(result.Response.StatusCode)
 				rsp.ContentType = utils.ParseStringToVisible(result.Response.Header.Get("Content-Type"))
 				var bodyLen int64 = 0
