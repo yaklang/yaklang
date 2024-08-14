@@ -14,9 +14,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var (
+	Action_Retain  = "retain"
+	Action_Discard = "discard"
+)
+
 type YakHttpFlowMatcher struct { // Added some display fields
 	Matcher *YakMatcher
 	Color   string
+	Action  string
 }
 
 func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakHttpFlowMatcher {
@@ -32,7 +38,8 @@ func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakHttpFlowMat
 			SubMatcherCondition: m.GetSubMatcherCondition(),
 			SubMatchers:         funk.Map(m.GetSubMatchers(), NewMatcherFromGRPCModel).([]*YakMatcher),
 		},
-		Color: m.GetHitColor(),
+		Color:  m.GetHitColor(),
+		Action: m.GetAction(),
 	}
 }
 
