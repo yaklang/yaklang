@@ -105,6 +105,21 @@ func TestSFURl(t *testing.T) {
 		checkVariable(t, res, []string{"a", "_"})
 	})
 
+	t.Run("check syntaxflow variable no data", func(t *testing.T) {
+		res, err := SendURL(local, progID, "/", `
+		dddd as $a
+		`)
+		assert.NoError(t, err)
+		spew.Dump(res)
+		checkVariable(t, res, []string{"a"})
+
+		res, err = SendURL(local, progID, "/a", `
+		dddd as $a
+		`)
+		assert.NoError(t, err)
+		spew.Dump(res)
+	})
+
 	t.Run("check syntaxflow variable with alert", func(t *testing.T) {
 		res, err := SendURL(local, progID, "/", `
 		target2(* #-> as $a) 
