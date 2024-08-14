@@ -11,9 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-var _ ssa.ExtraFileAnalyzer = &SSABuilder{}
+var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
 
-func (s *SSABuilder) PreHandler(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")

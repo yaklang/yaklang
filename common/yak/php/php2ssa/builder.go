@@ -2,11 +2,11 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,13 +17,29 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type SSABuild struct{}
-
-func (b *SSABuild) EnableExtraFileAnalyzer() bool {
-	return true
+type SSABuild struct {
+	ssa.DummyPreHandler
 }
 
-func (b *SSABuild) PreHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
+	container := fb.EmitEmptyContainer()
+	variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst("global"))
+	fb.AssignVariable(variable, fb.EmitEmptyContainer())
+	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("get"))
+	fb.AssignVariable(variable, fb.EmitEmptyContainer())
+	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("post"))
+	fb.AssignVariable(variable, fb.EmitEmptyContainer())
+	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("cookie"))
+	fb.AssignVariable(variable, fb.EmitEmptyContainer())
+	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("env"))
+	fb.AssignVariable(variable, fb.EmitEmptyContainer())
+	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("session"))
+	fb.AssignVariable(variable, fb.EmitEmptyContainer())
+	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("server"))
+	fb.AssignVariable(fb.CreateVariable("global-container"), container)
+	fb.GetProgram().GetApplication().GlobalScope = container
+}
+func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -31,6 +47,9 @@ func (b *SSABuild) PreHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBui
 	}
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
+	}
+	if !b.FilterFile(path) {
+		return nil
 	}
 	dirname, filename := fileSystem.PathSplit(path)
 	_ = dirname
@@ -51,13 +70,12 @@ func (b *SSABuild) PreHandler(fileSystem fi.FileSystem, builder *ssa.FunctionBui
 
 var Builder = &SSABuild{}
 
-func (s *SSABuild) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-		builder.MoreParse = true
-		builder.GetProgram().Build("", editor, builder)
-		builder.MoreParse = false
-	}
+func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.MoreParse = true
+	builder.GetProgram().Build("", editor, builder)
+	builder.MoreParse = false
 }
+
 func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {
@@ -96,16 +114,9 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	if b.IncludeStack.Len() <= 0 {
 		var program *ssa.Program
-		if b.MoreParse {
-			program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), nil)
-		} else {
-			program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), func(child *ssa.Program) {
-				b.GetProgram().ChildApplication = append(b.GetProgram().ChildApplication, child)
-			})
-		}
+		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.MoreParse)
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.MoreParse = b.MoreParse
-		functionBuilder.AssignVariable(functionBuilder.CreateVariable("global-container"), program.GetApplication().GlobalScope)
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

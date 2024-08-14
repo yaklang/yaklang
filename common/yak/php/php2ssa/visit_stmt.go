@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"strings"
 )
@@ -104,9 +102,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			library = prog.NewLibrary(pkgname, []string{prog.Loader.GetBasePath()})
 		}
 		//if custom syntax, only syntax it
-		library.PushEditor(prog.GetCurrentEditor(), func(o *omap.OrderedMap[string, *memedit.MemEditor]) {
-			o.Set(prog.GetCurrentEditor().GetFilename(), prog.GetCurrentEditor())
-		})
+		library.PushEditor(prog.GetCurrentEditor())
 		functionBuilder := library.GetAndCreateFunctionBuilder(pkgname, "init")
 		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
 		if functionBuilder != nil {

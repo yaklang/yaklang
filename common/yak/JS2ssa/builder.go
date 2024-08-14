@@ -1,9 +1,9 @@
 package js2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
@@ -15,14 +15,11 @@ import (
 )
 
 type SSABuild struct {
-	ssa.DummyExtraFileAnalyzer
+	ssa.DummyPreHandler
 }
 
 var Builder = &SSABuild{}
 
-func (s *SSABuild) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {}
-}
 func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {

@@ -6,22 +6,27 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-type ExtraFileAnalyzer interface {
-	PreHandler(fi.FileSystem, *FunctionBuilder, string) error
+type PreHandlerAnalyzer interface {
+	InitHandler(builder *FunctionBuilder)
+	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
+	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
 }
 
 type Builder interface {
-	MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *FunctionBuilder)
 	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
-	ExtraFileAnalyzer
+	PreHandlerAnalyzer
 }
 
-var _ ExtraFileAnalyzer = &DummyExtraFileAnalyzer{}
+var _ PreHandlerAnalyzer = &DummyPreHandler{}
 
-type DummyExtraFileAnalyzer struct{}
+type DummyPreHandler struct{}
 
-func (d *DummyExtraFileAnalyzer) PreHandler(fi.FileSystem, *FunctionBuilder, string) error {
+func (d *DummyPreHandler) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
+}
+
+func (d *DummyPreHandler) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
 	return nil
 }
+func (d *DummyPreHandler) InitHandler(builder *FunctionBuilder) {}

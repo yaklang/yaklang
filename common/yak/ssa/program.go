@@ -15,37 +15,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewChildProgram(prog *Program, name string, handler func(program *Program)) *Program {
-	childProg := &Program{
-		Name:                    name,
-		ProgramKind:             ChildAPP,
-		LibraryFile:             prog.LibraryFile,
-		Language:                prog.Language,
-		Application:             prog,
-		DownStream:              make(map[string]*Program),
-		UpStream:                make(map[string]*Program),
-		EnableDatabase:          prog.EnableDatabase,
-		FileList:                prog.FileList,
-		editorStack:             prog.editorStack,
-		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
-		Cache:                   NewDBCache(name, prog.EnableDatabase),
-		Funcs:                   make(map[string]*Function),
-		ClassBluePrint:          make(map[string]*ClassBluePrint),
-		OffsetMap:               make(map[int]*OffsetItem),
-		OffsetSortedSlice:       make([]int, 0),
-		Loader:                  prog.Loader,
-		Build:                   prog.Build,
-		cacheExternInstance:     make(map[string]Value),
-		externType:              prog.externType,
-		externBuildValueHandler: prog.externBuildValueHandler,
-		ExternInstance:          prog.ExternInstance,
-		ExternLib:               prog.ExternLib,
-		GlobalScope:             prog.GlobalScope,
+func NewChildProgram(prog *Program, name string, add bool) *Program {
+	program := NewProgram(name, prog.EnableDatabase, ChildAPP, prog.Loader.GetFilesysFileSystem(), prog.Loader.GetBasePath())
+	program.LibraryFile = prog.LibraryFile
+	program.Language = prog.Language
+	program.Application = prog
+	program.FileList = prog.FileList
+	program.editorStack = prog.editorStack
+	program.Loader = prog.Loader
+	program.Build = prog.Build
+	program.externType = prog.externType
+	program.externBuildValueHandler = prog.externBuildValueHandler
+	program.ExternInstance = prog.ExternInstance
+	program.ExternLib = prog.ExternLib
+	program.GlobalScope = prog.GlobalScope
+	if add {
+		prog.ChildApplication = append(prog.ChildApplication, program)
 	}
-	if handler != nil {
-		handler(childProg)
-	}
-	return childProg
+	return program
 }
 
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
@@ -277,11 +264,15 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }
 
-func (p *Program) PushEditor(e *memedit.MemEditor, handler func(*omap.OrderedMap[string, *memedit.MemEditor])) {
+func (p *Program) PushEditor(e *memedit.MemEditor) {
+	p.PushEditorex(e, true)
+}
+func (p *Program) PushEditorex(e *memedit.MemEditor, store bool) {
 	p.editorStack.Push(e)
-	handler(p.editorMap)
+	if store {
+		p.editorMap.Set(p.GetCurrentEditor().GetFilename(), p.GetCurrentEditor())
+	}
 	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
-	//p.editorMap.Set(e.GetFilename(), e)
 }
 
 func (p *Program) GetIncludeFiles() []string {
