@@ -197,8 +197,8 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	resources = append(resources, normalRes...)
 
 	// last add "_"
-	{
-		res := createNewRes(url, len(result.GetValues("_")), nil)
+	if vs := result.GetValues("_"); len(vs) > 0 {
+		res := createNewRes(url, len(vs), nil)
 		res.ResourceType = "variable"
 		res.VerboseType = "unknown"
 		res.ResourceName = "_"
