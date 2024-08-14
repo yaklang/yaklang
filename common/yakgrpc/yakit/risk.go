@@ -343,6 +343,44 @@ func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) cha
 	return outC
 }
 
+func YieldRisksByScriptName(db *gorm.DB, ctx context.Context, scriptName string) chan *schema.Risk {
+	outC := make(chan *schema.Risk)
+	db = db.Model(&schema.Risk{})
+	db = db.Where("from_yak_script = ?", scriptName)
+
+	go func() {
+		defer close(outC)
+
+		page := 1
+		for {
+			var items []*schema.Risk
+			if _, b := bizhelper.NewPagination(&bizhelper.Param{
+				DB:    db,
+				Page:  page,
+				Limit: 1000,
+			}, &items); b.Error != nil {
+				log.Errorf("paging failed: %s", b.Error)
+				return
+			}
+
+			page++
+
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+
+			if len(items) < 1000 {
+				return
+			}
+		}
+	}()
+	return outC
+}
+
 func QueryNewRisk(db *gorm.DB, req *ypb.QueryNewRiskRequest, newRisk bool, isRead bool) (*bizhelper.Paginator, []*schema.Risk, error) {
 	if req == nil {
 		return nil, nil, utils.Errorf("empty params")
