@@ -34,7 +34,63 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
+func TestGRPCMUSTPASS_CheckResponseValid(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 1\r\n\r\n"))
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// no fix check
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %v 
 
+asdghasdjfgahjksdgf
+`, utils.HostPort(host, port)),
+		Concurrent:               10,
+		IsHTTPS:                  false,
+		ForceFuzz:                true,
+		PerRequestTimeoutSeconds: 5,
+		NoFixContentLength:       true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		if !rsp.Ok {
+			t.Fatal("request failed")
+		}
+	}
+	// fix check
+	client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %v 
+
+asdghasdjfgahjksdgf
+`, utils.HostPort(host, port)),
+		Concurrent:               10,
+		IsHTTPS:                  false,
+		ForceFuzz:                true,
+		PerRequestTimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		if !rsp.Ok {
+			t.Fatal("request failed")
+		}
+	}
+}
 func TestGRPCMUSTPASS_FuzzerMatch(t *testing.T) {
 	data := uuid.New().String()
 	body, _ := utils.GzipCompress(data)
