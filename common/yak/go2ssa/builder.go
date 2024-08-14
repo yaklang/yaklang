@@ -1,7 +1,6 @@
 package go2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -18,13 +17,12 @@ import (
 )
 
 type SSABuilder struct {
-	ssa.DummyExtraFileAnalyzer
+	ssa.DummyPreHandler
 }
 
 var Builder = &SSABuilder{}
 
-
-func (s *SSABuilder) PreHandler(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -46,7 +44,7 @@ func (s *SSABuilder) PreHandler(fileSystem fi.FileSystem, functionBuilder *ssa.F
 			return nil
 		}
 		text := string(raw)
-		pattern := `module(.*?)\n` 
+		pattern := `module(.*?)\n`
 		re, err := regexp.Compile(pattern)
 		if err != nil {
 			log.Warnf("compile regexp error: %v", err)
@@ -61,10 +59,6 @@ func (s *SSABuilder) PreHandler(fileSystem fi.FileSystem, functionBuilder *ssa.F
 	}
 
 	return nil
-}
-
-func (s *SSABuilder) MoreSyntaxHandler() func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	return func(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {}
 }
 
 func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
@@ -91,7 +85,6 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".go"
 }
-
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
@@ -129,7 +122,7 @@ func (b *astbuilder) GetFromCmap(key string) bool {
 	for _, m := range b.cmap {
 		if _, ok := m[key]; ok {
 			return true
-		} 
+		}
 	}
 	return false
 }
@@ -139,25 +132,25 @@ func (b *astbuilder) InCmapLevel() {
 }
 
 func (b *astbuilder) OutCmapLevel() {
-    b.cmap = b.cmap[:len(b.cmap)-1]
+	b.cmap = b.cmap[:len(b.cmap)-1]
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
 }
 
-func (b* astbuilder) AddGlobalVariable(name string, v ssa.Value){
+func (b *astbuilder) AddGlobalVariable(name string, v ssa.Value) {
 	b.globalv[name] = v
 }
 
-func (b* astbuilder) GetGlobalVariable(name string) ssa.Value {
+func (b *astbuilder) GetGlobalVariable(name string) ssa.Value {
 	if b.globalv[name] == nil {
 		return nil
 	}
 	return b.globalv[name]
 }
 
-func (b *astbuilder) AddResultDefault(name string){
+func (b *astbuilder) AddResultDefault(name string) {
 	b.result = append(b.result, name)
 }
 
@@ -166,18 +159,18 @@ func (b *astbuilder) GetResultDefault() []string {
 }
 
 func (b *astbuilder) CleanResultDefault() {
-    b.result = []string{}
+	b.result = []string{}
 }
 
 func (b *astbuilder) AddExtendFuncs(name string, funcs map[string]*ssa.Function) {
-    b.extendFuncs[name] = funcs
+	b.extendFuncs[name] = funcs
 }
 
 func (b *astbuilder) GetExtendFuncs(name string) map[string]*ssa.Function {
 	if b.extendFuncs[name] == nil {
 		return nil
 	}
-    return b.extendFuncs[name]
+	return b.extendFuncs[name]
 }
 
 // ====================== Object type
@@ -198,10 +191,10 @@ func (b *astbuilder) GetStructAll() map[string]*ssa.ObjectType {
 
 // ====================== Alias type
 func (b *astbuilder) AddAlias(name string, t *ssa.AliasType) {
-	b.aliasTypes[name] = t 
+	b.aliasTypes[name] = t
 }
 
-func (b *astbuilder) DelAliasByStr(name string){
+func (b *astbuilder) DelAliasByStr(name string) {
 	delete(b.aliasTypes, name)
 }
 
