@@ -301,3 +301,191 @@ func TestFuzzerMatchMultipleColor(t *testing.T) {
 	require.Equal(t, 6, redCount, "token1 count is not 6")
 	require.Equal(t, 5, blueCount, "token2 count is not 5")
 }
+
+func TestFuzzerMatchMultipleColor_HasSubMatcher(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	token1 := utils.RandStringBytes(5)
+	token2 := utils.RandStringBytes(5)
+	token3 := utils.RandStringBytes(5)
+	token4 := utils.RandStringBytes(5)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
+		if index == 0 {
+			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n" + token1 + token3)
+		} else if index == 1 {
+			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n" + token2 + token4)
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matcher1 := &ypb.HTTPResponseMatcher{
+		SubMatcherCondition: "and",
+		SubMatchers: []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "word",
+				Scope:       "raw",
+				Condition:   "and",
+				Group:       []string{token1},
+				ExprType:    "nuclei-dsl",
+			},
+			{
+				MatcherType: "word",
+				Scope:       "raw",
+				Condition:   "and",
+				Group:       []string{token3},
+				ExprType:    "nuclei-dsl",
+			},
+		},
+		HitColor: "green",
+	}
+	matcher2 := &ypb.HTTPResponseMatcher{
+		MatcherType: "word",
+		Scope:       "raw",
+		Condition:   "and",
+		Group:       []string{token2, token4},
+		ExprType:    "nuclei-dsl",
+		HitColor:    "blue",
+	}
+	target := utils.HostPort(host, port)
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request:   "GET /?a={{i(0-1)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		ForceFuzz: true,
+		Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+	})
+	require.NoError(t, err)
+	var greenCount int
+	var blueCount int
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if resp.MatchedByMatcher {
+			if resp.HitColor == "green" {
+				greenCount++
+			}
+			if resp.HitColor == "blue" {
+				blueCount++
+			}
+		}
+	}
+	require.Equal(t, 1, greenCount, "green count is not 1")
+	require.Equal(t, 1, blueCount, "blue count is not 1")
+}
+
+func TestFuzzerMatchMultipleAction(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("retain test", func(t *testing.T) {
+		token1 := utils.RandStringBytes(5)
+		token2 := utils.RandStringBytes(5)
+		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
+			if index%2 == 0 {
+				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token1)
+			} else {
+				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token2)
+			}
+		})
+		matcher1 := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{token1},
+			ExprType:    "nuclei-dsl",
+			HitColor:    "red",
+			Action:      "retain",
+		}
+
+		matcher2 := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{token2},
+			ExprType:    "nuclei-dsl",
+			HitColor:    "blue",
+		}
+
+		target := utils.HostPort(host, port)
+		stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+			Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+			ForceFuzz: true,
+			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+		})
+		require.NoError(t, err)
+		var allCount int
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if resp.MatchedByMatcher {
+				require.Equal(t, "red", resp.HitColor, "retain action return color is not red")
+				allCount++
+			}
+		}
+		require.Equal(t, 6, allCount, "retain all count is not 6")
+	})
+
+	t.Run("discard test", func(t *testing.T) {
+		token1 := utils.RandStringBytes(5)
+		token2 := utils.RandStringBytes(5)
+		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
+			if index%2 == 0 {
+				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token1)
+			} else {
+				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token2)
+			}
+		})
+		matcher1 := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{token1},
+			ExprType:    "nuclei-dsl",
+			HitColor:    "red",
+			Action:      "discard",
+		}
+
+		matcher2 := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "raw",
+			Condition:   "and",
+			Group:       []string{token2},
+			ExprType:    "nuclei-dsl",
+			HitColor:    "blue",
+		}
+
+		target := utils.HostPort(host, port)
+		stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+			Request:   "GET /?a={{i(0-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+			ForceFuzz: true,
+			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+		})
+		require.NoError(t, err)
+		var allCount int
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if resp.MatchedByMatcher {
+				require.Equal(t, "blue", resp.HitColor, "discard action return color is not blue")
+				allCount++
+			}
+		}
+		require.Equal(t, 5, allCount, "discard all count is not 5")
+	})
+}
