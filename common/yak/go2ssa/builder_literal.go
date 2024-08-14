@@ -146,13 +146,24 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 		coverType(obj.GetType(), typ)
 		return obj
 	case ssa.StructTypeKind:
-		obj := b.InterfaceAddFieldBuild(len(values),
-		func(i int) ssa.Value {
-			return keys[i]
-		},
-		func(i int) ssa.Value {
-			return values[i]
-		},)
+		var obj ssa.Value
+		if len(keys) == 0{
+			obj = b.InterfaceAddFieldBuild(len(values),
+			func(i int) ssa.Value {
+				return typ.(*ssa.ObjectType).Keys[i]
+			},
+			func(i int) ssa.Value {
+				return values[i]
+			},)
+		}else{
+			obj = b.InterfaceAddFieldBuild(len(values),
+			func(i int) ssa.Value {
+				return keys[i]
+			},
+			func(i int) ssa.Value {
+				return values[i]
+			},)
+		}
 		coverType(obj.GetType(), typ)
 		return obj
 	case ssa.InterfaceTypeKind:

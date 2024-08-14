@@ -121,7 +121,9 @@ func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
 }
 
 func (b *astbuilder) AddToCmap(key string) {
-	b.cmap[len(b.cmap)-1][key] = struct{}{}
+	tcmap := make(map[string]struct{})
+	tcmap[key] = struct{}{}
+	b.cmap = append(b.cmap, tcmap)
 }
 
 func (b *astbuilder) GetFromCmap(key string) bool {
