@@ -92,6 +92,39 @@ var Cases = []BuildinRuleTestCase{
 		},
 		NegativeTest: true,
 	},
+	{
+		Name: "SAXReader 基础检查(安全)",
+		Rule: `java-saxreader-unsafe`,
+		FS: map[string]string{
+			"saxreazder.java": "saxreader/safe.java",
+		},
+		NegativeTest: true,
+	},
+	{
+		Name: "SAXReader 基础检查(不安全)",
+		Rule: `java-saxreader-unsafe`,
+		FS: map[string]string{
+			"saxreazder.java": "saxreader/unsafe.java",
+		},
+		ContainsAll: []string{"SAXReader"},
+	},
+
+	{
+		Name: "XMLReaderFactory 基础检查(不安全)",
+		Rule: `java-xmlreader-factory-unsafe`,
+		FS: map[string]string{
+			"xmlreaderfactory.java": "org-xml-sax-xmlreader/unsafe.java",
+		},
+		ContainsAll: []string{"createXMLReade", "example.xml"},
+	},
+	{
+		Name: "XMLReaderFactory 基础检查(消极测试)",
+		Rule: `java-xmlreader-factory-unsafe`,
+		FS: map[string]string{
+			"xmlreaderfactory.java": "org-xml-sax-xmlreader/safe.java",
+		},
+		NegativeTest: true,
+	},
 }
 
 func TestBuildInRule(t *testing.T) {
@@ -107,7 +140,7 @@ func TestBuildInRule_DEBUG(t *testing.T) {
 		return
 	}
 
-	var name = "SAXParserFactory"
+	var name = "XMLReaderFactory"
 
 	for i := 0; i < len(Cases); i++ {
 		c := Cases[i]
