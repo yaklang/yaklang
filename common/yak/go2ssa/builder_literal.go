@@ -276,31 +276,9 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa
 func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	var ssatyp ssa.Type
 
 	if name := stmt.TypeName(); name != nil {
-	    if qul := name.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
-			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
-				if obj != nil {
-					ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
-				}
-				return ssatyp,nil
-			}
-		}
-		text := name.GetText()
-		/*
-		if s, ok := stmt.TypeArgs().(*gol.TypeArgsContext); ok{
-			b.buildTypeArgs(s)
-		}*/
-
-		// var type name
-		if b := ssa.GetTypeByStr(text); b != nil {
-			return b,nil
-		}
-		if b := b.GetStructByStr(text); b != nil {
-			return b,nil
-		}
+	    return b.buildTypeName(name.(*gol.TypeNameContext)),nil
 	}
 	// slice type literal
 	if s, ok := stmt.SliceType().(*gol.SliceTypeContext); ok {
@@ -533,6 +511,27 @@ func (b* astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext,structTyp *ssa.Ob
 			}
 		}
 	}
+
+	if em := stmt.EmbeddedField(); em != nil {
+		if typ,ok := em.(*gol.EmbeddedFieldContext); ok {
+			parent := b.buildTypeName(typ.TypeName().(*gol.TypeNameContext))
+			if a := typ.TypeArgs(); a != nil {
+				b.tpHander[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
+			}
+			if parent == nil {
+				name := typ.TypeName().(*gol.TypeNameContext).GetText()
+			    b.NewError(ssa.Warn, TAG, StructNotFind(name))
+				parent = ssa.NewStructType()
+				parent.(*ssa.ObjectType).Name = name
+			}
+			if p,ok := parent.(*ssa.ObjectType); ok {
+				structTyp.AddField(b.EmitConstInst(""), p)
+				structTyp.AnonymousField = append(structTyp.AnonymousField, p)
+			} else {
+			    b.NewError(ssa.Error, TAG, "AnonymousField must be ObjectType type")
+			}
+		}
+	}
 }
 
 func (b *astbuilder) buildBasicLit(exp *gol.BasicLitContext) (ssa.Value) {
@@ -686,5 +685,8 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		for n,m := range wantTyp.GetMethod(){
 			typ.AddMethod(n,m)
 		}
+	}
+	for _, a := range wantTyp.AnonymousField {
+	    typ.AnonymousField = append(typ.AnonymousField, a)
 	}
 }

@@ -111,3 +111,28 @@ func TestBasic_Phi(t *testing.T) {
 		ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
+
+func TestBasic_BasicStruct(t *testing.T){
+	ssatest.CheckSyntaxFlowContain(t,
+		`package main
+
+type A struct {
+	a int 
+	b int 
+	c int
+}
+
+func println(int) {}
+
+func main (){
+	t1 := &A{a:1,b:2,c:3}
+	println(t1.a)
+}
+	`, `
+	println(* #-> as $a)
+	`, map[string][]string{
+			"a":  {"1"},
+		},
+		ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
