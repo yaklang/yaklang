@@ -12,6 +12,9 @@ type getSingleExpr interface {
 }
 
 func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	defer recoverRange()
+
 	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.Expression(i); s != nil {
 			rightv, _ := b.buildExpression(s.(*gol.ExpressionContext),IslValue)
@@ -164,8 +167,17 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 }
 
 func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	defer recoverRange()
+
 	if ret := exp.Operand(); ret != nil {
 		return b.buildOperandExpression(ret.(*gol.OperandContext), IslValue)
+	}
+	if ret := exp.MethodExpr(); ret != nil {
+		return b.buildMethodExpression(ret.(*gol.MethodExprContext), IslValue)
+	}
+	if ret := exp.Conversion(); ret != nil {
+		return b.buildConversion(ret.(*gol.ConversionContext), IslValue)
 	}
 
 	var leftv *ssa.Variable = nil
@@ -217,6 +229,57 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext,IslValue
 			}
 		}
 	}
+	return rightv, leftv
+}
+
+func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue bool) (ssa.Value, *ssa.Variable){
+	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	defer recoverRange()
+	var typ ssa.Type
+	var text string
+
+	if t := exp.Type_(); t != nil {
+	    typ = b.buildType(t.(*gol.Type_Context))
+	}
+	if id := exp.IDENTIFIER(); id != nil {
+	    text = id.GetText()
+	}
+
+	_ = typ
+	_ = text
+
+	// TODO
+	return b.EmitConstInst(0), b.CreateVariable("")
+}
+
+func (b *astbuilder) buildConversion(exp *gol.ConversionContext, IslValue bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	defer recoverRange()
+	var typ ssa.Type
+	var rightv ssa.Value
+	var leftv *ssa.Variable
+
+	if t := exp.Type_(); t != nil {
+	    typ = b.buildType(t.(*gol.Type_Context))
+	}
+	if exp.Expression() != nil {
+	    rightv, leftv = b.buildExpression(exp.Expression().(*gol.ExpressionContext), IslValue)
+	}
+
+	values := []ssa.Value{rightv}
+	switch typ.GetTypeKind() {
+	case ssa.SliceTypeKind, ssa.BytesTypeKind:
+		obj := b.InterfaceAddFieldBuild(len(values),
+		func(i int) ssa.Value { 
+			return b.EmitConstInst(i) 
+		},
+		func(i int) ssa.Value { 
+			return values[i] 
+		},)
+		coverType(obj.GetType(), typ)
+		return obj, leftv
+	}
+
 	return rightv, leftv
 }
 
