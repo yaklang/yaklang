@@ -71,7 +71,7 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 	if err != nil {
 		return err
 	}
-	builder.SupportClosure = true
+	builder.SupportClosure = false
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 		cmap:            []map[string]struct{}{},

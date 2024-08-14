@@ -70,8 +70,10 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 						objt.AddField(b.EmitConstInst(mName), m.GetType())
 					}
 					funcs := map[string]*ssa.Function{}
-					for _, f := range cbp.Method {
-						funcs[f.GetName()] = f
+					for _, f := range lib.Funcs {
+						if !f.IsMethod() && f.GetName() != "init" {
+							funcs[f.GetName()] = f
+						}
 					}
 					b.AddExtendFuncs(objt.Name, funcs)
 				}
@@ -120,11 +122,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			typValue := ssa.NewTypeValue(structType)
 			typValue.SetType(structType)
 			cbp.AddStaticMember(structName, typValue)
-		}
-		for _, f := range b.GetProgram().Funcs {
-			if !f.IsMethod() && f.GetName() != "init" {
-				cbp.AddMethod(f.GetName(), f)
-			}
 		}
 	}
 
