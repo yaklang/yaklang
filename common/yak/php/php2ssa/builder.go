@@ -63,6 +63,7 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
+	b.WithExternValue(phpBuildIn)
 	startParse := func(functionBuilder *ssa.FunctionBuilder) {
 		functionBuilder.SupportClassStaticModifier = true
 		functionBuilder.SupportClass = true
@@ -73,6 +74,7 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 				cache: make(map[string]struct{}),
 				decls: make(map[string]SyntaxBuilder),
 				stack: utils.NewStack[string](),
+				spin:  make(map[string]ssa.Value),
 			},
 			FuncSyntax: &Syntax{
 				cache: make(map[string]struct{}),
@@ -90,8 +92,6 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 			}
 			build.GetProgram().GetApplication().LibraryFile[str] = files
 		}
-		build.WithExternValue(phpBuildIn)
-		build.FunctionBuilder = functionBuilder
 		build.VisitHtmlDocument(ast)
 	}
 	if b.IncludeStack.Len() <= 0 {
@@ -105,6 +105,7 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		}
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.MoreParse = b.MoreParse
+		functionBuilder.AssignVariable(functionBuilder.CreateVariable("global-container"), program.GetApplication().GlobalScope)
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

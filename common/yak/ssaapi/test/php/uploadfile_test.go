@@ -28,9 +28,11 @@ func TestUploadParsing(t *testing.T) {
 }
 
 func TestUploadParsingPart2(t *testing.T) {
-	ssatest.CheckSyntaxFlow(t, `	  <?php
-move_uploaded_file($file['tmp_name'], auto_charset($filename,'utf-8','gbk'));`,
-		`move_uploaded_file as $target`, map[string][]string{
+	code := `<?php
+move_uploaded_file($file['tmp_name'], auto_charset($filename,'utf-8','gbk'));`
+	ssatest.CheckSyntaxFlow(t, code,
+		`move_uploaded_file as $target`,
+		map[string][]string{
 			"target": {"Undefined-move_uploaded_file"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),

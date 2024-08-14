@@ -116,14 +116,15 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			defer func() {
 				y.FunctionBuilder = currentBuilder
 			}()
+			afterFunc()
 		}
 	} else {
 		if y.MoreParse {
 			return nil
 		}
 		beforfunc()
+		afterFunc()
 	}
-	afterFunc()
 	return nil
 }
 
@@ -198,6 +199,8 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 						continue
 					} else {
 						y.AssignVariable(y.CreateVariable(alias), function)
+						y.GetProgram().Funcs[alias] = function
+						y.FuncSyntax.cache[alias] = struct{}{}
 					}
 				}
 				//有两种情况，class或者整个命名空间
@@ -217,7 +220,9 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 				if library, _ := prog.GetLibrary(strings.Join(append(path, old), ".")); library != nil {
 					//todo: 可能会和常量重名
 					for _, bluePrint := range library.ClassBluePrint {
-						y.SetClassBluePrint(fmt.Sprintf("%s\\%s", old, bluePrint.Name), bluePrint)
+						name := fmt.Sprintf("%s\\%s", old, bluePrint.Name)
+						y.SetClassBluePrint(name, bluePrint)
+						y.ClassSyntax.cache[name] = struct{}{}
 					}
 					for _, function := range library.Funcs {
 						y.AssignVariable(y.CreateVariable(fmt.Sprintf("%s\\%s", old, function.GetName())), function)

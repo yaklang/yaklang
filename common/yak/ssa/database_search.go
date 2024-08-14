@@ -81,6 +81,9 @@ func matchInstructionsEx(
 	for _, up := range prog.UpStream {
 		handler(up)
 	}
+	for _, childProg := range prog.ChildApplication {
+		handler(childProg)
+	}
 	return res
 }
 

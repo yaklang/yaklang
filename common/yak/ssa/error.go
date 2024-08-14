@@ -97,7 +97,11 @@ func (prog *Program) AddError(err *SSAError) {
 	prog.errors = append(prog.errors, err)
 }
 func (prog *Program) GetErrors() SSAErrors {
-	return prog.errors
+	errs := prog.errors
+	for _, program := range prog.ChildApplication {
+		errs = append(errs, program.errors...)
+	}
+	return errs
 }
 
 func (errs SSAErrors) String() string {
