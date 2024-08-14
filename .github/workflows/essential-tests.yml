@@ -19,7 +19,7 @@ jobs:
           path: |
             ~/yakit-projects
             ${{ github.workspace }}
-          key: go-${{ github.sha }}
+          key: go-${{ github.event.pull_request.head.sha }}
 
       - name: Check out code into the Go module directory
         if: steps.cache-project.outputs.cache-hit != 'true'
@@ -221,7 +221,7 @@ jobs:
           path: |
             ~/yakit-projects
             ${{ github.workspace }}
-          key: go-${{ github.sha }}
+          key: go-${{ github.event.pull_request.head.sha }}
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
