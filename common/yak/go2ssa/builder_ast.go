@@ -1717,40 +1717,50 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 	}
 
 	if tname := typ.TypeName(); tname != nil {
-		if qul := tname.(*gol.TypeNameContext).QualifiedIdent(); qul != nil {
-			if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-				obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
-				if obj != nil {
-					ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
-					if ssatyp == nil {
-						ssatyp = ssa.CreateAnyType()
-					}
-				}
-			}
-		} else {
-			name := typ.TypeName().(*gol.TypeNameContext).IDENTIFIER().GetText()
-			if a := typ.TypeArgs(); a != nil {
-				b.tpHander[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
-			}
-			ssatyp = ssa.GetTypeByStr(name)
-			if ssatyp == nil {
-				ssatyp = b.GetAliasByStr(name)
-			}
-			if ssatyp == nil {
-				ssatyp = b.GetStructByStr(name)
-			}
-			if ssatyp == nil {
-				ssatyp = b.GetSpecialByStr(name)
-			}
-			if ssatyp == nil {
-				b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
-				ssatyp = ssa.CreateAnyType()
-			}
+		ssatyp = b.buildTypeName(tname.(*gol.TypeNameContext))
+		if a := typ.TypeArgs(); a != nil {
+			b.tpHander[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 		}
 	}
 
 	if lit := typ.TypeLit(); lit != nil {
 		ssatyp, _ = b.buildTypeLit(lit.(*gol.TypeLitContext))
+	}
+
+	return ssatyp
+}
+
+func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
+	recoverRange := b.SetRange(tname.BaseParserRuleContext)
+	defer recoverRange()
+	var ssatyp ssa.Type
+
+	if qul := tname.QualifiedIdent(); qul != nil {
+		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
+			obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
+			if obj != nil {
+				ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
+				if ssatyp == nil {
+					ssatyp = ssa.CreateAnyType()
+				}
+			}
+		}
+	} else {
+		name := tname.IDENTIFIER().GetText()
+		ssatyp = ssa.GetTypeByStr(name)
+		if ssatyp == nil {
+			ssatyp = b.GetAliasByStr(name)
+		}
+		if ssatyp == nil {
+			ssatyp = b.GetStructByStr(name)
+		}
+		if ssatyp == nil {
+			ssatyp = b.GetSpecialByStr(name)
+		}
+		if ssatyp == nil {
+			b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))
+			ssatyp = ssa.CreateAnyType()
+		}
 	}
 
 	return ssatyp

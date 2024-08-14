@@ -110,3 +110,7 @@ func ToDo() string {
 func OutofBounds(ml, vl int) string {
 	return fmt.Sprintf("index %d is out of bounds (>= %d)", ml, vl)
 }
+
+func StructNotFind(n string) string {
+	return fmt.Sprintf("struct %s not find, it may belong to the golang library", n)
+}

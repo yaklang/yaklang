@@ -421,7 +421,35 @@ func TestType_normol(t *testing.T) {
 			do(b)
 		}
 		`, []string{
-			"ParameterMember-parameter[0].Add()","ParameterMember-parameter[0].Sub()",
+			"Undefined-i.Add(valid)(Parameter-i)","Undefined-i.Sub(valid)(Parameter-i)",
 		}, t)
 	})
+}
+
+func TestType_Struct(t *testing.T) {
+	t.Run("struct inheritance", func(t *testing.T) {
+	    
+		test.CheckPrintlnValue( `package main
+
+		type A struct {
+			a int 
+			b int 
+		}
+	
+		type B struct {
+			A
+			a int
+			c int
+		}
+	
+		func main (){
+			a := A{a: 1, b: 2 }
+			b := B{A: a, a: 3, c: 4}
+			println(a.a) // 1
+			println(b.a) // 3
+			println(b.b) // 2
+		}
+		`, []string{"1","3","Undefined-b.b(valid)"}, t)
+	})
+
 }
