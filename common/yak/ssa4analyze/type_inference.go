@@ -73,6 +73,8 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	}
 
 	switch inst := inst.(type) {
+	case *ssa.Call:
+		t.TypeInferenceCall(inst)
 	case *ssa.Phi:
 		// return t.TypeInferencePhi(inst)
 	case *ssa.UnOp:
@@ -146,6 +148,71 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 
 	// only first set type, phi will change
 	phi.SetType(typs[0])
+}
+
+func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
+	iFuncType := call.Method.GetType()
+	funcType, ok := iFuncType.(*ssa.FunctionType)
+	if !ok {
+		return
+	}
+	args := call.Args
+	paramsLen := funcType.ParameterLen
+
+	var typeInferenceFunctionType func(funcType *ssa.FunctionType)
+
+	typeInferenceArgWithParam := func(arg ssa.Value, argTyp ssa.Type, paramTyp ssa.Type) {
+		if !ssa.TypeCompare(argTyp, paramTyp) {
+			return
+		}
+		if argFuncType, ok := ssa.ToFunctionType(argTyp); ok {
+			arg.SetType(paramTyp)
+			paramFuncType, _ := ssa.ToFunctionType(paramTyp)
+			if paramFuncType == nil {
+				return
+			}
+
+			argFunc, ok := ssa.ToFunction(arg)
+			if !ok {
+				return
+			}
+			argFuncParams := len(argFunc.Params)
+			for i := range argFuncType.Parameter {
+				if i >= paramFuncType.ParameterLen {
+					break
+				}
+				if i >= argFuncParams {
+					break
+				}
+				argFunc.Params[i].SetType(paramFuncType.Parameter[i])
+				argFuncType.Parameter[i] = paramFuncType.Parameter[i]
+			}
+		} else if argTyp == ssa.GetAnyType() {
+			arg.SetType(paramTyp)
+		}
+	}
+
+	typeInferenceFunctionType = func(funcType *ssa.FunctionType) {
+		for i, paramTyp := range funcType.Parameter {
+			if i >= len(args) {
+				break
+			}
+			if i == paramsLen-1 && funcType.IsVariadic {
+				for j := i; j < len(args); j++ {
+					arg := args[j]
+					paramTyp, ok := ssa.ToObjectType(paramTyp)
+					if ok && paramTyp.Kind == ssa.SliceTypeKind {
+						typeInferenceArgWithParam(arg, arg.GetType(), paramTyp.FieldType)
+					}
+				}
+				break
+			}
+
+			arg := args[i]
+			typeInferenceArgWithParam(arg, arg.GetType(), paramTyp)
+		}
+	}
+	typeInferenceFunctionType(funcType)
 }
 
 func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {

@@ -316,3 +316,10 @@ func (p *Program) GetApplication() *Program {
 	}
 	return p.Application
 }
+
+func (p *Program) GetType(name string) Type {
+	if t, ok := p.externType[name]; ok {
+		return t
+	}
+	return nil
+}
