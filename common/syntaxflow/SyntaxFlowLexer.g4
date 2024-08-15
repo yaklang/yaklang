@@ -105,7 +105,7 @@ RegexpLiteral: '/' RegexpLiteralChar+ '/';
 WS: [ \t\r]+ -> skip;
 
 mode HereDocIdentifier;
-HereDocIdentifierName: (NameString{this.recordHereDocIdentifier()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
+HereDocIdentifierName: (NameString{this.recordHereDocLabel()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
 CRLFHereDocIdentifierBreak: '\r\n'{this.recordHereDocLF()} -> popMode,pushMode(CRLFHereDoc);
 LFHereDocIdentifierBreak: '\n'{this.recordHereDocLF()} -> popMode,pushMode(LFHereDoc);
 
