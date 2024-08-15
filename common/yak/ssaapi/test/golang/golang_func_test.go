@@ -35,7 +35,7 @@ func Test_Cross_Function(t *testing.T) {
 		)
 	})
 
-	t.Run("defaut return", func(t *testing.T) {
+	t.Run("default return", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `package main
 
 		func test()(a int){
