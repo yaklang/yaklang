@@ -557,7 +557,7 @@ func (l *SyntaxFlowLexer) HereDocIdentifierName_Action(localctx antlr.RuleContex
 
 	switch actionIndex {
 	case 0:
-		this.recordHereDocIdentifier()
+		this.recordHereDocLabel()
 
 	case 1:
 		this.recordHereDocLabel()
