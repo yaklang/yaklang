@@ -216,13 +216,29 @@ type CodeRange struct {
 }
 
 func coverCodeRange(programName string, r *ssa.Range) *CodeRange {
-	return &CodeRange{
-		URL:         fmt.Sprintf("/%s/%s", programName, r.GetEditor().GetFilename()),
-		StartLine:   int64(r.GetStart().GetLine()),
-		StartColumn: int64(r.GetStart().GetColumn()),
-		EndLine:     int64(r.GetEnd().GetLine()),
-		EndColumn:   int64(r.GetEnd().GetColumn()),
+	// url := ""
+	ret := &CodeRange{
+		URL:         "",
+		StartLine:   0,
+		StartColumn: 0,
+		EndLine:     0,
+		EndColumn:   0,
 	}
+	if r == nil {
+		return ret
+	}
+	if editor := r.GetEditor(); editor != nil {
+		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
+	}
+	if start := r.GetStart(); start != nil {
+		ret.StartLine = int64(start.GetLine())
+		ret.StartColumn = int64(start.GetColumn())
+	}
+	if end := r.GetEnd(); end != nil {
+		ret.EndLine = int64(end.GetLine())
+		ret.EndColumn = int64(end.GetColumn())
+	}
+	return ret
 }
 
 type NodeInfo struct {
