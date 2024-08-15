@@ -125,7 +125,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 					}
 				}
 				return nil
-			})
+			}, ssaapi.WithLanguage(ssaapi.JAVA))
 		}
 	})
 }

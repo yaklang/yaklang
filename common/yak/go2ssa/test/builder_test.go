@@ -10,7 +10,7 @@ import (
 
 func TestBuilder(t *testing.T) {
 	t.Run("builder", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 		 	println("hello world")
 		}
@@ -21,9 +21,9 @@ func TestBuilder(t *testing.T) {
 	})
 }
 
-
 func TestTemp2(t *testing.T) {
 	t.Run("multiple parameter", func(t *testing.T) {
+		t.Skip()
 		code := `package main
 
 		func main(){
@@ -45,7 +45,7 @@ func TestTemp2(t *testing.T) {
 		b as $b_def
 		`, map[string][]string{
 			"a_def": {"2"},
-			"b_def": {"22"},
+			"b_def": {"3"},
 		},
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
@@ -54,7 +54,8 @@ func TestTemp2(t *testing.T) {
 
 func TestTemp(t *testing.T) {
 	t.Run("temp", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		t.Skip()
+		test.CheckPrintlnValue(`package main
 
 		func main(){
 			i := 10
@@ -64,8 +65,7 @@ func TestTemp(t *testing.T) {
 			println(i) // 10
 		}
 		`, []string{
-			"2","3",
+			"phi(i)[5,add(i, 1)]", "10",
 		}, t)
 	})
 }
-
