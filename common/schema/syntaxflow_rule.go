@@ -1,11 +1,12 @@
 package schema
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 type SyntaxFlowRulePurposeType string
@@ -82,7 +83,7 @@ type SyntaxFlowRule struct {
 	// if the rule is not set, all languages will be used.
 	Language string
 
-	RuleName    string
+	RuleName    string `gorm:"unique_index"`
 	Title       string
 	TitleZh     string
 	Description string
