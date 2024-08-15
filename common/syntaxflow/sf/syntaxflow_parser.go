@@ -35,28 +35,30 @@ func syntaxflowparserParserInit() {
 		"", "'==>'", "'...'", "'%%'", "'..'", "'<='", "'>='", "'>>'", "'=>'",
 		"'=='", "'=~'", "'!~'", "'&&'", "'||'", "'!='", "'${'", "';'", "'?{'",
 		"'-{'", "'->'", "'}->'", "'-->'", "'#{'", "'#>'", "'#->'", "'>'", "'.'",
-		"'<'", "'='", "'+'", "'&'", "'?'", "'('", "','", "')'", "'['", "']'",
-		"'{'", "'}'", "'#'", "'$'", "':'", "'%'", "'!'", "'*'", "'-'", "'as'",
-		"'`'", "'''", "'\"'", "", "'\\n'", "", "", "", "", "", "'str'", "'list'",
-		"'dict'", "", "'bool'", "", "'alert'", "'check'", "'then'", "", "'else'",
-		"'type'", "'in'", "'call'", "'function'", "", "'phi'", "", "", "'opcode'",
-		"'have'", "'any'", "'not'", "'for'",
+		"'<<<'", "'<'", "'='", "'+'", "'&'", "'?'", "'('", "','", "')'", "'['",
+		"']'", "'{'", "'}'", "'#'", "'$'", "':'", "'%'", "'!'", "'*'", "'-'",
+		"'as'", "'`'", "'''", "'\"'", "", "'\\n'", "", "", "", "", "", "'str'",
+		"'list'", "'dict'", "", "'bool'", "", "'alert'", "'check'", "'then'",
+		"", "'else'", "'type'", "'in'", "'call'", "'function'", "", "'phi'",
+		"", "", "'opcode'", "'have'", "'any'", "'not'", "'for'",
 	}
 	staticData.symbolicNames = []string{
 		"", "DeepFilter", "Deep", "Percent", "DeepDot", "LtEq", "GtEq", "DoubleGt",
 		"Filter", "EqEq", "RegexpMatch", "NotRegexpMatch", "And", "Or", "NotEq",
 		"DollarBraceOpen", "Semicolon", "ConditionStart", "DeepNextStart", "UseStart",
 		"DeepNextEnd", "DeepNext", "TopDefStart", "DefStart", "TopDef", "Gt",
-		"Dot", "Lt", "Eq", "Add", "Amp", "Question", "OpenParen", "Comma", "CloseParen",
-		"ListSelectOpen", "ListSelectClose", "MapBuilderOpen", "MapBuilderClose",
-		"ListStart", "DollarOutput", "Colon", "Search", "Bang", "Star", "Minus",
-		"As", "Backtick", "SingleQuote", "DoubleQuote", "LineComment", "BreakLine",
-		"WhiteSpace", "Number", "OctalNumber", "BinaryNumber", "HexNumber",
-		"StringType", "ListType", "DictType", "NumberType", "BoolType", "BoolLiteral",
-		"Alert", "Check", "Then", "Desc", "Else", "Type", "In", "Call", "Function",
-		"Constant", "Phi", "FormalParam", "Return", "Opcode", "Have", "HaveAny",
-		"Not", "For", "Identifier", "IdentifierChar", "QuotedStringLiteral",
-		"RegexpLiteral", "WS",
+		"Dot", "StartNowDoc", "Lt", "Eq", "Add", "Amp", "Question", "OpenParen",
+		"Comma", "CloseParen", "ListSelectOpen", "ListSelectClose", "MapBuilderOpen",
+		"MapBuilderClose", "ListStart", "DollarOutput", "Colon", "Search", "Bang",
+		"Star", "Minus", "As", "Backtick", "SingleQuote", "DoubleQuote", "LineComment",
+		"BreakLine", "WhiteSpace", "Number", "OctalNumber", "BinaryNumber",
+		"HexNumber", "StringType", "ListType", "DictType", "NumberType", "BoolType",
+		"BoolLiteral", "Alert", "Check", "Then", "Desc", "Else", "Type", "In",
+		"Call", "Function", "Constant", "Phi", "FormalParam", "Return", "Opcode",
+		"Have", "HaveAny", "Not", "For", "Identifier", "IdentifierChar", "QuotedStringLiteral",
+		"RegexpLiteral", "WS", "HereDocIdentifierName", "CRLFHereDocIdentifierBreak",
+		"LFHereDocIdentifierBreak", "CRLFEndDoc", "CRLFHereDocText", "LFEndDoc",
+		"LFHereDocText",
 	}
 	staticData.ruleNames = []string{
 		"flow", "statements", "statement", "fileFilterContentStatement", "fileFilterContentInput",
@@ -75,7 +77,7 @@ func syntaxflowparserParserInit() {
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 85, 648, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 93, 648, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
 		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
 		2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20, 2,
@@ -147,9 +149,9 @@ func syntaxflowparserParserInit() {
 		1, 53, 1, 54, 1, 54, 1, 54, 0, 1, 90, 55, 0, 2, 4, 6, 8, 10, 12, 14, 16,
 		18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52,
 		54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88,
-		90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 0, 8, 2, 0, 28, 28, 41, 41,
-		1, 0, 47, 47, 2, 0, 43, 43, 79, 79, 5, 0, 5, 6, 9, 9, 14, 14, 25, 25, 27,
-		28, 1, 0, 10, 11, 1, 0, 53, 56, 1, 0, 70, 75, 1, 0, 57, 61, 729, 0, 110,
+		90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 0, 8, 2, 0, 29, 29, 42, 42,
+		1, 0, 48, 48, 2, 0, 44, 44, 80, 80, 5, 0, 5, 6, 9, 9, 14, 14, 25, 25, 28,
+		29, 1, 0, 10, 11, 1, 0, 54, 57, 1, 0, 71, 76, 1, 0, 58, 62, 729, 0, 110,
 		1, 0, 0, 0, 2, 114, 1, 0, 0, 0, 4, 143, 1, 0, 0, 0, 6, 145, 1, 0, 0, 0,
 		8, 159, 1, 0, 0, 0, 10, 161, 1, 0, 0, 0, 12, 168, 1, 0, 0, 0, 14, 192,
 		1, 0, 0, 0, 16, 196, 1, 0, 0, 0, 18, 199, 1, 0, 0, 0, 20, 201, 1, 0, 0,
@@ -181,67 +183,67 @@ func syntaxflowparserParserInit() {
 		0, 143, 118, 1, 0, 0, 0, 143, 122, 1, 0, 0, 0, 143, 126, 1, 0, 0, 0, 143,
 		130, 1, 0, 0, 0, 143, 134, 1, 0, 0, 0, 143, 138, 1, 0, 0, 0, 143, 142,
 		1, 0, 0, 0, 144, 5, 1, 0, 0, 0, 145, 146, 5, 15, 0, 0, 146, 147, 3, 8,
-		4, 0, 147, 149, 5, 38, 0, 0, 148, 150, 3, 30, 15, 0, 149, 148, 1, 0, 0,
+		4, 0, 147, 149, 5, 39, 0, 0, 148, 150, 3, 30, 15, 0, 149, 148, 1, 0, 0,
 		0, 149, 150, 1, 0, 0, 0, 150, 151, 1, 0, 0, 0, 151, 152, 5, 26, 0, 0, 152,
-		155, 3, 10, 5, 0, 153, 154, 5, 46, 0, 0, 154, 156, 3, 46, 23, 0, 155, 153,
+		155, 3, 10, 5, 0, 153, 154, 5, 47, 0, 0, 154, 156, 3, 46, 23, 0, 155, 153,
 		1, 0, 0, 0, 155, 156, 1, 0, 0, 0, 156, 7, 1, 0, 0, 0, 157, 160, 3, 20,
 		10, 0, 158, 160, 3, 98, 49, 0, 159, 157, 1, 0, 0, 0, 159, 158, 1, 0, 0,
-		0, 160, 9, 1, 0, 0, 0, 161, 162, 5, 81, 0, 0, 162, 164, 5, 32, 0, 0, 163,
+		0, 160, 9, 1, 0, 0, 0, 161, 162, 5, 82, 0, 0, 162, 164, 5, 33, 0, 0, 163,
 		165, 3, 12, 6, 0, 164, 163, 1, 0, 0, 0, 164, 165, 1, 0, 0, 0, 165, 166,
-		1, 0, 0, 0, 166, 167, 5, 34, 0, 0, 167, 11, 1, 0, 0, 0, 168, 170, 3, 14,
+		1, 0, 0, 0, 166, 167, 5, 35, 0, 0, 167, 11, 1, 0, 0, 0, 168, 170, 3, 14,
 		7, 0, 169, 171, 3, 30, 15, 0, 170, 169, 1, 0, 0, 0, 170, 171, 1, 0, 0,
-		0, 171, 182, 1, 0, 0, 0, 172, 174, 5, 33, 0, 0, 173, 175, 3, 30, 15, 0,
+		0, 171, 182, 1, 0, 0, 0, 172, 174, 5, 34, 0, 0, 173, 175, 3, 30, 15, 0,
 		174, 173, 1, 0, 0, 0, 174, 175, 1, 0, 0, 0, 175, 176, 1, 0, 0, 0, 176,
 		178, 3, 14, 7, 0, 177, 179, 3, 30, 15, 0, 178, 177, 1, 0, 0, 0, 178, 179,
 		1, 0, 0, 0, 179, 181, 1, 0, 0, 0, 180, 172, 1, 0, 0, 0, 181, 184, 1, 0,
 		0, 0, 182, 180, 1, 0, 0, 0, 182, 183, 1, 0, 0, 0, 183, 186, 1, 0, 0, 0,
-		184, 182, 1, 0, 0, 0, 185, 187, 5, 33, 0, 0, 186, 185, 1, 0, 0, 0, 186,
+		184, 182, 1, 0, 0, 0, 185, 187, 5, 34, 0, 0, 186, 185, 1, 0, 0, 0, 186,
 		187, 1, 0, 0, 0, 187, 189, 1, 0, 0, 0, 188, 190, 3, 30, 15, 0, 189, 188,
 		1, 0, 0, 0, 189, 190, 1, 0, 0, 0, 190, 13, 1, 0, 0, 0, 191, 193, 3, 16,
 		8, 0, 192, 191, 1, 0, 0, 0, 192, 193, 1, 0, 0, 0, 193, 194, 1, 0, 0, 0,
-		194, 195, 3, 18, 9, 0, 195, 15, 1, 0, 0, 0, 196, 197, 5, 81, 0, 0, 197,
-		198, 5, 41, 0, 0, 198, 17, 1, 0, 0, 0, 199, 200, 3, 82, 41, 0, 200, 19,
+		194, 195, 3, 18, 9, 0, 195, 15, 1, 0, 0, 0, 196, 197, 5, 82, 0, 0, 197,
+		198, 5, 42, 0, 0, 198, 17, 1, 0, 0, 0, 199, 200, 3, 82, 41, 0, 200, 19,
 		1, 0, 0, 0, 201, 206, 3, 82, 41, 0, 202, 203, 9, 0, 0, 0, 203, 205, 3,
 		82, 41, 0, 204, 202, 1, 0, 0, 0, 205, 208, 1, 0, 0, 0, 206, 204, 1, 0,
 		0, 0, 206, 207, 1, 0, 0, 0, 207, 21, 1, 0, 0, 0, 208, 206, 1, 0, 0, 0,
 		209, 213, 3, 46, 23, 0, 210, 212, 3, 50, 25, 0, 211, 210, 1, 0, 0, 0, 212,
 		215, 1, 0, 0, 0, 213, 211, 1, 0, 0, 0, 213, 214, 1, 0, 0, 0, 214, 218,
-		1, 0, 0, 0, 215, 213, 1, 0, 0, 0, 216, 217, 5, 46, 0, 0, 217, 219, 3, 46,
+		1, 0, 0, 0, 215, 213, 1, 0, 0, 0, 216, 217, 5, 47, 0, 0, 217, 219, 3, 46,
 		23, 0, 218, 216, 1, 0, 0, 0, 218, 219, 1, 0, 0, 0, 219, 226, 1, 0, 0, 0,
-		220, 223, 3, 52, 26, 0, 221, 222, 5, 46, 0, 0, 222, 224, 3, 46, 23, 0,
+		220, 223, 3, 52, 26, 0, 221, 222, 5, 47, 0, 0, 222, 224, 3, 46, 23, 0,
 		223, 221, 1, 0, 0, 0, 223, 224, 1, 0, 0, 0, 224, 226, 1, 0, 0, 0, 225,
 		209, 1, 0, 0, 0, 225, 220, 1, 0, 0, 0, 226, 23, 1, 0, 0, 0, 227, 228, 5,
-		50, 0, 0, 228, 25, 1, 0, 0, 0, 229, 232, 5, 16, 0, 0, 230, 232, 3, 28,
+		51, 0, 0, 228, 25, 1, 0, 0, 0, 229, 232, 5, 16, 0, 0, 230, 232, 3, 28,
 		14, 0, 231, 229, 1, 0, 0, 0, 231, 230, 1, 0, 0, 0, 232, 27, 1, 0, 0, 0,
-		233, 234, 5, 51, 0, 0, 234, 29, 1, 0, 0, 0, 235, 237, 3, 28, 14, 0, 236,
+		233, 234, 5, 52, 0, 0, 234, 29, 1, 0, 0, 0, 235, 237, 3, 28, 14, 0, 236,
 		235, 1, 0, 0, 0, 237, 238, 1, 0, 0, 0, 238, 236, 1, 0, 0, 0, 238, 239,
-		1, 0, 0, 0, 239, 31, 1, 0, 0, 0, 240, 241, 5, 66, 0, 0, 241, 243, 5, 32,
+		1, 0, 0, 0, 239, 31, 1, 0, 0, 0, 240, 241, 5, 67, 0, 0, 241, 243, 5, 33,
 		0, 0, 242, 244, 3, 34, 17, 0, 243, 242, 1, 0, 0, 0, 243, 244, 1, 0, 0,
-		0, 244, 245, 1, 0, 0, 0, 245, 252, 5, 34, 0, 0, 246, 248, 5, 37, 0, 0,
+		0, 244, 245, 1, 0, 0, 0, 245, 252, 5, 35, 0, 0, 246, 248, 5, 38, 0, 0,
 		247, 249, 3, 34, 17, 0, 248, 247, 1, 0, 0, 0, 248, 249, 1, 0, 0, 0, 249,
-		250, 1, 0, 0, 0, 250, 252, 5, 38, 0, 0, 251, 240, 1, 0, 0, 0, 251, 246,
+		250, 1, 0, 0, 0, 250, 252, 5, 39, 0, 0, 251, 240, 1, 0, 0, 0, 251, 246,
 		1, 0, 0, 0, 252, 33, 1, 0, 0, 0, 253, 255, 3, 30, 15, 0, 254, 253, 1, 0,
 		0, 0, 254, 255, 1, 0, 0, 0, 255, 256, 1, 0, 0, 0, 256, 264, 3, 36, 18,
-		0, 257, 259, 5, 33, 0, 0, 258, 260, 3, 30, 15, 0, 259, 258, 1, 0, 0, 0,
+		0, 257, 259, 5, 34, 0, 0, 258, 260, 3, 30, 15, 0, 259, 258, 1, 0, 0, 0,
 		259, 260, 1, 0, 0, 0, 260, 261, 1, 0, 0, 0, 261, 263, 3, 36, 18, 0, 262,
 		257, 1, 0, 0, 0, 263, 266, 1, 0, 0, 0, 264, 262, 1, 0, 0, 0, 264, 265,
-		1, 0, 0, 0, 265, 268, 1, 0, 0, 0, 266, 264, 1, 0, 0, 0, 267, 269, 5, 33,
+		1, 0, 0, 0, 265, 268, 1, 0, 0, 0, 266, 264, 1, 0, 0, 0, 267, 269, 5, 34,
 		0, 0, 268, 267, 1, 0, 0, 0, 268, 269, 1, 0, 0, 0, 269, 271, 1, 0, 0, 0,
 		270, 272, 3, 30, 15, 0, 271, 270, 1, 0, 0, 0, 271, 272, 1, 0, 0, 0, 272,
 		35, 1, 0, 0, 0, 273, 275, 3, 94, 47, 0, 274, 276, 3, 30, 15, 0, 275, 274,
 		1, 0, 0, 0, 275, 276, 1, 0, 0, 0, 276, 284, 1, 0, 0, 0, 277, 278, 3, 94,
-		47, 0, 278, 279, 5, 41, 0, 0, 279, 281, 3, 94, 47, 0, 280, 282, 3, 30,
+		47, 0, 278, 279, 5, 42, 0, 0, 279, 281, 3, 94, 47, 0, 280, 282, 3, 30,
 		15, 0, 281, 280, 1, 0, 0, 0, 281, 282, 1, 0, 0, 0, 282, 284, 1, 0, 0, 0,
 		283, 273, 1, 0, 0, 0, 283, 277, 1, 0, 0, 0, 284, 37, 1, 0, 0, 0, 285, 286,
-		5, 63, 0, 0, 286, 289, 3, 46, 23, 0, 287, 288, 5, 80, 0, 0, 288, 290, 3,
+		5, 64, 0, 0, 286, 289, 3, 46, 23, 0, 287, 288, 5, 81, 0, 0, 288, 290, 3,
 		94, 47, 0, 289, 287, 1, 0, 0, 0, 289, 290, 1, 0, 0, 0, 290, 39, 1, 0, 0,
-		0, 291, 292, 5, 64, 0, 0, 292, 294, 3, 46, 23, 0, 293, 295, 3, 42, 21,
+		0, 291, 292, 5, 65, 0, 0, 292, 294, 3, 46, 23, 0, 293, 295, 3, 42, 21,
 		0, 294, 293, 1, 0, 0, 0, 294, 295, 1, 0, 0, 0, 295, 297, 1, 0, 0, 0, 296,
 		298, 3, 44, 22, 0, 297, 296, 1, 0, 0, 0, 297, 298, 1, 0, 0, 0, 298, 41,
-		1, 0, 0, 0, 299, 300, 5, 65, 0, 0, 300, 301, 3, 94, 47, 0, 301, 43, 1,
-		0, 0, 0, 302, 303, 5, 67, 0, 0, 303, 304, 3, 94, 47, 0, 304, 45, 1, 0,
-		0, 0, 305, 311, 5, 40, 0, 0, 306, 312, 3, 100, 50, 0, 307, 308, 5, 32,
-		0, 0, 308, 309, 3, 100, 50, 0, 309, 310, 5, 34, 0, 0, 310, 312, 1, 0, 0,
+		1, 0, 0, 0, 299, 300, 5, 66, 0, 0, 300, 301, 3, 94, 47, 0, 301, 43, 1,
+		0, 0, 0, 302, 303, 5, 68, 0, 0, 303, 304, 3, 94, 47, 0, 304, 45, 1, 0,
+		0, 0, 305, 311, 5, 41, 0, 0, 306, 312, 3, 100, 50, 0, 307, 308, 5, 33,
+		0, 0, 308, 309, 3, 100, 50, 0, 309, 310, 5, 35, 0, 0, 310, 312, 1, 0, 0,
 		0, 311, 306, 1, 0, 0, 0, 311, 307, 1, 0, 0, 0, 312, 47, 1, 0, 0, 0, 313,
 		321, 3, 82, 41, 0, 314, 316, 5, 26, 0, 0, 315, 317, 3, 30, 15, 0, 316,
 		315, 1, 0, 0, 0, 316, 317, 1, 0, 0, 0, 317, 318, 1, 0, 0, 0, 318, 321,
@@ -249,48 +251,48 @@ func syntaxflowparserParserInit() {
 		0, 0, 0, 320, 319, 1, 0, 0, 0, 321, 49, 1, 0, 0, 0, 322, 365, 3, 48, 24,
 		0, 323, 325, 5, 2, 0, 0, 324, 326, 3, 30, 15, 0, 325, 324, 1, 0, 0, 0,
 		325, 326, 1, 0, 0, 0, 326, 327, 1, 0, 0, 0, 327, 365, 3, 82, 41, 0, 328,
-		330, 5, 32, 0, 0, 329, 331, 3, 30, 15, 0, 330, 329, 1, 0, 0, 0, 330, 331,
+		330, 5, 33, 0, 0, 329, 331, 3, 30, 15, 0, 330, 329, 1, 0, 0, 0, 330, 331,
 		1, 0, 0, 0, 331, 333, 1, 0, 0, 0, 332, 334, 3, 68, 34, 0, 333, 332, 1,
-		0, 0, 0, 333, 334, 1, 0, 0, 0, 334, 335, 1, 0, 0, 0, 335, 365, 5, 34, 0,
-		0, 336, 337, 5, 35, 0, 0, 337, 338, 3, 80, 40, 0, 338, 339, 5, 36, 0, 0,
+		0, 0, 0, 333, 334, 1, 0, 0, 0, 334, 335, 1, 0, 0, 0, 335, 365, 5, 35, 0,
+		0, 336, 337, 5, 36, 0, 0, 337, 338, 3, 80, 40, 0, 338, 339, 5, 37, 0, 0,
 		339, 365, 1, 0, 0, 0, 340, 341, 5, 17, 0, 0, 341, 342, 3, 90, 45, 0, 342,
-		343, 5, 38, 0, 0, 343, 365, 1, 0, 0, 0, 344, 365, 5, 19, 0, 0, 345, 365,
+		343, 5, 39, 0, 0, 343, 365, 1, 0, 0, 0, 344, 365, 5, 19, 0, 0, 345, 365,
 		5, 23, 0, 0, 346, 365, 5, 21, 0, 0, 347, 349, 5, 18, 0, 0, 348, 350, 3,
 		74, 37, 0, 349, 348, 1, 0, 0, 0, 349, 350, 1, 0, 0, 0, 350, 351, 1, 0,
 		0, 0, 351, 365, 5, 20, 0, 0, 352, 365, 5, 24, 0, 0, 353, 355, 5, 22, 0,
 		0, 354, 356, 3, 74, 37, 0, 355, 354, 1, 0, 0, 0, 355, 356, 1, 0, 0, 0,
-		356, 357, 1, 0, 0, 0, 357, 365, 5, 20, 0, 0, 358, 359, 5, 29, 0, 0, 359,
-		365, 3, 46, 23, 0, 360, 361, 5, 45, 0, 0, 361, 365, 3, 46, 23, 0, 362,
-		363, 5, 30, 0, 0, 363, 365, 3, 46, 23, 0, 364, 322, 1, 0, 0, 0, 364, 323,
+		356, 357, 1, 0, 0, 0, 357, 365, 5, 20, 0, 0, 358, 359, 5, 30, 0, 0, 359,
+		365, 3, 46, 23, 0, 360, 361, 5, 46, 0, 0, 361, 365, 3, 46, 23, 0, 362,
+		363, 5, 31, 0, 0, 363, 365, 3, 46, 23, 0, 364, 322, 1, 0, 0, 0, 364, 323,
 		1, 0, 0, 0, 364, 328, 1, 0, 0, 0, 364, 336, 1, 0, 0, 0, 364, 340, 1, 0,
 		0, 0, 364, 344, 1, 0, 0, 0, 364, 345, 1, 0, 0, 0, 364, 346, 1, 0, 0, 0,
 		364, 347, 1, 0, 0, 0, 364, 352, 1, 0, 0, 0, 364, 353, 1, 0, 0, 0, 364,
 		358, 1, 0, 0, 0, 364, 360, 1, 0, 0, 0, 364, 362, 1, 0, 0, 0, 365, 51, 1,
 		0, 0, 0, 366, 370, 3, 48, 24, 0, 367, 369, 3, 50, 25, 0, 368, 367, 1, 0,
 		0, 0, 369, 372, 1, 0, 0, 0, 370, 368, 1, 0, 0, 0, 370, 371, 1, 0, 0, 0,
-		371, 53, 1, 0, 0, 0, 372, 370, 1, 0, 0, 0, 373, 374, 5, 27, 0, 0, 374,
+		371, 53, 1, 0, 0, 0, 372, 370, 1, 0, 0, 0, 373, 374, 5, 28, 0, 0, 374,
 		375, 3, 56, 28, 0, 375, 376, 5, 25, 0, 0, 376, 55, 1, 0, 0, 0, 377, 379,
 		3, 100, 50, 0, 378, 380, 3, 58, 29, 0, 379, 378, 1, 0, 0, 0, 379, 380,
-		1, 0, 0, 0, 380, 57, 1, 0, 0, 0, 381, 383, 5, 37, 0, 0, 382, 384, 3, 60,
+		1, 0, 0, 0, 380, 57, 1, 0, 0, 0, 381, 383, 5, 38, 0, 0, 382, 384, 3, 60,
 		30, 0, 383, 382, 1, 0, 0, 0, 383, 384, 1, 0, 0, 0, 384, 385, 1, 0, 0, 0,
-		385, 392, 5, 38, 0, 0, 386, 388, 5, 32, 0, 0, 387, 389, 3, 60, 30, 0, 388,
+		385, 392, 5, 39, 0, 0, 386, 388, 5, 33, 0, 0, 387, 389, 3, 60, 30, 0, 388,
 		387, 1, 0, 0, 0, 388, 389, 1, 0, 0, 0, 389, 390, 1, 0, 0, 0, 390, 392,
-		5, 34, 0, 0, 391, 381, 1, 0, 0, 0, 391, 386, 1, 0, 0, 0, 392, 59, 1, 0,
+		5, 35, 0, 0, 391, 381, 1, 0, 0, 0, 391, 386, 1, 0, 0, 0, 392, 59, 1, 0,
 		0, 0, 393, 395, 3, 30, 15, 0, 394, 393, 1, 0, 0, 0, 394, 395, 1, 0, 0,
-		0, 395, 396, 1, 0, 0, 0, 396, 404, 3, 62, 31, 0, 397, 399, 5, 33, 0, 0,
+		0, 395, 396, 1, 0, 0, 0, 396, 404, 3, 62, 31, 0, 397, 399, 5, 34, 0, 0,
 		398, 400, 3, 30, 15, 0, 399, 398, 1, 0, 0, 0, 399, 400, 1, 0, 0, 0, 400,
 		401, 1, 0, 0, 0, 401, 403, 3, 62, 31, 0, 402, 397, 1, 0, 0, 0, 403, 406,
 		1, 0, 0, 0, 404, 402, 1, 0, 0, 0, 404, 405, 1, 0, 0, 0, 405, 408, 1, 0,
-		0, 0, 406, 404, 1, 0, 0, 0, 407, 409, 5, 33, 0, 0, 408, 407, 1, 0, 0, 0,
+		0, 0, 406, 404, 1, 0, 0, 0, 407, 409, 5, 34, 0, 0, 408, 407, 1, 0, 0, 0,
 		408, 409, 1, 0, 0, 0, 409, 411, 1, 0, 0, 0, 410, 412, 3, 30, 15, 0, 411,
 		410, 1, 0, 0, 0, 411, 412, 1, 0, 0, 0, 412, 61, 1, 0, 0, 0, 413, 414, 3,
 		64, 32, 0, 414, 415, 7, 0, 0, 0, 415, 417, 1, 0, 0, 0, 416, 413, 1, 0,
 		0, 0, 416, 417, 1, 0, 0, 0, 417, 418, 1, 0, 0, 0, 418, 419, 3, 66, 33,
 		0, 419, 63, 1, 0, 0, 0, 420, 421, 3, 100, 50, 0, 421, 65, 1, 0, 0, 0, 422,
-		435, 3, 100, 50, 0, 423, 435, 3, 92, 46, 0, 424, 428, 5, 47, 0, 0, 425,
+		435, 3, 100, 50, 0, 423, 435, 3, 92, 46, 0, 424, 428, 5, 48, 0, 0, 425,
 		427, 8, 1, 0, 0, 426, 425, 1, 0, 0, 0, 427, 430, 1, 0, 0, 0, 428, 426,
 		1, 0, 0, 0, 428, 429, 1, 0, 0, 0, 429, 431, 1, 0, 0, 0, 430, 428, 1, 0,
-		0, 0, 431, 435, 5, 47, 0, 0, 432, 433, 5, 40, 0, 0, 433, 435, 3, 100, 50,
+		0, 0, 431, 435, 5, 48, 0, 0, 432, 433, 5, 41, 0, 0, 433, 435, 3, 100, 50,
 		0, 434, 422, 1, 0, 0, 0, 434, 423, 1, 0, 0, 0, 434, 424, 1, 0, 0, 0, 434,
 		432, 1, 0, 0, 0, 435, 67, 1, 0, 0, 0, 436, 438, 3, 72, 36, 0, 437, 439,
 		3, 30, 15, 0, 438, 437, 1, 0, 0, 0, 438, 439, 1, 0, 0, 0, 439, 452, 1,
@@ -299,54 +301,54 @@ func syntaxflowparserParserInit() {
 		445, 447, 3, 72, 36, 0, 446, 445, 1, 0, 0, 0, 446, 447, 1, 0, 0, 0, 447,
 		449, 1, 0, 0, 0, 448, 450, 3, 30, 15, 0, 449, 448, 1, 0, 0, 0, 449, 450,
 		1, 0, 0, 0, 450, 452, 1, 0, 0, 0, 451, 436, 1, 0, 0, 0, 451, 441, 1, 0,
-		0, 0, 452, 69, 1, 0, 0, 0, 453, 454, 3, 72, 36, 0, 454, 455, 5, 33, 0,
-		0, 455, 458, 1, 0, 0, 0, 456, 458, 5, 33, 0, 0, 457, 453, 1, 0, 0, 0, 457,
+		0, 0, 452, 69, 1, 0, 0, 0, 453, 454, 3, 72, 36, 0, 454, 455, 5, 34, 0,
+		0, 455, 458, 1, 0, 0, 0, 456, 458, 5, 34, 0, 0, 457, 453, 1, 0, 0, 0, 457,
 		456, 1, 0, 0, 0, 458, 71, 1, 0, 0, 0, 459, 466, 5, 23, 0, 0, 460, 462,
 		5, 22, 0, 0, 461, 463, 3, 74, 37, 0, 462, 461, 1, 0, 0, 0, 462, 463, 1,
-		0, 0, 0, 463, 464, 1, 0, 0, 0, 464, 466, 5, 38, 0, 0, 465, 459, 1, 0, 0,
+		0, 0, 0, 463, 464, 1, 0, 0, 0, 464, 466, 5, 39, 0, 0, 465, 459, 1, 0, 0,
 		0, 465, 460, 1, 0, 0, 0, 465, 466, 1, 0, 0, 0, 466, 467, 1, 0, 0, 0, 467,
 		468, 3, 22, 11, 0, 468, 73, 1, 0, 0, 0, 469, 474, 3, 76, 38, 0, 470, 471,
-		5, 33, 0, 0, 471, 473, 3, 76, 38, 0, 472, 470, 1, 0, 0, 0, 473, 476, 1,
+		5, 34, 0, 0, 471, 473, 3, 76, 38, 0, 472, 470, 1, 0, 0, 0, 473, 476, 1,
 		0, 0, 0, 474, 472, 1, 0, 0, 0, 474, 475, 1, 0, 0, 0, 475, 478, 1, 0, 0,
-		0, 476, 474, 1, 0, 0, 0, 477, 479, 5, 33, 0, 0, 478, 477, 1, 0, 0, 0, 478,
+		0, 476, 474, 1, 0, 0, 0, 477, 479, 5, 34, 0, 0, 478, 477, 1, 0, 0, 0, 478,
 		479, 1, 0, 0, 0, 479, 75, 1, 0, 0, 0, 480, 482, 3, 28, 14, 0, 481, 480,
 		1, 0, 0, 0, 481, 482, 1, 0, 0, 0, 482, 483, 1, 0, 0, 0, 483, 484, 3, 100,
-		50, 0, 484, 485, 5, 41, 0, 0, 485, 487, 3, 78, 39, 0, 486, 488, 3, 30,
+		50, 0, 484, 485, 5, 42, 0, 0, 485, 487, 3, 78, 39, 0, 486, 488, 3, 30,
 		15, 0, 487, 486, 1, 0, 0, 0, 487, 488, 1, 0, 0, 0, 488, 77, 1, 0, 0, 0,
 		489, 492, 3, 100, 50, 0, 490, 492, 3, 92, 46, 0, 491, 489, 1, 0, 0, 0,
-		491, 490, 1, 0, 0, 0, 492, 498, 1, 0, 0, 0, 493, 494, 5, 47, 0, 0, 494,
-		495, 3, 22, 11, 0, 495, 496, 5, 47, 0, 0, 496, 498, 1, 0, 0, 0, 497, 491,
+		491, 490, 1, 0, 0, 0, 492, 498, 1, 0, 0, 0, 493, 494, 5, 48, 0, 0, 494,
+		495, 3, 22, 11, 0, 495, 496, 5, 48, 0, 0, 496, 498, 1, 0, 0, 0, 497, 491,
 		1, 0, 0, 0, 497, 493, 1, 0, 0, 0, 498, 79, 1, 0, 0, 0, 499, 502, 3, 82,
 		41, 0, 500, 502, 3, 92, 46, 0, 501, 499, 1, 0, 0, 0, 501, 500, 1, 0, 0,
-		0, 502, 81, 1, 0, 0, 0, 503, 507, 5, 44, 0, 0, 504, 507, 3, 100, 50, 0,
+		0, 502, 81, 1, 0, 0, 0, 503, 507, 5, 45, 0, 0, 504, 507, 3, 100, 50, 0,
 		505, 507, 3, 98, 49, 0, 506, 503, 1, 0, 0, 0, 506, 504, 1, 0, 0, 0, 506,
-		505, 1, 0, 0, 0, 507, 83, 1, 0, 0, 0, 508, 518, 5, 35, 0, 0, 509, 514,
-		3, 2, 1, 0, 510, 511, 5, 33, 0, 0, 511, 513, 3, 2, 1, 0, 512, 510, 1, 0,
+		505, 1, 0, 0, 0, 507, 83, 1, 0, 0, 0, 508, 518, 5, 36, 0, 0, 509, 514,
+		3, 2, 1, 0, 510, 511, 5, 34, 0, 0, 511, 513, 3, 2, 1, 0, 512, 510, 1, 0,
 		0, 0, 513, 516, 1, 0, 0, 0, 514, 512, 1, 0, 0, 0, 514, 515, 1, 0, 0, 0,
 		515, 519, 1, 0, 0, 0, 516, 514, 1, 0, 0, 0, 517, 519, 5, 2, 0, 0, 518,
 		509, 1, 0, 0, 0, 518, 517, 1, 0, 0, 0, 519, 520, 1, 0, 0, 0, 520, 544,
-		5, 36, 0, 0, 521, 537, 5, 37, 0, 0, 522, 523, 3, 100, 50, 0, 523, 524,
-		5, 41, 0, 0, 524, 525, 1, 0, 0, 0, 525, 534, 3, 2, 1, 0, 526, 527, 5, 16,
-		0, 0, 527, 528, 3, 100, 50, 0, 528, 529, 5, 41, 0, 0, 529, 530, 1, 0, 0,
+		5, 37, 0, 0, 521, 537, 5, 38, 0, 0, 522, 523, 3, 100, 50, 0, 523, 524,
+		5, 42, 0, 0, 524, 525, 1, 0, 0, 0, 525, 534, 3, 2, 1, 0, 526, 527, 5, 16,
+		0, 0, 527, 528, 3, 100, 50, 0, 528, 529, 5, 42, 0, 0, 529, 530, 1, 0, 0,
 		0, 530, 531, 3, 2, 1, 0, 531, 533, 1, 0, 0, 0, 532, 526, 1, 0, 0, 0, 533,
 		536, 1, 0, 0, 0, 534, 532, 1, 0, 0, 0, 534, 535, 1, 0, 0, 0, 535, 538,
 		1, 0, 0, 0, 536, 534, 1, 0, 0, 0, 537, 522, 1, 0, 0, 0, 537, 538, 1, 0,
 		0, 0, 538, 540, 1, 0, 0, 0, 539, 541, 5, 16, 0, 0, 540, 539, 1, 0, 0, 0,
-		540, 541, 1, 0, 0, 0, 541, 542, 1, 0, 0, 0, 542, 544, 5, 38, 0, 0, 543,
+		540, 541, 1, 0, 0, 0, 541, 542, 1, 0, 0, 0, 542, 544, 5, 39, 0, 0, 543,
 		508, 1, 0, 0, 0, 543, 521, 1, 0, 0, 0, 544, 85, 1, 0, 0, 0, 545, 550, 3,
-		96, 48, 0, 546, 547, 5, 33, 0, 0, 547, 549, 3, 96, 48, 0, 548, 546, 1,
+		96, 48, 0, 546, 547, 5, 34, 0, 0, 547, 549, 3, 96, 48, 0, 548, 546, 1,
 		0, 0, 0, 549, 552, 1, 0, 0, 0, 550, 548, 1, 0, 0, 0, 550, 551, 1, 0, 0,
-		0, 551, 554, 1, 0, 0, 0, 552, 550, 1, 0, 0, 0, 553, 555, 5, 33, 0, 0, 554,
+		0, 551, 554, 1, 0, 0, 0, 552, 550, 1, 0, 0, 0, 553, 555, 5, 34, 0, 0, 554,
 		553, 1, 0, 0, 0, 554, 555, 1, 0, 0, 0, 555, 87, 1, 0, 0, 0, 556, 557, 7,
-		2, 0, 0, 557, 89, 1, 0, 0, 0, 558, 559, 6, 45, -1, 0, 559, 560, 5, 32,
-		0, 0, 560, 561, 3, 90, 45, 0, 561, 562, 5, 34, 0, 0, 562, 598, 1, 0, 0,
-		0, 563, 598, 3, 52, 26, 0, 564, 565, 5, 76, 0, 0, 565, 566, 5, 41, 0, 0,
-		566, 571, 3, 104, 52, 0, 567, 568, 5, 33, 0, 0, 568, 570, 3, 104, 52, 0,
+		2, 0, 0, 557, 89, 1, 0, 0, 0, 558, 559, 6, 45, -1, 0, 559, 560, 5, 33,
+		0, 0, 560, 561, 3, 90, 45, 0, 561, 562, 5, 35, 0, 0, 562, 598, 1, 0, 0,
+		0, 563, 598, 3, 52, 26, 0, 564, 565, 5, 77, 0, 0, 565, 566, 5, 42, 0, 0,
+		566, 571, 3, 104, 52, 0, 567, 568, 5, 34, 0, 0, 568, 570, 3, 104, 52, 0,
 		569, 567, 1, 0, 0, 0, 570, 573, 1, 0, 0, 0, 571, 569, 1, 0, 0, 0, 571,
 		572, 1, 0, 0, 0, 572, 575, 1, 0, 0, 0, 573, 571, 1, 0, 0, 0, 574, 576,
-		5, 33, 0, 0, 575, 574, 1, 0, 0, 0, 575, 576, 1, 0, 0, 0, 576, 598, 1, 0,
-		0, 0, 577, 578, 5, 77, 0, 0, 578, 579, 5, 41, 0, 0, 579, 598, 3, 86, 43,
-		0, 580, 581, 5, 78, 0, 0, 581, 582, 5, 41, 0, 0, 582, 598, 3, 86, 43, 0,
+		5, 34, 0, 0, 575, 574, 1, 0, 0, 0, 575, 576, 1, 0, 0, 0, 576, 598, 1, 0,
+		0, 0, 577, 578, 5, 78, 0, 0, 578, 579, 5, 42, 0, 0, 579, 598, 3, 86, 43,
+		0, 580, 581, 5, 79, 0, 0, 581, 582, 5, 42, 0, 0, 582, 598, 3, 86, 43, 0,
 		583, 584, 3, 88, 44, 0, 584, 585, 3, 90, 45, 5, 585, 598, 1, 0, 0, 0, 586,
 		590, 7, 3, 0, 0, 587, 591, 3, 92, 46, 0, 588, 591, 3, 100, 50, 0, 589,
 		591, 3, 108, 54, 0, 590, 587, 1, 0, 0, 0, 590, 588, 1, 0, 0, 0, 590, 589,
@@ -360,21 +362,21 @@ func syntaxflowparserParserInit() {
 		605, 599, 1, 0, 0, 0, 605, 602, 1, 0, 0, 0, 606, 609, 1, 0, 0, 0, 607,
 		605, 1, 0, 0, 0, 607, 608, 1, 0, 0, 0, 608, 91, 1, 0, 0, 0, 609, 607, 1,
 		0, 0, 0, 610, 611, 7, 5, 0, 0, 611, 93, 1, 0, 0, 0, 612, 615, 3, 100, 50,
-		0, 613, 615, 5, 44, 0, 0, 614, 612, 1, 0, 0, 0, 614, 613, 1, 0, 0, 0, 615,
+		0, 613, 615, 5, 45, 0, 0, 614, 612, 1, 0, 0, 0, 614, 613, 1, 0, 0, 0, 615,
 		95, 1, 0, 0, 0, 616, 619, 3, 100, 50, 0, 617, 619, 3, 98, 49, 0, 618, 616,
-		1, 0, 0, 0, 618, 617, 1, 0, 0, 0, 619, 97, 1, 0, 0, 0, 620, 621, 5, 84,
-		0, 0, 621, 99, 1, 0, 0, 0, 622, 626, 5, 81, 0, 0, 623, 626, 3, 102, 51,
-		0, 624, 626, 5, 83, 0, 0, 625, 622, 1, 0, 0, 0, 625, 623, 1, 0, 0, 0, 625,
+		1, 0, 0, 0, 618, 617, 1, 0, 0, 0, 619, 97, 1, 0, 0, 0, 620, 621, 5, 85,
+		0, 0, 621, 99, 1, 0, 0, 0, 622, 626, 5, 82, 0, 0, 623, 626, 3, 102, 51,
+		0, 624, 626, 5, 84, 0, 0, 625, 622, 1, 0, 0, 0, 625, 623, 1, 0, 0, 0, 625,
 		624, 1, 0, 0, 0, 626, 101, 1, 0, 0, 0, 627, 640, 3, 106, 53, 0, 628, 640,
-		3, 104, 52, 0, 629, 640, 5, 76, 0, 0, 630, 640, 5, 64, 0, 0, 631, 640,
-		5, 65, 0, 0, 632, 640, 5, 66, 0, 0, 633, 640, 5, 67, 0, 0, 634, 640, 5,
-		68, 0, 0, 635, 640, 5, 69, 0, 0, 636, 640, 5, 77, 0, 0, 637, 640, 5, 78,
-		0, 0, 638, 640, 5, 62, 0, 0, 639, 627, 1, 0, 0, 0, 639, 628, 1, 0, 0, 0,
+		3, 104, 52, 0, 629, 640, 5, 77, 0, 0, 630, 640, 5, 65, 0, 0, 631, 640,
+		5, 66, 0, 0, 632, 640, 5, 67, 0, 0, 633, 640, 5, 68, 0, 0, 634, 640, 5,
+		69, 0, 0, 635, 640, 5, 70, 0, 0, 636, 640, 5, 78, 0, 0, 637, 640, 5, 79,
+		0, 0, 638, 640, 5, 63, 0, 0, 639, 627, 1, 0, 0, 0, 639, 628, 1, 0, 0, 0,
 		639, 629, 1, 0, 0, 0, 639, 630, 1, 0, 0, 0, 639, 631, 1, 0, 0, 0, 639,
 		632, 1, 0, 0, 0, 639, 633, 1, 0, 0, 0, 639, 634, 1, 0, 0, 0, 639, 635,
 		1, 0, 0, 0, 639, 636, 1, 0, 0, 0, 639, 637, 1, 0, 0, 0, 639, 638, 1, 0,
 		0, 0, 640, 103, 1, 0, 0, 0, 641, 642, 7, 6, 0, 0, 642, 105, 1, 0, 0, 0,
-		643, 644, 7, 7, 0, 0, 644, 107, 1, 0, 0, 0, 645, 646, 5, 62, 0, 0, 646,
+		643, 644, 7, 7, 0, 0, 644, 107, 1, 0, 0, 0, 645, 646, 5, 63, 0, 0, 646,
 		109, 1, 0, 0, 0, 97, 116, 120, 124, 128, 132, 136, 140, 143, 149, 155,
 		159, 164, 170, 174, 178, 182, 186, 189, 192, 206, 213, 218, 223, 225, 231,
 		238, 243, 248, 251, 254, 259, 264, 268, 271, 275, 281, 283, 289, 294, 297,
@@ -419,92 +421,100 @@ func NewSyntaxFlowParser(input antlr.TokenStream) *SyntaxFlowParser {
 
 // SyntaxFlowParser tokens.
 const (
-	SyntaxFlowParserEOF                 = antlr.TokenEOF
-	SyntaxFlowParserDeepFilter          = 1
-	SyntaxFlowParserDeep                = 2
-	SyntaxFlowParserPercent             = 3
-	SyntaxFlowParserDeepDot             = 4
-	SyntaxFlowParserLtEq                = 5
-	SyntaxFlowParserGtEq                = 6
-	SyntaxFlowParserDoubleGt            = 7
-	SyntaxFlowParserFilter              = 8
-	SyntaxFlowParserEqEq                = 9
-	SyntaxFlowParserRegexpMatch         = 10
-	SyntaxFlowParserNotRegexpMatch      = 11
-	SyntaxFlowParserAnd                 = 12
-	SyntaxFlowParserOr                  = 13
-	SyntaxFlowParserNotEq               = 14
-	SyntaxFlowParserDollarBraceOpen     = 15
-	SyntaxFlowParserSemicolon           = 16
-	SyntaxFlowParserConditionStart      = 17
-	SyntaxFlowParserDeepNextStart       = 18
-	SyntaxFlowParserUseStart            = 19
-	SyntaxFlowParserDeepNextEnd         = 20
-	SyntaxFlowParserDeepNext            = 21
-	SyntaxFlowParserTopDefStart         = 22
-	SyntaxFlowParserDefStart            = 23
-	SyntaxFlowParserTopDef              = 24
-	SyntaxFlowParserGt                  = 25
-	SyntaxFlowParserDot                 = 26
-	SyntaxFlowParserLt                  = 27
-	SyntaxFlowParserEq                  = 28
-	SyntaxFlowParserAdd                 = 29
-	SyntaxFlowParserAmp                 = 30
-	SyntaxFlowParserQuestion            = 31
-	SyntaxFlowParserOpenParen           = 32
-	SyntaxFlowParserComma               = 33
-	SyntaxFlowParserCloseParen          = 34
-	SyntaxFlowParserListSelectOpen      = 35
-	SyntaxFlowParserListSelectClose     = 36
-	SyntaxFlowParserMapBuilderOpen      = 37
-	SyntaxFlowParserMapBuilderClose     = 38
-	SyntaxFlowParserListStart           = 39
-	SyntaxFlowParserDollarOutput        = 40
-	SyntaxFlowParserColon               = 41
-	SyntaxFlowParserSearch              = 42
-	SyntaxFlowParserBang                = 43
-	SyntaxFlowParserStar                = 44
-	SyntaxFlowParserMinus               = 45
-	SyntaxFlowParserAs                  = 46
-	SyntaxFlowParserBacktick            = 47
-	SyntaxFlowParserSingleQuote         = 48
-	SyntaxFlowParserDoubleQuote         = 49
-	SyntaxFlowParserLineComment         = 50
-	SyntaxFlowParserBreakLine           = 51
-	SyntaxFlowParserWhiteSpace          = 52
-	SyntaxFlowParserNumber              = 53
-	SyntaxFlowParserOctalNumber         = 54
-	SyntaxFlowParserBinaryNumber        = 55
-	SyntaxFlowParserHexNumber           = 56
-	SyntaxFlowParserStringType          = 57
-	SyntaxFlowParserListType            = 58
-	SyntaxFlowParserDictType            = 59
-	SyntaxFlowParserNumberType          = 60
-	SyntaxFlowParserBoolType            = 61
-	SyntaxFlowParserBoolLiteral         = 62
-	SyntaxFlowParserAlert               = 63
-	SyntaxFlowParserCheck               = 64
-	SyntaxFlowParserThen                = 65
-	SyntaxFlowParserDesc                = 66
-	SyntaxFlowParserElse                = 67
-	SyntaxFlowParserType                = 68
-	SyntaxFlowParserIn                  = 69
-	SyntaxFlowParserCall                = 70
-	SyntaxFlowParserFunction            = 71
-	SyntaxFlowParserConstant            = 72
-	SyntaxFlowParserPhi                 = 73
-	SyntaxFlowParserFormalParam         = 74
-	SyntaxFlowParserReturn              = 75
-	SyntaxFlowParserOpcode              = 76
-	SyntaxFlowParserHave                = 77
-	SyntaxFlowParserHaveAny             = 78
-	SyntaxFlowParserNot                 = 79
-	SyntaxFlowParserFor                 = 80
-	SyntaxFlowParserIdentifier          = 81
-	SyntaxFlowParserIdentifierChar      = 82
-	SyntaxFlowParserQuotedStringLiteral = 83
-	SyntaxFlowParserRegexpLiteral       = 84
-	SyntaxFlowParserWS                  = 85
+	SyntaxFlowParserEOF                        = antlr.TokenEOF
+	SyntaxFlowParserDeepFilter                 = 1
+	SyntaxFlowParserDeep                       = 2
+	SyntaxFlowParserPercent                    = 3
+	SyntaxFlowParserDeepDot                    = 4
+	SyntaxFlowParserLtEq                       = 5
+	SyntaxFlowParserGtEq                       = 6
+	SyntaxFlowParserDoubleGt                   = 7
+	SyntaxFlowParserFilter                     = 8
+	SyntaxFlowParserEqEq                       = 9
+	SyntaxFlowParserRegexpMatch                = 10
+	SyntaxFlowParserNotRegexpMatch             = 11
+	SyntaxFlowParserAnd                        = 12
+	SyntaxFlowParserOr                         = 13
+	SyntaxFlowParserNotEq                      = 14
+	SyntaxFlowParserDollarBraceOpen            = 15
+	SyntaxFlowParserSemicolon                  = 16
+	SyntaxFlowParserConditionStart             = 17
+	SyntaxFlowParserDeepNextStart              = 18
+	SyntaxFlowParserUseStart                   = 19
+	SyntaxFlowParserDeepNextEnd                = 20
+	SyntaxFlowParserDeepNext                   = 21
+	SyntaxFlowParserTopDefStart                = 22
+	SyntaxFlowParserDefStart                   = 23
+	SyntaxFlowParserTopDef                     = 24
+	SyntaxFlowParserGt                         = 25
+	SyntaxFlowParserDot                        = 26
+	SyntaxFlowParserStartNowDoc                = 27
+	SyntaxFlowParserLt                         = 28
+	SyntaxFlowParserEq                         = 29
+	SyntaxFlowParserAdd                        = 30
+	SyntaxFlowParserAmp                        = 31
+	SyntaxFlowParserQuestion                   = 32
+	SyntaxFlowParserOpenParen                  = 33
+	SyntaxFlowParserComma                      = 34
+	SyntaxFlowParserCloseParen                 = 35
+	SyntaxFlowParserListSelectOpen             = 36
+	SyntaxFlowParserListSelectClose            = 37
+	SyntaxFlowParserMapBuilderOpen             = 38
+	SyntaxFlowParserMapBuilderClose            = 39
+	SyntaxFlowParserListStart                  = 40
+	SyntaxFlowParserDollarOutput               = 41
+	SyntaxFlowParserColon                      = 42
+	SyntaxFlowParserSearch                     = 43
+	SyntaxFlowParserBang                       = 44
+	SyntaxFlowParserStar                       = 45
+	SyntaxFlowParserMinus                      = 46
+	SyntaxFlowParserAs                         = 47
+	SyntaxFlowParserBacktick                   = 48
+	SyntaxFlowParserSingleQuote                = 49
+	SyntaxFlowParserDoubleQuote                = 50
+	SyntaxFlowParserLineComment                = 51
+	SyntaxFlowParserBreakLine                  = 52
+	SyntaxFlowParserWhiteSpace                 = 53
+	SyntaxFlowParserNumber                     = 54
+	SyntaxFlowParserOctalNumber                = 55
+	SyntaxFlowParserBinaryNumber               = 56
+	SyntaxFlowParserHexNumber                  = 57
+	SyntaxFlowParserStringType                 = 58
+	SyntaxFlowParserListType                   = 59
+	SyntaxFlowParserDictType                   = 60
+	SyntaxFlowParserNumberType                 = 61
+	SyntaxFlowParserBoolType                   = 62
+	SyntaxFlowParserBoolLiteral                = 63
+	SyntaxFlowParserAlert                      = 64
+	SyntaxFlowParserCheck                      = 65
+	SyntaxFlowParserThen                       = 66
+	SyntaxFlowParserDesc                       = 67
+	SyntaxFlowParserElse                       = 68
+	SyntaxFlowParserType                       = 69
+	SyntaxFlowParserIn                         = 70
+	SyntaxFlowParserCall                       = 71
+	SyntaxFlowParserFunction                   = 72
+	SyntaxFlowParserConstant                   = 73
+	SyntaxFlowParserPhi                        = 74
+	SyntaxFlowParserFormalParam                = 75
+	SyntaxFlowParserReturn                     = 76
+	SyntaxFlowParserOpcode                     = 77
+	SyntaxFlowParserHave                       = 78
+	SyntaxFlowParserHaveAny                    = 79
+	SyntaxFlowParserNot                        = 80
+	SyntaxFlowParserFor                        = 81
+	SyntaxFlowParserIdentifier                 = 82
+	SyntaxFlowParserIdentifierChar             = 83
+	SyntaxFlowParserQuotedStringLiteral        = 84
+	SyntaxFlowParserRegexpLiteral              = 85
+	SyntaxFlowParserWS                         = 86
+	SyntaxFlowParserHereDocIdentifierName      = 87
+	SyntaxFlowParserCRLFHereDocIdentifierBreak = 88
+	SyntaxFlowParserLFHereDocIdentifierBreak   = 89
+	SyntaxFlowParserCRLFEndDoc                 = 90
+	SyntaxFlowParserCRLFHereDocText            = 91
+	SyntaxFlowParserLFEndDoc                   = 92
+	SyntaxFlowParserLFHereDocText              = 93
 )
 
 // SyntaxFlowParser rules.
@@ -1889,7 +1899,7 @@ func (p *SyntaxFlowParser) FileFilterContentMethod() (localctx IFileFilterConten
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&1821065601025) != 0 {
+	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&1821065601025) != 0 {
 		{
 			p.SetState(163)
 			p.FileFilterContentMethodParam()
@@ -3558,7 +3568,7 @@ func (p *SyntaxFlowParser) DescriptionStatement() (localctx IDescriptionStatemen
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&721553973377) != 0 {
+		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&721553973377) != 0 {
 			{
 				p.SetState(242)
 				p.DescriptionItems()
@@ -3580,7 +3590,7 @@ func (p *SyntaxFlowParser) DescriptionStatement() (localctx IDescriptionStatemen
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&721553973377) != 0 {
+		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&721553973377) != 0 {
 			{
 				p.SetState(247)
 				p.DescriptionItems()
@@ -5776,7 +5786,7 @@ func (p *SyntaxFlowParser) FilterItem() (localctx IFilterItemContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-22)) & ^0x3f) == 0 && ((int64(1)<<(_la-22))&7638102734641825843) != 0 {
+		if (int64((_la-22)) & ^0x3f) == 0 && ((int64(1)<<(_la-22))&-3170538604425899949) != 0 {
 			{
 				p.SetState(332)
 				p.ActualParam()
@@ -5855,7 +5865,7 @@ func (p *SyntaxFlowParser) FilterItem() (localctx IFilterItemContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-51)) & ^0x3f) == 0 && ((int64(1)<<(_la-51))&5637140417) != 0 {
+		if (int64((_la-52)) & ^0x3f) == 0 && ((int64(1)<<(_la-52))&5637140417) != 0 {
 			{
 				p.SetState(348)
 				p.Config()
@@ -5886,7 +5896,7 @@ func (p *SyntaxFlowParser) FilterItem() (localctx IFilterItemContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-51)) & ^0x3f) == 0 && ((int64(1)<<(_la-51))&5637140417) != 0 {
+		if (int64((_la-52)) & ^0x3f) == 0 && ((int64(1)<<(_la-52))&5637140417) != 0 {
 			{
 				p.SetState(354)
 				p.Config()
@@ -6482,7 +6492,7 @@ func (p *SyntaxFlowParser) UseDefCalcParams() (localctx IUseDefCalcParamsContext
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-40)) & ^0x3f) == 0 && ((int64(1)<<(_la-40))&11544863697025) != 0 {
+		if (int64((_la-41)) & ^0x3f) == 0 && ((int64(1)<<(_la-41))&11544863697025) != 0 {
 			{
 				p.SetState(382)
 				p.NativeCallActualParams()
@@ -6504,7 +6514,7 @@ func (p *SyntaxFlowParser) UseDefCalcParams() (localctx IUseDefCalcParamsContext
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-40)) & ^0x3f) == 0 && ((int64(1)<<(_la-40))&11544863697025) != 0 {
+		if (int64((_la-41)) & ^0x3f) == 0 && ((int64(1)<<(_la-41))&11544863697025) != 0 {
 			{
 				p.SetState(387)
 				p.NativeCallActualParams()
@@ -7174,7 +7184,7 @@ func (p *SyntaxFlowParser) NativeCallActualParamValue() (localctx INativeCallAct
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-140737488355330) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&4194303) != 0 {
+		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-281474976710658) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1073741823) != 0 {
 			{
 				p.SetState(425)
 				_la = p.GetTokenStream().LA(1)
@@ -7499,7 +7509,7 @@ func (p *SyntaxFlowParser) ActualParam() (localctx IActualParamContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-22)) & ^0x3f) == 0 && ((int64(1)<<(_la-22))&7638102734641823795) != 0 {
+		if (int64((_la-22)) & ^0x3f) == 0 && ((int64(1)<<(_la-22))&-3170538604425904045) != 0 {
 			{
 				p.SetState(445)
 				p.SingleParam()
@@ -7795,7 +7805,7 @@ func (p *SyntaxFlowParser) SingleParam() (localctx ISingleParamContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-51)) & ^0x3f) == 0 && ((int64(1)<<(_la-51))&5637140417) != 0 {
+		if (int64((_la-52)) & ^0x3f) == 0 && ((int64(1)<<(_la-52))&5637140417) != 0 {
 			{
 				p.SetState(461)
 				p.Config()
@@ -9006,7 +9016,7 @@ func (p *SyntaxFlowParser) ChainFilter() (localctx IChainFilterContext) {
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-57)) & ^0x3f) == 0 && ((int64(1)<<(_la-57))&88080319) != 0 {
+		if (int64((_la-58)) & ^0x3f) == 0 && ((int64(1)<<(_la-58))&88080319) != 0 {
 			{
 				p.SetState(522)
 				p.Identifier()
@@ -10244,7 +10254,7 @@ func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpre
 
 			_la = p.GetTokenStream().LA(1)
 
-			if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&436224608) != 0) {
+			if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&838877792) != 0) {
 				var _ri = p.GetErrorHandler().RecoverInline(p)
 
 				localctx.(*FilterExpressionCompareContext).op = _ri
@@ -10479,7 +10489,7 @@ func (p *SyntaxFlowParser) NumberLiteral() (localctx INumberLiteralContext) {
 		p.SetState(610)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&135107988821114880) != 0) {
+		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&270215977642229760) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -11332,7 +11342,7 @@ func (p *SyntaxFlowParser) Opcodes() (localctx IOpcodesContext) {
 		p.SetState(641)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64((_la-70)) & ^0x3f) == 0 && ((int64(1)<<(_la-70))&63) != 0) {
+		if !((int64((_la-71)) & ^0x3f) == 0 && ((int64(1)<<(_la-71))&63) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -11448,7 +11458,7 @@ func (p *SyntaxFlowParser) Types() (localctx ITypesContext) {
 		p.SetState(643)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4467570830351532032) != 0) {
+		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8935141660703064064) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
