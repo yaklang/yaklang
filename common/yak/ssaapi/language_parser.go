@@ -56,7 +56,9 @@ func (c *config) parseProject() (Programs, error) {
 	if c.databasePath != "" {
 		consts.SetSSADataBasePath(c.databasePath)
 	}
-
+	if c.LanguageBuilder == nil {
+		c.LanguageBuilder = LanguageBuilders[Yak]
+	}
 	programPath := c.programPath
 	prog, builder, err := c.init()
 	if err != nil {
