@@ -135,7 +135,7 @@ func NewSystemMatrixBase() (*SystemMatrix, error) {
 
 	users, err := GetSystemUsers()
 	if err != nil {
-		log.Warnf("get system users info failed: %v", err)
+		log.Debugf("get system users info failed: %v", err)
 	}
 
 	networkInfo, err := GetNetworkInfo()
