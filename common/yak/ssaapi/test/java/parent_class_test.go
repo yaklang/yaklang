@@ -259,7 +259,7 @@ class User {
 			"interfaceTarget": {"11", "22", "Function-IA.get"},
 			"impl1Target":     {"11"},
 			"impl2Target":     {"22"},
-		}, true)
+		}, true, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
 	// form bottom to top
