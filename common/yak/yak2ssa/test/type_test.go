@@ -257,3 +257,16 @@ target = Test(a, func(i) { return int(i) })
 		)
 	})
 }
+
+func TestYaklangTypeInference(t *testing.T) {
+	t.Run("function-parameter", func(t *testing.T) {
+		test.CheckTypeEx(t, `
+openapi.flowHandler(flow => {
+	target = flow
+})
+		`,
+			func(p *ssaapi.Program) *ssaapi.Type {
+				return p.GetType("schema.HTTPFlow")
+			})
+	})
+}

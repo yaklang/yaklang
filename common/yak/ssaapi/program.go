@@ -35,6 +35,14 @@ func (p *Program) GetLanguage() string {
 	return p.Program.Language
 }
 
+func (p *Program) GetType(name string) *Type {
+	typ := p.Program.GetType(name)
+	if utils.IsNil(typ) {
+		return nil
+	}
+	return NewType(typ)
+}
+
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program: prog,
