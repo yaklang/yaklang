@@ -25,8 +25,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		} else {
 			pkgNameCurrent = pkgPath[0]
 		}
+		prog := b.GetProgram()
+		prog.Name = pkgNameCurrent
 		if pkgPath[0] != "main" {
-			prog := b.GetProgram()
 			lib, skip := prog.GetLibrary(pkgNameCurrent)
 			if skip {
 				return
