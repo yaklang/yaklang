@@ -70,7 +70,7 @@ declaration
     ;
 
 constDecl
-    : CONST (constSpec | L_PAREN eos* (constSpec eos)* R_PAREN)
+    : CONST eos* (constSpec eos* | L_PAREN eos* (constSpec eos*)* R_PAREN)
     ;
 
 constSpec
@@ -236,7 +236,7 @@ switchStmt
     ;
 
 exprSwitchStmt
-    : SWITCH (expression? | simpleStmt? eos? expression?) L_CURLY eos? exprCaseClause* eos? R_CURLY
+    : SWITCH eos* (expression? | simpleStmt? eos* expression?) L_CURLY eos* exprCaseClause* eos? R_CURLY
     ;
 
 exprCaseClause
