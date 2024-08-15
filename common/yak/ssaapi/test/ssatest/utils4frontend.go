@@ -198,6 +198,25 @@ func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {
 	CheckTestCase(t, tc)
 }
 
+func CheckTypeEx(t *testing.T, code string, typCallback func(*ssaapi.Program) *ssaapi.Type, opt ...ssaapi.Option) {
+	tc := TestCase{
+		Code: code,
+		Check: func(prog *ssaapi.Program, _ []string) {
+			vs := prog.Ref("target")
+			require.Len(t, vs, 1)
+
+			v := vs[0]
+			require.NotNil(t, v)
+			typ := ssaapi.GetBareType(typCallback(prog))
+
+			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
+			require.Truef(t, ssa.TypeEqual(ssaapi.GetBareType(v.GetType()), typ), "want %s, got %s", typ, v.GetType())
+		},
+		Option: opt,
+	}
+	CheckTestCase(t, tc)
+}
+
 func CheckMask(t *testing.T, tc TestCase) {
 	tc.Check = func(p *ssaapi.Program, want []string) {
 		targets := p.Ref("target").ShowWithSource()
