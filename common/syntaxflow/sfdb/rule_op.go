@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"io"
 	"path"
 	"strings"
 	"sync"
+
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -76,18 +77,21 @@ func ImportDatabase(reader io.Reader) error {
 	return nil
 }
 
-func CreateOrUpdateSyntaxFlow(hash string, i any) error {
+func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	db := consts.GetGormProfileDatabase()
 	var rule schema.SyntaxFlowRule
 
-	if err := db.Where("hash = ?", hash).First(&rule).Error; err != nil {
+	if err := db.Where("rule_name = ?", i.RuleName).First(&rule).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(i).Error
 		}
 		return err
 	}
-
-	return db.Model(&rule).Updates(i).Error
+	if rule.Hash != hash {
+		// if same name, but different content, update
+		return db.Model(&rule).Updates(i).Error
+	}
+	return nil
 }
 
 func DeleteRuleByRuleName(name string) error {
@@ -151,7 +155,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool) error
 		rule.AllowIncluded = true
 		rule.IncludedName = frame.AllowIncluded
 		rule.Title = frame.AllowIncluded
-		_ = DeleteRuleByLibName(frame.AllowIncluded)
+		// _ = DeleteRuleByLibName(frame.AllowIncluded)
 	}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {

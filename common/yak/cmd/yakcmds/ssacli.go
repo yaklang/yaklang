@@ -288,6 +288,7 @@ var SSACompilerCommands = []*cli.Command{
 			if err != nil {
 				return utils.Wrap(err, "open file failed")
 			}
+			defer file.Close()
 			err = sfdb.ImportDatabase(file)
 			if err != nil {
 				return err
