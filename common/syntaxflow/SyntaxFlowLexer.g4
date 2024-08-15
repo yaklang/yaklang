@@ -32,6 +32,7 @@ DefStart: '#>';
 TopDef: '#->';
 Gt: '>';
 Dot: '.';
+StartNowDoc: '<<<' -> pushMode(HereDocIdentifier);
 Lt: '<';
 Eq: '=';
 Add: '+';
@@ -96,15 +97,33 @@ QuotedStringLiteral
     | DoubleQuote ( ~["\\\r\n] | '\\"' | '\\\\' | '\\' )* DoubleQuote
     ;
 
+
+
+RegexpLiteral: '/' RegexpLiteralChar+ '/';
+
+
+WS: [ \t\r]+ -> skip;
+
+mode HereDocIdentifier;
+HereDocIdentifierName: (NameString{this.recordHereDocIdentifier()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
+CRLFHereDocIdentifierBreak: '\r\n'{this.recordHereDocLF()} -> popMode,pushMode(CRLFHereDoc);
+LFHereDocIdentifierBreak: '\n'{this.recordHereDocLF()} -> popMode,pushMode(LFHereDoc);
+
+mode CRLFHereDoc;
+CRLFEndDoc:  '\r\n' NameString {this.DocEndDistribute()};
+CRLFHereDocText: .;
+
+mode LFHereDoc;
+LFEndDoc:  '\n' NameString {this.DocEndDistribute()};
+LFHereDocText: .;
+
+fragment NameString: [a-zA-Z_\u0080-\ufffe][a-zA-Z0-9_\u0080-\ufffe]*;
+
 fragment IdentifierCharStart: '*' | '_' | [a-z] | [A-Z];
 fragment HexDigit: [a-fA-F0-9];
 fragment Digit: [0-9];
 fragment OctalDigit: [0-7];
-
-RegexpLiteral: '/' RegexpLiteralChar+ '/';
 fragment RegexpLiteralChar
     : '\\' '/'
     | ~[/]
     ;
-
-WS: [ \t\r]+ -> skip;
