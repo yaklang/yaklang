@@ -156,7 +156,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		liner.DeleteName(v)
 		return ret
 	case *ConstInst:
-		if v.Const.value != nil && !v.isIdentify && reflect.TypeOf(v.Const.value).Kind() == reflect.String {
+		if v.Const != nil && v.Const.value != nil && !v.isIdentify && reflect.TypeOf(v.Const.value).Kind() == reflect.String {
 			return fmt.Sprintf("%#v", v.String())
 		}
 		return fmt.Sprintf("%s", v.String())
