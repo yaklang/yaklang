@@ -166,6 +166,7 @@ func (lb *LoopBuilder) Finish() {
 	})
 
 	LoopBuilder.SetFirst(func(svt ssautil.ScopedVersionedTableIF[Value]) {
+		SSABuild.EmitJump(header)
 		SSABuild.CurrentBlock = header
 		SSABuild.CurrentBlock.SetScope(svt)
 		if lb.firstExpr != nil {
