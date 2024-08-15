@@ -299,7 +299,12 @@ func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Valu
 	defer recoverRange()
 
 	if stmt.StartNowDoc() != nil {
-		text := stmt.HereDocContent().GetText()
+		var text string
+		if node := stmt.CRLFHereDocText(); node != nil {
+			text = node.GetText()
+		} else if node := stmt.LFHereDocText(); node != nil {
+			text = node.GetText()
+		}
 		return b.EmitConstInst(text)
 	}
 	text := stmt.GetText()

@@ -545,7 +545,12 @@ func (y *YakCompiler) VisitDoc(raw yak.IStringLiteralContext) interface{} {
 	defer recoverRange()
 	y.writeString(raw.GetText())
 
-	text := i.HereDocContent().GetText()
+	var text string
+	if node := i.CRLFHereDocText(); node != nil {
+		text = node.GetText()
+	} else if node := i.LFHereDocText(); node != nil {
+		text = node.GetText()
+	}
 	y.pushString(text, text)
 	return nil
 }

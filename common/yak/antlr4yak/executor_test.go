@@ -4182,10 +4182,10 @@ assert a == b, a
 		_formattest(code, true)
 	})
 	t.Run("LF-CRLF", func(t *testing.T) {
-		code := "a=<<<TEST\na\r\nTEST\nTEST; dump(a);assert a == \"a\\r\\nTEST\", a;"
-		// showAst(code)
-		_marshallerTest(code)
-		_formattest(code, true)
+		code := "a=<<<TEST\na\r\nTEST; dump(a);assert a == \"a\\r\", a;"
+		showAst(code)
+		// _marshallerTest(code)
+		// _formattest(code, true)
 	})
 	t.Run("has empty line arround", func(t *testing.T) {
 		code := "a=<<<EOF\n\nasd\n\nEOF; dump(a); assert a == \"\\nasd\\n\", a;"

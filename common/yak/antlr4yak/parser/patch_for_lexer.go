@@ -10,8 +10,8 @@ import (
 type YaklangLexerBase struct {
 	*antlr.BaseLexer
 
-	_heredocLF         string
 	_heredocIdentifier string
+	_heredocCRLF       bool
 	_templateDepth     uint64
 }
 
@@ -33,34 +33,21 @@ func (l *YaklangLexer) recordHereDocLabel() {
 	l._heredocIdentifier = l.GetText()
 }
 
-func (l *YaklangLexer) recordHereDocCRLF() {
-	stream := l.GetInputStream()
-	preTextIndex := stream.Index() - 2
-	text := stream.GetText(preTextIndex, preTextIndex+1)
-	if text == "\r\n" {
-		l._heredocLF = text
-	} else {
-		l._heredocLF = "\n"
-	}
+func (l *YaklangLexer) recordHereDocLF() {
+	l._heredocCRLF = (l.GetText() == "\r\n")
 }
 
 func (l *YaklangLexer) DocEndDistribute() bool {
-	end := l.GetText()
-
-	if !strings.HasPrefix(end, l._heredocLF) {
-		l.SetType(YaklangLexerHereDocText)
-		return false
-	}
-	stream := l.GetInputStream()
-	index := stream.Index()
-	nextText := stream.GetText(index, index+len(l._heredocIdentifier)-1)
-
-	if l._heredocIdentifier == nextText {
-		l.SetType(YaklangLexerEndDoc)
+	text := l.GetText()
+	if strings.HasSuffix(text, l._heredocIdentifier) {
 		l.PopMode()
 		return true
 	} else {
-		l.SetType(YaklangLexerHereDocText)
+		if l._heredocCRLF {
+			l.SetType(YaklangLexerCRLFHereDocText)
+		} else {
+			l.SetType(YaklangLexerLFHereDocText)
+		}
 		return false
 	}
 }

@@ -209,11 +209,16 @@ mode TEMPLATE_BACKTICK_MODE;
 
 mode HereDocIdentifier;
 HereDocIdentifierName: (NameString{this.recordHereDocLabel()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
-HereDocIdentifierBreak: '\r'?'\n'{this.recordHereDocCRLF()} -> popMode,pushMode(HereDoc);
+CRLFHereDocIdentifierBreak: '\r\n'{this.recordHereDocLF()} -> popMode,pushMode(CRLFHereDoc);
+LFHereDocIdentifierBreak: '\n'{this.recordHereDocLF()} -> popMode,pushMode(LFHereDoc);
 
-mode HereDoc;
-EndDoc:  '\r'?'\n' {this.DocEndDistribute()} NameString;
-HereDocText: . ;
+mode CRLFHereDoc;
+CRLFEndDoc:  '\r\n' NameString {this.DocEndDistribute()};
+CRLFHereDocText: .+?;
+
+mode LFHereDoc;
+LFEndDoc:  '\n' NameString {this.DocEndDistribute()};
+LFHereDocText: .+?;
 
 // Fragment rules
 fragment NameString: [a-zA-Z_\u0080-\ufffe][a-zA-Z0-9_\u0080-\ufffe]*;
