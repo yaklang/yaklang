@@ -1,11 +1,12 @@
-package syntaxflow
+package syntaxflow_test
 
 import (
 	_ "embed"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 //go:embed syntaxflow_include_test.lib.sf
@@ -39,4 +40,43 @@ dump(e)
 		}
 		return nil
 	})
+}
+
+func TestFS_RuleUPdate(t *testing.T) {
+	name := "yak-a.sf"
+	content := `
+	desc(lib: "a")
+	a as $a
+	alert $a
+	`
+	sfdb.ImportRuleWithoutValid(name, content, true)
+	defer sfdb.DeleteRuleByRuleName(name)
+
+	ssatest.CheckSyntaxFlow(t, `
+	a = 1 
+	b = 2`,
+		`
+	<include(a)> as $target
+	`, map[string][]string{
+			"target": {"1"},
+		},
+	)
+
+	// update
+	content = `
+	desc(lib: "a")
+	b as $a
+	alert $a
+	`
+	sfdb.ImportRuleWithoutValid(name, content, true)
+
+	ssatest.CheckSyntaxFlow(t, `
+	a = 1 
+	b = 2`,
+		`
+	<include(a)> as $target
+	`, map[string][]string{
+			"target": {"2"},
+		},
+	)
 }
