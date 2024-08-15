@@ -26,6 +26,9 @@ var SpecialTypes = map[string]ssa.Type{
 	"comparable": ssa.CreateAnyType(),
 	"error":      ssa.CreateErrorType(),
 }
+var SpecialValue = []string{
+	"iota",
+}
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
@@ -213,10 +216,19 @@ func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
 	return b.aliasTypes[name].GetType()
 }
 
-// ====================== Special type
-func (b *astbuilder) GetSpecialByStr(name string) ssa.Type {
+// ====================== Special
+func (b *astbuilder) GetSpecialTypeByStr(name string) ssa.Type {
 	if SpecialTypes[name] == nil {
 		return nil
 	}
 	return SpecialTypes[name]
+}
+
+func (b *astbuilder) GetSpecialValueByStr(name string) ssa.Value {
+	for _,s := range SpecialValue{
+		if s == name{
+		    return b.EmitConstInst(s)
+		}
+	}
+	return nil
 }

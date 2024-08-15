@@ -105,6 +105,77 @@ func TestStmt_normol(t *testing.T) {
 	})
 }
 
+
+func TestStmt_const(t *testing.T) {
+	t.Run("const", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			const (
+				a int = 4
+				b int = 5
+				c int = 6
+			)
+		 	println(a)
+			println(b)
+			println(c)
+		}
+		`, []string{"4","5","6"}, t)
+	})
+
+	t.Run("const default", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			const (
+				a int = 4
+				b int = 5
+				c
+			)
+		 	println(a)
+			println(b)
+			println(c)
+		}
+		`, []string{"4","5","5"}, t)
+	})
+
+	t.Run("const default iota", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			const (
+				a int = 5
+				b int = iota
+				c
+				d
+			)
+		 	println(a)
+			println(b)
+			println(c)
+			println(d)
+		}
+		`, []string{"5","0","1","2"}, t)
+	})
+
+	t.Run("const default iota Ex", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+			const (
+				a int = iota
+				b
+				c int = iota
+				d
+			)
+		 	println(a)
+			println(b)
+			println(c)
+			println(d)
+		}
+		`, []string{"0","1","0","1"}, t)
+	})
+}
+
 func TestExpr_normol(t *testing.T) {
 	t.Run("add sub mul div", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
@@ -206,7 +277,7 @@ func TestFuntion_normol(t *testing.T) {
 		`, []string{"Function-ret(1,2,3)"}, t)
 	})
 
-	t.Run("defaut return", func(t *testing.T) {
+	t.Run("default return", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
 
 		func test()(a int){

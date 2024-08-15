@@ -403,6 +403,10 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 		    return v
 		}
 
+		if v := b.GetSpecialValueByStr(text); v != nil{
+		    return v
+		}
+
 		if t := b.GetStructByStr(text); t != nil{
 			typValue := ssa.NewTypeValue(t)
 			typValue.SetType(t)
