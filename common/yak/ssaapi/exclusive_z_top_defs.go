@@ -171,6 +171,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.Undefined:
 		// ret[n]
 		return getMemberCall(inst, actx)
+	case *ssa.ConstInst:
+		return i.visitedDefsDefault(actx)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
 			// phi is visited...
