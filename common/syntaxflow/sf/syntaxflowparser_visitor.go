@@ -1,10 +1,10 @@
 // Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
 
-package sf // SyntaxFlow
+package sf // SyntaxFlowParser
 import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 // A complete Visitor for a parse tree produced by SyntaxFlowParser.
-type SyntaxFlowVisitor interface {
+type SyntaxFlowParserVisitor interface {
 	antlr.ParseTreeVisitor
 
 	// Visit a parse tree produced by SyntaxFlowParser#flow.
