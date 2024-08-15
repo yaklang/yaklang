@@ -1,13 +1,9 @@
-grammar SyntaxFlow;
+parser grammar SyntaxFlowParser;
 
-/*
-yaklang.io
-v1ll4n.a5k@gmail.com
+options {
+    tokenVocab=SyntaxFlowLexer;
+}
 
-build with `antlr -Dlanguage=Go ./SyntaxFlow.g4 -o sf -package sf -no-listener -visitor`
-
-SyntaxFlow is a search expr can handle some structured data
-*/
 
 flow: statements EOF;
 
@@ -55,8 +51,8 @@ comment: LineComment;
 
 // eos means end of statement
 // the ';' can be
-eos: ';' | line ;
-line: '\n';
+eos: Semicolon | line ;
+line: BreakLine;
 lines: line+;
 
 // descriptionStatement will describe the filterExpr with stringLiteral
@@ -67,7 +63,7 @@ descriptionItem
     | stringLiteral ':' stringLiteral lines?
     ;
 
-// echo statement will echo the variable 
+// echo statement will echo the variable
 alertStatement: Alert refVariable (For stringLiteral)?;
 
 // checkStatement will check the filterExpr($params) is true( .len > 0), if not,
@@ -197,100 +193,3 @@ opcodes: Call | Constant | Phi | FormalParam | Return | Function;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
-
-DeepFilter: '==>';
-Deep: '...';
-
-Percent: '%%';
-DeepDot: '..';
-LtEq: '<=';
-GtEq: '>=';
-DoubleGt: '>>';
-Filter: '=>';
-EqEq: '==';
-RegexpMatch: '=~';
-NotRegexpMatch: '!~';
-And: '&&';
-Or: '||';
-NotEq: '!=';
-ConditionStart: '?{';
-DeepNextStart: '-{';
-DeepNextEnd: '}->';
-TopDefStart: '#{';
-DefStart: '#>';
-TopDef: '#->';
-Gt: '>';
-Dot: '.';
-Lt: '<';
-Eq: '=';
-Question: '?';
-OpenParen: '(';
-Comma: ',';
-CloseParen: ')';
-ListSelectOpen: '[';
-ListSelectClose: ']';
-MapBuilderOpen: '{';
-MapBuilderClose: '}';
-ListStart: '#';
-DollarOutput: '$';
-Colon: ':';
-Search: '%';
-Bang: '!';
-Star: '*';
-Minus: '-';
-As: 'as';
-Backtick: '`';
-SingleQuote: '\'';
-DoubleQuote: '"';
-LineComment: '//' (~[\r\n])*;
-WhiteSpace: [ \r\n] -> skip;
-Number: Digit+;
-OctalNumber: '0o' OctalDigit+;
-BinaryNumber: '0b' ('0' | '1')+;
-HexNumber: '0x' HexDigit+;
-//StringLiteral: '`' (~[`])* '`';
-StringType: 'str';
-ListType: 'list';
-DictType: 'dict';
-NumberType: 'int' | 'float';
-BoolType: 'bool';
-BoolLiteral: 'true' | 'false';
-Alert : 'alert';
-Check: 'check';
-Then: 'then';
-Desc: 'desc' | 'note';
-Else: 'else';
-Type: 'type';
-In: 'in';
-Call: 'call';
-Function: 'function';
-Constant: 'const' | 'constant';
-Phi: 'phi';
-FormalParam: 'param' | 'formal_param';
-Return: 'return' | 'ret';
-Opcode: 'opcode';
-Have: 'have';
-HaveAny: 'any';
-Not: 'not';
-For: 'for';
-
-Identifier: IdentifierCharStart IdentifierChar*;
-IdentifierChar: [0-9] | IdentifierCharStart;
-
-QuotedStringLiteral
-    : SingleQuote ( ~['\\\r\n] | ('\\\'') | '\\\\' | '\\')* SingleQuote
-    | DoubleQuote ( ~["\\\r\n] | '\\"' | '\\\\' | '\\' )* DoubleQuote
-    ;
-
-fragment IdentifierCharStart: '*' | '_' | [a-z] | [A-Z];
-fragment HexDigit: [a-fA-F0-9];
-fragment Digit: [0-9];
-fragment OctalDigit: [0-7];
-
-RegexpLiteral: '/' RegexpLiteralChar+ '/';
-fragment RegexpLiteralChar
-    : '\\' '/'
-    | ~[/]
-    ;
-
-WS: [ \t\r]+ -> skip;
