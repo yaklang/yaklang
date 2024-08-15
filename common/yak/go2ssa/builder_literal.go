@@ -150,7 +150,11 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 		if len(keys) == 0{
 			obj = b.InterfaceAddFieldBuild(len(values),
 			func(i int) ssa.Value {
-				return typ.(*ssa.ObjectType).Keys[i]
+				if i < len(typ.(*ssa.ObjectType).Keys) {
+					return typ.(*ssa.ObjectType).Keys[i]
+				}else{
+					return b.EmitConstInst("")
+				} 
 			},
 			func(i int) ssa.Value {
 				return values[i]

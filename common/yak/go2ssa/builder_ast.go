@@ -223,30 +223,61 @@ func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal boo
 func (b *astbuilder) buildConstDecl(constDecl *gol.ConstDeclContext) {
 	recoverRange := b.SetRange(constDecl.BaseParserRuleContext)
 	defer recoverRange()
+	var defaul ssa.Value = nil
+	var index int
+	var isiota bool = false
+
 	for _, v := range constDecl.AllConstSpec() {
-		b.buildConstSpec(v.(*gol.ConstSpecContext))
+		rightv,isiotat := b.buildConstSpec(v.(*gol.ConstSpecContext), defaul)
+		if isiotat { // 每个 const 块中的 iota 是独立的
+		    isiota = true
+			index = 1
+		}
+
+		if isiota {
+			rightv = b.EmitConstInst(index)
+			index++
+		}
+		defaul = rightv
 	}
 }
 
-func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext) {
+func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.Value) (ssa.Value,bool) {
 	recoverRange := b.SetRange(constSpec.BaseParserRuleContext)
 	defer recoverRange()
 
 	var leftvl []*ssa.Variable
 	var rightvl []ssa.Value
+	var isiota bool = false
 
 	leftList := constSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
-	rightList := constSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 	for _, value := range leftList {
 		leftv := b.CreateLocalVariable(value.GetText())
 		leftvl = append(leftvl, leftv)
 		b.AddToCmap(value.GetText())
 	}
-	for _, value := range rightList {
-		rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
-		rightvl = append(rightvl, rightv)
+
+	expList := constSpec.ExpressionList()
+	if expList != nil {
+		rightList := expList.(*gol.ExpressionListContext).AllExpression()
+		for _, value := range rightList {
+			rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+			rightvl = append(rightvl, rightv)
+		}
+	}else{
+		if defaul != nil && len(leftList) == 1 {
+			rightvl = append(rightvl, defaul)
+		}else{
+			b.NewError(ssa.Error, TAG, MissInitExpr(leftList[0].GetText()))
+		}
 	}
+	if rightvl[0].String() == "iota" {
+	    rightvl[0] = b.EmitConstInst(0)
+		isiota = true
+	}
+
 	b.AssignList(leftvl, rightvl)
+	return rightvl[0], isiota
 }
 
 func (b *astbuilder) buildVarDecl(varDecl *gol.VarDeclContext, isglobal bool) {
@@ -1755,7 +1786,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			ssatyp = b.GetStructByStr(name)
 		}
 		if ssatyp == nil {
-			ssatyp = b.GetSpecialByStr(name)
+			ssatyp = b.GetSpecialTypeByStr(name)
 		}
 		if ssatyp == nil {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("Type %v is not defined", name))

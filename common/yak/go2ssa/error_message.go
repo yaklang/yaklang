@@ -114,3 +114,7 @@ func OutofBounds(ml, vl int) string {
 func StructNotFind(n string) string {
 	return fmt.Sprintf("struct %s not find, it may belong to the golang library", n)
 }
+
+func MissInitExpr(name string) string {
+	return fmt.Sprintf("miss init expression for %s",name)
+}
