@@ -159,7 +159,7 @@ var DatabaseExports = map[string]interface{}{
 		return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
 	},
 
-	"SaveHTTPFlowWithTags": yakit.CreateHTTPFlowWithTags,
+	"saveHTTPFlowWithTags": yakit.CreateHTTPFlowWithTags,
 }
 
 func _deleteYakScriptByName(i string) error {
