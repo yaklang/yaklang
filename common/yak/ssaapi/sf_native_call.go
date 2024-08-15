@@ -166,9 +166,9 @@ func init() {
 				t := val.GetType()
 				fts := t.t.GetFullTypeNames()
 				var results []string
-				if len(fts) == 0{
+				if len(fts) == 0 {
 					results = append(results, t.t.String())
-				}else{
+				} else {
 					for _, ft := range fts {
 						//remove versioin name
 						index := strings.Index(ft, ":")
@@ -215,11 +215,11 @@ func init() {
 				}
 				t := val.GetType()
 				fts := t.t.GetFullTypeNames()
-				if len(fts) == 0{
+				if len(fts) == 0 {
 					results := val.NewValue(ssa.NewConst(t.String()))
 					vals = append(vals, results)
-				}else{
-					for _,ft := range fts{
+				} else {
+					for _, ft := range fts {
 						results := val.NewValue(ssa.NewConst(ft))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 						vals = append(vals, results)
@@ -237,7 +237,6 @@ func init() {
 
 特殊地，在 Java 中，会尽可能使用全限定类名，例如 com.alibaba.fastjson.JSON, 也会尽可能包含 sca 版本`),
 	)
-
 
 	registerNativeCall(
 		NativeCall_GetFormalParams,
@@ -342,7 +341,7 @@ func init() {
 				}
 				f := val.GetFunction()
 				if f != nil {
-					f.AppendPredecessor(v, frame.WithPredecessorContext("getFunc"))
+					f.AppendPredecessor(val, frame.WithPredecessorContext("getFunc"))
 					vals = append(vals, f)
 				}
 				return nil
