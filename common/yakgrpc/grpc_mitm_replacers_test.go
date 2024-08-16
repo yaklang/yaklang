@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
@@ -736,4 +737,92 @@ Host: www.example.com
 	time.Sleep(time.Second)
 	_, err = lowhttp.HTTP(lowhttp.WithPacketBytes(testReq), lowhttp.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)), lowhttp.WithHost(mockHost), lowhttp.WithPort(mockPort), lowhttp.WithTimeout(2*time.Second))
 	require.NoError(t, err)
+}
+
+// TestGRPCMUSTPASS_ReplaceRuleAndMirrorRule fix the bug that the mirror rule not work when the replace rule is enable
+func TestGRPCMUSTPASS_ReplaceRuleAndMirrorRule(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:             `百度`,
+		NoReplace:        false,
+		Result:           ``,
+		Color:            "",
+		EnableForRequest: true,
+		EnableForHeader:  true,
+		EnableForBody:    true,
+		Index:            0,
+		ExtraTag:         []string{"tag1"},
+		Disabled:         false,
+		VerboseName:      "",
+	}, &ypb.MITMContentReplacer{
+		Rule:             `百度`,
+		NoReplace:        true,
+		Result:           ``,
+		Color:            "",
+		EnableForRequest: true,
+		EnableForHeader:  true,
+		EnableForBody:    true,
+		Index:            0,
+		ExtraTag:         []string{"tag2"},
+		Disabled:         false,
+		VerboseName:      "",
+	})
+	requestBytes := []byte(`GET /content-search.xml HTTP/1.1
+Host: www.baidu.com
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Cookie: BAIDUID_BFESS=D541A87Daaa50ACC658F7405F62B195D8AA:FG=1; ZFY=Xx1VJGFY2aaHQ2vrOIEsC83loAk0wEEIPY3nVfBgtxymQ:C
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36
+
+{"product": "百度"}`)
+	req, err := lowhttp.ParseBytesToHttpRequest(requestBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules, _, _ := replacer.hook(true, false, requestBytes)
+	httpctx.AppendMatchedRule(req, rules...)
+	flow := &schema.HTTPFlow{}
+	replacer.hookColor(requestBytes, []byte(""), req, flow)
+	tags := strings.Split(flow.Tags, "|")
+	assert.Equal(t, 2, len(tags))
+}
+
+// TestGRPCMUSTPASS_ExtraRepeat fix the bug that the ExtraRepeat flow does not have the right tags and color
+func TestGRPCMUSTPASS_ExtraRepeat(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:             `百度`,
+		NoReplace:        false,
+		Result:           ``,
+		Color:            "red",
+		EnableForRequest: true,
+		EnableForHeader:  true,
+		EnableForBody:    true,
+		Index:            0,
+		ExtraTag:         []string{"tag1"},
+		Disabled:         false,
+		ExtraRepeat:      true,
+		VerboseName:      "",
+	})
+	requestBytes := []byte(`GET /content-search.xml HTTP/1.1
+Host: www.baidu.com
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9
+Cookie: BAIDUID_BFESS=D541A87Daaa50ACC658F7405F62B195D8AA:FG=1; ZFY=Xx1VJGFY2aaHQ2vrOIEsC83loAk0wEEIPY3nVfBgtxymQ:C
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36
+
+{"product": "百度"}`)
+	var tags string
+	lowhttp.RegisterSaveHTTPFlowHandler(func(lowhttpResponse *lowhttp.LowhttpResponse, b bool) {
+		tags = strings.Join(lowhttpResponse.Tags, "|")
+	})
+	replacer.hook(true, false, requestBytes)
+	replacer.WaitTasks()
+	assert.Equal(t, "[重发]tag1|YAKIT_COLOR_red", tags)
 }

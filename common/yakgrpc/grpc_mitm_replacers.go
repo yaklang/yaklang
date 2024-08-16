@@ -409,8 +409,12 @@ type mitmReplacer struct {
 	_ruleRegexpCache *sync.Map
 
 	repeatSender MitmRepeatSender
+	wg           *sync.WaitGroup
 }
 
+func (m *mitmReplacer) WaitTasks() {
+	m.wg.Wait()
+}
 func (m *mitmReplacer) SetRepeatSender(f MitmRepeatSender) {
 	m.repeatSender = f
 }
@@ -447,6 +451,7 @@ func NewMITMReplacer(initFunc ...func() []*ypb.MITMContentReplacer) *mitmReplace
 	}
 	replacer := &mitmReplacer{
 		_ruleRegexpCache: new(sync.Map),
+		wg:               &sync.WaitGroup{},
 	}
 	replacer.LoadRules(rules)
 	return replacer
@@ -911,8 +916,10 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		if len(args) > 0 {
 			extraArgHttps, _ = strconv.ParseBool(utils.InterfaceToString(args[0]))
 		}
+		m.wg.Add(1)
 		go func() {
 			defer func() {
+				m.wg.Done()
 				if err := recover(); err != nil {
 					log.Errorf("extraRepeat failed: %v", err)
 				}
