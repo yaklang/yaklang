@@ -283,10 +283,23 @@ var SSACompilerCommands = []*cli.Command{
 				return checkViaPath(".")
 			}
 			for _, i := range c.Args() {
-				err := checkViaPath(i)
-				if err != nil {
-					return err
+				if utils.IsDir(i) {
+					err := checkViaPath(i)
+					if err != nil {
+						return err
+					}
 				}
+				if ret := utils.GetFirstExistedFile(i); ret != "" {
+					raw, err := fsi.ReadFile(ret)
+					if err != nil {
+						return err
+					}
+					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
+					if err != nil {
+						return err
+					}
+				}
+
 			}
 			return nil
 		},

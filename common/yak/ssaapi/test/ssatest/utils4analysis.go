@@ -441,6 +441,10 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 			}
 			return utils.Errorf("syntax flow failed: %v", strings.Join(result.Errors, "\n"))
 		}
+		if len(result.AlertSymbolTable) <= 0 {
+			errs = append(errs, utils.Errorf("alert symbol table is empty"))
+			return err
+		}
 		result.Show()
 		return nil
 	}, ssaapi.WithLanguage(l))
