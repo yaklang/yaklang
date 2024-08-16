@@ -300,18 +300,10 @@ func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Valu
 
 	if stmt.StartNowDoc() != nil {
 		var text string
-		if nodes := stmt.AllCRLFHereDocText(); len(nodes) > 0 {
-			var builder strings.Builder
-			for _, node := range nodes {
-				builder.WriteString(node.GetText())
-			}
-			text = builder.String()
-		} else if nodes := stmt.AllLFHereDocText(); len(nodes) > 0 {
-			var builder strings.Builder
-			for _, node := range nodes {
-				builder.WriteString(node.GetText())
-			}
-			text = builder.String()
+		if node := stmt.CrlfHereDoc(); node != nil {
+			text = node.GetText()
+		} else if node := stmt.LfHereDoc(); node != nil {
+			text = node.GetText()
 		}
 		return b.EmitConstInst(text)
 	}
