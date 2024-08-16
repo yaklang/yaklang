@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -246,6 +246,49 @@ var SSACompilerCommands = []*cli.Command{
 				filename += ".sf"
 			}
 			return os.WriteFile(filename, buf.Bytes(), 0o666)
+		},
+	},
+	{
+		Name:    "syntaxflow-test",
+		Aliases: []string{"sftest", "sf-test"},
+		Action: func(c *cli.Context) error {
+			testingTInstance := utils.AssertTestingT(func(msg string, args ...any) {
+				log.Errorf(msg, args...)
+			})
+			fsi := filesys.NewLocalFs()
+
+			checkViaPath := func(pathRaw string) error {
+				err := filesys.Recursive(pathRaw, filesys.WithFileSystem(fsi), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					if fsi.Ext(s) == ".sf" || fsi.Ext(s) == "sf" {
+						raw, err := fsi.ReadFile(s)
+						if err != nil {
+							return err
+						}
+						err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
+						if err != nil {
+							return err
+						}
+						return nil
+					}
+					return nil
+				}))
+				if err != nil {
+					return err
+				}
+				return nil
+			}
+
+			empty := len(c.Args()) <= 0
+			if empty {
+				return checkViaPath(".")
+			}
+			for _, i := range c.Args() {
+				err := checkViaPath(i)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	},
 	{
