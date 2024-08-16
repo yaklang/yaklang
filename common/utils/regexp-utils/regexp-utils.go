@@ -2,10 +2,7 @@ package regexp_utils
 
 import (
 	"github.com/dlclark/regexp2"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
-	"sync"
 )
 
 type regexpMode string
@@ -16,11 +13,8 @@ var (
 )
 
 type YakRegexpUtils struct {
-	regexp1     *regexp.Regexp
-	regexp1Once *sync.Once
-
-	regexp2     *regexp2.Regexp
-	regexp2Once *sync.Once
+	reg  *RegexpWrapper
+	reg2 *Regexp2Wrapper
 
 	regexpRaw    string
 	regexpOption regexp2.RegexOptions
@@ -43,46 +37,37 @@ func WithRegexpOption(option regexp2.RegexOptions) YakRegexpUtilsOption {
 
 func NewYakRegexpUtils(raw string, options ...YakRegexpUtilsOption) *YakRegexpUtils {
 	reg := &YakRegexpUtils{
-		regexpRaw:   raw,
-		regexp1Once: &sync.Once{},
-		regexp2Once: &sync.Once{},
+		regexpRaw:    raw,
+		priorityMode: RegexpMode1,
 	}
 	for _, option := range options {
 		option(reg)
 	}
+
+	reg.reg = NewRegexpWrapper(raw)
+	reg.reg2 = NewRegexp2Wrapper(raw, reg.regexpOption)
+
 	return reg
-}
-
-func (m *YakRegexpUtils) getRegexp() *regexp.Regexp {
-	m.regexp1Once.Do(func() {
-		reg, err := regexp.Compile(m.regexpRaw)
-		if err != nil {
-			return
-		}
-		m.regexp1 = reg
-	})
-	if m.regexp1 != nil {
-		return m.regexp1
-	}
-	return nil
-}
-
-func (m *YakRegexpUtils) getRegexp2() *regexp2.Regexp {
-	m.regexp2Once.Do(func() {
-		reg, err := regexp2.Compile(m.regexpRaw, m.regexpOption)
-		if err != nil {
-			return
-		}
-		m.regexp2 = reg
-	})
-	if m.regexp2 != nil {
-		return m.regexp2
-	}
-	return nil
 }
 
 func (m *YakRegexpUtils) SetPriority(mode regexpMode) {
 	m.priorityMode = mode
+}
+
+func (m *YakRegexpUtils) getPriorityRegexp() RegWrapperInterface {
+	if m.priorityMode == RegexpMode1 {
+		return m.reg
+	} else {
+		return m.reg2
+	}
+}
+
+func (m *YakRegexpUtils) getSecondaryRegexp() RegWrapperInterface {
+	if m.priorityMode == RegexpMode1 {
+		return m.reg2
+	} else {
+		return m.reg
+	}
 }
 
 func (m *YakRegexpUtils) String() string {
@@ -90,129 +75,100 @@ func (m *YakRegexpUtils) String() string {
 }
 
 func (m *YakRegexpUtils) Match(b []byte) (bool, error) {
-	return m.MatchString(string(b))
-}
-
-func (m *YakRegexpUtils) MatchString(s string) (bool, error) {
-	if reg := m.getRegexp(); reg != nil {
-		return reg.MatchString(s), nil
-	} else if reg2 := m.getRegexp2(); reg2 != nil {
-		return reg2.MatchString(s)
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.Match(b)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.Match(b)
 	} else {
 		return false, utils.Error("yak regexp match fail: no usable regexp")
 	}
 }
 
-func (m *YakRegexpUtils) MatchRune(r []rune) (bool, error) {
-	if reg := m.getRegexp(); reg != nil {
-		return reg.MatchString(string(r)), nil
-	} else if reg2 := m.getRegexp2(); reg2 != nil {
-		return reg2.MatchRunes(r)
+func (m *YakRegexpUtils) MatchString(s string) (bool, error) {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.MatchString(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.MatchString(s)
 	} else {
 		return false, utils.Error("yak regexp match fail: no usable regexp")
 	}
 }
 
 func (m *YakRegexpUtils) Find(b []byte) ([]byte, error) {
-	res, err := m.FindString(string(b))
-	return []byte(res), err
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.Find(b)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.Find(b)
+	} else {
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
+	}
 }
 
 func (m *YakRegexpUtils) FindString(s string) (string, error) {
-	if reg := m.getRegexp(); reg != nil {
-		return reg.FindString(s), nil
-	} else if reg2 := m.getRegexp2(); reg2 != nil {
-		matchRes, err := reg2.FindStringMatch(s)
-		if err != nil {
-			return "", err
-		}
-		return matchRes.String(), nil
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindString(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindString(s)
 	} else {
 		return "", utils.Error("yak regexp find fail: no usable regexp")
 	}
 }
 
 func (m *YakRegexpUtils) FindSubmatch(b []byte) ([][]byte, error) {
-	res, err := m.FindStringSubmatch(string(b))
-	return lo.Map(res, func(a string, _ int) []byte {
-		return []byte(a)
-	}), err
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindSubmatch(b)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindSubmatch(b)
+	} else {
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
+	}
 }
 
 func (m *YakRegexpUtils) FindStringSubmatch(s string) ([]string, error) {
-	if reg := m.getRegexp(); reg != nil {
-		return reg.FindStringSubmatch(s), nil
-	} else if reg2 := m.getRegexp2(); reg2 != nil {
-		matchRes, err := reg2.FindStringMatch(s)
-		if err != nil {
-			return []string{""}, err
-		}
-		result := make([]string, matchRes.GroupCount())
-		for index, g := range matchRes.Groups() {
-			result[index] = g.String()
-		}
-		return result, nil
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindStringSubmatch(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindStringSubmatch(s)
 	} else {
-		return []string{""}, utils.Error("yak regexp find fail: no usable regexp")
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
 }
 
 func (m *YakRegexpUtils) FindAll(b []byte) ([][]byte, error) {
-	res, err := m.FindAllString(string(b))
-
-	return lo.Map(res, func(a string, _ int) []byte {
-		return []byte(a)
-	}), err
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindAll(b)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindAll(b)
+	} else {
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
+	}
 }
 
 func (m *YakRegexpUtils) FindAllString(s string) ([]string, error) {
-	if reg := m.getRegexp(); reg != nil {
-		return reg.FindAllString(s, -1), nil
-	} else if reg2 := m.getRegexp2(); reg2 != nil {
-		matchRes, err := reg2.FindStringMatch(s)
-		if err != nil {
-			return nil, err
-		}
-		var res []string
-		for matchRes != nil {
-			res = append(res, matchRes.String())
-			matchRes, err = m.regexp2.FindNextMatch(matchRes)
-			if err != nil {
-				return res, err
-			}
-		}
-		return res, nil
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindAllString(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindAllString(s)
 	} else {
-		return nil, utils.Error("yak regexp findAll fail: no usable regexp")
-	}
-}
-
-func (m *YakRegexpUtils) FindStringMatch(s string) (*regexp2.Match, error) {
-	if reg2 := m.getRegexp2(); reg2 != nil {
-		return reg2.FindStringMatch(s)
-	} else {
-		return nil, utils.Error("yak regexp findAll fail: no usable regexp")
-	}
-}
-
-func (m *YakRegexpUtils) FindNextMatch(match *regexp2.Match) (*regexp2.Match, error) {
-	if reg2 := m.getRegexp2(); reg2 != nil {
-		return reg2.FindNextMatch(match)
-	} else {
-		return nil, utils.Error("yak regexp findAll fail: no usable regexp")
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
 }
 
 func (m *YakRegexpUtils) ReplaceAll(src, repl []byte) ([]byte, error) {
-	res, err := m.ReplaceAllString(string(src), string(repl))
-	return []byte(res), err
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.ReplaceAll(src, repl)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.ReplaceAll(src, repl)
+	} else {
+		return nil, utils.Error("yak regexp replace fail: no usable regexp")
+	}
 }
 
 func (m *YakRegexpUtils) ReplaceAllString(src, repl string) (string, error) {
-	if reg := m.getRegexp(); reg != nil {
-		return reg.ReplaceAllString(src, repl), nil
-	} else if reg2 := m.getRegexp2(); reg2 != nil {
-		return reg2.Replace(src, repl, -1, -1)
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.ReplaceAllString(src, repl)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.ReplaceAllString(src, repl)
 	} else {
 		return "", utils.Error("yak regexp replace fail: no usable regexp")
 	}
