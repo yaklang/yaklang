@@ -1,0 +1,71 @@
+desc(
+    title: "Find 'javax.xml.transform.Transformer' unsafe use in context sink",
+    title_zh: "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
+    type: vuln,
+    level: warning,
+)
+
+TransformerFactory.newInstance() as $newInstance;
+$newInstance?{!.setAttribute}.new*().transform() as $vuln;
+check $vuln;
+alert $vuln
+
+// ---------------------------------------CODE----------------------------------------------
+desc(
+    lang: java,
+    "file:///unsafe.java": <<<UNSAFE
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.File;
+import java.io.IOException;
+
+public class XXEVulnerableExample {
+    public static void main(String[] args) {
+        try {
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer(
+                    new StreamSource(new File("vulnerable.xsl")));
+            transformer.transform(
+                    new StreamSource(new File("input.xml")),
+                    new StreamResult(new File("output.xml")));
+        } catch (TransformerException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+UNSAFE,
+    "safefile:///safe.java": <<<SAFE
+import javax.xml.XMLConstants;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.sax.SAXTransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.File;
+import java.io.IOException;
+
+public class XXESecureExample {
+    public static void main(String[] args) {
+        try {
+            SAXTransformerFactory transformerFactory = (SAXTransformerFactory) TransformerFactory.newInstance();
+            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+
+            Transformer transformer = transformerFactory.newTransformer(
+                    new StreamSource(new File("secure.xsl")));
+            transformer.transform(
+                    new StreamSource(new File("input.xml")),
+                    new StreamResult(new File("output.xml")));
+        } catch (TransformerConfigurationException | TransformerException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+SAFE
+)
+
