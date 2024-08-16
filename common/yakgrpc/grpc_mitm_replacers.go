@@ -392,6 +392,7 @@ func sortContentReplacer(i []*MITMReplaceRule) []*MITMReplaceRule {
 	return i
 }
 
+type MitmRepeatSender func(packet []byte)
 type mitmReplacer struct {
 	// 所有正常启动的规则
 	rules Rules
@@ -406,6 +407,12 @@ type mitmReplacer struct {
 	autoSave func(...*MITMReplaceRule)
 
 	_ruleRegexpCache *sync.Map
+
+	repeatSender MitmRepeatSender
+}
+
+func (m *mitmReplacer) SetRepeatSender(f MitmRepeatSender) {
+	m.repeatSender = f
 }
 
 // getRule 获取不到规则就返回空，通过 sync.Map 缓存规则
@@ -870,6 +877,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 	// 是否丢包
 	dropPacket := false
 	extraRepeat := false
+	var matchedRule *MITMReplaceRule
 	modifiedPacket := origin
 	for _, rule := range rules {
 		if rule.NoReplace {
@@ -891,6 +899,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 
 			if rule.GetExtraRepeat() && isRequest {
 				extraRepeat = true
+				matchedRule = rule
 			}
 
 			matchedRules = append(matchedRules, rule)
@@ -909,17 +918,30 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 				}
 			}()
 			log.Info("AUTO(EXTRA)-REPEAT FROM MITM")
-			rsp, err := lowhttp.HTTP(
-				lowhttp.WithPacketBytes(modifiedPacket), lowhttp.WithHttps(extraArgHttps),
-				lowhttp.WithTimeout(15*time.Second), lowhttp.WithRedirectTimes(3),
+			//if m.repeatSender != nil {
+			//	m.repeatSender(originPacket)
+			//}
+			_ = extraArgHttps
+			opts := []lowhttp.LowhttpOpt{
+				lowhttp.WithPacketBytes(originPacket), lowhttp.WithHttps(extraArgHttps),
+				lowhttp.WithTimeout(15 * time.Second), lowhttp.WithRedirectTimes(3),
 				lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource("mitm"),
-			)
+				lowhttp.WithRedirectTimes(0),
+			}
+			for _, tag := range matchedRule.ExtraTag {
+				opts = append(opts, lowhttp.WithAppendHTTPFlowTag("[重发]"+tag))
+			}
+			if matchedRule.Color != "" {
+				opts = append(opts, lowhttp.WithAppendHTTPFlowTag(schema.COLORPREFIX+matchedRule.Color))
+			}
+			rsp, err := lowhttp.HTTP(opts...)
 			if err != nil {
 				log.Errorf("extraRepeat failed: %v", err)
 			}
 			_ = rsp
+			_ = matchedRule
 		}()
-		return matchedRules.MITMContentReplacers(), originPacket, dropPacket
+		return matchedRules.MITMContentReplacers(), modifiedPacket, dropPacket
 	}
 
 	return matchedRules.MITMContentReplacers(), modifiedPacket, dropPacket

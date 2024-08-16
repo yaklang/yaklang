@@ -1633,7 +1633,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	for _, cert := range firstReq.GetCertificates() {
 		opts = append(opts, crep.MITM_MutualTLSClient(cert.CrtPem, cert.KeyPem, cert.GetCaCertificates()...))
 	}
-
 	mServer, err = crep.NewMITMServer(
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_RandomJA3(randomJA3),
