@@ -478,7 +478,6 @@ keyedElement
 
 key
     : expression
-    | literalValue
     ;
 
 element

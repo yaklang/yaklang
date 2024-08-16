@@ -89,14 +89,19 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) (ssa.Value) {
 	return newFunc
 }
 
+type keyValue struct {
+	key   ssa.Value
+	value []ssa.Value
+	kv 	  []keyValue
+}
+
 func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
-	var keys []ssa.Value
-	var values []ssa.Value
+	var kvs []keyValue
 
-	typ, lenv := b.buildLiteralType(exp.LiteralType().(*gol.LiteralTypeContext))
+	typ := b.buildLiteralType(exp.LiteralType().(*gol.LiteralTypeContext))
 	if typ == nil { // 目前还没法识别golang的标准库,这里暂时识别为StructType
 	    typ = ssa.NewStructType()
 	}
@@ -105,132 +110,135 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 			switch t := typ.(type) {
 			case *ssa.ObjectType:
 				if t.GetTypeKind() == ssa.StructTypeKind {
-					keys, values = b.buildLiteralValue(s, true)
+					kvs = b.buildLiteralValue(s, true)
 				}else{
-					keys, values = b.buildLiteralValue(s, false)
+					kvs = b.buildLiteralValue(s, false)
 				}
 			default:
 				typ = ssa.CreateAnyType()
-				keys, values = b.buildLiteralValue(s, false)
+				kvs = b.buildLiteralValue(s, false)
 			}
 		}
 	}
 
-	if lenv != nil {
-	    maxlen , _ := strconv.ParseInt(lenv.String(), 10, 64)
-		if int(maxlen) < len(values) {
-		    b.NewError(ssa.Error, TAG, OutofBounds(int(maxlen),len(values)))
-			return b.EmitConstInst(0)
-		}
-	}
-
-	switch typ.GetTypeKind() {
-	case ssa.SliceTypeKind, ssa.BytesTypeKind:
-		obj := b.InterfaceAddFieldBuild(len(values),
-		func(i int) ssa.Value { 
-			return b.EmitConstInst(i) 
-		},
-		func(i int) ssa.Value { 
-			return values[i] 
-		},)
-		coverType(obj.GetType(), typ)
-		return obj
-	case ssa.MapTypeKind:
-		obj := b.InterfaceAddFieldBuild(len(values),
-		func(i int) ssa.Value {
-			return keys[i]
-		},
-		func(i int) ssa.Value {
-			return values[i]
-		},)
-		coverType(obj.GetType(), typ)
-		return obj
-	case ssa.StructTypeKind:
+	var typeHander func(ssa.Type, []keyValue) ssa.Value
+	
+	typeHander = func(typ ssa.Type, kvs []keyValue) ssa.Value {
 		var obj ssa.Value
-		if len(keys) == 0{
-			obj = b.InterfaceAddFieldBuild(len(values),
-			func(i int) ssa.Value {
-				if i < len(typ.(*ssa.ObjectType).Keys) {
-					return typ.(*ssa.ObjectType).Keys[i]
-				}else{
-					return b.EmitConstInst("")
-				} 
-			},
-			func(i int) ssa.Value {
-				return values[i]
-			},)
-		}else{
-			obj = b.InterfaceAddFieldBuild(len(values),
-			func(i int) ssa.Value {
-				return keys[i]
-			},
-			func(i int) ssa.Value {
-				return values[i]
-			},)
+
+	    switch typ.GetTypeKind() {
+		case ssa.SliceTypeKind, ssa.BytesTypeKind:
+			if kvs[0].value != nil {
+				return kvs[0].value[0]
+			}else{
+				obj = b.InterfaceAddFieldBuild(len(kvs),
+				func(i int) ssa.Value { 
+					return b.EmitConstInst(i) 
+				},
+				func(i int) ssa.Value { 
+					return typeHander(typ.(*ssa.ObjectType).FieldType, kvs[i].kv)
+				},)
+			}
+		case ssa.MapTypeKind:
+			if kvs[0].value != nil {
+				return kvs[0].value[0]
+			}else{
+				obj = b.InterfaceAddFieldBuild(len(kvs),
+				func(i int) ssa.Value {
+					return kvs[i].key
+				},
+				func(i int) ssa.Value {
+					return typeHander(typ.(*ssa.ObjectType).FieldType, kvs[i].kv)
+				},)
+			}
+		case ssa.StructTypeKind:
+			if kvs[0].value != nil {
+				return kvs[0].value[0]
+			}else{
+				if kvs[0].key == nil{ // 全部初始化
+					obj = b.InterfaceAddFieldBuild(len(kvs),
+					func(i int) ssa.Value {
+						if i < len(typ.(*ssa.ObjectType).Keys) {
+							return typ.(*ssa.ObjectType).Keys[i]
+						}else{
+							return b.EmitConstInst("")
+						} 
+					},
+					func(i int) ssa.Value {
+						return typeHander(typ.(*ssa.ObjectType).FieldTypes[i], kvs[i].kv)
+					},)
+				}else{ // 部分初始化
+					obj = b.InterfaceAddFieldBuild(len(typ.(*ssa.ObjectType).Keys),
+					func(i int) ssa.Value {
+						return typ.(*ssa.ObjectType).Keys[i]
+					},
+					func(i int) ssa.Value {
+						for y, kv := range kvs {
+							if typ.(*ssa.ObjectType).Keys[i].String() == kv.key.String() {
+								return typeHander(typ.(*ssa.ObjectType).FieldTypes[i], kvs[y].kv)
+							}
+						}
+						return b.GetDefaultValue(typ.(*ssa.ObjectType).FieldTypes[i])
+					},)
+				}
+			}
+		case ssa.InterfaceTypeKind:
+			// TODO
+			obj = b.InterfaceAddFieldBuild(0,
+				func(i int) ssa.Value { 
+					return b.EmitConstInst(i) 
+				},
+				func(i int) ssa.Value { 
+					return b.EmitConstInst(i) 
+				},)
+		default:
+			return kvs[0].value[0]
 		}
 		coverType(obj.GetType(), typ)
 		return obj
-	case ssa.InterfaceTypeKind:
-
-	default:
-		obj := b.InterfaceAddFieldBuild(0,
-		func(i int) ssa.Value { 
-			return b.EmitConstInst(i) 
-		},
-		func(i int) ssa.Value { 
-			return b.EmitConstInst(i) 
-		},)
-		coverType(obj.GetType(), typ)
-		return obj
 	}
-
-	b.NewError(ssa.Error, TAG, Unreachable())
-	return b.EmitConstInst(0)
+	
+	return typeHander(typ, kvs)
 }
 
-func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bool) ([]ssa.Value,[]ssa.Value) {
+func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bool) (ret []keyValue) {
     recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
-	var values []ssa.Value
-	var keys []ssa.Value
-
+	
 	if list := exp.ElementList(); list != nil {
 	    for _, e := range list.(*gol.ElementListContext).AllKeyedElement() {
-			keyst, valuest := b.buildKeyedElement(e.(*gol.KeyedElementContext), iscreate)
-			values = append(values, valuest...)
-			keys = append(keys, keyst...)
+			kv := b.buildKeyedElement(e.(*gol.KeyedElementContext), iscreate)
+			ret = append(ret, kv)
 		}
 	}
 
-	return keys,values
+	return ret
 }
 
-func (b *astbuilder) buildKeyedElement(exp *gol.KeyedElementContext, iscreate bool) ([]ssa.Value,[]ssa.Value) {
+func (b *astbuilder) buildKeyedElement(exp *gol.KeyedElementContext, iscreate bool) (ret keyValue) {
     recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
-	var keys []ssa.Value
-	var values []ssa.Value
+	var keys ssa.Value
+	var kvs []keyValue
 
 	if key := exp.Key(); key != nil {
-		if s, ok := key.(*gol.KeyContext); ok {
-			keyst,valuest := b.buildKey(s, iscreate)
-			keys = append(keys, keyst...)
-			values = append(values, valuest...)
-		}
+		keys = b.buildKey(key.(*gol.KeyContext), iscreate)
 	}
 
 	if elem := exp.Element(); elem != nil {
 		if s, ok := elem.(*gol.ElementContext); ok {
-			keyt,valuest := b.buildElement(s, iscreate)
-			keys = append(keys, keyt...)
-			values = append(values, valuest...)
+			kvs = b.buildElement(s, iscreate)
 		}
 	}
-
-	return keys,values
+	
+	return keyValue{
+		key:   keys,
+		value: nil,
+		kv:    kvs,
+	}
 }
 
-func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) ([]ssa.Value,[]ssa.Value) {
+func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) (ssa.Value) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -245,28 +253,29 @@ func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) ([]ssa.Value,[
 					}
 				}
 			}
-			return []ssa.Value{leftv},nil
+			return leftv
 		}else{
 			rightv,_ := b.buildExpression(e.(*gol.ExpressionContext) , false)
-			return []ssa.Value{rightv},nil
+			return rightv
 		}
 	}
 
-	if e := exp.LiteralValue(); e != nil {
-	    return b.buildLiteralValue(e.(*gol.LiteralValueContext), iscreate)
-	}
-
 	b.NewError(ssa.Error, TAG, Unreachable())
-	return []ssa.Value{b.EmitConstInst(0)},[]ssa.Value{b.EmitConstInst(0)}
+	return b.EmitConstInst(0)
 }
 
-func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa.Value,[]ssa.Value) {
+func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) (ret []keyValue) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if e := exp.Expression(); e != nil {
 	    right,_ := b.buildExpression(e.(*gol.ExpressionContext) , false)
-		return nil,[]ssa.Value{right}  
+		kv := keyValue{
+			key:   nil,
+			value: []ssa.Value{right},
+			kv:    []keyValue{},
+		}  
+		ret = append(ret, kv)
 	}
 
 	if e := exp.LiteralValue(); e != nil {
@@ -274,19 +283,19 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) ([]ssa
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
-	return []ssa.Value{b.EmitConstInst(0)},[]ssa.Value{b.EmitConstInst(0)}
+	return ret
 }
 
-func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ssa.Value) {
+func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if name := stmt.TypeName(); name != nil {
-	    return b.buildTypeName(name.(*gol.TypeNameContext)),nil
+	    return b.buildTypeName(name.(*gol.TypeNameContext))
 	}
 	// slice type literal
 	if s, ok := stmt.SliceType().(*gol.SliceTypeContext); ok {
-		return b.buildSliceTypeLiteral(s),nil
+		return b.buildSliceTypeLiteral(s)
 	}
 
 	// array type literal
@@ -296,27 +305,27 @@ func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) (ssa.Type,ss
 
 	// map type literal
 	if s, ok := stmt.MapType().(*gol.MapTypeContext); ok {
-		return b.buildMapTypeLiteral(s),nil
+		return b.buildMapTypeLiteral(s)
 	}
 
 	// struct type literal
 	if s, ok := stmt.StructType().(*gol.StructTypeContext); ok {
-		return b.buildStructTypeLiteral(s),nil
+		return b.buildStructTypeLiteral(s)
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
-	return ssa.CreateAnyType(),b.EmitConstInst(0)
+	return ssa.CreateAnyType()
 }
 
 
-func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value) {
+func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	text := stmt.GetText()
 
 	// slice type literal
 	if s := stmt.SliceType(); s != nil {
-		return b.buildSliceTypeLiteral(s.(*gol.SliceTypeContext)),nil
+		return b.buildSliceTypeLiteral(s.(*gol.SliceTypeContext))
 	}
 
 	// array type literal
@@ -327,14 +336,14 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value)
 	// map type literal
 	if strings.HasPrefix(text, "map") {
 		if s := stmt.MapType(); s != nil {
-			return b.buildMapTypeLiteral(s.(*gol.MapTypeContext)),nil
+			return b.buildMapTypeLiteral(s.(*gol.MapTypeContext))
 		}
 	}
 
 	// struct type literal
 	if strings.HasPrefix(text, "struct") {
 		if s := stmt.StructType(); s != nil {
-			return b.buildStructTypeLiteral(s.(*gol.StructTypeContext)),nil
+			return b.buildStructTypeLiteral(s.(*gol.StructTypeContext))
 		}
 	}
 
@@ -342,7 +351,7 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value)
 	if strings.HasPrefix(text, "*") {
 	    if p := stmt.PointerType(); p != nil {
 			if t := p.(*gol.PointerTypeContext).Type_(); t != nil {
-				return b.buildType(t.(*gol.Type_Context)),nil
+				return b.buildType(t.(*gol.Type_Context))
 			} 
 		}
 	}
@@ -350,14 +359,14 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value)
 	// function type literal
 	if strings.HasPrefix(text, "func") {
 	    if s := stmt.FunctionType(); s != nil {
-			return b.buildFunctionTypeLiteral(s.(*gol.FunctionTypeContext)),nil
+			return b.buildFunctionTypeLiteral(s.(*gol.FunctionTypeContext))
 		}
 	}
 
 	// interface type literal
 	if strings.HasPrefix(text, "interface") {
 	    if s := stmt.InterfaceType(); s != nil {
-			return b.buildInterfaceTypeLiteral(s.(*gol.InterfaceTypeContext)),nil
+			return b.buildInterfaceTypeLiteral(s.(*gol.InterfaceTypeContext))
 		}
 	}
 
@@ -366,12 +375,12 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) (ssa.Type,ssa.Value)
 		strings.HasPrefix(text, "<-chan") || 
 		strings.HasPrefix(text, "chan<-") {
 	    if s := stmt.ChannelType(); s != nil {
-			return b.buildChanTypeLiteral(s.(*gol.ChannelTypeContext)),nil
+			return b.buildChanTypeLiteral(s.(*gol.ChannelTypeContext))
 		}
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
-	return ssa.CreateAnyType(),b.EmitConstInst(0)
+	return ssa.CreateAnyType()
 }
 
 func (b* astbuilder) buildFunctionTypeLiteral(stmt *gol.FunctionTypeContext) (ssa.Type) {
@@ -465,7 +474,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type 
 }
 
 
-func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) (ssa.Type,ssa.Value) {
+func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) (ssa.Type) {
     recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var value ssa.Value
@@ -479,11 +488,12 @@ func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) (ssa.Type
 
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
-			return ssa.NewSliceType(eleTyp),value
+			return ssa.NewSliceType(eleTyp)
 		}
 	}
+	_ = value
 	b.NewError(ssa.Error, TAG, Unreachable())
-	return ssa.CreateAnyType(), b.EmitConstInst(0)
+	return ssa.CreateAnyType()
 }
 
 
@@ -692,5 +702,18 @@ func coverType(ityp, iwantTyp ssa.Type) {
 	}
 	for _, a := range wantTyp.AnonymousField {
 	    typ.AnonymousField = append(typ.AnonymousField, a)
+	}
+}
+
+func (b* astbuilder)GetDefaultValue(ityp ssa.Type) ssa.Value {
+	switch ityp.GetTypeKind() {
+	case ssa.NumberTypeKind:
+		return b.EmitConstInst(0)
+	case ssa.StringTypeKind:
+		return b.EmitConstInst("")
+	case ssa.BooleanTypeKind:
+		return b.EmitConstInst(false)
+	default:
+		return b.EmitConstInst("")
 	}
 }
