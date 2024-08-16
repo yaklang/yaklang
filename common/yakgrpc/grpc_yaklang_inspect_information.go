@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -60,13 +61,13 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 				Double: param.MultipleSelect,
 				Data:   make([]PluginParamSelectData, 0),
 			}
-			for k, v := range param.SelectOption {
+			param.SelectOption.ForEach(func(k string, v any) {
 				paramSelect.Data = append(paramSelect.Data, PluginParamSelectData{
 					Key:   k,
 					Label: k,
-					Value: v,
+					Value: codec.AnyToString(v),
 				})
-			}
+			})
 			extra, _ = json.Marshal(paramSelect)
 		}
 
@@ -216,7 +217,10 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 			cliFunction = "StringSlice"
 			if para.ExtraSetting != "" {
 				var dataSelect *PluginParamSelect
-				json.Unmarshal([]byte(para.ExtraSetting), &dataSelect)
+				if err := json.Unmarshal([]byte(para.ExtraSetting), &dataSelect); err != nil {
+					log.Error(err)
+					continue
+				}
 				Option = append(Option, fmt.Sprintf(`cli.setMultipleSelect(%t)`, dataSelect.Double))
 				for _, v := range dataSelect.Data {
 					if v.Key == "" && v.Label != "" {
