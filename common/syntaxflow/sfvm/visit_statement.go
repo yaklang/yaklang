@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
@@ -64,11 +65,19 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 
 	for _, item := range i.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
 		if ret, ok := item.(*sf.DescriptionItemContext); ok {
-			results := ret.AllStringLiteral()
-			if len(results) >= 2 {
-				key := mustUnquoteSyntaxFlowString(results[0].GetText())
-				value := mustUnquoteSyntaxFlowString(results[1].GetText())
-				switch strings.ToLower(key) {
+			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+			value := ""
+			if ret.DescriptionItemValue() != nil {
+				if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok {
+					if valueItem.CrlfHereDoc() != nil {
+						value = valueItem.CrlfHereDoc().(*sf.CrlfHereDocContext).CrlfText().GetText()
+					} else if valueItem.LfHereDoc() != nil {
+						value = valueItem.LfHereDoc().(*sf.LfHereDocContext).LfText().GetText()
+					}
+				}
+			}
+			if value != "" {
+				switch keyLower := strings.ToLower(key); keyLower {
 				case "title":
 					y.title = value
 				case "description", "desc", "note":
@@ -79,13 +88,15 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 					y.allowIncluded = value
 				case "level", "severity", "sev":
 					y.severity = value
+				default:
+					urlIns, _ := url.Parse(keyLower)
+					if urlIns != nil && urlIns.Scheme == "file" && strings.HasPrefix(keyLower, "file://") {
+						filename := strings.TrimPrefix(keyLower, "file://")
+						y.verifyFilesystem[filename] = value
+					}
 				}
-				y.EmitAddDescription(key, value)
-			} else {
-				key := mustUnquoteSyntaxFlowString(results[0].GetText())
-				key = yakunquote.TryUnquote(key)
-				y.EmitAddDescription(key, "")
 			}
+			y.EmitAddDescription(key, value)
 		}
 	}
 
@@ -113,5 +124,4 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 	} else {
 		y.EmitAlert(ref, "")
 	}
-
 }
