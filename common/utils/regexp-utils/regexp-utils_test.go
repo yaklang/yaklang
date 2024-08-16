@@ -1,7 +1,15 @@
 package regexp_utils
 
-import "testing"
+import (
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"testing"
+)
 
 func TestYakRegexpManager(t *testing.T) {
-	NewYakRegexpUtils("2[0-4]\\d(?#200-249)|25[0-5](?#250-255)|[01]?\\d\\d?(?#0-199)")
+	res, err := NewRegexpWrapper("Server: (.*)").ReplaceAllStringFunc("Server: 123", func(s string) string {
+		return "Server: $1 qwe"
+	})
+	spew.Dump(err)
+	fmt.Println(res)
 }
