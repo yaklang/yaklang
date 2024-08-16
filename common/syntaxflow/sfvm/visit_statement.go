@@ -75,6 +75,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 						value = valueItem.LfHereDoc().(*sf.LfHereDocContext).LfText().GetText()
 					}
 				}
+			} else if ret.StringLiteral() != nil {
+				value = mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
 			}
 			if value != "" {
 				switch keyLower := strings.ToLower(key); keyLower {
@@ -88,11 +90,20 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 					y.allowIncluded = value
 				case "level", "severity", "sev":
 					y.severity = value
+				case "language", "lang":
+					y.language = value
 				default:
 					urlIns, _ := url.Parse(keyLower)
-					if urlIns != nil && urlIns.Scheme == "file" && strings.HasPrefix(keyLower, "file://") {
-						filename := strings.TrimPrefix(keyLower, "file://")
-						y.verifyFilesystem[filename] = value
+					if urlIns != nil {
+						if urlIns.Scheme == "file" && strings.HasPrefix(keyLower, "file://") {
+							filename := strings.TrimPrefix(keyLower, "file://")
+							y.verifyFilesystem[filename] = value
+							continue
+						} else if urlIns.Scheme == "negative-file" && strings.HasPrefix(keyLower, "negative-file://") {
+							filename := strings.TrimPrefix(keyLower, "negative-file://")
+							y.negativeFilesystem[filename] = value
+							continue
+						}
 					}
 				}
 			}

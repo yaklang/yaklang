@@ -13,18 +13,23 @@ import (
 )
 
 type SyntaxFlowVisitor struct {
-	text             string
-	title            string
-	allowIncluded    string
-	description      string
-	purpose          string
-	severity         string
-	verifyFilesystem map[string]string
-	codes            []*SFI
+	text               string
+	title              string
+	allowIncluded      string
+	description        string
+	purpose            string
+	severity           string
+	language           string
+	verifyFilesystem   map[string]string
+	negativeFilesystem map[string]string
+	codes              []*SFI
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
-	sfv := &SyntaxFlowVisitor{verifyFilesystem: make(map[string]string)}
+	sfv := &SyntaxFlowVisitor{
+		verifyFilesystem:   make(map[string]string),
+		negativeFilesystem: make(map[string]string),
+	}
 	return sfv
 }
 

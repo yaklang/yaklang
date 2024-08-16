@@ -1,7 +1,9 @@
 package consts
 
 import (
+	"github.com/pkg/errors"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -19,6 +21,22 @@ const (
 	JAVA Language = "java"
 	GO   Language = "go"
 )
+
+func ValidateLanguage(language string) (Language, error) {
+	switch strings.TrimSpace(strings.ToLower(language)) {
+	case "yak", "yaklang":
+		return Yak, nil
+	case "java":
+		return JAVA, nil
+	case "php":
+		return PHP, nil
+	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
+		return JS, nil
+	case "go", "golang":
+		return GO, nil
+	}
+	return "", errors.Errorf("unsupported language: %s", language)
+}
 
 var (
 	YAK_SSA_PROJECT_DB_PATH = ""
