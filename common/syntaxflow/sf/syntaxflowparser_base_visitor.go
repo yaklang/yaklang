@@ -111,6 +111,26 @@ func (v *BaseSyntaxFlowParserVisitor) VisitDescriptionItem(ctx *DescriptionItemC
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitDescriptionItemValue(ctx *DescriptionItemValueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitCrlfHereDoc(ctx *CrlfHereDocContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitLfHereDoc(ctx *LfHereDocContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitCrlfText(ctx *CrlfTextContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitLfText(ctx *LfTextContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitAlertStatement(ctx *AlertStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }

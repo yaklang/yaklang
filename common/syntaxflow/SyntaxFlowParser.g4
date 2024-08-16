@@ -60,8 +60,13 @@ descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? 
 descriptionItems: lines? descriptionItem (',' lines? descriptionItem)* ','? lines?;
 descriptionItem
     : stringLiteral lines?
-    | stringLiteral ':' stringLiteral lines?
+    | stringLiteral ':' descriptionItemValue lines?
     ;
+descriptionItemValue: stringLiteral | '<<<'  HereDocIdentifierName (crlfHereDoc | lfHereDoc);
+crlfHereDoc: CRLFHereDocIdentifierBreak crlfText? CRLFEndDoc;
+lfHereDoc: LFHereDocIdentifierBreak lfText? LFEndDoc;
+crlfText: CRLFHereDocText+;
+lfText: LFHereDocText+;
 
 // echo statement will echo the variable
 alertStatement: Alert refVariable (For stringLiteral)?;
