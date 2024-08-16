@@ -85,6 +85,21 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#descriptionItem.
 	VisitDescriptionItem(ctx *DescriptionItemContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#descriptionItemValue.
+	VisitDescriptionItemValue(ctx *DescriptionItemValueContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#crlfHereDoc.
+	VisitCrlfHereDoc(ctx *CrlfHereDocContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#lfHereDoc.
+	VisitLfHereDoc(ctx *LfHereDocContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#crlfText.
+	VisitCrlfText(ctx *CrlfTextContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#lfText.
+	VisitLfText(ctx *LfTextContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#alertStatement.
 	VisitAlertStatement(ctx *AlertStatementContext) interface{}
 

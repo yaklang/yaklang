@@ -104,6 +104,9 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	frame.AllowIncluded = result.allowIncluded
 	frame.Purpose = result.purpose
 	frame.Severity = result.severity
+	if len(result.verifyFilesystem) > 0 {
+		frame.VerifyFs = result.verifyFilesystem
+	}
 	frame.vm = s
 
 	s.frames = append(s.frames, frame)

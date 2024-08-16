@@ -149,6 +149,19 @@ a: 1,
 		"$a + $b",
 		"$a - $b",
 		"$a & $b",
+		`desc("aaa": <<<ABC
+AAAAPLasjkldfajskldf
+ABC,
+
+"A.java": <<<FILE
+ljkasdfjklasdfjkasdf
+asdf
+as
+dfa
+sdf
+asdf
+FILE,
+)`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)

@@ -31,6 +31,7 @@ type SFFrame struct {
 	AllowIncluded string
 	Purpose       string
 	Severity      string
+	VerifyFs      map[string]string
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -54,8 +55,9 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 	}
 
 	return &SFFrame{
-		Text:  text,
-		Codes: codes,
+		Text:     text,
+		Codes:    codes,
+		VerifyFs: make(map[string]string),
 	}
 }
 
