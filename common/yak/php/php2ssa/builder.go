@@ -23,21 +23,16 @@ type SSABuild struct {
 
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
-	variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst("global"))
-	fb.AssignVariable(variable, fb.EmitEmptyContainer())
-	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("get"))
-	fb.AssignVariable(variable, fb.EmitEmptyContainer())
-	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("post"))
-	fb.AssignVariable(variable, fb.EmitEmptyContainer())
-	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("cookie"))
-	fb.AssignVariable(variable, fb.EmitEmptyContainer())
-	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("env"))
-	fb.AssignVariable(variable, fb.EmitEmptyContainer())
-	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("session"))
-	fb.AssignVariable(variable, fb.EmitEmptyContainer())
-	variable = fb.CreateMemberCallVariable(container, fb.EmitConstInst("server"))
+	initHandler := func(name ...string) {
+		for _, _name := range name {
+			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
+			emptyContainer := fb.EmitEmptyContainer()
+			fb.AssignVariable(variable, emptyContainer)
+		}
+	}
+	initHandler("global", "get", "post", "cookie", "env", "session", "server")
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
-	fb.GetProgram().GetApplication().GlobalScope = container
+	fb.GetProgram().GlobalScope = container
 }
 func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
@@ -76,7 +71,7 @@ func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.Functi
 	builder.MoreParse = false
 }
 
-func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
@@ -117,6 +112,7 @@ func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.MoreParse)
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.MoreParse = b.MoreParse
+		s.InitHandler(functionBuilder)
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

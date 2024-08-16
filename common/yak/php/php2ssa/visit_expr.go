@@ -1205,7 +1205,7 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		variable := y.VisitVariable(i.Variable())
 		var position = ""
 		handler := func() ssa.Value {
-			member, _ := y.GetProgram().Application.GlobalScope.GetStringMember(position)
+			member, _ := y.GetProgram().GlobalScope.GetStringMember(position)
 			return member
 		}
 		switch strings.ToUpper(variable) {

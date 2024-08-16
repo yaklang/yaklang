@@ -56,15 +56,11 @@ func (c *config) parseProject() (Programs, error) {
 	if c.databasePath != "" {
 		consts.SetSSADataBasePath(c.databasePath)
 	}
-	if c.LanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilders[Yak]
-	}
 	programPath := c.programPath
 	prog, builder, err := c.init()
 	if err != nil {
 		return nil, err
 	}
-	c.LanguageBuilder.InitHandler(builder)
 	if prog.Name != "" {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
@@ -203,7 +199,6 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if err != nil {
 		return nil, err
 	}
-	c.LanguageBuilder.InitHandler(builder)
 	c.LanguageBuilder.PreHandlerFile(r, builder)
 	// parse code
 	if err := prog.Build("", r, builder); err != nil {
@@ -255,6 +250,9 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
+	}
+	if c.LanguageBuilder == nil {
+		c.LanguageBuilder = LanguageBuilders[Yak]
 	}
 
 	prog.Build = func(
@@ -328,6 +326,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
+	c.LanguageBuilder.InitHandler(builder)
 	builder.WithDefineFunction(c.defineFunc)
 	return prog, builder, nil
 }
