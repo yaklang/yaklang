@@ -191,8 +191,14 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) (ssa.Value)
 				func(i int) ssa.Value { 
 					return b.EmitConstInst(i) 
 				},)
+		case ssa.AnyTypeKind:
+			return b.EmitConstInst(0)
 		default:
-			return kvs[0].value[0]
+			if kvs[0].value[0] != nil {
+			    return kvs[0].value[0]
+			}
+			b.NewError(ssa.Error, TAG, "unhandled type")
+			return b.EmitConstInst(0)
 		}
 		coverType(obj.GetType(), typ)
 		return obj
