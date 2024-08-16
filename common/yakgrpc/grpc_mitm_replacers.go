@@ -552,10 +552,22 @@ func stringForSettingColor(s string, extraTag []string, flow *schema.HTTPFlow) {
 }
 
 func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, flow *schema.HTTPFlow) []*schema.ExtractedData {
+	var colorName string
+	var tagNames []string
+	applyStringForSettingColor := func() {
+		stringForSettingColor(colorName, tagNames, flow)
+	}
+	stringForSettingColorPrepare := func(s string, extraTag []string, flow *schema.HTTPFlow) {
+		colorName = s
+		tagNames = append(tagNames, extraTag...) // merge tag name
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
 		}
+	}()
+	defer func() {
+		applyStringForSettingColor()
 	}()
 	var (
 		// packetInfo      *yakit.PacketInfo
@@ -566,8 +578,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastElement := ret[len(ret)-1]
-		stringForSettingColor(lastElement.Color, lastElement.ExtraTag, flow)
-		return nil
+		stringForSettingColorPrepare(lastElement.Color, lastElement.ExtraTag, flow)
+		//return nil
 	}
 	if m == nil {
 		return nil
@@ -617,7 +629,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 				continue
 			}
 
-			stringForSettingColor(rule.Color, rule.ExtraTag, flow)
+			stringForSettingColorPrepare(rule.Color, rule.ExtraTag, flow)
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
 				flow.CalcHash(),
 				rule.VerboseName,
