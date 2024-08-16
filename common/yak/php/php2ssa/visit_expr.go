@@ -356,7 +356,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return y.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
 		case "!=":
 			return y.EmitBinOp(ssa.OpNotEq, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
-		case "!==":
+		case "<>", "!==":
 			return y.EmitBinOp(ssa.OpNotEq, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
 		default:
 			log.Errorf("unhandled comparison expression: %v", ret.GetText())
