@@ -37,21 +37,19 @@ function test(){
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 
-	//todo: 该测试，内存有问题
-
-	//	t.Run("test globals in function,and function used", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//$GLOBALS["a"] = 1;
-	//function test(){
-	//    return $GLOBALS['a'];
-	//}
-	//$a = test();
-	//println($a);
-	//`
-	//		ssatest.CheckSyntaxFlow(t, code,
-	//			`println(* #-> * as $param)`,
-	//			map[string][]string{"param": {"1", "make(any)"}},
-	//			ssaapi.WithLanguage(ssaapi.PHP))
-	//	})
+	t.Run("test globals in function,and function used", func(t *testing.T) {
+		code := `<?php
+	
+	$GLOBALS["a"] = 1;
+	function test(){
+	   return $GLOBALS['a'];
+	}
+	$a = test();
+	println($a);
+	`
+		ssatest.CheckSyntaxFlow(t, code,
+			`println(* #-> * as $param)`,
+			map[string][]string{"param": {"1", "make(any)"}},
+			ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
