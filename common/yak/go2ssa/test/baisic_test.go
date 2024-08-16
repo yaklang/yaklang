@@ -105,7 +105,6 @@ func TestStmt_normol(t *testing.T) {
 	})
 }
 
-
 func TestStmt_const(t *testing.T) {
 	t.Run("const", func(t *testing.T) {
 		test.CheckPrintlnValue( `package main
@@ -346,7 +345,7 @@ func TestType_normol(t *testing.T) {
 			println(d)
 		}
 			
-		`, []string{"0","0","0","0"}, t)
+		`, []string{"0","\"\"","false","0"}, t)
 	})
 
 	t.Run("baisic", func(t *testing.T) {
@@ -430,6 +429,7 @@ func TestType_normol(t *testing.T) {
 		type mystruct struct{
 		    a int 
 			b string
+			c []int
 		}
 
 		func main(){
@@ -497,7 +497,7 @@ func TestType_normol(t *testing.T) {
 	})
 }
 
-func TestType_Struct(t *testing.T) {
+func TestType_struct(t *testing.T) {
 	t.Run("struct inheritance", func(t *testing.T) {
 	    
 		test.CheckPrintlnValue( `package main
@@ -523,4 +523,63 @@ func TestType_Struct(t *testing.T) {
 		`, []string{"1","3","Undefined-b.b(valid)"}, t)
 	})
 
+}
+
+func TestType_nesting(t *testing.T) {
+	t.Run("map slice nesting", func(t *testing.T) {
+		test.CheckPrintlnValue( `package main
+
+		func main(){
+		    str := map[string][]string{
+				"baidu.com":{"http://baidu.com/asdasd","https://baidu.com"},
+			}
+			println(str["baidu.com"][0])
+			println(str["baidu.com"][1])
+		}
+
+		`, []string{"\"http://baidu.com/asdasd\"","\"https://baidu.com\""}, t)
+	})
+
+	t.Run("struct map nesting", func(t *testing.T) {
+	    
+		test.CheckPrintlnValue( `package main
+
+		type Typ struct {
+			a []string
+			b map[string]string
+		}
+
+		func main(){
+			typ := Typ{
+				a: []string{"1","2","3"},
+				b: map[string]string{
+					"baidu.com": "http://baidu.com",
+				},
+			}
+			println(typ.a[0])
+			println(typ.b["baidu.com"])
+		}
+
+		`, []string{"\"1\"","\"http://baidu.com\""}, t)
+	})
+
+	t.Run("slice struct nesting", func(t *testing.T) {
+	    
+		test.CheckPrintlnValue( `package main
+
+		type Typ struct {
+			a int
+			b string
+		}
+
+		func main(){
+			slice := []Typ{Typ{1,"a"},Typ{b:"b"}}
+			println(slice[0].a)
+			println(slice[0].b)
+			println(slice[1].a)
+			println(slice[1].b)
+		}
+
+		`, []string{"1","\"a\"","0","\"b\""}, t)
+	})
 }

@@ -313,7 +313,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				if b.GetFromCmap(id) {
 					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
-				b.AddGlobalVariable(id, b.EmitConstInst(0))
+				b.AddGlobalVariable(id, b.GetDefaultValue(ssaTyp))
 				recoverRange()
 			}
 		} else {
@@ -342,7 +342,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				}
 
 				leftv := b.CreateLocalVariable(id)
-				b.AssignVariable(leftv, b.EmitConstInst(0))
+				b.AssignVariable(leftv, b.GetDefaultValue(ssaTyp))
 				leftvl = append(leftvl, leftv)
 				recoverRange()
 			}
@@ -1756,7 +1756,7 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 	}
 
 	if lit := typ.TypeLit(); lit != nil {
-		ssatyp, _ = b.buildTypeLit(lit.(*gol.TypeLitContext))
+		ssatyp = b.buildTypeLit(lit.(*gol.TypeLitContext))
 	}
 
 	return ssatyp
