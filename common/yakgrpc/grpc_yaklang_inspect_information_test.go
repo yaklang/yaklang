@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -86,14 +85,17 @@ func CompareScriptParams(got, want []*ypb.YakScriptParam) error {
 			return utils.Errorf("cli parameter %d extra setting data length not match", i)
 		}
 		// sort extra*.Data by label
-		sort.Slice(extraWant.Data, func(i, j int) bool {
-			return extraWant.Data[i].Key < extraWant.Data[j].Key
-		})
-		sort.Slice(extraGot.Data, func(i, j int) bool {
-			return extraGot.Data[i].Key < extraGot.Data[j].Key
-		})
+		// sort.Slice(extraWant.Data, func(i, j int) bool {
+		// 	return extraWant.Data[i].Key < extraWant.Data[j].Key
+		// })
+		// sort.Slice(extraGot.Data, func(i, j int) bool {
+		// 	return extraGot.Data[i].Key < extraGot.Data[j].Key
+		// })
 		for j := range extraWant.Data {
 			if extraWant.Data[j].Key != extraGot.Data[j].Key {
+				return utils.Errorf("cli parameter %d extra setting data %d key not match", i, j)
+			}
+			if extraWant.Data[j].Label != extraGot.Data[j].Label {
 				return utils.Errorf("cli parameter %d extra setting data %d label not match", i, j)
 			}
 			if extraWant.Data[j].Value != extraGot.Data[j].Value {
@@ -202,7 +204,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 					Help:         "help information",
 					Required:     false,
 					Group:        "",
-					ExtraSetting: "{\"double\":true,\"data\":[{\"key\":\"c\",\"value\":\"c\"},{\"key\":\"a\",\"value\":\"A\"},{\"key\":\"b\",\"value\":\"B\"}]}",
+					ExtraSetting: "{\"double\":true,\"data\":[{\"key\":\"a\",\"label\":\"a\",\"value\":\"A\"},{\"key\":\"b\",\"label\":\"b\",\"value\":\"B\"},{\"key\":\"c\",\"label\":\"c\",\"value\":\"c\"}]}",
 				},
 			},
 			t,
@@ -352,7 +354,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 					Help:         "help information",
 					Required:     false,
 					Group:        "",
-					ExtraSetting: "{\"double\":true,\"data\":[{\"key\":\"c\",\"value\":\"c\"},{\"key\":\"a\",\"value\":\"A\"},{\"key\":\"b\",\"value\":\"B\"}]}",
+					ExtraSetting: "{\"double\":true,\"data\":[{\"key\":\"c\",\"label\":\"c\",\"value\":\"c\"},{\"key\":\"a\",\"label\":\"a\",\"value\":\"A\"},{\"key\":\"b\",\"label\":\"b\",\"value\":\"B\"}]}",
 					MethodType:   "select",
 				},
 			},
@@ -1004,7 +1006,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_CLI_SelectOption(t *testing.T)
 			{
 				Field: "types", TypeVerbose: "select",
 				FieldVerbose: "types",
-				ExtraSetting: "{\"double\":false,\"data\":[{\"key\":\"backup\",\"value\":\"backup\"}]}",
+				ExtraSetting: "{\"double\":false,\"data\":[{\"key\":\"backup\",\"label\":\"backup\",\"value\":\"backup\"}]}",
 				MethodType:   "select",
 			},
 		}
