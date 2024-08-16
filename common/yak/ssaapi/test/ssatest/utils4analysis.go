@@ -1,7 +1,9 @@
 package ssatest
 
 import (
+	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io/fs"
 	"sort"
 	"strings"
@@ -28,7 +30,7 @@ import (
 
 type checkFunction func(*ssaapi.Program) error
 
-func CheckWithFS(fs fi.FileSystem, t *testing.T, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
 		prog, err := ssaapi.ParseProject(fs, opt...)
@@ -413,5 +415,71 @@ func checkFunctionEx(
 			return fmt.Errorf("want[%d] %s not found", i, want[i])
 		}
 	}
+	return nil
+}
+
+func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
+	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(i)
+	if err != nil {
+		return err
+	}
+	l, vfs, err := frame.ExtractVerifyFilesystemAndLanguage()
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug())
+		if err != nil {
+			errs = append(errs, err)
+			return err
+		}
+		if len(result.Errors) > 0 {
+			for _, e := range result.Errors {
+				errs = append(errs, utils.Errorf("syntax flow failed: %v", e))
+			}
+			return utils.Errorf("syntax flow failed: %v", strings.Join(result.Errors, "\n"))
+		}
+		result.Show()
+		return nil
+	}, ssaapi.WithLanguage(l))
+	if len(errs) > 0 {
+		return utils.JoinErrors(errs...)
+	}
+
+	l, vfs, err = frame.ExtractNegativeFilesystemAndLanguage()
+	if err != nil {
+		return err
+	}
+
+	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug())
+		if err != nil {
+			if errors.Is(err, sfvm.CriticalError) {
+				errs = append(errs, err)
+				return err
+			}
+		}
+		if result != nil {
+			if len(result.Errors) > 0 {
+				return nil
+			}
+			if len(result.AlertSymbolTable) > 0 {
+				for name, vals := range result.AlertSymbolTable {
+					vals.Recursive(func(operator sfvm.ValueOperator) error {
+						errs = append(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
+						return nil
+					})
+				}
+			}
+		}
+		return nil
+	})
+
+	if len(errs) > 0 {
+		return utils.JoinErrors(errs...)
+	}
+
 	return nil
 }

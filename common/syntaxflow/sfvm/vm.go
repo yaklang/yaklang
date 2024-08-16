@@ -103,9 +103,13 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	frame.Description = result.description
 	frame.AllowIncluded = result.allowIncluded
 	frame.Purpose = result.purpose
+	frame.Language = result.language
 	frame.Severity = result.severity
 	if len(result.verifyFilesystem) > 0 {
 		frame.VerifyFs = result.verifyFilesystem
+	}
+	if len(result.negativeFilesystem) > 0 {
+		frame.NegativeFs = result.negativeFilesystem
 	}
 	frame.vm = s
 
