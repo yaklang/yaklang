@@ -95,14 +95,19 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 				default:
 					urlIns, _ := url.Parse(keyLower)
 					if urlIns != nil {
-						if urlIns.Scheme == "file" && strings.HasPrefix(keyLower, "file://") {
-							filename := strings.TrimPrefix(keyLower, "file://")
-							y.verifyFilesystem[filename] = value
-							continue
-						} else if urlIns.Scheme == "negative-file" && strings.HasPrefix(keyLower, "negative-file://") {
-							filename := strings.TrimPrefix(keyLower, "negative-file://")
-							y.negativeFilesystem[filename] = value
-							continue
+						switch ret := urlIns.Scheme; ret {
+						case "file", "fs", "filesystem":
+							if strings.HasPrefix(keyLower, ret+"://") {
+								filename := strings.TrimPrefix(keyLower, ret+"://")
+								y.verifyFilesystem[filename] = value
+								continue
+							}
+						case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
+							if strings.HasPrefix(keyLower, ret+"://") {
+								filename := strings.TrimPrefix(keyLower, ret+"://")
+								y.negativeFilesystem[filename] = value
+								continue
+							}
 						}
 					}
 				}
