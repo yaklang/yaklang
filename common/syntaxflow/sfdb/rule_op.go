@@ -79,18 +79,29 @@ func ImportDatabase(reader io.Reader) error {
 
 func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	db := consts.GetGormProfileDatabase()
-	var rule schema.SyntaxFlowRule
+	var rules []*schema.SyntaxFlowRule
 
-	if err := db.Where("rule_name = ?", i.RuleName).First(&rule).Error; err != nil {
+	if err := db.Where("rule_name = ?", i.RuleName).Find(&rules).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(i).Error
 		}
 		return err
 	}
-	if rule.Hash != hash {
-		// if same name, but different content, update
-		return db.Model(&rule).Updates(i).Error
+	if len(rules) == 1 {
+		// only one rule, check and update
+		rule := rules[0]
+		if rule.Hash != hash {
+			// if same name, but different content, update
+			return db.Model(&rule).Updates(i).Error
+		}
+	} else {
+		// multiple rule in same name, delete all and create new
+		if err := db.Where("rule_name = ?", i.RuleName).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
+			return err
+		}
+		return db.Create(i).Error
 	}
+
 	return nil
 }
 
