@@ -67,17 +67,16 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		if ret, ok := item.(*sf.DescriptionItemContext); ok {
 			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
 			value := ""
-			if ret.DescriptionItemValue() != nil {
-				if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok {
-					if valueItem.CrlfHereDoc() != nil {
-						value = valueItem.CrlfHereDoc().(*sf.CrlfHereDocContext).CrlfText().GetText()
-					} else if valueItem.LfHereDoc() != nil {
-						value = valueItem.LfHereDoc().(*sf.LfHereDocContext).LfText().GetText()
-					}
+			if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
+				if valueItem.CrlfHereDoc() != nil {
+					value = valueItem.CrlfHereDoc().(*sf.CrlfHereDocContext).CrlfText().GetText()
+				} else if valueItem.LfHereDoc() != nil {
+					value = valueItem.LfHereDoc().(*sf.LfHereDocContext).LfText().GetText()
+				} else if valueItem.StringLiteral() != nil {
+					value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
 				}
-			} else if ret.StringLiteral() != nil {
-				value = mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
 			}
+
 			if value != "" {
 				switch keyLower := strings.ToLower(key); keyLower {
 				case "title":
