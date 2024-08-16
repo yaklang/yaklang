@@ -570,3 +570,10 @@ eval($validate);
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+func TestCondition(t *testing.T) {
+	code := `<?php
+$a = 1;
+$a<>"";
+`
+	ssatest.MockSSA(t, code)
+}
