@@ -1,7 +1,9 @@
 package buildin_rule
 
 import (
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
@@ -125,6 +127,24 @@ var Cases = []BuildinRuleTestCase{
 		},
 		NegativeTest: true,
 	},
+}
+
+var Verified = []string{
+	"java-transformer-factory-unsafe.sf",
+}
+
+func TestVerifiedRule(t *testing.T) {
+	for _, name := range Verified {
+		t.Log("Start to verify: " + name)
+		rule, err := sfdb.GetRule(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = ssatest.EvaluateVerifyFilesystem(rule.Content, t)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestBuildInRule(t *testing.T) {
