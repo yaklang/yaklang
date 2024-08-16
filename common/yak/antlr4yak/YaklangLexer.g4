@@ -209,8 +209,7 @@ mode TEMPLATE_BACKTICK_MODE;
 
 mode HereDocIdentifier;
 HereDocIdentifierName: (NameString{this.recordHereDocLabel()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
-CRLFHereDocIdentifierBreak: '\r\n'{this.recordHereDocLF()} -> popMode,pushMode(CRLFHereDoc);
-LFHereDocIdentifierBreak: '\n'{this.recordHereDocLF()} -> popMode,pushMode(LFHereDoc);
+HereDocIdentifierBreak: '\r'?'\n'{this.recordHereDocLF()} {this.hereDocModeDistribute()};
 
 mode CRLFHereDoc;
 CRLFEndDoc:  '\r\n' NameString {this.DocEndDistribute()};

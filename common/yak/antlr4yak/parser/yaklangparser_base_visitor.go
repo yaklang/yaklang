@@ -252,6 +252,14 @@ func (v *BaseYaklangParserVisitor) VisitStringLiteral(ctx *StringLiteralContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseYaklangParserVisitor) VisitCrlfHereDoc(ctx *CrlfHereDocContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitLfHereDoc(ctx *LfHereDocContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseYaklangParserVisitor) VisitTemplateSingleQuoteStringLiteral(ctx *TemplateSingleQuoteStringLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }

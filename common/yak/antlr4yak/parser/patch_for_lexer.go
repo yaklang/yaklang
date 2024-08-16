@@ -37,6 +37,15 @@ func (l *YaklangLexer) recordHereDocLF() {
 	l._heredocCRLF = l.GetText()
 }
 
+func (l *YaklangLexer) hereDocModeDistribute() {
+	l.PopMode()
+	if l._heredocCRLF == "\r\n" {
+		l.PushMode(YaklangLexerCRLFHereDoc)
+	} else {
+		l.PushMode(YaklangLexerLFHereDoc)
+	}
+}
+
 func (l *YaklangLexer) DocEndDistribute() bool {
 	text := l.GetText()
 	if strings.HasSuffix(text, l._heredocCRLF+l._heredocIdentifier) {
