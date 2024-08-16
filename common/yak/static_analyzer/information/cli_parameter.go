@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -17,7 +18,7 @@ type CliParameter struct {
 	Help           string
 	Group          string
 	MultipleSelect bool
-	SelectOption   map[string]string
+	SelectOption   *orderedmap.OrderedMap
 }
 
 type UIInfo struct {
@@ -38,7 +39,7 @@ func newCliParameter(name, typ, methodTyp string) *CliParameter {
 		Help:           "",
 		Group:          "",
 		MultipleSelect: false,
-		SelectOption:   nil,
+		SelectOption:   orderedmap.New(),
 	}
 }
 
@@ -142,13 +143,10 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo) {
 			if cli.Type != "select" {
 				break
 			}
-			if cli.SelectOption == nil {
-				cli.SelectOption = make(map[string]string)
-			}
 			if arg1 == "" {
-				cli.SelectOption[arg2] = arg2
+				cli.SelectOption.Set(arg2, arg2)
 			} else {
-				cli.SelectOption[arg1] = arg2
+				cli.SelectOption.Set(arg1, arg2)
 			}
 		}
 	}
