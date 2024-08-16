@@ -63,7 +63,7 @@ func RegisterLowHTTPSaveCallback() {
 		reqIns = r.RequestInstance
 
 		// db := consts.GetGormProjectDatabase()
-		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithDuration(duration))
+		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")),CreateHTTPFlowWithDuration(duration))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
 			return

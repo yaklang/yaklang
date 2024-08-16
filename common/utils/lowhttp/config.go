@@ -261,7 +261,7 @@ type LowhttpOpt func(o *LowhttpExecConfig)
 
 func WithAppendHTTPFlowTag(tag string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.Tags = append(o.Tags)
+		o.Tags = append(o.Tags,tag)
 	}
 }
 
