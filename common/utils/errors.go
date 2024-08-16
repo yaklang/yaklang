@@ -23,6 +23,15 @@ func Error(i interface{}) error {
 	}
 }
 
+type AssertTestingT func(msg string, args ...any)
+
+func (a AssertTestingT) Errorf(format string, args ...interface{}) {
+	if a == nil {
+		return
+	}
+	a(format, args...)
+}
+
 func Errorf(format string, args ...interface{}) error {
 	oErr := fmt.Errorf(format, args...)
 	return &YakError{

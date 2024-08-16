@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"regexp"
 	"strings"
 
@@ -30,8 +33,10 @@ type SFFrame struct {
 	Description   string
 	AllowIncluded string
 	Purpose       string
+	Language      string
 	Severity      string
 	VerifyFs      map[string]string
+	NegativeFs    map[string]string
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -55,10 +60,63 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 	}
 
 	return &SFFrame{
-		Text:     text,
-		Codes:    codes,
-		VerifyFs: make(map[string]string),
+		Text:       text,
+		Codes:      codes,
+		VerifyFs:   make(map[string]string),
+		NegativeFs: make(map[string]string),
 	}
+}
+
+func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {
+	val, err := consts.ValidateLanguage(s.Language)
+	if err != nil {
+		log.Warnf("validate language failed: %s", err)
+	}
+	if s.VerifyFs == nil || len(s.VerifyFs) <= 0 {
+		return "", nil, utils.Wrap(err, "validator verify failed")
+	}
+
+	vfs := filesys.NewVirtualFs()
+	for name, content := range s.VerifyFs {
+		if val == "" {
+			lidx := strings.LastIndex(name, ".")
+			if lidx > 0 {
+				val, _ = consts.ValidateLanguage(name[lidx+1:])
+			}
+		}
+		vfs.AddFile(name, content)
+	}
+
+	if val == "" {
+		return "", nil, utils.Wrap(err, "validator language not found")
+	}
+	return val, vfs, nil
+}
+
+func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {
+	val, err := consts.ValidateLanguage(s.Language)
+	if err != nil {
+		log.Warnf("validate language failed: %s", err)
+	}
+	if s.VerifyFs == nil || len(s.VerifyFs) <= 0 {
+		return "", nil, utils.Wrap(err, "validator verify failed")
+	}
+
+	vfs := filesys.NewVirtualFs()
+	for name, content := range s.NegativeFs {
+		if val == "" {
+			lidx := strings.LastIndex(name, ".")
+			if lidx > 0 {
+				val, _ = consts.ValidateLanguage(name[lidx+1:])
+			}
+		}
+		vfs.AddFile(name, content)
+	}
+
+	if val == "" {
+		return "", nil, utils.Wrap(err, "validator language not found")
+	}
+	return val, vfs, nil
 }
 
 func (s *SFFrame) Flush() {
