@@ -546,18 +546,10 @@ func (y *YakCompiler) VisitDoc(raw yak.IStringLiteralContext) interface{} {
 	y.writeString(raw.GetText())
 
 	var text string
-	if nodes := i.AllCRLFHereDocText(); len(nodes) > 0 {
-		var builder strings.Builder
-		for _, node := range nodes {
-			builder.WriteString(node.GetText())
-		}
-		text = builder.String()
-	} else if nodes := i.AllLFHereDocText(); len(nodes) > 0 {
-		var builder strings.Builder
-		for _, node := range nodes {
-			builder.WriteString(node.GetText())
-		}
-		text = builder.String()
+	if node := i.CrlfHereDoc(); node != nil {
+		text = node.GetText()
+	} else if node := i.LfHereDoc(); node != nil {
+		text = node.GetText()
 	}
 	y.pushString(text, text)
 	return nil
