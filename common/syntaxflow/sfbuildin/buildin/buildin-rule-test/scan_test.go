@@ -131,6 +131,7 @@ var Cases = []BuildinRuleTestCase{
 
 var Verified = []string{
 	"java-transformer-factory-unsafe.sf",
+	"java-sax-transformer-factory-unsafe.sf",
 }
 
 func TestVerifiedRule(t *testing.T) {
