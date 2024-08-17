@@ -1,0 +1,77 @@
+desc(
+    title: "Find 'SAXTransformerFactory' unsafe use (XXE)",
+    type: vuln,
+    level: warning,
+)
+
+SAXTransformerFactory.newInstance() as $ins;
+$ins?{!.setAttribute}.newTransformerHandler().setResult() as $vuln;
+check $vuln;
+alert $vuln;
+
+desc(
+    lang: "java",
+    "file://unsafe.java": <<<UNSAFE
+package com.example.sax;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.XMLConstants;
+import javax.xml.transform.Result;
+import javax.xml.transform.sax.SAXTransformerFactory;
+import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.IOException;
+
+public class SAXTransformerFactoryServlet extends HttpServlet {
+    private void postNoFixXxe(HttpServletRequest req, HttpServletResponse resp){
+        try{
+            SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
+            StreamSource source = new StreamSource(req.getReader());
+            TransformerHandler transformerHandler = sf.newTransformerHandler(source);
+            // 创建Result对象，并通过transformerHandler将目的流与其关联
+            Result result = new StreamResult(resp.getWriter());
+            transformerHandler.setResult(result);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+    }
+}
+UNSAFE,
+    "safefile://safe.java": <<<SAFE
+package com.example.sax;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.XMLConstants;
+import javax.xml.transform.Result;
+import javax.xml.transform.sax.SAXTransformerFactory;
+import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.IOException;
+
+public class SAXTransformerFactoryServlet extends HttpServlet {
+    private void postWithFixXxe(HttpServletRequest req, HttpServletResponse resp){
+        try{
+            SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
+            sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+            StreamSource source = new StreamSource(req.getReader());
+            TransformerHandler transformerHandler = sf.newTransformerHandler(source);
+            // 创建Result对象，并通过transformerHandler将目的流与其关联
+            Result result = new StreamResult(resp.getWriter());
+            transformerHandler.setResult(result);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+}
+SAFE
+)
