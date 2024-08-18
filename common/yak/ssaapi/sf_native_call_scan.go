@@ -1,22 +1,30 @@
 package ssaapi
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type basicBlockap map[int64]struct{}
 
 type direction string
 
 const (
 	Previous direction = "Previous"
-	Next	direction="Next"
+	Next     direction = "Next"
 )
+
+type basicBlockInfo struct {
+	currentBlock    *ssa.BasicBlock
+	prog            *Program
+	frame           *sfvm.SFFrame
+	recursiveConfig *RecursiveConfig
+	visited         map[int64]struct{}
+	direction       direction
+	results         []sfvm.ValueOperator
+	isFinish        bool
+	
+}
 
 var nativeCallScanPrevious = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	var vals []sfvm.ValueOperator
@@ -25,13 +33,12 @@ var nativeCallScanPrevious = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, par
 		return false, nil, err
 	}
 
-	basicBlockMap := make(basicBlockap)
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
 		if !ok {
 			return nil
 		}
-		results, _ := searchAlongBasicBlock(val.node, prog, frame, params, basicBlockMap, Previous)
+		results := searchAlongBasicBlock(val.node, prog, frame, params, Previous)
 		if !ok {
 			return nil
 		}
@@ -48,13 +55,12 @@ var nativeCallScanNext = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params 
 		return false, nil, err
 	}
 
-	basicBlockMap := make(basicBlockap)
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
 		if !ok {
 			return nil
 		}
-		results, _ := searchAlongBasicBlock(val.node, prog, frame, params, basicBlockMap, Next)
+		results := searchAlongBasicBlock(val.node, prog, frame, params, Next)
 		if !ok {
 			return nil
 		}
@@ -65,110 +71,126 @@ var nativeCallScanNext = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params 
 }
 
 func searchAlongBasicBlock(
-		value ssa.Value,
-		prog *Program,
-		frame *sfvm.SFFrame,
-		params *sfvm.NativeCallActualParams,
-		basicBlockMap basicBlockap,
-		direction direction,
-	) ([]sfvm.ValueOperator, bool) {
+	value ssa.Value,
+	prog *Program,
+	frame *sfvm.SFFrame,
+	params *sfvm.NativeCallActualParams,
+	direction direction,
+) []sfvm.ValueOperator {
+	basicBlockInfo := &basicBlockInfo{
+		currentBlock:    nil,
+		prog:            prog,
+		frame:           frame,
+		recursiveConfig: nil,
+		visited:         make(map[int64]struct{}),
+		direction:       direction,
+		results:         make([]sfvm.ValueOperator, 0),
+		isFinish:        false,
+	}
+	basicBlockInfo.createRecursiveConfig(frame, params)
+	basicBlockInfo.searchBlock(value)
+	return basicBlockInfo.results
+}
+
+func (b *basicBlockInfo) createRecursiveConfig(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) {
+	sfResult, err := frame.GetSFResult()
+	if err != nil {
+		log.Warnf("Get sfResult error:%s", err)
+		return
+	}
+	var opts []*sfvm.RecursiveConfigItem
+	if depth := params.GetString("depth"); depth != "" {
+		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Hook, Value: depth, SyntaxFlowRule: false}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("hook"); rule != "" {
+		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Hook, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("exclude"); rule != "" {
+		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Exclude, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("include"); rule != "" {
+		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Include, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("until"); rule != "" {
+		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Until, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	b.recursiveConfig = CreateRecursiveConfig(sfResult,frame.GetConfig(), opts...)
+}
+
+func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 	if value == nil {
-		return nil, true
+		return
 	}
 
-	var results []sfvm.ValueOperator
 	block, ok := ssa.ToBasicBlock(value)
 	if !ok {
 		block = value.GetBlock()
 	}
-	if block == nil {
-		return nil, true
+	if block == nil{
+		return
 	}
-
-	if _, ok := basicBlockMap[block.GetId()]; ok {
-		return nil, true
+	b.currentBlock = block
+	blockId := block.GetId()
+	if _, ok := b.visited[blockId]; ok {
+		return
 	}
-	basicBlockMap[block.GetId()] = struct{}{}
+	b.visited[blockId] = struct{}{}
 
-	for _, inst := range block.Insts {
+	b.searchInsts()
+	if b.isFinish {
+		return
+	}
+	if b.direction == Previous {
+		for _, pred := range block.Preds {
+			b.searchBlock(pred)
+			if b.isFinish {
+				break
+			}
+		}
+	}
+	if b.direction == Next {
+		for _, next := range block.Succs {
+			b.searchBlock(next)
+			if b.isFinish {
+				break
+			}
+		}
+	}
+}
+
+func (b *basicBlockInfo) searchInsts() {
+	for _, inst := range b.currentBlock.Insts {
 		if lz, ok := ssa.ToLazyInstruction(inst); ok {
 			inst = lz.Self()
 		}
 		if v, ok := ssa.ToValue(inst); ok {
-			token := utils.RandStringBytes(16)
-			token = "a" + token
-			var sfRule string
-			if rule := params.GetString("until"); rule != "" {
-				sfRule = fmt.Sprintf("%s as $%s;", rule, token)
-				val := prog.NewValue(v)
-				res, err :=SyntaxFlowWithError(val, sfRule,sfvm.WithEnableDebug(true))
-				if err != nil {
-					log.Warnf("scanPrevious/scanNext error: %v", err)
-				}
-				allValues := res.GetAllValuesChain()
-				for  _,val := range allValues{
-					_=val.AppendPredecessor(val,frame.WithPredecessorContext(fmt.Sprintf("scan%s",direction)))
-				}
-				results = append(results, allValues)
-				if len(allValues) > 0 {
-					return results, false
-				}
-			}
-			if rule := params.GetString("hook"); rule != "" {
-				sfRule = fmt.Sprintf("%s as $%s;", rule, token)
-				val := prog.NewValue(v)
-				res, err := SyntaxFlowWithError(val, sfRule)
-				if err != nil {
-					log.Warnf("scanPrevious/scanNext error: %v", err)
-				}
-				allValues := res.GetAllValuesChain()
-				for  _,val := range allValues{
-					_=val.AppendPredecessor(val,frame.WithPredecessorContext(fmt.Sprintf("scan%s",direction)))
-				}
-				results = append(results, allValues)
-			}
-			if rule := params.GetString("exclude"); rule != "" {
-				sfRule = fmt.Sprintf("%s as $%s;", rule, token)
-				val := prog.NewValue(v)
-				res, err := SyntaxFlowWithError(val, sfRule)
-				if err != nil {
-					log.Warnf("scanPrevious/scanNext error: %v", err)
-				}
-				allValues := res.GetAllValuesChain()
-				for  _,val := range allValues{
-					_=val.AppendPredecessor(val,frame.WithPredecessorContext(fmt.Sprintf("scan%s",direction)))
-				}
-				if len(allValues) == 0 {
-					results = append(results, val)
-				}
-			}
-			if sfRule == "" {
-				val := prog.NewValue(v)
-				results = append(results, val)
-			}
-		}
-	}
-
-	// 向前寻找
-	if direction == Previous {
-		for _, pred := range block.Preds {
-			res, needContinue := searchAlongBasicBlock(pred, prog, frame, params, basicBlockMap, direction)
-			results = append(results, res...)
-			if !needContinue {
+			value := b.prog.NewValue(v)
+			configOption := b.recursiveConfig.handler(value)
+			switch configOption {
+			case ContinueSkip:
+				continue
+			case ContinueMatch:
+				b.results = append(b.results, value)
+				continue
+			case StopMatch:
+				b.results = append(b.results, value)
+				b.isFinish = true
 				break
-			}
-		}
-	}
-	// 向后寻找
-	if direction == Next {
-		for _, next := range block.Succs {
-			res, isContinue := searchAlongBasicBlock(next, prog, frame, params, basicBlockMap, direction)
-			results = append(results, res...)
-			if !isContinue {
+			case StopNoMatch:
+				b.isFinish = true
 				break
+			case Nothing:
+				b.results = append(b.results, value)
+				continue
+			default:
+				b.results = append(b.results, value)
+				continue
 			}
 		}
 	}
-
-	return results, true
 }

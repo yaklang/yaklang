@@ -75,7 +75,6 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
 			frame = nil
-			frame = nil
 		}
 	}()
 	errLis := antlr4util.NewErrorListener()
