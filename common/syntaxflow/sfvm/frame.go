@@ -98,7 +98,7 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, files
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
-	if s.VerifyFs == nil || len(s.VerifyFs) <= 0 {
+	if s.NegativeFs == nil || len(s.NegativeFs) <= 0 {
 		return "", nil, utils.Wrap(err, "validator verify failed")
 	}
 
