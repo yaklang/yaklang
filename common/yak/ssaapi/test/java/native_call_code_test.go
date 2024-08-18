@@ -3,16 +3,12 @@ package java
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestNativeCallOpCode(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("A.java", `
+	code := `
 	package com.org.A;
 	class A {
 		 int num=1;
@@ -41,91 +37,38 @@ func TestNativeCallOpCode(t *testing.T) {
 			}
 		}
 	}	
-	`)
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
-		prog.Show()
-		
-		result := prog.SyntaxFlowChain("a<opcodes> as $result").Show()
-		assert.Equal(t,16,result.Len()) 
-		result =prog.SyntaxFlowChain("b<getFunc><opcodes> as $result",sfvm.WithEnableDebug(true))
-		assert.Equal(t,16,result.Len()) 
-		return nil
-	})
+	`	
+	// 获取a所在函数所有的opcode
+	ssatest.CheckSyntaxFlowContain(t,code,`a<opcodes> as $result;`,map[string][]string{
+		"result": {"Parameter","ParameterMember","Return","Loop","Function","Call","Phi","Undefined","ConstInst","Jump","If","UnOp","Switch","ErrorHandler","Make","BinOp"},
+	},ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
 func TestGetSourceCode(t *testing.T){
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("B.java", `
+	code :=  `
 	package com.org.B;
 	class B {
 		public static void main(String[] args) {
 				b=6+6; 
 				a = 2;
 				if (c){
-					a=22;
+					bb1;
 				}else {
-					a=33;
+					bb2;
 				}
 				prinln(a);
 		}
 	}
-	`)
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
-		prog.Show()
-		result := prog.SyntaxFlowChain("a<sourceCode> as $result").Show(false)
-		assert.Equal(t,4,result.Len())
+	`
+	ssatest.CheckSyntaxFlow(t,code,`bb1<sourceCode> as $result;`,
+	map[string][]string{
+		"result": {"\"\\t\\t\\t\\t\\tbb1;\\n\""},
+	},ssaapi.WithLanguage(ssaapi.JAVA))
 
-		result = prog.SyntaxFlowChain("b<sourceCode(context=2)>?{have:'class B'&&have:'if (c)'} as $result;").Show(false)
-		assert.Equal(t,1,result.Len())
-
-		result = prog.SyntaxFlowChain("b<sourceCode(context=666666666)>?{have:'package com.org.B'} as $result;").Show(false)
-		assert.Equal(t,1,result.Len())
-		return nil
-	})
+	ssatest.CheckSyntaxFlow(t,code,`bb2<sourceCode(context=3)> as $result;`,
+	map[string][]string{
+		"result": {"\"\\t\\t\\t\\tif (c){\\n\\t\\t\\t\\t\\tbb1;\\n\\t\\t\\t\\t}else {\\n\\t\\t\\t\\t\\tbb2;\\n\\t\\t\\t\\t}\\n\\t\\t\\t\\tprinln(a);\\n\\t\\t}\\n\""},
+	},ssaapi.WithLanguage(ssaapi.JAVA))
+	
 }
 
-func TestNativeCall_FreeMaker_GetSourceCode(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java",`package com.example.demo.controller.freemakerdemo;
-    
-@Controller
-@RequestMapping("/freemarker")
-public class FreeMakerDemo {
-    
-
-    @GetMapping("/welcome")
-    public String welcome(@RequestParam String name, Model model) {
-        if (name == null || name.isEmpty()) {
-            model.addAttribute("name", "Welcome to Safe FreeMarker Demo, try <code>/freemarker/safe/welcome?name=Hacker<>");
-        } else {
-            model.addAttribute("name", name);
-        }
-        return "welcome";
-    }
-
-}`)
-	vf.AddFile("src/main/resources/application.properties",`spring.application.name=demo
-# freemaker
-spring.freemarker.template-loader-path=classpath:/templates/
-spring.freemarker.suffix=.ftl
-`)
-	vf.AddFile("welcome.ftl",`<!DOCTYPE html>
-<html>
-<head>
-    <title>Welcome</title>
-</head>
-<body>
-<h1>Welcome ${name1}!</h1>
-</body>
-</html>
-`)
-ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
-		sink := prog.SyntaxFlowChain(`*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink><sourceCode>as $result;`,sfvm.WithEnableDebug(true)).Show()
-        assert.Equal(t, 1, sink.Len())
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
-}

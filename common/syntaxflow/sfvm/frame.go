@@ -1225,6 +1225,11 @@ func (s *SFFrame) GetVM() *SyntaxFlowVirtualMachine {
 	return s.vm
 }
 
+func (s *SFFrame) GetConfig() *Config {
+	return s.config
+}
+
+
 func fetchId(i any) (int64, bool) {
 	result, ok := i.(ssa.GetIdIF)
 	if !ok {
