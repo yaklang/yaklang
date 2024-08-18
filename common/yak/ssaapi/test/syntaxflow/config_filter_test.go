@@ -9,17 +9,17 @@ import (
 func TestSF_Config_Filter(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
-		aa = 1 
-		ab = b 
-		ac = c()
+		a = 11
+		b = f(a,1)
+		b= 22
 		`,
-			"a* -{until:`* ?{opcode:const} `}-> * as $result",
+			"b -{until:`* ?{opcode:const} `}-> * as $result",
 			map[string][]string{
-				"result": {"1"},
+				"result": {"22"},
 			})
 	})
 
-	t.Run("test rule text", func(t *testing.T) {
+	t.Run("test hook", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		a = 11
 		b = f(a,1)
@@ -27,7 +27,30 @@ func TestSF_Config_Filter(t *testing.T) {
 		`,
 			"b #{hook:`* as $num`}-> as $result",
 			map[string][]string{
-				"num": {"1", "11", "22", "Undefined-f", "Undefined-f(11,1)"},
+				"num":    {"1", "11", "22", "Undefined-f", "Undefined-f(11,1)"},
+				"result": {"1", "11", "22", "Undefined-f"},
+			})
+	})
+	t.Run("test exclude", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a = 11
+		b = f(a,1)
+		b= 22
+		`,
+			"b #{exclude:`* ?{opcode:const}`}-> as $result",
+			map[string][]string{
+				"result": {"Undefined-f", "Undefined-f(11,1)"},
+			})
+	})
+	t.Run("test include", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		a = 11
+		b = f(a,1)
+		b= 22
+		`,
+			"b #{include:`* ?{opcode:const}`}-> as $result",
+			map[string][]string{
+				"result": {"1", "11", "22"},
 			})
 	})
 
