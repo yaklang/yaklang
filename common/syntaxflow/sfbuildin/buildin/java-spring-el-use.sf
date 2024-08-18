@@ -1,0 +1,38 @@
+desc(
+    title: "Spring EL (SpelExpressionParser) basic use",
+    type: audit,
+    level: middle,
+)
+
+
+SpelExpressionParser().parseExpression(,* as $params) as $call;
+check $call;
+check $params;
+alert $params;
+alert $call;
+
+
+
+
+desc(
+    lang: java,
+    'file:///speluse.java': <<<USE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
+
+public class SpringElExample {
+    public static void main(String[] args) {
+        ExpressionParser parser = new SpelExpressionParser();
+        StandardEvaluationContext context = new StandardEvaluationContext();
+
+        // 设置变量
+        context.setVariable("name", "World");
+
+        // 执行EL表达式
+        String greeting = parser.parseExpression("'Hello, ' + #name").getValue(context, String.class);
+        System.out.println(greeting); // 输出: Hello, World
+    }
+}
+USE
+)

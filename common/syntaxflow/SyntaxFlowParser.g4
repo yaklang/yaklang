@@ -135,8 +135,8 @@ actualParamFilter: singleParam ',' | ',';
 
 singleParam: ( '#>' | '#{' (config)? '}' )? filterStatement ;
 
-config: recursiveConfigItem (',' recursiveConfigItem)* ','?;
-recursiveConfigItem: line? identifier ':' recursiveConfigItemValue lines?;
+config: recursiveConfigItem (',' recursiveConfigItem)* ','? lines? ;
+recursiveConfigItem: lines? identifier ':' recursiveConfigItemValue lines?;
 recursiveConfigItemValue
     : (identifier | numberLiteral)
     | '`' filterStatement '`'

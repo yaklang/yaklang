@@ -1,0 +1,36 @@
+desc(
+    title: "SpringFramework SPEL Parser Injection",
+)
+
+<include('spring-param')> as $params;
+check $params;
+
+SpelExpressionParser().parseExpression(* as $sinks);
+$sinks #{
+    hook: `* & $params as $result`,
+}->;
+check $result;
+alert $result;
+
+desc(
+    lang: java,
+    'file:///spel-inject.java': <<<UNSAFE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class SpelInjectionController {
+
+    private static final ExpressionParser parser = new SpelExpressionParser();
+
+    @PostMapping("/evaluate")
+    public String evaluate(@RequestBody String expression) {
+        // 直接使用用户输入的表达式
+        return parser.parseExpression(expression).getValue().toString();
+    }
+}
+UNSAFE
+)

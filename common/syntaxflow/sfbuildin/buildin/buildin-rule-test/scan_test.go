@@ -175,3 +175,31 @@ func TestBuildInRule_DEBUG(t *testing.T) {
 		run(t, c.Name, c)
 	}
 }
+
+func TestBuildInRule_Verify_DEBUG(t *testing.T) {
+	if utils.InGithubActions() {
+		t.SkipNow()
+		return
+	}
+
+	ruleName := "java-spring-el-use.sf"
+
+	rule, err := sfdb.GetRule(ruleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
+		t.Run(rule.RuleName, func(t *testing.T) {
+			t.Log("Start to verify: " + rule.RuleName)
+			err := ssatest.EvaluateVerifyFilesystem(rule.Content, t)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

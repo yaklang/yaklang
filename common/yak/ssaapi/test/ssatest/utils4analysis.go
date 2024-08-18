@@ -430,7 +430,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 
 	var errs []error
 	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug())
+		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
 		if err != nil {
 			errs = append(errs, err)
 			return err
@@ -452,34 +452,32 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 		return utils.JoinErrors(errs...)
 	}
 
-	l, vfs, err = frame.ExtractNegativeFilesystemAndLanguage()
-	if err != nil {
-		return err
-	}
-
-	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug())
-		if err != nil {
-			if errors.Is(err, sfvm.CriticalError) {
-				errs = append(errs, err)
-				return err
-			}
-		}
-		if result != nil {
-			if len(result.Errors) > 0 {
-				return nil
-			}
-			if len(result.AlertSymbolTable) > 0 {
-				for name, vals := range result.AlertSymbolTable {
-					vals.Recursive(func(operator sfvm.ValueOperator) error {
-						errs = append(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
-						return nil
-					})
+	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
+	if vfs != nil && l != "" {
+		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+			result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
+			if err != nil {
+				if errors.Is(err, sfvm.CriticalError) {
+					errs = append(errs, err)
+					return err
 				}
 			}
-		}
-		return nil
-	})
+			if result != nil {
+				if len(result.Errors) > 0 {
+					return nil
+				}
+				if len(result.AlertSymbolTable) > 0 {
+					for name, vals := range result.AlertSymbolTable {
+						vals.Recursive(func(operator sfvm.ValueOperator) error {
+							errs = append(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
+							return nil
+						})
+					}
+				}
+			}
+			return nil
+		})
+	}
 
 	if len(errs) > 0 {
 		return utils.JoinErrors(errs...)
