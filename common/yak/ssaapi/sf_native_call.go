@@ -80,15 +80,15 @@ const (
 	NativeCall_StrLower = "strlower"
 	NativeCall_StrUpper = "strupper"
 
-	// NativeCall_As is used to put vars to variables
-	NativeCall_As = "as"
+	// NativeCall_Var is used to put vars to variables
+	NativeCall_Var = "var"
 
 	NativeCall_MyBatisSink = "mybatisSink"
 )
 
 func init() {
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
-	registerNativeCall(NativeCall_As, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
 		log.Info("syntax flow native call 'as' to", varName)
 		result, ok := frame.GetSymbolTable().Get(varName)
