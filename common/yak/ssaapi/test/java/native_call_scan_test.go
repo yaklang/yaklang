@@ -1,11 +1,9 @@
 package java
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"testing"
 )
 
 func TestScanWithIfStatement(t *testing.T) {
@@ -23,14 +21,12 @@ func TestScanWithIfStatement(t *testing.T) {
 		}
 	}
 	`
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlowChain("bb2<scanPrevious> as $result").Show(false)
-		assert.Equal(t, 6, result.Len())
-		result = prog.SyntaxFlowChain("bb1<scanNext> as $result").Show(false)
-		assert.Equal(t, 6, result.Len())
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `bb2<scanPrevious> as $target1;bb1<scanNext> as $target2`,
+		map[string][]string{
+			"target1": {"1", "2", "3", "Undefined-bb1", "Undefined-bb2", "Undefined-c"},
+			"target2": {"1", "2", "3", "Undefined-bb1", "Undefined-bb2", "Undefined-c"},
+		},
+		ssaapi.WithRawLanguage("java"))
 }
 
 func TestScanWithForStatement(t *testing.T) {
@@ -46,16 +42,12 @@ func TestScanWithForStatement(t *testing.T) {
 	}
 	`
 
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlowChain("bb2<scanPrevious> as $result").Show(false)
-		assert.Equal(t, 9, result.Len())
-
-		result = prog.SyntaxFlowChain("bb1<scanNext> as $result").Show()
-		assert.Equal(t, 9, result.Len())
-
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `bb2<scanPrevious> as $target1;bb1<scanNext> as $target2`,
+		map[string][]string{
+			"target1": {"1", "10", "Undefined-a", "Undefined-bb1", "Undefined-bb2", "Undefined-i", "add(Undefined-a, phi(i)[Undefined-i,add(i, 1)])", "add(phi(i)[Undefined-i,add(i, 1)], 1)", "lt(phi(i)[Undefined-i,add(i, 1)], 10)"},
+			"target2": {"1", "10", "Undefined-a", "Undefined-bb1", "Undefined-bb2", "Undefined-i", "add(Undefined-a, phi(i)[Undefined-i,add(i, 1)])", "add(phi(i)[Undefined-i,add(i, 1)], 1)", "lt(phi(i)[Undefined-i,add(i, 1)], 10)"},
+		},
+		ssaapi.WithRawLanguage("java"))
 }
 
 func TestScanWithSwitchStatemt(t *testing.T) {
@@ -78,21 +70,16 @@ func TestScanWithSwitchStatemt(t *testing.T) {
 		}
 	}
 	`
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlowChain("bb2<scanPrevious> as $result").Show(false)
-		assert.Equal(t, 11, result.Len())
-
-		result = prog.SyntaxFlowChain("bb1<scanNext> as $result").Show(false)
-		assert.Equal(t, 11, result.Len())
-
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `bb2<scanPrevious> as $target1;bb1<scanNext> as $target2`,
+		map[string][]string{
+			"target1": {"0", "1", "11", "2", "22", "3", "33", "44", "Undefined-bb1", "Undefined-bb2", "Undefined-c"},
+			"target2": {"0", "1", "11", "2", "22", "3", "33", "44", "Undefined-bb1", "Undefined-bb2", "Undefined-c"},
+		},
+		ssaapi.WithRawLanguage("java"))
 }
 
-func TestScanPreviousWithParam(t *testing.T) {
-	t.Run("test if stmt",func(t *testing.T) {
-		code := `package com.example.A;
+func TestScanPreviousIfStmtWithConfig(t *testing.T) {
+	code := `package com.example.A;
 	public class A {
 		public static void main(String[] args) {
 			bb1;
@@ -106,22 +93,42 @@ func TestScanPreviousWithParam(t *testing.T) {
 		}
 	}
 	`
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlowChain("bb2<scanPrevious(until=`*?{opcode: const}`)> as $result").Show(false)
-		assert.Equal(t, 1, result.Len())
+	t.Run("test exclude", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb2<scanPrevious(exclude=`*?{opcode: const}`)> as $result;",
+				map[string][]string{
+					"result":{"Undefined-bb1", "Undefined-bb2", "Undefined-c"},
+				}, ssaapi.WithLanguage("java"))
+		})
+	t.Run("test include",func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb2<scanPrevious{include:`* ?{opcode:const}`}> as $result;",
+		map[string][]string{
+			"result": {"1","2","3"},
+		}, ssaapi.WithLanguage("java"))
+	})
+	
+	t.Run("test until",func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb2<scanPrevious(until=`*?{opcode: const}`)> as $result;",
+		map[string][]string{
+			"result":{"Undefined-bb2","2"},
+		}, ssaapi.WithLanguage("java"))
 
-		result = prog.SyntaxFlowChain("bb2<scanPrevious(hook=`*?{opcode: const}`)> as $result").Show(false)
-		assert.Equal(t, 3, result.Len())
-
-		result = prog.SyntaxFlowChain("bb2<scanPrevious(exclude=`*?{opcode: const}`)> as $result").Show(false)
-		assert.Equal(t, 3, result.Len())
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
-	t.Run("test loop stmt",func(t *testing.T) {
-		code := `package com.example.A;
+	t.Run("test hook",func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb2<scanPrevious(hook=`*?{opcode: const} as $num`)> as $result;",
+		map[string][]string{
+			"result":{"1", "2", "3", "Undefined-bb1", "Undefined-bb2", "Undefined-c"},
+				"num":{"1","2","3"},
+		}, ssaapi.WithLanguage("java"))
+
+	})
+}
+
+	
+	
+
+func TestScanNextLoopWithConfig(t *testing.T)  {
+	code :=`package com.example.A;
 	public class A {
 		public static void main(String[] args) {
 			bb1;
@@ -130,48 +137,38 @@ func TestScanPreviousWithParam(t *testing.T) {
 			}
 			bb2;
 		}
-	}
-	`
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlowChain("bb2<scanPrevious(until=`*?{opcode: const}`)>?{have:'10'} as $result").Show(false)
-		assert.Equal(t, 1, result.Len())
+	}`
+	
+	t.Run("test exclude", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb1<scanNext(exclude=`*?{opcode: const}`)> as $result;",
+				map[string][]string{
+					"result":{"Undefined-a", "Undefined-bb1", "Undefined-bb2", "add(Undefined-a, phi(i)[0,add(i, 1)])", "add(phi(i)[0,add(i, 1)], 1)", "lt(phi(i)[0,add(i, 1)], 10)"},
+				}, ssaapi.WithLanguage("java"))
+		})
+	t.Run("test include",func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb1<scanNext{include:`* ?{opcode:const}`}> as $result;",
+		map[string][]string{
+			"result": {"0", "0", "1", "10"},
+		}, ssaapi.WithLanguage("java"))
+	})
+	
+	t.Run("test until",func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb1<scanNext(until=`*?{opcode: const}`)> as $result;",
+		map[string][]string{
+			"result":{"0", "0", "Undefined-bb1"},
+		}, ssaapi.WithLanguage("java"))
 
-		result = prog.SyntaxFlowChain("bb2<scanPrevious(hook=`*?{opcode: const}`)> as $result").Show(false)
-		assert.Equal(t, 4, result.Len())
-
-		result = prog.SyntaxFlowChain("bb2<scanPrevious(exclude=`*?{opcode: const}`)> as $result").Show()
-		assert.Equal(t, 6, result.Len())
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
-	t.Run("test if-else if stmt",func(t *testing.T) {
-		code := `package com.example.A;
-	public class A {
-		public void sink(String input){
-			bb1;
-			println();
-			if (cond1){
-				println1();
-			}else if(cond2){
-			    println2();
-			}else{
-				println3();
-			}
-			bb2;
-		}
-	}
-	`
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		result := prog.SyntaxFlowChain("bb2<scanPrevious(until=`<fullTypeName>?{have:'println2'}`)> as $result").Show(false)
-		assert.Equal(t,result.Len(), 1)
-		result = prog.SyntaxFlowChain("bb1<scanNext(until=`<fullTypeName>?{have:'println2'}`)> as $result").Show(false)
-		assert.Equal(t,result.Len(), 1)
-		result=prog.SyntaxFlowChain("bb1<scanNext(hook=`<fullTypeName>?{have:'println'}`)> as $result").Show(true)
-		assert.Equal(t,result.Len(), 4)
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	t.Run("test hook",func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code,"bb1<scanNext(hook=`*?{opcode: const} as $num`)> as $result;",
+		map[string][]string{
+			"result":{"0", "0", "1", "10", "Undefined-a", "Undefined-bb1", "Undefined-bb2", "add(Undefined-a, phi(i)[0,add(i, 1)])", "add(phi(i)[0,add(i, 1)], 1)", "lt(phi(i)[0,add(i, 1)], 10)"},
+				"num":{"0", "0", "1", "10"},
+		}, ssaapi.WithLanguage("java"))
+
 	})
-}
+	}
+	
+
+

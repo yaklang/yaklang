@@ -22,6 +22,7 @@ type RecursiveConfig struct {
 // ContinueSkip: 不匹配对应Value，数据流继续流动
 // StopMatch: 匹配对应Value，数据流停止流动
 // StopNoMatch: 不匹配对应Value，数据流停止流动
+// Nothing: 不处理对应Value,一般用于hook，避免hook执行的结果影响最终结果
 type RecursiveConfigOption int
 
 const (
@@ -29,6 +30,7 @@ const (
 	ContinueSkip
 	StopMatch
 	StopNoMatch
+	Nothing
 )
 
 func CreateRecursiveConfig(
@@ -59,7 +61,7 @@ func CreateRecursiveConfig(
 // handler:用于根据RecursiveConfig配置项对每个Value行为进行处理
 // 其中RecursiveConfig_Include在匹配到符合配置项的Value后，数据流继续流动，以匹配其它Value。
 // RecursiveConfig_Exclude在匹配到不符合配置项的Value后，数据流继续流动，以匹配其它Value。
-// RecursiveConfig_Until在匹配到符合配置项的Value后，数据流停止流动，不匹配其它Value。
+// RecursiveConfig_Until会沿着数据流匹配每个Value，知道匹配到符合配置项的Value的时候，数据流停止流动。
 // RecursiveConfig_Hook会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
 func (r *RecursiveConfig) handler(value *Value) RecursiveConfigOption {
 	for _, op := range r.configItems {
@@ -104,22 +106,22 @@ func (r *RecursiveConfig) handler(value *Value) RecursiveConfigOption {
 			}
 		case sf.RecursiveConfig_Hook:
 			// do nothing for outer
-			return ContinueSkip
+			return Nothing
 		case sf.RecursiveConfig_Until:
 			for _, sfDatas := range res.GetAllValues() {
 				for _, sfData := range sfDatas {
 					if ValueCompare(sfData, value) {
 						return StopMatch
 					} else {
-						return ContinueSkip
+						return ContinueMatch
 					}
 				}
 			}
-			return ContinueSkip
+			return Nothing
 		}
 
 	}
-	return ContinueSkip
+	return ContinueMatch
 }
 
 func WithSyntaxFlowConfig(
@@ -147,6 +149,8 @@ func WithSyntaxFlowConfig(
 				return utils.Error("abort")
 			case StopNoMatch:
 				return utils.Error("abort")
+			case Nothing:
+				return nil	
 			default:
 				return nil
 			}
