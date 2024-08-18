@@ -1,7 +1,10 @@
 package buildin_rule
 
 import (
+	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
@@ -129,21 +132,20 @@ var Cases = []BuildinRuleTestCase{
 	},
 }
 
-var Verified = []string{
-	"java-transformer-factory-unsafe.sf",
-	"java-sax-transformer-factory-unsafe.sf",
-}
-
 func TestVerifiedRule(t *testing.T) {
-	for _, name := range Verified {
-		t.Log("Start to verify: " + name)
-		rule, err := sfdb.GetRule(name)
+	for rule := range sfdb.YieldSyntaxFlowRules(consts.GetGormProfileDatabase(), context.Background()) {
+		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
-			t.Fatal(err)
+			continue
 		}
-		err = ssatest.EvaluateVerifyFilesystem(rule.Content, t)
-		if err != nil {
-			t.Fatal(err)
+		if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
+			t.Run(rule.RuleName, func(t *testing.T) {
+				t.Log("Start to verify: " + rule.RuleName)
+				err := ssatest.EvaluateVerifyFilesystem(rule.Content, t)
+				if err != nil {
+					t.Fatal(err)
+				}
+			})
 		}
 	}
 }
