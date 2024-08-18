@@ -1,0 +1,45 @@
+desc(
+    title: "Find Unsafe Reflection for 'Class.forName(...)'.",
+    type: audit,
+    level: low,
+)
+
+Class.forName(*?{<name>?{!have: Class}} as $resource);
+check $resource;
+$resource #{
+    hook: `*?{opcode: param || have: '.append(' || have: 'add('} as $calc`
+}->
+check $calc;
+alert $resource;
+
+desc(
+    lang: java,
+    "file:///unsafe.java": <<<UNSAFE
+package org.learn;
+import java.util.ArrayList;
+public class DemoForClassName {
+    private static void demoCreateThread(String userInput) throws ClassNotFoundException,
+            IllegalAccessException, InstantiationException, InterruptedException {
+        Class<?> loadClass = Class.forName(userInput + "MyThread");
+
+        Thread thread = (Thread) loadClass.newInstance();
+        thread.start();
+        thread.join();
+    }
+}
+UNSAFE,
+    "safefile:///safe1.java": <<<SAFE
+package org.learn;
+import java.util.ArrayList;
+public class DemoForClassName {
+    private static void demoCreateThread(String userInput) throws ClassNotFoundException,
+            IllegalAccessException, InstantiationException, InterruptedException {
+        Class<?> loadClass = Class.forName("org.my.MyThread");
+
+        Thread thread = (Thread) loadClass.newInstance();
+        thread.start();
+        thread.join();
+    }
+}
+SAFE,
+)
