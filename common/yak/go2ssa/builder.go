@@ -87,7 +87,7 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
-	fmt.Printf("Program: %v done\n",astBuilder.GetProgram().Name)
+	fmt.Printf("Program: %v done\n",astBuilder.pkgNameCurrent)
 	return nil
 }
 
@@ -104,6 +104,7 @@ type astbuilder struct {
 	result      []string
 	extendFuncs map[string]map[string]*ssa.Function
 	tpHander    map[string]func()
+	pkgNameCurrent string
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
