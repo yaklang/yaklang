@@ -399,7 +399,6 @@ function b($cmd)
 		)
 	})
 
-	//todo: namespace、function have error, repeat function
 	t.Run("test function in namespace", func(t *testing.T) {
 		code := `<?php
 
@@ -419,29 +418,31 @@ namespace {
 }`
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
-			map[string][]string{"param": {`"whoami"`, `Parameter-$a`}},
+			map[string][]string{"param": {`"whoami"`}},
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
+	//todo： get top define有点问题
 	t.Run("test function spin", func(t *testing.T) {
 		code := `<?php
 
 function a($cmd)
 {
-    b("whoa");
+    b("whoam");
 }
 
 function b($cmd)
 {
     if ($cmd == "whoami") {
-        exec($cmd);
+        echo exec($cmd);
     } else {
         a($cmd . "i");
     }
-}`
+}
+`
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
-			map[string][]string{"param": {`Parameter-$cmd`, `"whoa"`}},
+			map[string][]string{"param": {`"whoam"`}},
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})

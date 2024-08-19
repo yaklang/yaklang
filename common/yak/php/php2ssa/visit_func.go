@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -27,37 +26,24 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	_ = isRef
 	funcName := i.Identifier().GetText()
 	newFunction := y.NewFunc(funcName)
-	//variable := y.CreateVariable(funcName)
-	//y.AssignVariable(variable, newFunction)
-	buildHandler := func(b *builder) {
-		var _builder *builder
-		if utils.IsNil(b) {
-			_builder = y
-		} else {
-			_builder = b
-			newFunction = _builder.NewFunc(funcName)
-		}
-		_builder.SetMarkedFunction(funcName)
-		_builder.FunctionBuilder = _builder.PushFunction(newFunction)
-		for _, value := range _builder.FunctionBuilder.GetProgram().GlobalScope.GetAllMember() {
-			for globals, v := range value.GetAllMember() {
-				variable := _builder.CreateMemberCallVariable(value, globals)
-				_builder.AssignVariable(variable, v)
-			}
-		}
-		tmp := i.FormalParameterList()
+	variable := y.CreateVariable(funcName)
+	y.AssignVariable(variable, newFunction)
+	//todo: maybe need assign in this scope
+	y.GetProgram().Funcs[funcName] = newFunction
+	newFunction.SetBuilder(func() ssa.Value {
+		y.SetMarkedFunction(funcName)
+		y.FunctionBuilder = y.FunctionBuilder.PushFunction(newFunction)
 		{
-			_builder.VisitFormalParameterList(tmp)
-			_builder.VisitBlockStatement(i.BlockStatement())
-			_builder.SetType(_builder.VisitTypeHint(i.TypeHint()))
-			_builder.Finish()
+			y.VisitFormalParameterList(i.FormalParameterList())
+			y.VisitBlockStatement(i.BlockStatement())
+			y.SetType(y.VisitTypeHint(i.TypeHint()))
+			y.Finish()
 		}
-		_builder.FunctionBuilder = _builder.PopFunction()
+		y.FunctionBuilder = y.PopFunction()
 		variable := y.CreateVariable(funcName)
 		y.AssignVariable(variable, newFunction)
-		//y.AssignVariable(variable, newFunction)
-	}
-	y.FuncSyntax.store(funcName, buildHandler)
+		return newFunction
+	})
 	return nil
 }
 

@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -189,6 +190,14 @@ func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover b
 
 var _ Instruction = (*anInstruction)(nil)
 
+type parserMode int
+
+const (
+	prePar parserMode = iota
+	Paring
+	ParEnd
+)
+
 type anValue struct {
 	anInstruction
 
@@ -207,8 +216,50 @@ type anValue struct {
 
 	pointer   Values // the pointer is point to this value
 	reference Value  // the value is pointed by this value
+
+	//parse value
+	parseMode               parserMode //parse mode
+	checkSpinAndGetTmpValue func() (bool, Value)
+	build                   func() Value
+	this                    Value
 }
 
+func (n *anValue) SetBuilder(Builder func() Value) {
+	n.build = Builder
+}
+func (n *anValue) Builder() Value {
+	switch n.parseMode {
+	case prePar:
+		n.parseMode = Paring
+		val := n.build()
+		n.parseMode = ParEnd
+		//todo: unknown need spin check?
+		n.this = val
+		return val
+	case Paring:
+		tmpval := NewConst("spin value")
+		n.checkSpinAndGetTmpValue = func() (bool, Value) {
+			return true, tmpval
+		}
+		return tmpval
+	case ParEnd:
+		return n.this
+	}
+	return nil
+}
+func (n *anValue) FixSpinUdChain() {
+	if flag, val := n.checkSpinAndGetTmpValue(); flag {
+		lo.ForEach(val.GetUsers(), func(item User, index int) {
+			item.ReplaceValue(val, n.this)
+		})
+	}
+}
+func (n *anValue) CheckAndFinishBuilder() {
+	//not use this builder, finish builder
+	if n.parseMode == prePar {
+		n.build()
+	}
+}
 func NewValue() anValue {
 	return anValue{
 		anInstruction: NewInstruction(),
@@ -220,6 +271,14 @@ func NewValue() anValue {
 
 		variables: omap.NewOrderedMap(map[string]*Variable{}),
 		mask:      omap.NewOrderedMap(map[string]Value{}),
+
+		parseMode: prePar,
+		build: func() Value {
+			return NewConst("")
+		},
+		checkSpinAndGetTmpValue: func() (bool, Value) {
+			return false, NewConst("")
+		},
 	}
 }
 

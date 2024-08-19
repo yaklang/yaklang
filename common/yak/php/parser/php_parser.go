@@ -346,11 +346,11 @@ func phpparserParserInit() {
 		110, 1, 110, 3, 110, 1754, 8, 110, 1, 111, 1, 111, 1, 111, 1, 111, 1, 111,
 		1, 111, 3, 111, 1762, 8, 111, 1, 112, 3, 112, 1765, 8, 112, 1, 112, 3,
 		112, 1768, 8, 112, 1, 112, 3, 112, 1771, 8, 112, 1, 112, 3, 112, 1774,
-		8, 112, 1, 112, 1, 112, 1, 112, 3, 112, 1779, 8, 112, 1, 112, 1, 112, 3,
-		112, 1783, 8, 112, 1, 112, 1, 112, 1, 112, 1, 112, 3, 112, 1789, 8, 112,
-		3, 112, 1791, 8, 112, 1, 112, 3, 112, 1794, 8, 112, 1, 112, 1, 112, 5,
-		112, 1798, 8, 112, 10, 112, 12, 112, 1801, 9, 112, 1, 112, 1, 112, 1, 113,
-		1, 113, 1, 113, 1, 113, 1, 114, 3, 114, 1810, 8, 114, 1, 114, 3, 114, 1813,
+		8, 112, 1, 112, 1, 112, 3, 112, 1778, 8, 112, 1, 112, 1, 112, 3, 112, 1782,
+		8, 112, 1, 112, 1, 112, 3, 112, 1786, 8, 112, 1, 112, 1, 112, 1, 112, 1,
+		112, 3, 112, 1792, 8, 112, 3, 112, 1794, 8, 112, 1, 112, 1, 112, 5, 112,
+		1798, 8, 112, 10, 112, 12, 112, 1801, 9, 112, 1, 112, 1, 112, 1, 113, 1,
+		113, 1, 113, 1, 113, 1, 114, 3, 114, 1810, 8, 114, 1, 114, 3, 114, 1813,
 		8, 114, 1, 114, 1, 114, 1, 115, 1, 115, 1, 115, 3, 115, 1820, 8, 115, 1,
 		115, 1, 115, 1, 115, 3, 115, 1825, 8, 115, 1, 116, 1, 116, 1, 116, 3, 116,
 		1830, 8, 116, 1, 116, 1, 116, 1, 116, 1, 116, 5, 116, 1836, 8, 116, 10,
@@ -1056,15 +1056,15 @@ func phpparserParserInit() {
 		5, 114, 0, 0, 1767, 1766, 1, 0, 0, 0, 1767, 1768, 1, 0, 0, 0, 1768, 1770,
 		1, 0, 0, 0, 1769, 1771, 3, 290, 145, 0, 1770, 1769, 1, 0, 0, 0, 1770, 1771,
 		1, 0, 0, 0, 1771, 1773, 1, 0, 0, 0, 1772, 1774, 5, 112, 0, 0, 1773, 1772,
-		1, 0, 0, 0, 1773, 1774, 1, 0, 0, 0, 1774, 1790, 1, 0, 0, 0, 1775, 1778,
-		3, 30, 15, 0, 1776, 1777, 5, 80, 0, 0, 1777, 1779, 3, 220, 110, 0, 1778,
-		1776, 1, 0, 0, 0, 1778, 1779, 1, 0, 0, 0, 1779, 1782, 1, 0, 0, 0, 1780,
-		1781, 5, 90, 0, 0, 1781, 1783, 3, 32, 16, 0, 1782, 1780, 1, 0, 0, 0, 1782,
-		1783, 1, 0, 0, 0, 1783, 1791, 1, 0, 0, 0, 1784, 1785, 5, 100, 0, 0, 1785,
-		1788, 3, 292, 146, 0, 1786, 1787, 5, 80, 0, 0, 1787, 1789, 3, 32, 16, 0,
-		1788, 1786, 1, 0, 0, 0, 1788, 1789, 1, 0, 0, 0, 1789, 1791, 1, 0, 0, 0,
-		1790, 1775, 1, 0, 0, 0, 1790, 1784, 1, 0, 0, 0, 1791, 1793, 1, 0, 0, 0,
-		1792, 1794, 3, 236, 118, 0, 1793, 1792, 1, 0, 0, 0, 1793, 1794, 1, 0, 0,
+		1, 0, 0, 0, 1773, 1774, 1, 0, 0, 0, 1774, 1793, 1, 0, 0, 0, 1775, 1777,
+		3, 30, 15, 0, 1776, 1778, 3, 236, 118, 0, 1777, 1776, 1, 0, 0, 0, 1777,
+		1778, 1, 0, 0, 0, 1778, 1781, 1, 0, 0, 0, 1779, 1780, 5, 80, 0, 0, 1780,
+		1782, 3, 220, 110, 0, 1781, 1779, 1, 0, 0, 0, 1781, 1782, 1, 0, 0, 0, 1782,
+		1785, 1, 0, 0, 0, 1783, 1784, 5, 90, 0, 0, 1784, 1786, 3, 32, 16, 0, 1785,
+		1783, 1, 0, 0, 0, 1785, 1786, 1, 0, 0, 0, 1786, 1794, 1, 0, 0, 0, 1787,
+		1788, 5, 100, 0, 0, 1788, 1791, 3, 292, 146, 0, 1789, 1790, 5, 80, 0, 0,
+		1790, 1792, 3, 32, 16, 0, 1791, 1789, 1, 0, 0, 0, 1791, 1792, 1, 0, 0,
+		0, 1792, 1794, 1, 0, 0, 0, 1793, 1775, 1, 0, 0, 0, 1793, 1787, 1, 0, 0,
 		0, 1794, 1795, 1, 0, 0, 0, 1795, 1799, 5, 219, 0, 0, 1796, 1798, 3, 130,
 		65, 0, 1797, 1796, 1, 0, 0, 0, 1798, 1801, 1, 0, 0, 0, 1799, 1797, 1, 0,
 		0, 0, 1799, 1800, 1, 0, 0, 0, 1800, 1802, 1, 0, 0, 0, 1801, 1799, 1, 0,
@@ -1221,7 +1221,7 @@ func phpparserParserInit() {
 		1536, 1541, 1545, 1550, 1556, 1561, 1564, 1567, 1573, 1580, 1585, 1591,
 		1601, 1606, 1610, 1614, 1617, 1624, 1627, 1632, 1636, 1642, 1646, 1657,
 		1669, 1673, 1682, 1693, 1695, 1703, 1707, 1714, 1718, 1723, 1728, 1732,
-		1741, 1747, 1753, 1761, 1764, 1767, 1770, 1773, 1778, 1782, 1788, 1790,
+		1741, 1747, 1753, 1761, 1764, 1767, 1770, 1773, 1777, 1781, 1785, 1791,
 		1793, 1799, 1809, 1812, 1819, 1824, 1829, 1837, 1841, 1845, 1852, 1857,
 		1863, 1867, 1872, 1875, 1884, 1894, 1901, 1903, 1909, 1911, 1917, 1921,
 		1926, 1932, 1942, 1947, 1952, 1954, 1962, 1970, 1974, 1979, 1984, 1991,
@@ -26963,22 +26963,6 @@ func (s *AnonymousClassContext) Partial() antlr.TerminalNode {
 	return s.GetToken(PHPParserPartial, 0)
 }
 
-func (s *AnonymousClassContext) Arguments() IArgumentsContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IArgumentsContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IArgumentsContext)
-}
-
 func (s *AnonymousClassContext) AllClassStatement() []IClassStatementContext {
 	children := s.GetChildren()
 	len := 0
@@ -27018,6 +27002,22 @@ func (s *AnonymousClassContext) ClassStatement(i int) IClassStatementContext {
 	}
 
 	return t.(IClassStatementContext)
+}
+
+func (s *AnonymousClassContext) Arguments() IArgumentsContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IArgumentsContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IArgumentsContext)
 }
 
 func (s *AnonymousClassContext) Extends() antlr.TerminalNode {
@@ -27147,7 +27147,7 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		}
 
 	}
-	p.SetState(1790)
+	p.SetState(1793)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
@@ -27156,32 +27156,43 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 			p.SetState(1775)
 			p.ClassEntryType()
 		}
-		p.SetState(1778)
+		p.SetState(1777)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+
+		if _la == PHPParserOpenRoundBracket {
+			{
+				p.SetState(1776)
+				p.Arguments()
+			}
+
+		}
+		p.SetState(1781)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserExtends {
 			{
-				p.SetState(1776)
+				p.SetState(1779)
 				p.Match(PHPParserExtends)
 			}
 			{
-				p.SetState(1777)
+				p.SetState(1780)
 				p.QualifiedStaticTypeRef()
 			}
 
 		}
-		p.SetState(1782)
+		p.SetState(1785)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserImplements {
 			{
-				p.SetState(1780)
+				p.SetState(1783)
 				p.Match(PHPParserImplements)
 			}
 			{
-				p.SetState(1781)
+				p.SetState(1784)
 				p.InterfaceList()
 			}
 
@@ -27189,24 +27200,24 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 
 	case PHPParserInterface:
 		{
-			p.SetState(1784)
+			p.SetState(1787)
 			p.Match(PHPParserInterface)
 		}
 		{
-			p.SetState(1785)
+			p.SetState(1788)
 			p.Identifier()
 		}
-		p.SetState(1788)
+		p.SetState(1791)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserExtends {
 			{
-				p.SetState(1786)
+				p.SetState(1789)
 				p.Match(PHPParserExtends)
 			}
 			{
-				p.SetState(1787)
+				p.SetState(1790)
 				p.InterfaceList()
 			}
 
@@ -27214,17 +27225,6 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 
 	default:
 		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
-	}
-	p.SetState(1793)
-	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
-
-	if _la == PHPParserOpenRoundBracket {
-		{
-			p.SetState(1792)
-			p.Arguments()
-		}
-
 	}
 	{
 		p.SetState(1795)
