@@ -341,8 +341,10 @@ func (n *anValue) SetType(typ Type) {
 		if this == nil {
 			return
 		}
-		if fun := t.This; fun != nil {
-			Point(this, fun)
+		if !t.DisablePointSetting {
+			if fun := t.This; fun != nil {
+				Point(this, fun)
+			}
 		}
 		for _, f := range t.AnnotationFunc {
 			f(this)
