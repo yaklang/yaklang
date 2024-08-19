@@ -35,16 +35,29 @@ func WithRegexpOption(option regexp2.RegexOptions) YakRegexpUtilsOption {
 	}
 }
 
+func RegexpAppendOption(raw string, option regexp2.RegexOptions) string {
+	switch option {
+	case regexp2.IgnoreCase:
+		raw = "(?i)" + raw
+	case regexp2.Singleline:
+		raw = "(?s)" + raw
+	case regexp2.Multiline:
+		raw = "(?m)" + raw
+	}
+	return raw
+}
+
 func NewYakRegexpUtils(raw string, options ...YakRegexpUtilsOption) *YakRegexpUtils {
 	reg := &YakRegexpUtils{
 		regexpRaw:    raw,
 		priorityMode: RegexpMode1,
+		regexpOption: regexp2.None,
 	}
 	for _, option := range options {
 		option(reg)
 	}
 
-	reg.reg = NewRegexpWrapper(raw)
+	reg.reg = NewRegexpWrapper(RegexpAppendOption(raw, reg.regexpOption))
 	reg.reg2 = NewRegexp2Wrapper(raw, reg.regexpOption)
 
 	return reg
@@ -169,6 +182,26 @@ func (m *YakRegexpUtils) ReplaceAllString(src, repl string) (string, error) {
 		return reg.ReplaceAllString(src, repl)
 	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
 		return reg.ReplaceAllString(src, repl)
+	} else {
+		return "", utils.Error("yak regexp replace fail: no usable regexp")
+	}
+}
+
+func (m *YakRegexpUtils) ReplaceAllFunc(src []byte, repl func([]byte) []byte) ([]byte, error) {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.ReplaceAllFunc(src, repl)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.ReplaceAllFunc(src, repl)
+	} else {
+		return nil, utils.Error("yak regexp replace fail: no usable regexp")
+	}
+}
+
+func (m *YakRegexpUtils) ReplaceAllStringFunc(src string, repl func(string) string) (string, error) {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.ReplaceAllStringFunc(src, repl)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.ReplaceAllStringFunc(src, repl)
 	} else {
 		return "", utils.Error("yak regexp replace fail: no usable regexp")
 	}
