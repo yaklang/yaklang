@@ -46,7 +46,6 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext,IslValue bool) (
 				ssaop = ssa.OpBitwiseNot
 			case "<-":
 				ssaop = ssa.OpChan
-			// TODO
 			case "*":
 				ssaop = ""
 			case "&":
