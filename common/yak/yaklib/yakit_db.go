@@ -2,13 +2,14 @@ package yaklib
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -21,7 +22,7 @@ import (
 )
 
 func queryDomainAssetByNetwork(network string) (chan *schema.Domain, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -32,7 +33,7 @@ func queryDomainAssetByNetwork(network string) (chan *schema.Domain, error) {
 }
 
 func queryDomainAssetByDomainKeyword(keyword string) (chan *schema.Domain, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -43,7 +44,7 @@ func queryDomainAssetByDomainKeyword(keyword string) (chan *schema.Domain, error
 }
 
 func queryDomainAssetByHTMLTitle(title string) (chan *schema.Domain, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -54,7 +55,7 @@ func queryDomainAssetByHTMLTitle(title string) (chan *schema.Domain, error) {
 }
 
 func queryHostAssetByNetwork(network string) (chan *schema.Host, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -65,7 +66,7 @@ func queryHostAssetByNetwork(network string) (chan *schema.Host, error) {
 }
 
 func queryHostAssetByDomainKeyword(keyword string) (chan *schema.Host, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -76,7 +77,7 @@ func queryHostAssetByDomainKeyword(keyword string) (chan *schema.Host, error) {
 }
 
 func queryPortAssetByNetwork(network string) (chan *schema.Port, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -87,7 +88,7 @@ func queryPortAssetByNetwork(network string) (chan *schema.Port, error) {
 }
 
 func queryPortAssetByNetworkAndPort(network string, port string) (chan *schema.Port, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -99,7 +100,7 @@ func queryPortAssetByNetworkAndPort(network string, port string) (chan *schema.P
 }
 
 func queryPortAssetByKeyword(keyword string) (chan *schema.Port, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -188,7 +189,7 @@ func queryHostPortAll() chan string {
 }
 
 func saveCrawler(url string, req *http.Request, rsp *http.Response) error {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return utils.Errorf("cannot found database")
 	}
@@ -204,7 +205,7 @@ func saveHTTPFlowWithType(url string, req *http.Request, rsp *http.Response, typ
 	if typeStr == "" {
 		typeStr = "mitm"
 	}
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return utils.Errorf("cannot found database")
 	}
@@ -216,8 +217,12 @@ func saveHTTPFlowWithType(url string, req *http.Request, rsp *http.Response, typ
 	return nil
 }
 
+func saveHTTPFlowInstance(flow *schema.HTTPFlow) error {
+	return yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
+}
+
 func saveDomain(domain string, ip ...string) error {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return utils.Errorf("cannot found database")
 	}
@@ -270,7 +275,7 @@ func queryUrlsByKeyword(k string) chan string {
 	ch := make(chan string, 100)
 	go func() {
 		defer close(ch)
-		var db = consts.GetGormProjectDatabase()
+		db := consts.GetGormProjectDatabase()
 		if db == nil {
 			return
 		}
@@ -286,7 +291,7 @@ func queryHTTPFlowByKeyword(k string) chan *schema.HTTPFlow {
 	ch := make(chan *schema.HTTPFlow, 100)
 	go func() {
 		defer close(ch)
-		var db = consts.GetGormProjectDatabase()
+		db := consts.GetGormProjectDatabase()
 		if db == nil {
 			return
 		}
@@ -301,7 +306,7 @@ func queryHTTPFlowByKeyword(k string) chan *schema.HTTPFlow {
 }
 
 func queryPortsByUpdatedAt(timestamp int64) (chan *schema.Port, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -316,7 +321,7 @@ func queryPortsByUpdatedAt(timestamp int64) (chan *schema.Port, error) {
 }
 
 func queryPortsByTaskName(taskName string) (chan *schema.Port, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -330,7 +335,7 @@ func queryPortsByTaskName(taskName string) (chan *schema.Port, error) {
 }
 
 func queryPortsByRuntimeId(runtimeID string) (chan *schema.Port, error) {
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("cannot found database")
 	}
@@ -347,7 +352,7 @@ func queryHTTPFlowByID(id ...int64) chan *schema.HTTPFlow {
 	ch := make(chan *schema.HTTPFlow, 100)
 	go func() {
 		defer close(ch)
-		var db = consts.GetGormProjectDatabase()
+		db := consts.GetGormProjectDatabase()
 		if db == nil {
 			return
 		}
@@ -452,8 +457,8 @@ func init() {
 	YakitExports["QueryDomainsByDomainKeyword"] = queryDomainAssetByDomainKeyword
 	YakitExports["QueryDomainsByTitle"] = queryDomainAssetByHTMLTitle
 
-	//YakitExports["QueryPortAssetByPort"] = queryPortAssetByNetwork
-	//YakitExports["QueryPortAssetByKeyword"] = queryPortAssetByNetwork
+	// YakitExports["QueryPortAssetByPort"] = queryPortAssetByNetwork
+	// YakitExports["QueryPortAssetByKeyword"] = queryPortAssetByNetwork
 
 	// DeletePayload
 	YakitExports["DeletePayloadByGroup"] = deletePayloadByGroup

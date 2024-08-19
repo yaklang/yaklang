@@ -92,6 +92,7 @@ var DatabaseExports = map[string]interface{}{
 	"SaveHTTPFlowFromNative":         saveCrawler,
 	"SaveHTTPFlowFromNativeWithType": saveHTTPFlowWithType,
 	"SaveHTTPFlowFromRawWithOption":  saveHTTPFlowFromRawWithOption,
+	"SaveHTTPFlowInstance":           saveHTTPFlowInstance,
 	"SavePortFromResult":             savePortFromObj,
 	"SaveDomain":                     saveDomain,
 	"SavePayload":                    savePayloads,

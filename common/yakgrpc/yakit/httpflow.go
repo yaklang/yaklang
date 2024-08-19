@@ -484,6 +484,14 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 	return nil
 }
 
+func SaveHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) error {
+	if db := db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
+		return db.Error
+	}
+
+	return nil
+}
+
 // choose db save mode by const
 func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
