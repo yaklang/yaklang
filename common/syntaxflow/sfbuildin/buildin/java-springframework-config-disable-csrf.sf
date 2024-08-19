@@ -1,0 +1,65 @@
+desc(
+    title: "Unsafe Config for CSRF Protection '.csrf().disable()'",
+    title_zh: "关闭 CSRF 保护",
+    type: vuln,
+    level: low,
+)
+
+configure(* as $configEntry);
+check $configEntry;
+
+$configEntry ... csrf().disable() as $disableCSRF;
+check $disableCSRF;
+alert $disableCSRF;
+
+desc(
+    lang: java,
+    'safefile://config2.java': <<<SAFE
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .csrf().enable().and() // 开启 CSRF 保护，默认使用
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())  // 使用 Cookie 存储 CSRF 令牌
+                .and()
+            .headers()
+                .contentSecurityPolicy("script-src 'self'; report-uri /csp-report-endpoint/");  // 添加 CSP 策略
+    }
+}
+SAFE,
+    'file://config.java': <<<CONFIG
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .csrf().disable().and() // 开启 CSRF 保护，默认使用
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())  // 使用 Cookie 存储 CSRF 令牌
+                .and()
+            .headers()
+                .contentSecurityPolicy("script-src 'self'; report-uri /csp-report-endpoint/");  // 添加 CSP 策略
+    }
+}
+CONFIG
+)
