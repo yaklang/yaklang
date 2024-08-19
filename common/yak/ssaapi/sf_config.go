@@ -15,25 +15,22 @@ type RecursiveConfig struct {
 	depth int
 }
 
-// RecursiveConfigOption
-// SytaxFlow的Config语法通过WithHookEveryNode选项实现在每次Filter的时候进行回调
-// RecursiveConfigOption则决定回调过程中对相关Value行为的处理，具体行为如下:
-// ContinueMatch: 匹配对应Value，数据流继续流动
-// ContinueSkip: 不匹配对应Value，数据流继续流动
-// StopMatch: 匹配对应Value，数据流停止流动
-// StopNoMatch: 不匹配对应Value，数据流停止流动
-// Nothing: 不处理对应Value,一般用于hook，避免hook执行的结果影响最终结果
 type RecursiveConfigOption int
 
 const (
+	// ContinueMatch 匹配对应Value，数据流继续流动
 	ContinueMatch RecursiveConfigOption = iota
+	// ContinueSkip 不匹配对应Value，数据流继续流动
 	ContinueSkip
+	// StopMatch 匹配对应Value，数据流停止流动
 	StopMatch
+	// StopNoMatch StopNoMatch:不匹配对应Value，数据流停止流动
 	StopNoMatch
+	// Nothing 不处理对应Value,一般用于hook，避免hook执行的结果影响最终结果
 	Nothing
 )
 
-func CreateRecursiveConfig(
+func CreateRecursiveConfigFromItems(
 	sfResult *sf.SFFrameResult,
 	config *sf.Config,
 	opts ...*sf.RecursiveConfigItem,
@@ -56,6 +53,36 @@ func CreateRecursiveConfig(
 	}
 
 	return res
+}
+
+func CreateRecursiveConfigFromNativeCallParams(
+	sfResult *sf.SFFrameResult,
+	config *sf.Config,
+	params *sf.NativeCallActualParams,
+) *RecursiveConfig {
+	var opts []*sf.RecursiveConfigItem
+	if depth := params.GetString("depth"); depth != "" {
+		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Hook, Value: depth, SyntaxFlowRule: false}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("hook"); rule != "" {
+		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Hook, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("exclude"); rule != "" {
+		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Exclude, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("include"); rule != "" {
+		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Include, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+	if rule := params.GetString("until"); rule != "" {
+		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Until, Value: rule, SyntaxFlowRule: true}
+		opts = append(opts, configItem)
+	}
+
+	return CreateRecursiveConfigFromItems(sfResult, config, opts...)
 }
 
 // handler:用于根据RecursiveConfig配置项对每个Value行为进行处理
@@ -134,7 +161,7 @@ func WithSyntaxFlowConfig(
 	var result []*Value
 	var useResult bool
 
-	rc := CreateRecursiveConfig(sfResult, config, opts...)
+	rc := CreateRecursiveConfigFromItems(sfResult, config, opts...)
 	handlerValue := func(rc *RecursiveConfig) {
 		options = append(options, WithHookEveryNode(func(value *Value) error {
 			configOption := rc.handler(value)
@@ -150,7 +177,7 @@ func WithSyntaxFlowConfig(
 			case StopNoMatch:
 				return utils.Error("abort")
 			case Nothing:
-				return nil	
+				return nil
 			default:
 				return nil
 			}
