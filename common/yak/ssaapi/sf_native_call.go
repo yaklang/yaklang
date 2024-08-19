@@ -184,7 +184,7 @@ func init() {
 				fts := t.t.GetFullTypeNames()
 				var results []string
 				if len(fts) == 0 {
-					results = append(results, t.t.String())
+					results = append(results, t.String())
 				} else {
 					for _, ft := range fts {
 						//remove versioin name

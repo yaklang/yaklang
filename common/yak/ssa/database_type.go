@@ -67,7 +67,6 @@ func GetTypeFromDB(id int) Type {
 		return str
 	}
 
-
 	switch TypeKind(kind) {
 	case FunctionTypeKind:
 		typ := &FunctionType{}
@@ -85,24 +84,25 @@ func GetTypeFromDB(id int) Type {
 			// 	return r, true
 			// })
 		}
+		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		return typ
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
 		typ := &ObjectType{}
 		typ.Name = getParamStr("name")
-		typ.fullTypeName= utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = TypeKind(kind)
 		return typ
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
 		typ := &BasicType{}
 		typ.name = getParamStr("name")
-		typ.fullTypeName= utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = TypeKind(kind)
 		return typ
-	case ClassBluePrintTypeKind:		
+	case ClassBluePrintTypeKind:
 		typ := &ClassBluePrint{}
 		typ.Name = getParamStr("name")
-		typ.fullTypeName= utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		return typ
 	default:
 

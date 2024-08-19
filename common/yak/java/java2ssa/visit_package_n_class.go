@@ -88,10 +88,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		class = y.CreateClassBluePrint(className)
 	}
 	// set full type name for class's self
-	if len(y.selfPkgPath)!=0{
-		ftRaw := fmt.Sprintf("%s.%s",strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
-		class  = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
-	} 
+	if len(y.selfPkgPath) != 0 {
+		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
+		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.ClassBluePrint)
+	}
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
@@ -315,16 +315,13 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	className := i.TypeIdentifier().GetText()
 	if class := y.GetClassBluePrint(className); class != nil {
 		typ = class
-		if len(typ.GetFullTypeNames())== 0 {
-			 typ,_= y.AddFullTypeNameFromMap(className,typ)
+		if len(typ.GetFullTypeNames()) == 0 {
+			typ = y.AddFullTypeNameFromMap(className, typ)
 		}
 		return typ
-	}else {
+	} else {
 		typ = ssa.NewClassBluePrint()
-		typ,_ = y.AddFullTypeNameFromMap(className,typ)
-		if len(typ.GetFullTypeNames())== 0 {
-			typ = y.AddFullTypeNameForAllImport(className,typ)
-		}
+		typ = y.AddFullTypeNameFromMap(className, typ)
 		return typ
 	}
 }
@@ -342,11 +339,11 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	var t ssa.Type
 	switch i.GetText() {
 	case "boolean":
-		t= ssa.CreateBooleanType()
+		t = ssa.CreateBooleanType()
 	case "char", "short", "int", "long", "float", "double":
-		t= ssa.CreateNumberType()
+		t = ssa.CreateNumberType()
 	case "byte":
-		t=  ssa.CreateByteType()
+		t = ssa.CreateByteType()
 	default:
 		t = ssa.CreateAnyType()
 	}
@@ -864,4 +861,3 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	class.Constructor = newFunction
 
 }
-

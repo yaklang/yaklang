@@ -173,9 +173,12 @@ func TestMemberCallTypeName(t *testing.T){
 					var res1 = object.noExistMethod();  // fulltypeName 应该和object一样
 					var res2 = object.existMethod();  // fulltypeName 应该为number
 					var res3 = object.getDog();  // fulltypeName 应为com.org.Dog.Dog
-					var res4 = object.Runtime().exec();  // fulltypeName 应该和object一样
+					var res4 = object.method1().method2();  // fulltypeName 应该和object一样
 					var res5 = A.staticMethod();  // fulltypeName 应该找到Dog
 					var res6 = A.noExistMethod();  // fulltypeName 应该找到A	
+
+					Runtime runtime = Runtime.getRuntime();
+					runtime.exec();
 				}
 			};	
 	`)
@@ -213,6 +216,11 @@ func TestMemberCallTypeName(t *testing.T){
 			assert.Equal(t,2,obj.Len())
 			obj = prog.SyntaxFlowChain(`res6<fullTypeName>?{have: 'com.org.A.A'}as $obj`)
 			assert.Equal(t,1,obj.Len())
+
+			obj = prog.SyntaxFlowChain(`runtime<typeName> as $obj`)
+			assert.Equal(t,2,obj.Len())
+			obj = prog.SyntaxFlowChain(`.exec<typeName> as $obj`)
+			assert.Equal(t,2,obj.Len())
 			
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
