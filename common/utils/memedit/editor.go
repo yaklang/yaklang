@@ -196,6 +196,10 @@ func (ve *MemEditor) GetPositionByOffset(offset int) PositionIf {
 	return result
 }
 
+func (ve *MemEditor) GetPositionByLine(line, column int) PositionIf {
+	return NewPosition(line, column)
+}
+
 func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error) {
 	if offset < 0 {
 		// 偏移量为负，返回最初位置
@@ -238,7 +242,15 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 }
 
 func (ve *MemEditor) GetRangeOffset(start, end int) RangeIf {
-	return NewRange(ve.GetPositionByOffset(start), ve.GetPositionByOffset(end))
+	ret := NewRange(ve.GetPositionByOffset(start), ve.GetPositionByOffset(end))
+	ret.SetEditor(ve)
+	return ret
+}
+
+func (ve *MemEditor) GetRangeByPosition(start, end PositionIf) RangeIf {
+	ret := NewRange(start, end)
+	ret.SetEditor(ve)
+	return ret
 }
 
 func (ve *MemEditor) GetFullRange() RangeIf {
@@ -402,7 +414,7 @@ func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
 
 	startWordOffset, endWordOffset := ve.ExpandWordTextOffset(startOffset, endOffset)
 
-	return NewRange(ve.GetPositionByOffset(startWordOffset), ve.GetPositionByOffset(endWordOffset))
+	return ve.GetRangeByPosition(ve.GetPositionByOffset(startWordOffset), ve.GetPositionByOffset(endWordOffset))
 }
 
 func (ve *MemEditor) GetWordTextFromOffset(start, end int) string {
@@ -446,7 +458,7 @@ func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) erro
 		absoluteIndex := startIndex + index
 		startPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex)
 		endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + len(feature))
-		err := callback(NewRange(startPos, endPos))
+		err := callback(ve.GetRangeByPosition(startPos, endPos))
 		if err != nil {
 			return err // Return error if callback fails
 		}
@@ -465,7 +477,7 @@ func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, c
 	absoluteIndex := startIndex + index
 	startPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex)
 	endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + len(feature))
-	callback(NewRange(startPos, endPos))
+	callback(ve.GetRangeByPosition(startPos, endPos))
 	return startIndex + len(feature), true
 }
 
@@ -490,7 +502,7 @@ func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) e
 
 		startPos, _ := ve.GetPositionByOffsetWithError(matchStart)
 		endPos, _ := ve.GetPositionByOffsetWithError(matchEnd)
-		err = callback(NewRange(startPos, endPos))
+		err = callback(ve.GetRangeByPosition(startPos, endPos))
 		if err != nil {
 			return err // 如果回调函数出错，提前退出
 		}

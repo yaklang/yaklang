@@ -183,7 +183,7 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	return standardLibrarySuggestions
 }
 
-func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ssa.Range, skipNum int) *ssaapi.Value {
+func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng memedit.RangeIf, skipNum int) *ssaapi.Value {
 	// use editor instead of prog.Program.Editor because of ssa cache
 	var value ssa.Value
 	offset := rng.GetEndOffset()
@@ -674,7 +674,7 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 	return desc
 }
 
-func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Values {
+func sortValuesByPosition(values ssaapi.Values, position memedit.RangeIf) ssaapi.Values {
 	// todo: 需要修改SSA，需要真正的RefLocation
 	values = values.Filter(func(v *ssaapi.Value) bool {
 		position2 := v.GetRange()
@@ -698,7 +698,7 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Valu
 }
 
 // Deprecated: now can get the closest value
-func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
+func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
 	word := strings.Split(sourceCode, ".")[0]
 	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
 		position2 := v.GetRange()
@@ -718,7 +718,7 @@ func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, positi
 }
 
 // Deprecated: now can get the closest value
-func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
+func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
 	var values ssaapi.Values
 	for i, word := range strings.Split(sourceCode, ".") {
 		if i == 0 {
@@ -773,7 +773,7 @@ func trimSourceCode(sourceCode string) (string, bool) {
 	return strings.TrimSpace(sourceCode), containPoint
 }
 
-func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	ret = append(ret, &ypb.SuggestionDescription{
 		Label: getDescFromSSAValue(word, containPoint, prog, v),
 	})
@@ -781,7 +781,7 @@ func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Rang
 	return ret
 }
 
-func OnSignature(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnSignature(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 
 	label, doc := getFuncLabelAndDocBySSAValue(word, v)
@@ -810,7 +810,7 @@ func completionYakLanguageBasicType() (ret []*ypb.SuggestionDescription) {
 	return getLanguageBasicTypeSuggestions()
 }
 
-func completionUserDefinedVariable(prog *ssaapi.Program, rng *ssa.Range) (ret []*ypb.SuggestionDescription) {
+func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf) (ret []*ypb.SuggestionDescription) {
 	if prog == nil || prog.Program == nil {
 		return
 	}
@@ -904,7 +904,7 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*
 	return
 }
 
-func completionYakTypeBuiltinMethod(rng *ssa.Range, v *ssaapi.Value, realTyp ...ssa.Type) (ret []*ypb.SuggestionDescription) {
+func completionYakTypeBuiltinMethod(rng memedit.RangeIf, v *ssaapi.Value, realTyp ...ssa.Type) (ret []*ypb.SuggestionDescription) {
 	var bareTyp ssa.Type
 	if len(realTyp) > 0 {
 		bareTyp = realTyp[0]
@@ -1020,7 +1020,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 	return
 }
 
-func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("Language completion error: %v", r)
@@ -1048,12 +1048,11 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 	return ret
 }
 
-func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *ssa.Range {
+func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) memedit.RangeIf {
 	e := memedit.NewMemEditor(sourceCode)
-	return ssa.NewRange(
-		e,
-		ssa.NewPosition(r.StartLine, r.StartColumn-1),
-		ssa.NewPosition(r.EndLine, r.EndColumn-1),
+	return e.GetRangeByPosition(
+		e.GetPositionByLine(int(r.StartLine), int(r.StartColumn)),
+		e.GetPositionByLine(int(r.EndLine), int(r.EndColumn)),
 	)
 }
 

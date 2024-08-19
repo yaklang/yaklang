@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -79,7 +80,7 @@ func TestUndefineError(t *testing.T) {
 		test.CheckError(t, test.TestCase{
 			Code: code,
 			Want: []string{
-				ssa.BindingNotFound("xxx", ssa.NewRange(nil, ssa.NewPosition(5, 3), ssa.NewPosition(5, 6))),
+				ssa.BindingNotFound("xxx", memedit.NewRange(memedit.NewPosition(5, 3), memedit.NewPosition(5, 6))),
 				ssa.BindingNotFoundInCall("xxx"),
 			},
 			ExternValue: map[string]any{},
@@ -803,7 +804,7 @@ func TestClosureBinding(t *testing.T) {
 				// f2()
 				`,
 			Want: []string{
-				// ssa.BindingNotFound("a2", ssa.NewRange(ssa.NewPosition(0, 18, 3), ssa.NewPosition(0, 18, 7), "")),
+				// ssa.BindingNotFound("a2",memedit.NewRange(memedit.NewPosition(0, 18, 3), memedit.NewPosition(0, 18, 7), "")),
 				// ssa.BindingNotFoundInCall("a2"),
 			},
 		})
@@ -822,8 +823,8 @@ func TestClosureBinding(t *testing.T) {
 			f()
 			`,
 			Want: []string{
-				ssa.BindingNotFound("a1", ssa.NewRange(nil, ssa.NewPosition(2, 3), ssa.NewPosition(4, 4))),
-				ssa.BindingNotFound("a2", ssa.NewRange(nil, ssa.NewPosition(9, 3), ssa.NewPosition(9, 6))),
+				ssa.BindingNotFound("a1", memedit.NewRange(memedit.NewPosition(2, 3), memedit.NewPosition(4, 4))),
+				ssa.BindingNotFound("a2", memedit.NewRange(memedit.NewPosition(9, 3), memedit.NewPosition(9, 6))),
 				ssa.BindingNotFoundInCall("a2"),
 			},
 		})
@@ -1513,10 +1514,9 @@ func TestParameterMember(t *testing.T) {
 			f(a)
 			`,
 			Want: []string{
-				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", ssa.NewRange(
-					nil,
-					ssa.NewPosition(6, 3),
-					ssa.NewPosition(6, 7),
+				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", memedit.NewRange(
+					memedit.NewPosition(6, 3),
+					memedit.NewPosition(6, 7),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
 			},
@@ -1533,10 +1533,9 @@ func TestParameterMember(t *testing.T) {
 			f(a)
 			`,
 			Want: []string{
-				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", ssa.NewRange(
-					nil,
-					ssa.NewPosition(6, 3),
-					ssa.NewPosition(6, 7),
+				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", memedit.NewRange(
+					memedit.NewPosition(6, 3),
+					memedit.NewPosition(6, 7),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
 				ssa4analyze.InvalidField("number", "b"),

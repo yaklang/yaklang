@@ -49,7 +49,7 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 // 	b.CurrentRange = NewRange(p, fullRange.GetStart(), fullRange.GetEnd())
 // }
 
-func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *Range {
+func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) memedit.RangeIf {
 	if b.CurrentRange != nil {
 		return b.CurrentRange
 	}
@@ -58,10 +58,11 @@ func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *Range {
 		return GetRange(b.GetEditor(), fallback)
 	}
 	log.Error("fallback for GetCurrentRange is nil..., use (1:1, 1000,1) fallback, bad operation")
-	return NewRange(b.GetEditor(), NewPosition(1, 1), NewPosition(1000, 1))
+	return b.GetEditor().GetRangeOffset(1, 1000)
+	// return NewRange(b.GetEditor(), NewPosition(1, 1), NewPosition(1000, 1))
 }
 
-func (b *FunctionBuilder) GetRangeByToken(r CanStartStopToken) *Range {
+func (b *FunctionBuilder) GetRangeByToken(r CanStartStopToken) memedit.RangeIf {
 	return GetRange(b.GetEditor(), r)
 }
 
@@ -85,18 +86,13 @@ func GetEndPosition(t antlr.Token) (int, int) {
 	return line, column
 }
 
-func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *Range {
+func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeIf {
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {
 		return nil
 	}
-
-	start := NewPosition(int64(startToken.GetLine()), int64(startToken.GetColumn()))
-
-	endLine, endColumn := GetEndPosition(endToken)
-	end := NewPosition(int64(endLine), int64(endColumn))
-	return NewRange(editor, start, end)
+	return editor.GetRangeOffset(startToken.GetStart(), endToken.GetStop())
 }
 
 type Token struct {

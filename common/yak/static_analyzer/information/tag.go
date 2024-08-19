@@ -45,7 +45,7 @@ func GetLastRef(vs ssaapi.Values) *ssaapi.Value {
 		if ret == nil {
 			ret = v
 		}
-		if v.GetRange().GetOffset() > ret.GetRange().GetOffset() {
+		if v.GetRange().GetStartOffset() > ret.GetRange().GetStartOffset() {
 			ret = v
 		}
 	})

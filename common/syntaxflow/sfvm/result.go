@@ -7,8 +7,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -84,7 +84,7 @@ func (s *SFFrameResult) String() string {
 					idx = fmt.Sprintf("t%v", raw.GetId())
 				}
 				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
-				if rangeIns, ok := v.(interface{ GetRange() *ssa.Range }); ok {
+				if rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf }); ok {
 					ssaRange := rangeIns.GetRange()
 					if ssaRange != nil {
 						start, end := ssaRange.GetStart(), ssaRange.GetEnd()

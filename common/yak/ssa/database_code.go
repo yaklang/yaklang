@@ -3,6 +3,7 @@ package ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -34,15 +35,15 @@ func (c *Cache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode) Instruct
 	return inst
 }
 
-func fitRange(c *ssadb.IrCode, rangeIns *Range) {
+func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
 	if rangeIns == nil {
 		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
 		return
 	}
 	c.SourceCodeHash = codec.Sha256(rangeIns.GetEditor().GetSourceCode())
-	start, end := rangeIns.GetOffsetRange()
-	c.SourceCodeStartOffset = int64(start)
-	c.SourceCodeEndOffset = int64(end)
+	// start, end := rangeIns.GetOffsetRange()
+	c.SourceCodeStartOffset = int64(rangeIns.GetStartOffset())
+	c.SourceCodeEndOffset = int64(rangeIns.GetEndOffset())
 }
 
 func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -55,7 +56,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
 
-	var codeRange *Range
+	var codeRange memedit.RangeIf
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
 	} else if ret := inst.GetFunc().GetRange(); ret != nil {

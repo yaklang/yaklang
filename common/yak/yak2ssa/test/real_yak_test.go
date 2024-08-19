@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -107,7 +108,7 @@ Rawfuzz = func(p, fuzzPayload) {
 				errs := prog.GetErrors()
 				require.Len(t, errs, 2)
 				err := errs[0]
-				require.Equal(t, "a.b", err.Pos.GetWordText())
+				require.Equal(t, "a.b", err.Pos.GetText())
 			},
 		})
 	})
@@ -210,10 +211,9 @@ func Test_RealYak_FreeValueMemberCall(t *testing.T) {
 		f(1, 2)
 		`,
 			Want: []string{
-				ssa.BindingNotFound("b", ssa.NewRange(
-					nil,
-					ssa.NewPosition(10, 2),
-					ssa.NewPosition(10, 9),
+				ssa.BindingNotFound("b", memedit.NewRange(
+					memedit.NewPosition(10, 2),
+					memedit.NewPosition(10, 9),
 				)),
 				ssa.BindingNotFoundInCall("b"),
 			},
@@ -245,10 +245,9 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			f()
 			`,
 			Want: []string{
-				ssa.BindingNotFound("a", ssa.NewRange(
-					nil,
-					ssa.NewPosition(5, 3),
-					ssa.NewPosition(5, 6),
+				ssa.BindingNotFound("a", memedit.NewRange(
+					memedit.NewPosition(5, 3),
+					memedit.NewPosition(5, 6),
 				)),
 				ssa.BindingNotFoundInCall("a"),
 			},
@@ -287,10 +286,9 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			f()
 			`,
 			Want: []string{
-				ssa.BindingNotFound("a", ssa.NewRange(
-					nil,
-					ssa.NewPosition(5, 3),
-					ssa.NewPosition(5, 6),
+				ssa.BindingNotFound("a", memedit.NewRange(
+					memedit.NewPosition(5, 3),
+					memedit.NewPosition(5, 6),
 				)),
 				ssa.BindingNotFoundInCall("a"),
 			},
@@ -307,10 +305,9 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			f()
 			`,
 			Want: []string{
-				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", ssa.NewRange(
-					nil,
-					ssa.NewPosition(6, 3),
-					ssa.NewPosition(6, 6),
+				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", memedit.NewRange(
+					memedit.NewPosition(6, 3),
+					memedit.NewPosition(6, 6),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
 			},

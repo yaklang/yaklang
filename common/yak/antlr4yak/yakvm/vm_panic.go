@@ -100,7 +100,10 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 	}()
 
 	editor := memedit.NewMemEditor(codeOrigin)
-	codeReview = editor.GetTextContextWithPrompt(memedit.NewRange(memedit.NewPosition(code.StartLineNumber, code.StartColumnNumber), memedit.NewPosition(code.EndLineNumber, code.EndColumnNumber)), 3)
+	codeReview = editor.GetTextContextWithPrompt(editor.GetRangeByPosition(
+		memedit.NewPosition(code.StartLineNumber, code.StartColumnNumber),
+		memedit.NewPosition(code.EndLineNumber, code.EndColumnNumber),
+	), 3)
 	codeReview = strings.TrimSpace(codeReview)
 	// scanner := bufio.NewScanner(strings.NewReader(codeOrigin))
 	// scanner.Split(bufio.ScanLines)

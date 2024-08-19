@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 type ErrorKind int
@@ -30,7 +32,7 @@ const (
 	SSANoCheck ErrorCommentId = "// @ssa-nocheck"
 )
 
-func (ec ErrorComment) Skip(pos *Range) bool {
+func (ec ErrorComment) Skip(pos memedit.RangeIf) bool {
 	if ec.noCheck {
 		return true
 	}
@@ -61,7 +63,7 @@ func (f *Function) AddErrorComment(str string, line int) error {
 }
 
 type SSAError struct {
-	Pos     *Range
+	Pos     memedit.RangeIf
 	Tag     ErrorTag
 	Message string
 	Kind    ErrorKind
@@ -69,7 +71,7 @@ type SSAError struct {
 
 type SSAErrors []*SSAError
 
-func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Range, message string) {
+func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos memedit.RangeIf, message string) {
 	if Pos == nil {
 		return
 	}

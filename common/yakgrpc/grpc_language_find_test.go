@@ -13,11 +13,12 @@ import (
 
 func GrpcRangeToRangeIf(r *ypb.Range) memedit.RangeIf {
 	return memedit.NewRange(
-		memedit.NewPosition(int(r.StartLine), int(r.StartColumn)), memedit.NewPosition(int(r.EndLine), int(r.EndColumn)),
+		memedit.NewPosition(int(r.StartLine), int(r.StartColumn)),
+		memedit.NewPosition(int(r.EndLine), int(r.EndColumn)),
 	)
 }
 
-func newRangeFromText(text string) *memedit.Range {
+func newRangeFromText(text string) memedit.RangeIf {
 	splited := strings.Split(text, " ")
 	if len(splited) != 2 {
 		return nil
