@@ -9,12 +9,14 @@ import (
 // Graph represents a set of nodes, edges and attributes that can be
 // translated to DOT language.
 type Graph struct {
-	idGetter        func() int
-	parent          *Graph
-	subGraphs       []*Graph
+	idGetter  func() int
+	parent    *Graph
+	subGraphs []*Graph
+	// global
 	registeredNodes map[int]*node
 	registeredEdges map[int]*edge
 
+	// in this graph
 	nodes           map[int]*node
 	edges           map[int]*edge
 	graphAttributes attributes
@@ -66,7 +68,7 @@ func (g *Graph) SetTitle(title string) {
 // AddNode adds a new node with the given label and returns its id.
 func (g *Graph) AddNode(label string) int {
 	newId := g.idGetter()
-	nod := node{id: newId, label: label}
+	nod := CreateNode(newId, label)
 	if g.nodes == nil {
 		g.nodes = make(map[int]*node)
 	}
@@ -127,6 +129,10 @@ func (g *Graph) GetOrCreateNode(label string) int {
 	return g.AddNode(label)
 }
 
+func (g *Graph) GetNodeByID(id int) *node {
+	return g.registeredNodes[id]
+}
+
 // NodeExisted returns the id of the node with the given label if it
 func (g *Graph) NodeExisted(label string) (int, bool) {
 	for _, node := range g.nodes {
@@ -162,7 +168,7 @@ func (g *Graph) AddEdge(from, to int, label string) int {
 	fromNode := g.registeredNodes[from]
 	toNode := g.registeredNodes[to]
 	id := g.idGetter()
-	edg := edge{from: fromNode, to: toNode, label: label}
+	edg := CreateEdge(fromNode, toNode, label)
 	if g.edges == nil {
 		g.edges = make(map[int]*edge)
 	}
@@ -189,7 +195,7 @@ func (g *Graph) AddDashEdge(from, to int, label string) int {
 	fromNode := g.registeredNodes[from]
 	toNode := g.registeredNodes[to]
 	id := g.idGetter()
-	edg := edge{from: fromNode, to: toNode, label: label}
+	edg := CreateEdge(fromNode, toNode, label)
 	edg.attributes.set("style", "dashed")
 	if g.edges == nil {
 		g.edges = make(map[int]*edge)
@@ -206,7 +212,7 @@ func (g *Graph) AddDashEdgeWithoutArrowHead(from, to int, label string) int {
 	fromNode := g.registeredNodes[from]
 	toNode := g.registeredNodes[to]
 	id := g.idGetter()
-	edg := edge{from: fromNode, to: toNode, label: label}
+	edg := CreateEdge(fromNode, toNode, label)
 	edg.attributes.set("style", "dashed")
 	edg.attributes.set("dir", "none")
 	if g.edges == nil {
@@ -359,7 +365,25 @@ func (ai *attributeIterator) next() (name, value string) {
 type node struct {
 	id         int
 	label      string
+	nexts      []int
+	prevs      []int
 	attributes attributes
+}
+
+func CreateNode(id int, label string) node {
+	return node{id: id, label: label}
+}
+
+func (n node) ID() int {
+	return n.id
+}
+
+func (n node) Prevs() []int {
+	return n.prevs
+}
+
+func (n node) Nexts() []int {
+	return n.nexts
 }
 
 func NodeName(id int) string {
@@ -367,7 +391,7 @@ func NodeName(id int) string {
 }
 
 func (n node) name() string {
-	return fmt.Sprintf("n%v", n.id)
+	return NodeName(n.id)
 }
 
 func (n node) generateDOT(w io.Writer) {
@@ -384,6 +408,12 @@ type edge struct {
 	to         *node
 	label      string
 	attributes attributes
+}
+
+func CreateEdge(from, to *node, label string) edge {
+	from.nexts = append(from.nexts, to.id)
+	to.prevs = append(to.prevs, from.id)
+	return edge{from: from, to: to, label: label}
 }
 
 func (e edge) generateDOT(w io.Writer, directed bool) {
