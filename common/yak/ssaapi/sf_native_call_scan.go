@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-
 type direction string
 
 const (
@@ -23,7 +22,6 @@ type basicBlockInfo struct {
 	direction       direction
 	results         []sfvm.ValueOperator
 	isFinish        bool
-	
 }
 
 var nativeCallScanPrevious = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -98,28 +96,7 @@ func (b *basicBlockInfo) createRecursiveConfig(frame *sfvm.SFFrame, params *sfvm
 		log.Warnf("Get sfResult error:%s", err)
 		return
 	}
-	var opts []*sfvm.RecursiveConfigItem
-	if depth := params.GetString("depth"); depth != "" {
-		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Hook, Value: depth, SyntaxFlowRule: false}
-		opts = append(opts, configItem)
-	}
-	if rule := params.GetString("hook"); rule != "" {
-		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Hook, Value: rule, SyntaxFlowRule: true}
-		opts = append(opts, configItem)
-	}
-	if rule := params.GetString("exclude"); rule != "" {
-		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Exclude, Value: rule, SyntaxFlowRule: true}
-		opts = append(opts, configItem)
-	}
-	if rule := params.GetString("include"); rule != "" {
-		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Include, Value: rule, SyntaxFlowRule: true}
-		opts = append(opts, configItem)
-	}
-	if rule := params.GetString("until"); rule != "" {
-		configItem := &sfvm.RecursiveConfigItem{Key: sfvm.RecursiveConfig_Until, Value: rule, SyntaxFlowRule: true}
-		opts = append(opts, configItem)
-	}
-	b.recursiveConfig = CreateRecursiveConfig(sfResult,frame.GetConfig(), opts...)
+	b.recursiveConfig = CreateRecursiveConfigFromNativeCallParams(sfResult, frame.GetConfig(), params)
 }
 
 func (b *basicBlockInfo) searchBlock(value ssa.Value) {
@@ -131,7 +108,7 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 	if !ok {
 		block = value.GetBlock()
 	}
-	if block == nil{
+	if block == nil {
 		return
 	}
 	b.currentBlock = block

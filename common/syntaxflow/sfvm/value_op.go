@@ -13,10 +13,14 @@ const (
 	RecursiveConfig_Depth                       = "depth"
 	RecursiveConfig_DepthMin                    = "depth_min"
 	RecursiveConfig_DepthMax                    = "depth_max"
-	RecursiveConfig_Exclude                     = "exclude"
-	RecursiveConfig_Include                     = "include"
-	RecursiveConfig_Until                       = "until"
-	RecursiveConfig_Hook                        = "hook"
+	// RecursiveConfig_Exclude 在匹配到不符合配置项的Value后，数据流继续流动，以匹配其它Value。
+	RecursiveConfig_Exclude = "exclude"
+	// RecursiveConfig_Include 在匹配到符合配置项的Value后，数据流继续流动，以匹配其它Value。
+	RecursiveConfig_Include = "include"
+	// RecursiveConfig_Until 会沿着数据流匹配每个Value，知道匹配到符合配置项的Value的时候，数据流停止流动。
+	RecursiveConfig_Until = "until"
+	// RecursiveConfig_Hook 会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
+	RecursiveConfig_Hook = "hook"
 )
 
 func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
