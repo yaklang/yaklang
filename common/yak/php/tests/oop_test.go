@@ -695,53 +695,46 @@ class b
         return "1";
     }
 }`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, map[string][]string{
-			"param": {`"1"`},
-		})
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{`"1"`})
 	})
 
-	//todo:
-	//	t.Run("cls use other cls static function", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//class t
-	//{
-	//    public function a()
-	//    {
-	//        println(b::bb());
-	//    }
-	//}
-	//
-	//class b
-	//{
-	//    public function bb()
-	//    {
-	//        return "1";
-	//    }
-	//}`
-	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, map[string][]string{
-	//			"param": {`"1"`},
-	//		})
-	//	})
+	t.Run("cls use other cls static function", func(t *testing.T) {
+		code := `<?php
+	
+	class t
+	{
+	   public function a()
+	   {
+	       println(b::bb());
+	   }
+	}
+	
+	class b
+	{
+	   public static function bb()
+	   {
+	       return "1";
+	   }
+	}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{`"1"`})
+	})
 
-	//todo：
-
-	//	t.Run("anymous-class with parent", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//class a
-	//{
-	//    public $a;
-	//
-	//    public function __construct($a)
-	//    {
-	//        $this->a = $a;
-	//    }
-	//}
-	//
-	//$c = new class("2") extends a {
-	//};
-	//println($c->a);`
-	//		ssatest.CheckPrintlnValue(code, []string{}, t)
-	//	})
+	t.Run("anymous-class with parent", func(t *testing.T) {
+		code := `<?php
+	
+	class a
+	{
+	   public $a;
+	
+	   public function __construct($a)
+	   {
+	       $this->a = $a;
+	   }
+	}
+	
+	$c = new class("2") extends a {
+	};
+	println($c->a);`
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+	})
 }
