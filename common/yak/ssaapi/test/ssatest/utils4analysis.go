@@ -445,6 +445,14 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 			errs = append(errs, utils.Errorf("alert symbol table is empty"))
 			return err
 		}
+
+		if frame.AllowIncluded != "" {
+			libOutput, ok := result.AlertSymbolTable["output"]
+			if !ok {
+				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
+			}
+			_ = libOutput
+		}
 		result.Show()
 		return nil
 	}, ssaapi.WithLanguage(l))
