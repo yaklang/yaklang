@@ -2,6 +2,7 @@ desc(
     title: "Find Runtime.getRuntime().exec Point",
     lib: 'runtime-exec-sink',
     type: audit,
+    level: warning,
 )
 
 Runtime.getRuntime().exec(*?{!opcode: param && !have: 'getRuntime(', ')'} as $output);
