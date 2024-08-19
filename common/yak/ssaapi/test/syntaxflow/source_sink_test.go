@@ -35,7 +35,7 @@ func Test_Source_Sink(t *testing.T) {
 				exclude: %s
 			}-> * as $target)`, "`para`"),
 			map[string][]string{
-				"target": {`"bash"`},
+				"target": {`"bash"`, "add(\"bash\", Parameter-para)"},
 			},
 		)
 	})
@@ -50,7 +50,7 @@ func Test_Source_Sink(t *testing.T) {
 			system(cmd)
 		}
 		`,
-			"system(* #{until:`para`}-> * as $target)",
+			"system(* #{include:`para`}-> * as $target)",
 			map[string][]string{
 				"target": {"Parameter-para"},
 			},

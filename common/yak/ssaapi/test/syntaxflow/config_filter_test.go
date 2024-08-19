@@ -50,7 +50,7 @@ func TestSF_Config_Filter(t *testing.T) {
 		`,
 			"b #{include:`* ?{opcode:const}`}-> as $result",
 			map[string][]string{
-				"result": {"21", "11", "22","1"},
+				"result": { "11", "22","1"},
 			})
 	})
 

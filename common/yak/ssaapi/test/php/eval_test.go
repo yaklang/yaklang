@@ -20,7 +20,7 @@ $c($fun);
 `
 	_ = code
 	ssatest.CheckSyntaxFlow(t, code,
-		"global*<getMembers><getMembers> -{until: `* ?{opcode:call}`}-> * as $func",
+		"global*<getMembers><getMembers> -{include: `* ?{opcode:call}`}-> * as $func",
 		map[string][]string{"func": {`Function-base64_decode(Undefined-.get.func(valid))`}},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
