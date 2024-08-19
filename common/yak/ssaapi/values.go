@@ -83,6 +83,16 @@ func (p *Program) NewValue(n ssa.Value) *Value {
 	}
 }
 
+func (v *Value) GetProgramName() string {
+	if v.IsNil() {
+		return ""
+	}
+	if prog := v.node.GetProgram(); prog != nil {
+		return prog.GetProgramName()
+	}
+	return ""
+}
+
 func (v *Value) IsNil() bool {
 	return v == nil || v.node == nil
 }
