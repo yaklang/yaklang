@@ -130,11 +130,11 @@ func (f *HTTPFlow) ColorSharp(rgbHex string) {
 }
 
 func (f *HTTPFlow) CalcHash() string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
+	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Path, f.Method, f.BodyLength, f.ContentType, f.StatusCode, f.SourceType, f.Tags, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
 }
 
 func (f *HTTPFlow) CalcCacheHash(full bool) string {
-	return utils.CalcSha1(f.ID, f.IsHTTPS, f.Url, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
+	return utils.CalcSha1(f.ID, f.IsHTTPS, f.Url, f.Path, f.Method, f.BodyLength, f.ContentType, f.StatusCode, f.SourceType, f.Tags, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin, f.Response, full)
 }
 
 func (f *HTTPFlow) BeforeSave() error {
