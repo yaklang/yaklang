@@ -676,4 +676,72 @@ new test();`
 			map[string][]string{},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("cls use other cls function", func(t *testing.T) {
+		code := `<?php
+
+class t
+{
+    public function a()
+    {
+        $a = new b();
+        println($a->bb());
+    }
+}
+
+class b
+{
+    public function bb()
+    {
+        return "1";
+    }
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, map[string][]string{
+			"param": {`"1"`},
+		})
+	})
+
+	//todo:
+	//	t.Run("cls use other cls static function", func(t *testing.T) {
+	//		code := `<?php
+	//
+	//class t
+	//{
+	//    public function a()
+	//    {
+	//        println(b::bb());
+	//    }
+	//}
+	//
+	//class b
+	//{
+	//    public function bb()
+	//    {
+	//        return "1";
+	//    }
+	//}`
+	//		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, map[string][]string{
+	//			"param": {`"1"`},
+	//		})
+	//	})
+
+	//todo：
+
+	//	t.Run("anymous-class with parent", func(t *testing.T) {
+	//		code := `<?php
+	//
+	//class a
+	//{
+	//    public $a;
+	//
+	//    public function __construct($a)
+	//    {
+	//        $this->a = $a;
+	//    }
+	//}
+	//
+	//$c = new class("2") extends a {
+	//};
+	//println($c->a);`
+	//		ssatest.CheckPrintlnValue(code, []string{}, t)
+	//	})
 }

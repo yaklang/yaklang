@@ -28,6 +28,29 @@ println($a);
 			Code: code,
 		})
 	})
+
+	//todo: 修改scope之后待过测试
+
+	//	t.Run("custom if and class", func(t *testing.T) {
+	//		code := `<?php
+	//
+	//$a = 2;
+	//if ($a) {
+	//    class t
+	//    {
+	//        public $a = 1;
+	//    }
+	//} else {
+	//    class t
+	//    {
+	//        public $a = 2;
+	//    }
+	//}
+	//
+	//$c = new t();
+	//println($c->a);`
+	//		ssatest.CheckPrintlnValue(code, []string{}, t)
+	//	})
 	t.Run("custom-if-else", func(t *testing.T) {
 		code := `<?php
 $a=0;

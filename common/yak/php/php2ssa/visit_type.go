@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -22,7 +23,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if r := i.QualifiedStaticTypeRef(); r != nil {
 		//这里类型就行修复
 		className := y.VisitQualifiedStaticTypeRef(r)
-		return y.GetClassBluePrint(className)
+		return className
 	} else if i.Callable() != nil {
 		_ = i.Callable().GetText()
 	} else if i.PrimitiveType() != nil {
@@ -145,23 +146,29 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	}
 	return nil
 }
-func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) string {
+func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) *ssa.ClassBluePrint {
 	if y == nil || raw == nil {
-		return ""
+		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.QualifiedStaticTypeRefContext)
 	if i == nil {
-		return ""
+		return nil
 	}
-
-	if i.Static() != nil {
-		return i.Static().GetText()
-	} else if i.QualifiedNamespaceName() != nil {
-		y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+	if i.QualifiedNamespaceName() != nil {
+		path, name := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+		if library, _ := y.GetProgram().GetLibrary(strings.Join(path, ".")); !utils.IsNil(library) {
+			if cls := library.GetClassBluePrint(name); cls != nil {
+				return cls
+			}
+		} else {
+			if bluePrint := y.GetProgram().GetClassBluePrint(name); !utils.IsNil(bluePrint) {
+				return bluePrint
+			}
+		}
 	}
-
-	return ""
+	log.Warnf("classBlue print not found")
+	return y.CreateClassBluePrint(uuid.NewString())
 }
