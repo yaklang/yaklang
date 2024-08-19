@@ -322,13 +322,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	var beforeRequest func(https bool, originReq []byte, req []byte) []byte = nil
 	var afterRequest func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 
+	cacheThrottle := utils.NewDebounce(1)
+
 	clearPluginHTTPFlowCache := func() {
 		if mitmPluginCaller != nil {
 			mitmPluginCaller.ResetFilter()
 		}
-		stream.Send(&ypb.MITMResponse{
-			HaveNotification:    true,
-			NotificationContent: []byte("MITM 插件去重缓存已重置"),
+
+		cacheThrottle(func() {
+			stream.Send(&ypb.MITMResponse{
+				HaveNotification:    true,
+				NotificationContent: []byte("MITM 插件去重缓存已重置"),
+			})
 		})
 	}
 
