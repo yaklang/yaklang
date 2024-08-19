@@ -54,7 +54,7 @@ func TestObject_Recursive(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`d #-> * as $target`,
 			map[string][]string{
-				"target": {"1", "3", "make(map[any]any)"},
+				"target": {"1", "3"},
 			},
 		)
 	})
