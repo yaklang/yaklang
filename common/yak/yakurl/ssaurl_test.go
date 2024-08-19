@@ -201,27 +201,48 @@ func TestSFURl(t *testing.T) {
 
 			found := false
 			var node string
+			graphInfoMap := make(map[string]*yakurl.NodeInfo)
 			for _, extra := range res[0].Extra {
 				if extra.Key == "node_id" {
+					log.Infof("graph: %v", extra.Value)
 					node = extra.Value
 					continue
 				}
-
-				if extra.Key != "graph_info" {
+				if extra.Key == "graph" {
+					log.Infof("graph: %v", extra.Value)
 					continue
 				}
-				var graphInfo []*yakurl.NodeInfo
-				if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
-					t.Error(err)
-				}
 
-				for _, info := range graphInfo {
-					spew.Dump(info)
-					if info.NodeID == node {
-						found = true
+				if extra.Key == "graph_info" {
+					log.Infof("graph info: %v", extra.Value)
+					var graphInfo []*yakurl.NodeInfo
+					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+						t.Error(err)
 					}
+					for _, info := range graphInfo {
+						log.Infof("graph info item: \n%v", info)
+						// spew.Dump(info)
+						if info.NodeID == node {
+							found = true
+						}
+						graphInfoMap[info.NodeID] = info
 
-					check(info.CodeRange.URL)
+						check(info.CodeRange.URL)
+					}
+				}
+				if extra.Key == "graph_line" {
+					log.Infof("graph line: %s", extra.Value)
+					var res [][]string
+					if err := json.Unmarshal([]byte(extra.Value), &res); err != nil {
+						t.Error(err)
+					}
+					for _, resItem := range res {
+						for _, item := range resItem {
+							if _, ok := graphInfoMap[item]; !ok {
+								t.Errorf("not found in graph info: %s", item)
+							}
+						}
+					}
 				}
 			}
 			assert.True(t, found)
