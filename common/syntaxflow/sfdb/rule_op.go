@@ -81,6 +81,14 @@ func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	db := consts.GetGormProfileDatabase()
 	var rules []*schema.SyntaxFlowRule
 
+	if hash == "" {
+		hash = i.CalcHash()
+	}
+	var sameHashRule schema.SyntaxFlowRule
+	if db.Where("hash = ?", hash).First(&sameHashRule); sameHashRule.ID > 0 {
+		return nil
+	}
+
 	if err := db.Where("rule_name = ?", i.RuleName).Find(&rules).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(i).Error
@@ -88,6 +96,7 @@ func CreateOrUpdateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 		return err
 	}
 	if len(rules) == 1 {
+		i.Hash = i.CalcHash()
 		// only one rule, check and update
 		rule := rules[0]
 		if rule.Hash != hash {
@@ -170,7 +179,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool) error
 	}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
-		return utils.Wrap(err, "create or update syntax flow rule error")
+		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
 	}
 	return nil
 }
