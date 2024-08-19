@@ -231,6 +231,9 @@ func CheckFSWithProgram(
 	}))
 }
 
+func CheckSyntaxFlowPrintWithPhp(t *testing.T, code string, wants []string) {
+	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaapi.Option{ssaapi.WithLanguage(ssaapi.PHP)}, nil)
+}
 func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
