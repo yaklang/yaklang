@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -167,7 +166,7 @@ func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *Value) []*sarif.CodeFlo
 	return flows
 }
 
-func (s *SarifContext) CreateLocation(artifactId int, rg *ssa.Range) *sarif.Location {
+func (s *SarifContext) CreateLocation(artifactId int, rg memedit.RangeIf) *sarif.Location {
 	return sarif.NewLocation().WithPhysicalLocation(
 		sarif.NewPhysicalLocation().WithArtifactLocation(
 			sarif.NewArtifactLocation().WithIndex(artifactId),

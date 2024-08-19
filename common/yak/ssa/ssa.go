@@ -49,8 +49,8 @@ type Instruction interface {
 	SetId(int64)
 
 	// position
-	GetRange() *Range
-	SetRange(*Range)
+	GetRange() memedit.RangeIf
+	SetRange(memedit.RangeIf)
 	GetSourceCode() string
 	GetSourceCodeContext(n int) string
 

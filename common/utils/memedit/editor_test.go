@@ -1,9 +1,10 @@
 package memedit
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
@@ -188,8 +189,8 @@ func TestTextByRangeGetEditor(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		startPos *Position
-		endPos   *Position
+		startPos *position
+		endPos   *position
 		want     string
 		wantErr  bool
 	}{
