@@ -28,7 +28,6 @@ type RegWrapperInterface interface {
 	ReplaceAllStringFunc(src string, repl func(string) string) (string, error)
 
 	CanUse() bool
-
 	String() string
 }
 
@@ -208,7 +207,7 @@ func (r *Regexp2Wrapper) FindString(s string) (string, error) {
 		return "", errors.New("regexp is nil")
 	}
 	match, err := r.getReg().FindStringMatch(s)
-	if err != nil {
+	if err != nil || match == nil {
 		return "", err
 	}
 	return match.String(), err
@@ -286,15 +285,17 @@ func (r *Regexp2Wrapper) ReplaceAllFunc(src []byte, repl func([]byte) []byte) ([
 		return nil, errors.New("regexp is nil")
 	}
 
-	//r.getReg().ReplaceFunc()
-	return nil, nil
+	m, err := r.ReplaceAllStringFunc(string(src), func(s string) string { return string(repl([]byte(s))) })
+	return []byte(m), err
 }
 
 func (r *Regexp2Wrapper) ReplaceAllStringFunc(src string, repl func(string) string) (string, error) {
 	if r.getReg() == nil {
 		return "", errors.New("regexp is nil")
 	}
-	return "", nil
+	return r.getReg().ReplaceFunc(src, func(match regexp2.Match) string {
+		return repl(match.String())
+	}, 0, -1)
 }
 
 func (r *Regexp2Wrapper) String() string {
