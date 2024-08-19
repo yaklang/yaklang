@@ -1,0 +1,41 @@
+desc(
+    title: "Find EL Expression Factory basic use",
+    type: audit,
+    level: low,
+)
+
+ExpressionFactory.newInstance().createValueExpression(*?{!<typeName>?{any: ExpressionFactory,StandardELContext }} as $params) as $vuln;
+check $params;
+alert $params
+
+desc(
+    lang: java,
+    'file://expr-use.java': <<<EXPRUSE
+import javax.el.ExpressionFactory;
+import javax.el.StandardELContext;
+import javax.el.ValueExpression;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public class ElExampleServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // 创建EL表达式工厂
+        ExpressionFactory factory = ExpressionFactory.newInstance();
+        StandardELContext context = new StandardELContext(factory);
+
+        // 设置变量
+        context.setVariable("x", factory.createValueExpression(10, Integer.class));
+        context.setVariable("y", factory.createValueExpression(20, Integer.class));
+
+        // 执行EL表达式
+        ValueExpression expression = factory.createValueExpression(context, "${x + y}", Integer.class);
+        Integer result = (Integer) expression.getValue(context);
+
+        response.getWriter().write("结果: " + result); // 输出结果
+    }
+}
+EXPRUSE
+)

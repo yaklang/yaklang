@@ -1,0 +1,44 @@
+desc(
+    title: "Find javax.script.* ScriptEngineManager eval Sink",
+    type: audit,
+    level: low,
+    lib: "java-js-sink",
+)
+
+ScriptEngineManager().getEngineByName() as $engine;
+check $engine;
+$engine.eval(*<slice(start=1)> as $params);
+$engine.put(*<slice(start=1)> as $params);
+check $params;
+$params as $output;
+alert $output;
+
+
+desc(
+    lang: java,
+    "file://basic.java": <<<SCRIPT
+import javax.script.*;
+
+public class JavaScriptExample {
+    public static void main(String[] args) throws ScriptException {
+        // 创建一个ScriptEngine实例
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+
+        // 定义JavaScript代码
+        String script = "function add(a, b) { return a + b; }";
+
+        // 在Java中执行JavaScript代码
+        engine.eval(script);
+
+        // 调用JavaScript方法
+        Invocable invocable = (Invocable) engine;
+        Object result = invocable.invokeFunction("add", 5, 3);
+
+        // 输出结果
+        System.out.println(result); // 输出：8
+    }
+}
+
+SCRIPT
+)

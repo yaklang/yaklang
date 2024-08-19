@@ -71,6 +71,7 @@ const (
 	NativeCall_Show = "show"
 
 	// NativeCall_Slice just show the value, do nothing
+	// example: <slice(start=0)>
 	NativeCall_Slice = "slice"
 
 	// NativeCall_Regexp is used to regexp, group is available
@@ -87,7 +88,23 @@ const (
 )
 
 func init() {
-	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
+	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		start := params.GetInt(0, "start")
+		idx := 0
+		var vals []sfvm.ValueOperator
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			if idx >= start {
+				vals = append(vals, operator)
+			}
+			idx++
+			return nil
+		})
+		if len(vals) > 0 {
+			return true, sfvm.NewValues(vals), nil
+		}
+		return false, nil, utils.Error("no value found")
+	}))
+	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML), nc_desc("Fins MyBatis Sink for default searching"))
 	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
 		log.Info("syntax flow native call 'as' to", varName)
