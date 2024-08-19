@@ -30,6 +30,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
 	class, name := y.VisitTypeRef(i.TypeRef())
+	class.SyntaxMethods()
 	var obj ssa.Value
 	obj = y.EmitUndefined(name)
 	if utils.IsNil(obj) {
@@ -227,17 +228,10 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		_ = isRef
 
 		funcName := y.VisitIdentifier(ret.Identifier())
-
-		createFunction := func() *ssa.Function {
-			newFunction := y.NewFunc(funcName)
+		newFunction := y.NewFunc(funcName)
+		newFunction.SetBuilder(func() ssa.Value {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
-				for _, value := range y.FunctionBuilder.GetProgram().GlobalScope.GetAllMember() {
-					for globals, v := range value.GetAllMember() {
-						variable := y.CreateMemberCallVariable(value, globals)
-						y.AssignVariable(variable, v)
-					}
-				}
 				this := y.NewParam("$this")
 				this.SetType(class)
 				y.VisitFormalParameterList(ret.FormalParameterList())
@@ -246,17 +240,14 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
 			return newFunction
-		}
+		})
 
 		switch funcName {
 		case "__construct":
-			newFunction := createFunction()
 			class.Constructor = newFunction
 		case "__destruct":
-			function := createFunction()
-			class.Destructor = function
+			class.Destructor = newFunction
 		default:
-			newFunction := createFunction()
 			if isStatic {
 				variable := y.GetStaticMember(class.Name, newFunction.GetName())
 				y.AssignVariable(variable, newFunction)
@@ -736,17 +727,17 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	cname := uuid.NewString()
 	bluePrint := y.CreateClassBluePrint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
-		ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
-		if classBluePrint := y.GetClassBluePrint(ref); classBluePrint != nil {
-			bluePrint.AddParentClass(classBluePrint)
+		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
+			bluePrint.AddParentClass(ref)
 		}
 	}
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
+	bluePrint.SyntaxMethods()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
-	constructor := bluePrint.Constructor
+	constructor := bluePrint.GetConstruct()
 	if constructor == nil {
 		return obj
 	}

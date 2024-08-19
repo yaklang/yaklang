@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ClassModifier int
@@ -87,6 +88,28 @@ func (c *ClassBluePrint) GetMemberAndStaticMember(key string, supportStatic bool
 	return member
 }
 
+func (c *ClassBluePrint) GetConstruct() Value {
+	var val Value = nil
+	c.getMethodEx("", func(bluePrint *ClassBluePrint) bool {
+		if utils.IsNil(bluePrint.Constructor) {
+			return false
+		}
+		val = bluePrint.Constructor
+		return true
+	})
+	return val
+}
+func (c *ClassBluePrint) GetDestruct() Value {
+	var val Value = nil
+	c.getMethodEx("", func(bluePrint *ClassBluePrint) bool {
+		if utils.IsNil(bluePrint.Destructor) {
+			return false
+		}
+		val = bluePrint.Destructor
+		return true
+	})
+	return val
+}
 func (c *ClassBluePrint) GetConstEx(key string, get func(c *ClassBluePrint) bool) bool {
 	if b := get(c); b {
 		return true

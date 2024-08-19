@@ -695,12 +695,12 @@ typeRef
     ;
 
 anonymousClass
-    : attributes? Private? modifier? Partial? (
-        classEntryType /*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
+    : attributes? Private? modifier? Partial?(
+        classEntryType arguments?/*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
             Implements interfaceList
         )?
         | Interface identifier /*typeParameterListInBrackets?*/ (Extends interfaceList)?
-    ) arguments? OpenCurlyBracket classStatement* CloseCurlyBracket
+    ) OpenCurlyBracket classStatement* CloseCurlyBracket
     ;
 
 indirectTypeRef
