@@ -1111,9 +1111,9 @@ type FunctionType struct {
 	ObjectType      Type
 	IsModifySelf    bool // if this is method function
 
-	AnnotationFunc []func(Value)
-
-	fullTypeName []string
+	AnnotationFunc      []func(Value)
+	DisablePointSetting bool
+	fullTypeName        []string
 }
 
 var _ Type = (*FunctionType)(nil)
