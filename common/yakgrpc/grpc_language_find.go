@@ -99,7 +99,7 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 	return variables, parameter
 }
 
-func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value, isReference bool) ([]memedit.RangeIf, error) {
+func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value, isReference bool) ([]memedit.RangeIf, error) {
 	ranges := make([]memedit.RangeIf, 0)
 	variables, freeValue := languageServerFind(prog, word, containPoint, v, isReference)
 	editor := ssaRange.GetEditor()
@@ -155,11 +155,11 @@ func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.
 	return ranges, nil
 }
 
-func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value) ([]memedit.RangeIf, error) {
+func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) ([]memedit.RangeIf, error) {
 	return onFind(prog, word, containPoint, ssaRange, v, false)
 }
 
-func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange *ssa.Range, v *ssaapi.Value) ([]memedit.RangeIf, error) {
+func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) ([]memedit.RangeIf, error) {
 	return onFind(prog, word, containPoint, ssaRange, v, true)
 }
 

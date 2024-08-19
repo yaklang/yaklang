@@ -9,8 +9,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -217,7 +217,7 @@ type CodeRange struct {
 	EndColumn   int64  `json:"end_column"`
 }
 
-func coverCodeRange(programName string, r *ssa.Range) (*CodeRange, string) {
+func coverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) {
 	// url := ""
 	source := ""
 	ret := &CodeRange{

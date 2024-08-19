@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
 )
@@ -14,7 +15,7 @@ type anInstruction struct {
 	fun   Value
 	prog  *Program
 	block Instruction
-	R     *Range
+	R     memedit.RangeIf
 	// scope *Scope
 
 	name        string
@@ -144,9 +145,9 @@ func (a *anInstruction) GetBlock() *BasicBlock {
 }
 
 // source code position
-func (c *anInstruction) GetRange() *Range { return c.R }
+func (c *anInstruction) GetRange() memedit.RangeIf { return c.R }
 
-func (c *anInstruction) SetRange(pos *Range) {
+func (c *anInstruction) SetRange(pos memedit.RangeIf) {
 	// if c.Pos == nil {
 	c.R = pos
 	// }

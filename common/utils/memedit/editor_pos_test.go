@@ -314,14 +314,14 @@ func TestGetPositionByOffset(t *testing.T) {
 		offset           int
 		expectedLine     int
 		expectedColumn   int
-		expectedPosition *Position
+		expectedPosition *position
 	}{
 		{
 			name:           "Start of file",
 			offset:         0,
 			expectedLine:   1,
 			expectedColumn: 0,
-			expectedPosition: &Position{
+			expectedPosition: &position{
 				line:   1,
 				column: 0,
 			},
@@ -331,7 +331,7 @@ func TestGetPositionByOffset(t *testing.T) {
 			offset:         26,
 			expectedLine:   3,
 			expectedColumn: 14,
-			expectedPosition: &Position{
+			expectedPosition: &position{
 				line:   4,
 				column: 14,
 			},
@@ -341,21 +341,21 @@ func TestGetPositionByOffset(t *testing.T) {
 			offset:           -1,
 			expectedLine:     1,
 			expectedColumn:   0,
-			expectedPosition: &Position{line: 1, column: 0},
+			expectedPosition: &position{line: 1, column: 0},
 		},
 		{
 			name:             "Offset beyond EOF",
 			offset:           100,
 			expectedLine:     3,
 			expectedColumn:   14,
-			expectedPosition: &Position{line: 4, column: 14},
+			expectedPosition: &position{line: 4, column: 14},
 		},
 		{
 			name:           "Middle of line",
 			offset:         7,
 			expectedLine:   2,
 			expectedColumn: 1,
-			expectedPosition: &Position{
+			expectedPosition: &position{
 				line:   2,
 				column: 1,
 			},
@@ -365,7 +365,7 @@ func TestGetPositionByOffset(t *testing.T) {
 			offset:         5,
 			expectedLine:   1,
 			expectedColumn: 5,
-			expectedPosition: &Position{
+			expectedPosition: &position{
 				line:   1,
 				column: 5,
 			},

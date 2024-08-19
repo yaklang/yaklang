@@ -190,7 +190,7 @@ func (r *IrCode) GetSourceCode(db *gorm.DB) string {
 		log.Warnf("GetSourceCode failed: %v", err)
 		return ""
 	}
-	return editor.GetWordTextFromRange(memedit.NewRange(start, end))
+	return editor.GetWordTextFromRange(editor.GetRangeByPosition(start, end))
 }
 
 func (r *IrCode) GetSourceCodeContext(db *gorm.DB, n int) string {

@@ -46,9 +46,9 @@ type FunctionBuilder struct {
 	// defer function call
 
 	// for build
-	CurrentBlock *BasicBlock // current block to build
-	CurrentRange *Range      // current position in source code
-	CurrentFile  string      // current file name
+	CurrentBlock *BasicBlock     // current block to build
+	CurrentRange memedit.RangeIf // current position in source code
+	CurrentFile  string          // current file name
 
 	parentScope *ParentScope
 
