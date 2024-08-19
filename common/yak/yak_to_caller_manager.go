@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/synscanx"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/synscanx"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
@@ -17,11 +18,9 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/fuzztag"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/simulator"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
@@ -66,64 +65,121 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 			return []string{s}
 		})
 	}
-	return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
-		handle, params, _ := strings.Cut(s, "|")
+	return mutate.Fuzz_WithExtraFuzzTag("yak", &mutate.FuzzTagDescription{
+		TagName: "yak",
+		HandlerAndYieldString: func(s string, yield func(s string)) (err error) {
+			handle, params, _ := strings.Cut(s, "|")
+			logAndWrapError := func(errStr string) error {
+				errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errStr)
+				log.Errorf("call hotPatch code error: %v", errStr)
+				return utils.Error(errInfo)
+			}
 
-		defer func() {
-			if r := recover(); r != nil {
-				if e, ok := r.(*yakvm.VMPanic); ok {
-					log.Errorf("call hotPatch code error: %v", e.GetData())
-					err = fmt.Errorf("%v", e.GetData())
+			defer func() {
+				if r := recover(); r != nil {
+					if e, ok := r.(*yakvm.VMPanic); ok {
+						log.Errorf("call hotPatch code error: %v", e.GetData())
+						err = fmt.Errorf("%v", e.GetData())
+					}
 				}
+			}()
+			yakVar, ok := codeEnv.GetVar(handle)
+			if !ok {
+				return logAndWrapError(fmt.Sprintf("function %s not found", handle))
 			}
-		}()
-		yakVar, ok := codeEnv.GetVar(handle)
-		if !ok {
-			errorStr := spew.Sprintf("function %s not found", handle)
-			log.Errorf("call hotPatch code error: %s", errorStr)
-			return nil, errors.New(errorStr)
-		}
-		yakFunc, ok := yakVar.(*yakvm.Function)
-		if !ok {
-			errorStr := spew.Sprintf("function %s not found", handle)
-			log.Errorf("call hotPatch code error: %s", errorStr)
-			return nil, errors.New(errorStr)
-		}
-		iparams := []any{}
-		if yakFunc.IsVariableParameter() {
-			funk.ForEach(strings.Split(params, "|"), func(s any) {
-				iparams = append(iparams, s)
-			})
-		} else {
-			paramIn := yakFunc.GetNumIn()
-			splits := strings.Split(params, "|")
-			for len(splits) < paramIn {
-				splits = append(splits, "")
+			yakFunc, ok := yakVar.(*yakvm.Function)
+			if !ok {
+				return logAndWrapError(fmt.Sprintf("function %s not found", handle))
 			}
-			i := 0
-			for ; i < paramIn-1; i++ {
-				iparams = append(iparams, splits[i])
-			}
+			iparams := make([]any, 0, 1)
+			numIn := yakFunc.GetNumIn()
+			if numIn == 1 {
+				// func handle(params) params , return []string
+				iparams = append(iparams, params)
+				data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
+				if err != nil {
+					return logAndWrapError(err.Error())
+				}
+				if data == nil {
+					return logAndWrapError("return nil")
+				}
 
-			iparams = append(iparams, strings.Join(splits[i:], "|"))
-		}
-		data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
-		if err != nil {
-			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
-			log.Errorf("call hotPatch code error: %s", err)
-			return nil, errors.New(errInfo)
-		}
-		if data == nil {
-			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, "return nil")
-			log.Errorf("call hotPatch code error: %s", "return nil")
-			return result, errors.New(errInfo)
-		}
-		res := utils.InterfaceToStringSlice(data)
-		for _, item := range res {
-			result = append(result, parser.NewFuzzResultWithData(item))
-		}
-		return result, nil
+				res := utils.InterfaceToStringSlice(data)
+				for _, item := range res {
+					yield(item)
+				}
+				return nil
+			} else if numIn == 2 {
+				// func handle(params, yield), return nil
+				iparams = append(iparams, params)
+				iparams = append(iparams, yield)
+				_, err := codeEnv.CallYakFunction(ctx, handle, iparams)
+				if err != nil {
+					return logAndWrapError(err.Error())
+				}
+				return nil
+			}
+			return logAndWrapError("invalid function params")
+		},
 	})
+	// return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
+	// 	handle, params, _ := strings.Cut(s, "|")
+
+	// 	defer func() {
+	// 		if r := recover(); r != nil {
+	// 			if e, ok := r.(*yakvm.VMPanic); ok {
+	// 				log.Errorf("call hotPatch code error: %v", e.GetData())
+	// 				err = fmt.Errorf("%v", e.GetData())
+	// 			}
+	// 		}
+	// 	}()
+	// 	yakVar, ok := codeEnv.GetVar(handle)
+	// 	if !ok {
+	// 		errorStr := spew.Sprintf("function %s not found", handle)
+	// 		log.Errorf("call hotPatch code error: %s", errorStr)
+	// 		return nil, errors.New(errorStr)
+	// 	}
+	// 	yakFunc, ok := yakVar.(*yakvm.Function)
+	// 	if !ok {
+	// 		errorStr := spew.Sprintf("function %s not found", handle)
+	// 		log.Errorf("call hotPatch code error: %s", errorStr)
+	// 		return nil, errors.New(errorStr)
+	// 	}
+	// 	iparams := []any{}
+	// 	if yakFunc.IsVariableParameter() {
+	// 		funk.ForEach(strings.Split(params, "|"), func(s any) {
+	// 			iparams = append(iparams, s)
+	// 		})
+	// 	} else {
+	// 		paramIn := yakFunc.GetNumIn()
+	// 		splits := strings.Split(params, "|")
+	// 		for len(splits) < paramIn {
+	// 			splits = append(splits, "")
+	// 		}
+	// 		i := 0
+	// 		for ; i < paramIn-1; i++ {
+	// 			iparams = append(iparams, splits[i])
+	// 		}
+
+	// 		iparams = append(iparams, strings.Join(splits[i:], "|"))
+	// 	}
+	// 	data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
+	// 	if err != nil {
+	// 		errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
+	// 		log.Errorf("call hotPatch code error: %s", err)
+	// 		return nil, errors.New(errInfo)
+	// 	}
+	// 	if data == nil {
+	// 		errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, "return nil")
+	// 		log.Errorf("call hotPatch code error: %s", "return nil")
+	// 		return result, errors.New(errInfo)
+	// 	}
+	// 	res := utils.InterfaceToStringSlice(data)
+	// 	for _, item := range res {
+	// 		result = append(result, parser.NewFuzzResultWithData(item))
+	// 	}
+	// 	return result, nil
+	// })
 }
 
 func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPluginContext, script *schema.YakScript, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
@@ -699,7 +755,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		funcType := funcValue.Type()
 		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
 			pocContextOpt := []poc.PocConfigOption{
-				//poc.WithSource(pluginName),
+				// poc.WithSource(pluginName),
 				poc.WithFromPlugin(pluginName),
 				poc.WithRuntimeId(runtimeId),
 				poc.WithProxy(proxy),
@@ -731,7 +787,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		funcType := funcValue.Type()
 		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
 			httpContextOpt := []http_struct.HttpOption{
-				//yakhttp.WithSource(pluginName),
+				// yakhttp.WithSource(pluginName),
 				yakhttp.WithFromPlugin(pluginName),
 				yakhttp.WithRuntimeID(runtimeId),
 				yakhttp.WithProxy(proxy),
@@ -1145,7 +1201,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		nIns.GetVM().RegisterMapMemberCallHandler("servicescan", funcName, hookServiceScanFunc)
 	}
 
-	//hook synscan runtime id
+	// hook synscan runtime id
 	hookSynScanFunc := func(f interface{}) interface{} {
 		funcValue := reflect.ValueOf(f)
 		funcType := funcValue.Type()
@@ -1198,7 +1254,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	//for _, funcName := range PingScanFuncList {
 	//	nIns.GetVM().RegisterMapMemberCallHandler("ping", funcName, hookPingScanFunc)
 	//}
-
 }
 
 func (y *YakToCallerManager) AddForYakit(

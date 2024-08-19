@@ -19,12 +19,14 @@ const YakHotPatchErr = "__YakHotPatchErr@"
 type FuzzTag struct {
 	parser.BaseTag
 }
-type stepDataGetter func() ([]byte, error)
-type fuzztagCallInfo struct {
-	name   string
-	params string
-	labels []string
-}
+type (
+	stepDataGetter  func() ([]byte, error)
+	fuzztagCallInfo struct {
+		name   string
+		params string
+		labels []string
+	}
+)
 
 func parseFuzztagCall(content string) (info *fuzztagCallInfo, err error) {
 	info = &fuzztagCallInfo{}
@@ -65,6 +67,7 @@ func parseFuzztagCall(content string) (info *fuzztagCallInfo, err error) {
 	}
 	return info, nil
 }
+
 func (f *FuzzTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield func(result *parser.FuzzResult), methods map[string]*parser.TagMethod) error {
 	runFun := func(method *parser.TagMethod, data string) error {
 		if method.YieldFun != nil {
@@ -93,7 +96,7 @@ func (f *FuzzTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield func(r
 	if fun == nil {
 		yield(parser.NewFuzzResultWithData(""))
 		return nil
-		//return nil, utils.Errorf("fuzztag name %s not found", name)
+		// return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
 	var isDynFunRes bool
 	if fun.Expand != nil {
@@ -266,8 +269,8 @@ func ParseFuzztag(code string, simple bool) ([]parser.Node, error) {
 			parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
 		)
 	}
-
 }
+
 func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple, syncTag bool) (*parser.Generator, error) {
 	nodes, err := ParseFuzztag(code, isSimple)
 	if err != nil {
@@ -277,9 +280,11 @@ func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple, syn
 	gener.SetTagsSync(syncTag)
 	return gener, nil
 }
+
 func isIdentifyString(s string) bool {
 	return utils.MatchAllOfRegexp(s, "^[a-zA-Z_][a-zA-Z0-9_:-]*$")
 }
+
 func GetResultVerbose(f *parser.FuzzResult) []string {
 	var verboses []string
 	for _, datum := range f.Source {
@@ -292,7 +297,12 @@ func GetResultVerbose(f *parser.FuzzResult) []string {
 		return verboses
 	}
 	if f.Error != nil {
-		f.Verbose = fmt.Sprintf("[%s]", YakHotPatchErr+f.Error.Error())
+		errStr := f.Error.Error()
+		if strings.HasPrefix(errStr, YakHotPatchErr) {
+			f.Verbose = fmt.Sprintf("[%s]", errStr)
+		} else {
+			f.Verbose = fmt.Sprintf("[%s%s]", YakHotPatchErr, errStr)
+		}
 	} else if f.Verbose == "" {
 		f.Verbose = utils.InterfaceToString(f.Data)
 	}
