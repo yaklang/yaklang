@@ -685,7 +685,16 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			memberKey = y.EmitConstInst(ret.GetText())
 			// get parent class
 		}
+
 		methodCall := y.ReadMemberCallMethodVariable(object, memberKey)
+		methodTyp := methodCall.GetType()
+		if len(methodTyp.GetFullTypeNames()) == 0 {
+			t := object.GetType()
+			if ftName := t.GetFullTypeNames(); len(ftName) != 0 {
+				methodTyp.SetFullTypeNames(ftName)
+				methodCall.SetType(methodTyp)
+			}
+		}
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
@@ -1079,14 +1088,14 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 				value.SetType(rightValTyp)
 			} else {
 				// 没有类型转换，就使用在右值的typeName加上typeType的typeName
-				if typ != nil{
+				if typ != nil {
 					newTyp := y.MergeFullTypeNameForType(typ.GetFullTypeNames(), rightValTyp)
 					value.SetType(newTyp)
 				}
 			}
 		}
-			y.AssignVariable(variable, value)
-			return name, value
+		y.AssignVariable(variable, value)
+		return name, value
 	} else {
 		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(name)
@@ -1642,14 +1651,11 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 		if class == nil {
 			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
 			// create variable now, and auto create function
-			var newTyp ssa.Type
 
 			variable := y.CreateVariable(className)
 			defaultClassFullback := y.EmitUndefined(className)
-			newTyp,isFromMap := y.AddFullTypeNameFromMap(className, defaultClassFullback.GetType())
-			if !isFromMap{
-				newTyp = y.AddFullTypeNameFromAnnotationMap(className,defaultClassFullback.GetType())
-			}
+			newTyp := y.AddFullTypeNameFromMap(className, defaultClassFullback.GetType())
+
 			defaultClassFullback.SetType(newTyp)
 			y.AssignVariable(variable, defaultClassFullback)
 
@@ -1658,10 +1664,8 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			arguments := y.VisitClassCreatorRest(ret, className)
 			args = append(args, arguments...)
 			call := y.EmitCall(y.NewCall(defaultClassFullback, args))
-			newCallTyp,isFromMap = y.AddFullTypeNameFromMap(className, call.GetType())
-			if !isFromMap{
-				newCallTyp = y.AddFullTypeNameFromAnnotationMap(className,call.GetType())
-			}
+			newCallTyp = y.AddFullTypeNameFromMap(className, call.GetType())
+
 			call.SetType(newCallTyp)
 			return obj, call
 		}
@@ -1796,7 +1800,7 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	defer func() {
 		//set full type name
 		if len(value.GetType().GetFullTypeNames()) == 0 {
-			newType, _ := y.AddFullTypeNameFromMap(name, value.GetType())
+			newType := y.AddFullTypeNameFromMap(name, value.GetType())
 			value.SetType(newType)
 		}
 	}()
