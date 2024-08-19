@@ -5,7 +5,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -21,7 +20,7 @@ const (
 
 type LanguageServerAnalyzerResult struct {
 	Program      *ssaapi.Program
-	Range        *ssa.Range
+	Range        memedit.RangeIf
 	Value        *ssaapi.Value
 	Editor       *memedit.MemEditor
 	Word         string
@@ -53,7 +52,7 @@ func LanguageServerAnalyzeProgram(id, code, inspectType, scriptType string, rng 
 			return prog, nil
 		}
 
-		startOffset, endOffset := ssaRange.GetOffset(), ssaRange.GetEndOffset()
+		startOffset, endOffset := ssaRange.GetStartOffset(), ssaRange.GetEndOffset()
 		shouldTrim := containPoint
 		fixRange := true
 		if !containPoint && editor.GetTextFromOffset(endOffset, endOffset+1) == "." {
@@ -77,7 +76,7 @@ func LanguageServerAnalyzeProgram(id, code, inspectType, scriptType string, rng 
 					newEditor = memedit.NewMemEditor(trimCode)
 				}
 				if fixRange {
-					ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-1))
+					ssaRange = newEditor.GetRangeOffset(ssaRange.GetStartOffset(), endOffset-1)
 				}
 				editor = newEditor
 

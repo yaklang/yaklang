@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
@@ -335,7 +336,7 @@ func (lz *LazyInstruction) SetId(id int64) {
 	lz.Instruction.SetId(id)
 }
 
-func (lz *LazyInstruction) GetRange() *Range {
+func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 	lz.check()
 	if lz.Instruction == nil {
 		return nil
@@ -346,12 +347,12 @@ func (lz *LazyInstruction) GetRange() *Range {
 			log.Warnf("LazyInstruction(%T).GetRange failed: %v", lz.Self(), err)
 			return nil
 		}
-		lz.Instruction.SetRange(NewRange(editor, start, end))
+		lz.Instruction.SetRange(editor.GetRangeByPosition(start, end))
 	}
 	return lz.Instruction.GetRange()
 }
 
-func (lz *LazyInstruction) SetRange(r *Range) {
+func (lz *LazyInstruction) SetRange(r memedit.RangeIf) {
 	lz.check()
 	if lz.Instruction == nil {
 		return

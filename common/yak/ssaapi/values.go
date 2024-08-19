@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
@@ -290,7 +291,7 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	return ssa.AnyTypeKind
 }
 
-func (v *Value) GetRange() *ssa.Range {
+func (v *Value) GetRange() memedit.RangeIf {
 	if v.IsNil() {
 		return nil
 	}

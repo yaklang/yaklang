@@ -3,13 +3,14 @@ package ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 type Variable struct {
 	*ssautil.Versioned[Value]
-	DefRange *Range
-	UseRange map[*Range]struct{}
+	DefRange memedit.RangeIf
+	UseRange map[memedit.RangeIf]struct{}
 
 	// for object.member variable  access
 	object      Value
@@ -23,7 +24,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:  nil,
-		UseRange:  map[*Range]struct{}{},
+		UseRange:  map[memedit.RangeIf]struct{}{},
 	}
 	return ret
 }
@@ -88,7 +89,7 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 	return b.object, b.key
 }
 
-func (v *Variable) SetDefRange(r *Range) {
+func (v *Variable) SetDefRange(r memedit.RangeIf) {
 	if r == nil {
 		log.Error("SetDefRange: range is nil use fallback")
 		return
@@ -97,7 +98,7 @@ func (v *Variable) SetDefRange(r *Range) {
 	v.verboseName = r.GetText()
 }
 
-func (v *Variable) AddRange(r *Range, force bool) {
+func (v *Variable) AddRange(r memedit.RangeIf, force bool) {
 	if r == nil {
 		log.Error("AddRange: range is nil")
 	}

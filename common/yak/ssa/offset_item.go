@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"golang.org/x/exp/slices"
 )
 
@@ -48,7 +49,7 @@ func (prog *Program) ShowOffsetMap() {
 	}
 }
 
-func (prog *Program) SetOffsetVariable(v *Variable, r *Range) {
+func (prog *Program) SetOffsetVariable(v *Variable, r memedit.RangeIf) {
 	if r == nil {
 		return
 	}
@@ -67,15 +68,15 @@ func (prog *Program) SetOffsetVariable(v *Variable, r *Range) {
 	}
 }
 
-func (prog *Program) ForceSetOffsetValue(v Value, r *Range) {
+func (prog *Program) ForceSetOffsetValue(v Value, r memedit.RangeIf) {
 	prog.SetOffsetValueEx(v, r, true)
 }
 
-func (prog *Program) SetOffsetValue(v Value, r *Range) {
+func (prog *Program) SetOffsetValue(v Value, r memedit.RangeIf) {
 	prog.SetOffsetValueEx(v, r, false)
 }
 
-func (prog *Program) SetOffsetValueEx(v Value, r *Range, force bool) {
+func (prog *Program) SetOffsetValueEx(v Value, r memedit.RangeIf, force bool) {
 	if r == nil {
 		return
 	}

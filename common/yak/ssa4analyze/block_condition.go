@@ -106,7 +106,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(sw.DefaultBlock, from, defaultCond)
 	}
 
-	fixupBlockPos := func(b *ssa.BasicBlock) *ssa.Range {
+	fixupBlockPos := func(b *ssa.BasicBlock) memedit.RangeIf {
 		var start memedit.PositionIf
 		var end memedit.PositionIf
 		for _, inst := range b.Insts {
@@ -148,11 +148,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		if editor == nil {
 			log.Warnf("BUG: block has no position (in instrs)")
 		}
-		r := ssa.NewRange(
-			editor,
-			ssa.NewPosition(int64(start.GetLine()), int64(start.GetColumn())),
-			ssa.NewPosition(int64(end.GetLine()), int64(end.GetColumn())),
-		)
+		r := editor.GetRangeByPosition(start, end)
 		return r
 	}
 	_ = fixupBlockPos
