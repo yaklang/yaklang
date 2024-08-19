@@ -108,7 +108,7 @@ type SyntaxFlowRule struct {
 	AllowIncluded bool
 	IncludedName  string
 
-	Hash string `json:"hash"`
+	Hash string `json:"hash" gorm:"unique_index"`
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {

@@ -44,13 +44,20 @@ func (n *NativeCallActualParams) GetString(index any, extra ...any) string {
 	return ""
 }
 
-func (n *NativeCallActualParams) GetInt(index any) int {
+func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 	if n == nil {
 		return 0
 	}
 	raw, ok := n.m[codec.AnyToString(index)]
 	if ok {
 		return codec.Atoi(codec.AnyToString(raw))
+	}
+
+	for _, name := range extra {
+		raw, ok := n.m[codec.AnyToString(name)]
+		if ok {
+			return codec.Atoi(codec.AnyToString(raw))
+		}
 	}
 	return 0
 }
