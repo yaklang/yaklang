@@ -56,44 +56,44 @@ var ServletAnnotationMap = map[string]bool{
 }
 
 func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
-	newTyp, _ := y.AddFullTypeNameForType(typName, typ, true)
-	return newTyp
-}
-
-func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) (newTyp ssa.Type, fromMap bool) {
-	return y.AddFullTypeNameForType(typName, typ, false)
-}
-
-// AddFullTypeNameForType用于将FullTypeName设置到Type中。其中当Type是BasicType时，会创建新的Type，避免修改原来的Type。
-// isFullName表示是否是完整的FullTypeName，如果不是，则会从fullTypeNameMap寻找完整的FullTypeName。
-func (y *builder) AddFullTypeNameForType(typName string, typ ssa.Type, isFullName bool) (newTyp ssa.Type, fromMap bool) {
 	if b, ok := ssa.ToBasicType(typ); ok {
 		typ = ssa.NewBasicType(b.Kind, b.GetName())
 		typ.SetFullTypeNames(b.GetFullTypeNames())
 	}
 
 	if typ == nil {
-		return ssa.GetAnyType(), false
+		return ssa.GetAnyType()
+	}
+	typ.AddFullTypeName(typName)
+	return typ
+}
+
+func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type {
+	if b, ok := ssa.ToBasicType(typ); ok {
+		typ = ssa.NewBasicType(b.Kind, b.GetName())
+		typ.SetFullTypeNames(b.GetFullTypeNames())
+	}
+
+	if typ == nil {
+		return ssa.GetAnyType()
 	}
 
 	typStr := typName
-	if !isFullName {
-		if ft, ok := y.fullTypeNameMap[typName]; ok {
-			typStr = strings.Join(ft, ".")
-			for i := len(ft) - 1; i > 0; i-- {
-				version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
-				if version != "" {
-					typStr = (fmt.Sprintf("%s:%s", typStr, version))
-					break
-				}
+	if ft, ok := y.fullTypeNameMap[typName]; ok {
+		typStr = strings.Join(ft, ".")
+		for i := len(ft) - 1; i > 0; i-- {
+			version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
+			if version != "" {
+				typStr = (fmt.Sprintf("%s:%s", typStr, version))
+				break
 			}
-			typ.AddFullTypeName(typStr)
-			return typ, true
 		}
-	} else {
 		typ.AddFullTypeName(typStr)
+		return typ
+	} else {
+		return y.AddFullTypeNameForAllImport(typName, typ)
 	}
-	return typ, false
+
 }
 
 func (y *builder) MergeFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {
@@ -124,9 +124,9 @@ func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.
 				break
 			}
 		}
-		if typStrWithVersion != ""{
+		if typStrWithVersion != "" {
 			typ.AddFullTypeName(typStrWithVersion)
-		}else{
+		} else {
 			typStr = fmt.Sprintf("%s.%s", typStr, typName)
 			typ.AddFullTypeName(typStr)
 		}

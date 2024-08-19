@@ -150,7 +150,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			//}
 			annotationContainer := y.CreateMemberCallVariable(value, y.EmitConstInst("annotation"))
 			annotationCollector := y.EmitEmptyContainer()
-			
+
 			y.AssignVariable(annotationContainer, annotationCollector)
 			var fieldAnnotationName = annotationName
 			if annotationName == "" {
@@ -158,11 +158,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			}
 			y.AssignVariable(y.CreateMemberCallVariable(annotationCollector, y.EmitConstInst(fieldAnnotationName)), annotationContainerInstance)
 			// set fullType Name
-			var t ssa.Type
-			t,isFromMap := y.AddFullTypeNameFromMap(annotationName, annotationContainerInstance.GetType())
-			if !isFromMap{
-				t = y.AddFullTypeNameFromAnnotationMap(annotationName, annotationContainerInstance.GetType())
-			}
+			t := y.AddFullTypeNameFromMap(annotationName, annotationContainerInstance.GetType())
 			annotationContainerInstance.SetType(t)
 		}
 }
