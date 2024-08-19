@@ -78,6 +78,37 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Yield(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request:      "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = (result, yield) => {for i in 10 { yield(string(i)) } }`,
+		ForceFuzz:    true,
+	})
+	if err != nil {
+		t.Fatalf("expect error is nil, but got %v", err)
+	}
+	count := 0
+	for {
+		_, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		count++
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -340,28 +371,18 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzWithHotPatch(t *testing.T) {
 			`{{yak(handle|a|b)}}`,
 		},
 		[]any{
-			`handle=(a,b)=>{
-				assert a =="a" && b=="b|c"
+			`handle=(a)=>{
+				assert a =="a|b|c"
 				return "ok"
 			}`,
 			`{{yak(handle|a|b|c)}}`,
 		},
 		[]any{
-			`handle=(a,b,c,d)=>{
-				assert a =="a" && b=="b" && c=="" && d==""
+			`handle=(a)=>{
+				assert a =="a|b"
 				return "ok"
 			}`,
 			`{{yak(handle|a|b)}}`,
-		},
-		[]any{
-			`handle=(params...)=>{
-				data = ["a","b","c"]
-				for i=0;i<3;i++ {
-					assert params[i] == data[i]
-				}
-				return "ok"
-			}`,
-			`{{yak(handle|a|b|c)}}`,
 		},
 	} {
 		testCase := itestCase.([]any)
