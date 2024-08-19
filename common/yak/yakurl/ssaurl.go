@@ -120,9 +120,10 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		for index, v := range values {
 			_ = v
 			_ = index
+			codeRange, _ := coverCodeRange(programName, v.GetRange())
 			res := createNewRes(url, 0, []extra{
 				{"index", index},
-				{"code_range", coverCodeRange(programName, v.GetRange())},
+				{"code_range", codeRange},
 			})
 			res.ResourceType = "value"
 			res.ResourceName = v.String()
@@ -215,8 +216,9 @@ type CodeRange struct {
 	EndColumn   int64  `json:"end_column"`
 }
 
-func coverCodeRange(programName string, r *ssa.Range) *CodeRange {
+func coverCodeRange(programName string, r *ssa.Range) (*CodeRange, string) {
 	// url := ""
+	source := ""
 	ret := &CodeRange{
 		URL:         "",
 		StartLine:   0,
@@ -225,10 +227,11 @@ func coverCodeRange(programName string, r *ssa.Range) *CodeRange {
 		EndColumn:   0,
 	}
 	if r == nil {
-		return ret
+		return ret, source
 	}
 	if editor := r.GetEditor(); editor != nil {
 		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
+		source = editor.GetTextContextWithPrompt(r, 1)
 	}
 	if start := r.GetStart(); start != nil {
 		ret.StartLine = int64(start.GetLine())
@@ -238,13 +241,73 @@ func coverCodeRange(programName string, r *ssa.Range) *CodeRange {
 		ret.EndLine = int64(end.GetLine())
 		ret.EndColumn = int64(end.GetColumn())
 	}
-	return ret
+	return ret, source
 }
 
 type NodeInfo struct {
-	NodeID    string     `json:"node_id"`
-	IRCode    string     `json:"ir_code"`
-	CodeRange *CodeRange `json:"code_range"`
+	NodeID     string     `json:"node_id"`
+	IRCode     string     `json:"ir_code"`
+	SourceCode string     `json:"source_code"`
+	CodeRange  *CodeRange `json:"code_range"`
+}
+
+func coverNodeInfos(graph *ssaapi.ValueGraph, programName string, nodeID int) []*NodeInfo {
+	res := make([]*NodeInfo, 0, len(graph.Node2Value))
+	for id, node := range graph.Node2Value {
+		codeRange, source := coverCodeRange(programName, node.GetRange())
+		ret := &NodeInfo{
+			NodeID:     dot.NodeName(id),
+			IRCode:     node.String(),
+			SourceCode: source,
+			CodeRange:  codeRange,
+		}
+		res = append(res, ret)
+	}
+	return res
+}
+
+// deep first search for nodeID and its children to [][]id, id is string,
+// if node.Prev have more than one, add a new line
+type DeepFirst struct {
+	res     [][]string
+	current []string
+	graph   *ssaapi.ValueGraph
+}
+
+func (d *DeepFirst) deepFirst(nodeID int) {
+	d.current = append(d.current, dot.NodeName(nodeID))
+	node := d.graph.GetNodeByID(nodeID)
+	prevs := node.Prevs()
+	if len(prevs) == 0 {
+		d.res = append(d.res, d.current)
+		// d.current = d.current[:len(d.current)-1]
+		return
+	}
+	if len(prevs) == 1 {
+		prev := prevs[0]
+		d.current = append(d.current, dot.NodeName(prev))
+		d.deepFirst(prev)
+		return
+	}
+
+	// origin
+	current := d.current
+	for _, prev := range prevs {
+		// new line
+		d.current = make([]string, len(current))
+		copy(d.current, current)
+		d.deepFirst(prev)
+	}
+}
+
+func DeepFirstGraph(graph *ssaapi.ValueGraph, nodeID int) [][]string {
+	df := &DeepFirst{
+		res:     make([][]string, 0),
+		current: make([]string, 0),
+		graph:   graph,
+	}
+	df.deepFirst(nodeID)
+	return df.res
 }
 
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
@@ -252,22 +315,16 @@ func Value2Response(programName string, value *ssaapi.Value, msg string, url *yp
 	var buf bytes.Buffer
 	valueGraph.GenerateDOT(&buf)
 
-	id := valueGraph.Value2Node[value.GetId()]
-	nodeInfos := make([]*NodeInfo, 0, len(valueGraph.Node2Value))
-	for id, nodeValue := range valueGraph.Node2Value {
-		ni := &NodeInfo{
-			NodeID:    dot.NodeName(id),
-			IRCode:    nodeValue.String(),
-			CodeRange: coverCodeRange(programName, nodeValue.GetRange()),
-		}
-		nodeInfos = append(nodeInfos, ni)
-	}
+	nodeID := valueGraph.Value2Node[value.GetId()]
+	nodeInfos := coverNodeInfos(valueGraph, programName, nodeID)
+	graphLines := DeepFirstGraph(valueGraph, nodeID)
 
 	res := createNewRes(url, 0, []extra{
-		{"node_id", dot.NodeName(id)},
+		{"node_id", dot.NodeName(nodeID)},
 		{"graph", buf.String()},
 		{"graph_info", nodeInfos},
 		{"message", msg},
+		{"graph_line", graphLines},
 	})
 
 	res.ResourceType = "information"
