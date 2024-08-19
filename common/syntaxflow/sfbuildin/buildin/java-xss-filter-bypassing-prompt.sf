@@ -1,0 +1,42 @@
+desc(
+    title: "Find XSS Filter Call Existed, Please Checking Bypass tactics",
+    title_zh: "XSS 过滤器被使用，请排查是否可绕过",
+    type: audit,
+    level: low,
+)
+
+/(?i).*xss.*((clear)|(filter)|(escape)).*/ as $entryCall;
+/(?i)((clear)|(filter)|(escape)).*xss.*/ as $entryCall;
+
+$entryCall(* as $paramEntry);
+$paramEntry.../(?i)replace(all)?/() as $replacers;
+
+check $entryCall then "Find XSS Escaper" else "No XSS Escaper";
+alert $entryCall;
+
+desc(
+    lang: java,
+    "file:///unsafe.java": <<<UNSAFE
+@ApiIgnore
+@Controller("dynamicPageAction")
+@RequestMapping("/demo/clearXSS")
+public class MCmsAction extends net.demo.cms.action.BaseAction {
+    private String clearXss(String value) {
+
+        if (value == null || "".equals(value)) {
+            return value;
+        }
+
+        value = value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+        value = value.replaceAll("\\(", "&#40;").replace("\\)", "&#41;");
+        value = value.replaceAll("'", "&#39;");
+        value = value.replaceAll("eval\\((.*)\\)", "");
+        value = value.replaceAll("[\\\"\\\'][\\s]*javascript:(.*)[\\\"\\\']",
+                "\"\"");
+        value = value.replace("script", "");
+
+        return value;
+    }
+}
+UNSAFE
+)
