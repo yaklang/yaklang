@@ -685,14 +685,24 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			memberKey = y.EmitConstInst(ret.GetText())
 			// get parent class
 		}
-
 		methodCall := y.ReadMemberCallMethodVariable(object, memberKey)
+		//set type name
 		methodTyp := methodCall.GetType()
-		if len(methodTyp.GetFullTypeNames()) == 0 {
-			t := object.GetType()
-			if ftName := t.GetFullTypeNames(); len(ftName) != 0 {
-				methodTyp.SetFullTypeNames(ftName)
-				methodCall.SetType(methodTyp)
+		if methodTyp != nil && len(methodTyp.GetFullTypeNames()) == 0 {
+			if object != nil {
+				t := object.GetType()
+				if ftName := t.GetFullTypeNames(); len(ftName) != 0 {
+					methodTyp.SetFullTypeNames(ftName)
+					//If it is a function type, the setType method cannot be directly called
+					//because when anValue.SetType processes a function type,
+					//it also processes the Point, which affects the results of the ssaapi.
+					if f, ok := methodTyp.(*ssa.FunctionType); ok {
+						f.DisablePointSetting = true
+						methodCall.SetType(f)
+					} else {
+						methodCall.SetType(methodTyp)
+					}
+				}
 			}
 		}
 		var args []ssa.Value
