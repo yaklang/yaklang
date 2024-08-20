@@ -289,7 +289,6 @@ func (d *DeepFirst) deepFirst(nodeID int) {
 	}
 	if len(prevs) == 1 {
 		prev := prevs[0]
-		d.current.Set(dot.NodeName(prev), nil)
 		d.deepFirst(prev)
 		return
 	}
