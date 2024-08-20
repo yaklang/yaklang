@@ -737,7 +737,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	bluePrint.SyntaxMethods()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
-	constructor := bluePrint.GetConstruct()
+	constructor := bluePrint.GetConstructOrDestruct("constructor")
 	if constructor == nil {
 		return obj
 	}
