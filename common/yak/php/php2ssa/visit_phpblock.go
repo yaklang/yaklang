@@ -16,10 +16,7 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 		return nil
 	}
 
-	// import? what the fuck?
-	if len(i.AllImportStatement()) > 0 {
-		// handle ImportStmt
-	}
+	//==================================================================== visitor
 	if y.MoreParse && len(i.AllNamespaceDeclaration()) == 0 {
 		return nil
 	}
@@ -44,8 +41,10 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	for _, enum := range i.AllEnumDeclaration() {
 		y.VisitEnumDeclaration(enum)
 	}
+
+	//=================================================================== builder
 	for _, function := range y.GetProgram().Funcs {
-		function.Builder()
+		function.CheckAndFinishBuild()
 		function.FixSpinUdChain()
 	}
 	for _, bluePrint := range y.GetProgram().ClassBluePrint {

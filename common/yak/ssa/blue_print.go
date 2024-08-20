@@ -51,7 +51,7 @@ func (c *ClassBluePrint) SyntaxMethods() {
 	syntaxHandler := func(functions ...map[string]*Function) {
 		lo.ForEach(functions, func(item map[string]*Function, index int) {
 			for _, function := range item {
-				function.Builder()
+				function.Build()
 				function.FixSpinUdChain()
 			}
 		})

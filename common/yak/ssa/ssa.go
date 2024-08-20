@@ -92,13 +92,6 @@ type Node interface {
 	IsUndefined() bool
 }
 
-type Parser interface {
-	SetBuilder(Builder func() Value)
-	Builder() Value
-	FixSpinUdChain()
-	CheckAndFinishBuilder()
-}
-
 type Typed interface {
 	// Node
 	// type

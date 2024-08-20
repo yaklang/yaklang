@@ -120,7 +120,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}()
 		functionBuilder := func(funcname string, defaultValue ssa.Value) ssa.Value {
 			if function, ok := y.GetProgram().Funcs[funcname]; ok {
-				return function.Builder()
+				return function.Build()
 			}
 			return defaultValue
 		}

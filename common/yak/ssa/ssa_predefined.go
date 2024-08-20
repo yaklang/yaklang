@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -218,47 +217,44 @@ type anValue struct {
 	reference Value  // the value is pointed by this value
 
 	//parse value
-	parseMode               parserMode //parse mode
-	checkSpinAndGetTmpValue func() (bool, Value)
-	build                   func() Value
-	this                    Value
+	parseMode parserMode //parse mode
+	spinValue Value
+	build     func() Value
+	this      Value
 }
 
-func (n *anValue) SetBuilder(Builder func() Value) {
+func (n *anValue) SetOrdinalBuild(Builder func() Value) {
 	n.build = Builder
 }
-func (n *anValue) Builder() Value {
+func (n *anValue) Build() Value {
 	switch n.parseMode {
 	case prePar:
 		n.parseMode = Paring
 		val := n.build()
 		n.parseMode = ParEnd
-		//todo: unknown need spin check?
 		n.this = val
 		return val
 	case Paring:
-		tmpval := NewConst("spin value")
-		n.checkSpinAndGetTmpValue = func() (bool, Value) {
-			return true, tmpval
+		if utils.IsNil(n.spinValue) {
+			n.spinValue = NewConst("spin value")
+			return n.spinValue
 		}
-		return tmpval
 	case ParEnd:
 		return n.this
 	}
 	return nil
 }
 func (n *anValue) FixSpinUdChain() {
-	if flag, val := n.checkSpinAndGetTmpValue(); flag {
-		lo.ForEach(val.GetUsers(), func(item User, index int) {
-			item.ReplaceValue(val, n.this)
-		})
+	if !utils.IsNil(n.spinValue) {
+		ReplaceAllValue(n.spinValue, n.this)
 	}
 }
-func (n *anValue) CheckAndFinishBuilder() {
-	//not use this builder, finish builder
+func (n *anValue) CheckAndFinishBuild() bool {
 	if n.parseMode == prePar {
-		n.build()
+		n.Build()
+		return true
 	}
+	return false
 }
 func NewValue() anValue {
 	return anValue{
@@ -274,10 +270,7 @@ func NewValue() anValue {
 
 		parseMode: prePar,
 		build: func() Value {
-			return NewConst("")
-		},
-		checkSpinAndGetTmpValue: func() (bool, Value) {
-			return false, NewConst("")
+			return nil
 		},
 	}
 }
