@@ -16,6 +16,10 @@ var SSAProjectTables = []any{
 	&IrType{},
 	// program
 	&IrProgram{},
+
+	// audit
+	&AuditNode{},
+	&AuditEdge{},
 }
 
 func init() {
@@ -33,4 +37,6 @@ func deleteProgramDBOnly(db *gorm.DB, program string) {
 	db.Model(&IrSource{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrSource{}).Where("folder_path = ? AND file_name = ?", "/", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+	db.Model(&AuditNode{}).Where("program_name = ?", program).Unscoped().Delete(&AuditNode{})
+	db.Model(&AuditEdge{}).Where("program_name = ?", program).Unscoped().Delete(&AuditEdge{})
 }
