@@ -343,3 +343,48 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 		`)
 	})
 }
+
+type A struct{}
+
+func NewA() *A {
+	return &A{}
+}
+
+type B struct{}
+
+func (a *A) A(b *B) {
+}
+
+func Test_RealYak_LazyMethod(t *testing.T) {
+	t.Run("lazy", func(t *testing.T) {
+		ssatest.Check(t, `
+	a = NewA()
+	`, func(prog *ssaapi.Program) error {
+			// not test in database
+			if prog.IsFromDatabase() {
+				return nil
+			}
+			require.NotNil(t, prog.Program.GetType("test.A"))
+			require.Nil(t, prog.Program.GetType("test.B"))
+			return nil
+		}, ssaapi.WithExternValue(map[string]any{
+			"NewA": NewA,
+		}))
+	})
+	t.Run("lazy init", func(t *testing.T) {
+		ssatest.Check(t, `
+	a = NewA()
+b = a.A
+	`, func(prog *ssaapi.Program) error {
+			// not test in database
+			if prog.IsFromDatabase() {
+				return nil
+			}
+			require.NotNil(t, prog.Program.GetType("test.A"))
+			require.NotNil(t, prog.Program.GetType("test.B"))
+			return nil
+		}, ssaapi.WithExternValue(map[string]any{
+			"NewA": NewA,
+		}))
+	})
+}

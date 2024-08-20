@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 )
@@ -260,7 +261,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 			ret = NewChanType(prog.handlerType(typ.Elem(), level))
 		default:
 			if ret == nil {
-				fmt.Println("cannot handler this type:" + typ.Kind().String())
+				log.Errorf("cannot handler this type: %s", pkgPathName)
 				ret = NewObjectType()
 			}
 		}
@@ -275,23 +276,25 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	}
 
 	// handler method
-	pTyp := reflect.PointerTo(typ)
-	Methods := make(map[string]*Function, typ.NumMethod()+pTyp.NumMethod())
-	handlerMethod := func(typ reflect.Type) {
-		for i := 0; i < typ.NumMethod(); i++ {
-			method := typ.Method(i)
-			funTyp := prog.CoverReflectFunctionType(method.Type, level)
-			if isInterface {
-				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
+	ret.SetMethodGetter(func() map[string]*Function {
+		pTyp := reflect.PointerTo(typ)
+		methods := make(map[string]*Function, typ.NumMethod()+pTyp.NumMethod())
+		handlerMethod := func(typ reflect.Type) {
+			for i := 0; i < typ.NumMethod(); i++ {
+				method := typ.Method(i)
+				funTyp := prog.CoverReflectFunctionType(method.Type, level)
+				if isInterface {
+					funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
+				}
+				funTyp.SetName(fmt.Sprintf("%s.%s", pkgPathName, method.Name))
+				methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
 			}
-			funTyp.SetName(fmt.Sprintf("%s.%s", pkgPathName, method.Name))
-			Methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
 		}
-	}
+		handlerMethod(typ)
+		handlerMethod(pTyp)
+		return methods
+	})
 
-	handlerMethod(typ)
-	handlerMethod(pTyp)
-	ret.SetMethod(Methods)
 	return ret
 }
 
