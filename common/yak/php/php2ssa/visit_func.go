@@ -30,7 +30,7 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	y.AssignVariable(variable, newFunction)
 	//todo: maybe need assign in this scope
 	y.GetProgram().Funcs[funcName] = newFunction
-	newFunction.SetBuilder(func() ssa.Value {
+	newFunction.SetOrdinalBuild(func() ssa.Value {
 		y.SetMarkedFunction(funcName)
 		y.FunctionBuilder = y.FunctionBuilder.PushFunction(newFunction)
 		{
