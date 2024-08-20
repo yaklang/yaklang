@@ -229,7 +229,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 		funcName := y.VisitIdentifier(ret.Identifier())
 		newFunction := y.NewFunc(funcName)
-		newFunction.SetBuilder(func() ssa.Value {
+		newFunction.SetOrdinalBuild(func() ssa.Value {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				this := y.NewParam("$this")

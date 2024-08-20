@@ -422,7 +422,6 @@ namespace {
 			ssaapi.WithLanguage(ssaapi.PHP),
 		)
 	})
-	//todo： get top define有点问题
 	t.Run("test function spin", func(t *testing.T) {
 		code := `<?php
 
