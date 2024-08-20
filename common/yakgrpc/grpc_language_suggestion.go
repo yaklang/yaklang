@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -181,21 +180,6 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	}
 
 	return standardLibrarySuggestions
-}
-
-func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng memedit.RangeIf, skipNum int) *ssaapi.Value {
-	// use editor instead of prog.Program.Editor because of ssa cache
-	var value ssa.Value
-	offset := rng.GetEndOffset()
-	for i := 0; i < skipNum; i++ {
-		_, offset = prog.Program.SearchIndexAndOffsetByOffset(offset)
-		offset--
-	}
-	_, value = prog.Program.GetFrontValueByOffset(offset)
-	if !utils.IsNil(value) {
-		return prog.NewValue(value)
-	}
-	return nil
 }
 
 func getVscodeSnippetsBySSAValue(funcName string, v *ssaapi.Value) string {
@@ -674,72 +658,6 @@ func getDescFromSSAValue(name string, containPoint bool, prog *ssaapi.Program, v
 	return desc
 }
 
-func sortValuesByPosition(values ssaapi.Values, position memedit.RangeIf) ssaapi.Values {
-	// todo: 需要修改SSA，需要真正的RefLocation
-	values = values.Filter(func(v *ssaapi.Value) bool {
-		position2 := v.GetRange()
-		if position2 == nil {
-			return false
-		}
-		if position2.GetStart().GetLine() > position.GetStart().GetLine() {
-			return false
-		}
-		return true
-	})
-	sort.SliceStable(values, func(i, j int) bool {
-		line1, line2 := values[i].GetRange().GetStart().GetLine(), values[j].GetRange().GetStart().GetLine()
-		if line1 == line2 {
-			return values[i].GetRange().GetStart().GetColumn() > values[j].GetRange().GetStart().GetColumn()
-		} else {
-			return line1 > line2
-		}
-	})
-	return values
-}
-
-// Deprecated: now can get the closest value
-func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
-	word := strings.Split(sourceCode, ".")[0]
-	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
-		position2 := v.GetRange()
-		if position2 == nil {
-			return false
-		}
-		if position2.GetStart().GetLine() > position.GetStart().GetLine() {
-			return false
-		}
-		return true
-	})
-	values = sortValuesByPosition(values, position)
-	if len(values) == 0 {
-		return nil
-	}
-	return values[0].GetSelf()
-}
-
-// Deprecated: now can get the closest value
-func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
-	var values ssaapi.Values
-	for i, word := range strings.Split(sourceCode, ".") {
-		if i == 0 {
-			values = prog.Ref(word)
-		} else {
-			// fallback
-			newValues := values.Ref(word)
-			if len(newValues) == 0 {
-				break
-			} else {
-				values = newValues
-			}
-		}
-	}
-	values = sortValuesByPosition(values, position)
-	if len(values) == 0 {
-		return nil
-	}
-	return values[0].GetSelf()
-}
-
 func getFuncCompletionBySSAType(funcName string, typ ssa.Type) string {
 	s, ok := ssa.ToFunctionType(typ)
 	if !ok {
@@ -1048,18 +966,10 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng meme
 	return ret
 }
 
-func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) memedit.RangeIf {
-	e := memedit.NewMemEditor(sourceCode)
-	return e.GetRangeByPosition(
-		e.GetPositionByLine(int(r.StartLine), int(r.StartColumn)),
-		e.GetPositionByLine(int(r.EndLine), int(r.EndColumn)),
-	)
-}
-
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 
-	result, err := LanguageServerAnalyzeProgram(req.GetModelID(), req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
+	result, err := LanguageServerAnalyzeProgram(req)
 	if err != nil {
 		return ret, err
 	}

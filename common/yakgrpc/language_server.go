@@ -1,10 +1,14 @@
 package yakgrpc
 
 import (
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -40,7 +44,62 @@ func (r *LanguageServerAnalyzerResult) Clone() *LanguageServerAnalyzerResult {
 
 var fallbackAnalyzeCache = utils.NewTTLCache[*LanguageServerAnalyzerResult](30 * time.Second)
 
-func LanguageServerAnalyzeProgram(id, code, inspectType, scriptType string, rng *ypb.Range) (*LanguageServerAnalyzerResult, error) {
+func LanguageServerAnalyzeProgram(req *ypb.YaklangLanguageSuggestionRequest) (*LanguageServerAnalyzerResult, error) {
+	// from database
+	if programName := req.GetProgramName(); programName != "" {
+		return languageServerAnalyzeFromDatabase(req)
+	}
+	return languageServerAnalyzeFromSource(req)
+}
+
+func languageServerAnalyzeFromDatabase(req *ypb.YaklangLanguageSuggestionRequest) (*LanguageServerAnalyzerResult, error) {
+	ret := &LanguageServerAnalyzerResult{}
+	// get  program
+	programName := req.GetProgramName()
+	if prog, err := ssaapi.FromDatabase(programName); err != nil {
+		return ret, err
+	} else {
+		ret.Program = prog
+	}
+
+	// get editor
+	fileName := req.GetFileName()
+	editor, err := ssadb.GetEditorByFileName(fileName)
+	if err != nil {
+		return ret, err
+	}
+	// get range
+	rng := req.GetRange()
+	SSARange := editor.GetRangeByPosition(
+		editor.GetPositionByLine(int(rng.StartLine), int(rng.StartColumn)),
+		editor.GetPositionByLine(int(rng.EndLine), int(rng.EndColumn)),
+	)
+	ret.Range = SSARange
+
+	// word
+	ret.Word = SSARange.GetText()
+
+	// value
+	valueID, err := ssadb.GetValueBeforeEndOffset(ssadb.GetDB(), SSARange)
+	if err != nil {
+		return ret, err
+	}
+	if value, err := ssa.NewLazyInstruction(valueID); err != nil {
+		return ret, err
+	} else {
+		ret.Value = ret.Program.NewValue(value)
+	}
+
+	return ret, nil
+}
+
+func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) (*LanguageServerAnalyzerResult, error) {
+	// from source code
+	code := req.GetYakScriptCode()
+	rng := req.GetRange()
+	scriptType := req.GetYakScriptType()
+	id := req.GetModelID()
+
 	ssaRange := GrpcRangeToSSARange(code, rng)
 	editor := ssaRange.GetEditor()
 	rangeWordText := ssaRange.GetWordText()
@@ -122,4 +181,93 @@ func LanguageServerAnalyzeProgram(id, code, inspectType, scriptType string, rng 
 	}
 	fallbackAnalyzeCache.Set(id, result)
 	return result, err
+}
+
+func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) memedit.RangeIf {
+	e := memedit.NewMemEditor(sourceCode)
+	return e.GetRangeByPosition(
+		e.GetPositionByLine(int(r.StartLine), int(r.StartColumn)),
+		e.GetPositionByLine(int(r.EndLine), int(r.EndColumn)),
+	)
+}
+
+func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng memedit.RangeIf, skipNum int) *ssaapi.Value {
+	// use editor instead of prog.Program.Editor because of ssa cache
+	var value ssa.Value
+	offset := rng.GetEndOffset()
+	for i := 0; i < skipNum; i++ {
+		_, offset = prog.Program.SearchIndexAndOffsetByOffset(offset)
+		offset--
+	}
+	_, value = prog.Program.GetFrontValueByOffset(offset)
+	if !utils.IsNil(value) {
+		return prog.NewValue(value)
+	}
+	return nil
+}
+
+// Deprecated: now can get the closest value
+func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
+	var values ssaapi.Values
+	for i, word := range strings.Split(sourceCode, ".") {
+		if i == 0 {
+			values = prog.Ref(word)
+		} else {
+			// fallback
+			newValues := values.Ref(word)
+			if len(newValues) == 0 {
+				break
+			} else {
+				values = newValues
+			}
+		}
+	}
+	values = sortValuesByPosition(values, position)
+	if len(values) == 0 {
+		return nil
+	}
+	return values[0].GetSelf()
+}
+
+// Deprecated: now can get the closest value
+func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
+	word := strings.Split(sourceCode, ".")[0]
+	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
+		position2 := v.GetRange()
+		if position2 == nil {
+			return false
+		}
+		if position2.GetStart().GetLine() > position.GetStart().GetLine() {
+			return false
+		}
+		return true
+	})
+	values = sortValuesByPosition(values, position)
+	if len(values) == 0 {
+		return nil
+	}
+	return values[0].GetSelf()
+}
+
+func sortValuesByPosition(values ssaapi.Values, position memedit.RangeIf) ssaapi.Values {
+	// todo: 需要修改SSA，需要真正的RefLocation
+	values = values.Filter(func(v *ssaapi.Value) bool {
+		position2 := v.GetRange()
+		if position2 == nil {
+			return false
+		}
+		if position2.GetStart().GetLine() > position.GetStart().GetLine() {
+			return false
+		}
+		return true
+	})
+	sort.SliceStable(values, func(i, j int) bool {
+		line1, line2 := values[i].GetRange().GetStart().GetLine(), values[j].GetRange().GetStart().GetLine()
+		if line1 == line2 {
+			return values[i].GetRange().GetStart().GetColumn() > values[j].GetRange().GetStart().GetColumn()
+		} else {
+			return line1 > line2
+		}
+	})
+	return values
 }
