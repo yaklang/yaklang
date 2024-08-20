@@ -2,11 +2,12 @@ package java
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestGraphFrom_XXE(t *testing.T) {
@@ -26,7 +27,7 @@ check $source then "XXE Attack" else "XXE Safe";
 			"step[",
 			"penwidth=\"3.0\"",
 			": call",
-			"search parse",
+			"search-exact:parse", // "search parse",
 			"all-actual-args",
 		) {
 			fmt.Println(results)
