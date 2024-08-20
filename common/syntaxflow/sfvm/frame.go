@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"regexp"
-	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
@@ -453,7 +454,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		s.debugSubLog("result next: %v", next.String())
-		_ = next.AppendPredecessor(value, s.WithPredecessorContext("search "+i.UnaryStr))
+		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search "+i.UnaryStr))
 		s.stack.Push(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
@@ -714,7 +715,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("- get all argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("all-actual-args"))
+		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("all-actual-args"))
 		s.stack.Push(results)
 
 	case OpGetUsers:
