@@ -1,6 +1,10 @@
 package tests
 
-import "testing"
+import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"testing"
+)
 
 func TestJava_Simple_Expression(t *testing.T) {
 	t.Run("test PostfixExpression", func(t *testing.T) {
@@ -243,4 +247,32 @@ func TestJava_Literal(t *testing.T) {
 	println(uid);
 		`, []string{`neg("94044809860988047l")`}, t)
 	})
+}
+
+func TestJava_TryWithSource(t *testing.T) {
+	code := `package org.examle.A;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+class A {
+	public static void main(String[] args) {
+	try (InputStream   in = new FileInputStream(src);
+         OutputStream out = new FileOutputStream(dst)) {
+        byte[] buf = new byte[BUFFER_SIZE];
+        int n;
+        while ((n = in.read(buf)) >= 0)
+            out.write(buf, 0, n);
+    	}
+	}}
+`
+	ssatest.CheckSyntaxFlow(t, code, `in<fullTypeName> as $in;out<fullTypeName> as $out;`,
+		map[string][]string{
+			"in":  []string{"\"java.io.FileInputStream\"", "\"java.io.InputStream\""},
+			"out": []string{"\"java.io.FileOutputStream\"", "\"java.io.OutputStream\""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `.close<fullTypeName> as $close;`,
+		map[string][]string{
+			"close": []string{"\"java.io.FileInputStream\"", "\"java.io.FileOutputStream\"", "\"java.io.InputStream\"", "\"java.io.OutputStream\""},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

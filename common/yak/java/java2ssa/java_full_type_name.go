@@ -177,3 +177,40 @@ func (y *builder) AddFullTypeNameFromAnnotationMap(typName string, typ ssa.Type)
 
 	return y.AddFullTypeNameForAllImport(typName, typ)
 }
+
+func (y *builder) HaveCastType(typ ssa.Type) bool {
+	if typ == nil {
+		return false
+	}
+	fts := typ.GetFullTypeNames()
+	if len(fts) == 0 {
+		return false
+	}
+	return fts[0] == "__castType__"
+}
+
+func (y *builder) SetCastTypeFlag(typ ssa.Type) ssa.Type {
+	if typ == nil {
+		return nil
+	}
+	fts := typ.GetFullTypeNames()
+	if len(fts) == 0 {
+		return typ
+	}
+	newFts := utils.InsertSliceItem[string](fts, "__castType__", 0)
+	typ.SetFullTypeNames(newFts)
+	return typ
+}
+
+func (y *builder) RemoveCastTypeFlag(typ ssa.Type) ssa.Type {
+	if typ == nil {
+		return nil
+	}
+	fts := typ.GetFullTypeNames()
+	if len(fts) == 0 {
+		return typ
+	}
+	newFts := utils.RemoveSliceItem[string](fts, "__castType__")
+	typ.SetFullTypeNames(newFts)
+	return typ
+}

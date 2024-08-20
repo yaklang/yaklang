@@ -303,8 +303,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		var castType ssa.Type
 		if len(ret.AllBITAND()) == 0 {
 			castType = y.VisitTypeType(ret.TypeType(0))
-			typName := utils.InsertSliceItem[string](castType.GetFullTypeNames(), "__castType__", 0)
-			castType.SetFullTypeNames(typName)
+			castType = y.SetCastTypeFlag(castType)
 		} else {
 			// TODO:处理类型交集语句
 		}
@@ -913,7 +912,50 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		return nil
 	case *javaparser.TryWithResourcesStatementContext:
 		// 处理 try with resources 语句
-		// todo 处理try with resources语句
+		if ret.TRY() != nil {
+			tryBuilder := y.BuildTry()
+			var shouldClosedValue []ssa.Value
+			tryBuilder.BuildTryBlock(func() {
+				if r := ret.ResourceSpecification(); r != nil {
+					shouldClosedValue = y.VisitResourceSpecification(r)
+				}
+				if b := ret.Block(); ret != nil {
+					y.VisitBlock(b)
+				}
+			})
+			for _, catch := range ret.AllCatchClause() {
+				catchClause := catch.(*javaparser.CatchClauseContext)
+				tryBuilder.BuildErrorCatch(func() string {
+					return catchClause.Identifier().GetText()
+				}, func() {
+					if block := catchClause.Block(); block != nil {
+						y.VisitBlock(block)
+					}
+				})
+			}
+			if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
+				tryBuilder.BuildFinally(func() {
+					y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
+					key := y.EmitConstInst("close")
+					if shouldClosedValue != nil {
+						for _, value := range shouldClosedValue {
+							y.ReadMemberCallMethodVariable(value, key)
+						}
+					}
+				})
+			} else {
+				tryBuilder.BuildFinally(func() {
+					key := y.EmitConstInst("close")
+					if shouldClosedValue != nil {
+						for _, value := range shouldClosedValue {
+							y.ReadMemberCallMethodVariable(value, key)
+						}
+					}
+				})
+			}
+			tryBuilder.Finish()
+		}
+
 		return nil
 	case *javaparser.SwitchStatementContext:
 		// 处理 switch 语句
@@ -1073,10 +1115,9 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 			rightValTyp := value.GetType()
 			rightValTypName := rightValTyp.GetFullTypeNames()
 			// 如果有类型转换，就用转换后的typeName
-			if len(rightValTypName) != 0 && rightValTypName[0] == "__castType__" {
-				typName := utils.RemoveSliceItem[string](rightValTypName, "__castType__")
-				rightValTyp.SetFullTypeNames(typName)
-				value.SetType(rightValTyp)
+			if len(rightValTypName) != 0 && y.HaveCastType(rightValTyp) {
+				newTyp := y.RemoveCastTypeFlag(rightValTyp)
+				value.SetType(newTyp)
 			} else {
 				// 没有类型转换，就使用在右值的typeName加上typeType的typeName
 				if typ != nil {
@@ -1791,7 +1832,7 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	defer func() {
 		//set full type name
 		t := value.GetType()
-		if t!= nil{
+		if t != nil {
 			if len(t.GetFullTypeNames()) == 0 {
 				newType := y.AddFullTypeNameFromMap(name, value.GetType())
 				value.SetType(newType)
@@ -1819,4 +1860,83 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	}
 
 	return y.ReadValue(name)
+}
+
+func (y *builder) VisitResourceSpecification(raw javaparser.IResourceSpecificationContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.ResourceSpecificationContext)
+	if i == nil {
+		return nil
+	}
+	if ret := i.Resources(); ret != nil {
+		return y.VisitResources(ret)
+	}
+	return nil
+}
+
+func (y *builder) VisitResources(raw javaparser.IResourcesContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.ResourcesContext)
+	if i == nil {
+		return nil
+	}
+	var values []ssa.Value
+	for _, res := range i.AllResource() {
+		values = append(values, y.VisitResource(res))
+	}
+	return values
+}
+
+func (y *builder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.ResourceContext)
+	if i == nil {
+		return nil
+	}
+	var variable *ssa.Variable
+	var value ssa.Value
+	if i.Expression() != nil {
+		value = y.VisitExpression(i.Expression())
+	}
+	if value == nil {
+		return nil
+	}
+
+	if ret := i.Identifier(); ret != nil {
+		variable = y.CreateLocalVariable(ret.GetText())
+	} else if ret := i.VariableDeclaratorId(); ret != nil {
+		var typ ssa.Type
+		if cls := i.ClassOrInterfaceType(); cls != nil {
+			typ = y.VisitClassOrInterfaceType(cls)
+		}
+		if i.VariableDeclaratorId() != nil {
+			name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+			variable = y.CreateVariable(name)
+			rightValTyp := value.GetType()
+			rightValTypName := rightValTyp.GetFullTypeNames()
+			if len(rightValTypName) != 0 && y.HaveCastType(rightValTyp) {
+				newTyp := y.RemoveCastTypeFlag(rightValTyp)
+				value.SetType(newTyp)
+			} else {
+				if typ != nil {
+					newTyp := y.MergeFullTypeNameForType(typ.GetFullTypeNames(), rightValTyp)
+					value.SetType(newTyp)
+				}
+			}
+		}
+	}
+	y.AssignVariable(variable, value)
+	return value
 }
