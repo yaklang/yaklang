@@ -106,6 +106,7 @@ func (a *anInstruction) SetFunc(f *Function) {
 	a.fun = f
 	a.prog = f.GetProgram()
 }
+
 func (a *anInstruction) GetFunc() *Function {
 	f, ok := ToFunction(a.fun)
 	if ok {
@@ -113,6 +114,7 @@ func (a *anInstruction) GetFunc() *Function {
 	}
 	return nil
 }
+
 func (a *anInstruction) GetProgram() *Program {
 	return a.prog
 }
@@ -175,6 +177,7 @@ func (a *anInstruction) GetName() string  { return a.name }
 
 // id
 func (a *anInstruction) SetId(id int64) { a.id = id }
+
 func (a *anInstruction) GetId() int64 {
 	if a == nil {
 		return -1
@@ -226,6 +229,7 @@ func NewValue() anValue {
 func (n *anValue) IsMember() bool {
 	return n.object != nil && n.key != nil
 }
+
 func (n *anValue) SetObject(v Value) {
 	n.object = v
 }
@@ -314,6 +318,7 @@ func (n *anValue) GetType() Type {
 	}
 	return n.typ
 }
+
 func (n *anValue) SetType(typ Type) {
 	if typ == nil {
 		return
@@ -369,6 +374,7 @@ func (a *anValue) GetLastVariable() *Variable {
 func (a *anValue) GetAllVariables() map[string]*Variable {
 	return a.variables.GetMap()
 }
+
 func (a *anValue) AddVariable(v *Variable) {
 	name := v.GetName()
 	a.variables.Set(name, v)
@@ -390,6 +396,7 @@ func (i *anValue) Masked() bool {
 func (i *anValue) SetReference(v Value) {
 	i.reference = v
 }
+
 func (i *anValue) GetReference() Value {
 	return i.reference
 }
@@ -397,6 +404,7 @@ func (i *anValue) GetReference() Value {
 func (i *anValue) AddPointer(v Value) {
 	i.pointer = append(i.pointer, v)
 }
+
 func (i *anValue) GetPointer() Values {
 	return i.pointer
 }

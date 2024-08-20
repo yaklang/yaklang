@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,12 +12,12 @@ import (
 )
 
 func init() {
-	BasicTypes[ErrorTypeKind].method["Error"] = NewFunctionWithType("error.Error", NewFunctionTypeDefine(
+	BasicTypes[ErrorTypeKind].AddMethod("Error", NewFunctionWithType("error.Error", NewFunctionTypeDefine(
 		"error.Error",
 		[]Type{BasicTypes[ErrorTypeKind]},
 		[]Type{BasicTypes[StringTypeKind]},
 		false,
-	))
+	)))
 }
 
 const MAXTypeCompareDepth = 10
@@ -268,6 +269,7 @@ type Type interface {
 	SetFullTypeNames([]string)
 	// set/get method, method is a function
 	SetMethod(map[string]*Function)
+	SetMethodGetter(func() map[string]*Function)
 	AddMethod(string, *Function)
 	GetMethod() map[string]*Function
 }
@@ -362,23 +364,64 @@ const (
 	OrTypeKind
 )
 
+type baseType struct {
+	method       map[string]*Function
+	methodGetter func() map[string]*Function
+	methodOnce   sync.Once
+}
+
+func NewBaseType() *baseType {
+	return &baseType{}
+}
+
+func (b *baseType) SetMethodGetter(f func() map[string]*Function) {
+	b.methodGetter = f
+}
+
+func (b *baseType) SetMethod(m map[string]*Function) {
+	b.method = m
+}
+
+func (b *baseType) AddMethod(id string, f *Function) {
+	if b.method == nil {
+		// init
+		b.GetMethod()
+	}
+	b.method[id] = f
+}
+
+func (b *baseType) GetMethod() map[string]*Function {
+	if b.method == nil {
+		// 防止并发
+		b.methodOnce.Do(func() {
+			if b.methodGetter == nil {
+				b.method = make(map[string]*Function)
+			} else {
+				b.method = b.methodGetter()
+			}
+		})
+	}
+	return b.method
+}
+
 type BasicType struct {
+	*baseType
 	Kind    TypeKind
 	name    string
 	pkgPath string
 
-	method       map[string]*Function
 	fullTypeName []string
 }
 
 func NewBasicType(kind TypeKind, name string) *BasicType {
-	return &BasicType{
+	typ := &BasicType{
+		baseType:     NewBaseType(),
 		Kind:         kind,
 		name:         name,
 		pkgPath:      name,
-		method:       make(map[string]*Function),
 		fullTypeName: make([]string, 0),
 	}
+	return typ
 }
 
 var _ Type = (*BasicType)(nil)
@@ -403,9 +446,6 @@ func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
 }
 
-func (b *BasicType) GetMethod() map[string]*Function {
-	return b.method
-}
 func (b *BasicType) AddFullTypeName(name string) {
 	if b == nil {
 		return
@@ -425,17 +465,6 @@ func (b *BasicType) SetFullTypeNames(names []string) {
 		return
 	}
 	b.fullTypeName = names
-}
-
-func (b *BasicType) SetMethod(method map[string]*Function) {
-	b.method = method
-}
-
-func (b *BasicType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
 }
 
 func (b *BasicType) IsAny() bool {
@@ -581,8 +610,8 @@ func GetTypeByStr(typ string) Type {
 
 // ====================== alias type
 type AliasType struct {
+	*baseType
 	elem         Type
-	method       map[string]*Function
 	Name         string
 	pkgPath      string
 	fullTypeName []string
@@ -592,10 +621,10 @@ var _ Type = (*AliasType)(nil)
 
 func NewAliasType(name, pkg string, elem Type) *AliasType {
 	return &AliasType{
-		elem:    elem,
-		method:  make(map[string]*Function),
-		Name:    name,
-		pkgPath: pkg,
+		baseType: NewBaseType(),
+		elem:     elem,
+		Name:     name,
+		pkgPath:  pkg,
 	}
 }
 
@@ -618,21 +647,6 @@ func (a *AliasType) SetFullTypeNames(names []string) {
 		return
 	}
 	a.fullTypeName = names
-}
-
-func (a *AliasType) SetMethod(m map[string]*Function) {
-	a.method = m
-}
-
-func (b *AliasType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
-}
-
-func (a *AliasType) GetMethod() map[string]*Function {
-	return a.method
 }
 
 // func (b *AliasType) GetAllKey() []string {
@@ -665,7 +679,7 @@ func (a *AliasType) GetTypeKind() TypeKind {
 
 // ====================== interface type
 type InterfaceType struct {
-	method       map[string]*Function
+	*baseType
 	object       map[string]*ObjectType
 	name         string
 	pkgPath      string
@@ -676,28 +690,13 @@ type InterfaceType struct {
 
 func NewInterfaceType(name, pkgPath string) *InterfaceType {
 	return &InterfaceType{
-		method:  make(map[string]*Function),
-		name:    name,
-		pkgPath: pkgPath,
+		baseType: NewBaseType(),
+		name:     name,
+		pkgPath:  pkgPath,
 	}
 }
 
 var _ Type = (*InterfaceType)(nil)
-
-func (i *InterfaceType) SetMethod(m map[string]*Function) {
-	i.method = m
-}
-
-func (b *InterfaceType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
-}
-
-func (i *InterfaceType) GetMethod() map[string]*Function {
-	return i.method
-}
 
 func (i *InterfaceType) AddStructure(name string, o *ObjectType) {
 	if i.object == nil {
@@ -746,6 +745,7 @@ func (i *InterfaceType) AddFatherInterfaceType(parent *InterfaceType) {
 func (i *InterfaceType) AddChildInterfaceType(child *InterfaceType) {
 	i.childs = append(i.childs, child)
 }
+
 func (i *InterfaceType) AddFullTypeName(name string) {
 	if i == nil {
 		return
@@ -769,8 +769,8 @@ func (i *InterfaceType) SetFullTypeNames(names []string) {
 
 // ====================== chan type
 type ChanType struct {
+	*baseType
 	Elem         Type
-	method       map[string]*Function
 	fullTypeName []string
 }
 
@@ -796,20 +796,6 @@ func (c *ChanType) SetFullTypeNames(names []string) {
 	}
 	c.fullTypeName = names
 }
-func (c *ChanType) SetMethod(m map[string]*Function) {
-	c.method = m
-}
-
-func (b *ChanType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
-}
-
-func (c *ChanType) GetMethod() map[string]*Function {
-	return c.method
-}
 
 // func (b *ChanType) GetAllKey() []string {
 // 	return lo.Keys(b.method)
@@ -821,7 +807,8 @@ func (c *ChanType) GetTypeKind() TypeKind {
 
 func NewChanType(elem Type) *ChanType {
 	return &ChanType{
-		Elem: elem,
+		baseType: NewBaseType(),
+		Elem:     elem,
 	}
 }
 
@@ -839,6 +826,7 @@ func (c ChanType) RawString() string {
 
 // ==================== interface type
 type ObjectType struct {
+	*baseType
 	Name       string
 	pkgPath    string
 	Kind       TypeKind
@@ -852,8 +840,6 @@ type ObjectType struct {
 
 	Combination bool // function multiple return will combined to struct
 	// VariadicPara bool // function last variadic parameter will become slice
-
-	method map[string]*Function
 
 	KeyTyp    Type
 	FieldType Type
@@ -892,21 +878,6 @@ func (i *ObjectType) SetFullTypeNames(names []string) {
 	i.fullTypeName = names
 }
 
-func (i *ObjectType) GetMethod() map[string]*Function {
-	return i.method
-}
-
-func (i *ObjectType) SetMethod(m map[string]*Function) {
-	i.method = m
-}
-
-func (b *ObjectType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
-}
-
 func (i *ObjectType) SetName(name string) {
 	i.Name = name
 }
@@ -917,12 +888,12 @@ func (i *ObjectType) SetPkgPath(pkg string) {
 
 func NewObjectType() *ObjectType {
 	return &ObjectType{
+		baseType:   NewBaseType(),
 		Kind:       ObjectTypeKind,
 		Keys:       make([]Value, 0),
 		keymap:     make(map[string]int),
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
-		method:     make(map[string]*Function, 0),
 	}
 }
 
@@ -1096,6 +1067,7 @@ func (s *ObjectType) Finish() {
 }
 
 type FunctionType struct {
+	*baseType
 	Name            string
 	pkgPath         string
 	This            *Function
@@ -1131,19 +1103,13 @@ func (f *FunctionType) GetFullTypeNames() []string {
 	}
 	return f.fullTypeName
 }
+
 func (f *FunctionType) SetFullTypeNames(names []string) {
 	if f == nil {
 		return
 	}
 	f.fullTypeName = names
 }
-
-func (f *FunctionType) SetMethod(m map[string]*Function) {}
-func (f *FunctionType) GetMethod() map[string]*Function {
-	return nil
-}
-
-func (b *FunctionType) AddMethod(id string, f *Function) {}
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 
@@ -1168,6 +1134,7 @@ func CalculateType(ts []Type) Type {
 
 func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
 	f := &FunctionType{
+		baseType:     NewBaseType(),
 		Name:         name,
 		Parameter:    Parameter,
 		ParameterLen: len(Parameter),
@@ -1254,7 +1221,7 @@ func (f *FunctionType) AddAnnotationFunc(handler ...func(Value)) {
 
 // ====================== generic type
 type GenericType struct {
-	method       map[string]*Function
+	*baseType
 	symbol       string
 	fullTypeName []string
 }
@@ -1281,20 +1248,6 @@ func (c *GenericType) SetFullTypeNames(names []string) {
 	}
 	c.fullTypeName = names
 }
-func (c *GenericType) SetMethod(m map[string]*Function) {
-	c.method = m
-}
-
-func (b *GenericType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
-}
-
-func (c *GenericType) GetMethod() map[string]*Function {
-	return c.method
-}
 
 func (c *GenericType) GetTypeKind() TypeKind {
 	return GenericTypeKind
@@ -1310,8 +1263,8 @@ var (
 
 func NewGenericType(symbol string) *GenericType {
 	return &GenericType{
-		symbol: symbol,
-		method: make(map[string]*Function),
+		baseType: NewBaseType(),
+		symbol:   symbol,
 	}
 }
 
@@ -1437,7 +1390,7 @@ func CloneType(t Type) (Type, bool) {
 
 // ====================== or type
 type OrType struct {
-	method       map[string]*Function
+	*baseType
 	types        Types
 	fullTypeName []string
 }
@@ -1465,21 +1418,6 @@ func (c *OrType) AddFullTypeName(name string) {
 	c.fullTypeName = append(c.fullTypeName, name)
 }
 
-func (c *OrType) SetMethod(m map[string]*Function) {
-	c.method = m
-}
-
-func (b *OrType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		b.method = make(map[string]*Function)
-	}
-	b.method[id] = f
-}
-
-func (c *OrType) GetMethod() map[string]*Function {
-	return c.method
-}
-
 func (c *OrType) GetTypeKind() TypeKind {
 	return OrTypeKind
 }
@@ -1490,8 +1428,8 @@ func (c *OrType) GetTypes() Types {
 
 func NewOrType(types ...Type) *OrType {
 	return &OrType{
-		types:  Types(types),
-		method: make(map[string]*Function),
+		baseType: NewBaseType(),
+		types:    Types(types),
 	}
 }
 
