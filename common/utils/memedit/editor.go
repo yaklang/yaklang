@@ -583,6 +583,10 @@ func (ve *MemEditor) SourceCodeMd5() string {
 	return ve.sourceCodeMd5
 }
 
+func (ve *MemEditor) GetPureSourceHash() string {
+	return codec.Sha256(ve.safeSourceCode.String())
+}
+
 func (ve *MemEditor) SourceCodeSha1() string {
 	if ve.sourceCodeSha1 == "" {
 		ve.sourceCodeSha1 = utils.CalcSha1(ve.getCurrentSourceCodeContextText())

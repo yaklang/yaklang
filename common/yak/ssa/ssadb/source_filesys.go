@@ -133,6 +133,10 @@ func (fs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 }
 
 func (fs *irSourceFS) PathSplit(p string) (string, string) {
+	return pathSplit(p)
+}
+
+func pathSplit(p string) (string, string) {
 	dir, name := path.Split(p)
 	if len(dir) != 1 && dir[len(dir)-1] == '/' {
 		dir = dir[:len(dir)-1]
