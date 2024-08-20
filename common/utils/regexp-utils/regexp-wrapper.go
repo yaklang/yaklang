@@ -299,5 +299,5 @@ func (r *Regexp2Wrapper) ReplaceAllStringFunc(src string, repl func(string) stri
 }
 
 func (r *Regexp2Wrapper) String() string {
-	return r.getReg().String()
+	return r.regexpRaw
 }
