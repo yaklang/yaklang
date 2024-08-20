@@ -40,7 +40,7 @@ type ClassBluePrint struct {
 	_container Value
 
 	ParentClass []*ClassBluePrint
-	//full Type Name
+	// full Type Name
 	fullTypeName []string
 }
 
@@ -100,18 +100,23 @@ func (c *ClassBluePrint) String() string {
 	str := fmt.Sprintf("ClassBluePrint: %s", c.Name)
 	return str
 }
+
 func (c *ClassBluePrint) PkgPathString() string {
 	return ""
 }
+
 func (c *ClassBluePrint) RawString() string {
 	return ""
 }
+
 func (c *ClassBluePrint) GetTypeKind() TypeKind {
 	return ClassBluePrintTypeKind
 }
+
 func (c *ClassBluePrint) SetMethod(m map[string]*Function) {
 	c.Method = m
 }
+
 func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 	if c._container != nil {
 		// set the container ref key to the method
@@ -134,8 +139,12 @@ func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 	}
 	c.Method[key] = fun
 }
+
 func (c *ClassBluePrint) GetMethod() map[string]*Function {
 	return c.Method
+}
+
+func (c *ClassBluePrint) SetMethodGetter(f func() map[string]*Function) {
 }
 
 func (c *ClassBluePrint) AddFullTypeName(name string) {

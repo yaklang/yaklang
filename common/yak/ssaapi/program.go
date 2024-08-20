@@ -23,6 +23,10 @@ type Program struct {
 
 type Programs []*Program
 
+func (p *Program) IsFromDatabase() bool {
+	return p.comeFromDatabase
+}
+
 func (p *Program) GetNames() []string {
 	return []string{p.Program.GetProgramName()}
 }
