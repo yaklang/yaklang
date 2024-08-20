@@ -59,6 +59,11 @@ func New(maps ...any) *OrderedMap {
 	return o
 }
 
+func (o *OrderedMap) Copy() *OrderedMap {
+	ret := New(o.values)
+	return ret
+}
+
 func (o *OrderedMap) SetEscapeHTML(on bool) {
 	o.escapeHTML = on
 }

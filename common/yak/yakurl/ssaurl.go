@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -270,22 +271,25 @@ func coverNodeInfos(graph *ssaapi.ValueGraph, programName string, nodeID int) []
 // if node.Prev have more than one, add a new line
 type DeepFirst struct {
 	res     [][]string
-	current []string
+	current *orderedmap.OrderedMap // map[string]nil
 	graph   *ssaapi.ValueGraph
 }
 
 func (d *DeepFirst) deepFirst(nodeID int) {
-	d.current = append(d.current, dot.NodeName(nodeID))
+	if _, ok := d.current.Get(dot.NodeName(nodeID)); ok {
+		return
+	}
+	d.current.Set(dot.NodeName(nodeID), nil)
+	// d.current = append(d.current, dot.NodeName(nodeID))
 	node := d.graph.GetNodeByID(nodeID)
 	prevs := node.Prevs()
 	if len(prevs) == 0 {
-		d.res = append(d.res, d.current)
-		// d.current = d.current[:len(d.current)-1]
+		d.res = append(d.res, d.current.Keys())
 		return
 	}
 	if len(prevs) == 1 {
 		prev := prevs[0]
-		d.current = append(d.current, dot.NodeName(prev))
+		d.current.Set(dot.NodeName(prev), nil)
 		d.deepFirst(prev)
 		return
 	}
@@ -294,8 +298,8 @@ func (d *DeepFirst) deepFirst(nodeID int) {
 	current := d.current
 	for _, prev := range prevs {
 		// new line
-		d.current = make([]string, len(current))
-		copy(d.current, current)
+		d.current = orderedmap.New()
+		d.current = current.Copy()
 		d.deepFirst(prev)
 	}
 }
@@ -303,7 +307,7 @@ func (d *DeepFirst) deepFirst(nodeID int) {
 func DeepFirstGraph(graph *ssaapi.ValueGraph, nodeID int) [][]string {
 	df := &DeepFirst{
 		res:     make([][]string, 0),
-		current: make([]string, 0),
+		current: orderedmap.New(),
 		graph:   graph,
 	}
 	df.deepFirst(nodeID)
