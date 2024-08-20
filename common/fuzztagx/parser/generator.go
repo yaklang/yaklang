@@ -452,7 +452,7 @@ func (g *Generator) generate() (bool, error) {
 		if err != nil {
 			return genOneOk, err
 		}
-		if g.renderTagWithSyncIndex {
+		if g.renderTagWithSyncIndex { //all tag sync render
 			if _, ok := g.data[i].(*TagExecNode); ok {
 				for _, m := range g.data {
 					uid1 := reflect.ValueOf(m).UnsafePointer()
@@ -467,7 +467,7 @@ func (g *Generator) generate() (bool, error) {
 					genOneOk = genOneOk || ok1
 				}
 			}
-		} else {
+		} else { // labels sync render
 			if v, ok := g.data[i].(*TagExecNode); ok {
 				for _, label := range v.data.GetLabels() {
 					if ms, ok := v.methodCtx.labelTable[label]; ok {
@@ -484,7 +484,7 @@ func (g *Generator) generate() (bool, error) {
 							if err != nil {
 								return ok1, err
 							}
-							genOneOk = genOneOk || ok1
+							genOneOk = genOneOk || ok1 // all label sync render fail then genOneOk false
 						}
 					}
 				}
@@ -494,7 +494,7 @@ func (g *Generator) generate() (bool, error) {
 			if v, ok := g.data[i].(*TagExecNode); ok {
 				failedTag[v] = struct{}{}
 			}
-		} else {
+		} else { // all render fail try backpropagation
 			for _, back := range successCallBacks {
 				if err := back(); err != nil {
 					return true, err
@@ -514,6 +514,20 @@ func (g *Generator) generate() (bool, error) {
 					continue
 				} else {
 					tag.FirstExecWithBackpropagation(true, false, true)
+					for _, label := range tag.data.GetLabels() {
+						if ms, ok := tag.methodCtx.labelTable[label]; ok {
+							for m := range ms {
+								uid1 := reflect.ValueOf(m).UnsafePointer()
+								if uid1 == uid { // not allow sync self
+									continue
+								}
+								if !allowSyncTag(tag, m) { // check if allow sync by defined rules
+									continue
+								}
+								m.FirstExecWithBackpropagation(true, false, true)
+							}
+						}
+					}
 				}
 			}
 			for tag, _ := range g.methodCtx.dynTag {
