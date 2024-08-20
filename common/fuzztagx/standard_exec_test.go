@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -414,4 +415,40 @@ func TestYieldFun(t *testing.T) {
 	generator.Cancel()
 	time.Sleep(500 * time.Millisecond)
 	assert.Equal(t, true, finished)
+}
+
+func TestSyncRender2(t *testing.T) {
+	s := "{{int::1(1-10)}}-{{int::1(1-10)}}-{{int::1(1-10)}}-{{int::2(1-15)}}-{{int::2(1-15)}}"
+	res, err := ExecuteWithStringHandler(s, testMap)
+	require.NoError(t, err)
+	require.Len(t, res, 10*15)
+	for _, v := range res {
+		splited := strings.Split(v, "-")
+		for _, integer := range splited {
+			i, err := strconv.Atoi(integer)
+			require.NoError(t, err)
+			require.GreaterOrEqual(t, i, 1)
+			require.LessOrEqual(t, i, 15)
+		}
+	}
+}
+
+func TestSyncRender3(t *testing.T) {
+	s := "{{int::1(1-10)}}-{{int::1(1-15)}}"
+	res, err := ExecuteWithStringHandler(s, testMap)
+	require.NoError(t, err)
+	require.Len(t, res, 15)
+	count := 0
+	for _, v := range res {
+		count++
+		splited := strings.Split(v, "-")
+		require.Len(t, splited, 2)
+		if count > 10 {
+			require.Equal(t, "", splited[0], "sync tag out index error")
+		} else {
+			require.Equal(t, strconv.Itoa(count), splited[0])
+		}
+		require.Equal(t, strconv.Itoa(count), splited[1])
+
+	}
 }
