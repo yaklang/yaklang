@@ -737,4 +737,46 @@ class b
 	println($c->a);`
 		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 	})
+	t.Run("class const", func(t *testing.T) {
+		code := `<?php
+
+class b
+{
+    const c = 12;
+}
+
+println(b::c);`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"12"})
+	})
+	t.Run("class use parent static", func(t *testing.T) {
+		code := `<?php
+
+
+class testxx
+{
+    public static $a = 1;
+}
+
+class test extends testxx
+{
+}
+
+
+println(test::$a);`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
+	})
+
+	t.Run("add nomarvariable member", func(t *testing.T) {
+		code := `<?php
+
+class test
+{
+    public static $a = 1;
+}
+
+$a = "test";
+$b = "$a";
+println($a::$b);`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
+	})
 }
