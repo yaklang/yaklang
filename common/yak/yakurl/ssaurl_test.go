@@ -236,6 +236,7 @@ func TestSFURl(t *testing.T) {
 					if err := json.Unmarshal([]byte(extra.Value), &res); err != nil {
 						t.Error(err)
 					}
+					assert.Greater(t, len(res), 0)
 					for _, resItem := range res {
 						for _, item := range resItem {
 							if _, ok := graphInfoMap[item]; !ok {
