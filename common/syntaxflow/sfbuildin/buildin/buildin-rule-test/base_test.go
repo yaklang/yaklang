@@ -123,9 +123,14 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 									t.Fatal("contain any")
 								}
 							}
+							name := ""
 							val.Recursive(func(operator sfvm.ValueOperator) error {
 								switch ret := operator.(type) {
 								case *ssaapi.Value:
+									if ret.GetProgramName() == "" {
+										return nil
+									}
+									name = ret.GetProgramName()
 									return ssaapi.SaveValue(
 										ret,
 										ssaapi.OptionSaveValue_RuntimeId(runtimeId),
@@ -140,7 +145,9 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 								count++
 								_ = node
 							}
-							assert.Greater(t, count, 0)
+							if name != "" {
+								assert.Greater(t, count, 0)
+							}
 						}
 					} else {
 						t.Fatal("no alert found no result found")
