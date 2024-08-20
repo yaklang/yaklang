@@ -319,7 +319,7 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	// step3 Attempt to obtain instance methods and static methods
 	name, _ := checkCanMemberCall(object, key)
 	var typ Type
-	if object.GetType().GetTypeKind()==ClassBluePrintTypeKind{
+	if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 		blueprint := object.GetType().(*ClassBluePrint)
 		//normal
 		if method, ok := blueprint.Method[key.String()]; ok {
@@ -331,7 +331,6 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 		}
 	}
 
-	
 	// step4 try to peek value from this function
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
@@ -342,13 +341,19 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
 	if typ != nil {
 		origin.Kind = UndefinedMemberValid
-		origin.SetType(typ)
 	} else {
 		origin.Kind = UndefinedMemberInValid
 		t := NewFunctionTypeDefine(name, nil, nil, false)
 		t.IsMethod = true
-		origin.SetType(t)
+		typ = t
 	}
+	objectTyp := object.GetType()
+	if objectTyp != nil {
+		if fts := objectTyp.GetFullTypeNames(); len(fts) != 0 {
+			typ.SetFullTypeNames(fts)
+		}
+	}
+	origin.SetType(typ)
 	SetMemberCall(object, key, origin)
 	setMemberVerboseName(origin)
 	return origin
