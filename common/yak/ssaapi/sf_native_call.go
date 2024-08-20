@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"strconv"
 	"strings"
 
@@ -88,11 +89,10 @@ const (
 
 	NativeCall_FreeMarkerSink = "freeMarkerSink"
 
-	NativeCall_OpCodes = "opcodes"
-	NativeCall_SourceCode = "sourceCode"
+	NativeCall_OpCodes      = "opcodes"
+	NativeCall_SourceCode   = "sourceCode"
 	NativeCall_ScanPrevious = "scanPrevious"
-	NativeCall_ScanNext = "scanNext"
-
+	NativeCall_ScanNext     = "scanNext"
 )
 
 func init() {
@@ -202,6 +202,7 @@ func init() {
 				} else {
 					for _, ft := range fts {
 						//remove versioin name
+						ft = yakunquote.TryUnquote(ft)
 						index := strings.Index(ft, ":")
 						if index != -1 {
 							ft = ft[:index]
@@ -251,6 +252,7 @@ func init() {
 					vals = append(vals, results)
 				} else {
 					for _, ft := range fts {
+						ft = yakunquote.TryUnquote(ft)
 						results := val.NewValue(ssa.NewConst(ft))
 						results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
 						vals = append(vals, results)
