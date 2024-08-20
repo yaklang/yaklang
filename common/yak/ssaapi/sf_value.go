@@ -32,14 +32,14 @@ func (v *Value) IsList() bool {
 }
 
 func (v *Value) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, error) {
-	value := _SearchValue(v, mod, func(s string) bool { return s == want })
+	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
 	return value != nil, value, nil
 }
 
 func (v *Value) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
-	})
+	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
 	return value != nil, value, nil
 }
 
@@ -53,7 +53,7 @@ func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 func (v *Value) RegexpMatch(mod int, re string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
-	})
+	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
 	return value != nil, value, nil
 }
 
@@ -82,6 +82,10 @@ func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 			vs = append(vs, v.NewValue(para))
 		}
 	}
+	for _, value := range vs {
+		value.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("all-actual-args"))
+	}
+
 	return vs, nil
 }
 

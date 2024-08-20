@@ -74,21 +74,21 @@ func (value Values) Len() int {
 
 func (values Values) ExactMatch(mod int, want string) (bool, sfvm.ValueOperator, error) {
 	// log.Infof("ExactMatch: %v %v", mod, want)
-	newValue := _SearchValues(values, mod, func(s string) bool { return s == want })
+	newValue := _SearchValues(values, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
 	return len(newValue) > 0, newValue, nil
 }
 
 func (values Values) GlobMatch(mod int, g string) (bool, sfvm.ValueOperator, error) {
 	newValue := _SearchValues(values, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
-	})
+	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
 	return len(newValue) > 0, newValue, nil
 }
 
 func (values Values) RegexpMatch(mod int, re string) (bool, sfvm.ValueOperator, error) {
 	newValue := _SearchValues(values, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
-	})
+	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
 	return len(newValue) > 0, newValue, nil
 }
 

@@ -207,7 +207,9 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 		return ssa.AnyTypeKind
 	}
 	if n, ok := v.node.(ssa.Typed); ok {
-		return n.GetType().GetTypeKind()
+		if typ := n.GetType(); typ != nil {
+			return typ.GetTypeKind()
+		}
 	}
 	return ssa.AnyTypeKind
 }

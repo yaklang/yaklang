@@ -11,10 +11,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func _SearchValues(values Values, mod int, handler func(string) bool) Values {
+func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 	for _, value := range values {
-		result := _SearchValue(value, mod, handler)
+		result := _SearchValue(value, mod, handler, opt...)
 		newValue = append(newValue, result...)
 	}
 
@@ -22,8 +22,12 @@ func _SearchValues(values Values, mod int, handler func(string) bool) Values {
 	// return newValue
 }
 
-func _SearchValue(value *Value, mod int, compare func(string) bool) Values {
+func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
+	add := func(v *Value) {
+		v.AppendPredecessor(value, opt...)
+		newValue = append(newValue, v)
+	}
 	check := func(value *Value) bool {
 		if compare(value.GetName()) || compare(value.String()) {
 			return true
@@ -52,7 +56,7 @@ func _SearchValue(value *Value, mod int, compare func(string) bool) Values {
 	if mod&ssadb.NameMatch != 0 {
 		// handler self
 		if check(value) {
-			newValue = append(newValue, value)
+			add(value)
 		}
 	}
 	if mod&ssadb.KeyMatch != 0 {
@@ -60,7 +64,7 @@ func _SearchValue(value *Value, mod int, compare func(string) bool) Values {
 			allMember := value.node.GetAllMember()
 			for k, v := range allMember {
 				if check(value.NewValue(k)) {
-					newValue = append(newValue, value.NewValue(v))
+					add(value.NewValue(v))
 				}
 			}
 		}
