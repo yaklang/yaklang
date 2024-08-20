@@ -88,24 +88,21 @@ func (c *ClassBluePrint) GetMemberAndStaticMember(key string, supportStatic bool
 	return member
 }
 
-func (c *ClassBluePrint) GetConstruct() Value {
+func (c *ClassBluePrint) GetConstructOrDestruct(name string) Value {
 	var val Value = nil
 	c.getMethodEx("", func(bluePrint *ClassBluePrint) bool {
-		if utils.IsNil(bluePrint.Constructor) {
-			return false
+		switch name {
+		case "constructor":
+			if utils.IsNil(bluePrint.Constructor) {
+				return false
+			}
+			val = bluePrint.Constructor
+		case "destructor":
+			if utils.IsNil(bluePrint.Destructor) {
+				return false
+			}
+			val = bluePrint.Destructor
 		}
-		val = bluePrint.Constructor
-		return true
-	})
-	return val
-}
-func (c *ClassBluePrint) GetDestruct() Value {
-	var val Value = nil
-	c.getMethodEx("", func(bluePrint *ClassBluePrint) bool {
-		if utils.IsNil(bluePrint.Destructor) {
-			return false
-		}
-		val = bluePrint.Destructor
 		return true
 	})
 	return val

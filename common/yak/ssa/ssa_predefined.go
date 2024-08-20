@@ -237,8 +237,8 @@ func (n *anValue) Build() Value {
 	case Paring:
 		if utils.IsNil(n.spinValue) {
 			n.spinValue = NewConst("spin value")
-			return n.spinValue
 		}
+		return n.spinValue
 	case ParEnd:
 		return n.this
 	}
