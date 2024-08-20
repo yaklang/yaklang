@@ -45,6 +45,20 @@ func GetIrSourceByPathAndName(path, name string) (*IrSource, error) {
 	return &source, nil
 }
 
+func GetEditorByFileName(name string) (*memedit.MemEditor, error) {
+	dir, name := pathSplit(name)
+	source, err := GetIrSourceByPathAndName(dir, name)
+	if err != nil {
+		return nil, err
+	}
+	code := source.QuotedCode
+	if s, err := strconv.Unquote(code); err == nil {
+		code = s
+	}
+	ret := memedit.NewMemEditor(code)
+	return ret, nil
+}
+
 func SaveFile(filename, content string, folderPath []string) string {
 	start := time.Now()
 	defer func() {
