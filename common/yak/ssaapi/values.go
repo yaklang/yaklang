@@ -90,6 +90,11 @@ func (v *Value) GetProgramName() string {
 	if prog := v.node.GetProgram(); prog != nil {
 		return prog.GetProgramName()
 	}
+	if prog := v.ParentProgram; prog != nil {
+		if prog.Program != nil {
+			return prog.Program.GetProgramName()
+		}
+	}
 	return ""
 }
 
