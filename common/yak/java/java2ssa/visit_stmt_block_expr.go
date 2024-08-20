@@ -686,25 +686,6 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			// get parent class
 		}
 		methodCall := y.ReadMemberCallMethodVariable(object, memberKey)
-		//set type name
-		methodTyp := methodCall.GetType()
-		if methodTyp != nil && len(methodTyp.GetFullTypeNames()) == 0 {
-			if object != nil {
-				t := object.GetType()
-				if ftName := t.GetFullTypeNames(); len(ftName) != 0 {
-					methodTyp.SetFullTypeNames(ftName)
-					//If it is a function type, the setType method cannot be directly called
-					//because when anValue.SetType processes a function type,
-					//it also processes the Point, which affects the results of the ssaapi.
-					if f, ok := methodTyp.(*ssa.FunctionType); ok {
-						f.DisablePointSetting = true
-						methodCall.SetType(f)
-					} else {
-						methodCall.SetType(methodTyp)
-					}
-				}
-			}
-		}
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
@@ -1809,9 +1790,12 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	defer func() {
 		//set full type name
-		if len(value.GetType().GetFullTypeNames()) == 0 {
-			newType := y.AddFullTypeNameFromMap(name, value.GetType())
-			value.SetType(newType)
+		t := value.GetType()
+		if t!= nil{
+			if len(t.GetFullTypeNames()) == 0 {
+				newType := y.AddFullTypeNameFromMap(name, value.GetType())
+				value.SetType(newType)
+			}
 		}
 	}()
 
