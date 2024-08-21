@@ -586,7 +586,6 @@ func TestBasic_CFG_Break(t *testing.T) {
 		}, t)
 	})
 
-
 	t.Run("simple break label in loop", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		func main() {
@@ -602,27 +601,27 @@ func TestBasic_CFG_Break(t *testing.T) {
 			println(a) // phi(a)[1,2]
 		}
 		`, []string{
-			"2","phi(a)[1,2]",
+			"2", "phi(a)[1,2]",
 		}, t)
 	})
 
 	/*
-	t.Run("simple goto label in loop", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-		func main() {
-			a := 1
-			label1:
-			for i := 0; i < 10; i++ {
-				goto label1
-				a = 2
-				println(a) // unreachable
+		t.Run("simple goto label in loop", func(t *testing.T) {
+			test.CheckPrintlnValue(`package main
+			func main() {
+				a := 1
+				label1:
+				for i := 0; i < 10; i++ {
+					goto label1
+					a = 2
+					println(a) // unreachable
+				}
+				println(a) // 1
 			}
-			println(a) // 1
-		}
-		`, []string{
-			"1",
-		}, t)
-	})*/
+			`, []string{
+				"1",
+			}, t)
+		})*/
 
 	t.Run("simple break in switch", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
@@ -688,4 +687,3 @@ func TestBasic_CFG_Defer(t *testing.T) {
 		}, t)
 	})
 }
-

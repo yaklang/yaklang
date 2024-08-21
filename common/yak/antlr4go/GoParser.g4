@@ -52,7 +52,7 @@ packageName
     ;
 
 importDecl
-    : IMPORT (importSpec | L_PAREN eos? (importSpec eos?)* R_PAREN)
+    : IMPORT (importSpec | L_PAREN eos* (importSpec eos*)* R_PAREN)
     ;
 
 importSpec
@@ -86,7 +86,7 @@ expressionList
     ;
 
 typeDecl
-    : TYPE (typeSpec | L_PAREN eos? (typeSpec eos?)* eos? R_PAREN)
+    : TYPE (typeSpec | L_PAREN eos* (typeSpec eos*)* eos* R_PAREN)
     ;
 
 typeSpec
@@ -133,7 +133,7 @@ receiver
     ;
 
 varDecl
-    : VAR (varSpec | L_PAREN eos? (varSpec eos)* R_PAREN)
+    : VAR eos* (varSpec | L_PAREN eos* (varSpec eos*)* R_PAREN)
     ;
 
 varSpec
@@ -236,7 +236,7 @@ switchStmt
     ;
 
 exprSwitchStmt
-    : SWITCH eos* (expression? | simpleStmt? eos* expression?) L_CURLY eos* exprCaseClause* eos? R_CURLY
+    : SWITCH eos* (expression? | simpleStmt? eos* expression?) L_CURLY eos* exprCaseClause* eos* R_CURLY
     ;
 
 exprCaseClause
@@ -249,7 +249,7 @@ exprSwitchCase
     ;
 
 typeSwitchStmt
-    : SWITCH (typeSwitchGuard | eos typeSwitchGuard | simpleStmt eos typeSwitchGuard) L_CURLY eos? typeCaseClause* eos? R_CURLY
+    : SWITCH (typeSwitchGuard | eos* typeSwitchGuard | simpleStmt eos* typeSwitchGuard) L_CURLY eos* typeCaseClause* eos* R_CURLY
     ;
 
 typeSwitchGuard
@@ -266,11 +266,11 @@ typeSwitchCase
     ;
 
 typeList
-    : (type_ | NIL_LIT) (COMMA (type_ | NIL_LIT))*
+    : eos* (type_ | NIL_LIT) (COMMA eos* (type_ | NIL_LIT))*
     ;
 
 selectStmt
-    : SELECT L_CURLY eos? commClause* eos? R_CURLY
+    : SELECT L_CURLY eos* commClause* eos* R_CURLY
     ;
 
 commClause
@@ -345,7 +345,7 @@ pointerType
     ;
 
 interfaceType
-    : INTERFACE L_CURLY eos? ((methodSpec | typeElement) eos?)* eos? R_CURLY
+    : INTERFACE L_CURLY eos* ((methodSpec | typeElement) eos*)* eos* R_CURLY
     ;
 
 sliceType
@@ -408,7 +408,7 @@ primaryExpr
     : operand
     | conversion
     | methodExpr
-    | primaryExpr ( DOT IDENTIFIER | index | slice_ | typeAssertion | arguments)
+    | primaryExpr ( DOT IDENTIFIER typeArgs? | index | slice_ | typeAssertion | arguments)
     ;
 
 conversion

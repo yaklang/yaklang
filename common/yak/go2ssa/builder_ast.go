@@ -46,8 +46,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				currentBuilder := b.FunctionBuilder
 				b.FunctionBuilder = builder
 				defer func() {
-					for _,e := range builder.GetProgram().GetErrors() {
-					    currentBuilder.GetProgram().AddError(e)
+					for _, e := range builder.GetProgram().GetErrors() {
+						currentBuilder.GetProgram().AddError(e)
 					}
 					b.FunctionBuilder = currentBuilder
 				}()
@@ -232,9 +232,9 @@ func (b *astbuilder) buildConstDecl(constDecl *gol.ConstDeclContext) {
 	var isiota bool = false
 
 	for _, v := range constDecl.AllConstSpec() {
-		rightv,isiotat := b.buildConstSpec(v.(*gol.ConstSpecContext), defaul)
+		rightv, isiotat := b.buildConstSpec(v.(*gol.ConstSpecContext), defaul)
 		if isiotat { // 每个 const 块中的 iota 是独立的
-		    isiota = true
+			isiota = true
 			index = 1
 		}
 
@@ -246,7 +246,7 @@ func (b *astbuilder) buildConstDecl(constDecl *gol.ConstDeclContext) {
 	}
 }
 
-func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.Value) (ssa.Value,bool) {
+func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.Value) (ssa.Value, bool) {
 	recoverRange := b.SetRange(constSpec.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -268,15 +268,15 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.
 			rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 			rightvl = append(rightvl, rightv)
 		}
-	}else{
+	} else {
 		if defaul != nil && len(leftList) == 1 {
 			rightvl = append(rightvl, defaul)
-		}else{
+		} else {
 			b.NewError(ssa.Error, TAG, MissInitExpr(leftList[0].GetText()))
 		}
 	}
 	if rightvl[0].String() == "iota" {
-	    rightvl[0] = b.EmitConstInst(0)
+		rightvl[0] = b.EmitConstInst(0)
 		isiota = true
 	}
 
@@ -304,7 +304,6 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 		ssaTyp = b.buildType(typ.(*gol.Type_Context))
 	}
 
-	_ = ssaTyp
 	a := varSpec.ASSIGN()
 
 	if isglobal {
@@ -432,6 +431,10 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 		inter := rightVariables[0]
 		if c, ok := inter.(*ssa.Call); ok {
 			GetCallField(c, leftVariables)
+		} else {
+			for i, _ := range leftVariables {
+				b.AssignVariable(leftVariables[i], inter)
+			}
 		}
 	} else {
 		b.NewError(ssa.Error, TAG, MultipleAssignFailed(leftlen, rightlen))
@@ -1579,7 +1582,12 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 			rightv, _ := b.buildExpression(expl.Expression(s).(*gol.ExpressionContext), false)
 			values = append(values, rightv)
 		}
-		b.EmitReturn(values)
+		if len(values) == 0 {
+			b.NewError(ssa.Warn, TAG, "cannot return nil")
+			b.EmitReturn([]ssa.Value{b.EmitConstInstNil()})
+		} else {
+			b.EmitReturn(values)
+		}
 	} else {
 		results := b.GetResultDefault()
 		if results != nil {
@@ -1589,7 +1597,7 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 			b.EmitReturn(values)
 		} else {
 			b.NewError(ssa.Warn, TAG, "cannot return nil")
-			b.EmitReturn(nil)
+			b.EmitReturn([]ssa.Value{b.EmitConstInstNil()})
 		}
 	}
 }
@@ -1776,8 +1784,16 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			if obj != nil {
 				ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
 				if ssatyp == nil {
-					ssatyp = ssa.CreateAnyType()
+					// TODO
+					ssatyp = ssa.NewAliasType(qul.IDENTIFIER(1).GetText(), obj.PkgPathString(), ssa.CreateUndefinedType())
 				}
+			} else { // 有时golang的package名称可能和导入名称不同，在golang库解析实现之前只能考虑新建一个结构体对象
+				b.NewError(ssa.Warn, TAG, StructNotFind(qul.GetText()))
+				objt := ssa.NewObjectType()
+				objt.SetTypeKind(ssa.StructTypeKind)
+				objt.SetName(qul.IDENTIFIER(0).GetText())
+				b.AddStruct(objt.Name, objt)
+				ssatyp = ssa.NewAliasType(qul.IDENTIFIER(1).GetText(), objt.PkgPathString(), ssa.CreateUndefinedType())
 			}
 		}
 	} else {

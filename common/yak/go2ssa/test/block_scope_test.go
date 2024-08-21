@@ -20,7 +20,7 @@ func TestBlock_Value_If(t *testing.T) {
 		 	println(a) // Undefined-a
 		}
 		`, []string{
-			"2","2","Undefined-a",
+			"2", "2", "Undefined-a",
 		}, t)
 	})
 
@@ -36,7 +36,7 @@ func TestBlock_Value_If(t *testing.T) {
 		 	println(a) // 1
 		}
 		`, []string{
-			"2","2","1",
+			"2", "2", "1",
 		}, t)
 	})
 
@@ -52,7 +52,7 @@ func TestBlock_Value_If(t *testing.T) {
 		 	println(a) // 2
 		}
 		`, []string{
-			"2","2","2",
+			"2", "2", "2",
 		}, t)
 	})
 
@@ -71,7 +71,7 @@ func TestBlock_Value_If(t *testing.T) {
 			println(b) // 3
 		}
 		`, []string{
-			"2","3",
+			"2", "3",
 		}, t)
 	})
 
@@ -89,7 +89,7 @@ func TestBlock_Value_If(t *testing.T) {
 			}
 		}
 		`, []string{
-			"1","1","2","1",
+			"1", "1", "2", "1",
 		}, t)
 	})
 
@@ -106,7 +106,7 @@ func TestBlock_Value_If(t *testing.T) {
 			}
 		}
 		`, []string{
-			"1","2","2",
+			"1", "2", "2",
 		}, t)
 	})
 
@@ -125,7 +125,7 @@ func TestBlock_Value_If(t *testing.T) {
 			println(i)	// 1
 		}
 		`, []string{
-			"2","3","3","1",
+			"2", "3", "3", "1",
 		}, t)
 	})
 
@@ -144,7 +144,7 @@ func TestBlock_Value_If(t *testing.T) {
 			println(i)	// 3
 		}
 		`, []string{
-			"2","3","3","3",
+			"2", "3", "3", "3",
 		}, t)
 	})
 
@@ -165,14 +165,14 @@ func TestBlock_Value_If(t *testing.T) {
 			println(b) // 3
 		}
 		`, []string{
-			"2","3","3",
+			"2", "3", "3",
 		}, t)
 	})
 }
 
 func TestBlock_Value_Switch(t *testing.T) {
 	t.Run("switch stmt;exp", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		
 		func main(){
 			switch a := 2; a {
@@ -181,11 +181,11 @@ func TestBlock_Value_Switch(t *testing.T) {
 			}
 			println(a) // Undefined-a
 		}
-		`, []string{"2","Undefined-a"}, t)
+		`, []string{"2", "Undefined-a"}, t)
 	})
 
 	t.Run("switch stmt;exp EX", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		
 		func main(){
 			a := 1
@@ -197,11 +197,11 @@ func TestBlock_Value_Switch(t *testing.T) {
 			}
 			println(a) // 2
 		}
-		`, []string{"2","phi(a)[1,2]"}, t)
+		`, []string{"2", "phi(a)[1,2]"}, t)
 	})
 
 	t.Run("switch stmt;exp EX2", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		
 		func main(){
 			a := 1
@@ -213,11 +213,11 @@ func TestBlock_Value_Switch(t *testing.T) {
 			}
 			println(a) // 1
 		}
-		`, []string{"2","1"}, t)
+		`, []string{"2", "1"}, t)
 	})
 
 	t.Run("switch stmt;exp EX3", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 
 		func main(){
 			a := 1
@@ -227,11 +227,11 @@ func TestBlock_Value_Switch(t *testing.T) {
 			}
 			println(a) // 2
 		}
-		`, []string{"2","2"}, t)
+		`, []string{"2", "2"}, t)
 	})
 
 	t.Run("switch stmt;exp and block", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		
 		func main(){
 			a := 1
@@ -245,13 +245,13 @@ func TestBlock_Value_Switch(t *testing.T) {
 			}
 			println(b) // 3
 		}
-		`, []string{"2","3"}, t)
+		`, []string{"2", "3"}, t)
 	})
 }
 
 func TestBlock_Value_Select(t *testing.T) {
 	t.Run("select recv", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 
 		func main(){
 			channel1 := make(chan int)
@@ -265,31 +265,31 @@ func TestBlock_Value_Select(t *testing.T) {
 			default:
 			}
 		}
-		`, []string{"chan(Function-make(typeValue(chan number)))","chan(Function-make(typeValue(chan number)))"}, t)
+		`, []string{"chan(Function-make(typeValue(chan number)))", "chan(Function-make(typeValue(chan number)))"}, t)
 	})
 
 	// TODO: select send
 	/*
-	t.Run("select send", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		t.Run("select send", func(t *testing.T) {
+			test.CheckPrintlnValue( `package main
 
-		func main(){
-			channel1 := make(chan int)
-			channel2 := make(chan int)
+			func main(){
+				channel1 := make(chan int)
+				channel2 := make(chan int)
 
-		    select {
-			case channel1 <- 1:
-			case channel2 <- 2:
-			default:
+			    select {
+				case channel1 <- 1:
+				case channel2 <- 2:
+				default:
+				}
 			}
-		}
-		`, []string{""}, t)
-	})*/
+			`, []string{""}, t)
+		})*/
 }
 
 func TestBlock_Value_For(t *testing.T) {
 	t.Run("for stmt;exp;", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 			i := 0
 			for i = 1; i < 10; {
@@ -297,22 +297,22 @@ func TestBlock_Value_For(t *testing.T) {
 			}
 			println(i) // 1
 		}
-		`, []string{"1","1"}, t)
+		`, []string{"1", "1"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 			for i := 1; i < 10; i++ {
 				println(i) // phi
 			}
 			println(i) // Undefined-i
 		}
-		`, []string{"phi(i)[1,add(i, 1)]","Undefined-i"}, t)
+		`, []string{"phi(i)[1,add(i, 1)]", "Undefined-i"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt EX", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 			i := 10
 			for i := 5; i < 10; i++ {
@@ -320,11 +320,11 @@ func TestBlock_Value_For(t *testing.T) {
 			}
 			println(i) // 10
 		}
-		`, []string{"phi(i)[5,add(i, 1)]","10"}, t)
+		`, []string{"phi(i)[5,add(i, 1)]", "10"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt EX2", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 			i := 10
 			for i := 5; i < 10; i++ {
@@ -333,11 +333,11 @@ func TestBlock_Value_For(t *testing.T) {
 			}
 			println(i) // 10
 		}
-		`, []string{"phi(i)[5,11]","10"}, t)
+		`, []string{"phi(i)[5,11]", "10"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt EX3", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 			a := 1
 			i := 10
@@ -347,11 +347,11 @@ func TestBlock_Value_For(t *testing.T) {
 			println(i) // 10
 			println(a) // phi
 		}
-		`, []string{"10","phi(a)[1,10]"}, t)
+		`, []string{"10", "phi(a)[1,10]"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt EX4", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		func main(){
 			a := 1
 			i := 10
@@ -362,11 +362,11 @@ func TestBlock_Value_For(t *testing.T) {
 			println(i) // phi
 			println(a) // 1
 		}
-		`, []string{"phi(i)[5,add(i, 1)]","phi(i)[5,add(i, 1)]","1"}, t)
+		`, []string{"phi(i)[5,add(i, 1)]", "phi(i)[5,add(i, 1)]", "1"}, t)
 	})
 
 	t.Run("for stmt;exp;stmt and block", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 
 		func main(){
 			a := 1
@@ -379,6 +379,6 @@ func TestBlock_Value_For(t *testing.T) {
 			}
 			println(b) // 3
 		}
-		`, []string{"phi(a)[1,add(a, 1)]","3"}, t)
+		`, []string{"phi(a)[1,add(a, 1)]", "3"}, t)
 	})
 }
