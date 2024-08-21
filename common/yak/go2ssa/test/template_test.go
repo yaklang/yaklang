@@ -8,7 +8,7 @@ import (
 
 func TestTemplate_Type(t *testing.T) {
 	t.Run("template type", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 		type Queue[T int] struct {
 			items []T
 		}
@@ -19,14 +19,13 @@ func TestTemplate_Type(t *testing.T) {
 			println(item)
 		}
 
-		`, []string{ "Undefined-item(valid)",
-		}, t)
+		`, []string{"Undefined-item(valid)"}, t)
 	})
 }
 
 func TestTemplate_Function(t *testing.T) {
 	t.Run("template function", func(t *testing.T) {
-		test.CheckPrintlnValue( `package main
+		test.CheckPrintlnValue(`package main
 
 		func Pop[T int | string | bool](t T) T {
 			return t

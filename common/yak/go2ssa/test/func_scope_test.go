@@ -33,7 +33,7 @@ func TestFunction_Value(t *testing.T) {
 			println(add(1,2))
 		}
 		`, []string{
-			"Function-add","Function-add(1,2)",
+			"Function-add", "Function-add(1,2)",
 		}, t)
 	})
 
@@ -68,7 +68,7 @@ func TestFunction_Value(t *testing.T) {
 			println(count)
 		}
 		`, []string{
-			"2","1","1",
+			"2", "1", "1",
 		}, t)
 	})
 }
@@ -86,7 +86,7 @@ func TestClosu_Value(t *testing.T) {
 			println(a)
 		}
 		`, []string{
-			"FreeValue-a","1",
+			"FreeValue-a", "1",
 		}, t)
 	})
 
@@ -104,7 +104,7 @@ func TestClosu_Value(t *testing.T) {
 			println(a)
 		}
 		`, []string{
-			"2","1","side-effect(2, a)",
+			"2", "1", "side-effect(2, a)",
 		}, t)
 	})
 
@@ -129,7 +129,7 @@ func TestClosu_Value(t *testing.T) {
 		}
 
 		`, []string{
-			"1","1","1",
+			"1", "1", "1",
 		}, t)
 	})
 }
@@ -152,7 +152,7 @@ func TestClosu_Value_InFunction(t *testing.T) {
 			println(a)
 		}
 		`, []string{
-			"FreeValue-a","1",
+			"FreeValue-a", "1",
 		}, t)
 	})
 
@@ -174,8 +174,7 @@ func TestClosu_Value_InFunction(t *testing.T) {
 				println(a)
 			}
 		`, []string{
-			"FreeValue-a","Function-test()() binding[1]",
+			"FreeValue-a", "Function-test()() binding[1]",
 		}, t)
 	})
 }
-

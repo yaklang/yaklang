@@ -164,7 +164,7 @@ BIG_U_VALUE:
 
 // String literals
 
-RAW_STRING_LIT         : '`' ~'`'* '`' ;
+RAW_STRING_LIT         : '`' (.*?) '`' ;
 INTERPRETED_STRING_LIT : '"' (~["\\] | ESCAPED_VALUE)* '"' ;
 RAW_CHAR_LIT           : '\'' (~['\\] | ESCAPED_VALUE)? '\'';
 
