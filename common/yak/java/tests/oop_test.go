@@ -482,4 +482,14 @@ public class Main{
 			"Undefined-File(Undefined-File)",
 		}, t)
 	})
+	t.Run("test undefind function call", func(t *testing.T) {
+		code := `class tes1 {
+    public void function(test t) {
+        for (int a = 0; ; ) {
+            println(t.a());
+        }
+    }
+}`
+		ssatest.CheckPrintlnValue(code, []string{"ParameterMember-parameter[1].a(Parameter-t)"}, t)
+	})
 }
