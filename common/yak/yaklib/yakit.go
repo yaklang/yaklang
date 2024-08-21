@@ -61,6 +61,8 @@ var YakitExports = map[string]interface{}{
 	"Debug":         emptyVirtualClient.YakitDebug,
 	"Error":         emptyVirtualClient.YakitError,
 	"Text":          emptyVirtualClient.YakitTextBlock,
+	"Success":       emptyVirtualClient.YakitSuccess,
+	"Code":          emptyVirtualClient.YakitCode,
 	"Markdown":      emptyVirtualClient.YakitMarkdown,
 	"Report":        emptyVirtualClient.YakitReport,
 	"File":          emptyVirtualClient.YakitFile,
@@ -118,6 +120,8 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"Warn":          client.YakitWarn,
 		"Error":         client.YakitError,
 		"Text":          client.YakitTextBlock,
+		"Success":       client.YakitSuccess,
+		"Code":          client.YakitCode,
 		"Markdown":      client.YakitMarkdown,
 		"Report":        client.YakitReport,
 		"File":          client.YakitFile,
@@ -455,6 +459,7 @@ func YakitMessageGenerator(i interface{}) ([]byte, error) {
 // 设置基本图形
 type YakitGraph struct {
 	// line / bar / pie
+	Name string             `json:"name"`
 	Type string             `json:"type"`
 	Data []*yakitGraphValue `json:"data"`
 }
@@ -473,26 +478,48 @@ func (y *YakitGraph) Add(k string, v interface{}, id ...string) {
 	})
 }
 
-func NewLineGraph() *YakitGraph {
+var graphBaseName = "数据图表"
+
+func NewLineGraph(graphName ...string) *YakitGraph {
+	name := graphBaseName
+	if len(graphName) > 0 {
+		name = graphName[0]
+	}
 	return &YakitGraph{
+		Name: name,
 		Type: "line",
 	}
 }
 
-func NewBarGraph() *YakitGraph {
+func NewBarGraph(graphName ...string) *YakitGraph {
+	name := graphBaseName
+	if len(graphName) > 0 {
+		name = graphName[0]
+	}
 	return &YakitGraph{
+		Name: name,
 		Type: "bar",
 	}
 }
 
-func NewPieGraph() *YakitGraph {
+func NewPieGraph(graphName ...string) *YakitGraph {
+	name := graphBaseName
+	if len(graphName) > 0 {
+		name = graphName[0]
+	}
 	return &YakitGraph{
+		Name: name,
 		Type: "pie",
 	}
 }
 
-func NewWordCloud() *YakitGraph {
+func NewWordCloud(graphName ...string) *YakitGraph {
+	name := graphBaseName
+	if len(graphName) > 0 {
+		name = graphName[0]
+	}
 	return &YakitGraph{
+		Name: name,
 		Type: "wordcloud",
 	}
 }
@@ -508,6 +535,14 @@ func GetYakitClientInstance() *YakitClient {
 
 func (c *YakitClient) YakitTextBlock(tmp interface{}) {
 	c.YakitDraw("text", tmp)
+}
+
+func (c *YakitClient) YakitSuccess(tmp interface{}) {
+	c.YakitDraw("success", tmp)
+}
+
+func (c *YakitClient) YakitCode(tmp interface{}) {
+	c.YakitDraw("code", tmp)
 }
 
 func (c *YakitClient) YakitMarkdown(tmp interface{}) {
