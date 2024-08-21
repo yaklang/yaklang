@@ -191,6 +191,8 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 		c.Args[index] = to
 	} else if binding, ok := c.Binding[v.GetName()]; ok && binding == v {
 		c.Binding[v.GetName()] = to
+	} else if index := slices.Index(c.ArgMember, v); index > -1 {
+		c.ArgMember[index] = to
 	} else {
 		panic("call not use this value")
 	}

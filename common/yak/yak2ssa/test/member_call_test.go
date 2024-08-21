@@ -331,5 +331,25 @@ func Test_CallMember_Make(t *testing.T) {
 		}
 		`, []string{"Parameter-a"}, t)
 	})
+	t.Run("check free value", func(t *testing.T) {
 
+		code := `var a= 1
+for(x=1;;){
+    var b = func(){
+    return a
+}()
+	println(b)
+}`
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("check free value1", func(t *testing.T) {
+		code := `var a = ssa
+for(x=1;;){
+    var b = func(){
+    return a.Yak
+}()
+	println(b)
+}`
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"Undefined-a", "Undefined-a.Yak(valid)"}}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
 }

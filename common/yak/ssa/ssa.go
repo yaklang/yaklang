@@ -545,6 +545,11 @@ type Parameter struct {
 	FormalParameterIndex int
 }
 
+func (p *Parameter) ReplaceValue(v Value, to Value) {
+	if p.defaultValue == v {
+		p.defaultValue = to
+	}
+}
 func (p *Parameter) GetDefault() Value {
 	return p.defaultValue
 }
@@ -554,6 +559,8 @@ func (p *Parameter) SetDefault(v Value) {
 		return
 	}
 	p.defaultValue = v
+	//增加一个ud关系绑定
+	v.AddUser(p)
 	v.AddPointer(p)
 }
 

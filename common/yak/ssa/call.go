@@ -149,7 +149,6 @@ func (c *Call) handlerGeneric() {
 	}
 	c.Method = newMethod
 }
-
 func (c *Call) handlerObjectMethod() {
 	args := c.Args
 	target := c.Method
@@ -160,6 +159,7 @@ func (c *Call) handlerObjectMethod() {
 		} else {
 			args = utils.InsertSliceItem(args, this, 0)
 		}
+		this.AddUser(c)
 	}
 	switch t := target.GetType().(type) {
 	case *FunctionType:
@@ -266,9 +266,9 @@ func (c *Call) handleCalleeFunction() {
 					)
 					continue
 				}
-				c.ArgMember = append(c.ArgMember,
-					builder.ReadMemberCallVariable(object, key),
-				)
+				val := builder.ReadMemberCallVariable(object, key)
+				val.AddUser(c)
+				c.ArgMember = append(c.ArgMember, val)
 			}
 			break
 		}
@@ -321,17 +321,22 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 	recoverBuilder := builder.SetCurrent(c)
 	defer recoverBuilder()
 
+	bindAndHandler := func(name string, val Value) {
+		val.AddUser(c)
+		c.Binding[name] = val
+	}
 	for _, fv := range fvs {
 		// if freeValue has default value, skip
 		if fv.GetDefault() != nil {
-			c.Binding[fv.GetName()] = fv.GetDefault()
+			bindAndHandler(fv.GetName(), fv.GetDefault())
 			continue
 		}
 
 		v := builder.PeekValue(fv.GetName())
 
 		if v != nil {
-			c.Binding[fv.GetName()] = v
+			bindAndHandler(fv.GetName(), v)
+			//c.Binding[fv.GetName()] = v
 		} else {
 			// mark error in freeValue.Variable
 			// get freeValue
