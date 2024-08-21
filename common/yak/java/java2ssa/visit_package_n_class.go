@@ -21,9 +21,9 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 	if i == nil {
 		return
 	}
+	type callback func(ssa.Value)
 
-	var instanceCallback = func(ssa.Value) {}
-	var defCallbacks = func(ssa.Value) {}
+	var callBacks []callback
 
 	var modifier []string
 	for _, mod := range i.AllClassOrInterfaceModifier() {
@@ -32,26 +32,27 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 			continue
 		}
 		if raw.Annotation() != nil {
-			instanceCallback, defCallbacks = y.VisitAnnotation(raw.Annotation())
+			instanceCallback, defCallback := y.VisitAnnotation(raw.Annotation())
+			callBacks = append(callBacks, instanceCallback)
+			callBacks = append(callBacks, defCallback)
 		}
 		modifier = append(modifier, mod.GetText())
 	}
-	_ = instanceCallback
-	_ = defCallbacks
-
 	if ret := i.ClassDeclaration(); ret != nil {
 		container := y.VisitClassDeclaration(ret, nil)
 		if container != nil {
-			instanceCallback(container)
-			defCallbacks(container)
+			for _,callBack := range callBacks {
+				callBack(container)
+			}
 		}
 	} else if ret := i.EnumDeclaration(); ret != nil {
 		y.VisitEnumDeclaration(ret, nil)
 	} else if ret := i.InterfaceDeclaration(); ret != nil {
 		container := y.VisitInterfaceDeclaration(ret)
 		if container != nil {
-			instanceCallback(container)
-			defCallbacks(container)
+			for _,callBack := range callBacks {
+				callBack(container)
+			}
 		} else {
 			log.Error("BUG: interface container is nil")
 		}
