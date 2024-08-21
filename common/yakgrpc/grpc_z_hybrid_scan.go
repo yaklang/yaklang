@@ -213,9 +213,12 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		}
 		return nil
 	case <-streamCtx.Done():
-		taskManager.Stop()
-		RemoveHybridTask(taskId)
-		return utils.Error("client canceled")
+		if !firstRequest.GetDetach() {
+			taskManager.Stop()
+			RemoveHybridTask(taskId)
+			return utils.Error("client canceled")
+		}
+		return nil
 	}
 }
 
