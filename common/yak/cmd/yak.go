@@ -378,6 +378,11 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "disable-reverse-server",
 			Usage: "关闭反连服务器",
 		},
+		cli.StringFlag{
+			Name:  "common-name",
+			Usage: "设置证书的 Common Name, 默认为 Server",
+			Value: "Server",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
@@ -386,6 +391,12 @@ var startGRPCServerCommand = cli.Command{
 		if c.Bool("disable-output") {
 			os.Setenv("YAK_DISABLE", "output")
 		}
+
+		cn := c.String("common-name")
+		if cn == "" {
+			cn = "Server"
+		}
+
 		enableProfile := c.Bool("pprof")
 		if enableProfile {
 			println("----------------------------------------------------------------------")
@@ -502,7 +513,7 @@ var startGRPCServerCommand = cli.Command{
 				log.Warnf("open ca-key failed: %s", err)
 			}
 			if cert == nil || key == nil {
-				cert, key, err = tlsutils.GenerateSelfSignedCertKeyWithCommonNameEx("Yakit TeamServer Root", "Yakit TeamServer Root", "", nil, nil, nil, false)
+				cert, key, err = tlsutils.GenerateSelfSignedCertKeyWithCommonNameEx(cn+" Root", cn+" Root", "", nil, nil, nil, false)
 				if err != nil {
 					return err
 				}
@@ -520,7 +531,7 @@ var startGRPCServerCommand = cli.Command{
 				log.Infof("use current Root CA to login (For Yakit)\n\n%v\n\n", string(cert))
 			}
 
-			serverCert, serverKey, err := tlsutils.SignServerCrtNKeyWithParams(cert, key, "Yakit TeamServer", time.Now().Add(100*365*24*time.Hour), false)
+			serverCert, serverKey, err := tlsutils.SignServerCrtNKeyWithParams(cert, key, cn, time.Now().Add(100*365*24*time.Hour), false)
 			if err != nil {
 				return err
 			}
