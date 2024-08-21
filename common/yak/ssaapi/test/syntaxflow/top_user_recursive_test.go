@@ -82,3 +82,21 @@ func TestObject_Recursive(t *testing.T) {
 		)
 	})
 }
+
+func TestFunctionCall_REcursive(t *testing.T) {
+	t.Run("function call", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f = (a) => {
+			return a
+		}
+		f2 = (a)  => {
+			target = f(a)
+			f2(target)
+		}
+		`, `
+		target #-> * as $target
+		`, map[string][]string{
+			"target": {},
+		})
+	})
+}
