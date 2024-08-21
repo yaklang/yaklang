@@ -87,7 +87,7 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
-	fmt.Printf("Program: %v done\n",astBuilder.pkgNameCurrent)
+	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
 	return nil
 }
 
@@ -97,13 +97,13 @@ func (*SSABuilder) FilterFile(path string) bool {
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
-	cmap        []map[string]struct{}
-	globalv     map[string]ssa.Value
-	structTypes map[string]*ssa.ObjectType
-	aliasTypes  map[string]*ssa.AliasType
-	result      []string
-	extendFuncs map[string]map[string]*ssa.Function
-	tpHander    map[string]func()
+	cmap           []map[string]struct{}
+	globalv        map[string]ssa.Value
+	structTypes    map[string]*ssa.ObjectType
+	aliasTypes     map[string]*ssa.AliasType
+	result         []string
+	extendFuncs    map[string]map[string]*ssa.Function
+	tpHander       map[string]func()
 	pkgNameCurrent string
 }
 
@@ -226,9 +226,9 @@ func (b *astbuilder) GetSpecialTypeByStr(name string) ssa.Type {
 }
 
 func (b *astbuilder) GetSpecialValueByStr(name string) ssa.Value {
-	for _,s := range SpecialValue{
-		if s == name{
-		    return b.EmitConstInst(s)
+	for _, s := range SpecialValue {
+		if s == name {
+			return b.EmitConstInst(s)
 		}
 	}
 	return nil

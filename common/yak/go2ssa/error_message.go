@@ -68,7 +68,7 @@ func MakeSliceArgumentTooMuch() string {
 }
 
 func NotSetTypeInMakeExpression(typ string) string {
-	return fmt.Sprintf("not set type %s in make expression",typ)
+	return fmt.Sprintf("not set type %s in make expression", typ)
 }
 
 func MakeUnknownType() string {
@@ -116,5 +116,5 @@ func StructNotFind(n string) string {
 }
 
 func MissInitExpr(name string) string {
-	return fmt.Sprintf("miss init expression for %s",name)
+	return fmt.Sprintf("miss init expression for %s", name)
 }
