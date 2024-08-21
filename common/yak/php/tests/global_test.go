@@ -1,9 +1,10 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestGlobal(t *testing.T) {
@@ -49,7 +50,7 @@ function test(){
 	`
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* #-> * as $param)`,
-			map[string][]string{"param": {"1", "make(any)"}},
+			map[string][]string{"param": {"1"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
