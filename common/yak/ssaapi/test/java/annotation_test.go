@@ -158,3 +158,31 @@ public interface HomeDao3 {
 		return nil
 	})
 }
+
+func TestAnnotation_MutliAnnotation(t *testing.T) {
+	ssatest.CheckWithName("annotation-basic-TestAnnotation_Mutli_Annotation", t, `
+package com.vuln.controller;
+
+@Controller("aa")
+@ResponseBody("bb")
+public class DemoABCEntryClass {
+    @PostMapping("/")
+    @ResponseStatus("200")
+    public String methodEntry(@RequestParam(value = "xml_str") String xmlStr) throws Exception {
+        return "Hello World" + xmlStr;
+    }
+}
+`, func(prog *ssaapi.Program) error {		
+		prog.Show()
+		assert.Equal(t, prog.SyntaxFlowChain("Controller.__ref__ as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("ResponseBody.__ref__ as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.Controller.value?{have:'aa'} as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseBody.value?{have:'bb'} as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+
+		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__ as $ref", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain("ResponseStatus.__ref__ as $ref", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.*Mapping.value?{have:'/'} as $ref", sf.WithEnableDebug(false)).Show(false).Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseStatus.value?{have:'200'} as $ref ", sf.WithEnableDebug(false)).Show().Len(), 1)
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
