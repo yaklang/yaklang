@@ -1,0 +1,73 @@
+desc(
+    title: 'Checking [Swagger2 Configuration] in Springfox Aware',
+    type: audit,
+    level: low,
+    desc: <<<TEXT
+Springfox 是一个用于生成 Spring Boot 应用程序的 API 文档的库，主要与 Swagger 结合使用。它通过注解和配置来自动生成 API 文档，并提供一个用户友好的界面来查看和测试 API。
+TEXT
+)
+
+.api?{ <getFormalParams>?{<typeName>?{have: SwaggerProperties} } } as $config;
+check $config
+alert $config;
+
+desc(
+    lang: java,
+'file://config.java': <<<TEXT
+package com.ruoyi.common.swagger.config;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spi.service.contexts.SecurityContext;
+import springfox.documentation.spring.web.plugins.ApiSelectorBuilder;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+@Configuration
+@EnableSwagger2
+@EnableConfigurationProperties(SwaggerProperties.class)
+@ConditionalOnProperty(name = "swagger.enabled", matchIfMissing = true)
+@Import({SwaggerBeanPostProcessor.class, SwaggerWebConfiguration.class})
+public class SwaggerAutoConfiguration
+{
+    /**
+     * 默认的排除路径，排除Spring Boot默认的错误处理路径和端点
+     */
+    private static final List<String> DEFAULT_EXCLUDE_PATH = Arrays.asList("/error", "/actuator/**");
+
+    private static final String BASE_PATH = "/**";
+
+    @Bean
+    public Docket api(SwaggerProperties swaggerProperties)
+    {
+        // base-path处理
+        if (swaggerProperties.getBasePath().isEmpty())
+        {
+            swaggerProperties.getBasePath().add(BASE_PATH);
+        }
+        // noinspection unchecked
+        List<Predicate<String>> basePath = new ArrayList<Predicate<String>>();
+        swaggerProperties.getBasePath().forEach(path -> basePath.add(PathSelectors.ant(path)));
+
+        // exclude-path处理
+        if (swaggerProperties.getExcludePath().isEmpty())
+        {
+            swaggerProperties.getExcludePath().addAll(DEFAULT_EXCLUDE_PATH);
+        }
+
+        List<Predicate<String>> excludePath = new ArrayList<>();
+        swaggerProperties.getExcludePath().forEach(path -> excludePath.add(PathSelectors.ant(path)));
+
+        ApiSelectorBuilder builder = new Docket(DocumentationType.SWAGGER_2).host(swaggerProperties.getHost())
+                .apiInfo(apiInfo(swaggerProperties)).select()
+                .apis(RequestHandlerSelectors.basePackage(swaggerProperties.getBasePackage()));
+
+        swaggerProperties.getBasePath().forEach(p -> builder.paths(PathSelectors.ant(p)));
+        swaggerProperties.getExcludePath().forEach(p -> builder.paths(PathSelectors.ant(p).negate()));
+
+        return builder.build().securitySchemes(securitySchemes()).securityContexts(securityContexts()).pathMapping("/");
+    }
+}
+TEXT
+)
