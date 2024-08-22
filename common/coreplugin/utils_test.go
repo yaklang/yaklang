@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/stretchr/testify/require"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -140,5 +144,29 @@ func Must(condition bool, errMsg ...string) {
 		} else {
 			panic("TESTCASE FAILED")
 		}
+	}
+}
+
+func TestCorePluginAstCompileTime(t *testing.T) {
+	for _, pluginName := range GetAllCorePluginName() {
+		bytes := GetCorePluginData(pluginName)
+		avgDur := time.Duration(0)
+		times := 3
+		for i := 0; i < times; i++ {
+			lexer := yak.NewYaklangLexer(antlr.NewInputStream(string(bytes)))
+			lexer.RemoveErrorListeners()
+			tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+			parser := yak.NewYaklangParser(tokenStream)
+			parser.RemoveErrorListeners()
+			now := time.Now()
+			raw := parser.Program()
+			_ = raw
+			//println(raw.ToStringTree(parser.RuleNames, parser))
+			avgDur += time.Since(now)
+			fmt.Printf("[%d] ast compile time: %s \n", i, time.Since(now))
+		}
+		avgDur /= time.Duration(times)
+		fmt.Printf("---avg ast compile time: [%s]---\n", avgDur)
+		require.LessOrEqual(t, avgDur.Milliseconds(), int64(600), fmt.Sprintf("core plugin [%s] ast compile timeout", pluginName))
 	}
 }
