@@ -453,4 +453,21 @@ a($a);`
 			map[string][]string{"target": {"Undefined-a"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("test function", func(t *testing.T) {
+		code := `<?php
+function getfiles($files)
+{
+    while (1) {
+        if (b) {
+            b($files);
+        } else {
+            $files = [1];
+        }
+        return $files;
+    }
+}`
+		test.CheckSyntaxFlow(t, code, `b(* #-> * as $param)`, map[string][]string{
+			"param": {"Parameter-$files", "make(any)", "1", "Undefined-b"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
