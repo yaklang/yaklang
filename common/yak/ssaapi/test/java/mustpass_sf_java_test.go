@@ -3,7 +3,7 @@ package java
 import (
 	"embed"
 	_ "embed"
-	"path/filepath"
+	"path"
 	"testing"
 
 	"golang.org/x/exp/slices"
@@ -104,19 +104,19 @@ func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
 		if f.IsDir() {
 			continue
 		}
-		path := filepath.Join("mustpass", f.Name())
-		raw, err := sf_rules.ReadFile(path)
+		rulePath := path.Join("mustpass", f.Name())
+		raw, err := sf_rules.ReadFile(rulePath)
 		if err != nil {
-			t.Fatalf("cannot found syntax fs: %v", path)
+			t.Fatalf("cannot found syntax fs: %v", rulePath)
 		}
 		if len(include) != 0 && !slices.Contains(include, f.Name()) {
 			continue
 		}
 		frame, err := vm.Compile(string(raw))
 		if err != nil {
-			t.Fatalf("syntaxFlow compile error: %s", path)
+			t.Fatalf("syntaxFlow compile error: %s", rulePath)
 		}
-		t.Log("compile success: ", path)
+		t.Log("compile success: ", rulePath)
 
 		t.Run(f.Name(), func(t *testing.T) {
 			res, err := frame.Feed(vs)

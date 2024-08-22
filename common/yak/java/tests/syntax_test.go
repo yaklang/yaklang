@@ -3,7 +3,7 @@ package tests
 import (
 	"embed"
 	"fmt"
-	"path/filepath"
+	"path"
 	"strings"
 	"testing"
 
@@ -30,14 +30,14 @@ func TestAllSyntaxForJava_G4(t *testing.T) {
 		if f.IsDir() {
 			continue
 		}
-		path := filepath.Join("code", f.Name())
-		if !strings.HasSuffix(path, ".java") {
+		codePath := path.Join("code", f.Name())
+		if !strings.HasSuffix(codePath, ".java") {
 			continue
 		}
-		raw, err := codeFs.ReadFile(path)
+		raw, err := codeFs.ReadFile(codePath)
 		if err != nil {
-			t.Fatalf("cannot found syntax fs: %v", path)
+			t.Fatalf("cannot found syntax fs: %v", codePath)
 		}
-		validateSource(t, path, string(raw))
+		validateSource(t, codePath, string(raw))
 	}
 }
