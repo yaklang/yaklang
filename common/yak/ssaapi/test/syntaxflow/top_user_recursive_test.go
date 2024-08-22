@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -96,7 +97,19 @@ func TestFunctionCall_REcursive(t *testing.T) {
 		`, `
 		target #-> * as $target
 		`, map[string][]string{
-			"target": {},
+			"target": {"FreeValue-f(Parameter-a)"},
+		})
+	})
+}
+
+func TestFunctionCall_Recursive2(t *testing.T) {
+	t.Run("function call", func(t *testing.T) {
+		ssatest.Check(t, `f2 = (a)  => {
+			f2(a)
+		}`, func(prog *ssaapi.Program) error {
+			result := prog.SyntaxFlow("a?{opcode: param} #-> * as $target")
+			result.Show()
+			return nil
 		})
 	})
 }

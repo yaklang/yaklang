@@ -17,8 +17,11 @@ type objectItem struct {
 type AnalyzeContext struct {
 	// Self
 	Self *Value
+
 	// function call stack
-	_callStack *utils.Stack[*Value]
+	_callStack         *utils.Stack[*Value]
+	_negativeCallStack bool
+
 	_callTable *omap.OrderedMap[int64, *CallVisited]
 
 	// object visit stack
@@ -26,9 +29,18 @@ type AnalyzeContext struct {
 
 	config *OperationConfig
 
-	depth int
+	depth                       int
+	haveBeenReachedDepthLimited bool
 
 	_recursiveCounter int64
+}
+
+func (a *AnalyzeContext) ReachDepthLimited() {
+	a.haveBeenReachedDepthLimited = true
+}
+
+func (a *AnalyzeContext) IsReachedDepthLimited() bool {
+	return a.haveBeenReachedDepthLimited
 }
 
 func (a *AnalyzeContext) GetRecursiveCounter() int64 {
@@ -39,9 +51,9 @@ func (a *AnalyzeContext) EnterRecursive() {
 	atomic.AddInt64(&a._recursiveCounter, 1)
 }
 
-func (a *AnalyzeContext) ExitRecursive() {
-	atomic.AddInt64(&a._recursiveCounter, -1)
-}
+//func (a *AnalyzeContext) ExitRecursive() {
+//	atomic.AddInt64(&a._recursiveCounter, -1)
+//}
 
 // CallVisited is used to record the visited phi\object\default,
 // and only used in the single call
@@ -102,6 +114,14 @@ func (a *AnalyzeContext) PopCall() *Value {
 	val := a._callStack.Pop()
 	a._callTable.Delete(val.GetId())
 	return val
+}
+
+func (a *AnalyzeContext) EnableNegativeCallStack(b bool) {
+	a._negativeCallStack = b
+}
+
+func (a *AnalyzeContext) IsNegativeCallStack() bool {
+	return a._negativeCallStack
 }
 
 func (g *AnalyzeContext) GetCurrentCall() *Value {
