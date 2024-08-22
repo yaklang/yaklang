@@ -310,7 +310,7 @@ characterLiteral: CharacterLiteral;
 sliceLiteral: '[' ws* expressionListMultiline? ws* ']';
 
  sliceTypedLiteral
-     : sliceTypeLiteral '{' ws* expressionListMultiline? ws* '}'
+     : sliceTypeLiteral '{' ws* expressionListMultiline? ws* ';'?'}'
      ;
 
 // 表达式列表
@@ -320,10 +320,10 @@ expressionListMultiline: expression (',' ws* expression)* ','?;
 /* map literal */
 mapLiteral
     : mapTypedLiteral
-    |'{' ws* mapPairs? ws* '}'
+    |'{' ws* mapPairs? ws* ';'? '}'
     ;
 mapTypedLiteral
-    : mapTypeLiteral '{' ws* mapPairs? ws* '}'
+    : mapTypeLiteral '{' ws* mapPairs? ws* ';'?'}'
     ;
 mapPairs: mapPair (',' ws* mapPair)* ','?;
 mapPair: expression ':' expression;
@@ -336,5 +336,4 @@ eos
     | LF +
     | COMMENT
     | LINE_COMMENT
-    | { this.closingBracket() }?
     ;
