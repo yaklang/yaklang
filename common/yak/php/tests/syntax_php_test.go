@@ -7,7 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"path/filepath"
+	"path"
 	"strings"
 	"testing"
 
@@ -80,16 +80,16 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		if f.IsDir() {
 			continue
 		}
-		path := filepath.Join("syntax", f.Name())
-		if !strings.HasSuffix(path, ".php") {
+		syntaxPath := path.Join("syntax", f.Name())
+		if !strings.HasSuffix(syntaxPath, ".php") {
 			continue
 		}
-		raw, err := syntaxFs.ReadFile(path)
+		raw, err := syntaxFs.ReadFile(syntaxPath)
 		if err != nil {
-			t.Fatalf("cannot found syntax fs: %v", path)
+			t.Fatalf("cannot found syntax fs: %v", syntaxPath)
 		}
 		//ssatest.MockSSA(t, string(raw))
-		validateSource(t, path, string(raw))
+		validateSource(t, syntaxPath, string(raw))
 	}
 }
 
