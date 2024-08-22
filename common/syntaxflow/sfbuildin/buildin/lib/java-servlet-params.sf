@@ -4,7 +4,7 @@ desc(
   lib: 'servlet-param'
 )
 
-/(do(Get|Post|Delete|Filter|\w+))|(service)/(*?{!have: this && opcode: param } as $req);
+/(do(Get|Post|Delete|Filter|[A-Z]\w+))|(service)/(*?{!have: this && opcode: param } as $req);
 $req.getParameter() as $directParam;
 $req -{
   hook: `*.getParameter() as $indirectParam`
