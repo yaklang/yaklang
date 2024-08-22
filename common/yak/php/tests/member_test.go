@@ -15,4 +15,15 @@ function dump($a){}
 		echo 1,2,3,5;
 		`)
 	})
+	t.Run("array assign", func(t *testing.T) {
+		code := `<?php
+
+$files[] = array(
+    'url' => substr($path2, strlen($_SERVER['DOCUMENT_ROOT'])),
+    'mtime' => filemtime($path2)
+);
+println($files);
+`
+		test.CheckSyntaxFlowPrintWithPhp(t, code, []string{"make(any)", "Undefined-substr", "Undefined-$path2", "Function-strlen", "make(any)", "Undefined-filemtime"})
+	})
 }
