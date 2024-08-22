@@ -205,14 +205,13 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		callInst := y.NewCall(caller, []ssa.Value{args})
 		return y.EmitCall(callInst)
 	case *phpparser.ArrayCreationExpressionContext:
-		creation, i := y.VisitArrayCreation(ret.ArrayCreation())
-		obj := y.EmitMakeWithoutType(y.EmitConstInst(i), y.EmitConstInst(i))
+		creation, _ := y.VisitArrayCreation(ret.ArrayCreation())
+		container := y.EmitEmptyContainer()
 		for _, values := range creation {
 			key, value := values[0], values[1]
-			variable := y.ReadOrCreateMemberCallVariable(obj, key).GetLastVariable()
-			y.AssignVariable(variable, value)
+			y.AssignVariable(y.CreateMemberCallVariable(container, key), value)
 		}
-		return obj
+		return container
 	case *phpparser.ScalarExpressionContext: // constant / string / label / php literal
 		if i := ret.Constant(); i != nil {
 			return y.VisitConstant(i)
