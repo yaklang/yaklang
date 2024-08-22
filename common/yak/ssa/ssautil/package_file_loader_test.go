@@ -2,6 +2,7 @@ package ssautil
 
 import (
 	"io"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,10 +61,10 @@ func Test_PackageLoader(t *testing.T) {
 	t.Run("check directory in include path", func(t *testing.T) {
 		ch, err := loader.LoadDirectoryPackage("b", false)
 		require.NoError(t, err, "LoadDirectoryPackage failed for c", err)
-		filepath := make([]string, 0)
+		packagePath := make([]string, 0)
 		for v := range ch {
-			filepath = append(filepath, v.FileName)
+			packagePath = append(packagePath, v.FileName)
 		}
-		require.Equal(t, []string{"testdata/b/b.txt"}, filepath, "LoadDirectoryPackage failed for b")
+		require.Equal(t, []string{filepath.Join("testdata", "b", "b.txt")}, packagePath, "LoadDirectoryPackage failed for b")
 	})
 }
