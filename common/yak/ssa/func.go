@@ -56,7 +56,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 
 	enter := f.NewBasicBlock("entry")
-	enter.SetScope(NewScope(f, p.GetProgramName()))
+	enter.SetScope(f.GetProgram().GetApplication().ScopeCallback(NewScope(f, p.GetProgramName())))
 	f.EnterBlock = enter
 	return f
 }

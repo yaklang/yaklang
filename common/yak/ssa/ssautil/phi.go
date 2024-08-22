@@ -7,7 +7,7 @@ func ForEachCapturedVariable[T versionedValue](
 	handler VariableHandler[T],
 ) {
 	scope.ForEachCapturedVariable(func(name string, ver VersionedIF[T]) {
-		if ver.CanCaptureInScope(base) {
+		if ver.CanCaptureInScope(base) || scope.GetForceCapture() {
 			handler(name, ver)
 		}
 	})

@@ -40,6 +40,8 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// this scope
 	SetThis(ScopedVersionedTableIF[T])
 	GetThis() ScopedVersionedTableIF[T]
+	SetForceCapture()
+	GetForceCapture() bool
 
 	// create sub scope
 	CreateSubScope() ScopedVersionedTableIF[T]
@@ -81,6 +83,9 @@ func (s *ScopedVersionedTable[T]) GetScopeName() string {
 func (s *ScopedVersionedTable[T]) SetScopeName(name string) {
 	s.ScopeName = name
 }
+func (s *ScopedVersionedTable[T]) GetForceCapture() bool {
+	return s.ForceCapture
+}
 
 func (s *ScopedVersionedTable[T]) GetScopeID() int64 {
 	return s.ScopeId
@@ -103,9 +108,10 @@ func (s *ScopedVersionedTable[T]) SetScopeID(i int64) {
 // }
 
 type ScopedVersionedTable[T versionedValue] struct {
-	ProgramName string
-	ScopeName   string
-	ScopeId     int64
+	ProgramName  string
+	ForceCapture bool
+	ScopeName    string
+	ScopeId      int64
 
 	level         int
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
@@ -146,6 +152,10 @@ type ScopedVersionedTable[T versionedValue] struct {
 
 func (s *ScopedVersionedTable[T]) SetCallback(f func(VersionedIF[T])) {
 	s.callback = f
+}
+
+func (s *ScopedVersionedTable[T]) SetForceCapture() {
+	s.ForceCapture = true
 }
 
 func NewScope[T versionedValue](
@@ -287,7 +297,7 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 		// not in current scope
 		if scope.spin {
 			if scope.GetParent() == ret.GetScope() {
-			    isLocal = ret.GetLocal()
+				isLocal = ret.GetLocal()
 			}
 			t := scope.CreateVariable(name, isLocal)
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
@@ -380,11 +390,16 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 	}
 	// get variable from parent
 	parentVariable := v.GetParent().ReadVariable(name)
-	if parentVariable == nil {
+	if parentVariable == nil && !v.ForceCapture {
 		return
 	}
+	if parentVariable != nil {
+		ver.SetCaptured(parentVariable)
+	} else {
+		variable := v.GetParent().CreateVariable(name, false)
+		v.GetParent().AssignVariable(variable, ver.GetValue())
+	}
 	// mark original captured variable
-	ver.SetCaptured(parentVariable)
 	v.linkCaptured[name] = ver
 	//v.captured.Set(name, ver)
 }
