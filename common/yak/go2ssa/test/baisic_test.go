@@ -327,6 +327,24 @@ func TestFuntion_normol(t *testing.T) {
 	})
 }
 
+func TestClosu_normol(t *testing.T) {
+	t.Run("baisic", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			key := 0
+			a := func(){
+			    key = 6
+			}
+			println(key)
+			a()
+			println(key)
+		}
+
+		`, []string{"0", "side-effect(6, key)"}, t)
+	})
+}
+
 func TestType_normol(t *testing.T) {
 	t.Run("baisic unassign", func(t *testing.T) {
 
