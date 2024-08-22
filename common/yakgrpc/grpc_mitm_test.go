@@ -1572,3 +1572,64 @@ func TestGRPCMUSTTPASS_MITM_CAPages(t *testing.T) {
 		}, nil)
 	})
 }
+
+func TestGRPCMUSTTPASS_MITM_CheckHistoryDurationField(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host:                  "127.0.0.1",
+		Port:                  uint32(mitmPort),
+		ForceDisableKeepAlive: true,
+	})
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		writer.Write([]byte("ok"))
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		msg := string(rsp.GetMessage().GetMessage())
+		fmt.Println(msg)
+		if strings.Contains(msg, `starting mitm server`) {
+			packet := lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /abc HTTP/1.1
+Host: example.com
+
+`), "Host", utils.HostPort(host, port))
+			_, err := lowhttp.HTTP(
+				lowhttp.WithPacketBytes(packet),
+				lowhttp.WithProxy("http://"+utils.HostPort("127.0.0.1", mitmPort)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	res, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   1,
+			OrderBy: "created_at",
+			Order:   "desc",
+		},
+	})
+	assert.Equal(t, 1, len(res.GetData()))
+	if res.GetData()[0].DurationMs == 0 {
+		t.Fatal("save http flow duration failed")
+	}
+}
