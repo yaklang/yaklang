@@ -164,8 +164,8 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 					continue
 				}
 				stmt := istmt.(*yak.StatementContext)
-				// 忽略开头的empty
-				if i == 0 && stmt.Empty() != nil {
+				// 忽略开头和结尾的empty
+				if (i == 0 || i == lenOfAllStatement-1) && stmt.Empty() != nil {
 					continue
 				}
 
@@ -224,8 +224,8 @@ func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 				continue
 			}
 			stmt := istmt.(*yak.StatementContext)
-			// 忽略开头的empty
-			if i == 0 && stmt.Empty() != nil {
+			// 忽略开头和结尾的empty
+			if (i == 0 || i == lenOfAllStatement-1) && stmt.Empty() != nil {
 				continue
 			}
 
