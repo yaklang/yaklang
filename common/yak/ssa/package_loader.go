@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -18,7 +17,8 @@ func (b *FunctionBuilder) AddIncludePath(path string) {
 func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	p := b.GetProgram()
 	includePaths := p.GetIncludeFiles()
-	p.Loader.AddIncludePath(filepath.Dir(b.GetEditor().GetFilename()))
+	dir, _ := p.Loader.GetFilesysFileSystem().PathSplit(b.GetEditor().GetFilename())
+	p.Loader.AddIncludePath(dir)
 	currentMode := b.Included
 	defer func() {
 		b.Included = currentMode
