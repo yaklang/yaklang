@@ -6,6 +6,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	mq "github.com/yaklang/yaklang/common/mq"
 	utils "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type SCAN_StartScriptRequest struct {
@@ -66,8 +67,20 @@ type SCAN_InvokeScriptResponse struct {
 	Data interface{}
 }
 
+type SCAN_QueryYakScriptResponse struct {
+	Pagination *ypb.Paging
+	Total      int64
+	Data       []*ypb.YakScript
+	Groups     []string
+}
+
 var (
-	MethodList = []string{"SCAN_StartScript", "SCAN_GetRunningTasks", "SCAN_StopTask", "SCAN_RadCrawler", "SCAN_DownloadXrayAndRad", "SCAN_IsXrayAndRadAvailable", "SCAN_ScanFingerprint", "SCAN_BasicCrawler", "SCAN_ProxyCollector", "SCAN_InvokeScript"}
+	MethodList = []string{
+		"SCAN_StartScript", "SCAN_GetRunningTasks", "SCAN_StopTask",
+		"SCAN_RadCrawler", "SCAN_DownloadXrayAndRad", "SCAN_IsXrayAndRadAvailable",
+		"SCAN_ScanFingerprint", "SCAN_BasicCrawler", "SCAN_ProxyCollector",
+		"SCAN_InvokeScript", "SCAN_QueryYakScript",
+	}
 )
 
 type SCANServerHelper struct {
@@ -81,6 +94,7 @@ type SCANServerHelper struct {
 	DoSCAN_BasicCrawler          func(ctx context.Context, node string, req *SCAN_BasicCrawlerRequest, broker *mq.Broker) (*SCAN_BasicCrawlerResponse, error)
 	DoSCAN_ProxyCollector        func(ctx context.Context, node string, req *SCAN_ProxyCollectorRequest, broker *mq.Broker) (*SCAN_ProxyCollectorResponse, error)
 	DoSCAN_InvokeScript          func(ctx context.Context, node string, req *SCAN_InvokeScriptRequest, broker *mq.Broker) (*SCAN_InvokeScriptResponse, error)
+	DoSCAN_QueryYakScript        func(ctx context.Context, node string, req *ypb.QueryYakScriptRequest, broker *mq.Broker) (*SCAN_QueryYakScriptResponse, error)
 }
 
 func (h *SCANServerHelper) Do(broker *mq.Broker, ctx context.Context, f, node string, delivery *amqp.Delivery) (message interface{}, e error) {
@@ -185,6 +199,16 @@ func (h *SCANServerHelper) Do(broker *mq.Broker, ctx context.Context, f, node st
 			return nil, utils.Errorf("not implemented")
 		}
 		return h.DoSCAN_InvokeScript(ctx, node, &req, broker)
+	case "SCAN_QueryYakScript":
+		var req ypb.QueryYakScriptRequest
+		err := json.Unmarshal(delivery.Body, &req)
+		if err != nil {
+			return nil, err
+		}
+		if h.DoSCAN_QueryYakScript == nil {
+			return nil, utils.Errorf("not implemented")
+		}
+		return h.DoSCAN_QueryYakScript(ctx, node, &req, broker)
 	default:
 		return nil, utils.Errorf("unknown func: %v", f)
 	}

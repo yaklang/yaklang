@@ -207,6 +207,7 @@ func (s *ScanNode) initScanRPC() {
 	}
 	scanHelper.DoSCAN_InvokeScript = s.rpc_invokeScript
 	scanHelper.DoSCAN_StartScript = s.rpc_startScript
+	scanHelper.DoSCAN_QueryYakScript = s.rpcQueryYakScript
 
 	s.node.GetRPCServer().RegisterServices(scanrpc.MethodList, scanHelper.Do)
 }
