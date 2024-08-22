@@ -109,16 +109,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		}
 	}
 
-	for i, meth := range ast.AllMethodDecl() {
-		if meth, ok := meth.(*gol.MethodDeclContext); ok {
-			b.buildMethodDeclFinish(meth, methlist[i])
-		}
+	for _, f := range methlist {
+		f.Build()
 	}
-
-	for i, fun := range ast.AllFunctionDecl() {
-		if fun, ok := fun.(*gol.FunctionDeclContext); ok {
-			b.buildFunctionDeclFinish(fun, funclist[i])
-		}
+	for _, f := range funclist {
+		f.Build()
 	}
 
 	var cbpHander = func(cbp *ssa.ClassBluePrint) {
@@ -599,26 +594,28 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		variable := b.CreateLocalVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
-	return newFunc
-}
 
-func (b *astbuilder) buildFunctionDeclFinish(fun *gol.FunctionDeclContext, newFunc *ssa.Function) {
-	recoverRange := b.SetRange(fun.BaseParserRuleContext)
-	defer func() {
-		recoverRange()
-		if tph := b.tpHander[newFunc.GetName()]; tph != nil {
-			tph()
-			delete(b.tpHander, newFunc.GetName())
+	newFunc.SetOrdinalBuild(func() ssa.Value {
+		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		defer func() {
+			recoverRange()
+			if tph := b.tpHander[newFunc.GetName()]; tph != nil {
+				tph()
+				delete(b.tpHander, newFunc.GetName())
+			}
+		}()
+		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		if block, ok := fun.Block().(*gol.BlockContext); ok {
+			b.buildBlock(block)
 		}
-	}()
-	b.FunctionBuilder = b.PushFunction(newFunc)
+		b.Finish()
+		b.CleanResultDefault()
+		b.FunctionBuilder = b.PopFunction()
 
-	if block, ok := fun.Block().(*gol.BlockContext); ok {
-		b.buildBlock(block)
-	}
-	b.Finish()
-	b.CleanResultDefault()
-	b.FunctionBuilder = b.PopFunction()
+		return newFunc
+	})
+	return newFunc
 }
 
 func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Function {
@@ -686,26 +683,27 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		variable := b.CreateLocalVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
-	return newFunc
-}
+	newFunc.SetOrdinalBuild(func() ssa.Value {
+		recoverRange := b.SetRange(fun.BaseParserRuleContext)
+		defer func() {
+			recoverRange()
+			if tph := b.tpHander[newFunc.GetName()]; tph != nil {
+				tph()
+				delete(b.tpHander, newFunc.GetName())
+			}
+		}()
+		b.FunctionBuilder = b.PushFunction(newFunc)
 
-func (b *astbuilder) buildMethodDeclFinish(fun *gol.MethodDeclContext, newFunc *ssa.Function) {
-	recoverRange := b.SetRange(fun.BaseParserRuleContext)
-	defer func() {
-		recoverRange()
-		if tph := b.tpHander[newFunc.GetName()]; tph != nil {
-			tph()
-			delete(b.tpHander, newFunc.GetName())
+		if block, ok := fun.Block().(*gol.BlockContext); ok {
+			b.buildBlock(block)
 		}
-	}()
-	b.FunctionBuilder = b.PushFunction(newFunc)
+		b.Finish()
+		b.CleanResultDefault()
+		b.FunctionBuilder = b.PopFunction()
 
-	if block, ok := fun.Block().(*gol.BlockContext); ok {
-		b.buildBlock(block)
-	}
-	b.Finish()
-	b.CleanResultDefault()
-	b.FunctionBuilder = b.PopFunction()
+		return newFunc
+	})
+	return newFunc
 }
 
 func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {
