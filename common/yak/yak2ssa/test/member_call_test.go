@@ -352,4 +352,27 @@ for(x=1;;){
 }`
 		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"Undefined-a", "Undefined-a.Yak(valid)"}}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
+	t.Run("test freeValue in loop", func(t *testing.T) {
+		code := `var a = ssa
+for(){
+    if(c){
+		println(a.Yak)
+    }else{
+        a = 1
+    }
+}`
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"Undefined-a", "1", "Undefined-c"}}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test paramMember in loop", func(t *testing.T) {
+		code := `func(a){
+for{
+    if(c){
+		a = 1
+    }else{
+        println(a)
+    }
+}
+}`
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1", "FreeValue-c", "Parameter-a"}}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
 }
