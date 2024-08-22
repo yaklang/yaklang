@@ -579,6 +579,19 @@ func (b *astbuilder) buildBlock(stmt *yak.BlockContext, syntaxBlocks ...bool) {
 		b.NewError(ssa.Warn, TAG, "empty block")
 		return
 	}
+	var notEmpty bool
+	for _, st := range s.AllStatement() {
+		insideStmt := st.(*yak.StatementContext)
+		// 忽略开头和结尾的empty
+		if insideStmt.Empty() == nil {
+			notEmpty = true
+			break
+		}
+	}
+	if !notEmpty {
+		b.NewError(ssa.Warn, TAG, "empty block")
+		return
+	}
 	if syntaxBlock {
 		b.BuildSyntaxBlock(func() {
 			b.buildStatementList(s)
