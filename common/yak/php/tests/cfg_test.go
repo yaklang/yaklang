@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -30,27 +29,19 @@ println($a);
 	})
 
 	//todo: 修改scope之后待过测试
-
-	//	t.Run("custom if and class", func(t *testing.T) {
-	//		code := `<?php
-	//
-	//$a = 2;
-	//if ($a) {
-	//    class t
-	//    {
-	//        public $a = 1;
-	//    }
-	//} else {
-	//    class t
-	//    {
-	//        public $a = 2;
-	//    }
-	//}
-	//
-	//$c = new t();
-	//println($c->a);`
-	//		ssatest.CheckPrintlnValue(code, []string{}, t)
-	//	})
+	t.Run("php cfg", func(t *testing.T) {
+		code := `<?php
+	$c = 1;
+	$a = 2;
+	if ($c) {
+	   $a = 1;
+	} else {
+	   $a = 2;
+	}
+	
+	println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[1,2]"}, t)
+	})
 	t.Run("custom-if-else", func(t *testing.T) {
 		code := `<?php
 $a=0;
@@ -113,10 +104,7 @@ println($a);`
 		code := `<?php if ($a == 5) { ?>
 <sample></sample>
 <?php }; ?>`
-		ssatest.CheckError(t, ssatest.TestCase{
-			Code: code,
-			Want: []string{ssa.ValueUndefined("$a")},
-		})
+		ssatest.MockSSA(t, code)
 	})
 	t.Run("html-if-else", func(t *testing.T) {
 		code := `<?php if ($a == 5) { ?>
@@ -124,10 +112,7 @@ println($a);`
 <?php }else{ ?>
     <script>1</script>
 <?php }?>`
-		ssatest.CheckError(t, ssatest.TestCase{
-			Code: code,
-			Want: []string{ssa.ValueUndefined("$a")},
-		})
+		ssatest.MockSSA(t, code)
 	})
 }
 
@@ -213,10 +198,7 @@ switch($a):;
    default:
        echo 1;
 endswitch;`
-		ssatest.CheckError(t, ssatest.TestCase{
-			Code: code,
-			Want: []string{ssa.ValueUndefined("$a")},
-		})
+		ssatest.MockSSA(t, code)
 	})
 	t.Run("custom-switch-only-case", func(t *testing.T) {
 		code := `<?php
@@ -329,10 +311,7 @@ println($a); // phi[2, 5]
         3;
     <?php break;?>
 <?php endswitch; ?>`
-		ssatest.CheckError(t, ssatest.TestCase{
-			Code: code,
-			Want: []string{ssa.ValueUndefined("$a")},
-		})
+		ssatest.MockSSA(t, code)
 	})
 }
 func TestExpression_Loop(t *testing.T) {
@@ -382,6 +361,25 @@ $a++;
 } while ($a>3);
 println($a);`
 		ssatest.CheckPrintlnValue(code, []string{"phi($a)[0,add(phi($a)[1,0], 1)]"}, t)
+	})
+	t.Run("for value", func(t *testing.T) {
+		code := `<?php
+while (1) {
+    $a = 1;
+}
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("for test and global scope have value", func(t *testing.T) {
+		code := `<?php
+$a = 2;
+while (1) {
+    if(c){
+		$a =3;
+	}
+}
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[3,2]"}, t)
 	})
 }
 

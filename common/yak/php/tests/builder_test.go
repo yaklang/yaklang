@@ -201,10 +201,7 @@ func TestParseSSA_IF(t *testing.T) {
 if ($a > 0) {
 echo "abc";
 }`
-	test.CheckError(t, test.TestCase{
-		Code: code,
-		Want: []string{ssa.ValueUndefined("$a")},
-	})
+	test.MockSSA(t, code)
 }
 
 func TestParseSSA_TryCatch(t *testing.T) {
