@@ -13,6 +13,7 @@ type YaklangLexerBase struct {
 	_heredocIdentifier string
 	_heredocCRLF       string
 	_templateDepth     uint64
+	waitForCloseToken  antlr.Token
 }
 
 var templateDepthMap = new(sync.Map)
@@ -59,4 +60,26 @@ func (l *YaklangLexer) DocEndDistribute() bool {
 		}
 		return false
 	}
+}
+
+func (l *YaklangLexerBase) NextToken() antlr.Token {
+	if l.waitForCloseToken != nil {
+		next := l.waitForCloseToken
+		l.waitForCloseToken = nil
+		return next
+	}
+
+	next := l.BaseLexer.NextToken()
+
+	if next.GetTokenType() == YaklangLexerRBrace || next.GetTokenType() == -1 {
+		semit := l.GetTokenFactory().Create(
+			l.GetTokenSourceCharStreamPair(), YaklangLexerSemiColon, ";", next.GetChannel(),
+			next.GetStart(), next.GetStop()-1,
+			next.GetLine(), next.GetColumn(),
+		)
+		l.waitForCloseToken = next
+		next = semit
+	}
+
+	return next
 }
