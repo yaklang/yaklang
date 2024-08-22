@@ -29,6 +29,7 @@ func NewChildProgram(prog *Program, name string, add bool) *Program {
 	program.ExternInstance = prog.ExternInstance
 	program.ExternLib = prog.ExternLib
 	program.GlobalScope = prog.GlobalScope
+	program.ScopeCallback = prog.ScopeCallback
 	if add {
 		prog.ChildApplication = append(prog.ChildApplication, program)
 	}
@@ -57,6 +58,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
 		ExternInstance:          make(map[string]any),
 		ExternLib:               make(map[string]map[string]any),
+		ScopeCallback:           func(scope ScopeIF) ScopeIF { return scope },
 	}
 	if kind == Application {
 		prog.Application = prog

@@ -33,6 +33,10 @@ func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	initHandler("global", "get", "post", "cookie", "env", "session", "server")
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	fb.GetProgram().GlobalScope = container
+	fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
+		scope.SetForceCapture()
+		return scope
+	}
 }
 func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
