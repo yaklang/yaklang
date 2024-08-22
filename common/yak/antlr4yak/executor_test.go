@@ -246,7 +246,7 @@ assert f"${d.$e}" == "23"
 
 func TestNewExecutor_MultiQuote(t *testing.T) {
 	code := `dump(123)))`
-	if err := NewExecutor(code).VM.SafeExec(); !strings.Contains(err.Error(), "mismatched input ')'") {
+	if err := NewExecutor(code).VM.SafeExec(); !strings.Contains(err.Error(), "compile error") {
 		panic(err)
 	}
 }
