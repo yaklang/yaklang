@@ -1512,7 +1512,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, req, "mitm", reqUrl, remoteAddr)
 			flow.StatusCode = 200 // 先设置成200
 		} else {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, "mitm", reqUrl, remoteAddr) // , !responseOverSize)
+			var duration time.Duration
+			if i, ok := httpctx.GetResponseTraceInfo(req).(*lowhttp.LowhttpTraceInfo); ok {
+				duration = i.TotalTime
+			}
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, "mitm", reqUrl, remoteAddr, yakit.CreateHTTPFlowWithDuration(duration)) // , !responseOverSize)
 		}
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
