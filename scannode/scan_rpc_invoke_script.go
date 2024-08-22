@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
 	"os"
 	"os/exec"
@@ -218,4 +219,45 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	}
 
 	return &res, nil
+}
+
+func (s *ScanNode) rpcQueryYakScript(ctx context.Context, node string, req *ypb.QueryYakScriptRequest, broker *mq.Broker) (*scanrpc.SCAN_QueryYakScriptResponse, error) {
+
+	if req.GetNoResultReturn() {
+		return &scanrpc.SCAN_QueryYakScriptResponse{
+			Pagination: req.GetPagination(),
+			Total:      0,
+			Data:       nil,
+			Groups:     nil,
+		}, nil
+	}
+	p, data, err := yakit.QueryYakScript(consts.GetGormProfileDatabase(), req)
+	if err != nil {
+		return nil, err
+	}
+
+	rsp := &scanrpc.SCAN_QueryYakScriptResponse{
+		Pagination: &ypb.Paging{
+			Page:    int64(p.Page),
+			Limit:   int64(p.Limit),
+			OrderBy: req.Pagination.OrderBy,
+			Order:   req.Pagination.Order,
+		},
+		Total: int64(p.TotalRecord),
+	}
+	for _, d := range data {
+		rsp.Data = append(rsp.Data, d.ToGRPCModel())
+	}
+	var gs []string
+	groups, err := yakit.QueryGroupCount(consts.GetGormProfileDatabase(), nil, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		gs = append(gs, group.Value)
+	}
+	if len(gs) > 0 {
+		rsp.Groups = gs
+	}
+	return rsp, nil
 }
