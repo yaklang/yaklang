@@ -65,7 +65,7 @@ func (p *Phi) ReplaceValue(v Value, to Value) {
 	if index := slices.Index(p.Edge, v); index != -1 {
 		p.Edge[index] = to
 	} else {
-		panic("phi not use this value")
+		log.Warnf("phi not use this value")
 	}
 }
 

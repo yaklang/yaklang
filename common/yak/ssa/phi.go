@@ -63,6 +63,10 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 				phi2.Edge[index] = header
 				ret[name] = phi2
 				DeleteInst(phiValue)
+				ReplaceAllValue(phiValue, phi2)
+				for name, v := range ReplaceMemberCall(phiValue, phi2) {
+					ret[name] = v
+				}
 				return
 			}
 		}
