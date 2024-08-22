@@ -59,9 +59,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	}
 
 	actx.EnterRecursive()
-	defer func() {
-		actx.ExitRecursive()
-	}()
 
 	// 1w recursive call check
 	if !utils.InGithubActions() {
@@ -71,16 +68,22 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 	}
 
+	if actx.IsReachedDepthLimited() {
+		return Values{v}
+	}
+
 	actx.depth++
 	defer func() {
 		actx.depth--
 	}()
 	v.SetDepth(actx.depth)
 	if actx.config.MaxDepth > 0 && actx.depth > actx.config.MaxDepth {
-		return Values{}
+		actx.ReachDepthLimited()
+		return Values{v}
 	}
 	if actx.config.MinDepth < 0 && actx.depth < actx.config.MinDepth {
-		return Values{}
+		actx.ReachDepthLimited()
+		return Values{v}
 	}
 
 	if len(actx.config.HookEveryNode) > 0 {
