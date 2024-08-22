@@ -29,13 +29,14 @@ func (y *YakCompiler) VisitStatementList(raw yak.IStatementListContext, inline .
 	allStatement := i.AllStatement()
 	lenOfAllStatement := len(allStatement)
 	for index, s := range allStatement {
+		stmt := s.(*yak.StatementContext)
 		if index == 0 && len(inline) > 0 && inline[0] {
+		} else if index == lenOfAllStatement-1 && stmt.Empty() != nil {
+			continue
 		} else {
 			y.writeIndent()
 		}
-		y.keepCommentLine(allStatement, index)
-
-		newLine = y.VisitStatement(s.(*yak.StatementContext))
+		newLine = y.VisitStatement(stmt)
 		if index < lenOfAllStatement-1 && newLine {
 			y.writeNewLine()
 		}
