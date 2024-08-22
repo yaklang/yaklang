@@ -630,6 +630,12 @@ func SyntaxFlowQuery(
 	dbDebug, sfDebug, showDot, withCode bool,
 	callbacks ...func(*sfvm.SFFrameResult),
 ) error {
+	defer func() {
+		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
 	// set database
 	if databaseFileRaw != "" {
 		// set database path
