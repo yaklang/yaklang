@@ -4689,6 +4689,7 @@ message HTTPFlow {
 
   // payloads (web fuzzer)
   repeated string Payloads = 47;
+  int64 DurationMs = 48;
 }
 
 message FuzzableParam {

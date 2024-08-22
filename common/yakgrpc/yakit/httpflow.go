@@ -45,8 +45,10 @@ func RegisterLowHTTPSaveCallback() {
 			hiddenIndex = r.HiddenIndex
 			payloads    = r.Payloads
 			tags        = r.Tags
+			duration    = r.TraceInfo.TotalTime
 			reqIns      *http.Request
 		)
+
 		// fix some field
 		if r.HiddenIndex == "" {
 			r.HiddenIndex = uuid.NewString()
@@ -61,7 +63,7 @@ func RegisterLowHTTPSaveCallback() {
 		reqIns = r.RequestInstance
 
 		// db := consts.GetGormProjectDatabase()
-		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns))
+		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithDuration(duration))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
 			return
@@ -107,6 +109,7 @@ type CreateHTTPFlowConfig struct {
 	source      string
 	url         string
 	remoteAddr  string
+	duration    time.Duration
 	reqIns      *http.Request // 如果设置了，则不会再解析reqRaw
 	hiddenIndex string
 	runtimeID   string
@@ -167,6 +170,11 @@ func CreateHTTPFlowWithURL(url string) CreateHTTPFlowOptions {
 func CreateHTTPFlowWithRemoteAddr(remoteAddr string) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
 		c.remoteAddr = remoteAddr
+	}
+}
+func CreateHTTPFlowWithDuration(d time.Duration) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.duration = d
 	}
 }
 
@@ -233,6 +241,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		reqIns     = c.reqIns
 		runtimeID  = c.runtimeID
 		tags       = c.tags
+		duration   = int64(c.duration)
 	)
 
 	var (
@@ -295,6 +304,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		HiddenIndex: uuid.NewString(),
 		RuntimeId:   runtimeID,
 		Tags:        tags,
+		Duration:    duration,
 	}
 
 	// 如果设置了 reqIns，则不会再解析 reqRaw
@@ -835,7 +845,7 @@ CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,
 
 -- is response too large
 is_too_large_response, 
-too_large_response_header_file, too_large_response_body_file
+too_large_response_header_file, too_large_response_body_file, duration
 `, extraSelectField))
 	}
 

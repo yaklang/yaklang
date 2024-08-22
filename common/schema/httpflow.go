@@ -30,6 +30,7 @@ type HTTPFlow struct {
 	SourceType         string
 	Request            string
 	Response           string
+	Duration           int64
 	GetParamsTotal     int
 	PostParamsTotal    int
 	CookieParamsTotal  int
