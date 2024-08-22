@@ -560,8 +560,8 @@ func (p *Parameter) SetDefault(v Value) {
 	}
 	p.defaultValue = v
 	//增加一个ud关系绑定
-	v.AddUser(p)
 	v.AddPointer(p)
+	v.AddUser(p)
 }
 
 var (
