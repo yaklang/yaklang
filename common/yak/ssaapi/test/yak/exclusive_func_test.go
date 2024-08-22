@@ -137,7 +137,7 @@ g = d
 		value.GetTopDefs(ssaapi.WithDepthLimit(2)).Show().ForEach(func(value *ssaapi.Value) {
 			count++
 		})
-		if count == 1 {
+		if count == 2 {
 			depth2check = true
 		}
 
@@ -178,7 +178,7 @@ g = d
 			count++
 			value.Show()
 		})
-		if count == 1 {
+		if count == 2 {
 			depth2check = true
 		}
 

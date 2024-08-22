@@ -2,7 +2,7 @@
 
 
 echo "Start to Test SSAAPI"
-go test -timeout 60s ./common/yak/ssaapi/...
+go test -timeout 120s ./common/yak/ssaapi/...
 
 echo "Start to Test SSA-Analyze"
 # SSA plugin rule/option

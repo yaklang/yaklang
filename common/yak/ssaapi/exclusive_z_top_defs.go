@@ -88,29 +88,29 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	actx.EnterRecursive()
-	defer func() {
-		actx.ExitRecursive()
-	}()
-
 	// 1w recursive call check
 	if !utils.InGithubActions() {
 		if actx.GetRecursiveCounter() > 10000 {
 			log.Warnf("recursive call is over 10000, stop it")
-			return nil
+			return Values{i}
 		}
+	}
+	if actx.IsReachedDepthLimited() {
+		return Values{i}
 	}
 
 	actx.depth--
-	// log.Infof("depth: %d vs minDepth: %d vs maxDepth: %d", actx.depth, actx.config.MinDepth, actx.config.MaxDepth)
 	defer func() {
 		actx.depth++
 	}()
 	i.SetDepth(actx.depth)
 	if actx.depth > 0 && actx.config.MaxDepth > 0 && actx.depth > actx.config.MaxDepth {
-		return i.DependOn
+		actx.ReachDepthLimited()
+		return Values{i}
 	}
 	if actx.depth < 0 && actx.config.MinDepth < 0 && actx.depth < actx.config.MinDepth {
-		return i.EffectOn
+		actx.ReachDepthLimited()
+		return Values{i}
 	}
 
 	// hook everynode
@@ -426,16 +426,27 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
 			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
-			call := actx.PopCall()
+			var call *Value
+			if !actx.IsNegativeCallStack() {
+				call = actx.PopCall()
+				if utils.IsNil(call) {
+					actx.EnableNegativeCallStack(true)
+				}
+			}
 
 			ret := traced.getTopDefs(actx, opt...)
 			if call != nil {
 				actx.PushCall(call)
+			} else if calledInstance != nil {
+				actx.PushCall(called)
 			}
 			if len(ret) > 0 {
 				return ret
 			} else {
-				return Values{traced}
+				if actx.TheDefaultShouldBeVisited(traced) {
+					return Values{traced}
+				}
+				return Values{}
 			}
 		}
 
