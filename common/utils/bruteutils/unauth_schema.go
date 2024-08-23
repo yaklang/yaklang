@@ -2,7 +2,6 @@ package bruteutils
 
 import (
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -17,9 +16,6 @@ type DefaultServiceAuthInfo struct {
 
 	UnAuthVerify func(i *BruteItem) *BruteItemResult
 	BrutePass    func(i *BruteItem) *BruteItemResult
-
-	// map[string]
-	targetAuthChecked *sync.Map
 }
 
 func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
@@ -40,25 +36,16 @@ func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
 		}
 
 		if d.UnAuthVerify != nil {
-			if d.targetAuthChecked == nil {
-				d.targetAuthChecked = new(sync.Map)
+			result := d.UnAuthVerify(item)
+			if result.Ok {
+				result.Username = ""
+				result.Password = ""
+				return result
 			}
 
-			_, ok := d.targetAuthChecked.Load(item.Target)
-			if !ok {
-				d.targetAuthChecked.Store(item.Target, nil)
-				result := d.UnAuthVerify(item)
-				if result.Ok {
-					result.Username = ""
-					result.Password = ""
-					return result
-				}
-
-				if result.Finished {
-					return result
-				}
+			if result.Finished {
+				return result
 			}
-
 		}
 
 		if d.BrutePass == nil {
