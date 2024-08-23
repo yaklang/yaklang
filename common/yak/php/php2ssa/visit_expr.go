@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
@@ -1222,6 +1223,12 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 		for i := range ret.AllDollar() {
 			_ = i
 			value = y.ReadValue(id)
+			if value.IsUndefined() {
+				var varName = fmt.Sprintf("$dollar%v$", y.fetchDollarId())
+				variable := y.CreateVariable(varName)
+				y.AssignVariable(variable, value)
+				return varName
+			}
 			id = "$" + value.String()
 		}
 		return "$" + value.String()

@@ -196,7 +196,6 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					} else {
 						y.AssignVariable(y.CreateVariable(alias), function)
 						y.GetProgram().Funcs[alias] = function
-						y.FuncSyntax.cache[alias] = struct{}{}
 					}
 				}
 				//有两种情况，class或者整个命名空间
@@ -218,7 +217,6 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					for _, bluePrint := range library.ClassBluePrint {
 						name := fmt.Sprintf("%s\\%s", old, bluePrint.Name)
 						y.SetClassBluePrint(name, bluePrint)
-						y.ClassSyntax.cache[name] = struct{}{}
 					}
 					for _, function := range library.Funcs {
 						y.AssignVariable(y.CreateVariable(fmt.Sprintf("%s\\%s", old, function.GetName())), function)
