@@ -66,80 +66,50 @@ func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...sy
 }
 
 func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
-	var wg sync.WaitGroup
-
-	ctx, cancel := context.WithCancel(config.Ctx)
-	defer func() {
-		go func() {
-			wg.Wait()
-			cancel()
-		}()
-	}()
-	processedRes := make(chan string, 16)
-
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	ctx := config.Ctx
+	//defer cancel()
+	// 提取第一个ip
+	waitSimpleReady := make(chan struct{})
 	var sample string
-	var ok bool
-	select {
-	case sample, ok = <-res:
-		if !ok {
-			return nil, utils.Error("ping result is empty")
-		}
-		processedRes <- sample
-	case <-time.After(15 * time.Second):
-		return nil, utils.Error("ping timeout")
-	case <-ctx.Done():
-		return nil, utils.Error("ping canceled")
-	}
-
-	scanner, err := synscanx.NewScannerx(ctx, sample, config)
-	if err != nil {
-		return nil, err
-	}
-	scanner.FromPing = true
-	sendDoneSignal := make(chan struct{})
-
-	targetCh := make(chan *synscanx.SynxTarget, 16)
-	resultCh := make(chan *synscan.SynScanResult, 1024)
-
-	wg.Add(2)
-
+	inputCh := make(chan string)
 	go func() {
-		defer wg.Done()
-		scanner.SubmitTargetFromPing(processedRes, ports, targetCh)
-		close(targetCh)
-		<-sendDoneSignal
-		close(resultCh)
-		log.Infof("send done signal")
-	}()
-
-	time.Sleep(100 * time.Millisecond)
-
-	go func() {
-		defer wg.Done()
-
-		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
-		if err != nil {
-			close(resultCh)
-			log.Errorf("scan failed: %s", err)
-		}
-	}()
-
-	go func() {
+		defer close(inputCh)
 		for {
 			select {
-			case pingResult, ok := <-res:
+			case v, ok := <-res:
 				if !ok {
-					close(processedRes)
 					return
 				}
-				processedRes <- pingResult
+				if sample == "" {
+					sample = v
+					waitSimpleReady <- struct{}{}
+				}
+
+				inputCh <- sample
+
 			case <-ctx.Done():
-				close(processedRes)
 				return
 			}
 		}
 	}()
 
+	// 等待拿到第一个ip
+	<-waitSimpleReady
+
+	// 创建Scanner
+	scanner, err := synscanx.NewScannerx(ctx, sample, config)
+	if err != nil {
+		return nil, err
+	}
+	scanner.FromPing = true
+	targetCh := scanner.SubmitTargetFromPing(inputCh, ports)
+	resultCh, err := scanner.Scan(targetCh)
+	if err != nil {
+		log.Errorf("scan failed: %s", err)
+	}
 	return resultCh, nil
 }
 
@@ -160,8 +130,6 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 		cancel()
 		return nil, err
 	}
-	sendDoneSignal := make(chan struct{})
-
 	targetCh := make(chan *synscanx.SynxTarget, 16)
 	resultCh := make(chan *synscan.SynScanResult, 1024)
 
@@ -171,7 +139,6 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 		defer wg.Done()
 		scanner.SubmitTarget(targets, ports, targetCh)
 		close(targetCh)
-		<-sendDoneSignal
 		close(resultCh)
 		log.Infof("send done signal")
 	}()
@@ -181,7 +148,7 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	go func() {
 		defer wg.Done()
 
-		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
+		resultCh, err := scanner.Scan(targetCh)
 		if err != nil {
 			close(resultCh)
 			log.Errorf("scan failed: %s", err)

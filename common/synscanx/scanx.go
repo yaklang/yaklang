@@ -203,7 +203,8 @@ func (s *Scannerx) SubmitTarget(targets, ports string, targetCh chan *SynxTarget
 	}
 }
 
-func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *SynxTarget) {
+func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) chan *SynxTarget {
+	ch := make(chan *SynxTarget)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 
 	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
@@ -212,62 +213,66 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *
 	})
 	s._hosts = utils.NewHostsFilter()
 	var lock sync.Mutex
-	for {
-		select {
-		case <-s.ctx.Done():
-			log.Infof("SubmitTargetFromPing canceled")
-			return
-		case host, ok := <-res:
-			if !ok {
-				log.Debugf("ping result channel closed")
+	go func() {
+		defer close(ch)
+		for {
+			select {
+			case <-s.ctx.Done():
+				log.Infof("SubmitTargetFromPing canceled")
 				return
-			}
-			if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
-				log.Infof("Resolving %s", host)
-				host = netx.LookupFirst(host, netx.WithTimeout(3*time.Second))
-			}
-			// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
-			if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
-				continue
-			}
-			if s.excludedHost(host) {
-				return
-			}
-			lock.Lock()
-			s._hosts.Add(host)
-			lock.Unlock()
+			case host, ok := <-res:
+				if !ok {
+					log.Debugf("ping result channel closed")
+					return
+				}
+				if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
+					log.Infof("Resolving %s", host)
+					host = netx.LookupFirst(host, netx.WithTimeout(3*time.Second))
+				}
+				// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
+				if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
+					continue
+				}
+				if s.excludedHost(host) {
+					continue
+				}
+				lock.Lock()
+				s._hosts.Add(host)
+				lock.Unlock()
 
-			if s.isInternalAddress(host, ifaceIPNetV4, ifaceIPNetV6) {
-				s.arp(host)
-			}
-			for _, port := range nonExcludedPorts {
-				s.rateLimit()
-				if s.config.maxOpenPorts > 0 {
-					v, ok := s.ipOpenPortMap.Load(host)
-					if ok {
-						if v.(uint16) >= s.config.maxOpenPorts {
-							break
+				if s.isInternalAddress(host, ifaceIPNetV4, ifaceIPNetV6) {
+					s.arp(host)
+				}
+				for _, port := range nonExcludedPorts {
+					s.rateLimit()
+					if s.config.maxOpenPorts > 0 {
+						v, ok := s.ipOpenPortMap.Load(host)
+						if ok {
+							if v.(uint16) >= s.config.maxOpenPorts {
+								break
+							}
 						}
 					}
+					s.callOnSubmitTask(host, port)
+					proto, p := utils.ParsePortToProtoPort(port)
+					target := &SynxTarget{
+						Host: host,
+						Port: p,
+						Mode: TCP, // 默认 TCP
+					}
+					if proto == "udp" {
+						target.Mode = UDP
+					}
+					ch <- target
 				}
-				s.callOnSubmitTask(host, port)
-				proto, p := utils.ParsePortToProtoPort(port)
-				target := &SynxTarget{
-					Host: host,
-					Port: p,
-					Mode: TCP, // 默认 TCP
-				}
-				if proto == "udp" {
-					target.Mode = UDP
-				}
-				ch <- target
 			}
 		}
-	}
-
+	}()
+	return ch
 }
 
-func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh chan *synscan.SynScanResult) error {
+func (s *Scannerx) Scan(targetCh chan *SynxTarget) (chan *synscan.SynScanResult, error) {
+	resultCh := make(chan *synscan.SynScanResult)
 	openPortLock := new(sync.Mutex)
 	var openPortCount int
 	ipCountMap := make(map[string]struct{}, 16)
@@ -362,44 +367,30 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 		}
 	}
 
-	// recv packet 的总时长
-	deadline := time.Now().Add(s.config.waiting)
-	wCtx, wCancel := context.WithDeadline(context.Background(), deadline)
-	defer func() {
-		wCancel()
-	}()
-
-	go s.HandlerZeroCopyReadPacket(wCtx, resultCh)
-	time.Sleep(100 * time.Millisecond)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	// 异步执行扫描流程
 	go func() {
-		defer wg.Done()
+		go func() {
+			s.HandlerZeroCopyReadPacket(s.ctx, resultCh)
+			close(resultCh)
+		}()
+		time.Sleep(100 * time.Millisecond)
 		if !s.FromPing {
 			s.arpScan()
 			time.Sleep(1 * time.Second)
 		}
-		s.sendPacket(s.ctx, targetCh)
+		s.sendPacket(targetCh)
+		time.Sleep(s.config.waiting * time.Second)
+		log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
+		s.Close()
+		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Now().Sub(s.startTime))
 	}()
-	wg.Wait()
-
-	log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
-
-	<-wCtx.Done()
-
-	done <- struct{}{}
-
-	endTime := time.Now()
-	log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
-	defer s.Close()
-
-	return nil
+	return resultCh, nil
 }
 
-func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
+func (s *Scannerx) sendPacket(targetCh chan *SynxTarget) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-s.ctx.Done():
 			log.Info("Context cancelled, stopping packet sending")
 			return
 		case target, ok := <-targetCh:
