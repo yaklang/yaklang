@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -23,15 +22,6 @@ type PingResult struct {
 }
 
 var promptICMPNotAvailableOnce = new(sync.Once)
-
-/*
-if icmpEnable && !proxy {
-	return icmpPing(ip, timeout) // true / false
-}
-
-// tcp 5 seconds -> 22,80,443
-dial timeout
-*/
 
 func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 	var (
@@ -51,114 +41,64 @@ func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 		}
 	}()
 
-	log.Debugf("ping-auto cost timeout: %v", timeout.Seconds())
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	testPorts := utils.ParseStringToPorts(defaultTcpPort)
 	if len(testPorts) > 5 {
 		testPorts = testPorts[:5]
 		log.Infof("tcp-ping[%s] too many ports, only test first 5 most", defaultTcpPort)
 	}
-	swg := utils.NewSizedWaitGroup(6)
-	var alive = utils.NewBool(false)
 
-	if len(proxies) > 0 {
-		if !icmpPingIsNotAvailable.IsSet() {
-			icmpPingIsNotAvailable.Set()
-		}
-	}
-
-	swg.Add()
-	go func() {
-		defer swg.Done()
-		// if icmp is available, do it
-		if !icmpPingIsNotAvailable.IsSet() {
-			var result *PingResult
-			if config.pingNativeHandler != nil {
-				result = config.pingNativeHandler(ip, timeout)
-			} else {
-				result = PingNative(ip, timeout)
-			}
-			if result.Ok {
-				alive.Set()
-				cancel()
-			}
+	if !icmpPingIsNotAvailable.IsSet() && !config.forceTcpPing && len(proxies) == 0 {
+		if config.pingNativeHandler != nil {
+			return config.pingNativeHandler(ip, timeout)
 		} else {
-			promptICMPNotAvailableOnce.Do(func() {
-				log.Infof("icmp is not available, fallback to use tcp-ping")
-			})
-		}
-	}()
-
-	var unreachableCount int64
-	addUnreachableCount := func() {
-		atomic.AddInt64(&unreachableCount, 1)
-	}
-	for _, port := range testPorts {
-		err := swg.AddWithContext(ctx)
-		if err != nil {
-			break
-		}
-		addr := utils.HostPort(ip, port)
-		go func() {
-			defer swg.Done()
-			var (
-				conn net.Conn
-				err  error
-			)
-			if config.tcpDialHandler != nil {
-				conn, err = config.tcpDialHandler(ctx, addr, proxies...)
-			} else {
-				conn, err = netx.DialContext(ctx, addr, proxies...)
+			result, err := PcapxPing(ip, config)
+			if result != nil {
+				return result
 			}
-			if err != nil {
-				switch ret := err.(type) {
-				case *net.OpError:
-					if ret.Timeout() {
-						addUnreachableCount()
-					} else {
-						alive.Set()
-						cancel()
-					}
-				default:
-					if utils.MatchAnyOfSubString(
-						strings.ToLower(err.Error()),
-						"timeout", "deadline exceeded", " A connection attempt failed",
-						"no proxy available",
-					) {
-						addUnreachableCount()
-					}
-				}
+			log.Errorf("pcapx ping fail %v", err)
+		}
+	}
+
+	// tcp ping
+	wg := new(sync.WaitGroup)
+	isAlive := utils.NewBool(false)
+	ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
+	defer cancel()
+	for _, p := range testPorts {
+		p := p
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var conn net.Conn
+			var err error
+			if config.tcpDialHandler != nil {
+				conn, err = config.tcpDialHandler(ctx, utils.HostPort(ip, p), config.proxies...)
+			} else {
+				conn, err = netx.DialContext(ctx, utils.HostPort(ip, p), config.proxies...)
+			}
+			if err != nil && !utils.IContains(err.Error(), "refused") { // if err is refused ,mean host is alive
 				return
 			}
-			alive.Set()
+			isAlive.Set()
 			cancel()
-			conn.Close()
+			if conn != nil {
+				_ = conn.Close()
+			}
 		}()
 	}
-	swg.Wait()
-
-	if alive.IsSet() {
+	wg.Wait()
+	if isAlive.IsSet() {
 		return &PingResult{
-			IP: ip,
-			Ok: true,
+			IP:  ip,
+			Ok:  true,
+			RTT: 0,
 		}
 	}
-
-	if unreachableCount == int64(len(testPorts)) {
-		log.Debugf("tcp-ping %v -> [%s] all timeout, it seems down", ip, defaultTcpPort)
-		return &PingResult{
-			IP:     ip,
-			Ok:     false,
-			Reason: "tcp timeout",
-		}
-	}
-
 	return &PingResult{
 		IP:     ip,
-		Ok:     true,
-		Reason: "unknown(fallback)",
+		Ok:     false,
+		RTT:    0,
+		Reason: "tcp timeout",
 	}
 }
 
