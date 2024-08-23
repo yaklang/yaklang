@@ -605,23 +605,41 @@ func TestBasic_CFG_Break(t *testing.T) {
 		}, t)
 	})
 
-	/*
-		t.Run("simple goto label in loop", func(t *testing.T) {
-			test.CheckPrintlnValue(`package main
-			func main() {
-				a := 1
-				label1:
-				for i := 0; i < 10; i++ {
-					goto label1
-					a = 2
-					println(a) // unreachable
-				}
+	/*t.Run("simple goto up", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+			if a > 1 {
 				println(a) // 1
+		end:
+				println(a) // phi(a)[1,5]
+			}else{
+				a = 5
+				goto end
 			}
-			`, []string{
-				"1",
-			}, t)
-		})*/
+		}
+		`, []string{
+			"1", "phi(a)[1,5]",
+		}, t)
+	})*/
+
+	t.Run("simple goto down", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+			if a > 1 {
+				a = 5
+				goto end
+			}else{
+				println(a) // 1
+		end:
+				println(a) // phi(a)[1,5]
+			}
+		}
+		`, []string{
+			"1", "phi(a)[1,5]",
+		}, t)
+	})
 
 	t.Run("simple break in switch", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
