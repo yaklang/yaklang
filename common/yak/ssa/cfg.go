@@ -594,13 +594,12 @@ func (t *SwitchBuilder) Finish() {
 				cond = t.buildCondition()
 				return builder.CurrentBlock.ScopeTable
 			})
-	}else{
+	} else {
 		addToBlocks(condb)
 		builder.CurrentBlock = condb
-		
+
 		switchBuilder.BuildConditionWithoutExprsion()
 	}
-
 
 	for i := 0; i < t.caseSize; i++ {
 
@@ -654,4 +653,31 @@ func (t *SwitchBuilder) Finish() {
 	builder.CurrentBlock = done
 	end := switchBuilder.Build(generatePhi(builder, done, t.enter))
 	done.SetScope(end)
+}
+
+type GotoBuilder struct {
+	b     *FunctionBuilder
+	enter *BasicBlock
+	label *BasicBlock
+}
+
+func (b *FunctionBuilder) BuildGoto() *GotoBuilder {
+	enter := b.CurrentBlock
+
+	return &GotoBuilder{
+		b:     b,
+		enter: enter,
+	}
+}
+
+func (t *GotoBuilder) SetLabel(label *BasicBlock) {
+	t.label = label
+}
+
+func (t *GotoBuilder) Finish() {
+	builder := t.b
+	enter := t.enter.ScopeTable
+	label := t.label.ScopeTable
+	gotoBuilder := ssautil.NewGotoStmt(ssautil.ScopedVersionedTableIF[Value](enter), ssautil.ScopedVersionedTableIF[Value](label))
+	builder.CurrentBlock.SetScope(gotoBuilder.Build(generatePhi(builder, t.label, t.enter)))
 }
