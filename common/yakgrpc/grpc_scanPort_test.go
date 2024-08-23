@@ -72,6 +72,7 @@ func TestServer_CustomFingerprint(t *testing.T) {
 		Concurrent:           50,
 		Active:               false,
 		ScriptNames:          []string{},
+		SkippedHostAliveScan: true,
 	})
 	_ = r
 	require.Nil(t, err)
