@@ -163,11 +163,16 @@ func (s *Server) YaklangTerminal(inputStream ypb.Yak_YaklangTerminalServer) erro
 		}
 		envs = append(envs, fmt.Sprintf("SHELL=%s", shell))
 		envs = append(envs, fmt.Sprintf("TERM=xterm-256color"))
-		envs = append(envs, fmt.Sprintf("PATH=%s:%s", os.Getenv("PATH"), consts.GetDefaultYakitEngineDir()))
+		envs = append(envs, fmt.Sprintf("PATH=%s:%s", consts.GetDefaultYakitEngineDir(), os.Getenv("PATH")))
 	} else {
-		envs = append(envs, fmt.Sprintf("PATH=%s;%s", os.Getenv("PATH"), consts.GetDefaultYakitEngineDir()))
+		envs = append(envs, fmt.Sprintf("PATH=%s;%s", consts.GetDefaultYakitEngineDir(), os.Getenv("PATH")))
 	}
 	envs = append(envs, "TERM_PROGRAM=yaklang")
+	baseDir := consts.GetDefaultYakitBaseDir()
+	projectDatabaseName := consts.GetDefaultYakitProjectDatabase(baseDir)
+	profileDatabaseName := consts.GetDefaultYakitPluginDatabase(baseDir)
+	envs = append(envs, fmt.Sprintf("%s=%s", consts.CONST_YAK_DEFAULT_PROFILE_DATABASE_NAME, profileDatabaseName))
+	envs = append(envs, fmt.Sprintf("%s=%s", consts.CONST_YAK_DEFAULT_PROJECT_DATABASE_NAME, projectDatabaseName))
 
 	if err != nil {
 		return err
