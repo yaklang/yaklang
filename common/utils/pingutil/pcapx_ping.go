@@ -75,43 +75,52 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 	}
 
 	v4 := net.ParseIP(ip).To4() != nil
-
-	iface, _, _, err := netutil.GetPublicRoute()
-	if err != nil {
-		return nil, err
-	}
-
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return nil, err
-	}
-	if len(addrs) == 0 {
-		return nil, utils.Errorf("no address found")
-	}
+	isLoopback := utils.IsLoopback(ip)
+	var ifaceName string
 	var firstIP string
-	for _, addr := range addrs {
-		ipIns, _, err := net.ParseCIDR(addr.String())
+	if isLoopback {
+		var err error
+		ifaceName, err = netutil.GetLoopbackDevName()
 		if err != nil {
-			continue
+			return nil, err
 		}
-		if v4 {
-			if ipIns.To4() == nil {
+		firstIP = net.ParseIP("127.0.0.1").String()
+	} else {
+		iface, _, _, err := netutil.GetPublicRoute()
+		if err != nil {
+			return nil, err
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return nil, err
+		}
+		if len(addrs) == 0 {
+			return nil, utils.Errorf("no address found")
+		}
+		for _, addr := range addrs {
+			ipIns, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
 				continue
 			}
-			firstIP = ipIns.String()
-			if firstIP == "" {
-				continue
+			if v4 {
+				if ipIns.To4() == nil {
+					continue
+				}
+				firstIP = ipIns.String()
+				if firstIP == "" {
+					continue
+				}
+				break
+			} else {
+				if ipIns.To16() == nil {
+					continue
+				}
+				firstIP = ipIns.String()
+				if firstIP == "" {
+					continue
+				}
+				break
 			}
-			break
-		} else {
-			if ipIns.To16() == nil {
-				continue
-			}
-			firstIP = ipIns.String()
-			if firstIP == "" {
-				continue
-			}
-			break
 		}
 	}
 
@@ -126,8 +135,8 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		err = pcaputil.Start(
-			pcaputil.WithDevice(iface.Name),
+		err := pcaputil.Start(
+			pcaputil.WithDevice(ifaceName),
 			pcaputil.WithBPFFilter("icmp"),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithContext(ctx),
@@ -139,6 +148,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 							return
 						}
 						packet, err := pcapx.PacketBuilder(
+							pcapx.WithLoopback(isLoopback),
 							pcapx.WithIPv4_DstIP(ip),
 							pcapx.WithIPv4_SrcIP(firstIP),
 							pcapx.WithIPv4_NoOptions(),
