@@ -94,9 +94,25 @@ func ApplicationLayerName(packet gopacket.Packet) string {
 	return ""
 }
 
-func IsICMP(packet gopacket.Packet) bool {
+func IsICMP(packet gopacket.Packet) (ret bool) {
+	defer func() {
+		if err := recover(); err != nil {
+			ret = false
+		}
+	}()
 	if l := packet.NetworkLayer(); l != nil {
-		return l.LayerType() == layers.LayerTypeICMPv4 || l.LayerType() == layers.LayerTypeICMPv6
+		if l.LayerType() == layers.LayerTypeICMPv4 || l.LayerType() == layers.LayerTypeICMPv6 {
+			ret = true
+			return
+		}
+		if l.LayerType() == layers.LayerTypeIPv4 && l.(*layers.IPv4).Protocol == layers.IPProtocolICMPv4 {
+			ret = true
+			return
+		}
+		if l.LayerType() == layers.LayerTypeIPv6 && l.(*layers.IPv6).NextHeader == layers.IPProtocolICMPv6 {
+			ret = true
+			return
+		}
 	}
-	return false
+	return
 }

@@ -24,15 +24,14 @@ type PingResult struct {
 
 var promptICMPNotAvailableOnce = new(sync.Once)
 
-type PingConfig struct {
-	defaultTcpPort string
-	timeout        time.Duration
-	proxies        []string
-
-	// for test
-	pingNativeHandler func(ip string, timeout time.Duration) *PingResult
-	tcpDialHandler    func(ctx context.Context, addr string, proxies ...string) (net.Conn, error)
+/*
+if icmpEnable && !proxy {
+	return icmpPing(ip, timeout) // true / false
 }
+
+// tcp 5 seconds -> 22,80,443
+dial timeout
+*/
 
 func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 	var (
@@ -84,7 +83,6 @@ func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 			if result.Ok {
 				alive.Set()
 				cancel()
-
 			}
 		} else {
 			promptICMPNotAvailableOnce.Do(func() {
