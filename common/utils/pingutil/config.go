@@ -15,6 +15,7 @@ type PingConfig struct {
 	// for test
 	pingNativeHandler func(ip string, timeout time.Duration) *PingResult
 	tcpDialHandler    func(ctx context.Context, addr string, proxies ...string) (net.Conn, error)
+	forceTcpPing      bool
 }
 
 func NewPingConfig() *PingConfig {

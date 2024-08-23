@@ -126,37 +126,39 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		err = pcaputil.Sniff(
-			iface.Name,
+		err = pcaputil.Start(
+			pcaputil.WithDevice(iface.Name),
 			pcaputil.WithBPFFilter("icmp"),
 			pcaputil.WithEnableCache(true),
+			pcaputil.WithContext(ctx),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-				baseN := rand.Intn(3000) + 3000
-				for i := 0; i < 3; i++ {
-					if isAlive.IsSet() {
-						return
+				go func() {
+					baseN := rand.Intn(3000) + 3000
+					for i := 0; i < 3; i++ {
+						if isAlive.IsSet() {
+							return
+						}
+						packet, err := pcapx.PacketBuilder(
+							pcapx.WithIPv4_DstIP(ip),
+							pcapx.WithIPv4_SrcIP(firstIP),
+							pcapx.WithIPv4_NoOptions(),
+							pcapx.WithICMP_Type(layers.ICMPv4TypeEchoRequest, nil),
+							pcapx.WithICMP_Id(baseN),
+							pcapx.WithICMP_Sequence(i),
+							pcapx.WithPayload(icmpPayload),
+						)
+						if err != nil {
+							log.Errorf("build icmp packet failed: %s", err)
+							break
+						}
+						err = handle.WritePacketData(packet)
+						if err != nil {
+							log.Errorf("write icmp packet failed: %s", err)
+							return
+						}
+						time.Sleep(time.Millisecond * 600)
 					}
-
-					packet, err := pcapx.PacketBuilder(
-						pcapx.WithIPv4_DstIP(ip),
-						pcapx.WithIPv4_SrcIP(firstIP),
-						pcapx.WithIPv4_NoOptions(),
-						pcapx.WithICMP_Type(layers.ICMPv4TypeEchoRequest, nil),
-						pcapx.WithICMP_Id(baseN),
-						pcapx.WithICMP_Sequence(i),
-						pcapx.WithPayload(icmpPayload),
-					)
-					if err != nil {
-						log.Errorf("build icmp packet failed: %s", err)
-						break
-					}
-					err = handle.WritePacketData(packet)
-					if err != nil {
-						log.Errorf("write icmp packet failed: %s", err)
-						return
-					}
-					time.Sleep(time.Millisecond * 600)
-				}
+				}()
 			}),
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
 				defer func() {
@@ -184,7 +186,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 								ttl = int(ip4.TTL)
 								cancel()
 							}
-							log.Infof("%v is alive", ip4.SrcIP.String())
+							log.Debugf("%v is alive", ip4.SrcIP.String())
 							return
 						} else if ty == layers.ICMPv4TypeEchoRequest {
 							return
