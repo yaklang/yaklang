@@ -24,6 +24,7 @@ type BruteItem struct {
 	Target   string
 	Username string
 	Password string
+	Context  context.Context
 }
 
 func (b *BruteItem) Result() *BruteItemResult {
@@ -287,14 +288,11 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 	}
 
 	for _, i := range process.Items {
+		// 将上下文传递给子任务
+		i.Context = currCtx
 		if err := currCtx.Err(); err != nil {
 			return errors.New("context canceled")
 		}
-
-		//// 退出爆破
-		//if finished.IsSet() {
-		//	break
-		//}
 
 		// 计算子任务要求退出爆破次数
 		if atomic.LoadInt32(&finishedCount) >= int32(b.FinishingThreshold) && b.FinishingThreshold != 0 {

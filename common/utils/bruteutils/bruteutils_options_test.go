@@ -1,12 +1,13 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/mixer"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 func TestNewMultiTargetBruteUtilEx_WithTargetsConcurrentOption(t *testing.T) {
@@ -47,7 +48,12 @@ func TestNewMultiTargetBruteUtilEx_WithTargetsConcurrentOption(t *testing.T) {
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -108,7 +114,12 @@ func TestNewMultiTargetBruteUtilEx_WithTargetTasksConcurrentOption(t *testing.T)
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -170,7 +181,12 @@ func TestNewMultiTargetBruteUtilEx_WithOkToStop(t *testing.T) {
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -188,7 +204,6 @@ func TestNewMultiTargetBruteUtilEx_WithOkToStop(t *testing.T) {
 		t.Logf("Ok to Stop is invalid: %v", int(atomic.LoadInt32(&count)))
 		t.FailNow()
 	}
-
 }
 
 func TestNewMultiTargetBruteUtilEx_WithFinishingThreshold(t *testing.T) {
@@ -232,7 +247,12 @@ func TestNewMultiTargetBruteUtilEx_WithFinishingThreshold(t *testing.T) {
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -250,7 +270,6 @@ func TestNewMultiTargetBruteUtilEx_WithFinishingThreshold(t *testing.T) {
 		t.Logf("FinishingThreshold is invalid: %v", int(atomic.LoadInt32(&count)))
 		t.FailNow()
 	}
-
 }
 
 func TestNewMultiTargetBruteUtilEx_WithOnlyNeedPassword(t *testing.T) {
@@ -295,7 +314,12 @@ func TestNewMultiTargetBruteUtilEx_WithOnlyNeedPassword(t *testing.T) {
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -313,7 +337,6 @@ func TestNewMultiTargetBruteUtilEx_WithOnlyNeedPassword(t *testing.T) {
 		t.Logf("FinishingThreshold is invalid: %v", int(atomic.LoadInt32(&count)))
 		t.FailNow()
 	}
-
 }
 
 func TestNewMultiTargetBruteUtilEx_EliminatedUser(t *testing.T) {
@@ -366,7 +389,12 @@ func TestNewMultiTargetBruteUtilEx_EliminatedUser(t *testing.T) {
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -384,7 +412,6 @@ func TestNewMultiTargetBruteUtilEx_EliminatedUser(t *testing.T) {
 		t.Logf("FinishingThreshold is invalid: %v", int(atomic.LoadInt32(&count)))
 		t.FailNow()
 	}
-
 }
 
 func TestNewMultiTargetBruteUtilEx_WithBeforeBruteCallback(t *testing.T) {
@@ -442,7 +469,12 @@ func TestNewMultiTargetBruteUtilEx_WithBeforeBruteCallback(t *testing.T) {
 		results := mx.Value()
 		target, user, pass := results[0], results[1], results[2]
 
-		bu.Feed(&BruteItem{"", target, user, pass})
+		bu.Feed(&BruteItem{
+			Type:     "",
+			Target:   target,
+			Username: user,
+			Password: pass,
+		})
 
 		err := mx.Next()
 		if err != nil {
@@ -460,5 +492,4 @@ func TestNewMultiTargetBruteUtilEx_WithBeforeBruteCallback(t *testing.T) {
 		t.Logf("FinishingThreshold is invalid: %v", int(atomic.LoadInt32(&count)))
 		t.FailNow()
 	}
-
 }
