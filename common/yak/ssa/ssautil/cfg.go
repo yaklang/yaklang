@@ -373,12 +373,10 @@ func (s *SwitchStmt[T]) BuildCondition(
 	return body(sub)
 }
 
-func (s *SwitchStmt[T]) BuildConditionWithoutExprsion(
-) {
+func (s *SwitchStmt[T]) BuildConditionWithoutExprsion() {
 	sub := s.global.CreateShadowScope()
 	s.condition = sub
 }
-
 
 func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T] {
 	endc := s.condition.CreateShadowScope()
@@ -409,4 +407,41 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 	end := s.global.CreateShadowScope()
 	end.CoverBy(endc)
 	return end
+}
+
+type GotoStmt[T versionedValue] struct {
+	enter ScopedVersionedTableIF[T]
+	label ScopedVersionedTableIF[T]
+}
+
+func NewGotoStmt[T versionedValue](enter ScopedVersionedTableIF[T], label ScopedVersionedTableIF[T]) *GotoStmt[T] {
+	return &GotoStmt[T]{
+		enter: enter,
+		label: label,
+	}
+}
+
+func (s *GotoStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T] {
+	parent := s.label.GetParent()
+	end := parent.CreateShadowScope()
+	end.Merge(
+		false,
+		merge,
+		s.label,
+		s.enter,
+	)
+	s.label.CoverBy(end)
+	return s.label
+}
+
+func (s *GotoStmt[T]) Break(from ScopedVersionedTableIF[T]) {
+	// do nothing
+}
+
+func (s *GotoStmt[T]) Continue(from ScopedVersionedTableIF[T]) {
+	// do nothing
+}
+
+func (s *GotoStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
+	// do nothing
 }

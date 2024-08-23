@@ -84,6 +84,8 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 		result:          []string{},
 		extendFuncs:     map[string]map[string]*ssa.Function{},
 		tpHander:        map[string]func(){},
+		labelHander:     map[string]func(*ssa.BasicBlock){},
+		pkgNameCurrent:  "",
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
@@ -104,6 +106,7 @@ type astbuilder struct {
 	result         []string
 	extendFuncs    map[string]map[string]*ssa.Function
 	tpHander       map[string]func()
+	labelHander    map[string]func(*ssa.BasicBlock)
 	pkgNameCurrent string
 }
 

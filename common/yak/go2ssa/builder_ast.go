@@ -1106,24 +1106,27 @@ func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	// TODO
-	/*
-		var _goto *ssa.BasicBlock
-		if id := stmt.IDENTIFIER(); id != nil {
-			text := id.GetText()
-			if _goto = b.GetLabel(text); _goto != nil {
+	var _goto *ssa.BasicBlock
+	if id := stmt.IDENTIFIER(); id != nil {
+		text := id.GetText()
+		_goto = b.GetLabel(text)
+
+		GotoBuilder := b.BuildGoto()
+		if _goto != nil {
+			GotoBuilder.SetLabel(_goto)
+			GotoBuilder.Finish()
+			b.EmitJump(_goto)
+		} else {
+			b.labelHander[text] = func(_goto *ssa.BasicBlock) {
+				GotoBuilder.SetLabel(_goto)
+				GotoBuilder.Finish()
 				b.EmitJump(_goto)
-			} else {
-				b.NewError(ssa.Error, TAG, UndefineLabelstmt())
 			}
-			return
 		}
-	*/
-	b.NewError(ssa.Error, TAG, ToDo())
+	}
 }
 
 func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
-	// TODO: Label not defined
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -1131,16 +1134,19 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	if id := stmt.IDENTIFIER(); id != nil {
 		text = id.GetText()
 	}
-
 	block := b.NewBasicBlockUnSealed(text)
 	block.SetScope(b.CurrentBlock.ScopeTable.CreateSubScope())
 	b.AddLabel(text, block)
+	if b.labelHander[text] != nil {
+		b.labelHander[text](block)
+	}
+
 	b.EmitJump(block)
 	b.CurrentBlock = block
+
 	if s, ok := stmt.Statement().(*gol.StatementContext); ok {
 		b.buildStatement(s)
 	}
-	b.DeleteLabel(text)
 }
 
 func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
