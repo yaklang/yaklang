@@ -2,11 +2,9 @@ package bruteutils
 
 import (
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/smb"
 )
-
-import "github.com/stacktitan/smb/smb"
 
 const smbPasswd = `{{params(user)}}
 {{params(user)}}123
@@ -71,41 +69,47 @@ user
 mysql
 apache`
 
+func smbBrutePass(i *BruteItem) (*BruteItemResult, error) {
+	i.Target = appendDefaultPort(i.Target, 445)
+	host, port, _ := utils.ParseStringToHostPort(i.Target)
+	rdb := smb.Options{
+		Host:     host,
+		Port:     port,
+		User:     i.Username,
+		Password: i.Password,
+		Dialer:   defaultDialer,
+		Context:  i.Context,
+	}
+	session, err := smb.NewSession(rdb, false)
+	res := i.Result()
+
+	if err != nil {
+		res.Finished = true
+		return res, err
+	}
+	if session.IsAuthenticated {
+		res.Ok = true
+	}
+	return res, nil
+}
+
 var smbAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "smb",
 	DefaultPorts:     "445",
 	DefaultUsernames: []string{"administrator", "admin", "test", "user", "manager", "webadmin", "guest", "db2admin", "system", "root", "sa"},
 	DefaultPasswords: utils.ParseStringToLines(smbPasswd),
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
-		i.Target = appendDefaultPort(i.Target, 445)
-		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
+		result, err := smbBrutePass(i)
 		if err != nil {
-			res := i.Result()
-			res.Finished = true
-			return res
+			log.Errorf("smb un-auth verify failed: %s", err)
 		}
-		defer conn.Close()
-		return i.Result()
+		return result
 	},
 	BrutePass: func(i *BruteItem) *BruteItemResult {
-		i.Target = appendDefaultPort(i.Target, 445)
-		host, port, _ := utils.ParseStringToHostPort(i.Target)
-		rdb := smb.Options{
-			Host:     host,
-			Port:     port,
-			User:     i.Username,
-			Password: i.Password,
-		}
-		session, err := smb.NewSession(rdb, false)
+		result, err := smbBrutePass(i)
 		if err != nil {
-			log.Errorf("smb.NewSession failed: %s", err)
-			return i.Result()
+			log.Errorf("smb brute pass failed: %s", err)
 		}
-		res := i.Result()
-		if session.IsAuthenticated {
-			res.Ok = true
-			return res
-		}
-		return res
+		return result
 	},
 }
