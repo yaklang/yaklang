@@ -71,6 +71,10 @@ func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
 func Route(timeout time.Duration, target string) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
 	var addr = target
 	if !utils.IsIPv4(target) && !utils.IsIPv6(target) {
+		host, _, _ := utils.ParseStringToHostPort(target)
+		if host != "" {
+			target = host
+		}
 		// 针对域名，先去解析一下
 		log.Infof("fetching %v 's address for %s", target, timeout.String())
 		addr = netx.LookupFirst(target, netx.WithTimeout(timeout))
