@@ -85,8 +85,6 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 			return nil, utils.Error("ping result is empty")
 		}
 		processedRes <- sample
-	case <-time.After(15 * time.Second):
-		return nil, utils.Error("ping timeout")
 	case <-ctx.Done():
 		return nil, utils.Error("ping canceled")
 	}
@@ -105,6 +103,11 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 
 	go func() {
 		defer wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
 		scanner.SubmitTargetFromPing(processedRes, ports, targetCh)
 		close(targetCh)
 		<-sendDoneSignal
@@ -116,7 +119,11 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 
 	go func() {
 		defer wg.Done()
-
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
 		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
 		if err != nil {
 			close(resultCh)
@@ -169,6 +176,11 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 
 	go func() {
 		defer wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
 		scanner.SubmitTarget(targets, ports, targetCh)
 		close(targetCh)
 		<-sendDoneSignal
@@ -180,7 +192,11 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 
 	go func() {
 		defer wg.Done()
-
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
 		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
 		if err != nil {
 			close(resultCh)
