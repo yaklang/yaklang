@@ -99,7 +99,7 @@ func Start(opt ...CaptureOption) error {
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
 	defer func() {
-		log.Info("pcapx.utils.capture context done")
+		log.Debug("pcapx.utils.capture context done")
 		cancel()
 		conf.trafficPool.flowCache.ForEach(func(key string, flow *TrafficFlow) {
 			flow.ForceShutdownConnection()

@@ -56,8 +56,12 @@ func keepDaemonCache(key string, ctx context.Context) context.CancelFunc {
 	}
 }
 
+var getInterfaceHandlerMutex = new(sync.Mutex)
+
 func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, PcapHandleOperation, error) {
 	if conf.EnableCache {
+		getInterfaceHandlerMutex.Lock()
+		defer getInterfaceHandlerMutex.Unlock()
 		var hashRaw bytes.Buffer
 		hashRaw.WriteString(ifaceName)
 		hashRaw.WriteString("|")
@@ -139,7 +143,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 								err := v.handler(v.ctx, packet)
 								if err != nil {
 									//defer daemon.handler.Close()
-									log.Errorf("%v handler error: %s", i, err)
+									log.Debugf("%v handler error: %s", i, err)
 									failedTrigger = append(failedTrigger, i)
 								}
 								return true
