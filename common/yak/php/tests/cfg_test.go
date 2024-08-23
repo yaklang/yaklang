@@ -478,4 +478,13 @@ func TestExpression_Try(t *testing.T) {
 			"2", "phi($a)[2,1]", "3", "phi($a)[2,1]", "4", "phi($a)[2,3,4]", "5",
 		}, t)
 	})
+	t.Run("test foreach", func(t *testing.T) {
+		code := `<?php
+$arr = array(1, 2, 3, 4);
+foreach ($arr as $value) {
+    println($value);
+}
+?>`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"Function-array", "1", "2", "3", "4"})
+	})
 }

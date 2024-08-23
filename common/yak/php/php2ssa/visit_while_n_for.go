@@ -164,5 +164,121 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	if i == nil {
 		return nil
 	}
+	loop := y.CreateLoopBuilder()
+	var value ssa.Value
+	loop.SetFirst(func() []ssa.Value {
+		if i.Expression() != nil {
+			value = y.VisitExpression(i.Expression())
+		} else {
+			value = y.VisitChain(i.Chain(0))
+		}
+		return []ssa.Value{value}
+	})
+	loop.SetCondition(func() ssa.Value {
+		var lefts []*ssa.Variable
+		var valueLeft *ssa.Variable
+		if i.ArrayDestructuring() != nil {
+			lefts = y.VisitArrayDestructuring(i.ArrayDestructuring())
+		} else if i.Assignable() != nil {
+			lefts = y.VisitASsignVariable(i.Assignable())
+		} else if i.AssignmentList() != nil {
+			//todo:
+		}
+		if i.Chain(1) != nil {
+			valueLeft = y.VisitChainLeft(i.Chain(1))
+		}
+		//todo: more variable
+		key, field, ok := y.EmitNext(value, false)
+		if len(lefts) > 0 {
+			if valueLeft == nil {
+				y.AssignVariable(lefts[0], field)
+				ssa.DeleteInst(key)
+			} else {
+				y.AssignVariable(lefts[0], key)
+				y.AssignVariable(valueLeft, field)
+			}
+		}
+		return ok
+	})
+	loop.SetBody(func() {
+		if i.Statement() != nil {
+			y.VisitStatement(i.Statement())
+		} else {
+			y.VisitInnerStatementList(i.InnerStatementList())
+		}
+	})
+	loop.Finish()
 	return nil
+}
+func (y *builder) VisitASsignVariable(raw phpparser.IAssignableContext) []*ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.AssignableContext)
+	if i == nil {
+		return nil
+	}
+	var arrays []*ssa.Variable
+	if i.Chain() != nil {
+		arrays = append(arrays, y.VisitChainLeft(i.Chain()))
+	} else {
+		arrays = append(arrays, y.VisitArrayCreationLeft(i.ArrayCreation())...)
+	}
+	return arrays
+}
+
+func (y *builder) VisitArrayCreationLeft(raw phpparser.IArrayCreationContext) []*ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.ArrayCreationContext)
+	if i == nil {
+		return nil
+	}
+	var arrays []*ssa.Variable
+	arrays = append(arrays, y.VisitArrayItemListLeft(i.ArrayItemList())...)
+	return arrays
+}
+func (y *builder) VisitArrayItemListLeft(raw phpparser.IArrayItemListContext) []*ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.ArrayItemListContext)
+	if i == nil {
+		return nil
+	}
+	var arrays []*ssa.Variable
+	for _, item := range i.AllArrayItem() {
+		arrays = append(arrays, y.VisitArrayItemLeft(item))
+	}
+	return arrays
+}
+
+func (y *builder) VisitArrayItemLeft(raw phpparser.IArrayItemContext) *ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.ArrayItemContext)
+	if i == nil {
+		return nil
+	}
+
+	//todo: 没有翻译 =>
+	switch ret := i.Expression(0).(type) {
+	case *phpparser.VariableExpressionContext:
+		return y.VisitLeftVariable(ret.FlexiVariable())
+	}
+	return y.VisitChainLeft(i.Chain())
 }
