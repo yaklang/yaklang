@@ -105,7 +105,7 @@ func _pingScan(target string, opts ..._pingConfigOpt) chan *pingutil.PingResult 
 	config._cancel = cancel
 	opts = append(opts, _pingConfigOpt_cancel(config._cancel))
 
-	var resultChan = make(chan *pingutil.PingResult)
+	var resultChan = make(chan *pingutil.PingResult, 100)
 	go func() {
 		defer close(resultChan)
 

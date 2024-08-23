@@ -257,3 +257,10 @@ func WithIPv4_Option(optType any, data []byte) IPv4Option {
 		return nil
 	}
 }
+
+func WithIPv4_NoOptions() IPv4Option {
+	return func(pv4 *layers.IPv4) error {
+		pv4.Options = nil
+		return nil
+	}
+}
