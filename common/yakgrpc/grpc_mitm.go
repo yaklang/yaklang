@@ -1168,18 +1168,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return ret
 		})
 
-		// 保证始终只有一个 Goroutine 在处理请求
-		defer func() {
-			if err := recover(); err != nil {
-				log.Warnf("Hijack warning: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-			if beforeRequest != nil {
-				hijackReq = beforeRequest(isHttps, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
-				setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
-			}
-		}()
-
 		httpctx.SetMatchedRule(originReqIns, make([]*ypb.MITMContentReplacer, 0))
 		originReqRaw := req[:]
 		fixReq := lowhttp.FixHTTPRequest(req)
@@ -1192,6 +1180,26 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// handle rules
 		originRequestHash := codec.Sha256(plainRequest)
 
+		// modified ?
+		handleRequestModified := func(newReqBytes []byte) bool {
+			return codec.Sha256(newReqBytes) != originRequestHash
+		}
+
+		// 保证始终只有一个 Goroutine 在处理请求
+		defer func() {
+			if err := recover(); err != nil {
+				log.Warnf("Hijack warning: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+			if beforeRequest != nil {
+				newHijackReq := beforeRequest(isHttps, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
+				if handleRequestModified(newHijackReq) {
+					hijackReq = newHijackReq
+					setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
+				}
+			}
+		}()
+
 		rules, req1, shouldBeDropped := replacer.hook(true, false, req, isHttps)
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
@@ -1200,10 +1208,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		httpctx.AppendMatchedRule(originReqIns, rules...)
 
-		// modified ?
-		handleRequestModified := func(newReqBytes []byte) bool {
-			return codec.Sha256(newReqBytes) != originRequestHash
-		}
 		modifiedByRule := false
 		if handleRequestModified(req1) {
 			req = req1
@@ -1529,10 +1533,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if isViewed {
 			if isModified {
 				flow.AddTagToFirst("[手动修改]")
-				flow.Red()
+				flow.Orange()
 			} else {
 				flow.AddTagToFirst("[手动劫持]")
-				flow.Orange()
+				flow.Yellow()
 			}
 		}
 		if isResponseDropped {
