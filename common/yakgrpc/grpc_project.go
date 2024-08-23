@@ -67,11 +67,12 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 		if err != nil {
 			return nil, utils.Errorf("open project database failed: %s", err)
 		}
+		log.Infof("Set project db by grpc: %s", proj.DatabasePath)
 		consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
 		consts.SetGormProjectDatabase(projectDatabase)
 		return &ypb.Empty{}, nil
 	} else {
-		//传入CurrentProject id为空，默认关闭当前的currentProject数据库
+		// 传入CurrentProject id为空，默认关闭当前的currentProject数据库
 		consts.GetGormProjectDatabase().Close()
 	}
 	return nil, utils.Errorf("params is empty")
@@ -506,49 +507,54 @@ func CheckDefault(ProjectName, Type string, FolderId, ChildFolderId int64) error
 }
 
 func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectRequest) (*ypb.Empty, error) {
-	if req.GetId() > 0 {
-		db := s.GetProfileDatabase()
-		db = db.Where(" id = ? or folder_id = ? or child_folder_id = ? ", req.GetId(), req.GetId(), req.GetId())
-		projects := yakit.YieldProject(db, ctx)
-		if projects == nil {
-			return nil, utils.Error("project is not exist")
-		}
-		proj, err := yakit.GetDefaultProject(s.GetProfileDatabase())
-		if err != nil {
-			return nil, utils.Errorf("open project database failed: %s", err)
-		}
-		err = yakit.SetCurrentProjectById(s.GetProfileDatabase(), int64(proj.ID))
-		if err != nil {
-			return nil, utils.Errorf("open project database failed: %s", err)
-		}
-
-		for k := range projects {
-			if CheckDefault(k.ProjectName, k.Type, k.FolderID, k.ChildFolderID) != nil {
-				log.Info("[default] cannot be deleted")
-				break
-			}
-			if req.IsDeleteLocal {
-				consts.GetGormProjectDatabase().Close()
-				err := consts.DeleteDatabaseFile(k.DatabasePath)
-				if err != nil {
-					log.Errorf("delete local database error: %v", err)
-				}
-			}
-			defaultDB, err := consts.CreateProjectDatabase(proj.DatabasePath)
-			if err != nil {
-				log.Errorf("switch default database error: %v", err)
-			}
-
-			consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
-			consts.SetGormProjectDatabase(defaultDB)
-
-			err = yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
-			if err != nil {
-				log.Errorf("delete project error: %v", err)
-			}
-		}
-		return &ypb.Empty{}, nil
+	if req.GetId() == 0 {
+		return &ypb.Empty{}, utils.Error("invalid id")
 	}
+
+	db := s.GetProfileDatabase()
+	db = db.Where(" id = ? or folder_id = ? or child_folder_id = ? ", req.GetId(), req.GetId(), req.GetId())
+	projects := yakit.YieldProject(db, ctx)
+	if projects == nil {
+		return nil, utils.Error("project is not exist")
+	}
+	proj, err := yakit.GetDefaultProject(s.GetProfileDatabase())
+	if err != nil {
+		return nil, utils.Errorf("open project database failed: %s", err)
+	}
+	err = yakit.SetCurrentProjectById(s.GetProfileDatabase(), int64(proj.ID))
+	if err != nil {
+		return nil, utils.Errorf("open project database failed: %s", err)
+	}
+
+	// delete selected projects
+	for k := range projects {
+		if CheckDefault(k.ProjectName, k.Type, k.FolderID, k.ChildFolderID) != nil {
+			log.Info("[default] cannot be deleted")
+			break
+		}
+		if req.IsDeleteLocal {
+			consts.GetGormProjectDatabase().Close()
+			err := consts.DeleteDatabaseFile(k.DatabasePath)
+			if err != nil {
+				log.Errorf("delete local database error: %v", err)
+			}
+		}
+
+		err = yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
+		if err != nil {
+			log.Errorf("delete project error: %v", err)
+		}
+	}
+
+	// set current project
+	defaultDB, err := consts.CreateProjectDatabase(proj.DatabasePath)
+	if err != nil {
+		return &ypb.Empty{}, utils.Errorf("open default project database failed: %s", err)
+	}
+
+	log.Infof("Set default project db by grpc: %s", proj.DatabasePath)
+	consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
+	consts.SetGormProjectDatabase(defaultDB)
 	return &ypb.Empty{}, nil
 }
 
