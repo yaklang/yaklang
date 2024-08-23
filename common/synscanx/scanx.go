@@ -231,7 +231,7 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *
 				continue
 			}
 			if s.excludedHost(host) {
-				return
+				continue
 			}
 			lock.Lock()
 			s._hosts.Add(host)
@@ -347,7 +347,6 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 				Port: port,
 			}
 			s.config.callCallback(result)
-
 			resultCh <- result
 
 			if outputFile != nil {
@@ -363,29 +362,32 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	}
 
 	// recv packet 的总时长
-	deadline := time.Now().Add(s.config.waiting)
-	wCtx, wCancel := context.WithDeadline(context.Background(), deadline)
-	defer func() {
-		wCancel()
-	}()
-
-	go s.HandlerZeroCopyReadPacket(wCtx, resultCh)
-	time.Sleep(100 * time.Millisecond)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	wCtx, wCancel := context.WithCancel(context.Background())
 	go func() {
-		defer wg.Done()
-		if !s.FromPing {
-			s.arpScan()
-			time.Sleep(1 * time.Second)
-		}
-		s.sendPacket(s.ctx, targetCh)
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+		s.HandlerZeroCopyReadPacket(wCtx, resultCh)
 	}()
-	wg.Wait()
+	time.Sleep(100 * time.Millisecond)
 
+	defer func() {
+		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+	if !s.FromPing {
+		s.arpScan()
+		time.Sleep(1 * time.Second)
+	}
+	s.sendPacket(s.ctx, targetCh)
+
+	time.Sleep(s.config.waiting)
 	log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
 
-	<-wCtx.Done()
+	wCancel()
 
 	done <- struct{}{}
 
