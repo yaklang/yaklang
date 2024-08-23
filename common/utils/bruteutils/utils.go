@@ -29,23 +29,6 @@ func packetToBrute(
 	return rsp.RawPacket, nil
 }
 
-func GeneratePasswordByUser(user []string, pass []string) []string {
-	var results []string
-	for _, r := range pass {
-		for _, b := range user {
-			arr, err := mutate.QuickMutate(r, nil, mutate.MutateWithExtraParams(
-				map[string][]string{
-					"user": {b},
-				}))
-			if err != nil {
-				continue
-			}
-			results = append(results, arr...)
-		}
-	}
-	return results
-}
-
 // http://k8gege.org/p/16172.html
 var CommonUsernames = []string{
 	"admin", "root", "test", "op", "www", "data",

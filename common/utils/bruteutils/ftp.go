@@ -36,11 +36,10 @@ var ftpAuth = &DefaultServiceAuthInfo{
 		"fuckyou", "000000", "woaini", "qwerty", "1qaz2wsx", "abc123",
 		"abc123456", "1q2w3e4r", "123qwe", "159357", "p@55w0rd", "r00t",
 		"tomcat", "apache", "system", "huawei", "zte",
-	}, GeneratePasswordByUser(ftpUser, []string{
 		"{{param(user)}}{{param(user)}}",
 		"{{param(user)}}", "{{param(user)}}1",
 		"{{param(user)}}!",
-	})...),
+	}),
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 21)
 		result := i.Result()

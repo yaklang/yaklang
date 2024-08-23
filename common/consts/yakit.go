@@ -69,17 +69,18 @@ func GetGormProjectDatabase() *gorm.DB {
 	return projectDataBase
 }
 
-func InitializeYakitDatabase(projectDatabase string, profileDBName string) {
+func InitializeYakitDatabase(projectDB string, profileDB string) {
 	projectName := GetProjectDatabaseNameFromEnv()
-	if projectDatabase != "" {
-		projectName = projectDatabase
+	if projectDB != "" {
+		projectName = projectDB
 	}
-	profileDatabase := GetProfileDatabaseNameFromEnv()
-	if profileDBName != "" {
-		profileDatabase = profileDBName
+	profileDBName := GetProfileDatabaseNameFromEnv()
+	if profileDB != "" {
+		profileDBName = profileDB
 	}
+
 	SetDefaultYakitProjectDatabaseName(projectName)
-	SetDefaultYakitProfileDatabaseName(profileDatabase)
+	SetDefaultYakitProfileDatabaseName(profileDBName)
 	initYakitDatabase()
 }
 
@@ -101,9 +102,8 @@ func initYakitDatabase() {
 		/* 再创建项目数据库 */
 		projectDataBase, err = CreateProjectDatabase(projectDatabaseName)
 		if err != nil {
-			log.Errorf("init plugin-db[%v] failed: %s", projectDatabaseName, err)
+			log.Errorf("init project-db[%v] failed: %s", projectDatabaseName, err)
 		}
-
 		schema.SetGormProjectDatabase(projectDataBase)
 		schema.SetGormProfileDatabase(profileDatabase)
 	})
