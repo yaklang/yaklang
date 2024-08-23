@@ -47,7 +47,6 @@ func CreateProfileDatabase(path string) (*gorm.DB, error) {
 }
 
 func SetGormProjectDatabase(d *gorm.DB) {
-	log.Info("load gorm database connection")
 	projectDataBase = d
 	schema.AutoMigrate(d, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	schema.SetGormProjectDatabase(d)
