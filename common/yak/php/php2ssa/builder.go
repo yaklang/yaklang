@@ -84,20 +84,15 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	startParse := func(functionBuilder *ssa.FunctionBuilder) {
 		functionBuilder.SupportClassStaticModifier = true
 		functionBuilder.SupportClass = true
+		var id = 0
 		build := builder{
 			constMap:        make(map[string]ssa.Value),
 			FunctionBuilder: functionBuilder,
-			ClassSyntax: &Syntax{
-				cache: make(map[string]struct{}),
-				decls: make(map[string]SyntaxBuilder),
-				stack: utils.NewStack[string](),
-				spin:  make(map[string]ssa.Value),
-			},
-			FuncSyntax: &Syntax{
-				cache: make(map[string]struct{}),
-				decls: make(map[string]SyntaxBuilder),
-				stack: utils.NewStack[string](),
-				spin:  make(map[string]ssa.Value),
+			fetchDollarId: func() int {
+				defer func() {
+					id++
+				}()
+				return id
 			},
 		}
 		build.callback = func(str string, filename string) {
@@ -133,85 +128,12 @@ func (*SSABuild) GetLanguage() consts.Language {
 	return consts.PHP
 }
 
-type SyntaxBuilder func(builder *builder)
-type Syntax struct {
-	cache map[string]struct{}
-	decls map[string]SyntaxBuilder
-	stack *utils.Stack[string]
-	spin  map[string]ssa.Value
-}
-
-func (s *Syntax) checkSpin(name string) bool {
-	_, ok := s.spin[name]
-	return ok
-}
-
-func (s *Syntax) fixSpinUd(y *builder) {
-	//todo： ud关系修正应该另换位置
-	for name, value := range s.spin {
-		if function := y.GetProgram().GetFunction(name); utils.IsNil(function) {
-			log.Warnf("function: %s spin ud fix fail.", name)
-			continue
-		} else {
-			for _, user := range value.GetUsers() {
-				for _, u := range function.GetUsers() {
-					if u.GetName() == user.GetName() {
-						function.RemoveUser(u)
-						function.AddUser(user)
-					}
-				}
-			}
-		}
-	}
-}
-
-func (s *Syntax) store(name string, handler func(builder *builder)) {
-	s.decls[name] = handler
-}
-func (s *Syntax) getSyntaxHandler(name string) (bool, SyntaxBuilder) {
-	if syntaxBuilder, ok := s.decls[name]; ok {
-		return ok, syntaxBuilder
-	}
-	return false, nil
-}
-func (s *Syntax) checkAndPush(name string) (SyntaxBuilder, bool) {
-	if _, ok := s.cache[name]; ok {
-		log.Warnf("this function has syntaxted: %s", name)
-		return nil, false
-	}
-	syntax, syntaxBuilder := s.getSyntaxHandler(name)
-	if !syntax {
-		return nil, false
-	}
-	s.stack.Push(name)
-	return syntaxBuilder, true
-}
-
-func (s *Syntax) PopAndDel() {
-	name := s.stack.Pop()
-	s.cache[name] = struct{}{}
-	delete(s.decls, name)
-}
-
-func (s *Syntax) checkSyntaxInCurrent(name string) bool {
-	for i := 0; i < s.stack.Len(); i++ {
-		if s.stack.PeekN(i) == name {
-			return true
-		}
-	}
-	return false
-}
-func (s *Syntax) checkSyntaxInCache(name string) bool {
-	_, ok := s.cache[name]
-	return ok
-}
-
 type builder struct {
 	*ssa.FunctionBuilder
-	constMap                map[string]ssa.Value
-	isFunction              bool
-	callback                func(str string, filename string)
-	FuncSyntax, ClassSyntax *Syntax
+	constMap      map[string]ssa.Value
+	isFunction    bool
+	callback      func(str string, filename string)
+	fetchDollarId func() int
 }
 
 func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
