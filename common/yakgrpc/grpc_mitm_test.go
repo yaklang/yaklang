@@ -6,12 +6,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/google/uuid"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,8 +139,8 @@ Content-Length: 3
 
 			token := ksuid.New().String()
 			body, _ := utils.GzipCompress(token)
-			var packet = "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
-			var packetBytes = lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
+			packet := "GET / HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort) + "\r\n\r\n" + string(body)
+			packetBytes := lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Content-Encoding", "gzip")
 			// packetBytes = lowhttp.ReplaceHTTPPacketHeader(packetBytes, "Transfer-Encoding", "chunked")
 			packetBytes = lowhttp.HTTPPacketForceChunked(packetBytes)
 			_, err := yak.Execute(`
@@ -1338,9 +1339,7 @@ Host: example.com
 }
 
 func TestMiTMPlugins(t *testing.T) {
-	var (
-		count, _count = 0, 0
-	)
+	count, _count := 0, 0
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/notify" {
@@ -1632,4 +1631,72 @@ Host: example.com
 	if res.GetData()[0].DurationMs == 0 {
 		t.Fatal("save http flow duration failed")
 	}
+}
+
+func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	token, token2 := utils.RandStringBytes(20), utils.RandStringBytes(20)
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: 1\r\n\r\na"))
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host: mitmHost,
+			Port: uint32(mitmPort),
+		})
+		stream.Send(&ypb.MITMRequest{
+			SetAutoForward:   true,
+			AutoForwardValue: false,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+		_, _, err := poc.DoGET(fmt.Sprintf("http://%s?a=modified", utils.HostPort(host, port)), poc.WithProxy(proxy))
+		require.NoError(t, err)
+		_, _, err = poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(proxy))
+		require.NoError(t, err)
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+		if msg.GetMessage() != nil {
+			return
+		}
+		if req := msg.GetRequest(); req != nil {
+			query := lowhttp.GetHTTPRequestQueryParam(req, "a")
+			if query == "modified" {
+				req = lowhttp.ReplaceHTTPPacketQueryParam(req, "a", token)
+			}
+			// 直接Forward
+			stream.Send(&ypb.MITMRequest{
+				Id:      msg.GetId(),
+				Request: req,
+			})
+		}
+	})
+
+	// check modified
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword: token,
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 1,
+		},
+	}, 1)
+	require.NoError(t, err)
+	flow := flows.Data[0]
+	require.Contains(t, flow.Tags, "[手动修改]")
+	require.NotContains(t, flow.Tags, "[手动劫持]")
+	// check no modified
+	flows, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword: token2,
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 1,
+		},
+	}, 1)
+	require.NoError(t, err)
+	flow = flows.Data[0]
+	require.Contains(t, flow.Tags, "[手动劫持]")
+	require.NotContains(t, flow.Tags, "[手动修改]")
 }
