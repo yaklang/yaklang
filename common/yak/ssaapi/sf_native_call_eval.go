@@ -133,7 +133,9 @@ var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sf
 	})
 
 	var opts []mutate.FuzzConfigOpt
-	for name, values := range vals {
+	for rawTagName, valuesRaw := range vals {
+		name := rawTagName
+		values := valuesRaw
 		opt := mutate.Fuzz_WithExtraFuzzTagHandler(name, func(s string) []string {
 			results := []string{}
 			visited := map[string]struct{}{}
