@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"strings"
 	"testing"
 )
 
@@ -139,7 +140,7 @@ func TestVerifiedRule(t *testing.T) {
 			continue
 		}
 		if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
-			t.Run(rule.RuleName, func(t *testing.T) {
+			t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
 				t.Log("Start to verify: " + rule.RuleName)
 				err := ssatest.EvaluateVerifyFilesystem(rule.Content, t)
 				if err != nil {
