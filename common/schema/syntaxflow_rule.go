@@ -87,6 +87,7 @@ type SyntaxFlowRule struct {
 	Title       string
 	TitleZh     string
 	Description string
+	Tag         string
 
 	// yak or sf
 	Type     SyntaxFlowRuleType
@@ -112,7 +113,7 @@ type SyntaxFlowRule struct {
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
-	s.Hash = utils.CalcSha256(s.Content)
+	s.Hash = utils.CalcSha256(s.Content, s.Tag)
 	return s.Hash
 }
 
