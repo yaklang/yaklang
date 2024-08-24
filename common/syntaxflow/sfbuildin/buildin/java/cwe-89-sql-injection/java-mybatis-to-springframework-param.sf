@@ -1,0 +1,135 @@
+desc(
+    title: "Find My(i)Batis XML Weak ('${...}') Params to Spring Params",
+    title_zh: '找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径',
+    type: vuln,
+    level: middle,
+)
+
+<include('spring-param')> as $top;
+
+// <mybatisSink><getFunc> as $params;
+// $top -{
+//     hook: `*?{opcode: call}<getCaller> as $name`
+// }->
+// $name<getObject><typeName>?{!have: '.'} as $cls;
+// $name<name>?{!have: '.'} as $methodName;
+// <fuzztag('{{cls}}.{{methodName}} & $params as $target')><show><eval>
+// check $target
+// alert $target;
+
+<include('spring-param')> as $totalSource;
+<mybatisSink><getFunc><name>?{!have: '.' && !have: '__ref__'} as $name;
+<fuzztag('.{{name}} as $call')><eval>
+$call(*<slice(start=1)> #{
+    hook: `* & $totalSource as $source`,
+}->)
+// $call(*<slice(start=1)> #{
+//     hook: `*?{opcode: param && <getFunc>.annotation.*Mapping && <typeName>?{!have: Long} } as $source`,
+// }->)
+$source?{<typeName>?{!have: Long && !have: Integer && !have: Boolean && !have: Double}} as $vuln
+alert $vuln;
+
+
+desc(
+language: java,
+'file://Controller.java': <<<TEXT
+package com.mycompany.myapp;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/users")
+public class UserController {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUser(@PathVariable Long id) {
+        User user = userMapper.getUser(id);
+        return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
+    }
+
+    @PostMapping
+    public ResponseEntity<User> insertUser(@RequestBody User user) {
+        userMapper.insertUser(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
+        user.setId(id); // 确保更新的用户 ID 是正确的
+        userMapper.updateUser(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        userMapper.deleteUser(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers() {
+        List<User> users = userMapper.getAllUsers();
+        return ResponseEntity.ok(users);
+    }
+}
+TEXT,
+'file://UserMapper.java': <<<TEXT
+package com.mycompany.myapp;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+    User getUser(@Param("id") Long id);
+
+    void insertUser(User user);
+
+    void updateUser(User user);
+
+    void deleteUser(@Param("id") Long id);
+
+    List<User> getAllUsers(); // 可选，获取所有用户
+}
+TEXT,
+'file://sqlmap.xml': <<<TEXT
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+</mapper>
+TEXT
+)

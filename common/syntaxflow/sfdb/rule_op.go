@@ -132,7 +132,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func ImportRuleWithoutValid(ruleName string, content string, buildin bool) error {
+func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) error {
 	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
@@ -166,6 +166,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool) error
 		Description:   frame.Description,
 		Type:          ruleType,
 		Content:       content,
+		Tag:           strings.Join(tags, "|"),
 		IsBuildInRule: buildin,
 		Purpose:       schema.ValidPurpose(frame.Purpose),
 		Severity:      schema.ValidSeverityType(frame.Severity),

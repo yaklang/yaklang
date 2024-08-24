@@ -89,13 +89,27 @@ const (
 
 	NativeCall_FreeMarkerSink = "freeMarkerSink"
 
-	NativeCall_OpCodes      = "opcodes"
-	NativeCall_SourceCode   = "sourceCode"
-	NativeCall_ScanPrevious = "scanPrevious"
-	NativeCall_ScanNext     = "scanNext"
+	NativeCall_OpCodes        = "opcodes"
+	NativeCall_SourceCode     = "sourceCode"
+	NativeCall_ScanPrevious   = "scanPrevious"
+	NativeCall_ScanNext       = "scanNext"
+	NativeCall_DeleteVariable = "delete"
 )
 
 func init() {
+	registerNativeCall(NativeCall_DeleteVariable, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		name := params.GetString("name", 0)
+		if name != "" {
+			frame.GetSymbolTable().Delete(name)
+			result, _ := frame.GetSFResult()
+			if result != nil {
+				result.SymbolTable.Delete(name)
+				delete(result.AlertSymbolTable, name)
+				delete(result.AlertMsgTable, name)
+			}
+		}
+		return true, v, nil
+	}))
 	registerNativeCall(NativeCall_ScanNext, nc_func(nativeCallScanNext))
 	registerNativeCall(NativeCall_ScanPrevious, nc_func(nativeCallScanPrevious))
 	registerNativeCall(NativeCall_SourceCode, nc_func(nativeCallSourceCode))
