@@ -13,20 +13,20 @@ import (
 func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
-	ret := v.getBottomUses(actx)
+	ret := v.getBottomUses(actx, opt...)
 	lo.UniqBy(ret, func(item *Value) int64 {
 		return item.GetId()
 	})
 	return ret
 }
 
-func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
+func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if !actx.TheDefaultShouldBeVisited(v) {
 		return vals
 	}
 	v.GetUsers().ForEach(func(value *Value) {
-		if ret := value.AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+		if ret := value.AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	})
@@ -42,9 +42,9 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 		obj := v.GetObject()
 		if err := actx.PushObject(obj, v.GetKey(), v); err != nil {
 			log.Errorf("%v", err)
-			return v.visitedDefsDefault(actx)
+			return v.visitedDefsDefault(actx, opt...)
 		}
-		vals = append(vals, obj.getBottomUses(actx)...)
+		vals = append(vals, obj.getBottomUses(actx, opt...)...)
 		actx.PopObject()
 	}
 	if len(vals) <= 0 {
@@ -96,7 +96,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	}
 
 	if ValueCompare(v, actx.Self) {
-		return v.visitUserFallback(actx)
+		return v.visitUserFallback(actx, opt...)
 	}
 	var ok bool
 
@@ -114,35 +114,35 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			// the phi is existed, visited in the same stack.
 			return Values{}
 		}
-		return v.visitUserFallback(actx)
+		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
 		if !actx.TheCallShouldBeVisited(ins) {
 			// call existed
-			return v.visitUserFallback(actx)
+			return v.visitUserFallback(actx, opt...)
 		}
 
 		if ins.Method == nil {
 			// log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
-			return v.visitUserFallback(actx)
+			return v.visitUserFallback(actx, opt...)
 		}
 
 		// enter function via call
 		f, ok := ssa.ToFunction(ins.Method)
 		if !ok {
 			//log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
-			return v.visitUserFallback(actx)
+			return v.visitUserFallback(actx, opt...)
 		}
 
 		funcValue := v.NewValue(f).AppendDependOn(v)
 		if ValueCompare(funcValue, actx.Self) {
-			return v.visitUserFallback(actx)
+			return v.visitUserFallback(actx, opt...)
 		}
 
 		// push call
 		err := actx.PushCall(v)
 		if err != nil {
 			log.Infof("push call failed: %v", err)
-			return v.visitUserFallback(actx)
+			return v.visitUserFallback(actx, opt...)
 			// existed call
 		} else {
 			defer actx.PopCall()
@@ -207,7 +207,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 					} else {
 						defer actx.PopCall()
 					}
-					results = append(results, dep.getBottomUses(actx)...)
+					results = append(results, dep.getBottomUses(actx, opt...)...)
 				})
 			}
 			if len(results) > 0 {
@@ -246,7 +246,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			var vals Values
 			if !call.IsObject() || len(indexes) <= 0 {
 				v.NewValue(call).GetUsers().ForEach(func(user *Value) {
-					if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+					if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
 				})
@@ -254,7 +254,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				if len(vals) > 0 {
 					return vals
 				}
-				return v.NewValue(call).AppendDependOn(v).getBottomUses(actx)
+				return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
 			}
 
 			// handle indexed return to call return
@@ -267,7 +267,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				}
 				returnReceiver := v.NewValue(indexedReturn)
 				actx.PushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
-				if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
+				if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx, opt...); len(newVals) > 0 {
 					vals = append(vals, newVals...)
 				}
 				actx.PopObject()
@@ -275,9 +275,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if len(vals) > 0 {
 				return vals
 			}
-			return v.NewValue(call).AppendDependOn(v).getBottomUses(actx)
+			return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
 		}
 		return fallback()
 	}
-	return v.visitUserFallback(actx)
+	return v.visitUserFallback(actx, opt...)
 }
