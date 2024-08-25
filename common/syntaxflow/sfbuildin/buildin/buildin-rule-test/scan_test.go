@@ -183,7 +183,7 @@ func TestBuildInRule_Verify_DEBUG(t *testing.T) {
 		return
 	}
 
-	ruleName := "java-spring-el-use.sf"
+	ruleName := "java-servlet-n-spring-concat-command-injection.sf"
 
 	rule, err := sfdb.GetRule(ruleName)
 	if err != nil {
