@@ -427,29 +427,33 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
 			var call *Value
-			if !actx.IsNegativeCallStack() {
+			if !actx.HaveNegativeCallStack() {
+				// 通过Call调用栈可以知道实参被谁调用
 				call = actx.PopCall()
 				if utils.IsNil(call) {
-					actx.EnableNegativeCallStack(true)
+					// Call调用栈为空的时候，将called压入NegativeCall调用栈
+					// 以便在后续中可以使用callVisited表，避免出现递归
 					actx.PushNegativeCall(called)
-				}else {
-					actx.PushCall(call)
 				}
 			}
 
-			ret := traced.getTopDefs(actx, opt...)
-			if call != nil {
+			var ret Values
+			if !actx.HaveNegativeCallStack(){
+				ret = traced.getTopDefs(actx)
 				actx.PushCall(call)
-			} else if calledInstance != nil {
+			}else {
 				actx.PushCall(called)
+				if !actx.TheParameterShouldBeVisited(i) {
+					return Values{}
+				}
+				ret = traced.getTopDefs(actx)
+				actx.PopCall()
 			}
+
 			if len(ret) > 0 {
 				return ret
 			} else {
-				if actx.TheDefaultShouldBeVisited(traced) {
-					return Values{traced}
-				}
-				return Values{}
+				return Values{traced}
 			}
 		}
 

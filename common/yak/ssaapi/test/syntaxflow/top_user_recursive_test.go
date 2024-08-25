@@ -86,17 +86,22 @@ func TestObject_Recursive(t *testing.T) {
 func TestParameter_TopDef_REcursive(t *testing.T) {
 	t.Run("parameter top def recursive  1", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
-		f = (a) => {
-			return a
+		f1 = (a1) => {
+			return a1
 		}
-		f2 = (a)  => {
-			target = f(a)
+		f2 = (a2)  => {
+			target = f1(a2)
 			f2(target)
 		}
 		`, `
 		target #-> * as $target
 		`, map[string][]string{
-			"target": {"Parameter-a"},
+			// step 1 :找到f1(a2),f1(a2)是个Call，因此PushCall
+			// step 2 :找到返回值a1
+			// step 3 :找到调用a1的点，即f1(a2)，进行PopCall并对其形参a2进行topdef
+			// step 4 :找到调用a2的点，还是f1(a2)，但是此时CallStack是空的，启用NegativeCallStack，进行topdef
+			// step 5 :NegativeCallStack判断查找了两次参数a2，停止递归
+			"target": {"FreeValue-f1(Parameter-a2)"},
 		})
 	})
 	t.Run("parameter top def recursive 2 ", func(t *testing.T) {
