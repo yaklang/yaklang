@@ -96,6 +96,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 	}
 	if actx.IsReachedDepthLimited() {
+		log.Warnf("reached depth limit,stop it")
 		return Values{i}
 	}
 
@@ -425,12 +426,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
 			var call *Value
 			if !actx.IsNegativeCallStack() {
 				call = actx.PopCall()
 				if utils.IsNil(call) {
 					actx.EnableNegativeCallStack(true)
+					actx.PushNegativeCall(called)
+				}else {
+					actx.PushCall(call)
 				}
 			}
 
