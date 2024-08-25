@@ -1,7 +1,6 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -84,8 +83,8 @@ func TestObject_Recursive(t *testing.T) {
 	})
 }
 
-func TestFunctionCall_REcursive(t *testing.T) {
-	t.Run("function call", func(t *testing.T) {
+func TestParameter_TopDef_REcursive(t *testing.T) {
+	t.Run("parameter top def recursive  1", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		f = (a) => {
 			return a
@@ -97,19 +96,17 @@ func TestFunctionCall_REcursive(t *testing.T) {
 		`, `
 		target #-> * as $target
 		`, map[string][]string{
-			"target": {"FreeValue-f(Parameter-a)"},
+			"target": {"Parameter-a"},
 		})
 	})
-}
-
-func TestFunctionCall_Recursive2(t *testing.T) {
-	t.Run("function call", func(t *testing.T) {
-		ssatest.Check(t, `f2 = (a)  => {
+	t.Run("parameter top def recursive 2 ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f2 = (a)  => {
 			f2(a)
-		}`, func(prog *ssaapi.Program) error {
-			result := prog.SyntaxFlow("a?{opcode: param} #-> * as $target")
-			result.Show()
-			return nil
+		}
+		`, `
+		a?{opcode: param} #-> * as $target`, map[string][]string{
+			"target": {"Parameter-a"},
 		})
 	})
 }
