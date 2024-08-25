@@ -94,9 +94,49 @@ const (
 	NativeCall_ScanPrevious   = "scanPrevious"
 	NativeCall_ScanNext       = "scanNext"
 	NativeCall_DeleteVariable = "delete"
+	NativeCall_Forbid         = "forbid"
 )
 
+func haveResult(operator sfvm.ValueOperator) bool {
+	if utils.IsNil(operator) {
+		return false
+	}
+	haveResultFlag := false
+	_ = operator.Recursive(func(operator sfvm.ValueOperator) error {
+		if _, ok := operator.(*Value); ok {
+			haveResultFlag = true
+			return utils.Error("abort")
+		}
+		return nil
+	})
+	return haveResultFlag
+}
+
 func init() {
+	registerNativeCall(NativeCall_Forbid, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		name := params.GetString(0, "var")
+		if name != "" {
+			result, _ := frame.GetSFResult()
+			if result != nil {
+				vars, ok := result.SymbolTable.Get(name)
+				if ok && haveResult(vars) {
+					return false, nil, utils.Wrapf(sfvm.CriticalError, "forbid sf-var: %v", name)
+				}
+				if vars, ok := result.SymbolTable.Get(name); ok && haveResult(vars) {
+					return false, nil, utils.Wrapf(sfvm.CriticalError, "forbid sf-var: %v", name)
+				}
+			}
+			if vars, ok := frame.GetSymbolTable().Get(name); ok && haveResult(vars) {
+				return false, nil, utils.Wrapf(sfvm.CriticalError, "forbid sf-var: %v", name)
+			}
+			return true, v, nil
+		}
+
+		if haveResult(v) {
+			return false, nil, utils.Wrapf(sfvm.CriticalError, "forbid")
+		}
+		return true, v, nil
+	}))
 	registerNativeCall(NativeCall_DeleteVariable, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		name := params.GetString("name", 0)
 		if name != "" {
@@ -136,21 +176,26 @@ func init() {
 	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
 		log.Info("syntax flow native call 'as' to", varName)
+
+		var vals []sfvm.ValueOperator
 		result, ok := frame.GetSymbolTable().Get(varName)
-		if !ok {
-			frame.GetSymbolTable().Get(varName)
-		} else {
-			var vals []sfvm.ValueOperator
-			result.Recursive(func(operator sfvm.ValueOperator) error {
-				vals = append(vals, operator)
+		if ok && haveResult(result) {
+			_ = result.Recursive(func(operator sfvm.ValueOperator) error {
+				_, ok := operator.(*Value)
+				if ok {
+					vals = append(vals, operator)
+				}
 				return nil
 			})
-			v.Recursive(func(operator sfvm.ValueOperator) error {
-				vals = append(vals, operator)
-				return nil
-			})
-			return true, sfvm.NewValues(vals), nil
 		}
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			_, ok := operator.(*Value)
+			if ok {
+				vals = append(vals, operator)
+			}
+			return nil
+		})
+		frame.GetSymbolTable().Set(varName, sfvm.NewValues(vals))
 		return true, v, nil
 	}), nc_desc(`put vars to variables`))
 	registerNativeCall(NativeCall_StrLower, nc_func(nativeCallStrLower), nc_desc(`convert a string to lower case`))

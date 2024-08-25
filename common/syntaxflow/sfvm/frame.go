@@ -362,7 +362,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 	return nil
 }
 
-var CriticalError = utils.Error("CriticalError(BUG)")
+var CriticalError = utils.Error("CriticalError(Immediately Abort)")
 
 func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
 	if visited == nil {
@@ -1099,6 +1099,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil || !ok {
 			s.debugSubLog("No Result in [%v]", i.UnaryStr)
 			s.stack.Push(NewValues(nil))
+			if errors.Is(err, CriticalError) {
+				return err
+			}
 			return utils.Errorf("get native call failed: %v", err)
 		}
 		s.debugSubLog("<< push: %v", ret)
@@ -1229,7 +1232,6 @@ func (s *SFFrame) GetVM() *SyntaxFlowVirtualMachine {
 func (s *SFFrame) GetConfig() *Config {
 	return s.config
 }
-
 
 func fetchId(i any) (int64, bool) {
 	result, ok := i.(ssa.GetIdIF)

@@ -1,6 +1,10 @@
 package java
 
 import (
+	"errors"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -547,4 +551,34 @@ func TestTypeNameForCreator(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 
+}
+
+func TestNativeCall_Forbid(t *testing.T) {
+	ssatest.Check(t, `
+a = (b) => {
+	return b + 1;
+}
+c = a();
+`, func(prog *ssaapi.Program) error {
+		_, err := prog.SyntaxFlowWithError("b<show><forbid>")
+		if err != nil && errors.Is(err, sfvm.CriticalError) && strings.Contains(err.Error(), "forbid") {
+			return nil
+		}
+		return utils.Error("forbid native call is not finished")
+	})
+}
+
+func TestNativeCall_Forbid2(t *testing.T) {
+	ssatest.Check(t, `
+a = (b) => {
+	return b + 1;
+}
+c = a();
+`, func(prog *ssaapi.Program) error {
+		_, err := prog.SyntaxFlowWithError("b<show> as $ccccc; <forbid(ccccc)>")
+		if err != nil && errors.Is(err, sfvm.CriticalError) && strings.Contains(err.Error(), "forbid") {
+			return nil
+		}
+		return utils.Error("forbid native call is not finished")
+	})
 }
