@@ -164,6 +164,8 @@ func WithSyntaxFlowConfig(
 	rc := CreateRecursiveConfigFromItems(sfResult, config, opts...)
 	handlerValue := func(rc *RecursiveConfig) {
 		options = append(options, WithHookEveryNode(func(value *Value) error {
+			//valueStr := value.String()
+			//log.Infof("start to fetch: %v", valueStr)
 			configOption := rc.handler(value)
 			switch configOption {
 			case ContinueSkip:

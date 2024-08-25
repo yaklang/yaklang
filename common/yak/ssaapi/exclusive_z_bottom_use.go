@@ -90,6 +90,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				if err.Error() != "abort" {
 					log.Errorf("hook every node failed: %v", err)
 				}
+				return Values{}
 			}
 		}
 	}
