@@ -51,7 +51,7 @@ func (i Values) AppendDependOn(v *Value) Values {
 	return i
 }
 
-func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
+func (i *Value) visitedDefsDefault(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if i.node == nil {
 		return vals
@@ -60,7 +60,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 		return vals
 	}
 	for _, def := range i.node.GetValues() {
-		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
+		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	}
@@ -70,7 +70,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	}
 	if maskable, ok := i.node.(ssa.Maskable); ok {
 		for _, def := range maskable.GetMask() {
-			if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
+			if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
@@ -140,14 +140,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
 		if value.HasValues() {
-			return i.visitedDefsDefault(actx)
+			return i.visitedDefsDefault(actx, opt...)
 		}
 		if value.IsMember() {
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
 			if err := actx.PushObject(obj, key, i); err != nil {
 				log.Errorf("%v", err)
-				return i.visitedDefsDefault(actx)
+				return i.visitedDefsDefault(actx, opt...)
 			}
 
 			ret := obj.getTopDefs(actx, opt...)
@@ -156,7 +156,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return ret
 		}
-		return i.visitedDefsDefault(actx)
+		return i.visitedDefsDefault(actx, opt...)
 	}
 
 	switch inst := i.node.(type) {
@@ -172,7 +172,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// ret[n]
 		return getMemberCall(inst, actx)
 	case *ssa.ConstInst:
-		return i.visitedDefsDefault(actx)
+		return i.visitedDefsDefault(actx, opt...)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
 			// phi is visited...
@@ -312,7 +312,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			for _, r := range fun.Return {
 				for _, subVal := range r.GetValues() {
-					if ret := value.NewValue(subVal).AppendEffectOn(value).getTopDefs(actx); len(ret) > 0 {
+					if ret := value.NewValue(subVal).AppendEffectOn(value).getTopDefs(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
 				}
@@ -336,11 +336,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			switch inst.MemberCallKind {
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
-					return para.getTopDefs(actx)
+					return para.getTopDefs(actx, opt...)
 				}
 			case ssa.FreeValueMemberCall:
 				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
-					return fv.getTopDefs(actx)
+					return fv.getTopDefs(actx, opt...)
 				}
 			}
 			return Values{i}
@@ -358,7 +358,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
 			call := actx.PopCall()
-			ret := traced.getTopDefs(actx)
+			ret := traced.getTopDefs(actx, opt...)
 			if call != nil {
 				actx.PushCall(call)
 			}
@@ -428,7 +428,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			// todo: 解决exclusive_callstack_top_test.go测试不受出入栈影响
 			call := actx.PopCall()
 
-			ret := traced.getTopDefs(actx)
+			ret := traced.getTopDefs(actx, opt...)
 			if call != nil {
 				actx.PushCall(call)
 			}
@@ -479,7 +479,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				defer actx.PopCall()
 
 				v := i.NewValue(inst.Value).AppendEffectOn(i)
-				return v.getTopDefs(actx)
+				return v.getTopDefs(actx, opt...)
 			}
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
