@@ -21,7 +21,6 @@ type AnalyzeContext struct {
 	// function call stack
 	_callStack         *utils.Stack[*Value]
 	_negativeCallStack *utils.Stack[*Value]
-	_allowNegativeCallStack bool
 
 	_callTable *omap.OrderedMap[int64, *CallVisited]
 
@@ -62,6 +61,7 @@ type CallVisited struct {
 	_visitedPhi     map[int64]struct{}
 	_visitedObject  map[int64]struct{}
 	_visitedDefault map[int64]struct{}
+	_visitedParameter map[int64]struct{}
 }
 
 func NewCallVisited() *CallVisited {
@@ -69,6 +69,7 @@ func NewCallVisited() *CallVisited {
 		_visitedPhi:     make(map[int64]struct{}),
 		_visitedObject:  make(map[int64]struct{}),
 		_visitedDefault: make(map[int64]struct{}),
+		_visitedParameter: make(map[int64]struct{}),
 	}
 	return ret
 }
@@ -123,7 +124,7 @@ func (a *AnalyzeContext) TheCallShouldBeVisited(i *ssa.Call) bool {
 
 func (a *AnalyzeContext) PopCall() *Value {
 	if a._callStack.Len() <= 0 {
-		if a._allowNegativeCallStack{
+		if a.HaveNegativeCallStack(){
 			return a.PopNegativeCall()
 		}
 	}
@@ -141,12 +142,10 @@ func (a *AnalyzeContext) PopNegativeCall() *Value {
 	return val
 }
 
-func (a *AnalyzeContext) EnableNegativeCallStack(b bool) {
-	a._allowNegativeCallStack = b
-}
 
-func (a *AnalyzeContext) IsNegativeCallStack() bool {
-	return a._allowNegativeCallStack
+
+func (a *AnalyzeContext) HaveNegativeCallStack() bool {
+	return a._negativeCallStack.Len() > 0
 }
 
 func (g *AnalyzeContext) GetCurrentCall() *Value {
@@ -219,7 +218,19 @@ func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
 	}
 	return false
 }
-
+// ========================================== PHI STACK ==========================================
+// The ParameterShouldBeVisited is used to check whether the parameter should be visited
+func (a *AnalyzeContext) TheParameterShouldBeVisited(i *Value) bool {
+	callVisited := a.getVisit()
+	if callVisited == nil {
+		return false
+	}
+	if _, ok := callVisited._visitedParameter[i.GetId()]; !ok {
+		callVisited._visitedParameter[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
 // ========================================== DEFAULT STACK ==========================================
 
 func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
