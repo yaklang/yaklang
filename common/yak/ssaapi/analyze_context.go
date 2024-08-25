@@ -20,7 +20,8 @@ type AnalyzeContext struct {
 
 	// function call stack
 	_callStack         *utils.Stack[*Value]
-	_negativeCallStack bool
+	_negativeCallStack *utils.Stack[*Value]
+	_allowNegativeCallStack bool
 
 	_callTable *omap.OrderedMap[int64, *CallVisited]
 
@@ -75,6 +76,7 @@ func NewCallVisited() *CallVisited {
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
 		_callStack:   utils.NewStack[*Value](),
+		_negativeCallStack: utils.NewStack[*Value](),
 		_objectStack: utils.NewStack[objectItem](),
 		_callTable:   omap.NewEmptyOrderedMap[int64, *CallVisited](),
 		config:       NewOperations(opt...),
@@ -98,6 +100,18 @@ func (a *AnalyzeContext) PushCall(i *Value) error {
 	return nil
 }
 
+func (a *AnalyzeContext) PushNegativeCall(i *Value) error {
+	if !i.IsCall() {
+		return utils.Errorf("BUG: (callStack is not clean!) CallStack cannot recv %T", i.node)
+	}
+	if a._callTable.Have(i.GetId()) {
+		return utils.Errorf("call[%v] is existed on s-runtime call stack %v", i.GetId(), i.String())
+	}
+	a._negativeCallStack.Push(i)
+	a._callTable.Set(i.GetId(), NewCallVisited())
+	return nil
+}
+
 func (a *AnalyzeContext) IsExistedInCallStack(i *Value) bool {
 	return a._callTable.Have(i.GetId())
 }
@@ -109,19 +123,30 @@ func (a *AnalyzeContext) TheCallShouldBeVisited(i *ssa.Call) bool {
 
 func (a *AnalyzeContext) PopCall() *Value {
 	if a._callStack.Len() <= 0 {
-		return nil
+		if a._allowNegativeCallStack{
+			return a.PopNegativeCall()
+		}
 	}
 	val := a._callStack.Pop()
 	a._callTable.Delete(val.GetId())
 	return val
 }
 
+func (a *AnalyzeContext) PopNegativeCall() *Value {
+	if a._callStack.Len() <= 0 {
+		return nil
+	}
+	val := a._negativeCallStack.Pop()
+	a._callTable.Delete(val.GetId())
+	return val
+}
+
 func (a *AnalyzeContext) EnableNegativeCallStack(b bool) {
-	a._negativeCallStack = b
+	a._allowNegativeCallStack = b
 }
 
 func (a *AnalyzeContext) IsNegativeCallStack() bool {
-	return a._negativeCallStack
+	return a._allowNegativeCallStack
 }
 
 func (g *AnalyzeContext) GetCurrentCall() *Value {
