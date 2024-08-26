@@ -18,8 +18,8 @@ func testSocksProxy(scheme string, host string, username string, password string
 	rspInst, err := lowhttp.HTTP(
 		lowhttp.WithPacketBytes(lowhttp.BasicRequest()),
 		lowhttp.WithProxy(proxy),
-		lowhttp.WithConnectTimeoutFloat(15),
-		lowhttp.WithTimeoutFloat(10),
+		lowhttp.WithConnectTimeout(defaultTimeout),
+		lowhttp.WithTimeout(defaultTimeout),
 	)
 	if err == nil && len(rspInst.MultiResponseInstances) > 0 && rspInst.MultiResponseInstances[0].StatusCode == 200 && bytes.Contains(rspInst.RawPacket, ExampleChallengeContent) {
 		return true

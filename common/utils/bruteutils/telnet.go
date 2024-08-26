@@ -1,16 +1,13 @@
 package bruteutils
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
-	"time"
-)
 
-const CommonTimeoutDuration = 8 * time.Second
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 var telnetHostlock sync.Map
 
@@ -28,16 +25,16 @@ var telnetAuth = &DefaultServiceAuthInfo{
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 23)
 
-		conn, err := netx.DialTCPTimeout(CommonTimeoutDuration, i.Target)
+		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
-			log.Debugf("telnet:\\\\%v conn failed: %s", i.Target, err)
+			log.Errorf("telnet:%v conn failed: %s", i.Target, err)
 			res := i.Result()
 			res.Finished = true
 			return res
 		}
 		defer conn.Close()
 
-		raw := utils.StableReaderEx(conn, CommonTimeoutDuration, 1024)
+		raw := utils.StableReaderEx(conn, defaultTimeout, 1024)
 		if raw == nil {
 			res := i.Result()
 			res.Finished = true
@@ -45,7 +42,7 @@ var telnetAuth = &DefaultServiceAuthInfo{
 		}
 
 		conn.Write([]byte("?\n"))
-		raw = utils.StableReaderEx(conn, CommonTimeoutDuration, 4096)
+		raw = utils.StableReaderEx(conn, defaultTimeout, 4096)
 		if raw == nil {
 			return i.Result()
 		}
@@ -55,7 +52,7 @@ var telnetAuth = &DefaultServiceAuthInfo{
 			utils.MatchAnyOfSubString(string(raw), `prompt for`) ||
 			utils.MatchAllOfSubString(string(raw), "We Monitor Our Traffic") ||
 			utils.MatchAllOfSubString(string(raw), "THDCR001SW23>") {
-			var r = i.Result()
+			r := i.Result()
 			r.Ok = true
 			r.Username = ""
 			r.Password = ""
@@ -69,15 +66,14 @@ var telnetAuth = &DefaultServiceAuthInfo{
 
 		return i.Result()
 	},
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		if item.Password == "" && item.Username == "" {
+	BrutePass: func(i *BruteItem) *BruteItemResult {
+		if i.Password == "" && i.Username == "" {
 			log.Info("empty username and password")
 		}
-		log.Debugf("telnet client start to handle: %s", item.String())
-		defer log.Debugf("telnet finished to handle: %s", item.String())
+		log.Debugf("telnet client start to handle: %s", i.String())
+		defer log.Debugf("telnet finished to handle: %s", i.String())
 
-		result := item.Result()
-		var target = fixToTarget(item.Target, 23)
+		result := i.Result()
 
 		defer func() {
 			if err := recover(); err != nil {
@@ -87,17 +83,17 @@ var telnetAuth = &DefaultServiceAuthInfo{
 		}()
 
 		var mutex *sync.Mutex
-		val, ok := telnetHostlock.Load(item.Target)
+		val, ok := telnetHostlock.Load(i.Target)
 		if ok {
 			mutex = val.(*sync.Mutex)
 		} else {
 			mutex = new(sync.Mutex)
-			telnetHostlock.Store(item.Target, mutex)
+			telnetHostlock.Store(i.Target, mutex)
 		}
 		mutex.Lock()
 		defer mutex.Unlock()
 
-		var conn, err = netx.DialTCPTimeout(CommonTimeoutDuration, target)
+		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			log.Errorf("get auto proxy conn ex failed: %s", err)
 			if utils.MatchAnyOfRegexp(err.Error(), `(?i)timeout`) {
@@ -108,11 +104,11 @@ var telnetAuth = &DefaultServiceAuthInfo{
 
 		defer conn.Close()
 
-		var doPassword = func() *BruteItemResult {
-			var passRaw = utils.StableReaderEx(conn, CommonTimeoutDuration, 1024)
+		doPassword := func() *BruteItemResult {
+			passRaw := utils.StableReaderEx(conn, defaultTimeout, 1024)
 			if utils.MatchAnyOfRegexp(string(passRaw), `(?i)password`, `(?i)verification code:`) {
-				conn.Write([]byte(item.Password + "\n"))
-				var bruteResult = utils.StableReaderEx(conn, CommonTimeoutDuration, 1024)
+				conn.Write([]byte(i.Password + "\n"))
+				bruteResult := utils.StableReaderEx(conn, defaultTimeout, 1024)
 				if utils.MatchAnyOfRegexp(string(bruteResult), `(?i)invalid`, `(?i)incorrect`, `(?i)fail`) {
 					return result
 				}
@@ -126,19 +122,19 @@ var telnetAuth = &DefaultServiceAuthInfo{
 			return result
 		}
 
-		var bannerAndFinished = utils.StableReaderEx(conn, CommonTimeoutDuration, 1024)
-		var u = strings.TrimSpace(string(bannerAndFinished))
+		bannerAndFinished := utils.StableReaderEx(conn, defaultTimeout, 1024)
+		u := strings.TrimSpace(string(bannerAndFinished))
 		if !utils.MatchAnyOfRegexp(u, `(?i)login`, `(?i)user`) {
 			// 没有匹配到 login 或者 user，看是不是匹配到 password
 			if utils.MatchAnyOfRegexp(u, `(?i)password`) {
-				var finalResult = doPassword()
+				finalResult := doPassword()
 				finalResult.OnlyNeedPassword = true
 				return finalResult
 			}
 			return result
 		}
 
-		conn.Write([]byte(item.Username + "\n"))
+		conn.Write([]byte(i.Username + "\n"))
 		return doPassword()
 	},
 }

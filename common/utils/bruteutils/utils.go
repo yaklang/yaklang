@@ -1,6 +1,8 @@
 package bruteutils
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -13,14 +15,14 @@ func appendDefaultPort(i string, defaultPort int) string {
 func packetToBrute(
 	packet string,
 	data map[string][]string,
-	timeout float64,
+	timeout time.Duration,
 	isTls bool,
 ) ([]byte, error) {
 	res, _ := mutate.QuickMutate(packet, nil, mutate.MutateWithExtraParams(data))
 	if len(res) <= 0 {
 		return nil, utils.Error("mutate packet error... BUG!")
 	}
-	rsp, err := lowhttp.HTTP(lowhttp.WithHttps(isTls), lowhttp.WithTimeoutFloat(timeout), lowhttp.WithRequest(res[0]))
+	rsp, err := lowhttp.HTTP(lowhttp.WithHttps(isTls), lowhttp.WithTimeout(timeout), lowhttp.WithRequest(res[0]))
 	if err != nil {
 		return nil, err
 	}

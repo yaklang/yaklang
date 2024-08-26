@@ -1,73 +1,83 @@
 package bruteutils
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
+
+var registerDialContextOnce sync.Once
+
+func MYSQLAuth(target, username, password string, needAuth bool) (ok, finished bool, err error) {
+	registerDialContextOnce.Do(func() {
+		mysql.RegisterDialContext("tcp", func(ctx context.Context, addr string) (net.Conn, error) {
+			return defaultDialer.DialContext(ctx, "tcp", addr)
+		})
+	})
+
+	dsn := fmt.Sprintf("tcp(%v)/mysql?allowFallbackToPlaintext=true&allowCleartextPasswords=true", target)
+	if needAuth {
+		dsn = fmt.Sprintf("%v:%v@%v", url.PathEscape(username), url.PathEscape(password), dsn)
+	}
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return false, false, err
+	}
+	_, err = db.Exec("select 1")
+	if err != nil {
+		switch true {
+		case strings.Contains(err.Error(), "is not allowed to connect to"):
+			fallthrough
+		case strings.Contains(err.Error(), "connect: connection refused"): // connect: connection refused
+			return false, true, err
+		case strings.Contains(err.Error(), "Error 1045:"):
+			return false, false, utils.Wrapf(err, "auth failed: %s/%v", username, password)
+		}
+
+		return false, false, utils.Wrapf(err, "exec 'select 1' to mysql failed: %v, (%v:%v)", err, username, password)
+	}
+	return true, false, nil
+}
 
 var mysqlAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mysql",
 	DefaultPorts:     "3306",
-	DefaultUsernames: append([]string{"mysql", "root", "guest", "op", "ops"}),
+	DefaultUsernames: []string{"mysql", "root", "guest", "op", "ops"},
 	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 3306)
 		res := i.Result()
 
-		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
+		ok, finished, err := MYSQLAuth(i.Target, "", "", false)
 		if err != nil {
-			res.Finished = true
-			return res
+			log.Errorf("mysql unauth verify failed: %v", err)
 		}
-		raw, _ := utils.ReadConnWithTimeout(conn, 3*time.Second)
-		if raw != nil {
-			if strings.Contains(string(raw), "is not allowed to connect") {
-				res.Finished = true
-				return res
-			} else {
-				log.Infof("fetch mysql banner: %s", strconv.Quote(string(raw)))
-			}
-		}
+		res.Ok = ok
+		res.Finished = finished
+
 		return i.Result()
 	},
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		item.Target = appendDefaultPort(item.Target, 3306)
-		result := item.Result()
-		db, err := sql.Open("mysql", fmt.Sprintf("%v:%v@tcp(%v)/mysql",
-			url.PathEscape(item.Username),
-			url.PathEscape(item.Password),
-			item.Target))
+	BrutePass: func(i *BruteItem) *BruteItemResult {
+		i.Target = appendDefaultPort(i.Target, 3306)
+		res := i.Result()
+
+		ok, finished, err := MYSQLAuth(i.Target, i.Username, i.Password, true)
 		if err != nil {
-			log.Errorf("connect to mysql failed: %v", err)
-			return result
+			log.Errorf("mysql brute pass failed: %v", err)
 		}
-		_, err = db.Exec("select 1")
-		if err != nil {
-			switch true {
-			case strings.Contains(err.Error(), "is not allowed to connect to"):
-				result.Finished = true
-				return result
-			case strings.Contains(err.Error(), "connect: connection refused"): // connect: connection refused
-				result.Finished = true
-				return result
-			case strings.Contains(err.Error(), "Error 1045:"):
-				log.Errorf("auth failed: %s/%v", item.Username, item.Password)
-				return result
-			}
-			log.Errorf("exec 'select 1' to mysql failed: %v, (%v:%v)", err, item.Username, item.Password)
-			return result
-		}
-		result.Ok = true
-		return result
+		res.Ok = ok
+		res.Finished = finished
+
+		return res
 	},
 }

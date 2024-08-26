@@ -102,9 +102,8 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 var (
 	tomcatUnLoginRegexp = regexp.MustCompile(fmt.Sprintf(`(?i)%v`, regexp.QuoteMeta(`<h1>401 Unauthorized</h1>`)))
 	tomcatManagerRegexp = regexp.MustCompile(fmt.Sprintf(`(?i)%v`, regexp.QuoteMeta(`alt="The Tomcat Servlet/JSP Container"`)))
-	tomcatTlsTTLcache = utils.NewTTLCache[bool](30 * time.Minute)
+	tomcatTlsTTLcache   = utils.NewTTLCache[bool](30 * time.Minute)
 )
-
 
 var tomcat = &DefaultServiceAuthInfo{
 	ServiceName:      "tomcat",
@@ -129,7 +128,7 @@ var tomcat = &DefaultServiceAuthInfo{
 			"target": {utils.HostPort(host, port)},
 			"user":   {i.Username},
 			"pass":   {i.Password},
-		}, 10, isTls)
+		}, defaultTimeout, isTls)
 		if err != nil {
 			log.Errorf("send packet to tomcat brute failed: %s", err)
 			return result
@@ -162,7 +161,7 @@ var tomcat = &DefaultServiceAuthInfo{
 				"user":   {i.Username},
 				"pass":   {i.Password},
 			},
-			10, isTls,
+			defaultTimeout, isTls,
 		)
 		if tomcatManagerRegexp.Match(rsp) {
 			result.Ok = true

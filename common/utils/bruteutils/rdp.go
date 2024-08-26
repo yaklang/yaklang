@@ -5,6 +5,8 @@ import (
 	"fmt"
 	stdlog "log"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	//"github.com/shadow1ng/fscan/common"
-	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
@@ -35,16 +35,13 @@ var rdpAuth = &DefaultServiceAuthInfo{
 		i.Target = appendDefaultPort(i.Target, 3389)
 		result := i.Result()
 
-		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
+		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true
 			return res
 		}
 		conn.Close()
-		//if netx.IsTLSService(i.Target) {
-		//	rdpTLSCache.Set(i.Target, true)
-		//}
 
 		time.Sleep(3 * time.Second)
 
@@ -58,7 +55,6 @@ var rdpAuth = &DefaultServiceAuthInfo{
 		var r bool
 		if utils.IsIPv4(host) {
 			r, err = rdpLogin(host, host, "administrator", "", port)
-
 		} else {
 			ip := netx.LookupFirst(host, netx.WithTimeout(5*time.Second))
 			r, err = rdpLogin(ip, host, "administrator", "", port)
@@ -96,9 +92,8 @@ var rdpAuth = &DefaultServiceAuthInfo{
 		var r bool
 		if utils.IsIPv4(host) {
 			r, err = rdpLogin(host, host, i.Username, i.Password, port)
-
 		} else {
-			ip := netx.LookupFirst(host, netx.WithTimeout(5*time.Second))
+			ip := netx.LookupFirst(host, netx.WithTimeout(defaultTimeout))
 			r, err = rdpLogin(ip, host, i.Username, i.Password, port)
 		}
 
@@ -183,7 +178,7 @@ func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
 }
 
 func (g *rdpClient) Login(domain, user, pwd string) error {
-	conn, err := netx.DialTCPTimeout(5*time.Second, g.Host)
+	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", g.Host)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}
@@ -199,14 +194,14 @@ func (g *rdpClient) Login(domain, user, pwd string) error {
 	g.sec.SetUser(user)
 	g.sec.SetPwd(pwd)
 	g.sec.SetDomain(domain)
-	//g.sec.SetClientAutoReconnect()
+	// g.sec.SetClientAutoReconnect()
 
 	g.tpkt.SetFastPathListener(g.sec)
 	g.sec.SetFastPathListener(g.pdu)
 	g.pdu.SetFastPathSender(g.tpkt)
 
-	//g.x224.SetRequestedProtocol(x224.PROTOCOL_SSL)
-	//g.x224.SetRequestedProtocol(x224.PROTOCOL_RDP)
+	// g.x224.SetRequestedProtocol(x224.PROTOCOL_SSL)
+	// g.x224.SetRequestedProtocol(x224.PROTOCOL_RDP)
 
 	err = g.x224.Connect()
 	if err != nil {
