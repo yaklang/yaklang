@@ -1,24 +1,23 @@
 package bruteutils
 
 import (
-	"fmt"
-	"github.com/go-pg/pg/v10"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
+
+	"github.com/go-pg/pg/v10"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-func postgresqlUnAuthCheck(Host string, Port int) (bool, error) {
+func postgresqlUnAuthCheck(host string, port int) (bool, error) {
 	sendData := []byte{58, 0, 0, 0, 167, 65, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 255, 255, 255, 255, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0}
 	getlogData := []byte{72, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 33, 0, 0, 0, 2, 103, 101, 116, 76, 111, 103, 0, 16, 0, 0, 0, 115, 116, 97, 114, 116, 117, 112, 87, 97, 114, 110, 105, 110, 103, 115, 0, 0}
-	conn, err := netx.DialTimeout(5*time.Second, "tcp", fmt.Sprintf("%s:%v", Host, Port))
+	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", utils.HostPort(host, port))
 	if err != nil {
 		return false, err
 	}
 	defer conn.Close()
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	err = conn.SetReadDeadline(time.Now().Add(defaultTimeout))
 	if err != nil {
 		return false, err
 	}
@@ -34,7 +33,6 @@ func postgresqlUnAuthCheck(Host string, Port int) (bool, error) {
 	text := string(buf[0:count])
 	if strings.Contains(text, "ismaster") == false {
 		return false, err
-
 	}
 	_, err = conn.Write(getlogData)
 	if err != nil {
@@ -60,7 +58,7 @@ var postgresAuth = &DefaultServiceAuthInfo{
 		i.Target = appendDefaultPort(i.Target, 5432)
 
 		result := i.Result()
-		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
+		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			result.Finished = true
 			return result
@@ -85,6 +83,7 @@ var postgresAuth = &DefaultServiceAuthInfo{
 			Addr:     item.Target,
 			User:     item.Username,
 			Password: item.Password,
+			Dialer:   defaultDialer.DialContext,
 			Database: "postgres",
 		})
 		_, err := db.Exec("select 1")
