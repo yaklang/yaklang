@@ -113,6 +113,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		actx.ReachDepthLimited()
 		return Values{i}
 	}
+	if actx.depth > 0 && i.GetDepth() > 0 && actx.depth > i.GetDepth() {
+		actx.ReachDepthLimited()
+		return Values{i}
+	}
+	if actx.depth < 0 && i.GetDepth() < 0 && actx.depth < i.GetDepth() {
+		actx.ReachDepthLimited()
+		return Values{i}
+	}
 
 	// hook everynode
 	if len(actx.config.HookEveryNode) > 0 {
