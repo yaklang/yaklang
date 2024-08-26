@@ -503,7 +503,7 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	classTypeCheck := func() (*ClassBluePrint, bool) {
 		return func() (*ClassBluePrint, bool) {
-			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
+			if blueprint, ok := object.GetType().(*ClassBluePrint); ok && blueprint != nil {
 				return blueprint, true
 			}
 			if u, ok := object.(*Undefined); ok {
@@ -552,6 +552,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	member := classHandler(classTypeCheck, func(bluePrint *ClassBluePrint) Value {
 		return bluePrint.GetMemberAndStaticMember(key.String(), false)
 	}, nil)
+	_ = member
 	if !utils.IsNil(member) {
 		return member
 	}
