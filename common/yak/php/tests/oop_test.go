@@ -779,4 +779,16 @@ $b = "$a";
 println($a::$b);`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
 	})
+	t.Run("oop custom member", func(t *testing.T) {
+		code := `<?php
+
+class a
+{
+    public $a = 1;
+}
+
+$c = new a();
+println($c->a);`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
 }
