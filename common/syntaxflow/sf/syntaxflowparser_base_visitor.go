@@ -131,6 +131,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitLfText(ctx *LfTextContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitHereDoc(ctx *HereDocContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitAlertStatement(ctx *AlertStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -89,30 +89,28 @@ const (
 
 	NativeCall_FreeMarkerSink = "freeMarkerSink"
 
-	NativeCall_OpCodes        = "opcodes"
-	NativeCall_SourceCode     = "sourceCode"
-	NativeCall_ScanPrevious   = "scanPrevious"
-	NativeCall_ScanNext       = "scanNext"
+	NativeCall_OpCodes      = "opcodes"
+	NativeCall_SourceCode   = "sourceCode"
+	NativeCall_ScanPrevious = "scanPrevious"
+	NativeCall_ScanNext     = "scanNext"
+
+	//NativeCall_DeleteVariable is used to delete a variable
 	NativeCall_DeleteVariable = "delete"
-	NativeCall_Forbid         = "forbid"
+
+	// NativeCall_Forbid is used to forbid a value, if values existed, report critical error.
+	NativeCall_Forbid = "forbid"
+
+	// NativeCall_Self is used to get self value
+	NativeCall_Self = "self"
+
+	NativeCall_DataFlow = "dataflow"
 )
 
-func haveResult(operator sfvm.ValueOperator) bool {
-	if utils.IsNil(operator) {
-		return false
-	}
-	haveResultFlag := false
-	_ = operator.Recursive(func(operator sfvm.ValueOperator) error {
-		if _, ok := operator.(*Value); ok {
-			haveResultFlag = true
-			return utils.Error("abort")
-		}
-		return nil
-	})
-	return haveResultFlag
-}
-
 func init() {
+	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow))
+	registerNativeCall(NativeCall_Self, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		return true, v, nil
+	}))
 	registerNativeCall(NativeCall_Forbid, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		name := params.GetString(0, "var")
 		if name != "" {
@@ -692,4 +690,19 @@ func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
 	}
 	NativeCallDocuments[name] = n
 	sfvm.RegisterNativeCall(n.Name, n.Function)
+}
+
+func haveResult(operator sfvm.ValueOperator) bool {
+	if utils.IsNil(operator) {
+		return false
+	}
+	haveResultFlag := false
+	_ = operator.Recursive(func(operator sfvm.ValueOperator) error {
+		if _, ok := operator.(*Value); ok {
+			haveResultFlag = true
+			return utils.Error("abort")
+		}
+		return nil
+	})
+	return haveResultFlag
 }

@@ -68,10 +68,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
 			value := ""
 			if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
-				if valueItem.CrlfHereDoc() != nil {
-					value = valueItem.CrlfHereDoc().(*sf.CrlfHereDocContext).CrlfText().GetText()
-				} else if valueItem.LfHereDoc() != nil {
-					value = valueItem.LfHereDoc().(*sf.LfHereDocContext).LfText().GetText()
+				if valueItem.HereDoc() != nil {
+					value = y.VisitHereDoc(valueItem.HereDoc())
 				} else if valueItem.StringLiteral() != nil {
 					value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
 				}
