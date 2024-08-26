@@ -5069,6 +5069,7 @@ message ExecParamItem {
   string Value = 2;
 }
 message ExecRequest {
+  // 执行优先级为：ScriptPath > Script > ScriptId 
   repeated ExecParamItem Params = 1;
   string Script = 2;
   string ScriptId = 3;
@@ -5077,6 +5078,9 @@ message ExecRequest {
   // 这个是为了满足 Runner 的情况，属于特殊情况
   string RunnerParamRaw = 6;
   bool NoDividedEngine = 7;
+
+  string WorkDir = 8; // 工作目录
+  string ScriptPath = 9; // 脚本位置
 }
 
 message ExecResult {
