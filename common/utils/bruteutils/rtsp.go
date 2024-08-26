@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -83,7 +82,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 			u = parsed.String()
 		}
 		res := i.Result()
-		conn, err := netx.DialTCPTimeout(10*time.Second, i.Target)
+		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			log.Errorf("rtsp: %v conn failed: %s", i.Target, err)
 			res.Finished = true
@@ -123,7 +122,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		}
 
 		_ = u
-		conn, err := netx.DialTCPTimeout(10*time.Second, target)
+		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			log.Errorf("rtsp: %v conn failed: %s", target, err)
 			res.Finished = true

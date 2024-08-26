@@ -8,7 +8,7 @@ import (
 )
 
 func RedisAuth(target, password string, needAuth bool) (bool, error) {
-	conn, err := defaultDialer.Dial("TCP", target)
+	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", target)
 	if err != nil {
 		return false, err
 	}

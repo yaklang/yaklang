@@ -2,16 +2,26 @@ package bruteutils
 
 import (
 	"github.com/jlaffaye/ftp"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"time"
 )
 
 var ftpUser = []string{
 	"ftp", "www", "anonymous", "admin", "root", "db", "wwwroot", "data", "web",
 }
 
-const defaultTimeout = 10 * time.Second
+func FTPAuth(target, username, password string) (bool, error) {
+	c, err := ftp.Dial(target, ftp.DialWithTimeout(defaultTimeout), ftp.DialWithDialFunc(defaultDialer.Dial))
+	if err != nil {
+		return false, err
+	}
+	defer c.Quit()
+
+	err = c.Login(username, password)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
 
 // https://github.com/lowliness9/pocs-collection/tree/e22f0b4075a39ff217547613698991dca3273b30/poc-xunfeng
 var ftpAuth = &DefaultServiceAuthInfo{
@@ -33,51 +43,25 @@ var ftpAuth = &DefaultServiceAuthInfo{
 	})...),
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 21)
-		var res = i.Result()
+		result := i.Result()
 
-		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
+		ok, err := FTPAuth(i.Target, "anonymous", "anonymous")
 		if err != nil {
-			res.Finished = true
-			return res
-		}
-		conn.Close()
-
-		target := i.Target
-		c, err := ftp.Dial(target, ftp.DialWithTimeout(5*time.Second))
-		if err != nil {
-			res.Finished = true
-			return res
-		}
-
-		err = c.Login("anonymous", "anonymous")
-		if err != nil {
-			return res
-		}
-		_ = c.Logout()
-
-		return res
-	},
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		item.Target = appendDefaultPort(item.Target, 21)
-		target := item.Target
-		result := item.Result()
-
-		c, err := ftp.Dial(target, ftp.DialWithTimeout(5*time.Second))
-		if err != nil {
-			log.Errorf("dial ftp failed: %s", err)
 			result.Finished = true
 			return result
 		}
-		defer c.Quit()
-
-		err = c.Login(item.Username, item.Password)
+		result.Ok = ok
+		return result
+	},
+	BrutePass: func(i *BruteItem) *BruteItemResult {
+		i.Target = appendDefaultPort(i.Target, 21)
+		result := i.Result()
+		ok, err := FTPAuth(i.Target, i.Username, i.Password)
 		if err != nil {
-			log.Errorf("login failed: %s", err)
+			result.Finished = true
 			return result
 		}
-		_ = c.Logout()
-
-		result.Ok = true
+		result.Ok = ok
 		return result
 	},
 }
