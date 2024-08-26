@@ -13,9 +13,12 @@ func SaveValueAndVariableOffset(inst Instruction) {
 		ssadb.SaveIrOffset(offset)
 	}
 
-	instEndOffset := ssadb.CreateOffset()
-	instEndOffset.Offset = int64(inst.GetRange().GetEndOffset())
-	saveOffset(instEndOffset)
+	
+	if rng := inst.GetRange();rng != nil {
+		instEndOffset := ssadb.CreateOffset()
+		instEndOffset.Offset = int64(rng.GetEndOffset())
+		saveOffset(instEndOffset)
+	}
 	
 	{
 		// set variable def range offset
@@ -26,15 +29,19 @@ func SaveValueAndVariableOffset(inst Instruction) {
 		variables := value.GetAllVariables()
 		for name, variable := range variables {
 		// Save variable def range offset
-		defOffset := ssadb.CreateOffset()
-		defOffset.Variable = name
-		defOffset.Offset = int64(variable.DefRange.GetEndOffset())
-		saveOffset(defOffset)
+		if rng := variable.DefRange;rng != nil {
+			defOffset := ssadb.CreateOffset()
+			defOffset.Offset = int64(rng.GetEndOffset())
+			defOffset.VariableName = name
+			defOffset.IsVariable=true
+			saveOffset(defOffset)
+		}
 
 		// Save variable use range offsets
 		for rng := range variable.UseRange {
 			useOffset := ssadb.CreateOffset()
-			useOffset.Variable = name
+			useOffset.VariableName = name
+			useOffset.IsVariable=true
 			useOffset.Offset = int64(rng.GetEndOffset())
 			saveOffset(useOffset)
 		}
