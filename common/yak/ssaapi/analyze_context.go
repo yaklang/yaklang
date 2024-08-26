@@ -218,7 +218,7 @@ func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
 	}
 	return false
 }
-// ========================================== PHI STACK ==========================================
+// ========================================== Parameter STACK ==========================================
 // The ParameterShouldBeVisited is used to check whether the parameter should be visited
 func (a *AnalyzeContext) TheParameterShouldBeVisited(i *Value) bool {
 	callVisited := a.getVisit()
