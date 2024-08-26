@@ -20,7 +20,7 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 	function2IrCode(inst, ir)
 	basicBlock2IrCode(inst, ir)
 	ir.SetExtraInfo(marshalExtraInformation(inst))
-	SaveValueAndVariableOffset(inst)
+	SaveValueOffset(inst)
 	return nil
 }
 
