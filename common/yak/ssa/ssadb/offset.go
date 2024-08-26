@@ -13,8 +13,9 @@ type IrOffset struct {
 	ProgramName string `json:"program_name" gorm:"index"`
 	// offset
 	Offset int64 `json:"offset" gorm:"index"`
-	//variable name
-	Variable string `json:"variable" gorm:"index"`
+	//variable
+	VariableName string `json:"variable_name" gorm:"index"`
+	IsVariable bool `json:"is_variable" gorm:"index"`
 	// value
 	ValueID int64 `json:"value_id" gorm:"index"`
 }
