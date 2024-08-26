@@ -138,7 +138,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 	}
 
-	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
+	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
 		if value.HasValues() {
 			return i.visitedDefsDefault(actx, opt...)
 		}
@@ -149,7 +149,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Errorf("%v", err)
 				return i.visitedDefsDefault(actx, opt...)
 			}
-
+			obj.AppendDependOn(apiValue)
 			ret := obj.getTopDefs(actx, opt...)
 			if !ValueCompare(i, actx.Self) {
 				ret = append(ret, i)
@@ -170,7 +170,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return i.getTopDefs(actx, opt...)
 	case *ssa.Undefined:
 		// ret[n]
-		return getMemberCall(inst, actx)
+		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
 		return i.visitedDefsDefault(actx, opt...)
 	case *ssa.Phi:
@@ -180,7 +180,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 		conds := inst.GetControlFlowConditions()
-		result := getMemberCall(inst, actx)
+		result := getMemberCall(i, inst, actx)
 		for _, cond := range conds {
 			v := i.NewValue(cond)
 			ret := v.AppendEffectOn(i).getTopDefs(actx, opt...)
@@ -414,13 +414,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					actualParam = tmp
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
-					return getMemberCall(i.node, actx)
+					return getMemberCall(i, i.node, actx)
 				}
 			} else {
 				// parameter
 				if inst.FormalParameterIndex >= len(calledInstance.Args) {
 					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
-					return getMemberCall(i.node, actx)
+					return getMemberCall(i, i.node, actx)
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
@@ -501,5 +501,5 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return values
 	}
-	return getMemberCall(i.node, actx)
+	return getMemberCall(i, i.node, actx)
 }

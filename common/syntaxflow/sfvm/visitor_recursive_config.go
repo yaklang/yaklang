@@ -77,8 +77,42 @@ func (v *SyntaxFlowVisitor) VisitNativeCallActualParams(i *sf.NativeCallActualPa
 
 		configItem := &RecursiveConfigItem{Key: configKey}
 		value := item.NativeCallActualParamValue()
-		configItem.Value = yakunquote.TryUnquote(value.GetText())
+		if docContainer, ok := value.(*sf.NativeCallActualParamValueContext); ok {
+			if docContainer.HereDoc() != nil {
+				configItem.Value = v.VisitHereDoc(docContainer.HereDoc())
+			} else {
+				configItem.Value = yakunquote.TryUnquote(value.GetText())
+			}
+		} else {
+			configItem.Value = yakunquote.TryUnquote(value.GetText())
+		}
 		res = append(res, configItem)
 	}
 	return res
+}
+
+func (v *SyntaxFlowVisitor) VisitHereDoc(i any) string {
+	if i == nil {
+		return ""
+	}
+	item, ok := i.(*sf.HereDocContext)
+	if !ok {
+		return ""
+	}
+	if item.LfHereDoc() != nil {
+		doc, ok := item.LfHereDoc().(*sf.LfHereDocContext)
+		if ok {
+			return doc.LfText().GetText()
+		}
+		return ""
+	}
+
+	if item.CrlfHereDoc() != nil {
+		doc, ok := item.CrlfHereDoc().(*sf.CrlfHereDocContext)
+		if ok {
+			return doc.CrlfText().GetText()
+		}
+		return ""
+	}
+	return ""
 }
