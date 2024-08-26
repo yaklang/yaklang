@@ -10,6 +10,33 @@ import (
 	"strings"
 )
 
+var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	contextResult, err := frame.GetSFResult()
+	if err != nil {
+		return false, nil, err
+	}
+
+	code := params.GetString(0, "code")
+
+	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+		if val, ok := operator.(*Value); ok {
+			var dataFlows sfvm.ValueOperator = val.GetDataFlowPath()
+			//var defVals sfvm.ValueOperator = val.GetEffectOnPath()
+			//var useVals sfvm.ValueOperator = val.GetDependOnPath()
+			next := sfvm.NewValues([]sfvm.ValueOperator{dataFlows})
+			newResult, err := SyntaxFlowWithVMContext(next, code, contextResult, frame.GetVM().GetConfig())
+			if err != nil {
+				return err
+			}
+			if newResult != nil && newResult.SFFrameResult != nil {
+				frame.SetSFResult(newResult.SFFrameResult)
+			}
+		}
+		return nil
+	})
+	return true, v, nil
+}
+
 var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	contextResult, err := frame.GetSFResult()
 	if err != nil {

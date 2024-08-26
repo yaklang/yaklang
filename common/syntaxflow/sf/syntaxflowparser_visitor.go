@@ -100,6 +100,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#lfText.
 	VisitLfText(ctx *LfTextContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#hereDoc.
+	VisitHereDoc(ctx *HereDocContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#alertStatement.
 	VisitAlertStatement(ctx *AlertStatementContext) interface{}
 

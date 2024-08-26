@@ -35,6 +35,77 @@ type PredecessorValue struct {
 	Info *sfvm.AnalysisContext
 }
 
+func (v *Value) getEffectOnPath(m map[int64]struct{}) Values {
+	idStr := v.GetId()
+	_, visited := m[idStr]
+	if visited {
+		return nil
+	}
+	m[idStr] = struct{}{}
+	var vals Values
+	for _, i := range v.EffectOn {
+		vals = append(vals, i)
+	}
+	for _, i := range v.EffectOn {
+		vals = append(vals, i.getEffectOnPath(m)...)
+	}
+	return vals
+}
+
+func (v *Value) getDataFlowPath(m map[int64]struct{}) Values {
+	idStr := v.GetId()
+	_, visited := m[idStr]
+	if visited {
+		return nil
+	}
+	m[idStr] = struct{}{}
+	var vals Values
+	for _, i := range v.EffectOn {
+		vals = append(vals, i)
+	}
+	for _, i := range v.DependOn {
+		vals = append(vals, i)
+	}
+
+	for _, i := range v.EffectOn {
+		vals = append(vals, i.getDataFlowPath(m)...)
+	}
+	for _, i := range v.DependOn {
+		vals = append(vals, i.getDataFlowPath(m)...)
+	}
+
+	return vals
+}
+
+func (v *Value) GetDataFlowPath() Values {
+	return v.getDataFlowPath(make(map[int64]struct{}))
+}
+
+func (v *Value) GetEffectOnPath() Values {
+	return v.getEffectOnPath(make(map[int64]struct{}))
+}
+
+func (v *Value) getDependOnPath(m map[int64]struct{}) Values {
+	idStr := v.GetId()
+	_, visited := m[idStr]
+	if visited {
+		return nil
+	}
+	m[idStr] = struct{}{}
+	var vals Values
+	for _, i := range v.DependOn {
+		vals = append(vals, i)
+	}
+	for _, i := range v.DependOn {
+		vals = append(vals, i.getDependOnPath(m)...)
+	}
+	return vals
+}
+
+func (v *Value) GetDependOnPath() Values {
+	return v.getDependOnPath(make(map[int64]struct{}))
+}
+
 func ValueContain(v1 *Value, v2 ...*Value) bool {
 	for _, v := range v2 {
 		if ValueCompare(v1, v) {

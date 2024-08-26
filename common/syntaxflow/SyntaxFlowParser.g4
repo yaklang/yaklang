@@ -62,11 +62,12 @@ descriptionItem
     : stringLiteral lines?
     | stringLiteral ':' descriptionItemValue lines?
     ;
-descriptionItemValue: stringLiteral | '<<<'  HereDocIdentifierName (crlfHereDoc | lfHereDoc);
+descriptionItemValue: stringLiteral | hereDoc;
 crlfHereDoc: CRLFHereDocIdentifierBreak crlfText? CRLFEndDoc;
 lfHereDoc: LFHereDocIdentifierBreak lfText? LFEndDoc;
 crlfText: CRLFHereDocText+;
 lfText: LFHereDocText+;
+hereDoc: '<<<'  HereDocIdentifierName (crlfHereDoc | lfHereDoc);
 
 // echo statement will echo the variable
 alertStatement: Alert refVariable (For stringLiteral)?;
@@ -124,7 +125,7 @@ nativeCallActualParam
     : (nativeCallActualParamKey (':' | '='))?  nativeCallActualParamValue
     ;
 nativeCallActualParamKey: identifier;
-nativeCallActualParamValue: identifier | numberLiteral | '`' ~'`'* '`' | '$' identifier;
+nativeCallActualParamValue: identifier | numberLiteral | '`' ~'`'* '`' | '$' identifier | hereDoc;
 
 actualParam
     : singleParam    lines?                   # AllParam
