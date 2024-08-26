@@ -501,41 +501,59 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 }
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
-	if b.SupportClassStaticModifier {
-		if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
+	classTypeCheck := func() (*ClassBluePrint, bool) {
+		return func() (*ClassBluePrint, bool) {
 			if blueprint := object.GetType().(*ClassBluePrint); blueprint != nil {
-				if b.MarkedMemberCallWantMethod {
-					if value, ok := blueprint.StaticMethod[key.String()]; ok {
-						return value
-					}
-				}
-				if value, ok := blueprint.StaticMember[key.String()]; ok {
-					return value
-				}
-
+				return blueprint, true
 			}
-		}
-		//用于没有实例化类的时候获取静态方法或成员
-		//此时这个这个类为不可用undefined类型（UndefinedValueInValid）
-		if u, ok := object.(*Undefined); ok {
-			if u.Kind == UndefinedValueInValid {
-				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
-					if b.MarkedMemberCallWantMethod {
-						if value, ok := blueprint.StaticMethod[key.String()]; ok {
-							return value
-						}
-					}
-					if value, ok := blueprint.StaticMember[key.String()]; ok {
-						return value
+			if u, ok := object.(*Undefined); ok {
+				if u.Kind == UndefinedValueInValid {
+					if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
+						return blueprint, true
 					}
 				}
 			}
+			return nil, false
+		}()
+	}
+	classHandler := func(check func() (*ClassBluePrint, bool), handler func(bluePrint *ClassBluePrint) Value, beforeCheck func() bool) Value {
+		if beforeCheck != nil {
+			if !beforeCheck() {
+				return nil
+			}
 		}
+		if cls, ok := check(); ok {
+			if handler != nil {
+				return handler(cls)
+			}
+		}
+		return nil
+	}
 
+	val := classHandler(classTypeCheck, func(blueprint *ClassBluePrint) Value {
+		if b.MarkedMemberCallWantMethod {
+			if value, ok := blueprint.StaticMethod[key.String()]; ok {
+				return value
+			}
+		} else if value, ok := blueprint.StaticMember[key.String()]; ok {
+			return value
+		}
+		return nil
+	}, func() bool {
+		return b.SupportClassStaticModifier
+	})
+	if !utils.IsNil(val) {
+		return val
 	}
 	name, typ := checkCanMemberCall(object, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
+	}
+	member := classHandler(classTypeCheck, func(bluePrint *ClassBluePrint) Value {
+		return bluePrint.GetMemberAndStaticMember(key.String(), false)
+	}, nil)
+	if !utils.IsNil(member) {
+		return member
 	}
 	return b.getOriginMember(name, typ, object, key)
 
