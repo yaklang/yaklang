@@ -195,7 +195,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{i} // return self
 		}
 
-		// TODO: trace the specific return-values
 		fun, isFunc := ssa.ToFunction(calleeInst)
 		// callee := i.NewValue(fun)
 		if !isFunc && calleeInst.GetReference() != nil {
