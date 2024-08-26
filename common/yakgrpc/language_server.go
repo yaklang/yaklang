@@ -77,8 +77,7 @@ func languageServerAnalyzeFromDatabase(req *ypb.YaklangLanguageSuggestionRequest
 	ret.Range = SSARange
 
 	// word
-	// ret.Word = SSARange.GetText()
-	ret.Word = ssadb.GetVariableWordBeforeEndOffset(ssadb.GetDB(),SSARange,programName)
+	ret.Word = SSARange.GetText()
 
 	// value
 	valueID, err := ssadb.GetValueBeforeEndOffset(ssadb.GetDB(), SSARange)

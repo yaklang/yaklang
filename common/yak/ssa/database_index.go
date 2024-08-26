@@ -28,6 +28,7 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 		if variable == nil {
 			return
 		}
+		SaveVariableOffset(variable)
 		index.VersionID = variable.GetVersion()
 
 		// field
