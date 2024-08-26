@@ -536,8 +536,9 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticVariableContext:
 		// TODO class 命令空间
+		return y.CreateVariable(raw.GetText()), "", ""
 		//expr := y.VisitFullyQualifiedNamespaceExpr(i.FullyQualifiedNamespaceExpr())
-		//key = i.VarName().GetText()
+		//keys := y.VisitRightValue(i.FlexiVariable())
 	case *phpparser.ClassDirectStaticVariableContext:
 		//肯定是一个class，
 		class = i.Identifier().GetText()

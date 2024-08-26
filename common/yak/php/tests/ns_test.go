@@ -71,7 +71,7 @@ namespace{
     $a = new test();
     println($a->a);
 }`
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-$a.a(valid)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 	t.Run("decl function", func(t *testing.T) {
 		code := `<?php
@@ -191,18 +191,52 @@ namespace {
 			false,
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("namepsace references each other", func(t *testing.T) {
+		code := `<?php
+
+namespace a {
+
+    use function b\aa;
+
+    function t($a)
+    {
+        return $a;
+    }
+
+    function b($b)
+    {
+        return aa($b);
+    }
+}
+
+namespace b {
+
+    use function a\t;
+
+    function aa($c)
+    {
+        return t($c);
+    }
+}
+
+namespace {
+    $a = a\b(1);
+    println($a);
+}`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+	})
 	//t.Run("all namespace use static member", func(t *testing.T) {
 	//	code := `<?php
 	//
 	//namespace a\b\c {
-	//   class test
-	//   {
-	//       public static $a = 1;
-	//   }
+	//  class test
+	//  {
+	//      public static $a = 1;
+	//  }
 	//}
 	//
 	//namespace {
-	//   println(\a\b\c\test::$a);
+	//  println(\a\b\c\test::$a);
 	//}`
 	//	ssatest.CheckPrintlnValue(code, []string{}, t)
 	//})

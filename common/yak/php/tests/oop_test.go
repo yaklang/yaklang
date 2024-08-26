@@ -215,7 +215,7 @@ func TestOOP_var_member(t *testing.T) {
 		$c = "b";
 		println($a->$$c);
 		`, []string{
-			"Undefined-$a.a(valid)", "Undefined-$a.a(valid)", "Undefined-$a.a(valid)",
+			"0", "0", "0",
 		}, t)
 	})
 
@@ -233,7 +233,7 @@ func TestOOP_var_member(t *testing.T) {
 		$a->setA(1);
 		println($a->a);
 		`, []string{
-			"Undefined-$a.a(valid)", "side-effect(Parameter-$par, $this.a)",
+			"0", "side-effect(Parameter-$par, $this.a)",
 		}, t)
 	})
 
@@ -251,7 +251,7 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[Undefined-$a.a(valid)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
 			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
 		}, t)
 	})
@@ -303,7 +303,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$c = "b";
 		println($a->$$c);
 		`, []string{
-			"Undefined-$a.a(valid)", "Undefined-$a.a(valid)", "Undefined-$a.a(valid)",
+			"0", "0", "0",
 		}, t)
 	})
 
@@ -322,7 +322,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->a);
 		`, []string{
-			"Undefined-$a.a(valid)", "side-effect(Parameter-$par, $this.a)",
+			"0", "side-effect(Parameter-$par, $this.a)",
 		}, t)
 	})
 
@@ -341,7 +341,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[Undefined-$a.a(valid)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
 			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
 		}, t)
 	})
@@ -364,7 +364,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[Undefined-$a.a(valid)]",
+			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
 			"Undefined-$a.getA(valid)(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
@@ -383,7 +383,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[Undefined-$a.num(valid)]",
+			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
 		}, t)
 	})
 
@@ -473,35 +473,30 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 			}
 		}
 		$a = new A(); 
-		println($a);`
+		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a",
+			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
 		}, t)
 	})
-
 }
 
 func TestOOP_Syntax(t *testing.T) {
 	t.Run("__construct", func(t *testing.T) {
 		code := `<?php
-class test{
-    public $a;
-    public function __construct($a){
-    	$this->a = $a;
-        println($this->a);
-	}
+
+class t
+{
+    public $a = 1;
+
+    public function __construct()
+    {
+        $this->a = 2;
+    }
 }
-$a = new test("1");
-`
-		//执行会有问题，
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			prog.Show()
-			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
-		//ssatest.CheckSyntaxFlow(t, code,
-		//	`println(* #-> * as $param)`,
-		//	map[string][]string{"param": {`"1"`}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
+
+$c = new t();
+println($c->a);`
+		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
 	})
 	t.Run("__destruct", func(t *testing.T) {
 		code := `<?php
@@ -509,7 +504,7 @@ class test{
     public $a;
     function __destruct(){
         $this->a=1;
-        print($this->a);
+		print($this->a);
     }
 }
 $c = new test;
@@ -548,7 +543,7 @@ $c->a = 1;
 		//	map[string][]string{"param": {`1`}},
 		//	ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("code", func(t *testing.T) {
+	t.Run("__destruct", func(t *testing.T) {
 		code := `<?php
 function __destruct(){}
 __destruct();
@@ -558,7 +553,7 @@ __destruct();
 }
 
 func TestOOP_Extend(t *testing.T) {
-	t.Run("no impl __construct", func(t *testing.T) {
+	t.Run("impl __construct", func(t *testing.T) {
 		code := `<?php
 class b{
     public $a;
@@ -575,7 +570,7 @@ println($a->a);
 		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 	})
 
-	t.Run("impl __construct and get parent custom member", func(t *testing.T) {
+	t.Run("no impl __construct and get parent custom member", func(t *testing.T) {
 		code := `<?php
 class b{
     public $a=0;
@@ -592,9 +587,9 @@ class childB extends b{
 $b = new childB(1);
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-$b.a(valid)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"0"}, t)
 	})
-	t.Run("class custom memebr", func(t *testing.T) {
+	t.Run("class custom member", func(t *testing.T) {
 		code := `<?php
 class A{
     public function get(){
