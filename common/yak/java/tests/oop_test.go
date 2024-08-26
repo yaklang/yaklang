@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -20,7 +21,7 @@ class Main{
 			println(a.a);
 		}
 }
-		`, []string{"Undefined-a.a(valid)"}, t)
+		`, []string{"0"}, t)
 	})
 
 	t.Run("side effect", func(t *testing.T) {
@@ -41,7 +42,7 @@ class Main{
 		}
 	}
 		`, []string{
-			"Undefined-a.a(valid)", "side-effect(Parameter-par, this.a)",
+			"0", "side-effect(Parameter-par, this.a)",
 		}, t)
 	})
 
@@ -63,7 +64,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[Undefined-a.a(valid)]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
 			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
@@ -89,7 +90,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[Undefined-a.a(valid)]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
 			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
@@ -110,7 +111,7 @@ func TestJava_Extend_Class(t *testing.T) {
 		println(C.a); // 0
 }}
 		`, []string{
-			"Undefined-C.a(valid)",
+			"0",
 		}, t)
 	})
 
@@ -133,7 +134,7 @@ func TestJava_Extend_Class(t *testing.T) {
 }
 		`, []string{
 			// TODO: this error
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[Undefined-a.a(valid)]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
 			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
@@ -160,7 +161,7 @@ func TestJava_Extend_Class(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[Undefined-a.a(valid)]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
 			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
@@ -184,7 +185,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[Undefined-a.num(valid)]",
+			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -412,7 +413,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[Undefined-a.num(valid)]",
+			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -491,5 +492,30 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{"ParameterMember-parameter[1].a(Parameter-t)"}, t)
+	})
+	t.Run("test code", func(t *testing.T) {
+		code := `package org.example.vul;
+
+
+class tes1 {
+    public String a = "1";
+
+    public tes1(String a) {
+        this.a = a;
+    }
+
+    public void handle(tes1 tes1) {
+        tes1.a = "21312";
+    }
+}
+
+public class test {
+    public static void main(String[] args) {
+        tes1 tes1 = new tes1("12312");
+        println(tes1.a);
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
