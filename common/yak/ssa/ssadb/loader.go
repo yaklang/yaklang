@@ -156,3 +156,13 @@ func GetValueBeforeEndOffset(db *gorm.DB, rng memedit.RangeIf) (int64, error) {
 	}
 	return int64(ir.ID), nil
 }
+
+func GetVariableWordBeforeEndOffset(db *gorm.DB, rng memedit.RangeIf,programName string) string{
+	// get the last value or variable word before the end offset.
+	db = db.Model(&IrOffset{}).Where("proprgram_name = ?   and offset < ? and is_variable = true",rng.GetEndOffset())
+	var ir IrOffset
+	if err := db.Order("offset desc").First(&ir).Error; err != nil {
+		return ""
+	}
+	return ir.VariableName
+}
