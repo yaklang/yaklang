@@ -85,6 +85,14 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		actx.ReachDepthLimited()
 		return Values{v}
 	}
+	if actx.depth > 0 && v.GetDepth() > 0 && actx.depth > v.GetDepth() {
+		actx.ReachDepthLimited()
+		return Values{v}
+	}
+	if actx.depth < 0 && v.GetDepth() < 0 && actx.depth < v.GetDepth() {
+		actx.ReachDepthLimited()
+		return Values{v}
+	}
 
 	if len(actx.config.HookEveryNode) > 0 {
 		for _, hook := range actx.config.HookEveryNode {
