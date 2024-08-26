@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -35,7 +34,7 @@ func handleSSHError(result *BruteItemResult, target string, err error) {
 }
 
 func sshDial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	conn, err := netx.DialTimeout(config.Timeout, addr)
+	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), network, addr)
 	if err != nil {
 		return nil, err
 	}

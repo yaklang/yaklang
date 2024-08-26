@@ -4,13 +4,17 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
+	"time"
 
 	"github.com/yaklang/yaklang/common/netx"
 )
+const defaultTimeout = 10 * time.Second
+
 
 type NetXDialer struct{}
 
 var defaultDialer = &NetXDialer{}
+
 
 func (d *NetXDialer) Dial(network, address string) (net.Conn, error) {
 	return d.DialContext(context.Background(), network, address)

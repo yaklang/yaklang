@@ -16,8 +16,9 @@ var oracleServiceNames = []string{
 	"oracle",
 }
 
-var once sync.Once
+var setupUserEnvOnce sync.Once
 
+// for fix some OS call user.Current() panic in go-ora.getCurrentUser(), for example: centos7
 func setupUserEnv() {
 	if _, ok := os.LookupEnv("USER"); !ok {
 		os.Setenv("USER", "user")
@@ -44,7 +45,7 @@ var oracleAuth = &DefaultServiceAuthInfo{
 			return res
 		}
 
-		once.Do(setupUserEnv)
+		setupUserEnvOnce.Do(setupUserEnv)
 
 		for _, service := range oracleServiceNames {
 			dataSourceName := go_ora.BuildUrl(ip, port, service, i.Username, i.Password, urlOptions)

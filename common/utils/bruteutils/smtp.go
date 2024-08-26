@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -22,7 +21,7 @@ func SMTPAuthAndSendMail(target, username, password string, needAuth bool) (bool
 	fakeSenderMail := newFakeMail()
 	fakeReceiverMail := newFakeMail()
 
-	conn, err := netx.DialTimeout(defaultTimeout, target)
+	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", target)
 	if err != nil {
 		return false, err
 	}

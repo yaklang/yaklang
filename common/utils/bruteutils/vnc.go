@@ -2,9 +2,7 @@ package bruteutils
 
 import (
 	"github.com/mitchellh/go-vnc"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 // https://weakpass.com/generate
@@ -25,7 +23,7 @@ var vncAuth = &DefaultServiceAuthInfo{
 			return result
 		}
 
-		con, err := netx.DialTCPTimeout(10*time.Second, item.Target)
+		con, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", target)
 		if err != nil {
 			result.Finished = true
 			return result
