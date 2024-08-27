@@ -5,7 +5,6 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/google/gopacket/routing"
 	"github.com/pkg/errors"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -58,26 +57,26 @@ var (
 	notifyOnce = new(sync.Once)
 )
 
-func GetLoopbackDevName() (string, error) {
-	devs, err := pcap.FindAllDevs()
-	if err != nil {
-		return "", utils.Errorf("cannot find pcap ifaceDevs: %v", err)
-	}
-	for _, d := range devs { // 尝试获取本地回环网卡
-		for _, addr := range d.Addresses {
-			if addr.IP.IsLoopback() {
-				return d.Name, nil
-			}
-		}
-		if strings.Contains(strings.ToLower(d.Description), "adapter for loopback traffic capture") {
-			return d.Name, nil
-		}
-		if net.Flags(uint(d.Flags))&net.FlagLoopback == 1 {
-			return d.Name, nil
-		}
-	}
-	return "", utils.Errorf("cannot find loopback device")
-}
+//func GetLoopbackDevName() (string, error) {
+//	devs, err := pcap.FindAllDevs()
+//	if err != nil {
+//		return "", utils.Errorf("cannot find pcap ifaceDevs: %v", err)
+//	}
+//	for _, d := range devs { // 尝试获取本地回环网卡
+//		for _, addr := range d.Addresses {
+//			if addr.IP.IsLoopback() {
+//				return d.Name, nil
+//			}
+//		}
+//		if strings.Contains(strings.ToLower(d.Description), "adapter for loopback traffic capture") {
+//			return d.Name, nil
+//		}
+//		if net.Flags(uint(d.Flags))&net.FlagLoopback == 1 {
+//			return d.Name, nil
+//		}
+//	}
+//	return "", utils.Errorf("cannot find loopback device")
+//}
 
 func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
 	iface, gw, ip, err := Route(5*time.Second, "8.8.8.8")
