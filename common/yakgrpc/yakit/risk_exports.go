@@ -540,9 +540,6 @@ func _fetBridgeAddrAndSecret() (string, string, error) {
 }
 
 func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token string, _ error) {
-	if mockedNewDNSLogDomain != nil {
-		return mockedNewDNSLogDomain()
-	}
 	counter := 0
 	for {
 		counter++
@@ -564,10 +561,6 @@ func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token strin
 }
 
 func NewDNSLogDomain() (domain string, token string, _ error) {
-	if mockedNewDNSLogDomain != nil {
-		return mockedNewDNSLogDomain()
-	}
-
 	counter := 0
 	for {
 		counter++
@@ -660,28 +653,7 @@ func YakitNewCheckHTTPLogByToken(runtimeID string) func(token string, timeout ..
 	}
 }
 
-var dnslogMocked = make(map[string]func(token, runtime string, timeout ...float64) ([]*tpb.DNSLogEvent, error))
-
-func RegisterMockedCheckedDNSLogDomain(token string, mock func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error)) {
-	dnslogMocked[token] = mock
-}
-
-var mockedNewDNSLogDomain func() (string, string, error)
-
-func RegisterMockedNewDNSLogDomain(h func() (string, string, error)) {
-	mockedNewDNSLogDomain = h
-}
-
-func UnregisterMockedNewDNSLogDomain() {
-	mockedNewDNSLogDomain = nil
-}
-
 func CheckDNSLogByToken(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
-	mocked, ok := dnslogMocked[token]
-	if ok {
-		return mocked(token, runtimeId, timeout...)
-	}
-
 	var f float64
 	if len(timeout) > 0 {
 		f = timeout[0]
