@@ -16,7 +16,11 @@ var (
 	DefaultNmapServiceProbeRules     map[*NmapProbe][]*NmapMatch
 	DefaultNmapServiceProbeRulesOnce sync.Once
 	DefaultWebFingerprintRules       []*rule.FingerPrintRule
+	OldDefaultWebFingerprintRules       []*webfingerprint.WebRule
+
 	DefaultWebFingerprintRulesOnce   sync.Once
+	OldDefaultWebFingerprintRulesOnce   sync.Once
+
 )
 
 func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
@@ -87,6 +91,7 @@ func GetDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
 	})
 	return DefaultNmapServiceProbeRules, err
 }
+
 func GetDefaultWebFingerprintRules() ([]*rule.FingerPrintRule, error) {
 	var loadErr error
 	DefaultWebFingerprintRulesOnce.Do(func() {
@@ -108,4 +113,12 @@ func GetDefaultWebFingerprintRules() ([]*rule.FingerPrintRule, error) {
 		DefaultWebFingerprintRules = append(buildinRules, buildinYamlRules...)
 	})
 	return DefaultWebFingerprintRules, loadErr
+}
+
+func GetOldDefaultWebFingerprintRules() ([]*webfingerprint.WebRule, error) {
+	var err error
+	OldDefaultWebFingerprintRulesOnce.Do(func() {
+		OldDefaultWebFingerprintRules, err = webfingerprint.LoadDefaultDataSource()
+	})
+	return OldDefaultWebFingerprintRules, err
 }
