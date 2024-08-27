@@ -17,10 +17,14 @@ func init() {
 }
 
 type LazyInstruction struct {
+	// self
 	Instruction
 	Value
 	User
+	// cache
 	id          int64
+	variableDB  map[string]*ssadb.IrIndex
+	variable    map[string]*Variable
 	ir          *ssadb.IrCode
 	programName string
 	cache       *Cache
@@ -84,7 +88,14 @@ func newLazyInstruction(id int64, ir *ssadb.IrCode, cache *Cache) (Value, error)
 	lz := &LazyInstruction{
 		id:          id,
 		ir:          ir,
+		variableDB:  make(map[string]*ssadb.IrIndex),
 		programName: ir.ProgramName,
+	}
+	{
+		variableDB := ssadb.GetVariableByValue(id)
+		for _, v := range variableDB {
+			lz.variableDB[v.VariableName] = v
+		}
 	}
 	lz.cache = cache
 	lz.cache.InstructionCache.Set(lz.id, instructionIrCode{
@@ -548,6 +559,25 @@ func (lz *LazyInstruction) GetVariable(n string) *Variable {
 	lz.check()
 	if lz.Value == nil {
 		return nil
+	}
+	if v, ok := lz.variable[n]; ok {
+		return v
+	}
+	if vdb, ok := lz.variableDB[n]; ok {
+		v := NewVariable(int(vdb.VersionID), vdb.VariableName, false, nil).(*Variable)
+		v.Assign(lz)
+		offset := ssadb.GetOffsetByVariable(int64(vdb.ID))
+		for _, o := range offset {
+			editor, start, end, err := o.GetStartAndEndPositions()
+			if err != nil {
+				log.Errorf("GetStartAndEndPositions failed: %v", err)
+				continue
+			}
+			rng := editor.GetRangeByPosition(start, end)
+			v.AddRange(rng, true)
+		}
+		lz.variable[n] = v
+		return v
 	}
 	return lz.Value.GetVariable(n)
 }
