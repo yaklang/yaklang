@@ -30,6 +30,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
@@ -1162,5 +1163,100 @@ func (flow *CodecExecFlow) UTF8ToCharset(charset string) error {
 		return utils.Wrapf(err, "transform utf8 to %s error", name)
 	}
 	flow.Text = encoded
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "HTTP数据包变形"
+// Desc ="""将HTTP数据包变形，修改请求方法等"""
+// Params = [
+// { Name = "transform", Type = "select", DefaultValue = "GET",Options = ["GET", "POST", "HEAD", "Chunk 编码", "上传数据包", "上传数据包(仅POST参数)"], Required = true , Label = "转换方法"},
+// ]
+func (flow *CodecExecFlow) HTTPRequestMutate(transform string) error {
+	rawRequest := flow.Text
+	result := rawRequest
+	method := ""
+	chunkEncode, uploadEncode, onlyUsePostParams := false, false, false
+	switch transform {
+	case "GET", "POST", "HEAD":
+		method = transform
+	case "Chunk 编码":
+		chunkEncode = true
+	case "上传数据包":
+		uploadEncode = true
+	case "上传数据包(仅POST参数)":
+		uploadEncode = true
+		onlyUsePostParams = true
+	}
+	// get params
+	totalParams := lowhttp.GetFullHTTPRequestQueryParams(rawRequest)
+	contentType := lowhttp.GetHTTPPacketHeader(rawRequest, "Content-Type")
+	transferEncoding := lowhttp.GetHTTPPacketHeader(rawRequest, "Transfer-Encoding")
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
+	// chunked 转 Content-Length
+	if !chunkEncode && utils.IContains(transferEncoding, "chunked") {
+		result = lowhttp.ReplaceHTTPPacketBody(result, body, false)
+		_, body = lowhttp.SplitHTTPHeadersAndBodyFromPacket(result)
+	}
+	// post params
+	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
+	if totalParams == nil {
+		totalParams = make(map[string][]string, len(postParams))
+	}
+	if len(postParams) > 0 {
+		for k, v := range postParams {
+			totalParams[k] = append(totalParams[k], v...)
+		}
+	}
+
+	switch method {
+	case "POST":
+		result = poc.FixPacketByPocOptions(lowhttp.TrimLeftHTTPPacket(result),
+			poc.WithReplaceHttpPacketMethod("POST"),
+			poc.WithReplaceHttpPacketQueryParamRaw(""),
+			poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
+			poc.WithDeleteHeader("Transfer-Encoding"),
+			poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
+			poc.WithReplaceFullHttpPacketPostParamsWithoutEscape(totalParams),
+		)
+
+	default:
+		if len(method) > 0 {
+			result = poc.FixPacketByPocOptions(lowhttp.TrimLeftHTTPPacket(result),
+				poc.WithReplaceHttpPacketMethod(method),
+				poc.WithReplaceFullHttpPacketQueryParamsWithoutEscape(totalParams),
+				poc.WithDeleteHeader("Transfer-Encoding"),
+				poc.WithDeleteHeader("Content-Type"),
+				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
+				poc.WithReplaceHttpPacketBody(nil, false),
+			)
+		} else if chunkEncode {
+			// chunk编码
+			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result)
+			result = lowhttp.ReplaceHTTPPacketBody(result, body, true)
+		} else if uploadEncode {
+			opts := make([]poc.PocConfigOption, 0)
+			opts = append(opts, poc.WithReplaceHttpPacketBody(nil, false))
+			if !onlyUsePostParams {
+				opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
+			}
+			if len(totalParams) > 0 {
+				params := totalParams
+				if onlyUsePostParams {
+					params = postParams
+				}
+				for k, values := range params {
+					for _, v := range values {
+						opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+					}
+				}
+			} else {
+				opts = append(opts, poc.WithAppendHttpPacketUploadFile("key", "", "[value]", ""))
+			}
+			result = poc.FixPacketByPocOptions(lowhttp.TrimLeftHTTPPacket(result), opts...)
+		}
+	}
+
+	flow.Text = result
 	return nil
 }
