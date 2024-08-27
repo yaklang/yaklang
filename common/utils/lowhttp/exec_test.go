@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net"
 	"net/http"
@@ -527,4 +528,21 @@ func TestLowhttp_RESP_StreamBody(t *testing.T) {
 	if !bytes.Contains(results, []byte("abcdabcdabcdabcd")) {
 		panic("Response has content")
 	}
+}
+
+func TestLowhttp_HTTP_Cookie_Session(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nSet-Cookie: a=b; path=/\r\n\r\n"))
+	var packet = `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+`
+	_, err := HTTPWithoutRedirect(WithPacketBytes([]byte(packet)), WithSession("test"))
+	require.NoError(t, err)
+
+	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(packet)), WithSession("test"))
+	require.NoError(t, err)
+	require.Equal(t, "a=b", GetHTTPPacketHeader(rsp.RawRequest, "Cookie"))
+
+	rsp, err = HTTPWithoutRedirect(WithPacketBytes(ReplaceHTTPPacketCookie(rsp.RawRequest, "a", "c")), WithSession("test"))
+	require.NoError(t, err)
+	require.Equal(t, "a=c;", GetHTTPPacketHeader(rsp.RawRequest, "Cookie"))
 }
