@@ -148,6 +148,7 @@ func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 }
 
 func GetValueBeforeEndOffset(db *gorm.DB, rng memedit.RangeIf) (int64, error) {
+	db = db.Debug()
 	// get the last ir code before the end offset, and the source code hash must be the same
 	db = db.Model(&IrOffset{}).Where("end_offset < ? and  file_hash = ?", rng.GetEndOffset(), rng.GetEditor().GetPureSourceHash())
 	var ir IrOffset
@@ -155,4 +156,13 @@ func GetValueBeforeEndOffset(db *gorm.DB, rng memedit.RangeIf) (int64, error) {
 		return -1, err
 	}
 	return int64(ir.ValueID), nil
+}
+
+func GetVariableByValue(valueID int64) []*IrIndex {
+	db := GetDB()
+	var ir []*IrIndex
+	if err := db.Model(&IrIndex{}).Where("value_id = ? and variable_name != ?", valueID, "").Find(&ir).Error; err != nil {
+		return nil
+	}
+	return ir
 }

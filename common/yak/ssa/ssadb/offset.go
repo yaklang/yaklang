@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -31,4 +32,22 @@ func CreateOffset(rng memedit.RangeIf) *IrOffset {
 func SaveIrOffset(idx *IrOffset) {
 	db := GetDB()
 	db.Save(idx)
+}
+
+func GetOffsetByVariable(id int64) []*IrOffset {
+	db := GetDB()
+	var ir []*IrOffset
+	if err := db.Model(&IrOffset{}).Where("variable_id = ?", id).Find(&ir).Error; err != nil {
+		return nil
+	}
+	return ir
+}
+
+func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
+	editor, err := GetIrSourceFromHash(r.FileHash)
+	if err != nil {
+		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
+	}
+	start, end := editor.GetPositionByOffset(int(r.StartOffset)), editor.GetPositionByOffset(int(r.EndOffset))
+	return editor, start, end, nil
 }
