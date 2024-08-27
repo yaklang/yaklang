@@ -231,7 +231,7 @@ func Get(key interface{}) string {
 func Set(key interface{}, value interface{}) {
 	err := SetKey(consts.GetGormProfileDatabase(), key, value)
 	if err != nil {
-		log.Warnf("yakit.SetKey(consts.GetGormProfileDatabase(), key, value) failed: %s", err)
+		log.Debugf("yakit.SetKey(consts.GetGormProfileDatabase(), key, value) failed: %s", err)
 	}
 }
 
