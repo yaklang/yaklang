@@ -624,7 +624,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.AssignmentEqExpression2Context:
 		// 处理赋值表达式的等于号
 		if s := ret.Identifier(0); s != nil {
+			recoverRange := y.SetRange(s)
 			variable = y.CreateVariable(s.GetText())
+			recoverRange()
 		}
 		if id := ret.Identifier(1); id != nil {
 			value = y.ReadValue(id.GetText())
@@ -1105,9 +1107,16 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return
 	}
 
+	id, ok := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext)
+	if !ok {
+		return
+	}
+	name = id.Identifier().GetText()
+	recoverRange2 := y.SetRange(id)
+	variable := y.CreateVariable(name)
+	recoverRange2()
+
 	if i.VariableInitializer() != nil {
-		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
-		variable := y.CreateVariable(name)
 		value := y.VisitVariableInitializer(i.VariableInitializer())
 		if utils.IsNil(value) {
 			return name, nil
@@ -1129,8 +1138,6 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		y.AssignVariable(variable, value)
 		return name, value
 	} else {
-		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
-		y.CreateVariable(name)
 		value := y.EmitValueOnlyDeclare(name)
 		return name, value
 	}
