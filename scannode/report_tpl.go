@@ -11,7 +11,7 @@ import (
 )
 
 //go:embed yak_scripts/gen_report.yak
-var embedGenReport []byte
+var EmbedGenReport []byte
 
 const GENREPORT_KEY = "JznQXuFDSepeNWHbiLGEwONiaBxhvj_SERVER_SCAN_MANAGER"
 
@@ -22,7 +22,7 @@ func genReportFromKey(ctx context.Context, node string, helper *scanrpc.SCANServ
 			TaskId:          req.TaskId,
 			RuntimeId:       req.RuntimeId,
 			SubTaskId:       req.SubTaskId,
-			ScriptContent:   string(embedGenReport),
+			ScriptContent:   string(EmbedGenReport),
 			ScriptJsonParam: value,
 		}
 		_, err := helper.DoSCAN_InvokeScript(
