@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -196,9 +197,16 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 		ranges, err = OnFindReferences(prog, word, containPoint, ssaRange, v)
 	}
 
+	tmp := make(map[string]struct{})
 	for _, rng := range ranges {
+		hash := utils.CalcSha256(rng.GetStart().GetLine(), rng.GetStart().GetColumn(), rng.GetEnd().GetLine(), rng.GetEnd().GetColumn())
+		if _, ok := tmp[hash]; ok {
+			continue
+		}
 		ret.Ranges = append(ret.Ranges, RangeIfToGrpcRange(rng))
 	}
-
+	if len(ret.Ranges) == 0 {
+		ret.Ranges = append(ret.Ranges, RangeIfToGrpcRange(ssaRange))
+	}
 	return ret, nil
 }
