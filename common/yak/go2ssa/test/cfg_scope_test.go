@@ -586,61 +586,6 @@ func TestBasic_CFG_Break(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("simple break label in loop", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-		func main() {
-			a := 1
-			label1:
-			for i := 0; i < 10; i++ {
-				for j := 0; j < 10; j++ {
-					break label1
-				}
-				a = 2
-				println(a) // 2
-			}
-			println(a) // phi(a)[1,2]
-		}
-		`, []string{
-			"2", "phi(a)[1,2]",
-		}, t)
-	})
-
-	/*t.Run("simple goto up", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-		func main() {
-			a := 1
-			if a > 1 {
-				println(a) // 1
-		end:
-				println(a) // phi(a)[1,5]
-			}else{
-				a = 5
-				goto end
-			}
-		}
-		`, []string{
-			"1", "phi(a)[1,5]",
-		}, t)
-	})*/
-
-	t.Run("simple goto down", func(t *testing.T) {
-		test.CheckPrintlnValue(`package main
-		func main() {
-			a := 1
-			if a > 1 {
-				a = 5
-				goto end
-			}else{
-				println(a) // 1
-		end:
-				println(a) // phi(a)[1,5]
-			}
-		}
-		`, []string{
-			"1", "phi(a)[1,5]",
-		}, t)
-	})
-
 	t.Run("simple break in switch", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
@@ -683,6 +628,98 @@ func TestBasic_CFG_Break(t *testing.T) {
 		`, []string{
 			"phi(a)[2,1]",
 			"phi(a)[3,4]",
+		}, t)
+	})
+}
+
+func TestBasic_CFG_Goto(t *testing.T) {
+	/*t.Run("simple goto up", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+			if a > 1 {
+				println(a) // 1
+		end:
+				println(a) // phi(a)[1,5]
+			}else{
+				a = 5
+				goto end
+			}
+		}
+		`, []string{
+			"1", "phi(a)[1,5]",
+		}, t)
+	})*/
+
+	t.Run("goto down in if", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+			if a > 1 {
+				a = 5
+				goto end
+			}else{
+				println(a) // 1
+		end:
+				println(a) // phi(a)[1,5]
+			}
+		}
+		`, []string{
+			"1", "phi(a)[1,5]",
+		}, t)
+	})
+
+	t.Run("goto down in loop", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+
+			for i:=0; i<10; i++ {
+				a = 2
+				goto label1
+			}
+			println(a) // phi(a)[1,2]
+			label1:
+			println(a) // phi(a)[phi(a)[1,2],2]
+		}
+		`, []string{
+			"phi(a)[1,2]", "phi(a)[phi(a)[1,2],2]",
+		}, t)
+	})
+
+	t.Run("break label in loop", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+
+			label1:
+			for i:=0; i<10; i++ {
+				a = 2
+				break label1
+			}
+			println(a) // phi(a)[2,phi(a)[1,2]]
+		}
+		`, []string{
+			"phi(a)[2,phi(a)[1,2]]",
+		}, t)
+	})
+
+	t.Run("muti break label in loop", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+		func main() {
+			a := 1
+
+			label1:
+			for i:=0; i<10; i++ {
+				for y:=0; y<10; y++ {
+					a = 2
+					break label1
+				}
+			}
+			println(a) // phi(a)[2,phi(a)[1,2]]
+		}
+		`, []string{
+			"phi(a)[2,phi(a)[1,2]]",
 		}, t)
 	})
 }
