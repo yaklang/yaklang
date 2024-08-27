@@ -1,8 +1,8 @@
 package yaklib
 
 import (
-	"github.com/stacktitan/smb/smb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/smb"
 )
 
 type _smbConfig struct {
