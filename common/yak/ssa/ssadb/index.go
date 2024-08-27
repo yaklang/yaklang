@@ -31,6 +31,7 @@ type IrIndex struct {
 
 func CreateIndex() *IrIndex {
 	ret := &IrIndex{}
+	GetDB().Model(&IrIndex{}).Create(ret)
 	return ret
 }
 func SaveIrIndex(idx *IrIndex) {
