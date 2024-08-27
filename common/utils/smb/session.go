@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"log"
 	"net"
@@ -61,7 +62,7 @@ func NewSession(opt Options, debug bool) (s *Session, err error) {
 	}
 	var conn net.Conn
 	if opt.Dialer == nil {
-		conn, err = net.Dial("tcp", fmt.Sprintf("%s:%d", opt.Host, opt.Port))
+		conn, err = netx.DialX(fmt.Sprintf("%s:%d", opt.Host, opt.Port))
 		if err != nil {
 			return nil, err
 		}
