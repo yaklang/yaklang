@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -39,32 +38,32 @@ func check(
 		ProgramName: programName,
 	})
 	assert.NoErrorf(t, err, "YaklangLanguageFind failed: %v", err)
-	require.NotNil(t, rsp)
-	require.Len(t, rsp.Ranges, len(wantRanges))
+	assert.NotNil(t, rsp)
+	assert.Len(t, rsp.Ranges, len(wantRanges))
 	for i, wantRange := range wantRanges {
-		require.Equal(t, wantRange, GrpcRangeToRangeIf(rsp.Ranges[i]))
+		assert.Equal(t, wantRange, GrpcRangeToRangeIf(rsp.Ranges[i]))
 	}
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_Find_WithDB(t *testing.T) {
 	local, err := NewLocalClient()
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/java/A.java", `
-	package find.withDB.A; 
-	class A {
-		public void a() {
-			int a = 1; // 1, println1, println2
-			println1(a); // println1, 1
-			if (a == 1) {
-				a = 2; // 2, println2
-			}
-			println2(a); // println2, 1, 2
-		}
-	}
-	`)
-	a1 := newRangeFromText("5:17 5:18")
+package find.withDB.A; 
+class A {
+    public void a() {
+        int a = 1; // 1, println1, println2
+        println1(a); // println1, 1
+        if (a == 1) {
+            a = 2; // 2, println2
+        }
+            println2(a); // println2, 1, 2
+    }
+}
+    `)
+	a1 := newRangeFromText("5:13 5:14")
 	num1 := newRangeFromText("5:21 5:22")
 	println1 := newRangeFromText("6:22 6:23")
 	a2 := newRangeFromText("8:17 8:18")
