@@ -451,11 +451,7 @@ func TestYaklangBasic_Variable_Loop(t *testing.T) {
 func TestYaklangParameter(t *testing.T) {
 	check := func(code string, t *testing.T) {
 		test := assert.New(t)
-		prog, err := ssaapi.Parse(`
-		f = (a) => {
-			return a
-		}
-		`)
+		prog, err := ssaapi.Parse(code)
 		test.Nil(err)
 		as := prog.Ref("a").ShowWithSource()
 		test.Equal(1, len(as))

@@ -80,7 +80,7 @@ func TestGetOffsetByPosition_TABLE(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := editor.GetOffsetByPositionWithError(tt.line, tt.col)
+			got, err := editor.GetOffsetByPositionWithError(tt.line, tt.col+1)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetOffsetByPositionWithError() expected error = %v, got error = %v", tt.wantErr, err)
 			}
@@ -188,7 +188,7 @@ func TestGetOffsetByPositionWithError_Table3(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := editor.GetOffsetByPositionWithError(tt.line, tt.col)
+			got, err := editor.GetOffsetByPositionWithError(tt.line, tt.col+1)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%s: GetOffsetByPositionRaw() expected error = %v, got error = %v", tt.name, tt.wantErr, err)
 			}
@@ -296,7 +296,7 @@ func TestGetOffsetByPosition_TABLE_2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := editor.GetOffsetByPositionWithError(tt.line, tt.col)
+			got, err := editor.GetOffsetByPositionWithError(tt.line, tt.col+1)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("%s: GetOffsetByPositionRaw() expected error = %v, got error = %v", tt.name, tt.wantErr, err)
 			}
@@ -374,7 +374,7 @@ func TestGetPositionByOffset(t *testing.T) {
 
 	for _, tt := range tests {
 		pos := editor.GetPositionByOffset(tt.offset)
-		if pos.GetLine() != tt.expectedLine || pos.GetColumn() != tt.expectedColumn {
+		if pos.GetLine() != tt.expectedLine || pos.GetColumn() != tt.expectedColumn+1 {
 			t.Errorf("%s: GetPositionByOffset() got = (%d,%d), want = (%d,%d)",
 				tt.name, pos.GetLine(), pos.GetColumn(), tt.expectedLine, tt.expectedColumn)
 		}
@@ -420,6 +420,6 @@ func TestGetPositionByOffsetWithError(t *testing.T) {
 	}
 }
 
-func positionsEqual(p1, p2 PositionIf) bool {
-	return p1.GetLine() == p2.GetLine() && p1.GetColumn() == p2.GetColumn()
+func positionsEqual(got, want PositionIf) bool {
+	return got.GetLine() == want.GetLine() && got.GetColumn() == want.GetColumn()+1
 }

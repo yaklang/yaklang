@@ -53,8 +53,8 @@ func TestSelect(t *testing.T) {
 
 func TestUpdateTextByRange(t *testing.T) {
 	editor := NewMemEditor("Hello\nWorld\nThis is a test")
-	startPos := NewPosition(1, 0)
-	endPos := NewPosition(1, 5)
+	startPos := NewPosition(1, 1)
+	endPos := NewPosition(1, 6)
 	err := editor.UpdateTextByRange(NewRange(startPos, endPos), "Hi")
 	if err != nil {
 		t.Fatal("UpdateTextByRange() failed:", err)
@@ -196,50 +196,50 @@ func TestTextByRangeGetEditor(t *testing.T) {
 	}{
 		{
 			name:     "Select part of a single line",
-			startPos: NewPosition(1, 0),
-			endPos:   NewPosition(1, 4),
+			startPos: NewPosition(1, 1),
+			endPos:   NewPosition(1, 5),
 			want:     "0123",
 			wantErr:  false,
 		},
 		{
 			name:     "Select entire single line",
-			startPos: NewPosition(2, 0),
-			endPos:   NewPosition(2, 10),
+			startPos: NewPosition(2, 1),
+			endPos:   NewPosition(2, 11),
 			want:     "0123456789",
 			wantErr:  false,
 		},
 		{
 			name:     "Select text across multiple lines",
-			startPos: NewPosition(1, 0),
-			endPos:   NewPosition(3, 5),
+			startPos: NewPosition(1, 1),
+			endPos:   NewPosition(3, 6),
 			want:     "0123456789\n0123456789\n01234",
 			wantErr:  false,
 		},
 		{
 			name:     "Column number out of single line's length",
-			startPos: NewPosition(1, 0),
+			startPos: NewPosition(1, 1),
 			endPos:   NewPosition(1, 10000),
 			want:     "0123456789",
 			wantErr:  false,
 		},
 		{
 			name:     "Line number out of text's total lines",
-			startPos: NewPosition(1, 0),
-			endPos:   NewPosition(10, 0),
+			startPos: NewPosition(1, 1),
+			endPos:   NewPosition(10, 1),
 			want:     "0123456789\n0123456789\n0123456789\n0123456789\n0123456789\n0123456789",
 			wantErr:  true,
 		},
 		{
 			name:     "Start and end positions are the same",
-			startPos: NewPosition(2, 2),
-			endPos:   NewPosition(2, 2),
+			startPos: NewPosition(2, 3),
+			endPos:   NewPosition(2, 3),
 			want:     "",
 			wantErr:  false,
 		},
 		{
 			name:     "Start position is after end position",
-			startPos: NewPosition(3, 5),
-			endPos:   NewPosition(3, 2),
+			startPos: NewPosition(3, 6),
+			endPos:   NewPosition(3, 3),
 			want:     "234",
 			wantErr:  false,
 		},
@@ -283,13 +283,13 @@ func TestRunesSupporting(t *testing.T) {
 	result = e.GetTextFromRange(e.GetRangeOffset(5, 7))
 	assert.Equal(t, "？世", result)
 
-	result = e.GetTextFromPositionInt(4, 2, 4, 5)
+	result = e.GetTextFromPositionInt(4, 3, 4, 6)
 	assert.Equal(t, "？世界", result)
 
-	result = e.GetTextFromPositionInt(4, 5, 4, 7)
+	result = e.GetTextFromPositionInt(4, 6, 4, 8)
 	assert.Equal(t, ",O", result)
 
-	result = e.GetTextFromPositionInt(4, 5, 5, 2)
+	result = e.GetTextFromPositionInt(4, 6, 5, 3)
 	assert.Equal(t, ",OOO\nHe", result)
 	println(strconv.Quote(result))
 }

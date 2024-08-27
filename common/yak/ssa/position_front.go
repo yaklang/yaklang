@@ -92,7 +92,12 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 	if startToken == nil || endToken == nil {
 		return nil
 	}
-	return editor.GetRangeOffset(startToken.GetStart(), endToken.GetStop())
+
+	endLine, endColumn := GetEndPosition(endToken)
+	return editor.GetRangeByPosition(
+		editor.GetPositionByLine(startToken.GetLine(), startToken.GetColumn()+1),
+		editor.GetPositionByLine(endLine, endColumn+1),
+	)
 }
 
 type Token struct {

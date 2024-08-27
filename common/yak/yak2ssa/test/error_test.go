@@ -80,7 +80,7 @@ func TestUndefineError(t *testing.T) {
 		test.CheckError(t, test.TestCase{
 			Code: code,
 			Want: []string{
-				ssa.BindingNotFound("xxx", memedit.NewRange(memedit.NewPosition(5, 3), memedit.NewPosition(5, 6))),
+				ssa.BindingNotFound("xxx", memedit.NewRange(memedit.NewPosition(5, 4), memedit.NewPosition(5, 7))),
 				ssa.BindingNotFoundInCall("xxx"),
 			},
 			ExternValue: map[string]any{},
@@ -823,8 +823,8 @@ func TestClosureBinding(t *testing.T) {
 			f()
 			`,
 			Want: []string{
-				ssa.BindingNotFound("a1", memedit.NewRange(memedit.NewPosition(2, 3), memedit.NewPosition(4, 4))),
-				ssa.BindingNotFound("a2", memedit.NewRange(memedit.NewPosition(9, 3), memedit.NewPosition(9, 6))),
+				ssa.BindingNotFound("a1", memedit.NewRange(memedit.NewPosition(2, 4), memedit.NewPosition(4, 5))),
+				ssa.BindingNotFound("a2", memedit.NewRange(memedit.NewPosition(9, 4), memedit.NewPosition(9, 7))),
 				ssa.BindingNotFoundInCall("a2"),
 			},
 		})
@@ -1515,8 +1515,8 @@ func TestParameterMember(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", memedit.NewRange(
-					memedit.NewPosition(6, 3),
-					memedit.NewPosition(6, 7),
+					memedit.NewPosition(6, 4),
+					memedit.NewPosition(6, 8),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
 			},
@@ -1534,8 +1534,8 @@ func TestParameterMember(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", memedit.NewRange(
-					memedit.NewPosition(6, 3),
-					memedit.NewPosition(6, 7),
+					memedit.NewPosition(6, 4),
+					memedit.NewPosition(6, 8),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
 				ssa4analyze.InvalidField("number", "b"),

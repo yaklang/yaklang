@@ -167,9 +167,9 @@ func RangeIfToGrpcRange(rng memedit.RangeIf) *ypb.Range {
 	start, end := rng.GetStart(), rng.GetEnd()
 	return &ypb.Range{
 		StartLine:   int64(start.GetLine()),
-		StartColumn: int64(start.GetColumn() + 1),
+		StartColumn: int64(start.GetColumn()),
 		EndLine:     int64(end.GetLine()),
-		EndColumn:   int64(end.GetColumn() + 1),
+		EndColumn:   int64(end.GetColumn()),
 	}
 }
 

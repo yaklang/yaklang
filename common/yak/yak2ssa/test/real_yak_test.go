@@ -108,7 +108,7 @@ Rawfuzz = func(p, fuzzPayload) {
 				errs := prog.GetErrors()
 				require.Len(t, errs, 2)
 				err := errs[0]
-				require.Equal(t, "a.b", err.Pos.GetText())
+				require.Equal(t, ".b", err.Pos.GetText())
 			},
 		})
 	})
@@ -212,8 +212,8 @@ func Test_RealYak_FreeValueMemberCall(t *testing.T) {
 		`,
 			Want: []string{
 				ssa.BindingNotFound("b", memedit.NewRange(
-					memedit.NewPosition(10, 2),
-					memedit.NewPosition(10, 9),
+					memedit.NewPosition(10, 3),
+					memedit.NewPosition(10, 10),
 				)),
 				ssa.BindingNotFoundInCall("b"),
 			},
@@ -246,8 +246,8 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.BindingNotFound("a", memedit.NewRange(
-					memedit.NewPosition(5, 3),
-					memedit.NewPosition(5, 6),
+					memedit.NewPosition(5, 4),
+					memedit.NewPosition(5, 7),
 				)),
 				ssa.BindingNotFoundInCall("a"),
 			},
@@ -287,8 +287,8 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.BindingNotFound("a", memedit.NewRange(
-					memedit.NewPosition(5, 3),
-					memedit.NewPosition(5, 6),
+					memedit.NewPosition(5, 4),
+					memedit.NewPosition(5, 7),
 				)),
 				ssa.BindingNotFoundInCall("a"),
 			},
@@ -306,8 +306,8 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ValueNotMember(ssa.SSAOpcodeConstInst, "a", "b", memedit.NewRange(
-					memedit.NewPosition(6, 3),
-					memedit.NewPosition(6, 6),
+					memedit.NewPosition(6, 4),
+					memedit.NewPosition(6, 7),
 				)),
 				ssa.ValueNotMemberInCall("a", "b"),
 			},
