@@ -62,7 +62,7 @@ var (
 
 func scanHTTPResponseToMatchResult(r *http.Response) ([]*webfingerprint.CPE, error) {
 	if defaultHTTPResponseMatcher == nil {
-		rules, err := fp.GetDefaultWebFingerprintRules()
+		rules, err := fp.GetOldDefaultWebFingerprintRules()
 		if err != nil {
 			return nil, utils.Errorf("get web rules failed: %s", err)
 		}
