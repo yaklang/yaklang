@@ -408,10 +408,14 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	cookiejar := GetCookiejar(session)
 	if session != nil {
 		cookies := cookiejar.Cookies(urlIns)
-
 		if cookies != nil {
-			// 复用session中的cookie
-			requestPacket, err = AddOrUpgradeCookie(requestPacket, CookiesToString(cookies))
+			var needAppendCookie []*http.Cookie
+			for _, cookie := range cookies {
+				if GetHTTPPacketCookie(requestPacket, cookie.Name) == "" {
+					needAppendCookie = append(needAppendCookie, cookie)
+				}
+			}
+			requestPacket, err = AddOrUpgradeCookieHeader(requestPacket, CookiesToString(needAppendCookie))
 			if err != nil {
 				return response, err
 			}
