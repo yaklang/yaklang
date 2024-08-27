@@ -1,13 +1,17 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 
@@ -89,6 +93,67 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 		return nil, err
 	}
 	return model.ToHTTPFlowGRPCModelFull(flow)
+}
+
+func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream ypb.Yak_GetHTTPFlowBodyByIdServer) error {
+	bufSize := int(r.GetBufSize())
+	if bufSize == 0 {
+		bufSize = oneMB
+	} else if bufSize < 0 {
+		return utils.Error("GetHTTPFlowBodyById: bufSize must be positive")
+	}
+
+	flow, err := yakit.GetHTTPFlow(s.GetProjectDatabase(), r.GetId())
+	if err != nil {
+		return err
+	}
+	packet := flow.Request
+	filename := "body.txt"
+	if !r.GetIsRequest() {
+		packet = flow.Response
+	}
+	rawPacket, err := strconv.Unquote(packet)
+	if err != nil {
+		rawPacket = packet
+		log.Errorf("GetHTTPFlowBodyById: unquoted packet failed: %v", err)
+	}
+
+	if !r.GetIsRequest() {
+		u := utils.ParseStringToUrl(flow.Url)
+		base := path.Base(u.Path)
+		if !strings.Contains(base, ".") {
+			// try to detect mime type
+			mime := mimetype.Detect([]byte(rawPacket))
+			if mime != nil {
+				filename = "body" + mime.Extension()
+			}
+		} else {
+			filename = base
+		}
+	}
+	if err := stream.Send(&ypb.GetHTTPFlowBodyByIdResponse{Filename: filename}); err != nil {
+		return utils.Wrap(err, "GetHTTPFlowBodyById: send body to stream error")
+	}
+
+	_, body := lowhttp.SplitHTTPPacketFast(rawPacket)
+	reader := bytes.NewReader(body)
+	buf := make([]byte, bufSize)
+	eof := false
+
+	for !eof {
+		n, err := io.ReadAtLeast(reader, buf, bufSize)
+		if err != nil {
+			if err != io.EOF && err != io.ErrUnexpectedEOF {
+				return utils.Wrap(err, "GetHTTPFlowBodyById: read file error")
+			} else {
+				eof = true
+			}
+		}
+		if err := stream.Send(&ypb.GetHTTPFlowBodyByIdResponse{Data: buf[:n], EOF: eof}); err != nil {
+			return utils.Wrap(err, "GetHTTPFlowBodyById: send body to stream error")
+		}
+	}
+	return nil
 }
 
 func (s *Server) GetHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequest) (*ypb.HTTPFlows, error) {
