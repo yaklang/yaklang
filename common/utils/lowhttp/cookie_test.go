@@ -26,7 +26,7 @@ func TestCookiesToString(t *testing.T) {
 }
 
 func TestAddOrUpgradeCookie(t *testing.T) {
-	raw, err := AddOrUpgradeCookie([]byte(`GET / HTTP/1.1
+	raw, err := AddOrUpgradeCookieHeader([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Content-Length: 0
 
@@ -43,7 +43,7 @@ Content-Length: 0
 		return
 	}
 
-	raw, err = AddOrUpgradeCookie([]byte(`GET / HTTP/1.1
+	raw, err = AddOrUpgradeCookieHeader([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: c=d
 Content-Length: 0

@@ -210,7 +210,7 @@ func CookieToNative(cookies []*http.Cookie) string {
 	return strings.Join(cookieStrings, "; ")
 }
 
-func AddOrUpgradeCookie(raw []byte, value string) ([]byte, error) {
+func AddOrUpgradeCookieHeader(raw []byte, value string) ([]byte, error) {
 	var writer bytes.Buffer
 
 	raw = TrimLeftHTTPPacket(raw)
