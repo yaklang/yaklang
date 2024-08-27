@@ -6,7 +6,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 func YieldIrCodesProgramName(db *gorm.DB, ctx context.Context, program string) chan *IrCode {
@@ -145,17 +144,6 @@ func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ? OR field_name REGEXP ?", value, value, value)
 	}
 	return yieldIrIndex(db, context.Background())
-}
-
-func GetValueBeforeEndOffset(db *gorm.DB, rng memedit.RangeIf) (int64, error) {
-	db = db.Debug()
-	// get the last ir code before the end offset, and the source code hash must be the same
-	db = db.Model(&IrOffset{}).Where("end_offset < ? and  file_hash = ?", rng.GetEndOffset(), rng.GetEditor().GetPureSourceHash())
-	var ir IrOffset
-	if err := db.Order("end_offset desc").First(&ir).Error; err != nil {
-		return -1, err
-	}
-	return int64(ir.ValueID), nil
 }
 
 func GetVariableByValue(valueID int64) []*IrIndex {

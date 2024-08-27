@@ -26,7 +26,7 @@ func SaveValueOffset(inst Instruction) {
 	ssadb.SaveIrOffset(irOffset)
 }
 
-func SaveVariableOffset(v *Variable) {
+func SaveVariableOffset(v *Variable, variableName string) {
 	if v.GetId() == -1 {
 		return
 	}
@@ -38,7 +38,7 @@ func SaveVariableOffset(v *Variable) {
 		// program name \ file name \ offset
 		irOffset.ProgramName = v.GetProgram().GetProgramName()
 		// variable name
-		irOffset.VariableID = int64(v.GetId())
+		irOffset.VariableName = variableName
 		irOffset.ValueID = v.GetValue().GetId()
 		ssadb.SaveIrOffset(irOffset)
 	}
