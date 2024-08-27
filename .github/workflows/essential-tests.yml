@@ -162,9 +162,9 @@ jobs:
               # SyntaxFlow
               go test -timeout 20s ./common/syntaxflow
 
-          - name: Test Vulinbox(XSS/Shiro/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
+          - name: Test Vulinbox(XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
-              go test -timeout 5m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
+              go test -timeout 5m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
 
           - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
             run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin
