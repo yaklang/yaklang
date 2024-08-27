@@ -35,7 +35,7 @@ func Test_Statement(t *testing.T) {
 			channel2 := make(chan int)
 
 			go func() {
-				channel1 <- 1 
+				channel1 <- 1
 				channel2 <- 2
 			}()
 

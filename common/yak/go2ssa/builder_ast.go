@@ -1113,15 +1113,21 @@ func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
 
 		GotoBuilder := b.BuildGoto()
 		if _goto != nil {
+			LabelBuilder := b.GetLabelByName(text)
 			GotoBuilder.SetLabel(_goto)
-			GotoBuilder.Finish()
-			b.EmitJump(_goto)
+			GotoBuilder.SetName(text)
+			f := GotoBuilder.Finish()
+			LabelBuilder.SetGotoFinish(f)
 		} else {
-			b.labelHander[text] = func(_goto *ssa.BasicBlock) {
+			LabelBuilder := b.BuildLabel()
+			LabelBuilder.SetName(text)
+			LabelBuilder.SetGotoHander(func(_goto *ssa.BasicBlock) {
 				GotoBuilder.SetLabel(_goto)
-				GotoBuilder.Finish()
-				b.EmitJump(_goto)
-			}
+				GotoBuilder.SetName(text)
+				f := GotoBuilder.Finish()
+				LabelBuilder.SetGotoFinish(f)
+			})
+			b.labels[text] = LabelBuilder
 		}
 	}
 }
@@ -1134,19 +1140,28 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	if id := stmt.IDENTIFIER(); id != nil {
 		text = id.GetText()
 	}
-	block := b.NewBasicBlockUnSealed(text)
-	block.SetScope(b.CurrentBlock.ScopeTable.CreateSubScope())
+
+	LabelBuilder := b.GetLabelByName(text)
+	if LabelBuilder == nil {
+		LabelBuilder = b.BuildLabel()
+		LabelBuilder.SetName(text)
+		b.labels[text] = LabelBuilder
+	}
+
+	block := LabelBuilder.GetBlock()
+	LabelBuilder.Build()
 	b.AddLabel(text, block)
-	if b.labelHander[text] != nil {
-		b.labelHander[text](block)
+	for _, f := range LabelBuilder.GetGotoHanders() {
+		f(block)
 	}
 
 	b.EmitJump(block)
 	b.CurrentBlock = block
-
-	if s, ok := stmt.Statement().(*gol.StatementContext); ok {
-		b.buildStatement(s)
+	if s, ok := stmt.ForStmt().(*gol.ForStmtContext); ok {
+		b.buildForStmt(s)
 	}
+
+	LabelBuilder.Finish()
 }
 
 func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
@@ -1162,19 +1177,35 @@ func (b *astbuilder) buildBreakStmt(stmt *gol.BreakStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	var _break *ssa.BasicBlock
 	if id := stmt.IDENTIFIER(); id != nil {
 		text := id.GetText()
-		if _break = b.GetLabel(text); _break != nil {
-			b.EmitJump(_break)
-		} else {
-			b.NewError(ssa.Error, TAG, UndefineLabelstmt())
-		}
-		return
-	}
+		_goto := b.GetLabel(text)
 
-	if !b.Break() {
-		b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
+		b.GetLabelByName(text)
+
+		GotoBuilder := b.BuildGoto()
+		GotoBuilder.SetBreak()
+		if _goto != nil {
+			LabelBuilder := b.GetLabelByName(text)
+			GotoBuilder.SetLabel(_goto)
+			GotoBuilder.SetName(text)
+			f := GotoBuilder.Finish()
+			LabelBuilder.SetGotoFinish(f)
+		} else {
+			LabelBuilder := b.BuildLabel()
+			LabelBuilder.SetName(text)
+			LabelBuilder.SetGotoHander(func(_goto *ssa.BasicBlock) {
+				GotoBuilder.SetLabel(_goto)
+				GotoBuilder.SetName(text)
+				f := GotoBuilder.Finish()
+				LabelBuilder.SetGotoFinish(f)
+			})
+			b.labels[text] = LabelBuilder
+		}
+	} else {
+		if !b.Break() {
+			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
+		}
 	}
 }
 

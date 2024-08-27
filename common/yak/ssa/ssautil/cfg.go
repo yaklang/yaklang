@@ -410,28 +410,29 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 }
 
 type GotoStmt[T versionedValue] struct {
-	enter ScopedVersionedTableIF[T]
-	label ScopedVersionedTableIF[T]
+	enter        ScopedVersionedTableIF[T]
+	_goto        ScopedVersionedTableIF[T]
+	mergeToLabel ScopedVersionedTableIF[T]
 }
 
-func NewGotoStmt[T versionedValue](enter ScopedVersionedTableIF[T], label ScopedVersionedTableIF[T]) *GotoStmt[T] {
+func NewGotoStmt[T versionedValue](enter ScopedVersionedTableIF[T], _goto ScopedVersionedTableIF[T]) *GotoStmt[T] {
 	return &GotoStmt[T]{
 		enter: enter,
-		label: label,
+		_goto: _goto,
 	}
 }
 
 func (s *GotoStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T] {
-	parent := s.label.GetParent()
+	parent := s._goto.GetParent()
 	end := parent.CreateShadowScope()
 	end.Merge(
 		false,
 		merge,
-		s.label,
+		s._goto,
 		s.enter,
 	)
-	s.label.CoverBy(end)
-	return s.label
+	s._goto.CoverBy(end)
+	return s._goto
 }
 
 func (s *GotoStmt[T]) Break(from ScopedVersionedTableIF[T]) {
@@ -443,5 +444,40 @@ func (s *GotoStmt[T]) Continue(from ScopedVersionedTableIF[T]) {
 }
 
 func (s *GotoStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
+	// do nothing
+}
+
+type LabelStmt[T versionedValue] struct {
+	enter ScopedVersionedTableIF[T]
+	name  string
+}
+
+func NewLabelStmt[T versionedValue](enter ScopedVersionedTableIF[T]) *LabelStmt[T] {
+	return &LabelStmt[T]{
+		enter: enter,
+	}
+}
+
+func (s *LabelStmt[T]) SetName(name string) {
+	s.name = name
+}
+
+func (s *LabelStmt[T]) GetName() string {
+	return s.name
+}
+
+func (s *LabelStmt[T]) Build() ScopedVersionedTableIF[T] {
+	return s.enter
+}
+
+func (s *LabelStmt[T]) Break(from ScopedVersionedTableIF[T]) {
+	// do nothing
+}
+
+func (s *LabelStmt[T]) Continue(from ScopedVersionedTableIF[T]) {
+	// do nothing
+}
+
+func (s *LabelStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
 	// do nothing
 }
