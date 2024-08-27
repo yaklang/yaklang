@@ -144,7 +144,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 			if !targetList.Contains(ipAddr) {
 				return
 			}
-			log.Infof("IP[%v] 's mac addr: %v", ipAddr, arpIns.SourceHwAddress)
+			log.Debugf("IP[%v] 's mac addr: %v", ipAddr, arpIns.SourceHwAddress)
 			hwAddr := net.HardwareAddr(arpIns.SourceHwAddress)
 			results.Set(ipAddr, hwAddr)
 			if atomic.AddInt64(&resultSize, 1) >= int64(maxSize) {

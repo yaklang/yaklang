@@ -8,10 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/pcapx"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -84,7 +84,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		firstIP = net.ParseIP("127.0.0.1").String()
+		firstIP = ip
 	} else {
 		var srcIp net.IP
 		iface, _, srcIp, err = netutil.GetPublicRoute()
@@ -100,6 +100,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			firstIP = srcIp.To16().String()
 		}
 	}
+	macAddress, _ := arpx.Arp(iface.Name, ip)
 
 	isAlive := utils.NewBool(false)
 	ttl := 0
@@ -119,12 +120,12 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			pcaputil.WithContext(ctx),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
 				go func() {
-					baseN := rand.Intn(3000) + 3000
+					baseN := 1
 					for i := 0; i < 3; i++ {
 						if isAlive.IsSet() {
 							return
 						}
-						packet, err := pcapx.PacketBuilder(
+						packetOpts := []any{
 							pcapx.WithLoopback(isLoopBack),
 							pcapx.WithIPv4_DstIP(ip),
 							pcapx.WithIPv4_SrcIP(firstIP),
@@ -133,7 +134,11 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 							pcapx.WithICMP_Id(baseN),
 							pcapx.WithICMP_Sequence(i),
 							pcapx.WithPayload(icmpPayload),
-						)
+						}
+						if macAddress != nil {
+							packetOpts = append(packetOpts, pcapx.WithEthernet_DstMac(macAddress), pcapx.WithEthernet_SrcMac(iface.HardwareAddr))
+						}
+						packet, err := pcapx.PacketBuilder(packetOpts...)
 						if err != nil {
 							log.Errorf("build icmp packet failed: %s", err)
 							break
