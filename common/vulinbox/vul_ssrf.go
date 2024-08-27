@@ -3,10 +3,6 @@ package vulinbox
 import (
 	"encoding/json"
 	"fmt"
-	uuid "github.com/google/uuid"
-	"github.com/tidwall/gjson"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -15,10 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	uuid "github.com/google/uuid"
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (s *VulinServer) registerSSRF() {
-
 	s.router.HandleFunc("/redirect/main", func(writer http.ResponseWriter, request *http.Request) {
 		DefaultRender(`<h1>Hello, Welcome to Vulinbox!</h1>`, writer, request)
 	})
@@ -36,6 +36,15 @@ func (s *VulinServer) registerSSRF() {
 	}).Methods(http.MethodGet)
 	ssrfRoutes := []*VulInfo{
 		{
+			DefaultQuery: "url=http://www.baidu.com/",
+			Path:         "/safe",
+			Title:        "不存在 SSRF 漏洞的页面",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Write([]byte("no vulnerabilities here"))
+			},
+			RiskDetected: false,
+		},
+		{
 			DefaultQuery: "json={\"abc\": 123, \"ref\": \"http://www.baidu.com\"}",
 			Path:         "/json-in-get",
 			Title:        "SSRF JSON Body SSRF",
@@ -45,7 +54,7 @@ func (s *VulinServer) registerSSRF() {
 					writer.Write([]byte(`暂无数据！`))
 					return
 				}
-				var m = make(map[string]interface{})
+				m := make(map[string]interface{})
 				err := json.Unmarshal([]byte(raw), &m)
 				if err != nil {
 					writer.Write([]byte(`JSON Syntax Error: ` + err.Error()))
@@ -58,7 +67,7 @@ func (s *VulinServer) registerSSRF() {
 					return
 				}
 
-				var u = fmt.Sprint(ref)
+				u := fmt.Sprint(ref)
 				c := utils.NewDefaultHTTPClient()
 				c.Timeout = 5 * time.Second
 				rsp, err := c.Get(u)
@@ -81,7 +90,11 @@ func (s *VulinServer) registerSSRF() {
 			Title:        "SSRF GET 中 URL 参数",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				ref := request.URL.Query().Get("url")
-				var u = fmt.Sprint(ref)
+				if ref == "" {
+					writer.Write([]byte(`暂无数据！`))
+					return
+				}
+				u := fmt.Sprint(ref)
 				c := utils.NewDefaultHTTPClient()
 				c.Timeout = 5 * time.Second
 				rsp, err := c.Get(u)
@@ -146,7 +159,11 @@ func (s *VulinServer) registerSSRF() {
 					writer.Write([]byte(err.Error()))
 					return
 				}
-				var u = fmt.Sprint(values.Get("url"))
+				u := fmt.Sprint(values.Get("url"))
+				if u == "" {
+					writer.Write([]byte(`暂无数据！`))
+					return
+				}
 				c := utils.NewDefaultHTTPClient()
 				c.Timeout = 10 * time.Second
 				rsp, err := c.Get(u)
@@ -215,7 +232,7 @@ func (s *VulinServer) registerSSRF() {
 					writer.Write([]byte(err.Error()))
 					return
 				}
-				var u = fmt.Sprint(values.Get("url"))
+				u := fmt.Sprint(values.Get("url"))
 
 				if u == "" || !check(u) {
 					writer.Write([]byte("check url failed"))
@@ -292,7 +309,6 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/in-json-body",
 			Title:        "SSRF JSON Body SSRF",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-
 				return
 			},
 			RiskDetected: true,
@@ -302,7 +318,6 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/json-in-post-param",
 			Title:        "SSRF POST参数是JSON（包含URL）的情况",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-
 				return
 			},
 			RiskDetected: true,
@@ -313,7 +328,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/basic",
 			Title:        "完全开放重定向",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "destUrl")
+				u := LoadFromGetParams(request, "destUrl")
 				if strings.Contains(u, `redirect/basic`) {
 					DefaultRender("<p>forbidden to "+strconv.Quote(u)+"</p>", writer, request)
 					return
@@ -328,7 +343,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/redirect-hell",
 			Title:        "完全开放重定向(无限重定向)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "destUrl")
+				u := LoadFromGetParams(request, "destUrl")
 				writer.Header().Set("Location", u)
 				writer.WriteHeader(302)
 			},
@@ -339,7 +354,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/js/basic",
 			Title:        "完全开放重定向（JS location.href）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "redUrl")
+				u := LoadFromGetParams(request, "redUrl")
 				DefaultRender(`
 	<h2>Open Redirect With JS</h2>
 	<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
@@ -359,7 +374,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/js/basic1",
 			Title:        "完全开放重定向（JS location.replace）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "redirect_to")
+				u := LoadFromGetParams(request, "redirect_to")
 				DefaultRender(`
 	<h2>Open Redirect With JS</h2>
 	<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
@@ -379,7 +394,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/js/basic2",
 			Title:        "完全开放重定向（JS location.assign）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "redirect")
+				u := LoadFromGetParams(request, "redirect")
 				DefaultRender(`
 	<h2>Open Redirect With JS</h2>
 	<a href=`+strconv.Quote(u)+`>Click ME JUMP NOW (3s)</a>
@@ -399,7 +414,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/meta/case1",
 			Title:        "完全开放重定向（meta 延迟跳转）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "redirect")
+				u := LoadFromGetParams(request, "redirect")
 				DefaultRenderEx(true, `<!DOCTYPE html>
 	<html>
 	 <head>
@@ -418,7 +433,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/meta/case2",
 			Title:        "完全开放重定向（meta）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "redirect")
+				u := LoadFromGetParams(request, "redirect")
 				DefaultRenderEx(true, `<!DOCTYPE html>
 	<html>
 	 <head>
@@ -437,7 +452,7 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/redirect/safe",
 			Title:        "安全的重定向(只重定向path)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				var u = LoadFromGetParams(request, "redirect")
+				u := LoadFromGetParams(request, "redirect")
 				DefaultRenderEx(true, `<!DOCTYPE html>
 	<html>
 	 <head>
@@ -522,7 +537,7 @@ func check(s string) bool {
 		netx.WithDNSNoCache(true),
 		netx.WithDNSDisableSystemResolver(true),
 	)
-	//dns := dnsLookup(host)
+	// dns := dnsLookup(host)
 
 	dockerIP := "110.110.2.1"
 	if isPrivate(dns) || dns != dockerIP || port == "80" || port == "8080" {
