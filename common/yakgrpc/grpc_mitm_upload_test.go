@@ -5,20 +5,19 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"strconv"
-	"testing"
-	"time"
 )
 
 //go:embed grpc_mitm_upload_test_embed_file.jpg
@@ -68,17 +67,11 @@ func TestMITM_UploadFile(t *testing.T) {
 				}
 			}
 			log.Info("Start to check request in table")
-			p, flows, _ := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{Keyword: uid, SourceType: "mitm"})
-			if p.TotalRecord != 1 {
-				t.Fatal("not found (count is not right)")
-			}
-			flow := flows[0]
-			requestRaw, err := strconv.Unquote(flow.Request)
-			if err != nil {
-				t.Fatal(err)
-			}
+			flowMsg, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), localClient, &ypb.QueryHTTPFlowRequest{Keyword: uid, SourceType: "mitm"}, 1)
+			require.NoError(t, err)
+			flow := flowMsg.Data[0]
 			log.Info("check flow in mitm")
-			_, reqBody = lowhttp.SplitHTTPPacketFast(requestRaw)
+			_, reqBody = lowhttp.SplitHTTPPacketFast(flow.Request)
 			for {
 				part, err := reader.NextPart()
 				if err != nil {
