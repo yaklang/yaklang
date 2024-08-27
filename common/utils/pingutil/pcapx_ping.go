@@ -75,52 +75,29 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 	}
 
 	v4 := net.ParseIP(ip).To4() != nil
-	isLoopback := utils.IsLoopback(ip)
-	var ifaceName string
+	isLoopBack := utils.IsLoopback(ip)
+	var iface *net.Interface
+	var err error
 	var firstIP string
-	if isLoopback {
-		var err error
-		ifaceName, err = netutil.GetLoopbackDevName()
+	if isLoopBack {
+		iface, err = pcaputil.GetLoopBackNetInterface()
 		if err != nil {
 			return nil, err
 		}
 		firstIP = net.ParseIP("127.0.0.1").String()
 	} else {
-		iface, _, _, err := netutil.GetPublicRoute()
+		var srcIp net.IP
+		iface, _, srcIp, err = netutil.GetPublicRoute()
 		if err != nil {
 			return nil, err
 		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			return nil, err
-		}
-		if len(addrs) == 0 {
+		if srcIp == nil {
 			return nil, utils.Errorf("no address found")
 		}
-		for _, addr := range addrs {
-			ipIns, _, err := net.ParseCIDR(addr.String())
-			if err != nil {
-				continue
-			}
-			if v4 {
-				if ipIns.To4() == nil {
-					continue
-				}
-				firstIP = ipIns.String()
-				if firstIP == "" {
-					continue
-				}
-				break
-			} else {
-				if ipIns.To16() == nil {
-					continue
-				}
-				firstIP = ipIns.String()
-				if firstIP == "" {
-					continue
-				}
-				break
-			}
+		if v4 {
+			firstIP = srcIp.To4().String()
+		} else {
+			firstIP = srcIp.To16().String()
 		}
 	}
 
@@ -136,7 +113,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			}
 		}()
 		err := pcaputil.Start(
-			pcaputil.WithDevice(ifaceName),
+			pcaputil.WithDevice(iface.Name),
 			pcaputil.WithBPFFilter("icmp"),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithContext(ctx),
@@ -148,7 +125,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 							return
 						}
 						packet, err := pcapx.PacketBuilder(
-							pcapx.WithLoopback(isLoopback),
+							pcapx.WithLoopback(isLoopBack),
 							pcapx.WithIPv4_DstIP(ip),
 							pcapx.WithIPv4_SrcIP(firstIP),
 							pcapx.WithIPv4_NoOptions(),
