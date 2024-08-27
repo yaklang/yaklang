@@ -1214,6 +1214,7 @@ var requestToMutateResult = func(reqs []*http.Request, chunked bool) (*ypb.Mutat
 	return nil, utils.Errorf("empty result")
 }
 
+// 已弃用，使用 common\yak\yaklib\codec\codegrpc\codec_grpc_methods.go:HTTPRequestMutate
 func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMutateParams) (*ypb.MutateResult, error) {
 	rawRequest := req.GetRequest()
 	result := rawRequest
@@ -1271,8 +1272,10 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		opts = append(opts, poc.WithReplaceHttpPacketBody(nil, false))
 		opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
 		if len(totalParams) > 0 {
-			for k, v := range totalParams {
-				opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+			for k, values := range totalParams {
+				for _, v := range values {
+					opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+				}
 			}
 		} else {
 			opts = append(opts, poc.WithAppendHttpPacketUploadFile("key", "", "[value]", ""))

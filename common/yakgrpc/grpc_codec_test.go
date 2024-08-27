@@ -3,11 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,7 +25,7 @@ func TestGRPCMUSTPASS_COMMON_CODEC_AUTODECODE(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	var check = false
+	check := false
 	for _, r := range rsp.GetResults() {
 		if strings.Contains(string(r.Result), `ocalhost.localdoma`) {
 			check = true
@@ -215,16 +217,20 @@ func TestGRPCNewCodec_Replace(t *testing.T) {
 				{
 					Key:   "replace",
 					Value: "c",
-				}, {
+				},
+				{
 					Key:   "findType",
 					Value: "regexp",
-				}, {
+				},
+				{
 					Key:   "Global",
 					Value: "true",
-				}, {
+				},
+				{
 					Key:   "Multiline",
 					Value: "",
-				}, {
+				},
+				{
 					Key:   "IgnoreCase",
 					Value: "",
 				},
@@ -384,5 +390,144 @@ func TestGRPCCodecFlow(t *testing.T) {
 	require.Equal(t, codeData, string(rsp.GetRawResult()), "rawRes decode error")
 	require.Equal(t, false, rsp.GetIsFalseAppearance(), "IsFalseAppearance check error")
 	require.Equal(t, codeData, rsp.GetResult(), "result check error")
+}
 
+func TestGRPCNewCodec_HTTPRequestMutate(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	check := func(packet, transform string, callback func(string, []byte)) {
+		workFlow := []*ypb.CodecWork{
+			{
+				CodecType: "HTTPRequestMutate",
+				Params: []*ypb.ExecParamItem{
+					{
+						Key:   "transform",
+						Value: transform,
+					},
+				},
+			},
+		}
+		rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
+			&ypb.CodecRequestFlow{
+				Text:       packet,
+				Auto:       false,
+				WorkFlow:   workFlow,
+				InputBytes: nil,
+			},
+		)
+		require.NoError(t, err)
+		callback(rsp.GetResult(), rsp.GetRawResult())
+	}
+
+	t.Run("GET to Form", func(t *testing.T) {
+		check(`GET /?aaa=bbb HTTP/1.1
+Host: www.example.com
+`, "上传数据包", func(packet string, packetBytes []byte) {
+			require.Equal(t, "POST", lowhttp.GetHTTPRequestMethod(packetBytes))
+
+			contentType := lowhttp.GetHTTPPacketHeader(packetBytes, "content-type")
+			require.Contains(t, contentType, "multipart/form-data")
+
+			body := string(lowhttp.GetHTTPPacketBody(packetBytes))
+			body = strings.TrimSpace(body)
+			require.True(t, strings.HasPrefix(body, "--"), "expect body is a multipart/form-data, got "+body)
+			require.True(t, strings.HasSuffix(body, "--"), "expect body is a multipart/form-data, got "+body)
+			boundary := lowhttp.ExtractBoundaryFromBody(body)
+			require.Contains(t, contentType, boundary, "expect boundary in content-type, got "+contentType)
+			require.Contains(t, body, `name="aaa"`)
+			require.Contains(t, body, "\r\n\r\nbbb\r\n")
+		})
+	})
+
+	t.Run("Form to POST", func(t *testing.T) {
+		check(`POST /ofcms-admin/admin/cms/template/save.json HTTP/1.1
+Host: localhost:8080
+Content-Type: multipart/form-data; boundary=b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3
+
+--b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3
+Content-Disposition: form-data; name="key"
+
+value
+--b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3--`, "POST", func(packet string, packetBytes []byte) {
+			require.Equal(t, "POST", lowhttp.GetHTTPRequestMethod(packetBytes))
+
+			contentType := lowhttp.GetHTTPPacketHeader(packetBytes, "content-type")
+			require.Equal(t, "application/x-www-form-urlencoded", contentType)
+
+			body := string(lowhttp.GetHTTPPacketBody(packetBytes))
+			body = strings.TrimSpace(body)
+			require.Equal(t, "key=value", body)
+		})
+	})
+
+	t.Run("POST to GET same key", func(t *testing.T) {
+		check(`POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 11
+
+key=1&key=1`, "GET", func(packet string, packetBytes []byte) {
+			require.Equal(t, "GET", lowhttp.GetHTTPRequestMethod(packetBytes))
+			require.Equal(t, map[string][]string{
+				"key": {"1", "1"},
+			}, lowhttp.GetFullHTTPRequestQueryParams(packetBytes))
+
+			contentType := lowhttp.GetHTTPPacketHeader(packetBytes, "content-type")
+			require.Equal(t, "", contentType)
+
+			body := string(lowhttp.GetHTTPPacketBody(packetBytes))
+			body = strings.TrimSpace(body)
+			require.Equal(t, "", body)
+		})
+	})
+
+	t.Run("fix invalid host cause mutate failed", func(t *testing.T) {
+		check(`GET /?a=1 HTTP/1.1
+Host: {{payload(test)}}
+`, "POST", func(packet string, packetBytes []byte) {
+			require.Equal(t, "POST", lowhttp.GetHTTPRequestMethod(packetBytes))
+			require.Equal(t, "{{payload(test)}}", lowhttp.GetHTTPPacketHeader(packetBytes, "Host"))
+
+			contentType := lowhttp.GetHTTPPacketHeader(packetBytes, "content-type")
+			require.Equal(t, "application/x-www-form-urlencoded", contentType)
+
+			body := string(lowhttp.GetHTTPPacketBody(packetBytes))
+			body = strings.TrimSpace(body)
+			require.Equal(t, "a=1", body)
+		})
+	})
+
+	t.Run("Form only post params", func(t *testing.T) {
+		check(`POST /?q=w&e=r HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 11
+
+aaa=bbb&ccc=ddd`, "上传数据包(仅POST参数)", func(packet string, packetBytes []byte) {
+			require.Equal(t, "POST", lowhttp.GetHTTPRequestMethod(packetBytes))
+			require.Equal(t, map[string]string{
+				"q": "w",
+				"e": "r",
+			}, lowhttp.GetAllHTTPRequestQueryParams(packetBytes))
+
+			contentType := lowhttp.GetHTTPPacketHeader(packetBytes, "content-type")
+			require.Contains(t, contentType, "multipart/form-data")
+
+			body := string(lowhttp.GetHTTPPacketBody(packetBytes))
+			body = strings.TrimSpace(body)
+			require.True(t, strings.HasPrefix(body, "--"), "expect body is a multipart/form-data, got "+body)
+			require.True(t, strings.HasSuffix(body, "--"), "expect body is a multipart/form-data, got "+body)
+			boundary := lowhttp.ExtractBoundaryFromBody(body)
+			require.Contains(t, contentType, boundary, "expect boundary in content-type, got "+contentType)
+			require.Contains(t, body, `name="aaa"`)
+			require.Contains(t, body, "\r\n\r\nbbb\r\n")
+			require.Contains(t, body, `name="ccc"`)
+			require.Contains(t, body, "\r\n\r\nddd\r\n")
+			require.NotContains(t, body, `name="q"`)
+			require.NotContains(t, body, "\r\n\r\nw\r\n")
+			require.NotContains(t, body, `name="e"`)
+			require.NotContains(t, body, "\r\n\r\nr\r\n")
+		})
+	})
 }
