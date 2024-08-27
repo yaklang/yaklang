@@ -84,7 +84,7 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 		result:          []string{},
 		extendFuncs:     map[string]map[string]*ssa.Function{},
 		tpHander:        map[string]func(){},
-		labelHander:     map[string]func(*ssa.BasicBlock){},
+		labels:          map[string]*ssa.LabelBuilder{},
 		pkgNameCurrent:  "",
 	}
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
@@ -106,7 +106,7 @@ type astbuilder struct {
 	result         []string
 	extendFuncs    map[string]map[string]*ssa.Function
 	tpHander       map[string]func()
-	labelHander    map[string]func(*ssa.BasicBlock)
+	labels         map[string]*ssa.LabelBuilder
 	pkgNameCurrent string
 }
 
@@ -186,6 +186,13 @@ func (b *astbuilder) GetExtendFuncs(name string) map[string]*ssa.Function {
 		return nil
 	}
 	return b.extendFuncs[name]
+}
+
+func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
+	if b.labels[name] == nil {
+		return nil
+	}
+	return b.labels[name]
 }
 
 // ====================== Object type

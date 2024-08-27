@@ -426,7 +426,7 @@ func goparserParserInit() {
 		3, 20, 10, 0, 586, 67, 1, 0, 0, 0, 587, 588, 5, 27, 0, 0, 588, 592, 5,
 		37, 0, 0, 589, 591, 3, 208, 104, 0, 590, 589, 1, 0, 0, 0, 591, 594, 1,
 		0, 0, 0, 592, 590, 1, 0, 0, 0, 592, 593, 1, 0, 0, 0, 593, 596, 1, 0, 0,
-		0, 594, 592, 1, 0, 0, 0, 595, 597, 3, 52, 26, 0, 596, 595, 1, 0, 0, 0,
+		0, 594, 592, 1, 0, 0, 0, 595, 597, 3, 110, 55, 0, 596, 595, 1, 0, 0, 0,
 		596, 597, 1, 0, 0, 0, 597, 69, 1, 0, 0, 0, 598, 600, 5, 24, 0, 0, 599,
 		601, 3, 20, 10, 0, 600, 599, 1, 0, 0, 0, 600, 601, 1, 0, 0, 0, 601, 71,
 		1, 0, 0, 0, 602, 604, 5, 1, 0, 0, 603, 605, 5, 27, 0, 0, 604, 603, 1, 0,
@@ -7297,10 +7297,10 @@ func (s *LabeledStmtContext) Eos(i int) IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *LabeledStmtContext) Statement() IStatementContext {
+func (s *LabeledStmtContext) ForStmt() IForStmtContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IStatementContext); ok {
+		if _, ok := ctx.(IForStmtContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -7310,7 +7310,7 @@ func (s *LabeledStmtContext) Statement() IStatementContext {
 		return nil
 	}
 
-	return t.(IStatementContext)
+	return t.(IForStmtContext)
 }
 
 func (s *LabeledStmtContext) GetRuleContext() antlr.RuleContext {
@@ -7387,7 +7387,7 @@ func (p *GoParser) LabeledStmt() (localctx ILabeledStmtContext) {
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 58, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(595)
-			p.Statement()
+			p.ForStmt()
 		}
 
 	}

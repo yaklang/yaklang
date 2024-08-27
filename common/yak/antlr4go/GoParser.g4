@@ -199,7 +199,7 @@ shortVarDecl
     ;
 
 labeledStmt
-    : IDENTIFIER COLON eos* statement?
+    : IDENTIFIER COLON eos* forStmt?
     ;
 
 returnStmt

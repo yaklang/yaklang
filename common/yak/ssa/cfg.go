@@ -656,17 +656,21 @@ func (t *SwitchBuilder) Finish() {
 }
 
 type GotoBuilder struct {
-	b     *FunctionBuilder
-	enter *BasicBlock
-	label *BasicBlock
+	b       *FunctionBuilder
+	name    string
+	enter   *BasicBlock
+	label   *BasicBlock
+	isBreak bool
 }
 
 func (b *FunctionBuilder) BuildGoto() *GotoBuilder {
 	enter := b.CurrentBlock
 
 	return &GotoBuilder{
-		b:     b,
-		enter: enter,
+		b:       b,
+		name:    "",
+		enter:   enter,
+		isBreak: false,
 	}
 }
 
@@ -674,10 +678,128 @@ func (t *GotoBuilder) SetLabel(label *BasicBlock) {
 	t.label = label
 }
 
-func (t *GotoBuilder) Finish() {
+func (t *GotoBuilder) SetName(name string) {
+	t.name = name
+}
+
+func (t *GotoBuilder) SetBreak() {
+	t.isBreak = true
+}
+
+func (t *GotoBuilder) Finish() func() {
+	var _goto *BasicBlock
+	var _break *BasicBlock
+
 	builder := t.b
 	enter := t.enter.ScopeTable
-	label := t.label.ScopeTable
-	gotoBuilder := ssautil.NewGotoStmt(ssautil.ScopedVersionedTableIF[Value](enter), ssautil.ScopedVersionedTableIF[Value](label))
-	builder.CurrentBlock.SetScope(gotoBuilder.Build(generatePhi(builder, t.label, t.enter)))
+
+	if t.isBreak {
+		target := builder.target
+		/*
+			label1:
+			for i:=0; i<10; i++ {
+				label2:
+				for y:=0; y<10; y++ {
+					break label1
+				}
+			}
+
+			LoopStmt ->
+				LabelStmt ->
+					LoopStmt ->
+						LabelStmt ->
+		*/
+		for ; target.tail != nil; target = target.tail {
+			if l, ok := target.tail.LabelTarget.(*ssautil.LabelStmt[Value]); ok {
+				if l.GetName() == t.name {
+					break
+				}
+			}
+		}
+		_break = target._break
+		builder.EmitJump(_break)
+
+		return func() { /* 在某些情况下，_break.ScopeTable可能要等loop循环执行完毕后才加载，这里暂时返回一个回调函数 */
+			gotoBuilder := ssautil.NewGotoStmt(ssautil.ScopedVersionedTableIF[Value](enter), ssautil.ScopedVersionedTableIF[Value](_break.ScopeTable))
+			builder.CurrentBlock.SetScope(gotoBuilder.Build(generatePhi(builder, _break, t.enter)))
+		}
+
+	} else {
+		_goto = t.label
+		builder.EmitJump(_goto)
+
+		return func() {
+			gotoBuilder := ssautil.NewGotoStmt(ssautil.ScopedVersionedTableIF[Value](enter), ssautil.ScopedVersionedTableIF[Value](_goto.ScopeTable))
+			builder.CurrentBlock.SetScope(gotoBuilder.Build(generatePhi(builder, _goto, t.enter)))
+		}
+	}
+}
+
+type LabelBuilder struct {
+	b *FunctionBuilder
+
+	enter       *BasicBlock
+	name        string
+	gotoHanders []func(*BasicBlock)
+	/* 当某个goto语句遇到一个未解析的label时，可以将goto的finish作为回调函数记录在这里 */
+	gotoFinish []func()
+}
+
+func (b *FunctionBuilder) BuildLabel() *LabelBuilder {
+	enter := b.CurrentBlock
+
+	return &LabelBuilder{
+		b:           b,
+		enter:       enter,
+		name:        "",
+		gotoHanders: []func(*BasicBlock){},
+	}
+}
+
+func (t *LabelBuilder) SetGotoHander(f func(*BasicBlock)) {
+	t.gotoHanders = append(t.gotoHanders, f)
+}
+
+func (t *LabelBuilder) GetGotoHanders() []func(*BasicBlock) {
+	return t.gotoHanders
+}
+
+func (t *LabelBuilder) SetGotoFinish(f func()) {
+	t.gotoFinish = append(t.gotoFinish, f)
+}
+
+func (t *LabelBuilder) GetGotoFinish() []func() {
+	return t.gotoFinish
+}
+
+func (t *LabelBuilder) SetName(name string) {
+	t.name = name
+}
+
+func (t *LabelBuilder) GetBlock() *BasicBlock {
+	builder := t.b
+	block := builder.NewBasicBlockUnSealed(t.name)
+	block.SetScope(builder.CurrentBlock.ScopeTable.CreateSubScope())
+	return block
+}
+
+func (t *LabelBuilder) Build() {
+	builder := t.b
+	enter := t.enter.ScopeTable
+	labelBuilder := ssautil.NewLabelStmt(ssautil.ScopedVersionedTableIF[Value](enter))
+	labelBuilder.SetName(t.name)
+
+	target := builder.target
+	_break := target._break
+	_continue := t.enter
+
+	builder.PushTarget(labelBuilder, _break, _continue, nil)
+}
+
+func (t *LabelBuilder) Finish() {
+	builder := t.b
+	for _, f := range t.GetGotoFinish() {
+		f()
+	}
+	builder.PopTarget()
 }
