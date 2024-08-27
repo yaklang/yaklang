@@ -153,8 +153,9 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	// variable
-	for name := range value.GetAllVariables() {
+	for name, variable := range value.GetAllVariables() {
 		ir.Variable = append(ir.Variable, name)
+		SaveVariableOffset(variable, name)
 	}
 
 	// mask
