@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/stretchr/testify/require"
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	. "github.com/bytedance/mockey"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -56,10 +60,44 @@ func init() {
 func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
 	initDB.Do(func() {
 		yakit.InitialDatabase()
+
+		// mock DNSLog server
+		var mockMutex sync.Mutex
+		mockDomainToTokenMap := make(map[string]string, 0)
+		mockTokenToResultMap := make(map[string]*tpb.DNSLogEvent, 0)
+
+		Mock(yakit.NewDNSLogDomain).To(func() (domain string, token string, _ error) {
+			mockToken := utils.RandStringBytes(16)
+			host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+				mockMutex.Lock()
+				defer mockMutex.Unlock()
+				mockTokenToResultMap[mockToken] = &tpb.DNSLogEvent{Domain: ""}
+				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+			})
+			mockDomain := utils.HostPort(host, port)
+
+			mockMutex.Lock()
+			defer mockMutex.Unlock()
+			mockDomainToTokenMap[mockDomain] = mockToken
+			log.Infof("mock domain: %v, token: %v", mockDomain, mockToken)
+			return mockDomain, mockToken, nil
+		}).Build()
+		Mock(yakit.CheckDNSLogByToken).When(func(token string, runtimeId string, timeout ...float64) bool {
+			_, ok := mockTokenToResultMap[token]
+			return ok
+		}).To(func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+			events, ok := mockTokenToResultMap[token]
+			if !ok {
+				return nil, nil
+			} else {
+				return []*tpb.DNSLogEvent{events}, nil
+			}
+		}).Build()
 	})
+
 	codeBytes := GetCorePluginData(pluginName)
 	if codeBytes == nil {
-		t.Errorf("无法从bindata获取%v", pluginName)
+		t.Errorf("无法从bindata获取: %v", pluginName)
 		return false
 	}
 
@@ -161,7 +199,7 @@ func TestCorePluginAstCompileTime(t *testing.T) {
 			now := time.Now()
 			raw := parser.Program()
 			_ = raw
-			//println(raw.ToStringTree(parser.RuleNames, parser))
+			// println(raw.ToStringTree(parser.RuleNames, parser))
 			avgDur += time.Since(now)
 			fmt.Printf("[%d] ast compile time: %s \n", i, time.Since(now))
 		}
