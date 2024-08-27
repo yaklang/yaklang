@@ -6,16 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	utils2 "github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 //go:embed html/vul_fastjson.html
@@ -23,12 +23,12 @@ var fastjson_loginPage []byte
 
 type JsonParser func(data string) (map[string]any, error)
 
-var DnsRecord = sync.Map{}
+const magicIntranetHost = "qqqqqqqqqq.qqqqqqqqqq.qqqqqqqqqq.qqqqqqqqqq"
 
 func generateFastjsonParser(version string) JsonParser {
 	if version == "intranet" { // 内网版本，不能成功解析 payload 中的 dnslog 且解析超时
 		return func(data string) (map[string]any, error) {
-			return fastjsonParser(data, "qqqqqqqqqq.qqqqqqqqqq.qqqqqqqqqq.qqqqqqqqqq")
+			return fastjsonParser(data, magicIntranetHost)
 		}
 	}
 	return func(data string) (map[string]any, error) {
@@ -42,27 +42,27 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	if strings.Contains(data, "regex") {
 		time.Sleep(2 * time.Second)
 	}
-	var dnslog string
+	var domain string
 	// 查找dnslog
-	re, err := regexp.Compile(`(\w+\.)+((dnslog\.cn)|(ceye\.io)|(vcap\.me)|(vcap\.io)|(xip\.io)|(burpcollaborator\.net)|(dgrh3\.cn))`)
+	re, err := regexp.Compile(`127\.0\.0\.1\:\d+`)
 	if err != nil {
 		return nil, err
 	}
 	res := re.FindAllStringSubmatch(data, -1)
 	if len(res) > 0 {
-		dnslog = res[0][0]
+		domain = res[0][0]
 		if len(forceDnslog) > 0 {
-			dnslog = forceDnslog[0]
+			domain = forceDnslog[0]
 		}
 	}
-	if dnslog != "" {
+	if domain != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		go func() {
-			log.Infof("dnslog action to: %s", dnslog)
-			ip := netx.LookupFirst(dnslog, netx.WithDNSContext(ctx), netx.WithDNSNoCache(true))
-			if ip != "" {
-				log.Infof("dnslog %s resolve to %s", dnslog, ip)
-				DnsRecord.Store(dnslog, ip)
+			if domain != magicIntranetHost {
+				log.Infof("dnslog action to: %s", domain)
+				poc.DoGET("http://"+domain, poc.WithContext(ctx))
+			} else {
+				time.Sleep(2 * time.Second)
 			}
 			cancel()
 		}()
@@ -75,8 +75,10 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	return js, nil
 }
+
 func mockController(parser JsonParser, req *http.Request, data string) string {
 	newErrorResponse := func(err error) string {
 		response, _ := json.Marshal(map[string]any{
@@ -98,6 +100,7 @@ func mockController(parser JsonParser, req *http.Request, data string) string {
 	err = errors.New("user or password error")
 	return newErrorResponse(err)
 }
+
 func jacksonParser(data string) (map[string]any, error) {
 	var js map[string]any
 	err := json.Unmarshal([]byte(data), &js)
@@ -106,6 +109,7 @@ func jacksonParser(data string) (map[string]any, error) {
 	}
 	return js, nil
 }
+
 func mockJacksonController(req *http.Request, data string) string {
 	newErrorResponse := func(err error) string {
 		response, _ := json.Marshal(map[string]any{
@@ -123,14 +127,14 @@ func mockJacksonController(req *http.Request, data string) string {
 	unrecognizedFields := map[string]struct{}{}
 	allowFields := map[string]struct{}{}
 	if req.URL.Path == "/fastjson/json-in-cookie" {
-		for k, _ := range js {
+		for k := range js {
 			if k != "id" {
 				unrecognizedFields[k] = struct{}{}
 				allowFields["id"] = struct{}{}
 			}
 		}
 	} else {
-		for k, _ := range js {
+		for k := range js {
 			if k != "user" && k != "password" {
 				unrecognizedFields[k] = struct{}{}
 				allowFields["user"] = struct{}{}
@@ -143,11 +147,10 @@ func mockJacksonController(req *http.Request, data string) string {
 	if len(js) > 2 {
 		unrecognizedStr := ""
 		allowFieldsStr := ""
-		for k, _ := range unrecognizedFields {
+		for k := range unrecognizedFields {
 			unrecognizedStr += k + ","
-
 		}
-		for k, _ := range allowFields {
+		for k := range allowFields {
 			allowFieldsStr += k + ","
 		}
 		response, _ := json.Marshal(map[string]any{
@@ -161,11 +164,12 @@ func mockJacksonController(req *http.Request, data string) string {
 	}
 	return "ok"
 }
+
 func (s *VulinServer) registerFastjson() {
 	r := s.router
 	globalIdForUnstableNetwork := 0
-	var fastjsonGroup = r.PathPrefix("/fastjson").Name("Fastjson 案例").Subrouter()
-	var vuls = []*VulInfo{
+	fastjsonGroup := r.PathPrefix("/fastjson").Name("Fastjson 案例").Subrouter()
+	vuls := []*VulInfo{
 		{
 			Title:        "GET 传参案例案例",
 			Path:         "/json-in-query",

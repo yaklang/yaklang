@@ -1,63 +1,15 @@
 package coreplugin
 
 import (
-	"errors"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
-	domainMap := map[string]string{}
-	yakit.RegisterMockedNewDNSLogDomain(func() (string, string, error) {
-		token := strings.ToLower(utils.RandStringBytes(10))
-		domain := token + ".dnslog.cn"
-		domainMap[token] = domain
-		netx.AddHost(domain, "127.0.0.1")
-		netx.AddHost(strings.ToLower(domain), "127.0.0.1")
-		yakit.RegisterMockedCheckedDNSLogDomain(token, func(token string, runtimeId string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
-			timeout1 := 1.0
-			if len(timeout) > 0 {
-				timeout1 = timeout[0]
-			}
-			if v, ok := domainMap[token]; ok {
-				res := []*tpb.DNSLogEvent{}
-				for i := 0; i < 3; i++ {
-					hasRecord := false
-					vulinbox.DnsRecord.Range(func(key, value any) bool {
-						domain := key.(string)
-						if strings.HasSuffix(domain, v) {
-							hasRecord = true
-							res = append(res, &tpb.DNSLogEvent{
-								Domain: domain,
-							})
-							return false
-						}
-						return true
-					})
-					if hasRecord {
-						return res, nil
-					} else {
-						time.Sleep(utils.FloatSecondDuration(timeout1))
-					}
-				}
-			}
-			return nil, errors.New("not found record")
-		})
-		return token + ".dnslog.cn", token, nil
-	})
-	defer func() {
-		yakit.UnregisterMockedNewDNSLogDomain()
-	}()
 	client, err := yakgrpc.NewLocalClient(true)
 	if err != nil {
 		panic(err)
