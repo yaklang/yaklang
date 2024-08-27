@@ -96,7 +96,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			num1,
-			[]memedit.RangeIf{},
+			[]memedit.RangeIf{num1},
 		)
 	})
 	t.Run("find from assign by value: num2", func(t *testing.T) {
@@ -104,7 +104,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			num2,
-			[]memedit.RangeIf{},
+			[]memedit.RangeIf{num2},
 		)
 	})
 
