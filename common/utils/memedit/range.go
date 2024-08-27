@@ -30,6 +30,8 @@ type RangeIf interface {
 type PositionIf interface {
 	GetLine() int
 	GetColumn() int
+	// to string
+	String() string
 }
 
 var _ RangeIf = (*codeRange)(nil)
@@ -50,6 +52,10 @@ func (p *position) GetLine() int {
 
 func (p *position) GetColumn() int {
 	return p.column
+}
+
+func (p *position) String() string {
+	return fmt.Sprintf("%d:%d", p.line, p.column)
 }
 
 type codeRange struct {
