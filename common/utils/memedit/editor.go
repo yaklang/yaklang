@@ -85,12 +85,13 @@ func (ve *MemEditor) GetOffsetByPositionRaw(line, col int) int {
 }
 
 func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
-	if line < 1 || col < 0 {
+	if line < 1 || col < 1 {
 		return 0, errors.New("line number and column number must be positive")
 	}
 
 	// 调整line为内部索引使用，从0开始
 	adjustedLine := line - 1
+	adjustedCol := col - 1
 
 	// 检查行号是否超出范围
 	if adjustedLine >= len(ve.lineStartOffsetMap) {
@@ -98,19 +99,19 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 	}
 
 	// 检查列号是否超出当前行的长度
-	if col > ve.lineLensMap[adjustedLine] {
-		col = ve.lineLensMap[adjustedLine] // Clamp the column to the maximum length of the line
+	if adjustedCol > ve.lineLensMap[adjustedLine] {
+		adjustedCol = ve.lineLensMap[adjustedLine] // Clamp the column to the maximum length of the line
 	}
 
 	lineStartOffset := ve.lineStartOffsetMap[adjustedLine]
 	if adjustedLine < len(ve.lineLensMap)-1 {
-		return lineStartOffset + col, nil
+		return lineStartOffset + adjustedCol, nil
 	} else {
 		// For the last line, we need to ensure we do not exceed the length of the source code
-		if lineStartOffset+col >= ve.safeSourceCode.Len() {
+		if lineStartOffset+adjustedCol >= ve.safeSourceCode.Len() {
 			return ve.safeSourceCode.Len(), nil
 		} else {
-			return lineStartOffset + col, nil
+			return lineStartOffset + adjustedCol, nil
 		}
 	}
 }
@@ -203,7 +204,7 @@ func (ve *MemEditor) GetPositionByLine(line, column int) PositionIf {
 func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error) {
 	if offset < 0 {
 		// 偏移量为负，返回最初位置
-		return NewPosition(1, 0), errors.New("offset is negative")
+		return NewPosition(1, 1), errors.New("offset is negative")
 	}
 	if offset >= ve.safeSourceCode.Len() {
 		// 偏移量超出最大范围，返回最后位置
@@ -213,9 +214,9 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 		outOfRange := utils.Errorf("offset %d is out of range", offset)
 		if offset == ve.safeSourceCode.Len() && lastLineLen == 0 {
 			// 特殊情况，最后一行无内容
-			return NewPosition(lastLine+1, 0), outOfRange
+			return NewPosition(lastLine+1, 1), outOfRange
 		}
-		return NewPosition(lastLine+1, utils.Min(offset-lastLineStart, lastLineLen)), outOfRange
+		return NewPosition(lastLine+1, utils.Min(offset-lastLineStart, lastLineLen)+1), outOfRange
 	}
 
 	// 使用二分查找定位行
@@ -225,11 +226,11 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 		startOffset := ve.lineStartOffsetMap[mid]
 
 		if startOffset == offset {
-			return NewPosition(mid+1, 0), nil
+			return NewPosition(mid+1, 1), nil
 		} else if startOffset < offset {
 			if mid == high || ve.lineStartOffsetMap[mid+1] > offset {
 				column := offset - startOffset
-				return NewPosition(mid+1, column), nil
+				return NewPosition(mid+1, column+1), nil
 			}
 			low = mid + 1
 		} else {
@@ -238,7 +239,7 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 	}
 
 	// 理论上不应该执行到这里
-	return NewPosition(1, 0), errors.New("position not found")
+	return NewPosition(1, 1), errors.New("position not found")
 }
 
 func (ve *MemEditor) GetRangeOffset(start, end int) RangeIf {
