@@ -95,7 +95,7 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		globalv:         map[string]ssa.Value{},
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
-		result:          []string{},
+		result:          map[string][]string{},
 		extendFuncs:     map[string]map[string]*ssa.Function{},
 		tpHander:        map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
@@ -124,7 +124,7 @@ type astbuilder struct {
 	globalv        map[string]ssa.Value
 	structTypes    map[string]*ssa.ObjectType
 	aliasTypes     map[string]*ssa.AliasType
-	result         []string
+	result         map[string][]string
 	extendFuncs    map[string]map[string]*ssa.Function
 	tpHander       map[string]func()
 	labels         map[string]*ssa.LabelBuilder
@@ -187,15 +187,17 @@ func (b *astbuilder) GetGlobalVariable(name string) ssa.Value {
 }
 
 func (b *astbuilder) AddResultDefault(name string) {
-	b.result = append(b.result, name)
+	result := b.result[b.Function.GetName()]
+	if result == nil {
+		result = []string{name}
+	} else {
+		result = append(result, name)
+	}
+	b.result[b.Function.GetName()] = result
 }
 
 func (b *astbuilder) GetResultDefault() []string {
-	return b.result
-}
-
-func (b *astbuilder) CleanResultDefault() {
-	b.result = []string{}
+	return b.result[b.Function.GetName()]
 }
 
 func (b *astbuilder) AddExtendFuncs(name string, funcs map[string]*ssa.Function) {
