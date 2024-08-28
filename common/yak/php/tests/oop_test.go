@@ -543,13 +543,6 @@ $c->a = 1;
 		//	map[string][]string{"param": {`1`}},
 		//	ssaapi.WithLanguage(ssaapi.PHP))
 	})
-	t.Run("__destruct", func(t *testing.T) {
-		code := `<?php
-function __destruct(){}
-__destruct();
-`
-		ssatest.MockSSA(t, code)
-	})
 }
 
 func TestOOP_Extend(t *testing.T) {

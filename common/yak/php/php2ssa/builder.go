@@ -29,6 +29,7 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
+	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	initHandler := func(name ...string) {
 		for _, _name := range name {
 			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
@@ -36,8 +37,7 @@ func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 			fb.AssignVariable(variable, emptyContainer)
 		}
 	}
-	initHandler("GLOBALS", "_GET", "_POST", "_COOKIE", "_REQUEST", "_ENV", "_SESSION", "_SERVER", "_FILES", "$staticScope$")
-	fb.AssignVariable(fb.CreateVariable("global-container"), container)
+	initHandler("GLOBALS", "_SERVER", "$staticScope$")
 	fb.GetProgram().GlobalScope = container
 	fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
 		scope.SetForceCapture()
@@ -117,7 +117,6 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.MoreParse)
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.MoreParse = b.MoreParse
-		s.InitHandler(functionBuilder)
 		startParse(functionBuilder)
 	} else {
 		startParse(b)
@@ -184,6 +183,7 @@ func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 }
 
 var phpBuildIn = map[string]any{
+	"unlink":    func(file any) {},
 	"include":   func(file any) {},
 	"$_COOKIE":  map[interface{}]interface{}{},
 	"$_SESSION": map[interface{}]interface{}{},

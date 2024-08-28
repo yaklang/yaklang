@@ -1,0 +1,32 @@
+desc(
+    title: "mysql inject",
+    type: audit,
+    level: low,
+)
+
+mysql_query() as $source
+//
+$source?{* #{until:`*?{have: _GET || have: _POST || have: REQUEST}`}->} as $param
+alert $param
+
+desc(
+    lang: php,
+    'file:///mysql.php': <<<UNSAFE
+<?php
+    $llink=$_GET['r'];
+    $query = "SELECT * FROM nav WHERE link='$llink'";
+    $resul = mysql_query($query) or die('SQL语句有误：'.mysql_error());
+    $navs = mysql_fetch_array($resul);
+UNSAFE
+)
+
+desc(
+    lang: php,
+    'safefile:///safe.php': <<<SAFE
+<?php
+    $llink=addslashes($_GET['r']);
+    $query = "SELECT * FROM nav WHERE link='$llink'";
+    $resul = mysql_query($query) or die('SQL语句有误：'.mysql_error());
+    $navs = mysql_fetch_array($resul);
+SAFE
+)

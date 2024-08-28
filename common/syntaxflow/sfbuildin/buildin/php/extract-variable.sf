@@ -1,0 +1,17 @@
+desc(
+    title: "check php Variable coverage",
+    type: audit,
+    level: low,
+)
+
+extract() #->*?{have: '_GET'||have: '_POST'||have: '_REQUEST'} as $sink
+alert $sink
+
+
+desc(
+    lang: php,
+    'file://param.php': <<<PARAM
+<?php
+   extract($_GET);
+PARAM
+)

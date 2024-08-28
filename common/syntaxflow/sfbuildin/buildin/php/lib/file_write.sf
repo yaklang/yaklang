@@ -1,0 +1,36 @@
+desc(
+    title: "check file write function",
+    type: audit,
+    level: info,
+    lib: 'custom-file-write'
+)
+
+fwrite as $sink1
+file_put_contents as $sink2
+
+$sink1 + $sink2 as $output
+
+alert $output
+
+desc(
+    lang: php,
+    alert_min: '2',
+    'file://fileWrite.php': <<<PARAM
+<?php
+$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
+ 	$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
+ 	if(empty($tpl_name)){
+ 		return false;
+ 	}
+ 	$tpl = BLUE_ROOT.'templates/default/'.$tpl_name;
+ 	if(!$handle = @fopen($tpl, 'wb')){
+		showmsg("打开目标模版文件 $tpl 失败");
+ 	}
+ 	if(fwrite($handle, $tpl_content) === false){
+ 		showmsg('写入目标 $tpl 失败');
+ 	}
+ 	fclose($handle);
+ 	showmsg('编辑模板成功', 'tpl_manage.php');
+ 	file_put_contents("");
+PARAM
+)

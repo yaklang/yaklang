@@ -1,0 +1,26 @@
+desc(
+    title: "tp param",
+    type: audit,
+    level: info,
+    lib: 'tp-all-extern-variable-param-source'
+)
+input() as $param
+$param as $output
+check $output
+alert $output
+
+desc(
+    lang: php,
+    alert_min: '3',
+    'file://param.php': <<<PARAM
+<?php
+    input('get.name','','htmlspecialchars'); // 获取get变量 并用htmlspecialchars函数过滤
+    input('username','','strip_tags'); // 获取param变量 并用strip_tags函数过滤
+    input('post.name','','org\Filter::safeHtml'); // 获取post变量 并用org\Filter类的safeHtml方法过滤
+    input('get.id/d');
+    input('post.name/s');
+    input('post.ids/a');
+    input('get.');
+    input('name');
+PARAM
+)

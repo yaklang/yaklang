@@ -1,0 +1,22 @@
+desc(
+    title: 'check php function unserialize',
+    type: audit,
+    level: low,
+)
+
+unserialize() #->*?{have: '_GET'||have: '_POST'||have: '_REQUEST'} as $param
+
+check $param then '存在反序列化函数被用户控制' else '未找到反序列化函数被控制'
+alert $param
+
+desc(
+    lang: php,
+    'file:///unsafe.php': <<<UNSAFE
+<?php
+function __unserialize($a){
+    unserialize("$a");
+}
+$a = $_GET["1"];
+__unserialize($a);
+UNSAFE
+)
