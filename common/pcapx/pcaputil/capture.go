@@ -35,7 +35,10 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle) error
 	}
 }
 
+//var count atomic.Int64
+
 func Start(opt ...CaptureOption) error {
+	//count.Add(1)
 	conf := NewDefaultConfig()
 	for _, i := range opt {
 		if err := i(conf); err != nil {
@@ -99,7 +102,7 @@ func Start(opt ...CaptureOption) error {
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
 	defer func() {
-		log.Debug("pcapx.utils.capture context done")
+		log.Error("pcapx.utils.capture context done")
 		cancel()
 		conf.trafficPool.flowCache.ForEach(func(key string, flow *TrafficFlow) {
 			flow.ForceShutdownConnection()
@@ -129,7 +132,8 @@ func Start(opt ...CaptureOption) error {
 		var cancels []func()
 		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
 			if conf.EnableCache {
-				cancels = append(cancels, keepDaemonCache(i, ctx))
+				c := keepDaemonCache(ctx, i)
+				cancels = append(cancels, c)
 			}
 			return true
 		})
@@ -139,9 +143,10 @@ func Start(opt ...CaptureOption) error {
 			}
 		}()
 
-		runtimeId := uuid.New().String()
+		//runtimeId := uuid.New().String()
+		runtimeId := conf.Device[0]
 		for _, i := range handlers.Keys() {
-			registerCallback(i, runtimeId, ctx, func(ctx context.Context, packet gopacket.Packet) error {
+			registerCallback(ctx, i, runtimeId, func(ctx context.Context, packet gopacket.Packet) error {
 				conf.packetHandler(ctx, packet)
 				select {
 				case <-ctx.Done():
@@ -153,6 +158,7 @@ func Start(opt ...CaptureOption) error {
 		}
 		select {
 		case <-ctx.Done():
+			log.Error("11111  context done")
 		}
 	} else {
 		utils.WaitRoutinesFromSlice(handlers.Values(), func(origin PcapHandleOperation) {

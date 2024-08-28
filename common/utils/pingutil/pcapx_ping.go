@@ -119,38 +119,38 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithContext(ctx),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-				go func() {
-					baseN := 1
-					for i := 0; i < 3; i++ {
-						if isAlive.IsSet() {
-							return
-						}
-						packetOpts := []any{
-							pcapx.WithLoopback(isLoopBack),
-							pcapx.WithIPv4_DstIP(ip),
-							pcapx.WithIPv4_SrcIP(firstIP),
-							pcapx.WithIPv4_NoOptions(),
-							pcapx.WithICMP_Type(layers.ICMPv4TypeEchoRequest, nil),
-							pcapx.WithICMP_Id(baseN),
-							pcapx.WithICMP_Sequence(i),
-							pcapx.WithPayload(icmpPayload),
-						}
-						if macAddress != nil {
-							packetOpts = append(packetOpts, pcapx.WithEthernet_DstMac(macAddress), pcapx.WithEthernet_SrcMac(iface.HardwareAddr))
-						}
-						packet, err := pcapx.PacketBuilder(packetOpts...)
-						if err != nil {
-							log.Errorf("build icmp packet failed: %s", err)
-							break
-						}
-						err = handle.WritePacketData(packet)
-						if err != nil {
-							log.Errorf("write icmp packet failed: %s", err)
-							return
-						}
-						time.Sleep(time.Millisecond * 600)
+				//go func() {
+				baseN := 1
+				for i := 0; i < 3; i++ {
+					if isAlive.IsSet() {
+						return
 					}
-				}()
+					packetOpts := []any{
+						pcapx.WithLoopback(isLoopBack),
+						pcapx.WithIPv4_DstIP(ip),
+						pcapx.WithIPv4_SrcIP(firstIP),
+						pcapx.WithIPv4_NoOptions(),
+						pcapx.WithICMP_Type(layers.ICMPv4TypeEchoRequest, nil),
+						pcapx.WithICMP_Id(baseN),
+						pcapx.WithICMP_Sequence(i),
+						pcapx.WithPayload(icmpPayload),
+					}
+					if macAddress != nil {
+						packetOpts = append(packetOpts, pcapx.WithEthernet_DstMac(macAddress), pcapx.WithEthernet_SrcMac(iface.HardwareAddr))
+					}
+					packet, err := pcapx.PacketBuilder(packetOpts...)
+					if err != nil {
+						log.Errorf("build icmp packet failed: %s", err)
+						break
+					}
+					err = handle.WritePacketData(packet)
+					if err != nil {
+						log.Errorf("write icmp packet failed: %s", err)
+						return
+					}
+					time.Sleep(time.Millisecond * 600)
+				}
+				//}()
 			}),
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
 				defer func() {

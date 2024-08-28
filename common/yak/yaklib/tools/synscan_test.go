@@ -29,11 +29,11 @@ func TestBasicSynScanIntegrate(t *testing.T) {
 		rateLimitDelayMs:  1,
 		rateLimitDelayGap: 5,
 		//netInterface:      "\\Device\\NPF_{6E6F3FC9-4678-48E2-B746-C5DEEFE6CDF0}",
-		//netInterface: "WLAN 4",
-		netInterface: "Radmin VPN",
+		netInterface: "WLAN",
+		//netInterface: "Radmin VPN",
 	}
 
-	res, err := _synScanDo(hostsToChan("124.222.42.210"), "80", config)
+	res, err := _synScanDo(hostsToChan("192.168.3.1/24"), "80", config)
 	if err != nil {
 		return
 	}

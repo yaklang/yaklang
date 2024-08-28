@@ -334,7 +334,6 @@ func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig
 	if targetChan == nil {
 		return nil, utils.Error("empty target")
 	}
-	defer config.excludePorts.Close()
 
 	filteredTargetChan, sampleTarget := filterTargetChannel(targetChan, config.IsFiltered)
 
