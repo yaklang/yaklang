@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"github.com/google/gopacket"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -74,24 +73,25 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		cacheId := codec.Sha256(hashRaw.String())
 		if daemon, ok := getDaemonCache(cacheId); ok {
 			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
-				if oldHandle, ok := daemon.handler.(*pcap.Handle); ok {
+				if oldHandle, ok := daemon.handler.(*PcapHandleWrapper); ok {
 					conf.onNetInterfaceCreated(oldHandle)
 				}
 			}
 			return cacheId, daemon.handler, nil
 		}
 
-		var handler *pcap.Handle
+		var handler *PcapHandleWrapper
 		var operation PcapHandleOperation
 		var err error
 
 		if conf.mock != nil {
 			operation = conf.mock
 		} else {
-			handler, err = OpenIfaceLive(ifaceName)
+			pcapHandler, err := OpenIfaceLive(ifaceName)
 			if err != nil {
 				return "", nil, err
 			}
+			handler = WrapPcapHandle(pcapHandler)
 			operation = handler
 		}
 		if conf.BPFFilter != "" {
@@ -152,7 +152,10 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 								daemon.registeredHandlers.Delete(i)
 							}
 						case <-time.After(3 * time.Second):
-							if handler.Error() != nil && handler.Error().Error() != "" {
+							if handler == nil {
+								log.Errorf("background iface: %v handler is nil", ifaceName)
+								return
+							} else if handler.Error() != nil && handler.Error().Error() != "" {
 								log.Errorf("background iface: %v error: %s", ifaceName, handler.Error())
 								captureDaemonCache.Remove(cacheId)
 								return
