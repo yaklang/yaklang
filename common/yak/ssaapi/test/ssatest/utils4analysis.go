@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"io/fs"
 	"sort"
 	"strings"
@@ -388,7 +389,7 @@ func CheckTopDef_Equal(variable string, want []string, forceCheckLength ...bool)
 }
 
 func checkFunctionEx(
-	variable func() ssaapi.Values, // variable  for test
+	variable func() ssaapi.Values,         // variable  for test
 	get func(*ssaapi.Value) ssaapi.Values, // getTop / getBottom
 	checkLength bool,
 	want []string,
@@ -454,9 +455,41 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 			if !ok {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
 			}
-			_ = libOutput
+			count := 0
+			_ = libOutput.Recursive(func(operator sfvm.ValueOperator) error {
+				if _, ok := operator.(ssa.GetIdIF); ok {
+					count++
+				}
+				return nil
+			})
+			if count <= 0 {
+				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
+			}
+		}
+		alertCount := 0
+		for _, i := range result.AlertSymbolTable {
+			_ = i.Recursive(func(operator sfvm.ValueOperator) error {
+				if _, ok := operator.(ssa.GetIdIF); ok {
+					alertCount++
+					return nil
+				}
+				return nil
+			})
+		}
+		if alertCount <= 0 {
+			errs = append(errs, utils.Errorf("alert symbol table is empty"))
+			return nil
 		}
 		result.Show()
+
+		ret := frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin")
+		if ret > 0 {
+			if alertCount < frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin") {
+				errs = append(errs, utils.Errorf("alert symbol table is less than alert_min config: %v actual got: %v", ret, alertCount))
+				return nil
+			}
+		}
+
 		return nil
 	}, ssaapi.WithLanguage(l))
 	if len(errs) > 0 {

@@ -204,3 +204,47 @@ func TestBuildInRule_Verify_DEBUG(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildInRule_Verify_Negative_AlertMin(t *testing.T) {
+	err := ssatest.EvaluateVerifyFilesystem(`
+desc(
+alert_min: '2',
+language: yaklang,
+'file://a.yak': <<<EOF
+b = () => {
+	a = 1;
+}
+EOF
+)
+
+a as $output;
+check $output;
+alert $output;
+
+`, t)
+	if err == nil {
+		t.Fatal("expect error")
+	}
+}
+
+func TestBuildInRule_Verify_Positive_AlertMin2(t *testing.T) {
+	err := ssatest.EvaluateVerifyFilesystem(`
+desc(
+alert_min: 1,
+language: yaklang,
+'file://a.yak': <<<EOF
+b = () => {
+	a = 1;
+}
+EOF
+)
+
+a as $output;
+check $output;
+alert $output;
+
+`, t)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
