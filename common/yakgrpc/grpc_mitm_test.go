@@ -1148,36 +1148,36 @@ func TestGRPCMUSTPASS_MITM_CancelHijackResponse(t *testing.T) {
 	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
 	once := false
 	for {
-		rcpResponse, err := stream.Recv()
+		rpcResponse, err := stream.Recv()
 		if err != nil {
 			break
 		}
-		rspMsg := string(rcpResponse.GetMessage().GetMessage())
-		if rcpResponse.GetHaveMessage() {
-		} else if len(rcpResponse.GetRequest()) > 0 {
+		rspMsg := string(rpcResponse.GetMessage().GetMessage())
+		if rpcResponse.GetHaveMessage() {
+		} else if len(rpcResponse.GetRequest()) > 0 {
 
 			// 模拟用户点击切换劫持响应为从不
 			if !once {
 				once = true
 				stream.Send(&ypb.MITMRequest{
-					Id:             rcpResponse.GetId(),
+					Id:             rpcResponse.GetId(),
 					HijackResponse: true,
 				})
 				time.Sleep(100 * time.Microsecond)
 				stream.Send(&ypb.MITMRequest{
-					Id:                   rcpResponse.GetId(),
+					Id:                   rpcResponse.GetId(),
 					CancelhijackResponse: true, // 代表取消劫持响应
 				})
 				time.Sleep(100 * time.Microsecond)
 			}
 
 			stream.Send(&ypb.MITMRequest{
-				Id:      rcpResponse.GetId(),
-				Request: rcpResponse.GetRequest(),
+				Id:      rpcResponse.GetId(),
+				Request: rpcResponse.GetRequest(),
 			})
 
 			// 如果劫持了响应，第二次会进来
-			if len(rcpResponse.GetResponse()) > 0 {
+			if len(rpcResponse.GetResponse()) > 0 {
 				t.Fatalf("Should not hijack response, but hijacked")
 			}
 		}
@@ -1699,4 +1699,51 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 	flow = flows.Data[0]
 	require.Contains(t, flow.Tags, "[手动劫持]")
 	require.NotContains(t, flow.Tags, "[手动修改]")
+}
+
+func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	token, token2 := utils.RandStringBytes(20), utils.RandStringBytes(20)
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Length: %d\r\n\r\n%s", len(token), token)))
+	replacedHost := "www.example.com"
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host: mitmHost,
+			Port: uint32(mitmPort),
+		})
+		stream.Send(&ypb.MITMRequest{
+			SetAutoForward:   true,
+			AutoForwardValue: false,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+		_, _, err = poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(proxy))
+		require.NoError(t, err)
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+		if request := msg.GetRequest(); len(request) > 0 {
+			request = lowhttp.ReplaceHTTPPacketHost(request, replacedHost)
+			stream.Send(&ypb.MITMRequest{
+				Id:      msg.GetId(),
+				Request: request,
+			})
+		}
+	})
+
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		Keyword: token2,
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 1,
+		},
+	}, 1)
+	require.NoError(t, err)
+	flow := flows.Data[0]
+	require.Equal(t, replacedHost, lowhttp.GetHTTPPacketHeader(flow.Request, "Host"))
+	require.Equal(t, token, string(lowhttp.GetHTTPPacketBody(flow.Response)))
 }
