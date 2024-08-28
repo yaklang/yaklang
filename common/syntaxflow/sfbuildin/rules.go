@@ -23,7 +23,7 @@ func init() {
 		err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 			dirName, name := fsInstance.PathSplit(s)
 			if !strings.HasSuffix(name, ".sf") {
-				return utils.Error("invalid sf file")
+				return nil
 			}
 			raw, err := fsInstance.ReadFile(s)
 			if err != nil {
