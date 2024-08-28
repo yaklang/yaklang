@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -107,36 +108,60 @@ func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream y
 	if err != nil {
 		return err
 	}
-	packet := flow.Request
-	filename := "body.txt"
-	if !r.GetIsRequest() {
-		packet = flow.Response
-	}
-	rawPacket, err := strconv.Unquote(packet)
-	if err != nil {
-		rawPacket = packet
-		log.Errorf("GetHTTPFlowBodyById: unquoted packet failed: %v", err)
+	var (
+		packet, rawPacket string
+		filename          = "body.txt"
+		reader            io.Reader
+		isRequest         = r.GetIsRequest()
+	)
+
+	if isRequest {
+		packet = flow.Request
+	} else {
+		if flow.TooLargeResponseBodyFile != "" {
+			fh, err := os.Open(flow.TooLargeResponseBodyFile)
+			if err != nil {
+				return utils.Wrap(err, "GetHTTPFlowBodyById: open file error")
+			}
+			defer fh.Close()
+			reader = fh
+		} else {
+			packet = flow.Response
+		}
 	}
 
-	if !r.GetIsRequest() {
+	// unquote packet
+	if reader == nil {
+		rawPacket, err = strconv.Unquote(packet)
+		if err != nil {
+			rawPacket = packet
+			log.Errorf("GetHTTPFlowBodyById: unquoted packet failed: %v", err)
+		}
+		_, body := lowhttp.SplitHTTPPacketFast(rawPacket)
+		reader = bytes.NewReader(body)
+	}
+
+	// get save filename
+	if !isRequest {
 		u := utils.ParseStringToUrl(flow.Url)
 		base := path.Base(u.Path)
 		if !strings.Contains(base, ".") {
-			// try to detect mime type
-			mime := mimetype.Detect([]byte(rawPacket))
-			if mime != nil {
-				filename = "body" + mime.Extension()
+			if len(rawPacket) > 0 {
+				// try to detect mime type
+				mime := mimetype.Detect([]byte(rawPacket))
+				if mime != nil {
+					filename = "body" + mime.Extension()
+				}
 			}
 		} else {
 			filename = base
 		}
 	}
+
 	if err := stream.Send(&ypb.GetHTTPFlowBodyByIdResponse{Filename: filename}); err != nil {
 		return utils.Wrap(err, "GetHTTPFlowBodyById: send body to stream error")
 	}
 
-	_, body := lowhttp.SplitHTTPPacketFast(rawPacket)
-	reader := bytes.NewReader(body)
 	buf := make([]byte, bufSize)
 	eof := false
 
