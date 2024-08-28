@@ -64,6 +64,7 @@ type FunctionBuilder struct {
 
 	MarkedMemberCallWantMethod bool
 	parentBuilder              *FunctionBuilder
+	mainBuilder                *FunctionBuilder //global Scope Builder
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -89,6 +90,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		b.SupportClosure = parent.SupportClosure
 		b.SupportClassStaticModifier = parent.SupportClassStaticModifier
 		b.SupportClass = parent.SupportClass
+		b.mainBuilder = parent.mainBuilder
 	}
 
 	// b.ScopeStart()
@@ -100,6 +102,13 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	}
 	f.builder = b
 	return b
+}
+func (f *FunctionBuilder) SetMainbuilder(builder *FunctionBuilder) {
+	f.mainBuilder = builder
+}
+
+func (f *FunctionBuilder) GetMainBuilder() *FunctionBuilder {
+	return f.mainBuilder
 }
 
 func (b *FunctionBuilder) SetBuildSupport(parent *FunctionBuilder) {
@@ -141,6 +150,7 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 // function stack
 func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	build := NewBuilder(b.GetEditor(), newFunc, b)
+
 	// build.MarkedThisObject = b.MarkedThisObject
 	if this := b.MarkedThisObject; this != nil {
 		newParentScopeLevel := build.parentScope.scope
@@ -219,7 +229,4 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 
 func (b *FunctionBuilder) ReferenceParameter(name string) {
 	b.RefParameter[name] = struct{}{}
-}
-
-func (b *FunctionBuilder) name() {
 }

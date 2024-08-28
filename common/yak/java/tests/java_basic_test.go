@@ -16,7 +16,7 @@ func TestJava_LocalType_Declaration(t *testing.T) {
 		float c=3.14;
 		println(c);
 		string s ="aaa";
-		println(s);`, []string{"Undefined-a", "1", "true", "3.14", "\"aaa\""}, t)
+		println(s);`, []string{"Undefined-.$staticScope$.Main.a(valid)", "1", "true", "3.14", "\"aaa\""}, t)
 	})
 	t.Run("test array declaration", func(t *testing.T) {
 		CheckJavaPrintlnValue(`

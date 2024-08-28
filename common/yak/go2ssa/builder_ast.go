@@ -125,7 +125,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		for structName, structType := range b.GetStructAll() {
 			typValue := ssa.NewTypeValue(structType)
 			typValue.SetType(structType)
-			cbp.AddStaticMember(structName, typValue)
+			cbp.RegisterStaticMember(structName, typValue)
 		}
 	}
 

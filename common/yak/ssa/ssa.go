@@ -182,10 +182,11 @@ const (
 // both instruction and value
 type Program struct {
 	// package list
-	Name        string
-	Version     string
-	ProgramKind ProgramKind // is library or application
-	Language    string
+	Name            string
+	Version         string
+	ProgramKind     ProgramKind // is library or application
+	Language        string
+	magicMethodName []string
 
 	// from pom.xml file
 	SCAPackages   []*dxtypes.Package

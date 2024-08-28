@@ -41,7 +41,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 	if ret := i.ClassDeclaration(); ret != nil {
 		container := y.VisitClassDeclaration(ret, nil)
 		if container != nil {
-			for _,callBack := range callBacks {
+			for _, callBack := range callBacks {
 				callBack(container)
 			}
 		}
@@ -50,7 +50,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 	} else if ret := i.InterfaceDeclaration(); ret != nil {
 		container := y.VisitInterfaceDeclaration(ret)
 		if container != nil {
-			for _,callBack := range callBacks {
+			for _, callBack := range callBacks {
 				callBack(container)
 			}
 		} else {
@@ -230,9 +230,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
-		setMember := class.AddNormalMember
+		setMember := class.RegisterNormalMember
 		if isStatic {
-			setMember = class.AddStaticMember
+			setMember = class.RegisterStaticMember
 		}
 		field := ret.(*javaparser.FieldDeclarationContext)
 
@@ -417,7 +417,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 	// 实例化enum里的常量
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
-	setMember := class.AddNormalMember
+	setMember := class.RegisterNormalMember
 	for _, enumConstant := range allEnumConstant {
 		constant := enumConstant.(*javaparser.EnumConstantContext)
 		enumName := constant.Identifier().GetText()
@@ -453,7 +453,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 		_ = annotation
 	}
 
-	setMember := class.AddStaticMember
+	setMember := class.RegisterStaticMember
 
 	name := i.Identifier().GetText()
 	variable := y.CreateVariable(name)
@@ -574,11 +574,12 @@ func (y *builder) VisitMethodDeclaration(
 			for _, def := range defCallback {
 				def(newFunction)
 			}
-			class.AddStaticMethod(key, newFunction)
+			class.RegisterStaticMethod(key, newFunction)
 			//y.AddToPackage(funcName)
 		}
+		class.RegisterConstMember(key, newFunction)
 
-		y.AssignClassConst(class.Name, key, newFunction)
+		//y.AssignClassConst(class.Name, key, newFunction)
 		if i.THROWS() != nil {
 			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
 				y.VisitQualifiedNameList(qualifiedNameList)

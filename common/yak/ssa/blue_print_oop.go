@@ -58,10 +58,52 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 	klassContainer := b.EmitEmptyContainer()
 	b.AssignVariable(klassVar, klassContainer)
 	err := c.InitializeWithContainer(klassContainer)
+	members, _ := b.GetProgram().GetApplication().GlobalScope.GetStringMember("$staticScope$")
+	builder := b.mainBuilder
+	variable := builder.CreateMemberCallVariable(members, builder.EmitConstInst(name))
+	container := builder.EmitEmptyContainer()
+	builder.AssignVariable(variable, container)
+	c.InitStaticContainer(container)
 	if err != nil {
 		log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
 	}
 	return c
+}
+func (c *ClassBluePrint) GetMagicMethod(name string) Value {
+	var _method Value
+	c.getKlassEx(name, func(bluePrint *ClassBluePrint) bool {
+		if value := bluePrint.magicMethod[name]; utils.IsNil(value) {
+			return false
+		} else {
+			_method = value
+			return true
+		}
+	})
+	return _method
+}
+func (c *ClassBluePrint) GetStaticMember(name string) Value {
+	var member Value
+	c.getKlassEx(name, func(bluePrint *ClassBluePrint) bool {
+		if value := bluePrint.StaticMember[name]; !utils.IsNil(value) {
+			member = value
+			return true
+		}
+		return false
+	})
+	return member
+}
+
+// GetNormalMember todo: this read seem error
+func (c *ClassBluePrint) GetNormalMember(name string) Value {
+	var member Value
+	c.getKlassEx(name, func(bluePrint *ClassBluePrint) bool {
+		if printMember, ok := bluePrint.NormalMember[name]; ok {
+			member = printMember.Value
+			return true
+		}
+		return false
+	})
+	return member
 }
 
 func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
@@ -70,27 +112,9 @@ func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
 	return p.GetClassBluePrint(name)
 }
 
-func (c *ClassBluePrint) GetMemberAndStaticMember(key string, supportStatic bool) Value {
-	var member Value
-	c.GetMemberEx(key, func(c *ClassBluePrint) bool {
-		if m, ok := c.NormalMember[key]; ok {
-			member = m.Value
-			return true
-		}
-		if supportStatic {
-			if value, ok := c.StaticMember[key]; ok {
-				member = value
-				return true
-			}
-		}
-		return false
-	})
-	return member
-}
-
 func (c *ClassBluePrint) GetConstructOrDestruct(name string) Value {
 	var val Value = nil
-	c.getMethodEx("", func(bluePrint *ClassBluePrint) bool {
+	c.getKlassEx("", func(bluePrint *ClassBluePrint) bool {
 		switch name {
 		case "constructor":
 			if utils.IsNil(bluePrint.Constructor) {
@@ -107,61 +131,77 @@ func (c *ClassBluePrint) GetConstructOrDestruct(name string) Value {
 	})
 	return val
 }
-func (c *ClassBluePrint) GetConstEx(key string, get func(c *ClassBluePrint) bool) bool {
+func (c *ClassBluePrint) GetConst(key string) Value {
+	var val Value
+	c.getKlassEx(key, func(bluePrint *ClassBluePrint) bool {
+		if value, ok := bluePrint.ConstValue[key]; ok {
+			val = value
+			return true
+		}
+		return false
+	})
+	return val
+}
+func (c *ClassBluePrint) GetStaticMethod(key string) *Function {
+	var f *Function
+	c.getKlassEx(key, func(bluePrint *ClassBluePrint) bool {
+		if function, ok := bluePrint.StaticMethod[key]; ok {
+			f = function
+			return true
+		}
+		return false
+	})
+	return f
+}
+
+func (c *ClassBluePrint) GetMethod_(key string) *Function {
+	var f *Function
+	c.getKlassEx(key, func(bluePrint *ClassBluePrint) bool {
+		if function, ok := bluePrint.Method[key]; ok {
+			f = function
+			return true
+		}
+		return false
+	})
+	return f
+}
+
+// CreateStaticMemberVariable need global builder assign
+func (c *ClassBluePrint) CreateStaticMemberVariable(key string) *Variable {
+	builder := c._staticContainer.GetFunc().builder
+	return builder.CreateMemberCallVariable(c._staticContainer, builder.EmitConstInst(key))
+}
+func (c *ClassBluePrint) getKlassEx(key string, get func(bluePrint *ClassBluePrint) bool) bool {
 	if b := get(c); b {
 		return true
 	} else {
 		for _, class := range c.ParentClass {
-			if ex := class.GetConstEx(key, get); ex {
+			if ex := class.getKlassEx(key, get); ex {
 				return true
 			}
 		}
 	}
 	return false
 }
-func (c *ClassBluePrint) GetMethodAndStaticMethod(name string, supportStatic bool) *Function {
-	var _func *Function
-	c.getMethodEx(name, func(bluePrint *ClassBluePrint) bool {
-		if function, ok := bluePrint.Method[name]; ok {
-			_func = function
-			return true
-		} else if supportStatic {
-			if f, ok := bluePrint.StaticMethod[name]; ok {
-				_func = f
-				return true
-			}
-		}
-		return false
-	})
-	return _func
-}
-func (c *ClassBluePrint) getMethodEx(name string, get func(bluePrint *ClassBluePrint) bool) bool {
-	if b := get(c); b {
-		return true
-	}
-	for _, class := range c.ParentClass {
-		if ex := class.getMethodEx(name, get); ex {
-			return true
-		}
-	}
-	return false
-}
 
-func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
-	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
+func (b *FunctionBuilder) CreateStaticMember(class, key string) *Variable {
+	member, _ := b.mainBuilder.GetProgram().GlobalScope.GetStringMember("$staticScope$")
+	if stringMember, ok := member.GetStringMember(class); ok {
+		return b.mainBuilder.CreateMemberCallVariable(stringMember, b.mainBuilder.EmitConstInst(key))
+	}
+	log.Errorf("not found this class in global scope")
+	return b.mainBuilder.CreateVariable(fmt.Sprintf("%s_%s", class, key))
 }
-
-func (c *ClassBluePrint) GetMemberEx(key string, get func(*ClassBluePrint) bool) bool {
-	if ok := get(c); ok {
-		return true
+func (b *FunctionBuilder) ReadClsStaticMember(class, key string) Value {
+	member_ := b.mainBuilder.CreateVariable(fmt.Sprintf("%s_%s", class, key))
+	if val := b.PeekValueByVariable(member_); !utils.IsNil(val) {
+		return val
 	}
-	for _, p := range c.ParentClass {
-		if ok := p.GetMemberEx(key, get); ok {
-			return true
-		}
+	staticMembers := b.CreateStaticMember(class, key)
+	if val := b.mainBuilder.PeekValueByVariable(staticMembers); !utils.IsNil(val) {
+		return val
 	}
-	log.Errorf("VisitClassMember: this class: %s no this member %s", c.String(), key)
-	return false
+	return b.EmitUndefined(fmt.Sprintf("$%s$%s$", class, key))
 }
 
 //======================= class blue print
@@ -175,15 +215,6 @@ func (c *ClassBluePrint) GetMemberEx(key string, get func(*ClassBluePrint) bool)
 // 	}
 // }
 
-// AddNormalMember is used to add a normal member to the class,
-func (c *ClassBluePrint) AddNormalMember(name string, value Value) {
-	value.GetProgram().SetInstructionWithName(name, value)
-	c.NormalMember[name] = &BluePrintMember{
-		Value: value,
-		Type:  value.GetType(),
-	}
-}
-
 func (c *ClassBluePrint) AddNormalMemberOnlyType(name string, typ Type) {
 	c.NormalMember[name] = &BluePrintMember{
 		Value: nil,
@@ -192,14 +223,15 @@ func (c *ClassBluePrint) AddNormalMemberOnlyType(name string, typ Type) {
 }
 
 // AddStaticMember is used to add a static member to the class,
-func (c *ClassBluePrint) AddStaticMember(name string, value Value) {
-	c.StaticMember[name] = value
-}
-
-// AddStaticMethod is used to add a static method to the class,
-func (c *ClassBluePrint) AddStaticMethod(name string, value *Function) {
-	c.StaticMethod[name] = value
-}
+//func (c *ClassBluePrint) AddStaticMember(name string, value Value) {
+//	c.StaticMember[name] = value
+//}
+//
+//// AddStaticMethod is used to add a static method to the class,
+//func (c *ClassBluePrint) AddStaticMethod(name string, value *Function) {
+//	c.StaticMethod[name] = value
+//}
+//
 
 // AddParentClass is used to add a parent class to the class,
 func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
@@ -208,6 +240,13 @@ func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
 	}
 	c.ParentClass = append(c.ParentClass, parent)
 	for name, f := range parent.Method {
-		c.Method[name] = f
+		c.RegisterNormalMethod(name, f)
+	}
+	for s, value := range parent.StaticMember {
+		c.RegisterStaticMember(s, value)
+		delete(c.StaticMember, s)
+	}
+	for s, value := range parent.ConstValue {
+		c.RegisterConstMember(s, value)
 	}
 }

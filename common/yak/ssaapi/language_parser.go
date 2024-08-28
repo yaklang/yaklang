@@ -140,6 +140,7 @@ func (c *config) parseProject() (Programs, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")
 	}
+	builder.Finish()
 	prog.ProcessInfof("program %s finishing", prog.Name)
 	prog.Finish()
 	handled = totalSize
@@ -326,7 +327,8 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
-	//c.LanguageBuilder.InitHandler(builder)
+	c.LanguageBuilder.InitHandler(builder)
+	builder.SetMainbuilder(builder)
 	builder.WithDefineFunction(c.defineFunc)
 	return prog, builder, nil
 }

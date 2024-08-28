@@ -485,11 +485,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		variable, _, _ := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
-		//return y.ReadValueByVariable(member)
+		variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
-		y.AssignVariable(variable, rightValue)
+		y.GetMainBuilder().AssignVariable(variable, rightValue)
 		return rightValue
 	}
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
@@ -532,7 +531,7 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 		return y.VisitLeftVariable(i.FlexiVariable())
 	}
 	if i.StaticClassExprVariableMember() != nil {
-		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		member := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
 		return member
 	}
 	return nil

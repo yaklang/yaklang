@@ -1,7 +1,6 @@
 package ssa
 
 import (
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -14,14 +13,14 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 		return
 	}
 	blue := NewClassBluePrint()
-	// blue.SetObjectType(objectTyp)
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
 			// blue.NormalMember[key.String()] = member
-			blue.AddNormalMember(key.String(), member)
+			blue.RegisterNormalMember(key.String(), member)
+			//blue.AddNormalMember(key.String(), member)
 			continue
 		}
 
@@ -33,7 +32,8 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 			}
 		}
 
-		blue.AddNormalMember(key.String(), member)
+		//blue.AddNormalMember(key.String(), member)
+		blue.RegisterNormalMember(key.String(), member)
 	}
 
 	if len(blue.GetMethod()) != 0 {

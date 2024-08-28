@@ -105,12 +105,14 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 			build.GetProgram().GetApplication().LibraryFile[str] = files
 		}
 		build.VisitHtmlDocument(ast)
+		build.Finish()
 	}
 	if b.IncludeStack.Len() <= 0 {
 		var program *ssa.Program
 		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.MoreParse)
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.MoreParse = b.MoreParse
+		functionBuilder.SetMainbuilder(b.GetMainBuilder())
 		s.InitHandler(functionBuilder)
 		startParse(functionBuilder)
 	} else {
