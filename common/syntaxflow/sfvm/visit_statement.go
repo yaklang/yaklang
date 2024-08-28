@@ -72,6 +72,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 					value = y.VisitHereDoc(valueItem.HereDoc())
 				} else if valueItem.StringLiteral() != nil {
 					value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
+				} else {
+					value = valueItem.GetText()
 				}
 			}
 
@@ -90,23 +92,26 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 				case "language", "lang":
 					y.language = value
 				default:
-					urlIns, _ := url.Parse(keyLower)
-					if urlIns != nil {
-						switch ret := urlIns.Scheme; ret {
-						case "file", "fs", "filesystem":
-							if strings.HasPrefix(keyLower, ret+"://") {
-								filename := strings.TrimPrefix(keyLower, ret+"://")
-								y.verifyFilesystem[filename] = value
-								continue
-							}
-						case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
-							if strings.HasPrefix(keyLower, ret+"://") {
-								filename := strings.TrimPrefix(keyLower, ret+"://")
-								y.negativeFilesystem[filename] = value
-								continue
+					if strings.Contains(keyLower, "://") {
+						urlIns, _ := url.Parse(keyLower)
+						if urlIns != nil {
+							switch ret := urlIns.Scheme; ret {
+							case "file", "fs", "filesystem":
+								if strings.HasPrefix(keyLower, ret+"://") {
+									filename := strings.TrimPrefix(keyLower, ret+"://")
+									y.verifyFilesystem[filename] = value
+									continue
+								}
+							case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
+								if strings.HasPrefix(keyLower, ret+"://") {
+									filename := strings.TrimPrefix(keyLower, ret+"://")
+									y.negativeFilesystem[filename] = value
+									continue
+								}
 							}
 						}
 					}
+					y.rawDesc[key] = value
 				}
 			}
 			y.EmitAddDescription(key, value)
