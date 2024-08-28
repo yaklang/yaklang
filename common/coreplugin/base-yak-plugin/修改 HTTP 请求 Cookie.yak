@@ -8,12 +8,14 @@ cli.check()
 
 
 hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
-    skip := false
-    if keyword != "" {
-        skip = !url.Contains(keyword)
-    }
-    if skip {
+    if !url.Contains(keyword) {
         return
-    }
+     }
     forward(poc.ReplaceHTTPPacketCookie(req, key, val))
+}
+hijackSaveHTTPFlow = func(flow , modify, drop) {
+     if !flow.Url.Contains(keyword) {
+        return
+     }
+     flow.FromPlugin="修改 HTTP 请求 Cookie"
 }
