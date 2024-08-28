@@ -53,6 +53,9 @@ func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Progra
 		prog, err := ssaapi.ParseProject(fs, opt...)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			for _, program := range prog {
+				ssadb.DeleteProgram(ssadb.GetDB(), program.Program.Name)
+			}
 		}()
 		assert.Nil(t, err)
 
@@ -103,6 +106,9 @@ func CheckWithName(
 		defer func() {
 			// if name == "" {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			for _, program := range prog.Program.ChildApplication {
+				ssadb.DeleteProgram(ssadb.GetDB(), program.Name)
+			}
 			// }
 		}()
 		assert.Nil(t, err)
@@ -194,8 +200,7 @@ func CheckFSWithProgram(
 	if programName == "" {
 		programName = "test-" + uuid.New().String()
 	}
-	ssadb.DeleteProgram(ssadb.GetDB(), programName)
-	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	//ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
 	opt = append(opt, ssaapi.WithProgramName(programName))
 	_, err := ssaapi.ParseProject(codeFS, opt...)
@@ -206,6 +211,12 @@ func CheckFSWithProgram(
 	if err != nil {
 		t.Fatalf("get program from database failed: %v", err)
 	}
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		for _, p := range program.Program.ChildApplication {
+			ssadb.DeleteProgram(ssadb.GetDB(), p.Name)
+		}
+	}()
 	filesys.Recursive(".", filesys.WithFileSystem(ruleFS), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		if !strings.HasSuffix(s, ".sf") {
 			log.Infof("skip file: %s", s)
@@ -389,7 +400,7 @@ func CheckTopDef_Equal(variable string, want []string, forceCheckLength ...bool)
 }
 
 func checkFunctionEx(
-	variable func() ssaapi.Values,         // variable  for test
+	variable func() ssaapi.Values, // variable  for test
 	get func(*ssaapi.Value) ssaapi.Values, // getTop / getBottom
 	checkLength bool,
 	want []string,
