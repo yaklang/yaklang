@@ -36,7 +36,7 @@ func Test_Package(t *testing.T) {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1","2"},
+		"a": {"1", "2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }

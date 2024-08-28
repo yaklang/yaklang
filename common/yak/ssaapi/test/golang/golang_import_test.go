@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-
 func Test_Import(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
@@ -59,7 +58,7 @@ func TestImport_alias(t *testing.T) {
 	package A
 
 	func add(a,b int) int {
-	    return a + b
+	    return a + b + 3
 	}
 	`)
 	vf.AddFile("src/main/go/B/test.go", `
@@ -77,7 +76,7 @@ func TestImport_alias(t *testing.T) {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1","2"},
+		"a": {"1", "2", "3"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
@@ -126,7 +125,7 @@ func TestImport_muti(t *testing.T) {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1","2"},
+		"a": {"1", "2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }

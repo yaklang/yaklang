@@ -30,6 +30,20 @@ var SpecialValue = []string{
 	"iota",
 }
 
+func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
+	container := fb.EmitEmptyContainer()
+	initHandler := func(name ...string) {
+		for _, _name := range name {
+			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
+			emptyContainer := fb.EmitEmptyContainer()
+			fb.AssignVariable(variable, emptyContainer)
+		}
+	}
+	initHandler("")
+	fb.AssignVariable(fb.CreateVariable("global-container"), container)
+	fb.GetProgram().GlobalScope = container
+}
+
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
@@ -69,7 +83,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	return nil
 }
 
-func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
+func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
@@ -87,6 +101,13 @@ func (*SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) e
 		labels:          map[string]*ssa.LabelBuilder{},
 		pkgNameCurrent:  "",
 	}
+	/*
+		var program *ssa.Program
+		program = ssa.NewChildProgram(builder.GetProgram(), uuid.NewString(), !builder.MoreParse)
+		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
+
+		s.InitHandler(functionBuilder)
+	*/
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
 	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
