@@ -164,7 +164,7 @@ func TestBuildInRule_DEBUG(t *testing.T) {
 		return
 	}
 
-	var name = "XMLReaderFactory"
+	var name = "SAXReader 基础检查(安全)"
 
 	for i := 0; i < len(Cases); i++ {
 		c := Cases[i]
