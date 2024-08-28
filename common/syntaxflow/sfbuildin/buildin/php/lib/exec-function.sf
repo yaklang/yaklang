@@ -1,0 +1,25 @@
+desc(
+    title: "Execution input variable",
+    type: audit,
+    level: info,
+    lib: 'exec-function',
+)
+
+/eval|exec|assert|system|shell_exec|pcntl_exec|popen|ob_start/ as $output
+
+alert $output
+desc(
+    lang: php,
+    'file://unsafe.php': <<<UNSAFE
+<?php
+    eval($_POST[1]);
+    exec($_POST[1]);
+    assert($_POST[1]);
+    system($_POST[1]);
+    shell_exec($_POST[1]);
+    pcntl_exec($_POST[1]);
+    popen($_POST[1]);
+    ob_start($_POST[1]);
+    ob_end($_POST[1]);
+UNSAFE
+)

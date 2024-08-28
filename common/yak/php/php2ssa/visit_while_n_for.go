@@ -166,12 +166,12 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	}
 	loop := y.CreateLoopBuilder()
 	var value ssa.Value
+	if i.Expression() != nil {
+		value = y.VisitExpression(i.Expression())
+	} else {
+		value = y.VisitChain(i.Chain(0))
+	}
 	loop.SetFirst(func() []ssa.Value {
-		if i.Expression() != nil {
-			value = y.VisitExpression(i.Expression())
-		} else {
-			value = y.VisitChain(i.Chain(0))
-		}
 		return []ssa.Value{value}
 	})
 	loop.SetCondition(func() ssa.Value {

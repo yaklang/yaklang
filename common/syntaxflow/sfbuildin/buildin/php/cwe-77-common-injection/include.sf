@@ -1,0 +1,27 @@
+desc(
+    title: "include input variable",
+    type: audit,
+    level: high,
+)
+
+include() #->*?{!opcode: const,phi && have: '_GET' || have: '_POST' || have: '_REQUEST'} as $params;
+
+check $params then '存在任意文件包含' else '不存在任意文件包含'
+alert $params
+desc(
+    lang: php,
+    'file:///include.php': <<<UNSAFE
+<?php
+    function _Include($a)
+    {
+        $path = WWWROOT . "/public" . $a;
+        if (!file_exists($path)) {
+            return;
+        } else {
+            include $path;
+        }
+    }
+        $a = $_GET['a'] ?: "aaaa";
+        _Include($a);
+UNSAFE
+)

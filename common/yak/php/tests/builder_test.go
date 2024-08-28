@@ -154,14 +154,16 @@ a($b[0]); `
 }
 
 func TestParseSSA_DoWhileTag(t *testing.T) {
-	test.MockSSA(t, `<?php
+	test.Check(t, `<?php
 	function funcName() {
 		echo "a called";
 		return 2;
 	}
 	do{ print 2; } while (funcName() == 1);
-	
-	`)
+	`, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func TestParseSSA_WhileTag(t *testing.T) {
@@ -201,7 +203,10 @@ func TestParseSSA_IF(t *testing.T) {
 if ($a > 0) {
 echo "abc";
 }`
-	test.MockSSA(t, code)
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func TestParseSSA_TryCatch(t *testing.T) {
@@ -300,11 +305,15 @@ a?b:c;
 }
 
 func TestParseSSA_SMOKING_if(t *testing.T) {
-	test.MockSSA(t, `<?php 
+	code := `<?php 
 true and false;
 false or false;
 false xor true;
-`)
+`
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
 
 func TestParseSSA_SMOKING(t *testing.T) {

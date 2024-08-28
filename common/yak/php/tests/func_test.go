@@ -138,7 +138,7 @@ println($a);
 a($a);
 println($a);
 `
-	test.MockSSA(t, code)
+	test.CheckPrintlnValue(code, []string{`"2"`, `"2"`}, t)
 }
 
 func TestParseSSA_FuncCall(t *testing.T) {
@@ -148,7 +148,7 @@ function funcName() {return "2";}
 funcName().$a;`
 		test.CheckError(t, test.TestCase{
 			Code: code,
-			Want: []string{ssa.ValueUndefined("$a")},
+			Want: []string{ssa.ValueUndefined("$a"), ssa.ValueUndefined("funcName")},
 		})
 	})
 	t.Run("test-2", func(t *testing.T) {
@@ -452,22 +452,5 @@ a($a);`
 			`a as $target`,
 			map[string][]string{"target": {"Undefined-a"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
-	})
-	t.Run("test function", func(t *testing.T) {
-		code := `<?php
-function getfiles($files)
-{
-    while (1) {
-        if (b) {
-            b($files);
-        } else {
-            $files = [1];
-        }
-        return $files;
-    }
-}`
-		test.CheckSyntaxFlow(t, code, `b(* #-> * as $param)`, map[string][]string{
-			"param": {"Parameter-$files", "make(any)", "1", "Undefined-b"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

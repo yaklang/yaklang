@@ -170,5 +170,5 @@ func (c *Const) VarString() string {
 	if c.value == nil {
 		return ""
 	}
-	return c.value.(string)
+	return fmt.Sprintf("%v", c.value)
 }

@@ -339,7 +339,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
-	//c.LanguageBuilder.InitHandler(builder)
+	c.LanguageBuilder.InitHandler(builder)
 	builder.WithDefineFunction(c.defineFunc)
 	return prog, builder, nil
 }
