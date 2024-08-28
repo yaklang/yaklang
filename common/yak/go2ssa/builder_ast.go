@@ -433,7 +433,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 		for i, _ := range leftVariables {
 			b.AssignVariable(leftVariables[i], rightVariables[i])
 		}
-	} else if rightlen == 1 {
+	} else if rightlen == 1 { /* 大概率是函数调用 */
 		inter := rightVariables[0]
 		if c, ok := inter.(*ssa.Call); ok {
 			GetCallField(c, leftVariables)
@@ -621,7 +621,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 			b.buildBlock(block)
 		}
 		b.Finish()
-		b.CleanResultDefault()
 		b.FunctionBuilder = b.PopFunction()
 
 		return newFunc
@@ -709,7 +708,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 			b.buildBlock(block)
 		}
 		b.Finish()
-		b.CleanResultDefault()
 		b.FunctionBuilder = b.PopFunction()
 
 		return newFunc
@@ -1634,7 +1632,7 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 		} else {
 			b.EmitReturn(values)
 		}
-	} else {
+	} else { /* 如果return没有设置expr则查找是否有默认返回值 */
 		results := b.GetResultDefault()
 		if results != nil {
 			for _, result := range results {

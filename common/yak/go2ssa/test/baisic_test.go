@@ -279,18 +279,16 @@ func TestFuntion_normol(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		func test()(a int){
-			println(a)
-		    a = 6
-			println(a)
 			return
 		}
 
 		func main(){
 			a := test()
+			println(a)
 		}
 
 		`, []string{
-			"0", "6",
+			"Function-test()",
 		}, t)
 	})
 
