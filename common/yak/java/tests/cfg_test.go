@@ -142,7 +142,7 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 			 a = 2;
 		}
 		println(a);
-		`, []string{"Undefined-a"}, t)
+		`, []string{"Undefined-.$staticScope$.Main.a(valid)"}, t)
 	})
 
 	t.Run("test if mutli parexpression", func(t *testing.T) {
@@ -465,7 +465,7 @@ func TestJavaBasic_Variable_Try(t *testing.T) {
 		}
 		println(e);
 		`, []string{
-			"Parameter-e", "Undefined-e",
+			"Parameter-e", "Undefined-.$staticScope$.Main.e(valid)",
 		}, t)
 	})
 
@@ -481,8 +481,8 @@ func TestJavaBasic_Variable_Try(t *testing.T) {
 		println(e);
 		`, []string{
 			"Parameter-e",
-			"Undefined-e",
-			"Undefined-e",
+			"Undefined-.$staticScope$.Main.e(valid)",
+			"Undefined-.$staticScope$.Main.e(valid)",
 		}, t)
 	})
 }

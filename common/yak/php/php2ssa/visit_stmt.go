@@ -106,6 +106,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		library.PushEditor(prog.GetCurrentEditor())
 		functionBuilder := library.GetAndCreateFunctionBuilder(pkgname, "init")
 		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
+		functionBuilder.SetMainbuilder(y.GetMainBuilder())
 		if functionBuilder != nil {
 			functionBuilder.SetBuildSupport(y.FunctionBuilder)
 			currentBuilder := y.FunctionBuilder

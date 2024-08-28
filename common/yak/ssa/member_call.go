@@ -257,7 +257,10 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 		return name, BasicTypes[AnyTypeKind]
 	case ClassBluePrintTypeKind:
 		class := value.GetType().(*ClassBluePrint)
-		if member := class.GetMemberAndStaticMember(key.String(), true); member != nil {
+		if member := class.GetStaticMember(key.String()); !utils.IsNil(member) {
+			return name, member.GetType()
+		}
+		if member := class.GetNormalMember(key.String()); !utils.IsNil(member) {
 			return name, member.GetType()
 		}
 	// TODO: handler static member
@@ -482,23 +485,17 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 // 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
 func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 	if class := b.MarkedThisClassBlueprint; class != nil {
-		variable := b.GetStaticMember(class.Name, name)
-		if value := b.PeekValueByVariable(variable); value != nil {
+		if value := b.ReadClsStaticMember(class.Name, name); !utils.IsNil(value) {
 			return value
 		}
-		value, ok := class.StaticMember[name]
-		if ok {
-			return value
+		if val := class.GetStaticMember(name); !utils.IsNil(val) {
+			return val
 		}
-		member, ok := class.NormalMember[name]
-		if ok {
-			if member.Value != nil {
-				return member.Value
-			}
+		if normalMember := class.GetNormalMember(name); !utils.IsNil(normalMember) {
+			return normalMember
 		}
-		haveMethod, ok := class.Method[name]
-		if ok {
-			return haveMethod
+		if method_ := class.GetMethod_(name); !utils.IsNil(method_) {
+			return method_
 		}
 	}
 	return nil
@@ -560,7 +557,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		return ret
 	}
 	member := classHandler(classTypeCheck, func(bluePrint *ClassBluePrint) Value {
-		return bluePrint.GetMemberAndStaticMember(key.String(), false)
+		return bluePrint.GetNormalMember(key.String())
 	}, nil)
 	_ = member
 	if !utils.IsNil(member) {

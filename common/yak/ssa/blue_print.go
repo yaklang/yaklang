@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
 type method struct {
@@ -17,6 +18,16 @@ type BluePrintMember struct {
 	Value Value
 	Type  Type
 }
+type KlassType int
+
+const (
+	staticMethod KlassType = iota
+	staticMember
+	method_
+	member
+	magicMethod
+	constMember
+)
 
 // ClassBluePrint is a class blue print, it is used to create a new class
 type ClassBluePrint struct {
@@ -24,11 +35,16 @@ type ClassBluePrint struct {
 
 	Method       map[string]*Function
 	StaticMethod map[string]*Function
+	MagicMethod  map[string]*Function
 
-	NormalMember map[string]*BluePrintMember
-	StaticMember map[string]Value
+	NormalMember  map[string]*BluePrintMember
+	StaticMember  map[string]Value
+	_shadowMember map[string]Values
+	magicMethod   map[string]Value
+	ConstValue    map[string]Value
 
-	CallBack []func()
+	magicMethodCheck map[string]func(val Value) bool //对于有些魔术方法条件触发进行检查
+	CallBack         []func()
 
 	// magic method
 	Copy        Value
@@ -37,13 +53,123 @@ type ClassBluePrint struct {
 
 	// _container is an inner ssa.Value
 	// the container can ref to the class member
+	// _container in this scope
 	_container Value
+
+	//_staticContainer static container in globalScope
+	_staticContainer Value
 
 	ParentClass []*ClassBluePrint
 	// full Type Name
 	fullTypeName []string
 }
 
+func (c *ClassBluePrint) RegisterMagicMethod(name string, val *Function) {
+	c.registerKlassInfo(name, val, magicMethod)
+}
+func (c *ClassBluePrint) RegisterNormalMember(name string, val Value) {
+	c.registerKlassInfo(name, val, member)
+}
+func (c *ClassBluePrint) RegisterStaticMethod(name string, val *Function) {
+	c.registerKlassInfo(name, val, staticMethod)
+}
+func (c *ClassBluePrint) RegisterNormalMethod(name string, val *Function) {
+	c.registerKlassInfo(name, val, method_)
+}
+func (c *ClassBluePrint) RegisterStaticMember(name string, val Value) {
+	c.registerKlassInfo(name, val, staticMember)
+}
+func (c *ClassBluePrint) RegisterConstMember(name string, val Value) {
+	c.registerKlassInfo(name, val, constMember)
+}
+func (c *ClassBluePrint) registerKlassInfo(name string, val Value, _type KlassType) {
+	if _type != constMember {
+		c.storeInContainer(name, val, _type)
+	}
+	checkAndStoreFunc := func(handle func(f *Function)) {
+		if function, b := ToFunction(val); b {
+			handle(function)
+		} else {
+			log.Warnf("register klass method fail: not function")
+		}
+	}
+	switch _type {
+	case constMember:
+		c.ConstValue[name] = val
+	case magicMethod:
+		checkAndStoreFunc(func(f *Function) {
+			if slices.Contains(c._container.GetProgram().magicMethodName, name) {
+				c.magicMethod[name] = f
+			} else {
+				c.Method[name] = f
+			}
+		})
+	case staticMember:
+		c.StaticMember[name] = val
+	case staticMethod:
+		checkAndStoreFunc(func(f *Function) {
+			c.StaticMethod[name] = f
+		})
+	case method_:
+		checkAndStoreFunc(func(f *Function) {
+			c.Method[name] = f
+		})
+	case member:
+		val.GetProgram().SetInstructionWithName(name, val)
+		c.NormalMember[name] = &BluePrintMember{
+			Value: val,
+			Type:  val.GetType(),
+		}
+	}
+}
+
+// storeInContainer store static in global container
+func (c *ClassBluePrint) storeInContainer(name string, val Value, _type KlassType) {
+	createVariable := func(builder *FunctionBuilder, variable *Variable) {
+		builder.AssignVariable(variable, val)
+	}
+	//todo: extends seem error
+	switch _type {
+	case staticMethod, staticMember:
+		builder := c._staticContainer.GetFunc().builder.GetMainBuilder()
+		createVariable(builder, builder.CreateMemberCallVariable(c._staticContainer, builder.EmitConstInst(name)))
+	default:
+		builder := c._container.GetFunc().builder
+		createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))
+	}
+}
+func (c *ClassBluePrint) StaticGeneratePhi() {
+	lo.ForEach(lo.Entries(c._staticContainer.GetAllMember()), func(item lo.Entry[Value, Value], index int) {
+		if _, ok := c.StaticMember[item.Key.String()]; ok {
+			c._shadowMember[item.Key.String()] = append(c._shadowMember[item.Key.String()], item.Value)
+		} else {
+			//todo: add all member
+			log.Warnf("not found this klsMember in kls")
+		}
+	})
+	lo.ForEach(lo.Entries(c._shadowMember), func(item lo.Entry[string, Values], index int) {
+		builder := c._staticContainer.GetFunc().builder.GetMainBuilder()
+		phi := builder.EmitPhi(item.Key, []Value{})
+		for _, value := range item.Value {
+			ReplaceAllValue(value, phi)
+		}
+		phi.Edge = item.Value
+		c.StaticMember[item.Key] = phi
+
+	})
+}
+
+// ExecMagicMethod hook call
+func (c *ClassBluePrint) ExecMagicMethod(handle func(method Value), name string) {
+	if magicMethod := c.GetMagicMethod(name); !utils.IsNil(magicMethod) {
+		handle(magicMethod)
+	} else if method_ := c.GetMethod_(name); !utils.IsNil(method_) {
+		log.Infof("not found this method in normal function")
+		handle(method_)
+	} else {
+		log.Warn("not found this normal function")
+	}
+}
 func (c *ClassBluePrint) SyntaxMethods() {
 	lo.ForEach(c.ParentClass, func(item *ClassBluePrint, index int) {
 		item.SyntaxMethods()
@@ -75,9 +201,14 @@ func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
 	b._container = con
 	return nil
 }
-
+func (b *ClassBluePrint) InitStaticContainer(container *Make) {
+	b._staticContainer = container
+}
 func (b *ClassBluePrint) GetClassContainer() Value {
 	return b._container
+}
+func (c *ClassBluePrint) GetStaticContainer() Value {
+	return c._staticContainer
 }
 
 func NewClassBluePrint() *ClassBluePrint {
@@ -85,9 +216,12 @@ func NewClassBluePrint() *ClassBluePrint {
 		NormalMember: make(map[string]*BluePrintMember),
 		StaticMember: make(map[string]Value),
 
-		Method:       make(map[string]*Function),
-		StaticMethod: make(map[string]*Function),
-		fullTypeName: make([]string, 0),
+		Method:           make(map[string]*Function),
+		magicMethodCheck: make(map[string]func(val Value) bool),
+		StaticMethod:     make(map[string]*Function),
+		fullTypeName:     make([]string, 0),
+		ConstValue:       make(map[string]Value),
+		_shadowMember:    make(map[string]Values),
 	}
 	return class
 }
@@ -135,7 +269,6 @@ func (c *ClassBluePrint) AddMethod(key string, fun *Function) {
 	fun.SetMethod(true, c)
 	if f, ok := c.Method[key]; ok {
 		Point(fun, f)
-		// log.Infof("method %v is already exist, replace it", key)
 	}
 	c.Method[key] = fun
 }

@@ -67,6 +67,7 @@ type FunctionBuilder struct {
 
 	MarkedMemberCallWantMethod bool
 	parentBuilder              *FunctionBuilder
+	mainBuilder                *FunctionBuilder //global Scope Builder
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -93,6 +94,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		b.SupportClassStaticModifier = parent.SupportClassStaticModifier
 		b.SupportClass = parent.SupportClass
 		b.ctx = parent.ctx
+		b.mainBuilder = parent.mainBuilder
 	}
 
 	// b.ScopeStart()
@@ -223,7 +225,4 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 
 func (b *FunctionBuilder) ReferenceParameter(name string) {
 	b.RefParameter[name] = struct{}{}
-}
-
-func (b *FunctionBuilder) name() {
 }

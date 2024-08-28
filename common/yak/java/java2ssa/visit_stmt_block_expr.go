@@ -1864,8 +1864,8 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 	}
 	//if in this class, return
 	if class := y.MarkedThisClassBlueprint; class != nil {
-		if value, ok := y.ReadClassConst(class.Name, name); ok {
-			return value
+		if val := class.GetConst(name); !utils.IsNil(val) {
+			return val
 		}
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")

@@ -317,7 +317,7 @@ public class Main {
             println(a);
         }
  }
-			`, []string{"1"}, t)
+			`, []string{"phi(a)[1]"}, t)
 	})
 
 	t.Run("test static variable and method within a class (arg is a)", func(t *testing.T) {
@@ -328,7 +328,7 @@ public class Main {
            println(a);
         }
  }
-			`, []string{"1"}, t)
+			`, []string{"phi(a)[1]"}, t)
 	})
 
 	t.Run("test static variable and  method within a class (arg is this.a)", func(t *testing.T) {

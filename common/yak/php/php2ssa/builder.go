@@ -115,6 +115,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 			build.GetProgram().GetApplication().LibraryFile[str] = files
 		}
 		build.VisitHtmlDocument(ast)
+		build.Finish()
 	}
 	if b.IncludeStack.Len() <= 0 {
 		var program *ssa.Program

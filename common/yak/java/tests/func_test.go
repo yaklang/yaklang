@@ -17,7 +17,7 @@ func TestJava_Func_Params(t *testing.T) {
 }
 `, []string{
 			"Parameter-a",
-			"Function-Main_A(0)",
+			"Function-.$staticScope$.Main.A(0)",
 		}, t)
 	})
 
@@ -32,7 +32,7 @@ func TestJava_Func_Params(t *testing.T) {
     }
 }
 `, []string{
-			"Function-Main_A(0)",
+			"Function-.$staticScope$.Main.A(0)",
 			"Parameter-a",
 		}, t)
 	})
@@ -80,7 +80,7 @@ public static void main(String[] args) {
 	A();
     }
 }
-`, []string{"Undefined-a"}, t)
+`, []string{"Undefined-.$staticScope$.Main.a(valid)"}, t)
 	})
 }
 
@@ -126,7 +126,7 @@ public class Main {
         println(A);
     }
 }`, []string{
-			"Function-Main_A",
+			"Function-.$staticScope$.Main.A",
 		}, t)
 	})
 

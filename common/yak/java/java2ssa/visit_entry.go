@@ -39,6 +39,7 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		if builder != nil {
 			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
 			builder.SetBuildSupport(y.FunctionBuilder)
+			builder.SetMainbuilder(y.GetMainBuilder())
 			currentBuilder := y.FunctionBuilder
 			y.FunctionBuilder = builder
 			defer func() {

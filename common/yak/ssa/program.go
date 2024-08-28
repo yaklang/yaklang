@@ -31,6 +31,7 @@ func NewChildProgram(prog *Program, name string, add bool) *Program {
 	program.GlobalScope = prog.GlobalScope
 	program.ScopeCallback = prog.ScopeCallback
 	program.Cache.SetFetchId(prog.Cache.fetchId)
+	program.magicMethodName = prog.magicMethodName
 	if add {
 		prog.ChildApplication = append(prog.ChildApplication, program)
 	}
@@ -127,6 +128,9 @@ func (prog *Program) AddUpStream(p *Program) {
 	prog.UpStream[p.Name] = p
 	p.DownStream[prog.Name] = prog
 }
+func (p *Program) InitMagicMethod(methodName ...string) {
+	p.magicMethodName = methodName
+}
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
 	// create lib
@@ -138,6 +142,7 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 
 	lib := NewProgram(name, prog.EnableDatabase, Library, fs, programPath)
 	lib.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
+	lib.magicMethodName = prog.magicMethodName
 	lib.Language = prog.Language
 
 	//todo: 这里需要加一个测试
