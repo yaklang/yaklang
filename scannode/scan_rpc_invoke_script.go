@@ -254,6 +254,9 @@ func (s *ScanNode) rpcQueryYakScript(ctx context.Context, node string, req *ypb.
 		return nil, err
 	}
 	for _, group := range groups {
+		if group.IsPocBuiltIn == true {
+			continue
+		}
 		gs = append(gs, group.Value)
 	}
 	if len(gs) > 0 {
