@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"fmt"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
@@ -209,14 +210,14 @@ func OpenIfaceLive(iface string) (*pcap.Handle, error) {
 }
 
 type PcapHandleWrapper struct {
-	*pcap.Handle
+	handle  *pcap.Handle
 	mutex   *sync.RWMutex
 	isClose bool
 }
 
 func WrapPcapHandle(handle *pcap.Handle) *PcapHandleWrapper {
 	return &PcapHandleWrapper{
-		Handle:  handle,
+		handle:  handle,
 		mutex:   new(sync.RWMutex),
 		isClose: false,
 	}
@@ -228,7 +229,7 @@ func (w *PcapHandleWrapper) WritePacketData(data []byte) error {
 	if w.isClose {
 		return utils.Errorf("handle is closed")
 	}
-	return w.Handle.WritePacketData(data)
+	return w.handle.WritePacketData(data)
 }
 
 func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
@@ -237,17 +238,22 @@ func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, erro
 	if w.isClose {
 		return nil, gopacket.CaptureInfo{}, utils.Errorf("handle is closed")
 	}
-	return w.Handle.ReadPacketData()
+	return w.handle.ReadPacketData()
 }
 
-func (w *PcapHandleWrapper) Close() {
+func (w *PcapHandleWrapper) close() {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	if w.isClose {
 		return
 	}
-	w.Handle.Close()
+	w.handle.Close()
 	w.isClose = true
+	return
+}
+
+func (w *PcapHandleWrapper) Close() {
+	log.Infof("daemon take over close handle")
 	return
 }
 
@@ -260,5 +266,57 @@ func (w *PcapHandleWrapper) Error() (err error) {
 	if w.isClose {
 		return utils.Error("handle is closed")
 	}
-	return w.Handle.Error()
+	return w.handle.Error()
+}
+
+func (w *PcapHandleWrapper) CompileBPFFilter(expr string) ([]pcap.BPFInstruction, error) {
+	return w.handle.CompileBPFFilter(expr)
+}
+
+func (w *PcapHandleWrapper) LinkType() layers.LinkType {
+	return w.handle.LinkType()
+}
+
+func (w *PcapHandleWrapper) ListDataLinks() ([]pcap.Datalink, error) {
+	return w.handle.ListDataLinks()
+}
+
+func (w *PcapHandleWrapper) NewBPF(expr string) (*pcap.BPF, error) {
+	return w.handle.NewBPF(expr)
+}
+
+func (w *PcapHandleWrapper) NewBPFInstructionFilter(bpfInstructions []pcap.BPFInstruction) (*pcap.BPF, error) {
+	return w.handle.NewBPFInstructionFilter(bpfInstructions)
+}
+
+func (w *PcapHandleWrapper) Resolution() gopacket.TimestampResolution {
+	return w.handle.Resolution()
+}
+
+func (w *PcapHandleWrapper) SetBPFFilter(expr string) error {
+	return w.handle.SetBPFFilter(expr)
+}
+
+func (w *PcapHandleWrapper) SetBPFInstructionFilter(bpfInstructions []pcap.BPFInstruction) error {
+	return w.handle.SetBPFInstructionFilter(bpfInstructions)
+}
+
+func (w *PcapHandleWrapper) SetDirection(direction pcap.Direction) error {
+	return w.handle.SetDirection(direction)
+}
+
+func (w *PcapHandleWrapper) SetLinkType(linkType layers.LinkType) error {
+	return w.handle.SetLinkType(linkType)
+}
+
+func (w *PcapHandleWrapper) Stats() (*pcap.Stats, error) {
+	return w.handle.Stats()
+}
+
+func (w *PcapHandleWrapper) SnaLen() int {
+	return w.handle.SnapLen()
+}
+
+func (w *PcapHandleWrapper) ZeroCopyReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
+	return w.handle.ZeroCopyReadPacketData()
 }
