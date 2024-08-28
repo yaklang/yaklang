@@ -5,11 +5,12 @@ package simulator
 //func TestCaptcha(t *testing.T) {
 //	img := `iVBORw0KGgoAAAANSUhEUgAAACwAAAAUCAIAAAB5z0iWAAACFElEQVRIicWWz0sbQRTHvxNWECyEhMDqYenJ3YVC1FNBzSWnlp7E/gmWgnjx0D/BU/+CgvQsVCjYQ26BukEQemmgsK6HEFapA2HDggFBcTw8HSezP5piMF/2sPPmzb7Pe/NmWLbz5ScmLQPAp43aBAk+73rGiK6s9CLVLvqXT+fIhPBaDXVYSwTLwhonRG31bRbQ2DUEYZaL2jSPYq/VUIFIVIbDH9+g8CXdUtUbNCsz9XQIIuBRrFrMcnH/YC+VQPQvZT+ngmZJIwBQyPHmUbx/sKd9vTdoYrgfvVZjdf2NMAUAYQp6tE8JU/QGTTmrOTxWgkcxpU7DxZUlAFvbm0HoA7iI/s6W57D5EUDU/oXQty0XDzUQuCdgnEkUeicxziqog98DaYiPEEHoe7+P5dC23MXqy433H2iDbMuVuyD9T07bznw1CH2xDPvIkVEZZyqH2gREoPIBMKam+5RrbeE1hntClUZAWLzb4d0OAHRF8K7thFWya2vzCQAY11clWvYn/P7KWtMOSBYTSbaLOBc4B/vKqEIA5uFozlkEULejMlPPCTn6zUgpnSz7ABy4/yRAzmWliQ5F8nRlohw5eKiK3CC1JVWgUSHywydTJIsNl1BsrjeKqrx7YlyyLTcIfapKUkXj9jkgiINQUmefCUKipHKkQ1Ab/q9GWaVxnHUu4psCm8jv3dR0//qqBKBo3MY3hTt3I/ynYQuPcgAAAABJRU5ErkJggg==`
 //	type args struct {
-//		url  string
-//		mode string
-//		req  requestStructr
-//		res  responseStructr
-//		arg  string
+//		url     string
+//		mode    string
+//		req     requestStructr
+//		res     responseStructr
+//		arg     string
+//		typeStr string
 //	}
 //	tests := []struct {
 //		name string
@@ -38,6 +39,18 @@ package simulator
 //			},
 //			want: "s7nz",
 //		},
+//		{
+//			name: "newDDDD",
+//			args: args{
+//				url:     "http://0.0.0.0:8000/ocr",
+//				mode:    "",
+//				req:     &NewDDDDCaptcha{},
+//				res:     &NewDDDDResult{},
+//				arg:     img,
+//				typeStr: "NewDDDD",
+//			},
+//			want: "s7nz",
+//		},
 //	}
 //	for _, tt := range tests {
 //		t.Run(tt.name, func(t *testing.T) {
@@ -46,6 +59,7 @@ package simulator
 //				identifierMode: tt.args.mode,
 //				identifierReq:  tt.args.req,
 //				identifierRes:  tt.args.res,
+//				identifierType: tt.args.typeStr,
 //			}
 //			got, err := identifier.detect(tt.args.arg)
 //			if err != nil {
