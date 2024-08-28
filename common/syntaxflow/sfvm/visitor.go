@@ -16,6 +16,7 @@ type SyntaxFlowVisitor struct {
 	text               string
 	title              string
 	allowIncluded      string
+	rawDesc            map[string]string
 	description        string
 	purpose            string
 	severity           string
@@ -29,6 +30,7 @@ func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 	sfv := &SyntaxFlowVisitor{
 		verifyFilesystem:   make(map[string]string),
 		negativeFilesystem: make(map[string]string),
+		rawDesc:            make(map[string]string),
 	}
 	return sfv
 }

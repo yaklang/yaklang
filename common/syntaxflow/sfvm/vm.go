@@ -110,6 +110,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	if len(result.negativeFilesystem) > 0 {
 		frame.NegativeFs = result.negativeFilesystem
 	}
+	frame.ExtraDesc = result.rawDesc
 	frame.vm = s
 
 	s.frames = append(s.frames, frame)

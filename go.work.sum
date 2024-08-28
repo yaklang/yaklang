@@ -15,8 +15,6 @@ github.com/beevik/ntp v0.3.0/go.mod h1:hIHWr+l3+/clUnF44zdK+CWW7fO8dR5cIylAQ76NR
 github.com/beorn7/perks v1.0.0 h1:HWo1m869IqiPhD389kmkxeTalrjNbbJTC8LXupb+sl0=
 github.com/bradleyjkemp/cupaloy/v2 v2.8.0/go.mod h1:bm7JXdkRd4BHJk9HpwqAI8BoAY1lps46Enkdqw6aRX0=
 github.com/bwesterb/go-ristretto v1.2.3 h1:1w53tCkGhCQ5djbat3+MH0BAQ5Kfgbt56UZQ/JMzngw=
-github.com/bytedance/mockey v1.2.10 h1:4JlMpkm7HMXmTUtItid+iCu2tm61wvq+ca1X2u7ymzE=
-github.com/bytedance/mockey v1.2.10/go.mod h1:bNrUnI1u7+pAc0TYDgPATM+wF2yzHxmNH+iDXg4AOCU=
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/census-instrumentation/opencensus-proto v0.4.1 h1:iKLQ0xPNFxR/2hzXZMrBo8f1j86j5WHzznCCQxV/b8g=
 github.com/census-instrumentation/opencensus-proto v0.4.1/go.mod h1:4T9NM4+4Vw91VeyqjLS6ao50K5bOcLKN6Q42XnYaRYw=
@@ -232,5 +230,6 @@ mvdan.cc/sh/v3 v3.4.1 h1:sY7JU00i7R0mEm7v0g7Z88l1Hf/6K5wVIdA0o4hoSbo=
 mvdan.cc/sh/v3 v3.4.1/go.mod h1:p/tqPPI4Epfk2rICAe2RoaNd8HBSJ8t9Y2DA9yQlbzY=
 pack.ag/tftp v1.0.1-0.20181129014014-07909dfbde3c h1:4DHuGX0VtxRIyjXlVpcjSGEmZ7OnIK7Hvo+INnxI8yk=
 pack.ag/tftp v1.0.1-0.20181129014014-07909dfbde3c/go.mod h1:N1Pyo5YG+K90XHoR2vfLPhpRuE8ziqbgMn/r/SghZas=
+rsc.io/pdf v0.1.1 h1:k1MczvYDUvJBe93bYd7wrZLLUEcLZAuF824/I4e5Xr4=
 src.elv.sh v0.16.0-rc1.0.20220116211855-fda62502ad7f h1:pjVeIo9Ba6K1Wy+rlwX91zT7A+xGEmxiNRBdN04gDTQ=
 src.elv.sh v0.16.0-rc1.0.20220116211855-fda62502ad7f/go.mod h1:kPbhv5+fBeUh85nET3wWhHGUaUQ64nZMJ8FwA5v5Olg=

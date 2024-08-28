@@ -62,7 +62,7 @@ descriptionItem
     : stringLiteral lines?
     | stringLiteral ':' descriptionItemValue lines?
     ;
-descriptionItemValue: stringLiteral | hereDoc;
+descriptionItemValue: stringLiteral | hereDoc | numberLiteral;
 crlfHereDoc: CRLFHereDocIdentifierBreak crlfText? CRLFEndDoc;
 lfHereDoc: LFHereDocIdentifierBreak lfText? LFEndDoc;
 crlfText: CRLFHereDocText+;

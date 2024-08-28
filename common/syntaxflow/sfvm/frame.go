@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -38,6 +39,7 @@ type SFFrame struct {
 	Severity      string
 	VerifyFs      map[string]string
 	NegativeFs    map[string]string
+	ExtraDesc     map[string]string
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -54,6 +56,32 @@ type SFFrame struct {
 	predCounter int
 }
 
+func (s *SFFrame) GetExtraInfo(key string, backup ...string) string {
+	result, ok := s.ExtraDesc[key]
+	if ok {
+		return result
+	}
+	for _, b := range backup {
+		result, ok := s.ExtraDesc[b]
+		if ok {
+			return result
+		}
+	}
+	return ""
+}
+
+func (s *SFFrame) GetExtraInfoInt(key string, backup ...string) int {
+	result := s.GetExtraInfo(key, backup...)
+	if result == "" {
+		return 0
+	}
+	val, err := strconv.Atoi(result)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
 func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
 	v := vars
 	if v == nil {
@@ -65,6 +93,7 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 		Codes:      codes,
 		VerifyFs:   make(map[string]string),
 		NegativeFs: make(map[string]string),
+		ExtraDesc:  make(map[string]string),
 	}
 }
 
