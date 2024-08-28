@@ -6,7 +6,6 @@ import (
 	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
@@ -65,7 +64,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		pcaputil.WithEnableCache(true),
 		pcaputil.WithBPFFilter("arp"),
 		pcaputil.WithContext(ctx),
-		pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+		pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 			go func() {
 				for p := range targetList.Hosts() {
 					p := p
