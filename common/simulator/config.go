@@ -116,6 +116,7 @@ type BruteConfig struct {
 
 	captchaUrl  string
 	captchaMode string
+	captchaType string
 
 	usernameSelector    string
 	passwordSelector    string
@@ -209,6 +210,12 @@ func WithCaptchaUrl(url string) BruteConfigOpt {
 func WithCaptchaMode(mode string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.captchaMode = mode
+	}
+}
+
+func WithCaptchaType(typeStr string) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.captchaType = typeStr
 	}
 }
 

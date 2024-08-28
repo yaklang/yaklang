@@ -163,9 +163,13 @@ func (bruteForce *HttpBruteForceCore) captchaModeInit() (err error) {
 	captchaModule := CaptchaIdentifier{}
 	captchaModule.SetUrl(bruteForce.config.captchaUrl)
 	captchaModule.SetMode(bruteForce.config.captchaMode)
+	captchaModule.SetType(bruteForce.config.captchaType)
 	if strings.Contains(bruteForce.config.captchaUrl, "/runtime/text/invoke") {
 		captchaModule.SetRequest(&NormalCaptchaRequest{})
 		captchaModule.SetResponse(&NormalCaptchaResponse{})
+	} else if bruteForce.config.captchaType == "NewDDDD" {
+		captchaModule.SetRequest(&NewDDDDCaptcha{})
+		captchaModule.SetResponse(&NewDDDDResult{})
 	} else {
 		captchaModule.SetRequest(&DDDDCaptcha{})
 		captchaModule.SetResponse(&DDDDResult{})
