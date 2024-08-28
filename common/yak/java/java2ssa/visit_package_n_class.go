@@ -321,7 +321,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		}
 		return typ
 	} else {
-		typ = ssa.NewClassBluePrint()
+		typ = ssa.NewClassBluePrint(className)
 		typ = y.AddFullTypeNameFromMap(className, typ)
 		return typ
 	}

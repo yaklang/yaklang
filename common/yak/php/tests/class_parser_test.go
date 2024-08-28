@@ -2,9 +2,10 @@ package tests
 
 import (
 	_ "embed"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 //go:embed smtp-demo.php

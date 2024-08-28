@@ -122,6 +122,17 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	}
 
 	bpHandler()
+
+	//for _, cbp := range b.GetProgram().ClassBluePrint { // only once
+	//	if cbp.Name == pkgNameCurrent {
+	//		cbpHander(cbp)
+	//		return
+	//	}
+	//}
+	//
+	//cbp := ssa.NewClassBluePrint(pkgNameCurrent)
+	//cbpHander(cbp)
+	//b.SetClassBluePrint(cbp.Name, cbp)
 }
 
 func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
@@ -1114,7 +1125,7 @@ func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {
 		// target label not exist, create it
 		LabelBuilder := b.BuildLabel(labelName)
 		// use handler function
-		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock) {
+		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock)  {
 			gotoBuilder.SetLabel(_goto)
 			f := gotoBuilder.Finish()
 			LabelBuilder.SetGotoFinish(f)

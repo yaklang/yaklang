@@ -42,7 +42,6 @@ func (d *DummyPreHandler) PreHandlerProject(fi.FileSystem, *FunctionBuilder, str
 	return nil
 }
 func (d *DummyPreHandler) InitHandler(builder *FunctionBuilder) {
-	builder.SetMainbuilder(builder)
 	container := builder.EmitEmptyContainer()
 	variable := builder.CreateMemberCallVariable(container, builder.EmitConstInst("$staticScope$"))
 	emptyContainer := builder.EmitEmptyContainer()

@@ -43,10 +43,15 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 	return y.VisitExpression(i.Expression())
 }
 
-func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
-	if y == nil || raw == nil || y.IsStop() {
+func (y *builder) VisitExpression(raw phpparser.IExpressionContext)(v ssa.Value)  {
+	if y == nil || raw == nil|| y.IsStop() {
 		return nil
 	}
+	defer func() {
+		if v == nil {
+			log.Errorf("VisitExpression failed: %v", raw.GetText())
+		}
+	}()
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
@@ -472,10 +477,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
+		// variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
 		rightValue := y.VisitExpression(ret.Expression())
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
-		y.GetMainBuilder().AssignVariable(variable, rightValue)
+		// rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
+		// y.GetMainBuilder().AssignVariable(variable, rightValue)
 		return rightValue
 	}
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
@@ -518,8 +523,8 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 		return y.VisitLeftVariable(i.FlexiVariable())
 	}
 	if i.StaticClassExprVariableMember() != nil {
-		member := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-		return member
+		// member := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		// return member
 	}
 	return nil
 }

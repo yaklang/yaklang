@@ -263,7 +263,7 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 		if member := class.GetNormalMember(key.String()); !utils.IsNil(member) {
 			return name, member.GetType()
 		}
-	// TODO: handler static member
+	//TODO: handler static member
 	case NullTypeKind:
 		return name, nil
 	default:
@@ -315,7 +315,7 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	// 	member := b.getOriginMember(name, typ, object, key)
 	// 	return member
 	// }
-	// step2 for example:A.b(),if  A is not instantiated,  A is an Undefined ValueInValid. Attempt to obtain its static methods
+	//step2 for example:A.b(),if  A is not instantiated,  A is an Undefined ValueInValid. Attempt to obtain its static methods
 	if u, ok := ToUndefined(object); ok {
 		if u.Kind == UndefinedValueInValid {
 			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
@@ -331,11 +331,11 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	var typ Type
 	if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 		blueprint := object.GetType().(*ClassBluePrint)
-		// normal
+		//normal
 		if method, ok := blueprint.Method[key.String()]; ok {
 			typ = method.Type
 		}
-		// static
+		//static
 		if method, ok := blueprint.StaticMethod[key.String()]; ok {
 			return method
 		}
@@ -347,8 +347,8 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	}
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
-	// step6 Determine the type of member call.
-	// If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
+	//step6 Determine the type of member call.
+	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
 	if typ != nil {
 		origin.Kind = UndefinedMemberValid
 	} else {
@@ -440,15 +440,16 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 			return member
 		}
 		name, typ := checkCanMemberCall(para, key)
+		_ = typ
 		newParamterMember := b.NewParameterMember(name, para, key)
-		if b.MarkedMemberCallWantMethod {
-			// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
-			t := NewFunctionTypeDefine(name, nil, nil, false)
-			t.IsMethod = true
-			newParamterMember.SetType(t)
-		} else {
-			newParamterMember.SetType(typ)
-		}
+		// if b.MarkedMemberCallWantMethod {
+		// 	// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
+		// 	t := NewFunctionTypeDefine(name, nil, nil, false)
+		// 	t.IsMethod = true
+		// 	newParamterMember.SetType(t)
+		// } else {
+		// 	newParamterMember.SetType(typ)
+		// }
 		SetMemberCall(para, key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
 		return newParamterMember
@@ -481,26 +482,6 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	return ret
 }
 
-// ReadSelfMember  用于读取当前类成员，包括静态成员和普通成员和方法。
-// 其中使用MarkedThisClassBlueprint标识当前在哪个类中。
-func (b *FunctionBuilder) ReadSelfMember(name string) Value {
-	if class := b.MarkedThisClassBlueprint; class != nil {
-		if value := b.ReadClsStaticMember(class.Name, name); !utils.IsNil(value) {
-			return value
-		}
-		if val := class.GetStaticMember(name); !utils.IsNil(val) {
-			return val
-		}
-		if normalMember := class.GetNormalMember(name); !utils.IsNil(normalMember) {
-			return normalMember
-		}
-		if method_ := class.GetMethod_(name); !utils.IsNil(method_) {
-			return method_
-		}
-	}
-	return nil
-}
-
 func (b *FunctionBuilder) getFieldName(object, key Value) string {
 	name, typ := checkCanMemberCall(object, key)
 	b.getOriginMember(name, typ, object, key) // create undefine member
@@ -509,27 +490,25 @@ func (b *FunctionBuilder) getFieldName(object, key Value) string {
 
 func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	classTypeCheck := func() (*ClassBluePrint, bool) {
-		return func() (*ClassBluePrint, bool) {
-			if blueprint, ok := object.GetType().(*ClassBluePrint); ok && blueprint != nil {
-				return blueprint, true
-			}
-			if u, ok := object.(*Undefined); ok {
-				if u.Kind == UndefinedValueInValid {
-					if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
-						return blueprint, true
-					}
+		if blueprint, ok := object.GetType().(*ClassBluePrint); ok && blueprint != nil {
+			return blueprint, true
+		}
+		if u, ok := object.(*Undefined); ok {
+			if u.Kind == UndefinedValueInValid {
+				if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
+					return blueprint, true
 				}
 			}
-			return nil, false
-		}()
+		}
+		return nil, false
 	}
-	classHandler := func(check func() (*ClassBluePrint, bool), handler func(bluePrint *ClassBluePrint) Value, beforeCheck func() bool) Value {
+	classHandler := func(handler func(bluePrint *ClassBluePrint) Value, beforeCheck func() bool) Value {
 		if beforeCheck != nil {
 			if !beforeCheck() {
 				return nil
 			}
 		}
-		if cls, ok := check(); ok {
+		if cls, ok := classTypeCheck(); ok {
 			if handler != nil {
 				return handler(cls)
 			}
@@ -537,14 +516,14 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		return nil
 	}
 
-	val := classHandler(classTypeCheck, func(blueprint *ClassBluePrint) Value {
-		if b.MarkedMemberCallWantMethod {
-			if value, ok := blueprint.StaticMethod[key.String()]; ok {
-				return value
-			}
-		} else if value, ok := blueprint.StaticMember[key.String()]; ok {
-			return value
-		}
+	val := classHandler(func(blueprint *ClassBluePrint) Value {
+		// if b.MarkedMemberCallWantMethod {
+		// 	if value, ok := blueprint.StaticMethod[key.String()]; ok {
+		// 		return value
+		// 	}
+		// } else if value, ok := blueprint.StaticMember[key.String()]; ok {
+		// 	return value
+		// }
 		return nil
 	}, func() bool {
 		return b.SupportClassStaticModifier
@@ -556,7 +535,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
-	member := classHandler(classTypeCheck, func(bluePrint *ClassBluePrint) Value {
+	member := classHandler(func(bluePrint *ClassBluePrint) Value {
 		return bluePrint.GetNormalMember(key.String())
 	}, nil)
 	_ = member
@@ -564,6 +543,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		return member
 	}
 	return b.getOriginMember(name, typ, object, key)
+
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {

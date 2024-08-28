@@ -65,9 +65,7 @@ type FunctionBuilder struct {
 	MarkedThisObject         Value
 	MarkedThisClassBlueprint *ClassBluePrint
 
-	MarkedMemberCallWantMethod bool
-	parentBuilder              *FunctionBuilder
-	mainBuilder                *FunctionBuilder //global Scope Builder
+	parentBuilder *FunctionBuilder
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -94,7 +92,6 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		b.SupportClassStaticModifier = parent.SupportClassStaticModifier
 		b.SupportClass = parent.SupportClass
 		b.ctx = parent.ctx
-		b.mainBuilder = parent.mainBuilder
 	}
 
 	// b.ScopeStart()

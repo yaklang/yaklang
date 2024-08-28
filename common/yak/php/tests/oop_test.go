@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -11,7 +12,7 @@ import (
 
 func TestOOP_static_member(t *testing.T) {
 	t.Run("normal static member, use any", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
+		ssatest.CheckSyntaxFlowContain(t, `
 	<?php
 class Foo {
 	public static $my_static;
@@ -20,9 +21,10 @@ class Foo {
 println(Foo::$my_static . PHP_EOL);
 
 ?>    
-	`, []string{
-			"add(Undefined-.$staticScope$.Foo.my_static(valid), Undefined-PHP_EOL)",
-		}, t)
+`, `println(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"Undefine-my_static"},
+			}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
 	t.Run("normal static member,  assign again ", func(t *testing.T) {

@@ -12,7 +12,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	if !this.IsObject() {
 		return
 	}
-	blue := NewClassBluePrint()
+	blue := NewClassBluePrint("")
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field
@@ -79,7 +79,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		prog.Cache.AddClassInstance(c.Name, obj)
 	}
 
-	if builder.SupportClass {
+	if !builder.SupportClass {
 		return c
 	}
 
@@ -93,8 +93,8 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	}
 
 	for rawKey, member := range c.NormalMember {
-		typ := member.Type
-		value := member.Value
+		typ := member.GetType()
+		value := member
 		key := builder.EmitConstInst(rawKey)
 		log.Infof("apply key: %s, member: %v", key, member)
 

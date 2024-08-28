@@ -122,11 +122,6 @@ func (b *FunctionBuilder) Finish() {
 			}
 		}
 	}
-	if b.GetName() == "main" {
-		for _, bluePrint := range b.GetProgram().ClassBluePrint {
-			bluePrint.StaticGeneratePhi()
-		}
-	}
 	//builder := b.GetProgram().
 	//	GetApplication().
 	//	GlobalScope.GetFunc().
