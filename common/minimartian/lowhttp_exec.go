@@ -24,7 +24,12 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 
 	httpctx.SetRequestHTTPS(req, ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps))
 	inherit := func(i string) {
-		httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
+		// 从session中继承， session > httpctx
+		// 可能存在session中没有，httpctx中有的情况
+		sessionValue := ctx.GetSessionStringValue(i)
+		if sessionValue != "" {
+			httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
+		}
 	}
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
