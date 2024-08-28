@@ -26,6 +26,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			pkgNameCurrent = pkgPath[0]
 		}
 		prog := b.GetProgram()
+		application := prog.Application
+		global := application.GlobalScope
+		/* Todo: Global value */
+		_ = global
+
 		b.pkgNameCurrent = pkgNameCurrent
 		if pkgPath[0] != "main" {
 			lib, skip := prog.GetLibrary(pkgNameCurrent)
@@ -34,6 +39,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 			if lib == nil {
 				lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
+				lib.Cache = prog.Cache /* 继承Cache */
 			}
 			lib.PushEditor(prog.GetCurrentEditor())
 
@@ -74,8 +80,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 						objt.AddField(b.EmitConstInst(mName), m.GetType())
 					}
 					funcs := map[string]*ssa.Function{}
-					for _, f := range lib.Funcs {
-						if !f.IsMethod() && f.GetName() != "init" {
+					for _, f := range cbp.GetMethod() {
+						if f.GetName() != "init" {
 							funcs[f.GetName()] = f
 						}
 					}
@@ -121,6 +127,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			typValue := ssa.NewTypeValue(structType)
 			typValue.SetType(structType)
 			cbp.AddStaticMember(structName, typValue)
+		}
+		for _, f := range b.GetProgram().Funcs {
+			if !f.IsMethod() && f.GetName() != "init" {
+				cbp.AddMethod(f.GetName(), f)
+			}
 		}
 	}
 
