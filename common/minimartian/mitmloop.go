@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"net"
 	"net/http"
@@ -18,6 +17,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
@@ -431,15 +432,21 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 	}
 }
 
-// handleConnectionTunnel handles a CONNECT request.
-func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter) error {
-	httpctx.SetRequestViaCONNECT(req, true)
+func (p *Proxy) setHTTPCtxConnectTo(req *http.Request) (string, error) {
 	connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
 	if err != nil {
-		conn.Close()
-		return utils.Errorf("mitm: no host (and not connect to) in connect request: \n%v\n\n", err)
+		return "", utils.Wrap(err, "mitm: invalid host")
 	}
 
+	return connectedTo, nil
+}
+
+// handleConnectionTunnel handles a CONNECT request.
+func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter, connectedTo string) error {
+	var err error
+
+	httpctx.SetRequestViaCONNECT(req, true)
+	// set session ctx, session > httpctx
 	parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	parsedConnectedToHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
@@ -602,7 +609,6 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 				timer.Stop()
 			}
 		})
-
 		if err != nil {
 			errc <- err
 			return
@@ -644,9 +650,9 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	link(req, ctx, p)
 	defer unlink(req, p)
 
-	var proxyProtocol = ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol)
-	var authFinish = ctx.GetSessionBoolValue(AUTH_FINISH)
-	var needAuth = p.proxyUsername != "" || p.proxyPassword != ""
+	proxyProtocol := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_RequestProxyProtocol)
+	authFinish := ctx.GetSessionBoolValue(AUTH_FINISH)
+	needAuth := p.proxyUsername != "" || p.proxyPassword != ""
 	httpctx.SetRequestProxyProtocol(req, proxyProtocol)
 
 	var isHttps bool
@@ -735,8 +741,13 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 				return failed("empty Proxy-Authorization Header")
 			}
 		}
+		connectedTo, err := p.setHTTPCtxConnectTo(req)
+		if err != nil {
+			conn.Close()
+			return err
+		}
 		if req.Method == "CONNECT" { // handle connect request
-			return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw)
+			return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw, connectedTo)
 		}
 	}
 
@@ -829,7 +840,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		closing = errClose
 	}
-	if p.forceDisableKeepAlive { //if http force close ,  just use only once
+	if p.forceDisableKeepAlive { // if http force close ,  just use only once
 		conn.Close()
 	}
 
