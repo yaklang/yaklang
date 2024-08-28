@@ -73,6 +73,54 @@ func (s *Scannerx) initHandle() error {
 	return nil
 }
 
+func (s *Scannerx) initHandlerStart() error {
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+
+		err := pcaputil.Start(
+			pcaputil.WithContext(s.config.Ctx),
+			pcaputil.WithEnableCache(true),
+			pcaputil.WithDevice(s.config.Iface.Name),
+			pcaputil.WithBPFFilter(fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())),
+			pcaputil.WithDisableAssembly(true),
+			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
+				go func() {
+					for {
+						select {
+						case <-s.config.Ctx.Done():
+							return
+						case packet, ok := <-s.PacketChan:
+							if !ok {
+								continue
+							}
+
+							err := handle.WritePacketData(packet)
+							if err != nil {
+								log.Errorf("write packet failed: %v", err)
+								continue
+							}
+						}
+					}
+
+				}()
+			}),
+
+			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
+				s.handlePacket(packet)
+			}),
+		)
+		if err != nil {
+			log.Errorf("pcaputil start failed: %v", err)
+		}
+	}()
+	return nil
+}
+
 func (s *Scannerx) HandlerReadPacket(ctx context.Context, resultCh chan *synscan.SynScanResult) {
 	packetSource := gopacket.NewPacketSource(s.Handle, s.Handle.LinkType())
 	packetSource.Lazy = true
@@ -87,7 +135,7 @@ func (s *Scannerx) HandlerReadPacket(ctx context.Context, resultCh chan *synscan
 			if packet == nil {
 				continue
 			}
-			s.handlePacket(packet, resultCh)
+			s.handlePacket(packet)
 		}
 	}
 }
@@ -111,12 +159,12 @@ func (s *Scannerx) HandlerZeroCopyReadPacket(ctx context.Context, resultCh chan 
 			}
 
 			packet := gopacket.NewPacket(data, s.Handle.LinkType(), gopacket.Default)
-			s.handlePacket(packet, resultCh)
+			s.handlePacket(packet)
 		}
 	}
 }
 
-func (s *Scannerx) handlePacket(packet gopacket.Packet, resultCh chan *synscan.SynScanResult) {
+func (s *Scannerx) handlePacket(packet gopacket.Packet) {
 	if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
 		arp := arpLayer.(*layers.ARP)
 		if arp.Operation == 2 {

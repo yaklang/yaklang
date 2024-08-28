@@ -110,6 +110,7 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 		}()
 		scanner.SubmitTargetFromPing(processedRes, ports, targetCh)
 		close(targetCh)
+		//close(scanner.PacketChan)
 		<-sendDoneSignal
 		close(resultCh)
 		log.Infof("send done signal")
@@ -183,6 +184,7 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 		}()
 		scanner.SubmitTarget(targets, ports, targetCh)
 		close(targetCh)
+		//close(scanner.PacketChan)
 		<-sendDoneSignal
 		close(resultCh)
 		log.Infof("send done signal")
