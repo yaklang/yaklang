@@ -1169,21 +1169,23 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		}
 		switch strings.ToUpper(variable) {
 		case "$GLOBALS":
-			position = "global"
+			position = "GLOBALS"
 		case "$_GET":
-			position = "get"
+			position = "_GET"
 		case "$_POST":
-			position = "post"
+			position = "_POST"
 		case "$_REQUEST":
-			position = "global"
+			position = "_REQUEST"
 		case "$_SERVER":
-			position = "server"
+			position = "_SERVER"
 		case "$_COOKIE":
-			position = "cookie"
+			position = "_COOKIE"
 		case "$_ENV":
-			position = "env"
+			position = "_ENV"
 		case "$_SESSION":
-			position = "session"
+			position = "_SESSION"
+		case "$_FILES":
+			position = "_FILES"
 		}
 		if position != "" {
 			return handler()

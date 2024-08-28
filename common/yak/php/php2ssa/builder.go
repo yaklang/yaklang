@@ -36,7 +36,7 @@ func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 			fb.AssignVariable(variable, emptyContainer)
 		}
 	}
-	initHandler("global", "get", "post", "cookie", "env", "session", "server")
+	initHandler("GLOBALS", "_GET", "_POST", "_COOKIE", "_REQUEST", "_ENV", "_SESSION", "_SERVER", "_FILES", "$staticScope$")
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	fb.GetProgram().GlobalScope = container
 	fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
