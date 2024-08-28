@@ -254,8 +254,11 @@ func (w *PcapHandleWrapper) Close() {
 func (w *PcapHandleWrapper) Error() (err error) {
 	defer func() {
 		if panicError := recover(); panicError != nil {
-			err = utils.Errorf("panic: %v", panicError)
+			err = utils.Error("pcap handler get erro panic")
 		}
 	}()
+	if w.isClose {
+		return utils.Error("handle is closed")
+	}
 	return w.Handle.Error()
 }
