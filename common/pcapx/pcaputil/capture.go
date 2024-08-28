@@ -162,7 +162,7 @@ func Start(opt ...CaptureOption) error {
 				return
 			}
 			defer func() {
-				handler.Close()
+				handler.close()
 			}()
 			if err := _open(conf, ctx, handler); err != nil {
 				log.Errorf("open device failed: %s", err)

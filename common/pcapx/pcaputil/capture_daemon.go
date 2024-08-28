@@ -16,7 +16,7 @@ var captureDaemonCache = utils.NewTTLCache[*daemonCache](10 * time.Second)
 
 func init() {
 	captureDaemonCache.SetExpirationCallback(func(key string, value *daemonCache) {
-		value.handler.Close()
+		value.handler.close()
 	})
 }
 
@@ -57,7 +57,7 @@ func keepDaemonCache(key string, ctx context.Context) context.CancelFunc {
 
 var getInterfaceHandlerMutex = new(sync.Mutex)
 
-func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, PcapHandleOperation, error) {
+func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, *PcapHandleWrapper, error) {
 	if conf.EnableCache {
 		getInterfaceHandlerMutex.Lock()
 		defer getInterfaceHandlerMutex.Unlock()
@@ -73,7 +73,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		cacheId := codec.Sha256(hashRaw.String())
 		if daemon, ok := getDaemonCache(cacheId); ok {
 			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
-				if oldHandle, ok := daemon.handler.(*PcapHandleWrapper); ok {
+				if oldHandle := daemon.handler; oldHandle != nil {
 					conf.onNetInterfaceCreated(oldHandle)
 				}
 			}
@@ -193,10 +193,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		registerDaemonCache(cacheId, daemon)
 		return cacheId, daemon.handler, err
 	}
-	handler, err := OpenIfaceLive(ifaceName)
+	pcapHandler, err := OpenIfaceLive(ifaceName)
 	if err != nil {
 		return "", nil, err
 	}
+	handler := WrapPcapHandle(pcapHandler)
 	err = handler.SetBPFFilter(conf.BPFFilter)
 	if err != nil {
 		return "", handler, err
