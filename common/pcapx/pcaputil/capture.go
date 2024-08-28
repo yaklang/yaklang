@@ -44,11 +44,11 @@ func Start(opt ...CaptureOption) error {
 	}
 	handlers := omap.NewOrderedMap(map[string]PcapHandleOperation{})
 	if conf.Filename != "" {
-		handler, err := OpenFile(conf.Filename)
+		pcapHandler, err := OpenFile(conf.Filename)
 		if err != nil {
 			log.Errorf("open file (%v) failed: %s", conf.Filename, err)
 		} else {
-			handlers.Set(conf.Filename, handler)
+			handlers.Set(conf.Filename, WrapPcapHandle(pcapHandler))
 		}
 	} else if len(conf.Device) == 0 {
 		if conf.EmptyDeviceStop {
