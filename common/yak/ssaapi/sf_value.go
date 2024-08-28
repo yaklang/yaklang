@@ -83,6 +83,9 @@ func (v *Value) GetAllCallActualParams() (sfvm.ValueOperator, error) {
 		}
 	}
 	for _, value := range vs {
+		if utils.IsNil(value) {
+			continue
+		}
 		value.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("all-actual-args"))
 	}
 
