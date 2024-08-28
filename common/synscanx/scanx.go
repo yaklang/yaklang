@@ -35,6 +35,8 @@ type Scannerx struct {
 	loopbackMap      map[string]string
 	OpenPortHandlers func(ip net.IP, port int)
 
+	PacketChan chan []byte
+
 	ipOpenPortMap *sync.Map
 	// MAC地址表
 	macCacheTable *sync.Map
@@ -56,6 +58,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 		startTime:     time.Now(),
 		ports:         utils.NewPortsFilter(),
 		macCacheTable: new(sync.Map),
+		PacketChan:    make(chan []byte, 1024),
 		loopbackMap:   make(map[string]string),
 		sampleIP:      sample,
 		limiter:       rate.NewLimiter(rate.Every(limitInterval), config.rateLimitDelayGap),
@@ -68,7 +71,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 	if err != nil {
 		return nil, err
 	}
-	err = s.initHandle()
+	err = s.initHandlerStart()
 	if err != nil {
 		return nil, err
 	}
@@ -362,16 +365,16 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	}
 
 	// recv packet 的总时长
-	wCtx, wCancel := context.WithCancel(context.Background())
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		s.HandlerZeroCopyReadPacket(wCtx, resultCh)
-	}()
-	time.Sleep(100 * time.Millisecond)
+	//wCtx, wCancel := context.WithCancel(context.Background())
+	//go func() {
+	//	defer func() {
+	//		if err := recover(); err != nil {
+	//			utils.PrintCurrentGoroutineRuntimeStack()
+	//		}
+	//	}()
+	//	s.HandlerZeroCopyReadPacket(wCtx, resultCh)
+	//}()
+	//time.Sleep(100 * time.Millisecond)
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -387,13 +390,13 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 	time.Sleep(s.config.waiting)
 	log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
 
-	wCancel()
+	//wCancel()
 
 	done <- struct{}{}
 
 	endTime := time.Now()
 	log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
-	defer s.Close()
+	//defer s.Close()
 
 	return nil
 }
@@ -417,11 +420,12 @@ func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
 				log.Errorf("assemble packet failed: %v", err)
 				continue
 			}
-			err = s.Handle.WritePacketData(packet)
-			if err != nil {
-				log.Errorf("write to device syn failed: %v[%s:%d]", s.handleError(err), host, port)
-				continue
-			}
+			s.PacketChan <- packet
+			//err = s.Handle.WritePacketData(packet)
+			//if err != nil {
+			//	log.Errorf("write to device syn failed: %v[%s:%d]", s.handleError(err), host, port)
+			//	continue
+			//}
 		}
 	}
 }

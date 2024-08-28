@@ -20,7 +20,7 @@ func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
 			dstHw, ok := s.macCacheTable.Load(gateway)
 			if ok {
 				s.config.RemoteMac = dstHw.(net.HardwareAddr)
-				log.Infof("use arpx proto to fetch gateway's hw address: %s", dstHw)
+				log.Debugf("use arpx proto to fetch gateway's hw address: %s", dstHw)
 				return dstHw.(net.HardwareAddr), nil
 			}
 			retry++
@@ -91,9 +91,10 @@ func (s *Scannerx) arp(target string) {
 		log.Errorf("assemble arp packet failed: %v", err)
 		return
 	}
-	err = s.Handle.WritePacketData(packet)
-	if err != nil {
-		log.Errorf("write to device arp failed: %v", s.handleError(err))
-		return
-	}
+	s.PacketChan <- packet
+	//err = s.Handle.WritePacketData(packet)
+	//if err != nil {
+	//	log.Errorf("write to device arp failed: %v", s.handleError(err))
+	//	return
+	//}
 }
