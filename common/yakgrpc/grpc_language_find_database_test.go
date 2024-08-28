@@ -67,6 +67,7 @@ class A {
 	a1 := newRangeFromText("5:13 5:14")
 	num1 := newRangeFromText("5:17 5:18")
 	println1 := newRangeFromText("6:18 6:19")
+	c := newRangeFromText("7:13 7:14")
 	a2 := newRangeFromText("8:13 8:14")
 	num2 := newRangeFromText("8:17 8:18")
 	println2 := newRangeFromText("10:18 10:19")
@@ -122,6 +123,24 @@ class A {
 			"src/main/java/A.java",
 			println2,
 			[]memedit.RangeIf{a1, println1, a2, println2},
+		)
+	})
+
+	t.Run("find nothing else: c", func(t *testing.T) {
+		t.Log("find by c")
+		check(local, t, programID,
+			"src/main/java/A.java",
+			c,
+			[]memedit.RangeIf{c},
+		)
+	})
+
+	t.Run("error: error file", func(t *testing.T) {
+		t.Log("find by errRng")
+		check(local, t, programID,
+			"src/this_file_not_found/b.java",
+			a1,
+			[]memedit.RangeIf{a1},
 		)
 	})
 

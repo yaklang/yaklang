@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -100,8 +101,11 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 	return variables, parameter
 }
 
-func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value, isReference bool) ([]memedit.RangeIf, error) {
+func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value, isReference bool) []memedit.RangeIf {
 	ranges := make([]memedit.RangeIf, 0)
+	if isReference {
+		ranges = append(ranges, ssaRange)
+	}
 	variables, freeValue := languageServerFind(prog, word, containPoint, v, isReference)
 	editor := ssaRange.GetEditor()
 
@@ -153,14 +157,14 @@ func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange memed
 		return offset1 < offset2
 	})
 
-	return ranges, nil
+	return ranges
 }
 
-func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) ([]memedit.RangeIf, error) {
+func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) []memedit.RangeIf {
 	return onFind(prog, word, containPoint, ssaRange, v, false)
 }
 
-func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) ([]memedit.RangeIf, error) {
+func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) []memedit.RangeIf {
 	return onFind(prog, word, containPoint, ssaRange, v, true)
 }
 
@@ -187,14 +191,16 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
 
 	if err != nil {
-		return ret, err
+		ret.Ranges = append(ret.Ranges, req.GetRange())
+		log.Errorf("YaklangLanguageFind failed: %v", err)
+		return ret, nil
 	}
 
 	switch req.InspectType {
 	case DEFINITION:
-		ranges, err = OnFindDefinition(prog, word, containPoint, ssaRange, v)
+		ranges = OnFindDefinition(prog, word, containPoint, ssaRange, v)
 	case REFERENCES:
-		ranges, err = OnFindReferences(prog, word, containPoint, ssaRange, v)
+		ranges = OnFindReferences(prog, word, containPoint, ssaRange, v)
 	}
 
 	tmp := make(map[string]struct{})
@@ -203,10 +209,8 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 		if _, ok := tmp[hash]; ok {
 			continue
 		}
+		tmp[hash] = struct{}{}
 		ret.Ranges = append(ret.Ranges, RangeIfToGrpcRange(rng))
-	}
-	if len(ret.Ranges) == 0 {
-		ret.Ranges = append(ret.Ranges, RangeIfToGrpcRange(ssaRange))
 	}
 	return ret, nil
 }
