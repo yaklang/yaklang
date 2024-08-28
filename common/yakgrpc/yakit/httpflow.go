@@ -102,18 +102,20 @@ type TagAndStatusCode struct {
 }
 
 type CreateHTTPFlowConfig struct {
-	isHttps     bool
-	reqRaw      []byte
-	rspRaw      []byte
-	fixRspRaw   []byte // 如果设置了，则不会再修复rspRaw
-	source      string
-	url         string
-	remoteAddr  string
-	duration    time.Duration
-	reqIns      *http.Request // 如果设置了，则不会再解析reqRaw
-	hiddenIndex string
-	runtimeID   string
-	tags        string
+	isHttps            bool
+	reqRaw             []byte
+	rspRaw             []byte
+	fixRspRaw          []byte // 如果设置了，则不会再修复rspRaw
+	source             string
+	url                string
+	remoteAddr         string
+	duration           time.Duration
+	reqIns             *http.Request // 如果设置了，则不会再解析reqRaw
+	hiddenIndex        string
+	runtimeID          string
+	tags               string
+	tooLargeHeaderFile string
+	tooLargeBodyFile   string
 }
 
 type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
@@ -172,6 +174,7 @@ func CreateHTTPFlowWithRemoteAddr(remoteAddr string) CreateHTTPFlowOptions {
 		c.remoteAddr = remoteAddr
 	}
 }
+
 func CreateHTTPFlowWithDuration(d time.Duration) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
 		c.duration = d
@@ -182,6 +185,18 @@ func CreateHTTPFlowWithDuration(d time.Duration) CreateHTTPFlowOptions {
 func CreateHTTPFlowWithRequestIns(reqIns *http.Request) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
 		c.reqIns = reqIns
+	}
+}
+
+func CreateHTTPFlowWithTooLargeResponseHeaderFile(fp string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.tooLargeHeaderFile = fp
+	}
+}
+
+func CreateHTTPFlowWithTooLargeResponseBodyFile(fp string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.tooLargeBodyFile = fp
 	}
 }
 
@@ -231,17 +246,19 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	}
 
 	var (
-		isHttps    = c.isHttps
-		reqRaw     = c.reqRaw
-		rspRaw     = c.rspRaw
-		fixRspRaw  = c.fixRspRaw
-		source     = c.source
-		url        = c.url
-		remoteAddr = c.remoteAddr
-		reqIns     = c.reqIns
-		runtimeID  = c.runtimeID
-		tags       = c.tags
-		duration   = int64(c.duration)
+		isHttps            = c.isHttps
+		reqRaw             = c.reqRaw
+		rspRaw             = c.rspRaw
+		fixRspRaw          = c.fixRspRaw
+		source             = c.source
+		url                = c.url
+		remoteAddr         = c.remoteAddr
+		reqIns             = c.reqIns
+		runtimeID          = c.runtimeID
+		tags               = c.tags
+		duration           = int64(c.duration)
+		tooLargeHeaderFile = c.tooLargeHeaderFile
+		tooLargeBodyFile   = c.tooLargeBodyFile
 	)
 
 	var (
@@ -290,21 +307,23 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	responseRaw := strconv.Quote(string(rspRaw))
 
 	flow := &schema.HTTPFlow{
-		IsHTTPS:     isHttps,
-		Url:         url,
-		Path:        requestUri,
-		Method:      method,
-		BodyLength:  int64(len(body)),
-		ContentType: rspContentType,
-		StatusCode:  int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
-		SourceType:  source,
-		Request:     requestRaw,
-		Response:    responseRaw,
-		RemoteAddr:  remoteAddr,
-		HiddenIndex: uuid.NewString(),
-		RuntimeId:   runtimeID,
-		Tags:        tags,
-		Duration:    duration,
+		IsHTTPS:                    isHttps,
+		Url:                        url,
+		Path:                       requestUri,
+		Method:                     method,
+		BodyLength:                 int64(len(body)),
+		ContentType:                rspContentType,
+		StatusCode:                 int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
+		SourceType:                 source,
+		Request:                    requestRaw,
+		Response:                   responseRaw,
+		RemoteAddr:                 remoteAddr,
+		HiddenIndex:                uuid.NewString(),
+		RuntimeId:                  runtimeID,
+		Tags:                       tags,
+		Duration:                   duration,
+		TooLargeResponseBodyFile:   tooLargeBodyFile,
+		TooLargeResponseHeaderFile: tooLargeHeaderFile,
 	}
 
 	// 如果设置了 reqIns，则不会再解析 reqRaw

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -679,26 +680,16 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 	require.NoError(t, err)
 
 	db := consts.GetGormProjectDatabase()
-	token1 := utils.RandStringBytes(5)
-	token2 := utils.RandStringBytes(5)
-
-	// request
-	url1 := "http://" + token1 + ".com"
-	flow1, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1), yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token1+".com\r\n\r\n"+token1)))
-	require.NoError(t, err)
-	err = yakit.InsertHTTPFlow(db, flow1)
-	require.NoError(t, err)
-	// response
-	url2 := "http://" + token2 + ".com/a.jpg"
-	flow2, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url2), yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token2+".com\r\n\r\n")), yakit.CreateHTTPFlowWithResponseRaw([]byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Type: image/jpeg\r\n\r\n"+token2)))
-	require.NoError(t, err)
-	err = yakit.InsertHTTPFlow(db, flow2)
-	require.NoError(t, err)
-
-	defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
-	defer yakit.DeleteHTTPFlowByID(db, int64(flow2.ID))
 
 	t.Run("request", func(t *testing.T) {
+		token := utils.RandStringBytes(5)
+		url1 := "http://" + token + ".com"
+		flow1, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1), yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token+".com\r\n\r\n"+token)))
+		require.NoError(t, err)
+		err = yakit.InsertHTTPFlow(db, flow1)
+		require.NoError(t, err)
+		defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
+
 		count := 0
 		stream, err := client.GetHTTPFlowBodyById(ctx, &ypb.GetHTTPFlowBodyByIdRequest{Id: int64(flow1.ID), IsRequest: true})
 		require.NoError(t, err)
@@ -711,7 +702,7 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 			if count == 1 {
 				require.Equal(t, "body.txt", msg.GetFilename())
 			} else if count == 2 {
-				require.Equal(t, token1, string(msg.GetData()))
+				require.Equal(t, token, string(msg.GetData()))
 				require.True(t, msg.GetEOF())
 			}
 		}
@@ -719,6 +710,15 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 	})
 
 	t.Run("response", func(t *testing.T) {
+		token := utils.RandStringBytes(5)
+		url2 := "http://" + token + ".com/a.jpg"
+		flow2, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url2), yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token+".com\r\n\r\n")), yakit.CreateHTTPFlowWithResponseRaw([]byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Type: image/jpeg\r\n\r\n"+token)))
+		require.NoError(t, err)
+		err = yakit.InsertHTTPFlow(db, flow2)
+		require.NoError(t, err)
+
+		defer yakit.DeleteHTTPFlowByID(db, int64(flow2.ID))
+
 		count := 0
 		stream, err := client.GetHTTPFlowBodyById(ctx, &ypb.GetHTTPFlowBodyByIdRequest{Id: int64(flow2.ID)})
 		require.NoError(t, err)
@@ -731,7 +731,43 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById(t *testing.T) {
 			if count == 1 {
 				require.Equal(t, "a.jpg", msg.GetFilename())
 			} else if count == 2 {
-				require.Equal(t, token2, string(msg.GetData()))
+				require.Equal(t, token, string(msg.GetData()))
+				require.True(t, msg.GetEOF())
+			}
+		}
+		require.Equal(t, 2, count, "should only have 2 messages")
+	})
+
+	t.Run("too large response", func(t *testing.T) {
+		token := utils.RandStringBytes(16)
+		tempFileName, err := utils.SaveTempFile(token, "test-GetHTTPFlowBodyById")
+		defer os.Remove(tempFileName)
+
+		url2 := "http://test.com/a.jpg"
+		flow2, err := yakit.CreateHTTPFlow(
+			yakit.CreateHTTPFlowWithURL(url2),
+			yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: test.com\r\n\r\n")),
+			yakit.CreateHTTPFlowWithTooLargeResponseBodyFile(tempFileName),
+		)
+		require.NoError(t, err)
+		err = yakit.InsertHTTPFlow(db, flow2)
+		require.NoError(t, err)
+
+		defer yakit.DeleteHTTPFlowByID(db, int64(flow2.ID))
+
+		count := 0
+		stream, err := client.GetHTTPFlowBodyById(ctx, &ypb.GetHTTPFlowBodyByIdRequest{Id: int64(flow2.ID)})
+		require.NoError(t, err)
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			count++
+			if count == 1 {
+				require.Equal(t, "a.jpg", msg.GetFilename())
+			} else if count == 2 {
+				require.Equal(t, token, string(msg.GetData()))
 				require.True(t, msg.GetEOF())
 			}
 		}
