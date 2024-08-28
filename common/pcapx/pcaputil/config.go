@@ -16,7 +16,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/google/uuid"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -31,7 +30,7 @@ type CaptureConfig struct {
 	mock                  PcapHandleOperation // TEST MOCK
 	trafficPool           *TrafficPool
 	Output                *pcapgo.Writer // output debug info
-	onNetInterfaceCreated func(handle *pcap.Handle)
+	onNetInterfaceCreated func(handle *PcapHandleWrapper)
 	onFlowCreated         func(*TrafficFlow)
 	wg                    *sync.WaitGroup
 	Filename              string
@@ -62,7 +61,7 @@ func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 	}
 }
 
-func WithNetInterfaceCreated(h func(handle *pcap.Handle)) CaptureOption {
+func WithNetInterfaceCreated(h func(handle *PcapHandleWrapper)) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.onNetInterfaceCreated = h
 		return nil

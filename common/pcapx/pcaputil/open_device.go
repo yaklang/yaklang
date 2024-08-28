@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"fmt"
+	"github.com/google/gopacket"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 )
 
 func PcapInterfaceEqNetInterface(piface pcap.Interface, iface *net.Interface) bool {
@@ -204,4 +206,56 @@ func OpenIfaceLive(iface string) (*pcap.Handle, error) {
 	}
 	log.Infof("open iface %s success", iface)
 	return handler, nil
+}
+
+type PcapHandleWrapper struct {
+	*pcap.Handle
+	mutex   *sync.RWMutex
+	isClose bool
+}
+
+func WrapPcapHandle(handle *pcap.Handle) *PcapHandleWrapper {
+	return &PcapHandleWrapper{
+		Handle:  handle,
+		mutex:   new(sync.RWMutex),
+		isClose: false,
+	}
+}
+
+func (w *PcapHandleWrapper) WritePacketData(data []byte) error {
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
+	if w.isClose {
+		return utils.Errorf("handle is closed")
+	}
+	return w.Handle.WritePacketData(data)
+}
+
+func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
+	if w.isClose {
+		return nil, gopacket.CaptureInfo{}, utils.Errorf("handle is closed")
+	}
+	return w.Handle.ReadPacketData()
+}
+
+func (w *PcapHandleWrapper) Close() {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	if w.isClose {
+		return
+	}
+	w.Handle.Close()
+	w.isClose = true
+	return
+}
+
+func (w *PcapHandleWrapper) Error() (err error) {
+	defer func() {
+		if panicError := recover(); panicError != nil {
+			err = utils.Errorf("panic: %v", panicError)
+		}
+	}()
+	return w.Handle.Error()
 }

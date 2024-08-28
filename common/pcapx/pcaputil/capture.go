@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle) error {
+func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
@@ -156,7 +156,7 @@ func Start(opt ...CaptureOption) error {
 		}
 	} else {
 		utils.WaitRoutinesFromSlice(handlers.Values(), func(origin PcapHandleOperation) {
-			handler, ok := origin.(*pcap.Handle)
+			handler, ok := origin.(*PcapHandleWrapper)
 			if !ok {
 				log.Errorf("invalid handler: %v", origin)
 				return
