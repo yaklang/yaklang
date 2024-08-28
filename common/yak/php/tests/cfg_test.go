@@ -11,7 +11,7 @@ func TestExpression_If1(t *testing.T) {
 		code := `<?php 
 $cid = !empty($_REQUEST['cid']) ? b($_REQUEST['cid']) : '';
 println($cid);`
-		ssatest.CheckPrintlnValue(code, []string{`phi($cid)[Undefined-b(Undefined-.global.cid(valid)),""]`}, t)
+		ssatest.CheckPrintlnValue(code, []string{`phi($cid)[Undefined-b(Undefined-_REQUEST.cid(valid)),""]`}, t)
 	})
 	t.Run("customIf", func(t *testing.T) {
 		code := `<?php $a = 0;

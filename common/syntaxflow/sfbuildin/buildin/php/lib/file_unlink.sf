@@ -1,0 +1,34 @@
+desc(
+    title: "check php function--unlink",
+    type: audit,
+    lib: 'custom-file-unlink'
+)
+
+unlink as $unlink
+rmdir as $rmdir
+
+$rmdir + $unlink as $output
+
+alert $output
+
+desc(
+    lang: php,
+    alert_min: '3',
+    'file://fileUnlink.php': <<<PARAM
+<?php
+    $file_path = 'path/to/file.txt';
+    if (file_exists($file_path)) {
+        @unlink($file_path);
+        echo '文件删除成功';
+    } else {
+        echo '文件不存在';
+    }
+    $dir_path = 'path/to/directory';
+    if (is_dir($dir_path)) {
+        @rmdir($dir_path);
+        echo '目录删除成功';
+    } else {
+        echo '目录不存在';
+    }
+PARAM
+)

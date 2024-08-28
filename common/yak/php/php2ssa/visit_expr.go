@@ -478,6 +478,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return y.ReadValue(_value)
 		} else {
 			val := y.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
+			y.AssignVariable(y.CreateVariable(y.VisitIdentifier(ret.Identifier())), val)
 			return val
 		}
 
@@ -549,7 +550,12 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
-	return y.VisitRightValue(i.FlexiVariable())
+	if i.FlexiVariable() != nil {
+		return y.VisitRightValue(i.FlexiVariable())
+	} else {
+		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		return y.ReadValueByVariable(member)
+	}
 }
 
 func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAccessContext) ssa.Value {
@@ -1131,7 +1137,7 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 	case *phpparser.IndexVariableContext:
 		value := y.VisitRightValue(i.FlexiVariable())
 		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
-			return y.CreateMemberCallVariable(value, key)
+			return y.CreateMemberCallVariable(value, key) //这里有问题
 		} else {
 			return y.VisitLeftVariable(i.FlexiVariable())
 		}
@@ -1164,28 +1170,29 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		variable := y.VisitVariable(i.Variable())
 		var position = ""
 		handler := func() ssa.Value {
-			member, _ := y.GetProgram().GlobalScope.GetStringMember(position)
+			member, _ := y.GetProgram().GetApplication().GlobalScope.GetStringMember(position)
 			return member
 		}
-		switch strings.ToUpper(variable) {
+
+		switch variable {
 		case "$GLOBALS":
 			position = "GLOBALS"
 		case "$_GET":
-			position = "_GET"
+			variable = "_GET"
 		case "$_POST":
-			position = "_POST"
+			variable = "_POST"
 		case "$_REQUEST":
-			position = "_REQUEST"
+			variable = "_REQUEST"
 		case "$_SERVER":
 			position = "_SERVER"
 		case "$_COOKIE":
-			position = "_COOKIE"
+			variable = "_COOKIE"
 		case "$_ENV":
-			position = "_ENV"
+			variable = "_ENV"
 		case "$_SESSION":
-			position = "_SESSION"
+			variable = "_SESSION"
 		case "$_FILES":
-			position = "_FILES"
+			variable = "_FILES"
 		}
 		if position != "" {
 			return handler()

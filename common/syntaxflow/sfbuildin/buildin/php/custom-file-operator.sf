@@ -1,0 +1,28 @@
+desc(
+    title: 'file operator',
+    type: vul,
+    level: low
+)
+
+<include('custom-file-read')> as $read
+<include('custom-file-write')> as $write
+<include('custom-file-unlink')> as $unlink
+
+$read + $write + $unlink as $source
+
+$source() #->*?{have: _GET||have: _POST || have: _REQUEST}?{!opcode:const} as $param
+$param--> as $sink
+
+check $sink
+alert $sink
+
+desc(
+    lang: php,
+    alert_min: '3',
+    'file://unsafe.php': <<<UNSAFE
+<?php
+fopen($_GET[0],'r');
+file_get_contents($_GET[1]);
+file_put_contents('aa.php',$_GET[2]);
+UNSAFE
+)
