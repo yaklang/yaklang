@@ -15,6 +15,7 @@ var Exports = map[string]interface{}{
 	"proxy":                WithProxy,
 	"captchaUrl":           WithCaptchaUrl,
 	"captchaMode":          WithCaptchaMode,
+	"captchaType":          WithCaptchaType,
 	"usernameSelector":     WithUsernameSelector,
 	"passwordSelector":     WithPasswordSelector,
 	"captchaInputSelector": WithCaptchaSelector,

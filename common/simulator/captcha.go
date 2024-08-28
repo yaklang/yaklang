@@ -108,10 +108,54 @@ func (dddd *DDDDResult) GetErrorInfo() string {
 	return dddd.Message
 }
 func (dddd *DDDDResult) GetStatus() bool {
-	if dddd.Result == "" {
+	if dddd.Status == 200 {
+		return true
+	}
+	return false
+}
+
+type NewDDDDCaptcha struct {
+	Image string `json:"image"`
+}
+
+func (newDD *NewDDDDCaptcha) InputMode(s string) {
+
+}
+
+func (newDD *NewDDDDCaptcha) Generate() interface{} {
+	return newDD.Image
+}
+
+func (newDD *NewDDDDCaptcha) InputBase64(b64 string) {
+	var b64Code string
+	if strings.HasPrefix(b64, "data:") && strings.Contains(b64, ",") {
+		b64Code = strings.Split(b64, ",")[1]
+	} else {
+		b64Code = b64
+	}
+	newDD.Image = b64Code
+}
+
+type NewDDDDResult struct {
+	Code    int    `json:"code"`
+	Data    string `json:"data"`
+	Message string `json:"message"`
+}
+
+func (n *NewDDDDResult) GetResult() string {
+	return n.Data
+}
+
+func (n *NewDDDDResult) GetErrorInfo() string {
+	return n.Message
+}
+
+func (n *NewDDDDResult) GetStatus() bool {
+	if n.Code == 200 {
+		return true
+	} else {
 		return false
 	}
-	return true
 }
 
 type CaptchaIdentifier struct {
@@ -119,6 +163,7 @@ type CaptchaIdentifier struct {
 	identifierMode string
 	identifierReq  requestStructr
 	identifierRes  responseStructr
+	identifierType string
 	proxy          *url.URL
 }
 
@@ -140,6 +185,10 @@ func (identifier *CaptchaIdentifier) SetResponse(res responseStructr) {
 
 func (identifier *CaptchaIdentifier) SetProxy(proxy *url.URL) {
 	identifier.proxy = proxy
+}
+
+func (identifier *CaptchaIdentifier) SetType(typeStr string) {
+	identifier.identifierType = typeStr
 }
 
 func (identifier *CaptchaIdentifier) elementDetect(page *rod.Page, elementSelector string) (*rod.Element, error) {
@@ -191,15 +240,31 @@ func (identifier *CaptchaIdentifier) detect(imgB64 string) (string, error) {
 	}
 	identifier.identifierReq.InputBase64(imgB64)
 	identifier.identifierReq.InputMode(identifier.identifierMode)
-	reqBody, err := json.Marshal(identifier.identifierReq.Generate())
-	if err != nil {
-		return "", utils.Error(err)
+	var request *http.Request
+	var err error
+	if identifier.identifierType == "NewDDDD" {
+		b64Str, ok := identifier.identifierReq.Generate().(string)
+		if ok == false {
+			return "", utils.Errorf("new dddd data error: %v", identifier.identifierReq.Generate())
+		}
+		var urlValue = url.Values{}
+		urlValue.Set("image", b64Str)
+		request, err = http.NewRequest("POST", identifier.identifierUrl, strings.NewReader(urlValue.Encode()))
+		if err != nil {
+			return "", utils.Error(err)
+		}
+		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	} else {
+		reqBody, err := json.Marshal(identifier.identifierReq.Generate())
+		if err != nil {
+			return "", utils.Error(err)
+		}
+		request, err = http.NewRequest("POST", identifier.identifierUrl, strings.NewReader(string(reqBody)))
+		if err != nil {
+			return "", utils.Error(err)
+		}
+		request.Header.Add("Content-Type", "application/json")
 	}
-	request, err := http.NewRequest("POST", identifier.identifierUrl, strings.NewReader(string(reqBody)))
-	if err != nil {
-		return "", utils.Error(err)
-	}
-	request.Header.Add("Content-Type", "application/json")
 	opts := []lowhttp.LowhttpOpt{
 		lowhttp.WithRequest(request),
 	}
@@ -215,10 +280,13 @@ func (identifier *CaptchaIdentifier) detect(imgB64 string) (string, error) {
 		return "", utils.Error(err)
 	}
 	if !identifier.identifierRes.GetStatus() {
-		return "", utils.Error(identifier.identifierRes.GetErrorInfo())
+		if identifier.identifierRes.GetErrorInfo() != "" {
+			return "", utils.Error(identifier.identifierRes.GetErrorInfo())
+		} else {
+			return "", utils.Error("结果解析失败，请检查验证码相关参数是否正确")
+		}
 	}
 	return identifier.identifierRes.GetResult(), nil
-
 }
 
 func (identifier *CaptchaIdentifier) Detect(page *rod.Page, elementSelector string) (string, error) {
