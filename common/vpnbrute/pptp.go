@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"github.com/google/gopacket"
-	"github.com/yaklang/pcap"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
@@ -352,7 +351,7 @@ func (pptp *PPTPAuthItem) Tunnel(ctx context.Context) (error, bool) {
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithBPFFilter("proto 47"),
 			pcaputil.WithContext(ctx),
-			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
 					for {
 						select {

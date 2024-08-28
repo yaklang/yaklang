@@ -243,7 +243,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 				pcaputil.WithEnableCache(true),
 				pcaputil.WithBPFFilter("(tcp[tcpflags] & (tcp-rst) != 0)"),
 				pcaputil.WithContext(ctx),
-				pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+				pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 					go func() {
 						var counter int
 						var total int64
@@ -310,7 +310,7 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithBPFFilter("(tcp[tcpflags] & (tcp-rst) != 0)"),
 			pcaputil.WithContext(ctx),
-			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
 					var counter int
 					var total int64

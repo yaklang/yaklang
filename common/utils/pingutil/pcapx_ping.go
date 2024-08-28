@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/pcapx"
@@ -118,7 +117,7 @@ func PcapxPing(target string, config *PingConfig) (*PingResult, error) {
 			pcaputil.WithBPFFilter("icmp"),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithContext(ctx),
-			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
 					baseN := 1
 					for i := 0; i < 3; i++ {
