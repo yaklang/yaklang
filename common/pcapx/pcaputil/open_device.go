@@ -252,11 +252,6 @@ func (w *PcapHandleWrapper) close() {
 	return
 }
 
-func (w *PcapHandleWrapper) Close() {
-	log.Infof("daemon take over close handle")
-	return
-}
-
 func (w *PcapHandleWrapper) Error() (err error) {
 	defer func() {
 		if panicError := recover(); panicError != nil {

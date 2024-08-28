@@ -15,7 +15,7 @@ type pcapPacketHandlerContext struct {
 }
 
 type daemonCache struct {
-	handler            *PcapHandleWrapper
+	handler            PcapHandleOperation
 	registeredHandlers *omap.OrderedMap[string, *pcapPacketHandlerContext]
 	startOnce          *sync.Once
 }
