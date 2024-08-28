@@ -57,7 +57,7 @@ func keepDaemonCache(key string, ctx context.Context) context.CancelFunc {
 
 var getInterfaceHandlerMutex = new(sync.Mutex)
 
-func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, *PcapHandleWrapper, error) {
+func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, PcapHandleOperation, error) {
 	if conf.EnableCache {
 		getInterfaceHandlerMutex.Lock()
 		defer getInterfaceHandlerMutex.Unlock()
@@ -73,7 +73,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		cacheId := codec.Sha256(hashRaw.String())
 		if daemon, ok := getDaemonCache(cacheId); ok {
 			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
-				if oldHandle := daemon.handler; oldHandle != nil {
+				if oldHandle, ok := daemon.handler.(*PcapHandleWrapper); ok {
 					conf.onNetInterfaceCreated(oldHandle)
 				}
 			}
@@ -100,7 +100,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			}
 		}
 		daemon := &daemonCache{
-			handler:            handler,
+			handler:            operation,
 			registeredHandlers: omap.NewOrderedMap(make(map[string]*pcapPacketHandlerContext)),
 			startOnce:          new(sync.Once),
 		}
