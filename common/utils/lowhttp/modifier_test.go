@@ -1549,39 +1549,45 @@ Host: www.baidu.com
 
 func TestReplaceHTTPPacketPostParam(t *testing.T) {
 	testcases := []struct {
-		origin   string
-		key      string
-		value    string
-		expected string
+		origin     string
+		key        string
+		value      string
+		whitelists []string
+		blacklists []string
 	}{
 		{
 			origin: `POST / HTTP/1.1
 Host: www.baidu.com
 
 a=1&b=2`,
-			key:   "a",
-			value: "3",
-			expected: `POST / HTTP/1.1
-Host: www.baidu.com
-
-a=3&b=2`,
+			key:        "a",
+			value:      "3",
+			whitelists: []string{"\r\n\r\na=3&b=2", "Content-Type: application/x-www-form-urlencoded"},
+			blacklists: []string{"a=1"},
 		},
 	}
 	for _, testcase := range testcases {
 
-		actual := ReplaceHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value)
-		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
-		if bytes.Compare(actual, expected) != 0 {
-			t.Fatalf("ReplaceHTTPPacketPostParam failed: %s", string(actual))
+		actual := string(ReplaceHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value))
+		for _, whitelist := range testcase.whitelists {
+			if !strings.Contains(actual, whitelist) {
+				t.Fatalf("ReplaceHTTPPacketPostParam failed: %s", string(actual))
+			}
+		}
+		for _, blacklist := range testcase.blacklists {
+			if strings.Contains(actual, blacklist) {
+				t.Fatalf("ReplaceHTTPPacketPostParam failed: %s", string(actual))
+			}
 		}
 	}
 }
 
 func TestReplaceAllHttpPacketPostParams(t *testing.T) {
 	testcases := []struct {
-		origin   string
-		values   map[string]string
-		expected string
+		origin     string
+		values     map[string]string
+		whitelists []string
+		blacklists []string
 	}{
 		{
 			origin: `POST / HTTP/1.1
@@ -1589,65 +1595,87 @@ Host: www.baidu.com
 
 `,
 			values: map[string]string{"a": "1", "b": "2"},
-			expected: `POST / HTTP/1.1
-Host: www.baidu.com
-
-a=1&b=2`,
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"a=1&b=2",
+			},
 		},
 		{
 			origin: `POST / HTTP/1.1
 Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
 
 c=3`,
 			values: map[string]string{"a": "1", "b": "2"},
-			expected: `POST / HTTP/1.1
-Host: www.baidu.com
-
-a=1&b=2`,
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"\r\n\r\na=1&b=2",
+			},
+			blacklists: []string{
+				"c=3",
+			},
 		},
 	}
 	for _, testcase := range testcases {
-		actual := ReplaceAllHTTPPacketPostParams([]byte(testcase.origin), testcase.values)
-		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
-		if bytes.Compare(actual, expected) != 0 {
-			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
+		actual := string(ReplaceAllHTTPPacketPostParams([]byte(testcase.origin), testcase.values))
+		for _, whitelist := range testcase.whitelists {
+			if !strings.Contains(actual, whitelist) {
+				t.Fatalf("ReplaceAllHTTPPacketPostParams failed: %s", string(actual))
+			}
+		}
+		for _, blacklist := range testcase.blacklists {
+			if strings.Contains(actual, blacklist) {
+				t.Fatalf("ReplaceAllHTTPPacketPostParams failed: %s", string(actual))
+			}
 		}
 	}
 }
 
 func TestReplaceAllHttpPacketPostParamsWithoutEscape(t *testing.T) {
 	testcases := []struct {
-		origin   string
-		values   map[string]string
-		expected string
+		origin     string
+		values     map[string]string
+		whitelists []string
+		blacklists []string
 	}{
 		{
 			origin: `POST / HTTP/1.1
 Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
 
 c=1&d=2`,
 			values: map[string]string{"a": "{{int(1-100)}}", "b": "2"},
-			expected: `POST / HTTP/1.1
-Host: www.baidu.com
-
-a={{int(1-100)}}&b=2`,
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"\r\n\r\na={{int(1-100)}}&b=2",
+			},
+			blacklists: []string{
+				"c=1&d=2",
+			},
 		},
 	}
 	for _, testcase := range testcases {
-		actual := ReplaceAllHTTPPacketPostParamsWithoutEscape([]byte(testcase.origin), testcase.values)
-		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
-		if bytes.Compare(actual, expected) != 0 {
-			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
+		actual := string(ReplaceAllHTTPPacketPostParamsWithoutEscape([]byte(testcase.origin), testcase.values))
+		for _, whitelist := range testcase.whitelists {
+			if !strings.Contains(actual, whitelist) {
+				t.Fatalf("ReplaceAllHTTPPacketPostParamsWithoutEscape failed: %s", string(actual))
+			}
+		}
+		for _, blacklist := range testcase.blacklists {
+			if strings.Contains(actual, blacklist) {
+				t.Fatalf("ReplaceAllHTTPPacketPostParamsWithoutEscape failed: %s", string(actual))
+			}
 		}
 	}
 }
 
 func TestAppendHTTPPacketPostParam(t *testing.T) {
 	testcases := []struct {
-		origin   string
-		key      string
-		value    string
-		expected string
+		origin     string
+		key        string
+		value      string
+		whitelists []string
+		blacklists []string
 	}{
 		{
 			origin: `POST / HTTP/1.1
@@ -1656,10 +1684,10 @@ Host: www.baidu.com
 `,
 			key:   "a",
 			value: "1",
-			expected: `POST / HTTP/1.1
-Host: www.baidu.com
-
-a=1`,
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"\r\n\r\na=1",
+			},
 		},
 		{
 			origin: `POST / HTTP/1.1
@@ -1668,19 +1696,26 @@ Host: www.baidu.com
 a=1`,
 			key:   "b",
 			value: "2",
-			expected: `POST / HTTP/1.1
-Host: www.baidu.com
-
-a=1&b=2`,
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"\r\n\r\na=1&b=2",
+			},
 		},
 	}
 	for _, testcase := range testcases {
 
-		actual := AppendHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value)
-		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
-		if bytes.Compare(actual, expected) != 0 {
-			t.Fatalf("AddHTTPPacketPostParam failed: %s", string(actual))
+		actual := string(AppendHTTPPacketPostParam([]byte(testcase.origin), testcase.key, testcase.value))
+		for _, whitelist := range testcase.whitelists {
+			if !strings.Contains(actual, whitelist) {
+				t.Fatalf("AppendHTTPPacketPostParam failed: %s", string(actual))
+			}
 		}
+		for _, blacklist := range testcase.blacklists {
+			if strings.Contains(actual, blacklist) {
+				t.Fatalf("AppendHTTPPacketPostParam failed: %s", string(actual))
+			}
+		}
+
 	}
 }
 
