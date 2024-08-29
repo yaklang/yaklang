@@ -2,6 +2,9 @@ package ai
 
 import (
 	"errors"
+	"io"
+
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/chatglm"
 	"github.com/yaklang/yaklang/common/ai/comate"
@@ -12,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"io"
 )
 
 func init() {
@@ -54,6 +56,7 @@ func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (m
 func (g *Gateway) ChatStream(s string) (io.Reader, error) {
 	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.AIClient.BuildHTTPOptions)
 }
+
 func NewGateway() *Gateway {
 	return &Gateway{}
 }
@@ -86,12 +89,14 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
 
 	// update database if registered ai type is not in config or configured ai type is not in registered
 	updateCfg := false
-	for i, s := range cfg.AiApiPriority {
-		if !utils.StringArrayContains(total, s) {
-			cfg.AiApiPriority = append(cfg.AiApiPriority[:i], cfg.AiApiPriority[i+1:]...)
+	cfg.AiApiPriority = lo.Filter(cfg.AiApiPriority, func(s string, _ int) bool {
+		reserve := utils.StringArrayContains(total, s)
+		if !reserve {
 			updateCfg = true
 		}
-	}
+		return reserve
+	})
+
 	for _, s := range total {
 		if !utils.StringArrayContains(cfg.AiApiPriority, s) {
 			cfg.AiApiPriority = append(cfg.AiApiPriority, s)
@@ -115,6 +120,7 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
 
 	return errors.New("not found valid ai agent")
 }
+
 func createAIGateway(t string) aispec.AIClient {
 	gw, ok := aispec.Lookup(t)
 	if !ok {
