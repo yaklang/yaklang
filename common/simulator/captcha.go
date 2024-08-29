@@ -7,7 +7,6 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net/http"
 	"net/url"
 	"strings"
 )
@@ -163,7 +162,7 @@ type CaptchaIdentifier struct {
 	identifierMode string
 	identifierReq  requestStructr
 	identifierRes  responseStructr
-	identifierType string
+	identifierType int
 	proxy          *url.URL
 }
 
@@ -187,7 +186,7 @@ func (identifier *CaptchaIdentifier) SetProxy(proxy *url.URL) {
 	identifier.proxy = proxy
 }
 
-func (identifier *CaptchaIdentifier) SetType(typeStr string) {
+func (identifier *CaptchaIdentifier) SetType(typeStr int) {
 	identifier.identifierType = typeStr
 }
 
@@ -240,30 +239,27 @@ func (identifier *CaptchaIdentifier) detect(imgB64 string) (string, error) {
 	}
 	identifier.identifierReq.InputBase64(imgB64)
 	identifier.identifierReq.InputMode(identifier.identifierMode)
-	var request *http.Request
+	request := lowhttp.BasicRequest()
+	request = lowhttp.SetHTTPPacketUrl(request, identifier.identifierUrl)
 	var err error
-	if identifier.identifierType == "NewDDDD" {
+	if identifier.identifierType == NewDDDDOcr {
 		b64Str, ok := identifier.identifierReq.Generate().(string)
 		if ok == false {
 			return "", utils.Errorf("new dddd data error: %v", identifier.identifierReq.Generate())
 		}
 		var urlValue = url.Values{}
 		urlValue.Set("image", b64Str)
-		request, err = http.NewRequest("POST", identifier.identifierUrl, strings.NewReader(urlValue.Encode()))
-		if err != nil {
-			return "", utils.Error(err)
-		}
-		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		request = lowhttp.ReplaceHTTPPacketMethod(request, "POST")
+		request = lowhttp.ReplaceHTTPPacketHeader(request, "Content-Type", "application/x-www-form-urlencoded")
+		request = lowhttp.ReplaceHTTPPacketBody(request, []byte(urlValue.Encode()), false)
 	} else {
 		reqBody, err := json.Marshal(identifier.identifierReq.Generate())
 		if err != nil {
 			return "", utils.Error(err)
 		}
-		request, err = http.NewRequest("POST", identifier.identifierUrl, strings.NewReader(string(reqBody)))
-		if err != nil {
-			return "", utils.Error(err)
-		}
-		request.Header.Add("Content-Type", "application/json")
+		request = lowhttp.ReplaceHTTPPacketMethod(request, "POST")
+		request = lowhttp.ReplaceHTTPPacketHeader(request, "Content-Type", "application/json")
+		request = lowhttp.ReplaceHTTPPacketBody(request, reqBody, false)
 	}
 	opts := []lowhttp.LowhttpOpt{
 		lowhttp.WithRequest(request),
