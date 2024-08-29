@@ -663,12 +663,12 @@ type GotoBuilder struct {
 	isBreak bool
 }
 
-func (b *FunctionBuilder) BuildGoto() *GotoBuilder {
+func (b *FunctionBuilder) BuildGoto(name string) *GotoBuilder {
 	enter := b.CurrentBlock
 
 	return &GotoBuilder{
 		b:       b,
-		name:    "",
+		name:    name,
 		enter:   enter,
 		isBreak: false,
 	}
@@ -678,12 +678,8 @@ func (t *GotoBuilder) SetLabel(label *BasicBlock) {
 	t.label = label
 }
 
-func (t *GotoBuilder) SetName(name string) {
-	t.name = name
-}
-
-func (t *GotoBuilder) SetBreak() {
-	t.isBreak = true
+func (t *GotoBuilder) SetBreak(isBreak bool) {
+	t.isBreak = isBreak
 }
 
 func (t *GotoBuilder) Finish() func() {
@@ -745,13 +741,13 @@ type LabelBuilder struct {
 	gotoFinish []func()
 }
 
-func (b *FunctionBuilder) BuildLabel() *LabelBuilder {
+func (b *FunctionBuilder) BuildLabel(name string) *LabelBuilder {
 	enter := b.CurrentBlock
 
 	return &LabelBuilder{
 		b:           b,
 		enter:       enter,
-		name:        "",
+		name:        name,
 		gotoHanders: []func(*BasicBlock){},
 	}
 }
@@ -766,14 +762,6 @@ func (t *LabelBuilder) GetGotoHanders() []func(*BasicBlock) {
 
 func (t *LabelBuilder) SetGotoFinish(f func()) {
 	t.gotoFinish = append(t.gotoFinish, f)
-}
-
-func (t *LabelBuilder) GetGotoFinish() []func() {
-	return t.gotoFinish
-}
-
-func (t *LabelBuilder) SetName(name string) {
-	t.name = name
 }
 
 func (t *LabelBuilder) GetBlock() *BasicBlock {
@@ -798,7 +786,7 @@ func (t *LabelBuilder) Build() {
 
 func (t *LabelBuilder) Finish() {
 	builder := t.b
-	for _, f := range t.GetGotoFinish() {
+	for _, f := range t.gotoFinish {
 		f()
 	}
 	builder.PopTarget()
