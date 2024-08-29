@@ -1116,33 +1116,65 @@ func (b *astbuilder) buildDeferGoExpression(stmt *gol.ExpressionContext) ssa.Val
 	return b.NewCall(rv, args)
 }
 
+func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {
+	gotoBuilder := b.BuildGoto(labelName)
+	if len(isBreak) > 0 {
+		gotoBuilder.SetBreak(isBreak[0])
+	}
+	if targetBlock := b.GetLabel(labelName); targetBlock != nil {
+		// target label exist, just set it
+		LabelBuilder := b.GetLabelByName(labelName)
+		gotoBuilder.SetLabel(targetBlock)
+		f := gotoBuilder.Finish()
+		LabelBuilder.SetGotoFinish(f)
+	} else {
+		// target label not exist, create it
+		LabelBuilder := b.BuildLabel(labelName)
+		// use handler function
+		LabelBuilder.SetGotoHander(func(_goto *ssa.BasicBlock) {
+			gotoBuilder.SetLabel(_goto)
+			f := gotoBuilder.Finish()
+			LabelBuilder.SetGotoFinish(f)
+		})
+		b.labels[labelName] = LabelBuilder
+	}
+}
+
 func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-
-	var _goto *ssa.BasicBlock
 	if id := stmt.IDENTIFIER(); id != nil {
-		text := id.GetText()
-		_goto = b.GetLabel(text)
+		b.handlerGoto(id.GetText())
+	}
+}
 
-		GotoBuilder := b.BuildGoto()
-		if _goto != nil {
-			LabelBuilder := b.GetLabelByName(text)
-			GotoBuilder.SetLabel(_goto)
-			GotoBuilder.SetName(text)
-			f := GotoBuilder.Finish()
-			LabelBuilder.SetGotoFinish(f)
-		} else {
-			LabelBuilder := b.BuildLabel()
-			LabelBuilder.SetName(text)
-			LabelBuilder.SetGotoHander(func(_goto *ssa.BasicBlock) {
-				GotoBuilder.SetLabel(_goto)
-				GotoBuilder.SetName(text)
-				f := GotoBuilder.Finish()
-				LabelBuilder.SetGotoFinish(f)
-			})
-			b.labels[text] = LabelBuilder
-		}
+func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	// if exist label, goto label
+	if id := stmt.IDENTIFIER(); id != nil {
+		b.handlerGoto(id.GetText())
+		return
+	}
+
+	if !b.Continue() {
+		b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
+	}
+}
+
+func (b *astbuilder) buildBreakStmt(stmt *gol.BreakStmtContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	// if exist label, goto label
+	if id := stmt.IDENTIFIER(); id != nil {
+		b.handlerGoto(id.GetText(), true)
+		return
+	}
+
+	if !b.Break() {
+		b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
 	}
 }
 
@@ -1157,8 +1189,7 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 
 	LabelBuilder := b.GetLabelByName(text)
 	if LabelBuilder == nil {
-		LabelBuilder = b.BuildLabel()
-		LabelBuilder.SetName(text)
+		LabelBuilder = b.BuildLabel(text)
 		b.labels[text] = LabelBuilder
 	}
 
@@ -1176,51 +1207,6 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	}
 
 	LabelBuilder.Finish()
-}
-
-func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	defer recoverRange()
-
-	if !b.Continue() {
-		b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
-	}
-}
-
-func (b *astbuilder) buildBreakStmt(stmt *gol.BreakStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	defer recoverRange()
-
-	if id := stmt.IDENTIFIER(); id != nil {
-		text := id.GetText()
-		_goto := b.GetLabel(text)
-
-		b.GetLabelByName(text)
-
-		GotoBuilder := b.BuildGoto()
-		GotoBuilder.SetBreak()
-		if _goto != nil {
-			LabelBuilder := b.GetLabelByName(text)
-			GotoBuilder.SetLabel(_goto)
-			GotoBuilder.SetName(text)
-			f := GotoBuilder.Finish()
-			LabelBuilder.SetGotoFinish(f)
-		} else {
-			LabelBuilder := b.BuildLabel()
-			LabelBuilder.SetName(text)
-			LabelBuilder.SetGotoHander(func(_goto *ssa.BasicBlock) {
-				GotoBuilder.SetLabel(_goto)
-				GotoBuilder.SetName(text)
-				f := GotoBuilder.Finish()
-				LabelBuilder.SetGotoFinish(f)
-			})
-			b.labels[text] = LabelBuilder
-		}
-	} else {
-		if !b.Break() {
-			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
-		}
-	}
 }
 
 func (b *astbuilder) buildSelectStmt(stmt *gol.SelectStmtContext) {
