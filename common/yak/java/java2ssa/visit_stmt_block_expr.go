@@ -120,7 +120,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.AssignRightSideEmpty())
 			return nil
 		}
-		return y.ReadMemberCallVariable(expr, key)
+		return y.ReadMemberCallValue(expr, key)
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
 		obj := y.VisitExpression(ret.Expression())
@@ -148,7 +148,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			key = y.EmitConstInst(explicit.GetText())
 		}
 		if res == nil {
-			res = y.ReadMemberCallVariable(obj, key)
+			res = y.ReadMemberCallValue(obj, key)
 		}
 
 		resTyp := res.GetType()
@@ -697,7 +697,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			memberKey = y.EmitConstInst(ret.GetText())
 			// get parent class
 		}
-		methodCall := y.ReadMemberCallMethodVariable(object, memberKey)
+		methodCall := y.ReadMemberCallMethod(object, memberKey)
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
@@ -952,7 +952,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 					key := y.EmitConstInst("close")
 					if shouldClosedValue != nil {
 						for _, value := range shouldClosedValue {
-							y.ReadMemberCallMethodVariable(value, key)
+							y.ReadMemberCallMethod(value, key)
 						}
 					}
 				})
@@ -961,7 +961,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 					key := y.EmitConstInst("close")
 					if shouldClosedValue != nil {
 						for _, value := range shouldClosedValue {
-							y.ReadMemberCallMethodVariable(value, key)
+							y.ReadMemberCallMethod(value, key)
 						}
 					}
 				})
@@ -1798,7 +1798,7 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 		slice = y.EmitMakeBuildWithType(ssa.NewSliceType(ssa.BasicTypes[ssa.AnyTypeKind]),
 			y.EmitConstInst(0), y.EmitConstInst(0))
 	}
-	slice = y.InterfaceAddFieldBuild(len(allExpr),
+	slice = y.BuildObjectAddFieldBuild(len(allExpr),
 		func(i int) ssa.Value { return y.EmitConstInst(i) },
 		func(i int) ssa.Value { return y.VisitExpression(allExpr[i]) },
 	)

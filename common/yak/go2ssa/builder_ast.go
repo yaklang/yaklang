@@ -373,7 +373,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			length = it.Len
 			if len(leftVariables) == length {
 				for i := range leftVariables {
-					value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+					value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
 					b.AssignVariable(leftVariables[i], value)
 				}
 				return
@@ -383,7 +383,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			for i := range leftVariables {
 				b.AssignVariable(
 					leftVariables[i],
-					b.ReadMemberCallVariable(c, b.EmitConstInst(i)),
+					b.ReadMemberCallValue(c, b.EmitConstInst(i)),
 				)
 			}
 			return
@@ -410,7 +410,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 				b.AssignVariable(leftVariables[i], c)
 				continue
 			}
-			value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+			value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
 			b.AssignVariable(leftVariables[i], value)
 		}
 	}

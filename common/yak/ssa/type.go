@@ -1091,6 +1091,11 @@ type FunctionType struct {
 	fullTypeName   []string
 }
 
+func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
+	f.IsMethod = isMethod
+	f.ObjectType = obj
+}
+
 var _ Type = (*FunctionType)(nil)
 
 func (f *FunctionType) AddFullTypeName(name string) {

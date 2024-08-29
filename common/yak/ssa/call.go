@@ -248,7 +248,7 @@ func (c *Call) handleCalleeFunction() {
 					continue
 				}
 
-				if _, typ := checkCanMemberCall(object, key); typ == nil {
+				if res := checkCanMemberCallExist(object, key); res.exist {
 					builder.NewErrorWithPos(Error, SSATAG,
 						p.GetRange(),
 						ValueNotMember(
@@ -266,7 +266,7 @@ func (c *Call) handleCalleeFunction() {
 					)
 					continue
 				}
-				val := builder.ReadMemberCallVariable(object, key)
+				val := builder.ReadMemberCallValue(object, key)
 				val.AddUser(c)
 				c.ArgMember = append(c.ArgMember, val)
 			}

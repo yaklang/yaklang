@@ -25,7 +25,7 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 	}
 	allExpr := s.AllExpression()
 
-	obj := b.InterfaceAddFieldBuild(len(allExpr),
+	obj := b.BuildObjectAddFieldBuild(len(allExpr),
 		func(i int) ssa.Value { return b.EmitConstInst(i) },
 		func(i int) ssa.Value {
 			return b.buildExpression(allExpr[i].(*yak.ExpressionContext))
@@ -84,7 +84,7 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	}
 	allPair := s.AllMapPair()
 
-	obj := b.InterfaceAddFieldBuild(len(allPair),
+	obj := b.BuildObjectAddFieldBuild(len(allPair),
 		func(i int) ssa.Value {
 			return b.buildExpression(allPair[i].(*yak.MapPairContext).Expression(0).(*yak.ExpressionContext))
 		},

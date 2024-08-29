@@ -17,10 +17,10 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 	}
 
 	if para, ok := ToParameter(v.object); ok {
-		name, typ := checkCanMemberCall(para, v.key)
-		newParamterMember := b.NewParameterMember(name, para, v.key)
-		newParamterMember.SetType(typ)
-		SetMemberCall(para, v.key, newParamterMember)
+		res := checkCanMemberCallExist(para, v.key)
+		newParamterMember := b.NewParameterMember(res.name, para, v.key)
+		newParamterMember.SetType(res.typ)
+		setMemberCallRelationship(para, v.key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
 	}
 
@@ -37,7 +37,7 @@ func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
 }
 
 func (b *FunctionBuilder) ReadOrCreateMemberCallVariable(caller, callee Value) Value {
-	return b.ReadMemberCallVariable(caller, callee)
+	return b.ReadMemberCallValue(caller, callee)
 }
 
 func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
@@ -110,7 +110,7 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if enableClosureFreeValue  && create {
+	if enableClosureFreeValue && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
