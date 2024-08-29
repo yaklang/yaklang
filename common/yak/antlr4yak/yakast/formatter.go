@@ -84,20 +84,24 @@ func (y *YakCompiler) TrimEos(s string) int {
 }
 
 func (y *YakCompiler) writeStringWithWhitespace(i string) {
+	y.currentLineLength += len(i) + 2
 	y.formatted.WriteByte(' ')
 	y.formatted.WriteString(i)
 	y.formatted.WriteByte(' ')
 }
 
 func (y *YakCompiler) writeWhiteSpace(i int) {
+	y.currentLineLength += i
 	y.formatted.WriteString(strings.Repeat(" ", i))
 }
 
 func (y *YakCompiler) writeString(i string) {
+	y.currentLineLength += len(i)
 	y.formatted.WriteString(i)
 }
 
 func (y *YakCompiler) writeNewLine() {
+	y.currentLineLength = 0
 	y.formatted.WriteString("\n")
 }
 

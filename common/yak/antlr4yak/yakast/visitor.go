@@ -32,8 +32,10 @@ type YakCompiler struct {
 	currentStartPosition, currentEndPosition *Position
 
 	// 格式化
-	formatted                                    *bytes.Buffer
-	indent                                       int
+	formatted         *bytes.Buffer
+	indent            int
+	currentLineLength int
+
 	sourceCodeFilePathPointer, sourceCodePointer *string
 	codes                                        []*yakvm.Code
 	FreeValues                                   []int
