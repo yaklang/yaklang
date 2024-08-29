@@ -73,8 +73,7 @@ func (s *Scannerx) initHandle() error {
 	return nil
 }
 
-func (s *Scannerx) initHandlerStart() error {
-
+func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -83,7 +82,7 @@ func (s *Scannerx) initHandlerStart() error {
 		}()
 
 		err := pcaputil.Start(
-			pcaputil.WithContext(s.config.Ctx),
+			pcaputil.WithContext(ctx),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithDevice(s.config.Iface.Name),
 			pcaputil.WithBPFFilter(fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())),
@@ -92,7 +91,7 @@ func (s *Scannerx) initHandlerStart() error {
 				go func() {
 					for {
 						select {
-						case <-s.config.Ctx.Done():
+						case <-s.ctx.Done():
 							return
 						case packet, ok := <-s.PacketChan:
 							if !ok {

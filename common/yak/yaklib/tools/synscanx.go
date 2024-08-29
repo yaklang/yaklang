@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"sync"
 	"time"
 )
 
@@ -66,145 +65,78 @@ func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...sy
 }
 
 func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
-	var wg sync.WaitGroup
-
-	ctx, cancel := context.WithCancel(config.Ctx)
-	defer func() {
-		go func() {
-			wg.Wait()
-			cancel()
-		}()
-	}()
-	processedRes := make(chan string, 16)
-
-	var sample string
-	var ok bool
-	select {
-	case sample, ok = <-res:
-		if !ok {
-			return nil, utils.Error("ping result is empty")
-		}
-		processedRes <- sample
-	case <-ctx.Done():
-		return nil, utils.Error("ping canceled")
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
 	}
+	ctx := config.Ctx
+	// 提取第一个ip
+	waitSimpleReady := make(chan struct{})
+	var sample string
+	inputCh := make(chan string)
+	go func() {
+		defer close(inputCh)
+		for {
+			select {
+			case v, ok := <-res:
+				if !ok {
+					return
+				}
+				if sample == "" {
+					sample = v
+					waitSimpleReady <- struct{}{}
+				}
 
+				inputCh <- v
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	// 等待拿到第一个ip
+	<-waitSimpleReady
+
+	// 创建Scanner
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
 		return nil, err
 	}
 	scanner.FromPing = true
-	sendDoneSignal := make(chan struct{})
-
-	targetCh := make(chan *synscanx.SynxTarget, 16)
-	resultCh := make(chan *synscan.SynScanResult, 1024)
-
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		scanner.SubmitTargetFromPing(processedRes, ports, targetCh)
-		close(targetCh)
-		//close(scanner.PacketChan)
-		<-sendDoneSignal
-		close(resultCh)
-		log.Infof("send done signal")
-	}()
-
-	time.Sleep(100 * time.Millisecond)
-
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
-		if err != nil {
-			close(resultCh)
-			log.Errorf("scan failed: %s", err)
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case pingResult, ok := <-res:
-				if !ok {
-					close(processedRes)
-					return
-				}
-				processedRes <- pingResult
-			case <-ctx.Done():
-				close(processedRes)
-				return
-			}
-		}
-	}()
-
+	targetCh := scanner.SubmitTargetFromPing(inputCh, ports)
+	resultCh, err := scanner.Scan(targetCh)
+	if err != nil {
+		log.Errorf("scan failed: %s", err)
+	}
 	return resultCh, nil
+
 }
 
 func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
-	var wg sync.WaitGroup
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	ctx := config.Ctx
 
-	ctx, cancel := context.WithCancel(config.Ctx)
-	defer func() {
-		go func() {
-			wg.Wait()
-			cancel()
-		}()
-	}()
 	log.Infof("targets: %s", targets)
 	sample := utils.ParseStringToHosts(targets)[0]
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
-		cancel()
 		return nil, err
 	}
-	sendDoneSignal := make(chan struct{})
 
-	targetCh := make(chan *synscanx.SynxTarget, 16)
-	resultCh := make(chan *synscan.SynScanResult, 1024)
-
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		scanner.SubmitTarget(targets, ports, targetCh)
-		close(targetCh)
-		//close(scanner.PacketChan)
-		<-sendDoneSignal
-		close(resultCh)
-		log.Infof("send done signal")
+	defer func() {
+		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
 	}()
+	targetCh := scanner.SubmitTarget(targets, ports)
 
 	time.Sleep(100 * time.Millisecond)
 
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if err := recover(); err != nil {
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		err := scanner.Scan(sendDoneSignal, targetCh, resultCh)
-		if err != nil {
-			close(resultCh)
-			log.Errorf("scan failed: %s", err)
-		}
-	}()
+	resultCh, err := scanner.Scan(targetCh)
+	if err != nil {
+		log.Errorf("scan failed: %s", err)
+	}
 
 	return resultCh, nil
 }

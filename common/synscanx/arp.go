@@ -41,6 +41,11 @@ func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
 
 // getInterfaceNetworks 获取网络接口的 IPv4 和 IPv6 网络范围
 func (s *Scannerx) getInterfaceNetworks() (*net.IPNet, *net.IPNet) {
+	// 如果接口已经更新过了，直接返回缓存的值
+	if s.ifaceUpdated {
+		return s.ifaceIPNetV4, s.ifaceIPNetV6
+	}
+
 	addrs, _ := s.config.Iface.Addrs()
 
 	var ifaceIPNetV4 *net.IPNet
@@ -58,11 +63,21 @@ func (s *Scannerx) getInterfaceNetworks() (*net.IPNet, *net.IPNet) {
 		}
 	}
 
+	// 更新缓存
+	s.ifaceIPNetV4 = ifaceIPNetV4
+	s.ifaceIPNetV6 = ifaceIPNetV6
+	s.ifaceUpdated = true // 标记接口信息已更新
+
 	return ifaceIPNetV4, ifaceIPNetV6
 }
 
+func (s *Scannerx) ResetInterfaceCache() {
+	s.ifaceUpdated = false
+}
+
 // isInternalAddress 判断目标 IP 是否为内网地址
-func (s *Scannerx) isInternalAddress(target string, ifaceIPNetV4, ifaceIPNetV6 *net.IPNet) bool {
+func (s *Scannerx) isInternalAddress(target string) bool {
+	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
 	targetIP := net.ParseIP(target)
 	if targetIP == nil || targetIP.IsLoopback() || targetIP.IsLinkLocalUnicast() || targetIP.IsLinkLocalMulticast() {
 		return false
@@ -72,14 +87,14 @@ func (s *Scannerx) isInternalAddress(target string, ifaceIPNetV4, ifaceIPNetV6 *
 }
 
 func (s *Scannerx) arpScan() {
-	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
+
 	for target := range s.hosts.Hosts() {
 		s.rateLimit()
 		select {
 		case <-s.ctx.Done():
 			return
 		default:
-			if s.isInternalAddress(target, ifaceIPNetV4, ifaceIPNetV6) {
+			if s.isInternalAddress(target) {
 				s.arp(target)
 			}
 		}
