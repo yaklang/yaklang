@@ -24,8 +24,28 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 		dstMac = mac.(net.HardwareAddr)
 	}
 
+	//timeout := time.After(500 * time.Millisecond)
+	//ticker := time.NewTicker(10 * time.Millisecond)
+	//defer ticker.Stop()
+
+	//loop:
+	//	for {
+	//		select {
+	//		case <-ticker.C:
+	//			if mac, ok := s.macCacheTable.Load(host); ok {
+	//				dstMac = mac.(net.HardwareAddr)
+	//			}
+	//			if dstMac != nil {
+	//				break loop
+	//			}
+	//		case <-timeout:
+	//			log.Warnf("%s timeout waiting for ARP response", host)
+	//			break loop
+	//		}
+	//	}
+
 	if dstMac == nil {
-		if !isLoopback {
+		if !isLoopback && !s.isInternalAddress(host) {
 			// 外网扫描时，目标机器的 MAC 地址就是网关的 MAC 地址
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
@@ -52,8 +72,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 
 	var ipSrc string
 	if isLoopback {
-		//ipSrc = net.ParseIP("127.0.0.1").String()
-		ipSrc = net.ParseIP("192.168.3.3").String()
+		ipSrc = net.ParseIP("127.0.0.1").String()
 		host = ipSrc
 	} else {
 		ipSrc = s.config.SourceIP.String()
