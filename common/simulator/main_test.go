@@ -352,6 +352,13 @@ const (
 <form action="/login" method="post">
     用户名称:<input type="text" name="username"><br>
     密码:<input type="password" name="password"><br>
+		<div class="el-form-item__content" style="margin-left: 0px">
+			<div>
+				<input type="text" autocomplete="off" placeholder="请输入验证码" />
+			</div>
+			<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAAoCAYAAAA16j4lAAAFUElEQVR4nOyafYhUVR/HP8cXHh99nIFnrpDXaosiyl5MsMaM/KMWJAgrM6lssCzKMicsNq+RqGV0YZHkGglh+sekJhhrbxS4RtGLXcWyJAvCl4Ucre6WZ8pKTG+cOye72s66M3dmBy/3A7Nn7tyzv/Ob891zzvecu4N83ychvgxodgIJjSUROOYkAsecROCYkwgccxKBY04icMxJBI45icAxJxE45gxqdgL1JpsuDgVmA7cBFwPDgAPAZqDdleauZufYn4g4nUVn08VLgHeAlgpVjgAzXGmu7+fUmkZsBM6miyOAL4GzgFeA1cAOfA4juAJ4ErgFOAqMcaX5dbNzPpWckR4OtAFTgQv1x3uADsAueFJWGzNOAitRpwOvudKcWqFOhxZ5lSvN+/oa++rHF1fVSVuXLhTV1Kcs7v+BD4HRFarsBq4rePJANXFPWoPbW1rVl54PnAvsBZa1dXWuqDbZMHk7MxDEx6p/gdsdy9vwzz1jihIEeMOxvJtrbSObLo4E7gT+AB7rpeozWuBJtbbVQBZqcfcBc4D3gYHA9YADXAAsBe6qJuiJEdze0noNUAAeBFz1hwu8qkRp6+r8IErmedtQiX8G/KSMj2N5pbxtpIBvtAka7Vje/lrjZ9PFR4DlwMuuNO+PkmuzyBlp9f1N1e8FT2475d54YAtQKngyXU3c8Ai+B5jX1tW5WV+/197SugC4FYgksGN5u/K2sUSPIBt4GHgOUCNvdhRxNeN1+WbEOE2j4MlRvdzeq8sj1cYNC5zVnR/mI2BmtUF7xrdBqK3LrLxtfAc8BHzi40daAjSX6/ILvU3KA9OAi/TnylCtwWeFWzKr7qRmksukBiPESn25odrfDx90nAN8f8r9/Xruj4xjdf8J3AscA57VbvaB5VZ3PVzeSF2q6Wunnh3G6ulfvcYBzyPYotfrM4JcJjUIIdYBN2mTNb/aGOERPBw/MClhfgNS0VMt41jejrxtbNTbgLccy/uqTqH/p8uO4HuUDzpex+cgIrin/MRTwERl6LKp4gS3ZB7ta/D+cNE9IsQqfWCjBt6kWrZJAyq8L+NzHIJXXcjbxmXA3255ct42xtYp9BBd/kfp4UrzRVea+92SecyVpnSluQmfVm0exyGYUad2G0bOSKslJgcoUW8oeHJ3LXHCI7iECDro9xOfCIbqBiIzx84IgXhJt6m2BIuA1Xk7c5Vjdfd5NFVAzTz/BSxXmnt7qqBGbDZdVFO3mkHuAFb2NXjdRmR1zNblvIIna57pwqN2j7bpYUaFHFwkBEKZKrUVW+lY3tNqSwOMATGvDuFLunz7NPW26PLKOrTZaMbpcmOUIGGBt+q1Koy63h6lAcpT89naoR/QR3GKJ4CDwIK8bVwasYl9wU+fw73W8jmk3w2L2F5DyWVSSpehwYXv/xglVniKVm5tTXtL6w/ANi3uIr3IR+UFbX5mOpYXTPmO5f2ct41HgfXAqrydmeBY3cdqjP95sM0TwbZoZ8VaghH6XdR9d0MpdJeOB9nWgZPOottbWmfpY7LzgC5gSVtX59p6NNRIsuni5MA1wzJXmnN7qXe3Pq1b60pzev9m2Rxi8bAhmyoORvCt9hATXWl++q865QOQ7foZ8Y2uNN9tTrZ9I2ekA2EKnow0kmMhMGUBJ+lnwb9ql74RnyIiWG+vBRbrw48OV5pTmp3v6UgE7oFsujhdb3+GVKiyCZjmSvNQP6fWNGIlMGWRzwfm6keCyr3/AuxSRg6fdW7JrNXInZHETuCEk0n+qzLmJALHnETgmJMIHHMSgWNOInDMSQSOOYnAMeevAAAA///P/4+h8mI+XQAAAABJRU5ErkJggg=="
+			id="code" alt="验证码" />
+		</div>
     <input type="submit" value="Login">
 </form>
 
@@ -406,6 +413,10 @@ func TestHttpBruteForce(t *testing.T) {
 		WithExePath(`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`),
 		//WithCaptchaUrl(`http://192.168.3.20:8008/runtime/text/invoke`),
 		//WithCaptchaMode(`common_arithmetic`),
+		//WithCaptchaUrl(`http://192.168.0.115:9898/ocr/b64/json`),
+		//WithCaptchaType(OldDDDDOcr),
+		//WithCaptchaUrl(`http://0.0.0.0:8000/ocr`),
+		//WithCaptchaType(NewDDDDOcr),
 		WithUsernameList("admin"),
 		WithPasswordList("123321", "admin"),
 		WithExtraWaitLoadTime(1000),

@@ -58,3 +58,9 @@ var SimpleKeywordDict = map[string][]string{
 	"Captcha":  simpleCaptchaKeyword,
 	"Login":    loginKeyword,
 }
+
+const (
+	OtherOcr = iota + 1
+	OldDDDDOcr
+	NewDDDDOcr
+)
