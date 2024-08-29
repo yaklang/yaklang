@@ -166,8 +166,11 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			if extractorMap[index+1] != nil {
 				fuzzerReq.Extractors = extractorMap[index+1]
 			}
+			reqMatcher := &ypb.HTTPResponseMatcher{
+				SubMatcherCondition: matchersCondition,
+			}
 			if matcherMap[index+1] != nil {
-				fuzzerReq.Matchers = matcherMap[index+1]
+				reqMatcher.SubMatchers = matcherMap[index+1]
 			}
 			// if not set id
 			if index == len(fuzzerReqs)-1 {
@@ -175,10 +178,11 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 					fuzzerReq.Extractors = extractorMap[0]
 				}
 				if matcherMap[0] != nil {
-					fuzzerReq.Matchers = matcherMap[0]
+					reqMatcher.SubMatchers = matcherMap[0]
 				}
 			}
-			fuzzerReq.MatchersCondition = matchersCondition
+
+			fuzzerReq.Matchers = []*ypb.HTTPResponseMatcher{reqMatcher}
 			fuzzerReq.NoFixContentLength = noFixContentLength
 			fuzzerReq.NoFollowRedirect = noFollowRedirect
 			fuzzerReq.RedirectTimes = redirectTimes
@@ -290,13 +294,18 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
 			})
 		}
-		matchers := HttpResponseMatchers2YakMatchers(request.Matchers)
+		var topMatcher = &ypb.HTTPResponseMatcher{SubMatchers: []*ypb.HTTPResponseMatcher{}}
+		if len(request.GetMatchers()) > 0 {
+			topMatcher = request.GetMatchers()[0]
+		}
+
+		matchers := HttpResponseMatchers2YakMatchers(topMatcher.SubMatchers)
 		for _, matcher := range matchers {
 			matcher.Id = index + 1
 		}
 		if len(matchers) > 0 {
 			bulk.Matcher.SubMatchers = append(bulk.Matcher.SubMatchers, matchers...)
-			bulk.Matcher.SubMatcherCondition = request.MatchersCondition
+			bulk.Matcher.SubMatcherCondition = topMatcher.SubMatcherCondition
 		}
 		bulk.Extractor = append(bulk.Extractor, funk.Map(request.Extractors, func(extractor *ypb.HTTPResponseExtractor) *httptpl.YakExtractor {
 			typeName := ""
