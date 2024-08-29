@@ -119,6 +119,7 @@ func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) 
 	p.FormalParameterIndex = len(f.Params) - 1
 	p.IsFreeValue = false
 	variable := f.CreateVariable(p.GetName(), token...)
+	variable.AddRange(f.CurrentRange, false)
 	f.AssignVariable(variable, p)
 }
 

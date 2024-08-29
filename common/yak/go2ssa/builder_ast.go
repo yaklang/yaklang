@@ -420,7 +420,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 
 		for i := range leftVariables {
 			if i >= length {
-				value := b.EmitUndefined(leftVariables[i].GetName())
+				value := b.ReadValue(leftVariables[i].GetName())
 				b.AssignVariable(leftVariables[i], value)
 				continue
 			}
