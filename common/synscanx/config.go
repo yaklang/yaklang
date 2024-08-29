@@ -92,7 +92,7 @@ func NewDefaultConfig() *SynxConfig {
 		rateLimitDelayGap:                  150,
 		shuffle:                            true,
 		FetchGatewayHardwareAddressTimeout: 3 * time.Second,
-		Ctx: context.Background(),
+		Ctx:                                context.Background(),
 	}
 }
 
@@ -264,8 +264,8 @@ func WithConcurrent(count int) SynxConfigOption {
 		}
 		config.rateLimitDelayMs = float64(time.Second) / float64(count) / float64(time.Millisecond)
 		config.rateLimitDelayGap = count / 10
-		log.Infof("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
-		log.Infof("rate limit delay gap: %v", config.rateLimitDelayGap)
+		log.Debugf("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
+		log.Debugf("rate limit delay gap: %v", config.rateLimitDelayGap)
 	}
 }
 
