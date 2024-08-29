@@ -176,7 +176,7 @@ func (s *Scannerx) SubmitTarget(targets, ports string) <-chan *SynxTarget {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
 	})
 
-	tgCh := make(chan *SynxTarget, 16)
+	tgCh := make(chan *SynxTarget)
 	go func() {
 		defer close(tgCh)
 		for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
@@ -220,7 +220,7 @@ func (s *Scannerx) SubmitTarget(targets, ports string) <-chan *SynxTarget {
 }
 
 func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *SynxTarget {
-	tgCh := make(chan *SynxTarget, 16)
+	tgCh := make(chan *SynxTarget)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 
 	s.OnSubmitTask(func(h string, p int) {
@@ -399,9 +399,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		}
 		s.sendPacket(targetCh)
 		time.Sleep(s.config.waiting)
-		log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
+		log.Debugf("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
 
-		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Now().Sub(s.startTime))
+		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
 	}()
 
 	defer func() {
@@ -416,11 +416,9 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 	for {
 		select {
 		case <-s.ctx.Done():
-			log.Info("context cancelled, stopping packet sending")
 			return
 		case target, ok := <-targetCh:
 			if !ok {
-				log.Info("target channel closed, stopping packet sending")
 				return
 			}
 			host := target.Host
@@ -428,7 +426,7 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			proto := target.Mode
 			packet, err := s.assemblePacket(host, port, proto)
 			if err != nil {
-				log.Errorf("assemble packet failed: %v", err)
+				log.Debugf("assemble packet failed: %v", err)
 				continue
 			}
 			s.PacketChan <- packet

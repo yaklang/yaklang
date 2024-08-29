@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
+	"time"
 )
 
 func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
@@ -19,32 +20,18 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 
 	dstMac := s.config.RemoteMac
 	srcMac := s.config.SourceMac
-	// 内网扫描时，这一步应该能够获取到目标机器的 MAC 地址
-	if mac, ok := s.macCacheTable.Load(host); ok {
-		dstMac = mac.(net.HardwareAddr)
-	}
-
-	//timeout := time.After(500 * time.Millisecond)
-	//ticker := time.NewTicker(10 * time.Millisecond)
-	//defer ticker.Stop()
-
-	//loop:
-	//	for {
-	//		select {
-	//		case <-ticker.C:
-	//			if mac, ok := s.macCacheTable.Load(host); ok {
-	//				dstMac = mac.(net.HardwareAddr)
-	//			}
-	//			if dstMac != nil {
-	//				break loop
-	//			}
-	//		case <-timeout:
-	//			log.Warnf("%s timeout waiting for ARP response", host)
-	//			break loop
-	//		}
-	//	}
 
 	if dstMac == nil {
+		if isLoopback {
+			// Loopback
+			if runtime.GOOS == "windows" {
+				opts = append(opts, pcapx.WithLoopback(isLoopback))
+			} else {
+				opts = append(opts, pcapx.WithEthernet_SrcMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+				opts = append(opts, pcapx.WithEthernet_DstMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+			}
+		}
+		// 外网扫描
 		if !isLoopback && !s.isInternalAddress(host) {
 			// 外网扫描时，目标机器的 MAC 地址就是网关的 MAC 地址
 			dstMac, err = s.getGatewayMac()
@@ -54,13 +41,37 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 			// Ethernet
 			opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
 			opts = append(opts, pcapx.WithEthernet_DstMac(dstMac))
-		} else {
-			// Loopback
-			if runtime.GOOS == "windows" {
-				opts = append(opts, pcapx.WithLoopback(isLoopback))
-			} else {
-				opts = append(opts, pcapx.WithEthernet_SrcMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
-				opts = append(opts, pcapx.WithEthernet_DstMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+		}
+		// 内网扫描，不是回环地址，且是内网地址，尝试从缓存中获取目标机器的 MAC 地址
+		if !isLoopback && s.isInternalAddress(host) {
+			// 内网扫描时，这一步应该能够获取到目标机器的 MAC 地址
+			if mac, ok := s.macCacheTable.Load(host); ok {
+				switch mac.(type) {
+				case net.HardwareAddr:
+					dstMac = mac.(net.HardwareAddr)
+				case string:
+					return nil, utils.Errorf("get mac failed: %s", mac)
+				}
+			}
+			timeout := time.After(50 * time.Millisecond)
+			ticker := time.NewTicker(10 * time.Millisecond)
+			defer ticker.Stop()
+
+		loop:
+			for {
+				select {
+				case <-ticker.C:
+					if mac, ok := s.macCacheTable.Load(host); ok {
+						dstMac = mac.(net.HardwareAddr)
+					}
+					if dstMac != nil {
+						break loop
+					}
+				case <-timeout:
+					//log.Warnf("%s timeout waiting for ARP response", host)
+					s.macCacheTable.Store(host, "timeout")
+					break loop
+				}
 			}
 		}
 	} else {
