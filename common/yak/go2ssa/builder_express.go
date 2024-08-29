@@ -225,7 +225,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 					return fun, nil
 				} // TODO 目前没法识别golang库中的函数
 				b.NewError(ssa.Warn, TAG, "function not found, but create")
-				rightv = b.EmitUndefined(test)
+				rightv = b.ReadValue(test)
 			} else {
 				rightv = b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
 			}
@@ -431,7 +431,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 		v = funcs[text]
 		if v.(*ssa.Function) == nil {
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
-			return b.EmitUndefined(text)
+			return b.ReadValue(text)
 		}
 		return v
 	}
