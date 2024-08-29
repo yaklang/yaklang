@@ -164,10 +164,10 @@ func (bruteForce *HttpBruteForceCore) captchaModeInit() (err error) {
 	captchaModule.SetUrl(bruteForce.config.captchaUrl)
 	captchaModule.SetMode(bruteForce.config.captchaMode)
 	captchaModule.SetType(bruteForce.config.captchaType)
-	if strings.Contains(bruteForce.config.captchaUrl, "/runtime/text/invoke") {
+	if strings.Contains(bruteForce.config.captchaUrl, "/runtime/text/invoke") || bruteForce.config.captchaType == OtherOcr {
 		captchaModule.SetRequest(&NormalCaptchaRequest{})
 		captchaModule.SetResponse(&NormalCaptchaResponse{})
-	} else if bruteForce.config.captchaType == "NewDDDD" {
+	} else if bruteForce.config.captchaType == NewDDDDOcr {
 		captchaModule.SetRequest(&NewDDDDCaptcha{})
 		captchaModule.SetResponse(&NewDDDDResult{})
 	} else {
@@ -427,6 +427,7 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 		if err != nil {
 			return false, utils.Error(err)
 		}
+		log.Debugf("captcha words: %v", captchaWords)
 		err = ElementInput(bruteForce.page, bruteForce.CaptchaSelector, captchaWords)
 		if err != nil {
 			return false, utils.Error(err)
