@@ -28,7 +28,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		prog := b.GetProgram()
 		application := prog.Application
 		global := application.GlobalScope
-		/* Todo: Global value */
 		_ = global
 
 		b.pkgNameCurrent = pkgNameCurrent
@@ -75,9 +74,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				}
 
 				for _, cbp := range lib.ClassBluePrint { // only once
-					objlib := cbp.StaticMember
-					for mName, m := range objlib {
-						objt.AddField(b.EmitConstInst(mName), m.GetType())
+					for i, v := range cbp.StaticMember {
+						objt.AddField(b.EmitConstInst(i), v.GetType())
 					}
 					funcs := map[string]*ssa.Function{}
 					for _, f := range cbp.GetMethod() {
@@ -86,6 +84,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 						}
 					}
 					b.AddExtendFuncs(objt.Name, funcs)
+					/* Todo: Global value */
+
+					/*for i, v := range cbp.NormalMember {
+						objt.AddField(b.EmitConstInst(i), v.Type)
+					}*/
 				}
 				b.AddStruct(objt.Name, objt)
 			} else {
@@ -132,6 +135,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if !f.IsMethod() && f.GetName() != "init" {
 				cbp.AddMethod(f.GetName(), f)
 			}
+		}
+		for i, v := range b.GetGlobalVariables() {
+			cbp.AddNormalMember(i, v)
 		}
 	}
 
@@ -426,7 +432,6 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
 			b.AssignVariable(leftVariables[i], value)
 		}
-		return
 	}
 
 	if leftlen == rightlen {

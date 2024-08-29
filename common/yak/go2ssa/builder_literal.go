@@ -321,6 +321,11 @@ func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) ssa.Type {
 	if name := stmt.TypeName(); name != nil {
 		return b.buildTypeName(name.(*gol.TypeNameContext))
 	}
+
+	if stmt.ELLIPSIS() != nil {
+		return b.buildSliceTypeELiteral(stmt)
+	}
+
 	// slice type literal
 	if s, ok := stmt.SliceType().(*gol.SliceTypeContext); ok {
 		return b.buildSliceTypeLiteral(s)
@@ -499,11 +504,25 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type 
 	return ssatyp
 }
 
+func (b *astbuilder) buildSliceTypeELiteral(stmt *gol.LiteralTypeContext) ssa.Type {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	var ssatyp ssa.Type
+	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
+		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
+			ssatyp = ssa.NewSliceType(eleTyp)
+		}
+	}
+	return ssatyp
+}
+
 func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	var value ssa.Value
 
+	var value ssa.Value
+	var ssatyp ssa.Type
 	if s, ok := stmt.ArrayLength().(*gol.ArrayLengthContext); ok {
 		if e := s.Expression(); e != nil {
 			rightv, _ := b.buildExpression(e.(*gol.ExpressionContext), false)
@@ -513,12 +532,11 @@ func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) ssa.Type 
 
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
-			return ssa.NewSliceType(eleTyp)
+			ssatyp = ssa.NewSliceType(eleTyp)
 		}
 	}
 	_ = value
-	b.NewError(ssa.Error, TAG, Unreachable())
-	return ssa.CreateAnyType()
+	return ssatyp
 }
 
 func (b *astbuilder) buildStructTypeLiteral(stmt *gol.StructTypeContext) ssa.Type {
