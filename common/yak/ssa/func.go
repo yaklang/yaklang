@@ -62,11 +62,11 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 }
 
 func (f *Function) GetType() Type {
-	if f.Type != nil {
-		return f.Type
-	} else {
-		return GetAnyType()
+	if f.Type == nil {
+		f.Type = NewFunctionType("", nil, nil, false)
+		f.Type.This = f
 	}
+	return f.Type
 }
 
 func (f *Function) SetType(t Type) {

@@ -165,9 +165,11 @@ func TestMemberCall_CheckField(t *testing.T) {
 		a = {} 
 		if c {
 			a.b = 1
+			println(a.b)
 		}
 		println(a.b)
 		`, []string{
+			"1",
 			"phi(a.b)[1,Undefined-a.b(valid)]",
 		}, t)
 	})
@@ -182,13 +184,12 @@ func TestMemberCall_CheckField(t *testing.T) {
 		println(a.b)
 			`,
 			Check: func(p *ssaapi.Program, want []string) {
-				printlns := p.Ref("println").ShowWithSource()
-				arg := printlns.GetUsers().Filter(func(v *ssaapi.Value) bool {
-					return v.IsCall()
-				}).Flat(func(v *ssaapi.Value) ssaapi.Values {
-					return ssaapi.Values{v.GetOperand(1)}
-				}).ShowWithSource()
-
+				p.Show()
+				res := p.SyntaxFlow(`println(* as $target)`)
+				if res.Errors != nil {
+					require.Nilf(t, res.Errors, "syntaxflow error: %v", res.Errors)
+				}
+				arg := res.GetValues("target").ShowWithSource()
 				argUniqed := lo.UniqBy(arg, func(v *ssaapi.Value) int64 {
 					return v.GetId()
 				})
@@ -343,18 +344,18 @@ func Test_CallMember_Make(t *testing.T) {
 		code := `var a= 1
 for(x=1;;){
     var b = func(){
-    return a
-}()
+		return a
+	}()
 	println(b)
 }`
 		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
-	t.Run("check free value1", func(t *testing.T) {
+	t.Run("check free value with member", func(t *testing.T) {
 		code := `var a = ssa
 for(x=1;;){
     var b = func(){
-    return a.Yak
-}()
+		return a.Yak
+	}()
 	println(b)
 }`
 		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"Undefined-a", "Undefined-a.Yak(valid)"}}, ssaapi.WithLanguage(ssaapi.Yak))

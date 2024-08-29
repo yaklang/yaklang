@@ -248,7 +248,7 @@ func (c *Call) handleCalleeFunction() {
 					continue
 				}
 
-				if res := checkCanMemberCallExist(object, key); res.exist {
+				if res := checkCanMemberCallExist(object, key); !res.exist {
 					builder.NewErrorWithPos(Error, SSATAG,
 						p.GetRange(),
 						ValueNotMember(

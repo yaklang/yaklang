@@ -151,7 +151,12 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 
+	// check if assign extern value
 	if b.TryBuildExternValue(variable.GetName()) != nil {
+		b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
+	}
+	// check if assign extern lib value
+	if obj := variable.object; obj != nil && obj.GetOpcode() == SSAOpcodeExternLib {
 		b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
 	}
 

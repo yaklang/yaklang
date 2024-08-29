@@ -40,6 +40,7 @@ func TestYaklangType_Loop(t *testing.T) {
 		num = make([]int, 3)
 		for i=0; i < 3; i++ {
 			target = num[i]
+			println(target)
 		}
 		`,
 			ssa.NumberTypeKind)

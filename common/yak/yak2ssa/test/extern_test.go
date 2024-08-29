@@ -319,6 +319,7 @@ func TestExternRef(t *testing.T) {
 			lib.method()
 			`,
 			Check: func(p *ssaapi.Program, w []string) {
+				p.Show()
 				libs := p.Ref("lib")
 				require.Len(t, libs, 1)
 

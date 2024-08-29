@@ -19,7 +19,7 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 
 	// to extern lib
 	if extern, ok := ToExternLib(object); ok {
-		b.readMemberCallInExternLib(extern, key)
+		return b.TryBuildExternLibValue(extern, key)
 	}
 
 	// normal member call
@@ -33,19 +33,20 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 		log.Infof("CreateMemberCallVariable: %v, %v", object.GetName(), key)
 	}
 	// extern lib
-	if _, ok := ToExternLib(object); ok {
+	if extern, ok := ToExternLib(object); ok {
 		name := getExternLibMemberCall(object, key)
-		return b.CreateVariable(name)
+		ret := b.CreateVariable(name)
+		ret.SetMemberCall(extern, key)
+		return ret
 	}
 
 	// normal member call
 	// name := b.getFieldName(object, key)
 	res := checkCanMemberCallExist(object, key)
 	name := res.name
-	if !res.exist && object.GetOpcode() != SSAOpcodeParameter {
-		//TODO: this create undefine needed?
+	if object.GetOpcode() != SSAOpcodeParameter {
 		// if member not exist, create undefine member in object position
-		b.getOriginMember(name, res.typ, object, key)
+		b.checkAndCreatDefaultMember(res, object, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
 	ret := b.CreateVariable(name)

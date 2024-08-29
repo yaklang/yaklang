@@ -42,7 +42,8 @@ func checkCanMemberCallExist(value, key Value) (ret checkMemberResult) {
 		ret.name = fmt.Sprintf("#%d.#%d", value.GetId(), key.GetId())
 		switch value.GetType().GetTypeKind() {
 		case SliceTypeKind, MapTypeKind:
-			ret.typ, _ = ToObjectType(value.GetType())
+			objTyp, _ := ToObjectType(value.GetType())
+			ret.typ = objTyp.FieldType
 			return
 		case BytesTypeKind, StringTypeKind:
 			ret.typ = BasicTypes[NumberTypeKind]

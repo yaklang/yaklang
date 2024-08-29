@@ -79,9 +79,9 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		prog.Cache.AddClassInstance(c.Name, obj)
 	}
 
-	if !builder.SupportClass {
-		return c
-	}
+	// if !builder.SupportClass {
+	// 	return c
+	// }
 
 	call, isCall := ToCall(obj)
 

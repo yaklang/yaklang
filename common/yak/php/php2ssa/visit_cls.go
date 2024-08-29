@@ -237,8 +237,10 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 		switch funcName {
 		case "__construct":
+			newFunction.Build()
 			class.Constructor = newFunction
 		case "__destruct":
+			newFunction.Build()
 			class.Destructor = newFunction
 		default:
 			if isStatic {

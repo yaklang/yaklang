@@ -77,78 +77,64 @@ func (prog *Program) TryGetSimilarityKey(name, key string) string {
 	return ret
 }
 
+func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) Value {
+	// write to extern Lib
+	name := getExternLibMemberCall(extern, key)
+	// read from scope, if assign to this library-value, return this value
+	if ret := b.PeekValueInThisFunction(name); ret != nil {
+		return ret
+	}
+
+	// try build field
+	if ret := extern.BuildField(key.String()); ret != nil {
+		// set program offsetMap for extern value
+		b.GetProgram().SetOffsetValue(ret, b.CurrentRange)
+
+		// create variable for extern value
+		variable := ret.GetVariable(name)
+		if variable == nil {
+			ret.AddVariable(b.CreateMemberCallVariable(extern, key))
+		} else {
+			variable.AddRange(b.CurrentRange, true)
+		}
+
+		// set member call
+		setMemberCallRelationship(extern, key, ret)
+		return ret
+	}
+
+	// handler
+	// want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
+	want := b.TryGetSimilarityKey(extern.GetName(), key.String())
+	b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
+	p := NewParam(name, false, b)
+	p.SetExtern(true)
+	return p
+}
+
 func (prog *Program) TryBuildExternValue(b *FunctionBuilder, id string) Value {
-	getExternValue := func(id string) Value {
-		if v, ok := prog.cacheExternInstance[id]; ok {
-			return v
-		}
-
-		if prog.ExternInstance == nil {
-			return nil
-		}
-		v, ok := prog.ExternInstance[id]
-		if !ok {
-			return nil
-		}
-		ret := prog.BuildValueFromAny(b, id, v)
-		prog.cacheExternInstance[id] = ret
-		return ret
+	if v, ok := prog.cacheExternInstance[id]; ok {
+		return v
 	}
 
-	getExternLib := func(id string) *ExternLib {
-		if v, ok := prog.cacheExternInstance[id]; ok {
-			if ex, ok := v.(*ExternLib); ok {
-				return ex
-			}
-			return nil
-		}
-
-		if prog.ExternLib == nil {
-			return nil
-		}
-		table, ok := prog.ExternLib[id]
-		if !ok {
-			return nil
-		}
-		ex := NewExternLib(id, b, table)
-		ex.SetExtern(true)
-		prog.cacheExternInstance[id] = ex
-		return ex
-	}
-
-	getExternInstance := func(id string) Value {
-		if ret := getExternValue(id); ret != nil {
-			return ret
-		}
-		if ret := getExternLib(id); ret != nil {
-			return ret
-		}
-		return nil
-	}
-
-	getExternField := func(lib string, key string) Value {
-		if v, ok := prog.cacheExternInstance[id]; ok {
-			return v
-		}
-
-		extern := getExternLib(lib)
-		if extern == nil {
-			return nil
-		}
-		ret := extern.BuildField(key)
-		if ret != nil {
+	if prog.ExternInstance != nil {
+		if v, ok := prog.ExternInstance[id]; ok {
+			ret := prog.BuildValueFromAny(b, id, v)
 			prog.cacheExternInstance[id] = ret
+			return ret
 		}
-		return ret
 	}
 
-	if str := strings.Split(id, "."); len(str) == 1 {
-		return getExternInstance(id)
-	} else if len(str) == 2 {
-		return getExternField(str[0], str[1])
-	} else {
-		return nil
+	if prog.ExternLib != nil {
+		if table, ok := prog.ExternLib[id]; ok {
+			ex := NewExternLib(id, b, table)
+			ex.SetExtern(true)
+			prog.cacheExternInstance[id] = ex
+			return ex
+		}
 	}
+
+	return nil
 }
 
 func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (value Value) {

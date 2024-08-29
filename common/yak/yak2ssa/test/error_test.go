@@ -1110,7 +1110,7 @@ func TestExternInstance(t *testing.T) {
 				ssa.ExternFieldError("Lib", "lib", "GetInt", "getInt"),
 				ssa.ExternFieldError("Lib", "lib", "GetaInt", "getAInt"),
 				ssa.ContAssignExtern("lib.getInt"),
-				// ssa.ContAssignExtern("lib.GetInt"),
+				ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),
 				ssa.ContAssignExtern("print"),
 				ssa.ContAssignExtern("print"),

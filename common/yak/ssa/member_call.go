@@ -1,38 +1,5 @@
 package ssa
 
-func (b *FunctionBuilder) readMemberCallInExternLib(extern *ExternLib, key Value) Value {
-	// write to extern Lib
-	name := getExternLibMemberCall(extern, key)
-	if ret := ReadVariableFromScope(b.CurrentBlock.ScopeTable, name); ret != nil {
-		return ret.Value
-	}
-
-	if ret := extern.BuildField(key.String()); ret != nil {
-		// set program offsetMap for extern value
-		b.GetProgram().SetOffsetValue(ret, b.CurrentRange)
-
-		// create variable for extern value
-		variable := ret.GetVariable(name)
-		if variable == nil {
-			ret.AddVariable(b.CreateMemberCallVariable(extern, key))
-		} else {
-			variable.AddRange(b.CurrentRange, true)
-		}
-
-		// set member call
-		setMemberCallRelationship(extern, key, ret)
-		return ret
-	}
-
-	// handler
-	// want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
-	want := b.TryGetSimilarityKey(extern.GetName(), key.String())
-	b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
-	p := NewParam(name, false, b)
-	p.SetExtern(true)
-	return p
-}
-
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
 	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
@@ -96,7 +63,9 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	if para, ok := ToParameter(object); ok {
 		defaultMember = b.NewParameterMember(name, para, key)
 	} else {
+		recoverScope := b.SetCurrent(object, true)
 		un := b.writeUndefine(name)
+		recoverScope()
 		if res.exist {
 			un.Kind = UndefinedMemberValid
 		} else {
@@ -125,21 +94,31 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	return defaultMember
 }
 
-func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {
-	recoverScope := b.SetCurrent(value, true)
-	origin := b.ReadValueInThisFunction(name)
-	recoverScope()
-	if undefine, ok := ToUndefined(origin); ok {
-		undefine.SetRange(b.CurrentRange)
-		// undefine.SetName(b.setMember(key))
-		if typ != nil {
-			undefine.Kind = UndefinedMemberValid
-			undefine.SetType(typ)
-		} else {
-			undefine.Kind = UndefinedMemberInValid
-		}
-		setMemberCallRelationship(value, key, undefine)
+func (b *FunctionBuilder) checkAndCreatDefaultMember(res checkMemberResult, object, key Value) Value {
+	// 	recoverScope := b.SetCurrent(object, true)
+	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
+		return ret
 	}
-	setMemberVerboseName(origin)
-	return origin
+
+	// need default member
+	return b.createDefaultMember(res, object, key, false)
 }
+
+// func (b *FunctionBuilder) getOriginMember(res checkMemberResult, object, key Value) Value {
+// 	recoverScope := b.SetCurrent(object, true)
+// 	origin := b.ReadValueInThisFunction(name)
+// 	recoverScope()
+// 	if undefine, ok := ToUndefined(origin); ok {
+// 		undefine.SetRange(b.CurrentRange)
+// 		// undefine.SetName(b.setMember(key))
+// 		if typ != nil {
+// 			undefine.Kind = UndefinedMemberValid
+// 			undefine.SetType(typ)
+// 		} else {
+// 			undefine.Kind = UndefinedMemberInValid
+// 		}
+// 		setMemberCallRelationship(object, key, undefine)
+// 	}
+// 	setMemberVerboseName(origin)
+// 	return origin
+// }
