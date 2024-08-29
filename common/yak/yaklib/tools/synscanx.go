@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"time"
 )
 
 // Scan 使用 SYN 扫描技术进行端口扫描，它不必打开一个完整的TCP连接，只发送一个SYN包，就能做到打开连接的效果，然后等待对端的反应
@@ -117,7 +116,7 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	}
 	ctx := config.Ctx
 
-	log.Infof("targets: %s", targets)
+	log.Debugf("targets: %s", targets)
 	sample := utils.ParseStringToHosts(targets)[0]
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
@@ -131,11 +130,10 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	}()
 	targetCh := scanner.SubmitTarget(targets, ports)
 
-	time.Sleep(100 * time.Millisecond)
-
 	resultCh, err := scanner.Scan(targetCh)
 	if err != nil {
 		log.Errorf("scan failed: %s", err)
+		return nil, err
 	}
 
 	return resultCh, nil

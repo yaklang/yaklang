@@ -95,7 +95,7 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 							return
 						case packet, ok := <-s.PacketChan:
 							if !ok {
-								continue
+								return
 							}
 
 							err := handle.WritePacketData(packet)
@@ -110,7 +110,9 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 			}),
 
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				s.handlePacket(packet)
+				go func() {
+					s.handlePacket(packet)
+				}()
 			}),
 		)
 		if err != nil {
