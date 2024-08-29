@@ -1,6 +1,8 @@
 package yakast
 
 import (
+	"unicode/utf8"
+
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 )
 
@@ -20,7 +22,7 @@ func (y *YakCompiler) VisitFunctionCall(raw yak.IFunctionCallContext) interface{
 
 	// 函数调用需要先把参数压栈
 	// 调用的时候，call n 表示要取多少数出来
-	var argCount = 0
+	argCount := 0
 	if i.OrdinaryArguments() != nil {
 		argCount, _ = y.VisitOrdinaryArguments(i.OrdinaryArguments())
 	}
@@ -52,18 +54,18 @@ func (y *YakCompiler) VisitOrdinaryArguments(raw yak.IOrdinaryArgumentsContext) 
 	lenOfAllExpressions := len(allExpressions)
 
 	expressionTokenLengths := make([]int, lenOfAllExpressions)
-	tokenStart := i.BaseParserRuleContext.GetStart().GetColumn()
-	lineLength := tokenStart
+	// lineLength := i.BaseParserRuleContext.GetStart().GetColumn()
+	lineLength := y.currentLineLength
 	eachParamOneLine := false
-	// 先遍历一次，计算每个表达式的长度，如果过长，就需要换行
-	for i, e := range allExpressions {
-		expressionTokenLengths[i] = len(e.GetText())
-		if !eachParamOneLine && expressionTokenLengths[i] > FORMATTER_RECOMMEND_PARAM_LENGTH {
-			eachParamOneLine = true
+	// 计算每个表达式的长度，如果某个表达式过长或者总体过长，则每个参数一行
+	if lenOfAllExpressions > 1 {
+		for i, e := range allExpressions {
+			expressionTokenLengths[i] = utf8.RuneCountInString(e.GetText())
+			lineLength += expressionTokenLengths[i]
+			if !eachParamOneLine && (expressionTokenLengths[i] > FORMATTER_RECOMMEND_PARAM_LENGTH || lineLength > FORMATTER_MAXWIDTH) {
+				eachParamOneLine = true
+			}
 		}
-	}
-	if lenOfAllExpressions == 1 && eachParamOneLine {
-		eachParamOneLine = false
 	}
 
 	hadIncIndent := false
@@ -71,20 +73,14 @@ func (y *YakCompiler) VisitOrdinaryArguments(raw yak.IOrdinaryArgumentsContext) 
 	for index, expr := range allExpressions {
 		lineLength += expressionTokenLengths[index]
 
-		if lenOfAllExpressions > 1 { // 如果不是只有一个参数，超出单行最长长度或任意一个参数过长，就换行
-			if eachParamOneLine {
-				y.writeNewLine()
-				if !hadIncIndent {
-					y.incIndent()
-					hadIncIndent = true
-				}
-				y.writeIndent()
-				lineLength = y.indent*4 + expressionTokenLengths[index]
-			} else if lineLength > FORMATTER_MAXWIDTH {
-				y.writeNewLine()
-				y.writeWhiteSpace(tokenStart)
-				lineLength = tokenStart + expressionTokenLengths[index]
+		if eachParamOneLine {
+			y.writeNewLine()
+			if !hadIncIndent {
+				y.incIndent()
+				hadIncIndent = true
 			}
+			y.writeIndent()
+			lineLength = y.indent*4 + expressionTokenLengths[index]
 		}
 
 		y.VisitExpression(expr)
