@@ -4,11 +4,13 @@ package simulator
 
 import (
 	"encoding/json"
+	"net/url"
+	"strings"
+
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net/url"
-	"strings"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 const getImgB64Str = `
@@ -106,6 +108,7 @@ func (dddd *DDDDResult) GetResult() string {
 func (dddd *DDDDResult) GetErrorInfo() string {
 	return dddd.Message
 }
+
 func (dddd *DDDDResult) GetStatus() bool {
 	if dddd.Status == 200 {
 		return true
@@ -118,7 +121,6 @@ type NewDDDDCaptcha struct {
 }
 
 func (newDD *NewDDDDCaptcha) InputMode(s string) {
-
 }
 
 func (newDD *NewDDDDCaptcha) Generate() interface{} {
@@ -239,38 +241,33 @@ func (identifier *CaptchaIdentifier) detect(imgB64 string) (string, error) {
 	}
 	identifier.identifierReq.InputBase64(imgB64)
 	identifier.identifierReq.InputMode(identifier.identifierMode)
-	request := lowhttp.BasicRequest()
-	request = lowhttp.SetHTTPPacketUrl(request, identifier.identifierUrl)
-	var err error
+	var opts []poc.PocConfigOption
+
+	if identifier.proxy != nil {
+		opts = append(opts, poc.WithProxy(identifier.proxy.String()))
+	}
+
 	if identifier.identifierType == NewDDDDOcr {
 		b64Str, ok := identifier.identifierReq.Generate().(string)
 		if ok == false {
 			return "", utils.Errorf("new dddd data error: %v", identifier.identifierReq.Generate())
 		}
-		var urlValue = url.Values{}
-		urlValue.Set("image", b64Str)
-		request = lowhttp.ReplaceHTTPPacketMethod(request, "POST")
-		request = lowhttp.ReplaceHTTPPacketHeader(request, "Content-Type", "application/x-www-form-urlencoded")
-		request = lowhttp.ReplaceHTTPPacketBody(request, []byte(urlValue.Encode()), false)
+		opts = append(opts, poc.WithReplaceAllHttpPacketPostParams(map[string]string{
+			"image": b64Str,
+		}))
 	} else {
 		reqBody, err := json.Marshal(identifier.identifierReq.Generate())
 		if err != nil {
 			return "", utils.Error(err)
 		}
-		request = lowhttp.ReplaceHTTPPacketMethod(request, "POST")
-		request = lowhttp.ReplaceHTTPPacketHeader(request, "Content-Type", "application/json")
-		request = lowhttp.ReplaceHTTPPacketBody(request, reqBody, false)
+		opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"), poc.WithReplaceHttpPacketBody(reqBody, true))
 	}
-	opts := []lowhttp.LowhttpOpt{
-		lowhttp.WithRequest(request),
-	}
-	if identifier.proxy != nil {
-		opts = append(opts, lowhttp.WithProxy(identifier.proxy.String()))
-	}
-	response, err := lowhttp.HTTP(opts...)
+
+	response, _, err := poc.DoPOST(identifier.identifierUrl, opts...)
 	if err != nil {
 		return "", utils.Error(err)
 	}
+
 	_, resBody := lowhttp.SplitHTTPPacketFast(response.RawPacket)
 	if err = json.Unmarshal(resBody, &identifier.identifierRes); err != nil {
 		return "", utils.Error(err)
