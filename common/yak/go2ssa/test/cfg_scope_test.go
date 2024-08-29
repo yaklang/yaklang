@@ -697,10 +697,10 @@ func TestBasic_CFG_Goto(t *testing.T) {
 				a = 2
 				break label1
 			}
-			println(a) // phi(a)[2,phi(a)[1,2]]
+			println(a) // phi(a)[phi(a)[1,2],2]
 		}
 		`, []string{
-			"phi(a)[2,phi(a)[1,2]]",
+			"phi(a)[phi(a)[1,2],2]",
 		}, t)
 	})
 
@@ -716,10 +716,10 @@ func TestBasic_CFG_Goto(t *testing.T) {
 					break label1
 				}
 			}
-			println(a) // phi(a)[2,phi(a)[1,2]]
+			println(a) // phi(a)[phi(a)[1,2],2]
 		}
 		`, []string{
-			"phi(a)[2,phi(a)[1,2]]",
+			"phi(a)[phi(a)[1,2],2]",
 		}, t)
 	})
 }

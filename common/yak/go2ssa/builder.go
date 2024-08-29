@@ -186,6 +186,10 @@ func (b *astbuilder) GetGlobalVariable(name string) ssa.Value {
 	return b.globalv[name]
 }
 
+func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
+	return b.globalv
+}
+
 func (b *astbuilder) AddResultDefault(name string) {
 	result := b.result[b.Function.GetName()]
 	if result == nil {
