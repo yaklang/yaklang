@@ -252,15 +252,21 @@ func (identifier *CaptchaIdentifier) detect(imgB64 string) (string, error) {
 		if ok == false {
 			return "", utils.Errorf("new dddd data error: %v", identifier.identifierReq.Generate())
 		}
-		opts = append(opts, poc.WithReplaceAllHttpPacketPostParams(map[string]string{
-			"image": b64Str,
-		}))
+		opts = append(opts,
+			poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
+			poc.WithReplaceAllHttpPacketPostParams(map[string]string{
+				"image": b64Str,
+			}),
+		)
 	} else {
 		reqBody, err := json.Marshal(identifier.identifierReq.Generate())
 		if err != nil {
 			return "", utils.Error(err)
 		}
-		opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"), poc.WithReplaceHttpPacketBody(reqBody, true))
+		opts = append(opts,
+			poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+			poc.WithReplaceHttpPacketBody(reqBody, false),
+		)
 	}
 
 	response, _, err := poc.DoPOST(identifier.identifierUrl, opts...)
