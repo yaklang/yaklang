@@ -42,6 +42,11 @@ type Scannerx struct {
 	macCacheTable *sync.Map
 	MacHandlers   func(ip net.IP, addr net.HardwareAddr)
 
+	// 缓存内外网段
+	ifaceIPNetV4 *net.IPNet
+	ifaceIPNetV6 *net.IPNet
+	ifaceUpdated bool
+
 	Handle    *pcap.Handle
 	limiter   *rate.Limiter
 	startTime time.Time
@@ -71,10 +76,10 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 	if err != nil {
 		return nil, err
 	}
-	err = s.initHandlerStart()
-	if err != nil {
-		return nil, err
-	}
+	//err = s.initHandlerStart()
+	//if err != nil {
+	//	return nil, err
+	//}
 	return s, nil
 }
 
@@ -146,131 +151,143 @@ func (s *Scannerx) rateLimit() {
 	s.limiter.Wait(s.ctx)
 }
 
-func generateHostPort(nonExcludedHosts []string, nonExcludedPorts []int) <-chan SynxTarget {
-	out := make(chan SynxTarget)
+func generateHostPort(nonExcludedHosts []string, nonExcludedPorts []int) <-chan *SynxTarget {
+	out := make(chan *SynxTarget)
 	go func() {
 		defer close(out)
 		for _, host := range nonExcludedHosts {
 			for _, port := range nonExcludedPorts {
-				out <- SynxTarget{Host: host, Port: port}
+				out <- &SynxTarget{Host: host, Port: port}
 			}
 		}
 	}()
 	return out
 }
 
-func (s *Scannerx) SubmitTarget(targets, ports string, targetCh chan *SynxTarget) {
+func (s *Scannerx) SubmitTarget(targets, ports string) <-chan *SynxTarget {
 	nonExcludedHosts := s.GetNonExcludedHosts(targets)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 	if len(nonExcludedHosts) == 0 || len(nonExcludedPorts) == 0 {
 		log.Error("targets or ports is empty")
 		s.ctx.Done()
-		return
+		return nil
 	}
 	s.OnSubmitTask(func(h string, p int) {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
 	})
-	for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
-		host := hp.Host
-		port := hp.Port
-		// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
-		if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
-			continue
-		}
-		s.rateLimit()
-		if s.config.maxOpenPorts > 0 {
-			v, ok := s.ipOpenPortMap.Load(host)
-			if ok {
-				if v.(uint16) >= s.config.maxOpenPorts {
-					break
+
+	tgCh := make(chan *SynxTarget, 16)
+	go func() {
+		defer close(tgCh)
+		for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
+			host := hp.Host
+			port := hp.Port
+			// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
+			if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
+				continue
+			}
+
+			s.rateLimit()
+			if s.config.maxOpenPorts > 0 {
+				v, ok := s.ipOpenPortMap.Load(host)
+				if ok {
+					if v.(uint16) >= s.config.maxOpenPorts {
+						break
+					}
 				}
 			}
-		}
 
-		s.callOnSubmitTask(host, port)
-		proto, p := utils.ParsePortToProtoPort(port)
-		target := &SynxTarget{
-			Host: host,
-			Port: p,
-			Mode: TCP, // 默认 TCP
+			s.callOnSubmitTask(host, port)
+			proto, p := utils.ParsePortToProtoPort(port)
+			target := &SynxTarget{
+				Host: host,
+				Port: p,
+				Mode: TCP, // 默认 TCP
+			}
+			if proto == "udp" {
+				target.Mode = UDP
+			}
+
+			select {
+			case <-s.ctx.Done():
+				log.Infof("submitTarget canceled")
+				return
+			case tgCh <- target:
+			}
 		}
-		if proto == "udp" {
-			target.Mode = UDP
-		}
-		select {
-		case <-s.ctx.Done():
-			log.Infof("SubmitTarget canceled")
-			return
-		case targetCh <- target:
-		}
-	}
+	}()
+	return tgCh
 }
 
-func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string, ch chan *SynxTarget) {
+func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *SynxTarget {
+	tgCh := make(chan *SynxTarget, 16)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 
-	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
 	s.OnSubmitTask(func(h string, p int) {
 		s.config.callSubmitTaskCallback(utils.HostPort(h, p))
 	})
 	s._hosts = utils.NewHostsFilter()
 	var lock sync.Mutex
-	for {
-		select {
-		case <-s.ctx.Done():
-			log.Infof("SubmitTargetFromPing canceled")
-			return
-		case host, ok := <-res:
-			if !ok {
-				log.Debugf("ping result channel closed")
+	go func() {
+		defer close(tgCh)
+		for {
+			select {
+			case <-s.ctx.Done():
+				log.Infof("SubmitTargetFromPing canceled")
 				return
-			}
-			if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
-				log.Infof("Resolving %s", host)
-				host = netx.LookupFirst(host, netx.WithTimeout(3*time.Second))
-			}
-			// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
-			if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
-				continue
-			}
-			if s.excludedHost(host) {
-				continue
-			}
-			lock.Lock()
-			s._hosts.Add(host)
-			lock.Unlock()
+			case host, ok := <-res:
+				if !ok {
+					log.Debugf("ping result channel closed")
+					return
+				}
+				if !utils.IsIPv4(host) && !utils.IsIPv6(host) {
+					log.Infof("Resolving %s", host)
+					host = netx.LookupFirst(host, netx.WithTimeout(3*time.Second))
+				}
+				// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
+				if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
+					continue
+				}
+				if s.excludedHost(host) {
+					continue
+				}
+				lock.Lock()
+				s._hosts.Add(host)
+				lock.Unlock()
 
-			if s.isInternalAddress(host, ifaceIPNetV4, ifaceIPNetV6) {
-				s.arp(host)
-			}
-			for _, port := range nonExcludedPorts {
-				s.rateLimit()
-				if s.config.maxOpenPorts > 0 {
-					v, ok := s.ipOpenPortMap.Load(host)
-					if ok {
-						if v.(uint16) >= s.config.maxOpenPorts {
-							break
+				if s.isInternalAddress(host) {
+					s.arp(host)
+				}
+				for _, port := range nonExcludedPorts {
+					s.rateLimit()
+					if s.config.maxOpenPorts > 0 {
+						v, ok := s.ipOpenPortMap.Load(host)
+						if ok {
+							if v.(uint16) >= s.config.maxOpenPorts {
+								break
+							}
 						}
 					}
+					s.callOnSubmitTask(host, port)
+					proto, p := utils.ParsePortToProtoPort(port)
+					target := &SynxTarget{
+						Host: host,
+						Port: p,
+						Mode: TCP, // 默认 TCP
+					}
+					if proto == "udp" {
+						target.Mode = UDP
+					}
+					tgCh <- target
 				}
-				s.callOnSubmitTask(host, port)
-				proto, p := utils.ParsePortToProtoPort(port)
-				target := &SynxTarget{
-					Host: host,
-					Port: p,
-					Mode: TCP, // 默认 TCP
-				}
-				if proto == "udp" {
-					target.Mode = UDP
-				}
-				ch <- target
 			}
 		}
-	}
-
+	}()
+	return tgCh
 }
 
-func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh chan *synscan.SynScanResult) error {
+func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResult, error) {
+	resultCh := make(chan *synscan.SynScanResult, 1024)
 	openPortLock := new(sync.Mutex)
 	var openPortCount int
 	ipCountMap := make(map[string]struct{}, 16)
@@ -350,6 +367,7 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 				Port: port,
 			}
 			s.config.callCallback(result)
+
 			resultCh <- result
 
 			if outputFile != nil {
@@ -364,52 +382,45 @@ func (s *Scannerx) Scan(done chan struct{}, targetCh chan *SynxTarget, resultCh 
 		}
 	}
 
-	// recv packet 的总时长
-	//wCtx, wCancel := context.WithCancel(context.Background())
-	//go func() {
-	//	defer func() {
-	//		if err := recover(); err != nil {
-	//			utils.PrintCurrentGoroutineRuntimeStack()
-	//		}
-	//	}()
-	//	s.HandlerZeroCopyReadPacket(wCtx, resultCh)
-	//}()
-	//time.Sleep(100 * time.Millisecond)
+	wCtx, wCancel := context.WithCancel(context.Background())
+	// 异步执行扫描流程
+	go func() {
+		s.initHandlerStart(wCtx)
+		defer func() {
+			wCancel()
+			close(resultCh)
+			close(s.PacketChan)
+		}()
+		time.Sleep(100 * time.Millisecond)
+
+		if !s.FromPing {
+			s.arpScan()
+			time.Sleep(1 * time.Second)
+		}
+		s.sendPacket(targetCh)
+		time.Sleep(s.config.waiting)
+		log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
+
+		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Now().Sub(s.startTime))
+	}()
 
 	defer func() {
 		if err := recover(); err != nil {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	if !s.FromPing {
-		s.arpScan()
-		time.Sleep(1 * time.Second)
-	}
-	s.sendPacket(s.ctx, targetCh)
-
-	time.Sleep(s.config.waiting)
-	log.Infof("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
-
-	//wCancel()
-
-	done <- struct{}{}
-
-	endTime := time.Now()
-	log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, endTime.Sub(s.startTime))
-	//defer s.Close()
-
-	return nil
+	return resultCh, nil
 }
 
-func (s *Scannerx) sendPacket(ctx context.Context, targetCh chan *SynxTarget) {
+func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 	for {
 		select {
-		case <-ctx.Done():
-			log.Info("Context cancelled, stopping packet sending")
+		case <-s.ctx.Done():
+			log.Info("context cancelled, stopping packet sending")
 			return
 		case target, ok := <-targetCh:
 			if !ok {
-				log.Debugf("target channel closed, stopping packet sending")
+				log.Info("target channel closed, stopping packet sending")
 				return
 			}
 			host := target.Host
