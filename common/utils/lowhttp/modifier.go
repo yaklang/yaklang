@@ -435,7 +435,7 @@ func DeleteHTTPPacketQueryParam(packet []byte, key string) []byte {
 	})
 }
 
-func handleHTTPPacketPostParam(packet []byte, noAutoEncode bool, callback func(*QueryParams)) []byte {
+func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType bool, callback func(*QueryParams)) []byte {
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
@@ -444,7 +444,18 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode bool, callback func(*
 	callback(u)
 	newBody := u.Encode()
 
-	return ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
+	newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
+	// auto add content-type if not exist
+	if autoAddContentType && GetHTTPPacketHeader(packet, "Content-Type") == "" {
+		if strings.HasPrefix(newBody, "{") && strings.HasSuffix(newBody, "}") {
+			newPacket = ReplaceHTTPPacketHeader(newPacket, "Content-Type", "application/json")
+		} else if strings.HasPrefix(newBody, "<") && strings.HasSuffix(newBody, ">") {
+			newPacket = ReplaceHTTPPacketHeader(newPacket, "Content-Type", "application/xml")
+		} else {
+			newPacket = ReplaceHTTPPacketHeader(newPacket, "Content-Type", "application/x-www-form-urlencoded")
+		}
+	}
+	return newPacket
 }
 
 // ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
@@ -454,7 +465,7 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode bool, callback func(*
 // poc.ReplaceAllHTTPPacketPostParams(raw, {"a":"b", "c":"d"}) // 添加POST请求参数a，值为b，POST请求参数c，值为d
 // ```
 func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []byte {
-	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, false, true, func(p *QueryParams) {
 		replaceAllParams(values, p)
 	})
 }
@@ -468,13 +479,13 @@ func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []b
 // poc.ReplaceAllHTTPPacketPostParamsWithoutEscape(raw, {"a":"b", "c":"d"}) // 添加POST请求参数a，值为b，POST请求参数c，值为d
 // ```
 func ReplaceAllHTTPPacketPostParamsWithoutEscape(packet []byte, values map[string]string) []byte {
-	return handleHTTPPacketPostParam(packet, true, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, true, true, func(p *QueryParams) {
 		replaceAllParams(values, p)
 	})
 }
 
 func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[string][]string) []byte {
-	return handleHTTPPacketPostParam(packet, true, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, true, true, func(p *QueryParams) {
 		replaceFullParams(values, p)
 	})
 }
@@ -486,7 +497,7 @@ func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[stri
 // poc.ReplaceHTTPPacketPostParam(raw, "a", "b") // 添加POST请求参数a，值为b
 // ```
 func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, false, true, func(p *QueryParams) {
 		p.Set(key, value)
 	})
 }
@@ -497,7 +508,7 @@ func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
 // poc.AppendHTTPPacketPostParam(poc.BasicRequest(), "a", "b") // 向 pie.dev 发起请求，添加POST请求参数a，值为b
 // ```
 func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, false, true, func(p *QueryParams) {
 		p.Add(key, value)
 	})
 }
@@ -513,7 +524,7 @@ func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
 // a=b&c=d`, "a") // 删除POST请求参数a
 // ```
 func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
-	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, false, false, func(p *QueryParams) {
 		p.Del(key)
 	})
 }
