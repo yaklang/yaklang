@@ -12,14 +12,12 @@ const (
 	statusJar  int         = 1
 )
 
-var (
-	jarRequiredExtensions = []string{
-		".jar",
-		".war",
-		".ear",
-		".par",
-	}
-)
+var jarRequiredExtensions = []string{
+	".jar",
+	".war",
+	".ear",
+	".par",
+}
 
 func init() {
 	RegisterAnalyzer(TypJavaJar, NewJavaJarAnalyzer())
@@ -53,7 +51,7 @@ func (a jarAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a jarAnalyzer) Match(info MatchInfo) int {
-	ext := filepath.Ext(info.path)
+	ext := filepath.Ext(info.Path)
 	for _, required := range jarRequiredExtensions {
 		if strings.EqualFold(ext, required) {
 			return statusJar

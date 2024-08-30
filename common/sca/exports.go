@@ -9,12 +9,14 @@ var Exports = map[string]interface{}{
 	"ScanGitRepo":              ScanGitRepo,
 	"ScanLocalFilesystem":      ScanLocalFilesystem,
 	"ScanFilesystem":           ScanFilesystem,
+	"NewAnalyzerResult":        analyzer.NewAnalyzerResult,
 
 	// options
-	"endpoint":   _withEndPoint,
-	"scanMode":   _withScanMode,
-	"concurrent": _withConcurrent,
-	"analyzers":  _withAnalayzers,
+	"endpoint":       _withEndPoint,
+	"scanMode":       _withScanMode,
+	"concurrent":     _withConcurrent,
+	"analyzers":      _withAnalayzers,
+	"customAnalyzer": _withCustomAnalyzer,
 
 	// use prefix + type name as key
 	// e.g. "ANALYZER_TYPE_DPKG"

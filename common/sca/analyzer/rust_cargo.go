@@ -41,10 +41,10 @@ func (a cargoAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 
 func (a cargoAnalyzer) Match(info MatchInfo) int {
 	// Skip `composer.lock` inside `vendor` folder
-	if info.fi.Name() == CargoLock {
+	if info.FileInfo.Name() == CargoLock {
 		return statusCargoLock
 	}
-	if info.fi.Name() == CargoToml {
+	if info.FileInfo.Name() == CargoToml {
 		return statusCargoToml
 	}
 	return 0

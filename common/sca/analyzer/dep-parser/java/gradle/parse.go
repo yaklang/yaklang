@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type Parser struct{}
@@ -15,7 +16,7 @@ func NewParser() types.Parser {
 	return &Parser{}
 }
 
-func (Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var libs []types.Library
 	scanner := bufio.NewScanner(r)
 	var lineNum int

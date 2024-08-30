@@ -3,12 +3,12 @@ package analyzer
 import (
 	"archive/zip"
 	"io"
-	"io/fs"
 	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/python/packaging"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,7 +27,6 @@ var (
 	eggFile = ".egg" // zip format
 
 	pythonPackagingrequiredFiles = []string{
-
 		"EGG-INFO/PKG-INFO",
 
 		// .egg-info format: .egg-info can be Analyzer file or directory
@@ -45,7 +44,7 @@ func init() {
 }
 
 type pythonPackagingAnalyzer struct {
-	fileSystem fs.FS
+	fileSystem fi.FileSystem
 }
 
 func NewPythonPackagingAnalyzer() *pythonPackagingAnalyzer {
@@ -54,11 +53,11 @@ func NewPythonPackagingAnalyzer() *pythonPackagingAnalyzer {
 
 func (a pythonPackagingAnalyzer) Match(info MatchInfo) int {
 	for _, r := range pythonPackagingrequiredFiles {
-		if strings.HasSuffix(info.path, r) {
+		if strings.HasSuffix(info.Path, r) {
 			return statusPythonPackaging
 		}
 	}
-	if strings.HasSuffix(info.path, eggFile) {
+	if strings.HasSuffix(info.Path, eggFile) {
 		return statusEgg
 	}
 	return 0
@@ -76,7 +75,7 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Packag
 		zr, err := zip.NewReader(fi.LazyFile, realFileInfo.Size())
 		for _, vf := range zr.File {
 			matched := a.Match(MatchInfo{
-				path: vf.Name,
+				Path: vf.Name,
 			})
 			// no matched, skip
 			if matched == 0 {
@@ -108,7 +107,7 @@ func (a pythonPackagingAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Packag
 			// reset file offset to read
 			f.Seek(0, 0)
 
-			return ParseLanguageConfiguration(FileInfo{
+			return ParseLanguageConfiguration(&FileInfo{
 				LazyFile: lazyfile.LazyOpenStreamByFile(a.fileSystem, f),
 			}, packaging.NewParser())
 		}

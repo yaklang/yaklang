@@ -1,11 +1,13 @@
 package lazyfile
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io"
 	"io/fs"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -47,7 +49,7 @@ func LazyOpenStreamByFilePath(fsIns fs.FS, name string) *LazyFile {
 	return lf
 }
 
-func LazyOpenStreamByFile(f fs.FS, rf fs.File) *LazyFile {
+func LazyOpenStreamByFile(f fi.FileSystem, rf fs.File) *LazyFile {
 	var name string
 	info, _ := rf.Stat()
 	if info != nil {

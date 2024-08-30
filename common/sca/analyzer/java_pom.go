@@ -1,8 +1,6 @@
 package analyzer
 
 import (
-	"path/filepath"
-
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/pom"
@@ -41,7 +39,8 @@ func (a pomAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a pomAnalyzer) Match(info MatchInfo) int {
-	if filepath.Base(info.path) == MavenPom {
+	_, filename := info.fileSystem.PathSplit(info.Path)
+	if filename == MavenPom {
 		return statusPom
 	}
 	return 0

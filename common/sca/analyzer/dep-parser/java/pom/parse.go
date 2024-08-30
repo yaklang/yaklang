@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 const (
@@ -78,7 +79,7 @@ func NewParser(filePath string, opts ...option) types.Parser {
 	}
 }
 
-func (p *parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	content, err := parsePom(r)
 	if err != nil {
 		return nil, nil, outils.Errorf("failed to parse POM: %w", err)

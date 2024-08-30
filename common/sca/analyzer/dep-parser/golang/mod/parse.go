@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 var (
@@ -64,7 +65,7 @@ func resolveVCSUrl(modulePath string) string {
 }
 
 // Parse parses a go.mod file
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	libs := map[string]types.Library{}
 
 	goModData, err := io.ReadAll(r)

@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
 
 	"github.com/samber/lo"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"golang.org/x/xerrors"
 )
@@ -31,7 +32,7 @@ func NewParser() types.Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockfile Lockfile
 	decoder := toml.NewDecoder(r)
 	if _, err := decoder.Decode(&lockfile); err != nil {

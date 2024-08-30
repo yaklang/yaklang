@@ -41,7 +41,7 @@ func (a conanAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 }
 
 func (a conanAnalyzer) Match(info MatchInfo) int {
-	if strings.HasSuffix(info.path, ConanLock) {
+	if strings.HasSuffix(info.Path, ConanLock) {
 		return statusConan
 	}
 	return 0

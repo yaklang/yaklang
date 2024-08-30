@@ -27,8 +27,7 @@ func init() {
 	RegisterAnalyzer(TypDPKG, NewDpkgAnalyzer())
 }
 
-type dpkgAnalyzer struct {
-}
+type dpkgAnalyzer struct{}
 
 func (a dpkgAnalyzer) parseStatus(s string) bool {
 	for _, ss := range strings.Fields(s) {
@@ -43,7 +42,7 @@ func (a dpkgAnalyzer) parseDepends(s string) dxtypes.PackageRelationShip {
 	// e.g. passwd, debconf (>= 0.5) | debconf-2.0
 	// var dependencies []string
 
-	var packageRelationShip = dxtypes.PackageRelationShip{}
+	packageRelationShip := dxtypes.PackageRelationShip{}
 	if s == "" {
 		return packageRelationShip
 	}
@@ -138,7 +137,7 @@ func NewDpkgAnalyzer() *dpkgAnalyzer {
 }
 
 func (a dpkgAnalyzer) Match(info MatchInfo) int {
-	if strings.HasPrefix(info.path, statusDir) || info.path == statusFile {
+	if strings.HasPrefix(info.Path, statusDir) || info.Path == statusFile {
 		// handler status
 		return statusStatus
 	}

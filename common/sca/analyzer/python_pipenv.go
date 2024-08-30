@@ -27,7 +27,7 @@ func NewPythonPIPEnvAnalyzer() *pythonPIPEnvAnalyzer {
 }
 
 func (a pythonPIPEnvAnalyzer) Match(info MatchInfo) int {
-	if strings.HasSuffix(strings.ToLower(info.path), pipFile) {
+	if strings.HasSuffix(strings.ToLower(info.Path), pipFile) {
 		return statusPIPenvLock
 	}
 	return 0
