@@ -32,6 +32,7 @@ const (
 	SwitchDone    = "switch.done"
 	SwitchDefault = "switch.default"
 	SwitchHandler = "switch.handler"
+	SwitchBlock   = "switch.block"
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
@@ -560,16 +561,12 @@ func (t *SwitchBuilder) Finish() {
 
 	sLabels := make([]SwitchLabel, 0, t.caseSize)
 	handlers := make([]*BasicBlock, 0, t.caseSize)
+	blocks := make([]*BasicBlock, 0, t.caseSize)
 	for i := 0; i < t.caseSize; i++ {
-		vs := t.buildExpress(i)
 		handler := builder.NewBasicBlockNotAddBlocks(SwitchHandler)
+		block := builder.NewBasicBlockNotAddBlocks(SwitchBlock)
 		handlers = append(handlers, handler)
-
-		for _, v := range vs {
-			sLabels = append(sLabels, NewSwitchLabel(
-				v, handler,
-			))
-		}
+		blocks = append(blocks, block)
 	}
 
 	NextBlock := func(i int) *BasicBlock {
@@ -610,18 +607,29 @@ func (t *SwitchBuilder) Finish() {
 			_fallthrough = handlers[i+1]
 		}
 
-		builder.CurrentBlock = handlers[i]
+		switchBuilder.BuildBody(func(svt, svtsub ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+			builder.CurrentBlock = handlers[i]
+			addToBlocks(handlers[i])
+			condb.AddSucc(handlers[i])
 
-		addToBlocks(handlers[i])
-		condb.AddSucc(handlers[i])
-		switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 			builder.CurrentBlock.SetScope(svt)
+			vs := t.buildExpress(i)
+			builder.EmitJump(blocks[i])
+			for _, v := range vs {
+				sLabels = append(sLabels, NewSwitchLabel(
+					v, handlers[i],
+				))
+			}
+			builder.CurrentBlock = blocks[i]
+			addToBlocks(blocks[i])
 
+			builder.CurrentBlock.SetScope(svtsub)
 			builder.PushTarget(switchBuilder, done, nil, _fallthrough) // fallthrough just jump to next handler
 			t.buildBody(i)
 			builder.PopTarget()
 
-			return builder.CurrentBlock.ScopeTable
+			svt.CoverBy(svtsub)
+			return svt
 		}, generatePhi(builder, handlers[i], condb))
 
 		builder.EmitJump(NextBlock(i))
@@ -634,7 +642,7 @@ func (t *SwitchBuilder) Finish() {
 	// // build default
 	addToBlocks(defaultb)
 	condb.AddSucc(defaultb)
-	switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+	switchBuilder.BuildBody(func(svt, svtsub ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 		builder.CurrentBlock.SetScope(svt)
 		if t.buildDefault != nil {
 			builder.PushTarget(switchBuilder, done, nil, nil)
