@@ -3,6 +3,7 @@ package synscanx
 import (
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
@@ -53,26 +54,31 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 					return nil, utils.Errorf("get mac failed: %s", mac)
 				}
 			}
-			timeout := time.After(50 * time.Millisecond)
-			ticker := time.NewTicker(10 * time.Millisecond)
-			defer ticker.Stop()
+			if dstMac == nil {
+				timeout := time.After(20 * time.Millisecond)
+				ticker := time.NewTicker(5 * time.Millisecond)
+				defer ticker.Stop()
 
-		loop:
-			for {
-				select {
-				case <-ticker.C:
-					if mac, ok := s.macCacheTable.Load(host); ok {
-						dstMac = mac.(net.HardwareAddr)
-					}
-					if dstMac != nil {
+			loop:
+				for {
+					select {
+					case <-ticker.C:
+						if mac, ok := s.macCacheTable.Load(host); ok {
+							dstMac = mac.(net.HardwareAddr)
+						}
+						if dstMac != nil {
+							break loop
+						}
+					case <-timeout:
+						log.Debugf("%s timeout waiting for ARP response", host)
+						s.macCacheTable.Store(host, "timeout")
 						break loop
 					}
-				case <-timeout:
-					//log.Warnf("%s timeout waiting for ARP response", host)
-					s.macCacheTable.Store(host, "timeout")
-					break loop
 				}
 			}
+			// Ethernet
+			opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
+			opts = append(opts, pcapx.WithEthernet_DstMac(dstMac))
 		}
 	} else {
 		opts = append(opts,
@@ -128,12 +134,20 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 
 	dstMac := s.config.RemoteMac
 	srcMac := s.config.SourceMac
-	if mac, ok := s.macCacheTable.Load(host); ok {
-		dstMac = mac.(net.HardwareAddr)
-	}
 
 	if dstMac == nil {
-		if !isLoopback {
+		if isLoopback {
+			// Loopback
+			if runtime.GOOS == "windows" {
+				opts = append(opts, pcapx.WithLoopback(isLoopback))
+			} else {
+				opts = append(opts, pcapx.WithEthernet_SrcMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+				opts = append(opts, pcapx.WithEthernet_DstMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+			}
+		}
+		// 外网扫描
+		if !isLoopback && !s.isInternalAddress(host) {
+			// 外网扫描时，目标机器的 MAC 地址就是网关的 MAC 地址
 			dstMac, err = s.getGatewayMac()
 			if err != nil {
 				return nil, utils.Errorf("get gateway mac failed: %s", err)
@@ -141,9 +155,43 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 			// Ethernet
 			opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
 			opts = append(opts, pcapx.WithEthernet_DstMac(dstMac))
-		} else {
-			// Loopback
-			opts = append(opts, pcapx.WithLoopback(isLoopback))
+		}
+		// 内网扫描，不是回环地址，且是内网地址，尝试从缓存中获取目标机器的 MAC 地址
+		if !isLoopback && s.isInternalAddress(host) {
+			// 内网扫描时，这一步应该能够获取到目标机器的 MAC 地址
+			if mac, ok := s.macCacheTable.Load(host); ok {
+				switch mac.(type) {
+				case net.HardwareAddr:
+					dstMac = mac.(net.HardwareAddr)
+				case string:
+					return nil, utils.Errorf("get mac failed: %s", mac)
+				}
+			}
+			if dstMac == nil {
+				timeout := time.After(50 * time.Millisecond)
+				ticker := time.NewTicker(10 * time.Millisecond)
+				defer ticker.Stop()
+
+			loop:
+				for {
+					select {
+					case <-ticker.C:
+						if mac, ok := s.macCacheTable.Load(host); ok {
+							dstMac = mac.(net.HardwareAddr)
+						}
+						if dstMac != nil {
+							break loop
+						}
+					case <-timeout:
+						log.Debugf("%s timeout waiting for ARP response", host)
+						s.macCacheTable.Store(host, "timeout")
+						break loop
+					}
+				}
+			}
+			// Ethernet
+			opts = append(opts, pcapx.WithEthernet_SrcMac(srcMac))
+			opts = append(opts, pcapx.WithEthernet_DstMac(dstMac))
 		}
 	} else {
 		opts = append(opts,
