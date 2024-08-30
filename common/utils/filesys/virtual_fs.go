@@ -44,6 +44,10 @@ func (f *VirtualFS) MkdirAll(path string, mode os.FileMode) error {
 	return nil
 }
 
+func (f *VirtualFS) Base(s string) string {
+	return path.Base(s)
+}
+
 var _ fi.FileSystem = (*VirtualFS)(nil)
 
 func NewVirtualFs() *VirtualFS {
