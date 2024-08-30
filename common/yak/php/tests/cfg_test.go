@@ -485,6 +485,6 @@ foreach ($arr as $value) {
     println($value);
 }
 ?>`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"Function-array", "1", "2", "3", "4"})
+		CheckPrintTopDef(t, code, []string{"Function-array", "1", "2", "3", "4"})
 	})
 }

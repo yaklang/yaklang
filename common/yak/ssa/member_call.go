@@ -103,22 +103,3 @@ func (b *FunctionBuilder) checkAndCreatDefaultMember(res checkMemberResult, obje
 	// need default member
 	return b.createDefaultMember(res, object, key, false)
 }
-
-// func (b *FunctionBuilder) getOriginMember(res checkMemberResult, object, key Value) Value {
-// 	recoverScope := b.SetCurrent(object, true)
-// 	origin := b.ReadValueInThisFunction(name)
-// 	recoverScope()
-// 	if undefine, ok := ToUndefined(origin); ok {
-// 		undefine.SetRange(b.CurrentRange)
-// 		// undefine.SetName(b.setMember(key))
-// 		if typ != nil {
-// 			undefine.Kind = UndefinedMemberValid
-// 			undefine.SetType(typ)
-// 		} else {
-// 			undefine.Kind = UndefinedMemberInValid
-// 		}
-// 		setMemberCallRelationship(object, key, undefine)
-// 	}
-// 	setMemberVerboseName(origin)
-// 	return origin
-// }

@@ -477,10 +477,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext)(v ssa.Value)
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		// variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
 		rightValue := y.VisitExpression(ret.Expression())
-		// rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
-		// y.GetMainBuilder().AssignVariable(variable, rightValue)
+		if bluePrint, key := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember()); bluePrint != nil {
+			bluePrint.RegisterStaticMember(key, rightValue)
+		}
 		return rightValue
 	}
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)

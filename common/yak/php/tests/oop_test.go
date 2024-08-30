@@ -23,7 +23,7 @@ println(Foo::$my_static . PHP_EOL);
 ?>    
 `, `println(* #-> * as $target)`,
 			map[string][]string{
-				"target": {"Undefine-my_static"},
+				"target": {"Undefined-my_static"},
 			}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
@@ -38,10 +38,10 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`
-		ssatest.CheckPrintlnValue(
+		CheckPrintTopDef(t,
 			code, []string{
-				"add(\"foo\", Undefined-PHP_EOL)",
-			}, t)
+				`"foo"`,
+			})
 	})
 
 	t.Run("test phi static member", func(t *testing.T) {
@@ -57,7 +57,7 @@ if ($a) {
 }
 println(Foo::$my_static);
 `
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"foo", "bar", "start"})
+		CheckPrintTopDef(t, code, []string{"foo", "bar", "start"})
 	})
 	t.Run("string to call member", func(t *testing.T) {
 		code := `<?php
@@ -508,7 +508,7 @@ class t
 
 $c = new t();
 println($c->a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+		CheckPrintTopDef(t, code, []string{"2"})
 	})
 	t.Run("__destruct", func(t *testing.T) {
 		code := `<?php
@@ -695,7 +695,7 @@ class b
         return "1";
     }
 }`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{`"1"`})
+		CheckPrintTopDef(t, code, []string{`"1"`})
 	})
 
 	t.Run("cls use other cls static function", func(t *testing.T) {
@@ -716,7 +716,7 @@ class b
 	       return "1";
 	   }
 	}`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{`"1"`})
+		CheckPrintTopDef(t, code, []string{`"1"`})
 	})
 
 	t.Run("anymous-class with parent", func(t *testing.T) {
@@ -746,7 +746,7 @@ class b
 }
 
 println(b::c);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"12"})
+		CheckPrintTopDef(t, code, []string{"12"})
 	})
 	t.Run("class use parent static", func(t *testing.T) {
 		code := `<?php
@@ -763,7 +763,7 @@ class test extends testxx
 
 
 println(test::$a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+		CheckPrintTopDef(t, code, []string{"1"})
 	})
 
 	//todo: 这个有问题
@@ -782,7 +782,7 @@ class test extends testxx
 testxx::$a=2;
 
 println(test::$a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+		CheckPrintTopDef(t, code, []string{"2"})
 	})
 	t.Run("test static member", func(t *testing.T) {
 		code := `<?php
@@ -806,7 +806,7 @@ class a
 
 $c = new a();
 println($c->a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+		CheckPrintTopDef(t, code, []string{"1"})
 	})
 	t.Run("oop test", func(t *testing.T) {
 		code := `<?php

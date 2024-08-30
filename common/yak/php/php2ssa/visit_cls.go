@@ -1,8 +1,6 @@
 package php2ssa
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -442,155 +440,76 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) ssa.Value {
-	if y == nil || raw == nil || y.IsStop() {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) *ssa.ClassBluePrint  {
+	if y == nil || raw == nil  || y.IsStop(){
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	getValue := func(className, key string) ssa.Value {
-		// class const  variable
-		bluePrint := y.GetClassBluePrint(className)
-		if bluePrint != nil {
-			if fun := bluePrint.GetStaticMethod(key); fun != nil {
-				return fun
-				// } else {
-			}
-		}
 
-		un := y.EmitUndefined(fmt.Sprintf("%s::%s", className, key))
-		if bluePrint != nil {
-			bluePrint.RegisterStaticMethod(key, un)
-		}
-		return un
-
-		// function
-		//return y.ReadClsStaticMember(class, key)
-		//if val := y.CreateStaticMember(class, key)
-		// variable := y.CreateStaticMember(class, key)
-		// v := y.GetMainBuilder().ReadValueByVariable(variable)
-		// if u, ok := v.(*ssa.Undefined); ok && u.Kind == ssa.UndefinedValueInValid {
-		// 	class := y.ResolveValue(class)
-		// 	key := y.EmitConstInst(key)
-		// 	v = y.ReadMemberCallVariable(class, key)
-		// }
-		// v :
-		// return v
-		// return nil
+	i, _ := raw.(*phpparser.StaticClassContext)
+	if i == nil {
+		return nil
 	}
 
-	// var class, key string
-	switch i := raw.(type) {
-	case *phpparser.ClassStaticFunctionMemberContext:
-		// TODO：修改完staticMember 修改此处
-		expr := y.VisitFullyQualifiedNamespaceExpr(i.FullyQualifiedNamespaceExpr())
-		key := i.Identifier().GetText()
-		_ = expr
-		_ = key
-		// return getValue(expr,key)
-	case *phpparser.ClassDirectFunctionMemberContext:
-		class := i.Identifier(0).GetText()
-		key := i.Identifier(1).GetText()
-		return getValue(class, key)
-	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
-		class := ""
-		str, err := strconv.Unquote(i.String_().GetText())
-		if err != nil {
-			class = i.String_().GetText()
-		} else {
-			class = str
-		}
-		key := i.Identifier().GetText()
-		return getValue(class, key)
-	case *phpparser.VariableAsIndirectClassStaticFunctionMemberContext:
-		exprName := y.VisitVariable(i.Variable())
-		value := y.ReadValue(exprName)
-		key := i.Identifier().GetText()
-		// if value is instance of class, check this class static function or const member
-		if value.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-			if v := getValue(value.GetName(), key); v != nil {
-				return v
-			}
-		}
-		//if typ, ok := ssa.ToObjectType(value.GetType()); ok {
-		//	if v := getValue(typ.Name, key); v != nil {
-		//		return v
-		//	}
-		//}
-		return getValue(value.String(), key)
-	default:
-		_ = i
+	var value ssa.Value
+	var className string
+	if full := i.FullyQualifiedNamespaceExpr(); full != nil {
+		value = y.VisitFullyQualifiedNamespaceExpr(full)
+	} else if variable := i.Variable(); variable != nil {
+		name := y.VisitVariable(variable)
+		value = y.ReadValue(name)
+	} else if i.String_() != nil {
+		className = i.String_().GetText()
+	} else if i.Identifier() != nil {
+		className = i.Identifier().GetText()
+	} else {
+		return nil
 	}
-	return y.EmitUndefined(raw.GetText())
+
+	var bluePrint *ssa.ClassBluePrint
+	if value != nil {
+		if bp, ok := ssa.ToClassBluePrintType(value.GetType()); ok {
+			bluePrint = bp
+		}
+	}
+	if className != "" {
+		bluePrint = y.GetClassBluePrint(className)
+	}
+
+	return bluePrint
 }
 
-func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) *ssa.Value {
-	if y == nil || raw == nil || y.IsStop() {
-		return nil
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.ClassBluePrint, string) {
+	if y == nil || raw == nil {
+		return nil, ""
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	var className, key string
-	switch i := raw.(type) {
-	case *phpparser.ClassStaticVariableContext:
-		// TODO class 命令空间
-		// return y.CreateVariable(raw.GetText())
-		//expr := y.VisitFullyQualifiedNamespaceExpr(i.FullyQualifiedNamespaceExpr())
-		//keys := y.VisitRightValue(i.FlexiVariable())
-	case *phpparser.ClassDirectStaticVariableContext:
-		//肯定是一个class，
-		className = i.Identifier().GetText()
-		key = y.VisitRightValue(i.FlexiVariable()).GetName()
-		//key = i.VarName().GetText()
-	case *phpparser.StringAsIndirectClassStaticVariableContext:
-		// "test"::a;
-		str, err := strconv.Unquote(i.String_().GetText())
-		if err != nil {
-			className = i.String_().GetText()
-		} else {
-			className = str
-		}
-		key = y.VisitRightValue(i.FlexiVariable()).GetName()
-	case *phpparser.VariableAsIndirectClassStaticVariableContext:
-		key_ := y.VisitRightValue(i.FlexiVariable())
-		if key_.IsUndefined() {
-			key = key_.GetName()
-		} else {
-			key = key_.String()
-		}
-		exprName := y.VisitVariable(i.Variable())
-		v := y.ReadValue(exprName)
-		//又可能有全限定名，所以如果找到class的话，直接返回一个class
-		if v.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-			className = v.GetName()
-		} else {
-			className = v.String()
-		}
-	default:
-		_ = i
+	i, _ := raw.(*phpparser.StaticClassExprFunctionMemberContext)
+	if i == nil {
+		return nil, "'"
 	}
-	if className == "" {
-		return nil
+
+	key := i.Identifier().GetText()
+	bluePrint := y.VisitStaticClass(i.StaticClass())
+	return bluePrint, key
+}
+
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.ClassBluePrint, string) {
+	if y == nil || raw == nil|| y.IsStop()  {
+		return nil, ""
 	}
-	if strings.HasPrefix(key, "$") {
-		// variable
-		key = key[1:]
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*phpparser.StaticClassExprVariableMemberContext)
+	if i == nil {
+		return nil, "'"
 	}
-	bluePrint := y.GetClassBluePrint(className)
-	if bluePrint != nil {
-		if member := bluePrint.GetStaticMember(key); member != nil {
-			return member
-		}
-	}
-	un := y.EmitUndefined(fmt.Sprintf("%s::%s", className, key))
-	if bluePrint != nil {
-		bluePrint.RegisterStaticMember(key, un)
-	} else {
-		log.Warnf("class %v not found", className)
-	}
-	// function
-	// return y.CreateStaticMember(class, key)
-	return un
+
+	key := y.VisitRightValue(i.FlexiVariable()).GetName()
+	bluePrint := y.VisitStaticClass(i.StaticClass())
+	return bluePrint, key
 }
 
 func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {
@@ -601,13 +520,16 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 	defer recoverRange()
 	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
 		if i.StaticClassExprFunctionMember() != nil {
-			return y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember())
+			if bluePrint, key := y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember()); bluePrint != nil {
+				return bluePrint.GetStaticMethod(key)
+			}
 		}
 		if i.StaticClassExprVariableMember() != nil {
-			return y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-			// variable := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-			// return y.GetMainBuilder().ReadValueByVariable(variable)
+			if bluePrint, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember()); bluePrint != nil {
+				return bluePrint.GetStaticMember(key)
+			}
 		}
+		return y.EmitUndefined(raw.GetText())
 	}
 
 	return nil

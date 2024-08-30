@@ -481,20 +481,16 @@ staticClassExpr
     | staticClassExprVariableMember
     ;
 
-staticClassExprFunctionMember
-    : fullyQualifiedNamespaceExpr '::' identifier # ClassStaticFunctionMember
-    | identifier '::' identifier                  # ClassDirectFunctionMember
-    | string '::' identifier                      # StringAsIndirectClassStaticFunctionMember
-    | variable '::' identifier                    # VariableAsIndirectClassStaticFunctionMember
-    ;
+staticClassExprFunctionMember: staticClass '::' identifier;
 
-staticClassExprVariableMember
-    : fullyQualifiedNamespaceExpr '::' flexiVariable    # ClassStaticVariable
-    | identifier '::' flexiVariable                     # ClassDirectStaticVariable
-    | string '::' flexiVariable                         # StringAsIndirectClassStaticVariable
-    | variable '::' flexiVariable                       # VariableAsIndirectClassStaticVariable
-    ;
+staticClassExprVariableMember : staticClass '::' flexiVariable; 
 
+staticClass 
+    : fullyQualifiedNamespaceExpr    
+    | identifier  
+    | string 
+    | variable  
+    ;
 
 memberCallKey
     : identifier
