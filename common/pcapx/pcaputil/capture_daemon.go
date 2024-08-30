@@ -96,7 +96,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		}
 		if conf.BPFFilter != "" {
 			if err := operation.SetBPFFilter(conf.BPFFilter); err != nil {
-				return "", nil, err
+				return "", nil, utils.Errorf("SetBPFFilter failed: %v", err)
 			}
 		}
 		daemon := &daemonCache{
