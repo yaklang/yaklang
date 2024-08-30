@@ -87,7 +87,6 @@ func (s *Scannerx) isInternalAddress(target string) bool {
 }
 
 func (s *Scannerx) arpScan() {
-
 	for target := range s.hosts.Hosts() {
 		s.rateLimit()
 		select {
