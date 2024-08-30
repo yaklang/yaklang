@@ -11,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 
@@ -45,22 +47,28 @@ type FileInfo struct {
 	Analyzer    Analyzer
 	LazyFile    *lazyfile.LazyFile
 	MatchStatus int
+	filesystem  fi.FileSystem
+}
+
+func SetFileInfoFileSystem(fi *FileInfo, fs fi.FileSystem) {
+	fi.filesystem = fs
 }
 
 type AnalyzeFileInfo struct {
-	Self FileInfo
+	Self *FileInfo
 	// matched file
-	MatchedFileInfos map[string]FileInfo
+	MatchedFileInfos map[string]*FileInfo
 }
 
 type MatchInfo struct {
-	path   string
-	fi     fs.FileInfo
-	header []byte
+	Path       string
+	FileInfo   fs.FileInfo
+	FileHeader []byte
+	fileSystem fi.FileSystem
 }
 
 type AnalyzerGroup struct {
-	fileSystem fs.FS
+	fileSystem fi.FileSystem
 
 	analyzers []Analyzer
 
@@ -73,7 +81,7 @@ type AnalyzerGroup struct {
 	pkgs    []*dxtypes.Package
 
 	// matched file
-	matchedFileInfos map[string]FileInfo
+	matchedFileInfos map[string]*FileInfo
 }
 
 func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
@@ -117,14 +125,30 @@ func FilterAnalyzer(mode ScanMode, usedAnalyzers []TypAnalyzer) []Analyzer {
 	return ret
 }
 
-func NewAnalyzerGroup(numWorkers int, scanMode ScanMode, usedAnalyzers []TypAnalyzer) *AnalyzerGroup {
-	return &AnalyzerGroup{
+func NewAnalyzerGroup(numWorkers int, scanMode ScanMode, usedAnalyzers []TypAnalyzer, customAnalyzers []Analyzer, fis ...fi.FileSystem) *AnalyzerGroup {
+	var fi fi.FileSystem
+	if len(fis) > 0 {
+		fi = fis[0]
+	}
+	if fi == nil {
+		fi = filesys.NewLocalFs()
+	}
+	ag := &AnalyzerGroup{
 		ch:               make(chan AnalyzeFileInfo),
 		numWorkers:       numWorkers,
-		matchedFileInfos: make(map[string]FileInfo),
+		matchedFileInfos: make(map[string]*FileInfo),
 		analyzers:        FilterAnalyzer(scanMode, usedAnalyzers),
 		pkgs:             make([]*dxtypes.Package, 0),
+		fileSystem:       fi,
 	}
+	if len(customAnalyzers) > 0 {
+		ag.AddAnalyzers(customAnalyzers...)
+	}
+	return ag
+}
+
+func (ag *AnalyzerGroup) AddAnalyzers(analyzers ...Analyzer) {
+	ag.analyzers = append(ag.analyzers, analyzers...)
 }
 
 func (ag *AnalyzerGroup) Packages() []*dxtypes.Package {
@@ -141,7 +165,12 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 				pkgs, err := fileInfo.Self.Analyzer.Analyze(fileInfo)
 				if err == nil {
 					for _, pkg := range pkgs {
-						pkg.SetFrom(string(analyzerTyp[fileInfo.Self.Analyzer]), fileInfo.Self.Path)
+						a := fileInfo.Self.Analyzer
+						if name, ok := analyzerTyp[a]; ok {
+							pkg.SetFrom(string(name), fileInfo.Self.Path)
+						} else {
+							pkg.SetFrom("custom", fileInfo.Self.Path)
+						}
 					}
 					ag.pkgLock.Lock()
 					ag.pkgs = append(ag.pkgs, pkgs...)
@@ -181,9 +210,10 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		}
 
 		matchStatus := a.Match(MatchInfo{
-			path:   path,
-			fi:     fi,
-			header: header,
+			Path:       path,
+			FileInfo:   fi,
+			FileHeader: header,
+			fileSystem: ag.fileSystem,
 		})
 
 		if matchStatus == 0 {
@@ -191,7 +221,7 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		}
 		// match type > 0 mean matched and need to analyze
 
-		// save
+		// save to local instead of other file system
 		f, err := os.CreateTemp("", "fanal-file-*")
 		if err != nil {
 			return utils.Errorf("failed to create analyzer temporary file")
@@ -201,12 +231,14 @@ func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
 		}
 		f.Close()
 
-		// add to scanned files
-		ag.matchedFileInfos[path] = FileInfo{
+		// add to scanned files, use local fs instead
+		fs := filesys.NewLocalFs()
+		ag.matchedFileInfos[path] = &FileInfo{
 			Path:        path,
 			Analyzer:    a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(ag.fileSystem, f),
+			LazyFile:    lazyfile.LazyOpenStreamByFile(fs, f),
 			MatchStatus: matchStatus,
+			filesystem:  fs,
 		}
 	}
 	return nil
@@ -223,8 +255,8 @@ func (ag *AnalyzerGroup) Analyze() error {
 	return nil
 }
 
-func ParseLanguageConfiguration(fi FileInfo, parser types.Parser) ([]*dxtypes.Package, error) {
-	parsedLibs, parsedDeps, err := parser.Parse(fi.LazyFile)
+func ParseLanguageConfiguration(fi *FileInfo, parser types.Parser) ([]*dxtypes.Package, error) {
+	parsedLibs, parsedDeps, err := parser.Parse(fi.filesystem, fi.LazyFile)
 	if err != nil {
 		return nil, err
 	}

@@ -39,7 +39,7 @@ func (a rubyGemSpecAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, e
 }
 
 func (a rubyGemSpecAnalyzer) Match(info MatchInfo) int {
-	if gemspecRegex.MatchString(filepath.ToSlash(info.path)) {
+	if gemspecRegex.MatchString(filepath.ToSlash(info.Path)) {
 		return statusGemSpec
 	}
 	return 0

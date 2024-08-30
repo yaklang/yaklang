@@ -17,11 +17,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-var (
-	jarFileRegEx = regexp.MustCompile(`^([a-zA-Z0-9\._-]*[^-*])-(\d\S*(?:-SNAPSHOT)?).jar$`)
-)
+var jarFileRegEx = regexp.MustCompile(`^([a-zA-Z0-9\._-]*[^-*])-(\d\S*(?:-SNAPSHOT)?).jar$`)
 
 type JarParser struct {
 	rootFilePath string
@@ -59,16 +58,15 @@ func NewJarParser(path string, size int64) types.Parser {
 	}
 }
 
-func (p *JarParser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
-	libs, deps, err := p.parseArtifact(p.rootFilePath, p.size, r)
+func (p *JarParser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	libs, deps, err := p.parseArtifact(fs, p.rootFilePath, p.size, r)
 	if err != nil {
 		return nil, nil, utils.Errorf("unable to parse %s: %v", p.rootFilePath, err)
 	}
 	return removeLibraryDuplicates(libs), deps, nil
 }
 
-func (p *JarParser) parseArtifact(filePath string, size int64, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
-
+func (p *JarParser) parseArtifact(fs fi.FileSystem, filePath string, size int64, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	zr, err := zip.NewReader(r, size)
 	if err != nil {
 		return nil, nil, utils.Errorf("zip error: %v", err)
@@ -76,15 +74,16 @@ func (p *JarParser) parseArtifact(filePath string, size int64, r types.ReadSeeke
 
 	// Try to extract artifactId and version from the file name
 	// e.g. spring-core-5.3.4-SNAPSHOT.jar => sprint-core, 5.3.4-SNAPSHOT
-	fileProps := parseFileName(filePath)
+	fileProps := parseFileName(fs, filePath)
 
 	var libs []types.Library
 	var m manifest
 	var foundPomProps bool
 
 	for _, fileInJar := range zr.File {
+		filename := filepath.Base(fileInJar.Name)
 		switch {
-		case filepath.Base(fileInJar.Name) == "pom.properties":
+		case filename == "pom.properties":
 			props, err := parsePomProperties(fileInJar, filePath)
 			if err != nil {
 				return nil, nil, utils.Errorf("failed to parse %s: %v", fileInJar.Name, err)
@@ -95,13 +94,13 @@ func (p *JarParser) parseArtifact(filePath string, size int64, r types.ReadSeeke
 			if fileProps.ArtifactID == props.ArtifactID && fileProps.Version == props.Version {
 				foundPomProps = true
 			}
-		case filepath.Base(fileInJar.Name) == "MANIFEST.MF":
+		case filename == "MANIFEST.MF":
 			m, err = parseManifest(fileInJar)
 			if err != nil {
 				return nil, nil, utils.Errorf("failed to parse MANIFEST.MF: %v", err)
 			}
 		case isArtifact(fileInJar.Name):
-			innerLibs, _, err := p.parseInnerJar(fileInJar, filePath) //TODO process inner deps
+			innerLibs, _, err := p.parseInnerJar(fs, fileInJar, filePath) // TODO process inner deps
 			if err != nil {
 				continue
 			}
@@ -121,7 +120,7 @@ func (p *JarParser) parseArtifact(filePath string, size int64, r types.ReadSeeke
 	return append(libs, manifestProps.Library()), nil, nil
 }
 
-func (p *JarParser) parseInnerJar(zf *zip.File, rootPath string) ([]types.Library, []types.Dependency, error) {
+func (p *JarParser) parseInnerJar(fs fi.FileSystem, zf *zip.File, rootPath string) ([]types.Library, []types.Dependency, error) {
 	fr, err := zf.Open()
 	if err != nil {
 		return nil, nil, utils.Errorf("unable to open %s: %v", zf.Name, err)
@@ -145,7 +144,7 @@ func (p *JarParser) parseInnerJar(zf *zip.File, rootPath string) ([]types.Librar
 	fullPath := path.Join(rootPath, zf.Name)
 
 	// Parse jar/war/ear recursively
-	innerLibs, innerDeps, err := p.parseArtifact(fullPath, int64(zf.UncompressedSize64), f)
+	innerLibs, innerDeps, err := p.parseArtifact(fs, fullPath, int64(zf.UncompressedSize64), f)
 	if err != nil {
 		return nil, nil, utils.Errorf("failed to parse %s: %v", zf.Name, err)
 	}
@@ -161,8 +160,9 @@ func isArtifact(name string) bool {
 	return false
 }
 
-func parseFileName(filePath string) JarProperties {
-	fileName := filepath.Base(filePath)
+func parseFileName(fs fi.FileSystem, filePath string) JarProperties {
+	fileName := fs.Base(filePath)
+	// fileName := filepath.Base(filePath)
 	packageVersion := jarFileRegEx.FindStringSubmatch(fileName)
 	if len(packageVersion) != 3 {
 		return JarProperties{}

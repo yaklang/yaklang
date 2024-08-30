@@ -42,7 +42,7 @@ func (a gradleAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error)
 
 func (a gradleAnalyzer) Match(info MatchInfo) int {
 	// Skip `composer.lock` inside `vendor` folder
-	if strings.HasSuffix(info.path, javaGradleFile) {
+	if strings.HasSuffix(info.Path, javaGradleFile) {
 		return statusGradle
 	}
 	return 0

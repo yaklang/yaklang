@@ -37,8 +37,7 @@ func (a pnpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a pnpmAnalyzer) Match(info MatchInfo) int {
-
-	if info.fi.Name() == pnpmLockYaml {
+	if info.FileInfo.Name() == pnpmLockYaml {
 		return pnpmLockStatus
 	}
 

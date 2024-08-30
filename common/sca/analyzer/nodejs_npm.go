@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	godeptypes "github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 const (
@@ -55,10 +56,10 @@ func (a npmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a npmAnalyzer) Match(info MatchInfo) int {
-	if info.fi.Name() == packageJson {
+	if info.FileInfo.Name() == packageJson {
 		return statusNpmJson
 	}
-	if info.fi.Name() == packageLockJson {
+	if info.FileInfo.Name() == packageLockJson {
 		return statusNpmLockJson
 	}
 	return 0
@@ -92,7 +93,7 @@ func newNpmParse() *parser {
 	return &parser{}
 }
 
-func (*parser) Parse(r types.ReadSeekerAt) ([]godeptypes.Library, []godeptypes.Dependency, error) {
+func (*parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]godeptypes.Library, []godeptypes.Dependency, error) {
 	var pkgJSON packageJSON
 	// todo: use json field select
 	if err := json.NewDecoder(r).Decode(&pkgJSON); err != nil {

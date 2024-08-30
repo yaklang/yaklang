@@ -3,13 +3,14 @@ package sca
 import (
 	"archive/tar"
 	"context"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -23,6 +24,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 const (
@@ -31,11 +33,12 @@ const (
 )
 
 type ScanConfig struct {
-	endpoint      string
-	numWorkers    int
-	scanMode      analyzer.ScanMode
-	usedAnalyzers []analyzer.TypAnalyzer
-	fs            fs.FS
+	endpoint        string
+	numWorkers      int
+	scanMode        analyzer.ScanMode
+	usedAnalyzers   []analyzer.TypAnalyzer
+	customAnalyzers []analyzer.Analyzer
+	fs              fi.FileSystem
 }
 
 type ScanOption func(*ScanConfig)
@@ -46,6 +49,12 @@ func NewConfig() *ScanConfig {
 		endpoint:      "",
 		scanMode:      analyzer.AllMode,
 		usedAnalyzers: []analyzer.TypAnalyzer{},
+	}
+}
+
+func _withCustomAnalyzer(matchFunc func(info analyzer.MatchInfo) int, analyzeFunc func(fi *analyzer.FileInfo, otherFi map[string]*analyzer.FileInfo) []*analyzer.CustomPackage) ScanOption {
+	return func(c *ScanConfig) {
+		c.customAnalyzers = append(c.customAnalyzers, analyzer.NewCustomAnalyzer(matchFunc, analyzeFunc))
 	}
 }
 
@@ -130,15 +139,6 @@ func getContainerMountFSSource(c *client.Client, containerID string) ([]string, 
 type walkFunc func(string, fs.FileInfo, io.Reader) error
 
 func walkFS(config *ScanConfig, pathStr string, handler walkFunc) error {
-	//startPath := pathStr
-	//var err error
-	//if !filepath.IsAbs(pathStr) {
-	//	startPath, err = filepath.Abs(pathStr)
-	//	if err != nil {
-	//		return utils.Errorf("cannot fetch the absolute path: %v", err)
-	//	}
-	//}
-
 	if config.fs == nil {
 		config.fs = filesys.NewLocalFs()
 	}
@@ -159,7 +159,6 @@ func walkFS(config *ScanConfig, pathStr string, handler walkFunc) error {
 			log.Debugf("skipping the directory: %s", filePath)
 			return nil
 		}
-		//filePath = path.Join(startPath, filePath)
 
 		statsInfo, err := d.Info()
 		if err != nil {
@@ -269,7 +268,7 @@ func walkLayer(rc io.ReadCloser, handler walkFunc) error {
 }
 
 func scanGitRepo(repoDir string, config *ScanConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers, config.customAnalyzers)
 
 	// match file
 	err := walkGitCommit(repoDir, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -296,7 +295,7 @@ func scanGitRepo(repoDir string, config *ScanConfig) ([]*dxtypes.Package, error)
 }
 
 func scanDockerImage(imageFile *os.File, config *ScanConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers, config.customAnalyzers)
 
 	// match file
 	err := walkImage(imageFile, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -323,7 +322,7 @@ func scanDockerImage(imageFile *os.File, config *ScanConfig) ([]*dxtypes.Package
 }
 
 func scanContainer(rc io.ReadCloser, config *ScanConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers, config.customAnalyzers)
 
 	// match file
 	err := walkLayer(rc, func(path string, fi fs.FileInfo, r io.Reader) error {
@@ -350,13 +349,8 @@ func scanContainer(rc io.ReadCloser, config *ScanConfig) ([]*dxtypes.Package, er
 }
 
 func scanFS(fsPath string, config *ScanConfig) ([]*dxtypes.Package, error) {
-	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
-
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers, config.customAnalyzers, config.fs)
 	// match file
-	if config.fs == nil {
-		config.fs = filesys.NewLocalFs()
-	}
-
 	err := walkFS(config, fsPath, func(path string, fi fs.FileInfo, r io.Reader) error {
 		if err := ag.Match(path, fi, r); err != nil {
 			return err
@@ -385,10 +379,11 @@ func ScanLocalFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, erro
 	for _, opt := range opts {
 		opt(config)
 	}
+	config.fs = filesys.NewLocalFs()
 	return scanFS(p, config)
 }
 
-func ScanFilesystem(p fs.FS, opts ...ScanOption) ([]*dxtypes.Package, error) {
+func ScanFilesystem(p fi.FileSystem, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	config.fs = p
 	for _, opt := range opts {

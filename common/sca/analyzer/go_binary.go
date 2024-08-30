@@ -26,7 +26,7 @@ func NewGoBinaryAnalyzer() *goBinaryAnalyzer {
 }
 
 func (a goBinaryAnalyzer) Match(info MatchInfo) int {
-	if IsExecutable(info.header) {
+	if IsExecutable(info.FileHeader) {
 		return statusExecutable
 	}
 	return 0

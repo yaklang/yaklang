@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 var (
@@ -34,7 +35,7 @@ func NewParser() types.Parser {
 }
 
 // Parse scans file to try to report the Go and module versions.
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	info, err := buildinfo.Read(r)
 	if err != nil {
 		return nil, nil, convertError(err)

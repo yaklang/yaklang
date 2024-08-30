@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 var jarFileRegEx = regexp.MustCompile(`^([a-zA-Z0-9\._-]*[^-*])-(\d\S*(?:-SNAPSHOT)?).jar$`)
@@ -68,7 +69,7 @@ func NewParser(c Client, opts ...Option) types.Parser {
 	return p
 }
 
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	libs, deps, err := p.parseArtifact(p.rootFilePath, p.size, r)
 	if err != nil {
 		return nil, nil, utils.Errorf("unable to parse %s: %w", p.rootFilePath, err)
