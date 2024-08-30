@@ -80,12 +80,20 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-
+		var bpf string
+		if s.config.Iface.Flags&net.FlagLoopback == 0 {
+			// Interface is not loopback, set the filter.
+			bpf = fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())
+		} else {
+			// Interface is loopback, set a different filter.
+			// Replace the following line with the appropriate filter for your use case.
+			bpf = "udp || tcp[tcpflags] == tcp-syn|tcp-ack"
+		}
 		err := pcaputil.Start(
 			pcaputil.WithContext(ctx),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithDevice(s.config.Iface.Name),
-			pcaputil.WithBPFFilter(fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())),
+			pcaputil.WithBPFFilter(bpf),
 			pcaputil.WithDisableAssembly(true),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
