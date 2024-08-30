@@ -40,9 +40,9 @@ func StaticAnalyzeYaklang(code, codeTyp string, kind StaticAnalyzeKind) []*resul
 					Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
 					Severity:        result.Error,
 					StartLineNumber: int64(e.StartPos.LineNumber),
-					StartColumn:     int64(e.StartPos.ColumnNumber + 1),
+					StartColumn:     int64(e.StartPos.ColumnNumber),
 					EndLineNumber:   int64(e.EndPos.LineNumber),
-					EndColumn:       int64(e.EndPos.ColumnNumber + 2),
+					EndColumn:       int64(e.EndPos.ColumnNumber + 1),
 					From:            "compiler",
 				})
 			}
@@ -71,9 +71,9 @@ func StaticAnalyzeYaklang(code, codeTyp string, kind StaticAnalyzeKind) []*resul
 			Message:         err.Message,
 			Severity:        severity,
 			StartLineNumber: int64(err.Pos.GetStart().GetLine()),
-			StartColumn:     int64(err.Pos.GetStart().GetColumn() + 1),
+			StartColumn:     int64(err.Pos.GetStart().GetColumn()),
 			EndLineNumber:   int64(err.Pos.GetEnd().GetLine()),
-			EndColumn:       int64(err.Pos.GetEnd().GetColumn() + 1),
+			EndColumn:       int64(err.Pos.GetEnd().GetColumn()),
 			From:            "SSA:" + string(err.Tag),
 		})
 	}
