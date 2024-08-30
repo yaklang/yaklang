@@ -36,7 +36,7 @@ func NewGoModAnalyzer() *goModAnalyzer {
 }
 
 func (a goModAnalyzer) Match(info MatchInfo) int {
-	fileName := path.Base(info.path)
+	_, fileName := info.fileSystem.PathSplit(info.Path)
 	if fileName == goModFile {
 		return statusGoMod
 	} else if fileName == goSumFile {
@@ -50,7 +50,7 @@ func (a goModAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) 
 	switch fi.MatchStatus {
 	case statusGoMod:
 		p := mod.NewParser(true)
-		parsedLibs, parsedDeps, err := p.Parse(fi.LazyFile)
+		parsedLibs, parsedDeps, err := p.Parse(fi.filesystem, fi.LazyFile)
 		if err != nil {
 			return nil, err
 		}

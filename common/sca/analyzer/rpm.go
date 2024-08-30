@@ -127,7 +127,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a rpmAnalyzer) Match(info MatchInfo) int {
-	if utils.StringSliceContainsAll(rpmRequiredFiles, info.path) {
+	if utils.StringSliceContainsAll(rpmRequiredFiles, info.Path) {
 		return statusRPM
 	}
 	return 0

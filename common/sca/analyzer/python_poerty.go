@@ -28,7 +28,7 @@ func NewPythonPoetryAnalyzer() *pythonPoetryAnalyzer {
 }
 
 func (a pythonPoetryAnalyzer) Match(info MatchInfo) int {
-	if strings.HasSuffix(info.path, PoetryLockFile) || strings.HasSuffix(info.path, PyProjectFile) {
+	if strings.HasSuffix(info.Path, PoetryLockFile) || strings.HasSuffix(info.Path, PyProjectFile) {
 		return statusPIP
 	}
 	return 0

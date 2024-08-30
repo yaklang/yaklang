@@ -1,7 +1,6 @@
 package analyzer
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -46,15 +45,15 @@ func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, erro
 }
 
 func (a composerAnalyzer) Match(info MatchInfo) int {
-	fileName := filepath.Base(info.path)
+	_, filename := info.fileSystem.PathSplit(info.Path)
 	// Skip `composer.lock` inside `vendor` folder
-	if slices.Contains(strings.Split(info.path, "/"), "vendor") {
+	if slices.Contains(strings.Split(info.Path, "/"), "vendor") {
 		return 0
 	}
-	if fileName == phpJsonFile {
+	if filename == phpJsonFile {
 		return statusComposerJson
 	}
-	if fileName == phpLockFile {
+	if filename == phpLockFile {
 		return statusComposerLock
 	}
 	return 0

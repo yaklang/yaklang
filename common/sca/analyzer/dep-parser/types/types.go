@@ -2,6 +2,8 @@ package types
 
 import (
 	"io"
+
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type ReadSeekerAt interface {
@@ -73,7 +75,7 @@ func (deps Dependencies) Swap(i, j int) { deps[i], deps[j] = deps[j], deps[i] }
 
 type Parser interface {
 	// Parse parses the dependency file
-	Parse(r ReadSeekerAt) ([]Library, []Dependency, error)
+	Parse(fs fi.FileSystem, r ReadSeekerAt) ([]Library, []Dependency, error)
 }
 
 type RefType string

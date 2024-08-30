@@ -16,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 const nodeModulesDir = "node_modules"
@@ -55,7 +56,7 @@ func NewParser() types.Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockFile LockFile
 	input, err := io.ReadAll(r)
 	if err != nil {

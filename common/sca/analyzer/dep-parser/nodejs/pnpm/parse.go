@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type PackageResolution struct {
@@ -42,7 +43,7 @@ func (p *Parser) ID(name, version string) string {
 	return fmt.Sprintf("%s@%s", name, version)
 }
 
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockFile LockFile
 	if err := yaml.NewDecoder(r).Decode(&lockFile); err != nil {
 		return nil, nil, utils.Errorf("decode error: %w", err)

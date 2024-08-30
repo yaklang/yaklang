@@ -27,7 +27,7 @@ func NewPythonPIPAnalyzer() *pythonPIPAnalyzer {
 }
 
 func (a pythonPIPAnalyzer) Match(info MatchInfo) int {
-	if strings.HasSuffix(info.path, pipFile) {
+	if strings.HasSuffix(info.Path, pipFile) {
 		return statusPIP
 	}
 	return 0

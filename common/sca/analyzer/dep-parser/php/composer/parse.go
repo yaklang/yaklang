@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
 	outils "github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type lockFile struct {
@@ -32,7 +33,7 @@ func NewParser() types.Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	var lockFile lockFile
 	input, err := io.ReadAll(r)
 	if err != nil {

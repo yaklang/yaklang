@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"golang.org/x/exp/slices"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -124,18 +125,21 @@ func Run(tc testcase) []*dxtypes.Package {
 	if err != nil {
 		t.Fatalf("%s: con't open file: %v", err, tc.name)
 	}
+	fs := filesys.NewLocalFs()
 
-	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, analyzer.FileInfo) {
+	matchedFileInfos := lo.MapEntries(tc.matchedFileMap, func(k, v string) (string, *analyzer.FileInfo) {
 		f, err := CreateTempFromFsFile(v)
 		if err != nil {
 			t.Fatalf("%s: con't open file: %v", err, tc.name)
 		}
-		return k, analyzer.FileInfo{
+		fi := &analyzer.FileInfo{
 			Path:        k,
 			Analyzer:    tc.a,
 			LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
 			MatchStatus: tc.matchType,
 		}
+		analyzer.SetFileInfoFileSystem(fi, fs)
+		return k, fi
 	})
 	defer func() {
 		for _, fi := range matchedFileInfos {
@@ -145,13 +149,15 @@ func Run(tc testcase) []*dxtypes.Package {
 		}
 	}()
 
+	fi := &analyzer.FileInfo{
+		Path:        tc.virtualPath,
+		Analyzer:    tc.a,
+		LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
+		MatchStatus: tc.matchType,
+	}
+	analyzer.SetFileInfoFileSystem(fi, fs)
 	pkgs, err := tc.a.Analyze(analyzer.AnalyzeFileInfo{
-		Self: analyzer.FileInfo{
-			Path:        tc.virtualPath,
-			Analyzer:    tc.a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(nil, f),
-			MatchStatus: tc.matchType,
-		},
+		Self:             fi,
 		MatchedFileInfos: matchedFileInfos,
 	})
 	pkgs = analyzer.MergePackages(pkgs)
@@ -942,6 +948,38 @@ func TestRustCargo(t *testing.T) {
 		}
 		Run(tc)
 	})
+}
+
+func TestCustomAnalyzer(t *testing.T) {
+	tc := testcase{
+		name:        "positive",
+		filePath:    "./testdata/go_mod/positive/mod",
+		virtualPath: "/test/go.mod",
+		t:           t,
+		a: analyzer.NewCustomAnalyzer(
+			func(info analyzer.MatchInfo) int {
+				if strings.HasSuffix(info.Path, "go.mod") {
+					return 1
+				}
+				return 0
+			},
+			func(fi *analyzer.FileInfo, otherFi map[string]*analyzer.FileInfo) []*analyzer.CustomPackage {
+				return []*analyzer.CustomPackage{
+					{
+						Name:    "github.com/aquasecurity/go-dep-parser",
+						Version: "0.0.0-20220406074731-71021a481237",
+					},
+					{
+						Name:    "golang.org/x/xerrors",
+						Version: "0.0.0-20200804184101-5ec99f83aff1",
+					},
+				}
+			},
+		),
+		matchType: 1,
+		wantPkgs:  GoModWantPkgs,
+	}
+	Run(tc)
 }
 
 func showPkgs(pkgs []*dxtypes.Package) {

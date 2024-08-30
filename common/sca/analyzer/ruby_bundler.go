@@ -35,7 +35,7 @@ func (a rubyBunlderAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, e
 }
 
 func (a rubyBunlderAnalyzer) Match(info MatchInfo) int {
-	if info.fi.Name() == GemLock {
+	if info.FileInfo.Name() == GemLock {
 		return statusRubyBundler
 	}
 	return 0

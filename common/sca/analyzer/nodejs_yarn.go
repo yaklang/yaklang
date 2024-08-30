@@ -36,7 +36,7 @@ func (a yarnAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a yarnAnalyzer) Match(info MatchInfo) int {
-	if info.fi.Name() == YarnLock {
+	if info.FileInfo.Name() == YarnLock {
 		return yarnLockStatus
 	}
 	return 0

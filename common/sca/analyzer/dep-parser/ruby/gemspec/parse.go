@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 const specNewStr = "Gem::Specification.new"
@@ -45,7 +46,7 @@ func NewParser() types.Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(r types.ReadSeekerAt) (libs []types.Library, deps []types.Dependency, err error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) (libs []types.Library, deps []types.Dependency, err error) {
 	var newVar, name, version, license string
 
 	scanner := bufio.NewScanner(r)
@@ -97,7 +98,8 @@ func (p *Parser) Parse(r types.ReadSeekerAt) (libs []types.Library, deps []types
 			Name:    name,
 			Version: version,
 			License: license,
-		}}, nil, nil
+		},
+	}, nil, nil
 }
 
 func findSubString(re *regexp.Regexp, line, name string) string {
