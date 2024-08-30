@@ -64,7 +64,9 @@ sqlInjectionChecking = func(https, request) {
         paramValue = freq.GetQueryValue(paramName)
 
         info(f`参数名：${paramName} 参数值: ${paramValue}`)
-        pureInt = str.MatchAllOfRegexp(paramValue, `\d+`)
+        // pureInt = 
+        _, err = atoi(paramValue)
+        pureInt = err == nil
 
         prefix = []
         suffix = [" -- ", " # "]
