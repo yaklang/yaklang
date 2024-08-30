@@ -1295,7 +1295,7 @@ func (b *astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
 
 	if expl := stmt.ExpressionList(); expl != nil {
 		for _, exp := range expl.(*gol.ExpressionListContext).AllExpression() {
-			_, leftv := b.buildExpression(exp.(*gol.ExpressionContext), false)
+			_, leftv := b.buildExpression(exp.(*gol.ExpressionContext), true)
 			b.AssignVariable(leftv, recvv)
 		}
 	}

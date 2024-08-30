@@ -551,6 +551,87 @@ func TestBasic_Variable_Switch(t *testing.T) {
 	})
 }
 
+func TestBasic_Variable_Select(t *testing.T) {
+	t.Run("simple select", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			channel1 := make(chan int)
+			channel2 := make(chan string)
+
+		    select {
+			case data1 := <-channel1:
+				println(data1) // chan(Function-make(typeValue(chan number)))
+			case data2 := <-channel2:
+				println(data1) // Undefined-data1
+			}
+		}
+		`, []string{
+			"chan(Function-make(typeValue(chan number)))", "Undefined-data1",
+		}, t)
+	})
+
+	t.Run("simple select phi-case", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			data1 := "hello"
+
+			channel1 := make(chan string)
+			channel2 := make(chan string)
+
+			select {
+			case data1 = <-channel1:
+			case data1 = <-channel2:
+			}
+
+			println(data1)
+		}
+		`, []string{
+			"phi(data1)[chan(Function-make(typeValue(chan string))),chan(Function-make(typeValue(chan string))),\"hello\"]",
+		}, t)
+	})
+
+	t.Run("simple select cover-case", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			data1 := "hello"
+			channel1 := make(chan string)
+
+			select {
+			case data1 = <-channel1:
+				data1 = "world"
+			}
+			println(data1)
+		}
+		`, []string{
+			"phi(data1)[\"world\",\"hello\"]",
+		}, t)
+	})
+
+	t.Run("simple select phi-cover-case", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			data1 := "111111"
+			channel1 := make(chan string)
+
+			select {
+			case data1 = <-channel1:
+				data1 = "333333"
+			case data1 = <-channel1:
+				
+			}
+
+			println(data1)
+		}
+		`, []string{
+			"phi(data1)[\"333333\",chan(Function-make(typeValue(chan string))),\"111111\"]",
+		}, t)
+	})
+}
+
 func TestBasic_CFG_Break(t *testing.T) {
 	t.Run("simple break in loop", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main

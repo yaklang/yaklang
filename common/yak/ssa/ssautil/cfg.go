@@ -342,7 +342,7 @@ func (s *SwitchStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
 }
 
 func (s *SwitchStmt[T]) BuildBody(
-	body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
+	body func(ScopedVersionedTableIF[T], ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
 	merge func(string, []T) T,
 ) {
 	sub := s.condition.CreateSubScope()
@@ -350,7 +350,8 @@ func (s *SwitchStmt[T]) BuildBody(
 		sub.Merge(true, merge, s.mergeToNextBody)
 		s.mergeToNextBody = nil
 	}
-	ret := body(sub)
+	ret := body(sub, sub.CreateSubScope())
+
 	if s.AutoBreak { // if this switch fall through, then merge to next body
 		// if switch default break to switch end
 		if s.mergeToNextBody == nil {
@@ -410,9 +411,8 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 }
 
 type GotoStmt[T versionedValue] struct {
-	enter        ScopedVersionedTableIF[T]
-	_goto        ScopedVersionedTableIF[T]
-	mergeToLabel ScopedVersionedTableIF[T]
+	enter ScopedVersionedTableIF[T]
+	_goto ScopedVersionedTableIF[T]
 }
 
 func NewGotoStmt[T versionedValue](enter ScopedVersionedTableIF[T], _goto ScopedVersionedTableIF[T]) *GotoStmt[T] {
