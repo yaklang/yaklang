@@ -286,6 +286,8 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 	return tgCh
 }
 
+var countOnce sync.Once
+
 func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResult, error) {
 	resultCh := make(chan *synscan.SynScanResult, 1024)
 	openPortLock := new(sync.Mutex)
@@ -400,8 +402,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		s.sendPacket(targetCh)
 		time.Sleep(s.config.waiting)
 		log.Debugf("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
-
-		log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
+		countOnce.Do(func() {
+			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
+		})
 	}()
 
 	defer func() {
