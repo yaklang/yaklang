@@ -302,6 +302,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 // }
 
 func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
+	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
 	token := utils.RandSecret(10)
 	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
