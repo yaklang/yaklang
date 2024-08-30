@@ -100,3 +100,4 @@ func (f *RelLocalFs) String() string {
 }
 
 func (f *RelLocalFs) ExtraInfo(string) map[string]any { return nil }
+func (f *RelLocalFs) Base(p string) string            { return filepath.Base(p) }

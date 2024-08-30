@@ -26,6 +26,7 @@ type FileSystem interface {
 
 	GetSeparators() rune
 
+	Base(string) string
 	PathSplit(string) (string, string)
 	Ext(string) string
 	IsAbs(string) bool

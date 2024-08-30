@@ -61,6 +61,7 @@ func (f *embedFs) WriteFile(string, []byte, os.FileMode) error { return utils.Er
 func (f *embedFs) Delete(string) error                         { return utils.Error("implement me") }
 func (f *embedFs) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 func (f *embedFs) ExtraInfo(string) map[string]any             { return nil }
+func (f *embedFs) Base(p string) string                        { return path.Base(p) }
 
 func NewEmbedFS(fs embed.FS) fi.FileSystem {
 	return &embedFs{fs}
@@ -119,3 +120,4 @@ func (f *LocalFs) WriteFile(name string, data []byte, perm os.FileMode) error {
 func (f *LocalFs) Delete(name string) error                     { return os.RemoveAll(name) }
 func (f *LocalFs) MkdirAll(name string, perm os.FileMode) error { return os.MkdirAll(name, perm) }
 func (f *LocalFs) ExtraInfo(string) map[string]any              { return nil }
+func (f *LocalFs) Base(p string) string                         { return filepath.Base(p) }

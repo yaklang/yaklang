@@ -209,3 +209,4 @@ func (f *irSourceFS) Rename(string, string) error                 { return utils
 func (f *irSourceFS) Rel(string, string) (string, error)          { return "", utils.Error("implement me") }
 func (f *irSourceFS) WriteFile(string, []byte, os.FileMode) error { return utils.Error("implement me") }
 func (f *irSourceFS) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
+func (f *irSourceFS) Base(p string) string                        { return path.Base(p) }
