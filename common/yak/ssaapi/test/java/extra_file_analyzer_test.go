@@ -62,7 +62,8 @@ func TestSimpleExtraFile(t *testing.T) {
 			`${*.properties}.re(/spring.datasource.url=(.*)/) as $url`,
 			map[string][]string{
 				"url": {`"jdbc:mysql://localhost:3306/your_database"`},
-			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+			}, false,
+			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
@@ -76,7 +77,7 @@ func TestSimpleExtraFile(t *testing.T) {
 				"url":  {`"selectUserByUsername"`},
 				"url2": {`"selectUserByUsername"`},
 			}, false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 }
@@ -169,7 +170,8 @@ public interface HomeDao {
 			`${*Dao.xml}.xpath("//mapper/*[contains(.,'${') and @id]/@id") as $url`,
 			map[string][]string{
 				"url": {`"getFlashProductList"`},
-			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+			}, false,
+			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
@@ -178,7 +180,8 @@ public interface HomeDao {
 			`getFlashProductList as $func`,
 			map[string][]string{
 				"func": {"Function-HomeDao.getFlashProductList", "Undefined-HomeDao.getFlashProductList(valid)"},
-			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+			}, false,
+			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 
@@ -189,7 +192,8 @@ public interface HomeDao {
 			`,
 			map[string][]string{
 				"func": {"Function-HomeDao.getFlashProductList", "Undefined-HomeDao.getFlashProductList(valid)"},
-			}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+			}, false,
+			// ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 }

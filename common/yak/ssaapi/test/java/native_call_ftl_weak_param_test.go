@@ -12,7 +12,7 @@ import (
 func TestNativeCall_FreeMakerXSS(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java",`package com.example.demo.controller.freemakerdemo;
+	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java", `package com.example.demo.controller.freemakerdemo;
     
 @Controller
 @RequestMapping("/freemarker")
@@ -30,12 +30,12 @@ public class FreeMakerDemo {
     }
 
 }`)
-	vf.AddFile("src/main/resources/application.properties",`spring.application.name=demo
+	vf.AddFile("src/main/resources/application.properties", `spring.application.name=demo
 # freemaker
 spring.freemarker.template-loader-path=classpath:/templates/
 spring.freemarker.suffix=.ftl
 `)
-	vf.AddFile("welcome.ftl",`<!DOCTYPE html>
+	vf.AddFile("welcome.ftl", `<!DOCTYPE html>
 <html>
 <head>
     <title>Welcome</title>
@@ -46,10 +46,10 @@ spring.freemarker.suffix=.ftl
 </body>
 </html>
 `)
-ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
-        assert.Equal(t, 1, sink.Len())
+		assert.Equal(t, 1, sink.Len())
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
@@ -57,7 +57,7 @@ ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 func TestNativeCall_FreeMakerXSS_WithNoSuffixConfig(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java",`package com.example.demo.controller.freemakerdemo;
+	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java", `package com.example.demo.controller.freemakerdemo;
     
 
 @Controller
@@ -77,7 +77,7 @@ public class FreeMakerDemo {
     }
 
 }`)
-	vf.AddFile("welcome.ftl",`<!DOCTYPE html>
+	vf.AddFile("welcome.ftl", `<!DOCTYPE html>
 <html>
 <head>
     <title>Welcome</title>
@@ -88,19 +88,18 @@ public class FreeMakerDemo {
 </html>
 `)
 
-ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
-        assert.Equal(t, 1, sink.Len())
+		assert.Equal(t, 1, sink.Len())
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
-
 func TestNativeCall_FreeMakerXSS_WithDirfferentSuffix(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 
-	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java",`package com.example.demo.controller.freemakerdemo;
+	vf.AddFile("com/example/demo/controller/freemakerdemo/FreeMakerDemo.java", `package com.example.demo.controller.freemakerdemo;
     
 
 @Controller
@@ -120,12 +119,12 @@ public class FreeMakerDemo {
     }
 
 }`)
-	vf.AddFile("src/main/resources/application.properties",`spring.application.name=demo
+	vf.AddFile("src/main/resources/application.properties", `spring.application.name=demo
 # freemaker
 spring.freemarker.template-loader-path=classpath:/templates/
 spring.freemarker.suffix=.html
 `)
-	vf.AddFile("welcome.html",`<!DOCTYPE html>
+	vf.AddFile("welcome.html", `<!DOCTYPE html>
 <html>
 <head>
     <title>Welcome</title>
@@ -136,10 +135,10 @@ spring.freemarker.suffix=.html
 </html>
 `)
 
-ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
-        assert.Equal(t, 1, sink.Len())
+		assert.Equal(t, 1, sink.Len())
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }

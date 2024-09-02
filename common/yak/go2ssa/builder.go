@@ -43,6 +43,10 @@ func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	fb.GetProgram().GlobalScope = container
 }
+func (*SSABuilder) FilterPreHandlerFile(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".mod"
+}
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()

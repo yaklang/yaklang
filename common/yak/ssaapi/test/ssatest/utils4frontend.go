@@ -32,8 +32,10 @@ var (
 	language       consts.Language
 )
 
-func SetLanguage(lang consts.Language, build ssa.Builder) {
-	ssaapi.LanguageBuilders[lang] = build
+func SetLanguage(lang consts.Language, build ...ssa.Builder) {
+	if len(build) > 0 {
+		ssaapi.LanguageBuilders[lang] = build[0]
+	}
 	languageOption = ssaapi.WithLanguage(lang)
 	language = lang
 }
