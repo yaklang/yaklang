@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -58,6 +57,7 @@ public class PmsPortalBrandServiceImpl implements PmsPortalBrandService {
 		"caller":       {"Undefined-homeDao.getRecommendBrandList(valid)(Undefined-homeDao,mul(sub(Parameter-pageNum, 1), Parameter-pageSize),Parameter-pageSize)"},
 		"ParameterDef": {"1", "Parameter-pageNum", "Parameter-pageSize"},
 	},
-		false, ssaapi.WithLanguage(ssaapi.JAVA),
+		false,
+		// ssaapi.WithLanguage(ssaapi.JAVA),
 	)
 }

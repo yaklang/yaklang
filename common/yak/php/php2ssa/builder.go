@@ -2,9 +2,10 @@ package php2ssa
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
+
+	"github.com/google/uuid"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -19,6 +20,11 @@ import (
 
 type SSABuild struct {
 	ssa.DummyPreHandler
+}
+
+func (*SSABuild) FilterPreHandlerFile(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".php"
 }
 
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {

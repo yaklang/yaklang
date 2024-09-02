@@ -90,10 +90,12 @@ func (c *config) parseProject() (Programs, error) {
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
-			if language := c.LanguageBuilder; language != nil {
-				language.PreHandlerProject(c.fs, builder, path)
-			}
 			// check
+			if err := c.checkLanguagePreHandler(path); err == nil {
+				if language := c.LanguageBuilder; language != nil {
+					language.PreHandlerProject(c.fs, builder, path)
+				}
+			}
 			if err := c.checkLanguage(path); err == nil {
 				totalSize++
 			}
@@ -189,9 +191,11 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		}
 	}()
 	// path is empty, use language or YakLang as default
-	if c.LanguageBuilder == nil {
+	if c.SelectedLanguageBuilder == nil {
 		c.LanguageBuilder = LanguageBuilders[Yak]
 		// log.Infof("use default language [%s] for empty path", Yak)
+	} else {
+		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
 	prog, builder, err := c.init()
 
@@ -214,12 +218,23 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 
 var SkippedError = ssareducer.SkippedError
 
+func (c *config) checkLanguagePreHandler(path string) error {
+	return c.checkLanguageEx(path, func(builder ssa.Builder) bool {
+		return builder.FilterPreHandlerFile(path)
+	})
+}
+
 func (c *config) checkLanguage(path string) error {
-	LanguageBuilder := c.LanguageBuilder
+	return c.checkLanguageEx(path, func(builder ssa.Builder) bool {
+		return builder.FilterFile(path)
+	})
+}
+
+func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) error {
 
 	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
 		for _, instance := range builders {
-			if instance.FilterFile(path) {
+			if handler(instance) {
 				return instance, nil
 			}
 		}
@@ -229,6 +244,7 @@ func (c *config) checkLanguage(path string) error {
 	// TODO: whether to use the same programName for all program ?? when call ParseProject
 	// programName += "-" + path
 	var err error
+	LanguageBuilder := c.SelectedLanguageBuilder
 	if LanguageBuilder != nil {
 		LanguageBuilder, err = processBuilders(LanguageBuilder)
 	} else {
@@ -250,9 +266,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
-	}
-	if c.LanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilders[Yak]
 	}
 
 	prog.Build = func(
