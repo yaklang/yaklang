@@ -48,6 +48,10 @@ func registerDriver() {
 	regex := func(re, s string) (bool, error) {
 		return regexp.MatchString(re, s)
 	}
+	sleep := func(s int) bool {
+		time.Sleep(time.Duration(s) * time.Second)
+		return true
+	}
 	sql.Register(SQLiteExtend,
 		&sqlite3.SQLiteDriver{
 			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
@@ -59,6 +63,10 @@ func registerDriver() {
 				}
 
 				err = conn.RegisterFunc("regexp", regex, true)
+				if err != nil {
+					return err
+				}
+				err = conn.RegisterFunc("sleep", sleep, true)
 				if err != nil {
 					return err
 				}
