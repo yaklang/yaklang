@@ -1,20 +1,22 @@
 package cvequeryops
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 const (
@@ -63,7 +65,7 @@ func LoadCVE(fileDir, DbPath string, years ...int) {
 	}).([]string)
 
 	var count int
-	var total = len(CveDataFeed)
+	total := len(CveDataFeed)
 	for fileName := range CveDataFeed {
 		count++
 
@@ -72,10 +74,10 @@ func LoadCVE(fileDir, DbPath string, years ...int) {
 		}
 
 		fileName = path.Join(fileDir, fileName)
-		var startTime = time.Now()
+		startTime := time.Now()
 		log.Infof("LoadCVE begin: " + fileName)
 		_, err := LoadCVEByFileName(fileName, manager)
-		var endTime = time.Now()
+		endTime := time.Now()
 		log.Infof("handle %v cost %v (%v/%v)", fileName, endTime.Sub(startTime).String(), count, total)
 		if err != nil {
 			log.Errorf("handle %v failed: %v", fileName, err)
@@ -107,21 +109,21 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 func DownLoad(dir string) error {
 	for name, url := range CveDataFeed {
 		log.Infof("start to download from: %v", url)
-		resp, err := http.Get(url)
+		resp, _, err := poc.DoGET(url)
 		if err != nil {
 			log.Error(err)
 			continue
 		}
 
 		log.Infof("start to un-gzip from: %v", url)
-		rawData, err := gzip.NewReader(resp.Body)
+		rawData, err := gzip.NewReader(bytes.NewReader(resp.GetBody()))
 		if err != nil {
 			log.Error(err)
 			continue
 		}
 		f := filepath.Join(dir, name)
 		log.Infof("start to save to local file: %v", f)
-		dstFile, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0666)
+		dstFile, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE, 0o666)
 		if err != nil {
 			return utils.Errorf("open %v failed; %v", f, err)
 		}
