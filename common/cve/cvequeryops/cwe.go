@@ -2,20 +2,20 @@ package cvequeryops
 
 import (
 	"bytes"
+	"io/ioutil"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/antchfx/xmlquery"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 func DownloadCWE() (string, error) {
@@ -25,18 +25,20 @@ func DownloadCWE() (string, error) {
 	}
 	defer fp.Close()
 	// https://cwe.mitre.org/data/xml/cwec_latest.xml.zip
-	rsp, err := http.Get(`https://cwe.mitre.org/data/xml/cwec_latest.xml.zip`)
+	rsp, _, err := poc.DoGET(`https://cwe.mitre.org/data/xml/cwec_latest.xml.zip`)
 	if err != nil {
 		log.Errorf("download mitre cwe failed: %s", err)
 		return "", err
 	}
-	io.Copy(fp, rsp.Body)
+	if _, err := fp.Write(rsp.GetBody()); err != nil {
+		return "", err
+	}
 	return fp.Name(), nil
 }
 
 func SaveCWE(db *gorm.DB, cwes []*cveresources.CWE) {
 	for _, i := range cwes {
-		//log.Infof("start save cwe: %v", i.CWEString())
+		// log.Infof("start save cwe: %v", i.CWEString())
 		if d := db.Model(&cveresources.CWE{}).Save(i); d.Error != nil {
 			log.Errorf("save error: %s", d.Error)
 		}
@@ -106,7 +108,7 @@ func LoadCWE(cweXMLPath string) ([]*cveresources.CWE, error) {
 		var parent []string
 		xmlquery.FindEach(cweInstance, `//Related_Weaknesses/Related_Weakness`, func(i int, node *xmlquery.Node) {
 			idStr := strings.TrimSpace(node.SelectAttr(`CWE_ID`))
-			var id, _ = strconv.Atoi(idStr)
+			id, _ := strconv.Atoi(idStr)
 			if id <= 0 {
 				return
 			}
