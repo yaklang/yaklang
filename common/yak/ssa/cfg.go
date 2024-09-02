@@ -607,7 +607,7 @@ func (t *SwitchBuilder) Finish() {
 			_fallthrough = handlers[i+1]
 		}
 
-		switchBuilder.BuildBody(func(svt, svtsub ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+		switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 			builder.CurrentBlock = handlers[i]
 			addToBlocks(handlers[i])
 			condb.AddSucc(handlers[i])
@@ -623,12 +623,13 @@ func (t *SwitchBuilder) Finish() {
 			builder.CurrentBlock = blocks[i]
 			addToBlocks(blocks[i])
 
-			builder.CurrentBlock.SetScope(svtsub)
+			builder.CurrentBlock.SetScope(svt.CreateShadowScope())
 			builder.PushTarget(switchBuilder, done, nil, _fallthrough) // fallthrough just jump to next handler
 			t.buildBody(i)
 			builder.PopTarget()
 
-			svt.CoverBy(svtsub)
+			endc := builder.CurrentBlock.ScopeTable
+			svt.CoverBy(endc)
 			return svt
 		}, generatePhi(builder, handlers[i], condb))
 
@@ -642,7 +643,7 @@ func (t *SwitchBuilder) Finish() {
 	// // build default
 	addToBlocks(defaultb)
 	condb.AddSucc(defaultb)
-	switchBuilder.BuildBody(func(svt, svtsub ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+	switchBuilder.BuildBody(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 		builder.CurrentBlock.SetScope(svt)
 		if t.buildDefault != nil {
 			builder.PushTarget(switchBuilder, done, nil, nil)

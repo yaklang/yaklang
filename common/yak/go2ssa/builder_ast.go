@@ -1341,7 +1341,6 @@ func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
 		})
 	}
 
-	var values []ssa.Value
 	var casepList []*gol.ExprCaseClauseContext
 	var defaultp *gol.ExprCaseClauseContext
 
@@ -1358,6 +1357,7 @@ func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
 
 	SwitchBuilder.BuildCaseSize(len(casepList))
 	SwitchBuilder.SetCase(func(i int) []ssa.Value {
+		var values []ssa.Value
 		if exprcList := casepList[i].ExprSwitchCase(); exprcList != nil {
 			if exprList := exprcList.(*gol.ExprSwitchCaseContext).ExpressionList(); exprList != nil {
 				for _, expr := range exprList.(*gol.ExpressionListContext).AllExpression() {
