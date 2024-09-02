@@ -116,9 +116,16 @@ type CreateHTTPFlowConfig struct {
 	tags               string
 	tooLargeHeaderFile string
 	tooLargeBodyFile   string
+	fromPlugin         string
 }
 
 type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
+
+func CreateHTTPFlowWithFromPlugin(pluginName string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.fromPlugin = pluginName
+	}
+}
 
 func CreateHTTPFlowWithTags(tags string) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
@@ -259,6 +266,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		duration           = int64(c.duration)
 		tooLargeHeaderFile = c.tooLargeHeaderFile
 		tooLargeBodyFile   = c.tooLargeBodyFile
+		fromPlugin         = c.fromPlugin
 	)
 
 	var (
@@ -324,6 +332,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		Duration:                   duration,
 		TooLargeResponseBodyFile:   tooLargeBodyFile,
 		TooLargeResponseHeaderFile: tooLargeHeaderFile,
+		FromPlugin:                 fromPlugin,
 	}
 
 	// 如果设置了 reqIns，则不会再解析 reqRaw
