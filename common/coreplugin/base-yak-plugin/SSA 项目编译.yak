@@ -1,10 +1,10 @@
 yakit.AutoInitYakit()
 
+// {{ 必填项
 programName := cli.String("programName", 
     cli.setRequired(true),
     cli.setVerboseName("项目名")
 )
-
 language = cli.StringSlice("language", 
     cli.setMultipleSelect(false), 
     cli.setSelectOption("Java", "java"), 
@@ -14,31 +14,40 @@ language = cli.StringSlice("language",
     cli.setSelectOption("Golang", "go"), 
     cli.setRequired(true)
 )
-
 path = cli.FolderName("ProgramPath", 
     cli.setVerboseName("项目路径"),
     cli.setRequired(true),
 ) 
+// }}
 
+// {{ 项目额外信息
 description := cli.Text("description", 
     cli.setVerboseName("项目描述"),
-    cli.setRequired(false)
-)
-
-dbPaths := cli.FileNames("dbPath", 
-    cli.setVerboseName("数据库路径"),
+    cli.setCliGroup("information"),
     cli.setRequired(false),
 )
+// }}
 
-
+// {{ database 
+dbPaths := cli.FileNames("dbPath", 
+    cli.setVerboseName("数据库路径"),
+    cli.setCliGroup("database"),
+    cli.setRequired(false),
+)
 reCompile := cli.Bool("re-compile", 
     cli.setVerboseName("是否重新编译"),
+    cli.setCliGroup("database"),
     cli.setDefault(true),
 )
+// }}
 
+// {{ compile option 
 entry := cli.FileNames("entry", 
     cli.setVerboseName("项目入口文件"),
+    cli.setCliGroup("compile"),
 )
+// }}
+
 
 
 cli.check()
