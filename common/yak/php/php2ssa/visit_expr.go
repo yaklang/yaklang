@@ -1200,15 +1200,15 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallValue(obj, key)
+		return y.ReadMemberCallMethod(obj, key)
 	case *phpparser.IndexLegacyCallVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallValue(obj, key)
+		return y.ReadMemberCallMethod(obj, key)
 	case *phpparser.MemberVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
-		return y.ReadMemberCallValue(obj, key)
+		return y.ReadMemberCallMethod(obj, key)
 	default:
 		return y.EmitUndefined(raw.GetText())
 	}

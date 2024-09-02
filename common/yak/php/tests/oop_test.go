@@ -152,11 +152,11 @@ func TestOOP_static_method(t *testing.T) {
 		println($instance::aStaticMethod())
 		?>
 		`, []string{
-			"Function-.$staticScope$.Foo.aStaticMethod()",
-			"Function-.$staticScope$.Foo.aStaticMethod()",
-			"Function-.$staticScope$.Foo.aStaticMethod()",
-			"Function-.$staticScope$.Foo.aStaticMethod()",
-			"Function-.$staticScope$.Foo.aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
 		}, t)
 	})
 

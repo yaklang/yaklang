@@ -159,9 +159,6 @@ func handlerReturnType(rs []*Return) Type {
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
-	if f.DeferBlock != nil {
-		f.Blocks = append(f.Blocks, f.DeferBlock)
-	}
 
 	if f.Type == nil {
 		f.Type = NewFunctionType("", nil, nil, false)

@@ -13,6 +13,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func (y *builder) handlerClassConstructor(class *ssa.ClassBluePrint, args []ssa.Value, ellipsis bool) *ssa.Call {
+	// constructorFunc
+	constructorFunc := class.GetMagicMethod(ssa.Constructor)
+	constructorCall := y.NewCall(constructorFunc, args)
+	constructorCall.IsEllipsis = ellipsis
+	y.EmitCall(constructorCall)
+
+	// destructorFunc
+	destructorFunc := class.GetMagicMethod(ssa.Destructor)
+	destructorCall := y.NewCall(destructorFunc, []ssa.Value{constructorCall})
+	y.EmitDefer(destructorCall)
+	return constructorCall
+}
+
 func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
@@ -29,8 +43,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	}
 	class, name := y.VisitTypeRef(i.TypeRef())
 	class.FinishClassFunction()
-	var obj ssa.Value
-	obj = y.EmitUndefined(name)
+	obj := y.EmitUndefined(name)
 	if utils.IsNil(obj) {
 		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
 		log.Errorf("BUG: container cannot be empty or nil in: %v", raw.GetText())
@@ -54,50 +67,49 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	}
 	obj.SetType(class)
 
-	findConstructorAndDestruct := func(class *ssa.ClassBluePrint) (ssa.Value, ssa.Value) {
-		tmpClass := class
-		var (
-			constructor ssa.Value = nil
-			destructor  ssa.Value = nil
-		)
+	ellipsis := false
+	args := []ssa.Value{obj}
+	if i.Arguments() != nil {
+		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
+		ellipsis = hasEllipsis
+		args = append(args, tmp...)
+	}
+	return y.handlerClassConstructor(class, args, ellipsis)
+}
 
-		for {
-			if tmpClass.Constructor != nil && constructor == nil {
-				constructor = tmpClass.Constructor
-			}
-			if tmpClass.Destructor != nil && destructor == nil {
-				destructor = tmpClass.Destructor
-			}
-			if constructor != nil && destructor != nil {
-				return constructor, destructor
-			}
-			if len(tmpClass.ParentClass) != 0 {
-				tmpClass = class.ParentClass[0]
-			} else {
-				return constructor, destructor
-			}
+func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.AnonymousClassContext)
+	if i == nil {
+		return nil
+	}
+	cname := uuid.NewString()
+	bluePrint := y.CreateClassBluePrint(cname)
+	if i.QualifiedStaticTypeRef() != nil {
+		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
+			bluePrint.AddParentClass(ref)
 		}
 	}
+	for _, statement := range i.AllClassStatement() {
+		y.VisitClassStatement(statement, bluePrint)
+	}
+	bluePrint.FinishClassFunction()
+	obj := y.EmitMakeWithoutType(nil, nil)
+	obj.SetType(bluePrint)
+
 	args := []ssa.Value{obj}
-	constructor, destructor := findConstructorAndDestruct(class)
-	if destructor != nil {
-		call := y.NewCall(destructor, args)
-		y.EmitDefer(call)
-	}
-	if constructor == nil {
-		return obj
-	}
 	ellipsis := false
 	if i.Arguments() != nil {
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	c := y.NewCall(constructor, args)
-	c.IsEllipsis = ellipsis
-	y.EmitCall(c)
-
-	return obj
+	return y.handlerClassConstructor(bluePrint, args, ellipsis)
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
@@ -461,23 +473,27 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		value = y.ReadValue(name)
 	} else if i.String_() != nil {
 		className = i.String_().GetText()
+		if str, err := strconv.Unquote(className); err == nil {
+			className = str
+		}
 	} else if i.Identifier() != nil {
 		className = i.Identifier().GetText()
 	} else {
 		return nil
 	}
 
-	var bluePrint *ssa.ClassBluePrint
 	if value != nil {
 		if bp, ok := ssa.ToClassBluePrintType(value.GetType()); ok {
-			bluePrint = bp
+			return bp
+		}
+		if bp := y.GetClassBluePrint(value.String()); bp != nil {
+			return bp
 		}
 	}
 	if className != "" {
-		bluePrint = y.GetClassBluePrint(className)
+		return y.GetClassBluePrint(className)
 	}
-
-	return bluePrint
+	return nil
 }
 
 func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.ClassBluePrint, string) {

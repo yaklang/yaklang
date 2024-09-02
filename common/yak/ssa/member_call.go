@@ -20,7 +20,9 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 		return ret
 	}
 	// default member
-	return b.createDefaultMember(res, object, key, wantFunction)
+	value := b.createDefaultMember(res, object, key, wantFunction)
+	b.AssignVariable(b.CreateVariable(res.name), value)
+	return value
 }
 
 func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bool) Value {
@@ -56,7 +58,35 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 	return nil
 }
 
+func (b *FunctionBuilder) getDefaultMemberByClass(object, key Value) Value {
+	if !b.SupportClass {
+		return nil
+	}
+	// class blue print
+	bluePrint, ok := ToClassBluePrintType(object.GetType())
+	if !ok {
+		return nil
+	}
+	// this object from constructor
+	call, ok := ToCall(object)
+	if !ok {
+		return nil
+	}
+	if call.Method != bluePrint.Constructor {
+		return nil
+	}
+
+	// get member
+	if member := bluePrint.GetNormalMember(key.String()); member != nil {
+		return member
+	}
+	return nil
+}
+
 func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, wantFunction bool) Value {
+	if ret := b.getDefaultMemberByClass(object, key); ret != nil {
+		return ret
+	}
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
 	var defaultMember Value

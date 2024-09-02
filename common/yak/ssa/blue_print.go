@@ -35,7 +35,7 @@ type ClassBluePrint struct {
 
 	NormalMethod map[string]*Function
 	StaticMethod map[string]Value
-	MagicMethod  map[string]*Function
+	MagicMethod  map[BluePrintMagicMethodKind]*Function
 
 	NormalMember map[string]Value
 	StaticMember map[string]*Phi
@@ -52,7 +52,8 @@ type ClassBluePrint struct {
 	// _container in this scope
 	_container Value
 
-	GeneralPhi func(string) *Phi
+	GeneralPhi      func(string) *Phi
+	GeneralUndefine func(string) *Undefined
 
 	ParentClass []*ClassBluePrint
 	// full Type Name
@@ -68,7 +69,7 @@ func NewClassBluePrint(name string) *ClassBluePrint {
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]Value),
-		MagicMethod:  make(map[string]*Function),
+		MagicMethod:  make(map[BluePrintMagicMethodKind]*Function),
 
 		fullTypeName: make([]string, 0),
 	}

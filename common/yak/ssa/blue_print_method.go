@@ -1,52 +1,59 @@
 package ssa
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
-// constructor and destructor
-func (c *ClassBluePrint) GetConstructOrDestruct(name string) Value {
-	var val Value = nil
-	c.getFieldWithParent(func(bluePrint *ClassBluePrint) bool {
-		switch name {
-		case "constructor":
-			if utils.IsNil(bluePrint.Constructor) {
-				return false
-			}
-			val = bluePrint.Constructor
-		case "destructor":
-			if utils.IsNil(bluePrint.Destructor) {
-				return false
-			}
-			val = bluePrint.Destructor
-		}
-		return true
-	})
-	return val
-}
+type BluePrintMagicMethodKind string
+
+const (
+	Constructor BluePrintMagicMethodKind = "constructor"
+	Destructor                           = "destructor"
+)
 
 // magic
-func (c *ClassBluePrint) IsMagicMethodName(name string) bool {
-	return slices.Contains(c._container.GetProgram().magicMethodName, name)
+func (c *ClassBluePrint) IsMagicMethodName(name BluePrintMagicMethodKind) bool {
+	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
 }
 
-func (c *ClassBluePrint) RegisterMagicMethod(name string, val *Function) {
+func (c *ClassBluePrint) RegisterMagicMethod(name BluePrintMagicMethodKind, val *Function) {
 	if !c.IsMagicMethodName(name) {
 		log.Warnf("register magic method fail: not magic method")
 		return
 	}
 	c.MagicMethod[name] = val
 }
-func (c *ClassBluePrint) GetMagicMethod(name string) Value {
+func (c *ClassBluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
 	var _method Value
 	c.getFieldWithParent(func(bluePrint *ClassBluePrint) bool {
-		if value := bluePrint.MagicMethod[name]; utils.IsNil(value) {
-			return false
-		} else {
-			_method = value
+		switch name {
+		case Constructor:
+			if c.Constructor == nil {
+				name := fmt.Sprintf("%s-constructor", c.Name)
+				c.Constructor = c.GeneralUndefine(name)
+				c.Constructor.SetType(NewFunctionType(name, []Type{c}, c, true))
+			}
+			_method = c.Constructor
 			return true
+		case Destructor:
+			if c.Destructor == nil {
+				name := fmt.Sprintf("%s-destructor", c.Name)
+				c.Destructor = c.GeneralUndefine(name)
+				c.Destructor.SetType(NewFunctionType(name, []Type{c}, nil, true))
+			}
+			_method = c.Destructor
+			return true
+		default:
+			if value := bluePrint.MagicMethod[name]; utils.IsNil(value) {
+				return false
+			} else {
+				_method = value
+				return true
+			}
 		}
 	})
 	return _method
