@@ -305,7 +305,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			if len(i.Matcher.SubMatchers) <= 0 {
 				i.Matcher.SubMatchers = []*YakMatcher{
 					{
-						MatcherType: "status",
+						MatcherType: MATCHER_TYPE_STATUS_CODE,
 						Group:       []string{"200"},
 					},
 				}
@@ -320,7 +320,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			if len(i.Matcher.SubMatchers) <= 0 {
 				i.Matcher.SubMatchers = []*YakMatcher{
 					{
-						MatcherType: "dsl",
+						MatcherType: MATCHER_TYPE_EXPR,
 						Group:       []string{"true"},
 					},
 				}

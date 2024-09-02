@@ -162,9 +162,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	var httpTPLmatchersResult bool
 	var hitColor string
 	if len(req.GetMatchers()) != 0 {
-		httpTplMatcher := make([]*httptpl.YakHttpFlowMatcher, 0)
+		httpTplMatcher := make([]*YakFuzzerMatcher, 0)
 		for _, matcher := range req.GetMatchers() {
-			httpTplMatcher = append(httpTplMatcher, httptpl.NewHttpFlowMatcherFromGRPCModel(matcher))
+			httpTplMatcher = append(httpTplMatcher, NewHttpFlowMatcherFromGRPCModel(matcher))
 		}
 		mergedParams := make(map[string]interface{})
 		renderedParams, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
@@ -406,7 +406,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	historyID := req.GetHistoryWebFuzzerId()
 	reMatch := req.GetReMatch()
 
-	httpTplMatcher := make([]*httptpl.YakHttpFlowMatcher, len(req.GetMatchers()))
+	httpTplMatcher := make([]*YakFuzzerMatcher, len(req.GetMatchers()))
 	httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
 	haveHTTPTplMatcher := len(httpTplMatcher) > 0
 	haveHTTPTplExtractor := len(httpTplExtractor) > 0
@@ -418,7 +418,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	if haveHTTPTplMatcher {
 		for i, m := range req.GetMatchers() {
-			httpTplMatcher[i] = httptpl.NewHttpFlowMatcherFromGRPCModel(m)
+			httpTplMatcher[i] = NewHttpFlowMatcherFromGRPCModel(m)
 		}
 	}
 
@@ -1422,17 +1422,21 @@ func (s *Server) MatchHTTPResponse(ctx context.Context, req *ypb.MatchHTTPRespon
 			SubMatchers         []*YakMatcher
 		}
 	*/
-	matchers := funk.Map(req.GetMatchers(), func(i *ypb.HTTPResponseMatcher) *httptpl.YakMatcher {
-		return &httptpl.YakMatcher{
-			MatcherType:   i.GetMatcherType(),
-			ExprType:      i.GetExprType(),
-			Scope:         i.GetScope(),
-			Condition:     i.GetCondition(),
-			Group:         i.GetGroup(),
-			GroupEncoding: i.GetGroupEncoding(),
-			Negative:      i.GetNegative(),
-		}
-	}).([]*httptpl.YakMatcher)
+
+	//matchers := funk.Map(req.GetMatchers(), func(i *ypb.HTTPResponseMatcher) *httptpl.YakMatcher {
+	//	res := &httptpl.YakMatcher{
+	//		MatcherType:   i.GetMatcherType(),
+	//		ExprType:      i.GetExprType(),
+	//		Scope:         i.GetScope(),
+	//		Condition:     i.GetCondition(),
+	//		Group:         i.GetGroup(),
+	//		GroupEncoding: i.GetGroupEncoding(),
+	//		Negative:      i.GetNegative(),
+	//	}
+	//	res.Format()
+	//	return res
+	//}).([]*httptpl.YakMatcher)
+	matchers := httptpl.NewMatcherSliceFromGRPCModel(req.GetMatchers())
 
 	matcher := &httptpl.YakMatcher{
 		SubMatcherCondition: req.GetMatcherCondition(),
@@ -1617,7 +1621,37 @@ func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty)
 	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err
 }
 
-func MatchColor(m []*httptpl.YakHttpFlowMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor string, discard bool) {
+var (
+	Action_Retain  = "retain"
+	Action_Discard = "discard"
+)
+
+type YakFuzzerMatcher struct { // Added some display fields
+	Matcher *httptpl.YakMatcher
+	Color   string
+	Action  string
+}
+
+func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatcher {
+	res := &YakFuzzerMatcher{
+		Matcher: &httptpl.YakMatcher{
+			MatcherType:         m.GetMatcherType(),
+			ExprType:            m.GetExprType(),
+			Scope:               m.GetScope(),
+			Condition:           m.GetCondition(),
+			Group:               m.GetGroup(),
+			GroupEncoding:       m.GetGroupEncoding(),
+			Negative:            m.GetNegative(),
+			SubMatcherCondition: m.GetSubMatcherCondition(),
+			SubMatchers:         funk.Map(m.GetSubMatchers(), httptpl.NewMatcherFromGRPCModel).([]*httptpl.YakMatcher),
+		},
+		Color:  m.GetHitColor(),
+		Action: m.GetAction(),
+	}
+	return res
+}
+
+func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor string, discard bool) {
 	for _, flowMatcher := range m {
 		res, err := flowMatcher.Matcher.Execute(rsp, vars, suf...)
 		if err != nil {
@@ -1640,5 +1674,5 @@ func MatchColor(m []*httptpl.YakHttpFlowMatcher, rsp *httptpl.RespForMatch, vars
 }
 
 func CheckShouldDiscard(action string, matchRes bool) bool {
-	return (action == httptpl.Action_Retain && !matchRes) || (action == httptpl.Action_Discard && matchRes)
+	return (action == Action_Retain && !matchRes) || (action == Action_Discard && matchRes)
 }
