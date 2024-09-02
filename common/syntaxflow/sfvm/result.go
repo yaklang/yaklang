@@ -3,6 +3,7 @@ package sfvm
 import (
 	"bytes"
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -39,12 +40,39 @@ func NewSFResult(rule string) *SFFrameResult {
 	}
 }
 
+func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
+	result.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
+		if get, b := s.SymbolTable.Get(i); b {
+			if merge, err := get.Merge(v); err != nil {
+				log.Errorf("merge value fail: %v", err)
+				return true
+			} else {
+				s.SymbolTable.Set(i, merge)
+			}
+		} else {
+			s.SymbolTable.Set(i, v)
+		}
+		return true
+	})
+	lo.ForEach(lo.Entries(result.AlertSymbolTable), func(item lo.Entry[string, ValueOperator], index int) {
+		s.AlertSymbolTable[item.Key] = item.Value
+	})
+	lo.ForEach(lo.Entries(result.AlertMsgTable), func(item lo.Entry[string, string], index int) {
+		s.AlertMsgTable[item.Key] = item.Value
+	})
+	lo.ForEach(result.CheckParams, func(item string, index int) {
+		s.CheckParams = append(result.CheckParams, item)
+	})
+	lo.ForEach(result.Errors, func(item string, index int) {
+		s.Errors = append(s.Errors, item)
+	})
+}
+
 type showConfig struct {
 	showCode bool
 	showDot  bool
 	showAll  bool
 }
-
 type ShowHandle func(config *showConfig)
 
 func WithShowCode(show bool) ShowHandle {

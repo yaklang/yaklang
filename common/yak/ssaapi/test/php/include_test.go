@@ -24,8 +24,8 @@ include('files/'.$action.'.php'); //载入相应文件
 ?>`
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
-			result := prog.SyntaxFlow(`include(* #-> *<getMembers><name>?{have: get||have: post} as $include)`)
-			if strings.Contains(result.String(), ".get.r") {
+			result := prog.SyntaxFlow(`include(* #-> *?{any: _GET, _POST} as $include)`)
+			if strings.Contains(result.String(), "_GET") {
 				return nil
 			} else {
 				return utils.Error("not match")

@@ -17,7 +17,12 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	}
 
 	code := params.GetString(0, "code")
-
+	var tmpResult *SyntaxFlowResult
+	defer func() {
+		if tmpResult != nil && tmpResult.SFFrameResult != nil {
+			contextResult.MergeByResult(tmpResult.SFFrameResult)
+		}
+	}()
 	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 		if val, ok := operator.(*Value); ok {
 			var dataFlows sfvm.ValueOperator = val.GetDataFlowPath()
@@ -28,12 +33,13 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 			if err != nil {
 				return err
 			}
-			if newResult != nil && newResult.SFFrameResult != nil {
-				frame.SetSFResult(newResult.SFFrameResult)
-			}
+			tmpResult = newResult
 		}
 		return nil
 	})
+	//if tmpSfResult != nil && tmpSfResult.SFFrameResult != nil {
+	//	frame.SetSFResult(tmpSfResult.SFFrameResult)
+	//}
 	return true, v, nil
 }
 
@@ -42,7 +48,6 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 	if err != nil {
 		return false, nil, err
 	}
-
 	program, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err
@@ -53,9 +58,8 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		if err != nil {
 			return false, nil, err
 		}
-
 		if newResult != nil && newResult.SFFrameResult != nil {
-			frame.SetSFResult(newResult.SFFrameResult)
+			contextResult.MergeByResult(newResult.SFFrameResult)
 		}
 		return true, v, nil
 	}

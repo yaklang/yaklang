@@ -15,11 +15,11 @@ type RecursiveConfig struct {
 	depth int
 }
 
-type RecursiveConfigOption int
+type RecursiveKind int
 
 const (
 	// ContinueMatch 匹配对应Value，数据流继续流动
-	ContinueMatch RecursiveConfigOption = iota
+	ContinueMatch RecursiveKind = iota
 	// ContinueSkip 不匹配对应Value，数据流继续流动
 	ContinueSkip
 	// StopMatch 匹配对应Value，数据流停止流动
@@ -90,7 +90,7 @@ func CreateRecursiveConfigFromNativeCallParams(
 // RecursiveConfig_Exclude在匹配到不符合配置项的Value后，数据流继续流动，以匹配其它Value。
 // RecursiveConfig_Until会沿着数据流匹配每个Value，知道匹配到符合配置项的Value的时候，数据流停止流动。
 // RecursiveConfig_Hook会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
-func (r *RecursiveConfig) handler(value *Value) RecursiveConfigOption {
+func (r *RecursiveConfig) handler(value *Value) RecursiveKind {
 	for _, op := range r.configItems {
 		if !op.SyntaxFlowRule {
 			continue
@@ -100,6 +100,7 @@ func (r *RecursiveConfig) handler(value *Value) RecursiveConfigOption {
 			log.Errorf("SyntaxFlowWithVMContext error: %v", err)
 			continue
 		}
+		r.sfResult.MergeByResult(res.SFFrameResult)
 
 		switch op.Key {
 		case sf.RecursiveConfig_Exclude:
@@ -166,8 +167,8 @@ func WithSyntaxFlowConfig(
 		options = append(options, WithHookEveryNode(func(value *Value) error {
 			//valueStr := value.String()
 			//log.Infof("start to fetch: %v", valueStr)
-			configOption := rc.handler(value)
-			switch configOption {
+			_recursiveKind := rc.handler(value)
+			switch _recursiveKind {
 			case ContinueSkip:
 				return nil
 			case ContinueMatch:

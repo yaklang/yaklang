@@ -15,8 +15,8 @@ $c($fun);
 `
 	_ = code
 	ssatest.CheckSyntaxFlow(t, code,
-		"global*<getMembers><getMembers> -{until: `* ?{opcode:call} as $sink`}-> *",
-		map[string][]string{"sink": {`Function-base64_decode(Undefined-.get.func(valid))`, `add(add(Undefined-$a, Undefined-$s), Undefined-.get.func2(valid))(Function-base64_decode(Undefined-.get.func(valid)))`}},
+		"_GET.* -{until: `* ?{opcode:call} as $sink`}-> *",
+		map[string][]string{"sink": {"Function-base64_decode(Undefined-_GET.func(valid))", "add(add(Undefined-$a, Undefined-$s), Undefined-_GET.func2(valid))(Function-base64_decode(Undefined-_GET.func(valid)))"}},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
 }
