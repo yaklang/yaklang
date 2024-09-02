@@ -18,6 +18,7 @@ import (
 type httpFuzzerFallback struct {
 	grpc.ServerStream
 
+	sendMutex          sync.Mutex
 	runtimeID          string
 	allowMultiResponse bool
 	originSender       func(response *ypb.FuzzerSequenceResponse) error
@@ -45,6 +46,8 @@ func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
 	}
 
 	if h.originSender != nil {
+		h.sendMutex.Lock()
+		defer h.sendMutex.Unlock()
 		return h.originSender(&ypb.FuzzerSequenceResponse{
 			Request:  h.belong,
 			Response: r,
