@@ -21,6 +21,7 @@ recordPtr = cli.Int("record-ptr", cli.setDefault(0))
 recordFile = cli.String("record-file")
 
 progressData = cli.Float("progress-data")
+skipCveBaseLine = cli.Bool("skip-cve-baseline")
 
 baseProgress = 0.05
 
@@ -613,7 +614,45 @@ bruteScan = func(result) {
     }()
 }
 
+cveBaseLineWg = sync.NewSizedWaitGroup(10)
+
+cveBaselineCheck = func (result) {
+    cveBaseLineWg.Add(1)
+    go func() {
+        defer cveBaseLineWg.Done()
+        target = str.HostPort(result.Target, result.Port)
+        cpes = x.RemoveRepeat(result.Fingerprint.CPEs)
+        versionList = []
+        for _, cpe = range cpes {
+            parameter = cpe
+            cpe, err = cve.parseToCpe(cpe)
+            if err != nil {
+                continue
+            }
+            if cpe.Version != "*" {
+                // 防止重复判断漏洞
+                if cpe.Version not in versionList {
+                    versionList = append(versionList, cpe.Version)
+                    for res = range cve.QueryEx(cve.product(cpe.Product, cpe.Version)) {
+                        titleStr = sprintf("%s: - %s", res.CVE, res.TitleZh)
+                        risk.NewRisk(target, risk.title(titleStr), risk.type("cve-baseline"), risk.typeVerbose("CVE基线检查"),
+                                risk.parameter(parameter), risk.potential(true), risk.level(res.Severity),
+                                risk.description(res.DescriptionMainZh), risk.solution(res.Solution), risk.cve(res.CVE))
+                    }
+
+                }
+
+            }
+        }
+    }()
+}
+
 handleServiceScanResult = func(result) {
+    if skipCveBaseLine {
+        cveBaselineCheck(result)
+    }
+
+
     if !onlyBrute {
         manager.HandleServiceScanResult(result)
     }
@@ -850,6 +889,8 @@ if hostCountSec != 0 {
 
 bruteWg.Wait()
 yakit.Info("brute end success!")
+cveBaseLineWg.Wait()
+yakit.Info("cvebaseline end success!")
 manager.Wait()
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")

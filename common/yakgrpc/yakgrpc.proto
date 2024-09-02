@@ -3565,6 +3565,7 @@ message RecordPortScanRequest {
   StartBruteParams StartBruteParams = 3;
   PortScanRequest PortScanRequest = 2;
   string RuntimeId = 4;
+  bool SkipCveBaseLine = 5;
 }
 
 message CreatReportRequest {
