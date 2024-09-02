@@ -3,8 +3,6 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"sync/atomic"
 )
 
@@ -16,23 +14,13 @@ type objectItem struct {
 
 type AnalyzeContext struct {
 	// Self
-	Self *Value
-
-	// function call stack
-	_callStack         *utils.Stack[*Value]
-	_negativeCallStack *utils.Stack[*Value]
-
-	_callTable *omap.OrderedMap[int64, *CallVisited]
-
-	// object visit stack
-	_objectStack *utils.Stack[objectItem]
-
-	config *OperationConfig
-
+	Self                        *Value
+	crossProcessVisitedTable    *crossProcessVisitedTable
+	_objectStack                *utils.Stack[objectItem]
+	config                      *OperationConfig
 	depth                       int
 	haveBeenReachedDepthLimited bool
-
-	_recursiveCounter int64
+	_recursiveCounter           int64
 }
 
 func (a *AnalyzeContext) ReachDepthLimited() {
@@ -51,108 +39,109 @@ func (a *AnalyzeContext) EnterRecursive() {
 	atomic.AddInt64(&a._recursiveCounter, 1)
 }
 
-//func (a *AnalyzeContext) ExitRecursive() {
-//	atomic.AddInt64(&a._recursiveCounter, -1)
-//}
-
-// CallVisited is used to record the visited phi\object\default,
-// and only used in the single call
-type CallVisited struct {
-	_visitedPhi     map[int64]struct{}
-	_visitedObject  map[int64]struct{}
-	_visitedDefault map[int64]struct{}
-	_visitedParameter map[int64]struct{}
-}
-
-func NewCallVisited() *CallVisited {
-	ret := &CallVisited{
-		_visitedPhi:     make(map[int64]struct{}),
-		_visitedObject:  make(map[int64]struct{}),
-		_visitedDefault: make(map[int64]struct{}),
-		_visitedParameter: make(map[int64]struct{}),
-	}
-	return ret
-}
-
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
-		_callStack:   utils.NewStack[*Value](),
-		_negativeCallStack: utils.NewStack[*Value](),
+		crossProcessVisitedTable: newCrossProcessVisitedTable(),
+		//_callStack:   utils.NewStack[*Value](),
+		//_negativeCallStack: utils.NewStack[*Value](),
 		_objectStack: utils.NewStack[objectItem](),
-		_callTable:   omap.NewEmptyOrderedMap[int64, *CallVisited](),
-		config:       NewOperations(opt...),
-		depth:        -1,
+		//_callTable:   omap.NewEmptyOrderedMap[int64, *CallVisited](),
+		config: NewOperations(opt...),
+		depth:  -1,
 	}
-	actx._callTable.Set(-1, NewCallVisited())
+	//actx._callTable.Set(-1, NewCallVisited())
 	return actx
 }
 
-// ========================================== CALL STACK ==========================================
-
-func (a *AnalyzeContext) PushCall(i *Value) error {
-	if !i.IsCall() {
-		return utils.Errorf("BUG: (callStack is not clean!) CallStack cannot recv %T", i.node)
-	}
-	if a._callTable.Have(i.GetId()) {
-		return utils.Errorf("call[%v] is existed on s-runtime call stack %v", i.GetId(), i.String())
-	}
-	a._callStack.Push(i)
-	a._callTable.Set(i.GetId(), NewCallVisited())
-	return nil
+func (a *AnalyzeContext) CrossProcess(from *Value, to *Value) bool {
+	return a.crossProcessVisitedTable.crossProcess(from, to)
 }
 
-func (a *AnalyzeContext) PushNegativeCall(i *Value) error {
-	if !i.IsCall() {
-		return utils.Errorf("BUG: (callStack is not clean!) CallStack cannot recv %T", i.node)
+func (a *AnalyzeContext) RecoverCrossProcess() {
+	a.crossProcessVisitedTable.recoverCrossProcess()
+}
+
+// ReverseProcess 逆向跨过程，如果正栈为空，将停止逆向过程
+func (a *AnalyzeContext) ReverseProcess() (string, bool) {
+	return a.crossProcessVisitedTable.reverseProcess(nil, nil)
+}
+
+// ReverseProcessWithDirection 逆向跨过程，如果正栈为空，继续往非正栈中继续逆向过程
+func (a *AnalyzeContext) ReverseProcessWithDirection(from *Value, to *Value) (string, bool) {
+	return a.crossProcessVisitedTable.reverseProcess(from, to)
+}
+
+func (a *AnalyzeContext) RecoverReverseProcess(hash string) {
+	a.crossProcessVisitedTable.recoverReverseProcess(hash)
+}
+
+func (a *AnalyzeContext) GetCallFromLastCrossProcess() *Value {
+	table := a.crossProcessVisitedTable.getValueVisitedTable()
+	if table.Len() <= 0 {
+		return nil
 	}
-	if a._callTable.Have(i.GetId()) {
-		return utils.Errorf("call[%v] is existed on s-runtime call stack %v", i.GetId(), i.String())
+	if a.crossProcessVisitedTable.positiveHashStack.Len() == 0 {
+		return nil
 	}
-	a._negativeCallStack.Push(i)
-	a._callTable.Set(i.GetId(), NewCallVisited())
-	return nil
-}
-
-func (a *AnalyzeContext) IsExistedInCallStack(i *Value) bool {
-	return a._callTable.Have(i.GetId())
-}
-
-func (a *AnalyzeContext) TheCallShouldBeVisited(i *ssa.Call) bool {
-	// return !a._callTable.Have(i.GetId()) && i.Method.GetId() != a.Self.GetId()
-	return !a._callTable.Have(i.GetId())
-}
-
-func (a *AnalyzeContext) PopCall() *Value {
-	if a._callStack.Len() <= 0 {
-		if a.HaveNegativeCallStack(){
-			return a.PopNegativeCall()
+	hash := a.crossProcessVisitedTable.positiveHashStack.Peek()
+	visited, ok := table.Get(hash)
+	if ok {
+		if visited.to.IsCall() {
+			return visited.to
+		} else if visited.from.IsCall() {
+			return visited.from
 		}
 	}
-	val := a._callStack.Pop()
-	a._callTable.Delete(val.GetId())
-	return val
+	return nil
 }
 
-func (a *AnalyzeContext) PopNegativeCall() *Value {
-	if a._callStack.Len() <= 0 {
-		return nil
+func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
+	log.Infof("mark visited %s ", i.String())
+	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
+	if !ok {
+		return false
 	}
-	val := a._negativeCallStack.Pop()
-	a._callTable.Delete(val.GetId())
-	return val
-}
-
-
-
-func (a *AnalyzeContext) HaveNegativeCallStack() bool {
-	return a._negativeCallStack.Len() > 0
-}
-
-func (g *AnalyzeContext) GetCurrentCall() *Value {
-	if g._callStack.Len() <= 0 {
-		return nil
+	if _, ok := valueVisited.visitedDefault[i.GetId()]; !ok {
+		valueVisited.visitedDefault[i.GetId()] = struct{}{}
+		return true
 	}
-	return g._callStack.Peek()
+	return false
+}
+
+func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
+	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
+	if !ok {
+		return false
+	}
+	if _, ok := valueVisited.visitedPhi[i.GetId()]; !ok {
+		valueVisited.visitedPhi[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
+
+func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
+	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
+	if !ok {
+		return false
+	}
+	if _, ok := valueVisited.visitedObject[i.GetId()]; !ok {
+		valueVisited.visitedObject[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
+
+func (a *AnalyzeContext) TheCallShouldBeVisited(i *Value) bool {
+	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
+	if !ok {
+		return false
+	}
+	if _, ok := valueVisited.visitedCall[i.GetId()]; !ok {
+		valueVisited.visitedCall[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
 }
 
 // ========================================== OBJECT STACK ==========================================
@@ -194,65 +183,4 @@ func (g *AnalyzeContext) GetCurrentObject() (*Value, *Value, *Value) {
 	}
 	item := g._objectStack.Peek()
 	return item.object, item.key, item.member
-}
-
-func (a *AnalyzeContext) getVisit() *CallVisited {
-	_, callvisited, ok := a._callTable.Last()
-	if !ok {
-		log.Warnf("peeked call[%v] not bind visited map", a._callStack.Peek().GetId())
-		return nil
-	}
-	return callvisited
-}
-
-// ========================================== PHI STACK ==========================================
-// ThePhiShouldBeVisited is used to check whether the phi should be visited
-func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
-	callVisited := a.getVisit()
-	if callVisited == nil {
-		return false
-	}
-	if _, ok := callVisited._visitedPhi[i.GetId()]; !ok {
-		callVisited._visitedPhi[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
-}
-// ========================================== Parameter STACK ==========================================
-// The ParameterShouldBeVisited is used to check whether the parameter should be visited
-func (a *AnalyzeContext) TheParameterShouldBeVisited(i *Value) bool {
-	callVisited := a.getVisit()
-	if callVisited == nil {
-		return false
-	}
-	if _, ok := callVisited._visitedParameter[i.GetId()]; !ok {
-		callVisited._visitedParameter[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
-}
-// ========================================== DEFAULT STACK ==========================================
-
-func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
-	callVisited := a.getVisit()
-	if callVisited == nil {
-		return false
-	}
-	if _, ok := callVisited._visitedDefault[i.GetId()]; !ok {
-		callVisited._visitedDefault[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
-}
-
-func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
-	callVisited := a.getVisit()
-	if callVisited == nil {
-		return false
-	}
-	if _, ok := callVisited._visitedObject[i.GetId()]; !ok {
-		callVisited._visitedObject[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
 }

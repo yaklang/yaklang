@@ -52,6 +52,7 @@ func (i Values) AppendDependOn(v *Value) Values {
 }
 
 func (i *Value) visitedDefsDefault(actx *AnalyzeContext, opt ...OperationOption) Values {
+func (i *Value) visitedDefsValueDefault(actx *AnalyzeContext) Values {
 	var vals Values
 	if i.node == nil {
 		return vals
@@ -82,7 +83,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if i == nil {
 		return nil
 	}
-
+	log.Infof("this value is %v", i.String())
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
@@ -149,6 +150,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
 		if value.HasValues() {
+			return i.visitedDefsValueDefault(actx)
 			return i.visitedDefsDefault(actx, opt...)
 		}
 		if value.IsMember() {
@@ -156,6 +158,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			key := i.NewValue(value.GetKey())
 			if err := actx.PushObject(obj, key, i); err != nil {
 				log.Errorf("%v", err)
+				return i.visitedDefsValueDefault(actx)
 				return i.visitedDefsDefault(actx, opt...)
 			}
 			obj.AppendDependOn(apiValue)
@@ -165,6 +168,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return ret
 		}
+		return i.visitedDefsValueDefault(actx)
 		return i.visitedDefsDefault(actx, opt...)
 	}
 
@@ -181,10 +185,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// ret[n]
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
+		return i.visitedDefsValueDefault(actx)
 		return i.visitedDefsDefault(actx, opt...)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
-			// phi is visited...
 			return Values{}
 		}
 
@@ -215,12 +219,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			callee := i.NewValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			callee.AppendEffectOn(i)
-			err := actx.PushCall(i)
-			if err != nil {
-				log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
-				return Values{i}
+			needRecover := actx.CrossProcess(i, callee)
+			if needRecover {
+				defer actx.RecoverCrossProcess()
 			}
-			defer actx.PopCall()
 			// inherit return index
 			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
 			if ok {
@@ -370,22 +372,30 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if call != nil {
 				actx.PushCall(call)
 			}
+			ret := traced.getTopDefs(actx)
 			if len(ret) > 0 {
 				return ret
 			} else {
 				return Values{traced}
 			}
 		}
-		// log.Info("ParameterMember")
-		called := actx.GetCurrentCall()
+		called := actx.GetCallFromLastCrossProcess()
 		if called != nil {
+			hash, needRecover := actx.ReverseProcessWithDirection(i, called)
 			calledByValue := getCalledByValue(called)
+			if needRecover {
+				actx.RecoverReverseProcess(hash)
+			}
 			vals = append(vals, calledByValue...)
 		}
 		if actx.config.AllowIgnoreCallStack {
 			if fun := i.GetFunction(); fun != nil {
 				fun.GetCalledBy().ForEach(func(value *Value) {
-					val := getCalledByValue(value)
+					hash, needRecover := actx.ReverseProcessWithDirection(i, called)
+					val := getCalledByValue(called)
+					if needRecover {
+						actx.RecoverReverseProcess(hash)
+					}
 					vals = append(vals, val...)
 				})
 			}
@@ -402,7 +412,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
-			if thisFunc := i.GetFunction(); !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
+
+			thisFunc := i.GetFunction()
+			if !ValueCompare(i.NewValue(calledInstance.Method), thisFunc) {
 				log.Errorf("call stack function %s(%d) not same with Parameter function %s(%d)",
 					calledInstance.Method.GetName(), calledInstance.Method.GetId(),
 					thisFunc.GetName(), thisFunc.GetId(),
@@ -410,10 +422,21 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return Values{}
 			}
 
-			// fun := i.GetFunction()
-			// if !ValueCompare(fun, i.NewValue(calledInstance.Method)) {
-			// 	return Values{}
-			// }
+			isReturn := false
+			fun, ok := ssa.ToFunction(thisFunc.node)
+			if ok {
+				for _, r := range fun.Return {
+					for _, subVal := range r.GetValues() {
+						returnVal := i.NewValue(subVal)
+						if ValueCompare(i, returnVal) {
+							isReturn = true
+						}
+					}
+				}
+			}
+			if isReturn {
+				return Values{i}
+			}
 
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
@@ -432,30 +455,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
-			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			var call *Value
-			if !actx.HaveNegativeCallStack() {
-				// 通过Call调用栈可以知道实参被谁调用
-				call = actx.PopCall()
-				if utils.IsNil(call) {
-					// Call调用栈为空的时候，将called压入NegativeCall调用栈
-					// 以便在后续中可以使用callVisited表，避免出现递归
-					actx.PushNegativeCall(called)
-				}
-			}
 
-			var ret Values
-			if !actx.HaveNegativeCallStack(){
-				ret = traced.getTopDefs(actx)
-				actx.PushCall(call)
-			}else {
-				actx.PushCall(called)
-				if !actx.TheParameterShouldBeVisited(i) {
-					return Values{}
-				}
-				ret = traced.getTopDefs(actx)
-				actx.PopCall()
+			traced := i.NewValue(actualParam).AppendEffectOn(called)
+			if !actx.TheDefaultShouldBeVisited(traced) {
+				return Values{traced}
 			}
+			ret := traced.getTopDefs(actx, opt...)
 
 			if len(ret) > 0 {
 				return ret
@@ -468,13 +473,17 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return i.NewValue(inst.GetDefault()).getTopDefs(actx, opt...)
 		}
 		var vals Values
-		called := actx.GetCurrentCall()
+		called := actx.GetCallFromLastCrossProcess()
 		if called != nil {
 			if !called.IsCall() {
 				log.Infof("parent function is not called by any other function, skip (%T)", called)
 				return Values{i}
 			}
+			hash, needRecover := actx.ReverseProcess()
 			calledByValue := getCalledByValue(called)
+			if needRecover {
+				actx.RecoverReverseProcess(hash)
+			}
 			vals = append(vals, calledByValue...)
 		}
 
@@ -484,7 +493,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if fun != nil {
 				call2fun := fun.GetCalledBy()
 				call2fun.ForEach(func(call *Value) {
+					hash, needRecover := actx.ReverseProcessWithDirection(i, call)
 					val := getCalledByValue(call)
+					if needRecover {
+						actx.RecoverReverseProcess(hash)
+					}
 					vals = append(vals, val...)
 				})
 			}
@@ -497,15 +510,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
 		if callIns != nil {
-			err := actx.PushCall(i.NewValue(callIns).AppendEffectOn(i))
-			if err != nil {
-				log.Errorf("push call error: %v", err)
-			} else {
-				defer actx.PopCall()
-
-				v := i.NewValue(inst.Value).AppendEffectOn(i)
-				return v.getTopDefs(actx, opt...)
+			call := i.NewValue(callIns).AppendEffectOn(i)
+			needRecover := actx.CrossProcess(i, call)
+			if needRecover {
+				defer actx.RecoverCrossProcess()
 			}
+			v := i.NewValue(inst.Value).AppendEffectOn(i)
+			return v.getTopDefs(actx)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}
