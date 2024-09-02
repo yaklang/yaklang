@@ -109,9 +109,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var (
-		token = utils.RandStringBytes(32)
-	)
+	token := utils.RandStringBytes(32)
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("GREAT"))
 		return
@@ -221,12 +219,13 @@ abc`), "Host", utils.HostPort(host, port))),
 					InheritVariables:         true,
 					ForceFuzz:                true,
 				},
-			}},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var count = 0
+	count := 0
 	for {
 		resp, err := client.Recv()
 		if err != nil {
@@ -302,7 +301,8 @@ abc`), "Host", utils.HostPort(host, port))),
 					InheritVariables:         true,
 					ForceFuzz:                true,
 				},
-			}},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -385,7 +385,8 @@ abc`), "Host", utils.HostPort(host, port))),
 						},
 					},
 				},
-			}},
+			},
+		},
 	)
 	if err != nil {
 		panic(err)
@@ -465,12 +466,13 @@ abc`), "Host", utils.HostPort(host, port))),
 					InheritVariables:         true,
 					ForceFuzz:                true,
 				},
-			}},
+			},
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var count = 0
+	count := 0
 	for {
 		resp, err := client.Recv()
 		if err != nil {
@@ -502,7 +504,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritCookie(t *testing.T) {
 		verified        = false
 	)
 
-	var token2 = utils.RandStringBytes(100)
+	token2 := utils.RandStringBytes(100)
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 
@@ -575,8 +577,8 @@ abc`), "Host", utils.HostPort(host, port))),
 		t.Fatal(err)
 	}
 
-	var checkFuzzerIndex = false
-	var checkFuzzerIndex2 = false
+	checkFuzzerIndex := false
+	checkFuzzerIndex2 := false
 	for {
 		resp, err := client.Recv()
 		if err != nil {

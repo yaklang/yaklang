@@ -675,7 +675,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
 			mutate.WithPoolOpt_BatchTarget(batchTarget),
-			// mutate.WithPoolOpt_Concurrent(int(concurrent)),
 			mutate.WithPoolOpt_SizedWaitGroup(fuzzerRequestSwg),
 			mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
 			mutate.WithPoolOpt_RawMode(true),
