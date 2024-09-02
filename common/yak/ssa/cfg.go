@@ -623,7 +623,7 @@ func (t *SwitchBuilder) Finish() {
 			builder.CurrentBlock = blocks[i]
 			addToBlocks(blocks[i])
 
-			builder.CurrentBlock.SetScope(svt.CreateShadowScope())
+			builder.CurrentBlock.SetScope(svt.CreateSubScope())
 			builder.PushTarget(switchBuilder, done, nil, _fallthrough) // fallthrough just jump to next handler
 			t.buildBody(i)
 			builder.PopTarget()
@@ -631,7 +631,7 @@ func (t *SwitchBuilder) Finish() {
 			endc := builder.CurrentBlock.ScopeTable
 			svt.CoverBy(endc)
 			return svt
-		}, generatePhi(builder, handlers[i], condb))
+		}, generatePhi(builder, blocks[i], condb))
 
 		builder.EmitJump(NextBlock(i))
 

@@ -351,7 +351,7 @@ func (s *SwitchStmt[T]) BuildBody(
 		s.mergeToNextBody = nil
 	}
 	ret := body(sub)
-	end := s.condition.CreateSubScope()
+	end := s.condition.CreateShadowScope()
 	end.CoverBy(ret)
 
 	if s.AutoBreak { // if this switch fall through, then merge to next body
@@ -362,7 +362,7 @@ func (s *SwitchStmt[T]) BuildBody(
 		}
 	} else {
 		length := len(s.mergeToSwitchEnd)
-		if length == 0 || s.mergeToSwitchEnd[length-1] != end {
+		if length == 0 || s.mergeToSwitchEnd[length-1].GetParent() != ret {
 			s.mergeToNextBody = ret
 		}
 	}
