@@ -118,7 +118,8 @@ func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm
 	if err != nil {
 		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
 	}
-	frame.SetSFResult(sfResult)
+	//暂时未启用，后续如果config需要使用外部变量可以启用 context
+	frame.WithContext(sfResult)
 	res, err := frame.Feed(p)
 	return &SyntaxFlowResult{
 		SFFrameResult: res,

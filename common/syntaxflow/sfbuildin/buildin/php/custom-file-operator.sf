@@ -10,7 +10,7 @@ desc(
 
 $read + $write + $unlink as $source
 
-$source() #->*?{have: _GET||have: _POST || have: _REQUEST}?{!opcode:const} as $param
+$source() #->*?{any: _GET,_POST,_REQUEST}?{!opcode:const} as $param
 $param--> as $sink
 
 check $sink
