@@ -342,7 +342,7 @@ func (s *SwitchStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
 }
 
 func (s *SwitchStmt[T]) BuildBody(
-	body func(ScopedVersionedTableIF[T], ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
+	body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T],
 	merge func(string, []T) T,
 ) {
 	sub := s.condition.CreateSubScope()
@@ -350,17 +350,19 @@ func (s *SwitchStmt[T]) BuildBody(
 		sub.Merge(true, merge, s.mergeToNextBody)
 		s.mergeToNextBody = nil
 	}
-	ret := body(sub, sub.CreateSubScope())
+	ret := body(sub)
+	end := s.condition.CreateSubScope()
+	end.CoverBy(ret)
 
 	if s.AutoBreak { // if this switch fall through, then merge to next body
 		// if switch default break to switch end
 		if s.mergeToNextBody == nil {
 			// if not write FallThough, then merge to switch end
-			s.mergeToSwitchEnd = append(s.mergeToSwitchEnd, ret)
+			s.mergeToSwitchEnd = append(s.mergeToSwitchEnd, end)
 		}
 	} else {
 		length := len(s.mergeToSwitchEnd)
-		if length == 0 || s.mergeToSwitchEnd[length-1] != ret {
+		if length == 0 || s.mergeToSwitchEnd[length-1] != end {
 			s.mergeToNextBody = ret
 		}
 	}
