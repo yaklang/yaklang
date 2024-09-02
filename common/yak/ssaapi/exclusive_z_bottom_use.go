@@ -1,13 +1,12 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	"sort"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"sort"
 )
 
 func (v *Value) GetBottomUses(opt ...OperationOption) Values {
@@ -20,10 +19,18 @@ func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 	return ret
 }
 
+func (v Values) GetBottomUses(opts ...OperationOption) Values {
+	ret := make(Values, 0)
+	for _, sub := range v {
+		ret = append(ret, sub.GetBottomUses(opts...)...)
+	}
+	return ret
+}
+
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if !actx.TheDefaultShouldBeVisited(v) {
-		return vals
+		return Values{v}
 	}
 	v.GetUsers().ForEach(func(value *Value) {
 		if ret := value.AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
@@ -127,7 +134,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
-		if !actx.TheCallShouldBeVisited(ins) {
+		if !actx.TheCallShouldBeVisited(v) {
 			// call existed
 			return v.visitUserFallback(actx, opt...)
 		}
@@ -143,64 +150,73 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			//log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
-
 		funcValue := v.NewValue(f).AppendDependOn(v)
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-
-		// push call
-		err := actx.PushCall(v)
-		if err != nil {
-			log.Infof("push call failed: %v", err)
+		needRecover := actx.CrossProcess(v, funcValue)
+		if !needRecover {
 			return v.visitUserFallback(actx, opt...)
-			// existed call
 		} else {
-			defer actx.PopCall()
+			defer actx.RecoverCrossProcess()
 		}
-
 		// try to find formal param index from call
 		// v is calling instruction
 		// funcValue is the function
-		existed := map[int64]struct{}{}
-		v.DependOn.ForEach(func(value *Value) {
-			existed[value.GetId()] = struct{}{}
-		})
-		var formalParamsIndex = make([]int, 0, len(ins.Args))
-		for argIndex, targetIndex := range ins.Args {
-			if _, ok := existed[targetIndex.GetId()]; ok {
-				formalParamsIndex = append(formalParamsIndex, argIndex)
-			}
-		}
-		var params = omap.NewOrderedMap(map[int64]ssa.Value{})
-		lo.ForEach(f.Params, func(param ssa.Value, index int) {
-			for _, i := range formalParamsIndex {
-				if index == i {
-					params.Set(param.GetId(), param)
+		getCalledFormalParams := func(f *ssa.Function) Values {
+			existed := map[int64]struct{}{}
+			v.DependOn.ForEach(func(value *Value) {
+				existed[value.GetId()] = struct{}{}
+			})
+
+			var formalParamsIndex = make([]int, 0, len(ins.Args))
+			for argIndex, targetIndex := range ins.Args {
+				if _, ok := existed[targetIndex.GetId()]; ok {
+					formalParamsIndex = append(formalParamsIndex, argIndex)
 				}
 			}
-		})
-		if lo.Max(formalParamsIndex) >= len(f.Params) && len(f.Params) > 0 {
-			last, _ := lo.Last(f.Params)
-			if last != nil {
-				params.Set(last.GetId(), last)
+			var params = omap.NewOrderedMap(map[int64]ssa.Value{})
+			lo.ForEach(f.Params, func(param ssa.Value, index int) {
+				for _, i := range formalParamsIndex {
+					if index == i {
+						params.Set(param.GetId(), param)
+					}
+				}
+			})
+			if lo.Max(formalParamsIndex) >= len(f.Params) && len(f.Params) > 0 {
+				last, _ := lo.Last(f.Params)
+				if last != nil {
+					params.Set(last.GetId(), last)
+				}
 			}
-		}
 
-		var vals Values
-		if params.Len() > 0 {
-			for _, formalParam := range params.Values() {
-				rets := v.NewValue(formalParam).AppendDependOn(funcValue).getBottomUses(actx, opt...)
-				vals = append(vals, rets...)
+			var formalParams Values
+			if params.Len() > 0 {
+				for _, formalParam := range params.Values() {
+					formalParams = append(formalParams, v.NewValue(formalParam).AppendDependOn(funcValue))
+				}
+				return formalParams
 			}
-			return vals
+			return nil
+		}
+		formalParams := getCalledFormalParams(f)
+		if formalParams != nil {
+			var vals Values
+			formalParams.ForEach(func(actualParam *Value) {
+				rets := actualParam.getBottomUses(actx, opt...)
+				vals = append(vals, rets...)
+			})
+			if len(vals) > 0 {
+				return vals
+			}
 		}
 
 		// no formal parameters found!
 		// enter return
+		var vals Values
 		for _, retStmt := range f.Return {
-			retVals := v.NewValue(retStmt).AppendDependOn(funcValue)
-			vals = append(vals, retVals)
+			retVals := v.NewValue(retStmt).getBottomUses(actx, opt...).AppendDependOn(funcValue)
+			vals = append(vals, retVals...)
 		}
 		return vals
 	case *ssa.Return:
@@ -211,12 +227,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if f := ins.GetFunc(); f != nil {
 				v.NewValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
-					err := actx.PushCall(dep)
-
-					if err != nil {
-						log.Errorf("push call failed: %v", err)
-					} else {
-						defer actx.PopCall()
+					needRecover := actx.CrossProcess(v, dep)
+					if needRecover {
+						defer actx.RecoverCrossProcess()
 					}
 					results = append(results, dep.getBottomUses(actx, opt...)...)
 				})
@@ -229,66 +242,68 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 			return results
 		}
-		if actx._callStack.Len() > 0 {
-			existed := make(map[int64]struct{})
-			v.DependOn.ForEach(func(value *Value) {
-				existedId := value.GetId()
-				existed[existedId] = struct{}{}
+		// if actx.IsInPositiveStack() {
+		existed := make(map[int64]struct{})
+		v.DependOn.ForEach(func(value *Value) {
+			existedId := value.GetId()
+			existed[existedId] = struct{}{}
+		})
+		var indexes = make(map[int]struct{})
+		for idx, ret := range ins.Results {
+			if _, ok := existed[ret.GetId()]; ok {
+				indexes[idx] = struct{}{}
+			}
+		}
+
+		currentCallValue := actx.GetCallFromLastCrossProcess()
+		if currentCallValue == nil {
+			return fallback()
+		}
+		call, ok := ssa.ToCall(currentCallValue.node)
+		fun, ok := ssa.ToFunction(call.Method)
+		if !ok {
+			log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
+			return fallback()
+		}
+		_ = fun //TODO: fun can tell u, which return value is the target
+
+		var vals Values
+		if !call.IsObject() || len(indexes) <= 0 {
+			v.NewValue(call).GetUsers().ForEach(func(user *Value) {
+				if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+					vals = append(vals, ret...)
+				}
 			})
-			var indexes = make(map[int]struct{})
-			for idx, ret := range ins.Results {
-				if _, ok := existed[ret.GetId()]; ok {
-					indexes[idx] = struct{}{}
-				}
-			}
 
-			currentCallValue := actx.GetCurrentCall()
-			if currentCallValue == nil {
-				return fallback()
-			}
-			call, ok := ssa.ToCall(currentCallValue.node)
-			fun, ok := ssa.ToFunction(call.Method)
-			if !ok {
-				log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
-				return fallback()
-			}
-			_ = fun //TODO: fun can tell u, which return value is the target
-
-			var vals Values
-			if !call.IsObject() || len(indexes) <= 0 {
-				v.NewValue(call).GetUsers().ForEach(func(user *Value) {
-					if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
-						vals = append(vals, ret...)
-					}
-				})
-
-				if len(vals) > 0 {
-					return vals
-				}
-				return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
-			}
-
-			// handle indexed return to call return
-			orderedIndex := lo.Keys(indexes)
-			sort.Ints(orderedIndex)
-			for _, idx := range orderedIndex {
-				indexedReturn, ok := call.GetIndexMember(idx)
-				if !ok {
-					continue
-				}
-				returnReceiver := v.NewValue(indexedReturn)
-				actx.PushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
-				if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx, opt...); len(newVals) > 0 {
-					vals = append(vals, newVals...)
-				}
-				actx.PopObject()
-			}
 			if len(vals) > 0 {
 				return vals
 			}
 			return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
 		}
+
+		// handle indexed return to call return
+		orderedIndex := lo.Keys(indexes)
+		sort.Ints(orderedIndex)
+		for _, idx := range orderedIndex {
+			indexedReturn, ok := call.GetIndexMember(idx)
+			if !ok {
+				continue
+			}
+			returnReceiver := v.NewValue(indexedReturn)
+			actx.PushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
+			if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
+				vals = append(vals, newVals...)
+			}
+			actx.PopObject()
+		}
+		if len(vals) > 0 {
+			return vals
+		}
+		return v.NewValue(call).AppendDependOn(v).getBottomUses(actx, opt...)
+		// }
 		return fallback()
+	case *ssa.Function:
+
 	}
 	return v.visitUserFallback(actx, opt...)
 }

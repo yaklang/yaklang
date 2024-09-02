@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync/atomic"
 )
@@ -20,7 +19,6 @@ type AnalyzeContext struct {
 	config                      *OperationConfig
 	depth                       int
 	haveBeenReachedDepthLimited bool
-	_recursiveCounter           int64
 }
 
 func (a *AnalyzeContext) ReachDepthLimited() {
@@ -32,24 +30,20 @@ func (a *AnalyzeContext) IsReachedDepthLimited() bool {
 }
 
 func (a *AnalyzeContext) GetRecursiveCounter() int64 {
-	return atomic.LoadInt64(&a._recursiveCounter)
+	return atomic.LoadInt64(&a.crossProcessVisitedTable._recursiveCounter)
 }
 
 func (a *AnalyzeContext) EnterRecursive() {
-	atomic.AddInt64(&a._recursiveCounter, 1)
+	atomic.AddInt64(&a.crossProcessVisitedTable._recursiveCounter, 1)
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
 		crossProcessVisitedTable: newCrossProcessVisitedTable(),
-		//_callStack:   utils.NewStack[*Value](),
-		//_negativeCallStack: utils.NewStack[*Value](),
-		_objectStack: utils.NewStack[objectItem](),
-		//_callTable:   omap.NewEmptyOrderedMap[int64, *CallVisited](),
-		config: NewOperations(opt...),
-		depth:  -1,
+		_objectStack:             utils.NewStack[objectItem](),
+		config:                   NewOperations(opt...),
+		depth:                    -1,
 	}
-	//actx._callTable.Set(-1, NewCallVisited())
 	return actx
 }
 
@@ -96,13 +90,24 @@ func (a *AnalyzeContext) GetCallFromLastCrossProcess() *Value {
 }
 
 func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
-	log.Infof("mark visited %s ", i.String())
 	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
 	if !ok {
 		return false
 	}
 	if _, ok := valueVisited.visitedDefault[i.GetId()]; !ok {
 		valueVisited.visitedDefault[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
+
+func (a *AnalyzeContext) TheParameterShouldBeVisited(i *Value) bool {
+	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
+	if !ok {
+		return false
+	}
+	if _, ok := valueVisited.visitedParameter[i.GetId()]; !ok {
+		valueVisited.visitedParameter[i.GetId()] = struct{}{}
 		return true
 	}
 	return false
