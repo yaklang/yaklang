@@ -8,18 +8,20 @@ import (
 )
 
 type valueVisited struct {
-	from           *Value
-	to             *Value
-	visitedPhi     map[int64]struct{}
-	visitedObject  map[int64]struct{}
-	visitedDefault map[int64]struct{}
-	visitedCall    map[int64]struct{}
+	from             *Value
+	to               *Value
+	visitedPhi       map[int64]struct{}
+	visitedObject    map[int64]struct{}
+	visitedDefault   map[int64]struct{}
+	visitedCall      map[int64]struct{}
+	visitedParameter map[int64]struct{}
 }
 
 type crossProcessVisitedTable struct {
 	positiveHashStack    *utils.Stack[string]
 	nonPositiveHashStack *utils.Stack[string]
 	valueVisitedTable    *omap.OrderedMap[string, *valueVisited]
+	_recursiveCounter    int64
 }
 
 func newCrossProcessVisitedTable() *crossProcessVisitedTable {
@@ -38,23 +40,25 @@ func newCrossProcessVisitedTable() *crossProcessVisitedTable {
 
 func newValueVisited(from *Value, to *Value) *valueVisited {
 	return &valueVisited{
-		from:           from,
-		to:             to,
-		visitedPhi:     make(map[int64]struct{}),
-		visitedObject:  make(map[int64]struct{}),
-		visitedDefault: make(map[int64]struct{}),
-		visitedCall:    make(map[int64]struct{}),
+		from:             from,
+		to:               to,
+		visitedPhi:       make(map[int64]struct{}),
+		visitedObject:    make(map[int64]struct{}),
+		visitedDefault:   make(map[int64]struct{}),
+		visitedCall:      make(map[int64]struct{}),
+		visitedParameter: make(map[int64]struct{}),
 	}
 }
 
 func newDefaultValueVisited() *valueVisited {
 	return &valueVisited{
-		from:           nil,
-		to:             nil,
-		visitedPhi:     make(map[int64]struct{}),
-		visitedObject:  make(map[int64]struct{}),
-		visitedDefault: make(map[int64]struct{}),
-		visitedCall:    make(map[int64]struct{}),
+		from:             nil,
+		to:               nil,
+		visitedPhi:       make(map[int64]struct{}),
+		visitedObject:    make(map[int64]struct{}),
+		visitedDefault:   make(map[int64]struct{}),
+		visitedCall:      make(map[int64]struct{}),
+		visitedParameter: make(map[int64]struct{}),
 	}
 }
 
@@ -63,7 +67,7 @@ func (c *crossProcessVisitedTable) crossProcess(from *Value, to *Value) (needRec
 		return false
 	}
 	hash := calcCrossProcessHash(from, to)
-	log.Infof("cross process from:%s to:%s hash:%s", from.String(), to.String(), hash)
+	//log.Infof("cross process from:%s to:%s hash:%s", from.String(), to.String(), hash)
 	if c.valueVisitedTable.Have(hash) {
 		return false
 	}
@@ -94,7 +98,7 @@ func (c *crossProcessVisitedTable) reverseProcess(from *Value, to *Value) (hash 
 			return "", false
 		}
 		hash := calcCrossProcessHash(from, to)
-		log.Infof("reverse process from:%s to:%s", from.String(), to.String())
+		//log.Infof("reverse process from:%s to:%s", from.String(), to.String())
 		if c.valueVisitedTable.Have(hash) {
 			return hash, false
 		}

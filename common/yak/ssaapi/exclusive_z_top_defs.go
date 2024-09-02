@@ -29,30 +29,7 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 	return ret
 }
 
-func (v Values) GetBottomUses(opts ...OperationOption) Values {
-	ret := make(Values, 0)
-	for _, sub := range v {
-		ret = append(ret, sub.GetBottomUses(opts...)...)
-	}
-	return ret
-}
-
-func (i Values) AppendEffectOn(v *Value) Values {
-	for _, node := range i {
-		node.AppendEffectOn(v)
-	}
-	return i
-}
-
-func (i Values) AppendDependOn(v *Value) Values {
-	for _, node := range i {
-		node.AppendDependOn(v)
-	}
-	return i
-}
-
 func (i *Value) visitedDefsDefault(actx *AnalyzeContext, opt ...OperationOption) Values {
-func (i *Value) visitedDefsValueDefault(actx *AnalyzeContext) Values {
 	var vals Values
 	if i.node == nil {
 		return vals
@@ -83,7 +60,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if i == nil {
 		return nil
 	}
-	log.Infof("this value is %v", i.String())
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
@@ -150,7 +126,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
 		if value.HasValues() {
-			return i.visitedDefsValueDefault(actx)
 			return i.visitedDefsDefault(actx, opt...)
 		}
 		if value.IsMember() {
@@ -158,7 +133,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			key := i.NewValue(value.GetKey())
 			if err := actx.PushObject(obj, key, i); err != nil {
 				log.Errorf("%v", err)
-				return i.visitedDefsValueDefault(actx)
 				return i.visitedDefsDefault(actx, opt...)
 			}
 			obj.AppendDependOn(apiValue)
@@ -168,7 +142,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return ret
 		}
-		return i.visitedDefsValueDefault(actx)
 		return i.visitedDefsDefault(actx, opt...)
 	}
 
@@ -185,7 +158,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// ret[n]
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
-		return i.visitedDefsValueDefault(actx)
 		return i.visitedDefsDefault(actx, opt...)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
@@ -356,6 +328,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{i}
 		}
 		getCalledByValue := func(called *Value) Values {
+			if called == nil {
+				return nil
+			}
 			calledInstance, ok := ssa.ToCall(called.node)
 			if !ok {
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
@@ -367,12 +342,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			actualParam = calledInstance.ArgMember[inst.FormalParameterIndex]
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			call := actx.PopCall()
 			ret := traced.getTopDefs(actx, opt...)
-			if call != nil {
-				actx.PushCall(call)
-			}
-			ret := traced.getTopDefs(actx)
 			if len(ret) > 0 {
 				return ret
 			} else {
@@ -407,6 +377,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	case *ssa.Parameter:
 		// 查找被调用函数的TopDef
 		getCalledByValue := func(called *Value) Values {
+			if called == nil {
+				return nil
+			}
 			calledInstance, ok := ssa.ToCall(called.node)
 			if !ok {
 				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
@@ -420,22 +393,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 					thisFunc.GetName(), thisFunc.GetId(),
 				)
 				return Values{}
-			}
-
-			isReturn := false
-			fun, ok := ssa.ToFunction(thisFunc.node)
-			if ok {
-				for _, r := range fun.Return {
-					for _, subVal := range r.GetValues() {
-						returnVal := i.NewValue(subVal)
-						if ValueCompare(i, returnVal) {
-							isReturn = true
-						}
-					}
-				}
-			}
-			if isReturn {
-				return Values{i}
 			}
 
 			var actualParam ssa.Value
@@ -457,7 +414,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			if !actx.TheDefaultShouldBeVisited(traced) {
+			if !actx.TheParameterShouldBeVisited(traced) {
 				return Values{traced}
 			}
 			ret := traced.getTopDefs(actx, opt...)
