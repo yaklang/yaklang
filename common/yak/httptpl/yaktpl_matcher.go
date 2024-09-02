@@ -2,8 +2,9 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"regexp"
+	"github.com/gobwas/glob"
+	"github.com/samber/lo"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"strings"
 	"time"
 
@@ -14,37 +15,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var (
-	Action_Retain  = "retain"
-	Action_Discard = "discard"
-)
-
-type YakHttpFlowMatcher struct { // Added some display fields
-	Matcher *YakMatcher
-	Color   string
-	Action  string
-}
-
-func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakHttpFlowMatcher {
-	return &YakHttpFlowMatcher{
-		Matcher: &YakMatcher{
-			MatcherType:         m.GetMatcherType(),
-			ExprType:            m.GetExprType(),
-			Scope:               m.GetScope(),
-			Condition:           m.GetCondition(),
-			Group:               m.GetGroup(),
-			GroupEncoding:       m.GetGroupEncoding(),
-			Negative:            m.GetNegative(),
-			SubMatcherCondition: m.GetSubMatcherCondition(),
-			SubMatchers:         funk.Map(m.GetSubMatchers(), NewMatcherFromGRPCModel).([]*YakMatcher),
-		},
-		Color:  m.GetHitColor(),
-		Action: m.GetAction(),
-	}
+func NewMatcherSliceFromGRPCModel(m []*ypb.HTTPResponseMatcher) []*YakMatcher {
+	return lo.Map(m, func(item *ypb.HTTPResponseMatcher, index int) *YakMatcher {
+		itemMatcher := NewMatcherFromGRPCModel(item)
+		return itemMatcher
+	})
 }
 
 func NewMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakMatcher {
-	return &YakMatcher{
+	res := &YakMatcher{
 		MatcherType:         m.GetMatcherType(),
 		ExprType:            m.GetExprType(),
 		Scope:               m.GetScope(),
@@ -53,9 +32,40 @@ func NewMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakMatcher {
 		GroupEncoding:       m.GetGroupEncoding(),
 		Negative:            m.GetNegative(),
 		SubMatcherCondition: m.GetSubMatcherCondition(),
-		SubMatchers:         funk.Map(m.GetSubMatchers(), NewMatcherFromGRPCModel).([]*YakMatcher),
+		SubMatchers: lo.Map(m.GetSubMatchers(), func(item *ypb.HTTPResponseMatcher, index int) *YakMatcher {
+			return NewMatcherFromGRPCModel(item)
+		}),
 	}
+	return res
 }
+
+const (
+	MATCHER_TYPE_STATUS_CODE = "status_code"
+	MATCHER_TYPE_CL          = "content_length"
+	MATCHER_TYPE_BIN         = "binary"
+	MATCHER_TYPE_WORD        = "word"
+	MATCHER_TYPE_REGEXP      = "regexp"
+	MATCHER_TYPE_EXPR        = "expr"
+	MATCHER_TYPE_GLOB        = "glob"
+)
+
+const (
+	EXPR_TYPE_NUCLEI_DSL = "nuclei-dsl"
+)
+
+const (
+	SCOPE_STATUS_CODE         = "status_code"
+	SCOPE_HEADER              = "header"
+	SCOPE_BODY                = "body"
+	SCOPE_RAW                 = "raw"
+	SCOPE_INTERACTSH_PROTOCOL = "interactsh_protocol"
+	SCOPE_INTERACTSH_REQUEST  = "interactsh_request"
+)
+
+const (
+	GROUP_ENCODING_HEX    = "hex"
+	GROUP_ENCODING_BASE64 = "base64"
+)
 
 type YakMatcher struct {
 	// status
@@ -181,7 +191,7 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars m
 	return y.execute(config, rsp, vars, suf...)
 }
 
-func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
+func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
 	interactsh_protocol := utils.InterfaceToString(vars["interactsh_protocol"])
@@ -189,24 +199,24 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 
 	getMaterial := func() string {
 		if isExpr {
-			return string(rsp)
+			return string(packet)
 		}
 		var material string
 		scope := strings.ToLower(y.Scope)
-		scopeHash := cacheHash(rsp, scope)
+		scopeHash := cacheHash(packet, scope)
 
 		material, ok := matcherResponseCache.Get(scopeHash)
 		if !ok {
 			switch scope {
-			case "status", "status_code":
-				material = utils.InterfaceToString(lowhttp.ExtractStatusCodeFromResponse(rsp))
-			case "header":
-				header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
+			case SCOPE_STATUS_CODE, "status":
+				material = utils.InterfaceToString(lowhttp.ExtractStatusCodeFromResponse(packet))
+			case SCOPE_HEADER, "all_headers":
+				header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 				material = header
-			case "body":
-				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
+			case SCOPE_BODY:
+				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 				material = string(body)
-			case "interactsh_protocol", "oob_protocol":
+			case SCOPE_INTERACTSH_PROTOCOL, "oob_protocol":
 				if interactsh_protocol != "" {
 					material = interactsh_protocol
 				} else {
@@ -232,7 +242,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 						}
 					}
 				}
-			case "interactsh_request":
+			case SCOPE_INTERACTSH_REQUEST:
 				if interactsh_request != "" {
 					material = interactsh_request
 				} else {
@@ -259,10 +269,10 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 						}
 					}
 				}
-			case "raw":
+			case SCOPE_RAW:
 				fallthrough
 			default:
-				material = string(rsp)
+				material = string(packet)
 			}
 		}
 		matcherResponseCache.Set(scopeHash, material)
@@ -275,10 +285,10 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 
 	condition := strings.TrimSpace(strings.ToLower(y.Condition))
 	switch y.MatcherType {
-	case "status_code", "status":
-		statusCode := lowhttp.ExtractStatusCodeFromResponse(rsp)
+	case MATCHER_TYPE_STATUS_CODE, "status":
+		statusCode := lowhttp.ExtractStatusCodeFromResponse(packet)
 		if statusCode == 0 {
-			return false, utils.Errorf("extract status code failed: %s", string(rsp))
+			return false, utils.Errorf("extract status code failed: %s", string(packet))
 		}
 		ints := utils.ParseStringToInts(strings.Join(y.Group, ","))
 		if len(ints) <= 0 {
@@ -302,9 +312,9 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 			}
 			return false, nil
 		}
-	case "size", "content_length", "content-length":
+	case MATCHER_TYPE_CL, "size", "content-length":
 		log.Warnf("content-length is untrusted, you should avoid using content-length!")
-		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
+		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 		_ = header
 		contentLength := len(body)
 		ints := utils.ParseStringToInts(strings.Join(y.Group, ","))
@@ -329,10 +339,10 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 			}
 			return false, nil
 		}
-	case "binary":
+	case MATCHER_TYPE_BIN:
 		y.GroupEncoding = "hex"
 		fallthrough
-	case "word", "contains":
+	case MATCHER_TYPE_WORD, "contains":
 		matcherFunc = func(s string, sub string) bool {
 			if vars == nil {
 				return strings.Contains(s, sub)
@@ -346,22 +356,32 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 			}
 			return strings.Contains(s, sub)
 		}
-	case "regexp", "re", "regex":
+	case MATCHER_TYPE_REGEXP, "re", "regex":
 		matcherFunc = func(s string, sub string) bool {
-			result, err := regexp.MatchString(sub, s)
+			regUtils := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(sub)
+			result, err := regUtils.MatchString(s)
 			if err != nil {
 				log.Errorf("[%v] regexp match failed: %s, origin regex: %v", name, err, sub)
 				return false
 			}
 			return result
 		}
-	case "expr", "dsl", "cel":
+	case MATCHER_TYPE_GLOB:
+		matcherFunc = func(s string, sub string) bool {
+			globRule, err := glob.Compile(sub)
+			if err != nil {
+				log.Errorf("[%v] glob match failed: %s, origin glob: %v", name, err, sub)
+				return false
+			}
+			return globRule.Match(s)
+		}
+	case MATCHER_TYPE_EXPR, "dsl", "cel":
 		isExpr = true
 		switch y.ExprType {
-		case "nuclei-dsl", "nuclei":
+		case EXPR_TYPE_NUCLEI_DSL, "nuclei":
 			dslEngine := NewNucleiDSLYakSandbox()
 			matcherFunc = func(fullResponse string, sub string) bool {
-				loadVars := LoadVarFromRawResponse(rsp, duration, sufs...)
+				loadVars := LoadVarFromRawResponse(packet, duration, sufs...)
 				// 加载 resp 中的变量
 				for k, v := range vars { // 合并若有重名以 vars 为准
 					loadVars[k] = v
@@ -388,14 +408,14 @@ func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duratio
 	for _, wordRaw := range y.Group {
 		word := wordRaw
 		switch strings.TrimSpace(strings.ToLower(y.GroupEncoding)) {
-		case "hex":
+		case GROUP_ENCODING_HEX:
 			raw, err := codec.DecodeHex(wordRaw)
 			if err != nil {
 				log.Warnf("decode yak matcher hex failed: %s", err)
 				continue
 			}
 			word = string(raw)
-		case "base64":
+		case GROUP_ENCODING_BASE64:
 			raw, err := codec.DecodeBase64(wordRaw)
 			if err != nil {
 				log.Warnf("decode yak matcher base64 failed: %s", err)
