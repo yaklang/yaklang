@@ -1,8 +1,10 @@
 package regexp_utils
 
 import (
+	"fmt"
 	"github.com/dlclark/regexp2"
 	"github.com/yaklang/yaklang/common/utils"
+	"time"
 )
 
 type regexpMode string
@@ -36,13 +38,18 @@ func WithRegexpOption(option regexp2.RegexOptions) YakRegexpUtilsOption {
 }
 
 func RegexpAppendOption(raw string, option regexp2.RegexOptions) string {
-	switch option {
-	case regexp2.IgnoreCase:
-		raw = "(?i)" + raw
-	case regexp2.Singleline:
-		raw = "(?s)" + raw
-	case regexp2.Multiline:
-		raw = "(?m)" + raw
+	modeString := ""
+	if option&regexp2.IgnoreCase != 0 {
+		modeString = modeString + "i"
+	}
+	if option&regexp2.Singleline != 0 {
+		modeString = modeString + "s"
+	}
+	if option&regexp2.Multiline != 0 {
+		modeString = modeString + "m"
+	}
+	if modeString != "" {
+		return "(?" + modeString + ")" + raw
 	}
 	return raw
 }
@@ -61,6 +68,10 @@ func NewYakRegexpUtils(raw string, options ...YakRegexpUtilsOption) *YakRegexpUt
 	reg.reg2 = NewRegexp2Wrapper(raw, reg.regexpOption)
 
 	return reg
+}
+
+func (m *YakRegexpUtils) Hash() string {
+	return utils.CalcMd5(fmt.Sprintf("%s|%s|%d", m.regexpRaw, m.priorityMode, m.regexpOption))
 }
 
 func (m *YakRegexpUtils) SetPriority(mode regexpMode) {
@@ -205,4 +216,25 @@ func (m *YakRegexpUtils) ReplaceAllStringFunc(src string, repl func(string) stri
 	} else {
 		return "", utils.Error("yak regexp replace fail: no usable regexp")
 	}
+}
+
+var DefaultYakRegexpManager = NewYakRegexpManager()
+
+type YakRegexpManager struct {
+	regs *utils.Cache[*YakRegexpUtils]
+}
+
+func NewYakRegexpManager() *YakRegexpManager {
+	return &YakRegexpManager{
+		regs: utils.NewTTLCache[*YakRegexpUtils](5 * time.Minute),
+	}
+}
+
+func (manager *YakRegexpManager) GetYakRegexp(raw string, options ...YakRegexpUtilsOption) *YakRegexpUtils {
+	reg := NewYakRegexpUtils(raw, options...)
+	if reg, ok := manager.regs.Get(reg.Hash()); ok {
+		return reg
+	}
+	manager.regs.Set(raw, reg)
+	return reg
 }
