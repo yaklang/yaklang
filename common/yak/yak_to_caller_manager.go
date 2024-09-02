@@ -739,10 +739,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error)
 		if ok {
 			return func(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error {
-				if runtimeId != "" {
-					exOption = append(exOption, yakit.CreateHTTPFlowWithSource("scan"))
-					exOption = append(exOption, yakit.CreateHTTPFlowWithRuntimeID(runtimeId))
-				}
+				exOption = append(exOption, yakit.CreateHTTPFlowWithSource("scan"))
+				exOption = append(exOption, yakit.CreateHTTPFlowWithRuntimeID(runtimeId))
+				exOption = append(exOption, yakit.CreateHTTPFlowWithFromPlugin(pluginName))
 				return originFunc(url, req, rsp, exOption...)
 			}
 		}
