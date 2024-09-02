@@ -1,11 +1,12 @@
 package ssaapi
 
 import (
+	"sort"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"sort"
 )
 
 func (v *Value) GetBottomUses(opt ...OperationOption) Values {

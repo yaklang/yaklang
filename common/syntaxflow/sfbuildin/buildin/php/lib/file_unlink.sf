@@ -13,7 +13,7 @@ alert $output
 
 desc(
     lang: php,
-    alert_min: '3',
+    alert_min: '2',
     'file://fileUnlink.php': <<<PARAM
 <?php
     $file_path = 'path/to/file.txt';

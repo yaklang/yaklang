@@ -1168,7 +1168,11 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	switch i := raw.(type) {
 	case *phpparser.CustomVariableContext:
 		variable := y.VisitVariable(i.Variable())
-		var position = ""
+		var (
+			position     = ""
+			force_create = ""
+		)
+
 		handler := func() ssa.Value {
 			member, _ := y.GetProgram().GetApplication().GlobalScope.GetStringMember(position)
 			return member
@@ -1178,27 +1182,31 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		case "$GLOBALS":
 			position = "GLOBALS"
 		case "$_GET":
-			variable = "_GET"
+			force_create = "_GET"
 		case "$_POST":
-			variable = "_POST"
+			force_create = "_POST"
 		case "$_REQUEST":
-			variable = "_REQUEST"
+			force_create = "_REQUEST"
 		case "$_SERVER":
 			position = "_SERVER"
 		case "$_COOKIE":
-			variable = "_COOKIE"
+			force_create = "_COOKIE"
 		case "$_ENV":
-			variable = "_ENV"
+			force_create = "_ENV"
 		case "$_SESSION":
-			variable = "_SESSION"
+			force_create = "_SESSION"
 		case "$_FILES":
-			variable = "_FILES"
+			force_create = "_FILES"
 		}
 		if position != "" {
 			return handler()
-		} else {
-			return y.ReadValue(variable)
+		} else if force_create != "" {
+			createVariable := y.CreateVariable(force_create)
+			val := y.EmitUndefined(force_create)
+			y.AssignVariable(createVariable, val)
+			return val
 		}
+		return y.ReadValue(variable)
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())

@@ -54,6 +54,11 @@ type SFFrame struct {
 	debug           bool
 
 	predCounter int
+	context     *SFFrameResult
+}
+
+func (s *SFFrame) WithContext(result *SFFrameResult) {
+	s.context = result
 }
 
 func (s *SFFrame) GetExtraInfo(key string, backup ...string) string {
@@ -161,6 +166,14 @@ func (s *SFFrame) Flush() {
 
 func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
 	return s.result.SymbolTable
+}
+func (s *SFFrame) GetSymbol(str string) (ValueOperator, bool) {
+	if val, b := s.result.SymbolTable.Get(str); b {
+		return val, b
+	} else if s.context != nil {
+		return s.context.SymbolTable.Get(str)
+	}
+	return nil, false
 }
 
 func (s *SFFrame) ToLeft() bool {
@@ -1060,8 +1073,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push")
 	case OpIntersectionRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
-		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
-		if !ok || vs == nil {
+		vs, ok := s.GetSymbol(i.UnaryStr)
+		//vs, ok := s.result.SymbolTable.Get(i.UnaryStr)
+		if vs == nil || !ok {
 			s.debugLog("cannot find $%v", i.UnaryStr)
 			value := s.stack.Pop()
 			if value == nil {

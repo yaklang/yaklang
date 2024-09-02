@@ -19,7 +19,7 @@ var Cases = []BuildinRuleTestCase{
 		FS: map[string]string{
 			"download.java": "download.java",
 		},
-		ContainsAll: []string{"middle", "FileSystemResource"},
+		ContainsAll: []string{"middle", "headers"},
 	},
 	{
 		Name: "检测Java任意文件下载(attachment)",

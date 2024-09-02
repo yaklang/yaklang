@@ -16,7 +16,7 @@ system($command); //system函数特性 执行结果会自动打印
 	ssatest.CheckSyntaxFlow(t, code,
 		`system( * as $command)`,
 		map[string][]string{
-			"command": {"add(\"ping -c 1 \", Undefined-.get.ip(valid))"},
+			"command": {"add(\"ping -c 1 \", Undefined-_GET.ip(valid))"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -39,7 +39,7 @@ system($c);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(*  #-> * as $param)`,
 		map[string][]string{
-			"param": {"Function-base64_decode", "make(any)","Undefined-$a(valid)"},
+			"param": {"Function-base64_decode", "make(any)", "Undefined-$a(valid)", "Undefined-_GET"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -63,7 +63,7 @@ eval($ob->a);
 `
 		ssatest.CheckSyntaxFlow(t, code,
 			`eval(* #-> * as $param)`,
-			map[string][]string{"param": {"Undefined-.get.1(valid)", "make(any)"}},
+			map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
@@ -76,7 +76,7 @@ eval($a);
 	ssatest.CheckSyntaxFlow(t, code,
 		`eval(* #-> * as $param)`,
 		map[string][]string{
-			"param": {"make(any)","Undefined-$a(valid)"},
+			"param": {"make(any)", "Undefined-$a(valid)", "Undefined-_GET"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -90,7 +90,7 @@ function test($a){
 
 test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code, `eval(* #-> * as $command)`, map[string][]string{
-		"command": {"Undefined-.get.1(valid)", "make(any)"},
+		"command": {"Undefined-_GET", "Undefined-_GET.1(valid)"},
 	},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
@@ -103,6 +103,6 @@ function test($a){
 test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(* #->  as $param)`,
-		map[string][]string{"param": {"Undefined-.get.1(valid)", "make(any)"}},
+		map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
