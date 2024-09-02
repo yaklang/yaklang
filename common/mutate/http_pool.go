@@ -657,11 +657,12 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 			delayer, _ := utils.NewFloatSecondsDelayWaiter(config.DelayMinSeconds, config.DelayMaxSeconds)
 
 			maxSubmit := config.RequestCountLimiter
-			var requestCounter int
-			swg := utils.NewSizedWaitGroup(config.Size)
-			if config.SizedWaitGroupInstance != nil {
-				swg = config.SizedWaitGroupInstance
-			}
+			var (
+				requestCounter int
+				swg            = utils.NewSizedWaitGroup(config.Size)
+				// extern swg for overall concurrency  control
+				externSwg = config.SizedWaitGroupInstance
+			)
 
 			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, originRequestRaw []byte, payloads ...string) {
 				if maxSubmit > 0 && requestCounter >= maxSubmit {
@@ -674,6 +675,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 				execRequestInstance := func(targetRequest []byte) {
 					swg.Add()
+					if externSwg != nil {
+						externSwg.Add()
+					}
 					requestCounter++
 					go func() {
 						defer func() {
@@ -681,6 +685,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								delayer.Wait()
 							}
 							swg.Done()
+							if externSwg != nil {
+								externSwg.Done()
+							}
 						}()
 
 						// 处理异常
