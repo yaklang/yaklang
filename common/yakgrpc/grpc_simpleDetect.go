@@ -31,6 +31,13 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	reqRecord := req.LastRecord
 	reqPortScan := req.PortScanRequest
 	reqBrute := req.StartBruteParams
+
+	if req.GetSkipCveBaseLine() {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
+			Key: "skip-cve-baseline",
+		})
+	}
+
 	// 把文件写到本地。
 	tmpTargetFile, err := ioutil.TempFile("", "yakit-portscan-*.txt")
 	if err != nil {
