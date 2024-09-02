@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"mime"
 	"regexp"
 	"strings"
@@ -24,7 +25,50 @@ type MITMFilterManager struct {
 	ExcludeMIME      []string `json:"excludeMIME"`
 	ExcludeUri       []string `json:"excludeUri"`
 	IncludeUri       []string `json:"includeUri"`
+
+	ExcludeHostnamesMatcher *httptpl.YakMatcher
+	ExcludeSuffixMatcher    *httptpl.YakMatcher
+	ExcludeMethodsMatcher   *httptpl.YakMatcher
+	ExcludeMIMEMatcher      *httptpl.YakMatcher
 }
+
+var (
+	defaultExcludeHostnamesMatcher = &httptpl.YakMatcher{
+		MatcherType: "glob",
+		Scope:       "raw",
+		Group:       []string{"google.com", "*gstatic.com", "*bdstatic.com", "*google*.com"},
+	}
+	defaultExcludeSuffixMatcher = &httptpl.YakMatcher{
+		MatcherType: "word",
+		Scope:       "raw",
+		Group: []string{
+			".css",
+			".jpg", ".jpeg", ".png",
+			".mp3", ".mp4", ".ico", ".bmp",
+			".flv", ".aac", ".ogg", "avi",
+			".svg", ".gif", ".woff", ".woff2",
+			".doc", ".docx", ".pptx",
+			".ppt", ".pdf",
+		},
+	}
+
+	defaultExcludeMethodsMatcher = &httptpl.YakMatcher{
+		MatcherType: "glob",
+		Scope:       "raw",
+		Group:       []string{"OPTIONS", "CONNECT"},
+	}
+	defaultExcludeMIMEMatcher = &httptpl.YakMatcher{
+		MatcherType: "glob",
+		Scope:       "raw",
+		Group: []string{
+			"image/*",
+			"audio/*", "video/*", // "*octet-stream*",
+			"application/ogg", "application/pdf", "application/msword",
+			"application/x-ppt", "video/avi", "application/x-ico",
+			"*zip",
+		},
+	}
+)
 
 var (
 	defaultExcludeHostnames = []string{"google.com", "*gstatic.com", "*bdstatic.com", "*google*.com"}
@@ -289,6 +333,29 @@ func (m *MITMFilterManager) IsMIMEPassed(ct string) bool {
 		ct = parsed
 	}
 	return _mimeChecker(nil, m.ExcludeMIME, ct)
+}
+
+func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw string) bool {
+	if exclude != nil {
+		excludeRes, err := exclude.ExecuteRaw([]byte(raw), nil)
+		if err != nil {
+			log.Errorf("filter exlude execute matcher failed: %s", err)
+			return false
+		} else if excludeRes {
+			return false
+		}
+	}
+
+	if include != nil {
+		return true
+	}
+
+	includeRes, err := include.ExecuteRaw([]byte(raw), nil)
+	if err != nil {
+		log.Errorf("filter include execute matcher failed: %s", err)
+		return false
+	}
+	return includeRes
 }
 
 // IsPassed return true if passed, false if filtered out
