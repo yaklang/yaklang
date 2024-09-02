@@ -104,6 +104,9 @@ func WithError(err error) Option {
 }
 
 func WithRawLanguage(input_language string) Option {
+	if input_language == "" {
+		return func(*config) {}
+	}
 	if language, err := consts.ValidateLanguage(input_language); err == nil {
 		return WithLanguage(language)
 	} else {
@@ -113,6 +116,9 @@ func WithRawLanguage(input_language string) Option {
 
 func WithLanguage(language consts.Language) Option {
 	return func(c *config) {
+		if language == "" {
+			return
+		}
 		c.language = language
 		if parser, ok := LanguageBuilders[language]; ok {
 			c.LanguageBuilder = parser

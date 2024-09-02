@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -26,11 +27,11 @@ func TestParseAPI(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, prog)
 
-		// no set language
+		// no set language A, default use yak
 		prog, err = ssaapi.Parse(code, ssaapi.WithRawLanguage(""))
-		require.Nil(t, prog)
-		require.Error(t, err)
-		require.Equal(t, "language is empty, please set language", err.Error())
+		require.Equal(t, prog.GetLanguage(), string(consts.Yak))
+		require.NoError(t, err)
+		require.NotNil(t, prog)
 
 		// unsupported language
 		prog, err = ssaapi.Parse(code, ssaapi.WithRawLanguage("ja"))
