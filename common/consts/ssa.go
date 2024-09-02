@@ -1,10 +1,11 @@
 package consts
 
 import (
-	"github.com/pkg/errors"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -34,6 +35,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return JS, nil
 	case "go", "golang":
 		return GO, nil
+	case "":
+		return "", errors.Errorf("language is empty, please set language")
 	}
 	return "", errors.Errorf("unsupported language: %s", language)
 }

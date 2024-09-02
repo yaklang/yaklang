@@ -58,6 +58,9 @@ type config struct {
 	SaveToProfile              bool
 	// for hash
 	externInfo string
+
+	// error
+	err error
 }
 
 func defaultConfig() *config {
@@ -94,18 +97,18 @@ func WithReCompile(b bool) Option {
 	}
 }
 
-func WithRawLanguage(input_language string) Option {
-	input_language = strings.ToLower(input_language)
-	var language consts.Language
-	switch strings.ToLower(input_language) {
-	case "javascript", "js":
-		language = JS
-	case "yak", "yaklang":
-		language = Yak
-	default:
-		language = consts.Language(input_language)
+func WithError(err error) Option {
+	return func(c *config) {
+		c.err = err
 	}
-	return WithLanguage(language)
+}
+
+func WithRawLanguage(input_language string) Option {
+	if language, err := consts.ValidateLanguage(input_language); err == nil {
+		return WithLanguage(language)
+	} else {
+		return WithError(err)
+	}
 }
 
 func WithLanguage(language consts.Language) Option {
@@ -267,6 +270,9 @@ func ParseProject(fs fi.FileSystem, opts ...Option) (Programs, error) {
 	for _, opt := range opts {
 		opt(config)
 	}
+	if config.err != nil {
+		return nil, config.err
+	}
 	config.fs = fs
 	if config.fs == nil {
 		return nil, utils.Errorf("need set filesystem")
@@ -297,6 +303,9 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)
+	}
+	if config.err != nil {
+		return nil, config.err
 	}
 	if input != nil {
 		raw, err := io.ReadAll(input)

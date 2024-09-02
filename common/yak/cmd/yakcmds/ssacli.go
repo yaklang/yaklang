@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -140,20 +141,7 @@ var SSACompilerCommands = []*cli.Command{
 			opt := make([]ssaapi.Option, 0, 3)
 			opt = append(opt, ssaapi.WithDatabasePath(databaseFileRaw))
 			log.Infof("start to compile file: %v ", target)
-			if input_language != "" {
-				input_language = strings.ToLower(input_language)
-				var language consts.Language
-				switch strings.ToLower(input_language) {
-				case "javascript", "js":
-					language = ssaapi.JS
-				case "yak", "yaklang":
-					language = ssaapi.Yak
-				default:
-					language = consts.Language(input_language)
-				}
-				log.Infof("start to use language: %v", language)
-				opt = append(opt, ssaapi.WithLanguage(language))
-			}
+			opt = append(opt, ssaapi.WithRawLanguage(input_language))
 			if entry != "" {
 				log.Infof("start to use entry file: %v", entry)
 				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
