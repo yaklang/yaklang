@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -9,9 +10,16 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"golang.org/x/exp/slices"
 )
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
+
+func (*SSABuilder) FilterPreHandlerFile(path string) bool {
+	extension := filepath.Ext(path)
+	fileList := []string{".java", ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc", ".php", ".go"}
+	return !slices.Contains(fileList, extension)
+}
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
@@ -46,7 +54,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
-	case ".java",".jpg",".png",".gif",".jpeg",".css",".js",".avi",".mp4",".mp3",".pdf",".doc":
+	case ".java", ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
 	default:
 		fs, err := fileSystem.Open(path)
@@ -54,7 +62,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			log.Warnf("open file %s error: %v", path, err)
 			return nil
 		}
-		info,err := fs.Stat()
+		info, err := fs.Stat()
 		if err != nil {
 			return nil
 		}
@@ -77,7 +85,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			)
 			prog.ExtraFile[path] = ssadb.SaveFile(filename, string(raw), folders)
 		}
-		
+
 	}
 	return nil
 }

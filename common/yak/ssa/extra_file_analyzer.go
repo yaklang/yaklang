@@ -8,6 +8,7 @@ import (
 
 type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
+	FilterPreHandlerFile(string) bool
 	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
 	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
 }
@@ -24,6 +25,10 @@ var _ PreHandlerAnalyzer = &DummyPreHandler{}
 type DummyPreHandler struct{}
 
 func (d *DummyPreHandler) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
+}
+
+func (d *DummyPreHandler) FilterPreHandlerFile(string) bool {
+	return false
 }
 
 func (d *DummyPreHandler) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
