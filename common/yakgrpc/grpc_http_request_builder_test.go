@@ -802,3 +802,38 @@ nuclei.Scan(target, nuclei.rawTemplate(codec.DecodeBase64("%s")~))
 	require.Len(t, out.Data, 0)
 
 }
+
+func TestGRPCMUSTPASS_HTTP_DebugPlugin_SaveHTTPFlow_HOOK(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	code := `db.SaveHTTPFlowFromRawWithOption("http://www.yak.com", "abc", "bca")`
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", code)
+	require.NoError(t, err)
+	defer clearFunc()
+
+	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(4), &ypb.DebugPluginRequest{
+		PluginName: tempName,
+		PluginType: "yak",
+	})
+	if err != nil {
+		return
+	}
+	var runtimeID string
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.RuntimeID != "" {
+			runtimeID = data.RuntimeID
+		}
+	}
+
+	time.Sleep(2 * time.Second)
+	out, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		RuntimeId:  runtimeID,
+		FromPlugin: tempName,
+	})
+	require.NoError(t, err)
+	require.Len(t, out.Data, 1)
+}
