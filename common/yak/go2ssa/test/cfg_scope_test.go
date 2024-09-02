@@ -600,7 +600,7 @@ func TestBasic_Variable_Select(t *testing.T) {
 			channel1 := make(chan string)
 
 			select {
-			case data1 = <-channel1:
+			case data1 = <-channel1: // cover
 				data1 = "world"
 			}
 			println(data1)
@@ -618,16 +618,39 @@ func TestBasic_Variable_Select(t *testing.T) {
 			channel1 := make(chan string)
 
 			select {
-			case data1 = <-channel1:
-				data1 = "333333"
-			case data1 = <-channel1:
-				
+			case data1 = <-channel1: // cover
+				data1 = "333333" 
+			case data1 = <-channel1: // phi
+								
 			}
 
 			println(data1)
 		}
 		`, []string{
 			"phi(data1)[\"333333\",chan(Function-make(typeValue(chan string))),\"111111\"]",
+		}, t)
+	})
+
+	t.Run("if select phi", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main() {
+			data1 := 1
+			channel1 := make(chan int)
+
+			select {
+			case data1 = <-channel1: // cover
+				data1 = 2 
+			case data1 = <-channel1: // phi
+				if data1 == 0 { // phi
+					data1 = 3
+				}
+			}
+
+			println(data1)
+		}
+		`, []string{
+			"phi(data1)[2,phi(data1)[3,chan(Function-make(typeValue(chan number)))],1]",
 		}, t)
 	})
 }
