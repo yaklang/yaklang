@@ -385,6 +385,22 @@ rsp.`,
 		)
 	})
 
+	t.Run("halfway2", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t,
+			`freq, err = fuzz.htt`,
+			&ypb.Range{
+				Code:        "fuz.htt",
+				StartLine:   1,
+				StartColumn: 13,
+				EndLine:     1,
+				EndColumn:   21,
+			},
+			labelsContainsCallback(t, []string{"https", "HTTPRequest", "FuzzCalcExpr"}),
+		)
+	})
+
 	t.Run("completion with multi-bytes chars before", func(t *testing.T) {
 		t.Parallel()
 
