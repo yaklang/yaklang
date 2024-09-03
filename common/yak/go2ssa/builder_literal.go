@@ -90,7 +90,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 
 type keyValue struct {
 	key   ssa.Value
-	value []ssa.Value
+	value ssa.Value
 	kv    []keyValue
 }
 
@@ -110,6 +110,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			case *ssa.ObjectType:
 				if t.GetTypeKind() == ssa.StructTypeKind {
 					kvs = b.buildLiteralValue(s, true)
+				} else if t.GetTypeKind() == ssa.SliceTypeKind {
+					kvs = b.buildLiteralValue(s, false)
 				} else {
 					kvs = b.buildLiteralValue(s, false)
 				}
@@ -131,66 +133,69 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 		switch typ.GetTypeKind() {
 		case ssa.SliceTypeKind, ssa.BytesTypeKind:
+			objt := typ.(*ssa.ObjectType)
 			if len(kvs) == 0 {
 				return b.CreateInterfaceWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
-				return kvs[0].value[0]
+				return kvs[0].value
 			} else {
 				obj = b.InterfaceAddFieldBuild(len(kvs),
 					func(i int) ssa.Value {
 						return b.EmitConstInst(i)
 					},
 					func(i int) ssa.Value {
-						return typeHander(typ.(*ssa.ObjectType).FieldType, kvs[i].kv)
+						return typeHander(objt.FieldType, kvs[i].kv)
 					})
 			}
 		case ssa.MapTypeKind:
+			objt := typ.(*ssa.ObjectType)
 			if len(kvs) == 0 {
 				return b.CreateInterfaceWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
-				return kvs[0].value[0]
+				return kvs[0].value
 			} else {
 				obj = b.InterfaceAddFieldBuild(len(kvs),
 					func(i int) ssa.Value {
 						return kvs[i].key
 					},
 					func(i int) ssa.Value {
-						return typeHander(typ.(*ssa.ObjectType).FieldType, kvs[i].kv)
+						return typeHander(objt.FieldType, kvs[i].kv)
 					})
 			}
 		case ssa.StructTypeKind:
+			objt := typ.(*ssa.ObjectType)
 			if len(kvs) == 0 {
 				return b.CreateInterfaceWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
-				return kvs[0].value[0]
+				return kvs[0].value
 			} else {
 				if kvs[0].key == nil { // 全部初始化
 					obj = b.InterfaceAddFieldBuild(len(kvs),
 						func(i int) ssa.Value {
-							if i < len(typ.(*ssa.ObjectType).Keys) {
-								return typ.(*ssa.ObjectType).Keys[i]
+							if i < len(objt.Keys) {
+								return objt.Keys[i]
 							} else {
 								return b.EmitConstInst("")
 							}
 						},
 						func(i int) ssa.Value {
-							return typeHander(typ.(*ssa.ObjectType).FieldTypes[i], kvs[i].kv)
+							return typeHander(objt.FieldTypes[i], kvs[i].kv)
 						})
 				} else { // 部分初始化
-					obj = b.InterfaceAddFieldBuild(len(typ.(*ssa.ObjectType).Keys),
+					obj = b.InterfaceAddFieldBuild(len(objt.Keys),
 						func(i int) ssa.Value {
-							return typ.(*ssa.ObjectType).Keys[i]
+							return objt.Keys[i]
 						},
 						func(i int) ssa.Value {
 							for y, kv := range kvs {
-								if typ.(*ssa.ObjectType).Keys[i].String() == kv.key.String() {
-									return typeHander(typ.(*ssa.ObjectType).FieldTypes[i], kvs[y].kv)
+								if objt.Keys[i].String() == kv.key.String() {
+									return typeHander(objt.FieldTypes[i], kvs[y].kv)
 								}
 							}
-							return b.GetDefaultValue(typ.(*ssa.ObjectType).FieldTypes[i])
+							return b.GetDefaultValue(objt.FieldTypes[i])
 						})
 				}
 			}
@@ -214,9 +219,11 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				func(i int) ssa.Value {
 					return b.EmitConstInst(i)
 				})
+		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
+			return kvs[0].value
 		default:
-			if kvs[0].value[0] != nil {
-				return kvs[0].value[0]
+			if kvs[0].value != nil {
+				return kvs[0].value
 			}
 			b.NewError(ssa.Error, TAG, "unhandled type")
 			return b.EmitConstInst(0)
@@ -299,7 +306,7 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) (ret [
 		right, _ := b.buildExpression(e.(*gol.ExpressionContext), false)
 		kv := keyValue{
 			key:   nil,
-			value: []ssa.Value{right},
+			value: right,
 			kv:    []keyValue{},
 		}
 		ret = append(ret, kv)
@@ -743,6 +750,7 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		}
 	}
 	for _, a := range wantTyp.AnonymousField {
+		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
 		typ.AnonymousField = append(typ.AnonymousField, a)
 	}
 }
