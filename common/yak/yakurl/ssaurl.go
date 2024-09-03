@@ -55,7 +55,10 @@ func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlow
 	if err != nil {
 		return nil, err
 	}
-	res := prog.SyntaxFlow(code)
+	res, err := prog.SyntaxFlowWithError(code)
+	if err != nil {
+		return nil, err
+	}
 	a.QueryCache.Set(hash, res)
 	return res, nil
 }
