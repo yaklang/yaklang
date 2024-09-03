@@ -302,7 +302,6 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 // }
 
 func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
-	consts.GLOBAL_DB_SAVE_SYNC.SetTo(true)
 	token := utils.RandSecret(10)
 	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
@@ -320,28 +319,20 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 	packet := fmt.Sprintf("POST /\r\nHost: %s\r\n\r\n"+
 		"%s", target, token)
 	for i := 0; i < 3; i++ {
-		rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithRequest(packet))
-		if err != nil {
-			spew.Dump(err)
-			_ = rsp
-		}
+		rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithRequest(packet), lowhttp.WithSaveHTTPFlow(false))
+		require.NoError(t, err)
+		flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(rsp.Https, rsp.RawRequest, rsp.RawPacket, "scan", "http://"+target, target)
+		require.NoError(t, err)
+		err = yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
+		require.NoError(t, err)
 	}
 	var flows []*schema.HTTPFlow
-	err = utils.AttemptWithDelayFast(func() error {
-		_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-			Keyword: token,
-		})
-		if err != nil {
-			return err
-		}
-		if len(flows) != 3 {
-			return utils.Errorf("flow count not match")
-		}
-		return nil
+
+	_, flows, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+		Keyword: token,
 	})
-
 	require.NoError(t, err)
-
+	require.Equal(t, 3, len(flows), "count not match")
 	ids := []int64{}
 	for _, flow := range flows {
 		ids = append(ids, int64(flow.ID))
