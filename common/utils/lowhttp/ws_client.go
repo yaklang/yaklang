@@ -481,7 +481,11 @@ func (c *WebsocketClient) Close() error {
 	return c.conn.Close()
 }
 
-func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketClient, error) {
+func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClientOpt) (*WebsocketClient, error) {
+	packet, err := utils.DumpHTTPRequest(req, true)
+	if err != nil {
+		return nil, utils.Wrap(err, "dump websocket first upgrade request error")
+	}
 	config := &WebsocketClientConfig{TotalTimeout: time.Hour}
 	for _, p := range opt {
 		p(config)
@@ -568,11 +572,6 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 
 	// 判断websocket扩展
 	requestRaw := FixHTTPRequest(packet)
-	req, err := ParseBytesToHttpRequest(requestRaw)
-	if err != nil {
-		return nil, utils.Errorf("parse request failed: %s", err)
-	}
-
 	// 发送请求
 	_, err = conn.Write(requestRaw)
 	if err != nil {
@@ -648,6 +647,13 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	fw.SetWebsocketClient(client)
 
 	return client, nil
+}
+func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketClient, error) {
+	req, err := ParseBytesToHttpRequest(packet)
+	if err != nil {
+		return nil, utils.Errorf("parse http request failed: %v", err)
+	}
+	return NewWebsocketClientByUpgradeRequest(req, opt...)
 }
 
 func NewWebsocketClientIns(conn net.Conn, fr *FrameReader, fw *FrameWriter, ext *WebsocketExtensions, opts ...WebsocketClientOpt) *WebsocketClient {
