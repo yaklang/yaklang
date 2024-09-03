@@ -424,18 +424,22 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
 		})
 		require.NoError(t, err)
-		var allCount int
+		var retainCount, discardCount int
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
 				break
 			}
-			if resp.MatchedByMatcher {
-				require.Equal(t, "red", resp.HitColor, "retain action return color is not red")
-				allCount++
+			if resp.Discard {
+				discardCount++
+			} else {
+				require.Equal(t, "red", resp.HitColor, "retain color is not red")
+				retainCount++
 			}
 		}
-		require.Equal(t, 6, allCount, "retain all count is not 6")
+		require.Equal(t, 6, retainCount, "retain count is not 6")
+		require.Equal(t, 5, discardCount, "other count is not 5")
+
 	})
 
 	t.Run("discard test", func(t *testing.T) {
@@ -475,17 +479,21 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 			Matchers:  []*ypb.HTTPResponseMatcher{matcher1, matcher2},
 		})
 		require.NoError(t, err)
-		var allCount int
+		var discardCount, retainCount int
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
 				break
 			}
-			if resp.MatchedByMatcher {
-				require.Equal(t, "blue", resp.HitColor, "discard action return color is not blue")
-				allCount++
+			if resp.Discard {
+				require.Equal(t, "red", resp.HitColor, "discard return color is not red")
+				discardCount++
+			} else {
+				require.Equal(t, "blue", resp.HitColor, "not discard return color is not blue")
+				retainCount++
 			}
 		}
-		require.Equal(t, 5, allCount, "discard all count is not 5")
+		require.Equal(t, 6, discardCount, "discard count is not 6")
+		require.Equal(t, 5, retainCount, "other count is not 5")
 	})
 }
