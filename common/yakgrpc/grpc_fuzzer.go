@@ -464,7 +464,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					var httpTPLmatchersResult, discard bool
+					var httpTPLmatchersResult bool
 					var hitColor string
 					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), false) {
 						existedParams := make(map[string]string) // 传入的参数
@@ -484,7 +484,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						for _, kv := range extractorResults { // 合并
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
-						httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher,
+						httpTPLmatchersResult, hitColor, respModel.Discard = MatchColor(httpTplMatcher,
 							&httptpl.RespForMatch{
 								RawPacket: respModel.ResponseRaw,
 								Duration:  float64(respModel.DurationMs),
@@ -497,9 +497,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						}
 					}
 					respModel.TaskId = int64(historyID)
-					if !discard {
-						feedbackResponse(respModel, true)
-					}
+					feedbackResponse(respModel, true)
 				}
 
 			} else {
@@ -1030,6 +1028,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						MatchedByMatcher:      redirectMatchersResult,
 						HitColor:              redirectHitColor,
 						RuntimeID:             runtimeID,
+						Discard:               redirectDiscard,
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
 						redirectRsp.TotalDurationMs = redirectRes.TraceInfo.TotalTime.Milliseconds()
@@ -1091,12 +1090,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					redirectRsp.TaskId = int64(taskID)
-					if !redirectDiscard {
-						err := feedbackResponse(redirectRsp, false)
-						if err != nil {
-							log.Errorf("send to client failed: %s", err)
-							continue
-						}
+					err := feedbackResponse(redirectRsp, false)
+					if err != nil {
+						log.Errorf("send to client failed: %s", err)
+						continue
 					}
 				}
 				// 如果重定向了,修正最后一个req
@@ -1107,12 +1104,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
-			if !discard {
-				err := feedbackResponse(rsp, false)
-				if err != nil {
-					log.Errorf("send to client failed: %s", err)
-					continue
-				}
+			rsp.Discard = discard
+			err := feedbackResponse(rsp, false)
+			if err != nil {
+				log.Errorf("send to client failed: %s", err)
+				continue
 			}
 		}
 		return nil
