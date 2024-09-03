@@ -39,7 +39,7 @@ system($c);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(*  #-> * as $param)`,
 		map[string][]string{
-			"param": {"Function-base64_decode", "make(any)"},
+			"param": {"Function-base64_decode", "make(any)","Undefined-$a(valid)"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
