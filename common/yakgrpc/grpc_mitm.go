@@ -1004,6 +1004,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 
 		if filterWebSocket.IsSet() {
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
 		}
 
@@ -1454,7 +1455,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isRequestModified := httpctx.GetRequestIsModified(req)
 		isResponseModified := httpctx.GetResponseIsModified(req)
 		isResponseDropped := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped)
-		isFiltered := isFilteredByResponse || isFilteredByRequest
+		isFiltered := isFilteredByResponse || isFilteredByRequest || (filterWebSocket.IsSet() && httpctx.GetIsWebWebsocketRequest(req))
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 
@@ -1549,6 +1550,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow.AddTag(tags...)
 		}
 
+		// 处理ws升级请求包
+		if httpctx.GetIsWebWebsocketRequest(req) {
+			flow.IsWebsocket = true
+			wshash := httpctx.GetWebsocketRequestHash(req)
+			flow.WebsocketHash = wshash
+			flow.HiddenIndex = wshash
+		}
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
 

@@ -292,6 +292,7 @@ const (
 	REQUEST_CONTEXT_KEY_MatchedRules                 = "MatchedRules"
 	REQUEST_CONTEXT_KEY_WebsocketRequestHash         = "websocketRequestHash"
 	REQUEST_CONTEXT_KEY_RequestProxyProtocol         = "requestProxyProtocol"
+	REQUEST_CONTEXT_KEY_IsWebsocketRequest           = "isWebsocketRequest"
 )
 
 func SetRequestProxyProtocol(req *http.Request, p string) {
@@ -654,4 +655,19 @@ func GetWebsocketRequestHash(r *http.Request) string {
 
 func SetWebsocketRequestHash(r *http.Request, hash string) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_WebsocketRequestHash, hash)
+}
+
+func GetIsWebWebsocketRequest(r *http.Request) bool {
+	val := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_IsWebsocketRequest)
+	if val == "" {
+		return false
+	}
+	if v, ok := val.(bool); ok {
+		return v
+	}
+	return false
+}
+
+func SetIsWebWebsocketRequest(r *http.Request) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsWebsocketRequest, true)
 }

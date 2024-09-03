@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,12 +20,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type (
 	websocketHijackHandler = func(req []byte, r *http.Request, rspIns *http.Response, startTs int64) []byte
 	websocketMirrorHandler = func(rsp []byte)
+	websocketUpgradeMirror = func(isHttps bool, req *http.Request, rsp *http.Response, startTs int64)
 )
 
 type WebSocketModifier struct {
@@ -37,12 +36,12 @@ type WebSocketModifier struct {
 	websocketResponseHijackHandler websocketHijackHandler
 	websocketRequestMirror         websocketMirrorHandler
 	websocketResponseMirror        websocketMirrorHandler
+	websocketUpgradeRequestMirror  websocketUpgradeMirror
 	writeExcludeHeader             map[string]bool
 	wsCanonicalHeader              []string
 	ProxyGetter                    func() *minimartian.Proxy
 	RequestHijackCallback          func(req *http.Request) error
 	ResponseHijackCallback         func(req *http.Request, rsp *http.Response, rspRaw []byte) []byte
-	hashCache                      *sync.Map
 }
 
 func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
@@ -99,11 +98,6 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	}
 	logger.Infof("building websocket tunnel to %s", addr)
 
-	// dump request
-	reqRaw, err := utils.DumpHTTPRequest(req, true)
-	if err != nil {
-		return utils.Wrap(err, "dump websocket first upgrade request error")
-	}
 	// parse port to int
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
@@ -124,7 +118,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			c.WritePong(data, true)
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			if isHijack {
-				b := w.websocketResponseHijackHandler(data, req, upgradeRspIns, time.Now().UnixNano())
+				b := w.websocketResponseHijackHandler(data, upgradeRspIns.Request, upgradeRspIns, time.Now().UnixNano())
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				if w.websocketResponseMirror != nil {
@@ -154,7 +148,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			c.WritePong(data, true)
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
 			if isHijack {
-				b := w.websocketRequestHijackHandler(data, req, upgradeRspIns, time.Now().UnixNano())
+				b := w.websocketRequestHijackHandler(data, upgradeRspIns.Request, upgradeRspIns, time.Now().UnixNano())
 				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				if w.websocketRequestMirror != nil {
@@ -177,7 +171,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		}
 	}
 
-	toServer, err = lowhttp.NewWebsocketClient(reqRaw,
+	toServer, err = lowhttp.NewWebsocketClientByUpgradeRequest(req,
 		lowhttp.WithWebsocketCompressionContextTakeover(true),
 		lowhttp.WithWebsocketHost(hostname),
 		lowhttp.WithWebsocketPort(port),
@@ -189,7 +183,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				rsp = proxyutil.NewResponse(502, nil, req)
 				rspRaw, _ = utils.DumpHTTPResponse(rsp, true)
 			}
-			httpctx.SetBareResponseBytes(rsp.Request, rspRaw)
+			httpctx.SetBareResponseBytes(req, rspRaw)
 			fixRspRaw := w.ResponseHijackCallback(req, rsp, rspRaw)
 
 			// write back to client
@@ -198,35 +192,9 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			upgradeRspIns = rsp
 
 			// Save HTTPFlow
-			isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
-			wshash := httpctx.GetWebsocketRequestHash(req)
-			if wshash == "" {
-				wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), time.Now())
+			if w.websocketUpgradeRequestMirror != nil {
+				w.websocketUpgradeRequestMirror(isTLS, req, rsp, time.Now().Unix())
 			}
-
-			_, ok := w.hashCache.Load(wshash)
-			if !ok {
-				w.hashCache.Store(wshash, true)
-				httpctx.SetWebsocketRequestHash(req, wshash)
-
-				flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySaved(
-					isTls, req, rsp, "mitm", urlStr, httpctx.GetRemoteAddr(req),
-				)
-				if err != nil {
-					log.Errorf("httpflow failed: %s", err)
-				}
-				if flow != nil {
-					flow.IsWebsocket = true
-					flow.WebsocketHash = wshash
-					flow.HiddenIndex = wshash
-					flow.Hash = flow.CalcHash()
-					err := yakit.InsertHTTPFlowEx(flow, false)
-					if err != nil {
-						log.Errorf("create / save httpflow(websocket) error: %s", err)
-					}
-				}
-			}
-
 			return fixRspRaw
 		}),
 		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallback),

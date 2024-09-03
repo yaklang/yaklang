@@ -3,6 +3,7 @@ package crep
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -24,15 +25,29 @@ import (
 func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 	group := fifo.NewGroup()
 
+	hashCache := new(sync.Map)
+
 	wsModifier := &WebSocketModifier{
 		websocketHijackMode:            m.websocketHijackMode,
 		forceTextFrame:                 m.forceTextFrame,
 		websocketRequestHijackHandler:  m.websocketRequestHijackHandler,
 		websocketResponseHijackHandler: m.websocketResponseHijackHandler,
 		websocketRequestMirror:         m.websocketRequestMirror,
-		websocketResponseMirror:        m.websocketResponseMirror,
-		ProxyGetter:                    m.GetMartianProxy,
-		hashCache:                      new(sync.Map),
+		websocketUpgradeRequestMirror: func(isHttps bool, req *http.Request, rsp *http.Response, startTs int64) {
+			wshash := httpctx.GetWebsocketRequestHash(req)
+			if wshash == "" {
+				wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), time.Now())
+			}
+			_, ok := hashCache.Load(wshash)
+			if !ok {
+				hashCache.Store(wshash, true)
+				httpctx.SetWebsocketRequestHash(req, wshash)
+				httpctx.SetIsWebWebsocketRequest(req)
+				m.httpFlowMirror(isHttps, req, rsp, startTs)
+			}
+		},
+		websocketResponseMirror: m.websocketResponseMirror,
+		ProxyGetter:             m.GetMartianProxy,
 		RequestHijackCallback: func(req *http.Request) error {
 			var isHttps bool
 			switch req.URL.Scheme {
