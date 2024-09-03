@@ -253,7 +253,7 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 		if member := class.GetMemberAndStaticMember(key.String(), true); member != nil {
 			return name, member.GetType()
 		}
-	//TODO: handler static member
+	// TODO: handler static member
 	case NullTypeKind:
 		return name, nil
 	default:
@@ -305,7 +305,7 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	// 	member := b.getOriginMember(name, typ, object, key)
 	// 	return member
 	// }
-	//step2 for example:A.b(),if  A is not instantiated,  A is an Undefined ValueInValid. Attempt to obtain its static methods
+	// step2 for example:A.b(),if  A is not instantiated,  A is an Undefined ValueInValid. Attempt to obtain its static methods
 	if u, ok := ToUndefined(object); ok {
 		if u.Kind == UndefinedValueInValid {
 			if blueprint := u.GetProgram().GetClassBluePrint(u.GetName()); blueprint != nil {
@@ -321,11 +321,11 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	var typ Type
 	if object.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 		blueprint := object.GetType().(*ClassBluePrint)
-		//normal
+		// normal
 		if method, ok := blueprint.Method[key.String()]; ok {
 			typ = method.Type
 		}
-		//static
+		// static
 		if method, ok := blueprint.StaticMethod[key.String()]; ok {
 			return method
 		}
@@ -337,8 +337,8 @@ func (b *FunctionBuilder) ReadMemberCallMethodVariable(object, key Value) Value 
 	}
 	// step5 create undefined memberCall value if the value can not be peeked
 	origin := b.writeUndefine(name)
-	//step6 Determine the type of member call.
-	//If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
+	// step6 Determine the type of member call.
+	// If the type is nil, a new type will be created and IsMethod will be set to true to give itself a receiver
 	if typ != nil {
 		origin.Kind = UndefinedMemberValid
 	} else {
@@ -412,9 +412,10 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		// want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
 		want := b.TryGetSimilarityKey(extern.GetName(), key.String())
 		b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", extern.GetName(), key.String(), want))
-		p := NewParam(name, false, b)
-		p.SetExtern(true)
-		return p
+		un := b.EmitUndefined(name)
+		un.SetExtern(true)
+		SetMemberCall(value, key, un)
+		return un
 	}
 
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
@@ -557,7 +558,6 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 		return member
 	}
 	return b.getOriginMember(name, typ, object, key)
-
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {
