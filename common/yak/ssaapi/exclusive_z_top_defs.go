@@ -220,10 +220,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				if subNode == nil {
 					continue
 				}
-				// getTopDefs(nil,opt...)第一个参数指定为nil
-				// 提供一个新的上下文，避免指向新的actx.self导致多余的结果
-				vals := subNode.GetTopDefs(opt...).AppendEffectOn(subNode)
-				//vals := subNode.getTopDefs(nil, opt...).AppendEffectOn(subNode)
+				vals := subNode.getTopDefs(actx, opt...).AppendEffectOn(subNode)
 				results = append(results, vals...)
 			}
 			return results
@@ -473,7 +470,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				defer actx.RecoverCrossProcess()
 			}
 			v := i.NewValue(inst.Value).AppendEffectOn(i)
-			return v.getTopDefs(actx)
+			return v.getTopDefs(actx,opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}
@@ -481,9 +478,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		var values Values
 		values = append(values, i)
 		for key, member := range inst.GetAllMember() {
-			// if key.String() == "__ref__" {
-			// 	continue
-			// }
 			value := i.NewValue(member)
 			if err := actx.PushObject(i, i.NewValue(key), value); err != nil {
 				log.Errorf("push object failed: %v", err)

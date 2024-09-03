@@ -16,7 +16,7 @@ func TestGlobal(t *testing.T) {
 `
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* #-> * as $param)`,
-			map[string][]string{"param": {`Function-base64_decode`, `make(any)`}},
+			map[string][]string{"param": {"Function-base64_decode", "Undefined-$a(valid)", "make(any)"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("test globals", func(t *testing.T) {

@@ -75,11 +75,7 @@ func TestSF_GetUser(t *testing.T) {
 		check(t,
 			`b#->* as $target`,
 			[]string{
-				`Undefined-file`,
-				`"abc"`,
-				`Undefined-Runtime`,
-				`"bash attack"`,
-			},
+			"\"abc\"", "\"bash attack\"", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)", "Undefined-a.exec(valid)", "Undefined-file", "Undefined-file.Write(valid)"},
 		)
 	})
 }
