@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -63,17 +62,10 @@ func RegisterLowHTTPSaveCallback() {
 		reqIns = r.RequestInstance
 
 		// db := consts.GetGormProjectDatabase()
-		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")),CreateHTTPFlowWithDuration(duration))
+		flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")), CreateHTTPFlowWithDuration(duration))
 		if err != nil {
 			log.Errorf("create httpflow from lowhttp failed: %s", err)
 			return
-		}
-		if reqSource != "" {
-			flow.AddTag(reqSource)
-		} else {
-			if reqSource := os.Getenv(consts.YAKIT_PLUGIN_ID); reqSource != "" {
-				flow.AddTag(reqSource)
-			}
 		}
 		switch ret := strings.ToLower(reqSource); ret {
 		case "mitm":
