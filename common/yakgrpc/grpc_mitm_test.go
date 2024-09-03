@@ -32,6 +32,112 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestFilterWebsocketUpgradeRequest(t *testing.T) {
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+		// Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
+		rsp := []byte(`HTTP/1.1 101 Switching Protocols
+upgrade: websocket
+connection: Upgrade
+sec-websocket-accept: sFDrS2IYVLt69E6E21k3vkgxYjY=` + "\r\n\r\n")
+		return rsp
+	})
+	client, err := NewLocalClient() // 新建一个 yakit client
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := fmt.Sprintf("%s:%d", mockHost, mockPort)
+	rPort := utils.GetRandomAvailableTCPPort()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// 启动MITM服务器
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host:             "127.0.0.1",
+		Port:             uint32(rPort),
+		Recover:          true,
+		Forward:          true,
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+	})
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if rsp.GetHaveMessage() {
+			msg := rsp.GetMessage().GetMessage()
+			t.Logf("message: %s", msg)
+			if strings.Contains(string(msg), `starting mitm server`) {
+				break
+			}
+		}
+	}
+	tokenMap := map[string]int{}
+	checkSave := func(n int) {
+		token := utils.RandSecret(8)
+
+		lowhttp.HTTP(lowhttp.WithPacketBytes([]byte(`GET / HTTP/1.1
+Host: `+addr+`
+Accept-Encoding: gzip, deflate, br, zstd
+Pragma: no-cache
+Sec-WebSocket-Key: zpRVZDnNfCd+sYVS/DnNug==
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover
+Sec-WebSocket-Version: 13
+token: `+token+`
+
+`)), lowhttp.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", rPort)), lowhttp.WithSaveHTTPFlow(false))
+		tokenMap[token] = n
+	}
+
+	checkSave(1)
+	stream.Send(&ypb.MITMRequest{
+		UpdateFilterWebsocket: true,
+		FilterWebsocket:       true,
+		Recover:               true,
+		Forward:               true,
+		SetAutoForward:        true,
+		AutoForwardValue:      true,
+	})
+	time.Sleep(100 * time.Millisecond)
+	checkSave(0)
+	stream.Send(&ypb.MITMRequest{
+		UpdateFilterWebsocket: true,
+		FilterWebsocket:       false,
+		Recover:               true,
+		Forward:               true,
+		SetAutoForward:        true,
+		AutoForwardValue:      true,
+	})
+	time.Sleep(100 * time.Millisecond)
+	checkSave(1)
+	stream.Send(&ypb.MITMRequest{
+		ExcludeHostname:  []string{addr},
+		UpdateFilter:     true,
+		Recover:          true,
+		Forward:          true,
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+	})
+	time.Sleep(100 * time.Millisecond)
+	checkSave(0)
+	time.Sleep(1 * time.Second)
+	for token, expect := range tokenMap {
+		flows, err := client.QueryHTTPFlows(ctx, &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, expect, len(flows.GetData()))
+	}
+}
+
 func TestTestGRPCMUSTPASS_MITM_CHUNKED(t *testing.T) {
 	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
