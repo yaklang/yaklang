@@ -3,11 +3,10 @@ package yakgrpc
 import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"mime"
-	"regexp"
 	"strings"
 
-	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -15,60 +14,136 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-type MITMFilterManager struct {
+type MITMFilterManager struct { // legacy
 	db               *gorm.DB `json:"-"`
 	IncludeHostnames []string `json:"includeHostnames"`
 	ExcludeHostnames []string `json:"excludeHostnames"`
-	IncludeSuffix    []string `json:"includeSuffix"`
-	ExcludeSuffix    []string `json:"excludeSuffix"`
-	ExcludeMethods   []string `json:"excludeMethods"`
-	ExcludeMIME      []string `json:"excludeMIME"`
-	ExcludeUri       []string `json:"excludeUri"`
-	IncludeUri       []string `json:"includeUri"`
 
-	ExcludeHostnamesMatcher *httptpl.YakMatcher
-	ExcludeSuffixMatcher    *httptpl.YakMatcher
-	ExcludeMethodsMatcher   *httptpl.YakMatcher
-	ExcludeMIMEMatcher      *httptpl.YakMatcher
+	IncludeSuffix []string `json:"includeSuffix"`
+	ExcludeSuffix []string `json:"excludeSuffix"`
+
+	IncludeUri []string `json:"includeUri"`
+	ExcludeUri []string `json:"excludeUri"`
+
+	ExcludeMethods []string `json:"excludeMethods"`
+	ExcludeMIME    []string `json:"excludeMIME"`
 }
 
-var (
-	defaultExcludeHostnamesMatcher = &httptpl.YakMatcher{
-		MatcherType: "glob",
-		Scope:       "raw",
-		Group:       []string{"google.com", "*gstatic.com", "*bdstatic.com", "*google*.com"},
-	}
-	defaultExcludeSuffixMatcher = &httptpl.YakMatcher{
-		MatcherType: "word",
-		Scope:       "raw",
-		Group: []string{
-			".css",
-			".jpg", ".jpeg", ".png",
-			".mp3", ".mp4", ".ico", ".bmp",
-			".flv", ".aac", ".ogg", "avi",
-			".svg", ".gif", ".woff", ".woff2",
-			".doc", ".docx", ".pptx",
-			".ppt", ".pdf",
-		},
-	}
+func LegacyFilter2FilterMatcherData(m *MITMFilterManager) *ypb.MITMFilterData {
+	var result = &ypb.MITMFilterData{}
+	result.IncludeHostnames = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
+		Group:       m.IncludeHostnames,
+	}}
 
-	defaultExcludeMethodsMatcher = &httptpl.YakMatcher{
-		MatcherType: "glob",
-		Scope:       "raw",
-		Group:       []string{"OPTIONS", "CONNECT"},
+	result.ExcludeHostnames = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
+		Group:       m.ExcludeHostnames,
+	}}
+
+	result.IncludeSuffix = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+		Group:       m.IncludeSuffix,
+	}}
+
+	result.ExcludeSuffix = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+		Group:       m.ExcludeSuffix,
+	}}
+
+	result.IncludeUri = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
+		Group:       m.IncludeUri,
+	}}
+
+	result.ExcludeUri = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
+		Group:       m.ExcludeUri,
+	}}
+
+	result.ExcludeMethods = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
+		Group:       m.ExcludeMethods,
+	}}
+
+	result.ExcludeMIME = []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_MIME,
+		Group:       m.ExcludeMIME,
+	}}
+	return result
+}
+
+type FilterMatcher struct {
+	IncludeSuffixMatcher *httptpl.YakMatcher
+	ExcludeSuffixMatcher *httptpl.YakMatcher
+
+	IncludeHostnamesMatcher *httptpl.YakMatcher
+	ExcludeHostnamesMatcher *httptpl.YakMatcher
+
+	IncludeUriMatcher *httptpl.YakMatcher
+	ExcludeUriMatcher *httptpl.YakMatcher
+
+	ExcludeMethodsMatcher *httptpl.YakMatcher
+	ExcludeMIMEMatcher    *httptpl.YakMatcher
+}
+
+type MITMFilter struct {
+	db      *gorm.DB
+	Data    *ypb.MITMFilterData
+	Filters *FilterMatcher
+}
+
+func NewMITMFilter(data *ypb.MITMFilterData) *MITMFilter {
+	m := &MITMFilter{}
+	m.Update(data)
+	return m
+}
+
+func (m *MITMFilter) updateMatcher() {
+	if m.Data == nil {
+		m.Filters = nil
+		return
 	}
-	defaultExcludeMIMEMatcher = &httptpl.YakMatcher{
-		MatcherType: "glob",
-		Scope:       "raw",
-		Group: []string{
-			"image/*",
-			"audio/*", "video/*", // "*octet-stream*",
-			"application/ogg", "application/pdf", "application/msword",
-			"application/x-ppt", "video/avi", "application/x-ico",
-			"*zip",
-		},
+	m.Filters = &FilterMatcher{}
+	m.Filters.ExcludeSuffixMatcher = FilterDataToMatchers(m.Data.ExcludeSuffix)
+	m.Filters.IncludeSuffixMatcher = FilterDataToMatchers(m.Data.IncludeSuffix)
+
+	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames)
+	m.Filters.IncludeHostnamesMatcher = FilterDataToMatchers(m.Data.IncludeHostnames)
+
+	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(m.Data.ExcludeUri)
+	m.Filters.IncludeUriMatcher = FilterDataToMatchers(m.Data.IncludeUri)
+
+	m.Filters.ExcludeMethodsMatcher = FilterDataToMatchers(m.Data.ExcludeMethods)
+	m.Filters.ExcludeMIMEMatcher = FilterDataToMatchers(m.Data.ExcludeMIME)
+}
+
+func (m *MITMFilter) Recover() {
+	m.Update(defaultMITMFilterData)
+}
+
+func (m *MITMFilter) Update(data *ypb.MITMFilterData) {
+	m.Data = data
+	m.updateMatcher()
+}
+
+func FilterDataToMatchers(data []*ypb.FilterDataItem) *httptpl.YakMatcher {
+	var matchers []*httptpl.YakMatcher
+	for _, datum := range data {
+		matcher := &httptpl.YakMatcher{
+			MatcherType: datum.MatcherType,
+			Group:       datum.Group,
+		}
+		matchers = append(matchers, matcher)
 	}
-)
+	if len(matchers) == 0 {
+		return nil
+	}
+	return &httptpl.YakMatcher{
+		SubMatchers:         matchers,
+		SubMatcherCondition: "or",
+	}
+}
 
 var (
 	defaultExcludeHostnames = []string{"google.com", "*gstatic.com", "*bdstatic.com", "*google*.com"}
@@ -94,33 +169,6 @@ var (
 	}
 )
 
-func _exactChecker(includes, excludes []string, target string) bool {
-	excludes = utils.StringArrayFilterEmpty(excludes)
-	includes = utils.StringArrayFilterEmpty(includes)
-
-	for _, exclude := range excludes {
-		if match, err := regexp.MatchString(exclude, target); err == nil && match {
-			return false
-		} else if exclude == target {
-			return false
-		}
-	}
-
-	if includes == nil {
-		return true
-	}
-
-	for _, include := range includes {
-		if match, err := regexp.MatchString(include, target); err == nil && match {
-			return true
-		} else if include == target {
-			return true
-		}
-	}
-
-	return false
-}
-
 func fixSuffix(suf string) string {
 	if strings.HasPrefix(suf, ".") {
 		return suf
@@ -129,136 +177,26 @@ func fixSuffix(suf string) string {
 	}
 }
 
-func _suffixChecker(includes, excludes []string, target string) bool {
-	excludes = utils.StringArrayFilterEmpty(excludes)
-	includes = utils.StringArrayFilterEmpty(includes)
-
-	for _, exclude := range excludes {
-		if strings.HasSuffix(target, fixSuffix(exclude)) {
-			return false
-		} else if exclude == target {
-			return false
-		}
-	}
-
-	if includes == nil {
-		return true
-	}
-
-	for _, include := range includes {
-		if strings.HasSuffix(target, fixSuffix(include)) {
-			return true
-		} else if include == target {
-			return true
-		}
-	}
-
-	return false
+var defaultMITMFilterData = &ypb.MITMFilterData{
+	ExcludeMethods: []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_GLOB,
+		Group:       defaultExcludeMethods,
+	}},
+	ExcludeSuffix: []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+		Group:       defaultExcludeSuffix,
+	}},
+	ExcludeHostnames: []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_SUFFIX,
+		Group:       defaultExcludeHostnames,
+	}},
+	ExcludeMIME: []*ypb.FilterDataItem{{
+		MatcherType: httptpl.MATCHER_TYPE_MIME,
+		Group:       defaultExcludeMIME,
+	}},
 }
 
-func mimeCheckGlobRule(rule string, target string) bool {
-	if strings.Contains(rule, "/") && strings.Contains(target, "/") { // 如果两个都包含/，则进行分割匹配
-		ruleType := strings.SplitN(rule, "/", 2)
-		targetType := strings.SplitN(target, "/", 2)
-		for i := 0; i < 2; i++ {
-			if strings.Contains(ruleType[i], "*") {
-				rule, err := glob.Compile(ruleType[i])
-				if err != nil || !rule.Match(targetType[i]) {
-					return false // 任意部分匹配失败则 false,包括glob编译失败
-				}
-			} else {
-				if ruleType[i] != targetType[i] {
-					return false // 任意部分匹配失败则 false
-				}
-			}
-		}
-		return true // 全部通过 true
-	}
-
-	if !strings.Contains(target, "/") && !strings.Contains(rule, "/") { // 如果都不包含 /
-		if strings.Contains(rule, "*") { // 尝试glob 匹配
-			rule, err := glob.Compile(rule)
-			if err == nil && rule.Match(target) {
-				return true
-			}
-		} else { // 直接 contains
-			if utils.IContains(target, rule) {
-				return true
-			}
-		}
-		return false
-	}
-
-	if strings.Contains(target, "/") && !strings.Contains(rule, "/") { // 仅rule不包含 /
-		targetType := strings.SplitN(target, "/", 2)
-		for i := 0; i < 2; i++ {
-			if strings.Contains(rule, "*") {
-				rule, err := glob.Compile(rule)
-				if err != nil {
-					continue
-				}
-				if rule.Match(targetType[i]) {
-					return true // 任意部分匹配成功 则true
-				}
-			} else {
-				if rule == targetType[i] {
-					return true // 任意部分匹配成功 则true
-				}
-			}
-		}
-		return false // 全部失败 则false
-	}
-
-	return false // 仅 rule 有 / 则直接返回 false
-}
-
-func _mimeChecker(includes, excludes []string, target string) bool {
-	excludes = utils.StringArrayFilterEmpty(excludes)
-	includes = utils.StringArrayFilterEmpty(includes)
-
-	if includes == nil {
-		for _, rule := range excludes {
-			if mimeCheckGlobRule(rule, target) {
-				return false // 如果命中 excludes 则 false 即过滤
-			}
-		}
-		return true
-	}
-
-	for _, rule := range excludes {
-		if mimeCheckGlobRule(rule, target) {
-			return false // 如果命中 excludes 则 false 即过滤
-		}
-	}
-
-	for _, rule := range includes {
-		if mimeCheckGlobRule(rule, target) {
-			return true // 如果命中 includes 则 true 即放行
-		}
-	}
-	return false
-}
-
-func (m *MITMFilterManager) Recover() {
-	m.ExcludeMethods = defaultExcludeMethods
-	m.ExcludeSuffix = defaultExcludeSuffix
-	m.ExcludeHostnames = defaultExcludeHostnames
-	m.ExcludeMIME = defaultExcludeMIME
-	m.ExcludeUri = nil
-	m.IncludeUri = nil
-	m.IncludeHostnames = nil
-	m.IncludeSuffix = nil
-	m.Save()
-}
-
-var defaultMITMFilterManager = &MITMFilterManager{
-	ExcludeHostnames: defaultExcludeHostnames,
-	ExcludeSuffix:    defaultExcludeSuffix,
-	ExcludeMethods:   defaultExcludeMethods,
-	ExcludeMIME:      defaultExcludeMIME,
-}
-
-func getInitFilterManager(db *gorm.DB) (*MITMFilterManager, error) {
+func getInitFilterManager(db *gorm.DB) (*MITMFilter, error) {
 	if db == nil {
 		return nil, utils.Error("no database")
 	}
@@ -269,16 +207,21 @@ func getInitFilterManager(db *gorm.DB) (*MITMFilterManager, error) {
 		serializedFilter = yakit.GetKey(db, MITMFilterKeyRecords)
 	}
 
-	var manager MITMFilterManager
-	err := json.Unmarshal([]byte(serializedFilter), &manager)
+	var filter MITMFilter
+	err := json.Unmarshal([]byte(serializedFilter), &filter)
 	if err != nil {
-		return nil, err
+		// legacy
+		var manager MITMFilterManager
+		err = json.Unmarshal([]byte(serializedFilter), &manager)
+		if err != nil {
+			return nil, err
+		}
+		return NewMITMFilter(LegacyFilter2FilterMatcherData(&manager)), nil
 	}
-	managerP := &manager
-	return managerP, nil
+	return &filter, nil
 }
 
-func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilterManager {
+func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
 	// project first
 	for _, db := range []*gorm.DB{projectDB, profileDB} {
 		result, err := getInitFilterManager(db)
@@ -288,19 +231,20 @@ func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilterManager {
 		result.db = db
 		return result
 	}
-
-	defaultMITMFilterManager.db = projectDB
-	return defaultMITMFilterManager
+	filter := NewMITMFilter(defaultMITMFilterData)
+	filter.db = projectDB
+	return filter
 }
 
-func (m *MITMFilterManager) IsEmpty() bool {
-	return len(m.ExcludeMIME) <= 0 && len(m.ExcludeMethods) <= 0 &&
-		len(m.ExcludeSuffix) <= 0 && len(m.ExcludeHostnames) <= 0 &&
-		len(m.IncludeHostnames) <= 0 && len(m.IncludeSuffix) <= 0 &&
-		len(m.ExcludeUri) <= 0 && len(m.IncludeUri) <= 0
+func (m *MITMFilter) IsEmpty() bool {
+	data := m.Data
+	return len(data.ExcludeMIME) <= 0 && len(data.ExcludeMethods) <= 0 &&
+		len(data.ExcludeSuffix) <= 0 && len(data.ExcludeHostnames) <= 0 &&
+		len(data.IncludeHostnames) <= 0 && len(data.IncludeSuffix) <= 0 &&
+		len(data.ExcludeUri) <= 0 && len(data.IncludeUri) <= 0
 }
 
-func (m *MITMFilterManager) Save() {
+func (m *MITMFilter) Save() {
 	db := m.db
 	if db == nil {
 		return
@@ -310,8 +254,7 @@ func (m *MITMFilterManager) Save() {
 		m.Recover()
 		return
 	}
-
-	result, err := json.Marshal(m)
+	result, err := json.Marshal(m.Data)
 	if err != nil {
 		log.Errorf("marshal mitm filter failed: %s", err)
 		return
@@ -327,14 +270,6 @@ func (m *MITMFilterManager) Save() {
 	}
 }
 
-func (m *MITMFilterManager) IsMIMEPassed(ct string) bool {
-	parsed, _, _ := mime.ParseMediaType(ct)
-	if parsed != "" {
-		ct = parsed
-	}
-	return _mimeChecker(nil, m.ExcludeMIME, ct)
-}
-
 func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw string) bool {
 	if exclude != nil {
 		excludeRes, err := exclude.ExecuteRaw([]byte(raw), nil)
@@ -346,7 +281,7 @@ func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw 
 		}
 	}
 
-	if include != nil {
+	if include == nil {
 		return true
 	}
 
@@ -358,29 +293,41 @@ func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw 
 	return includeRes
 }
 
-// IsPassed return true if passed, false if filtered out
-func (m *MITMFilterManager) IsPassed(method string, hostport, urlStr string, ext string, isHttps bool) bool {
-	var passed bool
+func (m *MITMFilter) IsMIMEPassed(ct string) bool {
+	parsed, _, _ := mime.ParseMediaType(ct)
+	if parsed != "" {
+		ct = parsed
+	}
+	return _FilterCheck(nil, m.Filters.ExcludeMIMEMatcher, ct)
+}
 
-	passed = _exactChecker(nil, m.ExcludeMethods, method)
+// IsPassed return true if passed, false if filtered out
+func (m *MITMFilter) IsPassed(method string, hostport, urlStr string, ext string) bool {
+	var passed bool
+	matcher := m.Filters
+	if matcher == nil {
+		return true
+	}
+
+	passed = _FilterCheck(nil, matcher.ExcludeMethodsMatcher, method)
 	if !passed {
 		log.Debugf("[%v] url: %s is filtered via method", method, truncate(urlStr))
 		return false
 	}
 
-	passed = _suffixChecker(m.IncludeSuffix, m.ExcludeSuffix, strings.ToLower(ext))
+	passed = _FilterCheck(matcher.IncludeSuffixMatcher, matcher.ExcludeSuffixMatcher, ext)
 	if !passed {
 		log.Debugf("url: %v is filtered via suffix(%v)", truncate(urlStr), ext)
 		return false
 	}
 
-	passed = utils.IncludeExcludeChecker(m.IncludeHostnames, m.ExcludeHostnames, hostport)
+	passed = _FilterCheck(matcher.IncludeHostnamesMatcher, matcher.ExcludeHostnamesMatcher, hostport)
 	if !passed {
 		log.Debugf("url: %s is filtered via hostnames(%v)", truncate(urlStr), hostport)
 		return false
 	}
 
-	passed = utils.IncludeExcludeChecker(m.IncludeUri, m.ExcludeUri, urlStr)
+	passed = _FilterCheck(matcher.IncludeUriMatcher, matcher.ExcludeUriMatcher, utils.ExtractRawPath(urlStr))
 	if !passed {
 		log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
 		return false
