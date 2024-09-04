@@ -235,21 +235,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if i := ret.Yield(); i != nil {
 			return y.EmitConstInstNil()
 		} else if i := ret.List(); i != nil {
-		} else if i := ret.IsSet(); i != nil {
-			for _, chain := range ret.ChainList().(*phpparser.ChainListContext).AllChain() {
-				visitChain := y.VisitChain(chain)
-				undefine, ok := ssa.ToUndefined(visitChain)
-				if visitChain == nil || (ok && undefine.Kind == ssa.UndefinedValueInValid) {
-					return y.EmitConstInst(false)
-				}
-			}
-			return y.EmitConstInst(true)
-		} else if i := ret.Empty(); i != nil {
-			return y.VisitChain(ret.Chain())
-		} else if i := ret.Throw(); i != nil {
-			return y.VisitExpression(ret.Expression())
-		} else if ret.Die() != nil || ret.Exit() != nil {
-			return y.VisitExpression(ret.Expression())
 		}
 		return y.EmitConstInstNil()
 	case *phpparser.IncludeExpressionContext:
