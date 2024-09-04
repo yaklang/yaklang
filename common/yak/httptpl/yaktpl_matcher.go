@@ -1,7 +1,6 @@
 package httptpl
 
 import (
-	"fmt"
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
@@ -45,8 +44,10 @@ const (
 	MATCHER_TYPE_BIN         = "binary"
 	MATCHER_TYPE_WORD        = "word"
 	MATCHER_TYPE_REGEXP      = "regexp"
+	MATCHER_TYPE_SUFFIX      = "suffix"
 	MATCHER_TYPE_EXPR        = "expr"
 	MATCHER_TYPE_GLOB        = "glob"
+	MATCHER_TYPE_MIME        = "mime"
 )
 
 const (
@@ -194,8 +195,8 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars m
 func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
-	interactsh_protocol := utils.InterfaceToString(vars["interactsh_protocol"])
-	interactsh_request := utils.InterfaceToString(vars["interactsh_request"])
+	interactsh_protocol := utils.MapGetString(vars, "interactsh_protocol")
+	interactsh_request := utils.MapGetString(vars, "interactsh_request")
 
 	getMaterial := func() string {
 		if isExpr {
@@ -236,9 +237,9 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 						checkingInteractsh = config.OOBRequireCheckingTrigger
 					}
 					if checkingInteractsh != nil {
-						token, ok := vars["reverse_dnslog_token"]
-						if ok {
-							material, _ = checkingInteractsh(strings.ToLower(fmt.Sprint(token)), config.RuntimeId, oobTimeout)
+						token := utils.MapGetString(vars, "reverse_dnslog_token")
+						if token != "" {
+							material, _ = checkingInteractsh(strings.ToLower(token), config.RuntimeId, oobTimeout)
 						}
 					}
 				}
@@ -262,9 +263,9 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 						checkingInteractsh = config.OOBRequireCheckingTrigger
 					}
 					if checkingInteractsh != nil {
-						token, ok := vars["reverse_dnslog_token"]
-						if ok {
-							_, request := checkingInteractsh(strings.ToLower(fmt.Sprint(token)), config.RuntimeId, oobTimeout)
+						token := utils.MapGetString(vars, "reverse_dnslog_token")
+						if token != "" {
+							_, request := checkingInteractsh(strings.ToLower(token), config.RuntimeId, oobTimeout)
 							material = string(request)
 						}
 					}
@@ -356,6 +357,10 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 			}
 			return strings.Contains(s, sub)
 		}
+	case MATCHER_TYPE_SUFFIX:
+		matcherFunc = strings.HasSuffix
+	case MATCHER_TYPE_MIME:
+		matcherFunc = utils.MIMEGlobRuleCheck
 	case MATCHER_TYPE_REGEXP, "re", "regex":
 		matcherFunc = func(s string, sub string) bool {
 			regUtils := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(sub)
