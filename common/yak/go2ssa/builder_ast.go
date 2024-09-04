@@ -28,35 +28,41 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		prog := b.GetProgram()
 		application := prog.Application
 		global := application.GlobalScope
-		_ = global
+
+		initHandler := func(name string) {
+			variable := b.CreateMemberCallVariable(global, b.EmitConstInst(name))
+			emptyContainer := b.EmitEmptyContainer()
+			b.AssignVariable(variable, emptyContainer)
+		}
+		initHandler(pkgNameCurrent)
 
 		b.pkgNameCurrent = pkgNameCurrent
-		if pkgPath[0] != "main" {
-			lib, skip := prog.GetLibrary(pkgNameCurrent)
-			if skip {
-				return
-			}
-			if lib == nil {
-				lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
-				lib.Cache = prog.Cache /* 继承Cache */
-			}
-			lib.PushEditor(prog.GetCurrentEditor())
 
-			init := lib.GetAndCreateFunction(pkgNameCurrent, "init")
-			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
-			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "init")
+		lib, skip := prog.GetLibrary(pkgNameCurrent)
+		if skip {
+			return
+		}
+		if lib == nil {
+			lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
+			lib.Cache = prog.Cache /* 继承Cache */
+		}
+		lib.PushEditor(prog.GetCurrentEditor())
+		lib.GlobalScope = b.ReadMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))
 
-			if builder != nil {
-				builder.SetBuildSupport(b.FunctionBuilder)
-				currentBuilder := b.FunctionBuilder
-				b.FunctionBuilder = builder
-				defer func() {
-					for _, e := range builder.GetProgram().GetErrors() {
-						currentBuilder.GetProgram().AddError(e)
-					}
-					b.FunctionBuilder = currentBuilder
-				}()
-			}
+		init := lib.GetAndCreateFunction(pkgNameCurrent, "init")
+		init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
+		builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "init")
+
+		if builder != nil {
+			builder.SetBuildSupport(b.FunctionBuilder)
+			currentBuilder := b.FunctionBuilder
+			b.FunctionBuilder = builder
+			defer func() {
+				for _, e := range builder.GetProgram().GetErrors() {
+					currentBuilder.GetProgram().AddError(e)
+				}
+				b.FunctionBuilder = currentBuilder
+			}()
 		}
 	}
 
@@ -343,7 +349,6 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				rightvl = append(rightvl, rightv)
 				b.AddGlobalVariable(leftList[i].GetText(), rightv)
 			}
-			b.AssignList(leftvl, rightvl)
 		}
 	} else {
 		if a == nil {
@@ -622,6 +627,11 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
+		for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+			variable := b.CreateLocalVariable(i.String())
+			b.AssignVariable(variable, m)
+		}
+
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -708,6 +718,11 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+			variable := b.CreateLocalVariable(i.String())
+			b.AssignVariable(variable, m)
+		}
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
