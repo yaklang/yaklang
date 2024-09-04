@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/samber/lo"
+	"strconv"
 	"strings"
 	"time"
 
@@ -225,20 +227,11 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	var HttpResponseMatchers2YakMatchers func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher
 	HttpResponseMatchers2YakMatchers = func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher {
 		return funk.Map(matchers, func(matcher *ypb.HTTPResponseMatcher) *httptpl.YakMatcher {
-			scope := ""
-			switch matcher.Scope {
-			case "status_code":
-				scope = "status"
-			case "all_headers":
-				scope = "header"
-			default:
-				scope = matcher.Scope
-			}
 			return &httptpl.YakMatcher{
 				SubMatchers:         HttpResponseMatchers2YakMatchers(matcher.SubMatchers),
 				SubMatcherCondition: matcher.SubMatcherCondition,
 				MatcherType:         matcher.MatcherType,
-				Scope:               scope,
+				Scope:               matcher.Scope,
 				Condition:           matcher.Condition,
 				Group:               matcher.Group,
 				GroupEncoding:       matcher.GroupEncoding,
@@ -583,12 +576,17 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 					matcherItem.Set("words", subMatcher.Group)
 				case "status_code":
 					matcherItem.Set("type", "status")
-					matcherItem.Set("part", subMatcher.Scope)
-					matcherItem.Set("status", subMatcher.Group)
+					matcherItem.Set("status", lo.FilterMap(subMatcher.Group, func(s string, _ int) (int, bool) {
+						i, err := strconv.Atoi(s)
+						return i, err == nil
+					}))
 				case "content_length":
 					matcherItem.Set("type", "size")
 					matcherItem.Set("part", subMatcher.Scope)
-					matcherItem.Set("size", subMatcher.Group)
+					matcherItem.Set("size", lo.FilterMap(subMatcher.Group, func(s string, _ int) (int, bool) {
+						i, err := strconv.Atoi(s)
+						return i, err == nil
+					}))
 				case "binary":
 					matcherItem.Set("type", "binary")
 					matcherItem.Set("part", subMatcher.Scope)
