@@ -911,7 +911,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		}
 	}
 
-	if extraRepeat && isRequest {
+	if extraRepeat && isRequest { // 不修改原请求，修改后的请求作为额外发包
 		var extraArgHttps bool
 		if len(args) > 0 {
 			extraArgHttps, _ = strconv.ParseBool(utils.InterfaceToString(args[0]))
@@ -930,7 +930,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 			//}
 			_ = extraArgHttps
 			opts := []lowhttp.LowhttpOpt{
-				lowhttp.WithPacketBytes(originPacket), lowhttp.WithHttps(extraArgHttps),
+				lowhttp.WithPacketBytes(modifiedPacket), lowhttp.WithHttps(extraArgHttps),
 				lowhttp.WithTimeout(15 * time.Second), lowhttp.WithRedirectTimes(3),
 				lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource("mitm"),
 				lowhttp.WithRedirectTimes(0),
@@ -948,7 +948,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 			_ = rsp
 			_ = matchedRule
 		}()
-		return matchedRules.MITMContentReplacers(), modifiedPacket, dropPacket
+		return matchedRules.MITMContentReplacers(), originPacket, dropPacket
 	}
 
 	return matchedRules.MITMContentReplacers(), modifiedPacket, dropPacket
