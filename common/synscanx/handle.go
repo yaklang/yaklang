@@ -19,7 +19,7 @@ import (
 )
 
 // windows 的pcap 错误信息是gb18030编码的，需要转换成utf8
-func (s *Scannerx) handleError(err error) error {
+func handleError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -50,7 +50,7 @@ func (s *Scannerx) initHandle() error {
 	handle, err := pcap.OpenLive(pcapIface, 128, false, pcap.BlockForever)
 
 	if err != nil {
-		return s.handleError(err)
+		return handleError(err)
 	}
 	log.Infof("pcap open live success: %s", s.config.Iface.Name)
 	var bpf string
@@ -74,42 +74,77 @@ func (s *Scannerx) initHandle() error {
 }
 
 func (s *Scannerx) initHandlerStart(ctx context.Context) error {
+	var err error
+
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		var bpf string
-		if s.config.Iface.Flags&net.FlagLoopback == 0 {
-			// Interface is not loopback, set the filter.
-			bpf = fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())
-		} else {
-			// Interface is loopback, set a different filter.
-			// Replace the following line with the appropriate filter for your use case.
-			bpf = "udp || tcp[tcpflags] == tcp-syn|tcp-ack"
+
+		var adapters []*pcaputil.DeviceAdapter
+
+		if s.config.Iface != nil {
+			adapters = append(adapters, &pcaputil.DeviceAdapter{
+				DeviceName: s.config.Iface.Name,
+				BPF:        fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String()),
+				Snaplen:    128,
+				Promisc:    false,
+				Timeout:    pcap.BlockForever,
+			})
 		}
-		err := pcaputil.Start(
+		var loop *net.Interface
+		loop, err = pcaputil.GetLoopBackNetInterface()
+		if err == nil {
+			adapters = append(adapters, &pcaputil.DeviceAdapter{
+				DeviceName: loop.Name,
+				BPF:        "udp || tcp[tcpflags] == tcp-syn|tcp-ack",
+				Snaplen:    128,
+				Promisc:    false,
+				Timeout:    pcap.BlockForever,
+			})
+		} else {
+			log.Errorf("get loopback net interface failed: %v", err)
+		}
+		err = pcaputil.Start(
+			pcaputil.WithDeviceAdapter(adapters...),
 			pcaputil.WithContext(ctx),
 			pcaputil.WithEnableCache(true),
-			pcaputil.WithDevice(s.config.Iface.Name),
-			pcaputil.WithBPFFilter(bpf),
 			pcaputil.WithDisableAssembly(true),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
-					for {
-						select {
-						case <-s.ctx.Done():
-							return
-						case packet, ok := <-s.PacketChan:
-							if !ok {
+					if handle.IsLoopback() {
+						for {
+							select {
+							case <-s.ctx.Done():
 								return
+							case lpacket, ok := <-s.LoopPacket:
+								if !ok {
+									return
+								}
+								err := handle.WritePacketData(lpacket)
+								if err != nil {
+									log.Errorf("write packet failed: %v", handleError(err))
+									continue
+								}
 							}
+						}
+					} else {
+						for {
+							select {
+							case <-s.ctx.Done():
+								return
+							case packet, ok := <-s.PacketChan:
+								if !ok {
+									return
+								}
 
-							err := handle.WritePacketData(packet)
-							if err != nil {
-								log.Errorf("write packet failed: %v", err)
-								continue
+								err := handle.WritePacketData(packet)
+								if err != nil {
+									log.Errorf("write packet failed: %v", handleError(err))
+									continue
+								}
 							}
 						}
 					}
@@ -127,7 +162,7 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 			log.Errorf("pcaputil start failed: %v", err)
 		}
 	}()
-	return nil
+	return err
 }
 
 func (s *Scannerx) HandlerReadPacket(ctx context.Context, resultCh chan *synscan.SynScanResult) {
@@ -175,8 +210,12 @@ func (s *Scannerx) HandlerZeroCopyReadPacket(ctx context.Context, resultCh chan 
 
 func (s *Scannerx) handlePacket(packet gopacket.Packet) {
 	if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-		arp := arpLayer.(*layers.ARP)
-		if arp.Operation == 2 {
+		switch arpLayer.LayerType() {
+		case layers.LayerTypeARP:
+			arp, ok := arpLayer.(*layers.ARP)
+			if !ok {
+				return
+			}
 			srcIP := net.IP(arp.SourceProtAddress)
 			srcHw := net.HardwareAddr(arp.SourceHwAddress)
 			s.onArp(srcIP, srcHw)

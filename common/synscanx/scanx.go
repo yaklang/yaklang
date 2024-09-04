@@ -36,6 +36,7 @@ type Scannerx struct {
 	OpenPortHandlers func(ip net.IP, port int)
 
 	PacketChan chan []byte
+	LoopPacket chan []byte
 
 	ipOpenPortMap *sync.Map
 	// MAC地址表
@@ -55,6 +56,21 @@ type Scannerx struct {
 	FromPing             bool
 }
 
+var routeCache struct {
+	iface     *net.Interface
+	gatewayIP net.IP
+	srcIP     net.IP
+	err       error
+	once      sync.Once
+}
+
+func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
+	routeCache.once.Do(func() {
+		routeCache.iface, routeCache.gatewayIP, routeCache.srcIP, routeCache.err = netutil.Route(time.Second*2, sampleIP)
+	})
+	return routeCache.iface, routeCache.gatewayIP, routeCache.srcIP, routeCache.err
+}
+
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
 	limitInterval := time.Duration(config.rateLimitDelayMs * float64(time.Millisecond))
 	s := &Scannerx{
@@ -64,6 +80,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 		ports:         utils.NewPortsFilter(),
 		macCacheTable: new(sync.Map),
 		PacketChan:    make(chan []byte, 1024),
+		LoopPacket:    make(chan []byte, 1024),
 		loopbackMap:   make(map[string]string),
 		sampleIP:      sample,
 		limiter:       rate.NewLimiter(rate.Every(limitInterval), config.rateLimitDelayGap),
@@ -76,10 +93,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 	if err != nil {
 		return nil, err
 	}
-	//err = s.initHandlerStart()
-	//if err != nil {
-	//	return nil, err
-	//}
+
 	return s, nil
 }
 
@@ -88,55 +102,42 @@ func (s *Scannerx) initEssentialInfo() error {
 	var srcIP, gatewayIP net.IP
 	var err error
 
-	if utils.IsLoopback(s.sampleIP) && s.config.targetsCount == 1 && !s.FromPing {
-		iface, err = pcaputil.GetLoopBackNetInterface()
+	// 如果没有指定网卡名,就通过路由获取
+	if s.config.netInterface == "" {
+		iface, gatewayIP, srcIP, err = getRoute(s.sampleIP)
 		if err != nil {
-			return utils.Errorf("get loopback iface failed: %s", err)
+			return utils.Errorf("get iface failed: %s", err)
 		}
-		gatewayIP = net.IPv4(127, 0, 0, 1)
-		srcIP = net.IPv4(127, 0, 0, 1)
-		if iface.HardwareAddr == nil {
-			iface.HardwareAddr = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-		}
-		s.loopbackMap[srcIP.String()] = s.sampleIP
 	} else {
-		// 如果没有指定网卡名,就通过路由获取
-		if s.config.netInterface == "" {
-			iface, gatewayIP, srcIP, err = netutil.Route(time.Second*2, s.sampleIP)
+		// 支持 net interface name 和 pcap dev name
+		iface, err = net.InterfaceByName(s.config.netInterface)
+		if err != nil {
+			iface, err = pcaputil.PcapIfaceNameToNetInterface(s.config.netInterface)
 			if err != nil {
-				return utils.Errorf("get iface failed: %s", err)
+				return errors.Errorf("get iface failed: %s", err)
 			}
-		} else {
-			// 支持 net interface name 和 pcap dev name
-			iface, err = net.InterfaceByName(s.config.netInterface)
-			if err != nil {
-				iface, err = pcaputil.PcapIfaceNameToNetInterface(s.config.netInterface)
-				if err != nil {
-					return errors.Errorf("get iface failed: %s", err)
-				}
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return err
+		}
+		for _, addr := range addrs {
+			ip := addr.(*net.IPNet).IP
+			if utils.IsIPv6(ip.String()) {
+				srcIP = ip
 			}
-			addrs, err := iface.Addrs()
-			if err != nil {
-				return err
+			if utils.IsIPv4(ip.String()) {
+				srcIP = ip
+				break
 			}
-			for _, addr := range addrs {
-				ip := addr.(*net.IPNet).IP
-				if utils.IsIPv6(ip.String()) {
-					srcIP = ip
-				}
-				if utils.IsIPv4(ip.String()) {
-					srcIP = ip
-					break
-				}
-			}
-			if srcIP == nil {
-				return utils.Errorf("iface: %s has no addrs", iface.Name)
-			}
-			// 通过网卡名获取到网卡的 IP 地址后，再通过路由获取网关 IP 地址，网关 IP 地址用于获取网关的 MAC 地址，用于外网扫描
-			_, gatewayIP, _, err = netutil.Route(time.Second*2, srcIP.String())
-			if err != nil {
-				return utils.Errorf("get gateway failed: %s", err)
-			}
+		}
+		if srcIP == nil {
+			return utils.Errorf("iface: %s has no addrs", iface.Name)
+		}
+		// 通过网卡名获取到网卡的 IP 地址后，再通过路由获取网关 IP 地址，网关 IP 地址用于获取网关的 MAC 地址，用于外网扫描
+		_, gatewayIP, _, err = getRoute(srcIP.String())
+		if err != nil {
+			return utils.Errorf("get gateway failed: %s", err)
 		}
 	}
 
@@ -144,6 +145,9 @@ func (s *Scannerx) initEssentialInfo() error {
 	s.config.SourceIP = srcIP
 	s.config.SourceMac = iface.HardwareAddr
 	s.config.GatewayIP = gatewayIP
+
+	// 不确定扫描目标中是否存在回环地址，所以这里先初始化一个回环地址的映射表
+	s.loopbackMap["127.0.0.1"] = s.config.SourceIP.String()
 	return nil
 }
 
@@ -182,10 +186,6 @@ func (s *Scannerx) SubmitTarget(targets, ports string) <-chan *SynxTarget {
 		for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
 			host := hp.Host
 			port := hp.Port
-			// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
-			if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
-				continue
-			}
 
 			s.rateLimit()
 			if s.config.maxOpenPorts > 0 {
@@ -244,10 +244,7 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					log.Infof("Resolving %s", host)
 					host = netx.LookupFirst(host, netx.WithTimeout(3*time.Second))
 				}
-				// 如果打开的不是 Loopback 网卡，就跳过 Loopback 地址
-				if s.config.Iface.Flags&net.FlagLoopback == 0 && utils.IsLoopback(host) {
-					continue
-				}
+
 				if s.excludedHost(host) {
 					continue
 				}
@@ -289,6 +286,11 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 var countOnce sync.Once
 
 func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResult, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	resultCh := make(chan *synscan.SynScanResult, 1024)
 	openPortLock := new(sync.Mutex)
 	var openPortCount int
@@ -335,9 +337,6 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 
 			resultFilter.Insert(addr)
 			if s.FromPing {
-				//if !(s._hosts.Contains(ip2int(host)) && s.ports.Contains(port)) {
-				//	return
-				//}
 				if !(s._hosts.Contains(host.String()) && s.ports.Contains(port)) {
 					return
 				}
@@ -389,11 +388,17 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 	go func() {
 		s.initHandlerStart(wCtx)
 		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+		defer func() {
 			wCancel()
 			close(resultCh)
 			close(s.PacketChan)
+			close(s.LoopPacket)
 		}()
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 
 		if !s.FromPing {
 			s.arpScan()
@@ -405,12 +410,6 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		countOnce.Do(func() {
 			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
 		})
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
 	}()
 	return resultCh, nil
 }
@@ -432,7 +431,11 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 				log.Debugf("assemble packet failed: %v", err)
 				continue
 			}
-			s.PacketChan <- packet
+			if utils.IsLoopback(host) {
+				s.LoopPacket <- packet
+			} else {
+				s.PacketChan <- packet
+			}
 			//err = s.Handle.WritePacketData(packet)
 			//if err != nil {
 			//	log.Errorf("write to device syn failed: %v[%s:%d]", s.handleError(err), host, port)

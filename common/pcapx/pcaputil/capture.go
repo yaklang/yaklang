@@ -50,7 +50,42 @@ func Start(opt ...CaptureOption) error {
 		} else {
 			handlers.Set(conf.Filename, WrapPcapHandle(pcapHandler))
 		}
-	} else if len(conf.Device) == 0 {
+	} else if len(conf.DeviceAdapter) > 0 {
+		for _, adapter := range conf.DeviceAdapter {
+			pcapIface, err := IfaceNameToPcapIfaceName(adapter.DeviceName)
+			if err != nil {
+				log.Warnf("convert iface name (%v) failed: %s, use default", adapter.DeviceName, err)
+				pcapIface = adapter.DeviceName
+			}
+			conf.deviceAdapter = adapter
+			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
+			if err != nil {
+				log.Errorf("open device (%v) failed: %s", pcapIface, err)
+				continue
+			}
+			if cacheId == "" {
+				cacheId = uuid.New().String()
+			}
+			handlers.Set(cacheId, handler)
+		}
+	} else if len(conf.Device) > 0 {
+		for _, i := range conf.Device {
+			pcapIface, err := IfaceNameToPcapIfaceName(i)
+			if err != nil {
+				log.Warnf("convert iface name (%v) failed: %s, use default", i, err)
+				pcapIface = i
+			}
+			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
+			if err != nil {
+				log.Errorf("open device (%v) failed: %s", pcapIface, err)
+				continue
+			}
+			if cacheId == "" {
+				cacheId = uuid.New().String()
+			}
+			handlers.Set(cacheId, handler)
+		}
+	} else {
 		if conf.EmptyDeviceStop {
 			return utils.Errorf("no device found")
 		}
@@ -72,20 +107,6 @@ func Start(opt ...CaptureOption) error {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(iface.Name, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
-				continue
-			}
-			handlers.Set(cacheId, handler)
-		}
-	} else {
-		for _, i := range conf.Device {
-			pcapIface, err := IfaceNameToPcapIfaceName(i)
-			if err != nil {
-				log.Warnf("convert iface name (%v) failed: %s, use default", i, err)
-				pcapIface = i
-			}
-			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
-			if err != nil {
-				log.Errorf("open device (%v) failed: %s", pcapIface, err)
 				continue
 			}
 			if cacheId == "" {
