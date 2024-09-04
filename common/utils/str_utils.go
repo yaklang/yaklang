@@ -1314,6 +1314,64 @@ func IsPlainText(raw []byte) bool {
 	return true
 }
 
+func MIMEGlobRuleCheck(target string, rule string) bool {
+	if strings.Contains(rule, "/") && strings.Contains(target, "/") { // 如果两个都包含/，则进行分割匹配
+		ruleType := strings.SplitN(rule, "/", 2)
+		targetType := strings.SplitN(target, "/", 2)
+		for i := 0; i < 2; i++ {
+			if strings.Contains(ruleType[i], "*") {
+				rule, err := glob.Compile(ruleType[i])
+				if err != nil || !rule.Match(targetType[i]) {
+					return false // 任意部分匹配失败则 false,包括glob编译失败
+				}
+			} else {
+				if ruleType[i] != targetType[i] {
+					return false // 任意部分匹配失败则 false
+				}
+			}
+		}
+		return true // 全部通过 true
+	}
+
+	if !strings.Contains(target, "/") && !strings.Contains(rule, "/") { // 如果都不包含 /
+		if strings.Contains(rule, "*") { // 尝试glob 匹配
+			rule, err := glob.Compile(rule)
+			if err == nil && rule.Match(target) {
+				return true
+			}
+		} else { // 直接 contains
+			if IContains(target, rule) {
+				return true
+			}
+		}
+		return false
+	}
+
+	if strings.Contains(target, "/") && !strings.Contains(rule, "/") { // 仅rule不包含 /
+		targetType := strings.SplitN(target, "/", 2)
+		for i := 0; i < 2; i++ {
+			if strings.Contains(rule, "*") {
+				rule, err := glob.Compile(rule)
+				if err != nil {
+					continue
+				}
+				if rule.Match(targetType[i]) {
+					return true // 任意部分匹配成功 则true
+				}
+			} else {
+				if rule == targetType[i] {
+					return true // 任意部分匹配成功 则true
+				}
+			}
+		}
+		return false // 全部失败 则false
+	}
+
+	return false // 仅 rule 有 / 则直接返回 false
+}
+
+// UnquoteANSIC 解码ANSI-C风格的引号字符串
+func UnquoteANSIC(s string) (string, error) {
 func UnquoteANSICWithQuote(s string, quote rune) (string, error) {
 	// 检查是否以单引号开始和结束
 	if quote != 0 {
