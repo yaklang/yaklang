@@ -535,9 +535,9 @@ expression
     | Set_Include_Path expression                                 # IncludeExpression
     | Yield                                                       # SpecialWordExpression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
-    | IsSet '(' chainList ')'                                     # SpecialWordExpression
-    | Empty '(' chain ')'                                         # SpecialWordExpression
-    | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
+//    | IsSet '(' chainList ')'                                     # SpecialWordExpression
+//    | Empty '(' chain ')'                                         # SpecialWordExpression
+//    | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
     | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
@@ -907,7 +907,8 @@ key
     | EndSwitch
     | EndWhile
     | Eval
-//    | Exit
+    | Exit
+    | Die
     | Extends
     | Final
     | Finally
@@ -929,7 +930,7 @@ key
     | Int8Cast
     | Interface
     | IntType
-//    | IsSet
+    | IsSet
     | LambdaFn
     | List
     | LogicalAnd
@@ -959,7 +960,7 @@ key
     | Typeof
     | UintCast
     | UnicodeCast
-//    | Unset
+    | Unset
     | Use
     | Var
     | While
