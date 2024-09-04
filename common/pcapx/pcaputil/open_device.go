@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -9,11 +10,14 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
+	"time"
+	"unicode/utf8"
 )
 
 func PcapInterfaceEqNetInterface(piface pcap.Interface, iface *net.Interface) bool {
@@ -200,8 +204,52 @@ func OpenFile(filename string) (*pcap.Handle, error) {
 	return handler, nil
 }
 
-func OpenIfaceLive(iface string) (*pcap.Handle, error) {
-	handler, err := pcap.OpenLive(iface, 65535, true, pcap.BlockForever)
+type OpenIfaceLiveOptions struct {
+	SnapLen int32
+	Promisc bool
+	Timeout time.Duration
+}
+
+func DefaultOpenIfaceLiveOptions() []LiveConfig {
+	return []LiveConfig{
+		WithSnapLen(65535),
+		WithPromisc(true),
+		WithTimeout(pcap.BlockForever),
+	}
+}
+
+type LiveConfig func(*OpenIfaceLiveOptions)
+
+func WithSnapLen(snapLen int32) LiveConfig {
+	return func(options *OpenIfaceLiveOptions) {
+		if snapLen == 0 {
+			options.SnapLen = 65535
+		}
+		options.SnapLen = snapLen
+	}
+}
+
+func WithPromisc(promisc bool) LiveConfig {
+	return func(options *OpenIfaceLiveOptions) {
+		options.Promisc = promisc
+	}
+}
+
+func WithTimeout(timeout time.Duration) LiveConfig {
+	return func(options *OpenIfaceLiveOptions) {
+		if timeout == 0 {
+			options.Timeout = pcap.BlockForever
+		}
+		options.Timeout = timeout
+	}
+}
+
+func OpenIfaceLive(iface string, opts ...LiveConfig) (*pcap.Handle, error) {
+	options := &OpenIfaceLiveOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	handler, err := pcap.OpenLive(iface, options.SnapLen, options.Promisc, options.Timeout)
 	if err != nil {
 		return nil, utils.Errorf("pcap.OpenLive %s failed: %v", iface, err)
 	}
@@ -210,17 +258,27 @@ func OpenIfaceLive(iface string) (*pcap.Handle, error) {
 }
 
 type PcapHandleWrapper struct {
-	handle  *pcap.Handle
-	mutex   *sync.RWMutex
-	isClose bool
+	handle     *pcap.Handle
+	mutex      *sync.RWMutex
+	isClose    bool
+	isLoopback bool
 }
 
-func WrapPcapHandle(handle *pcap.Handle) *PcapHandleWrapper {
-	return &PcapHandleWrapper{
-		handle:  handle,
-		mutex:   new(sync.RWMutex),
-		isClose: false,
+func WrapPcapHandle(handle *pcap.Handle, isloop ...bool) *PcapHandleWrapper {
+	isLoopback := false
+	if len(isloop) > 0 {
+		isLoopback = isloop[0]
 	}
+	return &PcapHandleWrapper{
+		handle:     handle,
+		mutex:      new(sync.RWMutex),
+		isClose:    false,
+		isLoopback: isLoopback,
+	}
+}
+
+func (w *PcapHandleWrapper) IsLoopback() bool {
+	return w.isLoopback
 }
 
 func (w *PcapHandleWrapper) WritePacketData(data []byte) error {
@@ -258,10 +316,31 @@ func (w *PcapHandleWrapper) Error() (err error) {
 			err = utils.Error("pcap handler get erro panic")
 		}
 	}()
+
 	if w.isClose {
 		return utils.Error("handle is closed")
 	}
-	return w.handle.Error()
+
+	err = w.handle.Error()
+	if err == nil {
+		return nil
+	}
+
+	// 错误处理逻辑
+	if runtime.GOOS == "windows" {
+		errMsg := err.Error()
+		if !utf8.ValidString(errMsg) {
+			// 尝试转换错误信息编码
+			info, convertErr := codec.GB18030ToUtf8([]byte(errMsg))
+			if convertErr != nil {
+				// 如果转换失败，返回转换错误
+				return convertErr
+			}
+			// 如果转换成功，返回转换后的错误信息
+			return utils.Wrapf(errors.New(string(info)), "pcap ifaceDevs")
+		}
+	}
+	return err
 }
 
 func (w *PcapHandleWrapper) CompileBPFFilter(expr string) ([]pcap.BPFInstruction, error) {

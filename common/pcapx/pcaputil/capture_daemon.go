@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net"
 	"sync"
 	"time"
 )
@@ -58,14 +59,36 @@ func keepDaemonCache(key string, ctx context.Context) context.CancelFunc {
 var getInterfaceHandlerMutex = new(sync.Mutex)
 
 func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, PcapHandleOperation, error) {
+	dev := ifaceName
+	bpf := conf.BPFFilter
+
+	defLiveOpts := DefaultOpenIfaceLiveOptions()
+	if conf.deviceAdapter != nil {
+		bpf = conf.deviceAdapter.BPF
+		var opts []LiveConfig
+		opts = append(opts, WithSnapLen(conf.deviceAdapter.Snaplen))
+		opts = append(opts, WithPromisc(conf.deviceAdapter.Promisc))
+		opts = append(opts, WithTimeout(conf.deviceAdapter.Timeout))
+		defLiveOpts = opts
+	}
+
+	netIface, err := PcapIfaceNameToNetInterface(dev)
+	if err != nil {
+		return "", nil, err
+	}
+	loop := false
+	if netIface.Flags&net.FlagLoopback != 0 {
+		loop = true
+	}
+
 	if conf.EnableCache {
 		getInterfaceHandlerMutex.Lock()
 		defer getInterfaceHandlerMutex.Unlock()
 		var hashRaw bytes.Buffer
-		hashRaw.WriteString(ifaceName)
+		hashRaw.WriteString(dev)
 		hashRaw.WriteString("|")
 		if conf.OverrideCacheId == "" {
-			hashRaw.WriteString(conf.BPFFilter)
+			hashRaw.WriteString(bpf)
 		} else {
 			hashRaw.WriteString("override|")
 			hashRaw.WriteString(conf.OverrideCacheId)
@@ -87,15 +110,16 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		if conf.mock != nil {
 			operation = conf.mock
 		} else {
-			pcapHandler, err := OpenIfaceLive(ifaceName)
+			pcapHandler, err := OpenIfaceLive(dev, defLiveOpts...)
 			if err != nil {
 				return "", nil, err
 			}
-			handler = WrapPcapHandle(pcapHandler)
+
+			handler = WrapPcapHandle(pcapHandler, loop)
 			operation = handler
 		}
-		if conf.BPFFilter != "" {
-			if err := operation.SetBPFFilter(conf.BPFFilter); err != nil {
+		if bpf != "" {
+			if err := operation.SetBPFFilter(bpf); err != nil {
 				return "", nil, utils.Errorf("SetBPFFilter failed: %v", err)
 			}
 		}
@@ -107,8 +131,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 
 		if conf.mock == nil {
 			daemon.startOnce.Do(func() {
-				if conf.BPFFilter != "" {
-					log.Infof("background iface: %v with %s is start...", ifaceName, conf.BPFFilter)
+				if bpf != "" {
+					log.Infof("background iface: %v with %s is start...", ifaceName, bpf)
 				} else {
 					log.Infof("background iface: %v is start...", ifaceName)
 				}
@@ -193,12 +217,12 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		registerDaemonCache(cacheId, daemon)
 		return cacheId, daemon.handler, err
 	}
-	pcapHandler, err := OpenIfaceLive(ifaceName)
+	pcapHandler, err := OpenIfaceLive(dev, defLiveOpts...)
 	if err != nil {
 		return "", nil, err
 	}
-	handler := WrapPcapHandle(pcapHandler)
-	err = handler.SetBPFFilter(conf.BPFFilter)
+	handler := WrapPcapHandle(pcapHandler, loop)
+	err = handler.SetBPFFilter(bpf)
 	if err != nil {
 		return "", handler, err
 	}

@@ -31,10 +31,24 @@ func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
 }
 
 func (s *Scannerx) onArp(ip net.IP, hw net.HardwareAddr) {
-	log.Debugf("ARP: %s -> %s", ip.String(), hw.String())
 	if s.MacHandlers != nil {
 		s.MacHandlers(ip, hw)
 	}
+	if s.config.SourceIP.Equal(ip) || s.config.GatewayIP.Equal(ip) {
+		s.macCacheTable.Store(ip.String(), hw)
+		return
+	}
+
+	if s.FromPing {
+		if !s._hosts.Contains(ip.String()) {
+			return
+		}
+	} else {
+		if !s.hosts.Contains(ip.String()) {
+			return
+		}
+	}
+	log.Debugf("ARP: %s -> %s", ip.String(), hw.String())
 
 	s.macCacheTable.Store(ip.String(), hw)
 }
@@ -79,11 +93,11 @@ func (s *Scannerx) ResetInterfaceCache() {
 func (s *Scannerx) isInternalAddress(target string) bool {
 	ifaceIPNetV4, ifaceIPNetV6 := s.getInterfaceNetworks()
 	targetIP := net.ParseIP(target)
-	if targetIP == nil || targetIP.IsLoopback() || targetIP.IsLinkLocalUnicast() || targetIP.IsLinkLocalMulticast() {
+	if targetIP == nil || utils.IsLoopback(target) {
 		return false
 	}
-	return (targetIP.To4() != nil && ifaceIPNetV4 != nil && ifaceIPNetV4.Contains(targetIP)) ||
-		(targetIP.To16() != nil && ifaceIPNetV6 != nil && ifaceIPNetV6.Contains(targetIP))
+	return (targetIP.To4() != nil && ifaceIPNetV4 != nil && ifaceIPNetV4.Contains(targetIP.To4())) ||
+		(targetIP.To16() != nil && ifaceIPNetV6 != nil && ifaceIPNetV6.Contains(targetIP.To16()))
 }
 
 func (s *Scannerx) arpScan() {
