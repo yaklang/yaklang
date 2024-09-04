@@ -1,6 +1,7 @@
 package synscanx
 
 import (
+	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -71,8 +72,8 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 						}
 					case <-timeout:
 						log.Debugf("%s timeout waiting for ARP response", host)
-						s.macCacheTable.Store(host, "timeout")
-						break loop
+						s.macCacheTable.Store(host, fmt.Sprintf("%s timeout", host))
+						return nil, utils.Errorf("timeout waiting for %s ARP response", host)
 					}
 				}
 			}

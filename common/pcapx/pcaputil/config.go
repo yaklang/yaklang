@@ -25,6 +25,14 @@ import (
 
 var tsconst = uuid.New().String()
 
+type DeviceAdapter struct {
+	DeviceName string
+	BPF        string
+	Snaplen    int32
+	Promisc    bool
+	Timeout    time.Duration
+}
+
 type CaptureConfig struct {
 	Context               context.Context
 	mock                  PcapHandleOperation // TEST MOCK
@@ -43,12 +51,22 @@ type CaptureConfig struct {
 	EnableCache           bool //  cache for handler cache
 	EmptyDeviceStop       bool
 	DisableAssembly       bool
+	deviceAdapter         *DeviceAdapter
+	DeviceAdapter         []*DeviceAdapter
 }
 
 type CaptureOption func(*CaptureConfig) error
 
 func emptyOption(_ *CaptureConfig) error {
 	return nil
+}
+
+func WithDeviceAdapter(devices ...*DeviceAdapter) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.DeviceAdapter = devices
+		return nil
+	}
+
 }
 
 func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {

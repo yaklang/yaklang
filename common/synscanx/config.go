@@ -32,7 +32,6 @@ type SynxConfig struct {
 	excludePorts *utils.PortsFilter
 
 	maxOpenPorts       uint16 // 单个 IP 允许的最大开放端口数
-	targetsCount       uint16
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 
@@ -98,12 +97,19 @@ func NewDefaultConfig() *SynxConfig {
 
 type SynxConfigOption func(config *SynxConfig)
 
-func TargetCount(count int) SynxConfigOption {
-	return func(config *SynxConfig) {
-		config.targetsCount = uint16(count)
-	}
-}
 
+// maxOpenPorts syn scan 的配置选项，设置单个 IP 允许的最大开放端口数
+// @param {int} max 最大开放端口数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.maxOpenPorts(100) // 单个 IP 最多开放 100 个端口
+//
+// )
+// die(err)
+// ```
 func WithMaxOpenPorts(max int) SynxConfigOption {
 	return func(config *SynxConfig) {
 		if max <= 0 {

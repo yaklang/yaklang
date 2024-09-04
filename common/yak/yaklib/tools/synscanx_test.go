@@ -29,7 +29,8 @@ func Test__scanx(t *testing.T) {
 	res, err := _scanx(
 		//"192.168.124.50/24",
 		//"124.222.42.210/24",
-		"127.0.0.1",
+		//"192.168.3.3,192.168.3.5",
+		"192.168.3.1/24",
 		//"baidu.com",
 		//"U:137",
 		"21,22,443,445,80",
@@ -65,18 +66,15 @@ func Test__scanx2(t *testing.T) {
 		}()
 	}
 	startSYNPacketCounter()
-	swg := utils.NewSizedWaitGroup(20)
-	for _, target := range utils.ParseStringToHosts("192.168.3.5/24") {
+	swg := utils.NewSizedWaitGroup(50)
+	for _, target := range utils.ParseStringToHosts("124.222.42.210/24") {
 		host := target
 		swg.Add()
 		go func() {
 			defer swg.Done()
 			res, err := _scanx(
-				//"192.168.3.50/24",
 				host,
-				//"baidu.com",
-				//"U:137",
-				"22,443,445,80,21",
+				"21,22,443,445,80",
 				//synscanx.WithInitFilterPorts("443"),
 				//synscanx.WithWaiting(2),
 				synscanx.WithShuffle(false),
@@ -103,7 +101,7 @@ func Test___scanxFromPingUtils(t *testing.T) {
 	addSynPacketCounter := func() {
 		synPacketCounter++
 	}
-	list := utils.ParseStringToHosts("192.168.1.50/24")
+	list := utils.ParseStringToHosts("192.168.3.3/24")
 
 	c := make(chan *pingutil.PingResult)
 	go func() {
@@ -120,7 +118,7 @@ func Test___scanxFromPingUtils(t *testing.T) {
 		c,
 		//"47.52.100.35/24",
 		//"U:137",
-		"22,21,80,443",
+		"21,22,443,445,80",
 		//synscanx.WithInitFilterPorts("443"),
 		synscanx.WithWaiting(5),
 		synscanx.WithConcurrent(2000),
