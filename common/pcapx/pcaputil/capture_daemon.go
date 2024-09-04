@@ -72,13 +72,15 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		defLiveOpts = opts
 	}
 
-	netIface, err := PcapIfaceNameToNetInterface(dev)
-	if err != nil {
-		return "", nil, err
-	}
 	loop := false
-	if netIface.Flags&net.FlagLoopback != 0 {
-		loop = true
+	if conf.mock == nil {
+		netIface, err := PcapIfaceNameToNetInterface(dev)
+		if err != nil {
+			return "", nil, err
+		}
+		if netIface.Flags&net.FlagLoopback != 0 {
+			loop = true
+		}
 	}
 
 	if conf.EnableCache {
