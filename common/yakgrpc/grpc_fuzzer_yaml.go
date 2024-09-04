@@ -227,11 +227,20 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	var HttpResponseMatchers2YakMatchers func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher
 	HttpResponseMatchers2YakMatchers = func(matchers []*ypb.HTTPResponseMatcher) []*httptpl.YakMatcher {
 		return funk.Map(matchers, func(matcher *ypb.HTTPResponseMatcher) *httptpl.YakMatcher {
+			scope := ""
+			switch matcher.Scope {
+			case "status_code":
+				scope = "status"
+			case "all_headers":
+				scope = "header"
+			default:
+				scope = matcher.Scope
+			}
 			return &httptpl.YakMatcher{
 				SubMatchers:         HttpResponseMatchers2YakMatchers(matcher.SubMatchers),
 				SubMatcherCondition: matcher.SubMatcherCondition,
 				MatcherType:         matcher.MatcherType,
-				Scope:               matcher.Scope,
+				Scope:               scope,
 				Condition:           matcher.Condition,
 				Group:               matcher.Group,
 				GroupEncoding:       matcher.GroupEncoding,
