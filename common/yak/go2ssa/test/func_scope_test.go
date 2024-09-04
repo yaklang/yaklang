@@ -59,7 +59,6 @@ func TestFunction_Value(t *testing.T) {
 
 		func f(){
 			count = 2
-			println(count)
 		}
 
 		func main(){
@@ -68,7 +67,30 @@ func TestFunction_Value(t *testing.T) {
 			println(count)
 		}
 		`, []string{
-			"2", "1", "1",
+			"1", "1",
+		}, t)
+	})
+
+	t.Run("global value phi", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var count = 1
+
+		func f(){
+			count = 2
+			println(count)
+		}
+
+		func main(){
+			if true {
+			    count = 3
+			}else{
+			    count = 4
+			}
+			println(count)
+		}
+		`, []string{
+			"2", "phi(count)[3,4]",
 		}, t)
 	})
 }

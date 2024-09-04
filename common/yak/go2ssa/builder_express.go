@@ -386,6 +386,9 @@ func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal boo
 		if b.GetFromCmap(text) {
 			b.NewError(ssa.Warn, TAG, "cannot assign to const value")
 		}
+		/*if v, ok := b.GetGlobalVariableL(text); ok {
+			return v
+		}*/
 		if isLocal {
 			return b.CreateLocalVariable(text)
 		} else {
@@ -410,9 +413,9 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.buildBoolLiteral(text)
 		}
 		v := b.PeekValue(text)
-		if v == nil {
-			v = b.GetGlobalVariable(text)
-		}
+		/*if v == nil {
+			v = b.GetGlobalVariableR(text)
+		}*/
 		if v != nil {
 			return v
 		}
