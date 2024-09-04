@@ -102,11 +102,59 @@ func TestParameter_TopDef_Recursive(t *testing.T) {
 	t.Run("parameter top def recursive 2 ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		f2 = (a)  => {
-			f2(a)
+  			f2(a)
 		}
 		`, `
 		a?{opcode: param} #-> * as $target`, map[string][]string{
 			"target": {"Parameter-a"},
+		})
+	})
+}
+
+func TestMake_TopDef_Recursive(t *testing.T) {
+	t.Run("parameter make def recursive  ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `
+		f = (a) => {
+			return [f(a)]
+		}
+		target = f(a)
+		`, `
+		target #-> * as $target
+		`, map[string][]string{
+			"target": {"Undefined-a"},
+		})
+	})
+
+}
+
+func TestCrossProcessAndReverseProcess(t *testing.T) {
+	t.Run("test reverse process firstly and cross process later", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f2 = (a1)  => {
+  			return a1
+		}
+		f1 = (a2) => {
+			return 1
+		}
+		f2(f1(11))
+		`, `
+		a1?{opcode: param} #-> * as $target`, map[string][]string{
+			"target": {"1"},
+		})
+	})
+	t.Run("test reverse process firstly and cross process later with recursive", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+		f2 = (a1)  => {
+  			return a1
+		}
+		f1 = (a2) => {
+			return f2(a2)
+		}
+		tmp = f1(11)
+		f2(tmp)
+		`, `
+		a1?{opcode: param} #-> * as $target`, map[string][]string{
+			"target": {"11", "Parameter-a2"},
 		})
 	})
 }
