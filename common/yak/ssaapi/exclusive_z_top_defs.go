@@ -63,52 +63,18 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
-
-	actx.EnterRecursive()
-	// 1w recursive call check
-	if !utils.InGithubActions() {
-		if actx.GetRecursiveCounter() > 10000 {
-			log.Warnf("recursive call is over 10000, stop it")
-			return Values{i}
-		}
-	}
-	if actx.IsReachedDepthLimited() {
-		log.Warnf("reached depth limit,stop it")
-		return Values{i}
-	}
-
 	actx.depth--
 	defer func() {
 		actx.depth++
 	}()
-	i.SetDepth(actx.depth)
-	if actx.depth > 0 && actx.config.MaxDepth > 0 && actx.depth > actx.config.MaxDepth {
-		actx.ReachDepthLimited()
-		return Values{i}
-	}
-	if actx.depth < 0 && actx.config.MinDepth < 0 && actx.depth < actx.config.MinDepth {
-		actx.ReachDepthLimited()
-		return Values{i}
-	}
-	if actx.depth > 0 && i.GetDepth() > 0 && actx.depth > i.GetDepth() {
-		actx.ReachDepthLimited()
-		return Values{i}
-	}
-	if actx.depth < 0 && i.GetDepth() < 0 && actx.depth < i.GetDepth() {
-		actx.ReachDepthLimited()
-		return Values{i}
-	}
 
-	// hook everynode
-	if len(actx.config.HookEveryNode) > 0 {
-		for _, hook := range actx.config.HookEveryNode {
-			if err := hook(i); err != nil {
-				if err.Error() != "abort" {
-					log.Errorf("hook-every-node error: %v", err)
-				}
-				return Values{}
-			}
-		}
+	reachDepthLimit := actx.check(opt...)
+	if reachDepthLimit {
+		return Values{i}
+	}
+	err := actx.hook(i)
+	if err != nil {
+		return Values{}
 	}
 
 	{
@@ -191,8 +157,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			callee := i.NewValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			callee.AppendEffectOn(i)
-			needRecover := actx.CrossProcess(i, callee)
-			if needRecover {
+			crossSuccess := actx.CrossProcess(i, callee)
+			if crossSuccess {
 				defer actx.RecoverCrossProcess()
 			}
 			// inherit return index
@@ -348,9 +314,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		called := actx.GetCallFromLastCrossProcess()
 		if called != nil {
-			hash, needRecover := actx.ReverseProcessWithDirection(i, called)
+			hash, reverseSuccess := actx.ReverseProcessWithDirection(i, called)
 			calledByValue := getCalledByValue(called)
-			if needRecover {
+			if reverseSuccess {
 				actx.RecoverReverseProcess(hash)
 			}
 			vals = append(vals, calledByValue...)
@@ -358,9 +324,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if actx.config.AllowIgnoreCallStack {
 			if fun := i.GetFunction(); fun != nil {
 				fun.GetCalledBy().ForEach(func(value *Value) {
-					hash, needRecover := actx.ReverseProcessWithDirection(i, called)
+					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, called)
 					val := getCalledByValue(called)
-					if needRecover {
+					if reverseSuccess {
 						actx.RecoverReverseProcess(hash)
 					}
 					vals = append(vals, val...)
@@ -433,9 +399,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				log.Infof("parent function is not called by any other function, skip (%T)", called)
 				return Values{i}
 			}
-			hash, needRecover := actx.ReverseProcess()
+			hash, reverseSuccess := actx.ReverseProcess()
 			calledByValue := getCalledByValue(called)
-			if needRecover {
+			if reverseSuccess {
 				actx.RecoverReverseProcess(hash)
 			}
 			vals = append(vals, calledByValue...)
@@ -465,12 +431,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		callIns := inst.CallSite
 		if callIns != nil {
 			call := i.NewValue(callIns).AppendEffectOn(i)
-			needRecover := actx.CrossProcess(i, call)
-			if needRecover {
+			v := i.NewValue(inst.Value).AppendEffectOn(i)
+			crossSuccess := actx.CrossProcess(call, v)
+			if crossSuccess {
 				defer actx.RecoverCrossProcess()
 			}
-			v := i.NewValue(inst.Value).AppendEffectOn(i)
-			return v.getTopDefs(actx,opt...)
+			return v.getTopDefs(actx, opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}

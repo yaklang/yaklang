@@ -62,7 +62,7 @@ func newDefaultValueVisited() *valueVisited {
 	}
 }
 
-func (c *crossProcessVisitedTable) crossProcess(from *Value, to *Value) (needRecover bool) {
+func (c *crossProcessVisitedTable) crossProcess(from *Value, to *Value) (crossSuccess bool) {
 	if from == nil || to == nil {
 		return false
 	}
@@ -92,7 +92,7 @@ func (c *crossProcessVisitedTable) isInNonNegativeStack() bool {
 	return c.positiveHashStack.Len() > 0 || c.nonPositiveHashStack.Len() == 1
 }
 
-func (c *crossProcessVisitedTable) reverseProcess(from *Value, to *Value) (hash string, needRecover bool) {
+func (c *crossProcessVisitedTable) reverseProcess(from *Value, to *Value) (hash string, reverseSuccess bool) {
 	if !c.isInPositiveStack() {
 		if from == nil || to == nil {
 			return "", false
@@ -103,7 +103,7 @@ func (c *crossProcessVisitedTable) reverseProcess(from *Value, to *Value) (hash 
 			return hash, false
 		}
 		c.nonPositiveHashStack.Push(hash)
-		visited := newValueVisited(to, from)
+		visited := newValueVisited(from, to)
 		c.valueVisitedTable.Set(hash, visited)
 		return hash, true
 	}
@@ -137,7 +137,8 @@ func (c *crossProcessVisitedTable) getCurrentVisited() (*valueVisited, bool) {
 
 func calcCrossProcessHash(from *Value, to *Value) string {
 	fromId := from.GetId()
-	toId := to.GetFunction().GetId()
-	hash := codec.Sha1(codec.AnyToString(fromId) + codec.AnyToString(toId))
+	//toId := to.GetFunction().GetId()
+	toId := to.GetId()
+	hash := utils.CalcSha1(fromId,toId)
 	return hash
 }
