@@ -242,10 +242,9 @@ fragment EscapeSequence
     | '0' // no digit ahead! TODO
     | HexEscapeSequence
 
-    // 这两个是针对 unicode 的，暂时就不要了
-    // | UnicodeEscapeSequence
-    // | ExtendedUnicodeEscapeSequence
+    | UnicodeEscapeSequence
     ;
+
 fragment CharacterEscapeSequence
     : SingleEscapeCharacter
     | NonEscapeCharacter
@@ -253,6 +252,9 @@ fragment CharacterEscapeSequence
 fragment HexEscapeSequence
     : 'x' HexDigit HexDigit
     ;
+fragment UnicodeEscapeSequence:
+    'u' HexDigit HexDigit HexDigit HexDigit
+;
 
 fragment SingleEscapeCharacter
     : ['"\\bfnrtv]

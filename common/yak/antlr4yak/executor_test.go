@@ -4206,3 +4206,12 @@ assert a == b, a
 		_formattest(code, true)
 	})
 }
+
+func TestUnicode(t *testing.T) {
+	code := `
+assert "\xE4\xBD\xA0\xE5\xA5\xBD" == "你好"
+assert "\u4F60\u597D" == "你好"
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
