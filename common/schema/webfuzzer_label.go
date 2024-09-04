@@ -12,6 +12,7 @@ type WebFuzzerLabel struct {
 	DefaultDescription string `json:"default_description"`
 	Description        string `json:"description"`
 	Hash               string `gorm:"unique_index"`
+	Config             string `json:"config"`
 }
 
 func (w *WebFuzzerLabel) CalcHash() string {

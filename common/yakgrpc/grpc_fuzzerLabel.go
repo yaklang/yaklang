@@ -19,6 +19,7 @@ func (s *Server) SaveFuzzerLabel(ctx context.Context, req *ypb.SaveFuzzerLabelRe
 			Label:              v.Label,
 			Description:        v.Description,
 			DefaultDescription: v.DefaultDescription,
+			Config: 			v.Config,
 		}
 		item.Hash = item.CalcHash()
 		count := yakit.QueryWebFuzzerLabelCount(s.GetProfileDatabase())
@@ -48,6 +49,7 @@ func (s *Server) QueryFuzzerLabel(ctx context.Context, req *ypb.Empty) (*ypb.Que
 			Label:              v.Label,
 			Description:        v.Description,
 			DefaultDescription: v.DefaultDescription,
+			Config:            v.Config,
 			Hash:               v.Hash,
 		})
 	}

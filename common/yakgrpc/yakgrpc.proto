@@ -1811,6 +1811,8 @@ message FuzzerLabel {
   string Description = 3;
   string DefaultDescription = 4;
   string Hash = 5;
+  //存储标签页的配置项
+  string Config = 6;
 }
 
 message DeleteFuzzerLabelRequest {
