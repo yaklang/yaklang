@@ -1,8 +1,10 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type objectItem struct {
@@ -21,12 +23,44 @@ type AnalyzeContext struct {
 	haveBeenReachedDepthLimited bool
 }
 
-func (a *AnalyzeContext) ReachDepthLimited() {
-	a.haveBeenReachedDepthLimited = true
+func (a *AnalyzeContext) check(opt ...OperationOption) bool {
+	if a.haveBeenReachedDepthLimited {
+		log.Warnf("reached depth limit,stop it")
+		return true
+	}
+
+	a.EnterRecursive()
+	// 1w recursive call check
+	if !utils.InGithubActions() {
+		if a.GetRecursiveCounter() > 10000 {
+			log.Warnf("recursive call is over 10000, stop it")
+			return true
+		}
+	}
+
+	if a.depth > 0 && a.config.MaxDepth > 0 && a.depth > a.config.MaxDepth {
+		a.haveBeenReachedDepthLimited = true
+		return true
+	}
+	if a.depth < 0 && a.config.MinDepth < 0 && a.depth < a.config.MinDepth {
+		a.haveBeenReachedDepthLimited = true
+		return true
+	}
+	return false
 }
 
-func (a *AnalyzeContext) IsReachedDepthLimited() bool {
-	return a.haveBeenReachedDepthLimited
+func (a *AnalyzeContext) hook(i *Value) error {
+	if len(a.config.HookEveryNode) > 0 {
+		for _, hook := range a.config.HookEveryNode {
+			if err := hook(i); err != nil {
+				if err.Error() != "abort" {
+					log.Errorf("hook-every-node error: %v", err)
+				}
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (a *AnalyzeContext) GetRecursiveCounter() int64 {

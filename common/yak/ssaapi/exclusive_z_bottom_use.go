@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"sort"
@@ -61,56 +60,25 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 }
 
 func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Values {
+	if v == nil {
+		return nil
+	}
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
-
-	actx.EnterRecursive()
-
-	// 1w recursive call check
-	if !utils.InGithubActions() {
-		if actx.GetRecursiveCounter() > 10000 {
-			log.Warnf("recursive call is over 10000, stop it")
-			return nil
-		}
-	}
-
-	if actx.IsReachedDepthLimited() {
-		return Values{v}
-	}
-
 	actx.depth++
 	defer func() {
 		actx.depth--
 	}()
+	reachDepthLimit := actx.check(opt...)
+	if reachDepthLimit {
+		return Values{v}
+	}
 	v.SetDepth(actx.depth)
-	if actx.config.MaxDepth > 0 && actx.depth > actx.config.MaxDepth {
-		actx.ReachDepthLimited()
-		return Values{v}
-	}
-	if actx.config.MinDepth < 0 && actx.depth < actx.config.MinDepth {
-		actx.ReachDepthLimited()
-		return Values{v}
-	}
-	if actx.depth > 0 && v.GetDepth() > 0 && actx.depth > v.GetDepth() {
-		actx.ReachDepthLimited()
-		return Values{v}
-	}
-	if actx.depth < 0 && v.GetDepth() < 0 && actx.depth < v.GetDepth() {
-		actx.ReachDepthLimited()
-		return Values{v}
-	}
 
-	if len(actx.config.HookEveryNode) > 0 {
-		for _, hook := range actx.config.HookEveryNode {
-			err := hook(v)
-			if err != nil {
-				if err.Error() != "abort" {
-					log.Errorf("hook every node failed: %v", err)
-				}
-				return Values{}
-			}
-		}
+	err := actx.hook(v)
+	if err != nil {
+		return Values{}
 	}
 
 	if ValueCompare(v, actx.Self) {
@@ -154,8 +122,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}
-		needRecover := actx.CrossProcess(v, funcValue)
-		if !needRecover {
+		crossSuccess := actx.CrossProcess(v, funcValue)
+		if !crossSuccess {
 			return v.visitUserFallback(actx, opt...)
 		} else {
 			defer actx.RecoverCrossProcess()
@@ -227,8 +195,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			if f := ins.GetFunc(); f != nil {
 				v.NewValue(f).GetCalledBy().ForEach(func(value *Value) {
 					dep := value.AppendDependOn(v)
-					needRecover := actx.CrossProcess(v, dep)
-					if needRecover {
+					crossSuccess := actx.CrossProcess(v, dep)
+					if crossSuccess {
 						defer actx.RecoverCrossProcess()
 					}
 					results = append(results, dep.getBottomUses(actx, opt...)...)
