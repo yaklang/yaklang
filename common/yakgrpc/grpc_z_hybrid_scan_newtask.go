@@ -21,7 +21,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 )
@@ -439,7 +441,18 @@ type HybridScanTarget struct {
 func TargetGenerator(ctx context.Context, db *gorm.DB, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
 	outTarget := make(chan *HybridScanTarget)
-	buildRes, err := BuildHttpRequestPacket(db, targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
+	inputTarget := targetConfig.GetInput()
+	inputTargetFile := targetConfig.GetInputFile()
+	if len(inputTargetFile) != 0 {
+		hostFile, err := utils.DumpHostFileWithTextAndFiles(inputTarget, "\n", inputTargetFile...)
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(hostFile)
+		fileContentRaw, _ := ioutil.ReadFile(hostFile)
+		inputTarget = string(fileContentRaw)
+	}
+	buildRes, err := BuildHttpRequestPacket(db, targetConfig.GetHTTPRequestTemplate(), inputTarget)
 	if err != nil {
 		return nil, err
 	}

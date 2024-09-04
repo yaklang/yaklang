@@ -824,7 +824,7 @@ message HybridScanUpdateActiveTaskTable {
 // 输入目标，可以通过 input/file + template 构建可能带认证或其他内容的模版
 message HybridScanInputTarget {
   string Input = 1;
-  repeated string InputFile = 2; // 似乎已启用
+  repeated string InputFile = 2;
   HTTPRequestBuilderParams HTTPRequestTemplate = 3;
 }
 
