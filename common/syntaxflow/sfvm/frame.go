@@ -385,9 +385,6 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 		}
 		s.idx++
 	}
-	if len(s.result.Errors) > 0 {
-		return utils.Errorf("check params failed: %v", s.result.Errors)
-	}
 	return nil
 }
 
