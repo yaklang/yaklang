@@ -105,8 +105,15 @@ func Test_ForExcludeBadCase(t *testing.T) {
 		var packet []byte
 
 		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix: []string{".gif"},
-			UpdateFilter:  true,
+			FilterData: &ypb.MITMFilterData{
+				ExcludeSuffix: []*ypb.FilterDataItem{
+					{
+						MatcherType: "suffix",
+						Group:       []string{".gif"},
+					},
+				},
+			},
+			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
@@ -179,10 +186,23 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 		var token string
 		var packet []byte
 
+		FilterData := &ypb.MITMFilterData{
+			ExcludeUri: []*ypb.FilterDataItem{
+				{
+					MatcherType: "word",
+					Group:       []string{"abc"},
+				},
+			},
+			ExcludeMethods: []*ypb.FilterDataItem{
+				{
+					MatcherType: "glob",
+					Group:       []string{"NONONO"},
+				},
+			},
+		}
 		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeMethod: []string{"NONONO"},
-			ExcludeUri:    []string{"abc"},
-			UpdateFilter:  true,
+			FilterData:   FilterData,
+			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
@@ -215,10 +235,8 @@ sleep(0.3)
 			}
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
-			if count != expectCount {
-				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-				cancel()
-			}
+			fmt.Println("checking path : " + path)
+			require.Equal(t, expectCount, count)
 		}
 		cancel()
 	})
@@ -252,8 +270,15 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 		var packet []byte
 
 		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix: []string{".aaac", ".zip", ".js"},
-			UpdateFilter:  true,
+			FilterData: &ypb.MITMFilterData{
+				ExcludeSuffix: []*ypb.FilterDataItem{
+					{
+						MatcherType: "suffix",
+						Group:       []string{".aaac", ".zip", ".js"},
+					},
+				},
+			},
+			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
@@ -290,13 +315,30 @@ sleep(0.3)
 			}
 		}
 
+		FilterData := &ypb.MITMFilterData{
+			ExcludeSuffix: []*ypb.FilterDataItem{
+				{
+					MatcherType: "suffix",
+					Group:       []string{".aaac"},
+				},
+			},
+			ExcludeMethods: []*ypb.FilterDataItem{
+				{
+					MatcherType: "glob",
+					Group:       []string{"NONONO"},
+				},
+			},
+			ExcludeMIME: []*ypb.FilterDataItem{
+				{
+					MatcherType: "mime",
+					Group:       []string{"bbbbbb", "*cc", "*oct", "abc", "text"},
+				},
+			},
+		}
+
 		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix:       []string{".aaac"},
-			ExcludeMethod:       []string{"NONONO"},
-			ExcludeContentTypes: []string{"bbbbbb", "*cc", "*oct", "abc", "text"},
-			ExcludeUri:          nil,
-			IncludeUri:          nil,
-			UpdateFilter:        true,
+			FilterData:   FilterData,
+			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 
@@ -343,32 +385,32 @@ sleep(0.5)
 
 func TestMITMFilterManager_Filter(t *testing.T) {
 	type Case struct {
-		Filter *MITMFilterManager
+		Filter *MITMFilter
 		Send   [][]any
 		Count  int
 	}
 	cases := []Case{
 		{
-			Filter: &MITMFilterManager{
-				IncludeUri: []string{"abc"},
-			},
+			Filter: NewMITMFilter(&ypb.MITMFilterData{
+				IncludeUri: []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"abc"}}},
+			}),
 			Send: [][]any{
 				{
-					"GET", "localhost:80", "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabc", "", false,
+					"GET", "localhost:80", "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabc", "",
 				},
 			},
 			Count: 1,
 		},
 		{
-			Filter: &MITMFilterManager{
-				IncludeUri: []string{"/ab*c"},
-			},
+			Filter: NewMITMFilter(&ypb.MITMFilterData{
+				IncludeUri: []*ypb.FilterDataItem{{MatcherType: "glob", Group: []string{"/ab*c"}}},
+			}),
 			Send: [][]any{
 				{
-					"GET", "localhost:80", "/abbbbbbc", "", false,
+					"GET", "localhost:80", "/abbbbbbc", "",
 				},
 				{
-					"GET", "localhost:80", "/abaaaac", "", false,
+					"GET", "localhost:80", "/abaaaac", "",
 				},
 			},
 			Count: 2,
@@ -378,7 +420,7 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 	for _, c := range cases {
 		var count int
 		for _, send := range c.Send {
-			if c.Filter.IsPassed(send[0].(string), send[1].(string), send[2].(string), send[3].(string), send[4].(bool)) {
+			if c.Filter.IsPassed(send[0].(string), send[1].(string), send[2].(string), send[3].(string)) {
 				count++
 			}
 		}
