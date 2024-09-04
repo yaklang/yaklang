@@ -32,16 +32,11 @@ var SpecialValue = []string{
 
 func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
-	initHandler := func(name ...string) {
-		for _, _name := range name {
-			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
-			emptyContainer := fb.EmitEmptyContainer()
-			fb.AssignVariable(variable, emptyContainer)
-		}
-	}
-	initHandler("")
-	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	fb.GetProgram().GlobalScope = container
+	fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
+		scope.SetForceCapture()
+		return scope
+	}
 }
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
@@ -96,7 +91,6 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 		cmap:            []map[string]struct{}{},
-		globalv:         map[string]ssa.Value{},
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
 		result:          map[string][]string{},
@@ -105,13 +99,8 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		labels:          map[string]*ssa.LabelBuilder{},
 		pkgNameCurrent:  "",
 	}
-	/*
-		var program *ssa.Program
-		program = ssa.NewChildProgram(builder.GetProgram(), uuid.NewString(), !builder.MoreParse)
-		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 
-		s.InitHandler(functionBuilder)
-	*/
+	s.InitHandler(astBuilder.FunctionBuilder)
 	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
 	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
@@ -125,7 +114,6 @@ func (*SSABuilder) FilterFile(path string) bool {
 type astbuilder struct {
 	*ssa.FunctionBuilder
 	cmap           []map[string]struct{}
-	globalv        map[string]ssa.Value
 	structTypes    map[string]*ssa.ObjectType
 	aliasTypes     map[string]*ssa.AliasType
 	result         map[string][]string
@@ -180,18 +168,39 @@ func (*SSABuilder) GetLanguage() consts.Language {
 }
 
 func (b *astbuilder) AddGlobalVariable(name string, v ssa.Value) {
-	b.globalv[name] = v
+	variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(name))
+	b.AssignVariable(variable, v)
 }
 
-func (b *astbuilder) GetGlobalVariable(name string) ssa.Value {
-	if b.globalv[name] == nil {
-		return nil
+func (b *astbuilder) CheckGlobalVariablePhi(l *ssa.Variable, r ssa.Value) bool {
+	name := l.GetName()
+	for i, _ := range b.GetProgram().GlobalScope.GetAllMember() {
+		if i.String() == name {
+			b.GetProgram().GlobalScope.GetAllMember()[i] = r
+			return true
+		}
 	}
-	return b.globalv[name]
+	return false
+}
+
+func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
+	var variable *ssa.Variable
+	for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+		if i.String() == name {
+			variable = m.GetLastVariable()
+			return variable, true
+		}
+	}
+	return variable, false
+}
+
+func (b *astbuilder) GetGlobalVariableR(name string) ssa.Value {
+	member, _ := b.GetProgram().GlobalScope.GetStringMember(name)
+	return member
 }
 
 func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
-	return b.globalv
+	return nil
 }
 
 func (b *astbuilder) AddResultDefault(name string) {
