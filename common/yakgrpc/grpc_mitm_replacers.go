@@ -392,7 +392,6 @@ func sortContentReplacer(i []*MITMReplaceRule) []*MITMReplaceRule {
 	return i
 }
 
-type MitmRepeatSender func(packet []byte)
 type mitmReplacer struct {
 	// 所有正常启动的规则
 	rules Rules
@@ -408,15 +407,11 @@ type mitmReplacer struct {
 
 	_ruleRegexpCache *sync.Map
 
-	repeatSender MitmRepeatSender
-	wg           *sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 func (m *mitmReplacer) WaitTasks() {
 	m.wg.Wait()
-}
-func (m *mitmReplacer) SetRepeatSender(f MitmRepeatSender) {
-	m.repeatSender = f
 }
 
 // getRule 获取不到规则就返回空，通过 sync.Map 缓存规则
@@ -578,16 +573,19 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
 		}
 	}()
-	defer func() {
-		applyStringForSettingColor()
-	}()
+
 	var (
 		// packetInfo      *yakit.PacketInfo
 		extracted []*schema.ExtractedData
 
 		err error
 	)
-
+	defer func() {
+		applyStringForSettingColor()
+		for _, extractedData := range extracted {
+			extractedData.TraceId = flow.CalcHash()
+		}
+	}()
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastElement := ret[len(ret)-1]
 		stringForSettingColorPrepare(lastElement.Color, lastElement.ExtraTag, flow)
@@ -643,7 +641,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 
 			stringForSettingColorPrepare(rule.Color, rule.ExtraTag, flow)
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
-				flow.CalcHash(),
+				"",
 				rule.VerboseName,
 				match,
 				ret,
