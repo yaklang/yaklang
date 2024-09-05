@@ -668,6 +668,10 @@ func SyntaxFlowQuery(
 	}
 
 	log.Infof("syntax flow query result:")
-	result.Show(ssaapi.WithShowAll(sfDebug), ssaapi.WithShowCode(withCode), ssaapi.WithShowDot(showDot))
+	result.Show(
+		sfvm.WithShowAll(sfDebug),
+		sfvm.WithShowCode(withCode),
+		sfvm.WithShowDot(showDot),
+	)
 	return execError
 }
