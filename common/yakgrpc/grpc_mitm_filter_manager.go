@@ -298,6 +298,9 @@ func (m *MITMFilter) IsMIMEPassed(ct string) bool {
 	if parsed != "" {
 		ct = parsed
 	}
+	if m.Filters == nil {
+		return true
+	}
 	return _FilterCheck(nil, m.Filters.ExcludeMIMEMatcher, ct)
 }
 
