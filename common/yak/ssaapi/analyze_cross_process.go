@@ -8,13 +8,9 @@ import (
 )
 
 type valueVisited struct {
-	from             *Value
-	to               *Value
-	visitedPhi       map[int64]struct{}
-	visitedObject    map[int64]struct{}
-	visitedDefault   map[int64]struct{}
-	visitedCall      map[int64]struct{}
-	visitedParameter map[int64]struct{}
+	from    *Value
+	to      *Value
+	visited map[int64]struct{}
 }
 
 type crossProcessVisitedTable struct {
@@ -40,29 +36,22 @@ func newCrossProcessVisitedTable() *crossProcessVisitedTable {
 
 func newValueVisited(from *Value, to *Value) *valueVisited {
 	return &valueVisited{
-		from:             from,
-		to:               to,
-		visitedPhi:       make(map[int64]struct{}),
-		visitedObject:    make(map[int64]struct{}),
-		visitedDefault:   make(map[int64]struct{}),
-		visitedCall:      make(map[int64]struct{}),
-		visitedParameter: make(map[int64]struct{}),
+		from:    from,
+		to:      to,
+		visited: make(map[int64]struct{}),
 	}
 }
 
 func newDefaultValueVisited() *valueVisited {
 	return &valueVisited{
-		from:             nil,
-		to:               nil,
-		visitedPhi:       make(map[int64]struct{}),
-		visitedObject:    make(map[int64]struct{}),
-		visitedDefault:   make(map[int64]struct{}),
-		visitedCall:      make(map[int64]struct{}),
-		visitedParameter: make(map[int64]struct{}),
+		from:    nil,
+		to:      nil,
+		visited: make(map[int64]struct{}),
 	}
 }
 
 func (c *crossProcessVisitedTable) crossProcess(from *Value, to *Value) (crossSuccess bool) {
+	//log.Infof("CrossProcess from:%s to:%s", from.String(), to.String())
 	if from == nil || to == nil {
 		return false
 	}
@@ -139,6 +128,6 @@ func calcCrossProcessHash(from *Value, to *Value) string {
 	fromId := from.GetId()
 	//toId := to.GetFunction().GetId()
 	toId := to.GetId()
-	hash := utils.CalcSha1(fromId,toId)
+	hash := utils.CalcSha1(fromId, toId)
 	return hash
 }
