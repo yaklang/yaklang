@@ -627,10 +627,10 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
-		for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+		/*for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
 			variable := b.CreateLocalVariable(i.String())
 			b.AssignVariable(variable, m)
-		}
+		}*/
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)

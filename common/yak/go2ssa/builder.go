@@ -30,13 +30,6 @@ type ExData struct {
 }
 
 var Builder = &SSABuilder{}
-var SpecialTypes = map[string]ssa.Type{
-	"comparable": ssa.CreateAnyType(),
-	"error":      ssa.CreateErrorType(),
-}
-var SpecialValue = []string{
-	"iota",
-}
 
 func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
@@ -91,6 +84,18 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 	if err != nil {
 		return err
 	}
+
+	SpecialTypes := map[string]ssa.Type{
+		"comparable": ssa.CreateAnyType(),
+		"error":      ssa.CreateErrorType(),
+	}
+	SpecialValue := map[string]ssa.Value{
+		"nil":   builder.EmitConstInstNil(),
+		"iota":  builder.EmitConstInst("iota"),
+		"true":  builder.EmitConstInst(true),
+		"false": builder.EmitConstInst(false),
+	}
+
 	builder.SupportClosure = false
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
@@ -101,6 +106,8 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		tpHander:        map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
 		extendKey:       map[string]*ExData{},
+		specialValues:   SpecialValue,
+		specialTypes:    SpecialTypes,
 		pkgNameCurrent:  "",
 	}
 
@@ -124,6 +131,8 @@ type astbuilder struct {
 	tpHander       map[string]func()
 	labels         map[string]*ssa.LabelBuilder
 	extendKey      map[string]*ExData
+	specialValues  map[string]ssa.Value
+	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
 }
 
@@ -322,17 +331,15 @@ func (b *astbuilder) GetAliasAll() map[string]*ssa.AliasType {
 
 // ====================== Special
 func (b *astbuilder) GetSpecialTypeByStr(name string) ssa.Type {
-	if SpecialTypes[name] == nil {
+	if b.specialTypes[name] == nil {
 		return nil
 	}
-	return SpecialTypes[name]
+	return b.specialTypes[name]
 }
 
 func (b *astbuilder) GetSpecialValueByStr(name string) ssa.Value {
-	for _, s := range SpecialValue {
-		if s == name {
-			return b.EmitConstInst(s)
-		}
+	if b.specialValues[name] == nil {
+		return nil
 	}
-	return nil
+	return b.specialValues[name]
 }

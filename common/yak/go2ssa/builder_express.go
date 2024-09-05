@@ -416,15 +416,16 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 		if text == "_" {
 			b.NewError(ssa.Warn, TAG, "cannot use _ as value")
 		}
-		if text == "true" || text == "false" {
-			return b.buildBoolLiteral(text)
-		}
-		v := b.PeekValue(text)
-		if v != nil {
+
+		if v := b.GetSpecialValueByStr(text); v != nil {
 			return v
 		}
 
-		if v := b.GetSpecialValueByStr(text); v != nil {
+		v := b.PeekValue(text)
+		if v == nil {
+			v = b.GetGlobalVariableR(text)
+		}
+		if v != nil {
 			return v
 		}
 
