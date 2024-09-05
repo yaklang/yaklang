@@ -8,9 +8,10 @@ import (
 )
 
 type valueVisited struct {
-	from    *Value
-	to      *Value
-	visited map[int64]struct{}
+	from          *Value
+	to            *Value
+	visited       map[int64]struct{}
+	visitedObject map[int64]struct{}
 }
 
 type crossProcessVisitedTable struct {
@@ -36,17 +37,19 @@ func newCrossProcessVisitedTable() *crossProcessVisitedTable {
 
 func newValueVisited(from *Value, to *Value) *valueVisited {
 	return &valueVisited{
-		from:    from,
-		to:      to,
-		visited: make(map[int64]struct{}),
+		from:          from,
+		to:            to,
+		visited:       make(map[int64]struct{}),
+		visitedObject: make(map[int64]struct{}),
 	}
 }
 
 func newDefaultValueVisited() *valueVisited {
 	return &valueVisited{
-		from:    nil,
-		to:      nil,
-		visited: make(map[int64]struct{}),
+		from:          nil,
+		to:            nil,
+		visited:       make(map[int64]struct{}),
+		visitedObject: make(map[int64]struct{}),
 	}
 }
 
@@ -56,7 +59,7 @@ func (c *crossProcessVisitedTable) crossProcess(from *Value, to *Value) (crossSu
 		return false
 	}
 	hash := calcCrossProcessHash(from, to)
-	//log.Infof("cross process from:%s to:%s hash:%s", from.String(), to.String(), hash)
+	// log.Infof("cross process from:%s to:%s hash:%s", from.String(), to.String(), hash)
 	if c.valueVisitedTable.Have(hash) {
 		return false
 	}

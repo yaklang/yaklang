@@ -135,6 +135,18 @@ func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) bool {
 	return false
 }
 
+func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
+	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
+	if !ok {
+		return false
+	}
+	if _, ok := valueVisited.visitedObject[i.GetId()]; !ok {
+		valueVisited.visitedObject[i.GetId()] = struct{}{}
+		return true
+	}
+	return false
+}
+
 func (a *AnalyzeContext) TheCrossProcessVisited(from *Value, to *Value) bool {
 	visited := a.crossProcessVisitedTable.valueVisitedTable
 	if visited == nil {
@@ -152,7 +164,7 @@ func (a *AnalyzeContext) TheCrossProcessVisited(from *Value, to *Value) bool {
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
-	if !g.TheValueShouldBeVisited(member) {
+	if !g.TheMemberShouldBeVisited(member) {
 		return utils.Errorf("This member(%d) visited, skip", member.GetId())
 	}
 	if !obj.IsObject() {

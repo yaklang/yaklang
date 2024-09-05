@@ -109,7 +109,7 @@ func TestCall_SideEffect(t *testing.T) {
 		`,
 			`print(* #-> * as $target)`,
 			map[string][]string{
-				"target": {"12", "Parameter-i"},
+				"target": {"12"},
 			},
 			ssaapi.WithLanguage(ssaapi.JAVA),
 		)

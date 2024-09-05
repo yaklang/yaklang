@@ -34,10 +34,9 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	if i.node == nil {
 		return vals
 	}
-	//if !actx.TheDefaultShouldBeVisited(i) {
-	//	return vals
-	//}
+
 	for _, def := range i.node.GetValues() {
+
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
@@ -57,13 +56,13 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
-	log.Infof("gettop def i : %s", i.String())
 	if i == nil {
 		return nil
 	}
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
+
 	actx.depth--
 	defer func() {
 		actx.depth++
@@ -77,14 +76,25 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	if err != nil {
 		return Values{}
 	}
-
+	if inst, ok := ssa.ToLazyInstruction(i.node); ok {
+		var ok bool
+		i.node, ok = inst.Self().(ssa.Value)
+		if !ok {
+			log.Errorf("BUG: %T is not ssa.Value", inst.Self())
+			return Values{}
+		}
+		return i.getTopDefs(actx, opt...)
+	}
+	if !actx.TheValueShouldBeVisited(i) {
+		return Values{i}
+	}
 	{
 		obj, key, member := actx.GetCurrentObject()
 		_ = obj
 		_ = key
 		_ = member
 		if obj != nil && i.IsObject() && i != obj {
-			if m := i.GetMember(key); m != nil && m != member {
+			if m := i.GetMember(key); m != nil && !ValueCompare(m, member) {
 				actx.PopObject()
 				return m.getTopDefs(actx, opt...)
 			}
@@ -103,7 +113,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				return i.visitedDefs(actx, opt...)
 			}
 			obj.AppendDependOn(apiValue)
+			crossSuccess := actx.CrossProcess(i, obj)
 			ret := obj.getTopDefs(actx, opt...)
+			if crossSuccess {
+				actx.RecoverCrossProcess()
+			}
 			if !ValueCompare(i, actx.Self) {
 				ret = append(ret, i)
 			}
@@ -113,24 +127,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	switch inst := i.node.(type) {
-	case *ssa.LazyInstruction:
-		var ok bool
-		i.node, ok = inst.Self().(ssa.Value)
-		if !ok {
-			log.Errorf("BUG: %T is not ssa.Value", inst.Self())
-			return Values{}
-		}
-		return i.getTopDefs(actx, opt...)
 	case *ssa.Undefined:
 		// ret[n]
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
 		return i.visitedDefs(actx, opt...)
 	case *ssa.Phi:
-		if !actx.TheValueShouldBeVisited(i) {
-			return Values{}
-		}
-
 		conds := inst.GetControlFlowConditions()
 		result := getMemberCall(i, inst, actx)
 		for _, cond := range conds {
@@ -322,7 +324,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			vals = append(vals, calledByValue...)
 		}
-		if actx.config.AllowIgnoreCallStack {
+		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				fun.GetCalledBy().ForEach(func(call *Value) {
 					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
