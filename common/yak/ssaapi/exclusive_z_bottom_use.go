@@ -67,6 +67,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	defer func() {
 		actx.depth--
 	}()
+
 	reachDepthLimit := actx.check(opt...)
 	if reachDepthLimit {
 		return Values{v}
@@ -81,22 +82,21 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	if ValueCompare(v, actx.Self) {
 		return v.visitUserFallback(actx, opt...)
 	}
-	var ok bool
 
-	switch ins := v.node.(type) {
-	case *ssa.LazyInstruction:
+	if ins, ok := ssa.ToLazyInstruction(v.node); ok {
 		v.node, ok = ins.Self().(ssa.Value)
 		if !ok {
 			log.Warnf("BUG: (lazy instruction) unknown instruction: %v", v.String())
 			return nil
 		}
 		return v.getBottomUses(actx, opt...)
+	}
+	if !actx.TheValueShouldBeVisited(v) {
+		return Values{v}
+	}
+
+	switch ins := v.node.(type) {
 	case *ssa.Phi:
-		// enter function via phi
-		if !actx.TheValueShouldBeVisited(v) {
-			// the phi is existed, visited in the same stack.
-			return Values{}
-		}
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
 		if ins.Method == nil {
