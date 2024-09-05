@@ -167,13 +167,23 @@ func (s *SFFrame) Flush() {
 func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
 	return s.result.SymbolTable
 }
-func (s *SFFrame) GetSymbol(str string) (ValueOperator, bool) {
-	if val, b := s.result.SymbolTable.Get(str); b {
-		return val, b
-	} else if s.context != nil {
-		return s.context.SymbolTable.Get(str)
+func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
+	switch sfi.OpCode {
+	case OpMergeRef:
+		fallthrough
+	case OpRemoveRef:
+		fallthrough
+	case OpIntersectionRef:
+		if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
+			return val, b
+		}
+		if s.context != nil {
+			return s.context.SymbolTable.Get(sfi.UnaryStr)
+		}
+		return nil, false
+	default:
+		return s.result.SymbolTable.Get(sfi.UnaryStr)
 	}
-	return nil, false
 }
 
 func (s *SFFrame) ToLeft() bool {
@@ -815,7 +825,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("new ref failed: empty name")
 		}
 		s.debugSubLog(">> from ref: %v ", i.UnaryStr)
-		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		vs, ok := s.GetSymbol(i)
 		if ok {
 			if vs == nil {
 				return utils.Errorf("new ref failed: empty value: %v", i.UnaryStr)
@@ -841,7 +851,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return err
 		}
 
-		result, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		result, ok := s.GetSymbol(i)
 		if ok {
 			res := make([]ValueOperator, 0, valuesLen(result))
 			tmp := make(map[int64]struct{})
@@ -883,7 +893,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if i.UnaryStr == "" {
 			return utils.Errorf("echo failed: empty name")
 		}
-		value, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		value, ok := s.GetSymbol(i)
 		if !ok || value == nil {
 			return utils.Errorf("alert failed: not found: %v", i.UnaryStr)
 		}
@@ -907,7 +917,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		haveResult := false
 
-		results, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		results, ok := s.GetSymbol(i)
 		if !ok {
 			haveResult = false
 		} else if results == nil {
@@ -1036,7 +1046,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(NewValues(res))
 	case OpMergeRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
-		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		vs, ok := s.GetSymbol(i)
 		if !ok || vs == nil {
 			s.debugLog("cannot find $%v", i.UnaryStr)
 			return nil
@@ -1055,7 +1065,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push")
 	case OpRemoveRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
-		vs, ok := s.GetSymbolTable().Get(i.UnaryStr)
+		vs, ok := s.GetSymbol(i)
 		if !ok || vs == nil {
 			s.debugLog("cannot find $%v", i.UnaryStr)
 			return nil
@@ -1073,7 +1083,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push")
 	case OpIntersectionRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
-		vs, ok := s.GetSymbol(i.UnaryStr)
+		vs, ok := s.GetSymbol(i)
 		//vs, ok := s.result.SymbolTable.Get(i.UnaryStr)
 		if vs == nil || !ok {
 			s.debugLog("cannot find $%v", i.UnaryStr)

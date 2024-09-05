@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,23 +12,33 @@ type RecursiveConfig struct {
 	sfResult    *sf.SFFrameResult
 	config      *sf.Config
 	configItems []*sf.RecursiveConfigItem
+	vm          *sf.SyntaxFlowVirtualMachine
 	// depth limit
 	depth int
 }
 
 type RecursiveKind int
 
+// comparePriority 比较指令优先级并且替换
+
+func (r RecursiveKind) comparePriority(kind RecursiveKind) RecursiveKind {
+	if kind > r {
+		return kind
+	}
+	return r
+}
+
 const (
+	//有默认的优先级顺序
+
 	// ContinueMatch 匹配对应Value，数据流继续流动
-	ContinueMatch RecursiveKind = iota
+	ContinueSkip RecursiveKind = iota
 	// ContinueSkip 不匹配对应Value，数据流继续流动
-	ContinueSkip
+	ContinueMatch
 	// StopMatch 匹配对应Value，数据流停止流动
 	StopMatch
 	// StopNoMatch StopNoMatch:不匹配对应Value，数据流停止流动
 	StopNoMatch
-	// Nothing 不处理对应Value,一般用于hook，避免hook执行的结果影响最终结果
-	Nothing
 )
 
 func CreateRecursiveConfigFromItems(
@@ -39,7 +50,9 @@ func CreateRecursiveConfigFromItems(
 		sfResult:    sfResult,
 		config:      config,
 		configItems: opts,
+		vm:          sf.NewSyntaxFlowVirtualMachine(),
 	}
+	res.vm.SetConfig(config)
 
 	// handler other config
 	for _, op := range opts {
@@ -90,66 +103,68 @@ func CreateRecursiveConfigFromNativeCallParams(
 // RecursiveConfig_Exclude在匹配到不符合配置项的Value后，数据流继续流动，以匹配其它Value。
 // RecursiveConfig_Until会沿着数据流匹配每个Value，知道匹配到符合配置项的Value的时候，数据流停止流动。
 // RecursiveConfig_Hook会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
-func (r *RecursiveConfig) handler(value *Value) RecursiveKind {
-	for _, op := range r.configItems {
-		if !op.SyntaxFlowRule {
-			continue
-		}
-		res, err := SyntaxFlowWithVMContext(value, op.Value, r.sfResult, r.config)
-		if err != nil {
-			log.Errorf("SyntaxFlowWithVMContext error: %v", err)
-			continue
-		}
-		r.sfResult.MergeByResult(res.SFFrameResult)
-
-		switch op.Key {
+func (r *RecursiveConfig) compileAndRun(value *Value) RecursiveKind {
+	var resultKind = ContinueSkip
+	matchConfig := func(key string, result map[string]Values) {
+		switch key {
 		case sf.RecursiveConfig_Exclude:
-			isInclude := false
-			for _, sfDatas := range res.GetAllValues() {
-				for _, sfData := range sfDatas {
-					if ValueCompare(sfData, value) {
-						isInclude = true
-					}
+			lo.ForEach(lo.Entries(result), func(item lo.Entry[string, Values], index int) {
+				if item.Value == nil {
+					resultKind = resultKind.comparePriority(ContinueMatch)
 				}
-			}
-			if !isInclude {
-				return ContinueMatch
-			} else {
-				return ContinueSkip
-			}
+				lo.ForEach(item.Value, func(item1 *Value, index int) {
+					if !ValueCompare(value, item1) {
+						resultKind = resultKind.comparePriority(ContinueMatch)
+					}
+				})
+			})
 		case sf.RecursiveConfig_Include:
-			isInclude := false
-			for _, sfDatas := range res.GetAllValues() {
-				for _, sfData := range sfDatas {
-					if ValueCompare(sfData, value) {
-						isInclude = true
-					}
-				}
-			}
-
-			if isInclude {
-				return ContinueMatch
-			} else {
-				return ContinueSkip
-			}
-		case sf.RecursiveConfig_Hook:
-			// do nothing for outer
-			return Nothing
-		case sf.RecursiveConfig_Until:
-			for _, sfDatas := range res.GetAllValues() {
-				for _, sfData := range sfDatas {
-					if ValueCompare(sfData, value) {
-						return StopMatch
+			lo.ForEach(lo.Entries(result), func(item lo.Entry[string, Values], index int) {
+				lo.ForEach(item.Value, func(item1 *Value, index int) {
+					if ValueCompare(value, item1) {
+						resultKind = resultKind.comparePriority(ContinueMatch)
 					} else {
-						return ContinueMatch
+						resultKind = resultKind.comparePriority(ContinueSkip)
 					}
-				}
-			}
-			return Nothing
+				})
+			})
+		case sf.RecursiveConfig_Hook:
+			resultKind = resultKind.comparePriority(ContinueMatch)
+		case sf.RecursiveConfig_Until:
+			lo.ForEach(lo.Entries(result), func(item lo.Entry[string, Values], index int) {
+				lo.ForEach(item.Value, func(item1 *Value, index int) {
+					if ValueCompare(value, item1) {
+						resultKind = resultKind.comparePriority(StopMatch)
+					} else {
+						resultKind = resultKind.comparePriority(ContinueMatch)
+					}
+				})
+			})
 		}
-
 	}
-	return ContinueMatch
+	lo.ForEach(r.configItems, func(item *sf.RecursiveConfigItem, index int) {
+		if !item.SyntaxFlowRule {
+			return
+		}
+		frame, err := r.vm.Compile(item.Value)
+		if err != nil {
+			log.Errorf("syntaxflow rule compile fail: %v", utils.Errorf("SyntaxFlow compile %#v failed: %v", item.Value, err))
+			return
+		}
+		frame.WithContext(r.sfResult)
+		feed, err := frame.Feed(value)
+		if err != nil {
+			log.Errorf("frame exec opcode fail: %s", err)
+			return
+		}
+		s := &SyntaxFlowResult{
+			SFFrameResult: feed,
+			symbol:        make(map[string]Values),
+		}
+		r.sfResult.MergeByResult(feed)
+		matchConfig(item.Key, s.GetAllValues())
+	})
+	return resultKind
 }
 
 func WithSyntaxFlowConfig(
@@ -158,66 +173,59 @@ func WithSyntaxFlowConfig(
 	cb func(...OperationOption) Values,
 	opts ...*sf.RecursiveConfigItem,
 ) Values {
-	var options []OperationOption
-	var result []*Value
-	var useResult bool
-
-	rc := CreateRecursiveConfigFromItems(sfResult, config, opts...)
-	handlerValue := func(rc *RecursiveConfig) {
+	var (
+		use        bool
+		options    []OperationOption
+		_recursive = CreateRecursiveConfigFromItems(sfResult, config, opts...)
+		results    Values
+	)
+	handler := func() {
 		options = append(options, WithHookEveryNode(func(value *Value) error {
-			//valueStr := value.String()
-			//log.Infof("start to fetch: %v", valueStr)
-			_recursiveKind := rc.handler(value)
-			switch _recursiveKind {
+			switch _recursive.compileAndRun(value) {
+			case ContinueMatch:
+				results = append(results, value)
+				return nil
 			case ContinueSkip:
 				return nil
-			case ContinueMatch:
-				result = append(result, value)
-				return nil
 			case StopMatch:
-				result = append(result, value)
+				results = append(results, value)
 				return utils.Error("abort")
 			case StopNoMatch:
 				return utils.Error("abort")
-			case Nothing:
-				return nil
 			default:
 				return nil
 			}
 		}))
 	}
-
-	for _, op := range opts {
-		switch op.Key {
-		case sf.RecursiveConfig_Depth:
-			if ret := codec.Atoi(op.Value); ret > 0 {
-				options = append(options, WithDepthLimit(ret))
-			}
+	lo.ForEach(opts, func(item *sf.RecursiveConfigItem, index int) {
+		switch item.Key {
 		case sf.RecursiveConfig_DepthMin:
-			if ret := codec.Atoi(op.Value); ret > 0 {
+			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithMinDepth(ret))
 			}
+		case sf.RecursiveConfig_Depth:
+			if ret := codec.Atoi(item.Value); ret > 0 {
+				options = append(options, WithDepthLimit(ret))
+			}
 		case sf.RecursiveConfig_DepthMax:
-			if ret := codec.Atoi(op.Value); ret > 0 {
+			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithMaxDepth(ret))
 			}
-		case sf.RecursiveConfig_Exclude:
-			handlerValue(rc)
-			useResult = true
-		case sf.RecursiveConfig_Until:
-			handlerValue(rc)
-			useResult = true
-		case sf.RecursiveConfig_Hook:
-			handlerValue(rc)
-		case sf.RecursiveConfig_Include:
-			handlerValue(rc)
-			useResult = true
+		case sf.RecursiveConfig_Until, sf.RecursiveConfig_Exclude, sf.RecursiveConfig_Include:
+			use = true
+		default:
+			if !use {
+				use = false
+			}
 		}
-	}
-
-	if useResult {
+	})
+	handler()
+	defer func() {
+		results = make(Values, 0)
+	}()
+	if use {
 		cb(options...)
-		return result
+		return results
 	}
 	return cb(options...)
 }

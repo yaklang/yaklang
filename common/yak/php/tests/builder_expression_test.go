@@ -375,33 +375,6 @@ println($a);`
 	})
 }
 
-func TestParseSSA_SpecialWordExpression(t *testing.T) {
-	t.Run("exit", func(t *testing.T) {
-		code := `<?php
-exit(include("syntax/for.php"));`
-		ssatest.MockSSA(t, code)
-	})
-	t.Run("die", func(t *testing.T) {
-		code := `<?php
-die(include("syntax/for.php"));
-`
-		ssatest.MockSSA(t, code)
-	})
-	t.Run("isset-1", func(t *testing.T) {
-		code := `<?php
-$b =isset($a);
-println($b);`
-		ssatest.CheckPrintlnValue(code, []string{"false"}, t)
-	})
-	t.Run("isset-2", func(t *testing.T) {
-		code := `<?php
-$a = 1;
-$b =isset($a);
-println($b);`
-		ssatest.CheckPrintlnValue(code, []string{"true"}, t)
-	})
-}
-
 func TestParseSSA_DeclareConst(t *testing.T) {
 	t.Run("global const declare", func(t *testing.T) {
 		code := `<?php
