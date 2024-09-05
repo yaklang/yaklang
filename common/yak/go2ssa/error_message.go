@@ -111,6 +111,10 @@ func OutofBounds(ml, vl int) string {
 	return fmt.Sprintf("index %d is out of bounds (>= %d)", ml, vl)
 }
 
+func PackageNotFind(n string) string {
+	return fmt.Sprintf("package %s is golang library", n)
+}
+
 func StructNotFind(n string) string {
 	return fmt.Sprintf("struct %s not find, it may belong to the golang library", n)
 }

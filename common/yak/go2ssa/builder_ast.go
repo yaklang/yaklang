@@ -1831,16 +1831,18 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 	if qul := tname.QualifiedIdent(); qul != nil {
 		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
 			exData := b.GetExData(qul.IDENTIFIER(0).GetText())
+			if exData == nil { // 没有找到包，可能是golang标准库,也可能是package名称和导入名称不同
+				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
+				exData = b.AddExData(qul.IDENTIFIER(0).GetText())
+			}
+
 			obj := exData.GetExtendType(qul.IDENTIFIER(1).GetText())
 
 			if obj != nil {
 				ssatyp = obj
-			} else { // 有时golang的package名称可能和导入名称不同，在golang库解析实现之前只能考虑新建一个结构体对象
-				b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(0).GetText()))
-				objt := ssa.NewObjectType()
-				objt.SetTypeKind(ssa.StructTypeKind)
-				objt.SetName(qul.IDENTIFIER(0).GetText())
-				b.AddStruct(objt.Name, objt)
+			} else { // 没有找到类型，可能来自于golang标准库
+				b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(1).GetText()))
+				objt := ssa.CreateAnyType()
 				ssatyp = objt
 			}
 		}
