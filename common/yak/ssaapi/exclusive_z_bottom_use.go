@@ -80,9 +80,12 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		return Values{}
 	}
 
-	if ValueCompare(v, actx.Self) {
-		return v.visitUserFallback(actx, opt...)
-	}
+	// if lazy-instruction will entry this function twice
+	// will be blocked by this condition
+	// ValueCompare should check the Value is lazy
+	// if ValueCompare(v, actx.Self) {
+	// 	return v.visitUserFallback(actx, opt...)
+	// }
 
 	if ins, ok := ssa.ToLazyInstruction(v.node); ok {
 		v.node, ok = ins.Self().(ssa.Value)
