@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/bytedance/mockey"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strings"
@@ -726,6 +727,8 @@ for i in res {
 }
 
 func TestGRPCMUSTPASS_HTTP_DebugPlugin_Global_SaveHTTPFlow(t *testing.T) {
+	mockeyValue := mockey.MockValue(&consts.GLOBAL_HTTP_FLOW_SAVE).To(utils.NewBool(false))
+	defer mockeyValue.UnPatch()
 	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
@@ -733,12 +736,6 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_Global_SaveHTTPFlow(t *testing.T) {
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("a"))
 	})
-
-	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
-	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
-	require.NoError(t, err)
-	config.SkipSaveHTTPFlow = true
-	client.SetGlobalNetworkConfig(context.Background(), config)
 
 	target := "http://" + utils.HostPort(host, port)
 	testTemplate := `id: WebFuzzer-Template-gPdWZhvP
@@ -800,7 +797,6 @@ nuclei.Scan(target, nuclei.rawTemplate(codec.DecodeBase64("%s")~))
 	})
 	require.NoError(t, err)
 	require.Len(t, out.Data, 0)
-
 }
 
 func TestGRPCMUSTPASS_HTTP_DebugPlugin_SaveHTTPFlow_HOOK(t *testing.T) {
