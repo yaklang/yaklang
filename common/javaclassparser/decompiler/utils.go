@@ -2,6 +2,7 @@ package decompiler
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 )
 
@@ -49,14 +50,33 @@ func GetStoreIdx(code *OpCode) int {
 }
 
 const (
-	EQ  = "eq"
-	LT  = "lt"
-	GTE = "gte"
-	GT  = "gt"
-	NE  = "ne"
-	LTE = "lte"
+	EQ  = "=="
+	LT  = "<"
+	GTE = ">="
+	GT  = ">"
+	NE  = "!="
+	LTE = "<="
 )
 
+func GetNotOp(code *OpCode) string {
+	op := GetOp(code)
+	switch op {
+	case EQ:
+		return NE
+	case NE:
+		return EQ
+	case LT:
+		return GTE
+	case GTE:
+		return LT
+	case GT:
+		return LTE
+	case LTE:
+		return GT
+	default:
+		panic(fmt.Sprintf("unknow opcode: 0x%x", code.Instr.OpCode))
+	}
+}
 func GetOp(code *OpCode) string {
 	switch code.Instr.OpCode {
 	case OP_IF_ICMPEQ, OP_IF_ACMPEQ:
@@ -183,4 +203,13 @@ func parseType(descriptor string) (string, string, error) {
 	default:
 		return "", "", fmt.Errorf("unknown type descriptor: %c", descriptor[0])
 	}
+}
+
+func SplitPackageClassName(s string) (string, string) {
+	splits := strings.Split(s, ".")
+	if len(splits) > 0 {
+		return strings.Join(splits[:len(splits)-1], "."), splits[len(splits)-1]
+	}
+	log.Errorf("split package name and class name failed: %v", s)
+	return "", ""
 }

@@ -10,6 +10,14 @@ import (
 	"testing"
 )
 
+func TestAddSupperInterface(t *testing.T) {
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/Demo.class")
+	cf, err := Parse(classesContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cf.ConstantPool = append(cf.ConstantPool)
+}
 func TestDecompiler(t *testing.T) {
 	//classesContent, err := classes.FS.ReadFile("Demo.class")
 	classesContent, err := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/Demo.class")
@@ -20,11 +28,11 @@ func TestDecompiler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = cf.Dump()
+	source, err := cf.Dump()
 	if err != nil {
 		t.Fatal(err)
 	}
-	//println(source)
+	println(source)
 }
 func TestModifyOpcode(t *testing.T) {
 	classesContent, err := classes.FS.ReadFile("Demo.class")

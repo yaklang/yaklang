@@ -1,9 +1,13 @@
 package decompiler
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+	"strings"
+)
 
 type JavaValue interface {
-	String() string
+	String(funcCtx *FunctionContext) string
 	Type() JavaType
 }
 
@@ -14,6 +18,7 @@ var (
 	_ JavaValue = &JavaClass{}
 	_ JavaValue = &JavaClassMember{}
 	_ JavaValue = &JavaExpression{}
+	_ JavaValue = &NewExpression{}
 )
 
 type JavaRef struct {
@@ -25,7 +30,7 @@ func (j *JavaRef) Type() JavaType {
 	return j.JavaType
 }
 
-func (j *JavaRef) String() string {
+func (j *JavaRef) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("var%d", j.Id)
 }
 
@@ -46,15 +51,15 @@ func (j *JavaArray) Type() JavaType {
 	return j.JavaType
 }
 
-func (j *JavaArray) String() string {
-	return fmt.Sprintf("%s[%d]", j.Class.String(), j.Length)
+func (j *JavaArray) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("%s[%d]", j.Class.String(funcCtx), j.Length)
 }
 
 func NewJavaArray(class *JavaClass, length int) *JavaArray {
 	return &JavaArray{
 		Class:    class,
 		Length:   length,
-		JavaType: NewJavaArrayType(class.Type()),
+		JavaType: NewJavaArrayType(class, length),
 	}
 }
 
@@ -67,15 +72,10 @@ func (j *JavaLiteral) Type() JavaType {
 	return j.JavaType
 }
 
-func (j *JavaLiteral) String() string {
-	switch j.JavaType {
-	case RT_REFERENCE:
-		if v, ok := j.Data.(string); ok {
-			return fmt.Sprintf(`"%s"`, v)
-		} else {
-			return fmt.Sprint(j.Data)
-		}
-	default:
+func (j *JavaLiteral) String(funcCtx *FunctionContext) string {
+	if j.JavaType.String(funcCtx) == "java.lang.String" || j.JavaType.String(funcCtx) == "String" {
+		return fmt.Sprintf(`"%s"`, j.Data)
+	} else {
 		return fmt.Sprint(j.Data)
 	}
 }
@@ -98,7 +98,14 @@ func (j *JavaClassMember) Type() JavaType {
 	return j.JavaType
 }
 
-func (j *JavaClassMember) String() string {
+func (j *JavaClassMember) String(funcCtx *FunctionContext) string {
+	for _, lib := range funcCtx.BuildInLibs {
+		pkg, className := SplitPackageClassName(lib)
+		fpkg, fclassName := SplitPackageClassName(j.Name)
+		if fpkg == pkg && (className == "*" || fclassName == className) {
+			return fmt.Sprintf("%s.%s", fclassName, j.Member)
+		}
+	}
 	return fmt.Sprintf("%s.%s", j.Name, j.Member)
 }
 func NewJavaClassMember(typeName, member, desc string, typ JavaType) *JavaClassMember {
@@ -111,20 +118,29 @@ func NewJavaClassMember(typeName, member, desc string, typ JavaType) *JavaClassM
 }
 
 type JavaClass struct {
-	Name     string
-	JavaType JavaType
+	Name string
+	JavaType
 }
 
+func (j *JavaClass) IsJavaType() {
+
+}
 func (j *JavaClass) Type() JavaType {
-	return j.JavaType
+	return j
 }
 
-func (j *JavaClass) String() string {
+func (j *JavaClass) String(funcCtx *FunctionContext) string {
+	if j.Name == funcCtx.ClassName {
+		splits := strings.Split(j.Name, ".")
+		if len(splits) > 0 {
+			return utils.GetLastElement(splits)
+		}
+		return ""
+	}
 	return fmt.Sprintf("%s", j.Name)
 }
-func NewJavaClass(typeName string, typ JavaType) *JavaClass {
+func NewJavaClass(typeName string) *JavaClass {
 	return &JavaClass{
-		Name:     typeName,
-		JavaType: typ,
+		Name: typeName,
 	}
 }
