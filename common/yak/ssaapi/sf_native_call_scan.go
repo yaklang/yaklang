@@ -147,26 +147,28 @@ func (b *basicBlockInfo) searchInsts() {
 		}
 		if v, ok := ssa.ToValue(inst); ok {
 			value := b.prog.NewValue(v)
-			configOption := b.recursiveConfig.handler(value)
-			switch configOption {
-			case ContinueSkip:
-				continue
-			case ContinueMatch:
+			if b.recursiveConfig.configItems == nil {
 				b.results = append(b.results, value)
 				continue
-			case StopMatch:
-				b.results = append(b.results, value)
-				b.isFinish = true
-				break
-			case StopNoMatch:
-				b.isFinish = true
-				break
-			case Nothing:
-				b.results = append(b.results, value)
-				continue
-			default:
-				b.results = append(b.results, value)
-				continue
+			} else {
+				rcKind := b.recursiveConfig.compileAndRun(value)
+				switch rcKind {
+				case ContinueSkip:
+					continue
+				case ContinueMatch:
+					b.results = append(b.results, value)
+					continue
+				case StopMatch:
+					b.results = append(b.results, value)
+					b.isFinish = true
+					break
+				case StopNoMatch:
+					b.isFinish = true
+					break
+				default:
+					b.results = append(b.results, value)
+					continue
+				}
 			}
 		}
 	}

@@ -240,7 +240,7 @@ func (n *anValue) Build() Value {
 		return val
 	case Paring:
 		if utils.IsNil(n.spinValue) {
-			n.spinValue = NewConst("spin value")
+			n.spinValue = n.GetFunc().builder.EmitConstInst("spin value")
 		}
 		return n.spinValue
 	case ParEnd:
