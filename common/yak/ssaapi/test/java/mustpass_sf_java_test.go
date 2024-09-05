@@ -3,6 +3,7 @@ package java
 import (
 	"embed"
 	_ "embed"
+	"fmt"
 	"path"
 	"testing"
 
@@ -123,7 +124,7 @@ func Check(t *testing.T, progs []*ssaapi.Program, include ...string) {
 			if err != nil {
 				t.Fatalf("feed error: %v", err)
 			}
-			res.Show()
+			fmt.Println(res.String())
 		})
 	}
 }

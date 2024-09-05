@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -10,6 +11,70 @@ import (
 type SyntaxFlowResult struct {
 	*sfvm.SFFrameResult
 	symbol map[string]Values
+}
+
+type showConfig struct {
+	showCode     bool
+	showDot      bool
+	lessVariable bool
+	showAll      bool
+}
+
+type ShowHandle func(config *showConfig)
+
+func WithShowAll(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.showAll = show
+	}
+}
+func WithShowCode(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.showCode = show
+	}
+}
+func WithShowDot(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.showDot = show
+	}
+}
+func WithLessVariable(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.lessVariable = show
+	}
+}
+func (s *SyntaxFlowResult) Show(handle ...ShowHandle) {
+	var (
+		_config = new(showConfig)
+	)
+
+	for _, f := range handle {
+		f(_config)
+	}
+
+	fmt.Println(s.StringEx(_config.showAll))
+	if _config.showAll {
+		s.GetAllValues()
+	} else {
+		if len(s.AlertSymbolTable) > 0 {
+			for name, _ := range s.AlertSymbolTable {
+				s.GetValues(name)
+			}
+		} else {
+			s.GetValues("_")
+		}
+	}
+	lo.ForEach(lo.Entries(s.symbol), func(item lo.Entry[string, Values], index int) {
+		if _config.showCode {
+			log.Infof("===================== Variable:%v =================== ", item.Key)
+			for _, value := range item.Value {
+				value.ShowWithSourceCode()
+			}
+		}
+		if _config.showDot {
+			log.Infof("===================== DOT =================== ")
+			item.Value.ShowDot()
+		}
+	})
 }
 
 func (r *SyntaxFlowResult) GetValues(name string) Values {

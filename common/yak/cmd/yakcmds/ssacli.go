@@ -668,41 +668,6 @@ func SyntaxFlowQuery(
 	}
 
 	log.Infof("syntax flow query result:")
-	if withCode {
-		if len(result.AlertSymbolTable) != 0 {
-			for name := range result.AlertSymbolTable {
-				showValues(name, result.GetValues(name), showDot)
-			}
-		} else if result.SymbolTable.Len() != 0 {
-			for k, r := range result.GetAllValues() {
-				if k == "_" {
-					continue
-				}
-				showValues(k, r, showDot)
-			}
-		} else {
-			showValues("_", result.GetValues("_"), showDot)
-		}
-	} else {
-		result.Show()
-		if showDot {
-			fmt.Println("---------------------")
-			fmt.Println(result.GetAllValuesChain().DotGraph())
-		}
-	}
+	result.Show(ssaapi.WithShowAll(sfDebug), ssaapi.WithShowCode(withCode), ssaapi.WithShowDot(showDot))
 	return execError
-}
-
-func showValues(name string, vs ssaapi.Values, showDot bool) {
-	log.Infof("===================== Variable:%v =================== ", name)
-	show(vs)
-	if showDot {
-		log.Infof("===================== DOT =================== ")
-		vs.ShowDot()
-	}
-}
-func show(r ssaapi.Values) {
-	for _, v := range r {
-		v.ShowWithSourceCode()
-	}
 }
