@@ -586,6 +586,7 @@ func (v *Value) IsJump() bool            { return v.getOpcode() == ssa.SSAOpcode
 func (v *Value) IsIf() bool              { return v.getOpcode() == ssa.SSAOpcodeIf }
 func (v *Value) IsLoop() bool            { return v.getOpcode() == ssa.SSAOpcodeLoop }
 func (v *Value) IsSwitch() bool          { return v.getOpcode() == ssa.SSAOpcodeSwitch }
+func (v *Value) IsLazy() bool            { return v.node.IsLazy() }
 
 // // MemberCall : Object
 

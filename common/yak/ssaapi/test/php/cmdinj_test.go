@@ -39,7 +39,7 @@ system($c);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(*  #-> * as $param)`,
 		map[string][]string{
-			"param": {"Function-base64_decode", "make(any)", "Undefined-$a(valid)", "Undefined-_GET"},
+			"param": {"Function-base64_decode", "Undefined-$a(valid)", "Undefined-_GET"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -76,7 +76,7 @@ eval($a);
 	ssatest.CheckSyntaxFlow(t, code,
 		`eval(* #-> * as $param)`,
 		map[string][]string{
-			"param": {"make(any)", "Undefined-$a(valid)", "Undefined-_GET"},
+			"param": {"Undefined-_GET"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)

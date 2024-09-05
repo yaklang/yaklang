@@ -50,6 +50,9 @@ func (a *AnalyzeContext) check(opt ...OperationOption) bool {
 }
 
 func (a *AnalyzeContext) hook(i *Value) error {
+	if i.IsLazy() {
+		return nil
+	}
 	if len(a.config.HookEveryNode) > 0 {
 		for _, hook := range a.config.HookEveryNode {
 			if err := hook(i); err != nil {
