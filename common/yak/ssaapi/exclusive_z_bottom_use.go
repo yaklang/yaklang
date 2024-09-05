@@ -28,9 +28,6 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
-	if !actx.TheDefaultShouldBeVisited(v) {
-		return Values{v}
-	}
 	v.GetUsers().ForEach(func(value *Value) {
 		if ret := value.AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
@@ -48,7 +45,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		obj := v.GetObject()
 		if err := actx.PushObject(obj, v.GetKey(), v); err != nil {
 			log.Errorf("%v", err)
-			return v.visitedDefsDefault(actx, opt...)
+			return v.visitedDefs(actx, opt...)
 		}
 		vals = append(vals, obj.getBottomUses(actx, opt...)...)
 		actx.PopObject()
@@ -96,17 +93,12 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		return v.getBottomUses(actx, opt...)
 	case *ssa.Phi:
 		// enter function via phi
-		if !actx.ThePhiShouldBeVisited(v) {
+		if !actx.TheValueShouldBeVisited(v) {
 			// the phi is existed, visited in the same stack.
 			return Values{}
 		}
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
-		if !actx.TheCallShouldBeVisited(v) {
-			// call existed
-			return v.visitUserFallback(actx, opt...)
-		}
-
 		if ins.Method == nil {
 			// log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx, opt...)
@@ -119,6 +111,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx, opt...)
 		}
 		funcValue := v.NewValue(f).AppendDependOn(v)
+		if actx.TheCrossProcessVisited(v, funcValue) {
+			return v.visitUserFallback(actx, opt...)
+		}
 		if ValueCompare(funcValue, actx.Self) {
 			return v.visitUserFallback(actx, opt...)
 		}

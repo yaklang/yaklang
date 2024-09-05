@@ -29,14 +29,14 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 	return ret
 }
 
-func (i *Value) visitedDefsDefault(actx *AnalyzeContext, opt ...OperationOption) Values {
+func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if i.node == nil {
 		return vals
 	}
-	if !actx.TheDefaultShouldBeVisited(i) {
-		return vals
-	}
+	//if !actx.TheDefaultShouldBeVisited(i) {
+	//	return vals
+	//}
 	for _, def := range i.node.GetValues() {
 		if ret := i.NewValue(def).AppendEffectOn(i).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
@@ -57,6 +57,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext, opt ...OperationOption)
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
+	log.Infof("gettop def i : %s", i.String())
 	if i == nil {
 		return nil
 	}
@@ -92,14 +93,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
 		if value.HasValues() {
-			return i.visitedDefsDefault(actx, opt...)
+			return i.visitedDefs(actx, opt...)
 		}
 		if value.IsMember() {
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
 			if err := actx.PushObject(obj, key, i); err != nil {
 				log.Errorf("%v", err)
-				return i.visitedDefsDefault(actx, opt...)
+				return i.visitedDefs(actx, opt...)
 			}
 			obj.AppendDependOn(apiValue)
 			ret := obj.getTopDefs(actx, opt...)
@@ -108,7 +109,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 			return ret
 		}
-		return i.visitedDefsDefault(actx, opt...)
+		return i.visitedDefs(actx, opt...)
 	}
 
 	switch inst := i.node.(type) {
@@ -124,9 +125,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// ret[n]
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
-		return i.visitedDefsDefault(actx, opt...)
+		return i.visitedDefs(actx, opt...)
 	case *ssa.Phi:
-		if !actx.ThePhiShouldBeVisited(i) {
+		if !actx.TheValueShouldBeVisited(i) {
 			return Values{}
 		}
 
@@ -323,12 +324,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		if actx.config.AllowIgnoreCallStack {
 			if fun := i.GetFunction(); fun != nil {
-				fun.GetCalledBy().ForEach(func(value *Value) {
-					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, called)
-					val := getCalledByValue(called)
-					if reverseSuccess {
-						actx.RecoverReverseProcess(hash)
+				fun.GetCalledBy().ForEach(func(call *Value) {
+					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
+					if !reverseSuccess {
+						return
 					}
+					val := getCalledByValue(call)
+					actx.RecoverReverseProcess(hash)
 					vals = append(vals, val...)
 				})
 			}
@@ -375,11 +377,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
 			}
-
 			traced := i.NewValue(actualParam).AppendEffectOn(called)
-			if !actx.TheParameterShouldBeVisited(traced) {
-				return Values{traced}
-			}
 			ret := traced.getTopDefs(actx, opt...)
 
 			if len(ret) > 0 {
@@ -389,9 +387,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 		}
 
-		if inst.GetDefault() != nil {
-			return i.NewValue(inst.GetDefault()).getTopDefs(actx, opt...)
-		}
 		var vals Values
 		called := actx.GetCallFromLastCrossProcess()
 		if called != nil {
@@ -413,18 +408,23 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if fun != nil {
 				call2fun := fun.GetCalledBy()
 				call2fun.ForEach(func(call *Value) {
-					hash, needRecover := actx.ReverseProcessWithDirection(i, call)
-					val := getCalledByValue(call)
-					if needRecover {
-						actx.RecoverReverseProcess(hash)
+					hash, reverseSuccess := actx.ReverseProcessWithDirection(i, call)
+					if !reverseSuccess {
+						return
 					}
+					val := getCalledByValue(call)
+					actx.RecoverReverseProcess(hash)
 					vals = append(vals, val...)
 				})
 			}
 		}
 
 		if len(vals) == 0 {
-			vals = append(vals, i)
+			if i.IsFreeValue() && inst.GetDefault() != nil {
+				vals = append(vals, i.NewValue(inst.GetDefault()))
+			} else {
+				vals = append(vals, i)
+			}
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.SideEffect:
