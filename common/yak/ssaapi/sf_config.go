@@ -220,9 +220,6 @@ func WithSyntaxFlowConfig(
 		}
 	})
 	handler()
-	defer func() {
-		results = make(Values, 0)
-	}()
 	if use {
 		cb(options...)
 		return results
