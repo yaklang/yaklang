@@ -2,6 +2,8 @@ package javaclassparser
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
@@ -14,11 +16,20 @@ type ClassObjectDumper struct {
 	imports       map[string]struct{}
 	obj           *ClassObject
 	ClassName     string
+	PackageName   string
 	CurrentMethod *MemberInfo
 	ConstantPool  []ConstantInfo
 	deepStack     *utils.Stack[int]
 }
 
+func (c *ClassObjectDumper) GetConstructorMethodName() string {
+	after, ok := strings.CutPrefix(c.ClassName, c.PackageName+".")
+	if ok {
+		return after
+	}
+	log.Error("GetConstructorMethodName failed")
+	return ""
+}
 func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 	return &ClassObjectDumper{
 		obj:          obj,
@@ -29,6 +40,9 @@ func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 }
 func (c *ClassObjectDumper) TabNumber() int {
 	return c.deepStack.Peek()
+}
+func (c *ClassObjectDumper) GetTabString() string {
+	return strings.Repeat("\t", c.deepStack.Peek())
 }
 func (c *ClassObjectDumper) Tab() {
 	pre := c.deepStack.Peek()
@@ -51,8 +65,9 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	name := c.obj.GetClassName()
 	splits := strings.Split(name, "/")
 	packageName := strings.Join(splits[:len(splits)-1], ".")
+	c.PackageName = packageName
 	className := splits[len(splits)-1]
-	c.ClassName = className
+	c.ClassName = strings.Replace(name, "/", ".", -1)
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {
 		return "", utils.Error("className is empty")
@@ -166,11 +181,51 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		code := ""
 		c.Tab()
 		c.CurrentMethod = method
+		funcCtx := &decompiler.FunctionContext{
+			ClassName:    c.ClassName,
+			FunctionName: name,
+			PackageName:  c.PackageName,
+			BuildInLibs: []string{
+				"java.lang.*",
+			},
+		}
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
-				sourceCode, err := ParseBytesCode(c, codeAttr)
+				statements, err := ParseBytesCode(c, codeAttr)
 				if err != nil {
 					return nil, err
+				}
+				sourceCode := "\n"
+				for _, statement := range statements {
+					var statementStr string
+					switch ret := statement.(type) {
+					case *decompiler.FunctionCallStatement:
+						if funcCtx.FunctionName == "<init>" {
+							if IsJavaSupperRef(ret.Object) && ret.FunctionName == "<init>" {
+								continue
+							}
+						}
+						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
+					case *decompiler.ReturnStatement:
+						if funcCtx.FunctionName == "<init>" {
+							continue
+						}
+						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
+					case *decompiler.ForStatement:
+						datas := []string{}
+						datas = append(datas, ret.InitVar.String(funcCtx))
+						datas = append(datas, fmt.Sprintf("%s %s %s", ret.Condition.LeftValue.String(funcCtx), ret.Condition.Op, ret.Condition.RightValue.String(funcCtx)))
+						datas = append(datas, ret.EndExp.String(funcCtx))
+						var lines []string
+						for _, subStatement := range ret.SubStatements {
+							lines = append(lines, c.GetTabString()+"\t"+subStatement.String(funcCtx)+";")
+						}
+						s := fmt.Sprintf("%sfor(%s; %s; %s) {\n%s\n%s}", c.GetTabString(), datas[0], datas[1], datas[2], strings.Join(lines, "\n"), c.GetTabString())
+						statementStr = s
+					default:
+						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
+					}
+					sourceCode += fmt.Sprintf("%s\n", statementStr)
 				}
 				code = sourceCode
 			}
@@ -179,7 +234,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		methodSource := ""
 		switch name {
 		case "<init>":
-			name = fmt.Sprintf("%s(%s)", c.ClassName, paramsNewStr)
+			name = fmt.Sprintf("%s(%s)", c.GetConstructorMethodName(), paramsNewStr)
 			methodSource = fmt.Sprintf("%s %s {%s", accessFlags, name, code)
 		case "<clinit>":
 			methodSource = fmt.Sprintf("%s {%s", accessFlags, code)

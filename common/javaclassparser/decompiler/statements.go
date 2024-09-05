@@ -6,7 +6,7 @@ import (
 )
 
 type Statement interface {
-	String() string
+	String(funcCtx *FunctionContext) string
 }
 type ConditionStatement struct {
 	RightValue  JavaValue
@@ -16,8 +16,8 @@ type ConditionStatement struct {
 	ToStatement int
 }
 
-func (r *ConditionStatement) String() string {
-	return fmt.Sprintf("if %s %s %s goto %d", r.LeftValue.String(), r.Op, r.RightValue.String(), r.ToStatement)
+func (r *ConditionStatement) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("if %s %s %s goto %d", r.LeftValue.String(funcCtx), r.Op, r.RightValue.String(funcCtx), r.ToStatement)
 }
 
 func NewConditionStatement(l, r JavaValue, op string, to int) *ConditionStatement {
@@ -33,12 +33,12 @@ type ReturnStatement struct {
 	JavaValue JavaValue
 }
 
-func (r *ReturnStatement) String() string {
+func (r *ReturnStatement) String(funcCtx *FunctionContext) string {
 	if r.JavaValue == nil {
-		return "return;"
+		return "return"
 	}
 
-	return fmt.Sprintf("return %s;", r.JavaValue.String())
+	return fmt.Sprintf("return %s", r.JavaValue.String(funcCtx))
 }
 
 func NewReturnStatement(value JavaValue) *ReturnStatement {
@@ -53,12 +53,12 @@ type FunctionCallStatement struct {
 	Params       []JavaValue
 }
 
-func (f *FunctionCallStatement) String() string {
+func (f *FunctionCallStatement) String(funcCtx *FunctionContext) string {
 	paramStrs := []string{}
 	for _, param := range f.Params {
-		paramStrs = append(paramStrs, param.String())
+		paramStrs = append(paramStrs, param.String(funcCtx))
 	}
-	return fmt.Sprintf("%s.%s(%s)", f.Object.String(), f.FunctionName, strings.Join(paramStrs, ","))
+	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
 }
 
 func NewFunctionCallStatement(object JavaValue, name string, params []JavaValue) *FunctionCallStatement {
@@ -69,19 +69,74 @@ func NewFunctionCallStatement(object JavaValue, name string, params []JavaValue)
 	}
 }
 
+type DeclareStatement struct {
+	Id       int
+	JavaType JavaType
+}
+
+func (a *DeclareStatement) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("%s var%d", a.JavaType.String(funcCtx), a.Id)
+}
+
+func NewDeclareStatement(id int, typ JavaType) *DeclareStatement {
+	return &DeclareStatement{
+		Id:       id,
+		JavaType: typ,
+	}
+}
+
 type AssignStatement struct {
 	Id        int
 	JavaValue JavaValue
+	IsFirst   bool
 }
 
-func (a *AssignStatement) String() string {
-	return fmt.Sprintf("var%d = %s", a.Id, a.JavaValue.String())
+func (a *AssignStatement) String(funcCtx *FunctionContext) string {
+	assign := fmt.Sprintf("var%d = %s", a.Id, a.JavaValue.String(funcCtx))
+	if a.IsFirst {
+		return a.JavaValue.Type().String(funcCtx) + " " + assign
+	} else {
+		return assign
+	}
 }
 
-func NewAssignStatement(id int, value JavaValue) *AssignStatement {
+type ForStatement struct {
+	InitVar             Statement
+	Condition           *ConditionStatement
+	EndExp              Statement
+	SubStatements       []Statement
+	SubStatementsDumper func(subStatement Statement) string
+}
+
+func NewForStatement(subStatements []Statement) *ForStatement {
+	return &ForStatement{
+		InitVar:       subStatements[0],
+		Condition:     subStatements[1].(*ConditionStatement),
+		EndExp:        subStatements[len(subStatements)-2],
+		SubStatements: subStatements[2 : len(subStatements)-2],
+	}
+}
+func (f *ForStatement) String(funcCtx *FunctionContext) string {
+	datas := []string{}
+	datas = append(datas, f.InitVar.String(funcCtx))
+	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.LeftValue.String(funcCtx), f.Condition.Op, f.Condition.RightValue.String(funcCtx)))
+	datas = append(datas, f.EndExp.String(funcCtx))
+	statementStr := []string{}
+	for _, statement := range f.SubStatements {
+		if f.SubStatementsDumper != nil {
+			statementStr = append(statementStr, f.SubStatementsDumper(statement))
+		} else {
+			statementStr = append(statementStr, statement.String(funcCtx))
+		}
+	}
+	s := fmt.Sprintf("for(%s; %s; %s) {\n%s\n}", datas[0], datas[1], datas[2], strings.Join(statementStr, "\n"))
+	return s
+}
+func NewAssignStatement(id int, value JavaValue, isFirst bool) *AssignStatement {
 	return &AssignStatement{
 		Id:        id,
 		JavaValue: value,
+		IsFirst:   isFirst,
 	}
 }
 
@@ -90,7 +145,7 @@ type GOTOStatement struct {
 	ToStatement int
 }
 
-func (g *GOTOStatement) String() string {
+func (g *GOTOStatement) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("goto: %d", g.ToStatement)
 }
 func NewGOTOStatement(target int) *GOTOStatement {
@@ -103,8 +158,8 @@ type NewStatement struct {
 	Class *JavaClass
 }
 
-func (a *NewStatement) String() string {
-	return fmt.Sprintf("new %s();", a.Class.Name)
+func (a *NewStatement) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("new %s()", a.Class.Name)
 }
 
 func NewNewStatement(class *JavaClass) *NewStatement {
