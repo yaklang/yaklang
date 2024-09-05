@@ -71,32 +71,27 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		for i := range pkgNamel {
 			pkgName := strings.Split(pkgNamel[i], "/")
 			if lib, _ := b.GetProgram().GetLibrary(pkgNamel[i]); lib != nil {
-				objt := ssa.NewObjectType()
-				objt.SetTypeKind(ssa.StructTypeKind)
+				path := ""
 				if namel[i] != "" {
-					objt.SetName(namel[i])
+					path = namel[i]
 				} else {
-					objt.SetName(pkgName[len(pkgName)-1])
+					path = pkgName[len(pkgName)-1]
 				}
+				exData := b.AddExData(path)
 
 				for _, cbp := range lib.ClassBluePrint { // only once
 					for i, v := range cbp.StaticMember {
-						objt.AddField(b.EmitConstInst(i), v.GetType())
+						exData.AddExtendType(i, v.GetType())
 					}
-					funcs := map[string]*ssa.Function{}
 					for _, f := range cbp.GetMethod() {
 						if f.GetName() != "init" {
-							funcs[f.GetName()] = f
+							exData.AddExtendFunc(f)
 						}
 					}
-					b.AddExtendFuncs(objt.Name, funcs)
-					/* Todo: Global value */
-
-					/*for i, v := range cbp.NormalMember {
-						objt.AddField(b.EmitConstInst(i), v.Type)
-					}*/
+					for i, v := range cbp.NormalMember {
+						exData.AddExtendGlobal(i, v.Value)
+					}
 				}
-				b.AddStruct(objt.Name, objt)
 			} else {
 				objt := ssa.NewObjectType()
 				objt.SetTypeKind(ssa.StructTypeKind)
@@ -136,6 +131,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			typValue := ssa.NewTypeValue(structType)
 			typValue.SetType(structType)
 			cbp.AddStaticMember(structName, typValue)
+		}
+		for aliasName, aliasType := range b.GetAliasAll() {
+			typValue := ssa.NewTypeValue(aliasType)
+			typValue.SetType(aliasType)
+			cbp.AddStaticMember(aliasName, typValue)
 		}
 		for _, f := range b.GetProgram().Funcs {
 			if !f.IsMethod() && f.GetName() != "init" {
@@ -1830,20 +1830,18 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 	if qul := tname.QualifiedIdent(); qul != nil {
 		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-			obj := b.GetStructByStr(qul.IDENTIFIER(0).GetText())
+			exData := b.GetExData(qul.IDENTIFIER(0).GetText())
+			obj := exData.GetExtendType(qul.IDENTIFIER(1).GetText())
+
 			if obj != nil {
-				ssatyp = obj.(*ssa.ObjectType).GetField(b.EmitConstInst(qul.IDENTIFIER(1).GetText()))
-				if ssatyp == nil {
-					// TODO
-					ssatyp = ssa.NewAliasType(qul.IDENTIFIER(1).GetText(), obj.PkgPathString(), ssa.CreateUndefinedType())
-				}
+				ssatyp = obj
 			} else { // 有时golang的package名称可能和导入名称不同，在golang库解析实现之前只能考虑新建一个结构体对象
-				b.NewError(ssa.Warn, TAG, StructNotFind(qul.GetText()))
+				b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(0).GetText()))
 				objt := ssa.NewObjectType()
 				objt.SetTypeKind(ssa.StructTypeKind)
 				objt.SetName(qul.IDENTIFIER(0).GetText())
 				b.AddStruct(objt.Name, objt)
-				ssatyp = ssa.NewAliasType(qul.IDENTIFIER(1).GetText(), objt.PkgPathString(), ssa.CreateUndefinedType())
+				ssatyp = objt
 			}
 		}
 	} else {
