@@ -3,9 +3,9 @@ package sfvm
 import (
 	"bytes"
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,6 +23,7 @@ type SFFrameResult struct {
 	Errors      []string
 	// value
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
+	UnNameValue      []ValueOperator
 	AlertSymbolTable map[string]ValueOperator
 	AlertMsgTable    map[string]string
 }
@@ -38,10 +39,37 @@ func NewSFResult(rule string) *SFFrameResult {
 	}
 }
 
-func (s *SFFrameResult) String() string {
-	return s.StringEx(true)
+type showConfig struct {
+	showCode bool
+	showDot  bool
+	showAll  bool
 }
-func (s *SFFrameResult) StringEx(show bool) string {
+
+type ShowHandle func(config *showConfig)
+
+func WithShowCode(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.showCode = show
+	}
+}
+func WithShowDot(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.showDot = show
+	}
+}
+func WithShowAll(show bool) ShowHandle {
+	return func(config *showConfig) {
+		config.showAll = show
+	}
+}
+func (s *SFFrameResult) Show(opts ...ShowHandle) {
+	fmt.Println(s.String(opts...))
+}
+func (s *SFFrameResult) String(opts ...ShowHandle) string {
+	cfg := new(showConfig)
+	for _, f := range opts {
+		f(cfg)
+	}
 	buf := bytes.NewBufferString("")
 	buf.WriteString(fmt.Sprintf("rule md5 hash: %v\n", codec.Md5(s.Rule)))
 	buf.WriteString(fmt.Sprintf("rule preview: %v\n", utils.ShrinkString(s.Rule, 64)))
@@ -54,68 +82,99 @@ func (s *SFFrameResult) StringEx(show bool) string {
 		}
 		return buf.String()
 	}
-	count := 0
 	if s.SymbolTable.Len() > 0 {
 		buf.WriteString("Result Vars: \n")
 	}
-	if s.SymbolTable.Len() > 1 && s.SymbolTable.Have("_") {
-		s.SymbolTable.Delete("_")
-		s.SymbolTable.Delete("$_")
-	}
-	handler := func(_map map[string]ValueOperator) {
-		lo.ForEach(lo.Entries(_map), func(item lo.Entry[string, ValueOperator], index int) {
-			count++
-			var all []ValueOperator
-			_ = item.Value.Recursive(func(operator ValueOperator) error {
-				all = append(all, operator)
-				return nil
-			})
-			if len(all) >= 1 {
-				prefixVariable := "  "
-				varName := item.Key
-				if !strings.HasPrefix(varName, "$") {
-					varName = "$" + varName
-				}
-				buf.WriteString(prefixVariable + item.Key + ":\n")
-				prefixVariableResult := "    "
-				for idxRaw, v := range all {
-					var idx = fmt.Sprint(int64(idxRaw + 1))
-					if raw, ok := v.(interface{ GetId() int64 }); ok {
-						idx = fmt.Sprintf("t%v", raw.GetId())
-					}
-					buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
-					if rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf }); ok {
-						ssaRange := rangeIns.GetRange()
-						if ssaRange != nil {
-							start, end := ssaRange.GetStart(), ssaRange.GetEnd()
-							editor := ssaRange.GetEditor()
-							fileName := editor.GetFilename()
-							if fileName == "" {
-								var err error
-								editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
-								if err != nil {
-									log.Warn(err)
-								}
-								if editor != nil {
-									fileName = editor.GetFilename()
-									if fileName == "" {
-										fileName = `[md5:` + editor.SourceCodeMd5() + `]`
-									}
-								}
-							}
-							buf.WriteString(fmt.Sprintf(prefixVariableResult+"    %v:%v:%v - %v:%v\n", fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn()))
-						}
-					}
-				}
-			}
+	if cfg.showAll {
+		s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
+			showValueMap(buf, i, v, cfg)
+			return true
 		})
-	}
-	if !show {
-		handler(s.AlertSymbolTable)
 	} else {
-		handler(s.SymbolTable.GetMap())
+		if len(s.AlertSymbolTable) > 0 {
+			for name, value := range s.AlertSymbolTable {
+				showValueMap(buf, name, value, cfg)
+			}
+		} else if s.SymbolTable.Len() > 0 {
+			s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
+				showValueMap(buf, i, v, cfg)
+				return true
+			})
+		} else {
+			// use unName value
+			for _, v := range s.UnNameValue {
+				showValueMap(buf, "_", v, cfg)
+			}
+		}
 	}
 	return buf.String()
+}
+
+func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *showConfig) {
+	var all []ValueOperator
+	_ = value.Recursive(func(operator ValueOperator) error {
+		all = append(all, operator)
+		return nil
+	})
+	if len(all) == 0 {
+		return
+	}
+	prefixVariable := "  "
+	// varName := item.Key
+	if !strings.HasPrefix(varName, "$") {
+		varName = "$" + varName
+	}
+	buf.WriteString(prefixVariable + varName + ":\n")
+	prefixVariableResult := "    "
+	for idxRaw, v := range all {
+		var idx = fmt.Sprint(int64(idxRaw + 1))
+		if raw, ok := v.(interface{ GetId() int64 }); ok {
+			idx = fmt.Sprintf("t%v", raw.GetId())
+		}
+		buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
+		rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf })
+		if !ok {
+			continue
+		}
+		ssaRange := rangeIns.GetRange()
+		if ssaRange == nil {
+			continue
+		}
+		start, end := ssaRange.GetStart(), ssaRange.GetEnd()
+		editor := ssaRange.GetEditor()
+		fileName := editor.GetFilename()
+		if fileName == "" {
+			var err error
+			editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
+			if err != nil {
+				log.Warn(err)
+			}
+			if editor != nil {
+				fileName = editor.GetFilename()
+				if fileName == "" {
+					fileName = `[md5:` + editor.SourceCodeMd5() + `]`
+				}
+			}
+		}
+		buf.WriteString(fmt.Sprintf(
+			prefixVariableResult+"    %v:%v:%v - %v:%v\n",
+			fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn(),
+		))
+		if cfg.showCode {
+			showValue, ok := value.(interface{ StringWithSourceCode(msg ...string) string })
+			if !ok {
+				continue
+			}
+			buf.WriteString(showValue.StringWithSourceCode())
+		}
+		if cfg.showDot {
+			showDot, ok := value.(interface{ DotGraph() string })
+			if !ok {
+				continue
+			}
+			buf.WriteString(showDot.DotGraph())
+		}
+	}
 }
 
 func (s *SFFrameResult) Copy() *SFFrameResult {

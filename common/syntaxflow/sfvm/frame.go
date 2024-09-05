@@ -682,7 +682,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		i := s.stack.Pop()
 		s.debugSubLog(">> pop %v", valuesLen(i))
 		s.debugSubLog("save-to $_")
-		err := s.output("_", i)
+		err := s.saveUnName(i)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
 			return utils.Wrapf(CriticalError, "output '_' error: %v", err)
@@ -1169,6 +1169,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)
 	}
+	return nil
+}
+
+func (s *SFFrame) saveUnName(operator ValueOperator) error {
+	s.result.UnNameValue = append(s.result.UnNameValue, operator)
 	return nil
 }
 
