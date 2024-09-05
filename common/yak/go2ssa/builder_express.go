@@ -192,7 +192,8 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 		if ret := exp.DOT(); ret != nil {
 			id := exp.IDENTIFIER()
-			leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(id.GetText()))
+			test := id.GetText()
+			leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(test))
 		}
 	} else {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
@@ -219,11 +220,17 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				_ = a
 			}
 			if _, ok := rv.(*ssa.TypeValue); ok {
-				t := rv.GetType().(*ssa.ObjectType)
-				funcs := b.GetExtendFuncs(t.Name)
+				exData := b.GetExData(exp.PrimaryExpr().GetText())
+
+				funcs := exData.GetExtendFuncs()
 				if fun := funcs[test]; fun != nil {
 					return fun, nil
-				} // TODO 目前没法识别golang库中的函数
+				}
+				if glv := exData.GetExtendGlobal(test); glv != nil {
+					return glv, nil
+				}
+
+				// TODO 目前没法识别golang库中的函数
 				b.NewError(ssa.Warn, TAG, "function not found, but create")
 				rightv = b.ReadValue(test)
 			} else {
@@ -413,9 +420,6 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.buildBoolLiteral(text)
 		}
 		v := b.PeekValue(text)
-		/*if v == nil {
-			v = b.GetGlobalVariableR(text)
-		}*/
 		if v != nil {
 			return v
 		}
@@ -424,9 +428,8 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return v
 		}
 
-		if t := b.GetStructByStr(text); t != nil {
-			typValue := ssa.NewTypeValue(t)
-			typValue.SetType(t)
+		if exData := b.GetExData(text); exData != nil {
+			typValue := ssa.NewTypeValue(ssa.GetAnyType())
 			return typValue
 		}
 
