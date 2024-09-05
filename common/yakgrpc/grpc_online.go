@@ -231,11 +231,18 @@ func (s *Server) DownloadOnlinePluginBatch(ctx context.Context, req *ypb.Downloa
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 	plugins := client.DownloadOnlinePluginsBatch(ctx, req.Token, req.IsPrivate, req.Keywords, req.PluginType, req.Tags, req.UserName, req.UserId,
 		req.TimeSearch, req.Group, req.ListType, req.Status, req.UUID, req.ScriptName)
+	successCount := 0
 	for pluginIns := range plugins.Chan {
 		err := client.Save(s.GetProfileDatabase(), pluginIns.Plugin)
 		if err != nil {
 			log.Errorf("save err failed: %s", err)
+		} else {
+			successCount++
 		}
+	}
+
+	if len(req.UUID) > 0 && (len(req.UUID)-successCount) > 0 {
+		return nil, utils.Errorf("插件下载成功: %v个, 失败: %v个", successCount, len(req.UUID)-successCount)
 	}
 
 	return &ypb.Empty{}, nil
