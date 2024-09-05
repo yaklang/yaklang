@@ -123,70 +123,36 @@ func (a *AnalyzeContext) GetCallFromLastCrossProcess() *Value {
 	return nil
 }
 
-func (a *AnalyzeContext) TheDefaultShouldBeVisited(i *Value) bool {
+func (a *AnalyzeContext) TheValueShouldBeVisited(i *Value) bool {
 	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
 	if !ok {
 		return false
 	}
-	if _, ok := valueVisited.visitedDefault[i.GetId()]; !ok {
-		valueVisited.visitedDefault[i.GetId()] = struct{}{}
+	if _, ok := valueVisited.visited[i.GetId()]; !ok {
+		valueVisited.visited[i.GetId()] = struct{}{}
 		return true
 	}
 	return false
 }
 
-func (a *AnalyzeContext) TheParameterShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
+func (a *AnalyzeContext) TheCrossProcessVisited(from *Value, to *Value) bool {
+	visited := a.crossProcessVisitedTable.valueVisitedTable
+	if visited == nil {
 		return false
 	}
-	if _, ok := valueVisited.visitedParameter[i.GetId()]; !ok {
-		valueVisited.visitedParameter[i.GetId()] = struct{}{}
+	hash := calcCrossProcessHash(from, to)
+	_, ok := visited.Get(hash)
+	if ok {
 		return true
 	}
 	return false
-}
 
-func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visitedPhi[i.GetId()]; !ok {
-		valueVisited.visitedPhi[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
-}
-
-func (a *AnalyzeContext) TheMemberShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visitedObject[i.GetId()]; !ok {
-		valueVisited.visitedObject[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
-}
-
-func (a *AnalyzeContext) TheCallShouldBeVisited(i *Value) bool {
-	valueVisited, ok := a.crossProcessVisitedTable.getCurrentVisited()
-	if !ok {
-		return false
-	}
-	if _, ok := valueVisited.visitedCall[i.GetId()]; !ok {
-		valueVisited.visitedCall[i.GetId()] = struct{}{}
-		return true
-	}
-	return false
 }
 
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
-	if !g.TheMemberShouldBeVisited(member) {
+	if !g.TheValueShouldBeVisited(member) {
 		return utils.Errorf("This member(%d) visited, skip", member.GetId())
 	}
 	if !obj.IsObject() {
