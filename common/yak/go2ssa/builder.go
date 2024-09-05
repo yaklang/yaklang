@@ -21,6 +21,14 @@ type SSABuilder struct {
 	ssa.DummyPreHandler
 }
 
+type ExData struct {
+	exPath       string
+	exGlobals    map[string]ssa.Value
+	exFuncs      map[string]*ssa.Function
+	exTypes      map[string]ssa.Type
+	exAliasTypes map[string]*ssa.AliasType
+}
+
 var Builder = &SSABuilder{}
 var SpecialTypes = map[string]ssa.Type{
 	"comparable": ssa.CreateAnyType(),
@@ -90,9 +98,9 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
 		result:          map[string][]string{},
-		extendFuncs:     map[string]map[string]*ssa.Function{},
 		tpHander:        map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
+		extendKey:       map[string]*ExData{},
 		pkgNameCurrent:  "",
 	}
 
@@ -113,9 +121,9 @@ type astbuilder struct {
 	structTypes    map[string]*ssa.ObjectType
 	aliasTypes     map[string]*ssa.AliasType
 	result         map[string][]string
-	extendFuncs    map[string]map[string]*ssa.Function
 	tpHander       map[string]func()
 	labels         map[string]*ssa.LabelBuilder
+	extendKey      map[string]*ExData
 	pkgNameCurrent string
 }
 
@@ -196,7 +204,11 @@ func (b *astbuilder) GetGlobalVariableR(name string) ssa.Value {
 }
 
 func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
-	return nil
+	var variables = make(map[string]ssa.Value)
+	for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+		variables[i.String()] = m
+	}
+	return variables
 }
 
 func (b *astbuilder) AddResultDefault(name string) {
@@ -213,15 +225,56 @@ func (b *astbuilder) GetResultDefault() []string {
 	return b.result[b.Function.GetName()]
 }
 
-func (b *astbuilder) AddExtendFuncs(name string, funcs map[string]*ssa.Function) {
-	b.extendFuncs[name] = funcs
+func (b *astbuilder) AddExData(exPath string) *ExData {
+	exData := &ExData{
+		exPath:       exPath,
+		exGlobals:    map[string]ssa.Value{},
+		exFuncs:      map[string]*ssa.Function{},
+		exTypes:      map[string]ssa.Type{},
+		exAliasTypes: map[string]*ssa.AliasType{},
+	}
+	b.extendKey[exPath] = exData
+	return exData
 }
 
-func (b *astbuilder) GetExtendFuncs(name string) map[string]*ssa.Function {
-	if b.extendFuncs[name] == nil {
+func (b *astbuilder) GetExData(exPath string) *ExData {
+	return b.extendKey[exPath]
+}
+
+func (b *ExData) AddExtendFunc(fun *ssa.Function) {
+	b.exFuncs[fun.GetName()] = fun
+}
+
+func (b *ExData) AddExtendFuncs(funcs map[string]*ssa.Function) {
+	for _, f := range funcs {
+		b.AddExtendFunc(f)
+	}
+}
+
+func (b *ExData) GetExtendFuncs() map[string]*ssa.Function {
+	return b.exFuncs
+}
+
+func (b *ExData) AddExtendType(name string, t ssa.Type) {
+	b.exTypes[name] = t
+}
+
+func (b *ExData) GetExtendType(name string) ssa.Type {
+	if b.exTypes[name] == nil {
 		return nil
 	}
-	return b.extendFuncs[name]
+	return b.exTypes[name]
+}
+
+func (b *ExData) AddExtendGlobal(name string, v ssa.Value) {
+	b.exGlobals[name] = v
+}
+
+func (b *ExData) GetExtendGlobal(name string) ssa.Value {
+	if b.exGlobals[name] == nil {
+		return nil
+	}
+	return b.exGlobals[name]
 }
 
 func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
@@ -261,6 +314,10 @@ func (b *astbuilder) GetAliasByStr(name string) ssa.Type {
 		return nil
 	}
 	return b.aliasTypes[name].GetType()
+}
+
+func (b *astbuilder) GetAliasAll() map[string]*ssa.AliasType {
+	return b.aliasTypes
 }
 
 // ====================== Special
