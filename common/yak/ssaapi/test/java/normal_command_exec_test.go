@@ -461,7 +461,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `}, //数组 String[] 作为污点源
-		{"aTaintCase0150", false, []string{"Parameter-cmd", "2"},
+		{"aTaintCase0150", false, []string{"Undefined-Runtime", "Parameter-cmd", "2", "Undefined-Runtime.getRuntime", "Undefined-data.toString"},
 			`/**
      * 数组 char[] 作为污点源
      *

@@ -76,7 +76,7 @@ eval($a);
 	ssatest.CheckSyntaxFlow(t, code,
 		`eval(* #-> * as $param)`,
 		map[string][]string{
-			"param": {"make(any)"},
+			"param": {"make(any)","Undefined-$a(valid)"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
