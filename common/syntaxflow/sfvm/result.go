@@ -3,7 +3,6 @@ package sfvm
 import (
 	"bytes"
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -54,18 +53,14 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 		}
 		return true
 	})
-	lo.ForEach(lo.Entries(result.AlertSymbolTable), func(item lo.Entry[string, ValueOperator], index int) {
-		s.AlertSymbolTable[item.Key] = item.Value
-	})
-	lo.ForEach(lo.Entries(result.AlertMsgTable), func(item lo.Entry[string, string], index int) {
-		s.AlertMsgTable[item.Key] = item.Value
-	})
-	lo.ForEach(result.CheckParams, func(item string, index int) {
-		s.CheckParams = append(result.CheckParams, item)
-	})
-	lo.ForEach(result.Errors, func(item string, index int) {
-		s.Errors = append(s.Errors, item)
-	})
+	for k, v := range result.AlertSymbolTable {
+		s.AlertSymbolTable[k] = v
+	}
+	for k, v := range result.AlertMsgTable {
+		s.AlertMsgTable[k] = v
+	}
+	s.CheckParams = append(s.CheckParams, result.CheckParams...)
+	s.Errors = append(s.Errors, result.Errors...)
 }
 
 type showConfig struct {
