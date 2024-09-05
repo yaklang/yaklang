@@ -168,22 +168,17 @@ func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
 	return s.result.SymbolTable
 }
 func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
+	if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
+		return val, b
+	}
 	switch sfi.OpCode {
-	case OpMergeRef:
-		fallthrough
-	case OpRemoveRef:
-		fallthrough
-	case OpIntersectionRef:
-		if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
-			return val, b
-		}
+	// variable +/-/&& can read from context
+	case OpMergeRef, OpRemoveRef, OpIntersectionRef:
 		if s.context != nil {
 			return s.context.SymbolTable.Get(sfi.UnaryStr)
 		}
-		return nil, false
-	default:
-		return s.result.SymbolTable.Get(sfi.UnaryStr)
 	}
+	return nil, false
 }
 
 func (s *SFFrame) ToLeft() bool {
