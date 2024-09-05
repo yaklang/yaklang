@@ -3,6 +3,8 @@ package sfvm
 import (
 	"bytes"
 	"fmt"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -10,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type SFFrameResult struct {
@@ -37,11 +38,10 @@ func NewSFResult(rule string) *SFFrameResult {
 	}
 }
 
-func (s *SFFrameResult) Show() {
-	fmt.Println(s.String())
-}
-
 func (s *SFFrameResult) String() string {
+	return s.StringEx(true)
+}
+func (s *SFFrameResult) StringEx(show bool) string {
 	buf := bytes.NewBufferString("")
 	buf.WriteString(fmt.Sprintf("rule md5 hash: %v\n", codec.Md5(s.Rule)))
 	buf.WriteString(fmt.Sprintf("rule preview: %v\n", utils.ShrinkString(s.Rule, 64)))
@@ -54,7 +54,6 @@ func (s *SFFrameResult) String() string {
 		}
 		return buf.String()
 	}
-
 	count := 0
 	if s.SymbolTable.Len() > 0 {
 		buf.WriteString("Result Vars: \n")
@@ -63,53 +62,59 @@ func (s *SFFrameResult) String() string {
 		s.SymbolTable.Delete("_")
 		s.SymbolTable.Delete("$_")
 	}
-	s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
-		count++
-		var all []ValueOperator
-		_ = v.Recursive(func(operator ValueOperator) error {
-			all = append(all, operator)
-			return nil
-		})
-		if len(all) >= 1 {
-			prefixVariable := "  "
-			varName := i
-			if !strings.HasPrefix(varName, "$") {
-				varName = "$" + varName
-			}
-			buf.WriteString(prefixVariable + i + ":\n")
-			prefixVariableResult := "    "
-			for idxRaw, v := range all {
-				var idx = fmt.Sprint(int64(idxRaw + 1))
-				if raw, ok := v.(interface{ GetId() int64 }); ok {
-					idx = fmt.Sprintf("t%v", raw.GetId())
+	handler := func(_map map[string]ValueOperator) {
+		lo.ForEach(lo.Entries(_map), func(item lo.Entry[string, ValueOperator], index int) {
+			count++
+			var all []ValueOperator
+			_ = item.Value.Recursive(func(operator ValueOperator) error {
+				all = append(all, operator)
+				return nil
+			})
+			if len(all) >= 1 {
+				prefixVariable := "  "
+				varName := item.Key
+				if !strings.HasPrefix(varName, "$") {
+					varName = "$" + varName
 				}
-				buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
-				if rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf }); ok {
-					ssaRange := rangeIns.GetRange()
-					if ssaRange != nil {
-						start, end := ssaRange.GetStart(), ssaRange.GetEnd()
-						editor := ssaRange.GetEditor()
-						fileName := editor.GetFilename()
-						if fileName == "" {
-							var err error
-							editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
-							if err != nil {
-								log.Warn(err)
-							}
-							if editor != nil {
-								fileName = editor.GetFilename()
-								if fileName == "" {
-									fileName = `[md5:` + editor.SourceCodeMd5() + `]`
+				buf.WriteString(prefixVariable + item.Key + ":\n")
+				prefixVariableResult := "    "
+				for idxRaw, v := range all {
+					var idx = fmt.Sprint(int64(idxRaw + 1))
+					if raw, ok := v.(interface{ GetId() int64 }); ok {
+						idx = fmt.Sprintf("t%v", raw.GetId())
+					}
+					buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
+					if rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf }); ok {
+						ssaRange := rangeIns.GetRange()
+						if ssaRange != nil {
+							start, end := ssaRange.GetStart(), ssaRange.GetEnd()
+							editor := ssaRange.GetEditor()
+							fileName := editor.GetFilename()
+							if fileName == "" {
+								var err error
+								editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
+								if err != nil {
+									log.Warn(err)
+								}
+								if editor != nil {
+									fileName = editor.GetFilename()
+									if fileName == "" {
+										fileName = `[md5:` + editor.SourceCodeMd5() + `]`
+									}
 								}
 							}
+							buf.WriteString(fmt.Sprintf(prefixVariableResult+"    %v:%v:%v - %v:%v\n", fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn()))
 						}
-						buf.WriteString(fmt.Sprintf(prefixVariableResult+"    %v:%v:%v - %v:%v\n", fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn()))
 					}
 				}
 			}
-		}
-		return true
-	})
+		})
+	}
+	if !show {
+		handler(s.AlertSymbolTable)
+	} else {
+		handler(s.SymbolTable.GetMap())
+	}
 	return buf.String()
 }
 
