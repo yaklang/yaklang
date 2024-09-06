@@ -682,7 +682,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		i := s.stack.Pop()
 		s.debugSubLog(">> pop %v", valuesLen(i))
 		s.debugSubLog("save-to $_")
-		err := s.saveUnName(i)
+		err := s.output("_", i)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
 			return utils.Wrapf(CriticalError, "output '_' error: %v", err)
@@ -1172,10 +1172,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 	return nil
 }
 
-func (s *SFFrame) saveUnName(operator ValueOperator) error {
-	s.result.UnNameValue = append(s.result.UnNameValue, operator)
-	return nil
-}
+// func (s *SFFrame) saveUnName(operator ValueOperator) error {
+// 	s.result.UnNameValue = append(s.result.UnNameValue, operator)
+// 	return nil
+// }
 
 func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 	var value = operator
@@ -1202,7 +1202,12 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 		}
 	}
 
-	s.GetSymbolTable().Set(resultName, value)
+	if resultName == "_" {
+		s.result.UnNameValue = append(s.result.UnNameValue, value)
+	} else {
+
+		s.GetSymbolTable().Set(resultName, value)
+	}
 	if s.config != nil {
 		for _, callback := range s.config.onResultCapturedCallbacks {
 			if err := callback(resultName, operator); err != nil {
