@@ -21,13 +21,12 @@ function dump($a){}
 	})
 	t.Run("array assign", func(t *testing.T) {
 		code := `<?php
-
 $files[] = array(
-    'url' => substr($path2, strlen($_SERVER['DOCUMENT_ROOT'])),
+    'url' => substr($path2, a),
     'mtime' => filemtime($path2)
 );
 println($files);
 `
-		test.CheckSyntaxFlowPrintWithPhp(t, code, []string{"make(any)", "Undefined-substr", "Undefined-$path2", "Function-strlen", "Undefined-global-container._SERVER.DOCUMENT_ROOT(valid)", "Undefined-filemtime"})
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"make(any)", "Undefined-substr", "Undefined-$path2", "Undefined-a", "Undefined-filemtime"}}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
