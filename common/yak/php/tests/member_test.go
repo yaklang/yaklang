@@ -28,6 +28,6 @@ $files[] = array(
 );
 println($files);
 `
-		test.CheckSyntaxFlowPrintWithPhp(t, code, []string{"make(any)", "Undefined-substr", "Undefined-$path2", "Function-strlen", "make(any)", "Undefined-filemtime"})
+		test.CheckSyntaxFlowPrintWithPhp(t, code, []string{"make(any)", "Undefined-substr", "Undefined-$path2", "Function-strlen", "Undefined-global-container._SERVER.DOCUMENT_ROOT(valid)", "Undefined-filemtime"})
 	})
 }
