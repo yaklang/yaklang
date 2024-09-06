@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var Cases = []BuildinRuleTestCase{
@@ -135,6 +136,7 @@ var Cases = []BuildinRuleTestCase{
 }
 
 func TestVerifiedRule(t *testing.T) {
+	yakit.InitialDatabase()
 	for rule := range sfdb.YieldSyntaxFlowRules(consts.GetGormProfileDatabase(), context.Background()) {
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
