@@ -5,10 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/twofa"
 	"io"
 	"io/fs"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -36,6 +39,67 @@ import (
 )
 
 var UtilsCommands = []*cli.Command{
+	{
+		Name: "http-server",
+		Flags: []cli.Flag{
+			cli.IntFlag{
+				Name:  "port",
+				Usage: "default-ports default 8089",
+				Value: 8089,
+			},
+			cli.StringFlag{Name: "d,dir", Usage: "which directory do u want to serve"},
+			cli.StringFlag{Name: "f,file", Usage: "which file do u want to serve"},
+		},
+		Action: func(c *cli.Context) error {
+			lis, err := net.Listen("tcp", utils.HostPort("0.0.0.0", c.Int("port")))
+			if err != nil {
+				return err
+			}
+
+			dirname := c.String("dir")
+			filename := c.String("file")
+			if dirname == "" && filename == "" {
+				return utils.Errorf("directory or file should be set")
+			}
+			if dirname != "" {
+				log.Infof("input: -d %v", dirname)
+			}
+			if filename != "" {
+				log.Infof("input: -f %v", filename)
+			}
+
+			ifaces, err := pcap.FindAllDevs()
+			if err != nil {
+				return err
+			}
+			for _, iface := range ifaces {
+				for _, addr := range iface.Addresses {
+					v4 := addr.IP.String()
+					if !utils.IsIPv4(v4) {
+						continue
+					}
+					log.Infof("serve on: http://%v:%v", v4, c.Int("port"))
+				}
+			}
+
+			if utils.IsDir(dirname) && dirname != "" {
+				log.Infof("enable fileserver for dir: %v", dirname)
+				err = http.Serve(lis, http.FileServer(http.Dir(dirname)))
+				if err != nil {
+					return err
+				}
+			} else {
+				log.Infof("enable fileserver for file: %v", filename)
+				err = http.Serve(lis, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					http.ServeFile(writer, request, filename)
+				}))
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 	{
 		Name:  "gzip",
 		Usage: "gzip data or file",
