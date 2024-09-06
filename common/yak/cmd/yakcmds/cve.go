@@ -185,7 +185,7 @@ var CVEUtilCommands = []*cli.Command{
 				if !c.Bool("cache") {
 					err := cvequeryops.DownLoad(cvePath)
 					if err != nil {
-						log.Error("download failed: %s, err")
+						log.Errorf("download failed: %s", err)
 						downloadFailed = true
 						return
 					}
@@ -197,7 +197,7 @@ var CVEUtilCommands = []*cli.Command{
 				log.Infof("using description database: %s", descDBPath)
 				db, err := gorm.Open("sqlite3", descDBPath)
 				if err != nil {
-					log.Error("sqlite3 failed: %s", err)
+					log.Errorf("sqlite3 failed: %s", err)
 					return
 				}
 				log.Info("start to handling cve description db")
