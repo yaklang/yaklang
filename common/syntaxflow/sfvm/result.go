@@ -161,14 +161,15 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 			fileName, start.GetLine(), start.GetColumn(), end.GetLine(), end.GetColumn(),
 		))
 		if cfg.showCode {
-			showValue, ok := value.(interface{ StringWithSourceCode(msg ...string) string })
+			showValue, ok := v.(interface{ StringWithSourceCode(msg ...string) string })
 			if !ok {
 				continue
 			}
 			buf.WriteString(showValue.StringWithSourceCode())
 		}
+
 		if cfg.showDot {
-			showDot, ok := value.(interface{ DotGraph() string })
+			showDot, ok := v.(interface{ DotGraph() string })
 			if !ok {
 				continue
 			}
