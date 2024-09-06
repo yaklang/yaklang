@@ -102,7 +102,7 @@ func TestSFURl(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		spew.Dump(res)
-		checkVariable(t, res, []string{"a"})
+		checkVariable(t, res, []string{"a", "_"})
 	})
 
 	t.Run("check syntaxflow variable no data", func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestSFURl(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		spew.Dump(res)
-		checkVariable(t, res, []string{"target1", "a"})
+		checkVariable(t, res, []string{"target1", "a", "_"})
 		target1 := res[0]
 		assert.Equal(t, target1.VerboseName, "alert information")
 		assert.Equal(t, target1.ResourceType, "variable")
@@ -146,7 +146,7 @@ func TestSFURl(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		spew.Dump(res)
-		checkVariable(t, res, []string{"a", "not_const_parameter", "const_parameter"})
+		checkVariable(t, res, []string{"a", "not_const_parameter", "const_parameter", "_"})
 
 		errMsg := res[0]
 		assert.Equal(t, errMsg.ResourceType, "message")
@@ -172,7 +172,7 @@ func TestSFURl(t *testing.T) {
 			res, err := SendURL(local, progID, "/", query)
 			assert.NoError(t, err)
 			spew.Dump(res)
-			checkVariable(t, res, []string{"target", "a"})
+			checkVariable(t, res, []string{"target", "a", "_"})
 		}
 
 		{
