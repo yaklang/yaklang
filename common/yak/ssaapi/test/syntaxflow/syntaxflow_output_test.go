@@ -2,12 +2,12 @@ package syntaxflow
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"strings"
-	"testing"
 )
 
 func TestSfOutput(t *testing.T) {
@@ -22,16 +22,27 @@ b as $b
 alert $b
 `)
 		require.NoError(t, err)
+		// default
 		result := sfResult.String()
 		fmt.Println(result)
-		require.True(t, strings.Contains(result, "$b:") && !strings.Contains(result, "$a:"))
+		require.Contains(t, result, "$b:")
+		require.NotContains(t, result, "$a:")
+
+		// show all
 		result = sfResult.String(sfvm.WithShowAll(true))
 		fmt.Println(result)
-		require.True(t, strings.Contains(result, "$b:") && strings.Contains(result, "$a:"))
-		result = sfResult.String(sfvm.WithShowAll(true), sfvm.WithShowCode(true))
+		require.Contains(t, result, "$b:")
+		require.Contains(t, result, "$a:")
+
+		// with code
+		result = sfResult.String(sfvm.WithShowCode(true))
 		fmt.Println(result)
-		result = sfResult.String(sfvm.WithShowAll(true), sfvm.WithShowDot(true))
+		require.Contains(t, result, "b = 2")
+
+		// with dot
+		result = sfResult.String(sfvm.WithShowDot(true))
 		fmt.Println(result)
+		require.Contains(t, result, "strict digraph")
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
 }
