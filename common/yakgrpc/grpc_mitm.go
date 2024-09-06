@@ -1192,29 +1192,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				log.Warnf("Hijack warning: %v", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
-			if beforeRequest != nil {
-				newHijackReq := beforeRequest(isHttps, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
-				if handleRequestModified(newHijackReq) {
-					hijackReq = newHijackReq
-					setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
-				}
-			}
 		}()
-
-		rules, req1, shouldBeDropped := replacer.hook(true, false, req, isHttps)
-		if shouldBeDropped {
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
-			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
-			return nil
-		}
-		httpctx.AppendMatchedRule(originReqIns, rules...)
-
-		modifiedByRule := false
-		if handleRequestModified(req1) {
-			req = req1
-			modifiedByRule = true
-			setModifiedRequest("yakit.mitm.replacer", req1)
-		}
 
 		/* 由 MITM Hooks 触发 */
 		var (
@@ -1242,6 +1220,38 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 			httpctx.SetRequestURL(originReqIns, urlStr)
 		}
+
+		// 过滤
+		if !filterManager.IsPassed(method, hostname, urlStr, extName, isHttps) {
+			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
+			return req
+		}
+
+		defer func() {
+			if beforeRequest != nil {
+				newHijackReq := beforeRequest(isHttps, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
+				if handleRequestModified(newHijackReq) {
+					hijackReq = newHijackReq
+					setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
+				}
+			}
+		}()
+
+		rules, req1, shouldBeDropped := replacer.hook(true, false, req, isHttps)
+		if shouldBeDropped {
+			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
+			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
+			return nil
+		}
+		httpctx.AppendMatchedRule(originReqIns, rules...)
+
+		modifiedByRule := false
+		if handleRequestModified(req1) {
+			req = req1
+			modifiedByRule = true
+			setModifiedRequest("yakit.mitm.replacer", req1)
+		}
+
 		mitmPluginCaller.CallHijackRequest(isHttps, urlStr,
 			func() interface{} {
 				if modifiedByRule {
@@ -1271,12 +1281,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		if httpctx.GetRequestIsModified(originReqIns) {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
-		}
-
-		// 过滤
-		if !filterManager.IsPassed(method, hostname, urlStr, extName, isHttps) {
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
-			return req
 		}
 
 		// MITM 手动劫持放行
@@ -1471,14 +1475,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		shouldBeHijacked := !isFiltered
-		go func() {
-			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
-		}()
-
 		// 劫持过滤
 		if isFiltered {
 			return
 		}
+		go func() {
+			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
+		}()
 
 		saveBarePacketHandler := func(id uint) {
 			// 存储KV，将flow ID作为key，bare request和bare response作为value
