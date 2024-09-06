@@ -601,7 +601,11 @@ func GetKeyString(key Value) string {
 	}
 
 	if text == "" {
-		rawText := key.GetRange().GetText()
+		rng := key.GetRange()
+		if rng == nil {
+			return ""
+		}
+		rawText := rng.GetText()
 		idx := strings.LastIndex(rawText, ".")
 		if idx != -1 {
 			text = rawText[idx+1:]
