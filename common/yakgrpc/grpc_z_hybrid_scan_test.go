@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/tidwall/gjson"
-	"testing"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/schema"
+	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -50,6 +52,28 @@ func TestServer_HybridScan(t *testing.T) {
 		}
 		spew.Dump(rsp)
 	}
+}
+
+func TestTargetGenerator_InputTargetFile(t *testing.T) {
+	fp, err := ioutil.TempFile("", "tmpfile-*.txt")
+	expected := []string{"192.168.1.1", "192.168.1.2", "192.168.1.3"}
+	fp.WriteString(strings.Join(expected, "\n"))
+	targetFile := fp.Name()
+	defer func() {
+		fp.Close()
+		os.Remove(targetFile)
+	}()
+	targets := &ypb.HybridScanInputTarget{
+		InputFile: []string{targetFile},
+	}
+	gen, err := TargetGenerator(context.Background(), consts.GetGormProjectDatabase(), targets)
+	require.NoError(t, err)
+	got := make([]string, 0, len(expected))
+	for target := range gen {
+		u := utils.ParseStringToUrl(target.Url)
+		got = append(got, u.Host)
+	}
+	require.ElementsMatch(t, expected, got)
 }
 
 func TestGRPCMUSTPASS_HybridScan_status(t *testing.T) {

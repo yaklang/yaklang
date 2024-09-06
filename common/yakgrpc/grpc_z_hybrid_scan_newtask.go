@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
@@ -22,6 +23,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
+	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -439,7 +442,21 @@ type HybridScanTarget struct {
 func TargetGenerator(ctx context.Context, db *gorm.DB, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
 	outTarget := make(chan *HybridScanTarget)
-	buildRes, err := BuildHttpRequestPacket(db, targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
+	inputTarget := targetConfig.GetInput()
+	inputTargetFile := targetConfig.GetInputFile()
+	if len(inputTargetFile) != 0 {
+		inputTarget += "\n" + strings.Join(
+			lo.FilterMap(inputTargetFile, func(file string, _ int) (string, bool) {
+				fileContent, err := os.ReadFile(file)
+				if err != nil {
+					return "", false
+				}
+				return strings.ReplaceAll(string(fileContent), "\r", ""), true
+			}), "\n",
+		)
+	}
+	inputTarget = strings.TrimSpace(inputTarget)
+	buildRes, err := BuildHttpRequestPacket(db, targetConfig.GetHTTPRequestTemplate(), inputTarget)
 	if err != nil {
 		return nil, err
 	}
