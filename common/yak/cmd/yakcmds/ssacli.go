@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"golang.org/x/exp/slices"
 
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
@@ -104,11 +105,22 @@ var SSACompilerCommands = []*cli.Command{
 			}
 
 			programName := c.String("program")
+			reCompile := c.Bool("re-compile")
 			if programName != "" {
 				defer func() {
 					ssa.ShowDatabaseCacheCost()
 				}()
 			}
+			// check program name duplicate
+			if slices.Contains(ssadb.AllPrograms(ssadb.GetDB()), programName) {
+				if !reCompile {
+					return utils.Errorf(
+						"program name %v existed, please use `re-compile` flag to re-compile or change program name",
+						programName,
+					)
+				}
+			}
+
 			entry := c.String("entry")
 			input_language := c.String("language")
 			inMemory := c.Bool("memory")
@@ -121,8 +133,6 @@ var SSACompilerCommands = []*cli.Command{
 			sfDebug := c.Bool("syntaxflow-debug")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
-			// TODO: re-compile
-			// re-compile := c.Bool("re-compile")
 
 			// set database
 			if databaseFileRaw != "" {
@@ -142,6 +152,7 @@ var SSACompilerCommands = []*cli.Command{
 			opt = append(opt, ssaapi.WithDatabasePath(databaseFileRaw))
 			log.Infof("start to compile file: %v ", target)
 			opt = append(opt, ssaapi.WithRawLanguage(input_language))
+			opt = append(opt, ssaapi.WithReCompile(reCompile))
 			if entry != "" {
 				log.Infof("start to use entry file: %v", entry)
 				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
