@@ -1,15 +1,20 @@
 package syntaxflow
 
 import (
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
-func TestLib_ServletParam(t *testing.T) {
-
+func createTestVFS() filesys_interface.FileSystem {
 	vfs := filesys.NewVirtualFs()
 	vfs.AddFile("A.java", `package net.javaguides.usermanagement.web;
 
@@ -133,6 +138,11 @@ public class UserServlet extends HttpServlet {
 	}
 
 }`)
+	return vfs
+}
+
+func TestLib_ServletParam(t *testing.T) {
+	vfs := createTestVFS()
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
 		results := prog.SyntaxFlowChain(`<include('servlet-param')> as $params`)
@@ -140,4 +150,24 @@ public class UserServlet extends HttpServlet {
 		assert.Greater(t, len(results), 7)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func Test_Include_HitCache(t *testing.T) {
+	programName := uuid.NewString()
+	vfs := createTestVFS()
+	prog, err := ssaapi.ParseProject(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	start := time.Now()
+	prog.SyntaxFlowWithError(`include('servlet-param')`)
+	elapsed := time.Since(start)
+
+	start = time.Now()
+	prog.SyntaxFlowWithError(`include('servlet-param')`)
+	elapsed2 := time.Since(start)
+
+	log.Infof("elapsed: %v, elapsed2: %v", elapsed, elapsed2)
+	// assert that the second call is faster than the first call
+	assert.Less(t, elapsed2*10, elapsed)
 }

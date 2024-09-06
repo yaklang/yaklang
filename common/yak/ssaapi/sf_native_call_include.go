@@ -32,7 +32,13 @@ func ValidSyntaxFlowRule(s *schema.SyntaxFlowRule) error {
 	return nil
 }
 
-func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var includeCache = createIncludeCache()
+
+func createIncludeCache() *utils.Cache[sfvm.ValueOperator] {
+	return utils.NewTTLCache[sfvm.ValueOperator]()
+}
+
+func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.ValueOperator, err error) {
 	var parent *Program
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		switch ret := operator.(type) {
@@ -57,6 +63,20 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	if ruleName == "" {
 		return false, nil, utils.Error("no rule name found")
 	}
+
+	if includeCache != nil {
+		hash := utils.CalcSha256(ruleName, parent.GetNames())
+		if ret, ok := includeCache.Get(hash); ok {
+			return true, ret, nil
+		}
+		defer func() {
+			if !success || value == nil || err != nil {
+				return
+			}
+			includeCache.Set(hash, value)
+		}()
+	}
+
 	rule, err := sfdb.GetLibrary(ruleName)
 	if err != nil {
 		log.Warnf("get syntaxflow rule library %v error: %v", ruleName, err)
