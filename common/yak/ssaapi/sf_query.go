@@ -10,6 +10,7 @@ import (
 type SyntaxFlowResult struct {
 	*sfvm.SFFrameResult
 	symbol map[string]Values
+	unName Values
 }
 
 func (r *SyntaxFlowResult) GetValues(name string) Values {
@@ -27,6 +28,16 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 	return nil
 }
 
+func (r *SyntaxFlowResult) GetUnNameValues() Values {
+	if r == nil || r.symbol == nil || r.SFFrameResult == nil {
+		return nil
+	}
+	if len(r.unName) < len(r.UnNameValue) {
+		r.unName = SyntaxFlowVariableToValues(sfvm.NewValues(r.SFFrameResult.UnNameValue))
+	}
+	return r.unName
+}
+
 func (r *SyntaxFlowResult) GetAllValues() map[string]Values {
 	if r == nil || r.symbol == nil || r.SFFrameResult == nil {
 		return nil
@@ -34,20 +45,18 @@ func (r *SyntaxFlowResult) GetAllValues() map[string]Values {
 	for name := range r.SFFrameResult.SymbolTable.GetMap() {
 		r.GetValues(name)
 	}
+	// only when no symbol, we use unName values
+	if len(r.symbol) == 0 {
+		r.symbol["_"] = r.GetUnNameValues()
+	}
 	return r.symbol
 }
 
 func (r *SyntaxFlowResult) GetAllValuesChain() Values {
 	var results Values
 	m := r.GetAllValues()
-	for name, vs := range m {
-		if name == "_" {
-			continue
-		}
+	for _, vs := range m {
 		results = append(results, vs...)
-	}
-	if len(results) == 0 {
-		results = append(results, r.GetValues("_")...)
 	}
 	return results
 }
