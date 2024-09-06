@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"sync"
 	"testing"
@@ -489,4 +490,66 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 		}
 		cancel()
 	})
+}
+
+func TestGRPCMUSTPASS_MITM_Filter_Plugin(t *testing.T) {
+	var PluginTriggered bool
+	testToken := utils.RandStringBytes(10)
+	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		token := lowhttp.GetHTTPRequestQueryParam(req, "token")
+		if token == testToken {
+			PluginTriggered = true
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
+	})
+	packet := []byte(fmt.Sprintf(`GET /abc HTTP/1.1
+Host: 127.0.0.1:%d`, mockPort))
+
+	code := fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+poc.HTTP(req,poc.replaceQueryParam("token", "%s"))
+}
+
+hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
+poc.HTTP(req,poc.replaceQueryParam("token", "%s"))
+}
+
+beforeRequest = func(ishttps, oreq/*原始请求*/, req/*hijack修改后的请求*/){
+	poc.HTTP(req,poc.replaceQueryParam("token", "%s"))
+}
+
+afterRequest = func(ishttps, oreq/*原始请求*/ ,req/*hiajck修改之后的请求*/ ,orsp/*原始响应*/ ,rsp/*hijack修改后的响应*/){
+	poc.HTTP(req,poc.replaceQueryParam("token", "%s"))	
+}
+`, testToken, testToken, testToken, testToken)
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
+	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	}, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			SetYakScript:     true,
+			YakScriptContent: code,
+		})
+		stream.Recv()
+		stream.Send(&ypb.MITMRequest{
+			UpdateFilter: true,
+			ExcludeUri:   []string{"abc"},
+		})
+		stream.Recv()
+		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
+		_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
+		require.NoError(t, err)
+		time.Sleep(3 * time.Second)
+		cancel()
+	})
+	require.False(t, PluginTriggered)
 }
