@@ -68,7 +68,7 @@ func TestCheckStatement(t *testing.T) {
 				assert.NotNil(t, err)
 				log.Infof("err: %v", err)
 				log.Infof("data: %v", data)
-				assert.Equal(t, 1, data.SymbolTable.Len()) // just "_"
+				assert.Equal(t, 0, len(data.GetAllValuesChain()))
 				return nil
 			})
 	})
