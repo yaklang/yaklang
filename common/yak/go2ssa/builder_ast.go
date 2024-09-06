@@ -70,15 +70,14 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		namel, pkgNamel := b.buildImportDecl(impo.(*gol.ImportDeclContext))
 		for i := range pkgNamel {
 			pkgName := strings.Split(pkgNamel[i], "/")
+			path := ""
+			if namel[i] != "" {
+				path = namel[i]
+			} else {
+				path = pkgName[len(pkgName)-1]
+			}
+			exData := b.AddExData(path)
 			if lib, _ := b.GetProgram().GetLibrary(pkgNamel[i]); lib != nil {
-				path := ""
-				if namel[i] != "" {
-					path = namel[i]
-				} else {
-					path = pkgName[len(pkgName)-1]
-				}
-				exData := b.AddExData(path)
-
 				for _, cbp := range lib.ClassBluePrint { // only once
 					for i, v := range cbp.StaticMember {
 						exData.AddExtendType(i, v.GetType())
@@ -92,11 +91,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 						exData.AddExtendGlobal(i, v.Value)
 					}
 				}
-			} else {
-				objt := ssa.NewObjectType()
-				objt.SetTypeKind(ssa.StructTypeKind)
-				objt.SetName(pkgName[len(pkgName)-1])
-				b.AddStruct(objt.Name, objt)
 			}
 		}
 	}

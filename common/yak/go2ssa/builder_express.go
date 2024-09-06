@@ -219,20 +219,17 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			if a := exp.TypeArgs(); a != nil {
 				_ = a
 			}
-			if _, ok := rv.(*ssa.TypeValue); ok {
-				exData := b.GetExData(exp.PrimaryExpr().GetText())
 
-				funcs := exData.GetExtendFuncs()
-				if fun := funcs[test]; fun != nil {
-					return fun, nil
+			if exData := b.GetExData(rv.GetName()); exData != nil {
+				if fun := exData.GetExtendFuncs()[test]; fun != nil {
+					return b.ReadMemberCallVariable(b.ReadValue(rv.GetName()), fun), nil
 				}
 				if glv := exData.GetExtendGlobal(test); glv != nil {
-					return glv, nil
+					return b.ReadMemberCallVariable(rv, glv), nil
 				}
-
 				// TODO 目前没法识别golang库中的函数
 				b.NewError(ssa.Warn, TAG, "function not found, but create")
-				rightv = b.ReadValue(test)
+				rightv = b.ReadOrCreateMemberCallVariable(b.ReadValue(rv.GetName()), b.EmitConstInst(test))
 			} else {
 				rightv = b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
 			}
@@ -430,8 +427,22 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 		}
 
 		if exData := b.GetExData(text); exData != nil {
-			typValue := ssa.NewTypeValue(ssa.GetAnyType())
-			return typValue
+			var names []string
+			var values []ssa.Value
+
+			for n, g := range exData.exGlobals {
+				names = append(names, n)
+				values = append(values, g)
+			}
+			obj := b.InterfaceAddFieldBuild(len(exData.exGlobals),
+				func(i int) ssa.Value {
+					return b.EmitConstInst(names[i])
+				},
+				func(i int) ssa.Value {
+					return values[i]
+				})
+			obj.SetName(text)
+			return obj
 		}
 
 		funcs := b.GetProgram().Funcs
