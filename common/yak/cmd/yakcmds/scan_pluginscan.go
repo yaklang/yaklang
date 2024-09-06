@@ -87,7 +87,7 @@ var hybridScanCommand = &cli.Command{
 		return nil
 	},
 	Action: func(c *cli.Context) error {
-		fmt.Println(yakitScanBanner)
+		fmt.Print(yakitScanBanner)
 
 		db := consts.GetGormProfileDatabase()
 		if db == nil {
