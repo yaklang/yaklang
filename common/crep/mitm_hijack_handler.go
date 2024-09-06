@@ -267,6 +267,9 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 			httpctx.SetBareResponseBytes(req, responseBytes)
 		}
 
+		if httpctx.IsFiltered(req) {
+			return nil
+		}
 		isHttps := httpctx.GetRequestHTTPS(rsp.Request)
 		result := m.responseHijackHandler(isHttps, req, rsp, responseBytes, httpctx.GetRemoteAddr(req))
 		if result == nil {
@@ -287,7 +290,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		}
 	}
 
-	if m.httpFlowMirror != nil {
+	if m.httpFlowMirror != nil && !httpctx.IsFiltered(req) {
 		if len(responseBytes) <= 0 {
 			var err error
 			responseBytes, err = utils.HttpDumpWithBody(rsp, !tooLarge)
