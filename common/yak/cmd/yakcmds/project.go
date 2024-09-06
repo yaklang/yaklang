@@ -1,12 +1,13 @@
 package yakcmds
 
 import (
+	"strings"
+
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strings"
 )
 
 var ProjectCommands = []*cli.Command{
@@ -28,7 +29,7 @@ var ProjectCommands = []*cli.Command{
 			case "plugin", "plugins":
 				err := yakit.ExportYakScript(consts.GetGormProfileDatabase(), f)
 				if err != nil {
-					log.Error("output failed: %s", err)
+					log.Errorf("output failed: %s", err)
 				}
 			default:
 				log.Error("unsupported resource type: " + ret)
