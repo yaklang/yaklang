@@ -19,35 +19,42 @@ func TestImport_struct(t *testing.T) {
 	package A
 
 	type A1 struct {
-	    a int
+		str string
+		arr []int
+		mp map[string]int
 	}
 
-	func (a *A1) get() int {
-	    return a.a
-	}
 	`)
 	vf.AddFile("src/main/go/B/test.go", `
 	package B
 
 	import "github.com/yaklang/yaklang/A"
 
-	func println(){}
-
 	func test() {
-	    a := &A.A1{a: 1}
-	    println(a.get())
+		a := &A.A1{
+			str: "hello world",
+			arr: []int{1, 2, 3, 4},
+			mp: map[string]int{
+				"hello": 1,
+				"world": 2,
+			},
+		}
+
+	    println(a.str)
+		println(a.arr[0])
+		println(a.mp["world"])
 	}
 	`)
 
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1"},
+		"a": {"\"hello world\"", "1", "2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
 
-func TestImport_func(t *testing.T) {
+func TestImport_function(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -66,8 +73,6 @@ func TestImport_func(t *testing.T) {
 
 	import alias "github.com/yaklang/yaklang/A"
 
-	func println(){}
-
 	func test() {
 	    println(alias.add(1,2))
 	}
@@ -76,12 +81,12 @@ func TestImport_func(t *testing.T) {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1", "2", "3"},
+		"a": {"1", "2"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
 
-func TestImport_struct_func(t *testing.T) {
+func TestImport_struct_function(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
@@ -113,8 +118,6 @@ func TestImport_struct_func(t *testing.T) {
 		"github.com/yaklang/yaklang/A"
 		"github.com/yaklang/yaklang/B"
 	)
-
-	func println(){}
 
 	func test() {
 	    a := &A.A1{a: 1}
@@ -149,8 +152,6 @@ func TestImport_aliastyp(t *testing.T) {
 	import (
 		"github.com/yaklang/yaklang/A"
 	)
-
-	func println() {}
 
 	func test() {
 		var a A.Myint = 1
@@ -195,8 +196,6 @@ func TestImport_globals(t *testing.T) {
 		"github.com/yaklang/yaklang/A"
 	)
 
-	func println() {}
-
 	func test() {
 		println(A.Mymap["hello"])
 		println(A.Mystring)
@@ -208,6 +207,60 @@ func TestImport_globals(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1", "\"hello world\"", "3"},
+	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
+
+func TestImport_syntaxflow(t *testing.T) {
+	t.Run("temp", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `package main
+
+		import (
+			"fmt"
+		)
+
+		func main() {
+			fmt.Println("Hello, World!")
+		}
+
+	`,
+			`fmt.Println(* #-> as $a)`,
+			map[string][]string{
+				"a": {"\"Hello, World!\""},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}
+
+func TestImport_syntaxflow_muti(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	func function(a int) int {
+	    return a
+	}
+	`)
+	vf.AddFile("src/main/go/B/test.go", `
+	package B
+
+	import alias "github.com/yaklang/yaklang/A"
+
+	func test() {
+	   	alias.function(1)
+	}
+	`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		alias.function(* #-> as $a)
+		`, map[string][]string{
+		"a": {"1"},
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
