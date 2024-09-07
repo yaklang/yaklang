@@ -426,19 +426,23 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 
 	// parameter or freeValue, this member-call mark as Parameter
 	if para, ok := ToParameter(value); ok {
-		name, typ := checkCanMemberCall(para, key)
-		newParamterMember := b.NewParameterMember(name, para, key)
-		if b.MarkedMemberCallWantMethod {
-			// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
-			t := NewFunctionTypeDefine(name, nil, nil, false)
-			t.IsMethod = true
-			newParamterMember.SetType(t)
+		if member, exits := para.GetStringMember(key.String()); exits {
+			return member
 		} else {
-			newParamterMember.SetType(typ)
+			name, typ := checkCanMemberCall(para, key)
+			newParamterMember := b.NewParameterMember(name, para, key)
+			if b.MarkedMemberCallWantMethod {
+				// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
+				t := NewFunctionTypeDefine(name, nil, nil, false)
+				t.IsMethod = true
+				newParamterMember.SetType(t)
+			} else {
+				newParamterMember.SetType(typ)
+			}
+			SetMemberCall(para, key, newParamterMember)
+			setMemberVerboseName(newParamterMember)
+			return newParamterMember
 		}
-		SetMemberCall(para, key, newParamterMember)
-		setMemberVerboseName(newParamterMember)
-		return newParamterMember
 	}
 
 	return b.getFieldValue(value, key)
