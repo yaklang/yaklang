@@ -40,7 +40,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			// re-set type
 			name, typ := checkCanMemberCall(to, key)
 			// toMember := builder.getOriginMember(name, typ, to, key)
-			toMember := builder.ReadMemberCallVariable(to, key)
+			toMember := builder.PeekValue(name)
 
 			// then, we will replace value, `member` to `toMember`
 			if member.GetOpcode() != SSAOpcodeUndefined {
@@ -48,8 +48,15 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 				member.SetType(typ)
 				SetMemberCall(to, key, member)
 				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
-				ret[name] = createPhi(name, []Value{toMember, member})
+				if utils.IsNil(toMember) {
+					ret[name] = member
+				} else {
+					ret[name] = createPhi(name, []Value{toMember, member})
+				}
 				continue
+			}
+			if utils.IsNil(toMember) {
+				toMember = builder.ReadMemberCallVariable(to, key)
 			}
 
 			ReplaceAllValue(member, toMember)
@@ -428,21 +435,20 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	if para, ok := ToParameter(value); ok {
 		if member, exits := para.GetStringMember(key.String()); exits {
 			return member
-		} else {
-			name, typ := checkCanMemberCall(para, key)
-			newParamterMember := b.NewParameterMember(name, para, key)
-			if b.MarkedMemberCallWantMethod {
-				// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
-				t := NewFunctionTypeDefine(name, nil, nil, false)
-				t.IsMethod = true
-				newParamterMember.SetType(t)
-			} else {
-				newParamterMember.SetType(typ)
-			}
-			SetMemberCall(para, key, newParamterMember)
-			setMemberVerboseName(newParamterMember)
-			return newParamterMember
 		}
+		name, typ := checkCanMemberCall(para, key)
+		newParamterMember := b.NewParameterMember(name, para, key)
+		if b.MarkedMemberCallWantMethod {
+			// 当参数作为方法的caller的时候，确保其receiver可以作为方法的参数。
+			t := NewFunctionTypeDefine(name, nil, nil, false)
+			t.IsMethod = true
+			newParamterMember.SetType(t)
+		} else {
+			newParamterMember.SetType(typ)
+		}
+		SetMemberCall(para, key, newParamterMember)
+		setMemberVerboseName(newParamterMember)
+		return newParamterMember
 	}
 
 	return b.getFieldValue(value, key)
