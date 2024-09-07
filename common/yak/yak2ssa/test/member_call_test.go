@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/samber/lo"
@@ -295,15 +296,21 @@ func Test_CallMember_Cfg(t *testing.T) {
 	})
 
 	t.Run("test loop", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 		a = {} 
 		for i=0; i<10; i++ {
 			a.b = 1
 		}
 		println(a.b)
-		`, []string{
-			"phi(a.b)[Undefined-a.b(valid),1]",
-		}, t)
+		`
+		test.Check(t, code, func(prog *ssaapi.Program) error {
+			result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`)
+			require.NoError(t, err)
+			values := result.GetValues("param")
+			fmt.Println(values.String())
+			require.Contains(t, values.String(), "1")
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }
 

@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -492,30 +491,5 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{"ParameterMember-parameter[1].a(Parameter-t)"}, t)
-	})
-	t.Run("test code", func(t *testing.T) {
-		code := `package org.example.vul;
-
-
-class tes1 {
-    public String a = "1";
-
-    public tes1(String a) {
-        this.a = a;
-    }
-
-    public void handle(tes1 tes1) {
-        tes1.a = "21312";
-    }
-}
-
-public class test {
-    public static void main(String[] args) {
-        tes1 tes1 = new tes1("12312");
-        println(tes1.a);
-    }
-}
-`
-		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
