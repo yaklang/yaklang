@@ -787,4 +787,22 @@ switch ($type) {
 }`
 		ssatest.NonStrictMockSSA(t, code)
 	})
+	t.Run("oop member assign", func(t *testing.T) {
+		code := `<?php
+
+class a
+{
+    public $file;
+
+    public function test()
+    {
+        $this->file = input("file");
+        eval($this->file);
+    }
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `eval(* #-> as $param)`, map[string][]string{
+			"param": {`"file"`, `Undefined-input`},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
