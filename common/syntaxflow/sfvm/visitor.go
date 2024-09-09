@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"strconv"
 	"strings"
@@ -206,9 +207,17 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		y.EmitIterEnd(ctx)
 	case *sf.OpcodeTypeConditionContext:
 		y.EmitDuplicate()
-		ops := make([]string, 0, len(i.AllOpcodes()))
-		for _, opcode := range i.AllOpcodes() {
-			switch opcode.GetText() {
+		opcodes := i.AllOpcodesCondition()
+		ops := make([]string, 0, len(opcodes))
+		for _, opcode := range opcodes {
+			text := yakunquote.TryUnquote(opcode.GetText())
+			switch text {
+			case "add":
+				text = "+"
+			case "sub":
+				text = "-"
+			}
+			switch text {
 			case "call":
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeCall])
 			case "phi":
@@ -219,8 +228,10 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeParameter])
 			case "return":
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeReturn])
-			case "function":
+			case "function", "func", "def":
 				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeFunction])
+			case "+", "-", "*", "/", "%":
+				ops = append(ops, ssa.SSAOpcode2Name[ssa.SSAOpcodeBinOp]+"["+text+"]")
 			default:
 				log.Errorf("unknown opcode: %s", opcode.GetText())
 			}

@@ -17,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"golang.org/x/exp/slices"
 )
 
 type filterExprContext struct {
@@ -947,11 +946,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		res := make([]bool, 0, valuesLen(values))
 		_ = values.Recursive(func(vo ValueOperator) error {
-			if slices.Contains(i.Values, vo.GetOpcode()) {
-				res = append(res, true)
-			} else {
-				res = append(res, false)
+			for _, element := range i.Values {
+				if utils.MatchAllOfRegexp(element, `(?i)binop[.]`) {
+
+				}
+				if element == vo.GetOpcode() {
+					res = append(res, true)
+					return nil
+				}
 			}
+
+			res = append(res, false)
 			return nil
 		})
 		s.conditionStack.Push(res)
