@@ -64,10 +64,10 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		log.Errorf("read file %s error: %v", path, err)
 		return nil
 	}
-	builder.MoreParse = true
+	builder.PreHandler = true
 	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
 	defer func() {
-		builder.MoreParse = false
+		builder.PreHandler = false
 	}()
 	prog.GetIncludeFiles()
 	return nil
@@ -76,9 +76,9 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 var Builder = &SSABuild{}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.MoreParse = true
+	builder.PreHandler = true
 	builder.GetProgram().Build("", editor, builder)
-	builder.MoreParse = false
+	builder.PreHandler = false
 }
 
 func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
@@ -114,9 +114,9 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	if b.IncludeStack.Len() <= 0 {
 		var program *ssa.Program
-		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.MoreParse)
+		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.PreHandler)
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
-		functionBuilder.MoreParse = b.MoreParse
+		functionBuilder.PreHandler = b.PreHandler
 		startParse(functionBuilder)
 	} else {
 		startParse(b)
