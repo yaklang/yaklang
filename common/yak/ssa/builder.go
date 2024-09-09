@@ -34,7 +34,7 @@ type FunctionBuilder struct {
 	// Support obtaining static members and static method, even if the class is not instantiated.
 	SupportClassStaticModifier bool
 	SupportClass               bool
-	MoreParse                  bool
+	PreHandler                 bool
 	IncludeStack               *utils.Stack[string]
 
 	Included bool
