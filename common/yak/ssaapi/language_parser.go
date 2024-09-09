@@ -295,14 +295,19 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 
-		if programName != "" && !fb.PreHandler {
-			folderName, fileName := c.fs.PathSplit(filePath)
-			folders := []string{programName}
-			folders = append(folders,
-				strings.Split(folderName, string(c.fs.GetSeparators()))...,
-			)
-			src.ResetSourceCodeHash()
-			ssadb.SaveFile(fileName, src.GetSourceCode(), folders)
+		// TODO: check prog.FileList avoid duplicate file save to sourceDB,
+		// in php include just build file in child program, will cause the same file save to sourceDB, when the file include multiple times
+		// this check should be more readable, we should use Editor and `prog.PushEditor..` save sourceDB.
+		if _, exist := prog.FileList[filePath]; !exist {
+			if programName != "" {
+				folderName, fileName := c.fs.PathSplit(filePath)
+				folders := []string{programName}
+				folders = append(folders,
+					strings.Split(folderName, string(c.fs.GetSeparators()))...,
+				)
+				src.ResetSourceCodeHash()
+				ssadb.SaveFile(fileName, src.GetSourceCode(), folders)
+			}
 		}
 		// include source code will change the context of the origin editor
 		newCodeEditor := src
