@@ -295,7 +295,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
 
-		if programName != "" {
+		if programName != "" && !fb.PreHandler {
 			folderName, fileName := c.fs.PathSplit(filePath)
 			folders := []string{programName}
 			folders = append(folders,
@@ -313,7 +313,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 
 		// push into program for recording what code is compiling
-		prog.PushEditorex(newCodeEditor, !fb.MoreParse)
+		prog.PushEditorex(newCodeEditor, !fb.PreHandler)
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
