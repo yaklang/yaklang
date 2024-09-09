@@ -183,10 +183,7 @@ while ($i < 5) {
 	if(true) {break;};
 	if (false) {continue;};
 }`
-	test.CheckError(t, test.TestCase{
-		Code: code,
-		Want: []string{ssa.ValueUndefined("$i")},
-	})
+	test.NonStrictMockSSA(t, code)
 }
 
 func TestParseSSA_Break(t *testing.T) {

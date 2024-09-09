@@ -40,7 +40,7 @@ func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	initHandler("GLOBALS", "_SERVER", "$staticScope$")
 	fb.GetProgram().GlobalScope = container
 	fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
-		scope.SetForceCapture()
+		//scope.SetForceCapture()
 		return scope
 	}
 }
