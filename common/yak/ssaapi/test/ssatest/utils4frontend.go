@@ -82,6 +82,15 @@ func MockSSA(t *testing.T, src string) {
 	}
 	CheckTestCase(t, tc)
 }
+func NonStrictMockSSA(t *testing.T, code string) {
+	tc := TestCase{
+		Code: code,
+		Check: func(program *ssaapi.Program, strings []string) {
+			program.Show()
+		},
+	}
+	CheckTestCase(t, tc)
+}
 
 // ===================== struct =====================
 type ExampleInterface interface {

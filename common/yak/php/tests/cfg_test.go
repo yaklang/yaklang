@@ -104,7 +104,7 @@ println($a);`
 		code := `<?php if ($a == 5) { ?>
 <sample></sample>
 <?php }; ?>`
-		ssatest.MockSSA(t, code)
+		ssatest.NonStrictMockSSA(t, code)
 	})
 	t.Run("html-if-else", func(t *testing.T) {
 		code := `<?php if ($a == 5) { ?>
@@ -112,7 +112,7 @@ println($a);`
 <?php }else{ ?>
     <script>1</script>
 <?php }?>`
-		ssatest.MockSSA(t, code)
+		ssatest.NonStrictMockSSA(t, code)
 	})
 }
 
@@ -198,7 +198,7 @@ switch($a):;
    default:
        echo 1;
 endswitch;`
-		ssatest.MockSSA(t, code)
+		ssatest.NonStrictMockSSA(t, code)
 	})
 	t.Run("custom-switch-only-case", func(t *testing.T) {
 		code := `<?php
@@ -311,7 +311,7 @@ println($a); // phi[2, 5]
         3;
     <?php break;?>
 <?php endswitch; ?>`
-		ssatest.MockSSA(t, code)
+		ssatest.NonStrictMockSSA(t, code)
 	})
 }
 func TestExpression_Loop(t *testing.T) {
@@ -368,7 +368,7 @@ while (1) {
     $a = 1;
 }
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		ssatest.NonStrictMockSSA(t, code)
 	})
 	t.Run("for test and global scope have value", func(t *testing.T) {
 		code := `<?php

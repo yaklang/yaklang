@@ -225,21 +225,24 @@ namespace {
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
 	})
-	//t.Run("all namespace use static member", func(t *testing.T) {
-	//	code := `<?php
-	//
-	//namespace a\b\c {
-	//  class test
-	//  {
-	//      public static $a = 1;
-	//  }
-	//}
-	//
-	//namespace {
-	//  println(\a\b\c\test::$a);
-	//}`
-	//	ssatest.CheckPrintlnValue(code, []string{}, t)
-	//})
+	t.Run("all namespace use static member", func(t *testing.T) {
+		code := `<?php
+	
+	namespace a\b\c {
+	 class test
+	 {
+	     public static $a = 1;
+	 }
+	}
+	
+	namespace {
+	 println(\a\b\c\test::$a);
+	}`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 	//t.Run("namespace function call", func(t *testing.T) {
 	//	code := `<?php
 	//
