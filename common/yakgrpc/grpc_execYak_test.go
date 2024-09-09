@@ -6,9 +6,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
@@ -16,10 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"regexp"
-	"strings"
-	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -87,6 +89,7 @@ yakit_output(res)
 		t.Fatal("test mitm invoke ai failed")
 	}
 }
+
 func TestOUTPUT_AiChat(t *testing.T) {
 	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
@@ -177,6 +180,7 @@ func TestOUTPUT_AiChat(t *testing.T) {
 	assert.Equal(t, true, subMsgN >= 3)
 	assert.Contains(t, msg, "你好我是人工智障助手")
 }
+
 func TestOUTPUT_STREAMYakitStream(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -277,7 +281,7 @@ func TestGRPCMUSTPASS_LANGUAGE_YakitLog(t *testing.T) {
 		code += v[0] + "\n"
 	}
 
-	var client, err = NewLocalClient()
+	client, err := NewLocalClient()
 	stream, err := client.Exec(context.Background(), &ypb.ExecRequest{
 		Script:          code,
 		NoDividedEngine: true,
@@ -319,4 +323,59 @@ func TestGRPCMUSTPASS_LANGUAGE_YakitLog(t *testing.T) {
 	//		t.Fatal("log stream not contains", testCase[1])
 	//	}
 	//}
+}
+
+func TestGRPCMUSTPASS_ScriptPath(t *testing.T) {
+	client, err := NewLocalClient()
+	expectedMessage := "Hello Yak"
+	filename, err := utils.SaveTempFile(fmt.Sprintf(`println("%s")`, expectedMessage), "temp-yak-scriptPath")
+	require.NoError(t, err)
+	stream, err := client.Exec(context.Background(), &ypb.ExecRequest{
+		ScriptPath:      filename,
+		NoDividedEngine: true,
+	})
+
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		info := make(map[string]interface{})
+		err = json.Unmarshal(res.Message, &info)
+		if info["type"] == "log" {
+			if v, ok := info["content"].(map[string]interface{}); ok {
+				require.Contains(t, utils.InterfaceToString(v["data"]), expectedMessage)
+			} else {
+				t.Fatal("invalid log format")
+			}
+		}
+	}
+}
+
+func TestGRPCMUSTPASS_NotExistScriptPath(t *testing.T) {
+	client, err := NewLocalClient()
+	expectedMessage := "Hello Yak"
+	token := utils.RandStringBytes(16)
+	stream, err := client.Exec(context.Background(), &ypb.ExecRequest{
+		ScriptPath:      token + ".yak", // not exist path
+		Script:          fmt.Sprintf(`println("%s")`, expectedMessage),
+		NoDividedEngine: true,
+	})
+	require.NoError(t, err)
+
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		info := make(map[string]interface{})
+		err = json.Unmarshal(res.Message, &info)
+		if info["type"] == "log" {
+			if v, ok := info["content"].(map[string]interface{}); ok {
+				require.Contains(t, utils.InterfaceToString(v["data"]), expectedMessage)
+			} else {
+				t.Fatal("invalid log format")
+			}
+		}
+	}
 }
