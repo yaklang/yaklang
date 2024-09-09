@@ -26,7 +26,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	if dstMac == nil {
 		if isLoopback {
 			// Loopback
-			if runtime.GOOS == "windows" {
+			if runtime.GOOS != "linux" {
 				opts = append(opts, pcapx.WithLoopback(isLoopback))
 			} else {
 				opts = append(opts, pcapx.WithEthernet_SrcMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
