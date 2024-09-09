@@ -17,6 +17,9 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 	if r == nil || r.symbol == nil || r.SFFrameResult == nil {
 		return nil
 	}
+	if name == "_" {
+		return r.GetUnNameValues()
+	}
 	if vs, ok := r.symbol[name]; ok {
 		return vs
 	}
