@@ -168,6 +168,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		https                = option.Https
 		forceHttp2           = option.Http2
 		gmTLS                = option.GmTLS
+		onlyGMTLS            = option.GmTLSOnly
+		preferGMTLS          = option.GmTLSPrefer
 		host                 = option.Host
 		port                 = option.Port
 		requestPacket        = option.Packet
@@ -509,7 +511,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				MaxVersion:         tls.VersionTLS13,
 			}))
 		}
-		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https))
+		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https), netx.DialX_WithGMTLSOnly(onlyGMTLS), netx.DialX_WithGMTLSPrefer(preferGMTLS))
 
 		if clientHelloSpec != nil {
 			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
