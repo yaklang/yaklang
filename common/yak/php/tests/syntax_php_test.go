@@ -3,13 +3,15 @@ package tests
 import (
 	"embed"
 	"fmt"
+	"path"
+	"strings"
+	"testing"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"path"
-	"strings"
-	"testing"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -19,6 +21,9 @@ import (
 var syntaxFs embed.FS
 
 func validateSource(t *testing.T, filename string, src string) {
+	t.Run(fmt.Sprintf("ssa file: %v", filename), func(t *testing.T) {
+		ssatest.MockSSA(t, string(src))
+	})
 	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
 		errListener := antlr4util.NewErrorListener()
 		lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
@@ -88,9 +93,18 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		if err != nil {
 			t.Fatalf("cannot found syntax fs: %v", syntaxPath)
 		}
-		//ssatest.MockSSA(t, string(raw))
 		validateSource(t, syntaxPath, string(raw))
 	}
+}
+
+func TestAllSyntaxForPHP_DEBUG(t *testing.T) {
+	debugFileName := "asks.master.php"
+	syntaxPath := path.Join("syntax", debugFileName)
+	raw, err := syntaxFs.ReadFile(syntaxPath)
+	if err != nil {
+		t.Fatalf("cannot found syntax fs: %v", syntaxPath)
+	}
+	validateSource(t, syntaxPath, string(raw))
 }
 
 func TestSyntax_(t *testing.T) {
