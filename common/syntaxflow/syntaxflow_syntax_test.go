@@ -162,6 +162,7 @@ sdf
 asdf
 FILE,
 )`,
+		`a?{opcode: add}`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)

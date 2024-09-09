@@ -158,7 +158,7 @@ negativeCondition: (Not | '!');
 conditionExpression
     : '(' conditionExpression ')'                                                # ParenCondition
     | filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
-    |  Opcode ':' opcodes (',' opcodes) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
+    |  Opcode ':' opcodesCondition (',' opcodesCondition) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
     |  Have  ':' stringLiteralWithoutStarGroup       # StringContainHaveCondition // something like .(have: 'a', 'b')
     |  HaveAny ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
     | negativeCondition conditionExpression                                                    # NotCondition
@@ -172,6 +172,8 @@ conditionExpression
     | conditionExpression '&&' conditionExpression      # FilterExpressionAnd
     | conditionExpression '||' conditionExpression      # FilterExpressionOr
     ;
+
+opcodesCondition: opcodes | identifier;
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier | '*';

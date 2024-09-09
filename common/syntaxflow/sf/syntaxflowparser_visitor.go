@@ -262,6 +262,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#StringContainHaveCondition.
 	VisitStringContainHaveCondition(ctx *StringContainHaveConditionContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#opcodesCondition.
+	VisitOpcodesCondition(ctx *OpcodesConditionContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#numberLiteral.
 	VisitNumberLiteral(ctx *NumberLiteralContext) interface{}
 
