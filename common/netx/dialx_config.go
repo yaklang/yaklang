@@ -160,14 +160,12 @@ func DialX_WithGMTLSConfig(config *gmtls.Config) DialXOption {
 
 func DialX_WithGMTLSPrefer(b bool) DialXOption {
 	return func(c *dialXConfig) {
-		c.GMTLSSupport = true
 		c.GMTLSPrefer = b
 	}
 }
 
 func DialX_WithGMTLSOnly(b bool) DialXOption {
 	return func(c *dialXConfig) {
-		c.GMTLSSupport = true
 		c.GMTLSOnly = b
 	}
 }
