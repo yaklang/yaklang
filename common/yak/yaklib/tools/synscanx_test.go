@@ -1,10 +1,18 @@
 package tools
 
 import (
+	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/synscanx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"math/rand"
+	"net"
 	_ "net/http/pprof"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -160,4 +168,151 @@ func Test___filter(t *testing.T) {
 		wg.Wait()
 	}
 
+}
+
+func Test___Loopback(t *testing.T) {
+	// 打开环回设备
+	handle, err := pcap.OpenLive("lo", 1600, true, pcap.BlockForever)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//defer handle.Close()
+	var opts []any
+
+	opts = append(opts, pcapx.WithLoopback(true))
+	ipSrc := net.ParseIP("127.0.0.1").String()
+	host := ipSrc
+	opts = append(opts, pcapx.WithIPv4_Flags(layers.IPv4DontFragment))
+	opts = append(opts, pcapx.WithIPv4_Version(4))
+	opts = append(opts, pcapx.WithIPv4_NextProtocol(layers.IPProtocolTCP))
+	opts = append(opts, pcapx.WithIPv4_TTL(64))
+	opts = append(opts, pcapx.WithIPv4_ID(40000+rand.Intn(10000)))
+	opts = append(opts, pcapx.WithIPv4_SrcIP(ipSrc))
+	opts = append(opts, pcapx.WithIPv4_DstIP(host))
+	opts = append(opts, pcapx.WithIPv4_Option(nil, nil))
+	srcPort := rand.Intn(65534) + 1
+	opts = append(opts,
+		pcapx.WithTCP_SrcPort(srcPort),
+		pcapx.WithTCP_DstPort(22),
+		pcapx.WithTCP_Flags(pcapx.TCP_FLAG_SYN),
+		pcapx.WithTCP_Window(1024),
+		pcapx.WithTCP_Seq(500000+rand.Intn(10000)),
+	)
+
+	packetBytes, err := pcapx.PacketBuilder(opts...)
+	if err != nil {
+		t.FailNow()
+	}
+	// 发送数据包
+	err = handle.WritePacketData(packetBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Packet sent.")
+	// 设置一个超时时间以便接收响应
+	err = handle.SetBPFFilter("tcp and port 22")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	packetSource.DecodeOptions.Lazy = true
+	packetSource.DecodeOptions.NoCopy = true
+
+	// 使用超时确保测试不会永久阻塞
+	timeout := time.After(5 * time.Second)
+	done := make(chan bool)
+	go func() {
+		for packet := range packetSource.Packets() {
+			// 处理包
+			t.Log("Received a packet.")
+			networkLayer := packet.NetworkLayer()
+			if networkLayer == nil {
+				continue
+			}
+			ip, _ := networkLayer.(*layers.IPv4)
+			if ip != nil {
+				t.Logf("From %s to %s\n", ip.SrcIP, ip.DstIP)
+			}
+			transportLayer := packet.TransportLayer()
+			if transportLayer == nil {
+				continue
+			}
+			tcp, _ := transportLayer.(*layers.TCP)
+			if tcp != nil {
+				t.Logf("From port %d to port %d\n", tcp.SrcPort, tcp.DstPort)
+			}
+			done <- true
+			return
+		}
+	}()
+
+	select {
+	case <-timeout:
+		t.Fatal("Test timed out waiting for packets")
+	case <-done:
+		t.Log("Test completed successfully")
+	}
+}
+
+func Test_Loopback_unix(t *testing.T) {
+	destIP := "127.0.0.1"
+	destPort := 22
+	listenPort := 0
+
+	srcPort := rand.Intn(65534) + 1
+	// 监听 IP 数据包
+	conn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenPort))})
+	if err != nil {
+		t.Logf("ListenIP failed: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	ip4 := layers.IPv4{
+		DstIP:    net.ParseIP("127.0.0.1"),
+		SrcIP:    net.ParseIP("127.0.0.1"),
+		Version:  4,
+		TTL:      255,
+		Protocol: layers.IPProtocolTCP,
+	}
+
+	tcpOption := layers.TCPOption{
+		OptionType:   layers.TCPOptionKindMSS,
+		OptionLength: 4,
+		OptionData:   []byte{0x05, 0xB4},
+	}
+	// 构造一个 TCP SYN 包
+	// 注意：这里不包括 IP 头部，因为 net.ListenIP 会处理 IP 头部
+	tcp := layers.TCP{
+		SrcPort: layers.TCPPort(srcPort),
+		DstPort: layers.TCPPort(destPort),
+		Window:  1024,
+		Options: []layers.TCPOption{tcpOption},
+		SYN:     true,
+	}
+	err = tcp.SetNetworkLayerForChecksum(&ip4)
+	var defaultSerializeOptions = gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, &tcp); err != nil {
+		t.Log(err)
+	}
+
+	// 发送数据包
+	destAddr := &net.IPAddr{IP: net.ParseIP(destIP)}
+
+	_, err = conn.WriteTo(buf.Bytes(), destAddr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error sending packet: %v\n", err)
+		return
+	}
+
+	fmt.Println("TCP SYN packet sent")
+	// 等待一段时间查看是否有响应
+	time.Sleep(1 * time.Second)
 }
