@@ -249,4 +249,12 @@ func TestSFURl(t *testing.T) {
 			assert.True(t, found)
 		}
 	})
+	t.Run("check _", func(t *testing.T) {
+		query := fmt.Sprintf(`target*`)
+		{
+			res, err := SendURL(local, progID, "/_", query)
+			assert.NoError(t, err)
+			assert.Len(t, res, 2)
+		}
+	})
 }
