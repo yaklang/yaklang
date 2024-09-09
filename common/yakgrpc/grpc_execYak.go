@@ -154,15 +154,14 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 
 	// scriptPath > scriptCode > scriptId
 	if scriptPath != "" {
-		raw, err := os.ReadFile(scriptPath)
-		if err != nil {
-			return utils.Errorf("read script file failed: %s", err)
+		if !utils.IsFile(scriptPath) {
+			scriptPath = ""
 		}
-		scriptCode = string(raw)
-	} else if scriptCode != "" {
+	}
+	if scriptCode != "" {
 		scriptPath, err = createTempYakScript(scriptCode)
 		defer os.Remove(scriptPath)
-	} else {
+	} else if scriptId != "" {
 		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptId)
 		if err != nil {
 			return utils.Errorf("cannot find script yak code by scriptId:[%s]", scriptId)
