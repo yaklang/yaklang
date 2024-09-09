@@ -65,10 +65,11 @@ func (c *config) parseProject() (Programs, error) {
 		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
-	totalSize := 1
-	handled := 0
+	totalSize := 0
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
+		log.Infof("parsed file: %v", prog.GetIncludeFiles())
+		handled := prog.GetIncludeFileNum()
 		if c.process != nil {
 			c.process(msg, float64(handled)/float64(totalSize))
 		} else {
@@ -76,7 +77,6 @@ func (c *config) parseProject() (Programs, error) {
 		}
 	}
 	_ = totalSize
-	_ = handled
 
 	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, programPath)
 
@@ -97,6 +97,7 @@ func (c *config) parseProject() (Programs, error) {
 				}
 			}
 			if err := c.checkLanguage(path); err == nil {
+				log.Infof("parse file: %v", path)
 				totalSize++
 			}
 			return nil
@@ -135,7 +136,6 @@ func (c *config) parseProject() (Programs, error) {
 			if len(exclude) > 0 {
 				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
 			}
-			handled = len(exclude)
 			return exclude, nil
 		}),
 	)
@@ -144,7 +144,6 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	prog.ProcessInfof("program %s finishing", prog.Name)
 	prog.Finish()
-	handled = totalSize
 	prog.ProcessInfof("program %s finish", prog.Name)
 	var progs = []*Program{NewProgram(prog, c)}
 	for _, program := range prog.ChildApplication {
