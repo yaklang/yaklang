@@ -205,6 +205,7 @@ type Program struct {
 	EnableDatabase bool             // for compile, whether use database
 	irProgram      *ssadb.IrProgram // from database program
 
+	// TODO: this four map should need????!
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
 	FileList    map[string]string   // file-name and file hash
 	LibraryFile map[string][]string //library and file relation
