@@ -776,8 +776,15 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	program := y.GetProgram()
 	library, b := program.GetLibrary(strings.Join(pkgPath, "."))
 	if b {
-		function := library.GetFunction(identifier)
-		return function
+		if function := library.GetFunction(identifier); !utils.IsNil(function) {
+			return function
+		} else if cls := library.GetClassBluePrint(identifier); !utils.IsNil(cls) {
+			inst := y.EmitConstInst("")
+			inst.SetType(cls)
+			return inst
+		} else {
+			return y.EmitUndefined(raw.GetText())
+		}
 	}
 	return y.EmitUndefined(raw.GetText())
 }

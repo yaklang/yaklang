@@ -779,4 +779,12 @@ $c = new a();
 println($c->a);`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
 	})
+	t.Run("oop test", func(t *testing.T) {
+		code := `<?php
+switch ($type) {
+    case wechat::MSGTYPE_TEXT:
+    case wechat::MSGTYPE_VOICE:
+}`
+		ssatest.NonStrictMockSSA(t, code)
+	})
 }
