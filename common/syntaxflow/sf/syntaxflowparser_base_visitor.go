@@ -347,6 +347,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitStringContainHaveCondition(ctx *Strin
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitOpcodesCondition(ctx *OpcodesConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitNumberLiteral(ctx *NumberLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }

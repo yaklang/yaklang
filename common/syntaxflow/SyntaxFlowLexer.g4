@@ -78,7 +78,7 @@ Else: 'else';
 Type: 'type';
 In: 'in';
 Call: 'call';
-Function: 'function';
+Function: 'function' | 'func';
 Constant: 'const' | 'constant';
 Phi: 'phi';
 FormalParam: 'param' | 'formal_param';
