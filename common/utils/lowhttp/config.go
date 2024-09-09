@@ -30,6 +30,8 @@ type LowhttpExecConfig struct {
 	ResponseCallback                 func(response *LowhttpResponse)
 	Http2                            bool
 	GmTLS                            bool
+	GmTLSOnly                        bool
+	GmTLSPrefer                      bool
 	OverrideEnableSystemProxyFromEnv bool
 	EnableSystemProxyFromEnv         bool
 	ConnectTimeout                   time.Duration
@@ -261,7 +263,7 @@ type LowhttpOpt func(o *LowhttpExecConfig)
 
 func WithAppendHTTPFlowTag(tag string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.Tags = append(o.Tags,tag)
+		o.Tags = append(o.Tags, tag)
 	}
 }
 
@@ -293,6 +295,18 @@ func WithVerifyCertificate(b bool) LowhttpOpt {
 func WithGmTLS(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.GmTLS = b
+	}
+}
+
+func WithGmTLSPrefer(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.GmTLSPrefer = b
+	}
+}
+
+func WithGmTLSOnly(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.GmTLSOnly = b
 	}
 }
 
