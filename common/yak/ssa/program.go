@@ -274,7 +274,6 @@ func (p *Program) PushEditorex(e *memedit.MemEditor, store bool) {
 	if store {
 		p.editorMap.Set(p.GetCurrentEditor().GetFilename(), p.GetCurrentEditor())
 	}
-	p.FileList[e.GetFilename()] = e.SourceCodeMd5()
 }
 
 func (p *Program) GetIncludeFiles() []string {
@@ -299,7 +298,10 @@ func (p *Program) PopEditor() {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return
 	}
-	p.editorStack.Pop()
+	e := p.editorStack.Pop()
+	if e != nil {
+		p.FileList[e.GetFilename()] = e.SourceCodeMd5()
+	}
 }
 
 func (p *Program) GetSCAPackageByName(name string) *dxtypes.Package {
