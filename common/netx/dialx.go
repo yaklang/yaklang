@@ -228,21 +228,21 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 			}
 			return tlsConn, nil
 		case TLS_Strategy_GMDail:
-			if config.ShouldOverrideGMTLSConfig {
-				tlsConfig = config.GMTLSConfig
-			} else {
-				tlsConfig = &gmtls.Config{
-					GMSupport: &gmtls.GMSupport{
-						WorkMode: gmtls.ModeGMSSLOnly,
-					},
-					ServerName:         sni,
-					MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-					MaxVersion:         tls.VersionTLS13,
-					InsecureSkipVerify: true,
-					Renegotiation:      gmtls.RenegotiateFreelyAsClient,
-				}
+			gmtlsConfig := &gmtls.Config{
+				GMSupport: &gmtls.GMSupport{
+					WorkMode: gmtls.ModeGMSSLOnly,
+				},
+				ServerName:         sni,
+				MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+				MaxVersion:         tls.VersionTLS13,
+				InsecureSkipVerify: true,
+				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 			}
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+			if config.ShouldOverrideGMTLSConfig {
+				gmtlsConfig = config.GMTLSConfig
+			}
+
+			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, gmtlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
 			if err != nil {
 				errs = append(errs, err)
 				continue

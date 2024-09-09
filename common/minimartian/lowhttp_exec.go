@@ -69,6 +69,8 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithHttp2(isH2),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithGmTLS(isGmTLS),
+		lowhttp.WithGmTLSOnly(p.gmTLSOnly),
+		lowhttp.WithGmTLSPrefer(p.gmPrefer),
 		lowhttp.WithConnPool(true),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
