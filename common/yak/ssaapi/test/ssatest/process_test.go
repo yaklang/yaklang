@@ -56,18 +56,23 @@ func TestParseProject(t *testing.T) {
 		process float64
 	}
 
+	matchRightProcess := false
 	msgs := make([]message, 0)
 	programID := uuid.NewString()
 	prog, err := ssaapi.ParseProject(vf,
 		ssaapi.WithProgramName(programID),
 		ssaapi.WithLanguage(ssaapi.JAVA),
 		ssaapi.WithProcess(func(msg string, process float64) {
+			if 0 < process && process < 1 {
+				matchRightProcess = true
+			}
 			msgs = append(msgs, message{msg, process})
 		}),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programID)
 	assert.NoError(t, err)
 	assert.NotNil(t, prog)
+	assert.True(t, matchRightProcess)
 	log.Infof("message: %v", msgs)
 	assert.Greater(t, len(msgs), 0)
 	end := msgs[len(msgs)-1]
