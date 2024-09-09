@@ -1853,3 +1853,77 @@ func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
 	require.Equal(t, replacedHost, lowhttp.GetHTTPPacketHeader(flow.Request, "Host"))
 	require.Equal(t, token, string(lowhttp.GetHTTPPacketBody(flow.Response)))
 }
+
+func TestGRPCMUSTTPASS_MITM_GM_Only(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	GMTLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+		"Content-Length:0\r\n\r\n")))
+	TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:            mitmHost,
+			Port:            uint32(mitmPort),
+			EnableGMTLS:     true,
+			OnlyEnableGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+		rsp, _, err := poc.DoGET((GMTLSTarget), poc.WithProxy(proxy))
+		require.NoError(t, err)
+		require.Equal(t, rsp.GetStatusCode(), 200)
+
+		rsp, _, err = poc.DoGET((TLSTarget), poc.WithProxy(proxy))
+		require.NoError(t, err)
+		require.Contains(t, string(rsp.RawPacket), "all tls strategy failed")
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
+}
+
+func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	GMTLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+		"Content-Length:0\r\n\r\n")))
+	TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+		rsp, _, err := poc.DoGET((GMTLSTarget), poc.WithProxy(proxy))
+		require.NoError(t, err)
+		require.Equal(t, rsp.GetStatusCode(), 200)
+
+		rsp, _, err = poc.DoGET((TLSTarget), poc.WithProxy(proxy))
+		require.NoError(t, err)
+		require.Equal(t, rsp.GetStatusCode(), 200)
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
+}
