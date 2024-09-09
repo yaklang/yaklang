@@ -280,6 +280,9 @@ func (p *Program) PushEditorex(e *memedit.MemEditor, store bool) {
 func (p *Program) GetIncludeFiles() []string {
 	return p.editorMap.Keys()
 }
+func (p *Program) GetIncludeFileNum() int {
+	return p.editorMap.Len()
+}
 
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
