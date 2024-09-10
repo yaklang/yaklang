@@ -96,6 +96,7 @@ func (c *config) parseProject() (Programs, error) {
 			// check
 			if err := c.checkLanguagePreHandler(path); err == nil {
 				if language := c.LanguageBuilder; language != nil {
+					c.LanguageBuilder.InitHandler(builder)
 					language.PreHandlerProject(c.fs, builder, path)
 				}
 			}
@@ -200,6 +201,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
 	prog, builder, err := c.init()
+	c.LanguageBuilder.InitHandler(builder)
 
 	// builder.SetRangeInit(r)
 	if err != nil {
@@ -346,9 +348,12 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
-	if c.LanguageBuilder != nil {
-		c.LanguageBuilder.InitHandler(builder)
-	}
+
+	//if c.LanguageBuilder != nil {
+	//	c.LanguageBuilder.InitHandler(builder)
+	//} else if c.SelectedLanguageBuilder != nil {
+	//	c.SelectedLanguageBuilder.InitHandler(builder)
+	//}
 	builder.WithDefineFunction(c.defineFunc)
 	return prog, builder, nil
 }
