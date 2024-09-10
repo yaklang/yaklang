@@ -90,6 +90,9 @@ func (c *config) parseProject() (Programs, error) {
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
+			if fi.Size() == 0 {
+				return nil
+			}
 			// check
 			if err := c.checkLanguagePreHandler(path); err == nil {
 				if language := c.LanguageBuilder; language != nil {
