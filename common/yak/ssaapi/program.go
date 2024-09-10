@@ -27,8 +27,11 @@ func (p *Program) IsFromDatabase() bool {
 	return p.comeFromDatabase
 }
 
-func (p *Program) GetNames() []string {
-	return []string{p.Program.GetProgramName()}
+func (p *Program) GetProgramName() string {
+	if p == nil || p.Program == nil {
+		return ""
+	}
+	return p.Program.Name
 }
 
 func (p *Program) GetProgramKind() ssa.ProgramKind {
