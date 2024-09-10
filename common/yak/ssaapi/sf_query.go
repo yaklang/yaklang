@@ -85,30 +85,36 @@ func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 }
 
 func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+	result, _, err := SyntaxFlowWithError(p, i, opts...)
+	return result, err
+}
+
+func (p *Program) SyntaxFlowWithFrameAndError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, *sfvm.SFFrame, error) {
 	return SyntaxFlowWithError(p, i, opts...)
 }
 
 func (ps Programs) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowWithError(
+	result, _, error := SyntaxFlowWithError(
 		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
 		i, opts...,
 	)
+	return result, error
 }
 
-func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Option) (*SyntaxFlowResult, *sfvm.SFFrame, error) {
 	if utils.IsNil(p) {
-		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
+		return nil, nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
 	}
 	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
 	frame, err := vm.Compile(sfCode)
 	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
+		return nil, nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", sfCode, err)
 	}
 	res, err := frame.Feed(p)
 	return &SyntaxFlowResult{
 		SFFrameResult: res,
 		symbol:        make(map[string]Values),
-	}, err
+	}, frame, err
 }
 
 func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {

@@ -659,17 +659,10 @@ func SyntaxFlowQuery(
 	if sfDebug {
 		opt = append(opt, sfvm.WithEnableDebug())
 	}
-	var execError error
-	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
-	if err != nil {
-		var otherErrs []string
-		if result != nil && len(result.Errors) > 0 {
-			otherErrs = utils.StringArrayFilterEmpty(utils.RemoveRepeatStringSlice(result.Errors))
-		}
-		execError = utils.Wrapf(err, "prompt error: \n%v", strings.Join(otherErrs, "\n  "))
-	}
-	if result == nil {
-		return execError
+	result, frame, _ := prog.SyntaxFlowWithFrameAndError(syntaxFlow, opt...)
+	resultErr := EvaluateVerifyResult(result, frame)
+	if resultErr != nil {
+		return resultErr
 	}
 
 	if result.SFFrameResult != nil {
@@ -684,5 +677,81 @@ func SyntaxFlowQuery(
 		sfvm.WithShowCode(withCode),
 		sfvm.WithShowDot(showDot),
 	)
-	return execError
+	return nil
+}
+
+func EvaluateVerifyResult(result *ssaapi.SyntaxFlowResult, frame *sfvm.SFFrame) (err error) {
+	var errs []string
+	defer func() {
+		if len(errs) > 0 {
+			var buf bytes.Buffer
+			for i, e := range errs {
+				buf.WriteString("\t")
+				buf.WriteString(fmt.Sprintf("[%d]: ", i+1))
+				buf.WriteString(e)
+				buf.WriteByte('\n')
+			}
+			err = utils.Errorf("result error:\n%v", buf.String())
+		}
+	}()
+	if result == nil {
+		errs = append(errs, "syntax flow result is nil")
+		return
+	}
+	if len(result.Errors) > 0 {
+		otherErrs := utils.StringArrayFilterEmpty(utils.RemoveRepeatStringSlice(result.Errors))
+		var buf bytes.Buffer
+		for _, e := range otherErrs {
+			buf.WriteString("\t\t ")
+			buf.WriteString("> ")
+			buf.WriteString(e)
+			buf.WriteByte('\n')
+		}
+		execError := fmt.Sprintf("prompt error: \n%v", buf.String())
+		errs = append(errs, execError)
+	}
+	if len(result.AlertSymbolTable) <= 0 {
+		errs = append(errs, "alert symbol table is empty")
+		return
+	}
+	if frame.AllowIncluded != "" {
+		libOutput, ok := result.AlertSymbolTable["output"]
+		if !ok {
+			errs = append(errs, fmt.Sprintf("lib: %v is not exporting output in `alert`", result.Name()))
+		}
+		count := 0
+		if libOutput != nil {
+			_ = libOutput.Recursive(func(operator sfvm.ValueOperator) error {
+				if _, ok := operator.(ssa.GetIdIF); ok {
+					count++
+				}
+				return nil
+			})
+		}
+		if count <= 0 {
+			errs = append(errs, fmt.Sprintf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
+		}
+	}
+	alertCount := 0
+	for _, i := range result.AlertSymbolTable {
+		_ = i.Recursive(func(operator sfvm.ValueOperator) error {
+			if _, ok := operator.(ssa.GetIdIF); ok {
+				alertCount++
+				return nil
+			}
+			return nil
+		})
+	}
+	if alertCount <= 0 {
+		errs = append(errs, fmt.Sprintf("alert symbol table is empty"))
+		return
+	}
+	ret := frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin")
+	if ret > 0 {
+		if alertCount < frame.GetExtraInfoInt("alert_min", "vuln_min", "alertMin", "vulnMin") {
+			errs = append(errs, fmt.Sprintf("alert symbol table is less than alert_min config: %v actual got: %v", ret, alertCount))
+			return
+		}
+	}
+	return
 }

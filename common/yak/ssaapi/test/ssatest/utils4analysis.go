@@ -467,12 +467,14 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
 			}
 			count := 0
-			_ = libOutput.Recursive(func(operator sfvm.ValueOperator) error {
-				if _, ok := operator.(ssa.GetIdIF); ok {
-					count++
-				}
-				return nil
-			})
+			if libOutput != nil {
+				_ = libOutput.Recursive(func(operator sfvm.ValueOperator) error {
+					if _, ok := operator.(ssa.GetIdIF); ok {
+						count++
+					}
+					return nil
+				})
+			}
 			if count <= 0 {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
 			}
