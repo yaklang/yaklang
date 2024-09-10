@@ -36,3 +36,7 @@ func (s *Server) GetMITMFilter(ctx context.Context, req *ypb.Empty) (*ypb.SetMIT
 		IncludeUri:          filterManager.IncludeUri,
 	}, nil
 }
+
+func (s *Server) getMITMFilter() *MITMFilterManager {
+	return GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+}

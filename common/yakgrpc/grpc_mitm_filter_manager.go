@@ -195,7 +195,11 @@ func _mimeChecker(includes, excludes []string, target string) bool {
 	return false
 }
 
-func (m *MITMFilterManager) Recover() {
+func (m *MITMFilterManager) Recover(saves ...bool) {
+	save := true
+	if len(saves) > 0 && !saves[0] {
+		save = false
+	}
 	m.ExcludeMethods = defaultExcludeMethods
 	m.ExcludeSuffix = defaultExcludeSuffix
 	m.ExcludeHostnames = defaultExcludeHostnames
@@ -204,7 +208,9 @@ func (m *MITMFilterManager) Recover() {
 	m.IncludeUri = nil
 	m.IncludeHostnames = nil
 	m.IncludeSuffix = nil
-	m.Save()
+	if save {
+		m.Save()
+	}
 }
 
 var defaultMITMFilterManager = &MITMFilterManager{

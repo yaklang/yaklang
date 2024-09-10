@@ -27,5 +27,4 @@ func TestGRPCMUSTPASS_CSRF(t *testing.T) {
 	}
 
 	Must(CoreMitmPlugTest(pluginName, server, vul, client, t), " ")
-
 }

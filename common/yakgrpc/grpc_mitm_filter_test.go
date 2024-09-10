@@ -3,74 +3,45 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"golang.org/x/net/websocket"
 
+	"github.com/bytedance/mockey"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 
-	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func RunMITMTestServer(
-	client ypb.YakClient,
-	ctx context.Context,
-	req *ypb.MITMRequest,
-	onLoad func(mitmClient ypb.Yak_MITMClient),
-) (host, port string) {
-	return RunMITMTestServerEx(client, ctx, func(mitmClient ypb.Yak_MITMClient) {
-		mitmClient.Send(req)
-	}, onLoad, nil)
+var (
+	mockGetFilterMap = make(map[*Server]*MITMFilterManager, 0)
+	mockLock         = new(sync.Mutex)
+)
+
+func init() {
+	mockey.Mock((*Server).getMITMFilter).When(func(self *Server) bool {
+		_, ok := mockGetFilterMap[self]
+		return ok
+	}).To(func(self *Server) *MITMFilterManager {
+		return mockGetFilterMap[self]
+	}).Build()
 }
 
-func RunMITMTestServerEx(
-	client ypb.YakClient,
-	ctx context.Context,
-	onInit func(mitmClient ypb.Yak_MITMClient),
-	onLoad func(mitmClient ypb.Yak_MITMClient),
-	onRecv func(mitmClient ypb.Yak_MITMClient, msg *ypb.MITMResponse),
-) (host, port string) {
-	stream, err := client.MITM(ctx)
-	if err != nil {
-		panic(err)
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	onInit(stream)
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if msg.GetHaveMessage() {
-			msgStr := string(msg.GetMessage().GetMessage())
-			if strings.Contains(msgStr, `starting mitm serve`) {
-				if onLoad != nil {
-					go func() {
-						defer wg.Done()
-						onLoad(stream)
-					}()
-				}
-			}
-		}
-		if onRecv != nil {
-			onRecv(stream, msg)
-		}
-	}
-	wg.Wait()
-	return
+func registerMockServerGetMITMFilter(s *Server, filter *MITMFilterManager) {
+	mockLock.Lock()
+	defer mockLock.Unlock()
+
+	mockGetFilterMap[s] = filter
 }
 
 func Test_ForExcludeBadCase(t *testing.T) {
@@ -84,10 +55,16 @@ func Test_ForExcludeBadCase(t *testing.T) {
 		return rsp
 	})
 
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	server := client.server
+	require.NotNil(t, server)
+	filter := &MITMFilterManager{
+		db: server.GetProjectDatabase(),
 	}
+	filter.Recover(false)
+	registerMockServerGetMITMFilter(server, filter)
+
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
@@ -100,16 +77,10 @@ func Test_ForExcludeBadCase(t *testing.T) {
 		var token string
 		var packet []byte
 
-		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix: []string{".gif"},
-			UpdateFilter:  true,
-		})
-		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-		time.Sleep(500 * time.Millisecond)
+		filter.ExcludeSuffix = []string{".gif"}
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
 		} {
-			// path := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
 			token = uuid.NewString()
 			packet = []byte(`GET /-L-` + token + `/v.gif?logactid=1234567890&showTab=10000&opType=showpv&mod=superman%3Alib&submod=index&superver=supernewplus&glogid=2147883968&type=2011&pid=315&isLogin=0&version=PCHome&terminal=PC&qid=0xc349374900061bc0&sid=36551_38642_38831_39027_39022_38958_38955_39014_39038_38811_39084_38639_26350_39095_39100&super_frm=&from_login=&from_reg=&query=&curcard=2&curcardtab=&_r=0.9024198609355389 HTTP/1.1
@@ -128,21 +99,13 @@ sec-ch-ua-mobile: ?0
 sec-ch-ua-platform: "macOS"
 
 `)
-			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
-			params["packet"] = packet
-			_, err = yak.Execute(`
-rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-sleep(0.3)
-`, params)
-			if err != nil {
-				t.Fatalf("err: %v", err)
-			}
-			count := yakit.QuickSearchMITMHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
-			if count != expectCount {
-				cancel()
-				t.Fatal("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-			}
+			_, _, err = poc.HTTP(packet, poc.WithProxy(proxy), poc.WithHost("127.0.0.1"), poc.WithPort(mockPort))
+			require.NoError(t, err)
+			_, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				SourceType: "mitm",
+			}, expectCount)
+			require.NoErrorf(t, err, "test path failed: %s", ct[0])
 		}
 		cancel()
 	})
@@ -158,14 +121,19 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 		}
 		return rsp
 	})
-
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	server := client.server
+	require.NotNil(t, server)
+	filter := &MITMFilterManager{
+		db: server.GetProjectDatabase(),
 	}
+	filter.Recover(false)
+	registerMockServerGetMITMFilter(server, filter)
+
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
@@ -175,13 +143,8 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 		var token string
 		var packet []byte
 
-		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeMethod: []string{"NONONO"},
-			ExcludeUri:    []string{"abc"},
-			UpdateFilter:  true,
-		})
-		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-		time.Sleep(500 * time.Millisecond)
+		filter.ExcludeMethods = []string{"NONONO"}
+		filter.ExcludeUri = []string{"abc"}
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
 			{"/a/abc.js", 0},
@@ -194,27 +157,15 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 		} {
 			path := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
-			token = ksuid.New().String()
-			packet = []byte("GET " + path + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
-			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
-			packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token)
-			params["packet"] = packet
-			_, err = yak.Execute(`
-println(string(packet))
-rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-println(string(rsp))
-sleep(0.3)
-`, params)
-			if err != nil {
-				t.Logf("err: %v", err)
-				t.Fail()
-			}
-			count := yakit.QuickSearchMITMHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
-			if count != expectCount {
-				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-				cancel()
-			}
+			token = uuid.NewString()
+			packet = []byte(fmt.Sprintf("GET %s HTTP/1.1\r\nX-TOKEN: %s\r\nHost: %s\r\n", path, token, utils.HostPort("127.0.0.1", mockPort)))
+			_, _, err = poc.HTTP(packet, poc.WithProxy(proxy), poc.WithHost("127.0.0.1"), poc.WithPort(mockPort))
+			require.NoError(t, err)
+			_, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				SourceType: "mitm",
+			}, expectCount)
+			require.NoErrorf(t, err, "test path failed: %s", ct[0])
 		}
 		cancel()
 	})
@@ -231,13 +182,19 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 		return rsp
 	})
 
-	client, err := NewLocalClient()
-	if err != nil {
-		panic(err)
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	server := client.server
+	require.NotNil(t, server)
+	filter := &MITMFilterManager{
+		db: server.GetProjectDatabase(),
 	}
+	filter.Recover(false)
+	registerMockServerGetMITMFilter(server, filter)
+
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
@@ -247,12 +204,7 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 		var token string
 		var packet []byte
 
-		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix: []string{".aaac", ".zip", ".js"},
-			UpdateFilter:  true,
-		})
-		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-		time.Sleep(500 * time.Millisecond)
+		filter.ExcludeSuffix = []string{".aaac", ".zip", ".js"}
 		for _, ct := range [][]any{
 			{"/abc.png.zip?ab=1", 0},
 			{"/abc.a", 1},
@@ -266,37 +218,23 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 		} {
 			path := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
-			token = ksuid.New().String()
-			packet = []byte("GET " + path + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
-			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
-			packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token)
-			params["packet"] = packet
-			_, err = yak.Execute(`
-rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-sleep(0.3)
-`, params)
-			if err != nil {
-				t.Fatalf("err: %v", err)
-			}
-			count := yakit.QuickSearchMITMHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
-			if count != expectCount {
-				t.Fatalf("exclude suffix [.aaac, .zip, .js] failed, [%s] except %d but got %d", path, expectCount, count)
-				cancel()
-			}
+			token = uuid.NewString()
+			packet = []byte(fmt.Sprintf("GET %s HTTP/1.1\r\nX-TOKEN: %s\r\nHost: %s\r\n", path, token, utils.HostPort("127.0.0.1", mockPort)))
+			_, _, err = poc.HTTP(packet, poc.WithProxy(proxy), poc.WithHost("127.0.0.1"), poc.WithPort(mockPort))
+			require.NoError(t, err)
+			_, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				SourceType: "mitm",
+			}, expectCount)
+			require.NoErrorf(t, err, "test path failed: %s", ct[0])
 		}
 
-		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix:       []string{".aaac"},
-			ExcludeMethod:       []string{"NONONO"},
-			ExcludeContentTypes: []string{"bbbbbb", "*cc", "*oct", "abc", "text"},
-			ExcludeUri:          nil,
-			IncludeUri:          nil,
-			UpdateFilter:        true,
-		})
-		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
+		{
+			filter.ExcludeSuffix = []string{".aaac"}
+			filter.ExcludeMethods = []string{"NONONO"}
+			filter.ExcludeMIME = []string{"bbbbbb", "*cc", "*oct", "abc", "text"}
+		}
 
-		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"application/abc", 0},
 			{"abc1111", 0},
@@ -311,27 +249,17 @@ sleep(0.3)
 			{"textplain/test", 1}, // text 无法命中
 			{"textplain/text", 0}, // text 命中 后半部分
 		} {
-			path := "/"
 			contentType := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
-			token = ksuid.New().String()
-			packet = []byte("GET " + path + "?ct=" + codec.QueryEscape(contentType) + " HTTP/1.1\r\nHost: " + utils.HostPort("127.0.0.1", mockPort))
-			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
-			packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token)
-			params["packet"] = packet
-			_, err = yak.Execute(`
-rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-sleep(0.5)
-`, params)
-			if err != nil {
-				t.Fatalf("err: %v", err)
-			}
-			count := yakit.QuickSearchMITMHTTPFlowCount(token)
-			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
-			if count != expectCount {
-				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token) mimetype:[%v]", ct[0])
-				cancel()
-			}
+			token = uuid.NewString()
+			packet = []byte(fmt.Sprintf("GET /?ct=%s HTTP/1.1\r\nX-TOKEN: %s\r\nHost: %s\r\n", contentType, token, utils.HostPort("127.0.0.1", mockPort)))
+			_, _, err = poc.HTTP(packet, poc.WithProxy(proxy), poc.WithHost("127.0.0.1"), poc.WithPort(mockPort))
+			require.NoError(t, err)
+			_, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				SourceType: "mitm",
+			}, expectCount)
+			require.NoErrorf(t, err, "test content-type failed: %s", ct[0])
 		}
 		cancel()
 	})
