@@ -103,6 +103,8 @@ type ValueOperator interface {
 	IsMap() bool
 	IsList() bool
 	GetOpcode() string
+	GetBinaryOperator() string
+	GetUnaryOperator() string
 	// Len() int
 
 	// Recursive will execute with handler for every list or map
