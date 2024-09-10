@@ -25,7 +25,7 @@ func TestGlobal(t *testing.T) {
 $GLOBALS["a"] = 1;
 println($GLOBALS['a']);
 `
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-GLOBALS.a(valid)"}, t)
 	})
 
 	//todo: 该测试到class合并后进行修改
@@ -37,7 +37,7 @@ function test(){
     println($GLOBALS['a']);
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-global-container.GLOBALS.a(valid)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-GLOBALS.a(valid)"}, t)
 	})
 
 	//todo: class合并之后做

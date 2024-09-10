@@ -2,10 +2,9 @@ package php2ssa
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
-
-	"github.com/google/uuid"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -28,21 +27,23 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 }
 
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
-	container := fb.EmitEmptyContainer()
-	fb.AssignVariable(fb.CreateVariable("global-container"), container)
-	initHandler := func(name ...string) {
-		for _, _name := range name {
-			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
-			emptyContainer := fb.EmitEmptyContainer()
-			fb.AssignVariable(variable, emptyContainer)
+	fb.InitOnceFunc.Do(func() {
+		container := fb.EmitEmptyContainer()
+		fb.AssignVariable(fb.CreateVariable("global-container"), container)
+		initHandler := func(name ...string) {
+			for _, _name := range name {
+				variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
+				emptyContainer := fb.EmitEmptyContainer()
+				fb.AssignVariable(variable, emptyContainer)
+			}
 		}
-	}
-	initHandler("GLOBALS", "_SERVER", "$staticScope$")
-	fb.GetProgram().GlobalScope = container
-	fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
-		//scope.SetForceCapture()
-		return scope
-	}
+		initHandler("_SERVER")
+		fb.GetProgram().GlobalScope = container
+		fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
+			//scope.SetForceCapture()
+			return scope
+		}
+	})
 }
 func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()

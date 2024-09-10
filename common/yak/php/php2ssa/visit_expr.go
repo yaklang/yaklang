@@ -1165,7 +1165,7 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 
 		switch variable {
 		case "$GLOBALS":
-			position = "GLOBALS"
+			force_create = "GLOBALS"
 		case "$_GET":
 			force_create = "_GET"
 		case "$_POST":
