@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -156,15 +157,16 @@ func Test_Include_HitCache(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
 	prog, err := ssaapi.ParseProject(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
+	defer 	ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
 	start := time.Now()
-	prog.SyntaxFlowWithError(`include('servlet-param')`)
+	prog.SyntaxFlowWithError(`<include('servlet-param')>`)
 	elapsed := time.Since(start)
 
 	start = time.Now()
-	prog.SyntaxFlowWithError(`include('servlet-param')`)
+	prog.SyntaxFlowWithError(`<include('servlet-param')>`)
 	elapsed2 := time.Since(start)
 
 	log.Infof("elapsed: %v, elapsed2: %v", elapsed, elapsed2)
