@@ -947,12 +947,21 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		res := make([]bool, 0, valuesLen(values))
 		_ = values.Recursive(func(vo ValueOperator) error {
 			for _, element := range i.Values {
-				if utils.MatchAllOfRegexp(element, `(?i)binop[.]`) {
-
-				}
-				if element == vo.GetOpcode() {
+				code := vo.GetOpcode()
+				if element == code {
 					res = append(res, true)
 					return nil
+				} else if results := BinOpRegexp.FindStringSubmatch(element); len(results) > 2 {
+					if code == results[1] {
+						// vo.GetOpcode()
+						switch ret := ssa.BinaryOpcode(vo.GetBinaryOperator()); ret {
+						case ssa.OpAdd:
+							if results[2] == "+" {
+								res = append(res, true)
+								return nil
+							}
+						}
+					}
 				}
 			}
 

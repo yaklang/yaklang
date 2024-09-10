@@ -43,6 +43,14 @@ func (p *Program) GetOpcode() string {
 	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
 }
 
+func (p *Program) GetBinaryOperator() string {
+	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
+}
+
+func (p *Program) GetUnaryOperator() string {
+	return ssa.SSAOpcode2Name[ssa.SSAOpcodeUnKnow]
+}
+
 func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }

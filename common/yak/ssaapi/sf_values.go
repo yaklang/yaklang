@@ -33,6 +33,14 @@ func (value Values) GetCalled() (sfvm.ValueOperator, error) {
 	return vv, nil
 }
 
+func (Values) GetBinaryOperator() string {
+	return ""
+}
+
+func (Values) GetUnaryOperator() string {
+	return ""
+}
+
 func (value Values) GetFields() (sfvm.ValueOperator, error) {
 	var vv []sfvm.ValueOperator
 	for _, i := range value {
