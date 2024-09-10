@@ -39,6 +39,7 @@ func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.O
 	assert.Greater(t, len(msgs), 0)
 	end := msgs[len(msgs)-1]
 	assert.Equal(t, end.process, float64(1))
+
 }
 
 func TestParseProject_JAVA(t *testing.T) {
@@ -114,4 +115,35 @@ func TestParseProject_PHP(t *testing.T) {
 		}`)
 
 	checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+}
+
+func TestParseProject_PHP_withEmptyFile(t *testing.T) {
+	t.Run("empty file ", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("example/src/main/php/a.php", `
+		<?php
+		require_once("b.php");
+		`)
+		vf.AddFile("example/src/main/php/b.php", `
+		<?php
+		`)
+		vf.AddFile("example/src/main/php/c.php", ``)
+
+		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+
+	t.Run("empty file with include", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("example/src/main/php/a.php", `
+		<?php
+		require_once("b.php");
+		`)
+		vf.AddFile("example/src/main/php/b.php", `
+		<?php
+		require_once("c.php");
+		`)
+		vf.AddFile("example/src/main/php/c.php", ``)
+
+		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 }
