@@ -64,7 +64,7 @@ func TestFS_RuleUPdate(t *testing.T) {
 
 	// update
 	content = `
-	desc(lib: "a")
+	desc(lib: "b")
 	b as $a
 	alert $a
 	`
@@ -74,7 +74,7 @@ func TestFS_RuleUPdate(t *testing.T) {
 	a = 1 
 	b = 2`,
 		`
-	<include(a)> as $target
+	<include(b)> as $target
 	`, map[string][]string{
 			"target": {"2"},
 		},
