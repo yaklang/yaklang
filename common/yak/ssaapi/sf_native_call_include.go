@@ -64,8 +64,8 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return false, nil, utils.Error("no rule name found")
 	}
 
-	if includeCache != nil {
-		hash := utils.CalcSha256(ruleName, parent.GetNames())
+	if programName := parent.GetProgramName(); includeCache != nil && programName != "" {
+		hash := utils.CalcSha256(ruleName, programName)
 		if ret, ok := includeCache.Get(hash); ok {
 			return true, ret, nil
 		}
