@@ -2,6 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
+	"testing"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -10,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestQueryYakScriptRiskDetailByCWE(t *testing.T) {
@@ -126,6 +128,82 @@ func TestServer_Cli_YakSript(t *testing.T) {
 			[]string{"test-nuclei-cli", "test-port-scan-cli", "test-mitm-cli", "test-mitm-no-cli"}, consts.GetGormProfileDatabase(),
 		)
 	})
+}
+
+func TestServer_QueryYakSript_ByImportance(t *testing.T) {
+	type TestCase struct {
+		param  bool
+		script *schema.YakScript
+	}
+
+	checkByOrder := func(t *testing.T, scriptRequest *ypb.QueryYakScriptRequest, db *gorm.DB) {
+		_, scripts, err := yakit.QueryYakScript(db, scriptRequest)
+		require.NoError(t, err)
+		for _, s := range scripts {
+			log.Infof("scripts:%s", s.ScriptName)
+		}
+		for i := 0; i < len(scripts)-1; i++ {
+			if !scripts[i].IsCorePlugin && scripts[i+1].IsCorePlugin {
+				t.Fatalf("test failed: %s is not corePlugin,but its next plugin %s is  corePlugin", scripts[i].ScriptName, scripts[i+1].ScriptName)
+			}
+			if !scripts[i].IsCorePlugin && !scripts[i+1].IsCorePlugin {
+				if !scripts[i].OnlineOfficial && scripts[i+1].OnlineOfficial {
+					t.Fatalf("test failed: %s is not onlineOfficial,but its next plugin %s is onlineOfficial", scripts[i].ScriptName, scripts[i+1].ScriptName)
+				}
+			}
+		}
+	}
+
+	createScript := func(scripts ...*TestCase) {
+		for _, script := range scripts {
+			err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+			require.NoError(t, err)
+		}
+	}
+
+	testcases := []*TestCase{
+		{
+			script: &schema.YakScript{
+				ScriptName:   "test-script-1",
+				Type:         "nuclei",
+				Params:       "[{\"Field\":\"scan-url\",\"TypeVerbose\":\"text\",\"FieldVerbose\":\"请输入扫描目标\",\"Required\":true,\"MethodType\":\"text\"},{\"Field\":\"file-path\",\"TypeVerbose\":\"upload-path\",\"FieldVerbose\":\"请输入字典路径\",\"MethodType\":\"file\"}]",
+				IsCorePlugin: true,
+			},
+			param: false},
+		{script: &schema.YakScript{
+			ScriptName:     "test-script-2",
+			Type:           "port-scan",
+			Params:         "[{\"Field\":\"scan-url\",\"TypeVerbose\":\"text\",\"FieldVerbose\":\"请输入扫描目标\",\"Required\":true,\"MethodType\":\"text\"},{\"Field\":\"file-path\",\"TypeVerbose\":\"upload-path\",\"FieldVerbose\":\"请输入字典路径\",\"MethodType\":\"file\"}]",
+			OnlineOfficial: true,
+		},
+			param: false},
+		{script: &schema.YakScript{
+			ScriptName: "test-script-3",
+			Type:       "mitm",
+			Params:     "",
+		},
+			param: false}}
+
+	createScript(testcases...)
+	defer func() {
+		lo.ForEach(testcases, func(item *TestCase, index int) {
+			require.NoError(t, yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), item.script.ScriptName))
+		})
+	}()
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	_ = client
+	checkByOrder(t, &ypb.QueryYakScriptRequest{
+		Pagination: &ypb.Paging{
+			Page:     1,
+			Limit:    30,
+			OrderBy:  "",
+			Order:    "",
+			RawOrder: "is_core_plugin desc,online_official desc",
+		},
+	}, consts.GetGormProfileDatabase())
+
 }
 func TestServer_QueryYakScript(t *testing.T) {
 	client, err := NewLocalClient()
