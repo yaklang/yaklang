@@ -113,6 +113,14 @@ func (v *ValueList) ForEach(h func(i any)) {
 	})
 }
 
+func (v *ValueList) GetBinaryOperator() string {
+	return ""
+}
+
+func (v *ValueList) GetUnaryOperator() string {
+	return ""
+}
+
 func (v *ValueList) String() string {
 	var res []string
 	for _, v := range v.values {

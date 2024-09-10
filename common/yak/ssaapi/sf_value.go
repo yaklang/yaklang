@@ -23,6 +23,32 @@ func (v *Value) GetOpcode() string {
 	return ssa.SSAOpcode2Name[v.getOpcode()]
 }
 
+func (v *Value) GetBinaryOperator() string {
+	sa := v.GetSSAValue()
+	if utils.IsNil(sa) {
+		return ""
+	}
+	if sa.GetOpcode() == ssa.SSAOpcodeBinOp {
+		binop, ok := ssa.ToBinOp(sa)
+		if !ok {
+			return ""
+		}
+		return string(binop.Op)
+	}
+	return ""
+}
+
+func (v *Value) GetUnaryOperator() string {
+	sa := v.GetSSAValue()
+	if utils.IsNil(sa) {
+		return ""
+	}
+	if sa.GetOpcode() == ssa.SSAOpcodeUnOp {
+
+	}
+	return ""
+}
+
 func (v *Value) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(v)
 }
