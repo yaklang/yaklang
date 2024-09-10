@@ -132,7 +132,7 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 		))
 		buf := strings.Builder{}
 		buf.WriteString(fmt.Sprintf("### %s\n\n", html.EscapeString(fun.MethodName)))
-		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", html.EscapeString(document)))
+		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", document))
 		buf.WriteString(fmt.Sprintf("#### 定义\n\n`%s`\n\n", html.EscapeString(fun.Decl)))
 		if len(fun.Params) > 0 {
 			buf.WriteString("#### 参数\n")
