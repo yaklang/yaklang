@@ -1,0 +1,161 @@
+desc(
+    title: "SQL query concat or Out-Of-Control in createStatement().executeQuery",
+    title: 'SQL 语句拼接的不安全写法：executeQuery 发生拼接且调用参数直接被参数控制',
+    type: audit,
+    severity: mid,
+    description: <<<DESC
+在Java中，SQL语句拼接的不安全写法主要体现在使用字符串拼接来构建SQL查询时，用户输入的参数直接被插入到SQL语句中。
+
+这种做法容易导致SQL注入攻击，攻击者可以通过恶意构造的输入操控SQL查询，从而获取敏感数据或执行未授权的操作。
+DESC
+)
+
+.createStatement().executeQuery(*<slice(start=1)> as $params);
+check $params;
+
+// support StringBuilder
+$params<getCaller>?{<name>?{have: toString}}<getObject>?{.append()}.append as $appendMethod;
+$appendMethod(* <slice(start=1)>?{!opcode: const} as $builderAppendParams); <delete(appendMethod)>
+
+$params<getFunc>(*<slice(start=1)> as $limited)
+alert $limited;
+
+$params #{
+    hook: `*?{(opcode: '+' && <self>#>?{opcode: param})} as $directly`
+}->;
+$builderAppendParams?{opcode: param} as $directly;
+
+$params #{
+    hook: `*?{opcode: '+' || (opcode: 'call')} as $add`
+}->;
+$add #> * as $indirectly;
+$builderAppendParams?{!opcode: param} as $indirectly;
+<delete(add)>
+
+$indirectly ?{!opcode: const} #{hook: `*?{!opcode: const} as $ooc`}-> ;
+$ooc#{
+    hook: `*?{opcode: param && <self> & $limited} as $dep`,
+}->;
+
+
+$directly + $dep as $vuln;
+
+<delete(limited)>
+<delete(ooc)>
+<delete(indirectly)>
+<delete(builderAppendParams)>
+<delete(add)>
+<delete($directly)>
+alert $vuln;
+
+
+desc(
+language: java,
+alert_min: 8,
+'file://a.java': <<<FILE
+class Login {
+  String hashPassword(char[] p) {
+    return callHash(p);
+  }
+
+  public void doPrivilegedAction(String username, char[] password)
+                                 throws SQLException {
+    Connection connection = getConnection();
+    if (connection == null) {
+      // Handle error
+    }
+    try {
+      String pwd = hashPassword(password);
+
+      String sqlString = "SELECT * FROM db_user WHERE username = '"
+                         + username +
+                         "' AND password = '" + "" + "'";
+      Statement stmt = connection.createStatement();
+      ResultSet rs = stmt.executeQuery(sqlString);
+    } finally {
+    }
+  }
+}
+FILE,
+'file://a1.java': <<<FILE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+class Login {
+  String hashPassword(char[] p) {
+    return callHash(p);
+  }
+
+  public void doPrivilegedAction(String username, char[] password)
+                                 throws SQLException {
+    Connection connection = getConnection();
+    if (connection == null) {
+      // Handle error
+    }
+    try {
+      String pwd = hashPassword(password);
+
+      String sqlString = "SELECT * FROM db_user WHERE username = '"
+                         + username +
+                         "' AND password = '" + pwd + "'";
+      Statement stmt = connection.createStatement();
+      ResultSet rs = stmt.executeQuery(sqlString);
+    } finally {
+    }
+  }
+}
+FILE,
+'file://a3.java': <<<FILE
+class Login {
+  String hashPassword(char[] p) {
+    return callHash(p);
+  }
+
+  public void doPrivilegedAction(String concatUser)
+                                 throws SQLException {
+    Connection connection = getConnection();
+    if (connection == null) {
+      // Handle error
+    }
+    try {
+      String pwd = hashPassword(password);
+
+      String sqlString = "SELECT * FROM db_user WHERE username = '";
+      Statement stmt = connection.createStatement();
+      ResultSet rs = stmt.executeQuery(sqlString.concat(concatUser));
+    } finally {
+    }
+  }
+}
+FILE,
+'file://a4.java': <<<FILE
+class Login {
+  String hashPassword(char[] p) {
+    return callHash(p);
+  }
+
+  public void doPrivilegedAction(String appendUser, String appendPass)
+                                 throws SQLException {
+    Connection connection = getConnection();
+    if (connection == null) {
+      // Handle error
+    }
+    try {
+      String pwd = hashPassword(appendPass);
+
+      StringBuilder sqlString = new StringBuilder();
+      sqlString.append("SELECT * FROM db_user WHERE username = '");
+      sqlString.append(appendUser);
+      sqlString.append(" AND password = ");
+      sqlString.append(pwd);
+      Statement stmt = connection.createStatement();
+      ResultSet rs = stmt.executeQuery(sqlString.toString());
+    } finally {
+    }
+  }
+}
+FILE,
+)

@@ -1,0 +1,75 @@
+desc(
+    title: "SEI ignore replaces return",
+    ref: 'https://wiki.sei.cmu.edu/confluence/display/java/EXP00-J.+Do+not+ignore+values+returned+by+methods',
+    type: audit,
+    severity: low,
+)
+
+.replace() as $call;
+.replaceAll() as $call;
+.replaceFirst() as $call;
+.concat() as $call;
+
+$call?{!<self>->} as $result;
+alert $result for "Return String is not used";
+
+desc(
+lang: java,
+'safefile://b1.java': <<<REPLACE
+public class Replace {
+  public static void main(String[] args) {
+    String original = "insecure";
+    System.out.println(original.replace('i', '9'));
+  }
+}
+REPLACE,
+'safefile://b2.java': <<<REPLACE
+public class Replace {
+  public static void main(String[] args) {
+    String original = "insecure";
+    return original.replace('i', '9');
+  }
+}
+REPLACE,
+
+alert_min: 6,
+'file://a1.java': <<<REPLACE
+public class Replace {
+  public static void main(String[] args) {
+    String original = "insecure";
+    original.replace('i', '9');
+    System.out.println(original);
+  }
+}
+REPLACE,
+'file://a2.java': <<<REPLACE
+public class Replace {
+  public static void main(String[] args) {
+    String original = "insecure";
+    String c = original.replace('i', '9');
+    System.out.println(original);
+  }
+}
+REPLACE,
+'file://a3.java': <<<REPLACE
+public class Replace {
+  public static void main(String[] args) {
+    String original = "insecure";
+    String c = original.concat("aaaaa");
+    System.out.println(original);
+  }
+}
+REPLACE,
+'file://a4.java': <<<REPLACE
+public class Replace {
+  public static void main(String[] args) {
+    String original = "insecure";
+    String c = original.concat("aaaaa");
+    String c = original.replaceAll("aaaaa", "BBBB");
+    original.replaceFirst("CCC", "EEE");
+    System.out.println(original);
+  }
+}
+REPLACE,
+
+)
