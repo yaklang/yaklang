@@ -283,17 +283,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
 	})
 
-	recoverSend := func() {
+	recoverFilterAndReplacerSend := func() {
 		send(&ypb.MITMResponse{
 			JustFilter:          true,
-			IncludeHostname:     filterManager.IncludeHostnames,
-			ExcludeHostname:     filterManager.ExcludeHostnames,
-			ExcludeSuffix:       filterManager.ExcludeSuffix,
-			IncludeSuffix:       filterManager.IncludeSuffix,
-			ExcludeMethod:       filterManager.ExcludeMethods,
-			ExcludeContentTypes: filterManager.ExcludeMIME,
-			ExcludeUri:          filterManager.ExcludeUri,
-			IncludeUri:          filterManager.IncludeUri,
+			FilterData:          filterManager.Data,
 			JustContentReplacer: true,
 			Replacers:           replacer.GetRules(),
 		})
@@ -405,15 +398,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if reqInstance.GetSetResetFilter() {
 				filterManager.Recover()
 				send(&ypb.MITMResponse{
-					JustFilter:          true,
-					IncludeHostname:     filterManager.IncludeHostnames,
-					ExcludeHostname:     filterManager.ExcludeHostnames,
-					ExcludeSuffix:       filterManager.ExcludeSuffix,
-					IncludeSuffix:       filterManager.IncludeSuffix,
-					ExcludeMethod:       filterManager.ExcludeMethods,
-					ExcludeContentTypes: filterManager.ExcludeMIME,
-					IncludeUri:          filterManager.IncludeUri,
-					ExcludeUri:          filterManager.ExcludeUri,
+					JustFilter: true,
+					FilterData: filterManager.Data,
 				})
 				clearPluginHTTPFlowCache()
 				continue
@@ -427,7 +413,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					log.Infof("remove all content-replacer")
 					replacer.SetRules()
 				}
-				recoverSend()
+				recoverFilterAndReplacerSend()
 				clearPluginHTTPFlowCache()
 				continue
 			}
@@ -588,28 +574,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 更新过滤器
 			if reqInstance.UpdateFilter {
 				clearPluginHTTPFlowCache()
-				filterManager.IncludeSuffix = reqInstance.IncludeSuffix
-				filterManager.ExcludeSuffix = reqInstance.ExcludeSuffix
-				filterManager.IncludeHostnames = reqInstance.IncludeHostname
-				filterManager.ExcludeHostnames = reqInstance.ExcludeHostname
-				filterManager.ExcludeMethods = reqInstance.ExcludeMethod
-				filterManager.ExcludeMIME = reqInstance.ExcludeContentTypes
-				filterManager.ExcludeUri = reqInstance.ExcludeUri
-				filterManager.IncludeUri = reqInstance.IncludeUri
+				filterManager.Update(reqInstance.FilterData)
 				filterManager.Save()
-				send(&ypb.MITMResponse{
-					JustFilter:          true,
-					IncludeHostname:     filterManager.IncludeHostnames,
-					ExcludeHostname:     filterManager.ExcludeHostnames,
-					ExcludeSuffix:       filterManager.ExcludeSuffix,
-					IncludeSuffix:       filterManager.IncludeSuffix,
-					ExcludeMethod:       filterManager.ExcludeMethods,
-					ExcludeUri:          filterManager.ExcludeUri,
-					IncludeUri:          filterManager.IncludeUri,
-					ExcludeContentTypes: filterManager.ExcludeMIME,
-					JustContentReplacer: true,
-					Replacers:           replacer.GetRules(),
-				})
+				recoverFilterAndReplacerSend()
 				continue
 			}
 
@@ -751,14 +718,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				send(feedbackRspIns)
 				send(&ypb.MITMResponse{
 					JustFilter:          true,
-					IncludeHostname:     filterManager.IncludeHostnames,
-					ExcludeHostname:     filterManager.ExcludeHostnames,
-					ExcludeSuffix:       filterManager.ExcludeSuffix,
-					IncludeSuffix:       filterManager.IncludeSuffix,
-					ExcludeMethod:       filterManager.ExcludeMethods,
-					ExcludeContentTypes: filterManager.ExcludeMIME,
-					ExcludeUri:          filterManager.ExcludeUri,
-					IncludeUri:          filterManager.IncludeUri,
+					FilterData:          filterManager.Data,
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 				})
@@ -948,19 +908,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if reqInstance.GetRecover() {
 				log.Infof("retry recover mitm session")
 				send(feedbackRspIns)
-				send(&ypb.MITMResponse{
-					JustFilter:          true,
-					IncludeHostname:     filterManager.IncludeHostnames,
-					ExcludeHostname:     filterManager.ExcludeHostnames,
-					ExcludeSuffix:       filterManager.ExcludeSuffix,
-					IncludeSuffix:       filterManager.IncludeSuffix,
-					ExcludeMethod:       filterManager.ExcludeMethods,
-					ExcludeContentTypes: filterManager.ExcludeMIME,
-					ExcludeUri:          filterManager.ExcludeUri,
-					IncludeUri:          filterManager.IncludeUri,
-					JustContentReplacer: true,
-					Replacers:           replacer.GetRules(),
-				})
+				recoverFilterAndReplacerSend()
 				continue
 			}
 
@@ -1008,7 +956,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return raw
 		}
 
-		isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
+		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		var extName string
 		u, _ := url.Parse(urlStr)
 		if ret := path.Ext(u.EscapedPath()); ret != "" {
@@ -1017,7 +965,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				extName = "." + extName
 			}
 		}
-		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName, isTls) {
+		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
 		}
@@ -1082,14 +1030,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					IsHttps:             false,
 					Url:                 urlStr,
 					Id:                  id,
-					IncludeHostname:     filterManager.IncludeHostnames,
-					ExcludeHostname:     filterManager.ExcludeHostnames,
-					ExcludeSuffix:       filterManager.ExcludeSuffix,
-					IncludeSuffix:       filterManager.IncludeSuffix,
-					ExcludeMethod:       filterManager.ExcludeMethods,
-					ExcludeContentTypes: filterManager.ExcludeMIME,
-					ExcludeUri:          filterManager.ExcludeUri,
-					IncludeUri:          filterManager.IncludeUri,
+					FilterData:          filterManager.Data,
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					IsWebsocket:         true,
@@ -1274,7 +1215,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 过滤
-		if !filterManager.IsPassed(method, hostname, urlStr, extName, isHttps) {
+		if !filterManager.IsPassed(method, hostname, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req
 		}
@@ -1321,14 +1262,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					IsHttps:             isHttps,
 					Url:                 urlStr,
 					Id:                  id,
-					IncludeHostname:     filterManager.IncludeHostnames,
-					ExcludeHostname:     filterManager.ExcludeHostnames,
-					ExcludeSuffix:       filterManager.ExcludeSuffix,
-					IncludeSuffix:       filterManager.IncludeSuffix,
-					ExcludeMethod:       filterManager.ExcludeMethods,
-					ExcludeContentTypes: filterManager.ExcludeMIME,
-					ExcludeUri:          filterManager.ExcludeUri,
-					IncludeUri:          filterManager.IncludeUri,
+					FilterData:          filterManager.Data,
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
@@ -1669,9 +1603,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	// 发送第一个设置状态
-	recoverSend()
+	recoverFilterAndReplacerSend()
 	// 发送第二个来设置 replacer
-	recoverSend()
+	recoverFilterAndReplacerSend()
 
 	log.Infof("start serve mitm server for %s", addr)
 	// err = mServer.Run(ctx)
