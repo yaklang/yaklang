@@ -143,6 +143,9 @@ func (p *PackageFileLoader) LoadFilePackage(packageName string, once bool) (stri
 		return "", nil, err
 	}
 	data, err := p.fs.ReadFile(path)
+	if len(data) == 0 {
+		return "", nil, utils.Errorf("file %s is empty", path)
+	}
 	return path, memedit.NewMemEditor(string(data)), err
 }
 
