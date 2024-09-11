@@ -438,27 +438,7 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		}
 	}
 	p := params.Pagination
-	if !utils.StringArrayContains([]string{
-		"desc", "asc", "",
-	}, strings.ToLower(params.GetPagination().GetOrder())) {
-		return nil, nil, utils.Error("invalid order")
-	}
-	if rawOrder := params.GetPagination().GetRawOrder(); rawOrder != "" {
-		db = db.Order(rawOrder)
-	}
-	orderOrdinary := "updated_at desc"
-	if utils.StringArrayContains([]string{
-		"created_at", "updated_at", "id", "script_name",
-		"author",
-	}, strings.ToLower(params.GetPagination().GetOrderBy())) {
-		orderOrdinary = fmt.Sprintf("%v %v", params.GetPagination().GetOrderBy(), params.GetPagination().GetOrder())
-		orderOrdinary = strings.TrimSpace(orderOrdinary)
-	}
-	if orderOrdinary != "" {
-		db = db.Order(orderOrdinary)
-	} else {
-		db = db.Order("updated_at desc")
-	}
+	db = bizhelper.OrderByPaging(db, p)
 	db = FilterYakScript(db, params) // .LogMode(true).Debug()
 	var ret []*schema.YakScript
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
