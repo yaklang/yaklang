@@ -94,53 +94,76 @@ func (p *FuzzParam) String() string {
 	return fmt.Sprintf("Name:%-20s Position:[%v(%v)]\n", p.Name(), p.PositionVerbose(), p.Position())
 }
 
-func (p *FuzzParam) Fuzz(i string) (req *FuzzRequest) {
-	switch p.position {
-	case lowhttp.PosPath:
-		return p.origin.FuzzPath(i)
-	case lowhttp.PosPathAppend:
-		return p.origin.FuzzPathAppend(i)
-	case lowhttp.PosPathBlock:
-		return p.origin.FuzzPathBlock(i)
-	case lowhttp.PosMethod:
-		return p.origin.FuzzMethod(i)
-	case lowhttp.PosGetQuery:
-		req = p.origin.FuzzGetParams(p.param, i)
-	case lowhttp.PosGetQueryBase64:
-		return p.origin.FuzzGetBase64Params(p.param, i)
-	case lowhttp.PosGetQueryJson:
-		req = p.origin.FuzzGetJsonPathParams(p.param, p.path, i)
-	case lowhttp.PosGetQueryBase64Json:
-		return p.origin.FuzzGetBase64JsonPathParams(p.param, p.path, i)
-	case lowhttp.PosHeader:
-		return p.origin.FuzzHTTPHeader(p.param, i)
-	case lowhttp.PosCookie:
-		return p.origin.FuzzCookie(p.param, i)
-	case lowhttp.PosCookieBase64:
-		return p.origin.FuzzCookieBase64(p.param, i)
-	case lowhttp.PosCookieJson:
-		return p.origin.FuzzCookieJsonPath(p.param, p.path, i)
-	case lowhttp.PosCookieBase64Json:
-		return p.origin.FuzzCookieBase64JsonPath(p.param, p.path, i)
-	case lowhttp.PosPostJson:
-		return p.origin.FuzzPostJson(p.param, i)
-	case lowhttp.PosPostQuery:
-		return p.origin.FuzzPostParams(p.param, i)
-	case lowhttp.PosPostQueryBase64:
-		return p.origin.FuzzPostBase64Params(p.param, i)
-	case lowhttp.PosPostQueryJson:
-		return p.origin.FuzzPostJsonPathParams(p.param, p.path, i)
-	case lowhttp.PosPostQueryBase64Json:
-		return p.origin.FuzzPostBase64JsonPathParams(p.param, p.path, i)
-	case lowhttp.PosPostXML:
-		return p.origin.FuzzPostXMLParams(p.path, i)
-	case lowhttp.PosBody:
-		return p.origin.FuzzPostRaw(i)
-	default:
-		log.Warnf("cannot found fuzz params method identify: %v", lowhttp.PosGetQueryJson)
-		return p.origin
+func (p *FuzzParam) Exec(opts ...mutate.HttpPoolConfigOption) (chan *mutate.HttpResult, error) {
+	return p.origin.Exec(opts...)
+}
+
+func (p *FuzzParam) ExecFirst(opts ...mutate.HttpPoolConfigOption) (result *mutate.HttpResult, err error) {
+	return p.origin.ExecFirst(opts...)
+}
+
+func (p *FuzzParam) Results() [][]byte {
+	return p.origin.requests
+}
+
+func (p *FuzzParam) Show() *FuzzParam {
+	p.origin.Show()
+	return p
+}
+
+func (p *FuzzParam) FirstFuzzRequestBytes() []byte {
+	return p.origin.FirstFuzzRequestBytes()
+}
+
+func (p *FuzzParam) Fuzz(values ...string) *FuzzParam {
+	req := p.origin
+	for _, i := range values {
+		switch p.position {
+		case lowhttp.PosPath:
+			req.FuzzPath(i)
+		case lowhttp.PosPathAppend:
+			req.FuzzPathAppend(i)
+		case lowhttp.PosPathBlock:
+			req.FuzzPathBlock(i)
+		case lowhttp.PosMethod:
+			req.FuzzMethod(i)
+		case lowhttp.PosGetQuery:
+			req.FuzzGetParams(p.param, i)
+		case lowhttp.PosGetQueryBase64:
+			req.FuzzGetBase64Params(p.param, i)
+		case lowhttp.PosGetQueryJson:
+			req.FuzzGetJsonPathParams(p.param, p.path, i)
+		case lowhttp.PosGetQueryBase64Json:
+			req.FuzzGetBase64JsonPathParams(p.param, p.path, i)
+		case lowhttp.PosHeader:
+			req.FuzzHTTPHeader(p.param, i)
+		case lowhttp.PosCookie:
+			req.FuzzCookie(p.param, i)
+		case lowhttp.PosCookieBase64:
+			req.FuzzCookieBase64(p.param, i)
+		case lowhttp.PosCookieJson:
+			req.FuzzCookieJsonPath(p.param, p.path, i)
+		case lowhttp.PosCookieBase64Json:
+			req.FuzzCookieBase64JsonPath(p.param, p.path, i)
+		case lowhttp.PosPostJson:
+			req.FuzzPostJson(p.param, i)
+		case lowhttp.PosPostQuery:
+			req.FuzzPostParams(p.param, i)
+		case lowhttp.PosPostQueryBase64:
+			req.FuzzPostBase64Params(p.param, i)
+		case lowhttp.PosPostQueryJson:
+			req.FuzzPostJsonPathParams(p.param, p.path, i)
+		case lowhttp.PosPostQueryBase64Json:
+			req.FuzzPostBase64JsonPathParams(p.param, p.path, i)
+		case lowhttp.PosPostXML:
+			req.FuzzPostXMLParams(p.path, i)
+		case lowhttp.PosBody:
+			req.FuzzPostRaw(i)
+		default:
+			log.Warnf("cannot found fuzz params method identify: %v", p.position)
+		}
 	}
-	return
+	return p
 }
 
 func (f *FuzzRequest) GetCommonParams() []*FuzzParam {
