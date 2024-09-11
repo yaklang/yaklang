@@ -92,11 +92,12 @@ jobs:
               go test -timeout 20s ./common/netx/mustpass
               go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil
 
-          - name: Test FuzzTag
+          - name: Test Fuzz
             run: |
               go test -timeout 20s ./common/mutate_tests ./common/fuzztag  
               go test -timeout 20s ./common/fuzztagx 
               go test -timeout 30s ./common/mutate
+              go test -timeout 30s ./common/fuzzx
 
           - name: Test SSA / SSARule / StaticAnalyze / Multilingual Frontend
             run: |
