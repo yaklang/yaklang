@@ -241,7 +241,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			code: `
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	a.c
+	panic("a")
 }`,
 			err:       "冒烟测试失败",
 			codeTyp:   "mitm",
@@ -279,6 +279,34 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			err:       "",
 			codeTyp:   "mitm",
 			zeroScore: false,
+		})
+	})
+
+	t.Run("test static analyze rule", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+handle = result => {
+	yakit.Info(bacd)
+	risk.NewRisk("http://baidu.com" )
+}`,
+			codeTyp:   "port-scan",
+			err:       "risk.NewRisk should",
+			zeroScore: true,
+		})
+	})
+
+	t.Run("test static analyze score rule", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+handle = result => {
+	yakit.Info(bacd)
+	exec.System("a")
+}`,
+			codeTyp:   "port-scan",
+			err:       "forbid command exec library",
+			zeroScore: true,
 		})
 	})
 }
