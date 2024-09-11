@@ -98,7 +98,6 @@ func checkRules(plugin string, prog *ssaapi.Program, kind StaticAnalyzeKind) *re
 		if pluginType != plugin_type.PluginTypeYak {
 			ret.Merge(plugin_type.CheckScoreRules(pluginType, prog))
 		}
-	case Analyze:
 		fallthrough
 	default:
 		ret.Merge(plugin_type.CheckRules(plugin_type.PluginTypeYak, prog))

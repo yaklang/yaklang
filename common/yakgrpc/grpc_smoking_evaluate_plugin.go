@@ -5,6 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -14,9 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
 	"golang.org/x/exp/slices"
-	"math/rand"
-	"strings"
-	"sync"
 
 	"github.com/google/uuid"
 
@@ -228,7 +229,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 					pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
 				}
 			}
-			log.Error("static analyze failed")
+			if score < 60 {
+				return &ypb.SmokingEvaluatePluginResponse{
+					Score:   0,
+					Results: results,
+				}, nil
+			}
 		}
 	}
 
