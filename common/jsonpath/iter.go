@@ -75,7 +75,7 @@ func fetchAllIterKey(i any) []*iterKey {
 		raw = gSlice
 	}
 
-	var a = iterKeys(nil, raw, "$.")
+	a := iterKeys(nil, raw, "$.")
 	var result []*iterKey
 	el := a.Front()
 	for el != nil {
@@ -114,6 +114,19 @@ func ReplaceString(i string, jp string, replaced any) string {
 	}
 	raw, _ := json.Marshal(data)
 	return string(raw)
+}
+
+func ReplaceStringWithError(i string, jp string, replaced any) (string, error) {
+	if jp == "" {
+		return i, utils.Errorf("empty jsonpath")
+	}
+
+	data, err := Replace(i, jp, replaced)
+	if err != nil {
+		return "", err
+	}
+	raw, _ := json.Marshal(data)
+	return string(raw), nil
 }
 
 func RecursiveDeepJsonPath(i any) []string {

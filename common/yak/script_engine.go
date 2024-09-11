@@ -145,6 +145,7 @@ func initYaklangLib() {
 
 	// Fuzz 模糊测试
 	yaklang.Import("fuzz", yaklib.FuzzExports)
+	yaklang.Import("fuzzx", yaklib.FuzzxExports)
 
 	// xhtml xss检测基础工具
 	yaklang.Import("xhtml", xhtml.Exports)

@@ -2,6 +2,9 @@ package mutate
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -9,11 +12,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/mixer"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
-	"net/url"
 )
 
-func isBase64JSON(raw string) (string, bool) {
+func IsBase64JSON(raw string) (string, bool) {
 	if raw == "" {
 		return raw, false
 	}
@@ -33,7 +34,7 @@ func allPlain(i []byte) bool {
 	return true
 }
 
-func isStrictBase64(raw string) (string, bool) {
+func IsStrictBase64(raw string) (string, bool) {
 	if raw == "" {
 		return raw, false
 	}
@@ -53,7 +54,7 @@ func isStrictBase64(raw string) (string, bool) {
 	return string(decoded), true
 }
 
-func isBase64(raw string) (string, bool) {
+func IsBase64(raw string) (string, bool) {
 	if raw == "" {
 		return raw, false
 	}
@@ -124,7 +125,7 @@ func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val a
 	vals := lowhttp.ParseQueryParams(f.GetPostQuery())
 	originValue := vals.Get(keyStr)
 
-	if ret, ok := isBase64JSON(originValue); !ok {
+	if ret, ok := IsBase64JSON(originValue); !ok {
 		return nil, utils.Errorf("invalid base64 json: %s", ret)
 	} else {
 		originValue = ret
@@ -139,7 +140,6 @@ func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val a
 	}, func(result []string) error {
 		value := result[1]
 		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex)
-
 		if err != nil {
 			return err
 		}
@@ -176,7 +176,7 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 	vals := lowhttp.ParseQueryParams(f.GetQueryRaw())
 	originValue := vals.Get(keyStr)
 
-	if ret, ok := isBase64JSON(originValue); !ok {
+	if ret, ok := IsBase64JSON(originValue); !ok {
 		return nil, utils.Errorf("invalid base64 json: %s", ret)
 	} else {
 		originValue = ret
@@ -187,10 +187,9 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 	valueIndex := 0
 	err = cartesian.ProductEx([][]string{{keyStr}, InterfaceToFuzzResults(val)}, func(result []string) error {
 		value := result[1]
-		//var replaced = valueToJsonValue(value)
+		// var replaced = valueToJsonValue(value)
 
 		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex)
-
 		if err != nil {
 			return err
 		}
