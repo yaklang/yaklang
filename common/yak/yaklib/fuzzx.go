@@ -6,7 +6,8 @@ import (
 )
 
 var FuzzxExports = map[string]interface{}{
-	"HTTPRequest": fuzzx.NewFuzzHTTPRequest,
+	"NewRequest":     fuzzx.NewFuzzHTTPRequest,
+	"MustNewRequest": fuzzx.MustNewFuzzHTTPRequest,
 
 	"source":             mutate.WithPoolOpt_Source,
 	"fromPlugin":         mutate.WithPoolOpt_FromPlugin,
