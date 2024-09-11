@@ -18,7 +18,7 @@ import (
 func TestRepeat(t *testing.T) {
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.Repeat(10).Results()
 	require.Len(t, results, 10)
 	for _, r := range results {
@@ -31,7 +31,7 @@ func TestFuzzMethod(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzMethod(iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -44,7 +44,7 @@ func TestFuzzPath(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPath(iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -57,7 +57,7 @@ func TestFuzzPathAppend(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET /prefix HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPathAppend(iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -74,7 +74,7 @@ func TestFuzzPathBlock(t *testing.T) {
 	})
 	raw := []byte(`GET /1/2/3 HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPathBlock(iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -88,7 +88,7 @@ func TestFuzzHeader(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzHTTPHeader(headerKey, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -103,7 +103,7 @@ func TestFuzzCookie(t *testing.T) {
 	t.Run("Append", func(t *testing.T) {
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookie(key, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -115,7 +115,7 @@ Host: www.baidu.com`)
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=0`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookie(key, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -131,7 +131,7 @@ func TestFuzzCookieBase64(t *testing.T) {
 	t.Run("Append", func(t *testing.T) {
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookieBase64(key, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -143,7 +143,7 @@ Host: www.baidu.com`)
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=MA==`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookieBase64(key, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -160,7 +160,7 @@ func TestFuzzCookieJsonPath(t *testing.T) {
 	t.Run("Append", func(t *testing.T) {
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookieJsonPath(key, jsonPath, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -177,7 +177,7 @@ Host: www.baidu.com`)
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a={"b":"0"}`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookieJsonPath(key, jsonPath, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -202,7 +202,7 @@ func TestFuzzCookieBase64JsonPath(t *testing.T) {
 	t.Run("Append", func(t *testing.T) {
 		raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookieBase64JsonPath(key, jsonPath, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -217,7 +217,7 @@ Host: www.baidu.com`)
 		raw := []byte(fmt.Sprintf(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: a=%s`, codec.EncodeBase64(rawParam)))
-		freq := NewFuzzHTTPRequest(raw)
+		freq := MustNewFuzzHTTPRequest(raw)
 		results := freq.FuzzCookieBase64JsonPath(key, jsonPath, iFuzztag).Results()
 		require.Len(t, results, len(excepts))
 		for i, r := range results {
@@ -234,7 +234,7 @@ func TestFuzzGetParamsRaw(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzGetParamsRaw(iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -248,7 +248,7 @@ func TestFuzzGetParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzGetParams(key, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -262,7 +262,7 @@ func TestFuzzGetBase64Params(t *testing.T) {
 	excepts := QuickMutateSimple(fmt.Sprintf("{{base64(%s)}}", iFuzztag))
 	raw := []byte(`GET / HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzGetBase64Params(key, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -277,7 +277,7 @@ func TestFuzzGetJsonPathParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`GET /?a={"c":{"d":"123"}} HTTP/1.1
 Host: www.baidu.com`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzGetJsonPathParams(key, jsonPath, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -300,7 +300,7 @@ func TestFuzzGetBase64JsonPathParams(t *testing.T) {
 	})
 	raw := []byte(fmt.Sprintf(`GET /?a=%s HTTP/1.1
 Host: www.baidu.com`, codec.EncodeBase64(rawParam)))
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzGetBase64JsonPathParams(key, jsonPath, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -319,7 +319,7 @@ func TestFuzzPostRaw(t *testing.T) {
 Host: www.baidu.com
 	
 empty`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostRaw(iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -335,7 +335,7 @@ func TestFuzzPostParams(t *testing.T) {
 Host: www.baidu.com
 	
 a=b`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostParams(key, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -351,7 +351,7 @@ func TestFuzzPostBase64Params(t *testing.T) {
 Host: www.baidu.com
 	
 a=b`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostBase64Params(key, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -367,7 +367,7 @@ func TestFuzzPostJson(t *testing.T) {
 Host: www.baidu.com
 	
 {"b":"0"}`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostJson(jsonPath, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -387,7 +387,7 @@ func TestFuzzPostJsonPathParams(t *testing.T) {
 Host: www.baidu.com
 	
 a={"c":{"d":"123"}}`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostJsonPathParams(key, jsonPath, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -412,7 +412,7 @@ func TestFuzzPostBase64JsonPathParams(t *testing.T) {
 Host: www.baidu.com
 	
 a=%s`, rawParam))
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostBase64JsonPathParams(key, jsonPath, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {
@@ -445,7 +445,7 @@ Host: www.baidu.com
     <price>1.99</price>
   </book>
 </bookstore>`)
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostXMLParams(xpath, iFuzztag).Results()
 	require.Len(t, results, len(excepts))
 	for i, r := range results {

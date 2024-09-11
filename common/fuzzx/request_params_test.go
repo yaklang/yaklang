@@ -26,7 +26,7 @@ func compareParams(t *testing.T, wants, gots []*FuzzParam) {
 }
 
 func TestGetPathParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`GET /a/b/c HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`GET /a/b/c HTTP/1.1
 Host: www.baidu.com`)).GetPathParams()
 	wants := []*FuzzParam{
 		{
@@ -46,7 +46,7 @@ Host: www.baidu.com`)).GetPathParams()
 }
 
 func TestGetMethodParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`GET / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`GET / HTTP/1.1
 Host: www.baidu.com`)).GetMethodParams()
 	wants := []*FuzzParam{
 		{
@@ -57,7 +57,7 @@ Host: www.baidu.com`)).GetMethodParams()
 }
 
 func TestGetHeaderParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`GET / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`GET / HTTP/1.1
 AAA: BBB
 CCC: DDD
 Host: www.baidu.com`)).GetHeaderParams()
@@ -85,7 +85,7 @@ Host: www.baidu.com`)).GetHeaderParams()
 }
 
 func TestGetRawBodyParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.baidu.com
 
 {"a":"b"}`)).GetRawBodyParams()
@@ -98,7 +98,7 @@ Host: www.baidu.com
 }
 
 func TestGetQueryParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`GET /?a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9 HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`GET /?a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9 HTTP/1.1
 Host: www.baidu.com`)).GetQueryParams()
 	sort.SliceStable(gots, func(i, j int) bool {
 		if gots[i].param == gots[j].param {
@@ -148,7 +148,7 @@ Host: www.baidu.com`)).GetQueryParams()
 }
 
 func TestGetCookieParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`GET / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`GET / HTTP/1.1
 Cookie: a=1;b={"c":"d"};c=MTIz;d=eyJjIjoiZCJ9
 Host: www.baidu.com`)).GetCookieParams()
 	sort.SliceStable(gots, func(i, j int) bool {
@@ -199,7 +199,7 @@ Host: www.baidu.com`)).GetCookieParams()
 }
 
 func TestGetPostJsonParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.baidu.com
 
 {"a":"b","c":{"d":"e"}}`)).GetPostJsonParams()
@@ -230,7 +230,7 @@ Host: www.baidu.com
 }
 
 func TestGetPostXMLParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.baidu.com
 
 <?xml version="1.0"?>
@@ -281,7 +281,7 @@ Host: www.baidu.com
 }
 
 func TestGetPostParams(t *testing.T) {
-	gots := NewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
+	gots := MustNewFuzzHTTPRequest([]byte(`POST / HTTP/1.1
 Host: www.baidu.com
 
 a=1&b={"c":"d"}&c=MTIz&d=eyJjIjoiZCJ9`)).GetPostParams()

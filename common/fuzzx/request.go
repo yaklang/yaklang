@@ -3,6 +3,7 @@ package fuzzx
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -11,18 +12,29 @@ type FuzzRequest struct {
 	requests [][]byte
 }
 
-
-func NewFuzzHTTPRequest(raw []byte) *FuzzRequest {
+func NewFuzzHTTPRequest(raw []byte) (*FuzzRequest, error) {
+	_, err := utils.ReadHTTPRequestFromBytes(raw)
+	if err != nil {
+		return nil, utils.Wrap(err, "NewFuzzHTTPRequest error: invalid http request")
+	}
 	f := &FuzzRequest{
 		origin:   raw,
 		requests: make([][]byte, 0),
+	}
+	return f, nil
+}
+
+func MustNewFuzzHTTPRequest(raw []byte) *FuzzRequest {
+	f, err := NewFuzzHTTPRequest(raw)
+	if err != nil {
+		panic(err)
 	}
 	return f
 }
 
 func (f *FuzzRequest) Clone() *FuzzRequest {
 	return &FuzzRequest{
-		requests:  slices.Clone(f.requests), // shadow copy
+		requests: slices.Clone(f.requests), // shadow copy
 	}
 }
 
