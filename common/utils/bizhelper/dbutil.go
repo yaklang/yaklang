@@ -667,6 +667,15 @@ func QueryOrderP(db *gorm.DB, orderBy, order *string) *gorm.DB {
 	return QueryOrder(db, orderByS, orderS)
 }
 
+func OrderByPaging(db *gorm.DB, p *ypb.Paging) *gorm.DB {
+	if p.GetRawOrder() != "" {
+		return db.Order(p.GetRawOrder())
+	} else if p.GetOrderBy() != "" {
+		return QueryOrder(db, p.GetOrderBy(), p.GetOrder())
+	}
+	return db
+}
+
 func Paging(db *gorm.DB, page int, limit int, data interface{}) (*Paginator, *gorm.DB) {
 	p, db := NewPagination(&Param{
 		DB:    db,
