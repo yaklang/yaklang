@@ -1,8 +1,9 @@
 package mutate
 
 import (
-	"github.com/gobwas/glob"
 	"strconv"
+
+	"github.com/gobwas/glob"
 )
 
 var cookieKeyWhiteList = [...]glob.Glob{
@@ -20,7 +21,7 @@ var cookieKeyWhiteList = [...]glob.Glob{
 	glob.MustCompile(`_gh_sess`),  // gh
 }
 
-func shouldIgnoreCookie(cookieKeyName string) bool {
+func ShouldIgnoreCookie(cookieKeyName string) bool {
 	for _, i := range cookieKeyWhiteList {
 		if i.Match(cookieKeyName) {
 			return true

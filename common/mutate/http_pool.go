@@ -1042,6 +1042,7 @@ var (
 	WithPoolOpt_Concurrent                 = _httpPool_SetSize
 	WithPoolOpt_SizedWaitGroup             = _httpPool_SetSizedWaitGroup
 	WithPoolOpt_Addr                       = _httpPool_Host
+	WithPoolOpt_Port                       = _httpPool_Port
 	WithPoolOpt_RedirectTimes              = _httpPool_redirectTimes
 	WithPoolOpt_RawMode                    = _httpPool_RawMode
 	ExecPool                               = _httpPool
@@ -1074,7 +1075,7 @@ var (
 	WithPoolOpt_EtcHosts                   = _httpPool_EtcHosts
 	WithPoolOpt_NoSystemProxy              = _httpPool_NoSystemProxy
 	WithPoolOpt_RequestCountLimiter        = _httpPool_RequestCountLimiter
-	WithConnPool                           = _httpPool_withConnPool
+	WithPoolOpt_ConnPool                   = _httpPool_withConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 	WithPoolOpt_RandomSession              = _httpPool_withRandomSession

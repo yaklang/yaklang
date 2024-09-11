@@ -572,7 +572,7 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if bs64Raw, ok := isStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
@@ -637,8 +637,8 @@ func httpRequestReadBody(r *http.Request) []byte {
 	return buf.Bytes()
 }
 
-// hasSpecialJSONPathChars 检查 JSONPath 字符串是否包含特殊意义的符号。
-func hasSpecialJSONPathChars(jsonPath string) bool {
+// HasSpecialJSONPathChars 检查 JSONPath 字符串是否包含特殊意义的符号。
+func HasSpecialJSONPathChars(jsonPath string) bool {
 	// 定义一个包含 JSONPath 特殊字符的列表。
 	specialChars := []string{"$", "@", ".", "..", "*", "[", "]", "?", "(", ":", ")"}
 
@@ -661,14 +661,14 @@ func walk(value gjson.Result, gPrefix string, jPrefix string, call func(key, val
 		} else {
 			jPath = fmt.Sprintf("%s.%s", jPrefix, key.String())
 		}
-		if key.Type == gjson.String && hasSpecialJSONPathChars(key.String()) {
+		if key.Type == gjson.String && HasSpecialJSONPathChars(key.String()) {
 			jPath = fmt.Sprintf(`%s["%s"]`, jPrefix, key.String())
 		}
 		// gjson path syntax
 		gPath := key.String()
 		if gPrefix != "" {
 			curr := key.String()
-			if hasSpecialJSONPathChars(key.String()) {
+			if HasSpecialJSONPathChars(key.String()) {
 				curr = "\\" + key.String()
 			}
 			gPath = gPrefix + "." + curr
@@ -796,7 +796,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			walk(gjson.Parse(raw), "", "$", call)
 		}
 
-		if bs64Raw, ok := isStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
@@ -843,7 +843,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 
 	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
 	for _, k := range req.Cookies() {
-		if shouldIgnoreCookie(k.Name) {
+		if ShouldIgnoreCookie(k.Name) {
 			continue
 		}
 
@@ -864,7 +864,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if bs64Raw, ok := isStrictBase64(k.Value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := IsStrictBase64(k.Value); ok && govalidator.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
