@@ -2,12 +2,13 @@ package mutate
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
 )
 
 func valueToJsonValue(i string) []any {
@@ -49,7 +50,7 @@ func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any, 
 			continue
 		}
 		var ok bool
-		if originJson, ok = isBase64JSON(k.Value); !ok {
+		if originJson, ok = IsBase64JSON(k.Value); !ok {
 			originJson, ok = utils.IsJSON(k.Value)
 			if !ok {
 				continue
