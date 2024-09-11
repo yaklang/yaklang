@@ -18,7 +18,7 @@ func TestExec(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(fmt.Sprintf(`GET / HTTP/1.1
 Host: %s`, utils.HostPort(host, port)))
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	ch, err := freq.FuzzGetParams(key, iFuzztag).Exec()
 	require.NoError(t, err)
 	gotMap := make(map[string]struct{})
@@ -42,7 +42,7 @@ func TestExecFirst(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(fmt.Sprintf(`GET / HTTP/1.1
 Host: %s`, utils.HostPort(host, port)))
-	freq := NewFuzzHTTPRequest(raw)
+	freq := MustNewFuzzHTTPRequest(raw)
 	r, err := freq.FuzzGetParams(key, iFuzztag).ExecFirst()
 	require.NoError(t, err)
 	gotBody := string(lowhttp.GetHTTPPacketBody(r.ResponseRaw))
