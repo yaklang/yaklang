@@ -70,7 +70,7 @@ jobs:
         if: runner.os == 'Windows'
 
       - name: Upload Artifacts Windows
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
           name: vulinbox_windows_amd64.exe
@@ -78,7 +78,7 @@ jobs:
 
 
       - name: Upload Artifacts MacOS
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: vulinbox_darwin_amd64
@@ -86,7 +86,7 @@ jobs:
 
 
       - name: Upload Artifacts Linux
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Linux'
         with:
           name: vulinbox_linux_amd64

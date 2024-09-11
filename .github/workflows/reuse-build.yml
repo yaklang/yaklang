@@ -96,35 +96,35 @@ jobs:
         if: runner.os == 'Windows'
 
       - name: Upload Artifacts Windows
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
           name: yak_windows_amd64.exe
           path: ./yak_windows_amd64.exe
 
       - name: Upload Artifacts MacOS(amd64)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: inputs.os == 'macos-amd64'
         with:
           name: yak_darwin_amd64
           path: ./yak_darwin_amd64
 
       - name: Upload Artifacts MacOS(arm64)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: inputs.os == 'macos-arm64'
         with:
           name: yak_darwin_arm64
           path: ./yak_darwin_arm64
 
       - name: Upload Artifacts CrossBuild Linux(amd64)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: inputs.os == 'linux-amd64'
         with:
           name: yak_linux_amd64
           path: ./yak_linux_amd64
 
       - name: Upload Artifacts CrossBuild Linux(arm64)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: inputs.os == 'linux-arm64'
         with:
           name: yak_linux_arm64
