@@ -508,7 +508,7 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 
 	db = db.Model(&schema.HTTPFlow{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(i); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.HTTPFlow{}); db.Error != nil {
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
 	}
 	return nil
