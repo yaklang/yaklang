@@ -10,6 +10,7 @@ check $params then '存在任意文件包含' else '不存在任意文件包含'
 alert $params
 desc(
     lang: php,
+    alert_min: 4,
     'file:///include.php': <<<UNSAFE
 <?php
     function _Include($a)
@@ -23,5 +24,21 @@ desc(
     }
         $a = $_GET['a'] ?: "aaaa";
         _Include($a);
-UNSAFE
+UNSAFE,
+    'file:///include2.php': <<<TEXT
+<?php
+
+$INCLUDE_ALLOW_LIST = [
+    "home.php",
+    "dashboard.php",
+    "profile.php",
+    "settings.php"
+];
+
+$filename = $_GET["filename"];
+if (in_array($filename, $INCLUDE_ALLOW_LIST)) {
+  include $filename;
+}
+
+TEXT
 )
