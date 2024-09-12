@@ -225,7 +225,6 @@ func (d *Decompiler) ParseStatement1() error {
 			slot := varTable[id]
 			runtimeStack.Push(NewJavaRef(slot, varSlotTypeTable[slot]))
 			////return mkRetrieve(variableFactory);
-			//panic("not support")
 		case OP_ACONST_NULL:
 			assignStackVar(NewJavaLiteral(nil, JavaNull))
 		case OP_ICONST_M1:
@@ -243,19 +242,19 @@ func (d *Decompiler) ParseStatement1() error {
 		case OP_ICONST_5:
 			assignStackVar(NewJavaLiteral(5, JavaInteger))
 		case OP_LCONST_0:
-			assignStackVar(NewJavaLiteral(0, JavaLong))
+			assignStackVar(NewJavaLiteral(int64(0), JavaLong))
 		case OP_LCONST_1:
-			assignStackVar(NewJavaLiteral(1, JavaLong))
+			assignStackVar(NewJavaLiteral(int64(1), JavaLong))
 		case OP_FCONST_0:
-			assignStackVar(NewJavaLiteral(0, JavaFloat))
+			assignStackVar(NewJavaLiteral(float32(0), JavaFloat))
 		case OP_FCONST_1:
-			assignStackVar(NewJavaLiteral(1, JavaFloat))
+			assignStackVar(NewJavaLiteral(float32(1), JavaFloat))
 		case OP_FCONST_2:
-			assignStackVar(NewJavaLiteral(2, JavaFloat))
+			assignStackVar(NewJavaLiteral(float32(2), JavaFloat))
 		case OP_DCONST_0:
-			assignStackVar(NewJavaLiteral(0, JavaDouble))
+			assignStackVar(NewJavaLiteral(float64(0), JavaDouble))
 		case OP_DCONST_1:
-			assignStackVar(NewJavaLiteral(1, JavaDouble))
+			assignStackVar(NewJavaLiteral(float64(1), JavaDouble))
 		case OP_BIPUSH:
 			assignStackVar(NewJavaLiteral(opcode.Data[0], JavaInteger))
 		case OP_SIPUSH:
@@ -312,15 +311,88 @@ func (d *Decompiler) ParseStatement1() error {
 			var1 := runtimeStack.Pop().(JavaValue)
 			var2 := runtimeStack.Pop().(JavaValue)
 			runtimeStack.Push(NewBinaryExpression(var1, var2, "compare"))
-		case OP_LSUB, OP_LADD, OP_IADD, OP_FADD, OP_DADD, OP_ISUB, OP_DSUB, OP_FSUB, OP_IREM, OP_FREM, OP_LREM, OP_DREM, OP_IDIV, OP_FDIV, OP_DDIV, OP_IMUL, OP_DMUL, OP_FMUL, OP_LMUL, OP_LAND, OP_LDIV, OP_LOR, OP_LXOR, OP_ISHR, OP_ISHL, OP_LSHL, OP_LSHR, OP_IUSHR, OP_LUSHR:
+		case OP_LSUB, OP_ISUB, OP_DSUB, OP_FSUB, OP_LADD, OP_IADD, OP_FADD, OP_DADD, OP_IREM, OP_FREM, OP_LREM, OP_DREM, OP_IDIV, OP_FDIV, OP_DDIV, OP_LDIV, OP_IMUL, OP_DMUL, OP_FMUL, OP_LMUL, OP_LAND, OP_LOR, OP_LXOR, OP_ISHR, OP_ISHL, OP_LSHL, OP_LSHR, OP_IUSHR, OP_LUSHR, OP_IOR, OP_IAND, OP_IXOR:
+			var op string
 			switch opcode.Instr.OpCode {
+			case OP_LSUB, OP_ISUB, OP_DSUB, OP_FSUB:
+				op = SUB
+			case OP_LADD, OP_IADD, OP_FADD, OP_DADD:
+				op = ADD
+			case OP_IREM, OP_FREM, OP_LREM, OP_DREM:
+				op = REM
+			case OP_IDIV, OP_FDIV, OP_DDIV, OP_LDIV:
+				op = DIV
+			case OP_IMUL, OP_DMUL, OP_FMUL, OP_LMUL:
+				op = MUL
+			case OP_LAND, OP_IAND:
+				op = AND
+			case OP_LOR, OP_IOR:
+				op = OR
+			case OP_LXOR, OP_IXOR:
+				op = XOR
+			case OP_ISHR, OP_LSHR:
+				op = SHR
+			case OP_ISHL, OP_LSHL:
+				op = SHL
+			case OP_IUSHR, OP_LUSHR:
+				op = USHR
 			default:
 				panic("not support")
 			}
-		case OP_IOR, OP_IAND, OP_IXOR:
-			panic("not support")
+			var2 := runtimeStack.Pop().(JavaValue)
+			var1 := runtimeStack.Pop().(JavaValue)
+			runtimeStack.Push(NewBinaryExpression(var1, var2, op))
 		case OP_I2B, OP_I2C, OP_I2D, OP_I2F, OP_I2L, OP_I2S, OP_L2D, OP_L2F, OP_L2I, OP_F2D, OP_F2I, OP_F2L, OP_D2F, OP_D2I, OP_D2L:
-			panic("not support")
+			var fname string
+			var typ JavaType
+			switch opcode.Instr.OpCode {
+			case OP_I2B:
+				fname = TypeCaseByte
+				typ = JavaByte
+			case OP_I2C:
+				fname = TypeCaseChar
+				typ = JavaChar
+			case OP_I2D:
+				fname = TypeCaseDouble
+				typ = JavaDouble
+			case OP_I2F:
+				fname = TypeCaseFloat
+				typ = JavaFloat
+			case OP_I2L:
+				fname = TypeCaseLong
+				typ = JavaLong
+			case OP_I2S:
+				fname = TypeCaseShort
+				typ = JavaShort
+			case OP_L2D:
+				fname = TypeCaseDouble
+				typ = JavaDouble
+			case OP_L2F:
+				fname = TypeCaseFloat
+				typ = JavaFloat
+			case OP_L2I:
+				fname = TypeCaseInt
+				typ = JavaInteger
+			case OP_F2D:
+				fname = TypeCaseDouble
+				typ = JavaDouble
+			case OP_F2I:
+				fname = TypeCaseInt
+				typ = JavaInteger
+			case OP_F2L:
+				fname = TypeCaseLong
+				typ = JavaLong
+			case OP_D2F:
+				fname = TypeCaseFloat
+				typ = JavaFloat
+			case OP_D2I:
+				fname = TypeCaseInt
+				typ = JavaInteger
+			case OP_D2L:
+				fname = TypeCaseLong
+				typ = JavaLong
+			}
+			runtimeStack.Push(NewVirtualFunctionCall(fname, []JavaValue{runtimeStack.Pop().(JavaValue)}, typ))
 		case OP_INSTANCEOF:
 			panic("not support")
 		case OP_CHECKCAST:
