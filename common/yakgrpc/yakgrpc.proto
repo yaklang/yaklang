@@ -701,6 +701,12 @@ service Yak {
   rpc AddFingerprint(AddFingerprintRequest) returns (AddFingerprintResponse);
   rpc ModifyFingerprint(ModifyFingerprintRequest) returns (ModifyFingerprintResponse);
 
+  rpc QueryFingerprint(QueryFingerprintRequest) returns (QueryFingerprintResponse);
+  rpc DeleteFingerprint(DeleteFingerprintRequest) returns (Empty);
+  rpc UpdateFingerprint(UpdateFingerprintRequest) returns (Empty);
+  rpc CreateFingerprint(CreateFingerprintRequest) returns (Empty);
+
+
   // 反弹shell命令生成
   rpc GetReverseShellProgramList(GetReverseShellProgramListRequest) returns (GetReverseShellProgramListResponse);
   rpc GenerateReverseShellCommand(GenerateReverseShellCommandRequest) returns (GenerateReverseShellCommandResponse);
@@ -5339,4 +5345,54 @@ message DbOperateMessage {
   string Operation = 2; // 操作 (增删改查)
   int64 EffectRows = 3; // 影响行数
   string ExtraMessage = 4; // 额外信息
+}
+
+message CPE {
+  string Part = 1;
+  string Vendor = 2;
+  string Product = 3;
+  string Version = 4;
+  string Update = 5;
+  string Edition = 6;
+  string Language = 7;
+}
+
+message FingerprintRule {
+  int64 Id = 1;
+  string RuleName = 2;
+  CPE cpe = 3;
+  string WebPath = 4;
+  string ExtInfo = 5;
+  string MatchExpression = 6;
+}
+
+
+message FingerprintFilter {
+  repeated string Vendor = 1;
+  repeated string Product = 2;
+  repeated int64 IncludeId = 3;
+}
+
+message QueryFingerprintRequest {
+  FingerprintFilter Filter = 1;
+  Paging Pagination = 2;
+}
+
+message QueryFingerprintResponse {
+  Paging Pagination = 1;
+  repeated FingerprintRule Data = 2;
+  int64 Total = 3;
+}
+
+message DeleteFingerprintRequest {
+  FingerprintFilter Filter = 1;
+}
+
+message CreateFingerprintRequest {
+  FingerprintRule Rule = 1;
+}
+
+message UpdateFingerprintRequest {
+  string name = 1;
+  FingerprintRule Rule = 2;
 }
