@@ -1,0 +1,21 @@
+desc(
+    title: "Checking new DOMDocument().load with LIBXML_NOENT (XXE)",
+    type: vuln,
+    level: high,
+)
+
+LIBXML_NOENT<getCall><getCaller>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
+check $vuln;
+alert $vuln;
+
+desc(
+language: php,
+'file://a.php': <<<CODE
+
+<?php
+
+$doc = new DOMDocument();
+$doc->load('xxe.xml', LIBXML_NOENT); // Noncompliant
+
+CODE
+)
