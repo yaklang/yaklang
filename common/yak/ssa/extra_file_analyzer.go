@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/consts"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -14,6 +16,9 @@ type PreHandlerAnalyzer interface {
 }
 
 type Builder interface {
+	// create a new builder
+	Create() Builder
+
 	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
@@ -22,7 +27,9 @@ type Builder interface {
 
 var _ PreHandlerAnalyzer = &DummyPreHandler{}
 
-type DummyPreHandler struct{}
+type DummyPreHandler struct {
+	InitHandlerOnce sync.Once
+}
 
 func (d *DummyPreHandler) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
 }

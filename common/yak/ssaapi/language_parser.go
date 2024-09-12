@@ -196,10 +196,11 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	// path is empty, use language or YakLang as default
 	if c.SelectedLanguageBuilder == nil {
 		c.LanguageBuilder = LanguageBuilders[Yak]
-		// log.Infof("use default language [%s] for empty path", Yak)
+		log.Infof("use default language [%s] for empty path", Yak)
 	} else {
 		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
+	c.LanguageBuilder = c.LanguageBuilder.Create()
 	prog, builder, err := c.init()
 	c.LanguageBuilder.InitHandler(builder)
 
@@ -258,7 +259,7 @@ func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 	if err != nil {
 		return err
 	}
-	c.LanguageBuilder = LanguageBuilder
+	c.LanguageBuilder = LanguageBuilder.Create()
 	return nil
 }
 
@@ -349,11 +350,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 
-	//if c.LanguageBuilder != nil {
-	//	c.LanguageBuilder.InitHandler(builder)
-	//} else if c.SelectedLanguageBuilder != nil {
-	//	c.SelectedLanguageBuilder.InitHandler(builder)
-	//}
 	builder.WithDefineFunction(c.defineFunc)
 	return prog, builder, nil
 }
