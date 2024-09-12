@@ -1,8 +1,10 @@
 package decompiler
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
 
@@ -57,7 +59,39 @@ const (
 	NE  = "!="
 	LTE = "<="
 )
+const (
+	T_BOOLEAN = "boolean"
+	T_CHAR    = "char"
+	T_FLOAT   = "float"
+	T_DOUBLE  = "double"
+	T_BYTE    = "byte"
+	T_SHORT   = "short"
+	T_INT     = "int"
+	T_LONG    = "long"
+)
 
+func GetPrimerArrayType(id int) JavaType {
+	switch id {
+	case 4:
+		return JavaBoolean
+	case 5:
+		return JavaChar
+	case 6:
+		return JavaFloat
+	case 7:
+		return JavaDouble
+	case 8:
+		return JavaByte
+	case 9:
+		return JavaShort
+	case 10:
+		return JavaInteger
+	case 11:
+		return JavaLong
+	default:
+		panic(fmt.Sprintf("unknow primer array type: %d", id))
+	}
+}
 func GetNotOp(code *OpCode) string {
 	op := GetOp(code)
 	switch op {
@@ -112,21 +146,24 @@ func Convert2bytesToInt(data []byte) uint16 {
 	b2 := uint16(data[1])
 	return ((b1 & 0xFF) << 8) | (b2 & 0xFF)
 }
+func Convert4bytesToInt(data []byte) uint32 {
+	return binary.BigEndian.Uint32(data)
+}
 
 // parseMethodDescriptor 解析 Java 方法描述符
-func ParseMethodDescriptor(descriptor string) ([]string, string, error) {
+func ParseMethodDescriptor(descriptor string) ([]JavaType, JavaType, error) {
 	if descriptor == "" {
-		return nil, "", fmt.Errorf("descriptor is empty")
+		return nil, nil, fmt.Errorf("descriptor is empty")
 	}
 
 	if descriptor[0] != '(' {
-		return nil, "", fmt.Errorf("invalid descriptor format")
+		return nil, nil, fmt.Errorf("invalid descriptor format")
 	}
 
 	// 查找参数部分和返回类型部分
 	endIndex := strings.Index(descriptor, ")")
 	if endIndex == -1 {
-		return nil, "", fmt.Errorf("invalid descriptor format")
+		return nil, nil, fmt.Errorf("invalid descriptor format")
 	}
 
 	paramDescriptor := descriptor[1:endIndex]
@@ -135,21 +172,21 @@ func ParseMethodDescriptor(descriptor string) ([]string, string, error) {
 	// 解析参数类型
 	paramTypes, err := parseTypes(paramDescriptor)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	// 解析返回类型
 	returnType, _, err := parseType(returnTypeDescriptor)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	return paramTypes, returnType, nil
 }
 
 // parseTypes 解析多个类型描述符
-func parseTypes(descriptor string) ([]string, error) {
-	var types []string
+func parseTypes(descriptor string) ([]JavaType, error) {
+	var types []JavaType
 	for len(descriptor) > 0 {
 		t, rest, err := parseType(descriptor)
 		if err != nil {
@@ -160,48 +197,77 @@ func parseTypes(descriptor string) ([]string, error) {
 	}
 	return types, nil
 }
+func parseFuncType(desc string) (*JavaFuncType, string, error) {
+	if desc == "" {
+		return nil, "", fmt.Errorf("descriptor is empty")
+	}
+	if desc[0] != '(' {
+		return nil, "", fmt.Errorf("invalid descriptor format")
+	}
+	endIndex := strings.Index(desc, ")")
+	if endIndex == -1 {
+		return nil, "", fmt.Errorf("invalid descriptor format")
+	}
+	paramDesc := desc[1:endIndex]
+	returnDesc := desc[endIndex+1:]
+	params, err := parseTypes(paramDesc)
+	if err != nil {
+		return nil, "", err
+	}
+	returnType, _, err := parseType(returnDesc)
+	if err != nil {
+		return nil, "", err
+	}
+	return NewJavaFuncType(desc, params, returnType), "", nil
+}
 
 // parseType 解析单个类型描述符
-func parseType(descriptor string) (string, string, error) {
+func parseType(descriptor string) (JavaType, string, error) {
 	if len(descriptor) == 0 {
-		return "", "", fmt.Errorf("empty descriptor")
+		return nil, "", fmt.Errorf("empty descriptor")
 	}
 
 	switch descriptor[0] {
 	case 'B':
-		return "byte", descriptor[1:], nil
+		return JavaByte, descriptor[1:], nil
 	case 'C':
-		return "char", descriptor[1:], nil
+		return JavaChar, descriptor[1:], nil
 	case 'D':
-		return "double", descriptor[1:], nil
+		return JavaDouble, descriptor[1:], nil
 	case 'F':
-		return "float", descriptor[1:], nil
+		return JavaFloat, descriptor[1:], nil
 	case 'I':
-		return "int", descriptor[1:], nil
+		return JavaInteger, descriptor[1:], nil
 	case 'J':
-		return "long", descriptor[1:], nil
+		return JavaLong, descriptor[1:], nil
 	case 'S':
-		return "short", descriptor[1:], nil
+		return JavaShort, descriptor[1:], nil
 	case 'Z':
-		return "boolean", descriptor[1:], nil
+		return JavaBoolean, descriptor[1:], nil
 	case 'V':
-		return "void", descriptor[1:], nil
+		return JavaVoid, descriptor[1:], nil
 	case 'L':
 		// 类类型，以 L 开头，以 ; 结尾
 		endIndex := strings.Index(descriptor, ";")
 		if endIndex == -1 {
-			return "", "", fmt.Errorf("invalid class descriptor format")
+			return nil, "", fmt.Errorf("invalid class descriptor format")
 		}
-		return descriptor[1:endIndex], descriptor[endIndex+1:], nil
+		return NewJavaClass(descriptor[1:endIndex]), descriptor[endIndex+1:], nil
 	case '[':
 		// 数组类型，以 [ 开头，后跟元素类型
 		elemType, rest, err := parseType(descriptor[1:])
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
-		return "[]" + elemType, rest, nil
+		switch ret := elemType.(type) {
+		case *JavaArrayType:
+			ret.Length = append(ret.Length)
+			return ret, rest, nil
+		default:
+			return NewJavaArrayType(elemType), rest, nil
+		}
 	default:
-		return "", "", fmt.Errorf("unknown type descriptor: %c", descriptor[0])
+		return nil, "", fmt.Errorf("unknown type descriptor: %c", descriptor[0])
 	}
 }
 
@@ -212,4 +278,59 @@ func SplitPackageClassName(s string) (string, string) {
 	}
 	log.Errorf("split package name and class name failed: %v", s)
 	return "", ""
+}
+
+func GetShortName(ctx *FunctionContext, name string) string {
+	libs := append(ctx.BuildInLibs, ctx.ClassName)
+	for _, lib := range libs {
+		pkg, className := SplitPackageClassName(lib)
+		fpkg, fclassName := SplitPackageClassName(name)
+		if fpkg == pkg && (className == "*" || fclassName == className) {
+			return fclassName
+		}
+	}
+	return name
+}
+
+func SetNodeJmp(src, target *Node) {
+	target.Source = append(target.Source, src)
+	src.Next = append(src.Next, target)
+}
+func SetOpcode(src, target *OpCode) {
+	target.Source = append(target.Source, src)
+	src.Target = append(src.Target, target)
+}
+func ShowStatementNodes(nodes []*Node) {
+	funcCtx := &FunctionContext{}
+	for _, item := range nodes {
+		fmt.Printf("%d %s\n", item.Id, item.Statement.String(funcCtx))
+	}
+}
+func ShowOpcodes(opcodes []*OpCode) {
+	for i, opcode := range opcodes {
+		fmt.Printf("%d %s\n", i, opcode.Instr.Name)
+	}
+}
+
+//func WalkGraph[T any](node T, next func(T) []T, visit func(T)) {
+//	visit(node)
+//	for _, n := range next(node) {
+//		WalkGraph(n, next, visit)
+//	}
+//}
+
+func WalkGraph[T any](node T, next func(T) []T) {
+	stack := utils.NewStack[T]()
+	visited := utils.NewSet[any]()
+	stack.Push(node)
+	for stack.Len() > 0 {
+		current := stack.Pop()
+		if visited.Has(current) {
+			continue
+		}
+		visited.Add(current)
+		for _, n := range next(current) {
+			stack.Push(n)
+		}
+	}
 }

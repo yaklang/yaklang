@@ -1,8 +1,10 @@
 package decompiler
 
 type OpCode struct {
-	Instr *Instruction
-	Data  []byte
-	Jmp   int
+	Id     int
+	Instr  *Instruction
+	Data   []byte
+	Jmp    int
+	Source []*OpCode
+	Target []*OpCode
 }
-
