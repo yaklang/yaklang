@@ -1,0 +1,24 @@
+desc(
+    title: "CWE-611 simplexml_load_string checking for XXE (LIBXML_NOENT)",
+    level: high,
+    type: audit,
+)
+
+LIBXML_NOENT <getCall> <getCaller> <name> ?{have: simplexml_load_string} as $vuln;
+check $vuln;
+alert $vuln;
+
+desc(
+lang: php,
+alert_min: 1,
+'file://a.php': <<<CODE
+<?php
+$xml = file_get_contents('xxe.xml');
+$doc = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOENT); // Noncompliant
+CODE,
+'safefile://b.php': <<<CODE
+<?php
+$xml = file_get_contents('xxe.xml');
+$doc = simplexml_load_string($xml, 'SimpleXMLElement'); // Noncompliant
+CODE
+)
