@@ -9,23 +9,26 @@ type Statement interface {
 	String(funcCtx *FunctionContext) string
 }
 type ConditionStatement struct {
-	RightValue  JavaValue
-	LeftValue   JavaValue
+	Condition   JavaValue
 	Op          string
-	ToOpcode    int
 	ToStatement int
 }
 
 func (r *ConditionStatement) String(funcCtx *FunctionContext) string {
-	return fmt.Sprintf("if %s %s %s goto %d", r.LeftValue.String(funcCtx), r.Op, r.RightValue.String(funcCtx), r.ToStatement)
+	return fmt.Sprintf("if %s goto %d", r.Condition.String(funcCtx), r.ToStatement)
 }
 
-func NewConditionStatement(l, r JavaValue, op string, to int) *ConditionStatement {
-	return &ConditionStatement{
-		LeftValue:  l,
-		RightValue: r,
-		Op:         op,
-		ToOpcode:   to,
+func NewConditionStatement(cmp JavaValue, op string) *ConditionStatement {
+	if v, ok := cmp.(*JavaCompare); ok {
+		return &ConditionStatement{
+			Condition: NewBinaryExpression(v.JavaValue1, v.JavaValue2, op),
+			Op:        op,
+		}
+	} else {
+		return &ConditionStatement{
+			Condition: cmp,
+			Op:        op,
+		}
 	}
 }
 
@@ -47,28 +50,6 @@ func NewReturnStatement(value JavaValue) *ReturnStatement {
 	}
 }
 
-type FunctionCallStatement struct {
-	Object       JavaValue
-	FunctionName string
-	Params       []JavaValue
-}
-
-func (f *FunctionCallStatement) String(funcCtx *FunctionContext) string {
-	paramStrs := []string{}
-	for _, param := range f.Params {
-		paramStrs = append(paramStrs, param.String(funcCtx))
-	}
-	return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
-}
-
-func NewFunctionCallStatement(object JavaValue, name string, params []JavaValue) *FunctionCallStatement {
-	return &FunctionCallStatement{
-		Object:       object,
-		FunctionName: name,
-		Params:       params,
-	}
-}
-
 type DeclareStatement struct {
 	Id       int
 	JavaType JavaType
@@ -85,13 +66,32 @@ func NewDeclareStatement(id int, typ JavaType) *DeclareStatement {
 	}
 }
 
-type AssignStatement struct {
+type StackAssignStatement struct {
 	Id        int
 	JavaValue JavaValue
-	IsFirst   bool
+}
+
+func (a *StackAssignStatement) String(funcCtx *FunctionContext) string {
+	return a.JavaValue.String(funcCtx)
+}
+func NewStackAssignStatement(id int, value JavaValue) *StackAssignStatement {
+	return &StackAssignStatement{
+		Id:        id,
+		JavaValue: value,
+	}
+}
+
+type AssignStatement struct {
+	Id          int
+	ArrayMember *JavaArrayMember
+	JavaValue   JavaValue
+	IsFirst     bool
 }
 
 func (a *AssignStatement) String(funcCtx *FunctionContext) string {
+	if a.ArrayMember != nil {
+		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
+	}
 	assign := fmt.Sprintf("var%d = %s", a.Id, a.JavaValue.String(funcCtx))
 	if a.IsFirst {
 		return a.JavaValue.Type().String(funcCtx) + " " + assign
@@ -119,7 +119,7 @@ func NewForStatement(subStatements []Statement) *ForStatement {
 func (f *ForStatement) String(funcCtx *FunctionContext) string {
 	datas := []string{}
 	datas = append(datas, f.InitVar.String(funcCtx))
-	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.LeftValue.String(funcCtx), f.Condition.Op, f.Condition.RightValue.String(funcCtx)))
+	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.String(funcCtx)))
 	datas = append(datas, f.EndExp.String(funcCtx))
 	statementStr := []string{}
 	for _, statement := range f.SubStatements {
@@ -132,6 +132,14 @@ func (f *ForStatement) String(funcCtx *FunctionContext) string {
 	s := fmt.Sprintf("for(%s; %s; %s) {\n%s\n}", datas[0], datas[1], datas[2], strings.Join(statementStr, "\n"))
 	return s
 }
+
+func NewArrayMemberAssignStatement(m *JavaArrayMember, value JavaValue) *AssignStatement {
+	return &AssignStatement{
+		ArrayMember: m,
+		JavaValue:   value,
+	}
+}
+
 func NewAssignStatement(id int, value JavaValue, isFirst bool) *AssignStatement {
 	return &AssignStatement{
 		Id:        id,
@@ -140,18 +148,43 @@ func NewAssignStatement(id int, value JavaValue, isFirst bool) *AssignStatement 
 	}
 }
 
+type IfStatement struct {
+	Condition JavaValue
+	IfBody    []Statement
+	ElseBody  []Statement
+}
+
+func (g *IfStatement) String(funcCtx *FunctionContext) string {
+	getBody := func(sts []Statement) string {
+		var res []string
+		for _, st := range sts {
+			res = append(res, st.String(funcCtx))
+		}
+		return strings.Join(res, "\n")
+	}
+	return fmt.Sprintf("if (%s){\n"+
+		"%s\n"+
+		"}else{\n"+
+		"%s\n"+
+		"}", g.Condition.String(funcCtx), getBody(g.IfBody), getBody(g.ElseBody))
+}
+func NewIfStatement(condition JavaValue, ifBody, elseBody []Statement) *IfStatement {
+	return &IfStatement{
+		Condition: condition,
+		IfBody:    ifBody,
+		ElseBody:  elseBody,
+	}
+}
+
 type GOTOStatement struct {
-	ToOpcode    int
 	ToStatement int
 }
 
 func (g *GOTOStatement) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("goto: %d", g.ToStatement)
 }
-func NewGOTOStatement(target int) *GOTOStatement {
-	return &GOTOStatement{
-		ToOpcode: target,
-	}
+func NewGOTOStatement() *GOTOStatement {
+	return &GOTOStatement{}
 }
 
 type NewStatement struct {
@@ -165,5 +198,19 @@ func (a *NewStatement) String(funcCtx *FunctionContext) string {
 func NewNewStatement(class *JavaClass) *NewStatement {
 	return &NewStatement{
 		Class: class,
+	}
+}
+
+type ExpressionStatement struct {
+	Expression JavaValue
+}
+
+func (a *ExpressionStatement) String(funcCtx *FunctionContext) string {
+	return a.Expression.String(funcCtx)
+}
+
+func NewExpressionStatement(v JavaValue) *ExpressionStatement {
+	return &ExpressionStatement{
+		Expression: v,
 	}
 }

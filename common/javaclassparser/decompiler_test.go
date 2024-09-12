@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/javaclassparser/classes"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
 	"os"
@@ -10,17 +11,12 @@ import (
 	"testing"
 )
 
-func TestAddSupperInterface(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/Demo.class")
-	cf, err := Parse(classesContent)
+func TestDemoClass(t *testing.T) {
+	classesContent, err := classes.FS.ReadFile("test/Demo.class")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cf.ConstantPool = append(cf.ConstantPool)
-}
-func TestDecompiler(t *testing.T) {
-	//classesContent, err := classes.FS.ReadFile("Demo.class")
-	classesContent, err := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/Demo.class")
+	expectSource, err := classes.FS.ReadFile("test/Demo.java")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,8 +28,21 @@ func TestDecompiler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assert.Equal(t, string(expectSource), source)
+}
+func TestAddSupperInterface(t *testing.T) {
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/Demo1.class")
+	cf, err := Parse(classesContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := cf.Dump()
+	if err != nil {
+		t.Fatal(err)
+	}
 	println(source)
 }
+
 func TestModifyOpcode(t *testing.T) {
 	classesContent, err := classes.FS.ReadFile("Demo.class")
 	if err != nil {
