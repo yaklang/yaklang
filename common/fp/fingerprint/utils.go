@@ -8,11 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 )
 
-func LoadCPEFromWebfingerrintCPE(o *webfingerprint.CPE) *rule.CPE {
-	return &rule.CPE{
+func LoadCPEFromWebfingerrintCPE(o *webfingerprint.CPE) *schema.CPE {
+	return &schema.CPE{
 		Part:     o.Part,
 		Vendor:   o.Vendor,
 		Product:  o.Product,
@@ -30,11 +31,11 @@ func LoadAllDefaultRules() (rules []*rule.FingerPrintRule) {
 			if err != nil {
 				return err
 			}
-			ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) *rule.GeneralRule {
+			ruleInfos := funk.Map(strings.Split(string(content), "\n"), func(s string) *schema.GeneralRule {
 				splits := strings.Split(s, "\x00")
-				return &rule.GeneralRule{MatchExpression: splits[1], CPE: &rule.CPE{Product: splits[0]}}
+				return &schema.GeneralRule{MatchExpression: splits[1], CPE: &schema.CPE{Product: splits[0]}}
 			})
-			rs, err := parsers.ParseExpRule(ruleInfos.([]*rule.GeneralRule)...)
+			rs, err := parsers.ParseExpRule(ruleInfos.([]*schema.GeneralRule)...)
 			if err != nil {
 				return err
 			}
@@ -43,8 +44,8 @@ func LoadAllDefaultRules() (rules []*rule.FingerPrintRule) {
 		},
 		func() error {
 			db := consts.GetGormProjectDatabase()
-			var rs []*rule.GeneralRule
-			db = db.Model(&rule.GeneralRule{}).Find(&rs)
+			var rs []*schema.GeneralRule
+			db = db.Model(&schema.GeneralRule{}).Find(&rs)
 			if db.Error != nil {
 				return db.Error
 			}

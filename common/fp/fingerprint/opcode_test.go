@@ -4,14 +4,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"testing"
 )
 
-func newTestGenerateRule(exp string) *rule.GeneralRule {
-	return &rule.GeneralRule{
+func newTestGenerateRule(exp string) *schema.GeneralRule {
+	return &schema.GeneralRule{
 		MatchExpression: exp,
-		CPE: &rule.CPE{
+		CPE: &schema.CPE{
 			Product: "ok",
 		},
 	}
