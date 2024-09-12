@@ -19,9 +19,9 @@ import (
 
 func Test_scanFingerprint(t *testing.T) {
 
-	target := "127.0.0.1"
+	target := "123.204.5.34"
 
-	port := "58606"
+	port := "3389"
 
 	protoList := []interface{}{"tcp"}
 
@@ -30,6 +30,7 @@ func Test_scanFingerprint(t *testing.T) {
 	}
 
 	ch, err := scanFingerprint(target, port, pp(protoList...),
+		fp.WithForceEnableAllFingerprint(true),
 		fp.WithActiveMode(true),
 		//fp.WithProbeTimeoutHumanRead(5),
 		//fp.WithProbesMax(100),
@@ -41,7 +42,9 @@ func Test_scanFingerprint(t *testing.T) {
 	}
 
 	for v := range ch {
-		spew.Dump(v.Fingerprint.HttpFlows)
+		//fmt.Println(v.String())
+
+		spew.Dump(v)
 	}
 }
 

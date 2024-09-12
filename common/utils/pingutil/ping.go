@@ -37,7 +37,7 @@ func PingAutoConfig(ip string, config *PingConfig) *PingResult {
 	start := time.Now()
 	defer func() {
 		if time.Since(start).Seconds() > 6 {
-			log.Warnf("ping-auto cost: %v, too long!", time.Since(start).Seconds())
+			log.Debugf("ping-auto cost: %v, too long!", time.Since(start).Seconds())
 		}
 	}()
 
