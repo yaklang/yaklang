@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"testing"
@@ -153,4 +154,25 @@ func TestQueryFilterHTTPFlow(t *testing.T) {
 		}
 	}
 	assert.True(t, flag)
+}
+
+func TestCreateOrUpdateHTTPFlow(t *testing.T) {
+	token := utils.RandString(10)
+	token1 := utils.RandString(10)
+	flow := &schema.HTTPFlow{
+		SourceType: token,
+	}
+	err := InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow)
+	require.NoError(t, err)
+
+	defer DeleteHTTPFlowByID(consts.GetGormProjectDatabase().Debug(), int64(flow.ID))
+
+	err = CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &schema.HTTPFlow{
+		SourceType: token1,
+	})
+	require.NoError(t, err)
+
+	newFlow, err := GetHTTPFlowByIDOrHash(consts.GetGormProjectDatabase().Debug(), int64(flow.ID), "")
+	require.NoError(t, err)
+	require.Equal(t, token1, newFlow.SourceType, "create or update http flow error")
 }
