@@ -2,8 +2,6 @@ package decompiler
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 type JavaValue interface {
@@ -19,10 +17,34 @@ var (
 	_ JavaValue = &JavaClassMember{}
 	_ JavaValue = &JavaExpression{}
 	_ JavaValue = &NewExpression{}
+	_ JavaValue = &FunctionCallExpression{}
+	_ JavaValue = &VirtualRefMember{}
+	_ JavaValue = &JavaCompare{}
 )
+
+type JavaCompare struct {
+	JavaValue1, JavaValue2 JavaValue
+}
+
+func (j *JavaCompare) Type() JavaType {
+	return JavaBoolean
+}
+
+func (j *JavaCompare) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("%s compare %s", j.JavaValue1.String(funcCtx), j.JavaValue2.String(funcCtx))
+}
+
+func NewJavaCompare(v1, v2 JavaValue) *JavaCompare {
+	return &JavaCompare{
+		JavaValue1: v1,
+		JavaValue2: v2,
+	}
+}
 
 type JavaRef struct {
 	Id       int
+	StackVar JavaValue
+
 	JavaType JavaType
 }
 
@@ -31,6 +53,9 @@ func (j *JavaRef) Type() JavaType {
 }
 
 func (j *JavaRef) String(funcCtx *FunctionContext) string {
+	if j.StackVar != nil {
+		return j.StackVar.String(funcCtx)
+	}
 	return fmt.Sprintf("var%d", j.Id)
 }
 
@@ -43,7 +68,7 @@ func NewJavaRef(id int, typ JavaType) *JavaRef {
 
 type JavaArray struct {
 	Class    *JavaClass
-	Length   int
+	Length   JavaValue
 	JavaType JavaType
 }
 
@@ -55,7 +80,7 @@ func (j *JavaArray) String(funcCtx *FunctionContext) string {
 	return fmt.Sprintf("%s[%d]", j.Class.String(funcCtx), j.Length)
 }
 
-func NewJavaArray(class *JavaClass, length int) *JavaArray {
+func NewJavaArray(class *JavaClass, length JavaValue) *JavaArray {
 	return &JavaArray{
 		Class:    class,
 		Length:   length,
@@ -99,14 +124,8 @@ func (j *JavaClassMember) Type() JavaType {
 }
 
 func (j *JavaClassMember) String(funcCtx *FunctionContext) string {
-	for _, lib := range funcCtx.BuildInLibs {
-		pkg, className := SplitPackageClassName(lib)
-		fpkg, fclassName := SplitPackageClassName(j.Name)
-		if fpkg == pkg && (className == "*" || fclassName == className) {
-			return fmt.Sprintf("%s.%s", fclassName, j.Member)
-		}
-	}
-	return fmt.Sprintf("%s.%s", j.Name, j.Member)
+	name := GetShortName(funcCtx, j.Name)
+	return fmt.Sprintf("%s.%s", name, j.Member)
 }
 func NewJavaClassMember(typeName, member, desc string, typ JavaType) *JavaClassMember {
 	return &JavaClassMember{
@@ -115,6 +134,47 @@ func NewJavaClassMember(typeName, member, desc string, typ JavaType) *JavaClassM
 		Description: desc,
 		JavaType:    typ,
 	}
+}
+
+type VirtualRefMember struct {
+	Member   string
+	Id       int
+	JavaType JavaType
+}
+
+func (j *VirtualRefMember) Type() JavaType {
+	return j.JavaType
+}
+
+func NewVirtualRefMember(id int, member string, typ JavaType) *VirtualRefMember {
+	return &VirtualRefMember{
+		Member:   member,
+		Id:       id,
+		JavaType: typ,
+	}
+}
+
+type JavaArrayMember struct {
+	Ref   *JavaRef
+	Index JavaValue
+}
+
+func (j *JavaArrayMember) Type() JavaType {
+	return j.Ref.Type().(*JavaArrayType).JavaType
+}
+func (j *JavaArrayMember) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("var%d[%v]", j.Ref.Id, j.Index.String(funcCtx))
+}
+
+func NewJavaArrayMember(ref *JavaRef, index JavaValue) *JavaArrayMember {
+	return &JavaArrayMember{
+		Ref:   ref,
+		Index: index,
+	}
+}
+
+func (j *VirtualRefMember) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("var%d.%s", j.Id, j.Member)
 }
 
 type JavaClass struct {
@@ -130,14 +190,8 @@ func (j *JavaClass) Type() JavaType {
 }
 
 func (j *JavaClass) String(funcCtx *FunctionContext) string {
-	if j.Name == funcCtx.ClassName {
-		splits := strings.Split(j.Name, ".")
-		if len(splits) > 0 {
-			return utils.GetLastElement(splits)
-		}
-		return ""
-	}
-	return fmt.Sprintf("%s", j.Name)
+	name := GetShortName(funcCtx, j.Name)
+	return fmt.Sprintf("%s", name)
 }
 func NewJavaClass(typeName string) *JavaClass {
 	return &JavaClass{

@@ -58,6 +58,10 @@ func GetLiteralFromCP(pool []ConstantInfo, index int) *decompiler.JavaLiteral {
 	switch ret := constant.(type) {
 	case *ConstantStringInfo:
 		return decompiler.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, decompiler.JavaString)
+	case *ConstantLongInfo:
+		return decompiler.NewJavaLiteral(ret.Value, decompiler.JavaLong)
+	case *ConstantIntegerInfo:
+		return decompiler.NewJavaLiteral(ret.Value, decompiler.JavaInteger)
 	default:
 		panic("failed")
 	}

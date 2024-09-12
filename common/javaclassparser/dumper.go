@@ -199,10 +199,27 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 				for _, statement := range statements {
 					var statementStr string
 					switch ret := statement.(type) {
-					case *decompiler.FunctionCallStatement:
+					case *decompiler.IfStatement:
+						getBody := func(sts []decompiler.Statement) string {
+							c.Tab()
+							defer c.UnTab()
+							var res []string
+							for _, st := range sts {
+								res = append(res, c.GetTabString()+st.String(funcCtx))
+							}
+							return strings.Join(res, "\n")
+						}
+						statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
+							"%s\n"+
+							c.GetTabString()+"}else{\n"+
+							"%s\n"+
+							c.GetTabString()+"}", ret.Condition.String(funcCtx), getBody(ret.IfBody), getBody(ret.ElseBody))
+					case *decompiler.ExpressionStatement:
 						if funcCtx.FunctionName == "<init>" {
-							if IsJavaSupperRef(ret.Object) && ret.FunctionName == "<init>" {
-								continue
+							if v, ok := ret.Expression.(*decompiler.FunctionCallExpression); ok {
+								if IsJavaSupperRef(v.Object) && v.FunctionName == "<init>" {
+									continue
+								}
 							}
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
@@ -214,7 +231,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					case *decompiler.ForStatement:
 						datas := []string{}
 						datas = append(datas, ret.InitVar.String(funcCtx))
-						datas = append(datas, fmt.Sprintf("%s %s %s", ret.Condition.LeftValue.String(funcCtx), ret.Condition.Op, ret.Condition.RightValue.String(funcCtx)))
+						datas = append(datas, fmt.Sprintf("%s", ret.Condition.String(funcCtx)))
 						datas = append(datas, ret.EndExp.String(funcCtx))
 						var lines []string
 						for _, subStatement := range ret.SubStatements {

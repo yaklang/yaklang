@@ -1,6 +1,9 @@
 package decompiler
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	Integer    = "integer"
@@ -25,37 +28,61 @@ type JavaType interface {
 var _ JavaType = &JavaClass{}
 var _ JavaType = &JavaPrimer{}
 var _ JavaType = &JavaArrayType{}
-var _ JavaType = &JavaNull{}
+var _ JavaType = &javaNull{}
+var _ JavaType = &JavaFuncType{}
+
+type JavaFuncType struct {
+	Desc       string
+	Params     []JavaType
+	ReturnType JavaType
+}
+
+func (j JavaFuncType) String(funcCtx *FunctionContext) string {
+	return j.Desc
+}
+
+func (j JavaFuncType) IsJavaType() {
+
+}
+
+func NewJavaFuncType(desc string, params []JavaType, returnType JavaType) *JavaFuncType {
+	return &JavaFuncType{
+		Params:     params,
+		ReturnType: returnType,
+	}
+}
 
 type JavaArrayType struct {
 	JavaType JavaType
-	Length   int
+	Length   []JavaValue // 支持多维数组
 }
 
-func (j *JavaArrayType) String(funcCtx *FunctionContext) string  {
-	return fmt.Sprintf("%s[]", j.JavaType.String(funcCtx))
+func (j *JavaArrayType) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("%s%s", j.JavaType.String(funcCtx), strings.Repeat("[]", len(j.Length)))
 }
 
 func (j *JavaArrayType) IsJavaType() {
 
 }
 
-func NewJavaArrayType(typ JavaType, length int) *JavaArrayType {
+func NewJavaArrayType(typ JavaType, length ...JavaValue) *JavaArrayType {
 	return &JavaArrayType{
 		JavaType: typ,
 		Length:   length,
 	}
 }
 
-type JavaNull struct {
+type javaNull struct {
 }
 
-func (j JavaNull) String(funcCtx *FunctionContext) string  {
+func (j javaNull) String(funcCtx *FunctionContext) string {
 	return "null"
 }
 
-func (j JavaNull) IsJavaType() {
+func (j javaNull) IsJavaType() {
 }
+
+var JavaNull = javaNull{}
 
 type JavaPrimer struct {
 	Name string
@@ -68,14 +95,20 @@ func newJavaPrimer(name string) *JavaPrimer {
 }
 
 var (
-	JavaString  = newJavaPrimer("String")
-	JavaInteger = newJavaPrimer("Integer")
-	JavaLong    = newJavaPrimer("Long")
-	JavaDouble  = newJavaPrimer("Double")
-	JavaFloat   = newJavaPrimer("Float")
+	JavaChar    = newJavaPrimer("char")
+	JavaInteger = newJavaPrimer("int")
+	JavaLong    = newJavaPrimer("long")
+	JavaDouble  = newJavaPrimer("double")
+	JavaFloat   = newJavaPrimer("float")
+	JavaBoolean = newJavaPrimer("boolean")
+	JavaByte    = newJavaPrimer("byte")
+	JavaShort   = newJavaPrimer("short")
+
+	JavaString = newJavaPrimer("String")
+	JavaVoid   = newJavaPrimer("void")
 )
 
-func (j *JavaPrimer) String(funcCtx *FunctionContext) string  {
+func (j *JavaPrimer) String(funcCtx *FunctionContext) string {
 	return j.Name
 }
 
