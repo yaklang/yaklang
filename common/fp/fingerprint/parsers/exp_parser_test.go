@@ -1,12 +1,12 @@
 package parsers
 
 import (
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/schema"
 	"testing"
 )
 
-func newTestGenerateRule(exp string) *rule.GeneralRule {
-	return &rule.GeneralRule{
+func newTestGenerateRule(exp string) *schema.GeneralRule {
+	return &schema.GeneralRule{
 		MatchExpression: exp,
 	}
 }
