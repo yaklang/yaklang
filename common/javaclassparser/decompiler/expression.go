@@ -62,10 +62,11 @@ func (j *JavaExpression) String(funcCtx *FunctionContext) string {
 		return fmt.Sprintf("%s + %s", vs[0], vs[1])
 	case INC:
 		return fmt.Sprintf("%s += %s", vs[0], vs[1])
-	case GT:
+	case GT, SUB:
 		return fmt.Sprintf("%s %s %s", vs[0], j.Op, vs[1])
 	default:
-		return fmt.Sprintf("%s(%s)", j.Op, strings.Join(vs, ","))
+		return fmt.Sprintf("%s %s %s", vs[0], j.Op, vs[1])
+		//return fmt.Sprintf("%s(%s)", j.Op, strings.Join(vs, ","))
 	}
 }
 

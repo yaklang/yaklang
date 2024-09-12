@@ -52,12 +52,22 @@ func GetStoreIdx(code *OpCode) int {
 }
 
 const (
-	EQ  = "=="
-	LT  = "<"
-	GTE = ">="
-	GT  = ">"
-	NE  = "!="
-	LTE = "<="
+	EQ   = "=="
+	LT   = "<"
+	GTE  = ">="
+	GT   = ">"
+	NE   = "!="
+	LTE  = "<="
+	SUB  = "-"
+	REM  = "%"
+	DIV  = "/"
+	MUL  = "*"
+	AND  = "&"
+	OR   = "|"
+	XOR  = "^"
+	SHL  = "<<"
+	SHR  = ">>"
+	USHR = ">>>"
 )
 const (
 	T_BOOLEAN = "boolean"
