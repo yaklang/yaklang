@@ -3,6 +3,7 @@ package rule
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -46,10 +47,10 @@ type OpCode struct {
 
 type matchedResult struct {
 	ok         bool
-	RebuildCPE func(*CPE)
+	RebuildCPE func(*schema.CPE)
 }
 
-func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrintRule) (cpe *CPE, err error) {
+func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrintRule) (cpe *schema.CPE, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = utils.Error(e)
@@ -76,7 +77,7 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 		switch code.Op {
 		case OpInfo:
 			if v := stack.Pop().(*matchedResult); v.ok {
-				info := code.data[0].(*CPE)
+				info := code.data[0].(*schema.CPE)
 				if v.RebuildCPE != nil {
 					v.RebuildCPE(info)
 				}
@@ -196,7 +197,7 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 			}
 			if matchOk {
 				if len(code.data) == 6 {
-					stack.Push(&matchedResult{ok: true, RebuildCPE: func(info *CPE) {
+					stack.Push(&matchedResult{ok: true, RebuildCPE: func(info *schema.CPE) {
 						res := re.FindAllStringSubmatch(matchedData, 1)
 						getGroup := func(s *string, index int) {
 							if index != 0 && len(res) > 0 && index < len(res[0]) {
@@ -221,5 +222,5 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 	if stack.Size() == 0 {
 		return nil, nil
 	}
-	return stack.Pop().(*CPE), nil
+	return stack.Pop().(*schema.CPE), nil
 }

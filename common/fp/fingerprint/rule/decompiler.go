@@ -2,6 +2,7 @@ package rule
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 )
@@ -9,10 +10,10 @@ import (
 type tmpGeneralRule struct {
 	exp        string
 	or         bool
-	rebuildCPE func(cpe *CPE)
+	rebuildCPE func(cpe *schema.CPE)
 }
 
-func DecompileFingerprintRuleOpCodes(codes []*OpCode) (*GeneralRule, error) {
+func DecompileFingerprintRuleOpCodes(codes []*OpCode) (*schema.GeneralRule, error) {
 	expStack := utils.NewStack[any]()
 	var currentExpListP *[]*tmpGeneralRule
 	//opPoint := [][3]int{}
@@ -44,11 +45,11 @@ func DecompileFingerprintRuleOpCodes(codes []*OpCode) (*GeneralRule, error) {
 			//sort.Slice(expS, func(i, j int) bool { return true })
 
 			if v := expStack.Pop().(*tmpGeneralRule); v.exp != "" {
-				info := code.data[0].(*CPE)
+				info := code.data[0].(*schema.CPE)
 				if v.rebuildCPE != nil {
 					v.rebuildCPE(info)
 				}
-				expStack.Push(&GeneralRule{
+				expStack.Push(&schema.GeneralRule{
 					MatchExpression: v.exp,
 					CPE:             info,
 				})
@@ -103,7 +104,7 @@ func DecompileFingerprintRuleOpCodes(codes []*OpCode) (*GeneralRule, error) {
 			varName := d[1].(string)
 			exp := fmt.Sprintf("%v ~= %v", varName, pattern)
 			if len(code.data) == 6 {
-				*currentExpListP = append(*currentExpListP, &tmpGeneralRule{exp: exp, rebuildCPE: func(info *CPE) {
+				*currentExpListP = append(*currentExpListP, &tmpGeneralRule{exp: exp, rebuildCPE: func(info *schema.CPE) {
 					getGroup := func(s *string, index int) {
 						*s = fmt.Sprintf("$%d", index)
 					}
@@ -122,5 +123,5 @@ func DecompileFingerprintRuleOpCodes(codes []*OpCode) (*GeneralRule, error) {
 	if expStack.Size() == 0 {
 		return nil, nil
 	}
-	return expStack.Pop().(*GeneralRule), nil
+	return expStack.Pop().(*schema.GeneralRule), nil
 }

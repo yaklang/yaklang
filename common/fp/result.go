@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"github.com/dlclark/regexp2"
 	tablewriter "github.com/olekukonko/tablewriter"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
@@ -19,34 +19,34 @@ import (
 )
 
 type FingerprintInfo struct {
-	IP               string                 `json:"ip"`
-	Port             int                    `json:"port"`
-	Proto            TransportProto         `json:"proto"`
-	ServiceName      string                 `json:"service_name"`
-	ProductVerbose   string                 `json:"product_verbose"`
-	Info             string                 `json:"info"`
-	Version          string                 `json:"version"`
-	Hostname         string                 `json:"hostname"`
-	OperationVerbose string                 `json:"operation_verbose"`
-	DeviceType       string                 `json:"device_type"`
-	CPEs             []string               `json:"cpes"`
-	Raw              string                 `json:"raw"`
-	Banner           string                 `json:"banner"`
-	CPEFromUrls      map[string][]*rule.CPE `json:"cpe_from_urls"`
-	HttpFlows        []*HTTPFlow            `json:"http_flows"`
+	IP               string                   `json:"ip"`
+	Port             int                      `json:"port"`
+	Proto            TransportProto           `json:"proto"`
+	ServiceName      string                   `json:"service_name"`
+	ProductVerbose   string                   `json:"product_verbose"`
+	Info             string                   `json:"info"`
+	Version          string                   `json:"version"`
+	Hostname         string                   `json:"hostname"`
+	OperationVerbose string                   `json:"operation_verbose"`
+	DeviceType       string                   `json:"device_type"`
+	CPEs             []string                 `json:"cpes"`
+	Raw              string                   `json:"raw"`
+	Banner           string                   `json:"banner"`
+	CPEFromUrls      map[string][]*schema.CPE `json:"cpe_from_urls"`
+	HttpFlows        []*HTTPFlow              `json:"http_flows"`
 
 	// tls info for fill...
 	TLSInspectResults []*netx.TLSInspectResult
 }
 
 type HTTPFlow struct {
-	StatusCode     int         `json:"status_code"`
-	IsHTTPS        bool        `json:"is_https"`
-	RequestHeader  []byte      `json:"request_header"`
-	RequestBody    []byte      `json:"request_body"`
-	ResponseHeader []byte      `json:"response_header"`
-	ResponseBody   []byte      `json:"response_body"`
-	CPEs           []*rule.CPE `json:"cp_es"`
+	StatusCode     int           `json:"status_code"`
+	IsHTTPS        bool          `json:"is_https"`
+	RequestHeader  []byte        `json:"request_header"`
+	RequestBody    []byte        `json:"request_body"`
+	ResponseHeader []byte        `json:"response_header"`
+	ResponseBody   []byte        `json:"response_body"`
+	CPEs           []*schema.CPE `json:"cp_es"`
 }
 
 func (f *FingerprintInfo) FromRegexp2Match(match *regexp2.Match) {
