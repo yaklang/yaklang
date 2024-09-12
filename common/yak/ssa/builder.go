@@ -1,9 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
-	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -37,8 +37,7 @@ type FunctionBuilder struct {
 	PreHandler                 bool
 	IncludeStack               *utils.Stack[string]
 
-	Included     bool
-	InitOnceFunc *sync.Once
+	Included bool
 
 	RefParameter map[string]struct{}
 
@@ -78,10 +77,8 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		parentBuilder: parent,
 		RefParameter:  make(map[string]struct{}),
 		IncludeStack:  utils.NewStack[string](),
-		InitOnceFunc:  &sync.Once{},
 	}
 	if parent != nil {
-		b.InitOnceFunc = parent.InitOnceFunc
 		b.DefineFunc = parent.DefineFunc
 		b.MarkedThisObject = parent.MarkedThisObject
 		// sub scope
