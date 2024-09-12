@@ -2,9 +2,10 @@ package php2ssa
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
+
+	"github.com/google/uuid"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -27,7 +28,7 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 }
 
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
-	fb.InitOnceFunc.Do(func() {
+	s.InitHandlerOnce.Do(func() {
 		container := fb.EmitEmptyContainer()
 		fb.AssignVariable(fb.CreateVariable("global-container"), container)
 		initHandler := func(name ...string) {
@@ -75,6 +76,10 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 }
 
 var Builder = &SSABuild{}
+
+func (s *SSABuild) Create() ssa.Builder {
+	return &SSABuild{}
+}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.PreHandler = true

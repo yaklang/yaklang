@@ -2,6 +2,10 @@ package go2ssa
 
 import (
 	"fmt"
+	"path/filepath"
+	"regexp"
+	"strings"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,9 +13,6 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"path/filepath"
-	"regexp"
-	"strings"
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 )
@@ -28,12 +29,14 @@ type ExData struct {
 	exAliasTypes map[string]*ssa.AliasType
 }
 
-var (
-	Builder = &SSABuilder{}
-)
+var Builder = &SSABuilder{}
+
+func (s *SSABuilder) Create() ssa.Builder {
+	return &SSABuilder{}
+}
 
 func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
-	fb.InitOnceFunc.Do(func() {
+	s.InitHandlerOnce.Do(func() {
 		container := fb.EmitEmptyContainer()
 		fb.GetProgram().GlobalScope = container
 	})

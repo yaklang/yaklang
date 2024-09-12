@@ -21,6 +21,10 @@ type SSABuilder struct {
 
 var Builder = &SSABuilder{}
 
+func (s *SSABuilder) Create() ssa.Builder {
+	return &SSABuilder{}
+}
+
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.SupportClass = true
 	ast, err := Frontend(src, force)
