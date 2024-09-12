@@ -163,6 +163,19 @@ asdf
 FILE,
 )`,
 		`a?{opcode: add}`,
+		`"abc" as $b`,
+		`r"a" as $a`,
+		`e"e" as $a`,
+		`g"e" as $a`,
+		`r<<<TEXT
+AAB
+TEXT`,
+		`e<<<TEXT
+AAE
+TEXT`,
+		`g  <<<TEXT
+AAG
+TEXT`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)

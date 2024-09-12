@@ -118,6 +118,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#refVariable.
 	VisitRefVariable(ctx *RefVariableContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#ConstSearchFilter.
+	VisitConstSearchFilter(ctx *ConstSearchFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#NamedFilter.
 	VisitNamedFilter(ctx *NamedFilterContext) interface{}
 
@@ -126,6 +129,12 @@ type SyntaxFlowParserVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#NativeCallFilter.
 	VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#constSearchPrefix.
+	VisitConstSearchPrefix(ctx *ConstSearchPrefixContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#constSearchBody.
+	VisitConstSearchBody(ctx *ConstSearchBodyContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#First.
 	VisitFirst(ctx *FirstContext) interface{}

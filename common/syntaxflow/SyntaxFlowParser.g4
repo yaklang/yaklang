@@ -84,10 +84,14 @@ refVariable
 
 
 filterItemFirst
-    : nameFilter                                 # NamedFilter
+    : constSearchPrefix?  constSearchBody        # ConstSearchFilter
+    | nameFilter                                 # NamedFilter
     | '.' lines? nameFilter                      # FieldCallFilter
     | nativeCall                                 # NativeCallFilter
     ;
+
+constSearchPrefix: ConstSearchModePrefixRegexp | ConstSearchModePrefixGlob | ConstSearchModePrefixExact;
+constSearchBody: hereDoc | QuotedStringLiteral;
 
 filterItem
     : filterItemFirst                            # First
@@ -197,7 +201,7 @@ keywords
     | BoolLiteral
     ;
 
-opcodes: Call | Constant | Phi | FormalParam | Return | Function;
+opcodes: Call | Constant | Phi | FormalParam | Return | Function | constSearchPrefix;
 
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;

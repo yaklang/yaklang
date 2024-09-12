@@ -89,6 +89,10 @@ HaveAny: 'any';
 Not: 'not';
 For: 'for';
 
+ConstSearchModePrefixRegexp: 'r';
+ConstSearchModePrefixGlob: 'g';
+ConstSearchModePrefixExact: 'e';
+
 Identifier: IdentifierCharStart IdentifierChar*;
 IdentifierChar: [0-9] | IdentifierCharStart;
 

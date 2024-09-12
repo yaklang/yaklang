@@ -1,6 +1,8 @@
 package sfvm
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"reflect"
 	"regexp"
 	"strings"
@@ -126,6 +128,57 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 			}
 		}
 		y.EmitNativeCall(varname, items...)
+	case *sf.ConstSearchFilterContext:
+		a := raw.GetText()
+		fmt.Println(a)
+		var text string
+		body, ok := i.ConstSearchBody().(*sf.ConstSearchBodyContext)
+		if ok {
+			if body.HereDoc() != nil {
+				text = y.VisitHereDoc(body.HereDoc())
+			} else {
+				text = yakunquote.TryUnquote(body.GetText())
+			}
+		} else {
+			text = ""
+		}
+		_ = text
+		prefixStr := ""
+		prefix := i.ConstSearchPrefix()
+		if prefix != nil {
+			stop := prefix.GetStop().GetStop()
+			start := body.GetStart().GetStart()
+			if start-stop > 1 {
+				panic("const search need g'search' or g<<<TEXT, do not use whitespace to divide it")
+			}
+			prefixStr = prefix.GetText()
+		}
+		if prefixStr == "" {
+			if strings.Contains(text, "*") {
+				prefixStr = "g"
+			} else {
+				prefixStr = "e"
+			}
+		}
+		switch prefixStr {
+		case "g":
+			y.EmitNativeCall("const", &RecursiveConfigItem{
+				Key:   "glob",
+				Value: text,
+			})
+		case "e":
+			y.EmitNativeCall("const", &RecursiveConfigItem{
+				Key:   "exact",
+				Value: text,
+			})
+		case "r":
+			y.EmitNativeCall("const", &RecursiveConfigItem{
+				Key:   "regexp",
+				Value: text,
+			})
+		default:
+			panic("no const search mode decided")
+		}
 	default:
 		panic("BUG: in filter first")
 	}

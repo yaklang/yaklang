@@ -155,6 +155,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitRefVariable(ctx *RefVariableContext) 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitConstSearchFilter(ctx *ConstSearchFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitNamedFilter(ctx *NamedFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -164,6 +168,14 @@ func (v *BaseSyntaxFlowParserVisitor) VisitFieldCallFilter(ctx *FieldCallFilterC
 }
 
 func (v *BaseSyntaxFlowParserVisitor) VisitNativeCallFilter(ctx *NativeCallFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitConstSearchPrefix(ctx *ConstSearchPrefixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitConstSearchBody(ctx *ConstSearchBodyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
