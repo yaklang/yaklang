@@ -86,3 +86,45 @@ func Test_Phi_WithGoto_inLoop(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))
 }
+
+func Test_Phi_WithReturn(t *testing.T) {
+	code := `package main
+
+	func main() {
+		a := 1
+		if true {
+			return
+		}
+		b := a
+	}
+`
+	ssatest.CheckWithName("phi-with-return", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("b as $b").GetValues("b")
+		phi := phis[0]
+
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+
+	ssatest.CheckWithName("phi-with-return-syntaxflow", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("b #{until: `* ?{opcode: phi}`}-> * as $b; check $b;").GetValues("b")
+		phi := phis[0]
+
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+}

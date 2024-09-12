@@ -336,7 +336,7 @@ func (i *IfBuilder) Build() *IfBuilder {
 				SSABuilder.CurrentBlock.SetScope(bodyScope)
 				item.Body()
 				if SSABuilder.CurrentBlock.finish {
-					return nil
+					return SSABuilder.HandlerReturnPhi(bodyScope)
 				}
 				SSABuilder.EmitJump(DoneBlock)
 				return SSABuilder.CurrentBlock.ScopeTable
@@ -799,4 +799,18 @@ func (t *LabelBuilder) Finish() {
 		f()
 	}
 	builder.PopTarget()
+}
+
+func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+	parent := s.GetParent()
+	end := parent.CreateShadowScope()
+
+	names := parent.GetAllVariableNames()
+	for name, _ := range names {
+		leftv := end.CreateVariable(name, false)
+		_ = leftv
+		end.AssignVariable(leftv, b.EmitUndefined(name))
+	}
+
+	return end
 }
