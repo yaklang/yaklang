@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -9,14 +10,15 @@ func TestCache(t *testing.T) {
 	c := NewTTLCache[int](10 * time.Minute)
 
 	isNewItemCallback := false
-	expirationCallbackCount, wantExpirationCallbackCount := 0, 2
+	expirationCallbackCount, wantExpirationCallbackCount := uint64(0), uint64(2)
 	isCheckExpirationCallback := false
 	hasResetTTL := false
 	c.SetNewItemCallback(func(key string, value int) {
 		isNewItemCallback = true
 	})
 	c.SetExpirationCallback(func(key string, value int) {
-		expirationCallbackCount++
+		t.Logf("expiration callback: %s, %d", key, value)
+		atomic.AddUint64(&expirationCallbackCount, 1)
 	})
 	c.SetCheckExpirationCallback(func(key string, value int) bool {
 		isCheckExpirationCallback = true
@@ -26,14 +28,12 @@ func TestCache(t *testing.T) {
 		}
 		return true
 	})
-	c.SkipTtlExtensionOnHit(true)
 
 	c.SetWithTTL("one", 1, 1*time.Second)
 	c.SetWithTTL("four", 4, 1*time.Second)
 	if v, ok := c.Get("one"); !ok || v != 1 {
 		t.Fatal("TTLCache get/set failed")
 	}
-	// 1.5s:
 	time.Sleep(1500 * time.Millisecond)
 	if _, ok := c.Get("one"); ok {
 		t.Fatal("TTLCache live time failed")
@@ -55,8 +55,11 @@ func TestCache(t *testing.T) {
 	}
 
 	// 2s: test skip reset TTL
+	c.SkipTtlExtensionOnHit(true)
+	time.Sleep(500 * time.Millisecond)
 	c.Get("four")
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(600 * time.Millisecond)
+	// after 1.1s, four should be expired
 	if _, ok := c.Get("four"); ok {
 		t.Fatal("TTLCache SkipTtlExtensionOnHit failed, want disable reset ttl, but not")
 	}
