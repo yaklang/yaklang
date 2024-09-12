@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -19,8 +20,8 @@ func ParseYamlRule(ruleContent string) ([]*rule.FingerPrintRule, error) {
 	return rs, nil
 }
 func ConvertOldYamlWebRuleToGeneralRule(rules []*webfingerprint.WebRule) ([]*rule.FingerPrintRule, error) {
-	convertToMap := func(o *webfingerprint.CPE) *rule.CPE {
-		return &rule.CPE{
+	convertToMap := func(o *webfingerprint.CPE) *schema.CPE {
+		return &schema.CPE{
 			Part:     o.Part,
 			Vendor:   o.Vendor,
 			Product:  o.Product,
