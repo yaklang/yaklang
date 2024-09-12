@@ -74,6 +74,9 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	SetScopeName(string)
 
 	// GetPersistentProgramName() string
+
+	// for return phi
+	GetAllVariableNames() map[string]struct{}
 }
 
 func (s *ScopedVersionedTable[T]) GetScopeName() string {
@@ -525,4 +528,22 @@ func (s *ScopedVersionedTable[T]) IsSameOrSubScope(other ScopedVersionedTableIF[
 
 func (s *ScopedVersionedTable[T]) Compare(other ScopedVersionedTableIF[T]) bool {
 	return s.GetThis() == other.GetThis()
+}
+
+func (s *ScopedVersionedTable[T]) GetAllVariableNames() map[string]struct{} {
+	var names map[string]struct{} = make(map[string]struct{})
+
+	s.linkValues.ForEach(func(s string, vi VersionedIF[T]) {
+		names[s] = struct{}{}
+	})
+
+	parent := s.GetParent()
+	if parent != nil {
+		namesParent := parent.GetAllVariableNames()
+		for n := range namesParent {
+			names[n] = struct{}{}
+		}
+	}
+
+	return names
 }
