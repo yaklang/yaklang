@@ -1,7 +1,6 @@
 package sfvm
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"reflect"
 	"regexp"
@@ -129,8 +128,6 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 		}
 		y.EmitNativeCall(varname, items...)
 	case *sf.ConstSearchFilterContext:
-		a := raw.GetText()
-		fmt.Println(a)
 		var text string
 		body, ok := i.ConstSearchBody().(*sf.ConstSearchBodyContext)
 		if ok {

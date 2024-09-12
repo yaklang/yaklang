@@ -6,6 +6,21 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
+func TestSyntaxInOne_Bad(t *testing.T) {
+	for _, i := range []string{
+		`g <<<TEXT
+AAAA
+TEXT`,
+	} {
+		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
+		_, err := vm.Compile(i)
+		if err != nil {
+			continue
+		}
+		t.Fatalf("syntax bad checking failed: %#v", i)
+	}
+}
+
 func TestSyntaxInOne(t *testing.T) {
 	for _, i := range []string{
 		"aa",
@@ -173,7 +188,7 @@ TEXT`,
 		`e<<<TEXT
 AAE
 TEXT`,
-		`g  <<<TEXT
+		`g<<<TEXT
 AAG
 TEXT`,
 	} {
