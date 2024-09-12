@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strconv"
@@ -16,7 +17,7 @@ var buildinTokens = []string{"(", ")", "||", "&&", "\"", "\\"}
 func init() {
 	buildinTokens = append(buildinTokens, buildinOps...)
 }
-func ParseExpRule(rules ...*rule.GeneralRule) ([]*rule.FingerPrintRule, error) {
+func ParseExpRule(rules ...*schema.GeneralRule) ([]*rule.FingerPrintRule, error) {
 	res := []*rule.FingerPrintRule{}
 	errs := []error{}
 	for _, ruleInfo := range rules {

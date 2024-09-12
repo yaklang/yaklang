@@ -2,8 +2,6 @@ package rule
 
 import (
 	"errors"
-	"fmt"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -27,35 +25,12 @@ func NewHttpResource(data []byte) *MatchResource {
 	}
 }
 
-type GeneralRule struct {
-	gorm.Model
-	*CPE
-	WebPath         string
-	ExtInfo         string
-	MatchExpression string `gorm:"uniqueIndex"`
-}
-
-func (g *GeneralRule) String() string {
-	items := []string{}
-	cpeStr := g.CPE.String()
-	items = append(items, fmt.Sprintf("cpe:%s", cpeStr))
-
-	if g.WebPath != "" {
-		items = append(items, fmt.Sprintf("webpath:%s", g.WebPath))
-	}
-	if g.ExtInfo != "" {
-		items = append(items, fmt.Sprintf("info:%s", g.ExtInfo))
-	}
-	items = append(items, fmt.Sprintf("rule:%s", g.MatchExpression))
-	return strings.Join(items, " ")
-}
-
-func NewEmptyGeneralRule() *GeneralRule {
-	return &GeneralRule{
-		CPE: &CPE{},
+func NewEmptyGeneralRule() *schema.GeneralRule {
+	return &schema.GeneralRule{
+		CPE: &schema.CPE{},
 	}
 }
-func ParseGeneralRule(s string) (*GeneralRule, error) {
+func ParseGeneralRule(s string) (*schema.GeneralRule, error) {
 	rule := NewEmptyGeneralRule()
 	infoItems := map[string]func(s string){"cpe:": func(s string) {
 		cpe, err := ParseToCPE(s)
@@ -96,12 +71,12 @@ func ParseGeneralRule(s string) (*GeneralRule, error) {
 }
 
 func init() {
-	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_YAKIT_DATABASE, &GeneralRule{})
+	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_YAKIT_DATABASE, &schema.GeneralRule{})
 }
 
 type MatchMethodParam struct {
 	ExtParams map[string]any
-	Info      *CPE
+	Info      *schema.CPE
 
 	// regexp
 	RegexpPattern string
@@ -134,16 +109,6 @@ func NewEmptyFingerPrintRule() *FingerPrintRule {
 	return &FingerPrintRule{
 		MatchParam: &MatchMethodParam{},
 	}
-}
-
-type CPE struct {
-	Part     string `yaml:"part,omitempty" json:"part"`
-	Vendor   string `yaml:"vendor,omitempty" json:"vendor"`
-	Product  string `yaml:"product,omitempty" json:"product"`
-	Version  string `yaml:"version,omitempty" json:"version"`
-	Update   string `yaml:"update,omitempty" json:"update"`
-	Edition  string `yaml:"edition,omitempty" json:"edition"`
-	Language string `yaml:"language,omitempty" json:"language"`
 }
 
 func (f *FingerPrintRule) preToOpCodes() []*OpCode {
@@ -255,33 +220,7 @@ func (f *FingerPrintRule) ToOpCodes() []*OpCode {
 	return codes
 }
 
-func (c *CPE) Init() {
-	if c.Part == "" {
-		c.Part = "a"
-	}
-
-	setWildstart := func(raw *string) {
-		if *raw == "" {
-			*raw = "*"
-		}
-	}
-
-	setWildstart(&c.Vendor)
-	setWildstart(&c.Product)
-	setWildstart(&c.Version)
-	setWildstart(&c.Update)
-	setWildstart(&c.Edition)
-	setWildstart(&c.Language)
-}
-
-func (c *CPE) String() string {
-	c.Init()
-	raw := fmt.Sprintf("cpe:/%s:%s:%s:%s:%s:%s:%s", c.Part, c.Vendor, c.Product, c.Version, c.Update, c.Edition, c.Language)
-	raw = strings.ReplaceAll(raw, " ", "_")
-	raw = strings.ToLower(raw)
-	return raw
-}
-func ParseToCPE(cpe string) (*CPE, error) {
+func ParseToCPE(cpe string) (*schema.CPE, error) {
 	if (!strings.HasPrefix(cpe, "cpe:/")) && (!strings.HasPrefix(cpe, "cpe:2.3:")) {
 		return nil, utils.Errorf("raw [%s] is not a valid cpe", cpe)
 	}
@@ -300,7 +239,7 @@ func ParseToCPE(cpe string) (*CPE, error) {
 		}
 	}
 	cpeArgs[0] = cpeArgs[0][1:]
-	cpeModel := &CPE{
+	cpeModel := &schema.CPE{
 		Part:     cpeArgs[0],
 		Vendor:   cpeArgs[1],
 		Product:  cpeArgs[2],

@@ -2,7 +2,7 @@ package utils
 
 import (
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 )
 
@@ -20,7 +20,7 @@ func NewCPEAnalyzer(urls ...string) *CPEAnalyzer {
 	}
 }
 
-func (c *CPEAnalyzer) Feed(url string, cpes ...*rule.CPE) {
+func (c *CPEAnalyzer) Feed(url string, cpes ...*schema.CPE) {
 	for _, cpe := range cpes {
 		c.cpeMap.Store(cpe.String(), cpe)
 
@@ -30,10 +30,10 @@ func (c *CPEAnalyzer) Feed(url string, cpes ...*rule.CPE) {
 	}
 }
 
-func (c *CPEAnalyzer) AvailableCPE() []*rule.CPE {
-	var cpes []*rule.CPE
+func (c *CPEAnalyzer) AvailableCPE() []*schema.CPE {
+	var cpes []*schema.CPE
 	c.cpeMap.Range(func(key, value interface{}) bool {
-		cpes = append(cpes, value.(*rule.CPE))
+		cpes = append(cpes, value.(*schema.CPE))
 		return true
 	})
 	return cpes
@@ -48,8 +48,8 @@ func (c *CPEAnalyzer) IsProductExisted(product string) bool {
 	return false
 }
 
-func (c *CPEAnalyzer) GetCPEsByProduct(product string) []*rule.CPE {
-	var cpes []*rule.CPE
+func (c *CPEAnalyzer) GetCPEsByProduct(product string) []*schema.CPE {
+	var cpes []*schema.CPE
 	for _, cpe := range c.AvailableCPE() {
 		if cpe.Product == product {
 			cpes = append(cpes, cpe)
@@ -69,8 +69,8 @@ func (c *CPEAnalyzer) GetVersionByProduct(product string) (string, error) {
 	return cpes[0].Version, nil
 }
 
-func (c *CPEAnalyzer) QueryOrigins(cpes ...*rule.CPE) map[*rule.CPE]string {
-	results := map[*rule.CPE]string{}
+func (c *CPEAnalyzer) QueryOrigins(cpes ...*schema.CPE) map[*schema.CPE]string {
+	results := map[*schema.CPE]string{}
 	for _, value := range cpes {
 		if raw, ok := c.cpeOriginMap.Load(value.String()); ok {
 			origin := raw.(string)

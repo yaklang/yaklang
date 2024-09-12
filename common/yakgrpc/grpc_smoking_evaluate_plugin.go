@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -326,7 +326,7 @@ func MockPluginTestingFpResult(testDomain string, pluginTestingServer *PluginTes
 			Proto:       "tcp",
 			ServiceName: "http",
 			Banner:      "",
-			CPEFromUrls: make(map[string][]*rule.CPE),
+			CPEFromUrls: make(map[string][]*schema.CPE),
 			HttpFlows: []*fp.HTTPFlow{
 				{
 					StatusCode:     200,

@@ -2,6 +2,7 @@ package fingerprint
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"regexp"
 
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
@@ -26,8 +27,8 @@ func NewMatcher() *Matcher {
 	return matcher
 }
 
-func (m *Matcher) MatchResource(ctx context.Context, rules []*rule.FingerPrintRule, getter func(path string) (*rule.MatchResource, error)) []*rule.CPE {
-	var result []*rule.CPE
+func (m *Matcher) MatchResource(ctx context.Context, rules []*rule.FingerPrintRule, getter func(path string) (*rule.MatchResource, error)) []*schema.CPE {
+	var result []*schema.CPE
 	for i, r := range rules {
 		_ = i
 		select {
@@ -47,7 +48,7 @@ func (m *Matcher) MatchResource(ctx context.Context, rules []*rule.FingerPrintRu
 	return result
 }
 
-func (m *Matcher) Match(ctx context.Context, data []byte, rules []*rule.FingerPrintRule) []*rule.CPE {
+func (m *Matcher) Match(ctx context.Context, data []byte, rules []*rule.FingerPrintRule) []*schema.CPE {
 	return m.MatchResource(ctx, rules, func(path string) (*rule.MatchResource, error) {
 		cached := map[string][]byte{}
 		if path == "" || path == "/" {
