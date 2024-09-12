@@ -2,6 +2,7 @@ package decompiler
 
 import (
 	"fmt"
+	"strings"
 )
 
 type JavaValue interface {
@@ -196,5 +197,37 @@ func (j *JavaClass) String(funcCtx *FunctionContext) string {
 func NewJavaClass(typeName string) *JavaClass {
 	return &JavaClass{
 		Name: typeName,
+	}
+}
+
+const TypeCaseByte = "byte"
+const TypeCaseLong = "long"
+const TypeCaseShort = "short"
+const TypeCaseInt = "int"
+const TypeCaseChar = "char"
+const TypeCaseFloat = "float"
+const TypeCaseDouble = "double"
+
+type VirtualFunctionCall struct {
+	Name      string
+	Arguments []JavaValue
+	JavaType  JavaType
+}
+
+func (v *VirtualFunctionCall) Type() JavaType {
+	return v.JavaType
+}
+func (v *VirtualFunctionCall) String(funcCtx *FunctionContext) string {
+	args := []string{}
+	for _, arg := range v.Arguments {
+		args = append(args, arg.String(funcCtx))
+	}
+	return fmt.Sprintf("%s(%s)", v.Name, strings.Join(args, ","))
+}
+func NewVirtualFunctionCall(name string, arguemnts []JavaValue, javaType JavaType) *VirtualFunctionCall {
+	return &VirtualFunctionCall{
+		Name:      name,
+		Arguments: arguemnts,
+		JavaType:  javaType,
 	}
 }
