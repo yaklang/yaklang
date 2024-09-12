@@ -1,6 +1,13 @@
 package ssatest
 
 import (
+	"context"
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -146,4 +153,128 @@ func TestParseProject_PHP_withEmptyFile(t *testing.T) {
 
 		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+}
+
+func TestStopProcessByCtx(t *testing.T) {
+	toCreate := []string{
+		"example/src/main/java/com/example/testcontextFSB/a.java",
+		"example/src/main/java/com/example/testcontextFSB/b.java",
+		"example/src/main/java/com/example/testcontextFSA/a.java",
+		"example/src/main/java/com/example/testcontextFSA/b.java",
+		"example/src/main/java/com/example/testcontextFSA/c.java",
+		"example/src/main/java/com/example/testcontextFSA/d.java",
+		"example/src/main/java/com/example/testcontextFSA/e.java",
+		"example/src/main/java/com/example/testcontextFSC/a.java",
+		"example/src/main/java/com/example/testcontextFSC/b.java",
+		"example/src/main/java/com/example/testcontextFSC/c.java",
+	}
+
+	t.Run("test local fileSystem stop process by context", func(t *testing.T) {
+		ssadb.DeleteProgram(ssadb.GetDB(), "testcontextFSA")
+		ssadb.DeleteProgram(ssadb.GetDB(), "testcontextFSB")
+		ssadb.DeleteProgram(ssadb.GetDB(), "testcontextFSC")
+		dir := t.TempDir()
+		log.Infof("dir: %v", dir)
+
+		for _, path := range toCreate {
+			path = fmt.Sprintf("%s/%s", dir, path)
+			pathDir := filepath.Dir(path)
+			err := os.MkdirAll(pathDir, os.ModePerm)
+			require.NoError(t, err)
+			fd, err := os.Create(path)
+			require.NoError(t, err)
+			dirPath := filepath.Dir(path)
+			lastDirName := filepath.Base(dirPath)
+			pkg := fmt.Sprintf("package %s;", lastDirName)
+			fd.WriteString(pkg)
+			fd.Close()
+		}
+		var maxProcess float64
+		programID := uuid.NewString()
+		ctx, cancel := context.WithCancel(context.Background())
+		ctxFS := filesys.NewFileSystemWithContext(ctx, filesys.NewRelLocalFs(dir))
+		_, err := ssaapi.ParseProject(ctxFS,
+			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithProgramName(programID),
+			ssaapi.WithSaveToProfile(),
+			ssaapi.WithProcess(func(msg string, process float64) {
+				if process >= 0.5 {
+					cancel()
+				}
+				if process > maxProcess {
+					maxProcess = process
+				}
+				log.Infof("message %v, process: %f", msg, process)
+			}),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			ssadb.DeleteSSAProgram(programID)
+		}()
+		assert.NoErrorf(t, err, "parse project error: %v", err)
+		require.LessOrEqual(t, maxProcess, 0.5)
+		file := make([]string, 0)
+		dbfs := ssadb.NewIrSourceFs()
+		filesys.Recursive(
+			fmt.Sprintf("/%s", programID),
+			filesys.WithFileSystem(dbfs),
+			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+				_, path, _ := strings.Cut(s, programID+"/")
+				file = append(file, path)
+				return nil
+			}),
+		)
+		require.LessOrEqual(t, len(file), 5)
+	})
+
+	t.Run("test virtual fileSystem stop process by context", func(t *testing.T) {
+		ssadb.DeleteProgram(ssadb.GetDB(), "testcontextFSA")
+		ssadb.DeleteProgram(ssadb.GetDB(), "testcontextFSB")
+		ssadb.DeleteProgram(ssadb.GetDB(), "testcontextFSC")
+
+		vf := filesys.NewVirtualFs()
+		for _, path := range toCreate {
+			dirPath := filepath.Dir(path)
+			lastDirName := filepath.Base(dirPath)
+			vf.AddFile(path, fmt.Sprintf("package %s;", lastDirName))
+		}
+
+		var maxProcess float64
+		programID := uuid.NewString()
+		ctx, cancel := context.WithCancel(context.Background())
+		ctxFS := filesys.NewFileSystemWithContext(ctx, vf)
+		_, err := ssaapi.ParseProject(ctxFS,
+			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithProgramName(programID),
+			ssaapi.WithSaveToProfile(),
+			ssaapi.WithProcess(func(msg string, process float64) {
+				if process >= 0.5 {
+					cancel()
+				}
+				if process > maxProcess {
+					maxProcess = process
+				}
+				log.Infof("message %v, process: %f", msg, process)
+			}),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			ssadb.DeleteSSAProgram(programID)
+		}()
+		assert.NoErrorf(t, err, "parse project error: %v", err)
+		require.LessOrEqual(t, maxProcess, 0.5)
+		file := make([]string, 0)
+		dbfs := ssadb.NewIrSourceFs()
+		filesys.Recursive(
+			fmt.Sprintf("/%s", programID),
+			filesys.WithFileSystem(dbfs),
+			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+				_, path, _ := strings.Cut(s, programID+"/")
+				file = append(file, path)
+				return nil
+			}),
+		)
+		require.LessOrEqual(t, len(file), 5)
+	})
+
 }
