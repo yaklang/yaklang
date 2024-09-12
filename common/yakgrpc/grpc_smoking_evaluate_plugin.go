@@ -163,8 +163,7 @@ func BuildPluginTestingJunkData() []byte {
 	return junkData
 }
 
-// 只在评分中使用
-func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
+func (s *Server) EvaluatePluginEx(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer, skipRiskStatic, skipEchoServer, skipLogicCheck bool) (*ypb.SmokingEvaluatePluginResponse, error) {
 	defer pluginTestingServer.ClearRequestsHistory()
 	host, port := pluginTestingServer.Host, pluginTestingServer.Port
 	testDomain := utils.RandStringBytes(60) + ".com"
@@ -195,50 +194,53 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	)
 
 	var hasParameter bool
-	if pluginType != "nuclei" {
-		prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
-		if err != nil {
-			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
-		}
-		parameters, _ := information.ParseCliParameter(prog)
-		if len(parameters) > 0 {
-			hasParameter = true
-		}
-	}
-	// static analyze
-	if slices.Contains([]string{
-		"mitm", "port-scan", "codec", "yak",
-	}, pluginType) {
-		staticResults := yak.StaticAnalyzeYaklang(pluginCode,
-			yak.WithStaticAnalyzePluginType(pluginType),
-			yak.WithStaticAnalyzeKindScore(),
-		)
-		if len(staticResults) > 0 {
-			score = result.CalculateScoreFromResults(staticResults)
-			for _, sRes := range staticResults {
-				R := &ypb.Range{
-					StartLine:   int64(sRes.StartLineNumber),
-					StartColumn: int64(sRes.StartColumn),
-					EndLine:     int64(sRes.EndLineNumber),
-					EndColumn:   int64(sRes.EndColumn),
-				}
-				switch sRes.Severity {
-				case result.Error:
-					pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, []byte(sRes.From))
-				case result.Warn:
-					pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
-				}
+
+	if !skipRiskStatic {
+		if pluginType != "nuclei" {
+			prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
+			if err != nil {
+				pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
 			}
-			if score < 60 {
-				return &ypb.SmokingEvaluatePluginResponse{
-					Score:   0,
-					Results: results,
-				}, nil
+			parameters, _ := information.ParseCliParameter(prog)
+			if len(parameters) > 0 {
+				hasParameter = true
+			}
+		}
+		// static analyze
+		if slices.Contains([]string{
+			"mitm", "port-scan", "codec", "yak",
+		}, pluginType) {
+			staticResults := yak.StaticAnalyzeYaklang(pluginCode,
+				yak.WithStaticAnalyzePluginType(pluginType),
+				yak.WithStaticAnalyzeKindScore(),
+			)
+			if len(staticResults) > 0 {
+				score = result.CalculateScoreFromResults(staticResults)
+				for _, sRes := range staticResults {
+					R := &ypb.Range{
+						StartLine:   int64(sRes.StartLineNumber),
+						StartColumn: int64(sRes.StartColumn),
+						EndLine:     int64(sRes.EndLineNumber),
+						EndColumn:   int64(sRes.EndColumn),
+					}
+					switch sRes.Severity {
+					case result.Error:
+						pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, []byte(sRes.From))
+					case result.Warn:
+						pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
+					}
+				}
+				if score < 60 {
+					return &ypb.SmokingEvaluatePluginResponse{
+						Score:   0,
+						Results: results,
+					}, nil
+				}
 			}
 		}
 	}
 
-	if !hasParameter && slices.Contains([]string{
+	if !skipEchoServer && !hasParameter && slices.Contains([]string{
 		"mitm", "port-scan", "nuclei",
 	}, pluginType) { // echo debug script
 		getMockParam := func() []*ypb.KVPair {
@@ -290,7 +292,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			if err != nil {
 				log.Errorf("delete plugin testing risk error: %v", err)
 			}
-		} else { //  if not negative alarm, check plugin sent request
+		} else if !skipLogicCheck { //  if not negative alarm, check plugin sent request
 			wantCount := 1
 			if pluginType == "mitm" {
 				wantCount = 2 // mitm plugin need rsp, so there will have a default request
@@ -311,6 +313,11 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		Score:   int64(score),
 		Results: results,
 	}, nil
+}
+
+// 只在评分中使用
+func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
+	return s.EvaluatePluginEx(ctx, pluginCode, pluginType, pluginTestingServer, false, false, false)
 }
 
 func MockPluginTestingFpResult(testDomain string, pluginTestingServer *PluginTestingEchoServer) *fp.MatchResult {
