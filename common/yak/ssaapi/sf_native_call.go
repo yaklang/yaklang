@@ -237,7 +237,7 @@ func init() {
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatixXML))
 	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		varName := params.GetString(0)
-		log.Info("syntax flow native call 'as' to", varName)
+		//log.Info("syntax flow native call 'as' to", varName)
 
 		var vals []sfvm.ValueOperator
 		result, ok := frame.GetSymbolTable().Get(varName)

@@ -1,0 +1,64 @@
+desc(
+    title: "LDAP Injection PHP checking (without ldap_escape)",
+    type: vuln,
+    severity: mid,
+)
+
+ldap_search(*<slice(start=1)> as $query);
+ldap_list(*<slice(start=1)> as $query);
+ldap_read(*<slice(start=1)> as $query)
+ldap_compare(,* as $query);
+
+<include('php-param')> as $params;
+$query #{
+    until: `* & $params`,
+}-> as $root;
+$root?{!<dataflow(<<<CODE
+*?{opcode: call && <getCaller><name>?{have: ldap_escape}} as $__next__;
+CODE)>} as $result;
+alert $result;
+
+desc(
+
+language: php,
+alert_min: 2,
+
+'file://list3.php': <<<CODE
+<?php
+
+$ldapconn = ldap_connect("localhost");
+
+if($ldapconn){
+  $user2 = $_GET["user2"];
+
+  $filter = "(&(objectClass=user)(uid=" . $user2. "))";
+  $dn = "dc=example,dc=org";
+
+  ldap_list($ldapconn, $dn, $filter); // Noncompliant
+}
+CODE,
+
+'file://list2.php': <<<CODE
+<?php
+
+$username = $_POST['username'];
+$password = $_POST['password'];
+// without_pass
+$escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
+$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
+$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
+CODE,
+
+'safefile://list3.php': <<<CODE
+<?php
+
+$username = $_POST['username'];
+$password = $_POST['password'];
+// without_pass
+$escaped_username = ldap_escape($username, '', LDAP_ESCAPE_FILTER);
+$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
+$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
+CODE,
+
+
+)
