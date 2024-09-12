@@ -5,6 +5,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/synscanx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,11 +29,20 @@ func Test__scanx(t *testing.T) {
 		go func() {
 			for {
 				time.Sleep(2 * time.Second)
-				t.Log("SYN 发包数", synPacketCounter)
+				log.Infof("SYN 发包数 %v", synPacketCounter)
 			}
 		}()
 	}
 	startSYNPacketCounter()
+
+	xx, err := _scanx("127.0.0.1", "80")
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Second)
+	for re := range xx {
+		t.Log(re.String())
+	}
 
 	res, err := _scanx(
 		//"192.168.124.50/24",
