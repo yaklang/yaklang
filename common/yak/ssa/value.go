@@ -23,6 +23,11 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 		setMemberCallRelationship(para, v.key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
 	}
+	if !utils.IsNil(v.object) {
+		if val := b.getDefaultMemberOrMethodByClass(v.object, v.key, false); !utils.IsNil(val) {
+			return val
+		}
+	}
 
 	return b.ReadValue(v.GetName())
 }

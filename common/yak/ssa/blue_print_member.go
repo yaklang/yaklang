@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // normal member
 func (c *ClassBluePrint) RegisterNormalMember(name string, val Value) {
@@ -28,6 +31,18 @@ func (c *ClassBluePrint) RegisterStaticMember(name string, val Value) {
 		c.StaticMember[name] = phi
 	}
 	phi.Edge = append(phi.Edge, val)
+}
+
+func (c *ClassBluePrint) AssignStaticMember(name string, val Value) {
+	if member := c.GetStaticMember(name); utils.IsNil(member) {
+		log.Errorf("cls: %s static member not found this name: %s", c.Name, name)
+		return
+	} else if phi, b := ToPhi(member); b {
+		phi.Edge = append(phi.Edge, val)
+	} else {
+		log.Errorf("member not phi")
+		return
+	}
 }
 
 func (c *ClassBluePrint) GetStaticMember(name string) Value {

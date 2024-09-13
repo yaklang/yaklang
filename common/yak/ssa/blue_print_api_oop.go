@@ -44,7 +44,7 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 	c.GeneralPhi = func(s string) *Phi {
 		return b.EmitPhi(s, nil)
 	}
-	c.GeneralUndefine = func(s string) *Undefined {
+	c.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
 	p.ClassBluePrint[name] = c

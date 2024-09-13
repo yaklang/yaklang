@@ -1,14 +1,17 @@
 package ssa
 
+import "github.com/yaklang/yaklang/common/utils"
+
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
+
 	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
 		return ret
 	}
-
 	// normal method
 	if wantFunction {
 		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+			fun.SetObject(object)
 			return fun
 		}
 	}
@@ -19,6 +22,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
 		return ret
 	}
+
 	// default member
 	value := b.createDefaultMember(res, object, key, wantFunction)
 	b.AssignVariable(b.CreateVariable(res.name), value)
@@ -58,7 +62,7 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 	return nil
 }
 
-func (b *FunctionBuilder) getDefaultMemberByClass(object, key Value) Value {
+func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, method bool) Value {
 	if !b.SupportClass {
 		return nil
 	}
@@ -67,61 +71,57 @@ func (b *FunctionBuilder) getDefaultMemberByClass(object, key Value) Value {
 	if !ok {
 		return nil
 	}
-	// this object from constructor
-	call, ok := ToCall(object)
-	if !ok {
-		return nil
-	}
-	if call.Method != bluePrint.Constructor {
-		return nil
-	}
-
-	// get member
-	if member := bluePrint.GetNormalMember(key.String()); member != nil {
-		return member
+	if method {
+		if normalMethod := bluePrint.GetNormalMethod(key.String()); !utils.IsNil(normalMethod) {
+			return normalMethod
+		}
+	} else {
+		if member := bluePrint.GetNormalMember(key.String()); !utils.IsNil(member) {
+			return member
+		}
 	}
 	return nil
 }
 
 func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, wantFunction bool) Value {
-	if ret := b.getDefaultMemberByClass(object, key); ret != nil {
-		return ret
-	}
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
-	var defaultMember Value
+	memberHandler := func(typ Type, member Value) {
+		if wantFunction {
+			t := NewFunctionTypeDefine(name, nil, nil, false)
+			t.SetIsMethod(true, object.GetType())
+		}
+		objType := object.GetType()
+		if objType != nil {
+			if fts := objType.GetFullTypeNames(); len(fts) != 0 {
+				typ.SetFullTypeNames(fts)
+			}
+		}
+		member.SetType(typ)
+		setMemberCallRelationship(object, key, member)
+		setMemberVerboseName(member)
+	}
 	if para, ok := ToParameter(object); ok {
-		defaultMember = b.NewParameterMember(name, para, key)
+		if member, ok2 := para.GetStringMember(key.String()); ok2 {
+			return member
+		}
+		member := b.NewParameterMember(name, para, key)
+		memberHandler(res.typ, member)
+		return member
+	}
+	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
+		return field
+	}
+	recoverScope := b.SetCurrent(object, true)
+	un := b.writeUndefine(name)
+	recoverScope()
+	if res.exist {
+		un.Kind = UndefinedMemberValid
 	} else {
-		recoverScope := b.SetCurrent(object, true)
-		un := b.writeUndefine(name)
-		recoverScope()
-		if res.exist {
-			un.Kind = UndefinedMemberValid
-		} else {
-			un.Kind = UndefinedMemberInValid
-		}
-		defaultMember = un
+		un.Kind = UndefinedMemberInValid
 	}
-	// Determine the type of member call.
-	// If the type is nil and wantFunction , a new type will be created and IsMethod will be set to true to give itself a receiver
-	typ := res.typ
-	if typ == nil && wantFunction {
-		t := NewFunctionTypeDefine(name, nil, nil, false)
-		t.SetIsMethod(true, object.GetType())
-	}
-	objectTyp := object.GetType()
-	if objectTyp != nil {
-		if fts := objectTyp.GetFullTypeNames(); len(fts) != 0 {
-			typ.SetFullTypeNames(fts)
-		}
-	}
-	defaultMember.SetType(typ)
-
-	// set member-call relationship
-	setMemberCallRelationship(object, key, defaultMember)
-	setMemberVerboseName(defaultMember)
-	return defaultMember
+	memberHandler(res.typ, un)
+	return un
 }
 
 func (b *FunctionBuilder) checkAndCreatDefaultMember(res checkMemberResult, object, key Value) Value {

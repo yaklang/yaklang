@@ -74,7 +74,8 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	return y.handlerClassConstructor(class, args, ellipsis)
+	y.handlerClassConstructor(class, args, ellipsis)
+	return obj
 }
 
 func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
@@ -109,7 +110,8 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	return y.handlerClassConstructor(bluePrint, args, ellipsis)
+	y.handlerClassConstructor(bluePrint, args, ellipsis)
+	return obj
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
@@ -247,10 +249,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 		switch funcName {
 		case "__construct":
-			newFunction.Build()
 			class.Constructor = newFunction
 		case "__destruct":
-			newFunction.Build()
 			class.Destructor = newFunction
 		default:
 			if isStatic {
@@ -525,6 +525,9 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 
 	key := y.VisitRightValue(i.FlexiVariable()).GetName()
 	bluePrint := y.VisitStaticClass(i.StaticClass())
+	if strings.HasPrefix(key, "$") {
+		key = key[1:]
+	}
 	return bluePrint, key
 }
 
@@ -537,7 +540,12 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
 		if i.StaticClassExprFunctionMember() != nil {
 			if bluePrint, key := y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember()); bluePrint != nil {
-				return bluePrint.GetStaticMethod(key)
+				if method := bluePrint.GetStaticMethod(key); !utils.IsNil(method) {
+					return method
+				} else if member := bluePrint.GetConstMember(key); !utils.IsNil(member) {
+					return member
+				}
+				return y.EmitUndefined(raw.GetText())
 			}
 		}
 		if i.StaticClassExprVariableMember() != nil {
@@ -548,7 +556,7 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 		return y.EmitUndefined(raw.GetText())
 	}
 
-	return nil
+	return y.EmitUndefined(raw.GetText())
 }
 
 /// class modifier

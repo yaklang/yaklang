@@ -11,6 +11,18 @@ import (
 )
 
 func TestOOP_static_member(t *testing.T) {
+	t.Run("normal member", func(t *testing.T) {
+		code := `<?php
+
+class a
+{
+    public $a = 1;
+}
+$c = new a();
+println($c->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
 	t.Run("normal static member, use any", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, `
 	<?php
@@ -200,11 +212,11 @@ class B {
 }
 ?>
 		`, []string{
-			"Function-.$staticScope$.A.aStaticMethod()",
-			"Function-.$staticScope$.A.aStaticMethod()",
-			"Function-.$staticScope$.A.aStaticMethod()",
-			"Function-.$staticScope$.A.aStaticMethod()",
-			"Function-.$staticScope$.A.aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
 		}, t)
 
 	})
@@ -353,8 +365,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
+			"Function-getA(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Function-getA(Undefined-A-constructor(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -376,8 +388,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
+			"Function-getA(Undefined-A-constructor(Undefined-A)) member[0]",
+			"Function-getA(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -395,8 +407,26 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
+			"Function-getNum(Undefined-$a) member[0]",
 		}, t)
+	})
+	t.Run("new construct", func(t *testing.T) {
+		code := `<?php
+
+class test
+{
+    public $a;
+
+    public function __construct($a)
+    {
+        $this->a = $a;
+    }
+}
+
+$a = new test();
+println($a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-$a"}, t)
 	})
 
 	t.Run("normal construct", func(t *testing.T) {
@@ -454,9 +484,9 @@ println($c->a);`
 
 //func TestOOP_custom_member(t *testing.T) {
 //	code := `<?php
-//    class test{
-//        public $a = 1;
-//    }
+//   class test{
+//       public $a = 1;
+//   }
 //	$c = new test();
 //	println($c->$a);
 //`
@@ -471,7 +501,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a",
+			"Undefined-A-constructor(Undefined-A)",
 		}, t)
 	})
 
@@ -487,7 +517,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
+			"Function-getNum(Undefined-$a)",
 		}, t)
 	})
 }
