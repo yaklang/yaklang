@@ -42,7 +42,7 @@ func TestCheckStatement(t *testing.T) {
 				check $i then fine else fail
 				f( * as $b)
 				`, sfvm.WithEnableDebug())
-				assert.NotNil(t, data.Errors)
+				assert.NotNil(t, data.GetErrors())
 				log.Infof("err: %v", err)
 				log.Infof("data: %v", data)
 				res := data.GetValues("b")

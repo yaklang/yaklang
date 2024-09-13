@@ -142,7 +142,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 		value := vs[index]
 		msg := ""
-		if m := result.AlertMsgTable[variable]; m != "" {
+		if m, ok := result.GetAlertMsg(variable); ok {
 			msg = m
 		}
 		res := Value2Response(programName, value, msg, url)
@@ -162,18 +162,14 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	var resources []*ypb.YakURLResource
 
 	// if contain check params, add check params
-	for _, msg := range result.Errors {
+	for _, msg := range result.GetErrors() {
 		res := createNewRes(url, 0, nil)
 		res.ResourceType = "message"
 		res.VerboseType = "error"
 		res.VerboseName = msg
 		resources = append(resources, res)
 	}
-	for _, name := range result.CheckParams {
-		msg, ok := result.Description.Get("$" + name)
-		if !ok {
-			continue
-		}
+	for _, msg := range result.GetCheckMsg() {
 		res := createNewRes(url, 0, nil)
 		res.ResourceType = "message"
 		res.VerboseType = "info"
@@ -182,22 +178,25 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	}
 
 	normalRes := make([]*ypb.YakURLResource, 0)
-	for _, name := range result.SymbolTable.Keys() {
-		if name == "_" {
-			continue
-		}
-		vs := result.GetValues(name)
-		res := createNewRes(url, len(vs), nil)
-		res.ResourceType = "variable"
-		res.ResourceName = name
-		if msg, ok := result.AlertMsgTable[name]; ok {
-			res.VerboseType = "alert"
-			res.VerboseName = msg
-			resources = append(resources, res)
-		} else {
-			res.VerboseType = "normal"
-			normalRes = append(normalRes, res)
-		}
+	if variables := result.GetAllVariable(); variables != nil {
+		variables.ForEach(func(variable string, num any) {
+			valueNum := num.(int)
+			if variable == "_" {
+				return
+			}
+			// vs := result.GetValues(name)
+			res := createNewRes(url, valueNum, nil)
+			res.ResourceType = "variable"
+			res.ResourceName = variable
+			if msg, ok := result.GetAlertMsg(variable); ok {
+				res.VerboseType = "alert"
+				res.VerboseName = msg
+				resources = append(resources, res)
+			} else {
+				res.VerboseType = "normal"
+				normalRes = append(normalRes, res)
+			}
+		})
 	}
 	resources = append(resources, normalRes...)
 

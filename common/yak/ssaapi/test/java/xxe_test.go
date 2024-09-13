@@ -4,10 +4,11 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 //go:embed sample/xxe.java
@@ -69,7 +70,7 @@ alert $output;
 		if err != nil {
 			t.Fatal(err)
 		}
-		report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result.SFFrameResult)
+		report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result)
 		if err != nil {
 			t.Fatal(err)
 		}

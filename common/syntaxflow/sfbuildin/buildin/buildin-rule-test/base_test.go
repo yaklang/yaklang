@@ -4,6 +4,11 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
+	"path"
+	"strings"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,10 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"io/fs"
-	"path"
-	"strings"
-	"testing"
 )
 
 //go:embed sample
@@ -78,21 +79,18 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 					runtimeId := uuid.New().String()
 					result, err := prog.SyntaxFlowWithError(r.Content)
 					if !c.NegativeTest {
-						if err != nil || result.Errors != nil {
+						if err != nil || result.GetErrors() != nil {
 							if err != nil {
 								t.Fatal(err)
 							} else {
-								t.Fatal(result.Errors)
+								t.Fatal(result.GetErrors())
 							}
 						}
 					} else {
-						if err == nil && len(result.Errors) == 0 {
+						if err == nil && len(result.GetErrors()) == 0 {
 							count := 0
-							for _, i := range result.AlertSymbolTable {
-								i.Recursive(func(operator sfvm.ValueOperator) error {
-									count++
-									return nil
-								})
+							for _, i := range result.GetAlertVariables() {
+								count += len(result.GetValues(i))
 							}
 							if count > 0 {
 								t.Fatal("no alert variables should, negative test failed")
@@ -103,13 +101,13 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 							t.Fatal("cannot accept critical error: " + err.Error())
 						}
 
-						if len(result.AlertSymbolTable) > 0 {
+						if len(result.GetAlertVariables()) > 0 {
 							count := 0
-							for _, i := range result.AlertSymbolTable {
-								i.Recursive(func(operator sfvm.ValueOperator) error {
-									count++
-									return nil
-								})
+							for _, i := range result.GetAlertVariables() {
+								// i.Recursive(func(operator sfvm.ValueOperator) error {
+								count += len(result.GetValues(i))
+								// 	return nil
+								// })
 							}
 							if count > 0 {
 								t.Fatal("no alert variables should, negative test failed")
@@ -117,9 +115,9 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 						}
 						return nil
 					}
-
-					if len(result.AlertSymbolTable) >= 0 {
-						for name, val := range result.AlertSymbolTable {
+					if len(result.GetAlertVariables()) >= 0 {
+						for _, name := range result.GetAlertVariables() {
+							val := result.GetValues(name)
 							msg := fmt.Sprintf("%v\n%s\n%s\n\n", r.Severity, name, val)
 							t.Logf(msg)
 							if len(c.ContainsAll) > 0 {

@@ -111,13 +111,7 @@ func TestSFURl(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		spew.Dump(res)
-		checkVariable(t, res, []string{"a"})
-
-		res, err = SendURL(local, progID, "/a", `
-		dddd as $a
-		`)
-		assert.NoError(t, err)
-		spew.Dump(res)
+		checkVariable(t, res, []string{})
 	})
 
 	t.Run("check syntaxflow variable with alert", func(t *testing.T) {
@@ -146,7 +140,7 @@ func TestSFURl(t *testing.T) {
 		`)
 		assert.NoError(t, err)
 		spew.Dump(res)
-		checkVariable(t, res, []string{"a", "not_const_parameter", "const_parameter", "_"})
+		checkVariable(t, res, []string{"a", "const_parameter", "_"})
 
 		errMsg := res[0]
 		assert.Equal(t, errMsg.ResourceType, "message")

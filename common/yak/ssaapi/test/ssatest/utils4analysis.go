@@ -3,13 +3,13 @@ package ssatest
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -233,9 +233,9 @@ func CheckFSWithProgram(
 			if err != nil {
 				t.Fatalf("exec syntaxflow failed: %v", err)
 			}
-			if len(i.Errors) > 0 {
+			if len(i.GetErrors()) > 0 {
 				log.Infof("result: %s", i.String())
-				t.Fatalf("result has errors: %v", i.Errors)
+				t.Fatalf("result has errors: %v", i.GetErrors())
 			}
 		})
 
@@ -450,42 +450,29 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 			errs = append(errs, err)
 			return err
 		}
-		if len(result.Errors) > 0 {
-			for _, e := range result.Errors {
+		if len(result.GetErrors()) > 0 {
+			for _, e := range result.GetErrors() {
 				errs = append(errs, utils.Errorf("syntax flow failed: %v", e))
 			}
-			return utils.Errorf("syntax flow failed: %v", strings.Join(result.Errors, "\n"))
+			return utils.Errorf("syntax flow failed: %v", strings.Join(result.GetErrors(), "\n"))
 		}
-		if len(result.AlertSymbolTable) <= 0 {
+		if len(result.GetAlertVariables()) <= 0 {
 			errs = append(errs, utils.Errorf("alert symbol table is empty"))
 			return err
 		}
 
 		if frame.AllowIncluded != "" {
-			libOutput, ok := result.AlertSymbolTable["output"]
-			if !ok {
+			libOutput := result.GetValues("output")
+			if libOutput == nil {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
 			}
-			count := 0
-			_ = libOutput.Recursive(func(operator sfvm.ValueOperator) error {
-				if _, ok := operator.(ssa.GetIdIF); ok {
-					count++
-				}
-				return nil
-			})
-			if count <= 0 {
+			if len(libOutput) <= 0 {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
 			}
 		}
 		alertCount := 0
-		for _, i := range result.AlertSymbolTable {
-			_ = i.Recursive(func(operator sfvm.ValueOperator) error {
-				if _, ok := operator.(ssa.GetIdIF); ok {
-					alertCount++
-					return nil
-				}
-				return nil
-			})
+		for _, name := range result.GetAlertVariables() {
+			alertCount += len(result.GetValues(name))
 		}
 		if alertCount <= 0 {
 			errs = append(errs, utils.Errorf("alert symbol table is empty"))
@@ -518,15 +505,13 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 				}
 			}
 			if result != nil {
-				if len(result.Errors) > 0 {
+				if len(result.GetErrors()) > 0 {
 					return nil
 				}
-				if len(result.AlertSymbolTable) > 0 {
-					for name, vals := range result.AlertSymbolTable {
-						vals.Recursive(func(operator sfvm.ValueOperator) error {
-							errs = append(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
-							return nil
-						})
+				if len(result.GetAlertVariables()) > 0 {
+					for _, name := range result.GetAlertVariables() {
+						vals := result.GetValues(name)
+						errs = append(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
 					}
 				}
 			}

@@ -105,41 +105,38 @@ func CreateRecursiveConfigFromNativeCallParams(
 // RecursiveConfig_Hook会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
 func (r *RecursiveConfig) compileAndRun(value *Value) RecursiveKind {
 	var resultKind = ContinueSkip
-	matchConfig := func(key string, result map[string]Values) {
+	matchConfig := func(key string, result Values) {
 		switch key {
 		case sf.RecursiveConfig_Exclude:
-			lo.ForEach(lo.Entries(result), func(item lo.Entry[string, Values], index int) {
-				if item.Value == nil {
+			if len(result) == 0 {
+				resultKind = resultKind.comparePriority(ContinueMatch)
+			}
+			for _, v := range result {
+				if v == nil {
 					resultKind = resultKind.comparePriority(ContinueMatch)
 				}
-				lo.ForEach(item.Value, func(item1 *Value, index int) {
-					if !ValueCompare(value, item1) {
-						resultKind = resultKind.comparePriority(ContinueMatch)
-					}
-				})
-			})
+				if !ValueCompare(value, v) {
+					resultKind = resultKind.comparePriority(ContinueMatch)
+				}
+			}
 		case sf.RecursiveConfig_Include:
-			lo.ForEach(lo.Entries(result), func(item lo.Entry[string, Values], index int) {
-				lo.ForEach(item.Value, func(item1 *Value, index int) {
-					if ValueCompare(value, item1) {
-						resultKind = resultKind.comparePriority(ContinueMatch)
-					} else {
-						resultKind = resultKind.comparePriority(ContinueSkip)
-					}
-				})
-			})
+			for _, v := range result {
+				if ValueCompare(value, v) {
+					resultKind = resultKind.comparePriority(ContinueMatch)
+				} else {
+					resultKind = resultKind.comparePriority(ContinueSkip)
+				}
+			}
 		case sf.RecursiveConfig_Hook:
 			resultKind = resultKind.comparePriority(ContinueMatch)
 		case sf.RecursiveConfig_Until:
-			lo.ForEach(lo.Entries(result), func(item lo.Entry[string, Values], index int) {
-				lo.ForEach(item.Value, func(item1 *Value, index int) {
-					if ValueCompare(value, item1) {
-						resultKind = resultKind.comparePriority(StopMatch)
-					} else {
-						resultKind = resultKind.comparePriority(ContinueMatch)
-					}
-				})
-			})
+			for _, v := range result {
+				if ValueCompare(value, v) {
+					resultKind = resultKind.comparePriority(StopMatch)
+				} else {
+					resultKind = resultKind.comparePriority(ContinueMatch)
+				}
+			}
 		}
 	}
 	lo.ForEach(r.configItems, func(item *sf.RecursiveConfigItem, index int) {
@@ -152,17 +149,14 @@ func (r *RecursiveConfig) compileAndRun(value *Value) RecursiveKind {
 			return
 		}
 		frame.WithContext(r.sfResult)
-		feed, err := frame.Feed(value)
+		res, err := frame.Feed(value)
 		if err != nil {
 			log.Errorf("frame exec opcode fail: %s", err)
 			return
 		}
-		s := &SyntaxFlowResult{
-			SFFrameResult: feed,
-			symbol:        make(map[string]Values),
-		}
-		r.sfResult.MergeByResult(feed)
-		matchConfig(item.Key, s.GetAllValues())
+		s := CreateResultFromQuery(res)
+		r.sfResult.MergeByResult(res)
+		matchConfig(item.Key, s.GetAllValuesChain())
 	})
 	return resultKind
 }

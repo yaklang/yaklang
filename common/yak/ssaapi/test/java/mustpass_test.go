@@ -84,14 +84,14 @@ func TestMustPass_Debug(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(result.Errors) > 0 {
-			t.Fatal("errors: ", strings.Join(result.Errors, "\n"))
+		if len(result.GetErrors()) > 0 {
+			t.Fatal("errors: ", strings.Join(result.GetErrors(), "\n"))
 		}
 
 		result.Show()
 
 		fmt.Println("\n--------------------------------------")
-		totalGraph, err := ssaapi.CreateDotGraph(result.SymbolTable.Values()...)
+		totalGraph := result.GetAllValuesChain().DotGraph()
 		if err != nil {
 			t.Fatalf("create dot graph failed: %v", err)
 		}
