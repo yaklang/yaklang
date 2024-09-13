@@ -5306,3 +5306,10 @@ message GenerateReverseShellCommandResponse{
   GeneralResponse Status = 1;
   string Result = 2;
 }
+
+message DbOperateMessage {
+  string TableName = 1; // 表名 数据源
+  string Operation = 2; // 操作 (增删改查)
+  int64 EffectRows = 3; // 影响行数
+  string ExtraMessage = 4; // 额外信息
+}
