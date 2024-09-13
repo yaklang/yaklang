@@ -41,7 +41,7 @@ func TestGRPCMUSTPASS_FuzzerConfig(t *testing.T) {
 	saveFuzzerConfig(20)
 	_, err = client.DeleteFuzzerConfig(context.Background(), &ypb.DeleteFuzzerConfigRequest{PageId: "1"})
 	require.NoError(t, err)
-	result, err = client.QueryFuzzerConfig(context.Background(), &ypb.QueryFuzzerConfigRequest{})
+	result, err = client.QueryFuzzerConfig(context.Background(), &ypb.QueryFuzzerConfigRequest{Limit: -1})
 	require.NoError(t, err)
 	require.Equal(t, 19, len(result.GetData()))
 }
