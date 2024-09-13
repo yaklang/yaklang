@@ -90,6 +90,8 @@ var ProjectTables = []interface{}{
 
 	// Progress
 	&Progress{},
+	// WebFuzzer Config
+	&WebFuzzerConfig{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {
