@@ -204,10 +204,11 @@ func (s *Server) EvaluatePluginEx(ctx context.Context, pluginCode, pluginType st
 			prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
 			if err != nil {
 				pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
-			}
-			parameters, _ := information.ParseCliParameter(prog)
-			if len(parameters) > 0 {
-				hasParameter = true
+			} else {
+				parameters, _ := information.ParseCliParameter(prog)
+				if len(parameters) > 0 {
+					hasParameter = true
+				}
 			}
 		}
 		// static analyze
