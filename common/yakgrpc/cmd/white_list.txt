@@ -1,0 +1,186 @@
+IIS 写权限 漏洞检测
+Web 基础爬虫：表单与上传文件检测
+【端口扫描】主动信息探测
+【端口扫描】Zookeeper未授权访问
+Confluence CVE-2021-26084 漏洞检测
+hikvision 信息泄露漏洞检测
+hikvision默认密码检测
+万户OA fileUpload.controller 任意文件上传漏洞
+用友时空KSOA软件前台文件上传漏洞
+用友GRP-U8财务管理软件任意文件上传
+F5_BIG-IP_CVE-2022-1388_命令执行漏洞
+Struts2_CVE-2017-5638_S2-045远程代码执行漏洞
+Kubernetes Api Server 未授权
+maccms命令执行漏洞
+致远 OA A8 htmlofficeservlet getshell 漏洞
+致远OA A6 DownExcelBeanServlet员工敏感信息泄露漏洞
+用友 NC NCFindWeb 任意文件读取漏洞
+Webmin 远程命令执行漏洞（CVE-2019-15107）
+PHPstudy后门漏洞
+深信服 行为感知系统 c.php 远程命令执行漏洞
+深信服 日志中心 c.php 远程命令执行漏洞
+深信服 应用交付报表系统 download.php 任意文件读取漏洞
+通达OA 敏感信息泄露 漏洞检测
+（CVE-2018-12613）Phpmyadmin 远程文件包含漏洞
+通达OA V11.6 RCE 漏洞检测
+ShowDoc PageController.class.php 任意文件上传漏洞
+深信服 应用交付管理系统 sys_user.conf 账号密码泄漏漏洞
+万户OA DownloadServlet 任意文件读取漏洞
+万户OA download_ftp.jsp 任意文件下载漏洞
+万户OA download_old.jsp 任意文件下载漏洞
+万户OA downloadhttp.jsp 任意文件下载漏洞
+万户OA OfficeServer.jsp 任意文件上传漏洞
+万户OA TeleConferenceService XXE注入漏洞
+蓝凌OA 任意文件读取 漏洞检测
+万户OA showResult.action 后台SQL注入漏洞
+万户OA DocumentEdit.jsp SQL注入漏洞
+帆软报表 V8 get_geo_json 任意文件读取漏洞 CNVD-2018-04757
+Apache Axis2 HappyAxis.jsp信息泄露漏洞检测
+Apache Tomcat CVE-2020-1938 AJP 文件读取与包含漏洞检测
+Axis2 admin XSS漏洞检测
+Axis2 版本信息泄露漏洞检测
+Elasticsearch_CVE-2014-3120远程代码执行漏洞检测
+Elasticsearch沙盒绕过_CVE-2015-1427远程代码执行漏洞检测
+JBoss CVE-2017-12149 漏洞检测
+JBoss CVE-2017-7504 漏洞检测
+JBoss JMXInvokerServlet 反序列化 漏洞检测
+Jboss JMX-Console未授权访问 漏洞检测
+Jenkins CVE-2016-0792 漏洞检测
+Jenkins版本检测
+SpringCloudConfig Server_CVE-2019-3799目录遍历漏洞检测
+Spring_Cloud_CVE-2022-22947漏洞检测
+Spring_Cloud_CVE-2022-22963漏洞检测
+Spring_Data_Commons_CVE-2018-1273漏洞检测
+Spring_Data_Rest_CVE-2017-8046漏洞检测
+Struts2_CVE-2017-9805_S2-052远程代码执行漏洞检测
+VM-vCenter-CVE-2021-21972漏洞检测
+WebLogic CVE-2019-2890 T3反序列化漏洞检测
+WebLogic CVE-2020-14750权限绕过漏洞检测
+WebLogic CVE-2020-14750远程代码执行漏洞检测
+SpringFramework_CVE-2022-22965远程代码执行漏洞检测
+WebSphere CVE-2015-7450 漏洞检测
+Weblogic CVE-2020-14883 漏洞检测
+Weblogic iiop协议 反序列化 CVE-2020-2551检测
+Weblogic特定Nginx配置下Console绕过访问漏洞检测
+ActiveMQ 默认密码检查
+HTTP Web 目录爆破：敏感中间件
+/crossdomain.xml allow-access-from 检查
+ElasticSearch 未授权访问
+Git Leak Detection [ScanPort]
+Tomcat 登陆爆破
+weblogic ws_utc CVE-2018-2894任意文件上传漏洞检测
+Tomcat Path 403 Bypass
+锐捷云课堂主机pool目录遍历漏洞检测
+锐捷 NBR路由器CNVD-2021-09650远程命令执行漏洞检测
+锐捷 EG易网关 phpinfo.view.php 信息泄露漏洞检测
+通达OA v2017 video_file.php 任意文件下载漏洞检测
+通达OA v2017 action_upload.php 任意文件上传漏洞检测
+通达OA v2014 get_contactlist.php 敏感信息泄漏检测
+通达OA v11.7 auth_mobi.php 在线用户登录漏洞检测
+通达OA v11.6 report_bi.func.php SQL注入漏洞检测
+通达OA v11.5 swfupload_new.php SQL注入漏洞检测
+通达OA v11.5 login_code.php 任意用户登录检测
+若依-后台管理Druid未授权访问漏洞检测
+致远OA-ajax.do任意文件上传漏洞检测
+致远OA A8 status.jsp 信息泄露漏洞检测
+致远OA A6 setextno.jsp SQL注入漏洞检测
+网御星云WEB防护系统信息泄露漏洞检测
+致远OA A6 createMysql.jsp 数据库敏感信息泄露漏洞检测
+网神下一代极速防火墙pki_file_download任意文件读取漏洞检测
+奇安信天擎终端安全管理系统API信息检测
+airflow 漏洞检测
+alibaba-canal-default-password
+ThinkPHP CNVD-2018-2494 漏洞检测
+Hadoop YARN ResourceManager 未授权访问 漏洞检测
+ADSelfService CVE-2021-40539 漏洞检测
+Apache Skywalking SQL注入 漏洞检测
+Apache Solr CVE-2021-27905 漏洞检测
+通达OA CNVD-2021-21890 漏洞检测
+dedecms dedecms-carbuyaction-fileinclude
+docker 未授权命令执行漏洞检测
+Jira 批量检测
+Jenkins 漏洞批量检测
+Jellyfin 漏洞批量检测
+Ruby On Rails CVE-2018-3760 漏洞检测
+SpiderFlow save 远程命令执行漏洞检测
+ShowDoc PageController.class.php任意文件上传漏洞检测
+蓝凌OA RCE 漏洞检测
+UEditor编辑器-cnvd-2017-20077 文件上传漏洞
+Laravel 漏洞批量检测
+Netentsec-ngfw RCE 漏洞检测
+samsung wlan ap wea453e rce 漏洞
+sangfor edr arbitrary admin login 漏洞
+sangfor edr cssp rce 漏洞
+sangfor edr tool rce 漏洞
+Intellian Aptus Web 操作系统命令注入漏洞
+seacms before v992 rce 漏洞
+seacms sqli 漏洞
+secnet ac default password 漏洞
+seeyon ajax unauthorized access 漏洞
+致远oa系统存在任意文件读取漏洞（CNVD-2020-62422）
+seeyon oa cookie leak 漏洞
+seeyon session leak 漏洞
+seeyon wooyun 2015 0108235 sqli 漏洞
+seeyon wooyun 2015 148227 漏洞
+shiziyu cms apicontroller sqli 漏洞
+ShopXO存在任意文件读取漏洞（CNVD-2021-15822）
+showdoc default password 漏洞
+SolarWinds Orion API 远程代码执行漏洞
+SonarQube API 未授权访问漏洞（CVE-2020-27986）
+sonicwall ssl vpn rce 漏洞
+spark api unauth 漏洞
+spark webui unauth 漏洞
+spon ip intercom file read 漏洞
+spon ip intercom ping rce 漏洞
+Spring Cloud Config Server 目录遍历漏洞（CVE-2020-5405）
+Spring Cloud Config Server 目录遍历漏洞
+Spring Security OAuth RCE SpEL注入漏洞
+springboot env unauth 漏洞
+Supervisord inet_http_server 远程命令执行漏洞
+tamronos iptv rce 漏洞
+telecom gateway default password 漏洞
+tensorboard unauth 漏洞
+Terramaster TOS 操作系统命令注入漏洞
+TerraMaster TOS path 远程代码执行漏洞
+thinkadmin v6 readfile 漏洞
+thinkcmf lfi 漏洞
+thinkcmf write shell 漏洞
+thinkphp v6 file write 漏洞
+thinkphp5 controller rce 漏洞
+thinkphp5023 method rce 漏洞
+tianqing info leak 漏洞
+Apache Tomcat PUT 远程命令执行漏洞
+Apache HTTPD mod_jk 敏感信息泄漏漏洞
+tongda meeting unauthorized access 漏洞
+tongda user session disclosure 漏洞
+tpshop directory traversal 漏洞
+tpshop sqli 漏洞
+TVT NVMS-1000设备允许GET /..目录遍历
+vBulletin 5.x widgetConfig 远程代码执行漏洞（CVE-2019-16759）
+vmware vcenter arbitrary file read 漏洞
+VMware vCenter Server 远程代码执行漏洞（CVE-2021-21985）
+VMware vCenter vrops 远程代码执行漏洞（CVE-2021-21972）
+VMware vrealize_operations_manager 服务端请求伪造（ssrf）
+Oracle WebLogic Server wls9-async 组件反序列化漏洞CVE-2019-2729
+weiphp sql 漏洞
+领空技术WIFISKY 7层流控路由器存在弱口令漏洞（CNVD-2021-39012）
+WordPress Email Subscribers & Newsletters 信息泄露漏洞
+wordpress ext adaptive images lfi 漏洞
+wuzhicms v410 sqli 漏洞
+xdcms sql 漏洞
+xiuno bbs cvnd 2019 01348 reinstallation 漏洞
+迅优cms存在任意文件读取漏洞（CNVD-2020-23735）
+yccms rce 漏洞
+yongyou u8 oa sqli 漏洞
+yonyou grp u8 sqli to rce 漏洞
+yonyou grp u8 sqli 漏洞
+yonyou nc bsh servlet bshservlet rce 漏洞
+yungoucms sqli 漏洞
+zcms v3 sqli 漏洞
+Zeroshell <= 3.9.0 x509view 远程命令执行漏洞
+Zimbra Autodicovers XXE 读取配置文件漏洞 （CVE-2019-9670）
+zzcms zsmanage sqli 漏洞
+通达OA版本识别
+Exchange版本探测查询
+dedecms dedecms-carbuyaction-fileinclude
+Laravel 漏洞批量检测

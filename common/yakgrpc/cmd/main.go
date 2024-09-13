@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
 	"regexp"
@@ -13,6 +14,9 @@ import (
 
 //go:embed data.json
 var data []byte
+
+//go:embed white_list.txt
+var whiteList string
 
 type YakScriptRiskInfo struct {
 	ScriptName  string `json:"插件名称"`
@@ -32,6 +36,9 @@ func main() {
 			panic(err)
 		}
 	}
+
+	whiteName := utils.PrettifyListFromStringSplitEx(whiteList, "\n", "\r")
+
 	reTool, err := regexp.Compile(`(?s)risk\.NewRisk\(.*?\),`)
 	if err != nil {
 		panic(err)
@@ -48,7 +55,8 @@ func main() {
 	}
 
 	for _, info := range dataInfo {
-		if info.Sync != "已同步" {
+		if utils.StringArrayContains(whiteName, info.ScriptName) {
+			fmt.Println("skip white list script:", info.ScriptName)
 			continue
 		}
 		script, err := yakit.GetYakScriptIdOrName(db, 0, info.ScriptName)
@@ -58,7 +66,9 @@ func main() {
 		}
 		fmt.Println(reTool.MatchString(script.Content))
 		script.Content = reTool.ReplaceAllStringFunc(script.Content, func(s string) string {
-			return s + build(info)
+			update := s + build(info)
+			fmt.Printf("update script:%s from: [%s] to [%s]\n", script.ScriptName, s, update)
+			return update
 		})
 		err = yakit.CreateOrUpdateYakScriptByName(db, script.ScriptName, script)
 		if err != nil {
