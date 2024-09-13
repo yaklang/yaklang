@@ -35,15 +35,6 @@ func Test__scanx(t *testing.T) {
 	}
 	startSYNPacketCounter()
 
-	xx, err := _scanx("127.0.0.1", "80")
-	if err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(20 * time.Second)
-	for re := range xx {
-		t.Log(re.String())
-	}
-
 	res, err := _scanx(
 		//"192.168.124.50/24",
 		//"124.222.42.210/24",
