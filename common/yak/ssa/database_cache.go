@@ -45,6 +45,7 @@ type Cache struct {
 	VariableCache   map[string][]Instruction // variable(name:string) to []instruction
 	MemberCache     map[string][]Instruction
 	Class2InstIndex map[string][]Instruction
+	constCache      []Instruction
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -61,7 +62,7 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 		VariableCache:    make(map[string][]Instruction),
 		MemberCache:      make(map[string][]Instruction),
 		Class2InstIndex:  make(map[string][]Instruction),
-	}
+		constCache:       make([]Instruction, 0)}
 
 	if databaseEnable {
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
@@ -127,6 +128,9 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 
 // =============================================== Variable =======================================================
 
+func (c *Cache) AddConst(inst Instruction) {
+	c.constCache = append(c.constCache, inst)
+}
 func (c *Cache) AddVariable(name string, inst Instruction) {
 	member := ""
 	// field
