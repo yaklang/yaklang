@@ -57,6 +57,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			builder.SetBuildSupport(b.FunctionBuilder)
 			currentBuilder := b.FunctionBuilder
 			b.FunctionBuilder = builder
+			b.FunctionBuilder.CurrentBlock.ReSetFinish()
 			defer func() {
 				for _, e := range builder.GetProgram().GetErrors() {
 					currentBuilder.GetProgram().AddError(e)

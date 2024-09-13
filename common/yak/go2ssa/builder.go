@@ -202,12 +202,12 @@ func (b *astbuilder) CheckGlobalVariablePhi(l *ssa.Variable, r ssa.Value) bool {
 
 func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
 	var variable *ssa.Variable
-	for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+	/*for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
 		if i.String() == name {
 			variable = m.GetLastVariable()
 			return variable, true
 		}
-	}
+	}*/
 	return variable, false
 }
 
