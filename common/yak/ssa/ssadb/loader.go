@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -11,6 +10,21 @@ import (
 func YieldIrCodesProgramName(db *gorm.DB, ctx context.Context, program string) chan *IrCode {
 	db = db.Model(&IrCode{}).Where("program_name = ?", program)
 	return yieldIrCodes(db, ctx)
+}
+func _yieldIrCodes(db *gorm.DB, ctx context.Context) chan int64 {
+	res := make(chan int64)
+	go func() {
+		defer close(res)
+		codes := yieldIrCodes(db, ctx)
+		for code := range codes {
+			select {
+			case <-ctx.Done():
+				return
+			case res <- int64(code.ID):
+			}
+		}
+	}()
+	return res
 }
 
 func yieldIrCodes(db *gorm.DB, ctx context.Context) chan *IrCode {
@@ -88,6 +102,7 @@ const (
 	NameMatch int = 1
 	KeyMatch      = 1 << 1
 	BothMatch     = NameMatch | KeyMatch
+	ConstType     = 1 << 2
 )
 
 const (
@@ -110,6 +125,11 @@ func SearchVariable(db *gorm.DB, compareMode, matchMod int, value string) chan i
 
 func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrIndex{})
+	if mod&ConstType != 0 {
+		//指定opcode为const
+		_db := DB.Model(&IrCode{}).Where("opcode=5 and string=?", value)
+		return _yieldIrCodes(_db, context.Background())
+	}
 	switch mod {
 	case NameMatch:
 		db = db.Where("variable_name = ? OR class_name = ?", value, value)
@@ -118,11 +138,16 @@ func ExactSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	case BothMatch:
 		db = db.Where("variable_name = ? OR class_name = ? OR field_name = ?", value, value, value)
 	}
+
 	return yieldIrIndex(db, context.Background())
 }
 
 func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrIndex{})
+	if mod&ConstType != 0 {
+		_db := DB.Model(&IrCode{}).Where("opcode=5 and string GLOB ?", value)
+		return _yieldIrCodes(_db, context.Background())
+	}
 	switch mod {
 	case NameMatch:
 		db = db.Where("variable_name GLOB ?", value)
@@ -135,6 +160,10 @@ func GlobSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 }
 func RegexpSearchVariable(DB *gorm.DB, mod int, value string) chan int64 {
 	db := DB.Model(&IrIndex{})
+	if mod&ConstType != 0 {
+		_db := DB.Model(&IrCode{}).Where("opcode=5 and string REGEXP ?", value)
+		return _yieldIrCodes(_db, context.Background())
+	}
 	switch mod {
 	case NameMatch:
 		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ?", value, value)

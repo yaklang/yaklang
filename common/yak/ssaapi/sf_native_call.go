@@ -2,7 +2,10 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -104,9 +107,70 @@ const (
 	NativeCall_Self = "self"
 
 	NativeCall_DataFlow = "dataflow"
+	NativeCall_Const    = "const"
 )
 
 func init() {
+	registerNativeCall(NativeCall_Const, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var (
+			results    []sfvm.ValueOperator
+			mode, rule string
+		)
+
+		constHandler := func(operator sfvm.ValueOperator) {
+			switch mode {
+			case "e":
+				if match, valueOperator, err := operator.ExactMatch(ssadb.ConstType, rule); match && err == nil {
+					results = append(results, valueOperator)
+				}
+			case "g":
+				if match, valueOperator, err := operator.GlobMatch(ssadb.ConstType, rule); match && err == nil {
+					results = append(results, valueOperator)
+				}
+			case "r":
+				if match, valueOperator, err := operator.RegexpMatch(ssadb.ConstType, rule); match && err == nil {
+					results = append(results, valueOperator)
+				}
+			}
+		}
+		getRule := func(preMode ...string) string {
+			for _, s := range preMode {
+				if params.GetString(s) != "" {
+					mode = s
+					return params.GetString(s)
+				}
+			}
+			mode = ""
+			return yakunquote.TryUnquote(params.GetString(0))
+		}
+		autoMode := func(rule string) {
+			if _, err := glob.Compile(rule); err == nil {
+				mode = "g"
+				return
+			}
+			if _, err := regexp.Compile(rule); err == nil {
+				mode = "r"
+				return
+			}
+			mode = "e"
+		}
+		rule = getRule("g", "r", "e")
+		if mode == "" {
+			autoMode(rule)
+		}
+		if _, ok := v.(*Program); ok {
+			constHandler(v)
+		} else {
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				if operator.GetOpcode() != "ConstInst" {
+					return nil
+				}
+				constHandler(operator)
+				return nil
+			})
+		}
+		return true, sfvm.NewValues(results), nil
+	}))
 	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow))
 	registerNativeCall(NativeCall_Self, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		return true, v, nil

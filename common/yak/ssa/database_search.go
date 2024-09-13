@@ -92,6 +92,15 @@ func (c *Cache) _getByVariableEx(
 	checkValue func(string) bool,
 ) []Instruction {
 	var ins []Instruction
+	if mod&ssadb.ConstType != 0 {
+		for _, instruction := range c.constCache {
+			value, b := ToValue(instruction)
+			if b && checkValue(value.String()) {
+				ins = append(ins, instruction)
+			}
+		}
+		return ins
+	}
 	if mod&ssadb.KeyMatch != 0 {
 		// search all instruction
 		for member, insts := range c.MemberCache {

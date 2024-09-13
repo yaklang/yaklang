@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -52,7 +51,11 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 
 		return false
 	}
-
+	if mod&ssadb.ConstType != 0 {
+		if check(value) {
+			add(value)
+		}
+	}
 	if mod&ssadb.NameMatch != 0 {
 		// handler self
 		if check(value) {

@@ -379,6 +379,7 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	// }
 	ci := NewConst(i)
 	f.emit(ci)
+	f.GetProgram().AddConstInstruction(ci)
 	return ci
 }
 

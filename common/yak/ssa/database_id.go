@@ -32,6 +32,12 @@ func (p *Program) GetInstructionById(id int64) Instruction {
 	return p.Cache.GetInstruction(id)
 }
 
+func (p *Program) AddConstInstruction(instruction Instruction) {
+	if p == nil {
+		return
+	}
+	p.Cache.AddConst(instruction)
+}
 func (p *Program) SetInstructionWithName(name string, i Instruction) {
 	if p == nil {
 		return
