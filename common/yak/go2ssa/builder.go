@@ -43,7 +43,7 @@ func (s *SSABuilder) InitHandler(fb *ssa.FunctionBuilder) {
 }
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
-	return extension == ".go"
+	return extension == ".go" || extension == ".mod"
 }
 
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
