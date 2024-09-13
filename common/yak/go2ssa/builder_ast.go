@@ -49,15 +49,14 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		lib.PushEditor(prog.GetCurrentEditor())
 		lib.GlobalScope = b.ReadMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))
 
-		init := lib.GetAndCreateFunction(pkgNameCurrent, "init")
+		init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
 		init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
-		builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "init")
+		builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
 
 		if builder != nil {
 			builder.SetBuildSupport(b.FunctionBuilder)
 			currentBuilder := b.FunctionBuilder
 			b.FunctionBuilder = builder
-			b.FunctionBuilder.CurrentBlock.ReSetFinish()
 			defer func() {
 				for _, e := range builder.GetProgram().GetErrors() {
 					currentBuilder.GetProgram().AddError(e)
@@ -84,7 +83,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 						exData.AddExtendType(i, v.GetType())
 					}
 					for _, f := range cbp.GetMethod() {
-						if f.GetName() != "init" {
+						if f.GetName() != "@init" {
 							exData.AddExtendFunc(f)
 						}
 					}
@@ -133,7 +132,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			cbp.AddStaticMember(aliasName, typValue)
 		}
 		for _, f := range b.GetProgram().Funcs {
-			if !f.IsMethod() && f.GetName() != "init" {
+			if !f.IsMethod() && f.GetName() != "@init" {
 				cbp.AddMethod(f.GetName(), f)
 			}
 		}
