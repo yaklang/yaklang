@@ -5,11 +5,12 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
 
 func TestCURD_GeneralRule_base(t *testing.T) {
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProfileDatabase()
 	generalRule := &schema.GeneralRule{
 		CPE: &schema.CPE{
 			Part:    utils.RandStringBytes(10),
@@ -24,7 +25,25 @@ func TestCURD_GeneralRule_base(t *testing.T) {
 		MatchExpression: "windows",
 		RuleName:        "abc",
 	}
+
+	generalRule2 := &schema.GeneralRule{
+		CPE: &schema.CPE{
+			Part:    utils.RandStringBytes(10),
+			Vendor:  "microsoft",
+			Product: "windows",
+			Version: "10",
+			Update:  "1809",
+			Edition: "pro",
+		},
+		WebPath:         "https://www.microsoft.com",
+		ExtInfo:         "windows",
+		MatchExpression: "windows",
+		RuleName:        "cba",
+	}
 	err := CreateGeneralRule(db, generalRule)
+	require.NoError(t, err)
+
+	err = CreateGeneralRule(db, generalRule2)
 	require.NoError(t, err)
 
 	id := int64(generalRule.ID)
@@ -38,6 +57,7 @@ func TestCURD_GeneralRule_base(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, token, rule.CPE.Part)
 
-	err = DeleteGeneralRuleByID(db, id)
+	count, err := DeleteGeneralRuleByFilter(db, &ypb.FingerprintFilter{IncludeId: []int64{id, int64(generalRule2.ID)}})
 	require.NoError(t, err)
+	require.Equal(t, int64(2), count)
 }
