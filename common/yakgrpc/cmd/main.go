@@ -116,7 +116,11 @@ func main() {
 			script := script
 			swg.Add()
 			go func() {
-				pluginTestingServer := yakgrpc.NewPluginTestingEchoServer(context.Background())
+				defer swg.Done()
+				pluginTestingServer := &yakgrpc.PluginTestingEchoServer{}
+				if !skipEcho {
+					pluginTestingServer = yakgrpc.NewPluginTestingEchoServer(context.Background())
+				}
 				res, err := s.EvaluatePluginEx(context.Background(), script.Content, script.Type, pluginTestingServer, skipStatic, skipEcho, skipLogic)
 				if err != nil {
 					log.Errorf("error plugin:%s err: %v", script.ScriptName, err)
@@ -126,7 +130,6 @@ func main() {
 				}
 			}()
 		}
-
 		return nil
 	}
 
