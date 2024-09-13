@@ -20,11 +20,9 @@ func FilterGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter) *gorm.DB {
 	if len(filter.GetProduct()) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "product", filter.Product)
 	}
-
 	if len(filter.GetIncludeId()) > 0 {
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.IncludeId)
 	}
-
 	return db
 }
 
@@ -62,6 +60,30 @@ func GRPCGeneralRuleToSchemaGeneralRule(gr *ypb.FingerprintRule) *schema.General
 	}
 }
 
+func SchemaGeneralRuleToGRPCGeneralRule(gr *schema.GeneralRule) *ypb.FingerprintRule {
+	if gr == nil {
+		return nil
+	}
+	cpe := &ypb.CPE{}
+	if gr.CPE != nil {
+		cpe = &ypb.CPE{
+			Part:    gr.Part,
+			Vendor:  gr.Vendor,
+			Product: gr.Product,
+			Version: gr.Version,
+			Update:  gr.Update,
+			Edition: gr.Edition,
+		}
+	}
+
+	return &ypb.FingerprintRule{
+		Cpe:             cpe,
+		RuleName:        gr.RuleName,
+		WebPath:         gr.WebPath,
+		ExtInfo:         gr.ExtInfo,
+		MatchExpression: gr.MatchExpression,
+	}
+}
 func CreateGeneralRule(db *gorm.DB, rule *schema.GeneralRule) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -137,16 +159,16 @@ func DeleteGeneralRuleByID(db *gorm.DB, id int64) (fErr error) {
 	return nil
 }
 
-func DeleteGeneralRuleByIds(db *gorm.DB, ids []int64) (fErr error) {
+func DeleteGeneralRuleByFilter(db *gorm.DB, filter *ypb.FingerprintFilter) (rowCount int64, fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
 		}
 	}()
-	if db = db.Where("id IN (?)").Unscoped().Delete(&schema.GeneralRule{}); db.Error != nil {
-		return utils.Errorf("delete GeneralRule failed: %s", db.Error)
+	if db = FilterGeneralRule(db, filter).Unscoped().Delete(&schema.GeneralRule{}); db.Error != nil {
+		return 0, utils.Errorf("delete GeneralRule failed: %s", db.Error)
 	}
-	return nil
+	return db.RowsAffected, nil
 }
 
 func GetGeneralRuleByID(db *gorm.DB, id int64) (*schema.GeneralRule, error) {
