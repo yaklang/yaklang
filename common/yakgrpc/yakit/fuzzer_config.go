@@ -1,17 +1,18 @@
 package yakit
 
 import (
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func CreateOrUpdateWebFuzzerConfig(db *gorm.DB, config *schema.WebFuzzerConfig) error {
 	db = db.Model(&schema.WebFuzzerConfig{})
 	if db := db.Where("page_id = ?", config.PageId).Assign(config).FirstOrCreate(&schema.WebFuzzerConfig{}); db.Error != nil {
 		log.Warnf("create/update WebFuzzerLabel failed: %s", db.Error)
-		return utils.Errorf("create/update WebFuzzerLabel failed: %s", db.Error)
 	}
 	return nil
 }
@@ -30,14 +31,28 @@ func QueryWebFuzzerConfig(db *gorm.DB, limit int64) ([]*schema.WebFuzzerConfig, 
 	return result, nil
 }
 
-func DeleteWebFuzzerConfig(db *gorm.DB, pageId string, deleteAll bool) error {
+func DeleteWebFuzzerConfig(db *gorm.DB, pageIds []string, deleteAll bool) (*ypb.DbOperateMessage, error) {
+	msg := &ypb.DbOperateMessage{
+		TableName: "WebFuzzerConfig",
+		Operation: "Delete",
+	}
 	if deleteAll {
+		var count int64
+		db = db.Model(&schema.WebFuzzerConfig{}).Count(&count)
 		db = db.Unscoped().Delete(&schema.WebFuzzerConfig{})
-	} else if pageId != "" {
-		db = db.Unscoped().Where("page_id = ?", pageId).Delete(&schema.WebFuzzerConfig{})
+		msg = &ypb.DbOperateMessage{
+			EffectRows:   count,
+			ExtraMessage: "Delete all webFuzzerConfig",
+		}
+	} else if len(pageIds) > 0 {
+		db = db.Unscoped().Where("page_id IN (?)", pageIds).Delete(&schema.WebFuzzerConfig{})
+		msg = &ypb.DbOperateMessage{
+			EffectRows:   int64(len(pageIds)),
+			ExtraMessage: fmt.Sprintf("Delete webFuzzerConfig with pageId"),
+		}
 	}
 	if db.Error != nil {
-		return utils.Errorf("delete web fuzzer failed: %s", db.Error)
+		return msg, utils.Errorf("delete web fuzzer failed: %s", db.Error)
 	}
-	return nil
+	return msg, nil
 }

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -9,11 +10,17 @@ import (
 	"strings"
 )
 
-func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfigRequest) (*ypb.Empty, error) {
+func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfigRequest) (*ypb.DbOperateMessage, error) {
 	if req.Data == nil {
 		return nil, utils.Error("empty params")
 	}
 	var errs []string
+	msg := &ypb.DbOperateMessage{
+		TableName:    "WebFuzzerConfig",
+		Operation:    "CreateOrUpdate",
+		EffectRows:   int64(len(req.Data)),
+		ExtraMessage: fmt.Sprintf("CreateOrUpdate web fuzzer config with pageId"),
+	}
 	for _, v := range req.Data {
 		item := &schema.WebFuzzerConfig{
 			PageId: v.PageId,
@@ -26,9 +33,9 @@ func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfig
 		}
 	}
 	if len(errs) > 0 {
-		return nil, utils.Errorf(strings.Join(errs, ",") + "添加失败")
+		return msg, utils.Errorf(strings.Join(errs, ",") + "添加失败")
 	}
-	return &ypb.Empty{}, nil
+	return msg, nil
 }
 
 func (s *Server) QueryFuzzerConfig(ctx context.Context, params *ypb.QueryFuzzerConfigRequest) (*ypb.QueryFuzzerConfigResponse, error) {
@@ -47,10 +54,10 @@ func (s *Server) QueryFuzzerConfig(ctx context.Context, params *ypb.QueryFuzzerC
 	return &ypb.QueryFuzzerConfigResponse{Data: res}, nil
 }
 
-func (s *Server) DeleteFuzzerConfig(ctx context.Context, req *ypb.DeleteFuzzerConfigRequest) (*ypb.Empty, error) {
-	err := yakit.DeleteWebFuzzerConfig(s.GetProjectDatabase(), req.GetPageId(), req.GetDeleteAll())
+func (s *Server) DeleteFuzzerConfig(ctx context.Context, req *ypb.DeleteFuzzerConfigRequest) (*ypb.DbOperateMessage, error) {
+	msg, err := yakit.DeleteWebFuzzerConfig(s.GetProjectDatabase(), req.GetPageId(), req.GetDeleteAll())
 	if err != nil {
-		return nil, err
+		return msg, err
 	}
-	return &ypb.Empty{}, nil
+	return msg, nil
 }
