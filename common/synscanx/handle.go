@@ -114,6 +114,11 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 			pcaputil.WithDisableAssembly(true),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
 					if handle.IsLoopback() {
 						for {
 							select {
@@ -154,6 +159,11 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
 				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
 					s.handlePacket(packet)
 				}()
 			}),
