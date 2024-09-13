@@ -151,8 +151,8 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		matchResult, err = serviceFirst()
 	} else {
 		// 使用预定义的端口范围来决定扫描策略
-		webPortsFilter := utils2.NewPortsFilter(webPorts)
-		if webPortsFilter.Contains(port) {
+		webPortsFilter := utils2.ParseStringToPorts(webPorts)
+		if utils2.IntArrayContains(webPortsFilter, port) {
 			log.Debugf("web-detect first for: %v", utils2.HostPort(host, port))
 			matchResult, err = webFirst()
 		} else {
