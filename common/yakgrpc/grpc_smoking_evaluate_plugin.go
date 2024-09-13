@@ -164,12 +164,17 @@ func BuildPluginTestingJunkData() []byte {
 }
 
 func (s *Server) EvaluatePluginEx(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer, skipRiskStatic, skipEchoServer, skipLogicCheck bool) (*ypb.SmokingEvaluatePluginResponse, error) {
-	defer pluginTestingServer.ClearRequestsHistory()
-	host, port := pluginTestingServer.Host, pluginTestingServer.Port
-	testDomain := utils.RandStringBytes(60) + ".com"
-	netx.AddHost(testDomain, host)
-	defer netx.DeleteHost(testDomain)
-	target := fmt.Sprintf("http://%s:%d", testDomain, port)
+	host, target := "", ""
+	port := 0
+	if !skipEchoServer {
+		defer pluginTestingServer.ClearRequestsHistory()
+		host, port = pluginTestingServer.Host, pluginTestingServer.Port
+		testDomain := utils.RandStringBytes(60) + ".com"
+		netx.AddHost(testDomain, host)
+		defer netx.DeleteHost(testDomain)
+		target = fmt.Sprintf("http://%s:%d", testDomain, port)
+		fp.SetMatchResultCache(utils.HostPort(testDomain, port), MockPluginTestingFpResult(testDomain, pluginTestingServer))
+	}
 	var results []*ypb.SmokingEvaluateResult
 	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, i ...[]byte) {
 		var buf bytes.Buffer
@@ -184,7 +189,6 @@ func (s *Server) EvaluatePluginEx(ctx context.Context, pluginCode, pluginType st
 			Severity:   severity,
 		})
 	}
-	fp.SetMatchResultCache(utils.HostPort(testDomain, port), MockPluginTestingFpResult(testDomain, pluginTestingServer))
 
 	score := 100
 
