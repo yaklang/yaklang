@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"reflect"
 	"regexp"
 	"strings"
@@ -104,6 +105,41 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 		return nil
 	}
 	switch i := raw.(type) {
+	case *sf.ConstFilterContext:
+		var (
+			mode string
+			rule string
+		)
+		if i.ConstSearchPrefix() != nil {
+			prefix := i.ConstSearchPrefix().(*sf.ConstSearchPrefixContext)
+			switch {
+			case prefix.ConstSearchModePrefixGlob() != nil:
+				mode = "g"
+			case prefix.ConstSearchModePrefixRegexp() != nil:
+				mode = "r"
+			case prefix.ConstSearchModePrefixExact() != nil:
+				mode = "e"
+			}
+		}
+		if i.QuotedStringLiteral() != nil {
+			rule = i.QuotedStringLiteral().GetText()
+			rule = yakunquote.TryUnquote(rule)
+		} else {
+			rule = y.VisitHereDoc(i.HereDoc())
+		}
+		if mode == "" {
+			if glob, b := y.FormatStringOrGlob(rule); b {
+				mode = "g"
+				rule = glob
+			} else {
+				mode = "e"
+			}
+		}
+		y.EmitNativeCall("const", &RecursiveConfigItem{
+			Key:            mode,
+			Value:          rule,
+			SyntaxFlowRule: false,
+		})
 	case *sf.NamedFilterContext:
 		return y.VisitNameFilter(false, i.NameFilter())
 	case *sf.FieldCallFilterContext:

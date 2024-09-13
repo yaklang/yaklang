@@ -42,8 +42,8 @@ fileFilterContentMethodParamValue: nameFilter;
 fileName:nameFilter (. nameFilter)*;
 
 filterStatement
-    : refVariable filterItem*  (As refVariable)? # RefFilterExpr
-    | filterExpr  (As refVariable)?              # PureFilterExpr
+    : refVariable filterItem*  (As refVariable)?        # RefFilterExpr
+    | filterExpr  (As refVariable)?                     # PureFilterExpr
     ;
 
 comment: LineComment;
@@ -84,10 +84,13 @@ refVariable
 
 
 filterItemFirst
-    : nameFilter                                 # NamedFilter
-    | '.' lines? nameFilter                      # FieldCallFilter
-    | nativeCall                                 # NativeCallFilter
+    : constSearchPrefix?(QuotedStringLiteral|hereDoc) # ConstFilter
+    | nameFilter                                      # NamedFilter
+    | '.' lines? nameFilter                           # FieldCallFilter
+    | nativeCall                                      # NativeCallFilter
     ;
+
+constSearchPrefix: ConstSearchModePrefixRegexp | ConstSearchModePrefixGlob | ConstSearchModePrefixExact;
 
 filterItem
     : filterItemFirst                            # First
@@ -106,7 +109,7 @@ filterItem
     | '&' refVariable                            # IntersectionRefFilter
     ;
 
-filterExpr: filterItemFirst filterItem* ;
+filterExpr: filterItemFirst filterItem*;
 
 nativeCall
     : '<' useNativeCall '>'
@@ -195,6 +198,7 @@ keywords
     | Have
     | HaveAny
     | BoolLiteral
+    | constSearchPrefix
     ;
 
 opcodes: Call | Constant | Phi | FormalParam | Return | Function;
