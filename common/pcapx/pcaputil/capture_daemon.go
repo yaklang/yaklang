@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"sync"
 	"time"
@@ -98,8 +99,9 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			hashRaw.WriteString("override|")
 			hashRaw.WriteString(conf.OverrideCacheId)
 		}
-		//cacheId := codec.Sha256(hashRaw.String())
-		cacheId := hashRaw.String()
+		cacheId := codec.Sha256(hashRaw.String())
+		// debug
+		//cacheId := hashRaw.String()
 		if daemon, ok := getDaemonCache(cacheId); ok {
 			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
 				if oldHandle, ok := daemon.handler.(*PcapHandleWrapper); ok {
