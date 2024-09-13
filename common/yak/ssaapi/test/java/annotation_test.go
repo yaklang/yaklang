@@ -172,7 +172,7 @@ public class DemoABCEntryClass {
         return "Hello World" + xmlStr;
     }
 }
-`, func(prog *ssaapi.Program) error {		
+`, func(prog *ssaapi.Program) error {
 		prog.Show()
 		assert.Equal(t, prog.SyntaxFlowChain("Controller.__ref__ as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)
 		assert.Equal(t, prog.SyntaxFlowChain("ResponseBody.__ref__ as $ref ", sf.WithEnableDebug(false)).Show(false).Len(), 1)

@@ -481,14 +481,14 @@ var SSACompilerCommands = []*cli.Command{
 			if sarifFile != "" {
 				haveSarifRequired = true
 			}
-			var results []*sfvm.SFFrameResult
-			var sarifCallback func(result *sfvm.SFFrameResult)
+			var results []*ssaapi.SyntaxFlowResult
+			var sarifCallback func(result *ssaapi.SyntaxFlowResult)
 			if haveSarifRequired {
-				sarifCallback = func(result *sfvm.SFFrameResult) {
+				sarifCallback = func(result *ssaapi.SyntaxFlowResult) {
 					results = append(results, result)
 				}
 			} else {
-				sarifCallback = func(result *sfvm.SFFrameResult) {
+				sarifCallback = func(result *ssaapi.SyntaxFlowResult) {
 
 				}
 			}
@@ -627,7 +627,7 @@ func SyntaxFlowQuery(
 	programName, databaseFileRaw string,
 	syntaxFlow string,
 	dbDebug, sfDebug, showDot, withCode bool,
-	callbacks ...func(*sfvm.SFFrameResult),
+	callbacks ...func(*ssaapi.SyntaxFlowResult),
 ) error {
 	defer func() {
 		if err := recover(); err != nil {
@@ -663,8 +663,8 @@ func SyntaxFlowQuery(
 	result, err := prog.SyntaxFlowWithError(syntaxFlow, opt...)
 	if err != nil {
 		var otherErrs []string
-		if result != nil && len(result.Errors) > 0 {
-			otherErrs = utils.StringArrayFilterEmpty(utils.RemoveRepeatStringSlice(result.Errors))
+		if result != nil && len(result.GetErrors()) > 0 {
+			otherErrs = utils.StringArrayFilterEmpty(utils.RemoveRepeatStringSlice(result.GetErrors()))
 		}
 		execError = utils.Wrapf(err, "prompt error: \n%v", strings.Join(otherErrs, "\n  "))
 	}
@@ -672,9 +672,9 @@ func SyntaxFlowQuery(
 		return execError
 	}
 
-	if result.SFFrameResult != nil {
+	if result != nil {
 		for _, c := range callbacks {
-			c(result.SFFrameResult)
+			c(result)
 		}
 	}
 

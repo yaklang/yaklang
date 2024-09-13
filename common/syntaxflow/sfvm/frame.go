@@ -291,7 +291,7 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 				i.iter.originValues = nil
 				continue
 			}
-			s.debugLog("next value: %v", valuesLen(val))
+			s.debugLog("next value: %v", ValuesLen(val))
 			s.stack.Push(val)
 			s.debugLog(">> push " + fmt.Sprint(s.stack.Len()))
 		case OpIterEnd:
@@ -697,7 +697,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "E: stack is empty, cannot pop")
 		}
 		i := s.stack.Pop()
-		s.debugSubLog(">> pop %v", valuesLen(i))
+		s.debugSubLog(">> pop %v", ValuesLen(i))
 		s.debugSubLog("save-to $_")
 		err := s.output("_", i)
 		if err != nil {
@@ -721,7 +721,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("<< push")
 			return err
 		}
-		callLen := valuesLen(results)
+		callLen := ValuesLen(results)
 		s.debugSubLog("<< push len: %v", callLen)
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
 		s.stack.Push(results)
@@ -736,7 +736,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			err = utils.Errorf("get calling argument failed: %s", err)
 		}
-		callLen := valuesLen(results)
+		callLen := ValuesLen(results)
 		s.debugSubLog("- get argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
@@ -754,7 +754,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("get calling argument failed: %s", err)
 		}
-		callLen := valuesLen(results)
+		callLen := ValuesLen(results)
 		s.debugSubLog("- get all argument: %v", results.String())
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
@@ -785,7 +785,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
-		s.debugSubLog("<< push bottom uses %v", valuesLen(vals))
+		s.debugSubLog("<< push bottom uses %v", ValuesLen(vals))
 		s.stack.Push(vals)
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
@@ -798,7 +798,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
 		}
-		s.debugSubLog("<< push users %v", valuesLen(vals))
+		s.debugSubLog("<< push users %v", ValuesLen(vals))
 		s.stack.Push(vals)
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
@@ -811,7 +811,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
-		s.debugSubLog("<< push top defs %v", valuesLen(vals))
+		s.debugSubLog("<< push top defs %v", ValuesLen(vals))
 		s.stack.Push(vals)
 	case OpNewRef:
 		if i.UnaryStr == "" {
@@ -847,7 +847,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		result, ok := s.GetSymbol(i)
 		if ok {
-			res := make([]ValueOperator, 0, valuesLen(result))
+			res := make([]ValueOperator, 0, ValuesLen(result))
 			tmp := make(map[int64]struct{})
 			_ = result.Recursive(func(operator ValueOperator) error {
 				if i, ok := operator.(ssa.GetIdIF); ok {
@@ -944,7 +944,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if values == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		res := make([]bool, 0, valuesLen(values))
+		res := make([]bool, 0, ValuesLen(values))
 		_ = values.Recursive(func(vo ValueOperator) error {
 			for _, element := range i.Values {
 				code := vo.GetOpcode()
@@ -979,7 +979,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if mode != CompareStringAnyMode && mode != CompareStringHaveMode {
 			return utils.Wrapf(CriticalError, "compare string failed: invalid mode %v", mode)
 		}
-		res := make([]bool, 0, valuesLen(values))
+		res := make([]bool, 0, ValuesLen(values))
 		_ = values.Recursive(func(vo ValueOperator) error {
 			raw := vo.String()
 			if mode == CompareStringAnyMode {
@@ -1040,11 +1040,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
 		}
 		conds := s.conditionStack.Pop()
-		if len(conds) != valuesLen(vs) {
-			return utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", valuesLen(vs), len(conds))
+		if len(conds) != ValuesLen(vs) {
+			return utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", ValuesLen(vs), len(conds))
 		}
 		//log.Infof("condition: %v", conds)
-		res := make([]ValueOperator, 0, valuesLen(vs))
+		res := make([]ValueOperator, 0, ValuesLen(vs))
 		for i := 0; i < len(conds); i++ {
 			if conds[i] {
 				if v, err := vs.ListIndex(i); err == nil {

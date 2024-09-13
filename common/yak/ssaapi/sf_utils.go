@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -154,4 +155,12 @@ func _SFValueListToValues(count int, list *sfvm.ValueList) (Values, error) {
 		}
 	})
 	return vals, nil
+}
+
+func ValuesToSFValueList(values Values) sfvm.ValueOperator {
+	var list []sfvm.ValueOperator
+	for _, value := range values {
+		list = append(list, value)
+	}
+	return sfvm.NewValues(list)
 }

@@ -3,10 +3,11 @@ package syntaxflow
 import (
 	"bytes"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestAlertStatement(t *testing.T) {
@@ -25,7 +26,7 @@ func TestAlertStatement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result.SFFrameResult)
+			report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -49,7 +50,7 @@ func TestAlertStatement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result.SFFrameResult)
+			report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result)
 			if err != nil {
 				t.Fatal(err)
 			}

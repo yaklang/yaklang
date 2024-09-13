@@ -309,7 +309,7 @@ func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frame *sfvm.SFFrameRes
 	return runs
 }
 
-func ConvertSyntaxFlowResultToSarif(r ...*sfvm.SFFrameResult) (*sarif.Report, error) {
+func ConvertSyntaxFlowResultToSarif(r ...*SyntaxFlowResult) (*sarif.Report, error) {
 	report, err := sarif.New(sarif.Version210, false)
 	if err != nil {
 		return nil, utils.Wrap(err, "create sarif.New Report failed")
@@ -317,7 +317,7 @@ func ConvertSyntaxFlowResultToSarif(r ...*sfvm.SFFrameResult) (*sarif.Report, er
 
 	root := NewSarifContext()
 	for _, frame := range r {
-		for _, run := range convertSyntaxFlowFrameToSarifRun(root, frame) {
+		for _, run := range convertSyntaxFlowFrameToSarifRun(root, frame.memResult) {
 			if funk.IsEmpty(run) {
 				continue
 			}
