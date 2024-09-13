@@ -41,14 +41,14 @@ func (s *Server) QueryFingerprint(ctx context.Context, req *ypb.QueryFingerprint
 	}, nil
 }
 
-func (s *Server) DeleteFingerprint(ctx context.Context, req *ypb.DeleteFingerprintRequest) (*ypb.Empty, error) {
-	return &ypb.Empty{}, nil
-}
-
-func (s *Server) UpdateFingerprint(ctx context.Context, req *ypb.UpdateFingerprintRequest) (*ypb.Empty, error) {
+func (s *Server) DeleteFingerprint(ctx context.Context, req *ypb.DeleteFingerprintRequest) (*ypb.DbOperateMessage, error) {
 	return nil, nil
 }
 
-func (s *Server) CreateFingerprint(ctx context.Context, req *ypb.CreateFingerprintRequest) (*ypb.Empty, error) {
+func (s *Server) UpdateFingerprint(ctx context.Context, req *ypb.UpdateFingerprintRequest) (*ypb.DbOperateMessage, error) {
+	return nil, nil
+}
+
+func (s *Server) CreateFingerprint(ctx context.Context, req *ypb.CreateFingerprintRequest) (*ypb.DbOperateMessage, error) {
 	return nil, nil
 }

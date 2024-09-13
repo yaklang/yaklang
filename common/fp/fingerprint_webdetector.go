@@ -3,6 +3,7 @@ package fp
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"net"
 	"strconv"
 	"strings"
@@ -99,12 +100,12 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	}
 	for _, i := range redirectInfos {
 
-		var currentCPE []*rule.CPE
-		if !f.Config.DisableDefaultIotFingerprint {
-			iotdevResults := iotdevfp.MatchAll(i.Response)
-			for _, iotdevResult := range iotdevResults {
-				result.Fingerprint.CPEs = append(result.Fingerprint.CPEs, iotdevResult.GetCPE())
-				cpeIns, _ := webfingerprint.ParseToCPE(iotdevResult.GetCPE())
+			var currentCPE []*schema.CPE
+			if !f.Config.DisableDefaultIotFingerprint {
+				iotdevResults := iotdevfp.MatchAll(i.Response)
+				for _, iotdevResult := range iotdevResults {
+					result.Fingerprint.CPEs = append(result.Fingerprint.CPEs, iotdevResult.GetCPE())
+					cpeIns, _ := webfingerprint.ParseToCPE(iotdevResult.GetCPE())
 
 				if cpeIns != nil {
 					currentCPE = append(currentCPE, fingerprint.LoadCPEFromWebfingerrintCPE(cpeIns))
@@ -206,11 +207,11 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 			flow.CPEs = currentCPE
 		}
 	}
-	urlCpe := map[string][]*rule.CPE{}
+	urlCpe := map[string][]*schema.CPE{}
 	results.Range(func(key, value interface{}) bool {
 		log.Debugf("url: %s cpes: %#v", key, value)
 		_url := key.(string)
-		cpes := value.([]*rule.CPE)
+		cpes := value.([]*schema.CPE)
 		urlCpe[_url] = cpes
 		return true
 	})
