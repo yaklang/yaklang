@@ -466,7 +466,7 @@ func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *schema.YakScript {
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
 				DB:    db,
 				Page:  page,
-				Limit: 1000,
+				Limit: 10000,
 			}, &items); b.Error != nil {
 				log.Errorf("paging failed: %s", b.Error)
 				return

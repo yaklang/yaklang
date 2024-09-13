@@ -130,6 +130,7 @@ func main() {
 				}
 			}()
 		}
+		swg.Wait()
 		return nil
 	}
 
