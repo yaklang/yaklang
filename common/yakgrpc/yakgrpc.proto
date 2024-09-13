@@ -1826,7 +1826,7 @@ message SaveFuzzerConfigRequest {
 }
 
 message QueryFuzzerConfigRequest {
-  int64 Limit = 1;
+    Paging Pagination = 1;
 }
 
 message QueryFuzzerConfigResponse {
