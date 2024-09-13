@@ -369,8 +369,6 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			}
 			s.config.callCallback(result)
 
-			resultCh <- result
-
 			if outputFile != nil {
 				outputFile.Write(
 					[]byte(fmt.Sprintf(
@@ -379,6 +377,13 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 						addr,
 					)),
 				)
+			}
+
+			select {
+			case <-s.ctx.Done():
+				return
+			default:
+				resultCh <- result
 			}
 		}
 	}

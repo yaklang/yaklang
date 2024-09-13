@@ -271,7 +271,7 @@ func (m *MatchResult) getServiceName() string {
 	}
 
 	productsVer := make(map[string]string)
-	products := []string{}
+	var products []string
 	for _, cpe := range m.Fingerprint.CPEs {
 		cpeInstance, err := webfingerprint.ParseToCPE(cpe)
 		if err != nil {

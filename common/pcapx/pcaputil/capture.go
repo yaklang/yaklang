@@ -150,7 +150,7 @@ func Start(opt ...CaptureOption) error {
 		var cancels []func()
 		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
 			if conf.EnableCache {
-				cancels = append(cancels, keepDaemonCache(i, ctx))
+				cancels = append(cancels, keepDaemonCache(ctx, i))
 			}
 			return true
 		})
@@ -161,8 +161,8 @@ func Start(opt ...CaptureOption) error {
 		}()
 
 		runtimeId := uuid.New().String()
-		for _, i := range handlers.Keys() {
-			registerCallback(i, runtimeId, ctx, func(ctx context.Context, packet gopacket.Packet) error {
+		for _, key := range handlers.Keys() {
+			registerCallback(ctx, key, runtimeId, func(ctx context.Context, packet gopacket.Packet) error {
 				conf.packetHandler(ctx, packet)
 				select {
 				case <-ctx.Done():
