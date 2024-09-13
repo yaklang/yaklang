@@ -242,6 +242,10 @@ service Yak {
   rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
   rpc DeleteFuzzerLabel(DeleteFuzzerLabelRequest) returns (Empty);
 
+  rpc SaveFuzzerConfig(SaveFuzzerConfigRequest) returns (Empty);
+  rpc QueryFuzzerConfig(QueryFuzzerConfigRequest) returns (QueryFuzzerConfigResponse);
+  rpc DeleteFuzzerConfig(DeleteFuzzerConfigRequest) returns (Empty);
+
   // HTTPFuzzerResponse
   // 这个挺特殊的，因为数据包太多了，会卡，所以后端会保存一份，通过这个接口做缓存查询
   rpc QueryHTTPFuzzerResponseByTaskId(QueryHTTPFuzzerResponseByTaskIdRequest) returns (QueryHTTPFuzzerResponseByTaskIdResponse) ;
@@ -1815,6 +1819,29 @@ message FuzzerLabel {
 
 message DeleteFuzzerLabelRequest {
   string Hash = 1;
+}
+
+message SaveFuzzerConfigRequest {
+  repeated FuzzerConfig Data = 1;
+}
+
+message QueryFuzzerConfigRequest {
+  int64 Limit = 1;
+}
+
+message QueryFuzzerConfigResponse {
+  repeated FuzzerConfig Data = 1;
+}
+
+message FuzzerConfig {
+  string PageId = 1;
+  string Type = 2;
+  string Config = 3;
+}
+
+message DeleteFuzzerConfigRequest {
+  string PageId = 1;
+  bool DeleteAll =2;
 }
 
 message ExtractDataRequest {
