@@ -433,6 +433,10 @@ func (b *BasicBlock) GetType() Type {
 func (b *BasicBlock) SetType(ts Type) {
 }
 
+func (b *BasicBlock) ReSetFinish() {
+	b.finish = false
+}
+
 var (
 	_ Node  = (*BasicBlock)(nil)
 	_ Value = (*BasicBlock)(nil)
