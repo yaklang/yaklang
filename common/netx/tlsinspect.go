@@ -131,7 +131,7 @@ func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSIns
 	}
 	err = tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
 	if err != nil {
-		log.Errorf("TLSInspect: handshake error: %s", err)
+		log.Debugf("TLSInspect: handshake error: %s", err)
 	}
 	return results, nil
 }

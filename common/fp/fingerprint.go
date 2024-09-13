@@ -263,13 +263,6 @@ func (m *MatchResult) getServiceName() string {
 		return ""
 	}
 
-	var fixDefaultSchema string
-	if m.GetProto() == UDP {
-		fixDefaultSchema = GetDefaultUDPServiceName(m.Port)
-	} else {
-		fixDefaultSchema = GetDefaultTCPServiceName(m.Port)
-	}
-
 	productsVer := make(map[string]string)
 	var products []string
 	for _, cpe := range m.Fingerprint.CPEs {
@@ -298,14 +291,23 @@ func (m *MatchResult) getServiceName() string {
 			products = append(products, fmt.Sprintf("%v[%v]", k, v))
 		}
 	}
-
-	if m.Fingerprint.ServiceName != "" {
-		products = append(products, m.Fingerprint.ServiceName)
+	sn := m.Fingerprint.ServiceName
+	if sn != "" {
+		if aliasSn, ok := FingerprintAlias[sn]; ok {
+			sn = aliasSn
+		}
+		products = append(products, sn)
 	}
 	products = utils2.RemoveRepeatStringSlice(products)
 	sort.Strings(products)
 
 	if len(products) <= 0 {
+		var fixDefaultSchema string
+		if m.GetProto() == UDP {
+			fixDefaultSchema = GetDefaultUDPServiceName(m.Port)
+		} else {
+			fixDefaultSchema = GetDefaultTCPServiceName(m.Port)
+		}
 		products = append(products, fixDefaultSchema)
 	}
 

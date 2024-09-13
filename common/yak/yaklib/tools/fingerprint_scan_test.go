@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -19,9 +18,9 @@ import (
 
 func Test_scanFingerprint(t *testing.T) {
 
-	target := "123.204.5.34"
+	target := "192.168.3.139"
 
-	port := "3389"
+	port := "445"
 
 	protoList := []interface{}{"tcp"}
 
@@ -42,9 +41,9 @@ func Test_scanFingerprint(t *testing.T) {
 	}
 
 	for v := range ch {
-		//fmt.Println(v.String())
+		fmt.Println(v.String())
 
-		spew.Dump(v)
+		//spew.Dump(v)
 	}
 }
 
