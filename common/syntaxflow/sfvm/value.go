@@ -1,8 +1,9 @@
 package sfvm
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func AutoValue(i any) ValueOperator {
@@ -10,7 +11,7 @@ func AutoValue(i any) ValueOperator {
 	return i.(ValueOperator)
 }
 
-func valuesLen(i ValueOperator) int {
+func ValuesLen(i ValueOperator) int {
 	if i == nil {
 		return 0
 	}

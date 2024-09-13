@@ -68,27 +68,27 @@ type showConfig struct {
 	showDot  bool
 	showAll  bool
 }
-type ShowHandle func(config *showConfig)
+type ShowOption func(config *showConfig)
 
-func WithShowCode(show bool) ShowHandle {
+func WithShowCode(show bool) ShowOption {
 	return func(config *showConfig) {
 		config.showCode = show
 	}
 }
-func WithShowDot(show bool) ShowHandle {
+func WithShowDot(show bool) ShowOption {
 	return func(config *showConfig) {
 		config.showDot = show
 	}
 }
-func WithShowAll(show bool) ShowHandle {
+func WithShowAll(show bool) ShowOption {
 	return func(config *showConfig) {
 		config.showAll = show
 	}
 }
-func (s *SFFrameResult) Show(opts ...ShowHandle) {
+func (s *SFFrameResult) Show(opts ...ShowOption) {
 	fmt.Println(s.String(opts...))
 }
-func (s *SFFrameResult) String(opts ...ShowHandle) string {
+func (s *SFFrameResult) String(opts ...ShowOption) string {
 	cfg := new(showConfig)
 	for _, f := range opts {
 		f(cfg)

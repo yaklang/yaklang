@@ -1,13 +1,14 @@
 package ssaapi
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -19,8 +20,8 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	code := params.GetString(0, "code")
 	var tmpResult *SyntaxFlowResult
 	defer func() {
-		if tmpResult != nil && tmpResult.SFFrameResult != nil {
-			contextResult.MergeByResult(tmpResult.SFFrameResult)
+		if tmpResult != nil && tmpResult.memResult != nil {
+			contextResult.MergeByResult(tmpResult.memResult)
 		}
 	}()
 
@@ -72,8 +73,8 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		if err != nil {
 			return false, nil, err
 		}
-		if newResult != nil && newResult.SFFrameResult != nil {
-			contextResult.MergeByResult(newResult.SFFrameResult)
+		if newResult != nil && newResult.memResult != nil {
+			contextResult.MergeByResult(newResult.memResult)
 		}
 		return true, v, nil
 	}

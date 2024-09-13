@@ -25,8 +25,8 @@ func ValidSyntaxFlowRule(s *schema.SyntaxFlowRule) error {
 	if err != nil {
 		return err
 	}
-	if len(result.Errors) > 0 {
-		return utils.Errorf(`runtime error: %v`, result.Errors)
+	if len(result.GetErrors()) > 0 {
+		return utils.Errorf(`runtime error: %v`, result.GetErrors())
 	}
 	s.Verified = true
 	return nil
@@ -87,15 +87,13 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	if err != nil {
 		return false, nil, err
 	}
-	var vals []sfvm.ValueOperator
-	for _, val := range result.AlertSymbolTable {
-		val.Recursive(func(operator sfvm.ValueOperator) error {
-			vals = append(vals, operator)
-			return nil
-		})
+	var vals Values
+	for _, name := range result.GetAlertVariables() {
+		vs := result.GetValues(name)
+		vals = append(vals, vs...)
 	}
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, ValuesToSFValueList(vals), nil
 	}
 	return false, nil, utils.Error("no value found")
 }
