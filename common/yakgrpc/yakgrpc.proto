@@ -702,9 +702,9 @@ service Yak {
   rpc ModifyFingerprint(ModifyFingerprintRequest) returns (ModifyFingerprintResponse);
 
   rpc QueryFingerprint(QueryFingerprintRequest) returns (QueryFingerprintResponse);
-  rpc DeleteFingerprint(DeleteFingerprintRequest) returns (Empty);
-  rpc UpdateFingerprint(UpdateFingerprintRequest) returns (Empty);
-  rpc CreateFingerprint(CreateFingerprintRequest) returns (Empty);
+  rpc DeleteFingerprint(DeleteFingerprintRequest) returns (DbOperateMessage);
+  rpc UpdateFingerprint(UpdateFingerprintRequest) returns (DbOperateMessage);
+  rpc CreateFingerprint(CreateFingerprintRequest) returns (DbOperateMessage);
 
 
   // 反弹shell命令生成
