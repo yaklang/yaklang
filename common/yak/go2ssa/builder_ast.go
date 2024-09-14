@@ -44,7 +44,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		}
 		if lib == nil {
 			lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
-			lib.Cache = prog.Cache /* 继承Cache */
 		}
 		lib.PushEditor(prog.GetCurrentEditor())
 		lib.GlobalScope = b.ReadMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))

@@ -149,6 +149,7 @@ func (prog *Program) NewLibrary(name string, path []string) *Program {
 	lib.Application = prog.Application
 	lib.ExternLib = prog.ExternLib
 	lib.ExternInstance = prog.ExternInstance
+	lib.Cache.SetFetchId(prog.Cache.fetchId)
 	return lib
 }
 
