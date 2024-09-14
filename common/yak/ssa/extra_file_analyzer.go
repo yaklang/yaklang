@@ -41,11 +41,4 @@ func (d *DummyPreHandler) FilterPreHandlerFile(string) bool {
 func (d *DummyPreHandler) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
 	return nil
 }
-func (d *DummyPreHandler) InitHandler(builder *FunctionBuilder) {
-	container := builder.EmitEmptyContainer()
-	variable := builder.CreateMemberCallVariable(container, builder.EmitConstInst("$staticScope$"))
-	emptyContainer := builder.EmitEmptyContainer()
-	builder.AssignVariable(variable, emptyContainer)
-	builder.AssignVariable(builder.CreateVariable("global-container"), container)
-	builder.GetProgram().GlobalScope = container
-}
+func (d *DummyPreHandler) InitHandler(builder *FunctionBuilder) {}

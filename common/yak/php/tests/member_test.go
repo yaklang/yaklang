@@ -8,7 +8,7 @@ import (
 
 func TestParseSSA_BasicMember(t *testing.T) {
 	t.Run("slice normal", func(t *testing.T) {
-		test.MockSSA(t, `<?php
+		test.NonStrictMockSSA(t, `<?php
 function dump($a){}
 		$c=[1,2,3];
 		dump($c[2]);

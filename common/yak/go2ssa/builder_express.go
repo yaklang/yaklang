@@ -223,9 +223,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			if exData := b.GetImportPackage(rv.GetName()); exData != nil {
 				if value := exData.GetExprotValue(test); value != nil {
 					if fun, ok := value.(*ssa.Function); ok {
-						return b.ReadMemberCallVariable(b.ReadValue(rv.GetName()), fun), nil
+						return b.ReadOrCreateMemberCallVariable(b.ReadValue(rv.GetName()), fun), nil
 					} else {
-						return b.ReadMemberCallVariable(rv, value), nil
+						return b.ReadOrCreateMemberCallVariable(rv, value), nil
 					}
 				}
 

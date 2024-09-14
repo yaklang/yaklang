@@ -47,7 +47,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			lib = prog.NewLibrary(pkgPath[0], pkgPath)
 		}
 		lib.PushEditor(prog.GetCurrentEditor())
-		lib.GlobalScope = b.ReadMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))
+		lib.GlobalScope = b.ReadOrCreateMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))
 
 		init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
 		init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))

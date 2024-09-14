@@ -550,7 +550,7 @@ func (y *builder) VisitMethodDeclaration(
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s", class.Name, key)
+	funcName := fmt.Sprintf("%s", key)
 	methodName := key
 
 	if isStatic {
@@ -608,7 +608,6 @@ func (y *builder) VisitMethodDeclaration(
 		for _, def := range defCallback {
 			def(newFunction)
 		}
-		//y.AddToPackage(funcName)
 	}
 
 	if i.THROWS() != nil {

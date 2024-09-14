@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+	"strings"
+)
 
 type BluePrintFieldKind int
 
@@ -102,6 +105,14 @@ func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
 		c.RegisterConstMember(name, value)
 	}
 }
+func (c *ClassBluePrint) CheckExtendBy(kls string) bool {
+	for _, class := range c.ParentClass {
+		if strings.EqualFold(class.Name, kls) {
+			return true
+		}
+	}
+	return false
+}
 
 func (c *ClassBluePrint) getFieldWithParent(get func(bluePrint *ClassBluePrint) bool) bool {
 	// if current class can get this field, just return true
@@ -136,7 +147,7 @@ func (c *ClassBluePrint) storeInContainer(name string, val Value, _type BluePrin
 	}
 }
 func (b *ClassBluePrint) InitializeWithContainer(con *Make) error {
-	if con != nil {
+	if b._container != nil {
 		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
 	}
 	b._container = con

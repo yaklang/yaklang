@@ -48,20 +48,7 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 		return b.EmitUndefined(s)
 	}
 	p.ClassBluePrint[name] = c
-
-	// log.Infof("start to create class container variable for saving static member: %s", name)
-	// klassVar := b.CreateVariable(name, tokenizer...)
-	// klassContainer := b.EmitEmptyContainer()
-	// b.AssignVariable(klassVar, klassContainer)
-	// err := c.InitializeWithContainer(klassContainer)
-	// members, _ := b.GetProgram().GetApplication().GlobalScope.GetStringMember("$staticScope$")
-	// builder := b.mainBuilder
-	// variable := builder.CreateMemberCallVariable(members, builder.EmitConstInst(name))
-	// container := builder.EmitEmptyContainer()
-	// builder.AssignVariable(variable, container)
-	// if err != nil {
-	// 	log.Errorf("CreateClassBluePrint.InitializeWithContainer error: %s", err)
-	// }
+	c.InitializeWithContainer(b.EmitEmptyContainer())
 	return c
 }
 

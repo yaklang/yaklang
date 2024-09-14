@@ -543,8 +543,12 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if i.FlexiVariable() != nil {
 		return y.VisitRightValue(i.FlexiVariable())
 	} else {
-		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-		return y.ReadValueByVariable(member)
+		member, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		if staticMember := member.GetStaticMember(key); utils.IsNil(staticMember) {
+			return y.EmitUndefined(key)
+		} else {
+			return staticMember
+		}
 	}
 }
 

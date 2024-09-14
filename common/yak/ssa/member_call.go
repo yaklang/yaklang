@@ -4,18 +4,6 @@ import "github.com/yaklang/yaklang/common/utils"
 
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
-
-	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
-		return ret
-	}
-	// normal method
-	if wantFunction {
-		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
-			fun.SetObject(object)
-			return fun
-		}
-	}
-
 	res := checkCanMemberCallExist(object, key)
 	// normal member
 	// use name  peek value
@@ -25,7 +13,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 
 	// default member
 	value := b.createDefaultMember(res, object, key, wantFunction)
-	b.AssignVariable(b.CreateVariable(res.name), value)
+	b.AssignVariable(b.CreateVariable(value.GetVerboseName()), value)
 	return value
 }
 
@@ -61,7 +49,32 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 	}
 	return nil
 }
-
+func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value, value func(int) Value) *Make {
+	// lValueLen := NewConst(size)
+	var lValueLen Value = nil
+	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
+	if utils.IsNil(itf) {
+		return nil
+	}
+	if b.MarkedVariable != nil {
+		itf.SetName(b.MarkedVariable.GetName())
+		b.MarkedThisObject = itf
+		defer func() {
+			b.MarkedThisObject = nil
+		}()
+	}
+	ityp := NewObjectType()
+	itf.SetType(ityp)
+	for i := 0; i < size; i++ {
+		key := keys(i)
+		value := value(i)
+		v := b.CreateMemberCallVariable(itf, key)
+		b.AssignVariable(v, value)
+	}
+	ityp.Finish()
+	// ityp.Len = len(vs)
+	return itf
+}
 func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, method bool) Value {
 	if !b.SupportClass {
 		return nil
@@ -75,10 +88,9 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 		if normalMethod := bluePrint.GetNormalMethod(key.String()); !utils.IsNil(normalMethod) {
 			return normalMethod
 		}
-	} else {
-		if member := bluePrint.GetNormalMember(key.String()); !utils.IsNil(member) {
-			return member
-		}
+	}
+	if member := bluePrint.GetNormalMember(key.String()); !utils.IsNil(member) {
+		return member
 	}
 	return nil
 }
@@ -86,18 +98,24 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key Value, wantFunction bool) Value {
 	// create undefined memberCall value if the value can not be peeked
 	name := res.name
+	if res.typ == nil {
+		res.typ = CreateStringType()
+	}
 	memberHandler := func(typ Type, member Value) {
 		if wantFunction {
 			t := NewFunctionTypeDefine(name, nil, nil, false)
 			t.SetIsMethod(true, object.GetType())
+			typ = t
 		}
 		objType := object.GetType()
-		if objType != nil {
+		if objType != nil && typ != nil {
 			if fts := objType.GetFullTypeNames(); len(fts) != 0 {
 				typ.SetFullTypeNames(fts)
 			}
 		}
-		member.SetType(typ)
+		if typ != nil {
+			member.SetType(typ)
+		}
 		setMemberCallRelationship(object, key, member)
 		setMemberVerboseName(member)
 	}
@@ -108,6 +126,16 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		member := b.NewParameterMember(name, para, key)
 		memberHandler(res.typ, member)
 		return member
+	}
+	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
+		return ret
+	}
+	// normal method
+	if wantFunction {
+		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+			fun.SetObject(object)
+			return fun
+		}
 	}
 	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
 		return field

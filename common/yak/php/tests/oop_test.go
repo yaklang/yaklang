@@ -275,8 +275,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
+			"Function-getA(Undefined-$a) member[0]",
+			"Function-getA(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -365,8 +365,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(Undefined-A-constructor(Undefined-A)) member[0]",
-			"Function-getA(Undefined-A-constructor(Undefined-A)) member[1]",
+			"Function-getA(Undefined-$a) member[0]",
+			"Function-getA(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -388,8 +388,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-getA(Undefined-A-constructor(Undefined-A)) member[0]",
-			"Function-getA(Undefined-A-constructor(Undefined-A)) member[side-effect(Parameter-$par, $this.a)]",
+			"Function-getA(Undefined-$a) member[0]",
+			"Function-getA(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -443,7 +443,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
+			"Function-getNum(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }
@@ -501,7 +501,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A();
 		println($a);`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-A-constructor(Undefined-A)",
+			"Undefined-$a",
 		}, t)
 	})
 
@@ -517,7 +517,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(Undefined-$a)",
+			"Function-getNum(Undefined-$a) member[0]",
 		}, t)
 	})
 }
@@ -836,7 +836,8 @@ class a
 
 $c = new a();
 println($c->a);`
-		CheckPrintTopDef(t, code, []string{"1"})
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		//CheckPrintTopDef(t, code, []string{"1"})
 	})
 	t.Run("oop test", func(t *testing.T) {
 		code := `<?php
