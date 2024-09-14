@@ -2,7 +2,7 @@ desc(
     title: "Execution input variable",
     type: audit,
     level: info,
-    lib: 'exec-function',
+    lib: 'php-os-exec',
 )
 
 /eval|exec|assert|system|shell_exec|pcntl_exec|popen|ob_start/ as $output

@@ -1,0 +1,40 @@
+desc(
+    title: "PHP Directly Command Injection",
+    type: vuln,
+    level: critical,
+)
+
+<include('php-os-exec')>(* as $sink);
+<include('php-param')> as $params;
+
+$sink #{
+    until: `* & $params`,
+}->;
+
+$sink?{!<dataflow(<<<FLOW
+*?{opcode: call} as $__next__
+FLOW)>} as $vuln;
+alert $vuln
+
+<delete(sink)>
+<delete(params)>
+
+desc(
+language: php,
+alert_min: 2,
+'file://a.php': <<<CODE
+<?php
+if( isset( $_POST[ 'Submit' ]  ) ) {
+	// Get input
+	$target = $_REQUEST[ 'ip' ];
+	if( stristr( php_uname( 's' ), 'Windows NT' ) ) {
+		// Windows
+		$cmd = shell_exec( 'ping  ' . $target );
+	}
+	else {
+		// *nix
+		$cmd = shell_exec( 'ping  -c 4 ' . $target );
+	}
+}
+CODE,
+)
