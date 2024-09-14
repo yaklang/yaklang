@@ -5,6 +5,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sync"
@@ -58,15 +59,13 @@ func WatchDatabaseTableMeta(db *gorm.DB, last int64, streamCtx context.Context, 
 	if db == nil {
 		db = consts.GetGormProjectDatabase()
 	}
-	var result struct {
-		Count int64
-	}
-	db = db.Raw(`select seq as count from SQLITE_SEQUENCE where name = ?`, tableName)
-	if db.Scan(&result).Error != nil {
+
+	current, err := bizhelper.GetTableCurrentId(db, tableName)
+	if err != nil {
 		return last, false
 	}
-	if result.Count != last {
-		return result.Count, true
+	if current != last {
+		return current, true
 	}
-	return result.Count, false
+	return current, false
 }

@@ -1088,3 +1088,13 @@ func FuzzSearchWithStringArrayOrAf(db *gorm.DB, fields []string, targets []strin
 
 	return db.Where(strings.Join(conds, " OR "), items...)
 }
+
+func GetTableCurrentId(db *gorm.DB, tableName string) (int64, error) {
+	var result struct {
+		Count int64
+	}
+	if db = db.Raw(`select seq as count from SQLITE_SEQUENCE where name = ?`, tableName).Find(&result); db.Error != nil {
+		return 0, db.Error
+	}
+	return result.Count, nil
+}
