@@ -26,7 +26,9 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php"
 }
-
+func (s *SSABuild) Create() ssa.Builder {
+	return &SSABuild{}
+}
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	s.InitHandlerOnce.Do(func() {
 		container := fb.EmitEmptyContainer()
@@ -76,10 +78,6 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 }
 
 var Builder = &SSABuild{}
-
-func (s *SSABuild) Create() ssa.Builder {
-	return &SSABuild{}
-}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.PreHandler = true

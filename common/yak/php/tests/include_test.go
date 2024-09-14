@@ -74,3 +74,29 @@ println($a);
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+
+func TestNativeCall_Include(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("list3.php", `<?php
+	
+	$ldapconn = ldap_connect("localhost");
+	
+	if($ldapconn){
+	 $user2 = $_GET["user2"];
+	
+	 $filter = "(&(objectClass=user)(uid=" . $user2. "))";
+	 $dn = "dc=example,dc=org";
+	
+	 ldap_list($ldapconn, $dn, $filter); // Noncompliant
+	}`)
+	fs.AddFile("list2.php", `<?php
+	$username = $_POST['username'];
+	$password = $_POST['password'];
+	// without_pass
+	$escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
+	$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
+	$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `<include('php-param')> as $params`, map[string][]string{
+		"params": {"Undefined-$password(valid)", "Undefined-$user2(valid)", "Undefined-$username(valid)"},
+	}, false, ssaapi.WithLanguage(ssaapi.PHP))
+}
