@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -31,7 +32,7 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	b.Included = true
 	_path := p.Loader.GetCurrentPath()
 	p.Loader.SetCurrentPath(path.Dir(file))
-	err = p.Build(file, data, b)
+	err = p.Build(context.Background(), file, data, b)
 
 	p.Loader.SetCurrentPath(_path)
 	return err
@@ -59,7 +60,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 		// var build
 		build := app.Build
 		if build != nil {
-			err = build(v.FileName, memedit.NewMemEditor(string(raw)), b)
+			err = build(context.Background(), v.FileName, memedit.NewMemEditor(string(raw)), b)
 		} else {
 			log.Errorf("BUG: Build function is nil in package %s", p.Name)
 		}

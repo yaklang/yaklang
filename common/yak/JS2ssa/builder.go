@@ -24,7 +24,7 @@ func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{}
 }
 
-func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
+func (*SSABuild) Build(ctx context.Context,src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -25,7 +26,7 @@ func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{}
 }
 
-func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+func (*SSABuilder) Build(ctx context.Context,src string, force bool, b *ssa.FunctionBuilder) error {
 	b.SupportClass = true
 	ast, err := Frontend(src, force)
 	if err != nil {
@@ -38,6 +39,7 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		fullTypeNameMap:   make(map[string][]string),
 		allImportPkgSlice: make([][]string, 0),
 		selfPkgPath:       make([]string, 0),
+		ctx:               ctx,
 	}
 	build.SupportClassStaticModifier = true
 	build.VisitCompilationUnit(ast)
@@ -56,15 +58,16 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 type builder struct {
 	*ssa.FunctionBuilder
-	ast      javaparser.ICompilationUnitContext
-	constMap map[string]ssa.Value
-
+	ast            javaparser.ICompilationUnitContext
+	constMap       map[string]ssa.Value
 	bluePrintStack *utils.Stack[*ssa.ClassBluePrint]
 
 	// for full type name
 	fullTypeNameMap   map[string][]string
 	allImportPkgSlice [][]string
 	selfPkgPath       []string
+	//cotext
+	ctx context.Context
 }
 
 func (b *builder) PushBluePrint(bp *ssa.ClassBluePrint) {
@@ -127,4 +130,16 @@ func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
 func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
+}
+
+func (b *builder) isStop() bool {
+	if b.ctx == nil {
+		return false
+	}
+	select {
+	case <-b.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
