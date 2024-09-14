@@ -264,3 +264,49 @@ func TestImport_syntaxflow_muti(t *testing.T) {
 	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
+
+func TestImport_order(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	import "github.com/yaklang/yaklang/B"
+
+	func test() {
+		a := &B.B1{
+			str: "hello world",
+			arr: []int{1, 2, 3, 4},
+			mp: map[string]int{
+				"hello": 1,
+				"world": 2,
+			},
+		}
+
+	    println(a.str)
+		println(a.arr[0])
+		println(a.mp["world"])
+	}
+	`)
+	vf.AddFile("src/main/go/B/test.go", `
+	package B
+
+	type B1 struct {
+		str string
+		arr []int
+		mp map[string]int
+	}
+
+	`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		println(* #-> as $a)
+		`, map[string][]string{
+		"a": {"\"hello world\"", "1", "2"},
+	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	)
+}

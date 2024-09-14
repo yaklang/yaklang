@@ -743,9 +743,9 @@ func (t *GotoBuilder) Finish() func() {
 type LabelBuilder struct {
 	b *FunctionBuilder
 
-	enter       *BasicBlock
-	name        string
-	gotoHanders []func(*BasicBlock)
+	enter        *BasicBlock
+	name         string
+	gotoHandlers []func(*BasicBlock)
 	/* 当某个goto语句遇到一个未解析的label时，可以将goto的finish作为回调函数记录在这里 */
 	gotoFinish []func()
 }
@@ -754,19 +754,19 @@ func (b *FunctionBuilder) BuildLabel(name string) *LabelBuilder {
 	enter := b.CurrentBlock
 
 	return &LabelBuilder{
-		b:           b,
-		enter:       enter,
-		name:        name,
-		gotoHanders: []func(*BasicBlock){},
+		b:            b,
+		enter:        enter,
+		name:         name,
+		gotoHandlers: []func(*BasicBlock){},
 	}
 }
 
-func (t *LabelBuilder) SetGotoHander(f func(*BasicBlock)) {
-	t.gotoHanders = append(t.gotoHanders, f)
+func (t *LabelBuilder) SetGotoHandler(f func(*BasicBlock)) {
+	t.gotoHandlers = append(t.gotoHandlers, f)
 }
 
-func (t *LabelBuilder) GetGotoHanders() []func(*BasicBlock) {
-	return t.gotoHanders
+func (t *LabelBuilder) GetGotoHandlers() []func(*BasicBlock) {
+	return t.gotoHandlers
 }
 
 func (t *LabelBuilder) SetGotoFinish(f func()) {

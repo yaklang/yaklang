@@ -218,6 +218,8 @@ type Program struct {
 
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
+	ExprotValue    map[string]Value
+	ExprotType     map[string]Type
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
