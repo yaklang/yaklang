@@ -12,7 +12,7 @@ import (
 )
 
 func (y *builder) VisitBlock(raw javaparser.IBlockContext, syntaxBlocks ...bool) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -41,7 +41,7 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext, syntaxBlocks ...bool)
 }
 
 func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -63,7 +63,7 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 }
 
 func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -659,7 +659,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 }
 
 func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) *ssa.Call {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -710,7 +710,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 }
 
 func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -761,7 +761,7 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 }
 
 func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -778,7 +778,7 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa
 }
 
 func (y *builder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -799,7 +799,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 	if y.IsBlockFinish() {
 		return nil
 	}
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 
@@ -1062,7 +1062,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 }
 
 func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclarationContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1076,7 +1076,7 @@ func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclaration
 }
 
 func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDeclarationContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1107,7 +1107,7 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 }
 
 func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typ ssa.Type) (name string, value ssa.Value) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -1156,7 +1156,7 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 }
 
 func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1176,7 +1176,7 @@ func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerCo
 }
 
 func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1201,7 +1201,7 @@ func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 }
 
 func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1225,7 +1225,7 @@ func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []s
 }
 
 func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1245,7 +1245,7 @@ func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) inter
 }
 
 func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBuilder {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1307,7 +1307,7 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 }
 
 func (y *builder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1344,7 +1344,7 @@ func (y *builder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
 }
 
 func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1410,7 +1410,7 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 }
 
 func (y *builder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext, isExpression bool) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 
@@ -1597,7 +1597,7 @@ func (y *builder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext,
 }
 
 func (y *builder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1612,7 +1612,7 @@ func (y *builder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []s
 }
 
 func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListContext) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -1630,7 +1630,7 @@ func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListCont
 }
 
 func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassVariable string) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	i, _ := raw.(*javaparser.InnerCreatorContext)
@@ -1672,7 +1672,7 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 }
 
 func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, constructorCall ssa.Value) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil, nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1749,7 +1749,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 }
 
 func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, oldClassName string) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1778,7 +1778,7 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 }
 
 func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext, p ssa.Type) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1812,7 +1812,7 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 }
 
 func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1832,7 +1832,7 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type 
 }
 
 func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1888,7 +1888,7 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 }
 
 func (y *builder) VisitResourceSpecification(raw javaparser.IResourceSpecificationContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1904,7 +1904,7 @@ func (y *builder) VisitResourceSpecification(raw javaparser.IResourceSpecificati
 }
 
 func (y *builder) VisitResources(raw javaparser.IResourcesContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1921,7 +1921,7 @@ func (y *builder) VisitResources(raw javaparser.IResourcesContext) []ssa.Value {
 }
 
 func (y *builder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

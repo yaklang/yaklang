@@ -9,7 +9,7 @@ import (
 )
 
 func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return y.EmitEmptyContainer()
 	}
 	recoverRange := y.SetRange(raw)
@@ -62,7 +62,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 }
 
 func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.ClassBluePrint) interface{} {
-	if y == nil || c == nil {
+	if y == nil || c == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(c)
@@ -288,7 +288,7 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 }
 
 func (y *builder) VisitConstantDeclarator(c *javaparser.ConstantDeclaratorContext) (string, []ssa.Value) {
-	if y == nil || c == nil {
+	if y == nil || c == nil || y.isStop() {
 		return "", nil
 	}
 	recoverRange := y.SetRange(c)

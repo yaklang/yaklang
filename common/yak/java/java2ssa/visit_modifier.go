@@ -11,7 +11,7 @@ import (
 
 func (y *builder) VisitModifiers(raw javaparser.IModifiersContext) (instanceCallback []func(ssa.Value), defCallback []func(ssa.Value), isStatic bool) {
 	isStatic = false
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -168,7 +168,7 @@ func (y *builder) VisitStaticModifier(raw javaparser.IStaticModifierContext) ssa
 }
 
 func (y *builder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierContext) ssa.ClassModifier {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return ssa.NoneModifier
 	}
 	recoverRange := y.SetRange(raw)
@@ -198,7 +198,7 @@ func (y *builder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierCo
 func (y *builder) VisitElementValuePair(raw javaparser.IElementValuePairContext) (name string, v ssa.Value) {
 	name = ""
 	v = nil
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -215,7 +215,7 @@ func (y *builder) VisitElementValuePair(raw javaparser.IElementValuePairContext)
 
 func (y *builder) VisitElementValue(raw javaparser.IElementValueContext) (v ssa.Value) {
 	v = nil
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
