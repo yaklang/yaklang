@@ -10,54 +10,47 @@ import (
 )
 
 func TestCURD_GeneralRule_base(t *testing.T) {
+	ruleName1 := utils.RandStringBytes(10)
+	ruleExpr1 := utils.RandStringBytes(10)
+	ruleName2 := utils.RandStringBytes(10)
+	ruleExpr2 := utils.RandStringBytes(10)
+
 	db := consts.GetGormProfileDatabase()
 	generalRule := &schema.GeneralRule{
-		CPE: &schema.CPE{
-			Part:    utils.RandStringBytes(10),
-			Vendor:  "microsoft",
-			Product: "windows",
-			Version: "10",
-			Update:  "1809",
-			Edition: "pro",
-		},
-		WebPath:         "https://www.microsoft.com",
-		ExtInfo:         "windows",
-		MatchExpression: "windows",
-		RuleName:        "abc",
-	}
-
-	generalRule2 := &schema.GeneralRule{
-		CPE: &schema.CPE{
-			Part:    utils.RandStringBytes(10),
-			Vendor:  "microsoft",
-			Product: "windows",
-			Version: "10",
-			Update:  "1809",
-			Edition: "pro",
-		},
-		WebPath:         "https://www.microsoft.com",
-		ExtInfo:         "windows",
-		MatchExpression: "windows",
-		RuleName:        "cba",
+		MatchExpression: ruleExpr1,
+		RuleName:        ruleName1,
 	}
 	err := CreateGeneralRule(db, generalRule)
 	require.NoError(t, err)
 
-	err = CreateGeneralRule(db, generalRule2)
+	rule, err := GetGeneralRuleByID(db, int64(generalRule.ID))
+	require.NoError(t, err)
+	require.Equal(t, ruleExpr1, rule.MatchExpression)
+
+	generalRule.RuleName = ruleName2
+	_, err = UpdateGeneralRule(db, generalRule)
 	require.NoError(t, err)
 
-	id := int64(generalRule.ID)
-	token := utils.RandStringBytes(10)
-	generalRule.CPE.Part = token
+	rule, err = GetGeneralRuleByID(db, int64(generalRule.ID))
+	require.NoError(t, err)
+	require.Equal(t, ruleName2, rule.RuleName)
 
-	err = CreateOrUpdateGeneralRule(db, generalRule.RuleName, generalRule)
+	generalRule.MatchExpression = ruleExpr2
+	_, err = UpdateGeneralRuleByRuleName(db, generalRule.RuleName, generalRule)
 	require.NoError(t, err)
 
-	rule, err := GetGeneralRuleByID(db, id)
+	rule, err = GetGeneralRuleByID(db, int64(generalRule.ID))
 	require.NoError(t, err)
-	require.Equal(t, token, rule.CPE.Part)
+	require.Equal(t, ruleExpr2, rule.MatchExpression)
 
-	count, err := DeleteGeneralRuleByFilter(db, &ypb.FingerprintFilter{IncludeId: []int64{id, int64(generalRule2.ID)}})
+	count, err := DeleteGeneralRuleByFilter(db, &ypb.FingerprintFilter{IncludeId: []int64{int64(generalRule.ID)}})
 	require.NoError(t, err)
-	require.Equal(t, int64(2), count)
+	require.Equal(t, int64(1), count)
 }
+
+//func TestSssssaaa(t *testing.T) {
+//	db := consts.GetGormProfileDatabase()
+//	ClearGeneralRule(db)
+//	err := InsertBuiltinGeneralRules(db)
+//	require.NoError(t, err)
+//}
