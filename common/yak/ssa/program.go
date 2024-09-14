@@ -30,6 +30,7 @@ func NewChildProgram(prog *Program, name string, add bool) *Program {
 	program.ExternLib = prog.ExternLib
 	program.GlobalScope = prog.GlobalScope
 	program.ScopeCallback = prog.ScopeCallback
+	program.Cache.SetFetchId(prog.Cache.fetchId)
 	if add {
 		prog.ChildApplication = append(prog.ChildApplication, program)
 	}
