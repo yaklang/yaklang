@@ -6,7 +6,7 @@ import (
 )
 
 func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -28,7 +28,7 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 }
 
 func (y *builder) VisitHtmlDocumentElement(raw phpparser.IHtmlDocumentElementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -48,7 +48,7 @@ func (y *builder) VisitHtmlDocumentElement(raw phpparser.IHtmlDocumentElementCon
 }
 
 func (y *builder) VisitInlineHtml(raw phpparser.IInlineHtmlContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -66,7 +66,7 @@ func (y *builder) VisitInlineHtml(raw phpparser.IInlineHtmlContext) interface{} 
 }
 
 func (y *builder) VisitInlineHtmlStatement(raw phpparser.IInlineHtmlStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -83,7 +83,7 @@ func (y *builder) VisitInlineHtmlStatement(raw phpparser.IInlineHtmlStatementCon
 }
 
 func (y *builder) VisitHtmlElement(raw phpparser.IHtmlElementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -96,7 +96,7 @@ func (y *builder) VisitHtmlElement(raw phpparser.IHtmlElementContext) interface{
 }
 
 func (y *builder) VisitScriptText(raw phpparser.IScriptTextContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

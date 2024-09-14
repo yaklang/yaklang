@@ -6,7 +6,7 @@ import (
 )
 
 func (y *builder) VisitWhileStatement(raw phpparser.IWhileStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -32,7 +32,7 @@ func (y *builder) VisitWhileStatement(raw phpparser.IWhileStatementContext) inte
 }
 
 func (y *builder) VisitDoWhileStatement(raw phpparser.IDoWhileStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -60,7 +60,7 @@ func (y *builder) VisitDoWhileStatement(raw phpparser.IDoWhileStatementContext) 
 }
 
 func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -109,7 +109,7 @@ func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interfac
 }
 
 func (y *builder) VisitForInit(raw phpparser.IForInitContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -123,7 +123,7 @@ func (y *builder) VisitForInit(raw phpparser.IForInitContext) []ssa.Value {
 }
 
 func (y *builder) VisitForUpdate(raw phpparser.IForUpdateContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -137,7 +137,7 @@ func (y *builder) VisitForUpdate(raw phpparser.IForUpdateContext) []ssa.Value {
 }
 
 func (y *builder) VisitContinueStatement(raw phpparser.IContinueStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -154,7 +154,7 @@ func (y *builder) VisitContinueStatement(raw phpparser.IContinueStatementContext
 }
 
 func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -211,7 +211,7 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	return nil
 }
 func (y *builder) VisitASsignVariable(raw phpparser.IAssignableContext) []*ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -231,7 +231,7 @@ func (y *builder) VisitASsignVariable(raw phpparser.IAssignableContext) []*ssa.V
 }
 
 func (y *builder) VisitArrayCreationLeft(raw phpparser.IArrayCreationContext) []*ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -246,7 +246,7 @@ func (y *builder) VisitArrayCreationLeft(raw phpparser.IArrayCreationContext) []
 	return arrays
 }
 func (y *builder) VisitArrayItemListLeft(raw phpparser.IArrayItemListContext) []*ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -264,7 +264,7 @@ func (y *builder) VisitArrayItemListLeft(raw phpparser.IArrayItemListContext) []
 }
 
 func (y *builder) VisitArrayItemLeft(raw phpparser.IArrayItemContext) *ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
