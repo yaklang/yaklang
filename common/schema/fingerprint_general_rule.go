@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 )
 
@@ -65,4 +66,54 @@ func (g *GeneralRule) String() string {
 	}
 	items = append(items, fmt.Sprintf("rule:%s", g.MatchExpression))
 	return strings.Join(items, " ")
+}
+
+func FromFingerprintGRPCModel(gr *ypb.FingerprintRule) *GeneralRule {
+	if gr == nil {
+		return nil
+	}
+	cpe := &CPE{}
+	if gr.Cpe != nil {
+		cpe.Part = gr.Cpe.Part
+		cpe.Vendor = gr.Cpe.Vendor
+		cpe.Product = gr.Cpe.Product
+		cpe.Version = gr.Cpe.Version
+		cpe.Update = gr.Cpe.Update
+		cpe.Edition = gr.Cpe.Edition
+		cpe.Language = gr.Cpe.Language
+	}
+	rule := &GeneralRule{
+		CPE:             cpe,
+		RuleName:        gr.RuleName,
+		WebPath:         gr.WebPath,
+		ExtInfo:         gr.ExtInfo,
+		MatchExpression: gr.MatchExpression,
+	}
+	rule.ID = uint(gr.Id)
+	return rule
+}
+
+func (gr *GeneralRule) ToGRPCModel() *ypb.FingerprintRule {
+	if gr == nil {
+		return nil
+	}
+	cpe := &ypb.CPE{}
+	if gr.CPE != nil {
+		cpe = &ypb.CPE{
+			Part:    gr.Part,
+			Vendor:  gr.Vendor,
+			Product: gr.Product,
+			Version: gr.Version,
+			Update:  gr.Update,
+			Edition: gr.Edition,
+		}
+	}
+
+	return &ypb.FingerprintRule{
+		Cpe:             cpe,
+		RuleName:        gr.RuleName,
+		WebPath:         gr.WebPath,
+		ExtInfo:         gr.ExtInfo,
+		MatchExpression: gr.MatchExpression,
+	}
 }
