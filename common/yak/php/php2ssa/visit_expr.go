@@ -13,7 +13,7 @@ import (
 )
 
 func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -28,7 +28,7 @@ func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementCon
 }
 
 func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -43,7 +43,7 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 }
 
 func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -486,7 +486,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 }
 
 func (y *builder) VisitChainList(raw phpparser.IChainListContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -504,7 +504,7 @@ func (y *builder) VisitChainList(raw phpparser.IChainListContext) []ssa.Value {
 }
 
 func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -525,7 +525,7 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 }
 
 func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -544,7 +544,7 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 }
 
 func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAccessContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -565,7 +565,7 @@ func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAcces
 }
 
 func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -582,7 +582,7 @@ func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.
 }
 
 func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -628,7 +628,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 }
 
 func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -659,7 +659,7 @@ func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameC
 }
 
 func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressionContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -694,7 +694,7 @@ func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressio
 }
 
 func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -718,7 +718,7 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 }
 
 func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -747,7 +747,7 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 }
 
 func (y *builder) VisitChainOrigin(raw phpparser.IChainOriginContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -772,7 +772,7 @@ func (y *builder) VisitChainOrigin(raw phpparser.IChainOriginContext) ssa.Value 
 }
 
 func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -801,7 +801,7 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 }
 
 func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ([][2]ssa.Value, int) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return [][2]ssa.Value{}, 0
 	}
 	recoverRange := y.SetRange(raw)
@@ -815,7 +815,7 @@ func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ([][2]
 }
 
 func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) ([][2]ssa.Value, int) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return [][2]ssa.Value{}, 0
 	}
 	recoverRange := y.SetRange(raw)
@@ -842,7 +842,7 @@ func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) ([][2]
 }
 
 func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) (ssa.Value, ssa.Value) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil, nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -873,7 +873,7 @@ func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) (ssa.Value, ss
 }
 
 func (y *builder) VisitAttributes(raw phpparser.IAttributesContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -892,7 +892,7 @@ func (y *builder) VisitAttributes(raw phpparser.IAttributesContext) interface{} 
 }
 
 func (y *builder) VisitAttributeGroup(raw phpparser.IAttributeGroupContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -913,7 +913,7 @@ func (y *builder) VisitAttributeGroup(raw phpparser.IAttributeGroupContext) inte
 }
 
 func (y *builder) VisitAttribute(raw phpparser.IAttributeContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -933,7 +933,7 @@ func (y *builder) VisitAttribute(raw phpparser.IAttributeContext) interface{} {
 }
 
 func (y *builder) VisitLeftArrayCreation(raw phpparser.ILeftArrayCreationContext) []*ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return []*ssa.Variable{}
 	}
 	recoverRange := y.SetRange(raw)
@@ -942,7 +942,7 @@ func (y *builder) VisitLeftArrayCreation(raw phpparser.ILeftArrayCreationContext
 	return y.VisitArrayDestructuring(arraycreation.ArrayDestructuring())
 }
 func (y *builder) VisitArrayDestructuring(raw phpparser.IArrayDestructuringContext) []*ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return []*ssa.Variable{}
 	}
 	recoverRange := y.SetRange(raw)
@@ -960,7 +960,7 @@ func (y *builder) VisitArrayDestructuring(raw phpparser.IArrayDestructuringConte
 }
 
 func (y *builder) VisitIndexDestructItem(raw phpparser.IIndexedDestructItemContext) *ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -978,7 +978,7 @@ type arrayKeyValuePair struct {
 }
 
 func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1023,7 +1023,7 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 }
 
 func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1041,7 +1041,7 @@ func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ss
 }
 
 func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1110,7 +1110,7 @@ func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.V
 
 // VisitLeftVariable
 func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Variable {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1145,7 +1145,7 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 
 // flexivariable读右值
 func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1210,7 +1210,7 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 }
 
 func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return ""
 	}
 	recoverRange := y.SetRange(raw)
@@ -1248,7 +1248,7 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 }
 
 func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -1302,7 +1302,7 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 }
 
 func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

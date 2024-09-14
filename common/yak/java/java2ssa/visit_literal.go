@@ -12,7 +12,7 @@ import (
 )
 
 func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -24,9 +24,9 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 
 	var res ssa.Value
 	if ret := i.IntegerLiteral(); ret != nil {
-		res= y.VisitIntegerLiteral(ret)
+		res = y.VisitIntegerLiteral(ret)
 	} else if ret := i.FloatLiteral(); ret != nil {
-		res= y.VisitFloatLiteral(ret)
+		res = y.VisitFloatLiteral(ret)
 	} else if ret := i.CHAR_LITERAL(); ret != nil {
 		lit := ret.GetText()
 		var s string
@@ -43,46 +43,46 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 		}
 		runeChar := []rune(s)[0]
 		if runeChar < 256 {
-			res= y.EmitConstInst(byte(runeChar))
+			res = y.EmitConstInst(byte(runeChar))
 		} else {
-			res =y.EmitConstInst(runeChar)
+			res = y.EmitConstInst(runeChar)
 		}
 	} else if ret := i.STRING_LITERAL(); ret != nil {
 
 		text := ret.GetText()
 		if text == "\"\"" {
-			res=y.EmitConstInst(text)
+			res = y.EmitConstInst(text)
 		}
 		val, err := strconv.Unquote(text)
 		if err != nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
 			return nil
 		}
-		res=  y.EmitConstInst(val)
+		res = y.EmitConstInst(val)
 	} else if ret := i.BOOL_LITERAL(); ret != nil {
 		boolLit, err := strconv.ParseBool(ret.GetText())
 		if err != nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("parse bool error %s", err))
 			return nil
 		}
-		res= y.EmitConstInst(boolLit)
+		res = y.EmitConstInst(boolLit)
 	} else if ret = i.NULL_LITERAL(); ret != nil {
-		res= y.EmitConstInst(nil)
+		res = y.EmitConstInst(nil)
 	} else if ret = i.TEXT_BLOCK(); ret != nil {
 		text := ret.GetText()
 		val := text[3 : len(text)-3]
-		res= y.EmitConstInst(val)
+		res = y.EmitConstInst(val)
 	}
 	// set full type name for right literal value
 	t := res.GetType()
-	newTyp := y.AddFullTypeNameRaw(t.String(),t)
+	newTyp := y.AddFullTypeNameRaw(t.String(), t)
 	res.SetType(newTyp)
 	return res
 }
 
 // integer literal
 func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -119,14 +119,14 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 		return v
 	}
 	if resultInt64 > math.MaxInt {
-		return  y.EmitConstInst(int64(resultInt64))
+		return y.EmitConstInst(int64(resultInt64))
 	} else {
 		return y.EmitConstInst(int(resultInt64))
 	}
 }
 
 func (y *builder) VisitFloatLiteral(raw javaparser.IFloatLiteralContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

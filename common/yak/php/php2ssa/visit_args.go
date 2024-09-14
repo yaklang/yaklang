@@ -6,7 +6,7 @@ import (
 )
 
 func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([]ssa.Value, bool) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil, false
 	}
 	recoverRange := y.SetRange(raw)
@@ -35,7 +35,7 @@ func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([
 	return args, ellipsis
 }
 func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, bool) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil, false
 	}
 	recoverRange := y.SetRange(raw)
@@ -64,7 +64,7 @@ func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, 
 }
 
 func (y *builder) VisitActualArgument(raw phpparser.IActualArgumentContext) (ssa.Value, bool) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil, false
 	}
 	recoverRange := y.SetRange(raw)

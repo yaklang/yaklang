@@ -31,6 +31,14 @@ import (
 
 type checkFunction func(*ssaapi.Program) error
 
+type ParseStage int
+
+const (
+	OnlyMemory ParseStage = iota
+	WithDatabase
+	OnlyDatabase
+)
+
 func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
@@ -168,7 +176,6 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 
 	// only in memory
 	{
-
 		start := time.Now()
 		prog, err := ssaapi.Parse(code, opt...)
 		assert.Nil(t, err)
@@ -191,6 +198,54 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 		err = handler(false, prog, start)
 		assert.Nil(t, err)
 	}
+}
+
+func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option)error {
+	// only in memory
+	var errs error
+	{
+		start := time.Now()
+		prog, err := ssaapi.ParseProject(fs, opt...)
+		errs = utils.JoinErrors(err,errs)
+
+		log.Infof("only in memory ")
+		err = handler(OnlyMemory, prog, start)
+		assert.Nil(t, err)
+	}
+
+	programID := uuid.NewString()
+	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
+	log.Info("Program ID: ", programID)
+	ssadb.DeleteProgram(ssadb.GetDB(), programID)
+	fmt.Println("-----------------------------------------------------------------------------")
+	// parse with database
+	{
+		start := time.Now()
+		opt = append(opt, ssaapi.WithProgramName(programID))
+		prog, err := ssaapi.ParseProject(fs, opt...)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			for _, program := range prog {
+				ssadb.DeleteProgram(ssadb.GetDB(), program.Program.Name)
+			}
+		}()
+		errs = utils.JoinErrors(err,errs)
+
+		log.Infof("with database ")
+		err = handler(WithDatabase, prog, start)
+		assert.Nil(t, err)
+	}
+
+	// just use database
+	{
+		start := time.Now()
+		prog, err := ssaapi.FromDatabase(programID)
+		errs = utils.JoinErrors(err,errs)
+		log.Infof("only use database ")
+		err = handler(OnlyDatabase, []*ssaapi.Program{prog}, start)
+		assert.Nil(t, err)
+	}
+	return errs
 }
 
 func CheckFSWithProgram(

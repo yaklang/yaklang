@@ -13,7 +13,7 @@ import (
 )
 
 func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -38,7 +38,7 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 }
 
 func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -105,7 +105,7 @@ func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ss
 }
 
 func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -142,7 +142,7 @@ func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ss
 }
 
 func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -179,7 +179,7 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 }
 
 func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return ""
 	}
 	identifier := raw.(*phpparser.IdentifierContext)
@@ -196,7 +196,7 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 }
 
 func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) ssa.Value {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

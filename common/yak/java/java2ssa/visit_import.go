@@ -10,6 +10,9 @@ import (
 )
 
 func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
+	if y == nil || i == nil || y.isStop() {
+		return
+	}
 	start := time.Now()
 	defer func() {
 		deltaPackageCostFrom(start)

@@ -7,7 +7,7 @@ import (
 )
 
 func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -81,7 +81,7 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 }
 
 func (y *builder) VisitElseIfStatement(raw phpparser.IElseIfStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -103,7 +103,7 @@ func (y *builder) VisitElseIfStatement(raw phpparser.IElseIfStatementContext) in
 	}
 }
 func (y *builder) VisitElseIfColonStatement(raw phpparser.IElseIfColonStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -123,7 +123,7 @@ func (y *builder) VisitElseIfColonStatement(raw phpparser.IElseIfColonStatementC
 	}
 }
 func (y *builder) VisitElseStatement(raw phpparser.IElseStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -137,7 +137,7 @@ func (y *builder) VisitElseStatement(raw phpparser.IElseStatementContext) interf
 }
 
 func (y *builder) VisitElseColonStatement(raw phpparser.IElseColonStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -151,7 +151,7 @@ func (y *builder) VisitElseColonStatement(raw phpparser.IElseColonStatementConte
 }
 
 func (y *builder) VisitSwitchStatement(raw phpparser.ISwitchStatementContext) interface{} {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -187,7 +187,7 @@ func (y *builder) VisitSwitchStatement(raw phpparser.ISwitchStatementContext) in
 }
 
 func (y *builder) VisitSwitchCaseBlock(raw phpparser.ISwitchCaseBlockContext) (func() []ssa.Value, func()) {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil, nil
 	}
 	stmt, _ := raw.(*phpparser.SwitchCaseBlockContext)
@@ -202,7 +202,7 @@ func (y *builder) VisitSwitchCaseBlock(raw phpparser.ISwitchCaseBlockContext) (f
 }
 
 func (y *builder) VisitSwitchDefaultBlock(raw phpparser.ISwitchDefaultBlockContext) func() {
-	if y == nil || raw == nil {
+	if y == nil || raw == nil || y.isStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
