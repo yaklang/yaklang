@@ -74,7 +74,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 	err := actx.hook(i)
 	if err != nil {
-		return Values{}
+		return Values{i}
 	}
 	if inst, ok := ssa.ToLazyInstruction(i.node); ok {
 		var ok bool

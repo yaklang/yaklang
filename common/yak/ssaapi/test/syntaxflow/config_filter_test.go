@@ -7,50 +7,57 @@ import (
 )
 
 func TestSF_Config_Filter(t *testing.T) {
-	t.Run("simple", func(t *testing.T) {
+	t.Run("until", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
+		// match until 
 		a = 11
-		b = f(a,1)
-		b= 22
+		b1 = f(a,1)
+
+		// no match until get undefined 
+		b3 = ccc 
 		`,
-			"b -{until:`* ?{opcode:const}`}-> * as $result",
+			"b* #{until:`* ?{opcode:call}`}-> * as $result",
 			map[string][]string{
-				"result": {"22"},
+				"result": {"Undefined-b3", "Undefined-f(11,1)"},
 			})
 	})
 
-	t.Run("test hook", func(t *testing.T) {
+	t.Run("hook", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		a = 11
 		b = f(a,1)
-		b= 22
 		`,
 			"b #{hook:`* as $num`}-> as $result",
 			map[string][]string{
-				"num":    {"1", "11", "22", "Undefined-f", "Undefined-f(11,1)"},
-				"result": {"1", "11", "22", "Undefined-f"},
+				"num":    {"1", "11", "Undefined-f", "Undefined-f(11,1)"},
+				"result": {"1", "11", "Undefined-f"},
 			})
 	})
-	t.Run("test exclude", func(t *testing.T) {
+
+	t.Run("exclude", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
-		a = 11
-		b = f(a,1)
-		b= 22
+		// match exclude 
+		b = f1(a1,1)
+
+		// no match exclude get undefined
+		b2 = f2(a2)
 		`,
-			"b #{exclude:`* ?{opcode:const}`}-> as $result",
+			"b* #{exclude:`* ?{opcode:const}`}-> as $result",
 			map[string][]string{
-				"result": {"Undefined-f", "Undefined-f(11,1)"},
+				"result": {"Undefined-a2", "Undefined-f2"},
 			})
 	})
-	t.Run("test include", func(t *testing.T) {
+	t.Run("include", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
-		a = 11
-		b = f(a,1)
-		b= 22
+		// match exclude 
+		b = f1(a1,1)
+
+		// no match exclude get undefined
+		b2 = f2(a2)
 		`,
 			"b #{include:`* ?{opcode:const}`}-> as $result",
 			map[string][]string{
-				"result": {"11", "22", "1"},
+				"result": {"Undefined-a1", "Undefined-f1", "1"},
 			})
 	})
 
@@ -58,54 +65,38 @@ func TestSF_Config_Filter(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		a = 11
 		a = f(a,1)
-		b = f(a,2)
-		b= 22
+		b1 = f(a,2)
+		b2 = 22
 		`,
-			"b #{hook:`* ?{opcode:const} as $num`}-> as $result",
+			"b* #{hook:`* ?{!opcode:const,call} as $num`}-> as $result",
 			map[string][]string{
-				"num":    {"1", "11", "2", "22"},
+				"num":    {"Undefined-f"},
 				"result": {"1", "11", "2", "22", "Undefined-f"},
 			})
 	})
 
-	/*
-		f (a)=>{
-			b=a
-			return b
-		}
-		c = f(1)
-		f(c)
-	*/
-	t.Run("test data and test more config item", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, `
-		a = 11
-		a = f(a,1)
-		b = f(a,2)
-		b= 22
-		`,
-			"b #{hook:`* ?{opcode:const} as $num`}-> as $result",
-			map[string][]string{
-				"num":    {"1", "11", "2", "22"},
-				"result": {"1", "11", "2", "22", "Undefined-f"},
-			})
-	})
 }
 func TestMoreconfig(t *testing.T) {
 	code := `
-	a = 1
-	b = 2
-	c(a)
-	c(dd)
+a = 1
+f = (i)=>{
+	a = i 
+}
+
+f(2)
+c = a 
 `
 	t.Run("hook and hook", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code, "c(*#{hook: `*?{opcode: const} as $const`,hook: `*?{!opcode: const} as $_const`}->)",
+		ssatest.CheckSyntaxFlow(t, code,
+			"c(*#{hook: `*?{opcode: const} as $const`,hook: `*?{!opcode: const} as $_const`}->)",
 			map[string][]string{
 				"const":  {"1"},
 				"_const": {"Undefined-dd"},
 			})
 	})
 	t.Run("hook and until", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code, "c(* #{hook: `*?{opcode: const} as $const`,until: `*?{opcode: const} as $_const`}->)",
+		ssatest.CheckSyntaxFlow(t, code,
+			"c(* #{hook: `*?{opcode: const} as $const`,until: `*?{opcode: const} as $_const`}->)",
 			map[string][]string{
 				"const":  {"1"},
 				"_const": {"1"},

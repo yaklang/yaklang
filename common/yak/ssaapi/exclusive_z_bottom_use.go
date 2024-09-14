@@ -77,7 +77,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 
 	err := actx.hook(v)
 	if err != nil {
-		return Values{}
+		return Values{v}
 	}
 
 	// if lazy-instruction will entry this function twice
