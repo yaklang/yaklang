@@ -500,7 +500,6 @@ func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 		if ok {
 			return haveMethod
 		}
-
 	}
 	return nil
 }
