@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -33,6 +34,10 @@ func TestGRPC_FingerprintCURD_Base(t *testing.T) {
 		require.NotNil(t, message)
 		require.Equal(t, "create", message.Operation)
 		require.Equal(t, int64(1), message.EffectRows)
+
+		getRule, err := yakit.GetGeneralRuleByRuleName(consts.GetGormProfileDatabase(), testName)
+		require.NoError(t, err)
+		require.NotNil(t, getRule)
 	})
 
 	t.Run("Test Delete Fingerprint", func(t *testing.T) {
@@ -118,7 +123,7 @@ func TestGRPC_FingerprintCURD_Base(t *testing.T) {
 				CPE: &schema.CPE{
 					Vendor: testVendor,
 				},
-				RuleName: utils.RandStringBytes(10),
+				RuleName: uuid.New().String(),
 			})
 			require.NoError(t, err)
 		}
