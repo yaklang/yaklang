@@ -21,14 +21,6 @@ type SSABuilder struct {
 	ssa.DummyPreHandler
 }
 
-type ExData struct {
-	exPath       string
-	exGlobals    map[string]ssa.Value
-	exFuncs      map[string]*ssa.Function
-	exTypes      map[string]ssa.Type
-	exAliasTypes map[string]*ssa.AliasType
-}
-
 var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
@@ -109,9 +101,8 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		structTypes:     map[string]*ssa.ObjectType{},
 		aliasTypes:      map[string]*ssa.AliasType{},
 		result:          map[string][]string{},
-		tpHander:        map[string]func(){},
+		tpHandler:       map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
-		extendKey:       map[string]*ExData{},
 		specialValues:   SpecialValue,
 		specialTypes:    SpecialTypes,
 		pkgNameCurrent:  "",
@@ -132,9 +123,8 @@ type astbuilder struct {
 	structTypes    map[string]*ssa.ObjectType
 	aliasTypes     map[string]*ssa.AliasType
 	result         map[string][]string
-	tpHander       map[string]func()
+	tpHandler      map[string]func()
 	labels         map[string]*ssa.LabelBuilder
-	extendKey      map[string]*ExData
 	specialValues  map[string]ssa.Value
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
@@ -238,56 +228,13 @@ func (b *astbuilder) GetResultDefault() []string {
 	return b.result[b.Function.GetName()]
 }
 
-func (b *astbuilder) AddExData(exPath string) *ExData {
-	exData := &ExData{
-		exPath:       exPath,
-		exGlobals:    map[string]ssa.Value{},
-		exFuncs:      map[string]*ssa.Function{},
-		exTypes:      map[string]ssa.Type{},
-		exAliasTypes: map[string]*ssa.AliasType{},
-	}
-	b.extendKey[exPath] = exData
-	return exData
-}
-
-func (b *astbuilder) GetExData(exPath string) *ExData {
-	return b.extendKey[exPath]
-}
-
-func (b *ExData) AddExtendFunc(fun *ssa.Function) {
-	b.exFuncs[fun.GetName()] = fun
-}
-
-func (b *ExData) AddExtendFuncs(funcs map[string]*ssa.Function) {
-	for _, f := range funcs {
-		b.AddExtendFunc(f)
-	}
-}
-
-func (b *ExData) GetExtendFuncs() map[string]*ssa.Function {
-	return b.exFuncs
-}
-
-func (b *ExData) AddExtendType(name string, t ssa.Type) {
-	b.exTypes[name] = t
-}
-
-func (b *ExData) GetExtendType(name string) ssa.Type {
-	if b.exTypes[name] == nil {
+func (b *astbuilder) GetImportPackage(name string) *ssa.Program {
+	prog := b.GetProgram()
+	lib, skip := prog.GetLibrary(name)
+	if skip {
 		return nil
 	}
-	return b.exTypes[name]
-}
-
-func (b *ExData) AddExtendGlobal(name string, v ssa.Value) {
-	b.exGlobals[name] = v
-}
-
-func (b *ExData) GetExtendGlobal(name string) ssa.Value {
-	if b.exGlobals[name] == nil {
-		return nil
-	}
-	return b.exGlobals[name]
+	return lib
 }
 
 func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {

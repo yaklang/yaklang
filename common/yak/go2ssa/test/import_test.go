@@ -50,7 +50,7 @@ func TestImport(t *testing.T) {
 		`, []string{"Undefined-parsedURL.Scheme(valid)"}, t)
 	})
 
-	/*t.Run("struct value", func(t *testing.T) {
+	t.Run("struct value", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		import (
@@ -71,5 +71,28 @@ func TestImport(t *testing.T) {
 		}
 
 		`, []string{"\"https\"", "\"www.example.com\""}, t)
-	})*/
+	})
+
+	t.Run("struct value-muti", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		import (
+			"fmt"
+			"net/url"
+		)
+
+		func main() {
+			u := url.URL{
+				Scheme: url.URL{
+					Scheme: []string{"https"},
+				},
+				Host:   "www.example.com",
+			}
+
+			println(u.Scheme.Scheme[0])
+			println(u.Host)
+		}
+
+		`, []string{"\"https\"", "\"www.example.com\""}, t)
+	})
 }
