@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -38,12 +39,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 		b.pkgNameCurrent = pkgNameCurrent
 
-		lib, skip := prog.GetLibrary(pkgNameCurrent)
+		lib, skip := prog.GetLibrary(pkgPath[0])
 		if skip {
 			return
 		}
 		if lib == nil {
-			lib = prog.NewLibrary(pkgNameCurrent, pkgPath)
+			lib = prog.NewLibrary(pkgPath[0], pkgPath)
 			lib.Cache = prog.Cache /* 继承Cache */
 		}
 		lib.PushEditor(prog.GetCurrentEditor())
@@ -67,29 +68,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	}
 
 	for _, impo := range ast.AllImportDecl() {
-		namel, pkgNamel := b.buildImportDecl(impo.(*gol.ImportDeclContext))
-		for i := range pkgNamel {
-			pkgName := strings.Split(pkgNamel[i], "/")
-			path := ""
-			if namel[i] != "" {
-				path = namel[i]
-			} else {
-				path = pkgName[len(pkgName)-1]
-			}
-			exData := b.AddExData(path)
-			if lib, _ := b.GetProgram().GetLibrary(pkgNamel[i]); lib != nil {
-				for _, cbp := range lib.ClassBluePrint { // only once
-					for i, v := range cbp.StaticMember {
-						exData.AddExtendType(i, v.GetType())
-					}
-					for _, f := range cbp.GetMethod() {
-						if f.GetName() != "@init" {
-							exData.AddExtendFunc(f)
-						}
-					}
-					for i, v := range cbp.NormalMember {
-						exData.AddExtendGlobal(i, v.Value)
-					}
+		namel, _ := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+		for i := range namel {
+			if lib, _ := b.GetProgram().GetLibrary(namel[i]); lib == nil {
+				if _, err := b.BuildDirectoryPackage([]string{namel[i]}, true); err == nil {
+				} else {
+					log.Infof("Dependencies Missed: Import package not found(%v)", err)
 				}
 			}
 		}
@@ -120,38 +104,25 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		f.Build()
 	}
 
-	var cbpHander = func(cbp *ssa.ClassBluePrint) {
+	var bpHandler = func() {
+		lib := b.GetProgram()
 		for structName, structType := range b.GetStructAll() {
-			typValue := ssa.NewTypeValue(structType)
-			typValue.SetType(structType)
-			cbp.AddStaticMember(structName, typValue)
+			lib.SetExprotType(structName, structType)
 		}
 		for aliasName, aliasType := range b.GetAliasAll() {
-			typValue := ssa.NewTypeValue(aliasType)
-			typValue.SetType(aliasType)
-			cbp.AddStaticMember(aliasName, typValue)
+			lib.SetExprotType(aliasName, aliasType)
 		}
-		for _, f := range b.GetProgram().Funcs {
-			if !f.IsMethod() && f.GetName() != "@init" {
-				cbp.AddMethod(f.GetName(), f)
+		for funcName, funcValue := range b.GetProgram().Funcs {
+			if !funcValue.IsMethod() && funcValue.GetName() != "@init" {
+				lib.SetExprotValue(funcName, funcValue)
 			}
 		}
-		for i, v := range b.GetGlobalVariables() {
-			cbp.AddNormalMember(i, v)
+		for globalName, globalValue := range b.GetGlobalVariables() {
+			lib.SetExprotValue(globalName, globalValue)
 		}
 	}
 
-	for _, cbp := range b.GetProgram().ClassBluePrint { // only once
-		if cbp.Name == pkgNameCurrent {
-			cbpHander(cbp)
-			return
-		}
-	}
-
-	cbp := ssa.NewClassBluePrint()
-	cbp.Name = pkgNameCurrent
-	cbpHander(cbp)
-	b.SetClassBluePrint(cbp.Name, cbp)
+	bpHandler()
 }
 
 func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
@@ -178,21 +149,21 @@ func (b *astbuilder) buildPackageName(packageName *gol.PackageNameContext) strin
 func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) ([]string, []string) {
 	recoverRange := b.SetRange(importDecl.BaseParserRuleContext)
 	defer recoverRange()
-	var namel, pkgNamel []string
+	var namel, pathl []string
 
 	for _, i := range importDecl.AllImportSpec() {
-		name, pkgPath := b.buildImportSpec(i.(*gol.ImportSpecContext))
-		pkgName := strings.Join(pkgPath, "/")
+		name, path := b.buildImportSpec(i.(*gol.ImportSpecContext))
 		namel = append(namel, name)
-		pkgNamel = append(pkgNamel, pkgName)
+		pathl = append(pathl, path)
 	}
-	return namel, pkgNamel
+	return namel, pathl
 }
 
-func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string, []string) {
+func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string, string) {
 	recoverRange := b.SetRange(importSpec.BaseParserRuleContext)
 	defer recoverRange()
 	var name string
+	var path string
 
 	if id := importSpec.IDENTIFIER(); id != nil {
 		name = id.GetText()
@@ -201,11 +172,12 @@ func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string,
 		name = "."
 	}
 
-	if path := importSpec.ImportPath(); path != nil {
-		pkgPath := strings.Split(b.buildImportPath(path.(*gol.ImportPathContext)), "/")
-		return name, pkgPath
+	if p := importSpec.ImportPath(); p != nil {
+		path = b.buildImportPath(p.(*gol.ImportPathContext))
+		namel := strings.Split(path, "/")
+		name = namel[len(namel)-1]
 	}
-	return name, nil
+	return name, path
 }
 
 func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
@@ -491,8 +463,8 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	defer recoverRange()
 
 	if param := typedef.TypeParameters(); param != nil {
-		tpHander := b.buildTypeParameters(param.(*gol.TypeParametersContext))
-		defer tpHander()
+		tpHandler := b.buildTypeParameters(param.(*gol.TypeParametersContext))
+		defer tpHandler()
 	}
 
 	name := typedef.IDENTIFIER().GetText()
@@ -586,7 +558,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if typeps := fun.TypeParameters(); typeps != nil {
-			b.tpHander[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
+			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
 		}
 
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
@@ -614,9 +586,9 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer func() {
 			recoverRange()
-			if tph := b.tpHander[newFunc.GetName()]; tph != nil {
+			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
-				delete(b.tpHander, newFunc.GetName())
+				delete(b.tpHandler, newFunc.GetName())
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
@@ -706,17 +678,17 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer func() {
 			recoverRange()
-			if tph := b.tpHander[newFunc.GetName()]; tph != nil {
+			if tph := b.tpHandler[newFunc.GetName()]; tph != nil {
 				tph()
-				delete(b.tpHander, newFunc.GetName())
+				delete(b.tpHandler, newFunc.GetName())
 			}
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
-		for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+		/*for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
 			variable := b.CreateLocalVariable(i.String())
 			b.AssignVariable(variable, m)
-		}
+		}*/
 
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
@@ -1140,7 +1112,7 @@ func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {
 		// target label not exist, create it
 		LabelBuilder := b.BuildLabel(labelName)
 		// use handler function
-		LabelBuilder.SetGotoHander(func(_goto *ssa.BasicBlock) {
+		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock) {
 			gotoBuilder.SetLabel(_goto)
 			f := gotoBuilder.Finish()
 			LabelBuilder.SetGotoFinish(f)
@@ -1205,7 +1177,7 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	block := LabelBuilder.GetBlock()
 	LabelBuilder.Build()
 	b.AddLabel(text, block)
-	for _, f := range LabelBuilder.GetGotoHanders() {
+	for _, f := range LabelBuilder.GetGotoHandlers() {
 		f(block)
 	}
 
@@ -1806,7 +1778,7 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 	if tname := typ.TypeName(); tname != nil {
 		ssatyp = b.buildTypeName(tname.(*gol.TypeNameContext))
 		if a := typ.TypeArgs(); a != nil {
-			b.tpHander[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
+			b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 		}
 	}
 
@@ -1824,20 +1796,19 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 	if qul := tname.QualifiedIdent(); qul != nil {
 		if qul, ok := qul.(*gol.QualifiedIdentContext); ok {
-			exData := b.GetExData(qul.IDENTIFIER(0).GetText())
-			if exData == nil { // 没有找到包，可能是golang标准库,也可能是package名称和导入名称不同
+			lib := b.GetImportPackage(qul.IDENTIFIER(0).GetText())
+			if lib == nil { // 没有找到包，可能是golang库,也可能是package名称和导入名称不同
 				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
-				exData = b.AddExData(qul.IDENTIFIER(0).GetText())
-			}
+				ssatyp = ssa.CreateAnyType()
+			} else {
+				obj := lib.GetExprotType(qul.IDENTIFIER(1).GetText())
 
-			obj := exData.GetExtendType(qul.IDENTIFIER(1).GetText())
-
-			if obj != nil {
-				ssatyp = obj
-			} else { // 没有找到类型，可能来自于golang标准库
-				b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(1).GetText()))
-				objt := ssa.CreateAnyType()
-				ssatyp = objt
+				if obj != nil {
+					ssatyp = obj
+				} else { // 没有找到类型，可能来自于golang库
+					b.NewError(ssa.Warn, TAG, StructNotFind(qul.IDENTIFIER(1).GetText()))
+					ssatyp = ssa.CreateAnyType()
+				}
 			}
 		}
 	} else {

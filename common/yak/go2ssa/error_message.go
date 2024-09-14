@@ -122,3 +122,7 @@ func StructNotFind(n string) string {
 func MissInitExpr(name string) string {
 	return fmt.Sprintf("miss init expression for %s", name)
 }
+
+func NotFunction(name string) string {
+	return fmt.Sprintf("value %s is not a function", name)
+}

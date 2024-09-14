@@ -101,9 +101,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	var kvs []keyValue
 
 	typ := b.buildLiteralType(exp.LiteralType().(*gol.LiteralTypeContext))
-	if typ == nil { // 目前还没法识别golang的标准库,这里暂时识别为StructType
-		typ = ssa.NewStructType()
-	}
 	if value := exp.LiteralValue(); value != nil {
 		if s, ok := value.(*gol.LiteralValueContext); ok {
 			switch t := typ.(type) {
@@ -115,89 +112,87 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				} else {
 					kvs = b.buildLiteralValue(s, false)
 				}
-			case *ssa.AliasType: // 处理golang标准库
+			case *ssa.AliasType: // 处理golang库
 				// TODO
 				typ = typ.(*ssa.AliasType).GetType()
 				kvs = b.buildLiteralValue(s, true)
 			default:
 				typ = ssa.CreateAnyType()
-				kvs = b.buildLiteralValue(s, false)
+				kvs = b.buildLiteralValue(s, true)
 			}
 		}
 	}
 
-	var typeHander func(ssa.Type, []keyValue) ssa.Value
+	var typeHandler func(ssa.Type, []keyValue) ssa.Value
 
-	typeHander = func(typ ssa.Type, kvs []keyValue) ssa.Value {
+	typeHandler = func(typ ssa.Type, kvs []keyValue) ssa.Value {
 		var obj ssa.Value
 
 		switch typ.GetTypeKind() {
 		case ssa.SliceTypeKind, ssa.BytesTypeKind:
-			objt := typ.(*ssa.ObjectType)
 			if len(kvs) == 0 {
 				return b.CreateInterfaceWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
 				return kvs[0].value
-			} else {
-				obj = b.InterfaceAddFieldBuild(len(kvs),
-					func(i int) ssa.Value {
-						return b.EmitConstInst(i)
-					},
-					func(i int) ssa.Value {
-						return typeHander(objt.FieldType, kvs[i].kv)
-					})
 			}
+
+			objt := typ.(*ssa.ObjectType)
+			obj = b.InterfaceAddFieldBuild(len(kvs),
+				func(i int) ssa.Value {
+					return b.EmitConstInst(i)
+				},
+				func(i int) ssa.Value {
+					return typeHandler(objt.FieldType, kvs[i].kv)
+				})
 		case ssa.MapTypeKind:
-			objt := typ.(*ssa.ObjectType)
 			if len(kvs) == 0 {
 				return b.CreateInterfaceWithMap(nil, nil)
 			}
 			if kvs[0].value != nil {
 				return kvs[0].value
-			} else {
+			}
+			objt := typ.(*ssa.ObjectType)
+			obj = b.InterfaceAddFieldBuild(len(kvs),
+				func(i int) ssa.Value {
+					return kvs[i].key
+				},
+				func(i int) ssa.Value {
+					return typeHandler(objt.FieldType, kvs[i].kv)
+				})
+		case ssa.StructTypeKind:
+			if len(kvs) == 0 {
+				return b.CreateInterfaceWithMap(nil, nil)
+			}
+			if kvs[0].value != nil {
+				return kvs[0].value
+			}
+			objt := typ.(*ssa.ObjectType)
+			if kvs[0].key == nil { // 全部初始化
 				obj = b.InterfaceAddFieldBuild(len(kvs),
 					func(i int) ssa.Value {
-						return kvs[i].key
+						if i < len(objt.Keys) {
+							return objt.Keys[i]
+						} else {
+							return b.EmitConstInst("")
+						}
 					},
 					func(i int) ssa.Value {
-						return typeHander(objt.FieldType, kvs[i].kv)
+						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
-			}
-		case ssa.StructTypeKind:
-			objt := typ.(*ssa.ObjectType)
-			if len(kvs) == 0 {
-				return b.CreateInterfaceWithMap(nil, nil)
-			}
-			if kvs[0].value != nil {
-				return kvs[0].value
-			} else {
-				if kvs[0].key == nil { // 全部初始化
-					obj = b.InterfaceAddFieldBuild(len(kvs),
-						func(i int) ssa.Value {
-							if i < len(objt.Keys) {
-								return objt.Keys[i]
-							} else {
-								return b.EmitConstInst("")
+			} else { // 部分初始化
+				obj = b.InterfaceAddFieldBuild(len(objt.Keys),
+					func(i int) ssa.Value {
+						return objt.Keys[i]
+					},
+					func(i int) ssa.Value {
+						for y, kv := range kvs {
+							if objt.Keys[i].String() == kv.key.String() {
+								return typeHandler(objt.FieldTypes[i], kvs[y].kv)
 							}
-						},
-						func(i int) ssa.Value {
-							return typeHander(objt.FieldTypes[i], kvs[i].kv)
-						})
-				} else { // 部分初始化
-					obj = b.InterfaceAddFieldBuild(len(objt.Keys),
-						func(i int) ssa.Value {
-							return objt.Keys[i]
-						},
-						func(i int) ssa.Value {
-							for y, kv := range kvs {
-								if objt.Keys[i].String() == kv.key.String() {
-									return typeHander(objt.FieldTypes[i], kvs[y].kv)
-								}
-							}
-							return b.GetDefaultValue(objt.FieldTypes[i])
-						})
-				}
+						}
+						return b.GetDefaultValue(objt.FieldTypes[i])
+					})
 			}
 		case ssa.InterfaceTypeKind:
 			// TODO
@@ -208,9 +203,25 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				func(i int) ssa.Value {
 					return b.EmitConstInst(i)
 				})
-		case ssa.AnyTypeKind:
-			// TODO
-			return b.EmitUndefined(typ.String())
+		case ssa.AnyTypeKind: // 对于未知类型，这里选择根据LiteralValue的特征来推测其类型
+			var typt ssa.Type
+
+			if len(kvs) == 0 {
+				return b.EmitUndefined(typ.String())
+			} else if kvs[0].key == nil && kvs[0].value == nil { // array slice
+				kv := kvs[0].kv
+				typt = ssa.NewSliceType(kv[0].value.GetType())
+			} else if _, ok := ssa.ToBasicType(kvs[0].key.GetType()); ok { // struct map
+				typt = ssa.NewStructType()
+				for _, kv := range kvs {
+					value := kv.kv[0].value
+					typt.(*ssa.ObjectType).AddField(kv.key, value.GetType())
+				}
+			} else {
+				return b.EmitUndefined(typt.String())
+			}
+
+			return typeHandler(typt, kvs)
 		case ssa.UndefinedTypeKind:
 			obj = b.InterfaceAddFieldBuild(0,
 				func(i int) ssa.Value {
@@ -232,7 +243,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		return obj
 	}
 
-	return typeHander(typ, kvs)
+	return typeHandler(typ, kvs)
 }
 
 func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bool) (ret []keyValue) {
@@ -579,7 +590,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 		if typ, ok := em.(*gol.EmbeddedFieldContext); ok {
 			parent := b.buildTypeName(typ.TypeName().(*gol.TypeNameContext))
 			if a := typ.TypeArgs(); a != nil {
-				b.tpHander[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
+				b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
 			if parent == nil {
 				name := typ.TypeName().(*gol.TypeNameContext).GetText()
@@ -588,10 +599,12 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				parent.(*ssa.ObjectType).Name = name
 			}
 			if p, ok := parent.(*ssa.ObjectType); ok {
-				structTyp.AddField(b.EmitConstInst(""), p)
+				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
 				structTyp.AnonymousField = append(structTyp.AnonymousField, p)
 			} else if a, ok := parent.(*ssa.AliasType); ok {
 				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
+			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
+				structTyp.AddField(b.EmitConstInst(ba.GetName()), ba)
 			}
 		}
 	}
@@ -764,6 +777,6 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	case ssa.BooleanTypeKind:
 		return b.EmitConstInst(false)
 	default:
-		return b.EmitConstInst("")
+		return b.EmitConstInst(0)
 	}
 }
