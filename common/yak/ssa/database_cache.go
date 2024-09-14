@@ -218,7 +218,7 @@ func (c *Cache) saveInstruction(instIr instructionIrCode) bool {
 	if err := c.DB.Save(instIr.irCode).Error; err != nil {
 		log.Errorf("Save irCode error: %v", err)
 	}
-	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
+	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Since(start)))
 
 	return true
 }
