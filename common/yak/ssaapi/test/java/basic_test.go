@@ -10,7 +10,7 @@ func Test_Class_Member(t *testing.T) {
 			Code: `
 		class A {
 			int a; 
-			void main() {
+			public static void  main() {
 				println(a);
 			}
 		}
@@ -28,7 +28,7 @@ func Test_Class_Member(t *testing.T) {
 			Code: `
 		class A {
 			BClass B;
-			void main() {
+			public static void main() {
 				B.b(1);
 				B.b(2);
 			}

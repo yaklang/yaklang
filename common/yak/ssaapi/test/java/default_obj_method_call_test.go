@@ -155,7 +155,7 @@ class B {
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 func TestDefaultOBJFieldCall4(t *testing.T) {
-	ssatest.Check(t, `
+	ssatest.CheckSyntaxFlow(t, `
 class A {
 	static String staticValue = "abc";
 
@@ -170,16 +170,8 @@ class A {
 	}
 }
 
-`, func(prog *ssaapi.Program) error {
-		result := prog.SyntaxFlow(`staticValue as $entry;`)
-		rets := result.GetValues("entry")
-		if rets.Len() <= 0 {
-			t.Fatal("no entry")
-		}
-		if rets.Len() != 4 {
-			t.Fatal("staticValue should be 4")
-		}
-		return nil
+`, `staticValue as $entry;`, map[string][]string{
+		"entry": []string{"\"abc\"", "\"ddd\"", "\"eee\"", "phi(staticValue)[\"eee\",\"abc\"]"},
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 
@@ -365,9 +357,8 @@ public class B{
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 
-
 func TestDefaultObj_XX(t *testing.T) {
-	code :=`package com.example.filedownload;
+	code := `package com.example.filedownload;
 
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
@@ -397,11 +388,11 @@ public class FileDownloadController {
 }`
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
-		target:= prog.SyntaxFlowChain(`file.getName(* as $param)`).Show()
-		assert.Equal(t,1, target.Len())
+		target := prog.SyntaxFlowChain(`file.getName(* as $param)`).Show()
+		assert.Equal(t, 1, target.Len())
 
-		target= prog.SyntaxFlowChain(`headers.add(* as $param)`).Show()
-		assert.Equal(t,3, target.Len())
+		target = prog.SyntaxFlowChain(`headers.add(* as $param)`).Show()
+		assert.Equal(t, 3, target.Len())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))	
+	}, ssaapi.WithLanguage(consts.JAVA))
 }
