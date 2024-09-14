@@ -888,6 +888,7 @@ type YakClient interface {
 	DeleteFingerprint(ctx context.Context, in *DeleteFingerprintRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateFingerprint(ctx context.Context, in *UpdateFingerprintRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	CreateFingerprint(ctx context.Context, in *CreateFingerprintRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	RecoverBuiltinFingerprint(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	// 反弹shell命令生成
 	GetReverseShellProgramList(ctx context.Context, in *GetReverseShellProgramListRequest, opts ...grpc.CallOption) (*GetReverseShellProgramListResponse, error)
 	GenerateReverseShellCommand(ctx context.Context, in *GenerateReverseShellCommandRequest, opts ...grpc.CallOption) (*GenerateReverseShellCommandResponse, error)
@@ -5825,6 +5826,15 @@ func (c *yakClient) CreateFingerprint(ctx context.Context, in *CreateFingerprint
 	return out, nil
 }
 
+func (c *yakClient) RecoverBuiltinFingerprint(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/RecoverBuiltinFingerprint", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetReverseShellProgramList(ctx context.Context, in *GetReverseShellProgramListRequest, opts ...grpc.CallOption) (*GetReverseShellProgramListResponse, error) {
 	out := new(GetReverseShellProgramListResponse)
 	err := c.cc.Invoke(ctx, Yak_GetReverseShellProgramList_FullMethodName, in, out, opts...)
@@ -6335,6 +6345,7 @@ type YakServer interface {
 	DeleteFingerprint(context.Context, *DeleteFingerprintRequest) (*DbOperateMessage, error)
 	UpdateFingerprint(context.Context, *UpdateFingerprintRequest) (*DbOperateMessage, error)
 	CreateFingerprint(context.Context, *CreateFingerprintRequest) (*DbOperateMessage, error)
+	RecoverBuiltinFingerprint(context.Context, *Empty) (*DbOperateMessage, error)
 	// 反弹shell命令生成
 	GetReverseShellProgramList(context.Context, *GetReverseShellProgramListRequest) (*GetReverseShellProgramListResponse, error)
 	GenerateReverseShellCommand(context.Context, *GenerateReverseShellCommandRequest) (*GenerateReverseShellCommandResponse, error)
@@ -7475,6 +7486,9 @@ func (UnimplementedYakServer) UpdateFingerprint(context.Context, *UpdateFingerpr
 }
 func (UnimplementedYakServer) CreateFingerprint(context.Context, *CreateFingerprintRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateFingerprint not implemented")
+}
+func (UnimplementedYakServer) RecoverBuiltinFingerprint(context.Context, *Empty) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RecoverBuiltinFingerprint not implemented")
 }
 func (UnimplementedYakServer) GetReverseShellProgramList(context.Context, *GetReverseShellProgramListRequest) (*GetReverseShellProgramListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetReverseShellProgramList not implemented")
@@ -14532,6 +14546,24 @@ func _Yak_CreateFingerprint_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_RecoverBuiltinFingerprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RecoverBuiltinFingerprint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/RecoverBuiltinFingerprint",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RecoverBuiltinFingerprint(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetReverseShellProgramList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetReverseShellProgramListRequest)
 	if err := dec(in); err != nil {
@@ -15814,6 +15846,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateFingerprint",
 			Handler:    _Yak_CreateFingerprint_Handler,
+		},
+		{
+			MethodName: "RecoverBuiltinFingerprint",
+			Handler:    _Yak_RecoverBuiltinFingerprint_Handler,
 		},
 		{
 			MethodName: "GetReverseShellProgramList",
