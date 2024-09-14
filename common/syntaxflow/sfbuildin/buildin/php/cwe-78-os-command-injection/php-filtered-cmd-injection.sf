@@ -1,0 +1,101 @@
+desc(
+    title: "PHP Filtered Path Command Injection",
+    title_zh: "用户输入被过滤的命令注入代码（需额外检查过滤是否充分）",
+    type: audit,
+    level: mid,
+)
+
+<include('php-os-exec')>(* as $sink);
+<include('php-param')> as $params;
+
+$sink #{
+    until: `* & $params`,
+}->;
+
+$sink?{<dataflow(<<<FLOW
+*?{opcode: call && <getCaller><name>?{any: str_replace, htmlspecialchars, strip_tags, addslashes, filter, escape, sanitiz, remove,preg_replace} } as $__next__
+FLOW)>} as $target;
+alert $target
+
+<delete(sink)>
+<delete(params)>
+
+desc(
+language: php,
+alert_min: 4,
+'safefile://b.php': <<<CODE
+<?php
+if( isset( $_POST[ 'Submit' ]  ) ) {
+	$target = $_REQUEST[ 'ip' ];
+	$substitutions = array(
+		'&'  => '',
+		';'  => '',
+		'| ' => '',
+		'-'  => '',
+		'$'  => '',
+		'('  => '',
+		')'  => '',
+		'`'  => '',
+		'||' => '',
+	);
+	$target = trim( array_keys( $substitutions ), $substitutions, $target );
+	if( stristr( php_uname( 's' ), 'Windows NT' ) ) {
+		// Windows
+		$cmd = shell_exec( 'ping  ' . $target );
+	}
+	else {
+		$cmd = shell_exec( 'ping  -c 4 ' . $target );
+	}
+}
+CODE,
+'file://a.php': <<<CODE
+<?php
+if( isset( $_POST[ 'Submit' ]  ) ) {
+	$target = $_REQUEST[ 'ip' ];
+	$substitutions = array(
+		'&'  => '',
+		';'  => '',
+		'| ' => '',
+		'-'  => '',
+		'$'  => '',
+		'('  => '',
+		')'  => '',
+		'`'  => '',
+		'||' => '',
+	);
+	$target = str_replace( array_keys( $substitutions ), $substitutions, $target );
+	if( stristr( php_uname( 's' ), 'Windows NT' ) ) {
+		// Windows
+		$cmd = shell_exec( 'ping  ' . $target );
+	}
+	else {
+		$cmd = shell_exec( 'ping  -c 4 ' . $target );
+	}
+}
+CODE,
+'file://a1.php': <<<CODE
+<?php
+if( isset( $_POST[ 'Submit' ]  ) ) {
+	$target = $_REQUEST[ 'ip' ];
+	$substitutions = array(
+		'&'  => '',
+		';'  => '',
+		'| ' => '',
+		'-'  => '',
+		'$'  => '',
+		'('  => '',
+		')'  => '',
+		'`'  => '',
+		'||' => '',
+	);
+	$target = preg_replace( array_keys( $substitutions ), $substitutions, $target );
+	if( stristr( php_uname( 's' ), 'Windows NT' ) ) {
+		// Windows
+		$cmd = shell_exec( 'ping  ' . $target );
+	}
+	else {
+		$cmd = shell_exec( 'ping  -c 4 ' . $target );
+	}
+}
+CODE,
+)
