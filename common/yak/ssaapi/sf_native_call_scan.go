@@ -151,24 +151,24 @@ func (b *basicBlockInfo) searchInsts() {
 				b.results = append(b.results, value)
 				continue
 			} else {
-				rcKind := b.recursiveConfig.compileAndRun(value)
-				switch rcKind {
-				case ContinueSkip:
-					continue
-				case ContinueMatch:
-					b.results = append(b.results, value)
-					continue
-				case StopMatch:
-					b.results = append(b.results, value)
-					b.isFinish = true
-					break
-				case StopNoMatch:
-					b.isFinish = true
-					break
-				default:
-					b.results = append(b.results, value)
-					continue
-				}
+				// rcKind := b.recursiveConfig.compileAndRun(value)
+				// switch rcKind {
+				// case ContinueSkip:
+				// 	continue
+				// case ContinueMatch:
+				// 	b.results = append(b.results, value)
+				// 	continue
+				// case StopMatch:
+				// 	b.results = append(b.results, value)
+				// 	b.isFinish = true
+				// 	break
+				// case StopNoMatch:
+				// 	b.isFinish = true
+				// 	break
+				// default:
+				// 	b.results = append(b.results, value)
+				// 	continue
+				// }
 			}
 		}
 	}

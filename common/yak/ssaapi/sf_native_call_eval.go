@@ -11,53 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-	contextResult, err := frame.GetSFResult()
-	if err != nil {
-		return false, nil, err
-	}
-
-	code := params.GetString(0, "code")
-	var tmpResult *SyntaxFlowResult
-	defer func() {
-		if tmpResult != nil && tmpResult.memResult != nil {
-			contextResult.MergeByResult(tmpResult.memResult)
-		}
-	}()
-
-	var nextResults []sfvm.ValueOperator
-	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
-		if val, ok := operator.(*Value); ok {
-			var dataFlows sfvm.ValueOperator = val.GetDataFlowPath()
-			//var defVals sfvm.ValueOperator = val.GetEffectOnPath()
-			//var useVals sfvm.ValueOperator = val.GetDependOnPath()
-			next := sfvm.NewValues([]sfvm.ValueOperator{dataFlows})
-			if _, ok := contextResult.AlertSymbolTable["__next__"]; ok {
-				delete(contextResult.AlertSymbolTable, "__next__")
-			}
-			contextResult.SymbolTable.Delete("__next__")
-			newResult, err := SyntaxFlowWithVMContext(next, code, contextResult, frame.GetVM().GetConfig())
-			if err != nil {
-				return nil
-			}
-			tmpResult = newResult
-			val := newResult.GetValues("__next__")
-			if haveResult(val) {
-				nextResults = append(nextResults, operator)
-			}
-		}
-		return nil
-	})
-
-	if len(nextResults) > 0 {
-		return true, sfvm.NewValues(nextResults), nil
-	}
-	//if tmpSfResult != nil && tmpSfResult.SFFrameResult != nil {
-	//	frame.SetSFResult(tmpSfResult.SFFrameResult)
-	//}
-	return false, sfvm.NewValues(nil), nil
-}
-
 var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	contextResult, err := frame.GetSFResult()
 	if err != nil {

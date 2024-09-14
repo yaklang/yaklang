@@ -8,6 +8,8 @@ import (
 
 type RecursiveConfigKey string
 
+const RecursiveMagicVariable = "__next__"
+
 const (
 	RecursiveConfig_NULL     RecursiveConfigKey = ""
 	RecursiveConfig_Depth                       = "depth"
