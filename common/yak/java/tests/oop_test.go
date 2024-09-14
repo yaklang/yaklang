@@ -361,7 +361,7 @@ public class Main {
             println(a);
         }
  }
-			`, []string{"1"}, t)
+			`, []string{"ParameterMember-parameter[0].a"}, t)
 	})
 
 	t.Run("test member variable and static method within a class", func(t *testing.T) {
@@ -372,7 +372,7 @@ public class Main {
             println(a);
         }
  }
-			`, []string{"1"}, t)
+			`, []string{"ParameterMember-parameter[0].a"}, t)
 	})
 
 	t.Run("test cross class static variable calls ", func(t *testing.T) {

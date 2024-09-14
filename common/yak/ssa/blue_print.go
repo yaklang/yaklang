@@ -168,3 +168,7 @@ func (c *ClassBluePrint) SetFullTypeNames(names []string) {
 	}
 	c.fullTypeName = names
 }
+
+func (c *ClassBluePrint) GetNormalMember(name string) *BluePrintMember {
+	return c.NormalMember[name]
+}

@@ -54,7 +54,7 @@ public class PmsPortalBrandServiceImpl implements PmsPortalBrandService {
 	off #-> as $ParameterDef
 	check $ParameterDef then "fine" else "not found parameter offset defined"
 `, map[string][]string{
-		"caller":       {"Undefined-homeDao.getRecommendBrandList(valid)(Undefined-homeDao,mul(sub(Parameter-pageNum, 1), Parameter-pageSize),Parameter-pageSize)"},
+		"caller":       {"Undefined-this.homeDao.getRecommendBrandList(valid)(ParameterMember-parameter[0].homeDao,mul(sub(Parameter-pageNum, 1), Parameter-pageSize),Parameter-pageSize)"},
 		"ParameterDef": {"1", "Parameter-pageNum", "Parameter-pageSize"},
 	},
 		false,

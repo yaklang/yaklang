@@ -625,7 +625,18 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 处理赋值表达式的等于号
 		if s := ret.Identifier(0); s != nil {
 			recoverRange := y.SetRange(s)
-			variable = y.CreateVariable(s.GetText())
+			name := s.GetText()
+			if clazz := y.MarkedThisClassBlueprint; clazz != nil {
+				if clazz.GetNormalMember(name) != nil {
+					obj := y.PeekValue("this")
+					if obj != nil {
+						variable = y.CreateMemberCallVariable(obj, y.EmitConstInst(name))
+					}
+				}
+			}
+			if variable == nil {
+				variable = y.CreateVariable(name)
+			}
 			recoverRange()
 		}
 		if id := ret.Identifier(1); id != nil {
@@ -1856,8 +1867,15 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 		if value, ok := y.ReadClassConst(class.Name, name); ok {
 			return value
 		}
-
-		value := y.ReadSelfMember(name)
+		if class.GetNormalMember(name) != nil {
+			obj := y.PeekValue("this")
+			if obj != nil {
+				if value = y.ReadMemberCallVariable(obj, y.EmitConstInst(name)); value != nil {
+					return value
+				}
+			}
+		}
+		value = y.ReadSelfMember(name)
 		if value != nil {
 			return value
 		}
