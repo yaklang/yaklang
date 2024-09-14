@@ -51,6 +51,46 @@ func Test_Package_mutifile_init(t *testing.T) {
 	vf.AddFile("src/main/go/A/test1.go", `
 	package A
 
+	func init() int { // 特殊函数init可能会导致当前block提前finish
+		return 0
+	}
+	`)
+	vf.AddFile("src/main/go/A/test2.go", `
+	package A
+
+	var str = []string{
+		"hello world",
+	}
+
+	func main() {
+		for true {
+			if true {
+
+			}else{
+				println(str[0])
+			}
+		}
+	}
+	`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		println(* #-> as $a)
+		`, map[string][]string{
+		"a": {"\"hello world\""},
+	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
+
+func Test_Package_mutifile_meminit(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test1.go", `
+	package A
+
 	type T struct {
 	    
 	}
