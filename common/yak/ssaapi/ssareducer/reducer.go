@@ -29,7 +29,6 @@ func ReducerCompile(base string, opts ...Option) error {
 	defer visited.Close()
 
 	handler := func(path string) error {
-
 		fd, err := c.fs.Open(path)
 		if err != nil {
 			return utils.Wrapf(err, "c.fs.Open(%#v) failed", path)

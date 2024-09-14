@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,7 +70,7 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		return nil
 	}
 	builder.PreHandler = true
-	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
+	prog.Build(context.Background(), path, memedit.NewMemEditor(string(file)), builder)
 	defer func() {
 		builder.PreHandler = false
 	}()
@@ -81,11 +82,11 @@ var Builder = &SSABuild{}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.PreHandler = true
-	builder.GetProgram().Build("", editor, builder)
+	builder.GetProgram().Build(context.Background(), "", editor, builder)
 	builder.PreHandler = false
 }
 
-func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+func (s *SSABuild) Build(ctx context.Context, src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
@@ -104,6 +105,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 				}()
 				return id
 			},
+			ctx: ctx,
 		}
 		build.callback = func(str string, filename string) {
 			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
@@ -143,6 +145,7 @@ type builder struct {
 	isFunction    bool
 	callback      func(str string, filename string)
 	fetchDollarId func() int
+	ctx           context.Context
 }
 
 func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
@@ -184,6 +187,18 @@ func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
 func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
+}
+
+func (b *builder) isStop() bool {
+	if b.ctx == nil {
+		return false
+	}
+	select {
+	case <-b.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 var phpBuildIn = map[string]any{

@@ -59,7 +59,8 @@ type config struct {
 	SaveToProfile              bool
 	// for hash
 	externInfo string
-
+	// process manager
+	manager *SSAParseProcessManager
 	// error
 	err error
 }
@@ -265,6 +266,12 @@ func WithEnableCache(b ...bool) Option {
 		} else {
 			c.EnableCache = true
 		}
+	}
+}
+
+func WithProcessManager(manager *SSAParseProcessManager) Option {
+	return func(c *config) {
+		c.manager = manager
 	}
 }
 
