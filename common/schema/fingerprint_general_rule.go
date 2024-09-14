@@ -46,10 +46,10 @@ func (c *CPE) String() string {
 type GeneralRule struct {
 	gorm.Model
 	*CPE
-	RuleName        string `gorm:"unique_index"`
-	WebPath         string
+	RuleName        string `json:"指纹名称" gorm:"unique_index"`
+	WebPath         string `json:"web路径"`
 	ExtInfo         string
-	MatchExpression string
+	MatchExpression string `json:"指纹规则"`
 }
 
 func (g *GeneralRule) String() string {
