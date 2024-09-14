@@ -705,6 +705,7 @@ service Yak {
   rpc DeleteFingerprint(DeleteFingerprintRequest) returns (DbOperateMessage);
   rpc UpdateFingerprint(UpdateFingerprintRequest) returns (DbOperateMessage);
   rpc CreateFingerprint(CreateFingerprintRequest) returns (DbOperateMessage);
+  rpc RecoverBuiltinFingerprint(Empty) returns (DbOperateMessage);
 
 
   // 反弹shell命令生成
@@ -5393,6 +5394,7 @@ message CreateFingerprintRequest {
 }
 
 message UpdateFingerprintRequest {
-  string name = 1;
-  FingerprintRule Rule = 2;
+  int64 Id = 1;
+  string RuleName = 2;
+  FingerprintRule Rule = 3;
 }
