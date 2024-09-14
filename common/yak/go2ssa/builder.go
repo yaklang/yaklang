@@ -1,6 +1,7 @@
 package go2ssa
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -77,7 +78,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	return nil
 }
 
-func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
+func (s *SSABuilder) Build(ctx context.Context, src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
