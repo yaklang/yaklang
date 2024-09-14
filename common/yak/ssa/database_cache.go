@@ -39,13 +39,17 @@ type instructionIrCode struct {
 type Cache struct {
 	ProgramName      string // mark which program handled
 	DB               *gorm.DB
-	id               *atomic.Int64
+	fetchId          func() int64
 	InstructionCache *utils.CacheWithKey[int64, instructionIrCode] // instructionID to instruction
 
 	VariableCache   map[string][]Instruction // variable(name:string) to []instruction
 	MemberCache     map[string][]Instruction
 	Class2InstIndex map[string][]Instruction
 	constCache      []Instruction
+}
+
+func (c *Cache) SetFetchId(_func func() int64) {
+	c.fetchId = _func
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
@@ -70,7 +74,11 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 			return cache.saveInstruction(inst)
 		})
 	} else {
-		cache.id = atomic.NewInt64(0)
+		id := atomic.NewInt64(0)
+		cache.fetchId = func() int64 {
+			inc := id.Inc()
+			return inc
+		}
 	}
 
 	return cache
@@ -100,11 +108,11 @@ func (c *Cache) SetInstruction(inst Instruction) {
 		}
 	} else {
 		// not use database
-		id = c.id.Inc()
 		instIr = instructionIrCode{
 			inst:   inst,
 			irCode: nil,
 		}
+		id = c.fetchId()
 	}
 	inst.SetId(id)
 	c.InstructionCache.Set(id, instIr)
