@@ -36,31 +36,6 @@ func GRPCGeneralRuleToSchemaGeneralRule(gr *ypb.FingerprintRule) *schema.General
 	return rule
 }
 
-func SchemaGeneralRuleToGRPCGeneralRule(gr *schema.GeneralRule) *ypb.FingerprintRule {
-	if gr == nil {
-		return nil
-	}
-	cpe := &ypb.CPE{}
-	if gr.CPE != nil {
-		cpe = &ypb.CPE{
-			Part:    gr.Part,
-			Vendor:  gr.Vendor,
-			Product: gr.Product,
-			Version: gr.Version,
-			Update:  gr.Update,
-			Edition: gr.Edition,
-		}
-	}
-
-	return &ypb.FingerprintRule{
-		Cpe:             cpe,
-		RuleName:        gr.RuleName,
-		WebPath:         gr.WebPath,
-		ExtInfo:         gr.ExtInfo,
-		MatchExpression: gr.MatchExpression,
-	}
-}
-
 func FilterGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter) *gorm.DB {
 	if filter == nil {
 		return db
@@ -91,6 +66,14 @@ func QueryGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter, paging *ypb.Pa
 func GetGeneralRuleByID(db *gorm.DB, id int64) (*schema.GeneralRule, error) {
 	rule := &schema.GeneralRule{}
 	if db := db.Where("id = ?", id).First(rule); db.Error != nil {
+		return nil, db.Error
+	}
+	return rule, nil
+}
+
+func GetGeneralRuleByRuleName(db *gorm.DB, ruleName string) (*schema.GeneralRule, error) {
+	rule := &schema.GeneralRule{}
+	if db := db.Where("rule_name = ?", ruleName).First(rule); db.Error != nil {
 		return nil, db.Error
 	}
 	return rule, nil

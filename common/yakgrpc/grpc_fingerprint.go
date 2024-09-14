@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -18,7 +19,7 @@ func (s *Server) QueryFingerprint(ctx context.Context, req *ypb.QueryFingerprint
 	start := time.Now()
 	var res []*ypb.FingerprintRule
 	for _, r := range data {
-		m := yakit.SchemaGeneralRuleToGRPCGeneralRule(r)
+		m := r.ToGRPCModel()
 		if m == nil {
 			log.Errorf("failed to convert schema.GeneralRule to ypb.FingerprintRule: %v", r)
 		} else {
@@ -61,9 +62,9 @@ func (s *Server) UpdateFingerprint(ctx context.Context, req *ypb.UpdateFingerpri
 	rule := req.GetRule()
 	if req.GetId() > 0 {
 		rule.Id = req.GetId()
-		effectCount, err = yakit.UpdateGeneralRule(s.GetProfileDatabase(), yakit.GRPCGeneralRuleToSchemaGeneralRule(rule))
+		effectCount, err = yakit.UpdateGeneralRule(s.GetProfileDatabase(), schema.FromFingerprintGRPCModel(rule))
 	} else if req.GetRuleName() != "" {
-		effectCount, err = yakit.UpdateGeneralRuleByRuleName(s.GetProfileDatabase(), req.GetRuleName(), yakit.GRPCGeneralRuleToSchemaGeneralRule(rule))
+		effectCount, err = yakit.UpdateGeneralRuleByRuleName(s.GetProfileDatabase(), req.GetRuleName(), schema.FromFingerprintGRPCModel(rule))
 	} else {
 		return nil, utils.Errorf("id or rule_name must be set at least one")
 	}
@@ -88,7 +89,7 @@ func (s *Server) CreateFingerprint(ctx context.Context, req *ypb.CreateFingerpri
 	if rule == nil {
 		return nil, utils.Errorf("rule is nil")
 	}
-	err := yakit.CreateGeneralRule(s.GetProfileDatabase(), yakit.GRPCGeneralRuleToSchemaGeneralRule(rule))
+	err := yakit.CreateGeneralRule(s.GetProfileDatabase(), schema.FromFingerprintGRPCModel(rule))
 	if err != nil {
 		return nil, err
 	}
