@@ -16,9 +16,21 @@ func MergeValues(values ...ValueOperator) ValueOperator {
 
 func NewValues(values []ValueOperator) ValueOperator {
 	v := &ValueList{values: values}
+	tmp := make(map[int64]struct{})
 	vs := make([]ValueOperator, 0, len(values))
 	v.Recursive(func(operator ValueOperator) error {
-		vs = append(vs, operator)
+		if canGetID, ok := operator.(interface{ GetId() int64 }); ok {
+			//value filter by id
+			id := canGetID.GetId()
+			if id == -1 {
+				vs = append(vs, operator)
+			} else if _, ok := tmp[id]; !ok {
+				tmp[canGetID.GetId()] = struct{}{}
+				vs = append(vs, operator)
+			}
+		} else {
+			vs = append(vs, operator)
+		}
 		return nil
 	})
 	// flat
