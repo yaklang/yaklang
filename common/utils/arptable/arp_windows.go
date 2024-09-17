@@ -8,12 +8,12 @@ package arptable
 // is the same in other Windows versions.
 
 import (
-	"os/exec"
+	"github.com/yaklang/yaklang/common/utils/execx"
 	"strings"
 )
 
 func Table() ArpTable {
-	data, err := exec.Command("arp", "-a").Output()
+	data, err := execx.Command("arp", "-a").Output()
 	if err != nil {
 		return nil
 	}
