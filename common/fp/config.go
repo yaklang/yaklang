@@ -511,29 +511,32 @@ func WithWebFingerprintUseAllRules(b bool) ConfigOption {
 
 // webRule servicescan 的配置选项，设置本次扫描使用的 Web 指纹规则
 // @param {interface{}} i Web 指纹规则
-func WithWebFingerprintRule(i any) ConfigOption {
-	var rules []*rule.FingerPrintRule
-	switch ret := i.(type) {
-	case []byte:
-		rules, _ = parsers.ParseYamlRule(string(ret))
-	case string:
-		e := utils.GetFirstExistedPath(ret)
-		if e != "" {
-			raw, _ := ioutil.ReadFile(e)
-			rules, _ = parsers.ParseYamlRule(string(raw))
-		} else {
-			rules, _ = parsers.ParseYamlRule(ret)
+func WithWebFingerprintRule(rs ...any) ConfigOption {
+	var allRules []*rule.FingerPrintRule
+	for _, i := range rs {
+		var rules []*rule.FingerPrintRule
+		switch ret := i.(type) {
+		case []byte:
+			rules, _ = parsers.ParseYamlRule(string(ret))
+		case string:
+			e := utils.GetFirstExistedPath(ret)
+			if e != "" {
+				raw, _ := ioutil.ReadFile(e)
+				rules, _ = parsers.ParseYamlRule(string(raw))
+			} else {
+				rules, _ = parsers.ParseYamlRule(ret)
+			}
+		case []*rule.FingerPrintRule:
+			rules = ret
 		}
-	case []*rule.FingerPrintRule:
-		rules = ret
+		allRules = append(allRules, rules...)
 	}
 
 	return func(config *Config) {
-		if rules == nil {
+		if allRules == nil {
 			return
 		}
-
-		config.WebFingerprintRules = rules
+		config.WebFingerprintRules = allRules
 	}
 }
 

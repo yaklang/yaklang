@@ -51,20 +51,32 @@ func TestServer_CustomFingerprint(t *testing.T) {
 	client, err := NewLocalClient()
 	require.Nil(t, err)
 
-	host, port := utils.DebugMockHTTP([]byte("test CustomFingerprint"))
+	host, port := utils.DebugMockHTTP([]byte("test CustomFingerprint1,test CustomFingerprint2"))
 
+	fpFiles := []string{}
 	f, err := os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.WriteString(`- methods:
     - keywords:
-        - product: 测试
-          regexp: "test CustomFingerprint"`)
+        - product: 测试1
+          regexp: "test CustomFingerprint1"`)
 	f.Close()
+	fpFiles = append(fpFiles, f.Name())
+	f, err = os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(`- methods:
+    - keywords:
+        - product: 测试2
+          regexp: "test CustomFingerprint2"`)
+	f.Close()
+	fpFiles = append(fpFiles, f.Name())
 
 	r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
-		UserFingerprintFiles: []string{f.Name()},
+		UserFingerprintFiles: fpFiles,
 		Targets:              host,
 		Ports:                strconv.Itoa(port),
 		Mode:                 "fingerprint",
@@ -85,7 +97,7 @@ func TestServer_CustomFingerprint(t *testing.T) {
 			}
 			break
 		}
-		if strings.Contains(string(result.Message), "http/测试") {
+		if strings.Contains(string(result.Message), "http/测试1/测试2") || strings.Contains(string(result.Message), "http/测试2/测试1") {
 			ok = true
 		}
 		spew.Dump(result)
