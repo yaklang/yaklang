@@ -140,7 +140,7 @@ func TestVerifiedRule(t *testing.T) {
 	for rule := range sfdb.YieldSyntaxFlowRules(consts.GetGormProfileDatabase(), context.Background()) {
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
-			continue
+			t.Fatalf("compile rule %s error: %s", rule.RuleName, err)
 		}
 		if len(f.VerifyFs) > 0 || len(f.NegativeFs) > 0 {
 			t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
