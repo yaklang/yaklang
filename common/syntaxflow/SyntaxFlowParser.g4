@@ -144,6 +144,7 @@ recursiveConfigItem: lines? identifier ':' recursiveConfigItemValue lines?;
 recursiveConfigItemValue
     : (identifier | numberLiteral)
     | '`' filterStatement '`'
+    | hereDoc
     ;
 
 sliceCallItem: nameFilter | numberLiteral;
