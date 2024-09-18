@@ -34,8 +34,8 @@ func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfig
 func (s *Server) QueryFuzzerConfig(ctx context.Context, params *ypb.QueryFuzzerConfigRequest) (*ypb.QueryFuzzerConfigResponse, error) {
 	var res []*ypb.FuzzerConfig
 	fuzzerConfig, err := yakit.QueryWebFuzzerConfig(s.GetProjectDatabase(), params)
-	if err != nil {
-		return nil, utils.Errorf("empty result")
+ 	if err != nil {
+		return nil, err
 	}
 	for _, v := range fuzzerConfig {
 		res = append(res, &ypb.FuzzerConfig{

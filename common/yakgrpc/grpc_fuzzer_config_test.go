@@ -43,6 +43,14 @@ func TestGRPCMUSTPASS_FuzzerConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(res.Data), 10)
 
+	res, err = client.QueryFuzzerConfig(context.Background(), &ypb.QueryFuzzerConfigRequest{PageId: pageIds[:10]})
+	require.NoError(t, err)
+	require.Equal(t, len(res.Data), 10)
+
+	res, err = client.QueryFuzzerConfig(context.Background(), &ypb.QueryFuzzerConfigRequest{PageId: pageIds[:10], Pagination: &ypb.Paging{Limit: 15}})
+	require.NoError(t, err)
+	require.Equal(t, len(res.Data), 10)
+
 	_, err = client.DeleteFuzzerConfig(context.Background(), &ypb.DeleteFuzzerConfigRequest{PageId: pageIds})
 	require.NoError(t, err)
 	result, err := client.QueryFuzzerConfig(context.Background(), queryAll)
