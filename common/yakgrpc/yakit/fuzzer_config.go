@@ -19,12 +19,8 @@ func CreateOrUpdateWebFuzzerConfig(db *gorm.DB, config *schema.WebFuzzerConfig) 
 func QueryWebFuzzerConfig(db *gorm.DB, params *ypb.QueryFuzzerConfigRequest) ([]*schema.WebFuzzerConfig, error) {
 	var result []*schema.WebFuzzerConfig
 	db = db.Model(&schema.WebFuzzerConfig{})
-	limit := params.Pagination.Limit
-	if limit == -1 {
-		db = db.Order("updated_at DESC").Find(&result)
-	} else {
-		db = db.Order("updated_at DESC").Limit(limit).Find(&result)
-	}
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "page_id", params.GetPageId())
+	_, db = bizhelper.PagingByPagination(db, params.Pagination, &result)
 	if db.Error != nil {
 		return nil, utils.Errorf("query webFuzzerConfig failed: %s", db.Error)
 	}

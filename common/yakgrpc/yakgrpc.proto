@@ -1834,6 +1834,7 @@ message SaveFuzzerConfigRequest {
 
 message QueryFuzzerConfigRequest {
     Paging Pagination = 1;
+    repeated string PageId =2;
 }
 
 message QueryFuzzerConfigResponse {
