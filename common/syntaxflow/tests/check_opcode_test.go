@@ -6,6 +6,8 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
@@ -20,7 +22,15 @@ func check(t *testing.T, code string, op sfvm.SFVMOpCode) {
 		t.Fatalf("not found %v", op)
 	}
 }
+
 func checkContain(t *testing.T, code string, op sfvm.SFVMOpCode) bool {
+	match := false
+	checkOpcode(t, code, op, func(s *sfvm.SFI) {
+		match = true
+	})
+	return match
+}
+func checkOpcode(t *testing.T, code string, op sfvm.SFVMOpCode, handler func(*sfvm.SFI)) {
 	{
 		fmt.Printf("code: %v\n", code)
 		lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(code))
@@ -38,10 +48,9 @@ func checkContain(t *testing.T, code string, op sfvm.SFVMOpCode) bool {
 	vm.Show()
 	for _, c := range frame.Codes {
 		if op == c.OpCode {
-			return true
+			handler(c)
 		}
 	}
-	return false
 }
 
 func TestOpcode(t *testing.T) {
@@ -251,5 +260,34 @@ func TestOpcode(t *testing.T) {
 		check(t, `
 		${application.properties}.regexp(select: aaa)
 		`, sfvm.OpFileFilterReg)
+	})
+
+	t.Run("config heredoc", func(t *testing.T) {
+		checkOpcode(t, `a #{
+			hook: <<<HOOK
+			*.a as $a
+HOOK
+		}->`, sfvm.OpGetTopDefs, func(s *sfvm.SFI) {
+			require.Equal(t, 1, len(s.SyntaxFlowConfig))
+			require.NotContains(t, s.SyntaxFlowConfig[0].Value, "HOOK")
+			log.Infof("s: %v", s.SyntaxFlowConfig[0].Value)
+		})
+	})
+
+	t.Run("config heredoc complex", func(t *testing.T) {
+		checkOpcode(t, `a #{
+			hook: <<<HOOK
+			*.a as $a
+			*-{
+				until: <<<UNTIL
+				*.b 
+UNTIL
+			}->
+HOOK
+		}->`, sfvm.OpGetTopDefs, func(s *sfvm.SFI) {
+			require.Equal(t, 1, len(s.SyntaxFlowConfig))
+			require.NotContains(t, s.SyntaxFlowConfig[0].Value, "HOOK")
+			log.Infof("s: %v", s.SyntaxFlowConfig[0].Value)
+		})
 	})
 }

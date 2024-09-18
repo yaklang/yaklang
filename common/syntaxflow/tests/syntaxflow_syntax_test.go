@@ -191,6 +191,37 @@ TEXT`,
 		`g<<<TEXT
 AAG
 TEXT`,
+
+		`
+$a-{
+hook: <<<HOOK
+AA
+HOOK
+}->`,
+		`
+$a-{
+hook: <<<HOOK
+*-{
+until: <<<UNTIL
+	a 
+UNTIL
+}->
+HOOK
+}->
+			`,
+		`
+$a-{
+until: <<<UNTIL
+* ?{opcode: const,call} as $ConstOrCall 
+$b -{
+	depth:1
+	hook: <<<HOOK
+	* & $ConstOrCall as $target
+HOOK
+}->
+UNTIL
+}->
+`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)
