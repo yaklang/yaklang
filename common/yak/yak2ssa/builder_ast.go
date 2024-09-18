@@ -40,6 +40,9 @@ func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 	defer recoverRange()
 	allstmt := stmtlist.AllStatement()
 	for _, stmt := range allstmt {
+		if b.isStop() {
+			return
+		}
 		if stmt, ok := stmt.(*yak.StatementContext); ok {
 			b.buildStatement(stmt)
 		}
@@ -1614,4 +1617,16 @@ func (b *astbuilder) buildExpressionListMultiline(stmt *yak.ExpressionListMultil
 		}
 	}
 	return exprs
+}
+
+func (b *astbuilder) isStop() bool {
+	if b.ctx == nil {
+		return false
+	}
+	select {
+	case <-b.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }

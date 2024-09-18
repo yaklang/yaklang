@@ -962,6 +962,9 @@ func (b *astbuilder) buildStatementList(stmt *gol.StatementListContext) {
 		b.NewError(ssa.Warn, TAG, "empty statement list")
 	} else {
 		for _, stmt := range allstmt {
+			if b.isStop() {
+				return
+			}
 			if stmt, ok := stmt.(*gol.StatementContext); ok {
 				b.buildStatement(stmt)
 			}

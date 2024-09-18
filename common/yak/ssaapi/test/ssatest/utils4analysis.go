@@ -200,13 +200,12 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 	}
 }
 
-func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option)error {
+func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
 	// only in memory
-	var errs error
 	{
 		start := time.Now()
 		prog, err := ssaapi.ParseProject(fs, opt...)
-		errs = utils.JoinErrors(err,errs)
+		assert.Nil(t, err)
 
 		log.Infof("only in memory ")
 		err = handler(OnlyMemory, prog, start)
@@ -229,7 +228,7 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 				ssadb.DeleteProgram(ssadb.GetDB(), program.Program.Name)
 			}
 		}()
-		errs = utils.JoinErrors(err,errs)
+		assert.Nil(t, err)
 
 		log.Infof("with database ")
 		err = handler(WithDatabase, prog, start)
@@ -240,12 +239,11 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 	{
 		start := time.Now()
 		prog, err := ssaapi.FromDatabase(programID)
-		errs = utils.JoinErrors(err,errs)
+		assert.Nil(t, err)
 		log.Infof("only use database ")
 		err = handler(OnlyDatabase, []*ssaapi.Program{prog}, start)
 		assert.Nil(t, err)
 	}
-	return errs
 }
 
 func CheckFSWithProgram(
