@@ -2,11 +2,12 @@ package sfvm
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"regexp"
 )
 
 func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*RecursiveConfigItem {
@@ -39,6 +40,9 @@ func (v *SyntaxFlowVisitor) VisitRecursiveConfig(i *sf.ConfigContext) []*Recursi
 				configItem.Value = text
 			}
 
+		} else if doc := value.HereDoc(); doc != nil {
+			configItem.SyntaxFlowRule = true
+			configItem.Value = v.VisitHereDoc(doc)
 		} else {
 			configItem.Value = yakunquote.TryUnquote(value.GetText())
 		}
