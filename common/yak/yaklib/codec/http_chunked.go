@@ -137,8 +137,11 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 
 		buf := make([]byte, size)
 		blockN, err := io.ReadFull(reader, buf)
-		results.Write(buf[:blockN])
-		haveRead.Write(buf[:blockN])
+		bufex := bytes.Clone(buf[:blockN])
+		//_buf := make([]byte, blockN)
+		//_buf = append(_buf, buf[:blockN]...)
+		results.Write(bufex)
+		haveRead.Write(bufex)
 
 		fixedResults.Write(lineBytes)
 		if commentExisted {
@@ -146,7 +149,7 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 			fixedResults.Write(comment)
 		}
 		fixedResults.WriteString("\r\n")
-		fixedResults.Write(buf[:blockN])
+		fixedResults.Write(bufex)
 		fixedResults.WriteString("\r\n")
 		if err != nil {
 			if errors.Is(err, io.ErrUnexpectedEOF) {
