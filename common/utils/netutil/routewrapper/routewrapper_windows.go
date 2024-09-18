@@ -631,7 +631,7 @@ func NewWindowsRouteWrapper(routeCommand string) (*WindowsRouteWrapper, error) {
 		pif := &ifs[i]
 		_, ok := interfaces[pif.Index]
 		if ok {
-			return nil, fmt.Errorf("More than one Interfaces with the same index exists: %s", pif.Index)
+			return nil, fmt.Errorf("More than one Interfaces with the same index exists: %v", pif.Index)
 		}
 		interfaces[pif.Index] = pif
 		_, ok = interfacesByName[pif.Name]
