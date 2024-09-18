@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
@@ -35,7 +34,11 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 			}
 			return true
 		})
-		r.alertVariable = lo.Keys(r.memResult.AlertSymbolTable)
+		for name := range r.memResult.AlertSymbolTable {
+			if v, ok := r.variable.Get(name); ok && v.(int) > 0 {
+				r.alertVariable = append(r.alertVariable, name)
+			}
+		}
 	}
 
 	return r.variable
