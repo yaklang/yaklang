@@ -129,6 +129,7 @@ type astbuilder struct {
 	specialValues  map[string]ssa.Value
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
+	ctx            context.Context
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
@@ -294,4 +295,16 @@ func (b *astbuilder) GetSpecialValueByStr(name string) ssa.Value {
 		return nil
 	}
 	return b.specialValues[name]
+}
+
+func (b *astbuilder) isStop() bool {
+	if b.ctx == nil {
+		return false
+	}
+	select {
+	case <-b.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }

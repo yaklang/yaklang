@@ -278,10 +278,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
 	}
-
-	if m := c.manager; m != nil && m.ctx != nil {
-		c.fs = filesys.NewFileSystemWithContext(m.ctx, c.fs)
-	}
 	application.Build = func(
 		ctx context.Context, filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) error {
