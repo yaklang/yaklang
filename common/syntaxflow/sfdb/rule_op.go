@@ -158,26 +158,19 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	if err != nil {
 		return err
 	}
+	rule := frame.GetRule()
+	rule.Type = ruleType
+	rule.RuleName = ruleName
+	rule.Language = string(language)
+	rule.Tag = strings.Join(tags, "|")
+	rule.IsBuildInRule = buildin
 
-	rule := &schema.SyntaxFlowRule{
-		Language:      string(language),
-		Title:         frame.Title,
-		RuleName:      ruleName,
-		Description:   frame.Description,
-		Type:          ruleType,
-		Content:       content,
-		Tag:           strings.Join(tags, "|"),
-		IsBuildInRule: buildin,
-		Purpose:       schema.ValidPurpose(frame.Purpose),
-		Severity:      schema.ValidSeverityType(frame.Severity),
-	}
-
-	if frame.AllowIncluded != "" {
-		rule.AllowIncluded = true
-		rule.IncludedName = frame.AllowIncluded
-		rule.Title = frame.AllowIncluded
-		// _ = DeleteRuleByLibName(frame.AllowIncluded)
-	}
+	//if frame.AllowIncluded != "" {
+	//	rule.AllowIncluded = true
+	//	rule.IncludedName = frame.AllowIncluded
+	//	rule.Title = frame.AllowIncluded
+	//	// _ = DeleteRuleByLibName(frame.AllowIncluded)
+	//}
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
@@ -212,21 +205,9 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 	if err != nil {
 		return err
 	}
-
-	rule := &schema.SyntaxFlowRule{
-		Language:    string(language),
-		Title:       frame.Title,
-		Description: frame.Description,
-		Type:        ruleType,
-		Content:     content,
-		Purpose:     schema.ValidPurpose(frame.Purpose),
-	}
-
-	if frame.AllowIncluded != "" {
-		rule.AllowIncluded = true
-		rule.IncludedName = frame.AllowIncluded
-		rule.Title = frame.AllowIncluded
-	}
+	rule := frame.GetRule()
+	rule.Language = string(language)
+	rule.Type = ruleType
 
 	err = LoadFileSystem(rule, system)
 	if err != nil {

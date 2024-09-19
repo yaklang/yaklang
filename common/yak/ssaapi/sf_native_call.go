@@ -207,7 +207,7 @@ func init() {
 			if result != nil {
 				result.SymbolTable.Delete(name)
 				delete(result.AlertSymbolTable, name)
-				delete(result.AlertMsgTable, name)
+				delete(result.AlertDesc, name)
 			}
 		}
 		return true, v, nil

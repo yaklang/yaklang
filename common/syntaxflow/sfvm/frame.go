@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,16 +30,11 @@ type SFFrame struct {
 	vm *SyntaxFlowVirtualMachine
 
 	config *Config
+	rule   *schema.SyntaxFlowRule
 
-	Title         string
-	Description   string
-	AllowIncluded string
-	Purpose       string
-	Language      string
-	Severity      string
-	VerifyFs      map[string]string
-	NegativeFs    map[string]string
-	ExtraDesc     map[string]string
+	VerifyFs   map[string]string
+	NegativeFs map[string]string
+	ExtraDesc  map[string]string
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -54,6 +50,10 @@ type SFFrame struct {
 
 	predCounter int
 	context     *SFFrameResult
+}
+
+func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
+	return s.rule
 }
 
 func (s *SFFrame) WithContext(result *SFFrameResult) {
@@ -95,6 +95,7 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 	return &SFFrame{
 		Text:       text,
 		Codes:      codes,
+		rule:       &schema.SyntaxFlowRule{},
 		VerifyFs:   make(map[string]string),
 		NegativeFs: make(map[string]string),
 		ExtraDesc:  make(map[string]string),
@@ -102,7 +103,7 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 }
 
 func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {
-	val, err := consts.ValidateLanguage(s.Language)
+	val, err := consts.ValidateLanguage(s.rule.Language)
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
@@ -128,7 +129,7 @@ func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, filesys
 }
 
 func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {
-	val, err := consts.ValidateLanguage(s.Language)
+	val, err := consts.ValidateLanguage(s.rule.Language)
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
@@ -891,11 +892,19 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !ok || value == nil {
 			return utils.Errorf("alert failed: not found: %v", i.UnaryStr)
 		}
+		//m := s.result.rule.AlertDesc[i.UnaryStr]
+		//m := s.result.AlertMsgTable[i.UnaryStr]
+		//lo.ForEach(i.SyntaxFlowConfig, func(item *RecursiveConfigItem, index int) {
+		//	if m == nil || len(m) == 0 {
+		//		m = make(map[string]string)
+		//	}
+		//	m[item.Key] = item.Value
+		//})
 		s.result.AlertSymbolTable[i.UnaryStr] = value
-		alStr := i.ValueByIndex(0)
-		if alStr != "" {
-			s.result.AlertMsgTable[i.UnaryStr] = alStr
-		}
+		//alStr := i.ValueByIndex(0)
+		//if alStr != "" {
+		//	m["__extra__"] = alStr
+		//}
 	case OpCheckParams:
 		if i.UnaryStr == "" {
 			return utils.Errorf("check params failed: empty name")

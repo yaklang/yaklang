@@ -62,7 +62,7 @@ func TestCheckStatement(t *testing.T) {
 				data, err := prog.SyntaxFlowWithError(`
 				bbbb( * as $i )
 				check $i then fine else fail
-				f( * as $b)
+				f(* as $b)
 				`,
 					sfvm.WithEnableDebug(), sfvm.WithFailFast())
 				assert.NotNil(t, err)

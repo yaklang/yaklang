@@ -3,6 +3,7 @@ package sfvm
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -14,9 +15,16 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+type ExtraDescInfo struct {
+	Level     schema.SyntaxFlowSeverity
+	Purpose   schema.SyntaxFlowRulePurposeType
+	Msg       string
+	ExtraInfo map[string]string
+}
 type SFFrameResult struct {
 	// base info
 	Rule string
+	rule *schema.SyntaxFlowRule
 	// additional info
 	Description *omap.OrderedMap[string, string]
 	CheckParams []string
@@ -25,18 +33,27 @@ type SFFrameResult struct {
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	UnNameValue      []ValueOperator
 	AlertSymbolTable map[string]ValueOperator
-	AlertMsgTable    map[string]string
+
+	AlertDesc map[string]*ExtraDescInfo
 }
 
 func NewSFResult(rule string) *SFFrameResult {
 	return &SFFrameResult{
+		rule:             &schema.SyntaxFlowRule{},
 		Rule:             rule,
 		Description:      omap.NewEmptyOrderedMap[string, string](),
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
 		AlertSymbolTable: make(map[string]ValueOperator),
-		AlertMsgTable:    make(map[string]string),
+		AlertDesc:        make(map[string]*ExtraDescInfo),
 	}
+}
+func (s *SFFrameResult) GetAlertInfo(name string) (string, bool) {
+	info, ok := s.AlertDesc[name]
+	return codec.AnyToString(info), ok
+}
+func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
+	return s.rule
 }
 
 func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
@@ -56,8 +73,8 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	for k, v := range result.AlertSymbolTable {
 		s.AlertSymbolTable[k] = v
 	}
-	for k, v := range result.AlertMsgTable {
-		s.AlertMsgTable[k] = v
+	for k, v := range result.AlertDesc {
+		s.AlertDesc[k] = v
 	}
 	s.CheckParams = append(s.CheckParams, result.CheckParams...)
 	s.Errors = append(s.Errors, result.Errors...)
@@ -106,9 +123,9 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 		f(cfg)
 	}
 	buf := bytes.NewBufferString("")
-	buf.WriteString(fmt.Sprintf("rule md5 hash: %v\n", codec.Md5(s.Rule)))
-	buf.WriteString(fmt.Sprintf("rule preview: %v\n", utils.ShrinkString(s.Rule, 64)))
-	buf.WriteString(fmt.Sprintf("description: %v\n", s.Description.String()))
+	buf.WriteString(fmt.Sprintf("rule md5 hash: %v\n", codec.Md5(s.rule.Content)))
+	buf.WriteString(fmt.Sprintf("rule preview: %v\n", utils.ShrinkString(s.rule.Content, 64)))
+	buf.WriteString(fmt.Sprintf("description: %v\n", s.GetDescription()))
 	if len(s.Errors) > 0 {
 		buf.WriteString("ERROR:\n")
 		prefix := "  "
@@ -128,6 +145,9 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 	} else {
 		if len(s.AlertSymbolTable) > 0 {
 			for name, value := range s.AlertSymbolTable {
+				if info, b := s.GetAlertInfo(name); b {
+					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", name, codec.AnyToString(info)))
+				}
 				showValueMap(buf, name, value, cfg)
 			}
 		} else if s.SymbolTable.Len() > 0 {
@@ -224,27 +244,29 @@ func (s *SFFrameResult) Copy() *SFFrameResult {
 }
 
 func (s *SFFrameResult) Name() string {
-	for _, name := range []string{
-		"title", "name", "desc", "description",
-	} {
-		result, ok := s.Description.Get(name)
-		if !ok {
-			continue
+	checkAndHandler := func(str ...string) string {
+		for _, s2 := range str {
+			if s2 != "" {
+				return s2
+			}
 		}
-		return result
+		return ""
 	}
-	return utils.ShrinkString(s.String(), 40)
+	return checkAndHandler(s.rule.Title, s.rule.TitleZh, s.rule.Description, utils.ShrinkString(s.String(), 40))
 }
 
 func (s *SFFrameResult) GetDescription() string {
-	for _, name := range []string{
-		"desc", "description", "help",
-	} {
-		result, ok := s.Description.Get(name)
-		if !ok {
-			continue
+	if desc := s.rule.Description; desc != "" {
+		return desc
+	} else {
+		info := map[string]string{
+			"title":    s.rule.Title,
+			"title_zh": s.rule.TitleZh,
+			"desc":     s.rule.Description,
+			"type":     string(s.rule.Purpose),
+			"level":    string(s.rule.Severity),
+			"lang":     s.rule.Language,
 		}
-		return result
+		return codec.AnyToString(info)
 	}
-	return "no description field set"
 }

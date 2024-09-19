@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"strings"
 
@@ -81,6 +82,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 				switch keyLower := strings.ToLower(key); keyLower {
 				case "title":
 					y.title = value
+				case "title_zh":
+					y.title_zh = value
 				case "description", "desc", "note":
 					y.description = value
 				case "type", "purpose":
@@ -130,16 +133,54 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 	if i == nil {
 		return
 	}
-
-	// i.RefVariable()
 	ref := i.RefVariable().GetText()
 	ref = strings.TrimLeft(ref, "$")
-
-	if i.For() != nil {
+	var extra = &ExtraDescInfo{
+		ExtraInfo: make(map[string]string),
+	}
+	info := y.alertMsg[ref]
+	if info != nil {
+		extra = info
+	} else {
+		y.alertMsg[ref] = extra
+	}
+	if len(extra.ExtraInfo) <= 0 {
+		extra.ExtraInfo = make(map[string]string)
+	}
+	if i.DescriptionItems() != nil {
+		for _, item := range i.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
+			if ret, ok := item.(*sf.DescriptionItemContext); ok {
+				key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+				value := ""
+				if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
+					if valueItem.HereDoc() != nil {
+						value = y.VisitHereDoc(valueItem.HereDoc())
+					} else if valueItem.StringLiteral() != nil {
+						value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
+					} else {
+						value = valueItem.GetText()
+					}
+				}
+				if value != "" {
+					switch key {
+					case "level":
+						extra.Level = schema.ValidSeverityType(value)
+					case "type":
+						extra.Purpose = schema.ValidPurpose(value)
+					default:
+						extra.ExtraInfo[key] = value
+					}
+				}
+			}
+		}
+	}
+	if i.StringLiteral() != nil {
 		text := i.StringLiteral().GetText()
 		forString := mustUnquoteSyntaxFlowString(text)
-		y.EmitAlert(ref, forString)
-	} else {
-		y.EmitAlert(ref, "")
+		extra.Msg = forString
 	}
+	if extra.Level == "" {
+		extra.Level = schema.ValidSeverityType(y.severity)
+	}
+	y.EmitAlert(ref)
 }
