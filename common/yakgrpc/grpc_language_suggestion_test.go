@@ -106,13 +106,43 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		checkCompletionWithCallbacks(t, code, r, labelsContainsCallback(t, want))
 	}
 
-	gotExactSuggestion := func(t *testing.T, suggestions []*ypb.SuggestionDescription, label string) *ypb.SuggestionDescription {
+	getExactSuggestion := func(t *testing.T, suggestions []*ypb.SuggestionDescription, label string) *ypb.SuggestionDescription {
 		items := lo.Filter(suggestions, func(item *ypb.SuggestionDescription, _ int) bool {
 			return item.Label == label
 		})
 		require.Lenf(t, items, 1, `want only 1 %s but not`, label)
 		return items[0]
 	}
+
+	t.Run("object", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallbacks(t, `NewThreadPool = func(size){
+threadPool = {
+	"consumer":f =>{
+		return threadPool
+	},
+	"aaa": 1
+}
+return threadPool
+}
+pool = NewThreadPool(10)
+pool.`, &ypb.Range{
+			Code:        "pool.",
+			StartLine:   11,
+			StartColumn: 1,
+			EndLine:     11,
+			EndColumn:   6,
+		}, func(suggestions []*ypb.SuggestionDescription) {
+			item := getExactSuggestion(t, suggestions, "consumer")
+			require.Equal(t, "Method", item.Kind)
+			require.Equal(t, "consumer(${1:any})", item.InsertText)
+			item = getExactSuggestion(t, suggestions, "aaa")
+			require.Equal(t, "Field", item.Kind)
+			require.Equal(t, "aaa", item.InsertText)
+			require.Equal(t, "number", item.Description)
+		})
+	})
 
 	t.Run("before symbols", func(t *testing.T) {
 		t.Parallel()
@@ -154,7 +184,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 			},
 			func(suggestions []*ypb.SuggestionDescription) {
 				// check only one "a"
-				item := gotExactSuggestion(t, suggestions, "a")
+				item := getExactSuggestion(t, suggestions, "a")
 				require.Equal(t, "Function", item.Kind)
 			})
 	})
@@ -324,7 +354,7 @@ rsp.`,
 				},
 				labelsContainsCallback(t, []string{"field", "Keys"}),
 				func(suggestions []*ypb.SuggestionDescription) {
-					item := gotExactSuggestion(t, suggestions, "field")
+					item := getExactSuggestion(t, suggestions, "field")
 					require.Equal(t, "field", item.InsertText)
 				},
 			)
@@ -342,7 +372,7 @@ rsp.`,
 				},
 				func(suggestions []*ypb.SuggestionDescription) {
 					// check
-					item := gotExactSuggestion(t, suggestions, "func")
+					item := getExactSuggestion(t, suggestions, "func")
 					require.Equal(t, "Method", item.Kind)
 					require.Equal(t, getFuncCompletionBySSAType("func",
 						ssa.NewFunctionTypeDefine("func", []ssa.Type{ssa.GetAnyType(), ssa.GetAnyType()}, []ssa.Type{ssa.GetNumberType()}, false)),
