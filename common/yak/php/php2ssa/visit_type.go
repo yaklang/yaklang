@@ -1,16 +1,17 @@
 package php2ssa
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return ssa.GetAnyType()
 	}
 	recoverRange := y.SetRange(raw)
@@ -40,7 +41,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 }
 
 func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePrint, string) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		log.Errorf("[BUG]: TypeRef is nil")
 		return y.CreateClassBluePrint(raw.GetText()), raw.GetText()
 	}
@@ -81,7 +82,7 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.ClassBluePri
 }
 
 func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Type {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -113,7 +114,7 @@ func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Ty
 }
 
 func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Type {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -147,7 +148,7 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	return nil
 }
 func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) *ssa.ClassBluePrint {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

@@ -10,7 +10,7 @@ import (
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -35,7 +35,7 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 }
 
 func (y *builder) VisitEnumDeclaration(raw phpparser.IEnumDeclarationContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -50,7 +50,7 @@ func (y *builder) VisitEnumDeclaration(raw phpparser.IEnumDeclarationContext) in
 }
 
 func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDeclarationContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -69,7 +69,7 @@ func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDe
 }
 
 func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -126,7 +126,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 }
 
 func (y *builder) VisitNamesPaceStatement(raw phpparser.INamespaceStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -144,7 +144,7 @@ func (y *builder) VisitNamesPaceStatement(raw phpparser.INamespaceStatementConte
 	return nil
 }
 func (y *builder) BeforeVisitNamespaceStatement(raw phpparser.INamespaceStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -159,7 +159,7 @@ func (y *builder) BeforeVisitNamespaceStatement(raw phpparser.INamespaceStatemen
 	return nil
 }
 func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -231,7 +231,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 func (y *builder) VisitUseDeclarationContentList(
 	raw phpparser.IUseDeclarationContentListContext,
 	callback func(path []string, aliasMap map[string]string)) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -249,7 +249,7 @@ func (y *builder) VisitUseDeclarationContentList(
 }
 
 func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -317,7 +317,7 @@ func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
 
 // VisitLabelStatement check id: as goto target
 func (y *builder) VisitLabelStatement(raw phpparser.ILabelStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -332,7 +332,7 @@ func (y *builder) VisitLabelStatement(raw phpparser.ILabelStatementContext) inte
 }
 
 func (y *builder) VisitBlockStatement(raw phpparser.IBlockStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -349,7 +349,7 @@ func (y *builder) VisitBlockStatement(raw phpparser.IBlockStatementContext) inte
 }
 
 func (y *builder) VisitInnerStatementList(raw phpparser.IInnerStatementListContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -367,7 +367,7 @@ func (y *builder) VisitInnerStatementList(raw phpparser.IInnerStatementListConte
 }
 
 func (y *builder) VisitInnerStatement(raw phpparser.IInnerStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

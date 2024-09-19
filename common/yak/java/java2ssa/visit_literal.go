@@ -12,7 +12,7 @@ import (
 )
 
 func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -82,7 +82,7 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 
 // integer literal
 func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -126,7 +126,7 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 }
 
 func (y *builder) VisitFloatLiteral(raw javaparser.IFloatLiteralContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

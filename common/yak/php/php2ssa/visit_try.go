@@ -6,7 +6,7 @@ import (
 )
 
 func (y *builder) VisitTryCatchFinally(raw phpparser.ITryCatchFinallyContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -30,7 +30,7 @@ func (y *builder) VisitTryCatchFinally(raw phpparser.ITryCatchFinallyContext) in
 	return nil
 }
 func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext, tryBuilder *ssa.TryBuilder) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -49,7 +49,7 @@ func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext, tryBuilder
 }
 
 func (y *builder) VisitFinallyStatement(raw phpparser.IFinallyStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -64,7 +64,7 @@ func (y *builder) VisitFinallyStatement(raw phpparser.IFinallyStatementContext) 
 }
 
 func (y *builder) VisitThrowStatement(raw phpparser.IThrowStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

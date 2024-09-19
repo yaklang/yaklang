@@ -10,7 +10,7 @@ import (
 )
 
 func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
-	if y == nil || i == nil || y.isStop() {
+	if y == nil || i == nil || y.IsStop() {
 		return
 	}
 	start := time.Now()

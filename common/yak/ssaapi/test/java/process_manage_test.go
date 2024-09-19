@@ -1,14 +1,16 @@
 package java
 
 import (
+	"context"
 	_ "embed"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
-	"time"
 )
 
 func TestJava_ProcessManage(t *testing.T) {
@@ -23,12 +25,12 @@ func TestJava_ProcessManage(t *testing.T) {
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 
-	m := ssaapi.NewSSAParseProcessManager()
+	ctx, cancel := context.WithCancel(context.Background())
 	timer := time.NewTimer(originAstCost / 10)
 	go func() {
 		select {
 		case <-timer.C:
-			m.Stop()
+			cancel()
 		}
 	}()
 	ssatest.CheckProfileWithFS(fs, t, func(p ssatest.ParseStage, prog ssaapi.Programs, start time.Time) error {
@@ -36,7 +38,7 @@ func TestJava_ProcessManage(t *testing.T) {
 			cancelAstCost = time.Since(start)
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProcessManager(m))
+	}, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithContext(ctx))
 	require.Greater(t, originAstCost, cancelAstCost*2)
 	log.Info("origin ast cost: ", originAstCost)
 	log.Info("Proactively stop ast cost: ", cancelAstCost)

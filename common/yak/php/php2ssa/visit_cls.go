@@ -16,7 +16,7 @@ import (
 )
 
 func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -103,7 +103,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -171,7 +171,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 }
 
 func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.ClassBluePrint) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -287,7 +287,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 }
 
 func (y *builder) VisitTraitAdaptations(raw phpparser.ITraitAdaptationsContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -306,7 +306,7 @@ func (y *builder) VisitTraitAdaptations(raw phpparser.ITraitAdaptationsContext) 
 }
 
 func (y *builder) VisitTraitAdaptationStatement(raw phpparser.ITraitAdaptationStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -330,7 +330,7 @@ func (y *builder) VisitTraitAdaptationStatement(raw phpparser.ITraitAdaptationSt
 }
 
 func (y *builder) VisitTraitAlias(raw phpparser.ITraitAliasContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -354,7 +354,7 @@ func (y *builder) VisitTraitAlias(raw phpparser.ITraitAliasContext) interface{} 
 }
 
 func (y *builder) VisitTraitPrecedence(raw phpparser.ITraitPrecedenceContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -373,7 +373,7 @@ func (y *builder) VisitTraitPrecedence(raw phpparser.ITraitPrecedenceContext) in
 }
 
 func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -389,7 +389,7 @@ func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} 
 }
 
 func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitializerContext) (string, ssa.Value) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return "", nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -413,7 +413,7 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 
 // VisitVariableInitializer read ast and return varName and ssaValue
 func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerContext) (string, ssa.Value) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return "", nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -437,7 +437,7 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 }
 
 func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -454,7 +454,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 }
 
 func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	y.MarkedMemberCallWantMethod = true
@@ -527,7 +527,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 }
 
 func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.Variable, string, string) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil, "", ""
 	}
 	recoverRange := y.SetRange(raw)
@@ -583,7 +583,7 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 }
 
 func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -715,7 +715,7 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 }
 
 func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -757,7 +757,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 }
 
 func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

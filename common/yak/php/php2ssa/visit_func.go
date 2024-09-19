@@ -6,7 +6,7 @@ import (
 )
 
 func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -48,7 +48,7 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 }
 
 func (y *builder) VisitReturnTypeDecl(raw phpparser.IReturnTypeDeclContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -68,7 +68,7 @@ func (y *builder) VisitReturnTypeDecl(raw phpparser.IReturnTypeDeclContext) inte
 }
 
 func (y *builder) VisitBaseCtorCall(raw phpparser.IBaseCtorCallContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -83,7 +83,7 @@ func (y *builder) VisitBaseCtorCall(raw phpparser.IBaseCtorCallContext) interfac
 }
 
 func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -102,7 +102,7 @@ func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListCon
 }
 
 func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -146,7 +146,7 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 }
 
 func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -177,7 +177,7 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 	return newFunc
 }
 func (y *builder) VisitLambdaFunctionUseVars(raw phpparser.ILambdaFunctionUseVarsContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -193,7 +193,7 @@ func (y *builder) VisitLambdaFunctionUseVars(raw phpparser.ILambdaFunctionUseVar
 	return nil
 }
 func (y *builder) VisitLambdaFunctionUseVar(raw phpparser.ILambdaFunctionUseVarContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

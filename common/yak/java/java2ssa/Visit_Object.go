@@ -7,7 +7,7 @@ import (
 )
 
 func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

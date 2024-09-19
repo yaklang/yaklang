@@ -1,7 +1,6 @@
 package yak2ssa
 
 import (
-	"context"
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -23,7 +22,7 @@ func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{}
 }
 
-func (*SSABuilder) Build(ctx context.Context, src string, force bool, b *ssa.FunctionBuilder) error {
+func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrontEnd(src, force)
 	if err != nil {
 		return err
@@ -46,7 +45,6 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
-	ctx context.Context
 }
 
 func FrontEnd(src string, must bool) (*yak.ProgramContext, error) {
