@@ -1,7 +1,6 @@
 package go2ssa
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -78,7 +77,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	return nil
 }
 
-func (s *SSABuilder) Build(ctx context.Context, src string, force bool, builder *ssa.FunctionBuilder) error {
+func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
@@ -129,7 +128,6 @@ type astbuilder struct {
 	specialValues  map[string]ssa.Value
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
-	ctx            context.Context
 }
 
 func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
@@ -295,16 +293,4 @@ func (b *astbuilder) GetSpecialValueByStr(name string) ssa.Value {
 		return nil
 	}
 	return b.specialValues[name]
-}
-
-func (b *astbuilder) isStop() bool {
-	if b.ctx == nil {
-		return false
-	}
-	select {
-	case <-b.ctx.Done():
-		return true
-	default:
-		return false
-	}
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -24,7 +24,7 @@ func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) inte
 }
 
 func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -46,7 +46,7 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 }
 
 func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -78,7 +78,7 @@ func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) ss
 }
 
 func (y *builder) VisitGotoStatement(raw phpparser.IGotoStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -93,7 +93,7 @@ func (y *builder) VisitGotoStatement(raw phpparser.IGotoStatementContext) interf
 }
 
 func (y *builder) VisitEmptyStatement(raw phpparser.IEmptyStatement_Context) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

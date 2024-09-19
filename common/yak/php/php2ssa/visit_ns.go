@@ -6,7 +6,7 @@ import (
 )
 
 func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamespaceNameListContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -23,7 +23,7 @@ func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamesp
 }
 
 func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) ([]string, string) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return []string{}, ""
 	}
 	recoverRange := y.SetRange(raw)
@@ -42,7 +42,7 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 }
 
 func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ([]string, map[string]string) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return []string{}, nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -77,7 +77,7 @@ func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext
 }
 
 func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext) map[string]string {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -110,7 +110,7 @@ func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext
 }
 
 func (y *builder) VisitNamespacePath(raw phpparser.INamespacePathContext) []string {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return []string{}
 	}
 	recoverRange := y.SetRange(raw)

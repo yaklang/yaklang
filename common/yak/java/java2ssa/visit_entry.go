@@ -8,7 +8,7 @@ import (
 )
 
 func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 
@@ -59,7 +59,7 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 }
 
 func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContext) (packagePath []string, static bool, importAll bool) {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil, false, false
 	}
 	recoverRange := y.SetRange(raw)
@@ -79,7 +79,7 @@ func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContex
 }
 
 func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationContext) []string {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 
@@ -101,7 +101,7 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 }
 
 func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	i, _ := raw.(*javaparser.PackageNameContext)
@@ -114,7 +114,7 @@ func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string 
 }
 
 func (y *builder) VisitPackageQualifiedName(raw javaparser.IQualifiedNameContext) []string {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
