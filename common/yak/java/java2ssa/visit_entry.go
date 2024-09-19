@@ -33,11 +33,11 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		if lib == nil {
 			lib = prog.NewLibrary(pkgName, pkgPath)
 		}
-		lib.PushEditor(prog.GetCurrentEditor())
+		lib.PushEditor(prog.GetApplication().GetCurrentEditor())
 
 		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
 		if builder != nil {
-			builder.SetEditor(prog.GetCurrentEditor())
+			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
 			builder.SetBuildSupport(y.FunctionBuilder)
 			currentBuilder := y.FunctionBuilder
 			y.FunctionBuilder = builder
