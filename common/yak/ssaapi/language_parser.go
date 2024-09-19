@@ -265,21 +265,21 @@ func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 
 func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
-	prog := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, c.fs, c.programPath)
-	prog.Language = string(c.language)
+	application := ssa.NewProgram(programName, c.ProgramName != "", ssa.Application, c.fs, c.programPath)
+	application.Language = string(c.language)
 
-	prog.ProcessInfof = func(s string, v ...any) {
+	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
 	}
 
-	prog.Build = func(
+	application.Build = func(
 		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) error {
-		prog.ProcessInfof("start to compile : %v", filePath)
+		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
 		defer func() {
-			prog.ProcessInfof(
+			application.ProcessInfof(
 				"compile finish file: %s, cost: %v",
 				filePath, time.Since(start),
 			)
@@ -290,8 +290,8 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.language)
 		}
-		if prog.Language == "" {
-			prog.Language = string(LanguageBuilder.GetLanguage())
+		if application.Language == "" {
+			application.Language = string(LanguageBuilder.GetLanguage())
 		}
 
 		// get source code
@@ -303,7 +303,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		// TODO: check prog.FileList avoid duplicate file save to sourceDB,
 		// in php include just build file in child program, will cause the same file save to sourceDB, when the file include multiple times
 		// this check should be more readable, we should use Editor and `prog.PushEditor..` save sourceDB.
-		if _, exist := prog.FileList[filePath]; !exist {
+		if _, exist := application.FileList[filePath]; !exist {
 			if programName != "" {
 				folderName, fileName := c.fs.PathSplit(filePath)
 				folders := []string{programName}
@@ -323,18 +323,16 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 
 		// push into program for recording what code is compiling
-		prog.PushEditorex(newCodeEditor, !fb.PreHandler)
-		fb.SetProgram(prog)
+		application.PushEditorex(newCodeEditor, !fb.PreHandler)
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
-			prog.PopEditor()
+			application.PopEditor()
 		}()
 
 		if ret := fb.GetEditor(); ret != nil {
-			prog := fb.GetProgram()
-			cache := prog.Cache
-			progName, hash := prog.GetProgramName(), codec.Sha256(ret.GetSourceCode())
+			cache := application.Cache
+			progName, hash := application.GetProgramName(), codec.Sha256(ret.GetSourceCode())
 			if cache.IsExistedSourceCodeHash(progName, hash) {
 				c.DatabaseProgramCacheHitter(fb)
 			}
@@ -343,7 +341,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
-	builder := prog.GetAndCreateFunctionBuilder("main", "main")
+	builder := application.GetAndCreateFunctionBuilder("main", "main")
 	// TODO: this extern info should be set in program
 	builder.WithExternLib(c.externLib)
 	builder.WithExternValue(c.externValue)
@@ -351,5 +349,5 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 
 	builder.WithDefineFunction(c.defineFunc)
-	return prog, builder, nil
+	return application, builder, nil
 }

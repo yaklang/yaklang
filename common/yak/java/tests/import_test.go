@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -66,6 +67,7 @@ public class MDCAccessServletFilter implements Filter {
 		if err != nil {
 			return err
 		}
+		log.Info(result.String())
 		require.Contains(t, result.String(), "src/main/java/io/github/talelin/latticy/module/log/MDCAccessServletFilter.java")
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
