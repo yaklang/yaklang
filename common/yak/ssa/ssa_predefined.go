@@ -250,7 +250,11 @@ func (n *anValue) Build() Value {
 }
 func (n *anValue) FixSpinUdChain() {
 	if !utils.IsNil(n.spinValue) {
-		ReplaceAllValue(n.spinValue, n.this)
+		if !utils.IsNil(n.this) {
+			ReplaceAllValue(n.spinValue, n.this)
+		} else {
+			ReplaceAllValue(n.spinValue, n.GetFunc().builder.EmitConstInst("unknown_replace_value"))
+		}
 	}
 }
 func (n *anValue) CheckAndFinishBuild() bool {
