@@ -1,5 +1,5 @@
 desc(
-    title: "LDAP Injection PHP checking (without ldap_escape)",
+    title: "LDAP Injection PHP checking",
     type: vuln,
     severity: mid,
 )
@@ -10,18 +10,46 @@ ldap_read(*<slice(start=1)> as $query)
 ldap_compare(,* as $query);
 
 <include('php-param')> as $params;
+<include('php-filter-function')> as $filter;
 $query #{
-    include: `* & $params`,
-    exclude: `*?{opcode:call && <getCaller><name>?{have:ldap_escape}}`,
-}-> as $result;
-alert $result;
+    until: `* & $params`,
+}-> as $root;
+$root?{!<dataflow(<<<CODE
+*?{opcode: call && <getCaller><name>?{have: ldap_escape}} as $__next__;
+CODE)>} as $result;
+alert(
+    title: 'php ldap direct injection without filter',
+    type: 'vuln',
+    level: 'high'
+) $result;
+
+$root?{<dataflow(<<<CODE
+*?{opcode: call && !(have: ldap_escape)} as $__next__;
+CODE)>} as $filter_result;
+
+alert(
+    title: 'php ldap direct injection have filter,but not match this filter function',
+    type: 'mid',
+    level: 'mid'
+) $filter_result;
+
+$root?{<dataflow(<<<CODE
+*?{opcode: call && (<self> & $filter || have: ldap_escape)} as $__next__;
+CODE)>} as $info;
+
+alert(
+    title: 'php ldap inject have filter and match this filter function',
+    type: 'info',
+    level: 'info'
+)   $info
 
 desc(
 
 language: php,
-alert_min: 2,
+alert_min: 1,
+alert_mid: 1,
 
-'file://list3.php': <<<CODE
+'file:///list3.php': <<<CODE
 <?php
 
 $ldapconn = ldap_connect("localhost");
@@ -36,7 +64,7 @@ if($ldapconn){
 }
 CODE,
 
-'file://list2.php': <<<CODE
+'file:///list2.php': <<<CODE
 <?php
 
 $username = $_POST['username'];
@@ -45,18 +73,5 @@ $password = $_POST['password'];
 $escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
 $dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
 $is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
-CODE,
-
-'safefile://list3.php': <<<CODE
-<?php
-
-$username = $_POST['username'];
-$password = $_POST['password'];
-// without_pass
-$escaped_username = ldap_escape($username, '', LDAP_ESCAPE_FILTER);
-$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
-$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
-CODE,
-
-
+CODE
 )

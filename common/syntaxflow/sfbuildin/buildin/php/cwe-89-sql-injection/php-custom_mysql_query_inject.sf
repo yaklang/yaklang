@@ -3,14 +3,48 @@ desc(
     type: audit,
     level: low,
 )
+<include('php-param')> as $params;
+<include('php-filter-function')> as $filter;
 
-mysql_query() as $source
-$source?{* #{
-    include:`*?{have: _GET || have: _POST || have: REQUEST}`,
-}->} as $param
-alert $param
+mysql_query(* as $query);
+$query #{
+    until: `* & $params`,
+}-> as $root;
+$root?{!<dataflow(<<<CODE
+*?{opcode: call} as $__next__;
+CODE)>} as $result;
+alert(
+    title: "Direct mysql injection",
+    title_zh: "直接的mysql注入不经过任何过滤",
+    type: 'vuln',
+    level: 'high',
+) $result;
+
+$root?{<dataflow(<<<CODE
+*?{opcode: call && <self> & $filter} as $__next__;
+
+CODE)>} as $filter_result;
+
+alert(
+    title: 'Filtered sql injection, filter function detected',
+    title_zh: '经过过滤的sql注入，检测到过滤函数',
+    type: 'low',
+    level: 'low'
+) $filter_result;
+
+$root?{<dataflow(<<<CODE
+*?{opcode: call && !<self> & $filter} as $__next__;
+CODE)>} as $seem_filter;
+
+alert(
+    title: 'Filtered sql injection, but no filter function detected',
+    title_zh: '经过过滤的sql注入，但未检测到过滤函数',
+    type: 'mid',
+    level: 'mid'
+)  $seem_filter;
 
 desc(
+    alert_high: 1,
     lang: php,
     'file:///mysql.php': <<<UNSAFE
 <?php
@@ -23,11 +57,23 @@ UNSAFE
 
 desc(
     lang: php,
-    'safefile:///safe.php': <<<SAFE
+    'file:///mysql_filter.php': <<<CODE
 <?php
-    $llink=1;
+    $llink=addslashes($_GET['1']);
     $query = "SELECT * FROM nav WHERE link='$llink'";
-    $resul = mysql_query($query) or die('SQL语句有误：'.mysql_error());
-    $navs = mysql_fetch_array($resul);
-SAFE
+    $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
+    $navs = mysql_fetch_array($result);
+CODE
+)
+
+desc(
+    alert_mid: '1',
+    lang: php,
+    'file:///mysql_inject.php': <<<UNSAFE
+<?php
+    $llink=trim($_GET['1']);
+    $query = "SELECT * FROM nav WHERE link='$llink'";
+    $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
+    $navs = mysql_fetch_array($result);
+UNSAFE
 )

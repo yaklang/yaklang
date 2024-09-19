@@ -2,7 +2,7 @@ desc(
     title: "check file read function",
     type: audit,
     level: info,
-    lib: 'custom-file-read'
+    lib: 'php-file-read'
 )
 
 fopen as $sink1
