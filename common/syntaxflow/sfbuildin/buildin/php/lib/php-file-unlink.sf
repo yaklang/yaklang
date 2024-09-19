@@ -1,7 +1,7 @@
 desc(
     title: "check php function--unlink",
     type: audit,
-    lib: 'custom-file-unlink'
+    lib: 'php-file-unlink'
 )
 
 unlink as $unlink
