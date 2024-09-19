@@ -300,7 +300,6 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
-
 		// TODO: check prog.FileList avoid duplicate file save to sourceDB,
 		// in php include just build file in child program, will cause the same file save to sourceDB, when the file include multiple times
 		// this check should be more readable, we should use Editor and `prog.PushEditor..` save sourceDB.
@@ -325,6 +324,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 
 		// push into program for recording what code is compiling
 		prog.PushEditorex(newCodeEditor, !fb.PreHandler)
+		fb.SetProgram(prog)
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
