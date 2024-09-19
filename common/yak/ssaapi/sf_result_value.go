@@ -29,9 +29,7 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 	r.variable = orderedmap.New()
 	if r.memResult != nil {
 		r.memResult.SymbolTable.ForEach(func(name string, value sfvm.ValueOperator) bool {
-			if valueLen := sfvm.ValuesLen(value); valueLen > 0 {
-				r.variable.Set(name, valueLen)
-			}
+			r.variable.Set(name, sfvm.ValuesLen(value))
 			return true
 		})
 		for name := range r.memResult.AlertSymbolTable {
