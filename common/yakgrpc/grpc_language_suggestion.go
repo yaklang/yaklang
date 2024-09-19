@@ -182,20 +182,18 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	return standardLibrarySuggestions
 }
 
-func getVscodeSnippetsBySSAValue(funcName string, v *ssaapi.Value) string {
+func getSSAFunctionVscodeSnippets(funcName string, funTyp *ssa.FunctionType) string {
 	snippet := funcName
-	fun, ok := ssa.ToFunction(ssaapi.GetBareNode(v))
-	if !ok {
-		return snippet
+	parameter := funTyp.Parameter
+	if funTyp.IsMethod {
+		if len(parameter) > 0 {
+			parameter = parameter[1:]
+		}
 	}
-	funTyp, ok := ssa.ToFunctionType(fun.GetType())
-	lenOfParams := len(funTyp.Parameter)
-	if !ok {
-		return snippet
-	}
+	lenOfParams := len(parameter)
 	snippet += "("
 	snippet += strings.Join(
-		lo.Map(funTyp.Parameter, func(typ ssa.Type, i int) string {
+		lo.Map(parameter, func(typ ssa.Type, i int) string {
 			if i == lenOfParams-1 && funTyp.IsVariadic {
 				typStr := typ.String()
 				typStr = strings.TrimLeft(typStr, "[]")
@@ -763,7 +761,8 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf) (r
 		vKind := "Variable"
 		if !v.IsNil() && v.IsFunction() {
 			vKind = "Function"
-			insertText = getVscodeSnippetsBySSAValue(varName, v)
+			funcTyp, _ := ssa.ToFunctionType(bareValue.GetType())
+			insertText = getSSAFunctionVscodeSnippets(varName, funcTyp)
 		}
 		ret = append(ret, &ypb.SuggestionDescription{
 			Label:       varName,
@@ -894,6 +893,7 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 		bareTyp = ssaapi.GetBareType(v.GetType())
 	}
 	typKind := bareTyp.GetTypeKind()
+
 	if typKind == ssa.OrTypeKind {
 		// or 类型特殊处理
 		orTyp, ok := bareTyp.(*ssa.OrType)
@@ -909,32 +909,55 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 	typStr := _getGolangTypeStringBySSAType(bareTyp)
 	// 接口方法，结构体成员与方法，定义类型方法
 	lib, ok := doc.GetDefaultDocumentHelper().StructMethods[typStr]
-	if !ok {
-		return ret
-	}
-
-	for _, instance := range lib.Instances {
-		// 过滤掉非导出字段
-		if !_shouldExport(instance.InstanceName) {
-			continue
+	if ok {
+		for _, instance := range lib.Instances {
+			// 过滤掉非导出字段
+			if !_shouldExport(instance.InstanceName) {
+				continue
+			}
+			keyStr := instance.InstanceName
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       keyStr,
+				Description: "",
+				InsertText:  keyStr,
+				Kind:        "Field",
+			})
 		}
-		keyStr := instance.InstanceName
-		ret = append(ret, &ypb.SuggestionDescription{
-			Label:       keyStr,
-			Description: "",
-			InsertText:  keyStr,
-			Kind:        "Field",
-		})
+
+		for methodName, funcDecl := range lib.Functions {
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       methodName,
+				Description: funcDecl.Document,
+				InsertText:  funcDecl.VSCodeSnippets,
+				Kind:        "Method",
+			})
+		}
+		return
+
+	} else if objType, ok := ssa.ToObjectType(bareTyp); (typKind == ssa.ClassBluePrintTypeKind || typKind == ssa.ObjectTypeKind) && ok {
+		for _, key := range objType.Keys {
+			keyStr := key.String()
+			// 过滤掉非导出字段
+			fieldType := objType.GetField(key)
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       keyStr,
+				Description: fieldType.String(),
+				InsertText:  keyStr,
+				Kind:        "Field",
+			})
+		}
+		for methodName, method := range objType.GetMethod() {
+			funcTyp, _ := ssa.ToFunctionType(method.GetType())
+			insertText := getSSAFunctionVscodeSnippets(methodName, funcTyp)
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       methodName,
+				Description: "",
+				InsertText:  insertText,
+				Kind:        "Method",
+			})
+		}
 	}
 
-	for methodName, funcDecl := range lib.Functions {
-		ret = append(ret, &ypb.SuggestionDescription{
-			Label:       methodName,
-			Description: funcDecl.Document,
-			InsertText:  funcDecl.VSCodeSnippets,
-			Kind:        "Method",
-		})
-	}
 	return
 }
 
