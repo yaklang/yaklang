@@ -3,7 +3,7 @@ package php2ssa
 import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 
 func (y *builder) VisitGlobalStatement(raw phpparser.IGlobalStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

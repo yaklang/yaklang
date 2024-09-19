@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"context"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -170,7 +169,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(context.Context, string, *memedit.MemEditor, *FunctionBuilder) error
+type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
 
 type ProgramKind string
 

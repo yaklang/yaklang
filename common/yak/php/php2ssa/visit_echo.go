@@ -5,7 +5,7 @@ import (
 )
 
 func (y *builder) VisitEchoStatement(raw phpparser.IEchoStatementContext) interface{} {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

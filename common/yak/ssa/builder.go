@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,6 +26,8 @@ func (p *ParentScope) Create(scope ScopeIF) *ParentScope {
 // Function builder API
 type FunctionBuilder struct {
 	*Function
+
+	ctx context.Context
 
 	// do not use it directly
 	_editor *memedit.MemEditor
@@ -89,6 +92,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		b.SupportClosure = parent.SupportClosure
 		b.SupportClassStaticModifier = parent.SupportClassStaticModifier
 		b.SupportClass = parent.SupportClass
+		b.ctx = parent.ctx
 	}
 
 	// b.ScopeStart()

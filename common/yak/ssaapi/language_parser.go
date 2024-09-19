@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -59,11 +58,6 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	programPath := c.programPath
 	prog, builder, err := c.init()
-
-	var ctx context.Context
-	if m := c.manager; m != nil && m.ctx != nil {
-		ctx = m.ctx
-	}
 
 	if err != nil {
 		return nil, err
@@ -137,7 +131,7 @@ func (c *config) parseProject() (Programs, error) {
 			}
 
 			// build
-			if err := prog.Build(ctx, path, memedit.NewMemEditor(raw), builder); err != nil {
+			if err := prog.Build(path, memedit.NewMemEditor(raw), builder); err != nil {
 				log.Debugf("parse %#v failed: %v", path, err)
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
@@ -182,7 +176,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
-	if err := prog.Build(context.Background(), "", code, builder); err != nil {
+	if err := prog.Build("", code, builder); err != nil {
 		return err
 	}
 	builder.Finish()
@@ -216,7 +210,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}
 	c.LanguageBuilder.PreHandlerFile(r, builder)
 	// parse code
-	if err := prog.Build(context.Background(), "", r, builder); err != nil {
+	if err := prog.Build("", r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()
@@ -279,7 +273,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		log.Info(msg)
 	}
 	application.Build = func(
-		ctx context.Context, filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
+		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) error {
 		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
@@ -344,7 +338,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
-		return LanguageBuilder.Build(ctx, src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
 	builder := application.GetAndCreateFunctionBuilder("main", "main")
 	// TODO: this extern info should be set in program
@@ -352,7 +346,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
-
 	builder.WithDefineFunction(c.defineFunc)
+	builder.SetContext(c.ctx)
 	return application, builder, nil
 }

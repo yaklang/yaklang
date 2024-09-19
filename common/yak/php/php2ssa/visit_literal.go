@@ -1,10 +1,11 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -13,7 +14,7 @@ import (
 )
 
 func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -38,7 +39,7 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 }
 
 func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -105,7 +106,7 @@ func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ss
 }
 
 func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -142,7 +143,7 @@ func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ss
 }
 
 func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -179,7 +180,7 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 }
 
 func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return ""
 	}
 	identifier := raw.(*phpparser.IdentifierContext)
@@ -196,7 +197,7 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 }
 
 func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) ssa.Value {
-	if y == nil || raw == nil || y.isStop() {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)

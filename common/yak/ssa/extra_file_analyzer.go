@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"context"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -20,7 +19,7 @@ type Builder interface {
 	// create a new builder
 	Create() Builder
 
-	Build(context.Context,string, bool, *FunctionBuilder) error
+	Build(string, bool, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
 	PreHandlerAnalyzer

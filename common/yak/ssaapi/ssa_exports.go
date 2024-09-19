@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"io"
 	"path/filepath"
 	"strings"
@@ -59,8 +60,8 @@ type config struct {
 	SaveToProfile              bool
 	// for hash
 	externInfo string
-	// process manager
-	manager *SSAParseProcessManager
+	// process ctx
+	ctx context.Context
 	// error
 	err error
 }
@@ -269,9 +270,9 @@ func WithEnableCache(b ...bool) Option {
 	}
 }
 
-func WithProcessManager(manager *SSAParseProcessManager) Option {
+func WithContext(ctx context.Context) Option {
 	return func(c *config) {
-		c.manager = manager
+		c.ctx = ctx
 	}
 }
 
