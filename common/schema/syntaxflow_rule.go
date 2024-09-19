@@ -1,10 +1,10 @@
 package schema
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -88,7 +88,7 @@ type SyntaxFlowRule struct {
 	TitleZh     string
 	Description string
 	Tag         string
-
+	AlertDesc   string
 	// yak or sf
 	Type     SyntaxFlowRuleType
 	Severity SyntaxFlowSeverity

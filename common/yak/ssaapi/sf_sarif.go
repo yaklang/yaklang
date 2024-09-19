@@ -240,8 +240,8 @@ func convertSyntaxFlowFrameToSarifRun(root *SarifContext, frame *sfvm.SFFrameRes
 				if utils.IsNil(defaultEditor) {
 					defaultEditor = raw.GetRange().GetEditor()
 				}
-				if msg := frame.AlertMsgTable[k]; msg != "" {
-					sctx.AddSSAValue(raw, msg)
+				if m := frame.AlertDesc[k]; m != nil {
+					sctx.AddSSAValue(raw, frame.AlertDesc[k].Msg)
 				} else {
 					sctx.AddSSAValue(raw)
 				}

@@ -2,6 +2,11 @@ package buildin_rule
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 
@@ -250,4 +255,29 @@ alert $output;
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestImport(t *testing.T) {
+	err := sfdb.ImportRuleWithoutValid("test.sf", `
+desc(
+	title: "import test",
+	level: "high",
+	lang: "php",
+)
+$a #-> * as $param
+
+alert $param for {"level": "high"}
+`, true)
+	require.NoError(t, err)
+	rule, err := sfdb.GetRule("test.sf")
+	require.NoError(t, err)
+	var m map[string]*sfvm.ExtraDescInfo
+	fmt.Println(rule.AlertDesc)
+	err = json.Unmarshal(codec.AnyToBytes(rule.AlertDesc), &m)
+	require.NoError(t, err)
+	info, ok := m["param"]
+	require.True(t, ok)
+	require.True(t, info.Level == schema.SFR_SEVERITY_HIGH)
+	err = sfdb.DeleteRuleByRuleName("test.sf")
+	require.NoError(t, err)
 }

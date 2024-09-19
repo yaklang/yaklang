@@ -29,6 +29,7 @@ type Value struct {
 
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
+	DescInfo     map[string]string
 }
 
 type PredecessorValue struct {

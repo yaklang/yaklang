@@ -70,10 +70,10 @@ lfText: LFHereDocText+;
 hereDoc: '<<<'  HereDocIdentifierName (crlfHereDoc | lfHereDoc);
 
 // echo statement will echo the variable
-alertStatement: Alert refVariable (For stringLiteral)?;
+alertStatement: Alert  refVariable (For ((('{' descriptionItems '}'))|stringLiteral))?;
 
 // checkStatement will check the filterExpr($params) is true( .len > 0), if not,
-// it will record an error with stringLiteral
+// it will record an error with stringLitera
 // if thenExpr is provided, it will be executed(description) after the assertStatement
 checkStatement: Check refVariable thenExpr? elseExpr?;
 thenExpr: Then stringLiteral;

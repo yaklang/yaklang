@@ -21,7 +21,6 @@ var _ sfvm.ValueOperator = &Program{}
 func (p *Program) String() string {
 	return p.Program.GetProgramName()
 }
-
 func (p *Program) IsMap() bool { return false }
 
 func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error {

@@ -3,13 +3,12 @@ package ssatest
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -460,8 +459,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 			errs = append(errs, utils.Errorf("alert symbol table is empty"))
 			return err
 		}
-
-		if frame.AllowIncluded != "" {
+		if frame.GetRule().AllowIncluded {
 			libOutput := result.GetValues("output")
 			if libOutput == nil {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert`", result.Name()))
@@ -470,9 +468,25 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 				errs = append(errs, utils.Errorf("lib: %v is not exporting output in `alert` (empty result)", result.Name()))
 			}
 		}
-		alertCount := 0
+		var (
+			alertCount = 0
+			alert_high = 0
+			alert_mid  = 0
+			alert_info = 0
+		)
+
 		for _, name := range result.GetAlertVariables() {
 			alertCount += len(result.GetValues(name))
+			if info, b := result.GetAlertInfo(name); b {
+				switch info.Level {
+				case "mid", "m":
+					alert_mid += len(result.GetValues(name))
+				case "high", "h":
+					alert_high += len(result.GetValues(name))
+				case "info", "low":
+					alert_info += len(result.GetValues(name))
+				}
+			}
 		}
 		if alertCount <= 0 {
 			errs = append(errs, utils.Errorf("alert symbol table is empty"))
@@ -487,7 +501,27 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 				return nil
 			}
 		}
-
+		high := frame.GetExtraInfoInt("alert_high", "alertHigh", "vulnHigh")
+		if high > 0 {
+			if alert_high < high {
+				errs = append(errs, utils.Errorf("alert symbol table is less than alert_high config: %v, actual got: %v", high, alert_high))
+				return nil
+			}
+		}
+		mid := frame.GetExtraInfoInt("alert_mid", "alertMid", "vulnMid")
+		if mid > 0 {
+			if alert_mid < mid {
+				errs = append(errs, utils.Errorf("alert symbol table is less than alert_mid config: %v, actual got: %v", mid, alert_mid))
+				return nil
+			}
+		}
+		low := frame.GetExtraInfoInt("alert_low", "alertMid", "vulnMid", "alert_info")
+		if low > 0 {
+			if alert_info < low {
+				errs = append(errs, utils.Errorf("alert symbol table is less than alert_low config: %v, actual got: %v", low, alert_info))
+				return nil
+			}
+		}
 		return nil
 	}, ssaapi.WithLanguage(l))
 	if len(errs) > 0 {
