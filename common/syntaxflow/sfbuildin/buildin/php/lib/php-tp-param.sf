@@ -2,7 +2,7 @@ desc(
     title: "tp param",
     type: audit,
     level: info,
-    lib: 'tp-all-extern-variable-param-source'
+    lib: 'php-tp-all-extern-variable-param-source'
 )
 input() as $param
 $param as $output

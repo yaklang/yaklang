@@ -1,0 +1,26 @@
+desc(
+    title: 'php custom filter function',
+    type: audit,
+    level: info,
+    lib: 'php-filter-function'
+)
+
+/htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos/ as $output
+
+alert $output
+
+desc(
+    lang: php,
+    alert_min: 8,
+    'file:///filter.php': <<<CODE
+<?php
+    filter_input();
+    htmlspecialchars();
+    mysql_real_escape_string();
+    addslashes();
+    is_numeric();
+    strip_tags();
+    str_replace();
+    ereg();
+CODE
+)

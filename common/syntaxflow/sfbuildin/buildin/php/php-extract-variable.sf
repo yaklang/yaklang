@@ -4,14 +4,55 @@ desc(
     level: low,
 )
 
-extract() #->*?{have: '_GET'||have: '_POST'||have: '_REQUEST'} as $sink
-alert $sink
+<include('php-param')> as $input;
+<include('php-filter-function')> as $filter;
+extract(* as $output);
+
+$output #{until: `* & $input`}-> as $root;
+
+$root?{!<dataflow(<<<CODE
+*?{opcode: call && <self> & $filter} as $__next__
+CODE)>} as $result
+
+alert(
+    title: 'Variable overwriting is detected and there is no filtering',
+    title_zh: '检测到变量覆盖，并且没有任何过滤',
+    type: 'vuln',
+    level: 'high'
+) $result
+
+$root?{<dataflow(<<<CODE
+*?{opcode: call && !<self> & $filter} as $__next__
+CODE)>} as $middle
 
 
+alert(
+    title: 'Variable coverage detected, but filter function not detected',
+    title_zh: '检测到变量覆盖，但是未检出过滤函数',
+    type: 'mid',
+    level: 'mid'
+) $middle
+
+$root?{<dataflow(<<<CODE
+*?{opcode: call && <self> & $filter} as $__next__
+CODE)>} as $low
+
+alert(
+    title: 'Variable coverage detected, but filter function not detected',
+    title_zh: '检测到变量覆盖，检出过滤函数',
+    type: 'low',
+    level: 'low'
+) $low
 desc(
     lang: php,
-    'file://param.php': <<<PARAM
+    alert_high: 1,
+    alert_low: 1,
+'file:///param.php':<<<PARAM
 <?php
-   extract($_GET);
-PARAM
+extract($_GET);
+PARAM,
+'file:///param_filter.php':<<<CODE
+<?php
+    extract(filter($_GET));
+CODE
 )

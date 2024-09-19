@@ -3,12 +3,15 @@ desc(
     type: audit,
     lib: 'php-param'
 )
+/_POST|_GET|_REQUEST|_COOKIE/ as $extraInput
+
 _POST.* as $param1
 _GET.* as $param2
 _REQUEST.* as $param3
 _COOKIE.* as $param4
 
-$param1 + $param2 + $param3 + $param4 as $output
+
+$param1 + $param2 + $param3 + $param4 + $extraInput as $output
 alert $output
 
 desc(

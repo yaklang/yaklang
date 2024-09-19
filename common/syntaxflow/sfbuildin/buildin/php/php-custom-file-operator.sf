@@ -4,21 +4,31 @@ desc(
     level: low
 )
 
-<include('custom-file-read')> as $read
-<include('custom-file-write')> as $write
-<include('custom-file-unlink')> as $unlink
-
+<include('php-file-read')> as $read
+<include('php-file-unlink')> as $write
+<include('php-file-write')> as $unlink
 $read + $write + $unlink as $source
 
-$source() #->*?{any: _GET,_POST,_REQUEST}?{!opcode:const} as $param
-$param--> as $sink
+<include('php-param')> as $params
+<include('php-filter-function')> as $filter
 
-check $sink
-alert $sink
+$source(* as $param)
+
+$param#{until: `* & $params`}-> as $root
+
+$root?{!<dataflow(<<<CODE
+*?{opcode: call} as $__next__;
+CODE)>} as $result
+
+alert(
+    title: 'Direct file manipulation',
+    type: 'vuln',
+    level: 'high'
+) $result
 
 desc(
     lang: php,
-    alert_min: '3',
+    alert_min: 1,
     'file://unsafe.php': <<<UNSAFE
 <?php
 fopen($_GET[0],'r');

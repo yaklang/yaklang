@@ -2,7 +2,7 @@ desc(
     title: "check file write function",
     type: audit,
     level: info,
-    lib: 'custom-file-write'
+    lib: 'php-file-write'
 )
 
 fwrite as $sink1
@@ -15,7 +15,7 @@ alert $output
 desc(
     lang: php,
     alert_min: '2',
-    'file://fileWrite.php': <<<PARAM
+     'file://fileUnlink.php': <<<PARAM
 <?php
 $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
  	$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
