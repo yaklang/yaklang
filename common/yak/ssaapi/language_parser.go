@@ -142,6 +142,7 @@ func (c *config) parseProject() (Programs, error) {
 			}
 			return exclude, nil
 		}),
+		ssareducer.WithContext(c.ctx),
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")
