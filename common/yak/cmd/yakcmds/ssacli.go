@@ -98,6 +98,9 @@ var SSACompilerCommands = []*cli.Command{
 			cli.BoolFlag{
 				Name: "with-code,code", Usage: "show code context",
 			},
+			cli.BoolFlag{
+				Name: "save-to-profile", Usage: "save the compiled results to Yakit's profile database so that you can use Yakit for code audit",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -133,6 +136,7 @@ var SSACompilerCommands = []*cli.Command{
 			sfDebug := c.Bool("syntaxflow-debug")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
+			isProfile := c.Bool("save-to-profile")
 
 			// set database
 			if databaseFileRaw != "" {
@@ -153,6 +157,7 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("start to compile file: %v ", target)
 			opt = append(opt, ssaapi.WithRawLanguage(input_language))
 			opt = append(opt, ssaapi.WithReCompile(reCompile))
+			opt = append(opt, ssaapi.WithSaveToProfile(isProfile))
 			if entry != "" {
 				log.Infof("start to use entry file: %v", entry)
 				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
