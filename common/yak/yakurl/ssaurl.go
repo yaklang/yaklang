@@ -142,8 +142,8 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 		value := vs[index]
 		msg := ""
-		if m, ok := result.GetAlertMsg(variable); ok {
-			msg = m
+		if m, ok := result.GetAlertInfo(variable); ok {
+			msg = codec.AnyToString(m)
 		}
 		res := Value2Response(programName, value, msg, url)
 		resources = append(resources, res)
@@ -188,9 +188,9 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 			res := createNewRes(url, valueNum, nil)
 			res.ResourceType = "variable"
 			res.ResourceName = variable
-			if msg, ok := result.GetAlertMsg(variable); ok {
+			if msg, ok := result.GetAlertInfo(variable); ok {
 				res.VerboseType = "alert"
-				res.VerboseName = msg
+				res.VerboseName = codec.AnyToString(msg)
 				resources = append(resources, res)
 			} else {
 				res.VerboseType = "normal"

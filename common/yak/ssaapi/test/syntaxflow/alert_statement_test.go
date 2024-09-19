@@ -44,7 +44,7 @@ func TestAlertStatement(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			result, err := prog.SyntaxFlowWithError(`
 				f( * as $i )
-				alert $i for "this is an alert message"
+				alert $i for {msg: "this is an alert message"}
 
 `, sfvm.WithEnableDebug(true))
 			if err != nil {
@@ -62,5 +62,13 @@ func TestAlertStatement(t *testing.T) {
 			fmt.Println(string(buf.String()))
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test alert get exInfo", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `f( * as $i )
+alert $i for{
+info: "info",
+level: 'level'
+}
+`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }

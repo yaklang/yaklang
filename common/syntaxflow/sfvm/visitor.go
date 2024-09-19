@@ -16,6 +16,7 @@ import (
 type SyntaxFlowVisitor struct {
 	text               string
 	title              string
+	title_zh           string
 	allowIncluded      string
 	rawDesc            map[string]string
 	description        string
@@ -24,6 +25,7 @@ type SyntaxFlowVisitor struct {
 	language           string
 	verifyFilesystem   map[string]string
 	negativeFilesystem map[string]string
+	alertMsg           map[string]*ExtraDescInfo
 	codes              []*SFI
 }
 
@@ -32,6 +34,7 @@ func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 		verifyFilesystem:   make(map[string]string),
 		negativeFilesystem: make(map[string]string),
 		rawDesc:            make(map[string]string),
+		alertMsg:           make(map[string]*ExtraDescInfo),
 	}
 	return sfv
 }

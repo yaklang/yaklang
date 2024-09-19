@@ -222,6 +222,7 @@ HOOK
 UNTIL
 }->
 `,
+		`alert $i for {level: "high",msg: "xxx"}`,
 	} {
 		vm := sfvm.NewSyntaxFlowVirtualMachine().Debug(true)
 		_, err := vm.Compile(i)
