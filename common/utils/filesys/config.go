@@ -1,6 +1,7 @@
 package filesys
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"os"
@@ -43,6 +44,8 @@ type (
 		fileSystem fi.FileSystem
 
 		dirMatch []*dirMatch
+
+		ctx context.Context
 	}
 )
 
@@ -138,6 +141,12 @@ func WithDirWalkEnd(handle func(path string) error) Option {
 	}
 }
 
+func WithContext(ctx context.Context) Option {
+	return func(config *Config) {
+		config.ctx = ctx
+	}
+}
+
 // onReady will be called when the walker is ready to start walking.
 func withYaklangOnStart(h func(name string, isDir bool)) Option {
 	return WithOnStart(func(basename string, isDir bool) (err error) {
@@ -188,4 +197,16 @@ func withYaklangDirStat(h func(pathname string, info os.FileInfo)) Option {
 		h(pathname, info)
 		return nil
 	})
+}
+
+func (c *Config) isStop() bool {
+	if c == nil || c.ctx == nil {
+		return false
+	}
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }

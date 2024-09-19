@@ -1,6 +1,7 @@
 package ssareducer
 
 import (
+	"context"
 	"embed"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -18,6 +19,8 @@ type (
 
 		compileMethod      compileMethod
 		stopAtCompileError bool
+
+		ctx context.Context
 	}
 )
 
@@ -61,5 +64,11 @@ func WithEntryFiles(filename ...string) Option {
 func WithCompileMethod(handler compileMethod) Option {
 	return func(config *Config) {
 		config.compileMethod = handler
+	}
+}
+
+func WithContext(ctx context.Context) Option {
+	return func(config *Config) {
+		config.ctx = ctx
 	}
 }

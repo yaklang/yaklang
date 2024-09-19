@@ -104,7 +104,7 @@ func ReducerCompile(base string, opts ...Option) error {
 		}
 		return nil
 	}))
-
+	fileopts = append(fileopts, filesys.WithContext(c.ctx))
 	err := filesys.Recursive(base, fileopts...)
 	if err != nil {
 		return err
