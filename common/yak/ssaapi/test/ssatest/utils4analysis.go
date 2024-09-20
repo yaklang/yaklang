@@ -468,7 +468,9 @@ func checkFunctionEx(
 	vs = lo.UniqBy(vs, func(v *ssaapi.Value) int64 { return v.GetId() })
 	if checkLength {
 		if len(vs) != len(want) {
-			return fmt.Errorf("variable[%v] not want len(%d): %d: %v", values, len(want), len(vs), vs)
+			err := fmt.Errorf("variable[%v] got:%d: %v vs want: %d:%v", values, len(vs), vs, len(want), want)
+			log.Info(err)
+			return err
 		}
 	}
 	mark := make([]bool, len(want))
