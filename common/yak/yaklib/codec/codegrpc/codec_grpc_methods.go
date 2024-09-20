@@ -197,6 +197,123 @@ func unPadding(paddingType string, data []byte) ([]byte, error) {
 	}
 }
 
+func getKDF(kdfMode string, hashHandle hash.Hash) codec.KeyDerivationFunc {
+	if hashHandle == nil {
+		return nil
+	}
+	switch kdfMode {
+	case "PBKDF2":
+		return codec.NewPBKDF2Generator(func() hash.Hash { return hashHandle }, 1000)
+	case "Openssl":
+		return codec.NewBytesToKeyGenerator(func() hash.Hash { return hashHandle }, 1)
+	}
+	return nil
+}
+
+func getHash(hashFunc string) hash.Hash {
+	switch hashFunc {
+	case "MD5":
+		return md5.New()
+	case "SHA-1":
+		return sha1.New()
+	case "SHA-256":
+		return sha256.New()
+	case "SHA-384":
+		return sha512.New384()
+	case "SHA-512":
+		return sha512.New()
+	}
+	return nil
+}
+
+// Tag = "加密"
+// CodecName = "AES对称加密-KDF密钥生成"
+// Desc ="""高级加密标准（AES）是美国联邦信息处理标准（FIPS）。它是在一个历时5年的过程中，从15个竞争设计中选出的。
+// 你可以使用下列的其中一个KDF操作生成基于密码的密钥。"""
+// Params = [
+// { Name = "password", Type = "input", Required = true,Label = "密码" },
+// { Name = "kdfMode", Type = "select", DefaultValue = "Openssl", Options = ["Openssl", "PBKDF2"], Required = true ,Label = "密钥派生算法-KDF"},
+// { Name = "hashFunc", Type = "select",DefaultValue = "MD5", Options = ["MD5","SHA-1", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希"},
+// { Name = "noSalt", Type = "checkbox", Required = true , Label = "不加盐值"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "base64", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
+// ]
+func (flow *CodecExecFlow) AESEncryptKDF(password string, kdfMode string, hashFunc string, noSalt bool, mode string, output outputType, paddingType string) error {
+	inData, err := padding(paddingType, flow.Text, 16)
+	if err != nil {
+		return err
+	}
+
+	hashHandle := getHash(hashFunc)
+	if hashHandle == nil {
+		return utils.Error("unknown hash function")
+	}
+
+	kdf := getKDF(kdfMode, hashHandle)
+	if kdf == nil {
+		return utils.Error("unknown kdf mode")
+	}
+
+	salt := []byte("")
+	if !noSalt {
+		salt = codec.RandBytes(8)
+	}
+
+	cipherText, err := codec.AESEncWithPassphrase([]byte(password), inData, salt, kdf, mode)
+	if err != nil {
+		return err
+	}
+	if !noSalt {
+		prev := append([]byte("Salted__"), salt...)
+		cipherText = append(prev, cipherText...)
+	}
+	flow.Text = encodeData(cipherText, output)
+	return nil
+}
+
+// Tag = "解密"
+// CodecName = "AES对称解密-KDF密钥生成"
+// Desc = """高级加密标准（AES）是美国联邦信息处理标准（FIPS）。它是在一个历时5年的过程中，从15个竞争设计中选出的。
+// 你可以使用下列的其中一个KDF操作生成基于密码的密钥。
+// """
+// Params = [
+// { Name = "password", Type = "input", Required = true,Label = "密码" },
+// { Name = "kdfMode", Type = "select", DefaultValue = "Openssl", Options = ["Openssl", "PBKDF2"], Required = true ,Label = "密钥派生算法-KDF"},
+// { Name = "hashFunc", Type = "select",DefaultValue = "MD5", Options = ["MD5","SHA-1", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "input", Type = "select", DefaultValue = "base64", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"},
+// { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
+// ]
+func (flow *CodecExecFlow) AESDecryptKDF(password string, kdfMode string, hashFunc string, mode string, input outputType, paddingType string) error {
+	var err error
+	inputText := decodeData(flow.Text, input)
+	hashHandle := getHash(hashFunc)
+	if hashHandle == nil {
+		return utils.Error("unknown hash function")
+	}
+	kdf := getKDF(kdfMode, hashHandle)
+	if kdf == nil {
+		return utils.Error("unknown kdf mode")
+	}
+
+	salt := []byte("")
+	if bytes.HasPrefix(inputText, []byte("Salted__")) {
+		salt = inputText[8:16]
+		inputText = inputText[16:]
+	}
+	cipherText, err := codec.AESDecWithPassphrase([]byte(password), inputText, salt, kdf, mode)
+	if err != nil {
+		return err
+	}
+	cipherText, err = unPadding(paddingType, cipherText)
+	if err != nil {
+		return err
+	}
+	flow.Text = cipherText
+	return nil
+}
+
 // Tag = "加密"
 // CodecName = "AES对称加密"
 // Desc ="""高级加密标准（AES）是美国联邦信息处理标准（FIPS）。它是在一个历时5年的过程中，从15个竞争设计中选出的。
