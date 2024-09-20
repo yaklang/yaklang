@@ -15,8 +15,8 @@ import (
 type Value struct {
 	runtimeCtx    *omap.OrderedMap[ContextID, *Value]
 	ParentProgram *Program
-	EffectOn      Values
-	DependOn      Values
+	EffectOn      Values // this value effect current value     [effectOn -> self]
+	DependOn      Values // this value depend on current value  [self -> dependOn]
 
 	node ssa.Value
 	// cache
@@ -69,10 +69,10 @@ func (v *Value) getDataFlowPath(m map[int64]struct{}) Values {
 	}
 
 	for _, i := range v.EffectOn {
-		vals = append(vals, i.getDataFlowPath(m)...)
+		vals = append(vals, i.getEffectOnPath(m)...)
 	}
 	for _, i := range v.DependOn {
-		vals = append(vals, i.getDataFlowPath(m)...)
+		vals = append(vals, i.getDependOnPath(m)...)
 	}
 
 	return vals

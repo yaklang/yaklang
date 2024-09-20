@@ -123,41 +123,54 @@ UNTIL
 
 func TestSF_Config_MultipleConfig(t *testing.T) {
 	code := `
-a = 1
-f = (i)=>{
-	a = i 
+f1 = () => {
+	return 22
 }
 
-f(2)
-c = a 
+b = 11
+if c1 {
+	b = f1()
+}else if c1 {
+	b = f(b, 33)
+}else {
+	b = 44
+}
+
+println(b) // phi 
 `
-	t.Run("hook and hook", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code,
-			"c(*#{hook: `*?{opcode: const} as $const`,hook: `*?{!opcode: const} as $_const`}->)",
+	t.Run("hook and exclude", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+println(* as $para);
+$para #{
+		hook: <<<HOOK
+			*?{opcode:const} as $const
+HOOK,
+		exclude: <<<EXCLUDE
+			*?{opcode:call}
+EXCLUDE,
+}-> as $result 
+			`,
 			map[string][]string{
-				"const":  {"1"},
-				"_const": {"Undefined-dd"},
+				"const":  {"11", "22", "33", "44"},
+				"result": {"44", "Undefined-c1"},
 			})
 	})
 	t.Run("hook and until", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
-			"c(* #{hook: `*?{opcode: const} as $const`,until: `*?{opcode: const} as $_const`}->)",
+			`
+println(* as $para)
+$para #{
+	hook: <<<HOOK
+			*?{opcode:const} as $const
+HOOK,
+	until: <<<UNTIL
+		*?{opcode:call}
+UNTIL,
+}-> 
+
+			`,
 			map[string][]string{
-				"const":  {"1"},
-				"_const": {"1"},
+				"const": {"44"},
 			})
-	})
-	t.Run("until", func(t *testing.T) {
-		codes := `a = 1
-b = 2
-function aaa(a){
-    return a
-}
-c = aaa(a)
-cc = aaab(a)
-println(aa)`
-		ssatest.CheckSyntaxFlow(t, codes, "a-{until: `*<getCaller><name>?{have: \"aaab\"}`}-> as $result", map[string][]string{
-			"result": {"Undefined-aaab(1)"},
-		})
 	})
 }
