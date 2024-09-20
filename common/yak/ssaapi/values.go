@@ -61,6 +61,7 @@ func (v *Value) getDataFlowPath(m map[int64]struct{}) Values {
 	}
 	m[idStr] = struct{}{}
 	var vals Values
+	vals = append(vals, v)
 	for _, i := range v.EffectOn {
 		vals = append(vals, i)
 	}

@@ -47,7 +47,6 @@ c = a;
 		`, ssatest.CheckTopDef_Contain("b", []string{
 			"1",
 			"2",
-			"Undefined-foo(\"ooo\",\"kkk\")",
 			"Undefined-foo",
 			"ooo",
 			"kkk",
@@ -96,7 +95,6 @@ c = a;
 			"111",
 			"11",
 			"Undefined-c",
-			"phi(ok)[true,false]",
 			"true",
 			"false",
 			"Undefined-e",

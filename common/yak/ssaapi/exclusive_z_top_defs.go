@@ -138,7 +138,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		for _, cond := range conds {
 			v := i.NewValue(cond)
 			ret := v.AppendEffectOn(i).getTopDefs(actx, opt...)
-			result = append(result, v)
 			result = append(result, ret...)
 		}
 		return result
