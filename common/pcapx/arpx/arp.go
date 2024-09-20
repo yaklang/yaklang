@@ -2,6 +2,7 @@ package arpx
 
 import (
 	"context"
+	"github.com/google/gopacket"
 	"net"
 	"runtime"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/arptable"
 
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/mdlayher/arp"
 	"github.com/pkg/errors"
@@ -204,45 +204,48 @@ func IsLoopback(t string) bool {
 	}
 }
 
-func newArpARPPacket(iface *net.Interface, ip string) (gopacket.SerializeBuffer, error) {
+func newArpARPPacket(iface *net.Interface, ip string) ([]byte, error) {
 	ipIns := net.ParseIP(ip)
 	if ipIns == nil {
 		return nil, utils.Errorf("parse ip[%v] failed", ip)
 	}
 
-	srcIPS, err := iface.Addrs()
+	addrs, err := iface.Addrs()
 	if err != nil {
 		return nil, utils.Errorf("fetch src ip failed: %s", err)
 	}
 	var src net.IP
-	haveSet := false
-	for _, a := range srcIPS {
-		ip, _, err := net.ParseCIDR(a.String())
-		if err != nil {
-			continue
-		}
-		if haveSet {
-			break
+	for _, addr := range addrs {
+		ip := addr.(*net.IPNet).IP
+
+		if utils.IsIPv6(ip.String()) {
+			src = ip
 		}
 		if utils.IsIPv4(ip.String()) {
-			src = net.ParseIP(ip.String())
-			haveSet = true
+			src = ip
+			break
 		}
 	}
-	if !haveSet {
+	if src == nil {
 		return nil, utils.Errorf("iface[%v] 's ip cannot be found", iface.Name)
 	}
 
-	eth := &layers.Ethernet{SrcMAC: iface.HardwareAddr, DstMAC: net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, EthernetType: layers.EthernetTypeARP}
+	srcMac := iface.HardwareAddr
+	srcIP := src.To4()
+	eth := &layers.Ethernet{
+		SrcMAC:       srcMac,
+		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		EthernetType: layers.EthernetTypeARP,
+	}
 	arp := &layers.ARP{
 		AddrType:          layers.LinkTypeEthernet,
 		Protocol:          layers.EthernetTypeIPv4,
 		HwAddressSize:     6,
 		ProtAddressSize:   4,
 		Operation:         layers.ARPRequest,
-		SourceHwAddress:   []byte(iface.HardwareAddr),
-		SourceProtAddress: []byte(src.To4()),
-		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
+		SourceHwAddress:   iface.HardwareAddr,
+		SourceProtAddress: []byte(srcIP),
+		DstHwAddress:      make([]byte, 6),
 		DstProtAddress:    []byte(ipIns.To4()),
 	}
 	buf := gopacket.NewSerializeBuffer()
@@ -254,7 +257,7 @@ func newArpARPPacket(iface *net.Interface, ip string) (gopacket.SerializeBuffer,
 	if err != nil {
 		return nil, errors.Errorf("serialize arpx packet failed: %s", err)
 	}
-	return buf, nil
+	return buf.Bytes(), nil
 }
 
 //func ARPWithPcap(ctx context.Context, ifaceName string, targets string) (map[string]net.HardwareAddr, error) {
