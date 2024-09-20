@@ -7,58 +7,6 @@ availableSSRFParamNames = [
     "image", "imageurl",
 ]
 
-NewThreadPool = func(size){
-    inputChan = make(chan var)
-    var consumer
-    consumerWG = sync.NewWaitGroup()
-    productorWG = sync.NewWaitGroup()
-    threadPool = {
-        "consumer":f =>{
-            consumer = (id,data)=>{
-                try {
-                    f(id, data)
-                } catch err {
-                    log.warn("run consumer error: %v"%err)
-                }
-            }
-            return threadPool
-        },
-        "productor":f=>{
-            productorWG.Add(1)
-            go fn{
-                try {
-                    f(inputChan)
-                } catch err {
-                    log.warn("run productor error: %v"%err)
-                }
-                productorWG.Done()
-            }
-            return threadPool
-        },
-        "start":()=>{
-            for id = range size{
-                consumerWG.Add(1)
-                go func(id){
-                    for data in inputChan{
-                        if consumer{
-                            consumer(id,data)
-                        }else{
-                            log.warn("not set consumer for data: %v"%data)
-                        }
-                    }
-                    consumerWG.Done()
-                }(id)
-            }
-            return threadPool
-        },
-        "wait":()=>{
-            productorWG.Wait()
-            close(inputChan)
-            consumerWG.Wait()
-        }
-    }
-    return threadPool
-}
 
 description = `
 服务器端请求伪造（Server Side Request Forgery，简称SSRF）是一种网络安全漏洞，由攻击者构造并促使服务器端发起请求。这种漏洞的存在可能使攻击者能够控制服务器以发起网络请求，从而实现对未经授权资源的访问。
@@ -81,109 +29,103 @@ solution = `
 5. 使用Web应用防火墙（WAF）：WAF可以帮助识别和阻止SSRF攻击，增加了一个额外的防御层。
 `
 
+ssrfDetect = func(param) {
+    paramName = param.Name()
+    yakit_output("SSRF基础测试: 参数名[%v]" % [paramName])
+    domain,token,err = risk.NewDNSLogDomain()
+    if err {
+        yakit_output("获取dnslog失败: ^v，跳过对参数 [%s] 的检测" % [err,paramName])
+        return
+    }
+    payload = "http://%s"%domain
+    result, err = param.Fuzz(payload).ExecFirst()
+    if err != nil {
+        yakit_output("SSRF 发送请求失败")
+        return
+    }
+    url = result.Url
+    if "?" in url {
+        url = url[:url.IndexOf("?")]
+    }
+    if result.Error {
+        yakit_output("请求[%v]失败: %v" % [url, result.Error])
+    } else {
+        target = str.ParseStringUrlToWebsiteRootPath(url)
+        events, _ = risk.CheckDNSLogByToken(token)
+        if len(events) > 0 {
+            dnslogRiskTitle = "目标路径 %s 的 %s 参数收到 Dnslog 回显，可能存在SSRF漏洞" % [url,paramName]
+            yakit_output(dnslogRiskTitle)
+            haveHttpReverse = false
+            middleReason = "未收到HTTP反连请求"
+            httpReverseToken = risk.NewLocalReverseHTTPUrl()
+            if httpReverseToken == ""{
+                middleReason = "未配置 Yak Bridge 作为公网映射，无法获取带 Token 的 URL Callback"
+            }else{
+                result, err = param.Fuzz(payload).ExecFirst()
+                if err != nil {
+                    yakit_output("SSRF 发送请求失败")
+                    middleReason = "发送HTTP反连测试请求失败"
+                }else{
+                    if result.Error {
+                        yakit_output("请求[%v]失败: %v" % [url, result.Error])
+                        middleReason = "发送HTTP反连测试请求失败"
+                    }else{
+                        haveHttpReverse = risk.HaveReverseRisk(httpReverseToken)
+                    }
+                }
+            }
+            if haveHttpReverse{
+                title = "目标 %s 存在SSRF漏洞" % url
+                titleVerbose = "目标路径 %s 的 %s 参数收到 HTTP 反连，存在 SSRF 漏洞" % [url,paramName]
+                yakit_output(title)
+                risk.NewRisk(
+                    url,
+                    risk.title(title),
+                    risk.titleVerbose(titleVerbose),
+                    risk.details({
+                        "request": string(result.RequestRaw),
+                        "response": string(result.ResponseRaw),
+                        "url": result.Url,
+                    }),
+                    risk.level("critical"),
+                    risk.payload(payload),
+                    risk.parameter(paramName),
+                    risk.token(token),
+                    risk.description(description), 
+                    risk.solution(solution),
+                )
+            }else{
+                title = "目标 %s 可能存在SSRF漏洞" % url
+                titleVerbose = "收到Dnslog回显，但未收到HTTP回显(原因是 `%s`)，可能存在SSRF漏洞" % middleReason
+                risk.NewRisk(
+                    url,
+                    risk.details({
+                        "request": string(result.RequestRaw),
+                        "response": string(result.ResponseRaw),
+                        "url": result.Url,
+                    }),
+                    risk.level("middle"),
+                    risk.title(title),
+                    risk.titleVerbose(titleVerbose),
+                    risk.payload(payload),
+                    risk.parameter(paramName),
+                    risk.token(token),
+                    risk.description(description), 
+                    risk.solution(solution), 
+                )
+            }
+        }
+    }
+}
+
 # mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     paramName = ""
-    pool = NewThreadPool(10)
-    pool.consumer((id,data)=>{
-        param = data
-        paramName = param.Name()
-        yakit_output("SSRF基础测试: 参数名[%v]" % [paramName])
-        domain,token,err = risk.NewDNSLogDomain()
-        if err {
-            yakit_output("获取dnslog失败: ^v，跳过对参数 [%s] 的检测" % [err,paramName])
-            return
-        }
-        payload = "http://%s"%domain
-        result, err = param.Fuzz(payload).ExecFirst()
-        if err != nil {
-            yakit_output("SSRF 发送请求失败")
-            return
-        }
-        url = result.Url
-        if "?" in url {
-            url = url[:url.IndexOf("?")]
-        }
-        if result.Error {
-            yakit_output("请求[%v]失败: %v" % [url, result.Error])
-        } else {
-            target = str.ParseStringUrlToWebsiteRootPath(url)
-            events, _ = risk.CheckDNSLogByToken(token)
-            if len(events) > 0 {
-                dnslogRiskTitle = "目标路径 %s 的 %s 参数收到 Dnslog 回显，可能存在SSRF漏洞" % [url,paramName]
-                yakit_output(dnslogRiskTitle)
-                haveHttpReverse = false
-                middleReason = "未收到HTTP反连请求"
-                httpReverseToken = risk.NewLocalReverseHTTPUrl()
-                if httpReverseToken == ""{
-                    middleReason = "未配置 Yak Bridge 作为公网映射，无法获取带 Token 的 URL Callback"
-                }else{
-                    result, err = param.Fuzz(payload).ExecFirst()
-                    if err != nil {
-                        yakit_output("SSRF 发送请求失败")
-                        middleReason = "发送HTTP反连测试请求失败"
-                    }else{
-                        if result.Error {
-                            yakit_output("请求[%v]失败: %v" % [url, result.Error])
-                            middleReason = "发送HTTP反连测试请求失败"
-                        }else{
-                            haveHttpReverse = risk.HaveReverseRisk(httpReverseToken)
-                        }
-                    }
-                }
-                if haveHttpReverse{
-                    title = "目标 %s 存在SSRF漏洞" % url
-                    titleVerbose = "目标路径 %s 的 %s 参数收到 HTTP 反连，存在 SSRF 漏洞" % [url,paramName]
-                    yakit_output(title)
-                    risk.NewRisk(
-                        url,
-                        risk.title(title),
-                        risk.titleVerbose(titleVerbose),
-                        risk.details({
-                            "request": string(result.RequestRaw),
-                            "response": string(result.ResponseRaw),
-                            "url": result.Url,
-                        }),
-                        risk.level("critical"),
-                        risk.payload(payload),
-                        risk.parameter(paramName),
-                        risk.token(token),
-                        risk.description(description), 
-                        risk.solution(solution),
-                    )
-                }else{
-                    title = "目标 %s 可能存在SSRF漏洞" % url
-                    titleVerbose = "收到Dnslog回显，但未收到HTTP回显(原因是 `%s`)，可能存在SSRF漏洞" % middleReason
-                    risk.NewRisk(
-                        url,
-                        risk.details({
-                            "request": string(result.RequestRaw),
-                            "response": string(result.ResponseRaw),
-                            "url": result.Url,
-                        }),
-                        risk.level("middle"),
-                        risk.title(title),
-                        risk.titleVerbose(titleVerbose),
-                        risk.payload(payload),
-                        risk.parameter(paramName),
-                        risk.token(token),
-                        risk.description(description), 
-                        risk.solution(solution), 
-                    )
-                }
-            }
-        }
-    }).start()
-    var freq
+    swg = sync.NewSizedWaitGroup(10)
     try {
         freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
-    } catch err {
-        yakit.Error("构造Fuzz Request失败: %v" % err)
-        return
-    }
-    pool.productor(c=>{
-        for index, param = range freq.GetCommonParams() {
-            originValue = param.Value()
+        for index, reqParam = range freq.GetCommonParams() {
+            originValue = reqParam.Value()
             if typeof(originValue).Name() == typeof([]).Name() && originValue[0] != undefined{
                 originValue = originValue[0]
             }
@@ -192,10 +134,18 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                 log.Error("codec DecodeUrl error:", err)
                 continue
             }
-            if str.MatchAllOfRegexp(originValue,"^\\w+://")  || str.StringSliceContains(availableSSRFParamNames, str.ToLower(param.Name())) {
-                c<-param
+            if str.MatchAllOfRegexp(originValue,"^\\w+://")  || str.StringSliceContains(availableSSRFParamNames, str.ToLower(reqParam.Name())) {
+                swg.Add(1)
+                go func (){
+                    defer swg.Done()
+                    ssrfDetect(reqParam)
+                }()
             }
         }
-    })
-    pool.wait()
+
+    } catch err {
+        yakit.Error("构造Fuzz Request失败: %v" % err)
+        return
+    }
+    swg.wait()
 }
