@@ -10,6 +10,7 @@ import (
 )
 
 const DefaultPBKDF2Iterations = 10000
+const DefaultBytesToKeyIterations = 1
 
 const (
 	opensslKeyLength = 32
@@ -18,15 +19,15 @@ const (
 
 var (
 	// BytesToKeyMD5 utilizes MD5 key-derivation (`-md md5`)
-	BytesToKeyMD5 = NewBytesToKeyGenerator(md5.New, 1)
+	BytesToKeyMD5 = NewBytesToKeyGenerator(md5.New, DefaultBytesToKeyIterations)
 	// BytesToKeySHA1 utilizes SHA1 key-derivation (`-md sha1`)
-	BytesToKeySHA1 = NewBytesToKeyGenerator(sha1.New, 1)
+	BytesToKeySHA1 = NewBytesToKeyGenerator(sha1.New, DefaultBytesToKeyIterations)
 	// BytesToKeySHA256 utilizes SHA256 key-derivation (`-md sha256`)
-	BytesToKeySHA256 = NewBytesToKeyGenerator(sha256.New, 1)
+	BytesToKeySHA256 = NewBytesToKeyGenerator(sha256.New, DefaultBytesToKeyIterations)
 	// BytesToKeySHA384 utilizes SHA384 key-derivation (`-md sha384`)
-	BytesToKeySHA384 = NewBytesToKeyGenerator(sha512.New384, 1)
+	BytesToKeySHA384 = NewBytesToKeyGenerator(sha512.New384, DefaultBytesToKeyIterations)
 	// BytesToKeySHA512 utilizes SHA512 key-derivation (`-md sha512`)
-	BytesToKeySHA512 = NewBytesToKeyGenerator(sha512.New, 1)
+	BytesToKeySHA512 = NewBytesToKeyGenerator(sha512.New, DefaultBytesToKeyIterations)
 	// PBKDF2MD5 utilizes PBKDF2 key derivation with MD5 hashing (`-pbkdf2 -md md5`)
 	PBKDF2MD5 = NewPBKDF2Generator(md5.New, DefaultPBKDF2Iterations)
 	// PBKDF2SHA1 utilizes PBKDF2 key derivation with SHA1 hashing (`-pbkdf2 -md sha1`)
