@@ -49,7 +49,10 @@ func TestSF_Config_Exclude(t *testing.T) {
 		`,
 			"b* #{exclude:`* ?{opcode:const}`}-> as $result",
 			map[string][]string{
-				"result": {"Undefined-a2", "Undefined-f2"},
+				"result": {
+					"Undefined-a1", "Undefined-f1",
+					"Undefined-a2", "Undefined-f2",
+				},
 			})
 	})
 

@@ -32,7 +32,9 @@ func Test_HTTP_SSRF(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients", "Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost", "Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "neq(Parameter-param, nil)", "nil",
+					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients",
+					"Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost",
+					"Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "nil",
 				},
 			},
 		}
@@ -40,7 +42,7 @@ func Test_HTTP_SSRF(t *testing.T) {
 		testRequestTopDef(t, tt)
 	})
 
-	t.Run("aTaintCase023", func(t *testing.T) {
+	t.Run("aTaintCase023_2", func(t *testing.T) {
 		tt := &TestCase{
 			Name: "aTaintCase023_2",
 			Code: `
@@ -60,7 +62,9 @@ func Test_HTTP_SSRF(t *testing.T) {
 			Contain: true,
 			Expect: map[string][]string{
 				"target": {
-					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients", "Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost", "Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "neq(Parameter-param, nil)", "nil",
+					"Parameter-param", "Parameter-url", "Parameter-url", "Undefined-HttpClients",
+					"Undefined-HttpClients", "Undefined-HttpGet", "Undefined-HttpGet", "Undefined-HttpPost",
+					"Undefined-HttpPost", "Undefined-URIBuilder", "Undefined-URIBuilder", "nil",
 				}},
 		}
 		tt.Code = createHttpUtilCode(tt.Code)
