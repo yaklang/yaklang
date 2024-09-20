@@ -61,12 +61,14 @@ opts = [
     ssa.withProcess((msg , process )=>{
         yakit.SetProgressEx("complile", process)
         yakit.Info("%s: %f",msg, process)
+        log.info("%s: %f",msg, process)
     }), 
     ssa.withLanguage(language[0]), 
     ssa.withReCompile(reCompile), 
     ssa.withDescription(description),
     ssa.withDatabasePath(dbPath),
     ssa.withSaveToProfile(true),
+    ssa.withContext(context.Background()),
 ] 
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))

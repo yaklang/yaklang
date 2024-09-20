@@ -381,6 +381,7 @@ var Exports = map[string]any{
 	"withEntryFile":     WithFileSystemEntry,
 	"withReCompile":     WithReCompile,
 	"withSaveToProfile": WithSaveToProfile,
+	"withContext":       WithContext,
 	// "": with,
 	// language:
 	"Javascript": JS,
