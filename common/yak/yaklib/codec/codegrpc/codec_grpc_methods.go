@@ -203,9 +203,9 @@ func getKDF(kdfMode string, hashHandle hash.Hash) codec.KeyDerivationFunc {
 	}
 	switch kdfMode {
 	case "PBKDF2":
-		return codec.NewPBKDF2Generator(func() hash.Hash { return hashHandle }, 1000)
+		return codec.NewPBKDF2Generator(func() hash.Hash { return hashHandle }, codec.DefaultPBKDF2Iterations)
 	case "Openssl":
-		return codec.NewBytesToKeyGenerator(func() hash.Hash { return hashHandle }, 1)
+		return codec.NewBytesToKeyGenerator(func() hash.Hash { return hashHandle }, codec.DefaultBytesToKeyIterations)
 	}
 	return nil
 }
