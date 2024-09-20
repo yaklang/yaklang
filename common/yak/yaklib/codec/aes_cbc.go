@@ -144,3 +144,19 @@ func AESDec(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 		return nil, errors.New("AES: invalid mode")
 	}
 }
+
+func AESEncWithPassphrase(passphrase, data, salt []byte, KDF KeyDerivationFunc, aesMode string) ([]byte, error) {
+	key, iv, err := KDF(passphrase, salt)
+	if err != nil {
+		return nil, errors.New("OpensslAESEnc: generate key failed: " + err.Error())
+	}
+	return AESEnc(key, data, iv, aesMode)
+}
+
+func AESDecWithPassphrase(passphrase, data, salt []byte, KDF KeyDerivationFunc, aesMode string) ([]byte, error) {
+	key, iv, err := KDF(passphrase, salt)
+	if err != nil {
+		return nil, errors.New("OpensslAESDnc: generate key failed: " + err.Error())
+	}
+	return AESDec(key, data, iv, aesMode)
+}
