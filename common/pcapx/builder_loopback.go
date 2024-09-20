@@ -10,7 +10,6 @@ var loopbackLayerExports = map[string]interface{}{
 	"loopback_family":  WithLoopback_Family,
 }
 
-
 func init() {
 	for k, v := range loopbackLayerExports {
 		Exports[k] = v
@@ -18,7 +17,6 @@ func init() {
 }
 
 type LoopbackOption func(config *layers.Loopback) error
-
 
 func WithLoopback_Payload(payload []byte) LoopbackOption {
 	return func(config *layers.Loopback) error {
