@@ -99,7 +99,9 @@ var SSACompilerCommands = []*cli.Command{
 				Name: "with-code,code", Usage: "show code context",
 			},
 			cli.BoolFlag{
-				Name: "save-to-profile", Usage: "save the compiled results to Yakit's profile database so that you can use Yakit for code audit",
+				Name: "no-frontend",
+				Usage: `in default, you can see program that compiled by ssa-cli in Yakit Frontend.
+					you can use --no-frontend to disable this function`,
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -136,7 +138,7 @@ var SSACompilerCommands = []*cli.Command{
 			sfDebug := c.Bool("syntaxflow-debug")
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
-			isProfile := c.Bool("save-to-profile")
+			saveProfile := !c.Bool("no-frontend")
 
 			// set database
 			if databaseFileRaw != "" {
@@ -157,7 +159,7 @@ var SSACompilerCommands = []*cli.Command{
 			log.Infof("start to compile file: %v ", target)
 			opt = append(opt, ssaapi.WithRawLanguage(input_language))
 			opt = append(opt, ssaapi.WithReCompile(reCompile))
-			opt = append(opt, ssaapi.WithSaveToProfile(isProfile))
+			opt = append(opt, ssaapi.WithSaveToProfile(saveProfile))
 			if entry != "" {
 				log.Infof("start to use entry file: %v", entry)
 				opt = append(opt, ssaapi.WithFileSystemEntry(entry))
