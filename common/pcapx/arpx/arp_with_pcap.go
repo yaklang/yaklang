@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -44,7 +45,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		}
 	}
 	if ifaceIns.Flags&net.FlagLoopback != 0 {
-		return nil, errors.New("loopback")
+		return nil, errors.New("arp on loopback interface is not supported")
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -83,7 +84,8 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 
 						buf, err := newArpARPPacket(ifaceIns, p)
 						if err != nil {
-							log.Errorf("new arp packet failed: %s", err)
+							xx, _ := codec.GB18030ToUtf8([]byte(err.Error()))
+							log.Errorf("new arp packet failed: %s", xx)
 							return
 						}
 						count := 2
@@ -99,11 +101,12 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 							}
 
 							senderMutex.Lock()
-							err = handle.WritePacketData(buf.Bytes())
+							err = handle.WritePacketData(buf)
 							time.Sleep(5 * time.Millisecond) // some ms delay for write
 							senderMutex.Unlock()
 							if err != nil {
-								log.Errorf("write packet failed: %s", err)
+								xx, _ := codec.GB18030ToUtf8([]byte(err.Error()))
+								log.Errorf("write packet failed: %s", xx)
 								return
 							}
 
