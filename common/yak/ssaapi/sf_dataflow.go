@@ -146,7 +146,10 @@ func dataFlowFilter(
 		SyntaxFlowRule: true,
 	})
 	for _, v := range vs {
-		matchedConfigs := recursiveConfig.compileAndRun(v.GetDataFlowPath())
+		dataPath := v.GetDataFlowPath()
+		// log.Infof("v: %v", v)
+		// log.Infof("dataPath: %v", dataPath)
+		matchedConfigs := recursiveConfig.compileAndRun(dataPath)
 		if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
 			delete(all, v)
 		}
