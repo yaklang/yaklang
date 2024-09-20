@@ -109,6 +109,11 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
+	defer func() {
+		if msg := recover(); msg != nil {
+			log.Errorf("value2IrCode panic: %s", msg)
+		}
+	}()
 	value, ok := ToValue(inst)
 	if !ok {
 		return
