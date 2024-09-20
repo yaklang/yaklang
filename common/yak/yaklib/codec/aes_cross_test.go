@@ -1,7 +1,9 @@
 package codec
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -260,4 +262,20 @@ func TestAESGCMEncrypt2(t *testing.T) {
 		spew.Dump(string(raw))
 		panic("aes failed")
 	}
+}
+
+func TestAESWithPassphrase(t *testing.T) {
+	rawData := RandBytes(10)
+	password := RandBytes(10)
+	salt := RandBytes(8)
+	data := PKCS7Padding(rawData)
+	cipher, err := AESEncWithPassphrase(password, data, salt, BytesToKeyMD5, "CBC")
+	require.NoError(t, err)
+	fmt.Println(cipher)
+
+	plainText, err := AESDecWithPassphrase(password, cipher, salt, BytesToKeyMD5, "CBC")
+	require.NoError(t, err)
+	plainText = PKCS7UnPadding(plainText)
+	fmt.Println(plainText)
+	require.Equal(t, rawData, plainText)
 }
