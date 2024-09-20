@@ -5,6 +5,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gobwas/glob"
+	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/matchers"
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -16,16 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/h2non/filetype"
-	"github.com/h2non/filetype/matchers"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/gobwas/glob"
-	"github.com/pkg/errors"
 )
 
 // ExtractStrContext 从字符串raw中提取一组关键字res上下文的内容，上下文的长度是512个字符确定。
@@ -942,6 +940,10 @@ func RandAlphaNumStringBytes(n int) string {
 		b[i] = AlphaNumChar[rand.Intn(len(AlphaNumChar))]
 	}
 	return string(b)
+}
+
+func RandBytes(n int) []byte {
+	return codec.RandBytes(n)
 }
 
 const (

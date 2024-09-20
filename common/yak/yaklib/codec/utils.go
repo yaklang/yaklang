@@ -2,9 +2,12 @@ package codec
 
 import (
 	"crypto/cipher"
+	cryptoRand "crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
+	"github.com/yaklang/yaklang/common/log"
+	"io"
 	"strconv"
 )
 
@@ -160,3 +163,13 @@ func CTRDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
 }
 
 type EncodedFunc func(any) string
+
+func RandBytes(n int) []byte {
+	random := make([]byte, n)
+	_, err := io.ReadFull(cryptoRand.Reader, random)
+	if err != nil {
+		log.Errorf("failed to read random bytes: %v", err)
+		return nil
+	}
+	return random
+}
