@@ -8,16 +8,23 @@ import (
 
 	"github.com/yaklang/yaklang/common/netx"
 )
-const defaultTimeout = 10 * time.Second
 
+const defaultTimeout = 10 * time.Second
 
 type NetXDialer struct{}
 
 var defaultDialer = &NetXDialer{}
 
-
 func (d *NetXDialer) Dial(network, address string) (net.Conn, error) {
 	return d.DialContext(context.Background(), network, address)
+}
+
+func (d *NetXDialer) DialTCPContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	conn, err := netx.DialContext(ctx, addr)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
 func (d *NetXDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
@@ -31,9 +38,5 @@ func (d *NetXDialer) DialContext(ctx context.Context, network, address string) (
 		return conn, nil
 	}
 
-	conn, err = netx.DialContext(ctx, address)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+	return d.DialTCPContext(ctx, network, address)
 }
