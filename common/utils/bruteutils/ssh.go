@@ -1,8 +1,6 @@
 package bruteutils
 
 import (
-	"bytes"
-	"fmt"
 	"strings"
 	"time"
 
@@ -34,7 +32,7 @@ func handleSSHError(result *BruteItemResult, target string, err error) {
 }
 
 func sshDial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), network, addr)
+	conn, err := defaultDialer.DialTCPContext(utils.TimeoutContext(defaultTimeout), network, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -62,15 +60,19 @@ var sshAuth = &DefaultServiceAuthInfo{
 
 		config := &ssh.ClientConfig{
 			User:            i.Username,
+			Auth:            []ssh.AuthMethod{ssh.Password(i.Password)},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         10 * time.Second,
+			BannerCallback: func(message string) error {
+				log.Infof("fetch banner: %v from %v", message, i.Target)
+				return nil
+			},
+			HostKeyAlgorithms: []string{"ssh-rsa", "ssh-dss", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "ssh-ed25519"},
+			Timeout:           10 * time.Second,
 		}
-		config.Auth = []ssh.AuthMethod{ssh.Password(i.Password)}
 
 		client, err := sshDial("tcp", target, config)
 		if err != nil {
-			// 107.187.110.241/24
-			log.Errorf("ssh: %v conn failed: %s", i.Target, err)
+			log.Errorf("ssh: %v conn failed: %s try %v:%v", i.Target, err, i.Username, i.Password)
 			handleSSHError(result, target, err)
 			return result
 		}
@@ -85,18 +87,25 @@ var sshAuth = &DefaultServiceAuthInfo{
 		}
 		defer session.Close()
 
-		var stdoutBuf bytes.Buffer
-		session.Stdout = &stdoutBuf
-		verifyRandomString := utils.RandStringBytes(10)
-		err = session.Run(fmt.Sprintf("echo %s", verifyRandomString))
-		if err != nil {
-			log.Errorf("ssh: %v run command failed: %s", i.Target, err)
-			handleSSHError(result, target, err)
-			return result
-		}
-		if strings.Contains(stdoutBuf.String(), verifyRandomString) {
+		// 在一些路由器中，执行命令是没意义的，知道能进去就行了
+		// 之后可以想点办法
+		if len(client.SessionID()) > 0 {
 			result.Ok = true
+		} else {
+			log.Warnf("ssh: %v session id is empty", i.Target)
 		}
+		//var stdoutBuf bytes.Buffer
+		//session.Stdout = &stdoutBuf
+		//verifyRandomString := utils.RandStringBytes(10)
+		//err = session.Run(fmt.Sprintf("echo %s", verifyRandomString))
+		//if err != nil {
+		//	log.Errorf("ssh: %v run command failed: %s", i.Target, err)
+		//	handleSSHError(result, target, err)
+		//	return result
+		//}
+		//if strings.Contains(stdoutBuf.String(), verifyRandomString) {
+		//	result.Ok = true
+		//}
 
 		return result
 	},
