@@ -1,0 +1,66 @@
+desc(
+    title: "Find Java HTTP Fluent Request",
+    type: audit,
+    level: low,
+    lib: "java-http-fluent-request",
+)
+
+Request?{<fullTypeName>?{have: "client.fluent"}} as $root;
+
+// Get / Post / Put / Delete / Patch / Options / Head / Trace
+$root.Get as $methods
+$root.Post as $methods
+$root.Put as $methods
+$root.Delete as $methods
+$root.Patch as $methods
+$root.Options as $methods
+$root.Head as $methods
+$root.Trace as $methods
+
+$methods?{<getCall>?{<getCall><getCaller><getObject>?{.execute}}}(*?{!<fullTypeName>?{have: "client.fluent"}} as $output);
+alert $output;
+
+desc(
+lang: java,
+alert_min: 2,
+'file://risk2.java': <<<TEXT
+import org.apache.http.client.fluent.Request;
+import org.apache.http.client.fluent.Response;
+
+public class FluentGetExample {
+    public static void main(String[] args) {
+        try {
+            // 发送 GET 请求并获取响应
+            Response response = Request.Post("http://httpbin.org/get")
+                    .execute();
+            String responseBody = response.returnContent().asString();
+
+            System.out.println("Response Body:");
+            System.out.println(responseBody);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT,
+'file://risk1.java': <<<TEXT
+import org.apache.http.client.fluent.Request;
+import org.apache.http.client.fluent.Response;
+
+public class FluentGetExample {
+    public static void main(String[] args) {
+        try {
+            // 发送 GET 请求并获取响应
+            Response response = Request.Get("http://httpbin.org/get")
+                    .execute();
+            String responseBody = response.returnContent().asString();
+
+            System.out.println("Response Body:");
+            System.out.println(responseBody);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+)

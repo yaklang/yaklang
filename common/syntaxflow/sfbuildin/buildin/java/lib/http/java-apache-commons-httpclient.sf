@@ -1,0 +1,54 @@
+desc(
+    title: "Checking Java Apache Commons HttpClient Library",
+    type: audit,
+    level: low,
+    lib: "java-apache-commons-httpclient",
+)
+
+GetMethod?{<fullTypeName><show>?{have: 'commons.httpclient'}} as $methods;
+PostMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+PutMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+DeleteMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+PatchMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+OptionsMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+HeadMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+TraceMethod?{<fullTypeName>?{have: 'commons.httpclient'}} as $methods;
+$methods?{<getCall>?{<getCall><getCaller><getObject>?{.executeMethod}}}(,* as $output);
+<delete(methods)>
+alert $output;
+
+desc(
+lang: java,
+'file://risk.java': <<<TEXT
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+
+import java.io.IOException;
+
+public class HttpClientExample {
+    public static void main(String[] args) {
+        HttpClient client = new HttpClient();
+        client.getHttpConnectionManager().getParams().setConnectionTimeout(5000);
+        String url = "http://example.com";
+        GetMethod method = new GetMethod(url);
+        try {
+            method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
+                new DefaultHttpMethodRetryHandler(3, false));
+
+            // 执行请求，获取状态码
+            int statusCode = client.executeMethod(method);
+
+            if (statusCode != HttpStatus.SC_OK) {
+                System.err.println("Method failed: " + method.getStatusLine());
+            }
+        } catch (HttpException e) {
+        } catch (IOException e) {
+        } finally {
+        }
+    }
+}
+TEXT
+)
