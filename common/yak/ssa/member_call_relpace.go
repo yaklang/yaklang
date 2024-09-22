@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
@@ -27,7 +30,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			res := checkCanMemberCallExist(to, key)
 			name, typ := res.name, res.typ
 			// toMember := builder.getOriginMember(name, typ, to, key)
-			toMember := builder.ReadMemberCallValue(to, key)
+			toMember := builder.PeekValue(name)
 
 			// then, we will replace value, `member` to `toMember`
 			if member.GetOpcode() != SSAOpcodeUndefined {
@@ -35,10 +38,15 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 				member.SetType(typ)
 				setMemberCallRelationship(to, key, member)
 				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
-				ret[name] = createPhi(name, []Value{toMember, member})
-				continue
+				if utils.IsNil(toMember) {
+					ret[name] = member
+				} else {
+					ret[name] = createPhi(name, []Value{toMember, member})
+				}
 			}
-
+			if utils.IsNil(toMember) {
+				toMember = builder.ReadMemberCallValue(to, key)
+			}
 			ReplaceAllValue(member, toMember)
 			DeleteInst(member)
 

@@ -1870,7 +1870,7 @@ func (y *builder) VisitIdentifier(name string) (value ssa.Value) {
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")
 			if obj != nil {
-				if value = y.ReadMemberCallVariable(obj, y.EmitConstInst(name)); value != nil {
+				if value = y.ReadOrCreateMemberCallVariable(obj, y.EmitConstInst(name)); value != nil {
 					return value
 				}
 			}

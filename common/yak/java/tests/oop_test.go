@@ -63,8 +63,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-getA(Undefined-A(Undefined-A)) member[1]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -89,8 +89,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]", "Function-A.getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -133,8 +132,8 @@ func TestJava_Extend_Class(t *testing.T) {
 }
 		`, []string{
 			// TODO: this error
-			"Function-getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-getA(Undefined-A(Undefined-A)) member[1]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -160,8 +159,8 @@ func TestJava_Extend_Class(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Function-getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -184,7 +183,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getNum(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -415,7 +414,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getNum(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 	//todo:xx

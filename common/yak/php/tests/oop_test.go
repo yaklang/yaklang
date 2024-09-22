@@ -275,8 +275,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(Undefined-$a) member[0]",
-			"Function-getA(Undefined-$a) member[1]",
+			"Function-A.getA(Undefined-$a) member[0]",
+			"Function-A.getA(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -365,8 +365,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(Undefined-$a) member[0]",
-			"Function-getA(Undefined-$a) member[1]",
+			"Function-A.getA(Undefined-$a) member[0]",
+			"Function-A.getA(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -388,8 +388,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-getA(Undefined-$a) member[0]",
-			"Function-getA(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
+			"Function-A.getA(Undefined-$a) member[0]",
+			"Function-A.getA(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -407,7 +407,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(Undefined-$a) member[0]",
+			"Function-A.getNum(Undefined-$a) member[0]",
 		}, t)
 	})
 	t.Run("new construct", func(t *testing.T) {
@@ -443,7 +443,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
+			"Function-A.getNum(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }
@@ -517,7 +517,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(Undefined-$a) member[0]",
+			"Function-A.getNum(Undefined-$a) member[0]",
 		}, t)
 	})
 }

@@ -48,7 +48,10 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 		return b.EmitUndefined(s)
 	}
 	p.ClassBluePrint[name] = c
-	c.InitializeWithContainer(b.EmitEmptyContainer())
+	klassVar := b.CreateVariable(name, tokenizer...)
+	klassContainer := b.EmitEmptyContainer()
+	b.AssignVariable(klassVar, klassContainer)
+	_ = c.InitializeWithContainer(klassContainer)
 	return c
 }
 

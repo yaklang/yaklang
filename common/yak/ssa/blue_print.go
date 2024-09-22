@@ -133,14 +133,14 @@ func (c *ClassBluePrint) getFieldWithParent(get func(bluePrint *ClassBluePrint) 
 
 // storeInContainer store static in global container
 func (c *ClassBluePrint) storeInContainer(name string, val Value, _type BluePrintFieldKind) {
+	if utils.IsNil(c._container) || utils.IsNil(c._container.GetFunc()) {
+		return
+	}
 	createVariable := func(builder *FunctionBuilder, variable *Variable) {
 		builder.AssignVariable(variable, val)
 	}
-	//todo: extends seem error
 	switch _type {
 	case BluePrintStaticMethod, BluePrintStaticMember:
-		// builder := c._staticContainer.GetFunc().builder.GetMainBuilder()
-		// createVariable(builder, builder.CreateMemberCallVariable(c._staticContainer, builder.EmitConstInst(name)))
 	default:
 		builder := c._container.GetFunc().builder
 		createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name)))

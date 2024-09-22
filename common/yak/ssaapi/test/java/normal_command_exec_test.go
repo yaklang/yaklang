@@ -12,7 +12,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		expect []string
 		code   string
 	}{
-		{"aTaintCase011", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `@GetMapping("case011/{cmd}")
+		{"aTaintCase011", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, `@GetMapping("case011/{cmd}")
     public Map<String, Object> aTaintCase011(@PathVariable String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         try {
@@ -25,7 +25,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase012", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `@GetMapping("case011/{cmd}")
+		{"aTaintCase012", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, `@GetMapping("case011/{cmd}")
     public Map<String, Object> aTaintCase011(@PathVariable String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         try {
@@ -87,7 +87,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0117", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, ` /**
+		{"aTaintCase0117", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, ` /**
 		* arrayaccess
 		*/
 		@PostMapping(value = "case0117")
@@ -105,7 +105,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 		   }
 		   return modelMap;
 		}`},
-		{"aTaintCase0118", true, []string{"\" \"", "\"mkdir\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"},
+		{"aTaintCase0118", true, []string{"\" \"", "\"mkdir\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"},
 			`    /**
      * WhileStatement
      * @param cmd
@@ -128,7 +128,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0127", true, []string{"\"mkdir\"", "\"|\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"},
+		{"aTaintCase0127", true, []string{"\"mkdir\"", "\"|\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"},
 			` /**
      * forstatement
      * @param cmd
@@ -150,7 +150,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0128", true, []string{"\"mkdir\"", "\"|\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"},
+		{"aTaintCase0128", true, []string{"\"mkdir\"", "\"|\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"},
 			`/**
      * DoStatement
      * @param cmd
@@ -175,7 +175,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0129", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `   /**
+		{"aTaintCase0129", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, `   /**
      * CastExpression
      * @param cmd
      * @return
@@ -461,7 +461,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `}, //数组 String[] 作为污点源
-		{"aTaintCase0150", false, []string{"Undefined-Runtime", "Parameter-cmd", "2", "Undefined-Runtime.getRuntime", "Undefined-data.toString"},
+		{"aTaintCase0150", false, []string{"Undefined-Runtime", "Parameter-cmd", "2", "Undefined-Runtime.getRuntime(valid)", "Undefined-data.toString"},
 			`/**
      * 数组 char[] 作为污点源
      *
@@ -506,7 +506,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `    /**
+		{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -527,7 +527,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         }
         return modelMap;
     }`},
-		{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, `    /**
+		{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -568,7 +568,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
         return modelMap;
     }
 `},
-		{"aTaintCase0158", true, []string{"\"ls\"", "Undefined-Runtime", "Undefined-Runtime.getRuntime"},
+		{"aTaintCase0158", true, []string{"\"ls\"", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"},
 			`/**
      * 传播场景
      */
@@ -1261,7 +1261,7 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
 		code   string
 	}{
 		{"aTaintCase013", true,
-			[]string{"\"|grep a\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"},
+			[]string{"\"|grep a\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"},
 			`  /**
     * MethodInvocation
     */
@@ -1324,7 +1324,7 @@ func Test_CrossClass_Simple_Exec_Case(t *testing.T) {
        }
        return modelMap;
    }`}, //if语句
-		{"aTaintCase016", true, []string{"\" \"", "\"mkdir\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime"}, ` /**
+		{"aTaintCase016", true, []string{"\" \"", "\"mkdir\"", "Parameter-cmd", "Undefined-Runtime", "Undefined-Runtime.getRuntime(valid)"}, ` /**
     * Switch
     */
    @GetMapping("case016/{type}/{cmd}")

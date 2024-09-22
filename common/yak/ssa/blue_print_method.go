@@ -76,6 +76,7 @@ func (c *ClassBluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
 
 // normal method
 func (c *ClassBluePrint) RegisterNormalMethod(name string, val *Function) {
+	c.storeInContainer(name, val, BluePrintNormalMethod)
 	if f, ok := ToFunction(val); ok {
 		f.SetMethod(true, c)
 	}

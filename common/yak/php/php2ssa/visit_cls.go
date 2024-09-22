@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -452,8 +453,8 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) *ssa.ClassBluePrint  {
-	if y == nil || raw == nil  || y.IsStop(){
+func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.ClassBluePrint {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
@@ -513,7 +514,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 }
 
 func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) (*ssa.ClassBluePrint, string) {
-	if y == nil || raw == nil|| y.IsStop()  {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil, ""
 	}
 	recoverRange := y.SetRange(raw)
@@ -664,48 +665,6 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 	}
 
 	return y.EmitUndefined(raw.GetText())
-}
-
-func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
-	if y == nil || raw == nil || y.IsStop() {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.AnonymousClassContext)
-	if i == nil {
-		return nil
-	}
-	cname := uuid.NewString()
-	bluePrint := y.CreateClassBluePrint(cname)
-	if i.QualifiedStaticTypeRef() != nil {
-		if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
-			bluePrint.AddParentClass(ref)
-		}
-	}
-	for _, statement := range i.AllClassStatement() {
-		y.VisitClassStatement(statement, bluePrint)
-	}
-	bluePrint.FinishClassFunction()
-	obj := y.EmitMakeWithoutType(nil, nil)
-	obj.SetType(bluePrint)
-	constructor := bluePrint.GetConstructOrDestruct("constructor")
-	if constructor == nil {
-		return obj
-	}
-
-	args := []ssa.Value{obj}
-	ellipsis := false
-	if i.Arguments() != nil {
-		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
-		ellipsis = hasEllipsis
-		args = append(args, tmp...)
-	}
-	c := y.NewCall(constructor, args)
-	c.IsEllipsis = ellipsis
-	y.EmitCall(c)
-	return obj
 }
 
 func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualifiedNamespaceExprContext) ssa.Value {
