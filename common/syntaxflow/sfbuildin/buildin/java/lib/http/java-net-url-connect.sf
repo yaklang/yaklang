@@ -1,0 +1,76 @@
+desc(
+    title: "Find Java URL Connection Use",
+    type: audit,
+    level: low,
+    lib: "java-net-url-connect",
+)
+
+URL?{<getCall>?{.openConnection() || .openStream()}}(,* as $output);
+alert $output;
+
+desc(
+lang: java,
+alert_min: 2,
+'file://risk.java': <<<TEXT
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class HttpGetExample {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("http://example.com");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Accept", "application/json");
+            connection.connect();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String line;
+            StringBuilder response = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+                response.append('\r');
+            }
+            reader.close();
+            System.out.println("Response: " + response.toString());
+
+            connection.disconnect();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT,
+'file://risk2.java': <<<TEXT
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+
+public class SimpleWebReader {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("http://example.com");
+            // 直接使用 URL.openStream() 获取输入流
+            InputStream inputStream = url.openStream();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            String line;
+            StringBuilder response = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+                response.append('\n');  // 使用换行符来分隔每一行
+            }
+            reader.close();
+            System.out.println("Web page content:\n" + response.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+TEXT
+)

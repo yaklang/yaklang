@@ -1,0 +1,50 @@
+desc(
+    title: "Find Java Image IO Read URL",
+    type: audit,
+    level: low,
+    lib: "java-image-io-read-url",
+)
+
+ImageIO.read(*?{<typeName>?{have: URL}} as $params);
+$params<getCaller>(,* as $output);
+alert $output;
+
+desc(
+lang: java,
+alert_min: 2,
+'file://risk1.java': <<<TEXT
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+
+public class ImageDownloadExample {
+    public static void main(String[] args) {
+        try {
+            BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg"));
+        } catch (IOException e) {
+            System.out.println("Error occurred while trying to read the image.");
+        }
+    }
+}
+TEXT,
+'file://risk.java': <<<TEXT
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+
+public class ImageDownloadExample {
+    public static void main(String[] args) {
+        try {
+            URL imageUrl = new URL("http://example.com/image.jpg");
+            BufferedImage image = ImageIO.read(imageUrl);
+        } catch (IOException e) {
+            System.out.println("Error occurred while trying to read the image.");
+        }
+    }
+}
+TEXT
+)
