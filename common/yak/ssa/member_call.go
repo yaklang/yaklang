@@ -13,7 +13,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 
 	// default member
 	value := b.createDefaultMember(res, object, key, wantFunction)
-	b.AssignVariable(b.CreateVariable(value.GetVerboseName()), value)
+	//b.AssignVariable(b.CreateVariable(value.GetVerboseName()), value)
 	return value
 }
 
