@@ -936,6 +936,9 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 			for _, tag := range matchedRule.ExtraTag {
 				opts = append(opts, lowhttp.WithAppendHTTPFlowTag("[重发]"+tag))
 			}
+			if len(matchedRule.ExtraTag) == 0 {
+				opts = append(opts, lowhttp.WithAppendHTTPFlowTag("[重发]"))
+			}
 			if matchedRule.Color != "" {
 				opts = append(opts, lowhttp.WithAppendHTTPFlowTag(schema.COLORPREFIX+matchedRule.Color))
 			}
