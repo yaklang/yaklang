@@ -284,8 +284,6 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/huin/asn1ber v0.0.0-20120622192748-af09f62e6358 h1:hVXNJ57IHkOA8FBq80UG263MEBwNUMfS9c82J2QE5UQ=
 github.com/huin/asn1ber v0.0.0-20120622192748-af09f62e6358/go.mod h1:qBE210J2T9uLXRB3GNc73SvZACDEFAmDCOlDkV47zbY=
 github.com/ianlancetaylor/demangle v0.0.0-20220319035150-800ac71e25c2/go.mod h1:aYm2/VgdVmcIU8iMfdMvDMsRAQjcfZSKFby6HOFvi/w=
-github.com/icodeface/tls v0.0.0-20190904083142-17aec93c60e5 h1:ZcsPFW8UgACapqjcrBJx0PuyT4ppArO5VFn0vgnkvmc=
-github.com/icodeface/tls v0.0.0-20190904083142-17aec93c60e5/go.mod h1:VJNHW2GxCtQP/IQtXykBIPBV8maPJ/dHWirVTwm9GwY=
 github.com/icza/bitio v1.1.0 h1:ysX4vtldjdi3Ygai5m1cWy4oLkhWTAi+SyO6HC8L9T0=
 github.com/icza/bitio v1.1.0/go.mod h1:0jGnlLAx8MKMr9VGnn/4YrvZiprkvBelsVIbA9Jjr9A=
 github.com/icza/mighty v0.0.0-20180919140131-cfd07d671de6 h1:8UsGZ2rr2ksmEru6lToqnXgA8Mz1DP11X4zSJ159C3k=
