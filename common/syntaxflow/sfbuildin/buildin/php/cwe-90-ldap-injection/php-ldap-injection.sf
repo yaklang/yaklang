@@ -11,11 +11,9 @@ ldap_compare(,* as $query);
 
 <include('php-param')> as $params;
 $query #{
-    until: `* & $params`,
-}-> as $root;
-$root?{!<dataflow(<<<CODE
-*?{opcode: call && <getCaller><name>?{have: ldap_escape}} as $__next__;
-CODE)>} as $result;
+    include: `* & $params`,
+    exclude: `*?{opcode:call && <getCaller><name>?{have:ldap_escape}}`,
+}-> as $result;
 alert $result;
 
 desc(

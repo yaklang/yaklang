@@ -5,7 +5,9 @@ desc(
 )
 
 mysql_query() as $source
-$source?{* #{until:`*?{have: _GET || have: _POST || have: REQUEST}`}->} as $param
+$source?{* #{
+    include:`*?{have: _GET || have: _POST || have: REQUEST}`,
+}->} as $param
 alert $param
 
 desc(

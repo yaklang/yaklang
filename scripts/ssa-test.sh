@@ -4,6 +4,10 @@
 echo "Start to Test SSAAPI"
 go test -timeout 120s ./common/yak/ssaapi/...
 
+echo "Start to Test Syntaxflow rule "
+go test -timeout 1m ./common/syntaxflow/sfbuildin/...
+go test -timeout 20s ./common/syntaxflow/tests
+
 echo "Start to Test SSA-Analyze"
 # SSA plugin rule/option
 go test -timeout 20s ./common/yak/static_analyzer/test/...
