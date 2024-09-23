@@ -1,0 +1,55 @@
+desc(
+    title: "Find HTTP Sink in Java (Multiple Libraries)",
+    type: audit,
+    level: low,
+    lib: "java-http-sink",
+)
+
+<include('java-alibaba-druid-httpclientutil')> as $output;
+<include('java-apache-commons-httpclient')> as $output;
+<include('java-apache-http-request-url')> as $output;
+<include('java-http-fluent-request')> as $output;
+<include('java-image-io-read-url')> as $output;
+<include('java-net-url-connect')> as $output;
+// <include('java-net-url-connect')> as $output;
+alert $output;
+
+desc(
+lang: java,
+alert_min: 2,
+'file://risk1.java': <<<TEXT
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+
+public class ImageDownloadExample {
+    public static void main(String[] args) {
+        try {
+            BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg"));
+        } catch (IOException e) {
+            System.out.println("Error occurred while trying to read the image.");
+        }
+    }
+}
+TEXT,
+'file://risk.java': <<<TEXT
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+
+public class ImageDownloadExample {
+    public static void main(String[] args) {
+        try {
+            URL imageUrl = new URL("http://example.com/image.jpg");
+            BufferedImage image = ImageIO.read(imageUrl);
+        } catch (IOException e) {
+            System.out.println("Error occurred while trying to read the image.");
+        }
+    }
+}
+TEXT
+)

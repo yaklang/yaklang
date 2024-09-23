@@ -1,0 +1,33 @@
+desc(
+    title: "Find Alibaba Druid HttpClientUtils Uses and Executing Request",
+    type: audit,
+    level: low,
+    lib: "java-alibaba-druid-httpclientutil",
+)
+
+HttpClientUtils?{<fullTypeName>?{have: 'alibaba.druid'}} as $entry;
+$entry.get(*?{<fullTypeName>?{!have: 'alibaba.druid'}} as $output);
+$entry.post(*?{<fullTypeName>?{!have: 'alibaba.druid'}} as $output);
+alert $output;
+
+desc(
+lang: java,
+'file://a.java': <<<CODE
+import com.alibaba.druid.util.HttpClientUtils;
+
+public class HttpClientUtilsExample {
+    public static void main(String[] args) {
+        // 发送 GET 请求
+        String url = "https://api.github.com/users/github";
+        String responseGet = HttpClientUtils.get(url);
+        System.out.println("GET Response: " + responseGet);
+
+        // 发送 POST 请求
+        String postUrl = "http://httpbin.org/post";
+        String postData = "{\"name\":\"DruidUser\",\"job\":\"Developer\"}";
+        String responsePost = HttpClientUtils.post(postUrl, postData);
+        System.out.println("POST Response: " + responsePost);
+    }
+}
+CODE
+)
