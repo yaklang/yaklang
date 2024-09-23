@@ -2,6 +2,7 @@ package bruteutils
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/mixer"
@@ -166,5 +167,30 @@ func TestNewMultiTargetBruteUtilWithContext_Tomcat(t *testing.T) {
 }
 
 func TestBruteNoPass(t *testing.T) {
-	 NewMultiTargetBruteUtilEx()
+	NewMultiTargetBruteUtilEx()
+}
+
+func TestBrute(t *testing.T) {
+	res, err := GetBruteFuncByType("rdp")
+	if err != nil {
+		t.FailNow()
+	}
+	ut, err := NewMultiTargetBruteUtil(256, 1, 5, res)
+	if err != nil {
+		t.FailNow()
+	}
+	ut.StreamBruteContext(
+		context.Background(),
+		"rdp",
+		[]string{"192.168.3.140"},
+		[]string{"Anonymous"}, []string{
+			"asdfasdf",
+			"aasdfasdf",
+			"axvsdfgas",
+			"asdfasdfasdfasf",
+			"123456",
+		},
+		func(b *BruteItemResult) {
+			spew.Dump(b)
+		})
 }

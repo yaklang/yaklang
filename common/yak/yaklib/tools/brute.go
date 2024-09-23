@@ -32,7 +32,9 @@ var BruterExports = map[string]interface{}{
 }
 
 type yakBruter struct {
-	debug bool `json:"debug"`
+	Ctx       context.Context
+	RuntimeId string
+	debug     bool `json:"debug"`
 
 	// 设置用户与密码爆破字典
 	userList []string
@@ -62,70 +64,82 @@ type yakBruter struct {
 	finishingThreshold int
 }
 
-type yakBruteOpt func(bruter *yakBruter)
+type BruteOpt func(bruter *yakBruter)
 
-func yakBruteOpt_Debug(b bool) yakBruteOpt {
+func WithCtx(ctx context.Context) BruteOpt {
+	return func(bruter *yakBruter) {
+		bruter.Ctx = ctx
+	}
+}
+
+func WithRuntimeId(id string) BruteOpt {
+	return func(bruter *yakBruter) {
+		bruter.RuntimeId = id
+	}
+}
+
+func yakBruteOpt_Debug(b bool) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.debug = b
 	}
 }
 
-func yakBruteOpt_OkToStop(b bool) yakBruteOpt {
+func yakBruteOpt_OkToStop(b bool) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.okToStop = b
 	}
 }
 
-func yakBruteOpt_FinishingThreshold(i int) yakBruteOpt {
+func yakBruteOpt_FinishingThreshold(i int) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.finishingThreshold = i
 	}
 }
 
-func yakBruteOpt_ConcurrentTarget(c int) yakBruteOpt {
+func yakBruteOpt_ConcurrentTarget(c int) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.concurrentTarget = c
 	}
 }
 
-func yakBruteOpt_userlist(users ...string) yakBruteOpt {
+func yakBruteOpt_userlist(users ...string) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.userList = users
 	}
 }
 
-func yakBruteOpt_autoDict() yakBruteOpt {
+func yakBruteOpt_autoDict() BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.userList = bruteutils.GetUsernameListFromBruteType(bruter.bruteType)
 		bruter.passList = bruteutils.GetPasswordListFromBruteType(bruter.bruteType)
 	}
 }
 
-func yakBruteOpt_passlist(passes ...string) yakBruteOpt {
+func yakBruteOpt_passlist(passes ...string) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.passList = passes
 	}
 }
 
-func yakBruteOpt_minDelay(min int) yakBruteOpt {
+func yakBruteOpt_minDelay(min int) BruteOpt {
 	return func(b *yakBruter) {
 		b.minDelay = min
 	}
 }
 
-func yakBruteOpt_concurrent(c int) yakBruteOpt {
+func yakBruteOpt_concurrent(c int) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.concurrent = c
 	}
 }
 
-func yakBruteOpt_maxDelay(max int) yakBruteOpt {
+func yakBruteOpt_maxDelay(max int) BruteOpt {
 	return func(b *yakBruter) {
 		b.maxDelay = max
 	}
 }
 
-func yakBruteOpt_coreHandler(cb func(item *bruteutils.BruteItem) *bruteutils.BruteItemResult) yakBruteOpt {
+func yakBruteOpt_coreHandler(cb func(item *bruteutils.BruteItem) *bruteutils.BruteItemResult) BruteOpt {
 	return func(bruter *yakBruter) {
 		bruter.coreHandler = cb
 	}
@@ -164,7 +178,7 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 			y.passList = []string{""}
 		}
 
-		err := bruter.StreamBruteContext(context.Background(), y.bruteType, targets, y.userList, y.passList, func(b *bruteutils.BruteItemResult) {
+		err := bruter.StreamBruteContext(y.Ctx, y.bruteType, targets, y.userList, y.passList, func(b *bruteutils.BruteItemResult) {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Error(err)
@@ -223,7 +237,7 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 	return ch, nil
 }
 
-func _yakitBruterNew(typeStr string, opts ...yakBruteOpt) (*yakBruter, error) {
+func _yakitBruterNew(typeStr string, opts ...BruteOpt) (*yakBruter, error) {
 	bruter := &yakBruter{
 		bruteType:        typeStr,
 		concurrentTarget: 256,
@@ -233,6 +247,9 @@ func _yakitBruterNew(typeStr string, opts ...yakBruteOpt) (*yakBruter, error) {
 	}
 	for _, p := range opts {
 		p(bruter)
+	}
+	if bruter.Ctx == nil {
+		bruter.Ctx = context.Background()
 	}
 
 	if bruter.coreHandler == nil {
