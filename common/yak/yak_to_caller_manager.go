@@ -1227,6 +1227,29 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		nIns.GetVM().RegisterMapMemberCallHandler("synscan", funcName, hookSynScanFunc)
 	}
 
+	hookBruteFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			bruteOpt := []tools.BruteOpt{tools.WithRuntimeId(runtimeId), tools.WithCtx(streamContext)}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			bruteExtraOpts, ok := interfaceValue.([]tools.BruteOpt)
+			if ok {
+				bruteExtraOpts = append(bruteOpt, bruteExtraOpts...)
+			}
+			for _, p := range bruteExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+
+	nIns.GetVM().RegisterMapMemberCallHandler("brute", "New", hookBruteFunc)
+
 	// TODO
 	//hookPingScanFunc := func(f interface{}) interface{} {
 	//	funcValue := reflect.ValueOf(f)
