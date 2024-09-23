@@ -104,10 +104,10 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 		if (c) {
 			return ;
 		}
-		println(a); // 1
+		println(a); // phi(a)[Undefined-a,1]
 		`, []string{
 			"1",
-			"1",
+			"phi(a)[Undefined-a,1]",
 		}, t)
 	})
 
@@ -127,12 +127,12 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 			}
 			println(a); // unreachable // phi[2, 3]
 		}
-		println(a); // 1
+		println(a); // phi(a)[Undefined-a,1]
 		`, []string{
 			"1",
 			"2",
 			"3",
-			"1",
+			"phi(a)[Undefined-a,1]",
 		}, t)
 	})
 
