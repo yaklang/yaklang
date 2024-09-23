@@ -37,7 +37,6 @@ func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret.rule = res.GetRule()
 	return ret
 }
-
 func (r *SyntaxFlowResult) String(opts ...sfvm.ShowOption) string {
 	if r == nil || r.memResult == nil {
 		return ""
