@@ -62,7 +62,6 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/huin/asn1ber v0.0.0-20120622192748-af09f62e6358
-	github.com/icodeface/tls v0.0.0-20190904083142-17aec93c60e5
 	github.com/icza/bitio v1.1.0
 	github.com/itchyny/gojq v0.12.8
 	github.com/jellydator/ttlcache/v3 v3.3.0
