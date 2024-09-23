@@ -41,6 +41,7 @@ type FunctionBuilder struct {
 	IncludeStack               *utils.Stack[string]
 
 	Included bool
+	IsReturn bool
 
 	RefParameter map[string]struct{}
 
