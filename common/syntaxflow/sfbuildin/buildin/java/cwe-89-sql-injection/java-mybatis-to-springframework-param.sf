@@ -5,7 +5,7 @@ desc(
     level: middle,
 )
 
-<include('spring-param')> as $top;
+<include('java-spring-param')> as $top;
 
 // <mybatisSink><getFunc> as $params;
 // $top -{
@@ -17,7 +17,7 @@ desc(
 // check $target
 // alert $target;
 
-<include('spring-param')> as $totalSource;
+<include('java-spring-param')> as $totalSource;
 <mybatisSink><getFunc><name>?{!have: '.' && !have: '__ref__'} as $name;
 <fuzztag('.{{name}} as $call')><eval>
 $call(*<slice(start=1)> #{

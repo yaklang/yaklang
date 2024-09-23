@@ -11,6 +11,7 @@ desc(
 <include('java-http-fluent-request')> as $output;
 <include('java-image-io-read-url')> as $output;
 <include('java-net-url-connect')> as $output;
+<include('java-spring-rest-template-use')> as $output;
 // <include('java-net-url-connect')> as $output;
 alert $output;
 
