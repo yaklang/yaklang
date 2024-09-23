@@ -1,0 +1,67 @@
+desc(
+    title: "Find Java SpringBoot SSRF Vuln Directly",
+    type: vuln,
+    level: mid,
+)
+
+<include('java-spring-param')> as $source;
+<include("java-http-sink")> as $sink;
+
+$source -{
+    until: `* & $sink`,
+}-> as $result;
+
+$result & $sink as $output;
+
+$result<dataflow(<<<CODE
+*<show>?{!opcode: call} as $__next__;
+CODE)> as $output;
+
+alert $output;
+
+desc(
+lang: java,
+alert_min: 2,
+'file://risk1.java': <<<TEXT
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class SsrfVulnerableController {
+
+    @GetMapping("/fetch-url")
+    public String fetchUrl(@RequestParam("url") String url) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            String result = restTemplate.getForObject(url, String.class);
+            return result;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+}
+TEXT,
+'file://risk2.java': <<<TEXT
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class SsrfVulnerableController {
+
+    @GetMapping("/fetch-url")
+    public String fetchUrl(@RequestParam("url") String url) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            String result = restTemplate.getForObject(url + "?queryid=1", String.class);
+            return result;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+}
+TEXT
+)

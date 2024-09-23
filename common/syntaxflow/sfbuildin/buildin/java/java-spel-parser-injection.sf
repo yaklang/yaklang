@@ -2,7 +2,7 @@ desc(
     title: "SpringFramework SPEL Parser Injection",
 )
 
-<include('spring-param')> as $params;
+<include('java-spring-param')> as $params;
 check $params;
 
 SpelExpressionParser().parseExpression(* as $sinks);
