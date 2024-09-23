@@ -90,6 +90,7 @@ type Node interface {
 	HasValues() bool
 	GetValues() Values
 	IsUndefined() bool
+	IsParameter() bool
 }
 
 type Typed interface {
@@ -567,6 +568,10 @@ func (p *Parameter) SetDefault(v Value) {
 	//增加一个ud关系绑定
 	v.AddPointer(p)
 	v.AddUser(p)
+}
+
+func (p *Parameter) IsParameter() bool {
+	return true
 }
 
 var (

@@ -253,6 +253,14 @@ func (lz *LazyInstruction) IsUndefined() bool {
 	return lz.ir.Opcode == int64(SSAOpcodeUndefined)
 }
 
+func (lz *LazyInstruction) IsParameter() bool {
+	if lz.ir == nil {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return false
+	}
+	return lz.ir.Opcode == int64(SSAOpcodeParameter)
+}
+
 func (lz *LazyInstruction) GetFunc() *Function {
 	lz.check()
 	if lz.Instruction == nil {

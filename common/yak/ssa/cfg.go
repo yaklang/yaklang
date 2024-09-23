@@ -804,12 +804,24 @@ func (t *LabelBuilder) Finish() {
 func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 	parent := s.GetParent()
 	end := parent.CreateShadowScope()
+	b.CurrentBlock.SetScope(end)
 
 	names := parent.GetAllVariableNames()
 	for name, _ := range names {
-		leftv := end.CreateVariable(name, false)
-		_ = leftv
-		end.AssignVariable(leftv, b.EmitUndefined(name))
+		value := b.PeekValue(name)
+		if value == nil {
+			continue
+		}
+		if und, ok := value.(*Undefined); ok {
+			if und.Kind == UndefinedValueInValid {
+				continue
+			}
+		}
+
+		leftv := b.CreateVariable(name)
+		und := b.EmitUndefined(name)
+		und.Kind = UndefinedValueValid
+		b.AssignVariable(leftv, und)
 	}
 
 	return end
