@@ -47,6 +47,10 @@ func (i *anInstruction) IsUndefined() bool {
 	return false
 }
 
+func (i *anInstruction) IsParameter() bool {
+	return false
+}
+
 func (i *anInstruction) IsBlock(name string) bool {
 	if i.GetOpcode() == SSAOpcodeBasicBlock {
 		return strings.HasPrefix(i.GetName(), name)

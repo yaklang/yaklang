@@ -14,6 +14,16 @@ func SetMemberCall(obj, key, member Value) {
 	obj.AddMember(key, member)
 	member.SetObject(obj)
 	member.SetKey(key)
+
+	if phi, ok := obj.(*Phi); ok {
+		for _, v := range phi.Edge {
+			if _, ok := obj.GetMember(key); ok { // 避免循环
+				continue
+			}
+
+			SetMemberCall(v, key, member)
+		}
+	}
 }
 
 // ReplaceMemberCall replace all member or object relationship
