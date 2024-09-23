@@ -828,4 +828,9 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	replacer.hook(true, false, requestBytes)
 	replacer.WaitTasks()
 	assert.Equal(t, "[重发]tag1|YAKIT_COLOR_red", tags)
+	replacer.rules[0].ExtraTag = nil
+	replacer.hook(true, false, requestBytes)
+	tags = ""
+	replacer.WaitTasks()
+	assert.Equal(t, "[重发]|YAKIT_COLOR_red", tags)
 }
