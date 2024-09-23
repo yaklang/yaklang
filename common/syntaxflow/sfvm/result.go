@@ -70,19 +70,31 @@ type showConfig struct {
 }
 type ShowOption func(config *showConfig)
 
-func WithShowCode(show bool) ShowOption {
+func WithShowCode(show ...bool) ShowOption {
 	return func(config *showConfig) {
-		config.showCode = show
+		if len(show) > 0 {
+			config.showCode = show[0]
+		} else {
+			config.showCode = true
+		}
 	}
 }
-func WithShowDot(show bool) ShowOption {
+func WithShowDot(show ...bool) ShowOption {
 	return func(config *showConfig) {
-		config.showDot = show
+		if len(show) > 0 {
+			config.showDot = show[0]
+		} else {
+			config.showDot = true
+		}
 	}
 }
-func WithShowAll(show bool) ShowOption {
+func WithShowAll(show ...bool) ShowOption {
 	return func(config *showConfig) {
-		config.showAll = show
+		if len(show) > 0 {
+			config.showAll = show[0]
+		} else {
+			config.showAll = true
+		}
 	}
 }
 func (s *SFFrameResult) Show(opts ...ShowOption) {

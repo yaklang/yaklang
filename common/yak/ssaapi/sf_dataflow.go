@@ -16,12 +16,18 @@ func WithSyntaxFlowConfig(
 	opts ...*sf.RecursiveConfigItem,
 ) sf.ValueOperator {
 
-	var handlerResult func(v Values) Values
-	resultModeErr := utils.Errorf("exclude and include can't be used at the same time")
-	handlerResult = nil
-
+	handlerResult := make([]func(v Values) Values, 0)
+	addHandler := func(key sfvm.RecursiveConfigKey, code string) {
+		handlerResult = append(handlerResult, func(v Values) Values {
+			return dataFlowFilter(
+				key, code, v,
+				sfResult, config,
+			)
+		})
+	}
 	options := make([]OperationOption, 0)
 	configItems := make([]*sf.RecursiveConfigItem, 0)
+
 	for _, item := range opts {
 		switch item.Key {
 		case sf.RecursiveConfig_DepthMin:
@@ -42,28 +48,9 @@ func WithSyntaxFlowConfig(
 			configItems = append(configItems, item)
 
 		case sf.RecursiveConfig_Exclude:
-			if handlerResult == nil {
-				// exist include
-				log.Errorf("config: %v", resultModeErr)
-			}
-
-			handlerResult = func(v Values) Values {
-				return dataFlowFilter(
-					sf.RecursiveConfig_Exclude, item.Value, v,
-					sfResult, config,
-				)
-			}
+			addHandler(sf.RecursiveConfig_Exclude, item.Value)
 		case sf.RecursiveConfig_Include:
-			if handlerResult != nil {
-				// exist exclude
-				log.Errorf("config: %v", resultModeErr)
-			}
-			handlerResult = func(v Values) Values {
-				return dataFlowFilter(
-					sf.RecursiveConfig_Include, item.Value, v,
-					sfResult, config,
-				)
-			}
+			addHandler(sf.RecursiveConfig_Include, item.Value)
 		}
 	}
 
@@ -79,8 +66,8 @@ func WithSyntaxFlowConfig(
 	}
 
 	result := dataflowRecursiveFunc(options...)
-	if handlerResult != nil {
-		result = handlerResult(result)
+	for _, handler := range handlerResult {
+		result = handler(result)
 	}
 	return result
 }
@@ -91,8 +78,8 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 		return false, nil, err
 	}
 
-	exclude := params.GetString(0, "code", "exclude")
-	include := params.GetString("include")
+	include := params.GetString(0, "code", "include")
+	exclude := params.GetString("exclude")
 	if len(exclude) != 0 && len(include) != 0 {
 		return false, nil, utils.Errorf("exclude and include can't be used at the same time")
 	}
@@ -134,6 +121,9 @@ func dataFlowFilter(
 	if configKey != sf.RecursiveConfig_Exclude && configKey != sf.RecursiveConfig_Include {
 		return vs
 	}
+	if len(vs) == 0 {
+		return vs
+	}
 
 	var ret []*Value
 	all := make(map[*Value]struct{})
@@ -147,9 +137,13 @@ func dataFlowFilter(
 	})
 	for _, v := range vs {
 		dataPath := v.GetDataFlowPath()
-		// log.Infof("v: %v", v)
-		// log.Infof("dataPath: %v", dataPath)
 		matchedConfigs := recursiveConfig.compileAndRun(dataPath)
+
+		log.Infof("v: %v", v)
+		log.Infof("dataPath: %v", dataPath)
+		log.Infof("code[%v]: %v", configKey, code)
+		log.Infof("matchedConfig: %v", matchedConfigs)
+
 		if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
 			delete(all, v)
 		}
