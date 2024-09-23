@@ -1,9 +1,10 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestScanWithIfStatement(t *testing.T) {
@@ -109,7 +110,7 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 	t.Run("test until", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb2<scanPrevious(until=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
-				"result": {"2"},
+				"result": {"Undefined-bb2"},
 			}, ssaapi.WithLanguage("java"))
 
 	})
@@ -152,9 +153,8 @@ func TestScanNextLoopWithConfig(t *testing.T) {
 	t.Run("test until", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext(until=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
-				"result": {"0", "0"},
+				"result": {"Undefined-bb1"},
 			}, ssaapi.WithLanguage("java"))
-
 	})
 
 	t.Run("test hook", func(t *testing.T) {

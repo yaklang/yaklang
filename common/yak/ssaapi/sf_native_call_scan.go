@@ -20,6 +20,7 @@ type basicBlockInfo struct {
 	recursiveConfig *RecursiveConfig
 	visited         map[int64]struct{}
 	direction       direction
+	hasInclude      bool
 	results         []sfvm.ValueOperator
 	isFinish        bool
 }
@@ -96,7 +97,7 @@ func (b *basicBlockInfo) createRecursiveConfig(frame *sfvm.SFFrame, params *sfvm
 		log.Warnf("Get sfResult error:%s", err)
 		return
 	}
-	b.recursiveConfig = CreateRecursiveConfigFromNativeCallParams(sfResult, frame.GetConfig(), params)
+	b.recursiveConfig, b.hasInclude = CreateRecursiveConfigFromNativeCallParams(sfResult, frame.GetConfig(), params)
 }
 
 func (b *basicBlockInfo) searchBlock(value ssa.Value) {
@@ -151,24 +152,24 @@ func (b *basicBlockInfo) searchInsts() {
 				b.results = append(b.results, value)
 				continue
 			} else {
-				// rcKind := b.recursiveConfig.compileAndRun(value)
-				// switch rcKind {
-				// case ContinueSkip:
-				// 	continue
-				// case ContinueMatch:
-				// 	b.results = append(b.results, value)
-				// 	continue
-				// case StopMatch:
-				// 	b.results = append(b.results, value)
-				// 	b.isFinish = true
-				// 	break
-				// case StopNoMatch:
-				// 	b.isFinish = true
-				// 	break
-				// default:
-				// 	b.results = append(b.results, value)
-				// 	continue
-				// }
+				matchedConfig := b.recursiveConfig.compileAndRun(value)
+				if _, ok := matchedConfig[sfvm.RecursiveConfig_Include]; ok {
+					b.results = append(b.results, value)
+					continue
+				}
+				if _, ok := matchedConfig[sfvm.RecursiveConfig_Until]; ok {
+					b.isFinish = true
+					break
+				}
+				if _, ok := matchedConfig[sfvm.RecursiveConfig_Exclude]; ok {
+					// nothing todo
+					// this value skip
+					continue
+				}
+				if !b.hasInclude {
+					// if has include, only match value can save to results
+					b.results = append(b.results, value)
+				}
 			}
 		}
 	}
