@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -87,20 +88,27 @@ func (s *SFFrame) GetExtraInfoInt(key string, backup ...string) int {
 	return val
 }
 
-func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
+func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI, rule *schema.SyntaxFlowRule, config *Config) *SFFrame {
 	v := vars
 	if v == nil {
 		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
+	}
+	if rule == nil {
+		rule = &schema.SyntaxFlowRule{}
 	}
 
 	return &SFFrame{
 		Text:       text,
 		Codes:      codes,
-		rule:       &schema.SyntaxFlowRule{},
+		rule:       rule,
 		VerifyFs:   make(map[string]string),
 		NegativeFs: make(map[string]string),
 		ExtraDesc:  make(map[string]string),
 	}
+}
+
+func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
+	return newSfFrameEx(vars, text, codes, nil, nil)
 }
 
 func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, filesys_interface.FileSystem, error) {

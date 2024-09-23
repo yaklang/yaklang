@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -67,6 +68,10 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 	}
 }
 
+func (s *SyntaxFlowVirtualMachine) CompileFromDb(rule *schema.SyntaxFlowRule) (*SFFrame, error) {
+	frame := newSfFrameEx(s.vars, rule.Content, ToOpCodes(rule.OpCodes), rule, s.config)
+	return frame, nil
+}
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")

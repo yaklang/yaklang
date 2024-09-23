@@ -138,6 +138,7 @@ type SyntaxFlowRule struct {
 	// If the rule is included by other rules, the rule will not be shown in the result.
 	AllowIncluded bool
 	IncludedName  string
+	OpCodes       string
 
 	Hash string `json:"hash" gorm:"unique_index"`
 }

@@ -1,7 +1,10 @@
 package syntaxflow
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"strings"
 	"testing"
 
@@ -52,4 +55,13 @@ func TestCompile(t *testing.T) {
 		t.Fatal(err)
 	}
 	frame.Show()
+}
+func TestCompileFromDb(t *testing.T) {
+	vm := sfvm.NewSyntaxFlowVirtualMachine()
+	rule, err := sfdb.GetLibrary("php-param")
+	require.NoError(t, err)
+	frame, err := vm.CompileFromDb(rule)
+	require.NoError(t, err)
+	fmt.Println(frame.GetRule().OpCodes)
+	require.True(t, frame.GetRule().OpCodes != "")
 }
