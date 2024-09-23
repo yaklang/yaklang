@@ -9,6 +9,7 @@ type value interface {
 	Replace(value, value)
 	String() string
 	IsUndefined() bool
+	IsParameter() bool
 	SelfDelete()
 	GetId() int64
 }
@@ -46,6 +47,7 @@ func (p *phi) String() string {
 }
 
 func (p *phi) IsUndefined() bool { return false }
+func (p *phi) IsParameter() bool { return false }
 func (p *phi) SelfDelete()       {}
 
 type constsIns struct {
@@ -68,6 +70,7 @@ func (c *constsIns) String() string {
 	return fmt.Sprintf("const(%v)", c.value)
 }
 func (p *constsIns) IsUndefined() bool { return false }
+func (p *constsIns) IsParameter() bool { return false }
 func (p *constsIns) SelfDelete()       {}
 
 type binary struct {
@@ -99,6 +102,7 @@ func (b *binary) String() string {
 }
 
 func (p *binary) IsUndefined() bool { return false }
+func (p *binary) IsParameter() bool { return false }
 func (p *binary) SelfDelete()       {}
 
 // ======== builder

@@ -90,12 +90,15 @@ func Test_Phi_WithGoto_inLoop(t *testing.T) {
 func Test_Phi_WithReturn(t *testing.T) {
 	code := `package main
 
-	func main() {
+	func main(p int) {
 		a := 1
+		var u int
 		if true {
 			return
 		}
 		b := a
+		c := p
+		d := u
 	}
 `
 	ssatest.CheckWithName("phi-with-return", t, code, func(prog *ssaapi.Program) error {
@@ -109,6 +112,34 @@ func Test_Phi_WithReturn(t *testing.T) {
 		}
 		conds := targetIns.GetControlFlowConditions()
 		assert.Equal(t, 1, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+
+	ssatest.CheckWithName("phi-with-return-undefined", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		phis := prog.SyntaxFlow("d as $d").GetValues("d")
+		phi := phis[0]
+
+		targetIns, ok := ssa.ToPhi(phi.GetSSAValue())
+		if !ok {
+			t.Fatal("not phi")
+		}
+		conds := targetIns.GetControlFlowConditions()
+		assert.Equal(t, 1, len(conds))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.GO))
+
+	ssatest.CheckWithName("phi-with-return-without-param", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		nophis := prog.SyntaxFlow("c as $c").GetValues("c")
+		nophi := nophis[0]
+
+		_, ok := ssa.ToPhi(nophi.GetSSAValue())
+		if ok {
+			t.Fatal("It shouldn't be phi here")
+		}
 
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.GO))

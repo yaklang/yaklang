@@ -534,6 +534,15 @@ func (s *ScopedVersionedTable[T]) GetAllVariableNames() map[string]struct{} {
 	var names map[string]struct{} = make(map[string]struct{})
 
 	s.linkValues.ForEach(func(s string, vi VersionedIF[T]) {
+		if s == "" || s == "_" {
+			return
+		}
+		if vi.GetValue().IsParameter() { // 参数不能生成phi
+			return
+		}
+		if s[0] == '#' { // 成员变量不能生成phi
+			return
+		}
 		names[s] = struct{}{}
 	})
 
