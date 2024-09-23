@@ -39,8 +39,9 @@ func CreateRecursiveConfigFromNativeCallParams(
 	sfResult *sf.SFFrameResult,
 	config *sf.Config,
 	params *sf.NativeCallActualParams,
-) *RecursiveConfig {
+) (*RecursiveConfig, bool) {
 	var opts []*sf.RecursiveConfigItem
+	var hasInclude bool
 	if depth := params.GetString("depth"); depth != "" {
 		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Hook, Value: depth, SyntaxFlowRule: false}
 		opts = append(opts, configItem)
@@ -54,6 +55,7 @@ func CreateRecursiveConfigFromNativeCallParams(
 		opts = append(opts, configItem)
 	}
 	if rule := params.GetString("include"); rule != "" {
+		hasInclude = true
 		configItem := &sf.RecursiveConfigItem{Key: sf.RecursiveConfig_Include, Value: rule, SyntaxFlowRule: true}
 		opts = append(opts, configItem)
 	}
@@ -62,7 +64,7 @@ func CreateRecursiveConfigFromNativeCallParams(
 		opts = append(opts, configItem)
 	}
 
-	return CreateRecursiveConfigFromItems(sfResult, config, opts...)
+	return CreateRecursiveConfigFromItems(sfResult, config, opts...), hasInclude
 }
 
 // handler:用于根据RecursiveConfig配置项对每个Value行为进行处理
