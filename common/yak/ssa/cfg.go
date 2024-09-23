@@ -335,8 +335,10 @@ func (i *IfBuilder) Build() *IfBuilder {
 				SSABuilder.CurrentBlock = trueBlock
 				SSABuilder.CurrentBlock.SetScope(bodyScope)
 				item.Body()
-				if SSABuilder.CurrentBlock.finish {
+				if SSABuilder.IsReturn {
 					return SSABuilder.HandlerReturnPhi(bodyScope)
+				} else if SSABuilder.CurrentBlock.finish && !SSABuilder.IsReturn {
+					return nil
 				}
 				SSABuilder.EmitJump(DoneBlock)
 				return SSABuilder.CurrentBlock.ScopeTable

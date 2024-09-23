@@ -15,13 +15,29 @@ func SetMemberCall(obj, key, member Value) {
 	member.SetObject(obj)
 	member.SetKey(key)
 
-	if phi, ok := obj.(*Phi); ok {
-		for _, v := range phi.Edge {
-			if _, ok := obj.GetMember(key); ok { // 避免循环
+	handlerMemberCall := func(obj Value) {
+		for _, v := range obj.(*Phi).Edge {
+			if _, ok := v.GetMember(key); ok { // 避免循环
 				continue
 			}
+			if _, ok := v.(*Call); ok {
+				SetMemberCall(v, key, member)
+			}
+			if und, ok := v.(*Undefined); ok {
+				if und.Kind == UndefinedValueInValid {
+					SetMemberCall(v, key, member)
+				}
+			}
+		}
+	}
 
-			SetMemberCall(v, key, member)
+	if phi, ok := obj.(*Phi); ok {
+		for _, v := range phi.Edge {
+			if und, ok := ToUndefined(v); ok { // 遇到库类
+				if und.Kind == UndefinedValueValid {
+					handlerMemberCall(obj)
+				}
+			}
 		}
 	}
 }
