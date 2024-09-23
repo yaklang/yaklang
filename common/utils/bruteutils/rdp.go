@@ -3,15 +3,14 @@ package bruteutils
 import (
 	"errors"
 	"fmt"
-	stdlog "log"
-	"os"
-	"sync"
-	"time"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	stdlog "log"
+	"os"
+	"sync"
+	"time"
 
 	//"github.com/shadow1ng/fscan/common"
 
@@ -178,7 +177,7 @@ func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
 }
 
 func (g *rdpClient) Login(domain, user, pwd string) error {
-	conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", g.Host)
+	conn, err := defaultDialer.DialTCPContext(utils.TimeoutContext(defaultTimeout), "tcp", g.Host)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}
@@ -224,11 +223,11 @@ func (g *rdpClient) Login(domain, user, pwd string) error {
 	})
 	g.pdu.On("success", func() {
 		err = nil
-		log.Error("on success")
+		log.Info("on success")
 		g.pdu.Emit("done")
 	})
 	g.pdu.On("ready", func() {
-		log.Error("on ready")
+		log.Info("on ready")
 		g.pdu.Emit("done")
 	})
 	g.pdu.On("update", func(rectangles []pdu.BitmapData) {
