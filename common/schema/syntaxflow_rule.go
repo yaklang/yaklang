@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
@@ -74,6 +76,33 @@ func ValidPurpose(i any) SyntaxFlowRulePurposeType {
 	}
 }
 
+type MapEx[K comparable, V any] map[K]V
+
+func (m *MapEx[K, V]) Scan(value interface{}) error {
+	return json.Unmarshal(codec.AnyToBytes(value), m)
+}
+func (m MapEx[K, V]) Value() (driver.Value, error) {
+	return json.Marshal(m)
+}
+
+type SlicesEx[K comparable] []K
+
+func (s *SlicesEx[K]) Scan(value interface{}) error {
+	return json.Unmarshal(codec.AnyToBytes(value), s)
+}
+
+func (s *SlicesEx[K]) Value() (driver.Value, error) {
+	return json.Marshal(s)
+}
+
+type ExtraDescInfo struct {
+	Level     SyntaxFlowSeverity
+	Purpose   SyntaxFlowRulePurposeType
+	Msg       string
+	OnlyMsg   bool
+	ExtraInfo map[string]string
+}
+
 type SyntaxFlowRule struct {
 	gorm.Model
 
@@ -88,7 +117,7 @@ type SyntaxFlowRule struct {
 	TitleZh     string
 	Description string
 	Tag         string
-	AlertDesc   string
+	AlertDesc   MapEx[string, *ExtraDescInfo] `gorm:"type:text"`
 	// yak or sf
 	Type     SyntaxFlowRuleType
 	Severity SyntaxFlowSeverity
@@ -123,4 +152,13 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	s.Type = ValidRuleType(s.Type)
 	s.Severity = ValidSeverityType(s.Severity)
 	return nil
+}
+func (s *SyntaxFlowRule) GetAlertInfo(msg string) (string, bool) {
+	if info, ok := s.AlertDesc[msg]; ok {
+		if info.OnlyMsg {
+			return info.Msg, true
+		}
+		return codec.AnyToString(info), false
+	}
+	return "", false
 }

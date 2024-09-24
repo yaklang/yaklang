@@ -15,12 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-type ExtraDescInfo struct {
-	Level     schema.SyntaxFlowSeverity
-	Purpose   schema.SyntaxFlowRulePurposeType
-	Msg       string
-	ExtraInfo map[string]string
-}
 type SFFrameResult struct {
 	// base info
 	Rule string
@@ -33,8 +27,6 @@ type SFFrameResult struct {
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	UnNameValue      []ValueOperator
 	AlertSymbolTable map[string]ValueOperator
-
-	AlertDesc map[string]*ExtraDescInfo
 }
 
 func NewSFResult(rule string) *SFFrameResult {
@@ -45,12 +37,11 @@ func NewSFResult(rule string) *SFFrameResult {
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
 		AlertSymbolTable: make(map[string]ValueOperator),
-		AlertDesc:        make(map[string]*ExtraDescInfo),
 	}
 }
+
 func (s *SFFrameResult) GetAlertInfo(name string) (string, bool) {
-	info, ok := s.AlertDesc[name]
-	return codec.AnyToString(info), ok
+	return s.rule.GetAlertInfo(name)
 }
 func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
@@ -73,9 +64,9 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	for k, v := range result.AlertSymbolTable {
 		s.AlertSymbolTable[k] = v
 	}
-	for k, v := range result.AlertDesc {
-		s.AlertDesc[k] = v
-	}
+	//for k, v := range result.AlertDesc {
+	//	s.AlertDesc[k] = v
+	//}
 	s.CheckParams = append(s.CheckParams, result.CheckParams...)
 	s.Errors = append(s.Errors, result.Errors...)
 }

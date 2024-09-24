@@ -271,7 +271,7 @@ alert $param for {"level": "high"}
 	require.NoError(t, err)
 	rule, err := sfdb.GetRule("test.sf")
 	require.NoError(t, err)
-	var m map[string]*sfvm.ExtraDescInfo
+	var m map[string]*schema.ExtraDescInfo
 	fmt.Println(rule.AlertDesc)
 	err = json.Unmarshal(codec.AnyToBytes(rule.AlertDesc), &m)
 	require.NoError(t, err)

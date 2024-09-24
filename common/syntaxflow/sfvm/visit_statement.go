@@ -81,19 +81,23 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			if value != "" {
 				switch keyLower := strings.ToLower(key); keyLower {
 				case "title":
-					y.title = value
+					y.rule.Title = value
 				case "title_zh":
-					y.title_zh = value
+					y.rule.TitleZh = value
 				case "description", "desc", "note":
-					y.description = value
+					y.rule.Description = value
 				case "type", "purpose":
-					y.purpose = value
+					y.rule.Purpose = schema.ValidPurpose(value)
 				case "lib", "allow_include", "as_library", "as_lib", "library_name":
-					y.allowIncluded = value
+					y.rule.AllowIncluded = !strings.EqualFold(value, "")
+					if y.rule.AllowIncluded {
+						y.rule.IncludedName = value
+						y.rule.Title = value
+					}
 				case "level", "severity", "sev":
-					y.severity = value
+					y.rule.Severity = schema.ValidSeverityType(value)
 				case "language", "lang":
-					y.language = value
+					y.rule.Language = value
 				default:
 					if strings.Contains(keyLower, "://") {
 						urlIns, _ := url.Parse(keyLower)
@@ -135,14 +139,14 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 	}
 	ref := i.RefVariable().GetText()
 	ref = strings.TrimLeft(ref, "$")
-	var extra = &ExtraDescInfo{
+	var extra = &schema.ExtraDescInfo{
 		ExtraInfo: make(map[string]string),
 	}
-	info := y.alertMsg[ref]
+	info := y.rule.AlertDesc[ref]
 	if info != nil {
 		extra = info
 	} else {
-		y.alertMsg[ref] = extra
+		y.rule.AlertDesc[ref] = extra
 	}
 	if len(extra.ExtraInfo) <= 0 {
 		extra.ExtraInfo = make(map[string]string)
@@ -178,9 +182,8 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 		text := i.StringLiteral().GetText()
 		forString := mustUnquoteSyntaxFlowString(text)
 		extra.Msg = forString
+		extra.OnlyMsg = true
 	}
-	if extra.Level == "" {
-		extra.Level = schema.ValidSeverityType(y.severity)
-	}
+
 	y.EmitAlert(ref)
 }

@@ -307,7 +307,7 @@ func (v *SyntaxFlowVisitor) Show() {
 }
 
 func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, ValueOperator]) *SFFrame {
-	return NewSFFrame(vars, v.text, v.codes)
+	return NewSFFrame(vars, v.rule.Content, v.codes)
 }
 
 func (y *SyntaxFlowVisitor) EmitPop() {
