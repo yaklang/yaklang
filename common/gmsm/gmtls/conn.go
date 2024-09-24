@@ -1081,19 +1081,19 @@ func (c *Conn) Write(b []byte) (int, error) {
 	// https://bugzilla.mozilla.org/show_bug.cgi?id=665814
 	// https://www.imperialviolet.org/2012/01/15/beastfollowup.html
 
-	var m int
-	if len(b) > 1 && c.vers <= VersionTLS10 {
-		if _, ok := c.out.cipher.(cipher.BlockMode); ok {
-			n, err := c.writeRecordLocked(recordTypeApplicationData, b[:1])
-			if err != nil {
-				return n, c.out.setErrorLocked(err)
-			}
-			m, b = 1, b[1:]
-		}
-	}
+	//var m int
+	//if len(b) > 1 && c.vers <= VersionTLS10 {
+	//	if _, ok := c.out.cipher.(cipher.BlockMode); ok {
+	//		n, err := c.writeRecordLocked(recordTypeApplicationData, b[:1])
+	//		if err != nil {
+	//			return n, c.out.setErrorLocked(err)
+	//		}
+	//		m, b = 1, b[1:]
+	//	}
+	//}
 
 	n, err := c.writeRecordLocked(recordTypeApplicationData, b)
-	return n + m, c.out.setErrorLocked(err)
+	return n, c.out.setErrorLocked(err)
 }
 
 // handleRenegotiation processes a HelloRequest handshake message.
