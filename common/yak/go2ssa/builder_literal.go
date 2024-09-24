@@ -208,9 +208,16 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 			if len(kvs) == 0 {
 				return b.EmitUndefined(typ.String())
-			} else if kvs[0].key == nil && kvs[0].value == nil { // array slice
+			}
+			if kvs[0].value != nil {
+				return kvs[0].value
+			}
+
+			if kvs[0].key == nil && kvs[0].value == nil { // array slice
 				kv := kvs[0].kv
 				typt = ssa.NewSliceType(kv[0].value.GetType())
+			} else if kvs[0].key == nil { // any
+				return b.EmitUndefined(typ.String())
 			} else if _, ok := ssa.ToBasicType(kvs[0].key.GetType()); ok { // struct map
 				typt = ssa.NewStructType()
 				for _, kv := range kvs {
