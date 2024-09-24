@@ -20,11 +20,11 @@ $root?{!<dataflow(<<<CODE
 *?{opcode: call} as $__next__;
 CODE)>} as $result
 
-alert(
+alert $result for {
     title: 'Direct file manipulation',
     type: 'vuln',
     level: 'high'
-) $result
+}
 
 desc(
     lang: php,

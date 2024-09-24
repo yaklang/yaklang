@@ -21,23 +21,23 @@ $root?{<dataflow(<<<CODE
 *?{opcode: call && !<self> & $filter} as $__next__
 CODE)>} as $mid
 
-alert(
+alert $mid for {
     title: 'php deserialization has function calls, but no filter function is checked out',
     title_zh: 'php反序列化中有函数调用，但未检出过滤函数',
     type: 'mid',
     level: 'mid'
-) $mid
+}
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && <self> & $filter} as $__next__
 CODE)>} as $low
 
-alert(
+alert $low for {
     title: 'php deserialization has function calls that check out filter functions',
     title_zh: 'php反序列化中有函数调用，检出过滤函数',
     type: 'low',
     level: 'low'
-) $low
+}
 desc(
     lang: php,
     'file:///unsafe.php': <<<UNSAFE

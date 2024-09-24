@@ -17,31 +17,31 @@ $query #{
 $root?{!<dataflow(<<<CODE
 *?{opcode: call && <getCaller><name>?{have: ldap_escape}} as $__next__;
 CODE)>} as $result;
-alert(
+alert $result for {
     title: 'php ldap direct injection without filter',
     type: 'vuln',
     level: 'high'
-) $result;
+};
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && !(have: ldap_escape)} as $__next__;
 CODE)>} as $filter_result;
 
-alert(
+alert $filter_result for (
     title: 'php ldap direct injection have filter,but not match this filter function',
     type: 'mid',
     level: 'mid'
-) $filter_result;
+);
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && (<self> & $filter || have: ldap_escape)} as $__next__;
 CODE)>} as $info;
 
-alert(
+alert $info for {
     title: 'php ldap inject have filter and match this filter function',
     type: 'info',
     level: 'info'
-)   $info
+};
 
 desc(
 
