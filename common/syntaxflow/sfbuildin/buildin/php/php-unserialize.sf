@@ -11,11 +11,11 @@ $param#{until: `* & $params`}-> as $root
 $root?{!<dataflow(<<<CODE
 *?{opcode: call && <self> & $filter} as $__next__
 CODE)>} as $result
-alert(
+alert $result for {
     title: 'php deserialization is not filtered',
     type: 'vuln',
     level: 'high'
-) $result
+}
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && !<self> & $filter} as $__next__
