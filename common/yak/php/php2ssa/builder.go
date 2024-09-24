@@ -42,10 +42,6 @@ func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 		}
 		initHandler("_SERVER")
 		fb.GetProgram().GlobalScope = container
-		fb.GetProgram().GetApplication().ScopeCallback = func(scope ssa.ScopeIF) ssa.ScopeIF {
-			//scope.SetForceCapture()
-			return scope
-		}
 	})
 }
 func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
@@ -81,7 +77,7 @@ var Builder = &SSABuild{}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.PreHandler = true
-	builder.GetProgram().Build("", editor, builder)
+	builder.GetProgram().GetApplication().Build("", editor, builder)
 	builder.PreHandler = false
 }
 
