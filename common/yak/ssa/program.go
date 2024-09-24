@@ -15,27 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewChildProgram(prog *Program, name string, add bool) *Program {
-	program := NewProgram(name, prog.EnableDatabase, ChildAPP, prog.Loader.GetFilesysFileSystem(), prog.Loader.GetBasePath())
-	program.LibraryFile = prog.LibraryFile
-	program.Language = prog.Language
-	program.Application = prog
-	program.FileList = prog.FileList
-	program.editorStack = prog.editorStack
-	program.Loader = prog.Loader
-	program.Build = prog.Build
-	program.externType = prog.externType
-	program.externBuildValueHandler = prog.externBuildValueHandler
-	program.ExternInstance = prog.ExternInstance
-	program.ExternLib = prog.ExternLib
-	program.GlobalScope = prog.GlobalScope
-	program.Cache.SetFetchId(prog.Cache.fetchId)
-	if add {
-		prog.ChildApplication = append(prog.ChildApplication, program)
-	}
-	return program
-}
-
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
 	prog := &Program{
 		ChildApplication:        make([]*Program, 0),
@@ -69,6 +48,48 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ssautil.WithBasePath(programPath),
 	)
 	return prog
+}
+
+func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...string) *Program {
+	fs := prog.Loader.GetFilesysFileSystem()
+	fullPath := prog.GetCurrentEditor().GetFilename()
+	endPath := fs.Join(path...)
+	programPath, _, _ := strings.Cut(fullPath, endPath)
+	subProg := NewProgram(name, prog.EnableDatabase, kind, fs, programPath)
+	subProg.Application = prog.Application
+
+	subProg.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
+	subProg.Language = prog.Language
+
+	subProg.LibraryFile = prog.LibraryFile
+	subProg.FileList = prog.FileList
+	subProg.editorStack = prog.editorStack
+	subProg.externType = prog.externType
+	subProg.externBuildValueHandler = prog.externBuildValueHandler
+	subProg.ExternInstance = prog.ExternInstance
+	subProg.ExternLib = prog.ExternLib
+
+	//todo: 这里需要加一个测试
+	subProg.GlobalScope = prog.GlobalScope
+
+	// up-down stream and application
+	prog.AddUpStream(subProg)
+	prog.Application.AddUpStream(subProg)
+	subProg.Application = prog.Application
+	subProg.Cache.SetFetchId(prog.Cache.fetchId)
+	return subProg
+}
+
+func NewChildProgram(prog *Program, name string, add bool, path ...string) *Program {
+	program := prog.createSubProgram(name, ChildAPP, path...)
+	if add {
+		prog.ChildApplication = append(prog.ChildApplication, program)
+	}
+	return program
+}
+
+func (prog *Program) NewLibrary(name string, path []string) *Program {
+	return prog.createSubProgram(name, Library, path...)
 }
 
 func (prog *Program) GetLibrary(name string) (*Program, bool) {
@@ -124,31 +145,6 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 func (prog *Program) AddUpStream(p *Program) {
 	prog.UpStream[p.Name] = p
 	p.DownStream[prog.Name] = prog
-}
-
-func (prog *Program) NewLibrary(name string, path []string) *Program {
-	// create lib
-	// get program Path
-	fs := prog.Loader.GetFilesysFileSystem()
-	fullPath := prog.GetCurrentEditor().GetFilename()
-	endPath := fs.Join(path...)
-	programPath, _, _ := strings.Cut(fullPath, endPath)
-
-	lib := NewProgram(name, prog.EnableDatabase, Library, fs, programPath)
-	lib.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
-	lib.Language = prog.Language
-
-	//todo: 这里需要加一个测试
-	lib.GlobalScope = prog.GlobalScope
-
-	// up-down stream and application
-	prog.AddUpStream(lib)
-	prog.Application.AddUpStream(lib)
-	lib.Application = prog.Application
-	lib.ExternLib = prog.ExternLib
-	lib.ExternInstance = prog.ExternInstance
-	lib.Cache.SetFetchId(prog.Cache.fetchId)
-	return lib
 }
 
 func (prog *Program) GetProgramName() string {
