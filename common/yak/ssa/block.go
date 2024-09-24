@@ -84,7 +84,7 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 	if b.ScopeTable != nil {
 		log.Errorf("block %v already has a scope", b.GetName())
 	}
-	b.ScopeTable = b.GetProgram().GetApplication().ScopeCallback(s)
+	b.ScopeTable = s
 }
 
 /*

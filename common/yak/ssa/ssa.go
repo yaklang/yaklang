@@ -189,8 +189,7 @@ type Program struct {
 	Language    string
 
 	// from pom.xml file
-	SCAPackages   []*dxtypes.Package
-	ScopeCallback func(scope ScopeIF) ScopeIF
+	SCAPackages []*dxtypes.Package
 
 	// filename and data,
 	// if database exist, this is filename and hash, can use this hash to fetch source code
