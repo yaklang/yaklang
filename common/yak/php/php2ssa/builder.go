@@ -114,7 +114,7 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	if b.IncludeStack.Len() <= 0 {
 		var program *ssa.Program
-		program = ssa.NewChildProgram(b.GetProgram(), uuid.NewString(), !b.PreHandler)
+		program = b.GetProgram().NewChildProgram(uuid.NewString(), !b.PreHandler)
 		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.PreHandler = b.PreHandler
 		startParse(functionBuilder)
