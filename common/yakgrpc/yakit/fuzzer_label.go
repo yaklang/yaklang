@@ -48,7 +48,7 @@ func DeleteWebFuzzerLabel(db *gorm.DB, hash string) error {
 func QueryWebFuzzerLabelCount(db *gorm.DB) int64 {
 	var count int64
 	db = db.Model(&schema.WebFuzzerLabel{})
-	db = db.Find(&count)
+	db = db.Count(&count)
 	if db.Error != nil {
 		return 0
 	}
