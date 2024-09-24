@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -65,13 +64,12 @@ func DeleteSSAProgram(name string) error {
 }
 
 func AllSSAPrograms() []*schema.SSAProgram {
-	if len(Programs) > 0 {
-		return lo.Values(Programs)
-	}
-
 	db := consts.GetGormProfileDatabase()
 	var programs []*schema.SSAProgram
-	db.Model(&schema.SSAProgram{}).Order("created_at DESC").Find(&programs)
+	db = db.Model(&schema.SSAProgram{}).Order("created_at DESC").Find(&programs)
+	if err := db.Error; err != nil {
+		log.Errorf("get all ssa programs error: %s", err)
+	}
 	for _, p := range programs {
 		Programs[p.Name] = p
 	}

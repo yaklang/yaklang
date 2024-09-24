@@ -19,8 +19,10 @@ type irSourceFS struct {
 }
 
 func NewIrSourceFs() *irSourceFS {
+	virtual := filesys.NewVirtualFs()
+	virtual.AddDir("/")
 	return &irSourceFS{
-		virtual: filesys.NewVirtualFs(),
+		virtual: virtual,
 	}
 }
 
@@ -41,14 +43,17 @@ func (fs *irSourceFS) addFile(source *IrSource) {
 		fs.virtual.AddFile(path, code)
 	}
 }
-
-func (fs *irSourceFS) loadFile(fullPath string) error {
-	if fullPath == "/" {
+func (fs *irSourceFS) loadStat(fullpath string) error {
+	if fullpath == "/" {
 		for _, program := range AllSSAPrograms() {
 			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
 		}
 		return nil
 	}
+	return fs.loadFile(fullpath)
+}
+
+func (fs *irSourceFS) loadFile(fullPath string) error {
 	programName, _ := fs.getProgram(fullPath)
 	CheckAndSwitchDB(programName)
 
@@ -67,6 +72,12 @@ func (fs *irSourceFS) loadFile(fullPath string) error {
 }
 
 func (fs *irSourceFS) loadFolder(path string) error {
+	if path == "/" {
+		for _, program := range AllSSAPrograms() {
+			fs.virtual.AddDir(fmt.Sprintf("/%s", program.Name))
+		}
+		return nil
+	}
 	programName, _ := fs.getProgram(path)
 	CheckAndSwitchDB(programName)
 
@@ -116,7 +127,7 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 	if info, err := fs.virtual.Stat(path); err == nil {
 		return info, nil
 	}
-	if err := fs.loadFile(path); err != nil {
+	if err := fs.loadStat(path); err != nil {
 		return nil, err
 	}
 	return fs.virtual.Stat(path)

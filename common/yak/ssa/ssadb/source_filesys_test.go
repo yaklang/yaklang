@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -116,7 +117,52 @@ func TestSourceFilesysLocal(t *testing.T) {
 			"example/src/main/java/com/example/bpackage/sub/b.java",
 		}, file)
 	})
+	t.Run("test source file system root path", func(t *testing.T) {
+		info, err := dbfs.Stat("/")
+		_ = info
+		require.NoErrorf(t, err, "stat error: %v", err)
 
+		dirs = make([]string, 0)
+		infos, err := dbfs.ReadDir("/")
+		require.NoErrorf(t, err, "read dir error: %v", err)
+		for _, info := range infos {
+			dirs = append(dirs, info.Name())
+		}
+		assert.Contains(t, dirs, programID)
+	})
+
+	t.Run("test new source file system root path", func(t *testing.T) {
+		dbfs := ssadb.NewIrSourceFs()
+		info, err := dbfs.Stat("/")
+		_ = info
+		require.NoErrorf(t, err, "stat error: %v", err)
+
+		infos, err := dbfs.ReadDir("/")
+		require.NoErrorf(t, err, "read dir error: %v", err)
+		for _, info := range infos {
+			log.Infof("info: %v", info.Name())
+		}
+	})
+
+	t.Run("remove all program and query root path", func(t *testing.T) {
+		dbfs := ssadb.NewIrSourceFs()
+		info, err := dbfs.Stat("/")
+		_ = info
+		require.NoErrorf(t, err, "stat error: %v", err)
+
+		infos, err := dbfs.ReadDir("/")
+		require.NoErrorf(t, err, "read dir error: %v", err)
+		for _, info := range infos {
+			log.Infof("info: %v", info.Name())
+			err := dbfs.Delete("/" + info.Name())
+			require.NoErrorf(t, err, "delete error: %v", err)
+		}
+
+		newFS := ssadb.NewIrSourceFs()
+		infos, err = newFS.ReadDir("/")
+		require.NoErrorf(t, err, "read dir error: %v", err)
+		require.Len(t, infos, 0)
+	})
 }
 
 func TestSourceFilesys(t *testing.T) {
