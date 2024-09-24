@@ -32,7 +32,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	reqPortScan := req.PortScanRequest
 	reqBrute := req.StartBruteParams
 
-	if req.GetSkipCveBaseLine() {
+	if req.PortScanRequest.GetSkipCveBaseLine() {
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key: "skip-cve-baseline",
 		})
