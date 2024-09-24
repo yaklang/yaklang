@@ -1,11 +1,9 @@
 package ssaapi
 
 import (
-	"encoding/json"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type SyntaxFlowResult struct {
@@ -36,6 +34,7 @@ func createEmptyResult() *SyntaxFlowResult {
 func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.memResult = res
+	ret.rule = res.GetRule()
 	return ret
 }
 
@@ -64,23 +63,12 @@ func (r *SyntaxFlowResult) Name() string {
 	return ""
 }
 
-func (r *SyntaxFlowResult) GetAlertInfo(name string) (*sfvm.ExtraDescInfo, bool) {
-	if r == nil {
-		return nil, false
-	}
-
-	if r.memResult != nil {
-		res, ok := r.memResult.AlertDesc[name]
-		return res, ok
-	} else {
-		var m map[string]*sfvm.ExtraDescInfo
-		if err := json.Unmarshal(codec.AnyToBytes(r.rule.AlertDesc), &m); err != nil {
-			return nil, false
-		} else {
-			info, ok := m[name]
-			return info, ok
-		}
-	}
+func (r *SyntaxFlowResult) GetAlertInfo(name string) (string, bool) {
+	return r.rule.GetAlertInfo(name)
+}
+func (r *SyntaxFlowResult) GetAlertEx(name string) (*schema.ExtraDescInfo, bool) {
+	info, ok := r.rule.AlertDesc[name]
+	return info, ok
 }
 
 func (r *SyntaxFlowResult) GetErrors() []string {

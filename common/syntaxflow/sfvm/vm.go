@@ -1,11 +1,7 @@
 package sfvm
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -96,27 +92,10 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	if len(errLis.GetErrors()) > 0 {
 		return nil, utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrorString())
 	}
-	result.text = text
+	result.rule.Content = text
 	result.VisitFlow(flow)
 	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
-	frame.rule.Content = text
-	frame.rule.Title = result.title
-	frame.rule.TitleZh = result.title_zh
-	frame.rule.Description = result.description
-	frame.rule.Type = schema.ValidRuleType(result.purpose)
-	frame.rule.AllowIncluded = func() bool {
-		flag := result.allowIncluded != ""
-		if flag {
-			frame.rule.IncludedName = result.allowIncluded
-			frame.rule.Title = result.allowIncluded
-		}
-		return flag
-	}()
-	frame.rule.AlertDesc = codec.AnyToString(result.alertMsg)
-	frame.rule.Purpose = schema.ValidPurpose(result.purpose)
-	frame.rule.Language = result.language
-	frame.rule.Severity = schema.ValidSeverityType(result.severity)
 	if len(result.verifyFilesystem) > 0 {
 		frame.VerifyFs = result.verifyFilesystem
 	}
@@ -124,6 +103,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 		frame.NegativeFs = result.negativeFilesystem
 	}
 	frame.ExtraDesc = result.rawDesc
+	frame.rule = result.rule
 	frame.vm = s
 
 	s.frames = append(s.frames, frame)
@@ -160,10 +140,6 @@ func (s *SyntaxFlowVirtualMachine) SetConfig(config *Config) {
 func (frame *SFFrame) Feed(i ValueOperator) (*SFFrameResult, error) {
 	err := frame.exec(i)
 	frame.result.rule = frame.rule
-	if _err := json.Unmarshal(codec.AnyToBytes(frame.rule.AlertDesc), &frame.result.AlertDesc); _err != nil {
-		log.Errorf("json unmarshal fail: %s", _err)
-		return nil, _err
-	}
 	return frame.result, err
 }
 
