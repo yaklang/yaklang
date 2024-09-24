@@ -27,11 +27,11 @@ $root?{<dataflow(<<<CODE
 *?{opcode: call && !(have: ldap_escape)} as $__next__;
 CODE)>} as $filter_result;
 
-alert $filter_result for (
+alert $filter_result for {
     title: 'php ldap direct injection have filter,but not match this filter function',
     type: 'mid',
     level: 'mid'
-);
+};
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && (<self> & $filter || have: ldap_escape)} as $__next__;
