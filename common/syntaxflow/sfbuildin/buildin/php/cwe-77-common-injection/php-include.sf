@@ -11,35 +11,35 @@ $root?{!<dataflow(<<<FLOW
 *?{opcode: call} as $__next__
 FLOW)>} as $result;
 
-alert(
+alert $result for {
     title: 'The file contained was detected without any filtering',
     title_zh: '检测到文件包含无任何过滤',
     type: 'vuln',
     level: 'high',
-) $result
+}
 
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && <self> & $filter} as $__next__;
 CODE)>} as $filter_result;
 
-alert(
+alert $filter_result for {
     title: 'File contains detected, filter function checked out',
     title_zh: '检测到文件包含，检出过滤函数',
     type: 'audit',
     level: 'low'
-) $filter_result;
+};
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && !<self> & $filter} as $__next__;
 CODE)>} as $seem_result;
 
-alert(
+alert $seem_result for {
     title: 'File contains detected, but filter function not detected',
     title_zh: '检测到文件包含，但未检出过滤函数',
     type: 'mid',
     level: 'mid'
-) $seem_result;
+};
 
 desc(
     lang: php,

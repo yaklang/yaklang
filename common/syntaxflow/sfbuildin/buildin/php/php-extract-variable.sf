@@ -14,35 +14,37 @@ $root?{!<dataflow(<<<CODE
 *?{opcode: call && <self> & $filter} as $__next__
 CODE)>} as $result
 
-alert(
+alert $result for {
     title: 'Variable overwriting is detected and there is no filtering',
     title_zh: '检测到变量覆盖，并且没有任何过滤',
     type: 'vuln',
     level: 'high'
-) $result
+}
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && !<self> & $filter} as $__next__
 CODE)>} as $middle
 
 
-alert(
+alert $middle for {
     title: 'Variable coverage detected, but filter function not detected',
     title_zh: '检测到变量覆盖，但是未检出过滤函数',
     type: 'mid',
     level: 'mid'
-) $middle
+}
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && <self> & $filter} as $__next__
 CODE)>} as $low
 
-alert(
+alert $low for {
     title: 'Variable coverage detected, but filter function not detected',
     title_zh: '检测到变量覆盖，检出过滤函数',
     type: 'low',
     level: 'low'
-) $low
+};
+
+
 desc(
     lang: php,
     alert_high: 1,

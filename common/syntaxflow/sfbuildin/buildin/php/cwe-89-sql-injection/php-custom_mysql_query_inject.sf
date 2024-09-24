@@ -13,35 +13,35 @@ $query #{
 $root?{!<dataflow(<<<CODE
 *?{opcode: call} as $__next__;
 CODE)>} as $result;
-alert(
+alert $result for {
     title: "Direct mysql injection",
     title_zh: "直接的mysql注入不经过任何过滤",
     type: 'vuln',
     level: 'high',
-) $result;
+};
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && <self> & $filter} as $__next__;
 
 CODE)>} as $filter_result;
 
-alert(
+alert $filter_result for {
     title: 'Filtered sql injection, filter function detected',
     title_zh: '经过过滤的sql注入，检测到过滤函数',
     type: 'low',
     level: 'low'
-) $filter_result;
+};
 
 $root?{<dataflow(<<<CODE
 *?{opcode: call && !<self> & $filter} as $__next__;
 CODE)>} as $seem_filter;
 
-alert(
+alert $seem_filter for {
     title: 'Filtered sql injection, but no filter function detected',
     title_zh: '经过过滤的sql注入，但未检测到过滤函数',
     type: 'mid',
     level: 'mid'
-)  $seem_filter;
+};
 
 desc(
     alert_high: 1,
