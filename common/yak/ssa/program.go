@@ -76,11 +76,11 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	prog.AddUpStream(subProg)
 	prog.Application.AddUpStream(subProg)
 	subProg.Application = prog.Application
-	subProg.Cache.SetFetchId(prog.Cache.fetchId)
+	subProg.Cache = prog.Cache
 	return subProg
 }
 
-func NewChildProgram(prog *Program, name string, add bool, path ...string) *Program {
+func (prog *Program) NewChildProgram(name string, add bool, path ...string) *Program {
 	program := prog.createSubProgram(name, ChildAPP, path...)
 	if add {
 		prog.ChildApplication = append(prog.ChildApplication, program)
