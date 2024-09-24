@@ -49,7 +49,7 @@ var AllLanguageBuilders = []ssa.Builder{
 	go2ssa.Builder,
 }
 
-func (c *config) parseProject() (Programs, error) {
+func (c *config) parseProject() (*Program, error) {
 	if c.reCompile {
 		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
 	}
@@ -150,14 +150,10 @@ func (c *config) parseProject() (Programs, error) {
 	prog.ProcessInfof("program %s finishing", prog.Name)
 	prog.Finish()
 	prog.ProcessInfof("program %s finish", prog.Name)
-	var progs = []*Program{NewProgram(prog, c)}
-	//for _, program := range prog.ChildApplication {
-	//	progs = append(progs, NewProgram(program, c))
-	//}
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
 	}
-	return progs, nil
+	return NewProgram(prog, c), nil
 }
 
 func (c *config) parseFile() (ret *Program, err error) {

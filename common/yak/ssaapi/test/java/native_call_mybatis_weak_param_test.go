@@ -1,12 +1,13 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestNativeCall_MybatisSupport(t *testing.T) {
@@ -49,8 +50,8 @@ public interface UserMapper {
     void deleteUser(int id);
 }
 `)
-	ssatest.CheckWithFS(f, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(f, t, func(prog *ssaapi.Program) error {
+
 		vars := prog.SyntaxFlowChain(`<mybatisSink> as $params`).Show()
 		assert.GreaterOrEqual(t, vars.Len(), 1)
 		return nil

@@ -2,10 +2,11 @@ package java
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
@@ -77,8 +78,7 @@ public class FastJSONDemoController {
 </project>
 `)
 
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		obj := prog.SyntaxFlowChain(`JSON<fullTypeName>?{have: 'alibaba.fastjson'} as $obj`).Show(false)
 		assert.NotNil(t, obj)
 
@@ -118,8 +118,7 @@ func TestLocalVariableDeclareTypeName(t *testing.T) {
 				}
 			};	
 	`)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'string' || have: 'A'} as $obj`)
@@ -187,8 +186,7 @@ func TestMemberCallTypeName(t *testing.T) {
 			};	
 	`)
 
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		obj := prog.SyntaxFlowChain(`res1<typeName> as $obj`)
@@ -249,8 +247,7 @@ func TestParamTypeName(t *testing.T) {
 				}
 			};	
 	`)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		obj := prog.SyntaxFlowChain(`param1<typeName>?{have: 'number'} as $obj`)
@@ -289,8 +286,7 @@ func TestTypeNamePriority(t *testing.T) {
 				}
 			};	
 	`)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		obj := prog.SyntaxFlowChain(`res1<typeName>?{have: 'A'} as $obj`)
@@ -325,8 +321,7 @@ func TestTypeNameForImportStar(t *testing.T) {
 				}
 			};	
 	`)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		typeName := prog.SyntaxFlowChain(`res1<typeName> as $id;`)
@@ -365,8 +360,7 @@ func TestFullTypeNameWithParentClass1(t *testing.T) {
 			}
 		};	
 `)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		obj := prog.SyntaxFlowChain("a<typeName> as $obj")
@@ -408,8 +402,7 @@ func TestFullTypeNameWithParentClass2(t *testing.T) {
 			}
 		};	
 `)
-	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-		prog := progs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 		prog.Show()
 
 		obj := prog.SyntaxFlowChain("a<typeName> as $obj").Show()
@@ -436,8 +429,7 @@ public class FastJSONDemoController {
     }
 }`)
 
-		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-			prog := progs[0]
+		ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 			prog.Show()
 			obj := prog.SyntaxFlowChain("id.annotation.RequestParam<fullTypeName>?{have:'org.springframework.web.bind.annotation.RequestParam'} as $obj")
 			assert.Equal(t, 1, obj.Len())
@@ -466,8 +458,7 @@ public class FastJSONDemoController {
     }
 }`)
 
-		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-			prog := progs[0]
+		ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 			prog.Show()
 			obj := prog.SyntaxFlowChain("id.annotation.Hello<fullTypeName> as $obj").Show()
 			assert.Equal(t, 2, obj.Len())
@@ -491,8 +482,7 @@ public class Simple extends HttpServlet {
    }   
 }`)
 
-		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-			prog := progs[0]
+		ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 			prog.Show()
 			obj := prog.SyntaxFlowChain("Simple.annotation.WebServlet<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
 			assert.Equal(t, 1, obj.Len())
@@ -516,8 +506,7 @@ public class Simple extends HttpServlet {
    }   
 }`)
 
-		ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
-			prog := progs[0]
+		ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
 			prog.Show()
 			obj := prog.SyntaxFlowChain("Simple.annotation.WebServlet<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
 			assert.Equal(t, 1, obj.Len())

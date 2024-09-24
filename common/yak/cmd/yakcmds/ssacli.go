@@ -185,8 +185,9 @@ var SSACompilerCommands = []*cli.Command{
 			if err != nil {
 				return utils.Errorf("parse project [%v] failed: %v", target, err)
 			}
+			_ = proj
 
-			log.Infof("finished compiling..., results: %v", len(proj))
+			log.Infof("finished compiling...")
 			if syntaxFlow != "" {
 				log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
 				return SyntaxFlowQuery(programName, databaseFileRaw, syntaxFlow, dbDebug, sfDebug, showDot, withCode)

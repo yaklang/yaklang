@@ -61,8 +61,8 @@ public class MDCAccessServletFilter implements Filter {
     }
 }
 `)
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
+
 		result, err := prog.SyntaxFlowWithError(`doFilter`)
 		if err != nil {
 			return err

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -22,16 +21,10 @@ func TestParseProject(t *testing.T) {
 			ssaapi.WithFileSystemEntry("a/a.yak"),
 			// ssaapi.WithDatabaseProgramName("test"),
 		)
-		for index, prog := range progs {
-			log.Infof("prog[%d]:", index)
-			prog.Show()
-		}
 
 		require.NoError(t, err, "parse project failed")
 
-		// TODO: this parseProject will return one program
-		require.Len(t, progs, 1, "progs should be 2")
-		prog := progs[0]
+		prog := progs
 
 		valuesB := prog.Ref("b")
 		valuesB.Show()

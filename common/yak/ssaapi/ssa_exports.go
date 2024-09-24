@@ -276,11 +276,11 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
+func ParseProjectFromPath(path string, opts ...Option) (*Program, error) {
 	return ParseProject(filesys.NewRelLocalFs(path), opts...)
 }
 
-func ParseProject(fs fi.FileSystem, opts ...Option) (Programs, error) {
+func ParseProject(fs fi.FileSystem, opts ...Option) (*Program, error) {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)

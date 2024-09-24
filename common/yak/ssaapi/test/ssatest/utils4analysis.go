@@ -39,7 +39,7 @@ const (
 	OnlyDatabase
 )
 
-func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(*ssaapi.Program) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
 		prog, err := ssaapi.ParseProject(fs, opt...)
@@ -75,7 +75,7 @@ func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Progra
 		assert.Nil(t, err)
 
 		log.Infof("only use database ")
-		err = handler([]*ssaapi.Program{prog})
+		err = handler(prog)
 		assert.Nil(t, err)
 	}
 }
@@ -192,7 +192,7 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 	}
 }
 
-func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
+func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p ParseStage, prog *ssaapi.Program, start time.Time) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
 		start := time.Now()
@@ -230,7 +230,7 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 		prog, err := ssaapi.FromDatabase(programID)
 		assert.Nil(t, err)
 		log.Infof("only use database ")
-		err = handler(OnlyDatabase, []*ssaapi.Program{prog}, start)
+		err = handler(OnlyDatabase, prog, start)
 		assert.Nil(t, err)
 	}
 }
@@ -290,7 +290,7 @@ func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[stri
 }
 
 func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
-	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
+	CheckWithFS(fs, t, func(p *ssaapi.Program) error {
 		// for _, p := range p {
 		// 	p.Show()
 		// }
@@ -485,7 +485,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 	}
 
 	var errs []error
-	CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+	CheckWithFS(vfs, t, func(programs *ssaapi.Program) error {
 		result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
 		if err != nil {
 			errs = append(errs, err)
@@ -572,7 +572,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 
 	l, vfs, _ = frame.ExtractNegativeFilesystemAndLanguage()
 	if vfs != nil && l != "" {
-		CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		CheckWithFS(vfs, t, func(programs *ssaapi.Program) error {
 			result, err := programs.SyntaxFlowWithError(i, sfvm.WithEnableDebug(false))
 			if err != nil {
 				if errors.Is(err, sfvm.CriticalError) {

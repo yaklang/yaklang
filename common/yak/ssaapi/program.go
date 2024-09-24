@@ -21,8 +21,6 @@ type Program struct {
 	comeFromDatabase bool
 }
 
-type Programs []*Program
-
 func (p *Program) IsFromDatabase() bool {
 	return p.comeFromDatabase
 }

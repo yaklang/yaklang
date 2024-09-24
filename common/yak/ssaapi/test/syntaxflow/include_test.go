@@ -144,8 +144,7 @@ public class UserServlet extends HttpServlet {
 
 func TestLib_ServletParam(t *testing.T) {
 	vfs := createTestVFS()
-	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vfs, t, func(prog *ssaapi.Program) error {
 		results := prog.SyntaxFlowChain(`<include('servlet-param')> as $params`)
 		results.Show()
 		assert.Greater(t, len(results), 7)
@@ -157,7 +156,7 @@ func Test_Include_HitCache(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
 	prog, err := ssaapi.ParseProject(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
-	defer 	ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 

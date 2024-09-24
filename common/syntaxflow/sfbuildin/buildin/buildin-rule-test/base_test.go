@@ -71,94 +71,89 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 			}))
 		}
 		for _, r := range rules {
-			ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-				if len(programs) <= 0 {
-					t.Fatal("no program found")
+			ssatest.CheckWithFS(vfs, t, func(prog *ssaapi.Program) error {
+				runtimeId := uuid.New().String()
+				result, err := prog.SyntaxFlowWithError(r.Content)
+				if !c.NegativeTest {
+					if err != nil || result.GetErrors() != nil {
+						if err != nil {
+							t.Fatal(err)
+						} else {
+							t.Fatal(result.GetErrors())
+						}
+					}
+				} else {
+					if err == nil && len(result.GetErrors()) == 0 {
+						count := 0
+						for _, i := range result.GetAlertVariables() {
+							count += len(result.GetValues(i))
+						}
+						if count > 0 {
+							t.Fatal("no alert variables should, negative test failed")
+						}
+					}
+
+					if errors.Is(err, sfvm.CriticalError) {
+						t.Fatal("cannot accept critical error: " + err.Error())
+					}
+
+					if len(result.GetAlertVariables()) > 0 {
+						count := 0
+						for _, i := range result.GetAlertVariables() {
+							// i.Recursive(func(operator sfvm.ValueOperator) error {
+							count += len(result.GetValues(i))
+							// 	return nil
+							// })
+						}
+						if count > 0 {
+							t.Fatal("no alert variables should, negative test failed")
+						}
+					}
+					return nil
 				}
-				for _, prog := range programs {
-					runtimeId := uuid.New().String()
-					result, err := prog.SyntaxFlowWithError(r.Content)
-					if !c.NegativeTest {
-						if err != nil || result.GetErrors() != nil {
-							if err != nil {
-								t.Fatal(err)
-							} else {
-								t.Fatal(result.GetErrors())
+				if len(result.GetAlertVariables()) >= 0 {
+					for _, name := range result.GetAlertVariables() {
+						val := result.GetValues(name)
+						msg := fmt.Sprintf("%v\n%s\n%s\n\n", r.Severity, name, val)
+						t.Logf(msg)
+						if len(c.ContainsAll) > 0 {
+							if !utils.MatchAllOfSubString(msg, c.ContainsAll...) {
+								t.Fatal("not all contains")
 							}
 						}
-					} else {
-						if err == nil && len(result.GetErrors()) == 0 {
-							count := 0
-							for _, i := range result.GetAlertVariables() {
-								count += len(result.GetValues(i))
-							}
-							if count > 0 {
-								t.Fatal("no alert variables should, negative test failed")
+						if len(c.NotContainsAny) > 0 {
+							if utils.MatchAnyOfSubString(msg, c.NotContainsAny...) {
+								t.Fatal("contain any")
 							}
 						}
-
-						if errors.Is(err, sfvm.CriticalError) {
-							t.Fatal("cannot accept critical error: " + err.Error())
-						}
-
-						if len(result.GetAlertVariables()) > 0 {
-							count := 0
-							for _, i := range result.GetAlertVariables() {
-								// i.Recursive(func(operator sfvm.ValueOperator) error {
-								count += len(result.GetValues(i))
-								// 	return nil
-								// })
+						name := ""
+						val.Recursive(func(operator sfvm.ValueOperator) error {
+							switch ret := operator.(type) {
+							case *ssaapi.Value:
+								if ret.GetProgramName() == "" {
+									return nil
+								}
+								name = ret.GetProgramName()
+								return ssaapi.SaveValue(
+									ret,
+									ssaapi.OptionSaveValue_RuntimeId(runtimeId),
+									ssaapi.OptionSaveValue_RuleName(r.RuleName),
+									ssaapi.OptionSaveValue_RuleId(int(r.ID)),
+								)
 							}
-							if count > 0 {
-								t.Fatal("no alert variables should, negative test failed")
-							}
+							return nil
+						})
+						count := 0
+						for node := range ssadb.YieldAuditNodeByRuntimeId(ssadb.GetDB(), runtimeId) {
+							count++
+							_ = node
 						}
-						return nil
+						if name != "" {
+							assert.Greater(t, count, 0)
+						}
 					}
-					if len(result.GetAlertVariables()) >= 0 {
-						for _, name := range result.GetAlertVariables() {
-							val := result.GetValues(name)
-							msg := fmt.Sprintf("%v\n%s\n%s\n\n", r.Severity, name, val)
-							t.Logf(msg)
-							if len(c.ContainsAll) > 0 {
-								if !utils.MatchAllOfSubString(msg, c.ContainsAll...) {
-									t.Fatal("not all contains")
-								}
-							}
-							if len(c.NotContainsAny) > 0 {
-								if utils.MatchAnyOfSubString(msg, c.NotContainsAny...) {
-									t.Fatal("contain any")
-								}
-							}
-							name := ""
-							val.Recursive(func(operator sfvm.ValueOperator) error {
-								switch ret := operator.(type) {
-								case *ssaapi.Value:
-									if ret.GetProgramName() == "" {
-										return nil
-									}
-									name = ret.GetProgramName()
-									return ssaapi.SaveValue(
-										ret,
-										ssaapi.OptionSaveValue_RuntimeId(runtimeId),
-										ssaapi.OptionSaveValue_RuleName(r.RuleName),
-										ssaapi.OptionSaveValue_RuleId(int(r.ID)),
-									)
-								}
-								return nil
-							})
-							count := 0
-							for node := range ssadb.YieldAuditNodeByRuntimeId(ssadb.GetDB(), runtimeId) {
-								count++
-								_ = node
-							}
-							if name != "" {
-								assert.Greater(t, count, 0)
-							}
-						}
-					} else {
-						t.Fatal("no alert found no result found")
-					}
+				} else {
+					t.Fatal("no alert found no result found")
 				}
 				return nil
 			}, ssaapi.WithLanguage(ssaapi.JAVA))

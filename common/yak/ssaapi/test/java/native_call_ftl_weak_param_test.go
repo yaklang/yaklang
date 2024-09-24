@@ -46,8 +46,8 @@ spring.freemarker.suffix=.ftl
 </body>
 </html>
 `)
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
+
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
@@ -88,8 +88,8 @@ public class FreeMakerDemo {
 </html>
 `)
 
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
+
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
@@ -135,8 +135,8 @@ spring.freemarker.suffix=.html
 </html>
 `)
 
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vf, t, func(prog *ssaapi.Program) error {
+
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'string'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil

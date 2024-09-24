@@ -1,11 +1,12 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestSyntaxFlowConditionBad(t *testing.T) {
@@ -34,8 +35,7 @@ public class FastJSONDemoController {
         return ResponseEntity.ok(anyJSON);
     }
 }`)
-	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vfs, t, func(prog *ssaapi.Program) error {
 		results := prog.SyntaxFlowChain(`.getParameter()?{<getCaller><getObject><fullTypeName>?{have: servlet} || <getFunc>.annotation.*Mapping} as $dynamicParams`)
 		assert.Equal(t, 1, len(results))
 		return nil

@@ -35,8 +35,8 @@ public class FastJSONDemoController {
         return ResponseEntity.ok(anyJSON);
     }
 }`)
-	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
+	ssatest.CheckWithFS(vfs, t, func(prog *ssaapi.Program) error {
+
 		prog.Show()
 		results := prog.SyntaxFlowChain(`.getParameter()?{<getCaller><getObject><fullTypeName>?{have: servlet} && <getFunc><getObject>.annotation.*Mapping} as $dynamicParams`, sfvm.WithEnableDebug(true))
 		assert.Equal(t, 1, len(results))
