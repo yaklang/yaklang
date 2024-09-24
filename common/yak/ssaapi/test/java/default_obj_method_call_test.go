@@ -260,7 +260,7 @@ class A {
 		assert.Equal(t, 1, callA.Len())
 		callB := prog.SyntaxFlow(`.toString2(* as $param)`).GetValues("param")
 		assert.Equal(t, 1, callB.Len())
-		assert.Contains(t, callB.String(), "Undefined-b.getBody(valid)(Undefined-B(Undefined-B),Parameter-p)")
+		assert.Contains(t, callB.String(), "Function-getBody(Undefined-B(Undefined-B),Parameter-p)")
 		callB.Show()
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))

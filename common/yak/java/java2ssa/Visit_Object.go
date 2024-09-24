@@ -24,7 +24,7 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 			y.EmitConstInst(0), y.EmitConstInst(0),
 		)
 	}
-	obj := y.InterfaceAddFieldBuild(len(allVariableInitializer),
+	obj := y.BuildObjectAddFieldBuild(len(allVariableInitializer),
 		func(i int) ssa.Value { return y.EmitConstInst(i) },
 		func(i int) ssa.Value {
 			return y.VisitVariableInitializer(allVariableInitializer[i])

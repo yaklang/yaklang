@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -39,7 +40,13 @@ $a = new test;
 $a->a++;
 println($a->a);
 `
-	ssatest.CheckPrintlnValue(code, []string{"add(Undefined-$a.a(valid), 1)"}, t)
+	ssatest.CheckSyntaxFlow(t, code,
+		`println(* #-> * as $param)`,
+		map[string][]string{
+			"param": {"0", "1"},
+		},
+		ssaapi.WithLanguage(ssaapi.PHP),
+	)
 }
 
 func TestExperssion_PHP_Scope(t *testing.T) {

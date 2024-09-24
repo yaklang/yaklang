@@ -63,8 +63,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -89,8 +89,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]", "Function-A.getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -133,8 +132,8 @@ func TestJava_Extend_Class(t *testing.T) {
 }
 		`, []string{
 			// TODO: this error
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -160,8 +159,8 @@ func TestJava_Extend_Class(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
-			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -184,7 +183,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getNum(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
 
@@ -317,7 +316,7 @@ public class Main {
             println(a);
         }
  }
-			`, []string{"1"}, t)
+			`, []string{"phi(a)[1]"}, t)
 	})
 
 	t.Run("test static variable and method within a class (arg is a)", func(t *testing.T) {
@@ -328,13 +327,16 @@ public class Main {
            println(a);
         }
  }
-			`, []string{"1"}, t)
+			`, []string{"phi(a)[1]"}, t)
 	})
 
 	t.Run("test static variable and  method within a class (arg is this.a)", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 public class Main {
     static int a = 1 ;
+	public static void testx(){
+		this.a = 2;
+	}
     public void main(String[] args) {
             println(this.a);
         }
@@ -388,7 +390,7 @@ public class Main {
         }
  }
 	
-			`, []string{"1"}, t)
+			`, []string{"phi(a)[1]"}, t)
 	})
 
 }
@@ -412,10 +414,10 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Function-A.getNum(Undefined-A(Undefined-A)) member[0]",
 		}, t)
 	})
-
+	//todo:xx
 	t.Run("test package with constructor", func(t *testing.T) {
 		code := `
 	package com.example.A;
@@ -482,6 +484,7 @@ public class Main{
 			"Undefined-File(Undefined-File)",
 		}, t)
 	})
+	//todo:xx
 	t.Run("test undefind function call", func(t *testing.T) {
 		code := `class tes1 {
     public void function(test t) {
@@ -489,6 +492,14 @@ public class Main{
             println(t.a());
         }
     }
+}`
+		ssatest.CheckPrintlnValue(code, []string{"ParameterMember-parameter[1].a(Parameter-t)"}, t)
+	})
+	t.Run("test oop call", func(t *testing.T) {
+		code := `class test{
+public void function(test t){
+	println(t.a());
+}
 }`
 		ssatest.CheckPrintlnValue(code, []string{"ParameterMember-parameter[1].a(Parameter-t)"}, t)
 	})

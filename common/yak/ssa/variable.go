@@ -60,7 +60,7 @@ func (variable *Variable) Assign(value Value) error {
 		// setMemberVerboseName(value)
 		value.SetVerboseName(getMemberVerboseName(variable.object, variable.key))
 		obj, key := variable.GetMemberCall()
-		SetMemberCall(obj, key, value)
+		setMemberCallRelationship(obj, key, value)
 		if objTyp, ok := ToObjectType(obj.GetType()); ok {
 			objTyp.AddField(key, value.GetType())
 		}

@@ -9,8 +9,8 @@ func Test_Class_Member(t *testing.T) {
 		test(t, &TestCase{
 			Code: `
 		class A {
-			int a; 
-			public static void  main() {
+			int a = 0; 
+			public void  main() {
 				println(a);
 			}
 		}
@@ -18,7 +18,7 @@ func Test_Class_Member(t *testing.T) {
 			SF:      "a --> as $target",
 			Contain: false,
 			Expect: map[string][]string{
-				"target": {"Undefined-println(Undefined-a)"},
+				"target": {"0","Parameter-this","Undefined-println(ParameterMember-parameter[0].a)"},
 			},
 		})
 	})
@@ -28,7 +28,7 @@ func Test_Class_Member(t *testing.T) {
 			Code: `
 		class A {
 			BClass B;
-			public static void main() {
+			public void main() {
 				B.b(1);
 				B.b(2);
 			}
@@ -36,7 +36,7 @@ func Test_Class_Member(t *testing.T) {
 			`,
 			SF: `B.b(* as $target)`,
 			Expect: map[string][]string{
-				"target": {"1", "2", "Undefined-B"},
+				"target": {"1", "2", "ParameterMember-parameter[0].B"},
 			},
 		})
 	})

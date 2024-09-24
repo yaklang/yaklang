@@ -204,7 +204,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 		if ret := exp.Index(); ret != nil {
 			index := b.buildIndexExpression(ret.(*gol.IndexContext))
-			rightv = b.ReadMemberCallVariable(rv, index)
+			rightv = b.ReadMemberCallValue(rv, index)
 		}
 
 		if ret := exp.Slice_(); ret != nil {
@@ -223,9 +223,9 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			if exData := b.GetImportPackage(rv.GetName()); exData != nil {
 				if value := exData.GetExprotValue(test); value != nil {
 					if fun, ok := value.(*ssa.Function); ok {
-						return b.ReadMemberCallVariable(b.ReadValue(rv.GetName()), fun), nil
+						return b.ReadOrCreateMemberCallVariable(b.ReadValue(rv.GetName()), fun), nil
 					} else {
-						return b.ReadMemberCallVariable(rv, value), nil
+						return b.ReadOrCreateMemberCallVariable(rv, value), nil
 					}
 				}
 
@@ -233,7 +233,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				b.NewError(ssa.Warn, TAG, "function not found, but create")
 				rightv = b.ReadOrCreateMemberCallVariable(b.ReadValue(rv.GetName()), b.EmitConstInst(test))
 			} else {
-				rightv = b.ReadMemberCallVariable(rv, b.EmitConstInst(test))
+				rightv = b.ReadMemberCallValue(rv, b.EmitConstInst(test))
 			}
 		}
 
@@ -286,7 +286,7 @@ func (b *astbuilder) buildConversion(exp *gol.ConversionContext, IslValue bool) 
 	values := []ssa.Value{rightv}
 	switch typ.GetTypeKind() {
 	case ssa.SliceTypeKind, ssa.BytesTypeKind:
-		obj := b.InterfaceAddFieldBuild(len(values),
+		obj := b.BuildObjectAddFieldBuild(len(values),
 			func(i int) ssa.Value {
 				return b.EmitConstInst(i)
 			},

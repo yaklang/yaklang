@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -10,36 +11,20 @@ import (
 )
 
 func TestOOP_static_member(t *testing.T) {
+	t.Run("normal member", func(t *testing.T) {
+		code := `<?php
 
-	t.Run("normal static member", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-	<?php
-class Foo {
-	public static $my_static = 'foo';
+class a
+{
+    public $a = 1;
 }
-
-println(Foo::$my_static . PHP_EOL); // normal
-
-println("Foo"::$my_static . PHP_EOL); // string
-
-$a = "Foo";
-println($a::$my_static . PHP_EOL); // variable
-
-$b = "a";
-println($$b::$my_static . PHP_EOL); // dynamic variable
-
-?>    
-	`, []string{
-			"add(\"foo\", Undefined-PHP_EOL)",
-			"add(\"foo\", Undefined-PHP_EOL)",
-			"add(\"foo\", Undefined-PHP_EOL)",
-			"add(\"foo\", Undefined-PHP_EOL)",
-		}, t)
-
+$c = new a();
+println($c->a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
-
 	t.Run("normal static member, use any", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
+		ssatest.CheckSyntaxFlowContain(t, `
 	<?php
 class Foo {
 	public static $my_static;
@@ -48,9 +33,10 @@ class Foo {
 println(Foo::$my_static . PHP_EOL);
 
 ?>    
-	`, []string{
-			"add(Undefined-Foo.my_static(valid), Undefined-PHP_EOL)",
-		}, t)
+`, `println(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"Undefined-my_static"},
+			}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
 	t.Run("normal static member,  assign again ", func(t *testing.T) {
@@ -64,10 +50,10 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`
-		ssatest.CheckPrintlnValue(
+		CheckPrintTopDef(t,
 			code, []string{
-				"add(\"foo\", Undefined-PHP_EOL)",
-			}, t)
+				`"foo"`,
+			})
 	})
 
 	t.Run("test phi static member", func(t *testing.T) {
@@ -83,11 +69,48 @@ if ($a) {
 }
 println(Foo::$my_static);
 `
-		ssatest.CheckPrintlnValue(code, []string{
-			"phi(Foo_my_static)[\"foo\",\"bar\"]",
-		}, t)
+		CheckPrintTopDef(t, code, []string{"foo", "bar", "start"})
 	})
+	t.Run("string to call member", func(t *testing.T) {
+		code := `<?php
 
+class Foo
+{
+    public static $my_static = 'foo';
+}
+
+println("Foo"::$my_static);
+?>
+`
+		ssatest.CheckPrintlnValue(code, []string{`phi(my_static)["foo"]`}, t)
+	})
+	t.Run("variable to call static member", func(t *testing.T) {
+		code := `<?php
+
+class Foo
+{
+    public static $my_static = 'foo';
+}
+
+$a = 'Foo';
+println($a::$my_static);
+?>`
+		ssatest.CheckPrintlnValue(code, []string{`phi(my_static)["foo"]`}, t)
+	})
+	t.Run("more dollar test", func(t *testing.T) {
+		code := `<?php
+
+class Foo
+{
+    public static $my_static = 'foo';
+}
+
+$a = 'b';
+$b = "Foo";
+println($$a::$my_static);
+?>`
+		ssatest.CheckPrintlnValue(code, []string{`phi(my_static)["foo"]`}, t)
+	})
 	t.Run("Call static members across classes", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 	<?php
@@ -112,10 +135,10 @@ class Foo {
 	}
 ?>    
 	`, []string{
-			"add(\"foo\", Undefined-PHP_EOL)",
-			"add(\"foo\", Undefined-PHP_EOL)",
-			"add(\"foo\", Undefined-PHP_EOL)",
-			"add(\"foo\", Undefined-PHP_EOL)",
+			`add(phi(my_static)["foo"], Undefined-PHP_EOL)`,
+			`add(phi(my_static)["foo"], Undefined-PHP_EOL)`,
+			`add(phi(my_static)["foo"], Undefined-PHP_EOL)`,
+			`add(phi(my_static)["foo"], Undefined-PHP_EOL)`,
 		}, t)
 
 	})
@@ -141,11 +164,11 @@ func TestOOP_static_method(t *testing.T) {
 		println($instance::aStaticMethod())
 		?>
 		`, []string{
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
-			"Function-Foo_aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
 		}, t)
 	})
 
@@ -164,6 +187,7 @@ func TestOOP_static_method(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	//todo： 类型检查参数有问题
 	t.Run("Call static method across classes", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		<?php
@@ -188,11 +212,11 @@ class B {
 }
 ?>
 		`, []string{
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
-			"Function-A_aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
+			"Function-aStaticMethod()",
 		}, t)
 
 	})
@@ -251,8 +275,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
+			"Function-A.getA(Undefined-$a) member[0]",
+			"Function-A.getA(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -341,8 +365,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[1]",
+			"Function-A.getA(Undefined-$a) member[0]",
+			"Function-A.getA(Undefined-$a) member[1]",
 		}, t)
 	})
 
@@ -364,8 +388,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Undefined-$a.getA(valid)(Undefined-$a) member[0]",
-			"Undefined-$a.getA(valid)(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
+			"Function-A.getA(Undefined-$a) member[0]",
+			"Function-A.getA(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -383,8 +407,26 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
+			"Function-A.getNum(Undefined-$a) member[0]",
 		}, t)
+	})
+	t.Run("new construct", func(t *testing.T) {
+		code := `<?php
+
+class test
+{
+    public $a;
+
+    public function __construct($a)
+    {
+        $this->a = $a;
+    }
+}
+
+$a = new test();
+println($a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-$a"}, t)
 	})
 
 	t.Run("normal construct", func(t *testing.T) {
@@ -401,7 +443,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
+			"Function-A.getNum(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }
@@ -442,9 +484,9 @@ println($c->a);`
 
 //func TestOOP_custom_member(t *testing.T) {
 //	code := `<?php
-//    class test{
-//        public $a = 1;
-//    }
+//   class test{
+//       public $a = 1;
+//   }
 //	$c = new test();
 //	println($c->$a);
 //`
@@ -475,7 +517,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Undefined-$a) member[0]",
+			"Function-A.getNum(Undefined-$a) member[0]",
 		}, t)
 	})
 }
@@ -496,7 +538,7 @@ class t
 
 $c = new t();
 println($c->a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"2"})
+		CheckPrintTopDef(t, code, []string{"2"})
 	})
 	t.Run("__destruct", func(t *testing.T) {
 		code := `<?php
@@ -683,7 +725,7 @@ class b
         return "1";
     }
 }`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{`"1"`})
+		CheckPrintTopDef(t, code, []string{`"1"`})
 	})
 
 	t.Run("cls use other cls static function", func(t *testing.T) {
@@ -704,7 +746,7 @@ class b
 	       return "1";
 	   }
 	}`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{`"1"`})
+		CheckPrintTopDef(t, code, []string{`"1"`})
 	})
 
 	t.Run("anymous-class with parent", func(t *testing.T) {
@@ -734,7 +776,7 @@ class b
 }
 
 println(b::c);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"12"})
+		CheckPrintTopDef(t, code, []string{"12"})
 	})
 	t.Run("class use parent static", func(t *testing.T) {
 		code := `<?php
@@ -751,21 +793,38 @@ class test extends testxx
 
 
 println(test::$a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
+		CheckPrintTopDef(t, code, []string{"1"})
 	})
 
-	t.Run("add nomarvariable member", func(t *testing.T) {
+	//todo: 这个有问题
+	t.Run("class use parent static and modify static member", func(t *testing.T) {
 		code := `<?php
 
-class test
+
+class testxx
 {
     public static $a = 1;
 }
 
-$a = "test";
-$b = "$a";
-println($a::$b);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{})
+class test extends testxx
+{
+}
+testxx::$a=2;
+
+println(test::$a);`
+		CheckPrintTopDef(t, code, []string{"2"})
+	})
+	t.Run("test static member", func(t *testing.T) {
+		code := `<?php
+
+class a
+{
+    public static $a = 1;
+}
+
+println(a::$a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"phi(a)[1]"}, t)
 	})
 	t.Run("oop custom member", func(t *testing.T) {
 		code := `<?php
@@ -777,7 +836,8 @@ class a
 
 $c = new a();
 println($c->a);`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		//CheckPrintTopDef(t, code, []string{"1"})
 	})
 	t.Run("oop test", func(t *testing.T) {
 		code := `<?php

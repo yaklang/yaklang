@@ -1,10 +1,11 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestNamespace(t *testing.T) {
@@ -223,7 +224,7 @@ namespace {
     $a = a\b(1);
     println($a);
 }`
-		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
+		CheckPrintTopDef(t, code, []string{"1"})
 	})
 	t.Run("all namespace use static member", func(t *testing.T) {
 		code := `<?php

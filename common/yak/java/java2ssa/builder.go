@@ -1,7 +1,6 @@
 package java2ssa
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -119,11 +118,11 @@ func (b *builder) ReadConst(name string) (ssa.Value, bool) {
 	return v, ok
 }
 
-func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
-	name := fmt.Sprintf("%s_%s", className, key)
-	b.AssignConst(name, value)
-}
-func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
-	name := fmt.Sprintf("%s_%s", className, key)
-	return b.ReadConst(name)
-}
+//func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
+//	name := fmt.Sprintf("%s_%s", className, key)
+//	b.AssignConst(name, value)
+//}
+//func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
+//	name := fmt.Sprintf("%s_%s", className, key)
+//	return b.ReadConst(name)
+//}

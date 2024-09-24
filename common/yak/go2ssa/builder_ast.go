@@ -47,7 +47,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			lib = prog.NewLibrary(pkgPath[0], pkgPath)
 		}
 		lib.PushEditor(prog.GetCurrentEditor())
-		lib.GlobalScope = b.ReadMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))
+		lib.GlobalScope = b.ReadOrCreateMemberCallVariable(global, b.EmitConstInst(pkgNameCurrent))
 
 		init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
 		init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
@@ -122,6 +122,17 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	}
 
 	bpHandler()
+
+	//for _, cbp := range b.GetProgram().ClassBluePrint { // only once
+	//	if cbp.Name == pkgNameCurrent {
+	//		cbpHander(cbp)
+	//		return
+	//	}
+	//}
+	//
+	//cbp := ssa.NewClassBluePrint(pkgNameCurrent)
+	//cbpHander(cbp)
+	//b.SetClassBluePrint(cbp.Name, cbp)
 }
 
 func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
@@ -362,7 +373,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			length = it.Len
 			if len(leftVariables) == length {
 				for i := range leftVariables {
-					value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+					value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
 					b.AssignVariable(leftVariables[i], value)
 				}
 				return
@@ -372,7 +383,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			for i := range leftVariables {
 				b.AssignVariable(
 					leftVariables[i],
-					b.ReadMemberCallVariable(c, b.EmitConstInst(i)),
+					b.ReadMemberCallValue(c, b.EmitConstInst(i)),
 				)
 			}
 			return
@@ -399,7 +410,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 				b.AssignVariable(leftVariables[i], c)
 				continue
 			}
-			value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+			value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
 			b.AssignVariable(leftVariables[i], value)
 		}
 	}
@@ -1114,7 +1125,7 @@ func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {
 		// target label not exist, create it
 		LabelBuilder := b.BuildLabel(labelName)
 		// use handler function
-		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock) {
+		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock)  {
 			gotoBuilder.SetLabel(_goto)
 			f := gotoBuilder.Finish()
 			LabelBuilder.SetGotoFinish(f)

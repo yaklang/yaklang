@@ -17,11 +17,16 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 	}
 
 	if para, ok := ToParameter(v.object); ok {
-		name, typ := checkCanMemberCall(para, v.key)
-		newParamterMember := b.NewParameterMember(name, para, v.key)
-		newParamterMember.SetType(typ)
-		SetMemberCall(para, v.key, newParamterMember)
+		res := checkCanMemberCallExist(para, v.key)
+		newParamterMember := b.NewParameterMember(res.name, para, v.key)
+		newParamterMember.SetType(res.typ)
+		setMemberCallRelationship(para, v.key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
+	}
+	if !utils.IsNil(v.object) {
+		if val := b.getDefaultMemberOrMethodByClass(v.object, v.key, false); !utils.IsNil(val) {
+			return val
+		}
 	}
 
 	return b.ReadValue(v.GetName())
@@ -37,7 +42,7 @@ func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
 }
 
 func (b *FunctionBuilder) ReadOrCreateMemberCallVariable(caller, callee Value) Value {
-	return b.ReadMemberCallVariable(caller, callee)
+	return b.ReadMemberCallValue(caller, callee)
 }
 
 func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
@@ -110,7 +115,7 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if enableClosureFreeValue  && create {
+	if enableClosureFreeValue && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
@@ -151,7 +156,12 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 
+	// check if assign extern value
 	if b.TryBuildExternValue(variable.GetName()) != nil {
+		b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
+	}
+	// check if assign extern lib value
+	if obj := variable.object; obj != nil && obj.GetOpcode() == SSAOpcodeExternLib {
 		b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
 	}
 

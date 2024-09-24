@@ -363,9 +363,9 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			println(b.get())
 			`,
 			Want: []string{
-				"Undefined-a.get(valid)(Function-f()) member[side-effect(Parameter-i, a.key)]",
-				"Undefined-b.get(valid)(Function-f()) member[side-effect(Parameter-i, b.key)]",
-				"Undefined-a.get(valid)(Function-f()) member[side-effect(Parameter-i, a.key)]",
+				"Undefined-a.get(valid)(Function-f()) member[side-effect(Parameter-i, this.key)]",
+				"Undefined-b.get(valid)(Function-f()) member[side-effect(Parameter-i, this.key)]",
+				"Undefined-a.get(valid)(Function-f()) member[side-effect(Parameter-i, this.key)]",
 				"Undefined-b.get(valid)(Function-f()) member[side-effect(Parameter-i, this.key)]",
 			},
 		})
