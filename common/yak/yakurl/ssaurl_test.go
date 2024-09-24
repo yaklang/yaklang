@@ -118,13 +118,13 @@ func TestSFURl(t *testing.T) {
 		res, err := SendURL(local, progID, "/", `
 		target2(* #-> as $a) 
 		target1() as $target1
-		alert $target1 for {msg: 'alert information'}
+		alert $target1 for "alert information"
 		`)
 		assert.NoError(t, err)
 		spew.Dump(res)
 		checkVariable(t, res, []string{"target1", "a", "_"})
 		target1 := res[0]
-		assert.Equal(t, target1.VerboseName, `{"Level":"info","Purpose":"","Msg":"","ExtraInfo":{"msg":"alert information"}}`)
+		assert.Equal(t, target1.VerboseName, `alert information`)
 		assert.Equal(t, target1.ResourceType, "variable")
 		assert.Equal(t, target1.VerboseType, "alert")
 	})

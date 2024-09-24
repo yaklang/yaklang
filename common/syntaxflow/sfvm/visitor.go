@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"strconv"
@@ -14,27 +15,21 @@ import (
 )
 
 type SyntaxFlowVisitor struct {
-	text               string
-	title              string
-	title_zh           string
-	allowIncluded      string
+	rule               *schema.SyntaxFlowRule
 	rawDesc            map[string]string
-	description        string
-	purpose            string
-	severity           string
-	language           string
 	verifyFilesystem   map[string]string
 	negativeFilesystem map[string]string
-	alertMsg           map[string]*ExtraDescInfo
 	codes              []*SFI
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
 	sfv := &SyntaxFlowVisitor{
+		rule: &schema.SyntaxFlowRule{
+			AlertDesc: make(schema.MapEx[string, *schema.ExtraDescInfo]),
+		},
 		verifyFilesystem:   make(map[string]string),
 		negativeFilesystem: make(map[string]string),
 		rawDesc:            make(map[string]string),
-		alertMsg:           make(map[string]*ExtraDescInfo),
 	}
 	return sfv
 }

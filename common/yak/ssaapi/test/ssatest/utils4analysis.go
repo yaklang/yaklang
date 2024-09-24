@@ -532,7 +532,7 @@ func EvaluateVerifyFilesystem(i string, t assert.TestingT) error {
 
 		for _, name := range result.GetAlertVariables() {
 			alertCount += len(result.GetValues(name))
-			if info, b := result.GetAlertInfo(name); b {
+			if info, b := result.GetAlertEx(name); b {
 				switch info.Level {
 				case "mid", "m":
 					alert_mid += len(result.GetValues(name))
