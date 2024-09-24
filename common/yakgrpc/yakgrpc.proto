@@ -3569,7 +3569,6 @@ message RecordPortScanRequest {
   StartBruteParams StartBruteParams = 3;
   PortScanRequest PortScanRequest = 2;
   string RuntimeId = 4;
-  bool SkipCveBaseLine = 5;
 }
 
 message CreatReportRequest {
@@ -3643,6 +3642,7 @@ message PortScanRequest {
   // 爬虫是否启用 JS 解析
   bool BasicCrawlerEnableJSParser = 29;
   repeated string UserFingerprintFiles = 30;
+  bool SkipCveBaseLine = 31;
 }
 
 message DeletePortsRequest {
