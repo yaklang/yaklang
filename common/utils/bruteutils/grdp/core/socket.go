@@ -6,15 +6,14 @@ import (
 
 	"github.com/huin/asn1ber"
 
-	"crypto/tls"
 	"errors"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"net"
-	//"github.com/icodeface/tls"
 )
 
 type SocketLayer struct {
 	conn    net.Conn
-	tlsConn *tls.Conn
+	tlsConn *gmtls.Conn
 }
 
 func NewSocketLayer(conn net.Conn) *SocketLayer {
@@ -50,13 +49,13 @@ func (s *SocketLayer) Close() error {
 }
 
 func (s *SocketLayer) StartTLS() error {
-	config := &tls.Config{
+	config := &gmtls.Config{
 		InsecureSkipVerify:       true,
-		MinVersion:               tls.VersionTLS10,
-		MaxVersion:               tls.VersionTLS13,
+		MinVersion:               gmtls.VersionTLS10,
+		MaxVersion:               gmtls.VersionTLS13,
 		PreferServerCipherSuites: true,
 	}
-	s.tlsConn = tls.Client(s.conn, config)
+	s.tlsConn = gmtls.Client(s.conn, config)
 	return s.tlsConn.Handshake()
 }
 
