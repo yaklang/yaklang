@@ -76,8 +76,7 @@ func NewDBCache(programName string, databaseEnable bool, ConfigTTL ...time.Durat
 	} else {
 		id := atomic.NewInt64(0)
 		cache.fetchId = func() int64 {
-			inc := id.Inc()
-			return inc
+			return id.Inc()
 		}
 	}
 
