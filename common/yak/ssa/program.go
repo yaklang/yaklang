@@ -215,19 +215,10 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 }
 
 func (prog *Program) Finish() {
-	finishOnce := func() {
-		for _, program := range prog.ChildApplication {
-			program.Finish()
-		}
-		for _, up := range prog.UpStream {
-			up.Finish()
-		}
+	if prog.ProgramKind == Application && prog.EnableDatabase {
 		prog.Cache.SaveToDatabase()
-		if prog.EnableDatabase {
-			updateToDatabase(prog)
-		}
+		updateToDatabase(prog)
 	}
-	prog.finishOnce.Do(finishOnce)
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
