@@ -831,8 +831,8 @@ func _marshallerTestWithCtx(i string, ctx context.Context, debug bool) {
 				panic(fmt.Sprintf("no.%d opcode %s type not equal: %s[%s] != %s[%s]", index, name, c1, v1.TypeVerbose, c2, v2.TypeVerbose))
 			}
 
-			if v1.Literal != v2.Literal {
-				panic(fmt.Sprintf("no.%d opcode %s literal not equal: %s[%s] != %s[%s]", index, name, c1, v1.Literal, c2, v2.Literal))
+			if v1.GetLiteral() != v2.GetLiteral() {
+				panic(fmt.Sprintf("no.%d opcode %s literal not equal: %s[%s] != %s[%s]", index, name, c1, v1.GetLiteral(), c2, v2.GetLiteral()))
 			}
 
 			typ1, typ2 := reflect.TypeOf(v1.Value), reflect.TypeOf(v2.Value)

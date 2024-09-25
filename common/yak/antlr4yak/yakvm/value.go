@@ -3,6 +3,7 @@ package yakvm
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"strconv"
 	"sync"
 
@@ -29,6 +30,55 @@ type Value struct {
 	CallerRef *Value
 	CalleeRef *Value
 	ExtraInfo map[string]interface{}
+}
+
+func (v *Value) GetLiteral() string {
+	if v.Literal == "" {
+		switch ret := v.Value.(type) {
+		case bool:
+			v.Literal = strconv.FormatBool(ret)
+		case int:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case int8:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case int16:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case int32:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case int64:
+			v.Literal = strconv.FormatInt(ret, 10)
+		case uint8: // byte
+			v.Literal = string([]byte{ret})
+		case uint:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case uint16:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case uint32:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case uint64:
+			v.Literal = strconv.FormatInt(int64(ret), 10)
+		case float64:
+			v.Literal = strconv.FormatFloat(ret, 'f', 4, 64)
+		case float32:
+			v.Literal = strconv.FormatFloat(float64(ret), 'f', 4, 32)
+		case []byte:
+			v.Literal = strconv.Quote(string(ret))
+		case string:
+			v.Literal = strconv.Quote(ret)
+		default:
+			if v.Value != nil && v.NativeCallable() {
+				funcIns := runtime.FuncForPC(reflect.ValueOf(v.Value).Pointer())
+				funcName := funcIns.Name()
+				if funcName != "" {
+					v.Literal = funcName
+				}
+			}
+			if v.Literal == "" {
+				v.Literal = fmt.Sprint(ret)
+			}
+		}
+	}
+	return v.Literal
 }
 
 func (v *Value) AddExtraInfo(key string, info interface{}) {
@@ -173,7 +223,6 @@ func NewIntValue(i int) *Value {
 	return &Value{
 		TypeVerbose: "int",
 		Value:       i,
-		Literal:     fmt.Sprint(i),
 	}
 }
 
@@ -181,7 +230,6 @@ func NewInt64Value(i int64) *Value {
 	return &Value{
 		TypeVerbose: "int64",
 		Value:       int(i),
-		Literal:     fmt.Sprint(i),
 	}
 }
 
@@ -189,7 +237,6 @@ func NewBoolValue(b bool) *Value {
 	return &Value{
 		TypeVerbose: "bool",
 		Value:       b,
-		Literal:     fmt.Sprint(b),
 	}
 }
 
@@ -202,91 +249,76 @@ func NewAutoValue(b interface{}) *Value {
 		return &Value{
 			TypeVerbose: "bool",
 			Value:       ret,
-			Literal:     fmt.Sprint(b),
 		}
 	case int:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       ret,
-			Literal:     fmt.Sprint(b),
 		}
 	case int8:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       int(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case int16:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       int(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case int32:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       int(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case int64:
 		return &Value{
 			TypeVerbose: "int64",
-			Value:       int64(ret),
-			Literal:     fmt.Sprint(b),
+			Value:       ret,
 		}
 	case uint8: // byte
 		return &Value{
 			TypeVerbose: "byte",
 			Value:       byte(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case uint:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       int(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case uint16:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       int(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case uint32:
 		return &Value{
 			TypeVerbose: "int",
 			Value:       int(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case uint64:
 		return &Value{
 			TypeVerbose: "int64",
 			Value:       int64(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case float64:
 		return &Value{
 			TypeVerbose: "float64",
 			Value:       ret,
-			Literal:     fmt.Sprint(b),
 		}
 	case float32:
 		return &Value{
 			TypeVerbose: "float64",
 			Value:       float64(ret),
-			Literal:     fmt.Sprint(b),
 		}
 	case []byte:
 		return &Value{
 			TypeVerbose: "[]byte",
 			Value:       ret,
-			Literal:     fmt.Sprint(b),
 		}
 	default:
 		return &Value{
 			TypeVerbose: reflect.TypeOf(b).String(),
 			Value:       b,
-			Literal:     fmt.Sprint(b),
 		}
 	}
 }
@@ -295,7 +327,6 @@ func NewStringValue(i string) *Value {
 	return &Value{
 		TypeVerbose: "string",
 		Value:       i,
-		Literal:     strconv.Quote(i),
 	}
 }
 
@@ -303,7 +334,6 @@ func NewEmptyMap(lit string) *Value {
 	return &Value{
 		TypeVerbose: "map[string]interface{}",
 		Value:       make(map[string]interface{}),
-		Literal:     lit,
 	}
 }
 
@@ -311,7 +341,6 @@ func NewEmptyOMap(lit string) *Value {
 	return &Value{
 		TypeVerbose: "OrderedMap",
 		Value:       orderedmap.New(),
-		Literal:     lit,
 	}
 }
 
@@ -319,7 +348,6 @@ func NewGenericMap(lit string) *Value {
 	return &Value{
 		TypeVerbose: "map[interface{}]interface{}",
 		Value:       make(map[interface{}]interface{}),
-		Literal:     lit,
 	}
 }
 
@@ -335,7 +363,7 @@ func NewType(typeStr string, value reflect.Type) *Value {
 	return &Value{
 		TypeVerbose: typeStr,
 		Value:       value,
-		Literal:     "",
+		Literal:     typeStr,
 	}
 }
 
@@ -351,7 +379,6 @@ func NewStringSliceValue(i []string) *Value {
 	return &Value{
 		TypeVerbose: "[]string",
 		Value:       i,
-		Literal:     fmt.Sprintf("%v", i),
 	}
 }
 
@@ -586,7 +613,7 @@ func (v *Value) IsUndefined() bool {
 		return true
 	}
 
-	if v.TypeVerbose == "undefined" && v.Literal == "undefined" {
+	if v.TypeVerbose == "undefined" && v.GetLiteral() == "undefined" {
 		return true
 	}
 

@@ -3,12 +3,12 @@ package antlr4yak
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"math"
 	"reflect"
-	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
@@ -45,19 +45,18 @@ func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 	// return yakvm.NewBoolValue(funk.Equal(value.Value, value2.Value))
 	return yakvm.NewBoolValue(value.Equal(value2))
 }
+
 func _neq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
 	return yakvm.NewBoolValue(_eq(value, value2).False())
 }
 
 func init() {
-
 	// unary
 	yakvm.ImportYakUnaryOperator(yakvm.OpNot, func(op *yakvm.Value) *yakvm.Value {
 		b := op.True()
 		return &yakvm.Value{
 			TypeVerbose: "bool",
 			Value:       !b,
-			Literal:     fmt.Sprint(!b),
 		}
 	})
 
@@ -68,13 +67,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -87,14 +84,12 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "int64",
 				Value:       -v,
-				Literal:     fmt.Sprint(-v),
 			}
 		} else if op.IsFloat() {
 			v := op.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "float64",
 				Value:       -v,
-				Literal:     fmt.Sprint(-v),
 			}
 		}
 		panic(fmt.Sprintf("cannot support - op1[%v]", op.TypeVerbose))
@@ -106,14 +101,12 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "int64",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op.IsFloat() {
 			v := op.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "float64",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		}
 		panic(fmt.Sprintf("cannot support + op1[%v]", op.TypeVerbose))
@@ -128,28 +121,24 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
 			v := op1.Float64() > op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() > op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsString() && op1.IsString() {
 			v := op1.String() > op2.String()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		}
 
@@ -162,28 +151,24 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
 			ret := op1.Float64() >= op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       ret,
-				Literal:     fmt.Sprint(ret),
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() >= op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsString() && op1.IsString() {
 			v := op1.String() >= op2.String()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		}
 
@@ -196,28 +181,24 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
 			v := op1.Float64() < op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() < op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsString() && op1.IsString() {
 			v := strings.Compare(op1.String(), op2.String()) < 0
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		}
 		panic(fmt.Sprintf("cannot support op1[%v] < op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
@@ -229,28 +210,24 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
 			v := op1.Float64() <= op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() <= op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsString() && op1.IsString() {
 			v := strings.Compare(op1.String(), op2.String()) <= 0
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		}
 
@@ -265,13 +242,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -286,13 +261,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -307,13 +280,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -328,13 +299,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -349,13 +318,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -370,13 +337,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       resultInt64,
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(resultInt64),
-					Literal:     fmt.Sprint(resultInt64),
 				}
 			}
 		}
@@ -392,13 +357,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "int64",
 						Value:       v,
-						Literal:     fmt.Sprint(v),
 					}
 				} else {
 					return &yakvm.Value{
 						TypeVerbose: "int",
 						Value:       int(v),
-						Literal:     fmt.Sprint(v),
 					}
 				}
 			} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
@@ -406,14 +369,12 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "float64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 				v := op1.Float64() + op2.Float64()
 				return &yakvm.Value{
 					TypeVerbose: "float64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			} else if op1.IsStringOrBytes() && op2.IsStringOrBytes() {
 				v := op1.AsString() + op2.AsString()
@@ -421,13 +382,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "bytes",
 						Value:       []byte(v),
-						Literal:     fmt.Sprint(v),
 					}
 				} else if op1.IsString() && op2.IsString() {
 					return &yakvm.Value{
 						TypeVerbose: "string",
 						Value:       v,
-						Literal:     fmt.Sprint(v),
 					}
 				}
 				panic(fmt.Sprintf("cannot support op1[%v] + op2[%v]", op1.TypeVerbose, op2.TypeVerbose))
@@ -441,7 +400,6 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       ret,
-					Literal:     fmt.Sprint(ret),
 				}
 			} else if op1.IsInt64() && op2.IsString() {
 				str := op2.Value.(string)
@@ -453,7 +411,6 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       ret,
-					Literal:     fmt.Sprint(ret),
 				}
 			} else if op1.IsBytes() && op2.IsInt64() {
 				b := op1.Value.([]byte)
@@ -465,7 +422,6 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "bytes",
 					Value:       ret,
-					Literal:     fmt.Sprint(ret),
 				}
 			} else if op1.IsInt64() && op2.IsBytes() {
 				b := op2.Value.([]byte)
@@ -477,7 +433,6 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "bytes",
 					Value:       ret,
-					Literal:     fmt.Sprint(ret),
 				}
 			}
 
@@ -552,13 +507,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "int64",
 						Value:       v,
-						Literal:     fmt.Sprint(v),
 					}
 				} else {
 					return &yakvm.Value{
 						TypeVerbose: "int",
 						Value:       int(v),
-						Literal:     fmt.Sprint(v),
 					}
 				}
 			} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
@@ -566,14 +519,12 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "float64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 				v := op1.Float64() - op2.Float64()
 				return &yakvm.Value{
 					TypeVerbose: "float64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			}
 
@@ -591,13 +542,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "int64",
 						Value:       v,
-						Literal:     fmt.Sprint(v),
 					}
 				} else {
 					return &yakvm.Value{
 						TypeVerbose: "int",
 						Value:       int(v),
-						Literal:     fmt.Sprint(v),
 					}
 				}
 			case op2.IsFloat():
@@ -605,7 +554,6 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "float64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			case op2.IsStringOrBytes():
 				v := strings.Repeat(op2.AsString(), int(op1.Int64()))
@@ -613,13 +561,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "bytes",
 						Value:       []byte(v),
-						Literal:     v,
 					}
 				}
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       v,
-					Literal:     strconv.Quote(v),
 				}
 			}
 
@@ -630,7 +576,6 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "float64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			}
 		case op1.IsStringOrBytes():
@@ -641,13 +586,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "bytes",
 						Value:       []byte(v),
-						Literal:     v,
 					}
 				}
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       v,
-					Literal:     strconv.Quote(v),
 				}
 			}
 		}
@@ -662,13 +605,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(v),
-					Literal:     fmt.Sprint(v),
 				}
 			}
 		} else if op1.IsFloat() && (op2.IsInt64() || op2.IsFloat()) {
@@ -676,14 +617,12 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "float64",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		} else if op2.IsFloat() && (op1.IsInt64() || op1.IsFloat()) {
 			v := op1.Float64() / op2.Float64()
 			return &yakvm.Value{
 				TypeVerbose: "float64",
 				Value:       v,
-				Literal:     fmt.Sprint(v),
 			}
 		}
 
@@ -697,13 +636,11 @@ func init() {
 				return &yakvm.Value{
 					TypeVerbose: "int64",
 					Value:       v,
-					Literal:     fmt.Sprint(v),
 				}
 			} else {
 				return &yakvm.Value{
 					TypeVerbose: "int",
 					Value:       int(v),
-					Literal:     fmt.Sprint(v),
 				}
 			}
 		} else if op1.IsStringOrBytes() {
@@ -724,13 +661,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "bytes",
 						Value:       []byte(formatted),
-						Literal:     formatted,
 					}
 				}
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       formatted,
-					Literal:     strconv.Quote(formatted),
 				}
 			default:
 				formatted := fmt.Sprintf(op1.AsString(), op2.Value)
@@ -738,13 +673,11 @@ func init() {
 					return &yakvm.Value{
 						TypeVerbose: "bytes",
 						Value:       formatted,
-						Literal:     formatted,
 					}
 				}
 				return &yakvm.Value{
 					TypeVerbose: "string",
 					Value:       formatted,
-					Literal:     strconv.Quote(formatted),
 				}
 			}
 		}
@@ -879,7 +812,6 @@ func init() {
 			return &yakvm.Value{
 				TypeVerbose: "bool",
 				Value:       result,
-				Literal:     fmt.Sprint(result),
 			}
 		} else {
 			panic(fmt.Sprintf("cannot support op1[%v] in op2[%v]", op1.TypeVerbose, op2.TypeVerbose))

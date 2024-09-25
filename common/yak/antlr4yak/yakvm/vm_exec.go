@@ -3,6 +3,11 @@ package yakvm
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+	"sync/atomic"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -11,10 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"github.com/yaklang/yaklang/common/yakdocument"
-	"reflect"
-	"strconv"
-	"strings"
-	"sync/atomic"
 )
 
 type ExitCodeType int
@@ -397,7 +398,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 								return
 							}
 							table[v1[0].SymbolId] = array
-							//v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
+							// v.CurrentScope().NewValueByID(v1[0].SymbolId, array)
 							val = array
 						}
 						if v2, ok := val.Value.(*nasl_type.NaslArray); ok {
@@ -1214,7 +1215,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				idValue = Val
 			}
 			// 内置函数直接调用
-			if idValue.Literal == "__method_proxy__" {
+			if idValue.GetLiteral() == "__method_proxy__" {
 				params := [][]interface{}{}
 				params = append(params, []interface{}{args[0].Value})
 				for i := 1; i < len(args); i++ {
@@ -1380,7 +1381,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			memberName := args[0].AsString()
 			value, ok := m.Get(memberName)
 			if ok {
-				literal := fmt.Sprintf("%s.%s", iterableValue.Literal, memberName)
+				literal := fmt.Sprintf("%s.%s", iterableValue.GetLiteral(), memberName)
 				v.push(NewValue(fmt.Sprintf("%T", value), value, literal))
 				return
 			}
@@ -1877,7 +1878,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 				member := callerReflectValue.MapIndex(reflect.ValueOf(memberNameV.Value))
 				if member.IsValid() {
-					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
 					value := NewValue(member.Type().String(), member.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -1925,7 +1926,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				}
 				fun := callerReflectValue.MethodByName(newMemberName)
 				if fun.IsValid() {
-					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
 					value := NewValue(fun.Type().String(), fun.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -1941,7 +1942,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				isOrderedMap = true
 				value, ok := m.Get(memberName)
 				if ok {
-					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
 					v.push(NewValue(fmt.Sprintf("%T", value), value, literal))
 					return
 				}
@@ -1964,10 +1965,10 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				}
 				member := getMember()
 				if member.IsValid() {
-					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
 
 					calleeValue := member.Interface()
-					calleeValue = v.execHijackMapMemberCallHandler(caller.Literal, memberName, calleeValue)
+					calleeValue = v.execHijackMapMemberCallHandler(caller.GetLiteral(), memberName, calleeValue)
 					value := NewValue(member.Type().String(), calleeValue, literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
@@ -2018,7 +2019,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				}
 				// 这里可能拿到结构体指针的方法
 				if member.CanInterface() {
-					literal := fmt.Sprintf("%s.%s", caller.Literal, memberName)
+					literal := fmt.Sprintf("%s.%s", caller.GetLiteral(), memberName)
 					value := NewValue(member.Type().String(), member.Interface(), literal)
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
