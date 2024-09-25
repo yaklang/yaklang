@@ -3,12 +3,13 @@ package ssatest
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -60,9 +61,6 @@ func CheckWithFS(fs fi.FileSystem, t assert.TestingT, handler func(ssaapi.Progra
 		prog, err := ssaapi.ParseProject(fs, opt...)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
-			for _, program := range prog {
-				ssadb.DeleteProgram(ssadb.GetDB(), program.Program.Name)
-			}
 		}()
 		assert.Nil(t, err)
 
@@ -111,12 +109,7 @@ func CheckWithName(
 		opt = append(opt, ssaapi.WithProgramName(programID))
 		prog, err := ssaapi.Parse(code, opt...)
 		defer func() {
-			// if name == "" {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
-			for _, program := range prog.Program.ChildApplication {
-				ssadb.DeleteProgram(ssadb.GetDB(), program.Name)
-			}
-			// }
 		}()
 		assert.Nil(t, err)
 		// prog.Show()
@@ -223,9 +216,6 @@ func CheckProfileWithFS(fs fi.FileSystem, t assert.TestingT, handler func(p Pars
 		prog, err := ssaapi.ParseProject(fs, opt...)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
-			for _, program := range prog {
-				ssadb.DeleteProgram(ssadb.GetDB(), program.Program.Name)
-			}
 		}()
 		assert.Nil(t, err)
 
@@ -265,9 +255,6 @@ func CheckFSWithProgram(
 	}
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
-		for _, p := range program.Program.ChildApplication {
-			ssadb.DeleteProgram(ssadb.GetDB(), p.Name)
-		}
 	}()
 	filesys.Recursive(".", filesys.WithFileSystem(ruleFS), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		if !strings.HasSuffix(s, ".sf") {

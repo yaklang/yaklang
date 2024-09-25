@@ -14,7 +14,7 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 	defer ssadb.SaveIrIndex(index)
 
 	// index
-	index.ProgramName = prog.GetProgramName()
+	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
 	index.VariableName = name
 
@@ -51,7 +51,7 @@ func SaveClassIndex(inst Instruction, name string) {
 	defer ssadb.SaveIrIndex(index)
 
 	// index
-	index.ProgramName = prog.GetProgramName()
+	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
 	index.ClassName = name
 }
