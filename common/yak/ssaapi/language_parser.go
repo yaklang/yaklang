@@ -224,9 +224,6 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
-	for _, program := range prog.ChildApplication {
-		ssa4analyze.RunAnalyzer(program)
-	}
 	return prog, nil
 }
 
