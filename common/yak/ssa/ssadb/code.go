@@ -103,8 +103,8 @@ func emptyIrCode() *IrCode {
 	return &IrCode{}
 }
 
-func RequireIrCode(db *gorm.DB, program string) (uint, *IrCode) {
-	db = db.Model(&IrCode{})
+func RequireIrCode(DB *gorm.DB, program string) (uint, *IrCode) {
+	db := DB.Model(&IrCode{})
 	ircode := emptyIrCode()
 	ircode.ProgramName = program
 	db.Create(ircode)
