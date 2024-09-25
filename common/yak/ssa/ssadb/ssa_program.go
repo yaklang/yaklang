@@ -55,7 +55,7 @@ func SaveSSAProgram(name, desc, language string) error {
 
 func DeleteSSAProgram(name string) error {
 	db := consts.GetGormProfileDatabase()
-	if err := db.Model(&schema.SSAProgram{}).Where("name = ?", name).Delete(&schema.SSAProgram{}).Unscoped().Error; err != nil {
+	if err := db.Model(&schema.SSAProgram{}).Where("name = ?", name).Unscoped().Delete(&schema.SSAProgram{}).Error; err != nil {
 		log.Errorf("delete ssa program [%v] error: %s", name, err)
 		return err
 	}
@@ -66,6 +66,7 @@ func DeleteSSAProgram(name string) error {
 func AllSSAPrograms() []*schema.SSAProgram {
 	db := consts.GetGormProfileDatabase()
 	var programs []*schema.SSAProgram
+	db = db.Where("deleted_at = '' or deleted_at IS NULL ")
 	db = db.Model(&schema.SSAProgram{}).Order("created_at DESC").Find(&programs)
 	if err := db.Error; err != nil {
 		log.Errorf("get all ssa programs error: %s", err)
