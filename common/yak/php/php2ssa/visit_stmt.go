@@ -91,9 +91,11 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		}
 	}
 	//compose child app
-	if i.NamespacePath() != nil && y.PreHandler {
+	hasName := i.NamespacePath() != nil
+
+	if hasName && y.PreHandler {
+		// has name, build in pre-handler
 		beforfunc()
-		//namespace
 		pkgpath := y.VisitNamespacePath(i.NamespacePath())
 		pkgname := strings.Join(pkgpath, ".")
 		y.callback(pkgname, y.FunctionBuilder.GetEditor().GetFilename())
@@ -115,13 +117,12 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			}()
 			afterFunc()
 		}
-	} else {
-		if y.PreHandler {
-			return nil
-		}
+	} else if !hasName && !y.PreHandler {
+		// no name, build in normal
 		beforfunc()
 		afterFunc()
 	}
+
 	return nil
 }
 
