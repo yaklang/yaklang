@@ -52,11 +52,17 @@ var ethIPv4, ethIPv6, ethIPv4ToServer, ethIPv6ToServer *layers.Ethernet
 
 func GetPublicToServerLinkLayerIPv4() (*layers.Ethernet, error) {
 	if ethIPv4ToServer != nil {
-		return ethIPv4ToServer, nil
+		ethernet := *ethIPv4ToServer
+		return &ethernet, nil
 	}
 	var err error
 	ethIPv4ToServer, err = GetPublicLinkLayer(layers.EthernetTypeIPv4, true)
-	return ethIPv4ToServer, err
+	if err != nil {
+		return nil, err
+	}
+
+	ethernet := *ethIPv4ToServer
+	return &ethernet, nil
 }
 
 func GetPublicToServerLinkLayerIPv6() (*layers.Ethernet, error) {

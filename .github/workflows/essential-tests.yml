@@ -180,9 +180,7 @@ jobs:
               go test -timeout 20s -run TestMUSTPASS* ./common/suricata/...
               go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker
               # pcapx
-              go test -timeout 20s -run TestSmoking_ICMP ./common/pcapx
-              go test -timeout 20s -run TestSmoking_TCP ./common/pcapx
-              go test -timeout 20s -run TestSmoking_UDP ./common/pcapx
+              go test -timeout 20s -run TestSmoking_* ./common/pcapx
 
           - name: Test Crawler / Crawlerx (chromium based crawler)
             run: |
