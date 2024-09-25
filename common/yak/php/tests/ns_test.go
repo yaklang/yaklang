@@ -39,12 +39,13 @@ namespace{
 		code := `<?php
 namespace test{
 	$a = 1;
+	println($a);
 }
 
 namespace{
 	println($a);
 }`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1", "1"}, t)
 	})
 	t.Run("more namespace variable", func(t *testing.T) {
 		code := `<?php
