@@ -2,9 +2,7 @@ package ssadb
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
 type IrProgram struct {
@@ -20,8 +18,8 @@ type IrProgram struct {
 	Language string `json:"language" gorm:"index"`
 
 	// application / library
-	ProgramKind          string      `json:"program_kind" gorm:"index"`
-	ChildApplicationName StringSlice `json:"child_application_name" gorm:"type:text"`
+	ProgramKind string `json:"program_kind" gorm:"index"`
+
 	// up-stream program is the program that this program depends on
 	UpStream StringSlice `json:"up_stream_programs" gorm:"type:text"`
 	// down-stream program is the program that depends on this program
@@ -34,13 +32,12 @@ type IrProgram struct {
 	ExtraFile StringMap `json:"extra_file" gorm:"type:text"`
 }
 
-func CreateProgram(name, kind, version string, childName []string) *IrProgram {
+func CreateProgram(name, kind, version string) *IrProgram {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{
-		ProgramName:          name,
-		Version:              version,
-		ProgramKind:          kind,
-		ChildApplicationName: childName,
+		ProgramName: name,
+		Version:     version,
+		ProgramKind: kind,
 	}
 	db.Save(out)
 	return out
@@ -87,74 +84,11 @@ func UpdateProgram(prog *IrProgram) {
 }
 
 func GetDBInProgram(program string) *gorm.DB {
-	this, err := GetProgram(program, "")
-	if err != nil {
-		log.Errorf("get program %s error : %v", program, err)
-		return GetDB().Where("program_name = ?", program)
-	}
-	res := append(this.UpStream, program)
-	res = append(res, this.ChildApplicationName...)
-	return bizhelper.ExactOrQueryStringArrayOr(GetDB(), "program_name", res)
+	return GetDB().Where("program_name = ?", program)
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	// reuse the program object, avoid multiple db operation in short time
-	progs := make(map[string]*IrProgram)
-	getProgram := func(name string) (*IrProgram, error) {
-		if p, ok := progs[name]; ok {
-			return p, nil
-		}
-		p, err := GetProgram(name, "")
-		if err != nil {
-			return nil, err
-		}
-		progs[name] = p
-		return p, nil
-	}
-	updateProgram := func(prog *IrProgram) {
-		progs[prog.ProgramName] = prog
-	}
-	defer func() {
-		for _, p := range progs {
-			UpdateProgram(p)
-		}
-	}()
-
-	var handlerUpstream func(this *IrProgram)
-	handlerUpstream = func(this *IrProgram) {
-		// update the down-stream programs
-		for _, upStream := range this.UpStream {
-			up, err := getProgram(upStream)
-			if err != nil {
-				log.Infof("get program %s error : %v", upStream, err)
-				continue
-			}
-			up.DownStream = utils.RemoveSliceItem(up.DownStream, this.ProgramName)
-			// if the up-stream program is not used by other programs, delete it
-			if len(up.DownStream) == 0 {
-				handlerUpstream(up)
-			} else {
-				updateProgram(up)
-			}
-		}
-		// handler down-stream programs
-		for _, downStream := range this.DownStream {
-			down, err := getProgram(downStream)
-			if err != nil {
-				log.Infof("get program %s error : %v", downStream, err)
-				continue
-			}
-			down.UpStream = utils.RemoveSliceItem(down.UpStream, this.ProgramName)
-			updateProgram(down)
-		}
-		deleteProgramDBOnly(db, this.ProgramName)
-	}
-	this, err := getProgram(program)
-	if err != nil {
-		log.Errorf("get program %s error : %v", program, err)
-		return
-	}
-	handlerUpstream(this)
+	deleteProgramDBOnly(db, program)
 }
 
 func AllPrograms(db *gorm.DB) []string {

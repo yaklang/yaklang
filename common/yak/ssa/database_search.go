@@ -47,43 +47,34 @@ func matchInstructionsEx(
 			}
 		}
 	}
-	handler := func(prog *Program) {
-		if prog.EnableDatabase {
-			// from database
-			var insts []Instruction
-			ch := ssadb.SearchVariable(
-				ssadb.GetDB().Where("program_name = ?", prog.Name),
-				compareMode, matchMode, name,
-			)
-			for id := range ch {
-				inst := prog.Cache.newLazyInstruction(id)
-				insts = append(insts, inst)
-			}
-			addRes(insts...)
-		} else {
-			// from cache
-			check := func(s string) bool {
-				switch compareMode {
-				case ssadb.ExactCompare:
-					return s == name
-				case ssadb.GlobCompare:
-					return glob.MustCompile(name).Match(s)
-				case ssadb.RegexpCompare:
-					return regexp.MustCompile(name).MatchString(s)
-				}
-				return false
-			}
-			addRes(prog.Cache._getByVariableEx(matchMode, check)...)
+	if prog.EnableDatabase {
+		// from database
+		var insts []Instruction
+		ch := ssadb.SearchVariable(
+			ssadb.GetDB().Where("program_name = ?", prog.Name),
+			compareMode, matchMode, name,
+		)
+		for id := range ch {
+			inst := prog.Cache.newLazyInstruction(id)
+			insts = append(insts, inst)
 		}
+		addRes(insts...)
+	} else {
+		// from cache
+		check := func(s string) bool {
+			switch compareMode {
+			case ssadb.ExactCompare:
+				return s == name
+			case ssadb.GlobCompare:
+				return glob.MustCompile(name).Match(s)
+			case ssadb.RegexpCompare:
+				return regexp.MustCompile(name).MatchString(s)
+			}
+			return false
+		}
+		addRes(prog.Cache._getByVariableEx(matchMode, check)...)
 	}
 
-	handler(prog)
-	for _, up := range prog.UpStream {
-		handler(up)
-	}
-	for _, childProg := range prog.ChildApplication {
-		handler(childProg)
-	}
 	return res
 }
 

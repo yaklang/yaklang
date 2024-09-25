@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -34,20 +33,14 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 
 func updateToDatabase(prog *Program) {
 	ir := prog.irProgram
-	var childApplicationName []string
-	for _, program := range prog.ChildApplication {
-		childApplicationName = append(childApplicationName, program.Name)
-	}
 	if ir == nil {
-		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version, childApplicationName)
+		ir = ssadb.CreateProgram(prog.Name, string(prog.ProgramKind), prog.Version)
 		prog.irProgram = ir
 	}
 	ir.Language = prog.Language
 	ir.ProgramKind = string(prog.ProgramKind)
 	ir.ProgramName = prog.Name
 	ir.Version = prog.Version
-	ir.UpStream = append(ir.UpStream, lo.Keys(prog.UpStream)...)
-	ir.DownStream = append(ir.DownStream, lo.Keys(prog.DownStream)...)
 	ir.FileList = prog.FileList
 	ir.ExtraFile = prog.ExtraFile
 	ssadb.UpdateProgram(ir)

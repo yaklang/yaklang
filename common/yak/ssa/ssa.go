@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"sync"
-
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/samber/lo"
@@ -230,9 +228,6 @@ type Program struct {
 	Build  Build
 
 	errors SSAErrors
-
-	// for build
-	finishOnce sync.Once
 
 	// process
 	ProcessInfof func(string, ...any)
