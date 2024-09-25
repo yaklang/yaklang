@@ -901,7 +901,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 	// metadata
 	switch v := i.(type) {
 	case *yakvm.Value:
-		literal = v.Literal
+		literal = v.GetLiteral()
 		i = v.Value
 	case *yakvm.Scope:
 		// ? scope没有metadata

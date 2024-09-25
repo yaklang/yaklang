@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"runtime"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -18,26 +17,11 @@ func (v *Value) NativeCall(vm *Frame, wavy bool, vs ...*Value) interface{} {
 	return v.nativeCall(false, wavy, vm, vs...)
 }
 
-func (v *Value) GetNativeCallFunctionName() string {
-	if v == nil {
-		return ""
-	}
-
-	if v.Value != nil && v.NativeCallable() {
-		funcIns := runtime.FuncForPC(reflect.ValueOf(v.Value).Pointer())
-		funcName := funcIns.Name()
-		return funcName
-	}
-	return ""
-}
 
 func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interface{} {
 	rets := reflect.ValueOf(v.Value)
 	funcType := rets.Type()
-	funcName := v.Literal
-	if funcName == "" {
-		funcName = v.GetNativeCallFunctionName()
-	}
+	funcName := v.GetLiteral()
 	// 这儿很不完善，需要做大量兼容性处理
 	numin := funcType.NumIn()
 	if funcType.IsVariadic() {

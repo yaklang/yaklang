@@ -2,14 +2,19 @@ package luaast
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
-const GLOBAL_ASSIGN_UNARY = 0
-const LOCAL_ASSIGN_UNARY = 1
+const (
+	GLOBAL_ASSIGN_UNARY = 0
+	LOCAL_ASSIGN_UNARY  = 1
+)
 
-const OBJECT_METHOD = 0 // include self
-const STATIC_METHOD = 1
+const (
+	OBJECT_METHOD = 0 // include self
+	STATIC_METHOD = 1
+)
 
 func (l *LuaTranslator) _pushOpcodeWithCurrentCodeContext(codes ...*yakvm.Code) {
 	for _, c := range codes {
@@ -48,6 +53,7 @@ func (l *LuaTranslator) pushInt64(i int64, origin string) {
 		},
 	})
 }
+
 func (l *LuaTranslator) pushChar(i rune, origin string) {
 	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
@@ -58,6 +64,7 @@ func (l *LuaTranslator) pushChar(i rune, origin string) {
 		},
 	})
 }
+
 func (l *LuaTranslator) pushByte(i byte, origin string) {
 	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
@@ -97,7 +104,6 @@ func (l *LuaTranslator) pushBool(i bool) {
 		Op1: &yakvm.Value{
 			TypeVerbose: "bool",
 			Value:       i,
-			Literal:     fmt.Sprint(i),
 		},
 	})
 }
@@ -216,7 +222,8 @@ func (l *LuaTranslator) pushDefer(codes []*yakvm.Code) {
 		Unary:  len(codes),
 		Op1: yakvm.NewValue(
 			"opcodes", codes, "",
-		)})
+		),
+	})
 }
 
 func (l *LuaTranslator) pushIterableCall(i int) {
@@ -225,6 +232,7 @@ func (l *LuaTranslator) pushIterableCall(i int) {
 		Unary:  i,
 	})
 }
+
 func (l *LuaTranslator) pushListWithLen(i int) {
 	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpList,
