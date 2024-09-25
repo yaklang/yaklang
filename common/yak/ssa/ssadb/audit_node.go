@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -87,18 +88,18 @@ func (n *AuditNode) CreatePredecessorEdge(to int64, step int64, label string) *A
 	return ae
 }
 
-func YieldAuditNodeByRuntimeId(db *gorm.DB, runtimeId string) chan *AuditNode {
-	db = db.Model(&AuditNode{}).Where("runtime_id = ?", runtimeId)
+func YieldAuditNodeByRuntimeId(DB *gorm.DB, runtimeId string) chan *AuditNode {
+	db := DB.Model(&AuditNode{}).Where("runtime_id = ?", runtimeId)
 	return yieldAuditNode(db, context.Background())
 }
 
-func YieldAuditNodeByRuleName(db *gorm.DB, ruleName string) chan *AuditNode {
-	db = db.Model(&AuditNode{}).Where("rule_name = ?", ruleName)
+func YieldAuditNodeByRuleName(DB *gorm.DB, ruleName string) chan *AuditNode {
+	db := DB.Model(&AuditNode{}).Where("rule_name = ?", ruleName)
 	return yieldAuditNode(db, context.Background())
 }
 
-func yieldAuditNode(db *gorm.DB, ctx context.Context) chan *AuditNode {
-	db = db.Model(&AuditNode{}).Where("is_entry_node = true")
+func yieldAuditNode(DB *gorm.DB, ctx context.Context) chan *AuditNode {
+	db := DB.Model(&AuditNode{}).Where("is_entry_node = true")
 	outC := make(chan *AuditNode)
 	go func() {
 		defer close(outC)
