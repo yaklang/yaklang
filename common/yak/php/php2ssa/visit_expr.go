@@ -347,6 +347,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return y.EmitConstInstNil()
 		}
 	case *phpparser.ConditionalExpressionContext:
+		/*
+			<?php
+
+			$a=$_GET[1] ?:"aa";
+			$a = $_GET[1]? "1": "2";
+		*/
 		variableName := "unknown-variable"
 		variable := y.CreateVariable(variableName)
 		y.AssignVariable(variable, y.EmitUndefined(variableName))
@@ -367,11 +373,17 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}).Build()
 		return y.ReadValue(variableName)
 	case *phpparser.NullCoalescingExpressionContext:
-		if leftValue := y.VisitExpression(ret.Expression(0)); leftValue.IsUndefined() {
-			return y.VisitExpression(ret.Expression(1)) // 如果是undefined就返回1
-		} else {
-			return leftValue
-		}
+		name := "unknown-variableEx"
+		variable := y.CreateVariable(name)
+		y.AssignVariable(variable, y.EmitUndefined(name))
+		y.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return y.VisitExpression(ret.Expression(0))
+		}, func() {
+			y.AssignVariable(y.CreateVariable(name), y.VisitExpression(ret.Expression(1)))
+		}).SetElse(func() {
+			y.AssignVariable(y.CreateVariable(name), y.VisitExpression(ret.Expression(0)))
+		}).Build()
+		return y.ReadValue(name)
 	case *phpparser.DefinedOrScanDefinedExpressionContext:
 		return y.VisitDefineExpr(ret.DefineExpr())
 	case *phpparser.SpaceshipExpressionContext:

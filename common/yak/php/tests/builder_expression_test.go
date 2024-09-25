@@ -85,14 +85,14 @@ func TestExpression_NullCoalescingExpression(t *testing.T) {
 		ssatest.CheckPrintlnValue(`<?php
 $a = $a??12312;
 println($a);
-`, []string{"12312"}, t)
+`, []string{"phi($a)[12312,Undefined-unknown-variableEx]"}, t)
 	})
 	t.Run("check has variables declare", func(t *testing.T) {
 		code := `<?php
 $a = 1;
 $a = $a??12312;
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[12312,1]"}, t)
 	})
 
 }
