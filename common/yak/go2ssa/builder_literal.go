@@ -658,17 +658,9 @@ func (b *astbuilder) buildStringLiteral(stmt *gol.String_Context) ssa.Value {
 
 	switch text[0] {
 	case '"':
-		val, err := strconv.Unquote(text)
-		if err != nil {
-			b.NewError(ssa.Error, TAG, CannotParseString(stmt.GetText(), err.Error()))
-		}
-		return b.EmitConstInstWithUnary(val, 0)
+		return b.EmitConstInstWithUnary(text[1:len(text)-1], 0)
 	case '`':
-		val, err := strconv.Unquote(text)
-		if err != nil {
-			b.NewError(ssa.Error, TAG, CannotParseString(stmt.GetText(), err.Error()))
-		}
-		return b.EmitConstInstWithUnary(val, 0)
+		return b.EmitConstInstWithUnary(text[1:len(text)-1], 0)
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
