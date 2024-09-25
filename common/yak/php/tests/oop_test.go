@@ -805,4 +805,29 @@ class a
 			"param": {`"file"`, `Undefined-input`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+
+	//todo: visit if condition
+	//
+	//	t.Run("test", func(t *testing.T) {
+	//		code := `<?php
+	//   function _Include($a)
+	//   {
+	//       $path = WWWROOT . "/public" . $a;
+	//       if (!file_exists($path)) {
+	//           return;
+	//       } else {
+	//           include $path;
+	//       }
+	//   }
+	//       $a = $_GET['a'] ?: "aaaa";
+	//       _Include(filter($a));`
+	//		ssatest.CheckSyntaxFlow(t, code, `<include('php-param')> as $params;
+	//<include('php-filter-function')> as $filter;
+	//include(* as $param);
+	//`+
+	//			"$param #{until: `<self> & $params`,include: `<self> & $params`}-> as $root;"+
+	//			`$root?{<dataflow(<<<CODE
+	//<self>?{opcode: call && !<self & $filter} as $__next__;
+	//CODE)>} as $low;`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+	//	})
 }
