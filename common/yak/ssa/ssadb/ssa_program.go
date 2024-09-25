@@ -66,7 +66,6 @@ func DeleteSSAProgram(name string) error {
 func AllSSAPrograms() []*schema.SSAProgram {
 	db := consts.GetGormProfileDatabase()
 	var programs []*schema.SSAProgram
-	db = db.Where("deleted_at = '' or deleted_at IS NULL ")
 	db = db.Model(&schema.SSAProgram{}).Order("created_at DESC").Find(&programs)
 	if err := db.Error; err != nil {
 		log.Errorf("get all ssa programs error: %s", err)
