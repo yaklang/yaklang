@@ -4,14 +4,16 @@ desc(
     level: low,
 )
 
-<include('php-param')> as $input;
+<include('php-param')> as $input1;
+<include('php-global-variable')> as $input2;
+$input1 + $input2 as $input;
 <include('php-filter-function')> as $filter;
 extract(* as $output);
 
-$output #{until: `* & $input`}-> as $root;
+$output #{until: `* & $input`,include: `* & $input`}-> as $root;
 
 $root?{!<dataflow(<<<CODE
-*?{opcode: call && <self> & $filter} as $__next__
+*?{opcode: call && <self><getCaller> & $filter} as $__next__
 CODE)>} as $result
 
 alert $result for {
@@ -22,7 +24,7 @@ alert $result for {
 }
 
 $root?{<dataflow(<<<CODE
-*?{opcode: call && !<self> & $filter} as $__next__
+*?{opcode: call && !<self><getCaller> & $filter} as $__next__
 CODE)>} as $middle
 
 
@@ -34,7 +36,7 @@ alert $middle for {
 }
 
 $root?{<dataflow(<<<CODE
-*?{opcode: call && <self> & $filter} as $__next__
+*?{opcode: call && <self><getCaller> & $filter} as $__next__
 CODE)>} as $low
 
 alert $low for {
