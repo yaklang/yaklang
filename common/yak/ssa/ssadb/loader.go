@@ -2,13 +2,14 @@ package ssadb
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
-func YieldIrCodesProgramName(db *gorm.DB, ctx context.Context, program string) chan *IrCode {
-	db = db.Model(&IrCode{}).Where("program_name = ?", program)
+func YieldIrCodesProgramName(rawDB *gorm.DB, ctx context.Context, program string) chan *IrCode {
+	db := rawDB.Model(&IrCode{}).Where("program_name = ?", program)
 	return yieldIrCodes(db, ctx)
 }
 func _yieldIrCodes(db *gorm.DB, ctx context.Context) chan int64 {
@@ -27,8 +28,8 @@ func _yieldIrCodes(db *gorm.DB, ctx context.Context) chan int64 {
 	return res
 }
 
-func yieldIrCodes(db *gorm.DB, ctx context.Context) chan *IrCode {
-	db = db.Model(&IrCode{})
+func yieldIrCodes(DB *gorm.DB, ctx context.Context) chan *IrCode {
+	db := DB.Model(&IrCode{})
 	outC := make(chan *IrCode)
 	go func() {
 		defer close(outC)
@@ -58,8 +59,8 @@ func yieldIrCodes(db *gorm.DB, ctx context.Context) chan *IrCode {
 	return outC
 }
 
-func yieldIrIndex(db *gorm.DB, ctx context.Context) chan int64 {
-	db = db.Model(&IrIndex{})
+func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan int64 {
+	db := DB.Model(&IrIndex{})
 	outC := make(chan int64)
 	go func() {
 		defer close(outC)
