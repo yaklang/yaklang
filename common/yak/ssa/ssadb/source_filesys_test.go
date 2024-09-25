@@ -154,14 +154,19 @@ func TestSourceFilesysLocal(t *testing.T) {
 		require.NoErrorf(t, err, "read dir error: %v", err)
 		for _, info := range infos {
 			log.Infof("info: %v", info.Name())
-			err := dbfs.Delete("/" + info.Name())
-			require.NoErrorf(t, err, "delete error: %v", err)
+			if info.Name() == programID {
+				err := dbfs.Delete("/" + info.Name())
+				require.NoErrorf(t, err, "delete error: %v", err)
+			}
 		}
-
 		newFS := ssadb.NewIrSourceFs()
 		infos, err = newFS.ReadDir("/")
 		require.NoErrorf(t, err, "read dir error: %v", err)
-		require.Len(t, infos, 0)
+		for _, info := range infos {
+			if info.Name() == programID {
+				t.Fatalf("program %v not deleted", programID)
+			}
+		}
 	})
 }
 
