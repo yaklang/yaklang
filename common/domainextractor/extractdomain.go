@@ -156,8 +156,8 @@ func TryDecode(s string) string {
 	return s
 }
 
-func ExtractDomains(code string) []string {
-	results, rootDomains := scan(code)
+func ExtractDomains(code string, tryDecode ...bool) []string {
+	results, rootDomains := scan(code, tryDecode...)
 	return utils.RemoveRepeatStringSlice(append(rootDomains, results...))
 }
 
@@ -189,7 +189,7 @@ func ExtractDomainsEx(code string) ([]string, []string) {
 	return re1, ret
 }
 
-func scan(code string) ([]string, []string) {
+func scan(code string, tryDecode ...bool) ([]string, []string) {
 	/*
 		1st: (?P<durl>(%25[a-fA-F0-9]{2}){2,})
 		2nd: (?P<quoted>(([\\]{2}x[0-9a-fA-F]{2})|([\\]{1}x[0-9a-fA-F]{2})))
@@ -205,7 +205,10 @@ func scan(code string) ([]string, []string) {
 	// 4. &#[0-9]{1,5};
 	// 5. %25{\d}{2} 有多个的时候，一般这个会有用
 	// 6. \?\x[0-9a-fA-F]{2}
-	return _scan(TryDecode(code))
+	if len(tryDecode) > 0 && tryDecode[0] {
+		code = TryDecode(code)
+	}
+	return _scan(code)
 }
 
 func _scan(code string) ([]string, []string) {

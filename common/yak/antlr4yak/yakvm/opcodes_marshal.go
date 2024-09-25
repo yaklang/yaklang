@@ -2,9 +2,10 @@ package yakvm
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"google.golang.org/protobuf/encoding/protowire"
 )
@@ -40,9 +41,11 @@ func (c *CodesMarshaller) Unmarshal(buf []byte) (*SymbolTable, []*Code, error) {
 	}
 	return tbl, codes, nil
 }
+
 func (c *CodesMarshaller) MarshalWithDebugInfo(tbl *SymbolTable, codes []*Code) ([]byte, error) {
 	return c.Marshal(tbl, codes)
 }
+
 func (c *CodesMarshaller) Marshal(tbl *SymbolTable, codes []*Code) ([]byte, error) {
 	var buf []byte
 
@@ -66,7 +69,7 @@ func (c *CodesMarshaller) walkSymbolTable(tbl *SymbolTable) []*SymbolTable {
 	if tbl == nil {
 		return nil
 	}
-	var tables = []*SymbolTable{tbl}
+	tables := []*SymbolTable{tbl}
 	for _, t := range tbl.children {
 		tables = append(tables, c.walkSymbolTable(t)...)
 	}
@@ -109,13 +112,12 @@ func (c *CodesMarshaller) getSymbolTableById(id int) *SymbolTable {
 }
 
 func (c *CodesMarshaller) consumeSymbolTable(buf []byte) (*SymbolTable, []byte, error) {
-
 	i, n := protowire.ConsumeVarint(buf)
 	buf = buf[n:]
 	blockLen := int(i)
 	c.table = make(map[int]*SymbolTable, blockLen)
 
-	var tableDesc = make(map[int]*SymbolTableDesc)
+	tableDesc := make(map[int]*SymbolTableDesc)
 	for index := 1; index <= blockLen; index++ {
 		tbl := &SymbolTableDesc{NameToId: make(map[string]int)}
 		// index
@@ -477,7 +479,7 @@ func (c *CodesMarshaller) consumeValue(buf []byte) (*Value, []byte, error) {
 
 func (c *CodesMarshaller) marshalValue(buf []byte, v *Value) ([]byte, error) {
 	buf = protowire.AppendBytes(buf, []byte(v.TypeVerbose))
-	buf = protowire.AppendBytes(buf, []byte(v.Literal))
+	buf = protowire.AppendBytes(buf, []byte(v.GetLiteral()))
 	var err error
 	buf, err = c.marshalAny(buf, v.Value)
 	if err != nil {

@@ -1,7 +1,6 @@
 package visitors
 
 import (
-	"fmt"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
@@ -35,21 +34,23 @@ func (c *Compiler) pushScope(verbose string) {
 		},
 	})
 }
+
 func (c *Compiler) pushScopeEnd() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpScopeEnd,
 	})
 }
+
 func (s *Compiler) pushInt(i int) *yakvm.Code {
 	return s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpPush,
 		Op1: &yakvm.Value{
 			TypeVerbose: "nasl_int",
 			Value:       i,
-			Literal:     fmt.Sprintf("%d", i),
 		},
 	})
 }
+
 func (s *Compiler) pushFloat(f float64) {
 	panic("not implemented")
 	s.pushOpcode(&yakvm.Code{
@@ -57,7 +58,6 @@ func (s *Compiler) pushFloat(f float64) {
 		Op1: &yakvm.Value{
 			TypeVerbose: "float64",
 			Value:       f,
-			Literal:     fmt.Sprintf("%f", f),
 		},
 	})
 }
@@ -80,6 +80,7 @@ func (s *Compiler) pushString(i string) {
 		},
 	})
 }
+
 func (c *Compiler) pushRef(name string) *yakvm.Code {
 	var code *yakvm.Code
 	code = &yakvm.Code{
@@ -89,6 +90,7 @@ func (c *Compiler) pushRef(name string) *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (c *Compiler) pushUninitedLeftRef(name string) *yakvm.Code {
 	id, ok := c.symbolTable.GetSymbolByVariableName(name)
 	if !ok {
@@ -106,6 +108,7 @@ func (c *Compiler) pushUninitedLeftRef(name string) *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (c *Compiler) pushLeftRef(name string) *yakvm.Code {
 	id, ok := c.symbolTable.GetSymbolByVariableName(name)
 	if !ok {
@@ -124,17 +127,20 @@ func (c *Compiler) pushLeftRef(name string) *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (c *Compiler) pushJustAssigin() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAssign,
 	})
 }
+
 func (c *Compiler) pushAutoMapAssigin() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAssign,
 		Op1:    yakvm.NewAutoValue("auto_created"),
 	})
 }
+
 func (c *Compiler) pushAssigin() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAssign,
@@ -144,12 +150,14 @@ func (c *Compiler) pushAssigin() {
 	//	Unary:  1,
 	//})
 }
+
 func (c *Compiler) pushGlobalDeclare() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAssign,
 		Op1:    yakvm.NewStringValue("nasl_global_declare"),
 	})
 }
+
 func (c *Compiler) pushDeclare() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAssign,
@@ -165,28 +173,33 @@ func (c *Compiler) pushCall(i int) *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (c *Compiler) pushList(i int) {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpNewSlice,
 		Unary:  i,
 	})
 }
+
 func (c *Compiler) pushGenList(i int) {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpList,
 		Unary:  i,
 	})
 }
+
 func (c *Compiler) pushBitOr() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpOr,
 	})
 }
+
 func (c *Compiler) pushBitAnd() {
 	c.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpAnd,
 	})
 }
+
 func (c *Compiler) pushJmp() *yakvm.Code {
 	code := &yakvm.Code{
 		Opcode: yakvm.OpJMP,
@@ -194,6 +207,7 @@ func (c *Compiler) pushJmp() *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (c *Compiler) pushJmpIfFalse() *yakvm.Code {
 	code := &yakvm.Code{
 		Opcode: yakvm.OpJMPFOP,
@@ -201,6 +215,7 @@ func (c *Compiler) pushJmpIfFalse() *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (c *Compiler) pushJmpIfTrue() *yakvm.Code {
 	code := &yakvm.Code{
 		Opcode: yakvm.OpJMPTOP,
@@ -208,18 +223,21 @@ func (c *Compiler) pushJmpIfTrue() *yakvm.Code {
 	c.pushOpcode(code)
 	return code
 }
+
 func (s *Compiler) pushValue(i *yakvm.Value) {
 	s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpPush,
 		Op1:    i,
 	})
 }
+
 func (s *Compiler) pushNewSlice(n int) {
 	s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpNewSlice,
 		Unary:  n,
 	})
 }
+
 func (s *Compiler) pushIterableCall() {
 	s.pushOpcode(&yakvm.Code{
 		Opcode: yakvm.OpIterableCall,

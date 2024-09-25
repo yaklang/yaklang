@@ -375,14 +375,15 @@ func extractJsonEx(i interface{}) ([]string, []string) {
 	return jsonextractor.ExtractJSONWithRaw(utils.InterfaceToString(i))
 }
 
-// ExtractDomain 尝试提取字符串中的域名并返回
+// ExtractDomain 尝试提取字符串中的域名并返回，后续可以接收一个 tryDecode 参数，如果传入 true，则会尝试对输入的文本进行解码(双重URL编码，URL编码，unicode编码，quoted编码)
 // Example:
 // ```
 // str.ExtractDomain("hello yak") // []
 // str.ExtractDomain("hello yaklang.com or yaklang.io") // ["yaklang.com", "yaklang.io"]
+// str.ExtractDomain(`{"message:"%79%61%6b%6c%61%6e%67.com"}`, true) // ["yaklang.com"]
 // ```
-func extractDomain(i interface{}) []string {
-	return domainextractor.ExtractDomains(utils.InterfaceToString(i))
+func extractDomain(i any, tryDecode ...bool) []string {
+	return domainextractor.ExtractDomains(utils.InterfaceToString(i), tryDecode...)
 }
 
 // ExtractRootDomain 尝试提取字符串中的根域名并返回

@@ -92,7 +92,6 @@ func (s *YakCompiler) pushBool(i bool) {
 		Op1: &yakvm.Value{
 			TypeVerbose: "bool",
 			Value:       i,
-			Literal:     fmt.Sprint(i),
 		},
 	})
 }
