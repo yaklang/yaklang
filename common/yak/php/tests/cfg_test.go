@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -26,6 +27,24 @@ println($a);
 			Want: []string{"0", "1", "phi($a)[1,0]"},
 			Code: code,
 		})
+	})
+	t.Run("test condition", func(t *testing.T) {
+		code := `<?php
+
+$a=$_GET[1] ?:"aa";
+println($a);
+$a = $_GET[1]? "1": "2";
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{
+			"phi($a)[Undefined-unknown-variable(valid),\"aa\"]", "phi($a)[\"1\",\"2\"]",
+		}, t)
+	})
+	t.Run("test condition1", func(t *testing.T) {
+		code := `<?php
+$data = $_POST['data'] ??"aa";
+println($data);
+`
+		ssatest.CheckPrintlnValue(code, []string{"phi($data)[\"aa\",Undefined-unknown-variableEx(valid)]"}, t)
 	})
 
 	//todo: 修改scope之后待过测试
@@ -486,5 +505,22 @@ foreach ($arr as $value) {
 }
 ?>`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"Function-array", "1", "2", "3", "4"})
+	})
+	t.Run("code", func(t *testing.T) {
+		code := `<?php
+
+$INCLUDE_ALLOW_LIST = [
+    "home.php",
+    "dashboard.php",
+    "profile.php",
+    "settings.php"
+];
+
+$filename = $_GET["filename"];
+if (in_array($filename, $INCLUDE_ALLOW_LIST)) {
+  include $filename;
+}`
+		ssatest.CheckSyntaxFlow(t, code, "include(* #-> * as $param)",
+			map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
