@@ -24,6 +24,17 @@ namespace{
 `
 		ssatest.MockSSA(t, code)
 	})
+	t.Run("namespace variables assign and read both in unname", func(t *testing.T) {
+		code := `<?php
+namespace {
+	$a = 1;
+}
+
+namespace{
+	println($a);
+}`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
 	t.Run("namespace variables", func(t *testing.T) {
 		code := `<?php
 namespace test{
