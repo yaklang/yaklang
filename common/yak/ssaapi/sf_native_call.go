@@ -82,20 +82,32 @@ const (
 	//   you can use <regexp(`...`, group: 1)> to extract
 	NativeCall_Regexp = "regexp"
 
+	// NativeCall_StrLower is used to convert a string to lower case
 	NativeCall_StrLower = "strlower"
+
+	// NativeCall_StrUpper is used to convert a string to upper case
 	NativeCall_StrUpper = "strupper"
 
 	// NativeCall_Var is used to put vars to variables
 	NativeCall_Var = "var"
 
+	// NativeCall_MyBatisSink is used to find MyBatis Sink for default searching
 	NativeCall_MyBatisSink = "mybatisSink"
 
+	// NativeCall_FreeMarkerSink is used to find FreeMarker Sink for default searching
 	NativeCall_FreeMarkerSink = "freeMarkerSink"
 
-	NativeCall_OpCodes      = "opcodes"
-	NativeCall_SourceCode   = "sourceCode"
+	// NativeCall_OpCodes is used to get the opcodes of a value
+	NativeCall_OpCodes = "opcodes"
+
+	// NativeCall_SourceCode is used to get the source code of a value
+	NativeCall_SourceCode = "sourceCode"
+
+	// NativeCall_ScanPrevious is used to scan previous opcode of a value
 	NativeCall_ScanPrevious = "scanPrevious"
-	NativeCall_ScanNext     = "scanNext"
+
+	// NativeCall_ScanNext is used to scan next
+	NativeCall_ScanNext = "scanNext"
 
 	//NativeCall_DeleteVariable is used to delete a variable
 	NativeCall_DeleteVariable = "delete"
@@ -106,8 +118,15 @@ const (
 	// NativeCall_Self is used to get self value
 	NativeCall_Self = "self"
 
+	// NativeCall_DataFlow is used to get data flow
+	// if u want to fetch dataflow, call <dataflow...> after --> or #->
+	// use it like: $data<dataflow(<<<CODE
+	// *?{opcode: call && <getCaller><name>?{name} }
+	// CODE)>
 	NativeCall_DataFlow = "dataflow"
-	NativeCall_Const    = "const"
+
+	// NativeCall_Const is used to search const value
+	NativeCall_Const = "const"
 )
 
 func init() {
