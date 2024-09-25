@@ -17,7 +17,6 @@ import (
 
 func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi.FileSystem, programPath string) *Program {
 	prog := &Program{
-		ChildApplication:        make([]*Program, 0),
 		Name:                    ProgramName,
 		ProgramKind:             kind,
 		LibraryFile:             make(map[string][]string),
@@ -81,12 +80,12 @@ func (prog *Program) createSubProgram(name string, kind ProgramKind, path ...str
 	return subProg
 }
 
-func (prog *Program) NewChildProgram(name string, add bool, path ...string) *Program {
-	program := prog.createSubProgram(name, ChildAPP, path...)
-	if add {
-		prog.ChildApplication = append(prog.ChildApplication, program)
+func (prog *Program) GetSubProgram(name string, path ...string) *Program {
+	child, ok := prog.UpStream[name]
+	if !ok {
+		child = prog.createSubProgram(name, Library, path...)
 	}
-	return program
+	return child
 }
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
@@ -143,9 +142,9 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	return p, hasFile(p)
 }
 
-func (prog *Program) AddUpStream(p *Program) {
-	prog.UpStream[p.Name] = p
-	p.DownStream[prog.Name] = prog
+func (prog *Program) AddUpStream(sub *Program) {
+	prog.UpStream[sub.Name] = sub
+	sub.DownStream[prog.Name] = prog
 }
 
 func (prog *Program) GetProgramName() string {
@@ -203,6 +202,11 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 
 	for _, f := range prog.Funcs {
 		handFunc(f)
+	}
+	for _, up := range prog.UpStream {
+		for _, f := range up.Funcs {
+			handFunc(f)
+		}
 	}
 }
 

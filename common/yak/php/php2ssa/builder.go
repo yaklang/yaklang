@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/uuid"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -114,9 +112,8 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		build.VisitHtmlDocument(ast)
 	}
 	if b.IncludeStack.Len() <= 0 {
-		var program *ssa.Program
-		program = b.GetProgram().NewChildProgram(uuid.NewString(), !b.PreHandler)
-		functionBuilder := program.GetAndCreateFunctionBuilder("main", "main")
+		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
+		functionBuilder := childProgram.GetAndCreateFunctionBuilder("main", "main")
 		functionBuilder.PreHandler = b.PreHandler
 		startParse(functionBuilder)
 	} else {
