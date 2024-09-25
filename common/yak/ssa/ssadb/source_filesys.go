@@ -179,6 +179,7 @@ func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 }
 
 func (f *irSourceFS) Delete(path string) error {
+	f.virtual.Delete(path)
 	// if root path ? get program Name
 	programName, programRoot := f.getProgram(path)
 	if !programRoot {
@@ -193,12 +194,9 @@ func (f *irSourceFS) Delete(path string) error {
 	if origin != prog.DBPath {
 		consts.SetSSADataBasePath(prog.DBPath)
 	}
-
 	// delete program
 	DeleteProgram(GetDB(), programName)
 	DeleteSSAProgram(programName)
-	f.virtual.Delete(path)
-
 	return nil
 }
 
