@@ -1,0 +1,23 @@
+desc(
+    title: "Check PHP XSS: Directly User OUTPUT",
+)
+
+<include('php-param')> as $result;
+echo(* as $sink);
+$sink<show> #{
+    include: `* & $result as $vuln`,
+    exclude: `*?{!opcode:call}`,
+}->;
+alert $vuln for {
+    level: mid,
+};
+
+desc(
+    language: php,
+    alert_min: 1,
+    'file://a.php': <<<CODE
+<?php
+echo "您的输入是：" . $_POST['data'];
+?>
+CODE
+)
