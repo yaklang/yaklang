@@ -115,6 +115,9 @@ func (b *FunctionBuilder) readValueEx(
 			return b.BuildFreeValue(name)
 		}
 	}
+	if v := b.GetProgram().getImportValue(name); v != nil {
+		return v
+	}
 	if create {
 		return b.writeUndefine(name)
 	}

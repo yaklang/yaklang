@@ -213,11 +213,11 @@ type Program struct {
 
 	// function list
 	Funcs map[string]*Function
-
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-
 	// for import/export
+	importValue map[string]Value
+	importType  map[string]Type
 	ExportValue map[string]Value
 	ExportType  map[string]Type
 

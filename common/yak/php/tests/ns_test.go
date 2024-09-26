@@ -9,8 +9,6 @@ import (
 )
 
 func TestNamespace(t *testing.T) {
-	// TODO: this php namespace bug will fixup in: https://github.com/yaklang/yaklang/pull/1911
-	t.Skip()
 	t.Run("namespace mock", func(t *testing.T) {
 		code := `<?php
 namespace test{
