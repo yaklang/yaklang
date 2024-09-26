@@ -15,7 +15,7 @@ generateIntCastCheckingExpr = func(i) {
     return expr
 }
 
-unionPayloads = func(checkType) {
+stackedPayloads = func(checkType) {
     exprInfo = fuzz.FuzzCalcExpr()
     expr = exprInfo.expr
 
@@ -34,7 +34,7 @@ unionPayloads = func(checkType) {
     var results = []
     for i in 16 {
         payloads.Push(basicItem)
-        realPayload = "union select %v" % str.Join(payloads, ",")
+        realPayload = ";\nselect %v" % str.Join(payloads, ",")
         results.Push(realPayload)
     }
     return results, token
@@ -83,7 +83,7 @@ sqlInjectionChecking = func(https, request) {
         paramValue = i.ValueString()
         prefix = sqlBuildPrefix(paramValue)
         suffix = [" -- ", " # "]
-        payloads, token = unionPayloads("md5")
+        payloads, token = stackedPayloads("md5")
         token = sprint(token)
         info(f"Payload: ${len(payloads)} Prefix:${len(prefix)} Suffix:${len(suffix)} TOKEN 为 " + sprint(token))
 
