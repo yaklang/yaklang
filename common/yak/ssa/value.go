@@ -110,10 +110,13 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if enableClosureFreeValue  && create {
+	if enableClosureFreeValue && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
+	}
+	if v := b.GetProgram().getImportValue(name); v != nil {
+		return v
 	}
 	if create {
 		return b.writeUndefine(name)

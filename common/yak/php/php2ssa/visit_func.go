@@ -29,7 +29,8 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	variable := y.CreateVariable(funcName)
 	y.AssignVariable(variable, newFunction)
 	//todo: maybe need assign in this scope
-	y.GetProgram().Funcs[funcName] = newFunction
+	// y.GetProgram().Funcs[funcName] = newFunction
+	y.GetProgram().SetExportValue(funcName, newFunction)
 	newFunction.SetLazyBuilder(func() {
 		y.SetMarkedFunction(funcName)
 		y.FunctionBuilder = y.FunctionBuilder.PushFunction(newFunction)
