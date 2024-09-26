@@ -107,6 +107,24 @@ filterItem
     | '+' refVariable                            # MergeRefFilter
     | '-' refVariable                            # RemoveRefFilter
     | '&' refVariable                            # IntersectionRefFilter
+    | In (
+        '['
+        | '('
+    ) vstart? ',' vend? (
+        ']'
+        | ')'
+    )   # InFilter
+    ;
+
+vstart: versionString;
+vend: versionString;
+// unless ',' ']' ')'
+versionBlockElement: Number versionSuffix* ;
+versionSuffix: '-' | Identifier;
+versionBlock:  versionBlockElement+;
+versionString
+    : stringLiteral
+    | versionBlock
     ;
 
 filterExpr: filterItemFirst filterItem*;

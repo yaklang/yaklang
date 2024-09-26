@@ -231,6 +231,34 @@ func (v *BaseSyntaxFlowParserVisitor) VisitIntersectionRefFilter(ctx *Intersecti
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitInFilter(ctx *InFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVstart(ctx *VstartContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVend(ctx *VendContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionBlockElement(ctx *VersionBlockElementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionSuffix(ctx *VersionSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionBlock(ctx *VersionBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionString(ctx *VersionStringContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitFilterExpr(ctx *FilterExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
