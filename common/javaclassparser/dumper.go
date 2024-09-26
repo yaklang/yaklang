@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
 	"strings"
 )
 
@@ -15,6 +14,7 @@ const attrTemplate = `%s %s %s {%s}`
 type ClassObjectDumper struct {
 	imports       map[string]struct{}
 	obj           *ClassObject
+	FuncCtx       *decompiler.FunctionContext
 	ClassName     string
 	PackageName   string
 	CurrentMethod *MemberInfo
@@ -57,6 +57,15 @@ func (c *ClassObjectDumper) UnTab() {
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	result := classTemplate
+	funcCtx := &decompiler.FunctionContext{
+		ClassName:   c.ClassName,
+		PackageName: c.PackageName,
+		BuildInLibs: []string{
+			"java.lang.*",
+			"java.io.*",
+		},
+	}
+	c.FuncCtx = funcCtx
 	accessFlagsVerbose := c.obj.AccessFlagsVerbose
 	if len(accessFlagsVerbose) < 1 {
 		return "", utils.Error("accessFlagsVerbose is empty")
@@ -114,9 +123,9 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 	result := []string{}
 	for _, field := range c.obj.Fields {
 		accessFlagsVerbose := getAccessFlagsVerbose(field.AccessFlags)
-		if len(accessFlagsVerbose) < 1 {
-			return nil, utils.Error("fields accessFlagsVerbose is empty")
-		}
+		//if len(accessFlagsVerbose) < 1 {
+		//	return nil, utils.Error("fields accessFlagsVerbose is empty")
+		//}
 		accessFlags := strings.Join(accessFlagsVerbose, " ")
 		name, err := c.obj.getUtf8(field.NameIndex)
 		if err != nil {
@@ -126,7 +135,11 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		lastPacket := c.parseImportCLass(descriptor)
+		fieldType, err := decompiler.ParseDescriptor(descriptor)
+		if err != nil {
+			return nil, err
+		}
+		lastPacket := c.parseImportCLass(fieldType.String(c.FuncCtx))
 		result = append(result, fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name))
 	}
 	return result, nil
@@ -137,9 +150,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	result := []string{}
 	for _, method := range c.obj.Methods {
 		accessFlagsVerbose := getAccessFlagsVerbose(method.AccessFlags)
-		if len(accessFlagsVerbose) < 1 {
-			return nil, utils.Error("method accessFlagsVerbose is empty")
-		}
+		//if len(accessFlagsVerbose) < 1 {
+		//	return nil, utils.Error("method accessFlagsVerbose is empty")
+		//}
 		accessFlags := strings.Join(accessFlagsVerbose, " ")
 		name, err := c.obj.getUtf8(method.NameIndex)
 		if err != nil {
@@ -149,46 +162,21 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		r, err := regexp.Compile("\\((.*)\\)(.+?)")
+		paramsTypes, returnType, err := decompiler.ParseMethodDescriptor(descriptor)
 		if err != nil {
 			return nil, err
 		}
-
-		matchRes := r.FindAllStringSubmatch(descriptor, -1)
-		if len(matchRes) != 1 {
-			return nil, utils.Error("method descriptor is invalid")
-		}
-		matchResOne := matchRes[0]
-		if len(matchResOne) != 3 {
-			return nil, utils.Error("method descriptor is invalid")
-		}
-		paramsStr := matchResOne[1]
-		params := strings.Split(paramsStr, ";")
 		paramsNewStrList := []string{}
-		returnType := matchResOne[2]
-		if returnType == "V" {
-			returnType = "void"
+		for _, paramsType := range paramsTypes {
+			paramsNewStrList = append(paramsNewStrList, paramsType.String(c.FuncCtx))
 		}
-		for i, param := range params {
-			array := ""
-			if param == "" {
-				continue
-			}
-			lastPacket := c.parseImportCLass(param)
-			paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s%s var%d", lastPacket, array, i))
-		}
+		returnTypeStr := returnType.String(c.FuncCtx)
 		paramsNewStr := strings.Join(paramsNewStrList, ", ")
 		code := ""
 		c.Tab()
 		c.CurrentMethod = method
-		funcCtx := &decompiler.FunctionContext{
-			ClassName:    c.ClassName,
-			FunctionName: name,
-			PackageName:  c.PackageName,
-			BuildInLibs: []string{
-				"java.lang.*",
-			},
-		}
+		funcCtx := c.FuncCtx
+		funcCtx.FunctionName = name
 		for _, attribute := range method.Attributes {
 			if codeAttr, ok := attribute.(*CodeAttribute); ok {
 				statements, err := ParseBytesCode(c, codeAttr)
@@ -196,9 +184,34 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					return nil, err
 				}
 				sourceCode := "\n"
-				for _, statement := range statements {
-					var statementStr string
+				var statementToString func(statement decompiler.Statement) string
+				var statementListToString func(statements []decompiler.Statement) string
+				statementListToString = func(statements []decompiler.Statement) string {
+					c.Tab()
+					defer c.UnTab()
+					var res []string
+					for _, statement := range statements {
+						res = append(res, statementToString(statement))
+					}
+					return strings.Join(res, "\n")
+				}
+				statementToString = func(statement decompiler.Statement) (statementStr string) {
 					switch ret := statement.(type) {
+					case *decompiler.SwitchStatement:
+						getBody := func(caseItems []*decompiler.CaseItem) string {
+							var res []string
+							for _, st := range caseItems {
+								if st.IsDefault {
+									res = append(res, c.GetTabString()+fmt.Sprintf("default:\n%s", statementListToString(st.Body)))
+									continue
+								}
+								res = append(res, c.GetTabString()+fmt.Sprintf("case %d:\n%s", st.IntValue, statementListToString(st.Body)))
+							}
+							return strings.Join(res, "\n")
+						}
+						statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
+							"%s\n"+
+							c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
 					case *decompiler.IfStatement:
 						getBody := func(sts []decompiler.Statement) string {
 							c.Tab()
@@ -211,21 +224,24 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 						}
 						statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
 							"%s\n"+
-							c.GetTabString()+"}else{\n"+
-							"%s\n"+
-							c.GetTabString()+"}", ret.Condition.String(funcCtx), getBody(ret.IfBody), getBody(ret.ElseBody))
+							c.GetTabString()+"}", ret.Condition.String(funcCtx), getBody(ret.IfBody))
+						if len(ret.ElseBody) > 0 {
+							statementStr += fmt.Sprintf("else{\n"+
+								"%s\n"+
+								c.GetTabString()+"}", getBody(ret.ElseBody))
+						}
 					case *decompiler.ExpressionStatement:
 						if funcCtx.FunctionName == "<init>" {
 							if v, ok := ret.Expression.(*decompiler.FunctionCallExpression); ok {
 								if IsJavaSupperRef(v.Object) && v.FunctionName == "<init>" {
-									continue
+									return statementStr
 								}
 							}
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
 					case *decompiler.ReturnStatement:
 						if funcCtx.FunctionName == "<init>" {
-							continue
+							return
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
 					case *decompiler.ForStatement:
@@ -242,6 +258,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					default:
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
 					}
+					return statementStr
+				}
+				for _, statement := range statements {
+					statementStr := statementToString(statement)
 					sourceCode += fmt.Sprintf("%s\n", statementStr)
 				}
 				code = sourceCode
@@ -257,7 +277,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 			methodSource = fmt.Sprintf("%s {%s", accessFlags, code)
 		default:
 			name = fmt.Sprintf("%s(%s)", name, paramsNewStr)
-			methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnType, name, code)
+			methodSource = fmt.Sprintf(`%s %s %s {%s`, accessFlags, returnTypeStr, name, code)
 		}
 		methodSource += strings.Repeat("\t", c.TabNumber()) + "}"
 		result = append(result, methodSource)
@@ -265,21 +285,11 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	return result, nil
 }
 func (c *ClassObjectDumper) parseImportCLass(name string) string {
-	if name[len(name)-1] == ';' {
-		name = name[:len(name)-1]
+	packageName, className := decompiler.SplitPackageClassName(name)
+	if packageName != "" {
+		c.imports[packageName] = struct{}{}
 	}
-	array := ""
-	if name[0] == '[' {
-		name = name[1:]
-		array = "[]"
-	}
-	if name[0] == 'L' {
-		name = name[1:]
-	}
-	paramSplit := strings.Split(name, "/")
-	lastPacket := paramSplit[len(paramSplit)-1]
-	c.imports[strings.Join(paramSplit, ".")] = struct{}{}
-	return lastPacket + array
+	return className
 }
 func (c *ClassObjectDumper) dumpConstantPool() ([]string, error) {
 	result := []string{}
