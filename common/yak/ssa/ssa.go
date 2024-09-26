@@ -216,8 +216,12 @@ type Program struct {
 
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	ExprotValue    map[string]Value
-	ExprotType     map[string]Type
+
+	// for namespace/use
+	Alias map[string]string // current-name to real-full-path-name
+	// for import/export
+	ExportValue map[string]Value
+	ExportType  map[string]Type
 
 	// offset
 	OffsetMap         map[int]*OffsetItem
