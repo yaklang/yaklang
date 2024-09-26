@@ -362,6 +362,7 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					startRng := ret.Insts[0].GetRange()
 					endRng := ret.Insts[len(ret.Insts)-1].GetRange()
 					fallbackRange := memedit.NewRange(startRng.GetStart(), endRng.GetEnd())
+					fallbackRange.SetEditor(startRng.GetEditor())
 					lz.Instruction.SetRange(fallbackRange)
 					return fallbackRange
 				}
