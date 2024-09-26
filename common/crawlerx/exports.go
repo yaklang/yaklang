@@ -47,6 +47,7 @@ var CrawlerXExports = map[string]interface{}{
 	"HighRepeatLevel":    highLevel,
 	"ExtremeRepeatLevel": extremeLevel,
 
-	"AllDomainScan": mainDomain,
-	"SubMenuScan":   subDomain,
+	"AllDomainScan":       mainDomain,
+	"SubMenuScan":         subDomain,
+	"UnlimitedDomainScan": unlimitedDomain,
 }

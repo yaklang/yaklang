@@ -43,18 +43,21 @@ var RepeatLevelMap = map[int]repeatLevel{
 type scanRangeLevel int
 
 const (
-	mainDomain scanRangeLevel = 0
-	subDomain  scanRangeLevel = 1
+	mainDomain      scanRangeLevel = 0
+	subDomain       scanRangeLevel = 1
+	unlimitedDomain scanRangeLevel = 2
 )
 
 var ScanRangeLevelMap = map[int]scanRangeLevel{
 	0: mainDomain,
 	1: subDomain,
+	2: unlimitedDomain,
 }
 
 var generalScanRangeMap = map[scanRangeLevel]func(string) []string{
-	mainDomain: generalMainDomainRange,
-	subDomain:  generalSubDomainRange,
+	mainDomain:      generalMainDomainRange,
+	subDomain:       generalSubDomainRange,
+	unlimitedDomain: generalUnlimitedDomainRange,
 }
 
 var elementAttribute = []string{
