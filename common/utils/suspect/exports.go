@@ -17,7 +17,7 @@ import (
 // str.IsAlpha("abc123") // false
 // ```
 func isAlpha(i interface{}) bool {
-	return utils.MatchAllOfRegexp(i, `[a-zA-Z]+`)
+	return utils.MatchAllOfRegexp(i, `^[a-zA-Z]+$`)
 }
 
 // IsDigit 尝试将传入的参数转换为字符串，然后判断其是否都由数字组成
@@ -27,7 +27,7 @@ func isAlpha(i interface{}) bool {
 // str.IsDigit("abc123") // false
 // ```
 func isDigit(i interface{}) bool {
-	return utils.MatchAllOfRegexp(i, `[0-9]+`)
+	return utils.MatchAllOfRegexp(i, `^[0-9]+$`)
 }
 
 // IsAlphaNum / IsAlNum 尝试将传入的参数转换为字符串，然后判断其是否都由英文字母和数字组成
@@ -37,7 +37,7 @@ func isDigit(i interface{}) bool {
 // str.IsAlphaNum("abc123!") // false
 // ```
 func isAlphaNum(i interface{}) bool {
-	return utils.MatchAllOfRegexp(i, `[a-zA-Z0-9]+`)
+	return utils.MatchAllOfRegexp(i, `^[a-zA-Z0-9]+$`)
 }
 
 // IsTLSServer 尝试访问传入的host，然后判断其是否为 TLS 服务。第一个参数为 host，后面可以传入零个或多个参数，为代理地址
