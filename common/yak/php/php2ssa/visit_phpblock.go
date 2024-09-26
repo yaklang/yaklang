@@ -17,7 +17,7 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	}
 
 	//==================================================================== visitor
-	if y.PreHandler && len(i.AllNamespaceDeclaration()) == 0 {
+	if y.PreHandler() && len(i.AllNamespaceDeclaration()) == 0 {
 		return nil
 	}
 	for _, namespace := range i.AllNamespaceDeclaration() {
