@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -357,6 +356,16 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 	if lz.Instruction.GetRange() == nil {
 		editor, start, end, err := lz.ir.GetStartAndEndPositions(lz.cache.DB)
 		if err != nil {
+			switch ret := lz.Self().(type) {
+			case *BasicBlock:
+				if len(ret.Insts) > 0 {
+					startRng := ret.Insts[0].GetRange()
+					endRng := ret.Insts[len(ret.Insts)-1].GetRange()
+					fallbackRange := memedit.NewRange(startRng.GetStart(), endRng.GetEnd())
+					lz.Instruction.SetRange(fallbackRange)
+					return fallbackRange
+				}
+			}
 			log.Warnf("LazyInstruction(%T).GetRange failed: %v", lz.Self(), err)
 			return nil
 		}
