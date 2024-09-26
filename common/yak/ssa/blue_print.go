@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -57,7 +58,7 @@ func (c *ClassBluePrint) SyntaxMethods() {
 		})
 	}
 	checkAndGetMaps := func(vals ...Value) map[string]*Function {
-		var results = make(map[string]*Function)
+		results := make(map[string]*Function)
 		lo.ForEach(vals, func(item Value, index int) {
 			if funcs, b := ToFunction(c.Constructor); b {
 				results[uuid.NewString()] = funcs

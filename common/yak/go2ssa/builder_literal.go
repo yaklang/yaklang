@@ -651,7 +651,7 @@ func (b *astbuilder) buildBasicLit(exp *gol.BasicLitContext) ssa.Value {
 }
 
 func (b *astbuilder) buildStringLiteral(stmt *gol.String_Context) ssa.Value {
-	var text = stmt.GetText()
+	text := stmt.GetText()
 	if text == "" {
 		return b.EmitConstInst(text)
 	}
@@ -699,17 +699,17 @@ func (b *astbuilder) buildIntegerLiteral(stmt *gol.IntegerContext) ssa.Value {
 	lit := stmt.GetText()
 
 	if find := strings.Contains(lit, "."); find {
-		var f, _ = strconv.ParseFloat(lit, 64)
+		f, _ := strconv.ParseFloat(lit, 64)
 		return b.EmitConstInst(f)
 	} else {
 		var err error
-		var originStr = stmt.GetText()
-		var intStr = strings.ToLower(originStr)
+		originStr := stmt.GetText()
+		intStr := strings.ToLower(originStr)
 		var resultInt64 int64
 
 		if num := stmt.DECIMAL_LIT(); num != nil { // 十进制
 			if strings.Contains(stmt.GetText(), "e") {
-				var f, _ = strconv.ParseFloat(intStr, 64)
+				f, _ := strconv.ParseFloat(intStr, 64)
 				return b.EmitConstInst(f)
 			}
 			resultInt64, err = strconv.ParseInt(intStr, 10, 64)
@@ -757,9 +757,9 @@ func coverType(ityp, iwantTyp ssa.Type) {
 	case ssa.StructTypeKind:
 		typ.FieldType = wantTyp.FieldType
 		typ.KeyTyp = wantTyp.KeyTyp
-		for n, m := range wantTyp.GetMethod() {
-			typ.AddMethod(n, m)
-		}
+		wantTyp.RangeMethod(func(s string, f *ssa.Function) {
+			typ.AddMethod(s, f)
+		})
 	}
 	for _, a := range wantTyp.AnonymousField {
 		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
