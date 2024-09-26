@@ -2,6 +2,30 @@ buildSqlPayload = (pre, suf) => {
     return f"${pre}/**/And/**/SleeP(3)${suf}"
 }
 
+sqlBuildPrefix = func(paramValue) {
+    pureInt = str.IsDigit(paramValue)
+
+    wideByte = string([uint8(randn(129, 254))])
+    prefix = []
+
+    valueList = [paramValue]
+    boundaryList = [" ",")","))"]
+
+    formatString = "%s"
+    if !pureInt {
+        formatString = formatString + wideByte + "'"
+        valueList = append(valueList, randstr(10))
+    }
+    formatString = formatString + "%s"
+
+    for v  in valueList {
+        for b in boundaryList {
+            prefix.Push(sprintf(formatString,v,b))
+        }
+    }
+    return prefix
+}
+
 description = `
 SQL 时间盲注（Time-Based Blind SQL Injection）是一种针对数据库的攻击方式，攻击者利用数据库执行时间的差异来推断出数据库中的信息，而不需要直接获取数据库的反馈信息。这种攻击适用在被攻击的应用程序未能有效过滤用户输入以及未采取相应的安全措施的情况下。`
 solution = ``
@@ -25,15 +49,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
         val := p.GetFirstValue()
         isNum = str.IsDigit(val)
         var suffix = [" -- "]
-        var prefix = []
-        if isNum {
-            prefix.Push(f`${val}`)
-            prefix.Push(f`${val}'`)
-        } else {
-            prefix.Push(f`${val}'`)
-            prefix.Push(f`${val}')`)
-            prefix.Push(f`${val}'))`)
-        }
+        var prefix = sqlBuildPrefix(val)
         for suf in suffix {
             for pre in prefix {
                 payload := buildSqlPayload(pre, suf)
