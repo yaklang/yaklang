@@ -228,8 +228,10 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		isRef := ret.Ampersand()
 		_ = isRef
 
-		funcName := y.VisitIdentifier(ret.Identifier())
+		methodName := y.VisitIdentifier(ret.Identifier())
+		funcName := fmt.Sprintf("%s_%s", class.Name, &methodName)
 		newFunction := y.NewFunc(funcName)
+		newFunction.SetMethodName(methodName)
 		newFunction.SetLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
