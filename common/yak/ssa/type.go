@@ -368,6 +368,7 @@ type baseType struct {
 	method       map[string]*Function
 	methodGetter func() map[string]*Function
 	methodOnce   sync.Once
+	methodLock   sync.RWMutex
 }
 
 func NewBaseType() *baseType {
@@ -387,6 +388,8 @@ func (b *baseType) AddMethod(id string, f *Function) {
 		// init
 		b.GetMethod()
 	}
+	b.methodLock.Lock()
+	defer b.methodLock.Unlock()
 	b.method[id] = f
 }
 
@@ -402,6 +405,14 @@ func (b *baseType) GetMethod() map[string]*Function {
 		})
 	}
 	return b.method
+}
+
+func (b *baseType) RangeMethod(f func(string, *Function)) {
+	b.methodLock.RLock()
+	defer b.methodLock.RUnlock()
+	for k, v := range b.method {
+		f(k, v)
+	}
 }
 
 type BasicType struct {
