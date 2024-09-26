@@ -175,6 +175,27 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#IntersectionRefFilter.
 	VisitIntersectionRefFilter(ctx *IntersectionRefFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#InFilter.
+	VisitInFilter(ctx *InFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#vstart.
+	VisitVstart(ctx *VstartContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#vend.
+	VisitVend(ctx *VendContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionBlockElement.
+	VisitVersionBlockElement(ctx *VersionBlockElementContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionSuffix.
+	VisitVersionSuffix(ctx *VersionSuffixContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionBlock.
+	VisitVersionBlock(ctx *VersionBlockContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionString.
+	VisitVersionString(ctx *VersionStringContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#filterExpr.
 	VisitFilterExpr(ctx *FilterExprContext) interface{}
 
