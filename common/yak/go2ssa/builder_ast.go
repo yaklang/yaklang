@@ -106,18 +106,18 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	var bpHandler = func() {
 		lib := b.GetProgram()
 		for structName, structType := range b.GetStructAll() {
-			lib.SetExprotType(structName, structType)
+			lib.SetExportType(structName, structType)
 		}
 		for aliasName, aliasType := range b.GetAliasAll() {
-			lib.SetExprotType(aliasName, aliasType)
+			lib.SetExportType(aliasName, aliasType)
 		}
 		for funcName, funcValue := range b.GetProgram().Funcs {
 			if !funcValue.IsMethod() && funcValue.GetName() != "@init" {
-				lib.SetExprotValue(funcName, funcValue)
+				lib.SetExportValue(funcName, funcValue)
 			}
 		}
 		for globalName, globalValue := range b.GetGlobalVariables() {
-			lib.SetExprotValue(globalName, globalValue)
+			lib.SetExportValue(globalName, globalValue)
 		}
 	}
 
@@ -1801,7 +1801,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 				b.NewError(ssa.Warn, TAG, PackageNotFind(qul.IDENTIFIER(0).GetText()))
 				ssatyp = ssa.CreateAnyType()
 			} else {
-				obj := lib.GetExprotType(qul.IDENTIFIER(1).GetText())
+				obj := lib.GetExportType(qul.IDENTIFIER(1).GetText())
 
 				if obj != nil {
 					ssatyp = obj

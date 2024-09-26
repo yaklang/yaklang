@@ -322,30 +322,30 @@ func (p *Program) GetType(name string) Type {
 	return nil
 }
 
-func (p *Program) GetExprotType(name string) Type {
-	if p.ExprotType[name] != nil {
-		return p.ExprotType[name]
+func (p *Program) GetExportType(name string) Type {
+	if p.ExportType[name] != nil {
+		return p.ExportType[name]
 	}
 	return nil
 }
 
-func (p *Program) GetExprotValue(name string) Value {
-	if p.ExprotValue[name] != nil {
-		return p.ExprotValue[name]
+func (p *Program) GetExportValue(name string) Value {
+	if p.ExportValue[name] != nil {
+		return p.ExportValue[name]
 	}
 	return nil
 }
 
-func (p *Program) SetExprotType(name string, t Type) {
-	if p.ExprotType == nil {
-		p.ExprotType = make(map[string]Type)
+func (p *Program) SetExportType(name string, t Type) {
+	if p.ExportType == nil {
+		p.ExportType = make(map[string]Type)
 	}
-	p.ExprotType[name] = t
+	p.ExportType[name] = t
 }
 
-func (p *Program) SetExprotValue(name string, v Value) {
-	if p.ExprotValue == nil {
-		p.ExprotValue = make(map[string]Value)
+func (p *Program) SetExportValue(name string, v Value) {
+	if p.ExportValue == nil {
+		p.ExportValue = make(map[string]Value)
 	}
-	p.ExprotValue[name] = v
+	p.ExportValue[name] = v
 }
