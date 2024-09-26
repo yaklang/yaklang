@@ -30,7 +30,6 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
 	class, name := y.VisitTypeRef(i.TypeRef())
-	class.SyntaxMethods()
 	var obj ssa.Value
 	obj = y.EmitUndefined(name)
 	if utils.IsNil(obj) {
@@ -204,14 +203,16 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 		}
 
-		// handle variable name
-		for _, va := range ret.AllVariableInitializer() {
-			name, value := y.VisitVariableInitializer(va)
-			if strings.HasPrefix(name, "$") {
-				name = name[1:]
+		class.SetLazyBuilder(func() {
+			// handle variable name
+			for _, va := range ret.AllVariableInitializer() {
+				name, value := y.VisitVariableInitializer(va)
+				if strings.HasPrefix(name, "$") {
+					name = name[1:]
+				}
+				setMember(name, value)
 			}
-			setMember(name, value)
-		}
+		})
 
 		return
 	case *phpparser.FunctionContext:
@@ -229,7 +230,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 		funcName := y.VisitIdentifier(ret.Identifier())
 		newFunction := y.NewFunc(funcName)
-		newFunction.SetOrdinalBuild(func() ssa.Value {
+		newFunction.SetLazyBuilder(func() {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
 				this := y.NewParam("$this")
@@ -239,7 +240,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
-			return newFunction
 		})
 
 		switch funcName {
@@ -735,7 +735,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
-	bluePrint.SyntaxMethods()
+	bluePrint.Build()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
 	constructor := bluePrint.GetConstructOrDestruct("constructor")
