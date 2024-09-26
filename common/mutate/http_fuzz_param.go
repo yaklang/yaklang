@@ -10,8 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-
-
 func PositionTypeVerbose(pos lowhttp.HttpParamPositionType) string {
 	switch pos {
 	case lowhttp.PosMethod:
@@ -104,7 +102,7 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
 	switch p.position {
 	case lowhttp.PosCookie, lowhttp.PosCookieJson, lowhttp.PosCookieBase64,
-	lowhttp.PosCookieBase64Json:
+		lowhttp.PosCookieBase64Json:
 		return true
 	}
 	return false
@@ -231,6 +229,10 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 	//
 	//}
 	return p.paramValue
+}
+
+func (p *FuzzHTTPRequestParam) ValueString() string {
+	return fmt.Sprintf("%s", p.Value())
 }
 
 func (p *FuzzHTTPRequestParam) Repeat(i int) FuzzHTTPRequestIf {
