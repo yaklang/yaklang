@@ -44,13 +44,42 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			return nil
 		}
 		vfs := filesys.NewVirtualFs()
-		vfs.AddFile("pom.xml", string(raw))
+		vfs.AddFile(filename, string(raw))
 		pkgs, err := sca.ScanFilesystem(vfs)
 		if err != nil {
 			log.Warnf("scan pom.xml error: %v", err)
 			return nil
 		}
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
+		/*
+			__dependency__.name?{}
+		*/
+		variable := functionBuilder.CreateVariable("__dependency__")
+		container := functionBuilder.EmitEmptyContainer()
+		functionBuilder.AssignVariable(variable, container)
+		for _, pkg := range pkgs {
+			sub := functionBuilder.EmitEmptyContainer()
+
+			// check item
+			// 1. name
+			// 2. version
+			// 3. filename
+			// 4. group
+			// 5. artifact
+			for k, v := range map[string]string{
+				"name":     pkg.Name,
+				"version":  pkg.Version,
+				"filename": filename,
+			} {
+				functionBuilder.AssignVariable(
+					functionBuilder.CreateMemberCallVariable(sub, functionBuilder.EmitConstInst(k)),
+					functionBuilder.EmitConstInst(v),
+				)
+			}
+
+			pkgItem := functionBuilder.CreateMemberCallVariable(container, functionBuilder.EmitConstInst(pkg.Name))
+			functionBuilder.AssignVariable(pkgItem, sub)
+		}
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {

@@ -281,3 +281,39 @@ alert $param for {"level": "high"}
 	err = sfdb.DeleteRuleByRuleName("test.sf")
 	require.NoError(t, err)
 }
+
+func TestJavaDependencies(t *testing.T) {
+	code := `
+__dependency__.*fastjson.version as $ver;
+alert $ver;
+
+desc(
+lang: java,
+'file://pom.xml': <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vulnerable-fastjson-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- Fastjson dependency with known vulnerabilities -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <!-- An example version with known vulnerabilities, make sure to check for specific vulnerable versions -->
+            <version>1.2.24</version>
+        </dependency>
+    </dependencies>
+</project>
+CODE
+)`
+	err := ssatest.EvaluateVerifyFilesystem(code, t)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
