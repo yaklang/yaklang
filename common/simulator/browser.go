@@ -7,6 +7,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/log"
@@ -91,7 +92,7 @@ func (starter *BrowserStarter) doLaunch(l *launcher.Launcher) *launcher.Launcher
 	if starter.config.proxy != nil {
 		l = l.Proxy(starter.config.proxy.String())
 	}
-	l = l.NoSandbox(true).Headless(true)
+	l = l.NoSandbox(true).Set(flags.Headless, "new")
 	if starter.config.leakless == LeaklessOff {
 		l = l.Leakless(false)
 	} else if starter.config.leakless == LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {
