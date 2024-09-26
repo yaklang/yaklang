@@ -31,7 +31,7 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	b.Included = true
 	_path := p.Loader.GetCurrentPath()
 	p.Loader.SetCurrentPath(path.Dir(file))
-	err = p.Build(file, data, b)
+	err = p.GetApplication().Build(file, data, b)
 
 	p.Loader.SetCurrentPath(_path)
 	return err
