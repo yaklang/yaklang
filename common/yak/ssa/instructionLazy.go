@@ -366,6 +366,41 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					lz.Instruction.SetRange(fallbackRange)
 					return fallbackRange
 				}
+
+				// check if block has no instruction
+				var startRng memedit.RangeIf
+				for _, start := range ret.Preds {
+					if rng := start.GetRange(); rng != nil {
+						startRng = rng
+						break
+					}
+				}
+				var endRng memedit.RangeIf
+				for _, end := range ret.Succs {
+					if rng := end.GetRange(); rng != nil {
+						endRng = rng
+						break
+					}
+				}
+				if startRng != nil && endRng != nil {
+					log.Infof("use pred start range and succ end range for %v(%T)", lz.GetId(), lz.Self())
+					fallbackRange := memedit.NewRange(startRng.GetStart(), endRng.GetEnd())
+					fallbackRange.SetEditor(startRng.GetEditor())
+					lz.Instruction.SetRange(fallbackRange)
+					return fallbackRange
+				}
+
+				if startRng != nil {
+					log.Infof("just use pred start range for %v(%T)", lz.GetId(), lz.Self())
+					lz.Instruction.SetRange(startRng)
+					return startRng
+				}
+
+				if endRng != nil {
+					log.Infof("just use succ end range for %v(%T)", lz.GetId(), lz.Self())
+					lz.Instruction.SetRange(endRng)
+					return endRng
+				}
 			}
 			log.Warnf("LazyInstruction(%T).GetRange failed: %v", lz.Self(), err)
 			return nil
