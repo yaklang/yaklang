@@ -63,11 +63,7 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		log.Errorf("read file %s error: %v", path, err)
 		return nil
 	}
-	builder.PreHandler = true
 	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
-	defer func() {
-		builder.PreHandler = false
-	}()
 	prog.GetIncludeFiles()
 	return nil
 }
@@ -75,9 +71,7 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 var Builder = &SSABuild{}
 
 func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.PreHandler = true
 	builder.GetProgram().GetApplication().Build("", editor, builder)
-	builder.PreHandler = false
 }
 
 func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
@@ -114,7 +108,6 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if b.IncludeStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("main", "main")
-		functionBuilder.PreHandler = b.PreHandler
 		startParse(functionBuilder)
 	} else {
 		startParse(b)

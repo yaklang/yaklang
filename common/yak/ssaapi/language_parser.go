@@ -82,6 +82,7 @@ func (c *config) parseProject() (Programs, error) {
 	}
 	_ = totalSize
 
+	prog.SetPreHandler(true)
 	prog.ProcessInfof("parse project in fs: %v, path: %v", c.fs, programPath)
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(c.fs),
@@ -111,6 +112,7 @@ func (c *config) parseProject() (Programs, error) {
 		}),
 	)
 
+	prog.SetPreHandler(false)
 	// parse project
 	err = ssareducer.ReducerCompile(
 		programPath, // base
@@ -211,14 +213,15 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}
 	c.LanguageBuilder = c.LanguageBuilder.Create()
 	prog, builder, err := c.init()
+	prog.SetPreHandler(true)
 	c.LanguageBuilder.InitHandler(builder)
-
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
 	}
 	c.LanguageBuilder.PreHandlerFile(r, builder)
 	// parse code
+	prog.SetPreHandler(false)
 	if err := prog.Build("", r, builder); err != nil {
 		return nil, err
 	}
@@ -328,7 +331,7 @@ func (c *config) init() (*ssa.Program, *ssa.FunctionBuilder, error) {
 		}
 
 		// push into program for recording what code is compiling
-		application.PushEditorex(newCodeEditor, !fb.PreHandler)
+		application.PushEditor(newCodeEditor)
 		defer func() {
 			// recover source code context
 			fb.SetEditor(originEditor)
