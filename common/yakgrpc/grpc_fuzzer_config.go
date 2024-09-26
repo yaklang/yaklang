@@ -15,8 +15,7 @@ func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfig
 	var errs error
 	msg := &ypb.DbOperateMessage{
 		TableName:    "WebFuzzerConfig",
-		Operation:    "CreateOrUpdate",
-		EffectRows:   int64(len(req.Data)),
+		Operation:    DbOperationCreateOrUpdate,
 		ExtraMessage: "CreateOrUpdate web fuzzer config with pageId",
 	}
 	for _, v := range req.Data {
@@ -25,7 +24,8 @@ func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfig
 			Type:   v.Type,
 			Config: v.Config,
 		}
-		err := yakit.CreateOrUpdateWebFuzzerConfig(s.GetProjectDatabase(), item)
+		count,err := yakit.CreateOrUpdateWebFuzzerConfig(s.GetProjectDatabase(), item)
+		msg.EffectRows +=count
 		errs = utils.JoinErrors(errs, err)
 	}
 	return msg, errs
@@ -48,9 +48,15 @@ func (s *Server) QueryFuzzerConfig(ctx context.Context, params *ypb.QueryFuzzerC
 }
 
 func (s *Server) DeleteFuzzerConfig(ctx context.Context, req *ypb.DeleteFuzzerConfigRequest) (*ypb.DbOperateMessage, error) {
-	msg, err := yakit.DeleteWebFuzzerConfig(s.GetProjectDatabase(), req.GetPageId(), req.GetDeleteAll())
+	count, err := yakit.DeleteWebFuzzerConfig(s.GetProjectDatabase(), req.GetPageId(), req.GetDeleteAll())
 	if err != nil {
-		return msg, err
+		return nil, err
+	}
+	msg := &ypb.DbOperateMessage{
+		TableName:    "web_fuzzer_config",
+		Operation:    DbOperationDelete,
+		EffectRows:   count,
+		ExtraMessage: "delete web fuzzer config with pageId",
 	}
 	return msg, nil
 }

@@ -399,6 +399,11 @@ const (
 	Yak_RecoverBuiltinFingerprint_FullMethodName                  = "/ypb.Yak/RecoverBuiltinFingerprint"
 	Yak_GetReverseShellProgramList_FullMethodName                 = "/ypb.Yak/GetReverseShellProgramList"
 	Yak_GenerateReverseShellCommand_FullMethodName                = "/ypb.Yak/GenerateReverseShellCommand"
+	Yak_QuerySyntaxFlowRule_FullMethodName                        = "/ypb.Yak/QuerySyntaxFlowRule"
+	Yak_SaveSyntaxFlowRule_FullMethodName                         = "/ypb.Yak/SaveSyntaxFlowRule"
+	Yak_DeleteSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/DeleteSyntaxFlowRule"
+	Yak_QuerySyntaxFlowRuleGroup_FullMethodName                   = "/ypb.Yak/QuerySyntaxFlowRuleGroup"
+	Yak_SaveSyntaxFlowRuleGroup_FullMethodName                    = "/ypb.Yak/SaveSyntaxFlowRuleGroup"
 )
 
 // YakClient is the client API for Yak service.
@@ -897,6 +902,12 @@ type YakClient interface {
 	// 反弹shell命令生成
 	GetReverseShellProgramList(ctx context.Context, in *GetReverseShellProgramListRequest, opts ...grpc.CallOption) (*GetReverseShellProgramListResponse, error)
 	GenerateReverseShellCommand(ctx context.Context, in *GenerateReverseShellCommandRequest, opts ...grpc.CallOption) (*GenerateReverseShellCommandResponse, error)
+	// SyntaxFlow Rule
+	QuerySyntaxFlowRule(ctx context.Context, in *QuerySyntaxFlowRuleRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleResponse, error)
+	SaveSyntaxFlowRule(ctx context.Context, in *SaveSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleGroupResponse, error)
+	SaveSyntaxFlowRuleGroup(ctx context.Context, in *SaveSyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 }
 
 type yakClient struct {
@@ -5858,6 +5869,51 @@ func (c *yakClient) GenerateReverseShellCommand(ctx context.Context, in *Generat
 	return out, nil
 }
 
+func (c *yakClient) QuerySyntaxFlowRule(ctx context.Context, in *QuerySyntaxFlowRuleRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleResponse, error) {
+	out := new(QuerySyntaxFlowRuleResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySyntaxFlowRule_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SaveSyntaxFlowRule(ctx context.Context, in *SaveSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_SaveSyntaxFlowRule_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteSyntaxFlowRule_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleGroupResponse, error) {
+	out := new(QuerySyntaxFlowRuleGroupResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySyntaxFlowRuleGroup_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SaveSyntaxFlowRuleGroup(ctx context.Context, in *SaveSyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_SaveSyntaxFlowRuleGroup_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -6354,6 +6410,12 @@ type YakServer interface {
 	// 反弹shell命令生成
 	GetReverseShellProgramList(context.Context, *GetReverseShellProgramListRequest) (*GetReverseShellProgramListResponse, error)
 	GenerateReverseShellCommand(context.Context, *GenerateReverseShellCommandRequest) (*GenerateReverseShellCommandResponse, error)
+	// SyntaxFlow Rule
+	QuerySyntaxFlowRule(context.Context, *QuerySyntaxFlowRuleRequest) (*QuerySyntaxFlowRuleResponse, error)
+	SaveSyntaxFlowRule(context.Context, *SaveSyntaxFlowRuleRequest) (*DbOperateMessage, error)
+	DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error)
+	QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error)
+	SaveSyntaxFlowRuleGroup(context.Context, *SaveSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7500,6 +7562,21 @@ func (UnimplementedYakServer) GetReverseShellProgramList(context.Context, *GetRe
 }
 func (UnimplementedYakServer) GenerateReverseShellCommand(context.Context, *GenerateReverseShellCommandRequest) (*GenerateReverseShellCommandResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateReverseShellCommand not implemented")
+}
+func (UnimplementedYakServer) QuerySyntaxFlowRule(context.Context, *QuerySyntaxFlowRuleRequest) (*QuerySyntaxFlowRuleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowRule not implemented")
+}
+func (UnimplementedYakServer) SaveSyntaxFlowRule(context.Context, *SaveSyntaxFlowRuleRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveSyntaxFlowRule not implemented")
+}
+func (UnimplementedYakServer) DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSyntaxFlowRule not implemented")
+}
+func (UnimplementedYakServer) QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowRuleGroup not implemented")
+}
+func (UnimplementedYakServer) SaveSyntaxFlowRuleGroup(context.Context, *SaveSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveSyntaxFlowRuleGroup not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -14605,6 +14682,96 @@ func _Yak_GenerateReverseShellCommand_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QuerySyntaxFlowRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySyntaxFlowRuleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySyntaxFlowRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySyntaxFlowRule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySyntaxFlowRule(ctx, req.(*QuerySyntaxFlowRuleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SaveSyntaxFlowRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveSyntaxFlowRuleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SaveSyntaxFlowRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SaveSyntaxFlowRule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SaveSyntaxFlowRule(ctx, req.(*SaveSyntaxFlowRuleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSyntaxFlowRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSyntaxFlowRuleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSyntaxFlowRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSyntaxFlowRule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSyntaxFlowRule(ctx, req.(*DeleteSyntaxFlowRuleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySyntaxFlowRuleGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySyntaxFlowRuleGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySyntaxFlowRuleGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySyntaxFlowRuleGroup(ctx, req.(*QuerySyntaxFlowRuleGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SaveSyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveSyntaxFlowRuleGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SaveSyntaxFlowRuleGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SaveSyntaxFlowRuleGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SaveSyntaxFlowRuleGroup(ctx, req.(*SaveSyntaxFlowRuleGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -15863,6 +16030,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateReverseShellCommand",
 			Handler:    _Yak_GenerateReverseShellCommand_Handler,
+		},
+		{
+			MethodName: "QuerySyntaxFlowRule",
+			Handler:    _Yak_QuerySyntaxFlowRule_Handler,
+		},
+		{
+			MethodName: "SaveSyntaxFlowRule",
+			Handler:    _Yak_SaveSyntaxFlowRule_Handler,
+		},
+		{
+			MethodName: "DeleteSyntaxFlowRule",
+			Handler:    _Yak_DeleteSyntaxFlowRule_Handler,
+		},
+		{
+			MethodName: "QuerySyntaxFlowRuleGroup",
+			Handler:    _Yak_QuerySyntaxFlowRuleGroup_Handler,
+		},
+		{
+			MethodName: "SaveSyntaxFlowRuleGroup",
+			Handler:    _Yak_SaveSyntaxFlowRuleGroup_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

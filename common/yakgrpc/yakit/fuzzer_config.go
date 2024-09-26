@@ -8,12 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func CreateOrUpdateWebFuzzerConfig(db *gorm.DB, config *schema.WebFuzzerConfig) error {
+func CreateOrUpdateWebFuzzerConfig(db *gorm.DB, config *schema.WebFuzzerConfig) (int64, error) {
 	db = db.Model(&schema.WebFuzzerConfig{})
 	if db := db.Where("page_id = ?", config.PageId).Assign(config).FirstOrCreate(&schema.WebFuzzerConfig{}); db.Error != nil {
-		return utils.Errorf("create/update WebFuzzerLabel failed: %s", db.Error)
+		return 0, utils.Errorf("create/update WebFuzzerLabel failed: %s", db.Error)
 	}
-	return nil
+	return db.RowsAffected, nil
 }
 
 func QueryWebFuzzerConfig(db *gorm.DB, params *ypb.QueryFuzzerConfigRequest) ([]*schema.WebFuzzerConfig, error) {
@@ -27,26 +27,14 @@ func QueryWebFuzzerConfig(db *gorm.DB, params *ypb.QueryFuzzerConfigRequest) ([]
 	return result, nil
 }
 
-func DeleteWebFuzzerConfig(db *gorm.DB, pageIds []string, deleteAll bool) (*ypb.DbOperateMessage, error) {
-	msg := &ypb.DbOperateMessage{
-		TableName: "WebFuzzerConfig",
-		Operation: "Delete",
-	}
+func DeleteWebFuzzerConfig(db *gorm.DB, pageIds []string, deleteAll bool) (int64, error) {
 	if deleteAll {
 		db = db.Unscoped().Delete(&schema.WebFuzzerConfig{})
-		msg = &ypb.DbOperateMessage{
-			EffectRows:   db.RowsAffected,
-			ExtraMessage: "Delete all webFuzzerConfig",
-		}
 	} else if len(pageIds) > 0 {
 		db = bizhelper.ExactOrQueryStringArrayOr(db, "page_id", pageIds).Unscoped().Delete(&schema.WebFuzzerConfig{})
-		msg = &ypb.DbOperateMessage{
-			EffectRows:   db.RowsAffected,
-			ExtraMessage: "Delete webFuzzerConfig with pageId",
-		}
 	}
 	if db.Error != nil {
-		return msg, utils.Errorf("delete web fuzzer failed: %s", db.Error)
+		return 0, utils.Errorf("delete web fuzzer failed: %s", db.Error)
 	}
-	return msg, nil
+	return db.RowsAffected, nil
 }
