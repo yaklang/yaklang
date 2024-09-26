@@ -52,6 +52,7 @@ func GetStoreIdx(code *OpCode) int {
 }
 
 const (
+	NEQ  = "!="
 	EQ   = "=="
 	LT   = "<"
 	GTE  = ">="
@@ -159,6 +160,10 @@ func Convert2bytesToInt(data []byte) uint16 {
 func Convert4bytesToInt(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
+func ParseDescriptor(descriptor string) (JavaType, error) {
+	returnType, _, err := parseType(descriptor)
+	return returnType, err
+}
 
 // parseMethodDescriptor 解析 Java 方法描述符
 func ParseMethodDescriptor(descriptor string) ([]JavaType, JavaType, error) {
@@ -262,7 +267,8 @@ func parseType(descriptor string) (JavaType, string, error) {
 		if endIndex == -1 {
 			return nil, "", fmt.Errorf("invalid class descriptor format")
 		}
-		return NewJavaClass(descriptor[1:endIndex]), descriptor[endIndex+1:], nil
+		name := strings.Replace(descriptor[1:endIndex], "/", ".", -1)
+		return NewJavaClass(name), descriptor[endIndex+1:], nil
 	case '[':
 		// 数组类型，以 [ 开头，后跟元素类型
 		elemType, rest, err := parseType(descriptor[1:])
@@ -302,7 +308,21 @@ func GetShortName(ctx *FunctionContext, name string) string {
 	return name
 }
 
-func SetNodeJmp(src, target *Node) {
+func CutNode(src, target *Node) {
+	for i, item := range src.Next {
+		if item == target {
+			src.Next = append(src.Next[:i], src.Next[i+1:]...)
+			break
+		}
+	}
+	for i, item := range target.Source {
+		if item == src {
+			target.Source = append(target.Source[:i], target.Source[i+1:]...)
+			break
+		}
+	}
+}
+func LinkNode(src, target *Node) {
 	target.Source = append(target.Source, src)
 	src.Next = append(src.Next, target)
 }
@@ -329,7 +349,7 @@ func ShowOpcodes(opcodes []*OpCode) {
 //	}
 //}
 
-func WalkGraph[T any](node T, next func(T) []T) {
+func WalkGraph[T any](node T, next func(T) ([]T, error)) error {
 	stack := utils.NewStack[T]()
 	visited := utils.NewSet[any]()
 	stack.Push(node)
@@ -339,8 +359,56 @@ func WalkGraph[T any](node T, next func(T) []T) {
 			continue
 		}
 		visited.Add(current)
-		for _, n := range next(current) {
+		n, err := next(current)
+		if err != nil {
+			return err
+		}
+		for _, n := range n {
 			stack.Push(n)
 		}
+	}
+	return nil
+}
+
+func StatementsString(statements []Statement, funcCtx *FunctionContext) string {
+	var res string
+	for _, statement := range statements {
+		res += statement.String(funcCtx)
+	}
+	return res
+}
+
+func NodeToStatement(nodes []*Node) []Statement {
+	res := make([]Statement, len(nodes))
+	for i, node := range nodes {
+		res[i] = node.Statement
+	}
+	return res
+}
+
+func VisitBody(raw Statement, f func(statement Statement) Statement) Statement {
+	switch ret := raw.(type) {
+	case *SwitchStatement:
+		for _, item := range ret.Cases {
+			for i, bodyItem := range item.Body {
+				item.Body[i] = VisitBody(bodyItem, f)
+			}
+		}
+		return ret
+	case *IfStatement:
+		for i, bodyItem := range ret.IfBody {
+			ret.IfBody[i] = VisitBody(bodyItem, f)
+		}
+		for i, bodyItem := range ret.ElseBody {
+			ret.ElseBody[i] = VisitBody(bodyItem, f)
+		}
+		return ret
+	case *ForStatement:
+		for i, bodyItem := range ret.SubStatements {
+			ret.SubStatements[i] = VisitBody(bodyItem, f)
+		}
+		return ret
+	default:
+		return f(ret)
 	}
 }

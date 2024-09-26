@@ -75,6 +75,10 @@ func NewJavaArrayType(typ JavaType, length ...JavaValue) *JavaArrayType {
 type javaNull struct {
 }
 
+func (j javaNull) Type() JavaType {
+	return j
+}
+
 func (j javaNull) String(funcCtx *FunctionContext) string {
 	return "null"
 }

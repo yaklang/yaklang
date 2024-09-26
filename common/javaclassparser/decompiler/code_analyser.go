@@ -1,7 +1,6 @@
 package decompiler
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -16,14 +15,15 @@ type FunctionContext struct {
 	BuildInLibs  []string
 }
 type Decompiler struct {
-	FunctionContext           *FunctionContext
-	bytecodes                 []byte
-	opCodes                   []*OpCode
-	Statements                []Statement
-	constantPoolGetter        func(id int) JavaValue
-	ConstantPoolLiteralGetter func(id int) *JavaLiteral
-	offsetToOpcodeIndex       map[uint16]int
-	opcodeIndexToOffset       map[int]uint16
+	FunctionContext               *FunctionContext
+	bytecodes                     []byte
+	opCodes                       []*OpCode
+	Statements                    []Statement
+	constantPoolGetter            func(id int) JavaValue
+	ConstantPoolLiteralGetter     func(constantPoolGetterid int) *JavaLiteral
+	ConstantPoolInvokeDynamicInfo func(id int) (string, string)
+	offsetToOpcodeIndex           map[uint16]int
+	opcodeIndexToOffset           map[int]uint16
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) JavaValue) *Decompiler {
@@ -40,24 +40,30 @@ func (d *Decompiler) ParseOpcode() error {
 	opcodes := []*OpCode{}
 	offsetToIndex := map[uint16]int{}
 	indexToOffset := map[int]uint16{}
-	reader := bytes.NewReader(d.bytecodes)
-	i := 0
+	reader := NewJavaByteCodeReader(d.bytecodes)
 	id := 0
 	for {
 		b, err := reader.ReadByte()
 		if err != nil {
 			break
 		}
+		current := reader.CurrentPos - 1
 		instr, ok := InstrInfos[int(b)]
 		if !ok {
 			return fmt.Errorf("unknow op: %x", b)
 		}
-		opcode := &OpCode{Instr: instr, Data: make([]byte, instr.Length), Id: id}
-		reader.Read(opcode.Data)
+		opcode := &OpCode{Instr: instr, Id: id, CurrentOffset: uint16(current)}
+		var factory = DefaultFactory
+		if v, ok := OpFactories[instr.HandleName]; ok {
+			factory = v
+		}
+		err = factory(reader, opcode)
+		if err != nil {
+			return err
+		}
 		opcodes = append(opcodes, opcode)
-		offsetToIndex[uint16(i)] = len(opcodes) - 1
-		indexToOffset[len(opcodes)-1] = uint16(i)
-		i += instr.Length + 1
+		offsetToIndex[uint16(current)] = len(opcodes) - 1
+		indexToOffset[len(opcodes)-1] = uint16(current)
 		id++
 	}
 	d.offsetToOpcodeIndex = offsetToIndex
@@ -66,29 +72,12 @@ func (d *Decompiler) ParseOpcode() error {
 	return d.ScanJmp()
 }
 
-type Node struct {
-	Statement Statement
-	Id        int
-	Source    []*Node
-	Next      []*Node
-}
-
-func (n *Node) AddSource(node *Node) {
-	n.Source = append(n.Source, node)
-}
-func (n *Node) AddNext(node *Node) {
-	n.Next = append(n.Next, node)
-}
-func NewNode(statement Statement) *Node {
-	return &Node{Statement: statement}
-}
 func (d *Decompiler) ScanJmp() error {
 	opcodes := d.opCodes
 	visitNodeRecord := utils.NewSet[*OpCode]()
 	var walkNode func(start int)
 	walkNode = func(start int) {
 		var pre *OpCode
-		deferStartOp := []int{}
 		i := start
 		for {
 			if i >= len(opcodes) {
@@ -108,38 +97,55 @@ func (d *Decompiler) ScanJmp() error {
 				gotoRaw := Convert2bytesToInt(opcode.Data)
 				gotoOp := d.offsetToOpcodeIndex[d.opcodeIndexToOffset[i]+gotoRaw]
 				SetOpcode(opcode, d.opCodes[gotoOp])
-				deferStartOp = append(deferStartOp, gotoOp)
+				walkNode(gotoOp)
 			case OP_GOTO:
 				target := Convert2bytesToInt(opcode.Data)
 				gotoOp := d.offsetToOpcodeIndex[d.opcodeIndexToOffset[i]+target]
 				SetOpcode(opcode, d.opCodes[gotoOp])
-				i = gotoOp - 1
+				walkNode(gotoOp)
+				return
 			case OP_GOTO_W:
 				target := Convert2bytesToInt(opcode.Data)
 				gotoOp := d.offsetToOpcodeIndex[d.opcodeIndexToOffset[i]+target]
 				SetOpcode(opcode, d.opCodes[gotoOp])
-				i = gotoOp - 1
+				walkNode(gotoOp)
+				return
+			case OP_LOOKUPSWITCH, OP_TABLESWITCH:
+				targets := []uint32{}
+				for _, u := range opcode.SwitchJmpCase {
+					targets = append(targets, u)
+				}
+				for _, target := range targets {
+					gotoOp := d.offsetToOpcodeIndex[uint16(target)]
+					SetOpcode(opcode, d.opCodes[gotoOp])
+					walkNode(gotoOp)
+				}
+				return
 			}
 			i++
 		}
-		for _, code := range deferStartOp {
-			walkNode(code)
-		}
 	}
 	walkNode(0)
+	//for _, code := range d.opCodes {
+	//	code.Source = utils.NewSet(code.Source).List()
+	//	code.Target = utils.NewSet(code.Target).List()
+	//}
 	return nil
 }
 func (d *Decompiler) DropUnreachableOpcode() error {
 	// DropUnreachableOpcode and nop
 	visitNodeRecord := utils.NewSet[*OpCode]()
-	WalkGraph[*OpCode](d.opCodes[0], func(code *OpCode) []*OpCode {
+	err := WalkGraph[*OpCode](d.opCodes[0], func(code *OpCode) ([]*OpCode, error) {
 		visitNodeRecord.Add(code)
 		target := []*OpCode{}
 		for _, opCode := range code.Target {
 			target = append(target, opCode)
 		}
-		return target
+		return target, nil
 	})
+	if err != nil {
+		return err
+	}
 	var newOpcodes []*OpCode
 	for _, code := range d.opCodes {
 		if !visitNodeRecord.Has(code) {
@@ -165,13 +171,17 @@ func (d *Decompiler) ParseStatement1() error {
 	if err != nil {
 		return err
 	}
+	//println(DumpOpcodesToDotExp(d.opCodes[0]))
 	err = d.DropUnreachableOpcode()
 	if err != nil {
 		return err
 	}
 	nodes := []*Node{}
 	statementsIndex := 0
-
+	var handleToStatementGetters []func(getter func(id int) (toStatement int))
+	addToStatementGetterHandle := func(handle func(getter func(id int) (toStatement int))) {
+		handleToStatementGetters = append(handleToStatementGetters, handle)
+	}
 	appendNode := func(statement Statement) *Node {
 		node := NewNode(statement)
 		node.Id = statementsIndex
@@ -207,13 +217,17 @@ func (d *Decompiler) ParseStatement1() error {
 	stackVarIndex := 0
 	mapCodeToStackVarIndex := map[*OpCode]int{}
 	assignStackVar := func(value JavaValue) {
-		appendNode(NewStackAssignStatement(stackVarIndex, value))
+		//appendNode(NewStackAssignStatement(stackVarIndex, value))
 		ref := NewJavaRef(stackVarIndex, value.Type())
 		ref.StackVar = value
 		runtimeStack.Push(ref)
 		stackVarIndex++
 	}
-
+	lambdaIndex := 0
+	getLambdaIndex := func() int {
+		defer func() { lambdaIndex++ }()
+		return lambdaIndex
+	}
 	parseOpcode := func(opcode *OpCode) {
 		//opcodeIndex := opcode.Id
 		statementsIndex = opcode.Id
@@ -263,7 +277,7 @@ func (d *Decompiler) ParseStatement1() error {
 			id := GetStoreIdx(opcode)
 			value := runtimeStack.Pop().(JavaValue)
 			isFirst := assignVar(id, value)
-			appendNode(NewAssignStatement(varTable[id], value, isFirst))
+			appendNode(NewAssignStatement(NewJavaRef(varTable[id], value.Type()), value, isFirst))
 		case OP_NEW:
 			n := Convert2bytesToInt(opcode.Data)
 			javaClass := d.constantPoolGetter(int(n)).(*JavaClass)
@@ -297,7 +311,7 @@ func (d *Decompiler) ParseStatement1() error {
 			runtimeStack.Push(exp)
 		case OP_ARRAYLENGTH:
 			ref := runtimeStack.Pop().(*JavaRef)
-			runtimeStack.Push(NewVirtualRefMember(ref.Id, "length", JavaInteger))
+			runtimeStack.Push(NewRefMember(ref.Id, "length", JavaInteger))
 		case OP_AALOAD, OP_IALOAD, OP_BALOAD, OP_CALOAD, OP_FALOAD, OP_LALOAD, OP_DALOAD, OP_SALOAD:
 			index := runtimeStack.Pop().(JavaValue)
 			ref := runtimeStack.Pop().(*JavaRef)
@@ -392,11 +406,28 @@ func (d *Decompiler) ParseStatement1() error {
 				fname = TypeCaseLong
 				typ = JavaLong
 			}
-			runtimeStack.Push(NewVirtualFunctionCall(fname, []JavaValue{runtimeStack.Pop().(JavaValue)}, typ))
+			arg := runtimeStack.Pop().(JavaValue)
+			runtimeStack.Push(NewCustomValue(func(funcCtx *FunctionContext) string {
+				return fmt.Sprintf("(%s)%s", fname, arg.String(funcCtx))
+			}, func() JavaType {
+				return typ
+			}))
 		case OP_INSTANCEOF:
-			panic("not support")
+			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClass)
+			value := runtimeStack.Pop().(JavaValue)
+			runtimeStack.Push(NewCustomValue(func(funcCtx *FunctionContext) string {
+				return fmt.Sprintf("%s instanceof %s", value.String(funcCtx), classInfo.String(funcCtx))
+			}, func() JavaType {
+				return JavaBoolean
+			}))
 		case OP_CHECKCAST:
-			panic("not support")
+			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClass)
+			arg := runtimeStack.Pop().(JavaValue)
+			runtimeStack.Push(NewCustomValue(func(funcCtx *FunctionContext) string {
+				return fmt.Sprintf("(%s)(%s)", classInfo.String(funcCtx), arg.String(funcCtx))
+			}, func() JavaType {
+				return classInfo
+			}))
 		case OP_INVOKESTATIC:
 			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClassMember)
 			methodName := classInfo.Member
@@ -415,7 +446,13 @@ func (d *Decompiler) ParseStatement1() error {
 				runtimeStack.Push(funcCallValue)
 			}
 		case OP_INVOKEDYNAMIC:
-			panic("not support")
+			_, desc := d.ConstantPoolInvokeDynamicInfo(int(Convert2bytesToInt(opcode.Data)))
+			typ, _, err := parseFuncType(desc)
+			if err != nil {
+				panic(err)
+				return
+			}
+			runtimeStack.Push(NewLambdaFuncRef(getLambdaIndex(), typ.ReturnType))
 		case OP_INVOKESPECIAL:
 			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClassMember)
 			methodName := classInfo.Member
@@ -433,7 +470,7 @@ func (d *Decompiler) ParseStatement1() error {
 			if funcCallValue.FuncType.ReturnType.String(funcCtx) != JavaVoid.String(funcCtx) {
 				runtimeStack.Push(funcCallValue)
 			}
-		case OP_INVOKEVIRTUAL, OP_INVOKEINTERFACE:
+		case OP_INVOKEINTERFACE:
 			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClassMember)
 			methodName := classInfo.Member
 			funcType, _, err := parseFuncType(classInfo.Description)
@@ -451,32 +488,47 @@ func (d *Decompiler) ParseStatement1() error {
 			} else {
 				appendNode(NewExpressionStatement(funcCallValue))
 			}
-
-			//classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClassMember)
-			//methodName := classInfo.Member
-			////if methodName == "<init>" {
-			////	runtimeStack.Push(NewFunctionCallExpression(runtimeStack.Pop().(JavaValue), methodName, nil))
-			////	break
-			////}
-			//paramTypes, _, _ := ParseMethodDescriptor(classInfo.Description)
-			//params := runtimeStack.PopN(len(paramTypes))
-			//valuesParams := []JavaValue{}
-			//for _, param := range params {
-			//	valuesParams = append(valuesParams, param.(JavaValue))
-			//}
-			//ins := runtimeStack.Pop().(JavaValue)
-			//runtimeStack.Push(NewFunctionCallExpression(ins, methodName, classInfo.Description, valuesParams))
+		case OP_INVOKEVIRTUAL:
+			classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*JavaClassMember)
+			methodName := classInfo.Member
+			funcType, _, err := parseFuncType(classInfo.Description)
+			if err != nil {
+				panic(utils.Errorf("parseFuncType %s error:%v", classInfo.Description, err))
+			}
+			funcCallValue := NewFunctionCallExpression(nil, methodName, funcType) // 不push到栈中
+			for i := 0; i < len(funcCallValue.FuncType.Params); i++ {
+				funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStack.Pop().(JavaValue))
+			}
+			funcCallValue.Arguments = funk.Reverse(funcCallValue.Arguments).([]JavaValue)
+			funcCallValue.Object = runtimeStack.Pop().(JavaValue)
+			if funcCallValue.FuncType.ReturnType.String(funcCtx) != JavaVoid.String(funcCtx) {
+				runtimeStack.Push(funcCallValue)
+			} else {
+				appendNode(NewExpressionStatement(funcCallValue))
+			}
 		case OP_RETURN:
 			appendNode(NewReturnStatement(nil))
 		case OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE:
 			op := GetNotOp(opcode)
 			rv := runtimeStack.Pop().(JavaValue)
 			lv := runtimeStack.Pop().(JavaValue)
-			appendNode(NewConditionStatement(NewJavaCompare(lv, rv), op))
+			st := NewConditionStatement(NewJavaCompare(lv, rv), op)
+			appendNode(st)
+			addToStatementGetterHandle(func(getter func(id int) (toStatement int)) {
+				st.ToStatement = getter(opcode.Id)
+			})
 		case OP_IFNONNULL:
-			panic("not support")
+			st := NewConditionStatement(NewJavaCompare(runtimeStack.Pop().(JavaValue), JavaNull), EQ)
+			appendNode(st)
+			addToStatementGetterHandle(func(getter func(id int) (toStatement int)) {
+				st.ToStatement = getter(opcode.Id)
+			})
 		case OP_IFNULL:
-			panic("not support")
+			st := NewConditionStatement(NewJavaCompare(runtimeStack.Pop().(JavaValue), JavaNull), NEQ)
+			appendNode(st)
+			addToStatementGetterHandle(func(getter func(id int) (toStatement int)) {
+				st.ToStatement = getter(opcode.Id)
+			})
 		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
 			op := ""
 			switch opcode.Instr.OpCode {
@@ -502,96 +554,150 @@ func (d *Decompiler) ParseStatement1() error {
 			if !ok {
 				panic("not support")
 			}
-			appendNode(NewConditionStatement(cmp, op))
+			st := NewConditionStatement(cmp, op)
+			appendNode(st)
+			addToStatementGetterHandle(func(getter func(id int) (toStatement int)) {
+				st.ToStatement = getter(opcode.Id)
+			})
 		case OP_JSR, OP_JSR_W:
 			panic("not support")
 		case OP_RET:
 			panic("not support")
-		case OP_GOTO:
-			appendNode(NewGOTOStatement())
-		case OP_GOTO_W:
-			panic("not support")
+		case OP_GOTO, OP_GOTO_W:
+			st := NewGOTOStatement()
+			appendNode(st)
+			addToStatementGetterHandle(func(getter func(id int) (toStatement int)) {
+				st.ToStatement = getter(opcode.Target[0].Id)
+			})
 		case OP_ATHROW:
-			panic("not support")
+			val := runtimeStack.Pop().(JavaValue)
+			appendNode(NewCustomStatement(func(funcCtx *FunctionContext) string {
+				return fmt.Sprintf("throw %v", val.String(funcCtx))
+			}))
 		case OP_IRETURN:
 			v := runtimeStack.Pop().(JavaValue)
 			appendNode(NewReturnStatement(v))
-		case OP_ARETURN:
-			panic("not support")
-		case OP_LRETURN:
-			panic("not support")
-		case OP_DRETURN:
-			panic("not support")
-		case OP_FRETURN:
-			panic("not support")
+		case OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN:
+			v := runtimeStack.Pop().(JavaValue)
+			appendNode(NewReturnStatement(v))
 		case OP_GETFIELD:
-			panic("not support")
+			index := Convert2bytesToInt(opcode.Data)
+			member := d.constantPoolGetter(int(index)).(*JavaClassMember)
+			v := runtimeStack.Pop().(JavaValue)
+			runtimeStack.Push(NewRefMember(v.(*JavaRef).Id, member.Member, member.JavaType))
 		case OP_GETSTATIC:
 			index := Convert2bytesToInt(opcode.Data)
 			runtimeStack.Push(d.constantPoolGetter(int(index)))
-		case OP_PUTSTATIC:
-			panic("not support")
-		case OP_PUTFIELD:
-			panic("not support")
+		case OP_PUTSTATIC, OP_PUTFIELD:
+			index := Convert2bytesToInt(opcode.Data)
+			staticVal := d.constantPoolGetter(int(index))
+			appendNode(NewAssignStatement(staticVal, runtimeStack.Pop().(JavaValue), false))
 		case OP_SWAP:
-			panic("not support")
+			v1 := runtimeStack.Pop()
+			v2 := runtimeStack.Pop()
+			runtimeStack.Push(v1)
+			runtimeStack.Push(v2)
 		case OP_DUP:
 			runtimeStack.Push(runtimeStack.Peek())
 		case OP_DUP_X1:
-			panic("not support")
+			v1 := runtimeStack.Pop()
+			v2 := runtimeStack.Pop()
+			runtimeStack.Push(v1)
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
 		case OP_DUP_X2:
-			panic("not support")
+			v1 := runtimeStack.Pop()
+			v2 := runtimeStack.Pop()
+			v3 := runtimeStack.Pop()
+			runtimeStack.Push(v1)
+			runtimeStack.Push(v3)
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
 		case OP_DUP2:
-			panic("not support")
+			v1 := runtimeStack.Pop()
+			v2 := runtimeStack.Pop()
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
 		case OP_DUP2_X1:
-			panic("not support")
+			v1 := runtimeStack.Pop()
+			v2 := runtimeStack.Pop()
+			v3 := runtimeStack.Pop()
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
+			runtimeStack.Push(v3)
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
 		case OP_DUP2_X2:
-			panic("not support")
+			v1 := runtimeStack.Pop()
+			v2 := runtimeStack.Pop()
+			v3 := runtimeStack.Pop()
+			v4 := runtimeStack.Pop()
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
+			runtimeStack.Push(v4)
+			runtimeStack.Push(v3)
+			runtimeStack.Push(v2)
+			runtimeStack.Push(v1)
 		case OP_LDC:
 			runtimeStack.Push(d.ConstantPoolLiteralGetter(int(opcode.Data[0])))
 		case OP_LDC_W:
-			panic("not support")
+			runtimeStack.Push(d.ConstantPoolLiteralGetter(int(Convert2bytesToInt(opcode.Data))))
 		case OP_LDC2_W:
 			v := d.ConstantPoolLiteralGetter(int(Convert2bytesToInt(opcode.Data)))
 			runtimeStack.Push(v)
 		case OP_MONITORENTER:
-			panic("not support")
+			v := runtimeStack.Pop().(JavaValue)
+			st := NewCustomStatement(func(funcCtx *FunctionContext) string {
+				return fmt.Sprintf("synchronized (%s)", v.String(funcCtx))
+			})
+			st.Name = "monitor_enter"
+			st.Info = v
+			appendNode(st)
 		case OP_MONITOREXIT:
-			panic("not support")
-		//case OP_FAKE_TRY:
-		//	panic("not support")
-		//case OP_FAKE_CATCH:
-		//	panic("not support")
+			st := NewCustomStatement(func(funcCtx *FunctionContext) string {
+				return ""
+			})
+			st.Name = "monitor_exit"
+			appendNode(st)
 		case OP_NOP:
-			panic("not support")
+			return
 		case OP_POP:
 			appendNode(NewExpressionStatement(runtimeStack.Pop().(JavaValue)))
 		case OP_POP2:
-			panic("not support")
-		case OP_TABLESWITCH:
-			panic("not support")
-		case OP_LOOKUPSWITCH:
-			panic("not support")
+			appendNode(NewExpressionStatement(runtimeStack.Pop().(JavaValue)))
+			appendNode(NewExpressionStatement(runtimeStack.Pop().(JavaValue)))
+		case OP_TABLESWITCH, OP_LOOKUPSWITCH:
+			switchMap := map[int]int{}
+			for k, v := range opcode.SwitchJmpCase {
+				switchMap[k] = d.offsetToOpcodeIndex[uint16(v)]
+			}
+			switchStatement := NewMiddleStatement(MiddleSwitch, []any{switchMap, runtimeStack.Pop().(JavaValue)})
+			appendNode(switchStatement)
+
+			addToStatementGetterHandle(func(getter func(id int) (toStatement int)) {
+				for k, v := range switchMap {
+					switchMap[k] = getter(v)
+				}
+			})
 		case OP_IINC:
 			index := opcode.Data[0]
 			inc := opcode.Data[1]
 			slot := int(index)
 			appendNode(NewBinaryExpression(NewJavaRef(slot, varSlotTypeTable[slot]), NewJavaLiteral(inc, JavaInteger), INC))
-		//case OP_IINC_WIDE:
-		//	panic("not support")
-		case OP_DNEG:
-			panic("not support")
-		case OP_FNEG:
-			panic("not support")
-		case OP_LNEG:
-			panic("not support")
-		case OP_INEG:
-			panic("not support")
+		case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
+			v := runtimeStack.Pop().(JavaValue)
+			runtimeStack.Push(NewCustomValue(func(funcCtx *FunctionContext) string {
+				return fmt.Sprintf("-%s", v.String(funcCtx))
+			}, func() JavaType {
+				return v.Type()
+			}))
 		default:
 			panic("not support")
 		}
 	}
-	WalkGraph[*OpCode](d.opCodes[0], func(code *OpCode) []*OpCode {
+	err = WalkGraph[*OpCode](d.opCodes[0], func(code *OpCode) ([]*OpCode, error) {
 		var initN int
 		if len(code.Source) == 0 {
 			mapCodeToStackVarIndex[code] = 0
@@ -603,26 +709,38 @@ func (d *Decompiler) ParseStatement1() error {
 			initN = initN + pushL
 			mapCodeToStackVarIndex[code] = initN
 		}
-		return code.Target
+		return code.Target, nil
 	})
-	WalkGraph[*OpCode](d.opCodes[0], func(node *OpCode) []*OpCode {
+	if err != nil {
+		return err
+	}
+	err = WalkGraph[*OpCode](d.opCodes[0], func(node *OpCode) ([]*OpCode, error) {
 		parseOpcode(node)
-		return node.Target
+		return node.Target, nil
 	})
+	if err != nil {
+		return err
+	}
+	//println(DumpOpcodesToDotExp(d.opCodes[0]))
+	// generate to statement
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].Id < nodes[j].Id
 	})
+
 	idToNode := map[int]*Node{}
 	for _, node := range nodes {
 		idToNode[node.Id] = node
 	}
-	getStatementIdByOpcodeId := func(id int) int {
+	getStatementNextIdByOpcodeId := func(id int) int {
 		if v, ok := idToNode[id]; ok {
 			return v.Id
 		}
 		idx := sort.Search(len(nodes), func(i int) bool {
 			return nodes[i].Id > id
 		})
+		if idx >= len(nodes) || idx < 0 {
+			return -1
+		}
 		return nodes[idx].Id
 	}
 	idToOpcode := map[int]*OpCode{}
@@ -630,38 +748,35 @@ func (d *Decompiler) ParseStatement1() error {
 		idToOpcode[opcode.Id] = opcode
 	}
 	for _, node := range nodes {
-		switch ret := node.Statement.(type) {
-		case *ConditionStatement:
-			ret.ToStatement = getStatementIdByOpcodeId(idToOpcode[node.Id].Target[0].Id)
-		case *GOTOStatement:
-			ret.ToStatement = getStatementIdByOpcodeId(idToOpcode[node.Id].Target[0].Id)
+		for _, code := range idToOpcode[node.Id].Target {
+			id := getStatementNextIdByOpcodeId(code.Id)
+			if id == -1 {
+				continue
+			}
+			node.Next = append(node.Next, idToNode[id])
+			idToNode[id].Source = append(idToNode[id].Source, node)
 		}
 	}
-	nodes, err = RewriteIf(nodes)
+	for _, f := range handleToStatementGetters {
+		f(func(id int) (toStatement int) {
+			toStatement = getStatementNextIdByOpcodeId(id)
+			return
+		})
+	}
+	statementManager := NewStatementManager(nodes[0])
+	//statementManager.SetNodes(nodes)
+
+	err = statementManager.Rewrite(func(node *Node) bool {
+		return true
+	})
 	if err != nil {
 		return err
 	}
-	statements := []Statement{}
-	for _, node := range nodes {
-		statements = append(statements, node.Statement)
+	sts, err := statementManager.ToStatements()
+	if err != nil {
+		return err
 	}
-	var filterNodes func(nodes []Statement) []Statement
-	filterNodes = func(nodes []Statement) []Statement {
-		return funk.Filter(nodes, func(item Statement) bool {
-			switch ret := item.(type) {
-			case *IfStatement:
-				ret.IfBody = filterNodes(ret.IfBody)
-				ret.ElseBody = filterNodes(ret.ElseBody)
-			case *StackAssignStatement:
-				_, ok := item.(*StackAssignStatement)
-				return !ok
-			}
-			return true
-		}).([]Statement)
-	}
-	statements = filterNodes(statements)
-	//ShowStatementNodes(nodes)
-	d.Statements = statements
+	d.Statements = sts
 	return nil
 }
 
