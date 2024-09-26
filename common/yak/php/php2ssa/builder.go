@@ -31,6 +31,7 @@ func (s *SSABuild) Create() ssa.Builder {
 }
 func (s *SSABuild) InitHandler(fb *ssa.FunctionBuilder) {
 	s.InitHandlerOnce.Do(func() {
+		fb.SetEmptyRange()
 		container := fb.EmitEmptyContainer()
 		fb.AssignVariable(fb.CreateVariable("global-container"), container)
 		initHandler := func(name ...string) {
