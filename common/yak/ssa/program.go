@@ -180,14 +180,16 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 }
 
 func (p *Program) GetFunction(name string) *Function {
-	f, ok := p.Funcs[name]
-	if !ok {
-		return nil
+	if f, ok := p.Funcs[name]; ok {
+		if !p.PreHandler() {
+			f.Build()
+		}
+		return f
 	}
-	if !p.PreHandler() {
-		f.Build()
+	if importedF, ok := p.importValue[name].(*Function); ok {
+		return importedF
 	}
-	return f
+	return nil
 }
 
 func (prog *Program) EachFunction(handler func(*Function)) {
@@ -312,32 +314,4 @@ func (p *Program) GetType(name string) Type {
 		return t
 	}
 	return nil
-}
-
-func (p *Program) GetExportType(name string) Type {
-	if p.ExportType[name] != nil {
-		return p.ExportType[name]
-	}
-	return nil
-}
-
-func (p *Program) GetExportValue(name string) Value {
-	if p.ExportValue[name] != nil {
-		return p.ExportValue[name]
-	}
-	return nil
-}
-
-func (p *Program) SetExportType(name string, t Type) {
-	if p.ExportType == nil {
-		p.ExportType = make(map[string]Type)
-	}
-	p.ExportType[name] = t
-}
-
-func (p *Program) SetExportValue(name string, v Value) {
-	if p.ExportValue == nil {
-		p.ExportValue = make(map[string]Value)
-	}
-	p.ExportValue[name] = v
 }
