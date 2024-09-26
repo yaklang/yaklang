@@ -86,6 +86,8 @@ jobs:
               go test ./common/cybertunnel/...
               # YAK GIT DIFF
               go test ./common/utils/yakgit/yakdiff/...
+              # YAK suspect tools
+              go test ./common/utils/suspect
 
           - name: Test NetX
             run: |
