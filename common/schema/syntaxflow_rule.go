@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -19,7 +20,7 @@ const (
 	SFR_PURPOSE_AUDIT    SyntaxFlowRulePurposeType = "audit"
 	SFR_PURPOSE_VULN     SyntaxFlowRulePurposeType = "vuln"
 	SFR_PURPOSE_CONFIG   SyntaxFlowRulePurposeType = "config"
-	SFR_PURPOSE_SECURITY SyntaxFlowRulePurposeType = "securiy"
+	SFR_PURPOSE_SECURITY SyntaxFlowRulePurposeType = "security"
 )
 
 const (
@@ -161,4 +162,26 @@ func (s *SyntaxFlowRule) GetAlertInfo(msg string) (string, bool) {
 		return codec.AnyToString(info), false
 	}
 	return "", false
+}
+
+func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRuleData {
+	sfRule := &ypb.SyntaxFlowRuleData{
+		IsBuildInRule:        s.IsBuildInRule,
+		Language:             s.Language,
+		RuleName:             s.RuleName,
+		Title:                s.Title,
+		TitleZh:              s.TitleZh,
+		Description:          s.Description,
+		Type:                 string(s.Type),
+		Severity:             string(s.Severity),
+		Content:              s.Content,
+		Purpose:              string(s.Purpose),
+		TypicalHitFileSystem: s.TypicalHitFileSystem,
+		Verified:             s.Verified,
+		AllowIncluded:        s.AllowIncluded,
+		IncludedName:         s.IncludedName,
+		Hash:                 s.Hash,
+		Tag:                  s.Tag,
+	}
+	return sfRule
 }

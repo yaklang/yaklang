@@ -24,6 +24,13 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	DbOperationCreate = "create"
+	DbOperationDelete = "delete"
+	DbOperationUpdate = "update"
+	DbOperationQuery  = "query"
+	DbOperationCreateOrUpdate = "create_or_update"
+)
 // OpenPortServerStreamerHelperRWC
 type OpenPortServerStreamerHelperRWC struct {
 	io.ReadWriteCloser
