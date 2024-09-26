@@ -79,8 +79,18 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 	OverWriteYakPlugin(plugin.ScriptName, plugin, config.EnableGenerateParam)
 }
 
+var BlackListCorePlugin = []string{
+	"启发式SQL注入检测",
+}
+
+func ClearBlackListPlugin(blackList []string) {
+	err := yakit.DeleteYakScriptByNames(consts.GetGormProfileDatabase(), blackList)
+	log.Errorf("delete black list plugin failed: %s", err)
+}
+
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
+		ClearBlackListPlugin(BlackListCorePlugin)
 		log.Debug("start to load core plugin")
 		registerBuildInPlugin(
 			"mitm",
@@ -128,11 +138,11 @@ func init() {
 			withPluginHelp("检查网站是否开放 Swagger JSON 的 API 信息"),
 			withPluginAuthors("V1ll4n"),
 		)
-		registerBuildInPlugin(
-			"mitm", "启发式SQL注入检测",
-			withPluginHelp("请求包中各种情况参数进行sql注入检测"),
-			withPluginAuthors("雨过天晴&伞落人离"),
-		)
+		//registerBuildInPlugin(
+		//	"mitm", "启发式SQL注入检测",
+		//	withPluginHelp("请求包中各种情况参数进行sql注入检测"),
+		//	withPluginAuthors("雨过天晴&伞落人离"),
+		//)
 		registerBuildInPlugin(
 			"mitm", "基础 XSS 检测",
 			withPluginHelp("一个检测参数中的 XSS 算法，支持各种被编码或 JSON 中的 XSS 检测"),
