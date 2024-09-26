@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
@@ -79,86 +80,83 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	if i == nil {
 		return nil
 	}
-	//custom syntax
-	beforfunc := func() {
-		for _, statementContext := range i.AllNamespaceStatement() {
-			y.BeforeVisitNamespaceStatement(statementContext)
+	nameSpaceStmt := func(build func(*phpparser.NamespaceStatementContext)) {
+		for _, stmt := range i.AllNamespaceStatement() {
+			if i, ok := stmt.(*phpparser.NamespaceStatementContext); ok {
+				build(i)
+			}
 		}
 	}
-	afterFunc := func() {
-		for _, statementContext := range i.AllNamespaceStatement() {
-			y.VisitNamesPaceStatement(statementContext)
-		}
+	UseStatement := func() {
+		nameSpaceStmt(func(nsc *phpparser.NamespaceStatementContext) {
+			y.VisitUseDeclaration(nsc.UseDeclaration())
+		})
+	}
+	normalStatement := func() {
+		nameSpaceStmt(func(nsc *phpparser.NamespaceStatementContext) {
+			y.VisitStatement(nsc.Statement())
+		})
+	}
+	declareStatement := func() {
+		nameSpaceStmt(func(i *phpparser.NamespaceStatementContext) {
+			y.VisitFunctionDeclaration(i.FunctionDeclaration())
+			y.VisitClassDeclaration(i.ClassDeclaration())
+			y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
+		})
 	}
 	//compose child app
 	hasName := i.NamespacePath() != nil
 
-	if hasName && y.PreHandler() {
-		// has name, build in pre-handler
-		beforfunc()
-		pkgpath := y.VisitNamespacePath(i.NamespacePath())
-		pkgname := strings.Join(pkgpath, ".")
-		y.callback(pkgname, y.FunctionBuilder.GetEditor().GetFilename())
-		prog := y.GetProgram().GetApplication() //拿到主app
-		library, _ := prog.GetLibrary(pkgname)
+	prog := y.GetProgram().GetApplication() //拿到主app
+	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
+	namespaceName := strings.Join(nameSpacePath, ".")
+	switchToNamespace := func() (*ssa.Program, func()) {
+		library, _ := prog.GetLibrary(namespaceName)
 		if library == nil {
-			library = prog.NewLibrary(pkgname, []string{prog.Loader.GetBasePath()})
+			library = prog.NewLibrary(namespaceName, []string{prog.Loader.GetBasePath()})
 		}
 		//if custom syntax, only syntax it
 		library.PushEditor(prog.GetCurrentEditor())
-		functionBuilder := library.GetAndCreateFunctionBuilder(pkgname, "init")
+		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, "init")
 		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
-		if functionBuilder != nil {
-			functionBuilder.SetBuildSupport(y.FunctionBuilder)
-			currentBuilder := y.FunctionBuilder
-			y.FunctionBuilder = functionBuilder
-			defer func() {
-				y.FunctionBuilder = currentBuilder
-			}()
-			afterFunc()
+		functionBuilder.SetBuildSupport(y.FunctionBuilder)
+		currentBuilder := y.FunctionBuilder
+		y.FunctionBuilder = functionBuilder
+		return library, func() {
+			y.FunctionBuilder = currentBuilder
 		}
-	} else if !hasName && !y.PreHandler() {
-		// no name, build in normal
-		beforfunc()
-		afterFunc()
+	}
+
+	switch {
+	case hasName && y.PreHandler():
+		// has name, and in pre-handler,  build this namespace and set lazyBuild in function
+		y.callback(namespaceName, y.FunctionBuilder.GetEditor().GetFilename())
+		_, f := switchToNamespace()
+		defer f()
+		declareStatement()
+		// }
+	case hasName && !y.PreHandler():
+		// finish Function
+		normalStatement()
+		namespaceProg, f := switchToNamespace()
+		defer f()
+		UseStatement()
+		for _, fun := range namespaceProg.Funcs {
+			fun.Build()
+		}
+		for _, cls := range namespaceProg.ClassBluePrint {
+			cls.Build()
+		}
+	case !hasName && !y.PreHandler():
+		// build this un-name namespace
+		UseStatement()
+		normalStatement()
+		declareStatement()
 	}
 
 	return nil
 }
 
-func (y *builder) VisitNamesPaceStatement(raw phpparser.INamespaceStatementContext) interface{} {
-	if y == nil || raw == nil || y.IsStop() {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.NamespaceStatementContext)
-	if i == nil {
-		return nil
-	}
-	y.VisitUseDeclaration(i.UseDeclaration())
-	//y.VisitStatement(i.Statement())
-	y.VisitFunctionDeclaration(i.FunctionDeclaration())
-	y.VisitClassDeclaration(i.ClassDeclaration())
-	y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
-	return nil
-}
-func (y *builder) BeforeVisitNamespaceStatement(raw phpparser.INamespaceStatementContext) interface{} {
-	if y == nil || raw == nil || y.IsStop() {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.NamespaceStatementContext)
-	if i == nil {
-		return nil
-	}
-	y.VisitUseDeclaration(i.UseDeclaration())
-	y.VisitStatement(i.Statement())
-	return nil
-}
 func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
