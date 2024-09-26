@@ -171,6 +171,9 @@ func StringSuffixList(s string, suffixes []string) bool {
 
 func StringPrefixList(origin string, prefixes []string) bool {
 	for _, prefix := range prefixes {
+		if prefix == "*" {
+			return true
+		}
 		if strings.HasPrefix(origin, prefix) {
 			return true
 		}

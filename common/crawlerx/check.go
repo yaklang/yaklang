@@ -183,6 +183,10 @@ func generalSubDomainRange(targetUrl string) []string {
 	return ranges
 }
 
+func generalUnlimitedDomainRange(_ string) []string {
+	return []string{"*"}
+}
+
 func whiteListCheckGenerator(whitelist []*regexp.Regexp) func(string) bool {
 	return func(url string) bool {
 		for _, whiteReg := range whitelist {

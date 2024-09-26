@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/launcher/flags"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -233,7 +234,7 @@ func (starter *BrowserStarter) doLauncher(l *launcher.Launcher) *launcher.Launch
 	if starter.browserConfig.proxyAddress != nil {
 		l = l.Proxy(starter.browserConfig.proxyAddress.String())
 	}
-	l = l.NoSandbox(true).Headless(true)
+	l = l.NoSandbox(true).Set(flags.Headless, "new")
 	if (starter.baseConfig.leakless == "default" && strings.Contains(runtime.GOOS, "windows")) ||
 		starter.baseConfig.leakless == "false" {
 		l = l.Leakless(false)
