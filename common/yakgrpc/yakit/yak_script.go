@@ -254,6 +254,16 @@ func DeleteYakScriptByName(db *gorm.DB, s string) error {
 	return nil
 }
 
+func DeleteYakScriptByNames(DB *gorm.DB, s []string) error {
+	yakScriptOpLock.Lock()
+	defer yakScriptOpLock.Unlock()
+	db := bizhelper.ExactQueryStringArrayOr(DB.Model(&schema.YakScript{}), "script_name", s)
+	if db = db.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
 func DeleteYakScriptByUserID(db *gorm.DB, s int64, onlineBaseUrl string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
