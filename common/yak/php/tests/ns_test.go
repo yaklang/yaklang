@@ -213,14 +213,14 @@ namespace a {
 
     use function b\aa;
 
-    function t($a)
+    function t()
     {
-        return $a;
+        return 1;
     }
 
-    function b($b)
+    function b()
     {
-        return aa($b);
+        return aa();
     }
 }
 
@@ -228,14 +228,14 @@ namespace b {
 
     use function a\t;
 
-    function aa($c)
+    function aa()
     {
-        return t($c);
+        return t();
     }
 }
 
 namespace {
-    $a = a\b(1);
+    $a = a\b();
     println($a);
 }`
 		ssatest.CheckSyntaxFlowPrintWithPhp(t, code, []string{"1"})
