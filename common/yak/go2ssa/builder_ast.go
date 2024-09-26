@@ -560,7 +560,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.AssignVariable(variable, newFunc)
 	}
 
-	newFunc.SetOrdinalBuild(func() ssa.Value {
+	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer func() {
 			recoverRange()
@@ -591,7 +591,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) *ssa.F
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-		return newFunc
 	})
 	return newFunc
 }
@@ -635,7 +634,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		b.AssignVariable(variable, newFunc)
 	}
 
-	newFunc.SetOrdinalBuild(func() ssa.Value {
+	newFunc.SetLazyBuilder(func() {
 		recoverRange := b.SetRange(fun.BaseParserRuleContext)
 		defer func() {
 			recoverRange()
@@ -672,7 +671,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) *ssa.Funct
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
-		return newFunc
 	})
 	return newFunc
 }
