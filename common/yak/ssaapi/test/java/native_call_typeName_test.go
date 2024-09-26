@@ -527,30 +527,59 @@ public class Simple extends HttpServlet {
 }
 
 func TestTypeNameForCreator(t *testing.T) {
-	code := `package com.Annotation5.example;
-	import java.io.FileWriter;
-	import java.io.File;
-	class A{
-		public static main(String[] args){
-		FileWriter fw = new FileWriter(new File("a.txt"));
-		}
-	}`
-	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		res := prog.SyntaxFlowChain(`File<typeName>?{have:'File'} as $a;`)
-		assert.Equal(t, 2, res.Len())
+	t.Run("simple", func(t *testing.T) {
+		code := `package com.Annotation5.example;
+		import java.io.FileWriter;
+		import java.io.File;
+		class A{
+			public static main(String[] args){
+			FileWriter fw = new FileWriter(new File("a.txt"));
+			}
+		}`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			prog.Show()
+			res := prog.SyntaxFlowChain(`File<typeName>?{have:'File'} as $a;`)
+			assert.Equal(t, 2, res.Len())
 
-		res = prog.SyntaxFlowChain(`File<fullTypeName>?{have:'java.io.File'} as $a;`)
-		assert.Equal(t, 1, res.Len())
+			res = prog.SyntaxFlowChain(`File<fullTypeName>?{have:'java.io.File'} as $a;`)
+			assert.Equal(t, 1, res.Len())
 
-		res = prog.SyntaxFlowChain(`FileWriter<typeName>?{have:'FileWriter'} as $a;`)
-		assert.Equal(t, 2, res.Len())
-		res = prog.SyntaxFlowChain(`FileWriter<typeName>?{have:'java.io.FileWriter'} as $a;`)
-		assert.Equal(t, 1, res.Len())
+			res = prog.SyntaxFlowChain(`FileWriter<typeName>?{have:'FileWriter'} as $a;`)
+			assert.Equal(t, 2, res.Len())
+			res = prog.SyntaxFlowChain(`FileWriter<typeName>?{have:'java.io.FileWriter'} as $a;`)
+			assert.Equal(t, 1, res.Len())
 
-		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 
+	t.Run("test chain creator simple", func(t *testing.T) {
+		code := `
+	import okhttp3.Request;
+	class Main{
+	public static void main(String[] args) {
+		Request request = new Request.Builder();
+	    }
+	}
+`
+		ssatest.CheckSyntaxFlowContain(t, code, `Request?{<typeName>?{have:'okhttp3.'}}.Builder as $result`, map[string][]string{
+			"result": {"Undefined-Request.Builder(valid)"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test chain creator complex", func(t *testing.T) {
+		code := `
+	import okhttp3.Request;
+	class Main{
+	public static void main(String[] args) {
+		Request request = new Request.Builder.AAA.BBB();
+	    }
+	}
+`
+		ssatest.CheckSyntaxFlowContain(t, code, `Request.Builder.AAA<typeName> as $result`, map[string][]string{
+			"result": {"okhttp3.Request"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }
 
 func TestNativeCall_Forbid(t *testing.T) {
