@@ -133,27 +133,15 @@ func DeleteRuleByTitle(name string) error {
 }
 
 func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) error {
-	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
-	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
-	case "yak", "yaklang":
-		language = consts.Yak
-	case "java":
-		language = consts.JAVA
-	case "php":
-		language = consts.PHP
-	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
-		language = consts.JS
+	language, err := CheckSyntaxFlowLanguage(languageRaw)
+	if err != nil {
+		log.Error(err)
 	}
-
-	var ruleType schema.SyntaxFlowRuleType
-	switch path.Ext(ruleName) {
-	case ".sf", ".syntaxflow":
-		ruleType = schema.SFR_RULE_TYPE_SF
-	default:
-		log.Errorf("invalid rule type: %v is not supported yet, treat it as syntaxflow(.sf, .syntaxflow)", ruleName)
+	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
+	if err != nil {
+		log.Error(err)
 	}
-
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
 	if err != nil {
 		return err
@@ -179,26 +167,14 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
-	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
-	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
-	case "yak", "yaklang":
-		language = consts.Yak
-	case "java":
-		language = consts.JAVA
-	case "php":
-		language = consts.PHP
-	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
-		language = consts.JS
+	language, err := CheckSyntaxFlowLanguage(languageRaw)
+	if err != nil {
+		log.Error(err)
 	}
-
-	var ruleType schema.SyntaxFlowRuleType
-	switch path.Ext(ruleName) {
-	case ".sf", ".syntaxflow":
-		ruleType = schema.SFR_RULE_TYPE_SF
-	default:
-		log.Errorf("invalid rule type: %v is not supported yet", ruleName)
-		return nil
+	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
+	if err != nil {
+		log.Error(err)
 	}
 
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
@@ -226,6 +202,31 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
 	return nil
+}
+
+func CheckSyntaxFlowLanguage(languageRaw string) (consts.Language, error) {
+	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
+	case "yak", "yaklang":
+		return consts.Yak, nil
+	case "java":
+		return consts.JAVA, nil
+	case "php":
+		return consts.PHP, nil
+	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
+		return consts.JS, nil
+	case "go":
+		return consts.GO, nil
+	}
+	return "", utils.Errorf("invalid language: %v is not supported yet", languageRaw)
+}
+
+func CheckSyntaxFlowRuleType(ruleName string) (schema.SyntaxFlowRuleType, error) {
+	switch path.Ext(ruleName) {
+	case ".sf", ".syntaxflow":
+		return schema.SFR_RULE_TYPE_SF, nil
+	default:
+		return "", utils.Errorf("invalid rule type: %v is not supported yet, treat it as syntaxflow(.sf, .syntaxflow)", ruleName)
+	}
 }
 
 var valid func(rule *schema.SyntaxFlowRule) error

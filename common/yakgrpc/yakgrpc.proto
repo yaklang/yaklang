@@ -711,6 +711,13 @@ service Yak {
   // 反弹shell命令生成
   rpc GetReverseShellProgramList(GetReverseShellProgramListRequest) returns (GetReverseShellProgramListResponse);
   rpc GenerateReverseShellCommand(GenerateReverseShellCommandRequest) returns (GenerateReverseShellCommandResponse);
+
+  // SyntaxFlow Rule
+  rpc QuerySyntaxFlowRule(QuerySyntaxFlowRuleRequest) returns (QuerySyntaxFlowRuleResponse);
+  rpc SaveSyntaxFlowRule(SaveSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
+  rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
+  rpc SaveSyntaxFlowRuleGroup(SaveSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
@@ -5398,4 +5405,81 @@ message UpdateFingerprintRequest {
   int64 Id = 1;
   string RuleName = 2;
   FingerprintRule Rule = 3;
+}
+
+
+message QuerySyntaxFlowRuleRequest{
+  Paging Pagination = 1;
+  SyntaxFlowRuleFilter Filter = 2;
+}
+
+message QuerySyntaxFlowRuleResponse{
+  Paging Pagination = 1;
+  DbOperateMessage DbMessage= 2;
+  repeated SyntaxFlowRuleData Data = 3;
+}
+
+message SyntaxFlowRuleFilter {
+  string RuleName = 1;
+  string Keyword = 2;
+  repeated string Language = 3;
+  repeated string Severity = 4;
+  repeated string Purpose = 5;
+  repeated string Tag = 6;
+  bool Verified =7;
+  bool IsBuildInRule = 8;
+  bool AllowIncluded = 9;
+}
+
+message SyntaxFlowRuleData{
+  bool IsBuildInRule = 1;
+  string Language = 2;
+  string RuleName =3;
+  string Title = 4;
+  string TitleZh = 5;
+  string Description = 6;
+  string Type = 7;
+  string Severity = 8;
+  string Content = 9;
+  string Purpose = 10;
+  bytes TypicalHitFileSystem = 11;
+  bool Verified = 12;
+  bool AllowIncluded = 13;
+  string IncludedName = 14;
+  string Hash = 15;
+  string Tag = 16;
+  string AlertDesc = 17;
+}
+
+message SaveSyntaxFlowRuleRequest{
+  string RuleName = 1;
+  string Content = 2;
+  string Language = 3;
+  repeated string Tags = 4;
+}
+
+message DeleteSyntaxFlowRuleRequest{
+  SyntaxFlowRuleFilter Filter = 1;
+}
+
+message QuerySyntaxFlowRuleGroupRequest{
+  bool All = 1;
+  bool IsBuiltinRule = 2;
+  string GroupName = 3;
+}
+
+message QuerySyntaxFlowRuleGroupResponse{
+  repeated SyntaxFlowRuleGroupNormalized Group = 1;
+}
+
+message SyntaxFlowRuleGroupNormalized {
+  string GroupName = 1; // 归一化分组名,目前支持"language","severity","purpose"
+  int64 Count = 2;
+  bool IsBuildInRule = 3;
+}
+
+message SyntaxFlowRuleGroup{
+  string Language =1;
+  string Severity = 2;
+  string Purpose = 3;
 }
