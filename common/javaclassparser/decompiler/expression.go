@@ -59,13 +59,13 @@ func (j *JavaExpression) String(funcCtx *FunctionContext) string {
 	}
 	switch j.Op {
 	case ADD:
-		return fmt.Sprintf("%s + %s", vs[0], vs[1])
+		return fmt.Sprintf("(%s) + (%s)", vs[0], vs[1])
 	case INC:
-		return fmt.Sprintf("%s += %s", vs[0], vs[1])
+		return fmt.Sprintf("(%s) += (%s)", vs[0], vs[1])
 	case GT, SUB:
-		return fmt.Sprintf("%s %s %s", vs[0], j.Op, vs[1])
+		return fmt.Sprintf("(%s) %s (%s)", vs[0], j.Op, vs[1])
 	default:
-		return fmt.Sprintf("%s %s %s", vs[0], j.Op, vs[1])
+		return fmt.Sprintf("(%s) %s (%s)", vs[0], j.Op, vs[1])
 		//return fmt.Sprintf("%s(%s)", j.Op, strings.Join(vs, ","))
 	}
 }

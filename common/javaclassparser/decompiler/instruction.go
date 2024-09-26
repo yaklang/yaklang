@@ -260,6 +260,9 @@ func init() {
 	}
 	for k, instruction := range instrInfos {
 		instruction.Name = k
+		if instruction.Length < 0 {
+			instruction.Length = 0
+		}
 		InstrInfos[instruction.OpCode] = instruction
 	}
 }

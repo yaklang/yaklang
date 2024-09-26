@@ -19,8 +19,9 @@ var (
 	_ JavaValue = &JavaExpression{}
 	_ JavaValue = &NewExpression{}
 	_ JavaValue = &FunctionCallExpression{}
-	_ JavaValue = &VirtualRefMember{}
+	_ JavaValue = &RefMember{}
 	_ JavaValue = &JavaCompare{}
+	_ JavaValue = &javaNull{}
 )
 
 type JavaCompare struct {
@@ -62,6 +63,30 @@ func (j *JavaRef) String(funcCtx *FunctionContext) string {
 
 func NewJavaRef(id int, typ JavaType) *JavaRef {
 	return &JavaRef{
+		Id:       id,
+		JavaType: typ,
+	}
+}
+
+type LambdaFuncRef struct {
+	Id           int
+	JavaType     JavaType
+	LambdaRender func(funcCtx *FunctionContext) string
+}
+
+func (j *LambdaFuncRef) Type() JavaType {
+	return j.JavaType
+}
+
+func (j *LambdaFuncRef) String(funcCtx *FunctionContext) string {
+	if j.LambdaRender != nil {
+		return j.LambdaRender(funcCtx)
+	}
+	return fmt.Sprintf("getLambda(%d)", j.Id)
+}
+
+func NewLambdaFuncRef(id int, typ JavaType) *LambdaFuncRef {
+	return &LambdaFuncRef{
 		Id:       id,
 		JavaType: typ,
 	}
@@ -125,10 +150,14 @@ func (j *JavaClassMember) Type() JavaType {
 }
 
 func (j *JavaClassMember) String(funcCtx *FunctionContext) string {
+	if j.Name == funcCtx.ClassName {
+		return j.Member
+	}
 	name := GetShortName(funcCtx, j.Name)
 	return fmt.Sprintf("%s.%s", name, j.Member)
 }
-func NewJavaClassMember(typeName, member, desc string, typ JavaType) *JavaClassMember {
+func NewJavaClassMember(typeName, member, desc string) *JavaClassMember {
+	typ, _, _ := parseType(desc)
 	return &JavaClassMember{
 		Name:        typeName,
 		Member:      member,
@@ -137,18 +166,18 @@ func NewJavaClassMember(typeName, member, desc string, typ JavaType) *JavaClassM
 	}
 }
 
-type VirtualRefMember struct {
+type RefMember struct {
 	Member   string
 	Id       int
 	JavaType JavaType
 }
 
-func (j *VirtualRefMember) Type() JavaType {
+func (j *RefMember) Type() JavaType {
 	return j.JavaType
 }
 
-func NewVirtualRefMember(id int, member string, typ JavaType) *VirtualRefMember {
-	return &VirtualRefMember{
+func NewRefMember(id int, member string, typ JavaType) *RefMember {
+	return &RefMember{
 		Member:   member,
 		Id:       id,
 		JavaType: typ,
@@ -174,7 +203,10 @@ func NewJavaArrayMember(ref *JavaRef, index JavaValue) *JavaArrayMember {
 	}
 }
 
-func (j *VirtualRefMember) String(funcCtx *FunctionContext) string {
+func (j *RefMember) String(funcCtx *FunctionContext) string {
+	if j.Id == 0 {
+		return j.Member
+	}
 	return fmt.Sprintf("var%d.%s", j.Id, j.Member)
 }
 
@@ -230,4 +262,54 @@ func NewVirtualFunctionCall(name string, arguemnts []JavaValue, javaType JavaTyp
 		Arguments: arguemnts,
 		JavaType:  javaType,
 	}
+}
+
+type CustomValue struct {
+	StringFunc func(funcCtx *FunctionContext) string
+	TypeFunc   func() JavaType
+}
+
+func (v *CustomValue) Type() JavaType {
+	return v.TypeFunc()
+}
+func (v *CustomValue) String(funcCtx *FunctionContext) string {
+	return v.StringFunc(funcCtx)
+}
+func NewCustomValue(stringFun func(funcCtx *FunctionContext) string, typeFunc func() JavaType) *CustomValue {
+	return &CustomValue{
+		StringFunc: stringFun,
+		TypeFunc:   typeFunc,
+	}
+}
+
+type CustomStatement struct {
+	Name       string
+	Info any
+	StringFunc func(funcCtx *FunctionContext) string
+}
+
+func (v *CustomStatement) String(funcCtx *FunctionContext) string {
+	return v.StringFunc(funcCtx)
+}
+func NewCustomStatement(stringFun func(funcCtx *FunctionContext) string) *CustomStatement {
+	return &CustomStatement{
+		StringFunc: stringFun,
+	}
+}
+
+type LazyJavaValue struct {
+	GetJavaValue func() JavaValue
+}
+
+func NewLazyJavaValue(f func() JavaValue) *LazyJavaValue {
+	return &LazyJavaValue{
+		GetJavaValue: f,
+	}
+}
+func (l *LazyJavaValue) Type() JavaType {
+	return l.GetJavaValue().Type()
+}
+
+func (l *LazyJavaValue) String(funcCtx *FunctionContext) string {
+	return l.GetJavaValue().String(funcCtx)
 }

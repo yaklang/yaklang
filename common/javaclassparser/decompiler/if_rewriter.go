@@ -1,22 +1,171 @@
 package decompiler
 
-import "github.com/yaklang/yaklang/common/go-funk"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
-func RewriteIf(nodes []*Node) ([]*Node, error) {
-	scanWithRewriter := func(rewriter func(nodes []*Node, index int)) {
-		for index, node := range nodes {
-			if node == nil {
-				continue
-			}
-			rewriter(nodes, index)
-		}
-		nodes = funk.Filter(nodes, func(item *Node) bool { return item != nil }).([]*Node)
+type Rewriter func(statementManager *StatementManager, node *Node) error
+
+func RewriteIf(statementManager *StatementManager, node *Node) error {
+	ifNode := node
+	if _, ok := ifNode.Statement.(*ConditionStatement); !ok {
+		return nil
 	}
-	scanWithRewriter(rewriteTernaryExpression)
-	scanWithRewriter(rewriteLogicalExpressions)
-	scanWithRewriter(rewriteIf)
-	return nodes, nil
+	if len(ifNode.Next) != 2 {
+		return nil
+	}
+	ifBodyStartNode := ifNode.Next[1]
+	elseBodyStartNode := ifNode.Next[0]
+
+	// search merge node, if founded successful, conform that this is an if statement
+	ifBodyManager := NewStatementManager(ifBodyStartNode)
+	ifNodeRecord := utils.NewSet[*Node]()
+	ifBodyManager.ScanStatementSimple(func(node *Node) error {
+		ifNodeRecord.Add(node)
+		return nil
+	})
+	var mergeNode *Node
+	elseBodyManager := NewStatementManager(elseBodyStartNode)
+	elseNodeRecord := utils.NewSet[*Node]()
+	elseBodyManager.ScanStatement(func(node *Node) (error, bool) {
+		if ifNodeRecord.Has(node) {
+			mergeNode = node
+			return nil, false
+		}
+		elseNodeRecord.Add(node)
+		return nil, true
+	})
+	if mergeNode == nil {
+		return nil
+	}
+	//
+	//ifNodeRecord = utils.NewSet[*Node]()
+	//ifBodyManager.ScanStatement(func(node *Node) (error, bool) {
+	//	if node == mergeNode {
+	//		return nil, false
+	//	}
+	//	ifNodeRecord.Add(node)
+	//	return nil, true
+	//})
+	//var elseEndNode *Node
+	//
+	//if ifNodeRecord.Has(elseBodyStartNode) {
+	//	mergeNode = elseBodyStartNode
+	//	elseEndNode = elseBodyStartNode
+	//} else {
+	//	elseBodyManager.ScanStatement(func(node *Node) (error, bool) {
+	//		for _, n := range node.Next {
+	//			if ifNodeRecord.Has(n) {
+	//				mergeNode = n
+	//				elseEndNode = node
+	//				return nil, false
+	//			}
+	//		}
+	//		return nil, true
+	//	})
+	//}
+	//if mergeNode == nil {
+	//	return nil
+	//}
+	//if len(mergeNode.Source) < 2 {
+	//	return nil
+	//}
+	//mergeNodeSource := mergeNode.Source
+	//// cutlink
+	//for _, n := range mergeNodeSource {
+	//	if n == elseEndNode || ifNodeRecord.Has(n) {
+	//		CutNode(n, mergeNode)
+	//	}
+	//}
+	var ifBodyStatements, elseBodyStatements []Statement
+	if ifBodyStartNode != mergeNode {
+		err := ifBodyManager.Rewrite(func(node *Node) bool {
+			if len(node.Next) == 1 && node.Next[0] == mergeNode {
+				return false
+			}
+			return true
+		})
+		if err != nil {
+			return nil
+		}
+		ifBody, err := ifBodyManager.ToStatements()
+		if err != nil {
+			return nil
+		}
+		ifBodyStatements = ifBody
+	}
+	if elseBodyStartNode != mergeNode {
+		err := elseBodyManager.Rewrite(func(node *Node) bool {
+			if len(node.Next) == 0 && node.Next[0] == mergeNode {
+				return false
+			}
+			return true
+		})
+		if err != nil {
+			return nil
+		}
+		elseBody, err := elseBodyManager.ToStatements()
+		if err != nil {
+			return nil
+		}
+		elseBodyStatements = elseBody
+	}
+	ifStatement := NewIfStatement(ifNode.Statement.(*ConditionStatement).Condition, ifBodyStatements, elseBodyStatements)
+	ifStatementNode := NewNode(ifStatement)
+	//statementManager.DeleteStatementById(ifNode.Id)
+	ifStatementNode.Id = ifNode.Id
+	ifStatementNode.Source = node.Source
+	for _, n := range ifNode.Source {
+		for i, nextNode := range n.Next {
+			if nextNode.Id == ifNode.Id {
+				n.Next[i] = ifStatementNode
+			}
+		}
+	}
+	mergeNode.Source = append(mergeNode.Source, ifStatementNode)
+	ifStatementNode.Next = []*Node{mergeNode}
+	*node = *ifStatementNode
+	return nil
 }
+
+//func _RewriteIf(statementManager *StatementManager) error {
+//	nodes := statementManager.GetNodes()
+//	entryPoint := []int{}
+//	for i, node := range nodes {
+//		if _, ok := node.Statement.(*ConditionStatement); ok {
+//			entryPoint = append(entryPoint, i)
+//		}
+//	}
+//	scanWithRewriter := func(rewriter func(nodes []*Node, index int)) {
+//		for _, i := range entryPoint {
+//			if nodes[i] == nil {
+//				continue
+//			}
+//			rewriter(nodes, i)
+//		}
+//	}
+//	scanWithRewriter(rewriteTernaryExpression)
+//	scanWithRewriter(rewriteLogicalExpressions)
+//	for i, _ := range nodes {
+//		if nodes[i] == nil {
+//			continue
+//		}
+//		_, ok := nodes[i].Statement.(*ConditionStatement)
+//		if !ok {
+//			continue
+//		}
+//		rewriteIf(nodes, i)
+//	}
+//	newNodes := []*Node{}
+//	for _, node := range nodes {
+//		if node != nil {
+//			newNodes = append(newNodes, node)
+//		}
+//	}
+//	statementManager.SetNodes(newNodes)
+//	return nil
+//}
 
 // rewriteIf
 // if condition goto xxx
@@ -54,11 +203,18 @@ func rewriteIf(nodes []*Node, index int) {
 			break
 		}
 	}
-	if gotoStatement == nil {
-		return
+	var ifBodyEnd int
+	var elseBodyEnd int
+	if gotoStatement == nil { // 不存在else body
+		ifBodyEnd = elseBodyStart
+		elseBodyEnd = elseBodyStart
+	} else {
+		ifBodyEnd = gotoStatementIndex
+		fmt.Println(gotoStatement.ToStatement)
+		elseBodyEnd = idToIndex(gotoStatement.ToStatement)
 	}
-	ifBodyEnd := gotoStatementIndex
-	elseBodyEnd := idToIndex(gotoStatement.ToStatement)
+	fmt.Println(elseBodyEnd)
+	fmt.Println(ifBodyStart)
 	ifBody := nodes[ifBodyStart:ifBodyEnd]
 	elseBody := nodes[elseBodyStart:elseBodyEnd]
 	getBody := func(nodes []*Node) []Statement {
@@ -163,3 +319,14 @@ func rewriteTernaryExpression(nodes []*Node, index int) {
 		nodes[i] = nil
 	}
 }
+
+//func scanNodes(nodes []*Node,condition func(node *Node, index int) bool, rewriter Rewriter) {
+//	for i, node := range nodes {
+//		if node == nil {
+//			continue
+//		}
+//		if condition(node, i){
+//			rewriter(nodes, i)
+//		}
+//	}
+//}

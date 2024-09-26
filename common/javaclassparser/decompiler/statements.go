@@ -82,7 +82,7 @@ func NewStackAssignStatement(id int, value JavaValue) *StackAssignStatement {
 }
 
 type AssignStatement struct {
-	Id          int
+	LeftValue   JavaValue
 	ArrayMember *JavaArrayMember
 	JavaValue   JavaValue
 	IsFirst     bool
@@ -92,7 +92,7 @@ func (a *AssignStatement) String(funcCtx *FunctionContext) string {
 	if a.ArrayMember != nil {
 		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
 	}
-	assign := fmt.Sprintf("var%d = %s", a.Id, a.JavaValue.String(funcCtx))
+	assign := fmt.Sprintf("%s = %s", a.LeftValue.String(funcCtx), a.JavaValue.String(funcCtx))
 	if a.IsFirst {
 		return a.JavaValue.Type().String(funcCtx) + " " + assign
 	} else {
@@ -140,9 +140,9 @@ func NewArrayMemberAssignStatement(m *JavaArrayMember, value JavaValue) *AssignS
 	}
 }
 
-func NewAssignStatement(id int, value JavaValue, isFirst bool) *AssignStatement {
+func NewAssignStatement(leftVal, value JavaValue, isFirst bool) *AssignStatement {
 	return &AssignStatement{
-		Id:        id,
+		LeftValue: leftVal,
 		JavaValue: value,
 		IsFirst:   isFirst,
 	}
@@ -213,4 +213,74 @@ func NewExpressionStatement(v JavaValue) *ExpressionStatement {
 	return &ExpressionStatement{
 		Expression: v,
 	}
+}
+
+type CaseItem struct {
+	IsDefault bool
+	IntValue  int
+	Body      []Statement
+}
+
+func NewCaseItem(v int, body []Statement) *CaseItem {
+	return &CaseItem{
+		Body:     body,
+		IntValue: v,
+	}
+}
+
+type SwitchStatement struct {
+	Value JavaValue
+	Cases []*CaseItem
+}
+
+func (a *SwitchStatement) String(funcCtx *FunctionContext) string {
+	casesStrs := []string{}
+	for _, c := range a.Cases {
+		if c.IsDefault {
+			casesStrs = append(casesStrs, fmt.Sprintf("default:\n%s", StatementsString(c.Body, funcCtx)))
+			continue
+		}
+		casesStrs = append(casesStrs, fmt.Sprintf("case %d:\n%s", c.IntValue, StatementsString(c.Body, funcCtx)))
+	}
+	return fmt.Sprintf("switch(%s) {\n%s\n}", a.Value.String(funcCtx), strings.Join(casesStrs, "\n"))
+}
+
+func NewSwitchStatement(value JavaValue, cases []*CaseItem) *SwitchStatement {
+	return &SwitchStatement{
+		Value: value,
+		Cases: cases,
+	}
+}
+
+const (
+	MiddleSwitch = "switch"
+)
+
+type MiddleStatement struct {
+	Data any
+	Flag string
+}
+
+func (a *MiddleStatement) String(funcCtx *FunctionContext) string {
+	return "<middle statement>"
+}
+
+func NewMiddleStatement(flag string, d any) *MiddleStatement {
+	return &MiddleStatement{
+		Flag: flag,
+		Data: d,
+	}
+}
+
+type SynchronizedStatement struct {
+	Argument JavaValue
+	Body     []Statement
+}
+
+func NewSynchronizedStatement(val JavaValue, body []Statement) *SynchronizedStatement {
+	return &SynchronizedStatement{Argument: val, Body: body}
+}
+
+func (s *SynchronizedStatement) String(funcCtx *FunctionContext) string {
+	return fmt.Sprintf("synchronized(%s) {\n%s\n}", s.Argument.String(funcCtx), StatementsString(s.Body, funcCtx))
 }

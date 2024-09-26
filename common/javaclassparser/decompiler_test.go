@@ -11,6 +11,25 @@ import (
 	"testing"
 )
 
+func TestArrayAnfIfClass(t *testing.T) {
+	classesContent, err := classes.FS.ReadFile("test/array_if_test.class")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectSource, err := classes.FS.ReadFile("test/array_if_test.java")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cf, err := Parse(classesContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := cf.Dump()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, string(expectSource), source)
+}
 func TestDemoClass(t *testing.T) {
 	classesContent, err := classes.FS.ReadFile("test/Demo.class")
 	if err != nil {
