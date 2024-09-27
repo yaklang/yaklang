@@ -52,6 +52,9 @@ var AllLanguageBuilders = []ssa.Builder{
 func (c *config) parseProject() (Programs, error) {
 	if c.reCompile {
 		ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+		if c.SaveToProfile {
+			ssadb.DeleteSSAProgram(c.ProgramName)
+		}
 	}
 	if c.databasePath != "" {
 		consts.SetSSADataBasePath(c.databasePath)
@@ -156,6 +159,8 @@ func (c *config) parseProject() (Programs, error) {
 	//}
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
+
+
 	}
 	return progs, nil
 }
