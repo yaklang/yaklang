@@ -2,9 +2,9 @@ package vulinbox
 
 import (
 	"fmt"
-
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -135,14 +135,6 @@ func newDBM() (*dbm, error) {
 	return &dbm{db}, nil
 }
 
-func (s *dbm) GetUserById(i int) (*VulinUser, error) {
-	var v VulinUser
-	if db := s.db.Where("id = ?", i).First(&v); db.Error != nil {
-		return nil, db.Error
-	}
-	return &v, nil
-}
-
 func (s *dbm) GetUserBySession(uuid string) (*Session, error) {
 	var session Session
 	if db := s.db.Where("uuid = ?", uuid).First(&session); db.Error != nil {
@@ -158,35 +150,90 @@ func (s *dbm) DeleteSession(uuid string) error {
 	return nil
 }
 
-func (s *dbm) GetUserByIdUnsafe(i string) (*VulinUser, error) {
+func (s *dbm) UnsafeSqlQuery(rawString string) ([]map[string]interface{}, error) {
+	rows, err := s.db.Debug().Raw(rawString).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // 确保在退出前关闭结果集
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	var results []map[string]interface{}
+	for rows.Next() {
+		columnPointers := lo.Map(columns, func(_ string, index int) interface{} {
+			var item interface{}
+			return &item
+		})
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, err
+		}
+		rowMap := make(map[string]interface{})
+		for i, col := range columns {
+			rowMap[col] = columnPointers[i]
+		}
+		results = append(results, rowMap)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (s *dbm) GetUserByIdUnsafe(i string) (map[string]interface{}, error) {
+	res, err := s.UnsafeSqlQuery(`select * from vulin_users where id = ` + i + ";")
+	if err != nil || len(res) == 0 {
+		return nil, err
+	}
+	return res[0], nil
+}
+
+func (s *dbm) GetUserById(i int) (*VulinUser, error) {
 	var v VulinUser
-	db := s.db.Raw(`select * from vulin_users where id = ` + i + ";").Debug()
-	if db := db.Scan(&v); db.Error != nil {
+	if db := s.db.Where("id = ?", i).First(&v); db.Error != nil {
 		return nil, db.Error
 	}
 	return &v, nil
 }
 
-func (s *dbm) GetUserByUsernameUnsafe(i string) ([]*VulinUser, error) {
+func (s *dbm) GetUserByUsernameUnsafe(i string) ([]map[string]interface{}, error) {
+	res, err := s.UnsafeSqlQuery(`select * from vulin_users where username = '` + i + "';")
+	if err != nil || len(res) == 0 {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (s *dbm) GetUserByUsername(i string) ([]*VulinUser, error) {
 	var v []*VulinUser
-	db := s.db.Raw(`select * from vulin_users where username = '` + i + "';").Debug()
+	db := s.db.Model(&VulinUser{}).Where("username = ?", i).Debug()
 	if db := db.Scan(&v); db.Error != nil {
 		return nil, db.Error
 	}
 	return v, nil
 }
 
-func (s *dbm) GetUserByUnsafe(i, p string) ([]*VulinUser, error) {
+func (s *dbm) GetUserByUnsafe(i, p string) ([]map[string]interface{}, error) {
+	res, err := s.UnsafeSqlQuery(`select * from vulin_users where username = '` + i + `' AND password = '` + p + `';`)
+	if err != nil || len(res) == 0 {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (s *dbm) GetUser(i, p string) ([]*VulinUser, error) {
 	var v []*VulinUser
-	sql := `select * from vulin_users where username = '` + i + `' AND password = '` + p + `';`
-	db := s.db.Raw(sql).Debug()
+	db := s.db.Model(&VulinUser{}).Where("username = ? AND password = ?", i, p).Debug()
 	if db := db.Scan(&v); db.Error != nil {
 		return nil, db.Error
 	}
 	if len(v) == 0 {
-		return nil, utils.Errorf("username or password incorrect")
+		return nil, utils.Errorf("username or password i\n\treturn v, nilncorrect")
 	}
-
 	return v, nil
 }
 

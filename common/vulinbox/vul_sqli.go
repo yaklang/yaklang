@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
+	"github.com/samber/lo"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -19,11 +20,11 @@ import (
 //go:embed html/vul_sqli.html
 var vulInSQLIViewer []byte
 
-func sqliWriter(writer http.ResponseWriter, request *http.Request, data []*VulinUser, str ...string) {
+func sqliWriter(writer http.ResponseWriter, request *http.Request, data []interface{}, str ...string) {
 	sqliWriterEx(false, writer, request, data, str...)
 }
 
-func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Request, data []*VulinUser, str ...string) {
+func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Request, data []interface{}, str ...string) {
 	raw, err := json.Marshal(data)
 	if err != nil {
 		Failed(writer, request, err.Error())
@@ -78,7 +79,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 				return
 			},
 			RiskDetected:   false,
@@ -96,7 +97,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 				return
 			},
 			RiskDetected:   true,
@@ -128,7 +129,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 				return
 			},
 			RiskDetected:   true,
@@ -166,7 +167,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 				return
 			},
 			RiskDetected:   true,
@@ -190,7 +191,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 				return
 			},
 			RiskDetected:   true,
@@ -241,7 +242,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 			},
 			RiskDetected:   true,
 			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字[ID] 双引号闭合】": 1, "存在基于UNION SQL 注入: [参数名:ID 值:[1]]": 1},
@@ -258,7 +259,9 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, u)
+				sqliWriter(writer, request, lo.Map(u, func(i map[string]interface{}, _ int) interface{} {
+					return i
+				}))
 				return
 			},
 			RiskDetected:   true,
@@ -269,21 +272,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/name/like",
 			Title:        "字符串注入点模糊查询",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				name := LoadFromGetParams(request, "name")
-				msg := `select * from vulin_users where username LIKE '%` + name + `%';`
-				var users []*VulinUser
-				db = db.Raw(msg)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, msg, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				rowStr := `select * from vulin_users where username LIKE '%` + name + `%';`
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, msg, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, msg)
 			},
 			RiskDetected:   true,
 			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 1, "存在基于UNION SQL 注入: [参数名:name 值:[a]]": 1},
@@ -293,21 +289,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/name/like/2",
 			Title:        "字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				name := LoadFromGetParams(request, "name")
 				rowStr := `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
-				db = db.Raw(rowStr)
-				var users []*VulinUser
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected:   true,
 			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 1},
@@ -317,21 +306,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/name/like/b64",
 			Title:        "参数编码字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
-				var users []*VulinUser
 				name := LoadFromGetBase64Params(request, "nameb64")
 				rowStr := `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -340,21 +322,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/name/like/b64j",
 			Title:        "Base64参数(JSON)嵌套字符串注入点模糊查询(括号边界)",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				name := LoadFromGetBase64JSONParam(request, "data", "nameb64j")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + name + `%') AND (age > 20);`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected:   true,
 			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[data] like注入( %' )】": 1},
@@ -364,21 +339,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/limit/int",
 			Title:        "LIMIT（语句结尾）注入案例",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				limit := LoadFromGetParams(request, "limit")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') LIMIT ` + limit + `;`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -387,21 +355,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/limit/4/order1",
 			Title:        "ORDER注入：单个条件排序位于 LIMIT 之前",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				data := LoadFromGetParams(request, "order")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + ` LIMIT 5;`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -410,21 +371,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/limit/4/order2",
 			Title:        "ORDER注入：多条件排序位于 LIMIT 之前",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				data := LoadFromGetParams(request, "order")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY username ` + data + `, created_at LIMIT 5;`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -433,21 +387,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/order3",
 			Title:        "注入：多条件排序位（无LIMIT）",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				data := LoadFromGetParams(request, "order")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY created_at desc, username ` + data + `;`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -456,21 +403,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/limit/4/orderby",
 			Title:        "ORDERBY 注入：多字段",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				data := LoadFromGetParams(request, "orderby")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + data + ` desc LIMIT 5;`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -479,21 +419,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/limit/4/orderby1",
 			Title:        "ORDER BY注入：反引号+排序",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				data := LoadFromGetParams(request, "orderby")
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "` desc" + ` LIMIT 5;`
-				var users []*VulinUser
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -502,21 +435,14 @@ func (s *VulinServer) registerSQLinj() {
 			Path:         "/user/limit/4/orderby2",
 			Title:        "ORDER BY 注入：反引号+多字段",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				db := s.database.db
 				data := LoadFromGetParams(request, "orderby")
-				var users []*VulinUser
 				rowStr := `select * from vulin_users where (username LIKE '%` + "a" + `%') ORDER BY ` + "`" + data + "`,created_at" + ` LIMIT 5;`
-				db = db.Raw(rowStr)
-				if db.Error != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, db.Error.Error())
-					return
-				}
-				err := db.Scan(&users).Error
+				users, err := s.database.UnsafeSqlQuery(rowStr)
 				if err != nil {
-					sqliWriterEx(true, writer, request, users, rowStr, err.Error())
-					return
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr, err.Error())
+				} else {
+					sqliWriterEx(true, writer, request, utils.InterfaceToSliceInterface(users), rowStr)
 				}
-				sqliWriterEx(true, writer, request, users, rowStr)
 			},
 			RiskDetected: true,
 		},
@@ -532,7 +458,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []*VulinUser{u})
+				sqliWriter(writer, request, []interface{}{u})
 				return
 			},
 			RiskDetected: true,
