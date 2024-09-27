@@ -1629,6 +1629,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else if needUpdate {
 				go func() {
+					<-colorOK
+					<-pluginFinishCh
 					err := yakit.UpdateHTTPFlowTagsEx(flow)
 					if err != nil {
 						log.Errorf("update http flow tags error: %s", err)

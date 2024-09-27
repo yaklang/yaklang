@@ -1491,7 +1491,7 @@ func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name str
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(false, pluginId, name, nil, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(false, pluginId, name, callback, itemsFuncs...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
@@ -1500,17 +1500,20 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 		return
 	}
 
-	notified := new(sync.Map)
-	_ = notified
-
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("call [%v] failed: %v", name, err)
 			return
 		}
 	}()
+
+	taskWG := new(sync.WaitGroup)
+	isSync := y.swg == nil || forceSync
 	y.baseWaitGroup.Add(1)
 	defer func() {
+		if !isSync {
+			taskWG.Wait()
+		}
 		y.baseWaitGroup.Done()
 		if callback != nil {
 			callback()
@@ -1535,6 +1538,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 
 	call := func(i *Caller) {
 		defer func() {
+			taskWG.Done()
 			if err := recover(); err != nil {
 				log.Errorf("call failed: \n%v", err)
 			}
@@ -1556,28 +1560,23 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 		if iRaw.Id != verbose {
 			verbose = fmt.Sprintf("%v[%v]", iRaw.Id, iRaw.Verbose)
 		}
-		// println(fmt.Sprintf("hook.Caller call [%v]'s %v", verbose, name))
 
 		// 没有设置并发控制，就直接顺序执行，需要处理上下文
-		if y.swg == nil || forceSync {
+		if isSync {
 			log.Debugf("Start Call Plugin: %v", verbose)
 			call(iRaw)
 			continue
+		} else {
+			taskWG.Add(1)
 		}
 
 		// 设置了并发控制就这样
 		i := iRaw
 		go func() {
-			defer func() {
-				if err := recover(); err != nil {
-					return
-				}
-			}()
-
 			y.swg.Add()
 			go func() {
-				defer y.swg.Done()
 				defer func() {
+					y.swg.Done()
 					if err := recover(); err != nil {
 						log.Errorf("panic from call[%v]: %v", verbose, err)
 					}
