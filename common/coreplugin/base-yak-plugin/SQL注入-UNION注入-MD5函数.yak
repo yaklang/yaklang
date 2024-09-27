@@ -54,7 +54,7 @@ sqlBuildPrefix = func(paramValue) {
         formatString = formatString + wideByte + "'"
         valueList = append(valueList, randstr(10))
     }
-    formatString = formatString + "%s"
+    formatString = formatString + "%s and 1=0 "
 
     for v  in valueList {
         for b in boundaryList {
@@ -112,8 +112,7 @@ sqlInjectionChecking = func(https, request) {
                         count = payload.Count(",") + 1
                         risk.NewRisk(
                             url,
-                            risk.title(f"UNION SQL Injection Columns(MD5)[${count}] For: ${url}"),
-                            risk.title(f"SQL注入（UNION）列数(MD5)[${count}] URL: ${url}"),
+                            risk.title(f"SQL注入（UNION）列数(MD5)[${count}] 参数[${paramName}]"),
                             risk.type("sqlinjection"),
                             risk.severity("high"),
                             risk.request(rsp.RequestRaw),
