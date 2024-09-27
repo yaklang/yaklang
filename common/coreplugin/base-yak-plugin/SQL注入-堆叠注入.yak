@@ -54,7 +54,7 @@ sqlBuildPrefix = func(paramValue) {
         formatString = formatString + wideByte + "'"
         valueList = append(valueList, randstr(10))
     }
-    formatString = formatString + "%s"
+    formatString = formatString + "%s and 1=0 "
 
     for v  in valueList {
         for b in boundaryList {
@@ -113,16 +113,16 @@ sqlInjectionChecking = func(https, request) {
                         risk.NewRisk(
                             url,
                             risk.title(f"UNION SQL Injection Columns(MD5)[${count}] For: ${url}"),
-                            risk.title(f"SQL注入（UNION）列数(MD5)[${count}] URL: ${url}"),
+                            risk.title(f"SQL注入（堆叠）(MD5)URL: ${url}"),
                             risk.type("sqlinjection"),
                             risk.severity("high"),
                             risk.request(rsp.RequestRaw),
                             risk.parameter(i.String()),
                             risk.response(rsp.ResponseRaw),
                             risk.payload(finPayload),
-                            risk.description("Union-Based SQL 注入是一种常见的 SQL 注入攻击技术，通过在应用程序的查询语句中使用 UNION 操作符来获取数据库中的敏感信息。攻击者利用 UNION 操作符将恶意的 SELECT 查询与正常的查询结果合并，从而泄露数据库的数据。本漏洞检测方式是，使用 UNION Select 表达式的md5计算结果作为检测依据。"),
+                            risk.description("SQL堆叠注入是一种SQL注入攻击技术，它利用了某些数据库管理系统（如MySQL ）允许在单个查询语句中执行多个SQL语句的特性。攻击者通过在输入中插入额外的SQL语句，并使用分号（;）分隔，以此来执行多个SQL命令。这种技术通常用于绕过简单的输入验证，并且可以在没有错误信息显示的情况下，悄无声息地执行恶意SQL命令"),
                             risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
-                            risk.details("通过 UNION SELECT 随机 Token 为测试手段，测出回显列数然后在响应结果中找到 Token"),
+                            risk.details("通过 堆叠 SELECT 随机 Token 为测试手段，测出回显列数然后在响应结果中找到 Token"),
                         )
                         finished = true
                         return
