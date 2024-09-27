@@ -134,42 +134,47 @@ const (
 
 func init() {
 	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		lt := params.GetString("lt", "lessthan", "lessThan")   // <
-		le := params.GetString("le", "lessequal", "lessEqual") // <=
-
+		lt := params.GetString("lessThan")  // <
+		le := params.GetString("lessEqual") // <=
 		if lt != "" && le != "" {
 			return false, nil, utils.Errorf("lt and le cannot be used at the same time")
 		}
-		left := "0.0.0"
-		leftEqual := false
+		vstart := "0.0.0"
+		vstartEqual := false
 		if lt != "" {
-			left = lt
+			vstart = lt
 		} else if le != "" {
-			left = le
-			leftEqual = true
+			vstart = le
+			vstartEqual = true
 		}
 
-		gt := params.GetString("gt", "greaterthan", "greaterThan")   // >
-		ge := params.GetString("ge", "greaterequal", "greaterEqual") // >=
+		gt := params.GetString("greaterThan")  // >
+		ge := params.GetString("greaterEqual") // >=
 		if gt != "" && ge != "" {
 			return false, nil, utils.Errorf("gt and ge cannot be used at the same time")
 		}
-
-		right := "99999999.999.999"
-		rightEqual := false
+		vend := "99999999.999.999"
+		vendEqual := false
 		if gt != "" {
-			right = gt
+			vend = gt
 		} else if ge != "" {
-			right = ge
-			rightEqual = true
+			vend = ge
+			vendEqual = true
 		}
 
-		compareIn := func(str string) bool {
-			_ = right
-			_ = rightEqual
-			_ = left
-			_ = leftEqual
-			return false
+		compareIn := func(version string) bool {
+			c1, err := utils.VersionCompare(version, vstart)
+			if err != nil {
+				return false
+			}
+			c2, err := utils.VersionCompare(vend, version)
+			if c1 == 0 && !vstartEqual {
+				return false
+			}
+			if c2 == 0 && !vendEqual {
+				return false
+			}
+			return c1 != -1 && c2 != -1
 		}
 
 		var results []sfvm.ValueOperator
@@ -178,19 +183,20 @@ func init() {
 			if !ok {
 				return nil
 			}
-			if val.GetSSAValue().GetOpcode() != ssa.SSAOpcodeConstInst {
+			ssaValue := val.GetSSAValue()
+			if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
 				return nil
 			}
-			ver := fmt.Sprint(val.GetConstValue())
+			ver := fmt.Sprint(ssaValue)
 			if compareIn(ver) {
-				results = append(results, ver)
+				results = append(results, val)
 			}
 			return nil
 		})
 		if len(results) > 0 {
 			return true, sfvm.NewValues(results), nil
 		}
-		return false, nil, utils.Error("no value found")
+		return false, nil, utils.Error("not value in version range")
 	}), nc_desc("获取版本信息"))
 	registerNativeCall(NativeCall_Const, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var (

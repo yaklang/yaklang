@@ -285,7 +285,10 @@ alert $param for {"level": "high"}
 func TestJavaDependencies(t *testing.T) {
 	code := `
 __dependency__.*fastjson.version as $ver;
-alert $ver;
+$ver in(1.2.3,2.3.4] as $vulnVersion
+alert $vulnVersion for {
+	title:"存在fastjson 1.2.3-2.3.4漏洞",
+};
 
 desc(
 lang: java,
