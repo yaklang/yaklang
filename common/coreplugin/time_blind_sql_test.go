@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc"
 )
 
-func TestGRPCMUSTPASS_TimeBlindSQL(t *testing.T) {
+func TestGRPCMUSTPASS_SQLTimeBlind(t *testing.T) {
 	client, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
