@@ -95,8 +95,9 @@ const (
 	// OpIterNext will get next value from iterator
 	// if the channel from iter context has a next element, push into stack and execute filter
 	// if not, exit
-	OpIterNext
-	OpIterEnd
+	OpIterNext  // check next to end or end
+	OpIterLatch // jump to next
+	OpIterEnd   // end
 
 	OpCheckStackTop // check the top of stack, if empty, push input into stack
 
@@ -120,30 +121,27 @@ type SFI struct {
 	OpCode               SFVMOpCode
 	UnaryInt             int
 	UnaryStr             string
-	Desc                 string
 	Values               []string
 	SyntaxFlowConfig     []*RecursiveConfigItem
 	FileFilterMethodItem map[string]string
-	// iter
-	iter *IterContext
+	Iter                 *IterIndex
 }
 
 func (s *SFI) IsIterOpcode() bool {
 	switch s.OpCode {
-	case OpCreateIter, OpIterNext, OpIterEnd:
+	case OpCreateIter, OpIterLatch, OpIterNext, OpIterEnd:
 		return true
 	default:
 		return false
 	}
 }
 
-type IterContext struct {
-	originValues chan ValueOperator
-	results      []bool
-	start        int
-	next         int
-	end          int
-	_counter     int
+type IterIndex struct {
+	// static
+	Start int `json:"start"`
+	Next  int `json:"next"`
+	Latch int `json:"latch"`
+	End   int `json:"end"`
 }
 
 func (s *SFI) ValueByIndex(i int) string {
@@ -256,8 +254,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "iter-start", s.UnaryStr)
 	case OpIterEnd:
 		return fmt.Sprintf(verboseLen+" %v", "iter-end", s.UnaryStr)
+	case OpIterLatch:
+		return fmt.Sprintf(verboseLen+" iter-latch to: %d", s.UnaryStr, s.Iter.Next)
 	case OpIterNext:
-		return fmt.Sprintf(verboseLen+" start: %v end: %v", "iter-next", s.iter.start, s.iter.end)
+		return fmt.Sprintf(verboseLen+" start: %v  latch:%v end: %v", "iter-next", s.Iter.Start, s.Iter.Latch, s.Iter.End)
 	case OpFilterExprEnter:
 		return fmt.Sprintf(verboseLen, "  \\")
 	case OpFilterExprExit:
@@ -285,7 +285,7 @@ func (s *SFI) String() string {
 	case OpFileFilterJsonPath:
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
 	case OpVersionIn:
-		return fmt.Sprintf(verboseLen+" ", "version$in" )
+		return fmt.Sprintf(verboseLen+" ", "version$in")
 	default:
 		panic("unhandled default case")
 	}
