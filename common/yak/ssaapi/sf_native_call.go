@@ -127,9 +127,71 @@ const (
 
 	// NativeCall_Const is used to search const value
 	NativeCall_Const = "const"
+
+	// NativeCall_VersionIn is used to get the version in
+	NativeCall_VersionIn = "versionIn"
 )
 
 func init() {
+	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		lt := params.GetString("lt", "lessthan", "lessThan")   // <
+		le := params.GetString("le", "lessequal", "lessEqual") // <=
+
+		if lt != "" && le != "" {
+			return false, nil, utils.Errorf("lt and le cannot be used at the same time")
+		}
+		left := "0.0.0"
+		leftEqual := false
+		if lt != "" {
+			left = lt
+		} else if le != "" {
+			left = le
+			leftEqual = true
+		}
+
+		gt := params.GetString("gt", "greaterthan", "greaterThan")   // >
+		ge := params.GetString("ge", "greaterequal", "greaterEqual") // >=
+		if gt != "" && ge != "" {
+			return false, nil, utils.Errorf("gt and ge cannot be used at the same time")
+		}
+
+		right := "99999999.999.999"
+		rightEqual := false
+		if gt != "" {
+			right = gt
+		} else if ge != "" {
+			right = ge
+			rightEqual = true
+		}
+
+		compareIn := func(str string) bool {
+			_ = right
+			_ = rightEqual
+			_ = left
+			_ = leftEqual
+			return false
+		}
+
+		var results []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
+				return nil
+			}
+			if val.GetSSAValue().GetOpcode() != ssa.SSAOpcodeConstInst {
+				return nil
+			}
+			ver := fmt.Sprint(val.GetConstValue())
+			if compareIn(ver) {
+				results = append(results, ver)
+			}
+			return nil
+		})
+		if len(results) > 0 {
+			return true, sfvm.NewValues(results), nil
+		}
+		return false, nil, utils.Error("no value found")
+	}), nc_desc("获取版本信息"))
 	registerNativeCall(NativeCall_Const, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var (
 			results    []sfvm.ValueOperator
