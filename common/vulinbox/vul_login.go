@@ -53,7 +53,7 @@ func (s *VulinServer) registerLoginRoute() {
 						return
 					}
 
-					users, err := s.database.GetUserByUsernameUnsafe(username)
+					users, err := s.database.GetUserByUsername(username)
 					if err != nil {
 						writer.WriteHeader(500)
 						writer.Write([]byte("internal error, cannot found user: " + username))
@@ -127,7 +127,7 @@ func (s *VulinServer) registerLoginRoute() {
 
 					writer.Header().Set("Content-Type", "application/json")
 					name := utils.MapGetString(token.Header, "username")
-					users, err := s.database.GetUserByUsernameUnsafe(name)
+					users, err := s.database.GetUserByUsername(name)
 					if err != nil {
 						writer.WriteHeader(500)
 						writer.Write([]byte("internal error, cannot found user: " + name))

@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strconv"
 	"strings"
@@ -68,14 +69,18 @@ func (s *VulinServer) mallUserRoute() {
 					return
 				}
 				user := users[0]
-
+				userMap := utils.InterfaceToMap(user)
+				id, err := strconv.Atoi(userMap["id"][0])
+				if err != nil {
+					id = 0
+				}
 				// 假设验证通过，返回登录成功消息
 				response := struct {
 					Id      uint   `json:"id"`
 					Success bool   `json:"success"`
 					Message string `json:"message"`
 				}{
-					Id:      user.ID,
+					Id:      uint(id),
 					Success: true,
 					Message: "Login successful",
 				}
