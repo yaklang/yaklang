@@ -28,6 +28,9 @@ var MitmExports = map[string]interface{}{
 	"wsforcetext":          mitmConfigWSForceTextFrame,
 	"rootCA":               mitmConfigCertAndKey,
 	"useDefaultCA":         mitmConfigUseDefault,
+	"gmtls":                mitmConfigGMTLS,
+	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
+	"gmtlsOnly":            mitmConfigGMTLSOnly,
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
@@ -52,6 +55,9 @@ type mitmConfig struct {
 	mitmCert, mitmPkey []byte
 	useDefaultMitmCert bool
 	maxContentLength   int
+	gmtls              bool
+	gmtlsPrefer        bool
+	gmtlsOnly          bool
 
 	// 是否开启透明劫持
 	isTransparent            bool
@@ -72,6 +78,42 @@ type MitmConfigOpt func(config *mitmConfig)
 func mitmConfigIsTransparent(b bool) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.isTransparent = b
+	}
+}
+
+// gmtls 是一个选项参数，用于指定中间人代理服务器是否开启 GMTLS 劫持模式，默认为false
+// 在开启 GMTLS 劫持模式下，中间人代理服务器会劫持所有的 GMTLS 流量
+// Example:
+// ```
+// mitm.Start(8080, mitm.gmtls(true))
+// ```
+func mitmConfigGMTLS(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.gmtls = b
+	}
+}
+
+// gmtlsPrefer 是一个选项参数，用于指定中间人代理服务器是否优先使用 GMTLS 劫持模式，默认为false
+// 在开启 GMTLS 劫持模式下，中间人代理服务器会优先使用 GMTLS 劫持模式
+// Example:
+// ```
+// mitm.Start(8080, mitm.gmtlsPrefer(true))
+// ```
+func mitmConfigGMTLSPrefer(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.gmtlsPrefer = b
+	}
+}
+
+// gmtlsOnly 是一个选项参数，用于指定中间人代理服务器是否只使用 GMTLS 劫持模式，默认为false
+// 在开启 GMTLS 劫持模式下，中间人代理服务器只会使用 GMTLS 劫持模式
+// Example:
+// ```
+// mitm.Start(8080, mitm.gmtlsOnly(true))
+// ```
+func mitmConfigGMTLSOnly(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.gmtlsOnly = b
 	}
 }
 
@@ -269,6 +311,9 @@ func startBridge(
 	}
 
 	server, err := crep.NewMITMServer(
+		crep.MITM_SetGM(config.gmtls),
+		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
+		crep.MITM_SetGMOnly(config.gmtlsOnly),
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetForceTextFrame(config.wsForceTextFrame),
 		crep.MITM_SetWebsocketRequestHijackRaw(func(req []byte, r *http.Request, rspIns *http.Response, t int64) []byte {
