@@ -85,7 +85,9 @@ var BlackListCorePlugin = []string{
 
 func ClearBlackListPlugin(blackList []string) {
 	err := yakit.DeleteYakScriptByNames(consts.GetGormProfileDatabase(), blackList)
-	log.Errorf("delete black list plugin failed: %s", err)
+	if err != nil {
+		log.Errorf("delete black list plugin failed: %s", err)
+	}
 }
 
 func init() {
@@ -126,6 +128,16 @@ func init() {
 			"mitm", "SQL注入-MySQL-ErrorBased",
 			withPluginHelp("MySQL 报错注入（使用 MySQL 十六进制字符串特征检测）"),
 			withPluginAuthors("V1ll4n"),
+		)
+		registerBuildInPlugin(
+			"mitm", "SQL注入-时间盲注-Sleep",
+			withPluginHelp("SQL 时间盲注"),
+			withPluginAuthors("WAY"),
+		)
+		registerBuildInPlugin(
+			"mitm", "SQL注入-堆叠注入",
+			withPluginHelp("SQL 堆叠注入（带回显），使用 md5 函数检测特征输出（mysql/postgres）"),
+			withPluginAuthors("WAY"),
 		)
 		registerBuildInPlugin(
 			"mitm",

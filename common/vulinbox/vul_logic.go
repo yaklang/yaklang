@@ -62,7 +62,7 @@ func (s *VulinServer) registerUserRoute() {
 					return
 				}
 				// sql 注入 , 万能密码
-				users, err := s.database.GetUserByUnsafe(username, password)
+				users, err := s.database.GetUser(username, password)
 				if err != nil {
 					writer.WriteHeader(500)
 					writer.Write([]byte("internal error: " + err.Error()))

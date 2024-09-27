@@ -28,7 +28,7 @@ window.location.href = '/logic/user/login?from=` + request.URL.Path + `';
 
 	// 在这里执行获取用户详细信息的逻辑
 	// 假设根据用户名查询用户信息
-	users, err := s.GetUserByUsernameUnsafe(se.Username)
+	users, err := s.GetUserByUsername(se.Username)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("Internal error, cannot retrieve user information"))
@@ -63,7 +63,7 @@ window.location.href = '/mall/user/login';
 
 	// 在这里执行获取用户详细信息的逻辑
 	// 假设根据用户名查询用户信息
-	users, err := s.GetUserByUsernameUnsafe(se.Username)
+	users, err := s.GetUserByUsername(se.Username)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("Internal error, cannot retrieve user information"))
