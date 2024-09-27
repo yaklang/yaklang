@@ -57,42 +57,97 @@ func TestFunction_Value(t *testing.T) {
 
 		var count = 1
 
-		func f(){
-			count = 2
-		}
-
 		func main(){
-			println(count)
-			f()
-			println(count)
+			println(count) // 1
 		}
 		`, []string{
-			"1", "1",
+			"1",
 		}, t)
 	})
 
-	//t.Run("global value phi", func(t *testing.T) {
-	//	test.CheckPrintlnValue(`package main
-	//
-	//	var count = 1
-	//
-	//	func f(){
-	//		count = 2
-	//		println(count)
-	//	}
-	//
-	//	func main(){
-	//		if true {
-	//		    count = 3
-	//		}else{
-	//		    count = 4
-	//		}
-	//		println(count)
-	//	}
-	//	`, []string{
-	//		"2", "phi(count)[3,4]",
-	//	}, t)
-	//})
+	t.Run("global value phi", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+	
+		var count = 1
+	
+		func main(){
+			if true {
+			    count = 2
+				println(count) // 2
+			}
+
+			println(count) // phi(count)[1,2]
+		}
+		`, []string{
+			"2", "phi(count)[1,2]",
+		}, t)
+	})
+
+	t.Run("global value phi-scope", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+	
+		var count = 1
+	
+		func main(){
+			if true {
+			    count = 2
+				count = 3
+				println(count) // 3
+			}
+
+			println(count) // phi(count)[1,3]
+		}
+		`, []string{
+			"3", "phi(count)[1,3]",
+		}, t)
+	})
+
+	/*t.Run("global value phi-scope EX", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		var count = 1
+
+		func main(){
+			if true {
+			    count = 3
+			}else{
+			    count = 4
+			}
+			count = 5
+			println(count) // 5
+		}
+
+		func main2(){
+		    println(count) // phi(count)[1,5]
+		}
+		`, []string{
+			"5", "phi(count)[1,5]",
+		}, t)
+	})*/
+
+	t.Run("global value phi-function", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+	
+		var count = 1
+	
+		func f(){
+			count = 2
+			println(count) // 2
+		}
+	
+		func main(){
+			println(count) // phi(count)[1,2]
+			if true {
+			    count = 3
+			}else{
+			    count = 4
+			}
+			println(count) // phi(count)[phi(count)[phi(count)[1,2],3],4]
+		}
+		`, []string{
+			"2", "phi(count)[1,2]", "phi(count)[phi(count)[phi(count)[1,2],3],4]",
+		}, t)
+	})
 }
 
 func TestClosu_Value(t *testing.T) {

@@ -346,6 +346,18 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 	return nil, false
 }
 
+func (n *anValue) SetStringMember(key string, v Value) {
+	for _, i := range n.member.Keys() {
+		lit, ok := i.(*ConstInst)
+		if !ok {
+			continue
+		}
+		if lit.value == key {
+			n.member.Set(lit, v)
+		}
+	}
+}
+
 func (n *anValue) GetAllMember() map[Value]Value {
 	return n.member.GetMap()
 }

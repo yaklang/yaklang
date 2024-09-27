@@ -105,6 +105,7 @@ type MemberCall interface {
 	GetMember(Value) (Value, bool)
 	GetIndexMember(int) (Value, bool)
 	GetStringMember(string) (Value, bool)
+	SetStringMember(string, Value)
 	DeleteMember( /*key*/ Value)   // delete by key
 	GetAllMember() map[Value]Value // map[key]value
 	ForEachMember(func(k Value, v Value) bool)
