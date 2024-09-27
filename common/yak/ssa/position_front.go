@@ -35,8 +35,22 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	}
 }
 
+func (b *FunctionBuilder) GetRangeByText(searchText string) []memedit.RangeIf {
+	return GetRangeByText(b.GetEditor(), searchText)
+}
+
+func (b *FunctionBuilder) SetRangeByRangeIf(rng memedit.RangeIf) {
+	if b == nil {
+		return
+	}
+	b.CurrentRange = rng
+}
+
 func (b *FunctionBuilder) SetEmptyRange() {
-	editor := *memedit.NewMemEditor("")
+	editor := b.GetEditor()
+	if editor == nil {
+		editor = memedit.NewMemEditor("")
+	}
 	r := editor.GetFullRange()
 	b.CurrentRange = r
 }
@@ -104,6 +118,23 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 		editor.GetPositionByLine(startToken.GetLine(), startToken.GetColumn()+1),
 		editor.GetPositionByLine(endLine, endColumn+1),
 	)
+}
+
+func GetRangeByText(editor *memedit.MemEditor, searchText string) []memedit.RangeIf {
+	lines := strings.Split(editor.GetSourceCode(), "\n")
+	var rngs []memedit.RangeIf
+	for lineNum, line := range lines {
+		col := strings.Index(line, searchText)
+		if col != -1 {
+			startLine, startCol, endLine, endCol := lineNum+1, col, lineNum+1, col+len(searchText)
+			rngs = append(rngs, editor.GetRangeByPosition(
+				editor.GetPositionByLine(startLine, startCol+1),
+				editor.GetPositionByLine(endLine, endCol+1),
+			),
+			)
+		}
+	}
+	return rngs
 }
 
 type Token struct {

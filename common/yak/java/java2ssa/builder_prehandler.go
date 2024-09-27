@@ -1,6 +1,8 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"path/filepath"
 	"strings"
 
@@ -21,8 +23,8 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return !slices.Contains(fileList, extension)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
-	prog := functionBuilder.GetProgram()
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
+	prog := fb.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
 		return nil
@@ -38,11 +40,20 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 
 	// pom.xml
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
+		s.InitHandlerOnce.Do(func() {
+			fb.SetEmptyRange()
+			variable := fb.CreateVariable("__dependency__")
+			container := fb.EmitEmptyContainer()
+			fb.AssignVariable(variable, container)
+		})
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			log.Warnf("read pom.xml error: %v", err)
 			return nil
 		}
+		editor := memedit.NewMemEditor(string(raw))
+		editor.SetUrl(path)
+		fb.SetEditor(editor)
 		vfs := filesys.NewVirtualFs()
 		vfs.AddFile(filename, string(raw))
 		pkgs, err := sca.ScanFilesystem(vfs)
@@ -51,35 +62,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			return nil
 		}
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
-		/*
-			__dependency__.name?{}
-		*/
-		variable := functionBuilder.CreateVariable("__dependency__")
-		container := functionBuilder.EmitEmptyContainer()
-		functionBuilder.AssignVariable(variable, container)
-		for _, pkg := range pkgs {
-			sub := functionBuilder.EmitEmptyContainer()
-
-			// check item
-			// 1. name
-			// 2. version
-			// 3. filename
-			// 4. group
-			// 5. artifact
-			for k, v := range map[string]string{
-				"name":     pkg.Name,
-				"version":  pkg.Version,
-				"filename": filename,
-			} {
-				functionBuilder.AssignVariable(
-					functionBuilder.CreateMemberCallVariable(sub, functionBuilder.EmitConstInst(k)),
-					functionBuilder.EmitConstInst(v),
-				)
-			}
-
-			pkgItem := functionBuilder.CreateMemberCallVariable(container, functionBuilder.EmitConstInst(pkg.Name))
-			functionBuilder.AssignVariable(pkgItem, sub)
-		}
+		handlerDependency(pkgs, fb, filename)
 	}
 
 	switch strings.ToLower(fileSystem.Ext(path)) {
@@ -117,4 +100,59 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 
 	}
 	return nil
+}
+
+func handlerDependency(pkgs []*dxtypes.Package, fb *ssa.FunctionBuilder, filename string) {
+	container := fb.ReadValue("__dependency__")
+	if container == nil {
+		return
+	}
+
+	setDependencyRange := func(name string) {
+		id := strings.Split(name, ":")
+		if len(id) != 2 {
+			return
+		}
+		group, artifact := id[0], id[1]
+		rs1 := fb.GetRangeByText(artifact)
+		if len(rs1) == 1 {
+			fb.SetRangeByRangeIf(rs1[0])
+			return
+		}
+		rs2 := fb.GetRangeByText(group)
+		if len(rs2) == 1 {
+			fb.SetRangeByRangeIf(rs2[0])
+			return
+		}
+		fb.SetEmptyRange()
+	}
+	/*
+		__dependency__.name?{}
+	*/
+	fb.SetEmptyRange()
+	for _, pkg := range pkgs {
+		sub := fb.EmitEmptyContainer()
+		// check item
+		// 1. name
+		// 2. version
+		// 3. filename
+		// 4. group
+		// 5. artifact
+		for k, v := range map[string]string{
+			"name":     pkg.Name,
+			"version":  pkg.Version,
+			"filename": filename,
+		} {
+			if k == "name" {
+				setDependencyRange(v)
+			}
+			fb.AssignVariable(
+				fb.CreateMemberCallVariable(sub, fb.EmitConstInst(k)),
+				fb.EmitConstInst(v),
+			)
+		}
+
+		pkgItem := fb.CreateMemberCallVariable(container, fb.EmitConstInst(pkg.Name))
+		fb.AssignVariable(pkgItem, sub)
+	}
 }
