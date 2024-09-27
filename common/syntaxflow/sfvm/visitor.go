@@ -2,11 +2,12 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -19,7 +20,7 @@ type SyntaxFlowVisitor struct {
 	rawDesc            map[string]string
 	verifyFilesystem   map[string]string
 	negativeFilesystem map[string]string
-	codes              []*SFI
+	codes              OpCodes
 }
 
 func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
@@ -202,6 +203,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			log.Warnf("compile filter-expr in condition expression failed: %v", err)
 			return err
 		}
+		y.EmitLatchIterator(ctx)
 		y.EmitIterEnd(ctx)
 	case *sf.OpcodeTypeConditionContext:
 		y.EmitDuplicate()

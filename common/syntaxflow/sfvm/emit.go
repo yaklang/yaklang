@@ -2,9 +2,10 @@ package sfvm
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -332,22 +333,27 @@ func (v *SyntaxFlowVisitor) EmitPass() {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitCreateIterator() *IterContext {
+func (v *SyntaxFlowVisitor) EmitCreateIterator() *IterIndex {
 	idx := len(v.codes)
-	it := &IterContext{start: idx}
-	v.codes = append(v.codes, &SFI{OpCode: OpCreateIter, iter: it})
+	it := &IterIndex{Start: idx}
+	v.codes = append(v.codes, &SFI{OpCode: OpCreateIter, Iter: it})
 	return it
 }
 
-func (v *SyntaxFlowVisitor) EmitNextIterator(i *IterContext) {
-	i.next = len(v.codes)
-	v.codes = append(v.codes, &SFI{OpCode: OpIterNext, iter: i})
+func (v *SyntaxFlowVisitor) EmitNextIterator(i *IterIndex) {
+	i.Next = len(v.codes)
+	v.codes = append(v.codes, &SFI{OpCode: OpIterNext, Iter: i})
 }
 
-func (v *SyntaxFlowVisitor) EmitIterEnd(i *IterContext) {
+func (v *SyntaxFlowVisitor) EmitLatchIterator(i *IterIndex) {
+	i.Latch = len(v.codes)
+	v.codes = append(v.codes, &SFI{OpCode: OpIterLatch, Iter: i})
+}
+
+func (v *SyntaxFlowVisitor) EmitIterEnd(i *IterIndex) {
 	idx := len(v.codes)
-	code := &SFI{OpCode: OpIterEnd, iter: i}
-	i.end = idx
+	code := &SFI{OpCode: OpIterEnd, Iter: i}
+	i.End = idx
 	v.codes = append(v.codes, code)
 }
 
