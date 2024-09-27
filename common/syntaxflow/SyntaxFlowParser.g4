@@ -113,7 +113,7 @@ filterItem
     ) vstart? ',' vend? (
         ']'
         | ')'
-    )   # InFilter
+    )   # VersionInFilter
     ;
 
 vstart: versionString;
@@ -121,7 +121,7 @@ vend: versionString;
 // unless ',' ']' ')'
 versionBlockElement: Number versionSuffix* ;
 versionSuffix: '-' | Identifier;
-versionBlock:  versionBlockElement+;
+versionBlock:  versionBlockElement ('.' versionBlockElement )*;
 versionString
     : stringLiteral
     | versionBlock
