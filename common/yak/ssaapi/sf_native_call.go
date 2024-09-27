@@ -134,44 +134,45 @@ const (
 
 func init() {
 	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		lt := params.GetString("lessThan")  // <
-		le := params.GetString("lessEqual") // <=
-		if lt != "" && le != "" {
+		gt := params.GetString("greaterThan")  // <
+		ge := params.GetString("greaterEqual") // <=
+		if gt != "" && ge != "" {
 			return false, nil, utils.Errorf("lt and le cannot be used at the same time")
 		}
 		vstart := "0.0.0"
-		vstartEqual := false
-		if lt != "" {
-			vstart = lt
-		} else if le != "" {
-			vstart = le
-			vstartEqual = true
+		geFlag := false
+		if gt != "" {
+			vstart = gt
+		} else if ge != "" {
+			vstart = ge
+			geFlag = true
 		}
 
-		gt := params.GetString("greaterThan")  // >
-		ge := params.GetString("greaterEqual") // >=
-		if gt != "" && ge != "" {
+		lt := params.GetString("lessThan")  // >
+		le := params.GetString("lessEqual") // >=
+		if lt != "" && le != "" {
 			return false, nil, utils.Errorf("gt and ge cannot be used at the same time")
 		}
 		vend := "99999999.999.999"
-		vendEqual := false
-		if gt != "" {
-			vend = gt
-		} else if ge != "" {
-			vend = ge
-			vendEqual = true
+		leFlag := false
+		if lt != "" {
+			vend = lt
+		} else if le != "" {
+			vend = le
+			leFlag = true
 		}
-
+		vstart = yakunquote.TryUnquote(vstart)
+		vend = yakunquote.TryUnquote(vend)
 		compareIn := func(version string) bool {
 			c1, err := utils.VersionCompare(version, vstart)
 			if err != nil {
 				return false
 			}
 			c2, err := utils.VersionCompare(vend, version)
-			if c1 == 0 && !vstartEqual {
+			if c1 == 0 && !geFlag {
 				return false
 			}
-			if c2 == 0 && !vendEqual {
+			if c2 == 0 && !leFlag {
 				return false
 			}
 			return c1 != -1 && c2 != -1
