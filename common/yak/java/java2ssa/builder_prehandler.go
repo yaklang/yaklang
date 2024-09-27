@@ -40,12 +40,6 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 
 	// pom.xml
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
-		s.InitHandlerOnce.Do(func() {
-			fb.SetEmptyRange()
-			variable := fb.CreateVariable("__dependency__")
-			container := fb.EmitEmptyContainer()
-			fb.AssignVariable(variable, container)
-		})
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			log.Warnf("read pom.xml error: %v", err)
@@ -62,6 +56,12 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			return nil
 		}
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
+		s.InitHandlerOnce.Do(func() {
+			fb.SetEmptyRange()
+			variable := fb.CreateVariable("__dependency__")
+			container := fb.EmitEmptyContainer()
+			fb.AssignVariable(variable, container)
+		})
 		handlerDependency(pkgs, fb, filename)
 	}
 
