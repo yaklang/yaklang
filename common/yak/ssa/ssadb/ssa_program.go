@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -38,7 +39,6 @@ func GetSSAProgram(name string) *schema.SSAProgram {
 }
 
 func SaveSSAProgram(name, desc, language string) error {
-
 	db := consts.GetGormProfileDatabase()
 
 	prog := &schema.SSAProgram{
@@ -74,5 +74,11 @@ func AllSSAPrograms() []*schema.SSAProgram {
 		Programs[p.Name] = p
 	}
 
+	return programs
+}
+
+func GetProfileSSAProgram(db *gorm.DB) []string {
+	var programs []string
+	db.Model(&schema.SSAProgram{}).Select("DISTINCT(name)").Pluck("name", &programs)
 	return programs
 }

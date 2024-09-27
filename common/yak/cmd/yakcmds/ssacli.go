@@ -116,16 +116,6 @@ var SSACompilerCommands = []*cli.Command{
 					ssa.ShowDatabaseCacheCost()
 				}()
 			}
-			// check program name duplicate
-			if slices.Contains(ssadb.AllPrograms(ssadb.GetDB()), programName) {
-				if !reCompile {
-					return utils.Errorf(
-						"program name %v existed, please use `re-compile` flag to re-compile or change program name",
-						programName,
-					)
-				}
-			}
-
 			entry := c.String("entry")
 			input_language := c.String("language")
 			inMemory := c.Bool("memory")
@@ -139,6 +129,25 @@ var SSACompilerCommands = []*cli.Command{
 			showDot := c.Bool("dot")
 			withCode := c.Bool("with-code")
 			saveProfile := !c.Bool("no-frontend")
+
+			// check program name duplicate
+			if slices.Contains(ssadb.AllPrograms(ssadb.GetDB()), programName) {
+				if !reCompile {
+					return utils.Errorf(
+						"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
+						programName,
+					)
+				}
+			}
+
+			if saveProfile && slices.Contains(ssadb.GetProfileSSAProgram(consts.GetGormProfileDatabase()), programName) {
+				if !reCompile {
+					return utils.Errorf(
+						"program name %v existed in other database, please use `re-compile` flag to re-compile or change program name",
+						programName,
+					)
+				}
+			}
 
 			// set database
 			if databaseFileRaw != "" {
