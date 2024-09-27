@@ -481,7 +481,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
 			_, err := yak.Execute(`
 			for i in 10 {
 				url = f"${target}?token=${token}&randstr=${str.RandStr(10)}"
-				rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy))
+				rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
 			}
 			`, map[string]any{
 				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
