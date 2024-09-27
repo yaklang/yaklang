@@ -37,20 +37,15 @@ func TestDepencyVersionIn(t *testing.T) {
             <version>1.2.24</version>
         </dependency>
 		<dependency>
-            <groupId>com.example</groupId>
+            <groupId>com.org</groupId>
             <artifactId>test1</artifactId>
             <version>1.11.1</version>
         </dependency>
 		<dependency>
-            <groupId>com.org</groupId>
+            <groupId>com.example</groupId>
             <artifactId>test1</artifactId>
-            <version>2.22.2</version>
+            <version>3.22.2</version>
         </dependency>
-		<dependency>
-			<groupId>com.org</groupId>
-			<artifactId>test1</artifactId>
-			<version>2.22.2</version>
-		</dependency>
 		 <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -80,11 +75,18 @@ $ver in["1.2.4",) as $vulnVersion`, map[string][]string{
 			"vulnVersion": {"\"1.2.24\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
-	t.Run("test the same artifactId ", func(t *testing.T) {
+	t.Run("test the same artifactId 1 ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__./com.org/.version as $ver;
 $ver in[1.1.0,3.0.0) as $vulnVersion`, map[string][]string{
-			"ver":         {"\"2.22.2\""},
-			"vulnVersion": {"\"2.22.2\""},
+			"ver":         {"\"1.11.1\""},
+			"vulnVersion": {"\"1.11.1\""},
+		}, false, ssaapi.WithLanguage(consts.JAVA))
+	})
+	t.Run("test the same artifactId 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*test1.version as $ver;
+$ver in[3.0.0,) as $vulnVersion`, map[string][]string{
+			"ver":         {"\"1.11.1\"", "\"3.22.2\""},
+			"vulnVersion": {"\"3.22.2\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test abnormal version ", func(t *testing.T) {

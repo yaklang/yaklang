@@ -96,22 +96,22 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	case *sf.VersionInFilterContext:
 		var left, right, vstart, vend string
 		if filter.ListSelectOpen() != nil {
-			left = "lessEqual"
+			left = "greaterEqual"
 		} else if filter.OpenParen() != nil {
-			left = "lessThan"
+			left = "greaterThan"
 		}
 
 		if filter.ListSelectClose() != nil {
-			left = "greaterEqual"
+			right = "lessEqual"
 		} else if filter.CloseParen() != nil {
-			left = "greaterThan"
+			right = "lessThan"
 		}
 
 		if v := filter.Vstart(); v != nil {
 			vstart = y.VisitVersionString(v.(*sf.VstartContext).VersionString())
 		}
 		if v := filter.Vend(); v != nil {
-			vstart = y.VisitVersionString(v.(*sf.VendContext).VersionString())
+			vend = y.VisitVersionString(v.(*sf.VendContext).VersionString())
 		}
 
 		y.EmitNativeCall("versionIn",
