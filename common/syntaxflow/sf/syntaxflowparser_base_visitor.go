@@ -231,7 +231,7 @@ func (v *BaseSyntaxFlowParserVisitor) VisitIntersectionRefFilter(ctx *Intersecti
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowParserVisitor) VisitInFilter(ctx *InFilterContext) interface{} {
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionInFilter(ctx *VersionInFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
