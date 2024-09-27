@@ -43,6 +43,7 @@ type SFFrame struct {
 	stack           *utils.Stack[ValueOperator]
 	filterExprStack *utils.Stack[*filterExprContext]
 	conditionStack  *utils.Stack[[]bool]
+	iterStack       *utils.Stack[*IterContext] // for loop
 	Text            string
 	Codes           []*SFI
 	toLeft          bool
@@ -161,6 +162,7 @@ func (s *SFFrame) Flush() {
 	s.stack = utils.NewStack[ValueOperator]()
 	s.filterExprStack = utils.NewStack[*filterExprContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
+	s.iterStack = utils.NewStack[*IterContext]()
 	s.idx = 0
 }
 
@@ -264,86 +266,37 @@ func (s *SFFrame) exec(input ValueOperator) (ret error) {
 			if vs == nil {
 				return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
 			}
-			channel := make(chan ValueOperator)
-			go func() {
-				defer close(channel)
-				_ = vs.Recursive(func(vo ValueOperator) error {
-					channel <- vo
-					return nil
-				})
-			}()
-			i.iter.originValues = channel
+			s.IterStart(vs)
 		case OpIterNext:
-			if i.iter == nil {
-				return utils.Error("BUG: iterContext is nil")
+			vs, next, err := s.IterNext()
+			if err != nil {
+				return err
 			}
-			c := i.iter.originValues
-			if c == nil {
-				return utils.Error("BUG: iterContext.originValues is nil")
-			}
-
-			val, ok := <-c
-			if !ok {
-				// finish this iter
-				next := i.iter.end
-				s.debugLog("no next data, to %v", next)
+			if !next {
 				// jump to end
-				s.idx = next
-				i.iter.originValues = nil
+				end := i.Iter.End
+				s.debugSubLog("no next data, to %v", end)
+				s.idx = end
 				continue
 			}
-			s.debugLog("next value: %v", ValuesLen(val))
-			s.stack.Push(val)
-			s.debugLog(">> push " + fmt.Sprint(s.stack.Len()))
+			s.stack.Push(vs)
+		case OpIterLatch:
+			if s.stack.IsEmpty() {
+				return utils.Wrapf(CriticalError, "BUG: iterLatch: stack top is empty")
+			}
+			if err := s.IterLatch(s.stack.Pop()); err != nil {
+				return err
+			}
+			// jump to next
+			next := i.Iter.Next
+			s.debugSubLog("jump to next code: %v", next)
+			s.idx = next
+			continue
 		case OpIterEnd:
-			if i.iter == nil {
-				return utils.Error("BUG: iterContext is nil")
+			// end iter, pop and collect results to conditionStack
+			if err := s.IterEnd(); err != nil {
+				return err
 			}
-
-			if s.stack.Len() <= 0 {
-				return utils.Error("BUG: stack is empty (next/iter should keep stack balanced)")
-			}
-			finished := false
-			if i.iter.originValues != nil {
-				val := s.stack.Pop()
-				s.debugSubLog("iter index: %d", i.iter._counter)
-				i.iter._counter++
-
-				s.debugLog(">> pop: %v", val)
-				if val.IsList() {
-					ele, _ := val.ListIndex(0)
-					if ele != nil {
-						s.debugLog("   peeked idx: %v", i.iter._counter)
-						i.iter.results = append(i.iter.results, true)
-						finished = true
-					}
-				} else {
-					if val != nil {
-						i.iter.results = append(i.iter.results, true)
-						finished = true
-					}
-				}
-				if !finished {
-					i.iter.results = append(i.iter.results, false)
-					finished = true
-				}
-
-				s.debugSubLog("idx: %v", i.iter.results[len(i.iter.results)-1])
-
-				next := i.iter.next
-				s.debugSubLog("jump to next code: %v", next)
-				s.idx = next
-				continue
-			}
-
-			results := i.iter.results
-			i.iter.results = nil
-			i.iter._counter = 0
-			//if len(results) == 0 {
-			//	return utils.Errorf("iter results is empty")
-			//}
-			s.debugSubLog("<< push condition results[len: %v]", results)
-			s.conditionStack.Push(results)
 		case OpFileFilterJsonPath:
 			s.debugSubLog(">> pop file name: %v", i.UnaryStr)
 			name := i.UnaryStr
