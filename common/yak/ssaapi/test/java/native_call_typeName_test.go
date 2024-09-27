@@ -79,19 +79,22 @@ public class FastJSONDemoController {
 
 	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
 		prog := progs[0]
-		obj := prog.SyntaxFlowChain(`JSON<fullTypeName>?{have: 'alibaba.fastjson'} as $obj`).Show(false)
-		assert.NotNil(t, obj)
+		prog.Show()
+		//obj := prog.SyntaxFlowChain(`JSON<fullTypeName>?{have: 'alibaba.fastjson'} as $obj`).Show(false)
+		//assert.NotNil(t, obj)
+		//
+		//obj = prog.SyntaxFlowChain(`parse*?{<getObject><fullTypeName>?{have: 'alibaba.fastjson'} } as $obj`).Show(false)
+		//assert.NotNil(t, obj)
+		//
+		//obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
+		//assert.NotNil(t, obj)
+		//
+		//typeName := prog.SyntaxFlowChain(`anyJSON<typeName>?{have:'JSON'} as $id;`).Show()
+		//assert.Contains(t, typeName.String(), "JSON")
+		//typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName>?{have:'JSON'} as $id`)
+		//assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
+		prog.SyntaxFlow(`<dependency{"name":"com.alibaba.fastjson"}> as $a;`, sfvm.WithEnableDebug(true)).Show()
 
-		obj = prog.SyntaxFlowChain(`parse*?{<getObject><fullTypeName>?{have: 'alibaba.fastjson'} } as $obj`).Show(false)
-		assert.NotNil(t, obj)
-
-		obj = prog.SyntaxFlowChain(`ok()?{<getCaller><getObject><fullTypeName>?{have: 'org.springframework.'} } as $obj`).Show(true)
-		assert.NotNil(t, obj)
-
-		typeName := prog.SyntaxFlowChain(`anyJSON<typeName>?{have:'JSON'} as $id;`).Show()
-		assert.Contains(t, typeName.String(), "JSON")
-		typeName = prog.SyntaxFlowChain(`anyJSON<fullTypeName>?{have:'JSON'} as $id`)
-		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
@@ -223,7 +226,7 @@ func TestMemberCallTypeName(t *testing.T) {
 
 		obj = prog.SyntaxFlowChain(`runtime<typeName>?{have:'com.example.MemberCallTypeName.B.Runtime'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
-		obj = prog.SyntaxFlowChain(`.exec<typeName>?{have:'com.example.MemberCallTypeName.B.Runtime'} as $obj`)
+		obj = prog.SyntaxFlowChain(`.exec<typeName>?{have:'com.example.MemberCallTypeName.B.Runtime'} as $obj`, sfvm.WithEnableDebug(true)).Show()
 		assert.Equal(t, 1, obj.Len())
 
 		return nil

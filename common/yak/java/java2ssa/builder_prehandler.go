@@ -1,6 +1,8 @@
 package java2ssa
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"path/filepath"
 	"strings"
 
@@ -21,8 +23,8 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return !slices.Contains(fileList, extension)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
-	prog := functionBuilder.GetProgram()
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
+	prog := fb.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
 		return nil
@@ -38,6 +40,11 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 
 	// pom.xml
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
+		s.InitHandlerOnce.Do(func() {
+			fb.SetEmptyRange()
+			container := fb.EmitEmptyContainer()
+			fb.AssignVariable(fb.CreateVariable("__dependencies__"), container)
+		})
 		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			log.Warnf("read pom.xml error: %v", err)
@@ -50,6 +57,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			log.Warnf("scan pom.xml error: %v", err)
 			return nil
 		}
+		handlerJavaSCA(fb, pkgs)
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 	}
 
@@ -88,4 +96,23 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 
 	}
 	return nil
+}
+
+func handlerJavaSCA(fb *ssa.FunctionBuilder, pkgs []*dxtypes.Package) {
+	if fb == nil || len(pkgs) == 0 {
+		return
+	}
+	container := fb.ReadValue("__dependencies__")
+	if container == nil {
+		return
+	}
+	for _, pkg := range pkgs {
+		names := strings.Split(pkg.Name, ":")
+		if len(names) != 2 {
+			continue
+		}
+		dependencyName := fmt.Sprintf("%s.%s", names[0], names[1])
+		variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(dependencyName))
+		fb.AssignVariable(variable, fb.EmitConstInst(pkg.Version))
+	}
 }

@@ -108,9 +108,28 @@ const (
 
 	NativeCall_DataFlow = "dataflow"
 	NativeCall_Const    = "const"
+
+	// NativeCall_Dependencies is used to get sca version
+	NativeCall_Dependency = "dependency"
 )
 
 func init() {
+	registerNativeCall(NativeCall_Dependency, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+
+		name := params.GetString("name")
+		if name == "" {
+			return false, nil, nil
+		}
+		name = yakunquote.TryUnquote(name)
+		variableName := "__dependencies__"
+		match, value, err := v.ExactMatch(ssadb.NameMatch, variableName)
+		if !match || err != nil {
+			return false, nil, err
+		}
+		match, vvv, _ := value.ExactMatch(ssadb.NameMatch, name)
+
+		return true, vvv, nil
+	}))
 	registerNativeCall(NativeCall_Const, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var (
 			results    []sfvm.ValueOperator
