@@ -74,3 +74,7 @@ func CallAssignmentMismatchDropError(left int, right string) string {
 		right, left,
 	)
 }
+
+func PhiEdgeLengthMisMatch() string {
+	return "Phi edges length < 2"
+}

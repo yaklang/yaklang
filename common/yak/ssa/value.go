@@ -110,7 +110,7 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
-	if enableClosureFreeValue  && create {
+	if enableClosureFreeValue && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
@@ -145,6 +145,22 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	scope := b.CurrentBlock.ScopeTable
 	scope.AssignVariable(variable, value)
+
+	global := b.GetProgram().GlobalScope
+	if member, ok := global.GetStringMember(name); ok {
+		mscope := member.GetBlock().ScopeTable
+		if mscope != scope { // 如果位于不同作用域则生成phi值，否则直接替换phi.Edge
+			phi := b.EmitPhi(name, []Value{member, value})
+			global.SetStringMember(name, phi)
+		} else if phi, ok := member.(*Phi); ok {
+			if len(phi.Edge) < 2 {
+				b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, PhiEdgeLengthMisMatch())
+			} else {
+				phi.Edge[1] = value
+			}
+		}
+	}
+
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
 			return
