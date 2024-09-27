@@ -5,6 +5,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -23,7 +24,7 @@ func TestRemoveUnprintableChars(t *testing.T) {
 }
 
 func TestParseStringToLines(t *testing.T) {
-	var a = ParseStringToLines(`abc
+	a := ParseStringToLines(`abc
 ccc
 ddd`)
 	spew.Dump(a)
@@ -80,8 +81,9 @@ func TestMUSTPASS_UrlJoin(t *testing.T) {
 
 func TestMUSTPASS_ParseStringToHostPort(t *testing.T) {
 	type Result struct {
-		Host string
-		Port int
+		Host   string
+		Port   int
+		hasErr bool
 	}
 	cases := map[string]Result{
 		"http://baidu.com":     {Host: "baidu.com", Port: 80},
@@ -93,35 +95,20 @@ func TestMUSTPASS_ParseStringToHostPort(t *testing.T) {
 		"1.2.3.4:1":            {Host: "1.2.3.4", Port: 1},
 		"baidu.com:1":          {Host: "baidu.com", Port: 1},
 		"http://[::1]:1":       {Host: "::1", Port: 1},
-	}
-
-	falseCases := []string{
-		"baidu.com", "1.2.3.5", "[1:123:123:123]",
+		"baidu.com":            {Host: "baidu.com", Port: 0, hasErr: true},
+		"1.2.3.5":              {Host: "1.2.3.5", Port: 0, hasErr: true},
+		"[1:123:123:123]":      {Host: "1:123:123:123", Port: 0, hasErr: true},
+		"::1":                  {Host: "::1", Port: 0, hasErr: true},
 	}
 
 	for raw, result := range cases {
 		host, port, err := ParseStringToHostPort(raw)
-		if err != nil {
-			t.Errorf("parse %s failed: %s", raw, err)
-			t.FailNow()
-		}
-
-		if result.Host == host && result.Port == port {
-			continue
+		require.Equal(t, result.Host, host)
+		require.Equal(t, result.Port, port)
+		if result.hasErr {
+			require.Error(t, err, "should have error")
 		} else {
-			t.Errorf("parse result failed: %s expect: %s:%v actually: %s %v", raw, result.Host, result.Port,
-				host, port)
-			t.FailNow()
-		}
-	}
-
-	for _, c := range falseCases {
-		_, _, err := ParseStringToHostPort(c)
-		if err != nil {
-
-		} else {
-			t.Errorf("%s should failed now", c)
-			t.FailNow()
+			require.NoError(t, err, "should not have error")
 		}
 	}
 }
