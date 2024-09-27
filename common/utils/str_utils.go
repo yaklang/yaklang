@@ -5,14 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/gobwas/glob"
-	"github.com/h2non/filetype"
-	"github.com/h2non/filetype/matchers"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -24,6 +16,15 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gobwas/glob"
+	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/matchers"
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // ExtractStrContext 从字符串raw中提取一组关键字res上下文的内容，上下文的长度是512个字符确定。
@@ -675,6 +676,10 @@ func ParseStringToHostPort(raw string) (host string, port int, err error) {
 			err = nil
 			return host, port, err
 		}
+	}
+	// 这里需要处理ipv6的情况，如果是ipv6的话，直接返回
+	if ip := net.ParseIP(raw); ip != nil {
+		return raw, 0, errors.Errorf("unknown port for [%s]", raw)
 	}
 
 	host = stripPort(raw)
