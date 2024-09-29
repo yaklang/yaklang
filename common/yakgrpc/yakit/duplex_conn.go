@@ -2,9 +2,10 @@ package yakit
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,7 +14,7 @@ import (
 
 func init() {
 	// set broadcast schema
-	schema.SetBoardCast_Data(BroadcastData)
+	schema.SetBroadCast_Data(BroadcastData)
 }
 
 type serverPushDescription struct {
@@ -92,6 +93,7 @@ func BroadcastData(typeString string, data any) {
 		})
 	}
 }
+
 func signalRaw(id string, data *ypb.DuplexConnectionResponse) {
 	serverPushMutex.Lock()
 	defer serverPushMutex.Unlock()

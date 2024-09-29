@@ -159,21 +159,16 @@ func (f *HTTPFlow) fixURL() {
 }
 
 func (f *HTTPFlow) AfterCreate(tx *gorm.DB) (err error) {
-	boardcastData("httpflow", "create")
-	return nil
-}
-
-func (f *HTTPFlow) AfterSave(tx *gorm.DB) (err error) {
-	boardcastData("httpflow", "save")
+	broadcastData.Call("httpflow", "create")
 	return nil
 }
 
 func (f *HTTPFlow) AfterUpdate(tx *gorm.DB) (err error) {
-	boardcastData("httpflow", "update")
+	broadcastData.Call("httpflow", "update")
 	return nil
 }
 
 func (f *HTTPFlow) AfterDelete(tx *gorm.DB) (err error) {
-	boardcastData("httpflow", "delete")
+	broadcastData.Call("httpflow", "delete")
 	return nil
 }
