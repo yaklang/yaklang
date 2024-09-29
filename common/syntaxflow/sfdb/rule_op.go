@@ -132,7 +132,7 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) error {
+func ParseRule(ruleName string, content string, tags ...string) (*schema.SyntaxFlowRule, error) {
 	var language consts.Language
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
 	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
@@ -156,21 +156,20 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rule := frame.GetRule()
 	rule.Type = ruleType
 	rule.RuleName = ruleName
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
-	rule.IsBuildInRule = buildin
+	// rule.IsBuildInRule = buildin
+	return nil, err
+}
 
-	//if frame.AllowIncluded != "" {
-	//	rule.AllowIncluded = true
-	//	rule.IncludedName = frame.AllowIncluded
-	//	rule.Title = frame.AllowIncluded
-	//	// _ = DeleteRuleByLibName(frame.AllowIncluded)
-	//}
+func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) error {
+	rule, err := ParseRule(ruleName, content, tags...)
+	rule.IsBuildInRule = buildin
 	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
 		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
