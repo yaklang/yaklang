@@ -403,7 +403,6 @@ const (
 	Yak_SaveSyntaxFlowRule_FullMethodName                         = "/ypb.Yak/SaveSyntaxFlowRule"
 	Yak_DeleteSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/DeleteSyntaxFlowRule"
 	Yak_QuerySyntaxFlowRuleGroup_FullMethodName                   = "/ypb.Yak/QuerySyntaxFlowRuleGroup"
-	Yak_SaveSyntaxFlowRuleGroup_FullMethodName                    = "/ypb.Yak/SaveSyntaxFlowRuleGroup"
 )
 
 // YakClient is the client API for Yak service.
@@ -907,7 +906,6 @@ type YakClient interface {
 	SaveSyntaxFlowRule(ctx context.Context, in *SaveSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleGroupResponse, error)
-	SaveSyntaxFlowRuleGroup(ctx context.Context, in *SaveSyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 }
 
 type yakClient struct {
@@ -5905,15 +5903,6 @@ func (c *yakClient) QuerySyntaxFlowRuleGroup(ctx context.Context, in *QuerySynta
 	return out, nil
 }
 
-func (c *yakClient) SaveSyntaxFlowRuleGroup(ctx context.Context, in *SaveSyntaxFlowRuleGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
-	out := new(DbOperateMessage)
-	err := c.cc.Invoke(ctx, Yak_SaveSyntaxFlowRuleGroup_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -6415,7 +6404,6 @@ type YakServer interface {
 	SaveSyntaxFlowRule(context.Context, *SaveSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error)
-	SaveSyntaxFlowRuleGroup(context.Context, *SaveSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7574,9 +7562,6 @@ func (UnimplementedYakServer) DeleteSyntaxFlowRule(context.Context, *DeleteSynta
 }
 func (UnimplementedYakServer) QuerySyntaxFlowRuleGroup(context.Context, *QuerySyntaxFlowRuleGroupRequest) (*QuerySyntaxFlowRuleGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySyntaxFlowRuleGroup not implemented")
-}
-func (UnimplementedYakServer) SaveSyntaxFlowRuleGroup(context.Context, *SaveSyntaxFlowRuleGroupRequest) (*DbOperateMessage, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SaveSyntaxFlowRuleGroup not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -14754,24 +14739,6 @@ func _Yak_QuerySyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_SaveSyntaxFlowRuleGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SaveSyntaxFlowRuleGroupRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YakServer).SaveSyntaxFlowRuleGroup(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_SaveSyntaxFlowRuleGroup_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).SaveSyntaxFlowRuleGroup(ctx, req.(*SaveSyntaxFlowRuleGroupRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -16046,10 +16013,6 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuerySyntaxFlowRuleGroup",
 			Handler:    _Yak_QuerySyntaxFlowRuleGroup_Handler,
-		},
-		{
-			MethodName: "SaveSyntaxFlowRuleGroup",
-			Handler:    _Yak_SaveSyntaxFlowRuleGroup_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
