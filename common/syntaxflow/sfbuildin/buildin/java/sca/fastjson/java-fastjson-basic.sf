@@ -1,0 +1,75 @@
+desc(
+    title: 'SCA: Checking Java Fastjson Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*alibaba*fastjson.version as $ver;
+$ver in (,1.2.47] as $vuln_1_2_47;
+alert $vuln_1_2_47 for {
+    message: 'SCA: com.alibaba.fastjson <= 1.2.47 RCE Easy to exploit',
+    severity: critical,
+    cvss: "9.8"
+}
+
+$ver in (,1.2.68] as $vuln_1_2_68;
+alert $vuln_1_2_68 for {
+    message: 'SCA: com.alibaba.fastjson <= 1.2.68 RCE Mid to exploit',
+    level: high,
+
+}
+
+$ver in (,1.2.83) as $vuln_1_2_80;
+alert $vuln_1_2_80 for {
+    message: 'SCA: com.alibaba.fastjson < 1.2.83 RCE Hard to exploit',
+    level: mid,
+}
+
+
+desc(
+lang: java,
+alert_min: 5,
+'file://b/pom.xml': <<<AAA
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vulnerable-fastjson-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- Fastjson dependency with known vulnerabilities -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <!-- An example version with known vulnerabilities, make sure to check for specific vulnerable versions -->
+            <version>1.2.59</version>
+        </dependency>
+    </dependencies>
+</project>
+AAA,
+'file://pom.xml': <<<AAA
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vulnerable-fastjson-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- Fastjson dependency with known vulnerabilities -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <!-- An example version with known vulnerabilities, make sure to check for specific vulnerable versions -->
+            <version>1.2.24</version>
+        </dependency>
+    </dependencies>
+</project>
+AAA,
+)
