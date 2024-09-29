@@ -3,13 +3,14 @@ package schema
 import (
 	"bytes"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/kataras/pio"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type Risk struct {
@@ -172,21 +173,16 @@ func (p *Risk) BeforeSave() error {
 }
 
 func (r *Risk) AfterCreate(tx *gorm.DB) (err error) {
-	boardcastData("risk", "create")
-	return nil
-}
-
-func (r *Risk) AfterSave(tx *gorm.DB) (err error) {
-	boardcastData("risk", "save")
+	broadcastData.Call("risk", "create")
 	return nil
 }
 
 func (r *Risk) AfterUpdate(tx *gorm.DB) (err error) {
-	boardcastData("risk", "update")
+	broadcastData.Call("risk", "update")
 	return nil
 }
 
 func (r *Risk) AfterDelete(tx *gorm.DB) (err error) {
-	boardcastData("risk", "delete")
+	broadcastData.Call("risk", "delete")
 	return nil
 }

@@ -2,13 +2,14 @@ package schema
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type YakScript struct {
@@ -110,22 +111,17 @@ func (s *YakScript) BeforeSave() error {
 }
 
 func (s *YakScript) AfterCreate(tx *gorm.DB) (err error) {
-	boardcastData("yakscript", "create")
-	return nil
-}
-
-func (s *YakScript) AfterSave(tx *gorm.DB) (err error) {
-	boardcastData("yakscript", "save")
+	broadcastData.Call("yakscript", "create")
 	return nil
 }
 
 func (s *YakScript) AfterUpdate(tx *gorm.DB) (err error) {
-	boardcastData("yakscript", "update")
+	broadcastData.Call("yakscript", "update")
 	return nil
 }
 
 func (s *YakScript) AfterDelete(tx *gorm.DB) (err error) {
-	boardcastData("yakscript", "delete")
+	broadcastData.Call("yakscript", "delete")
 	return nil
 }
 

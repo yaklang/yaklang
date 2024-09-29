@@ -458,24 +458,35 @@ func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *h
 }
 
 // direct save
-func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) error {
+func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 	if i == nil {
 		return nil
 	}
 	db = db.Model(&schema.HTTPFlow{})
+	id, tags := i.ID, i.Tags
+	defer func() {
+		if finErr == nil {
+			// 需要手动触发广播，因为要拿到id，在AfterSave/AfterUpdate中无法拿到id
+			schema.GetBroadCast_Data().Call("httpflow", map[string]any{
+				"id":     id,
+				"tags":   tags,
+				"action": "update",
+			})
+		}
+	}()
 
 	if i.ID > 0 {
-		if db = db.Where("id = ?", i.ID).Update("tags", i.Tags); db.Error != nil {
+		if db = db.Where("id = ?", i.ID).UpdateColumn("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by id) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.HiddenIndex != "" {
-		if db = db.Where("hidden_index = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
+		if db = db.Where("hidden_index = ?", i.HiddenIndex).UpdateColumn("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by hidden_index) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.Hash != "" {
-		if db = db.Where("hash = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
+		if db = db.Where("hash = ?", i.HiddenIndex).UpdateColumn("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by hash) failed: %s", db.Error)
 			return db.Error
 		}
