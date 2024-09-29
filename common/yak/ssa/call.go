@@ -273,6 +273,13 @@ func (c *Call) handleCalleeFunction() {
 			break
 		}
 
+		/*
+			public function A(){
+				$c = new C(0);
+				$c->a = 1; //se
+				return $c;
+			}
+		*/
 		// handle side effect
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
@@ -284,12 +291,16 @@ func (c *Call) handleCalleeFunction() {
 				// is normal side-effect
 				variable = builder.CreateVariable(se.Name)
 			} else {
-				// is object
-				obj, ok := se.Get(c)
-				if !ok {
-					continue
+				if funcTyp.markFuncMemberCall {
+					variable = builder.CreateMemberCallVariable(c, se.MemberCallKey)
+				} else {
+					// is object
+					obj, ok := se.Get(c)
+					if !ok {
+						continue
+					}
+					variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
 				}
-				variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
 			}
 
 			// TODO: handle side effect in loop scope,

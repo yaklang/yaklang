@@ -1087,8 +1087,9 @@ type FunctionType struct {
 	ObjectType      Type
 	IsModifySelf    bool // if this is method function
 
-	AnnotationFunc []func(Value)
-	fullTypeName   []string
+	AnnotationFunc     []func(Value)
+	fullTypeName       []string
+	markFuncMemberCall bool
 }
 
 func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {

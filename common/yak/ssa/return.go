@@ -132,13 +132,20 @@ func (b *FunctionBuilder) Finish() {
 }
 
 // calculate all return instruction in function, get return type
-func handlerReturnType(rs []*Return) Type {
+func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 	tmp := make(map[Type]struct{}, len(rs))
 	for _, r := range rs {
 		typs := r.calcType()
 
 		if _, ok := tmp[typs]; !ok {
 			tmp[typs] = struct{}{}
+		}
+		for _, result := range r.Results {
+			if result.GetOpcode() != SSAOpcodeParameter || result.GetOpcode() != SSAOpcodeFreeValue || result.GetOpcode() != SSAOpcodeParameterMember || result.GetOpcode() != SSAOpcodeSideEffect {
+				if result.IsObject() || result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
+					functionType.markFuncMemberCall = true
+				}
+			}
 		}
 	}
 
@@ -171,7 +178,8 @@ func (f *Function) Finish() {
 	})
 	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i Value, _ int) (*Return, bool) {
 		return ToReturn(i)
-	}))
+	}), funType)
+	_ = f.Type
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
 	funType.ParameterLen = f.ParamLength
