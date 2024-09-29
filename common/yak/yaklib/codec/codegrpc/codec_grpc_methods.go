@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"hash"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
@@ -1228,6 +1229,30 @@ func (flow *CodecExecFlow) CustomCodecPlugin(pluginContent string) error {
 		return utils.Errorf("import %v' s handle failed: %s", "temp-codec", err)
 	}
 	flow.Text = utils.InterfaceToBytes(pluginRes)
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "转义字符串"
+// Desc ="""转义一串字符串，转义后的字符串用双引号包裹。返回的字符串将转义控制字符和不可打印字符以及双引号。"""
+// Params = [
+// ]
+func (flow *CodecExecFlow) StrQuote() error {
+	flow.Text = []byte(strconv.Quote(string(flow.Text)))
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "解转义字符串"
+// Desc ="""解转义一串字符串，输入需要用双引号包裹。返回的字符串将转义控制字符和不可打印字符以及双引号。"""
+// Params = [
+// ]
+func (flow *CodecExecFlow) StrUnQuote() error {
+	text, err := strconv.Unquote(string(flow.Text))
+	if err != nil {
+		return err
+	}
+	flow.Text = []byte(text)
 	return nil
 }
 
