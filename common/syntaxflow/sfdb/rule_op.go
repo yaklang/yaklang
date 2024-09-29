@@ -142,11 +142,10 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	if err != nil {
 		log.Error(err)
 	}
-	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
+	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
 		return err
 	}
-	rule := frame.GetRule()
 	rule.Type = ruleType
 	rule.RuleName = ruleName
 	rule.Language = string(language)
@@ -177,11 +176,10 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		log.Error(err)
 	}
 
-	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
+	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
 		return err
 	}
-	rule := frame.GetRule()
 	rule.Language = string(language)
 	rule.Type = ruleType
 
@@ -227,6 +225,39 @@ func CheckSyntaxFlowRuleType(ruleName string) (schema.SyntaxFlowRuleType, error)
 	default:
 		return "", utils.Errorf("invalid rule type: %v is not supported yet, treat it as syntaxflow(.sf, .syntaxflow)", ruleName)
 	}
+}
+
+func CheckSyntaxFlowRuleContent(content string) (*schema.SyntaxFlowRule, error) {
+	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(content)
+	if err != nil {
+		return &schema.SyntaxFlowRule{}, err
+	}
+	rule := frame.GetRule()
+	return rule, nil
+}
+
+func SaveSyntaxFlowRule(ruleName,language,content string,tags ...string) error {
+	languageType, err := CheckSyntaxFlowLanguage(language)
+	if err != nil {
+		return err
+	}
+	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
+	if err != nil {
+		return err
+	}
+	rule,err:=CheckSyntaxFlowRuleContent(content)
+	if err != nil {
+		return err
+	}
+	rule.Type = ruleType
+	rule.RuleName = ruleName
+	rule.Language = string(languageType)
+	rule.Tag = strings.Join(tags, "|")
+	err = CreateOrUpdateSyntaxFlow(rule.CalcHash(), rule)
+	if err != nil {
+		return utils.Wrap(err, "ImportRuleWithoutValid create or update syntax flow rule error")
+	}
+	return nil
 }
 
 var valid func(rule *schema.SyntaxFlowRule) error

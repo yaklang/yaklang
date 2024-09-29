@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -36,7 +37,7 @@ func (s *Server) SaveSyntaxFlowRule(ctx context.Context, req *ypb.SaveSyntaxFlow
 		TableName: "syntax_flow_rule",
 		Operation: DbOperationCreateOrUpdate,
 	}
-	err := yakit.SaveSyntaxFlowRule(s.GetProfileDatabase(), req)
+	err := sfdb.SaveSyntaxFlowRule(req.GetRuleName(),req.GetLanguage(),req.GetContent(),req.GetTags()...)
 	if err != nil {
 		msg.EffectRows = 0
 		return msg, err
