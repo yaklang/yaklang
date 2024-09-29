@@ -72,7 +72,7 @@ enableBrute = cli.Have("enable-brute")
 userList := cli.String("user-list-file")
 passList := cli.String("pass-list-file")
 bruteConcurrent := cli.Int("brute-concurrent")
-taskConcurrent := cli.Int("task-concurrent")
+taskConcurrent := cli.Int("task-concurrent",cli.setDefault(10))
 minDelay, maxDelay := cli.Int("delay-min", cli.setDefault(3)), cli.Int("delay-max", cli.setDefault(5))
 okToStop := cli.Bool("ok-to-stop")
 replaceDefaultUsernameDict := cli.Bool("replace-default-username-dict")
@@ -128,7 +128,7 @@ if bruteConcurrent > 0 {
 
 if taskConcurrent > 0 {
     yakit.Info("设置单目标爆破并发：%v", taskConcurrent)
-    opt = append(bruteOpt, brute.concurrent(taskConcurrent))
+    opt = append(bruteOpt, brute.concurrent(10))
 }
 
 
@@ -216,7 +216,9 @@ if len(tcpPortsList) >= 65535 {
 } else {
     synPorts = str.Join(str.FilterPorts(synPorts, tcpPorts), ",")
 }
-
+// debug
+//synPorts = "8000,443,8080,7001,7890"
+//tcpPorts = "21,22,25,3306,80,2080,1080,10808"
 
 yakit.SetProgress(baseProgress + 0.02)
 sleep(1)
@@ -403,8 +405,12 @@ files.Push(inputFiles...)
 hostTotal = hostCount
 portTotal = len(str.RemoveDuplicatePorts(tcpPorts, synPorts))
 // 需要传递给报告的参数
-yakit.StatusCard("扫描端口数", portTotal)
+yakit.StatusCard("总扫描端口数", portTotal)
+synPortsCount = len(str.ParseStringToPorts(synPorts))
+//yakit.StatusCard("SYN扫描端口数", synPortsCount)
 yakit.StatusCard("开放端口数/已扫主机数", "-/-")
+//yakit.StatusCard("SYN开放端口数/已扫主机数", "-/-")
+//yakit.StatusCard("TCP开放端口数/已扫主机数", "-/-")
 db.SetKey(
     "simple_detect_" + runtimeID,
     json.dumps({"hostTotal": hostTotal, "portTotal": portTotal, "pingAliveHostTotal": aliveHostCount, "plugins": loadPluginFinished, "task_name": taskName}),
@@ -440,13 +446,8 @@ updateProgress = func(delta) {
     yakit.SetProgress((baseProgress + ((1 - baseProgress) * (float(portResultFinalTotal) / float(totalTasks)))) - 0.01)
 }
 
-bruteWg = sync.NewSizedWaitGroup(10)
 
-bruteScan = func(result) {
-    bruteWg.Add()
-    go func() {
-        defer bruteWg.Done()
-
+func bruteScan(result) {
         bruteType = ""
         if result.GetServiceName() == "exasoftport1" {
             return
@@ -611,12 +612,11 @@ bruteScan = func(result) {
             }
 
         }
-    }()
 }
 
-cveBaseLineWg = sync.NewSizedWaitGroup(10)
+cveBaseLineWg := sync.NewSizedWaitGroup(10)
 
-cveBaselineCheck = func (result) {
+func cveBaselineCheck(result) {
     cveBaseLineWg.Add(1)
     go func() {
         defer cveBaseLineWg.Done()
@@ -639,15 +639,13 @@ cveBaselineCheck = func (result) {
                                 risk.parameter(parameter), risk.potential(true), risk.level(res.Severity),
                                 risk.description(res.DescriptionMainZh), risk.solution(res.Solution), risk.cve(res.CVE))
                     }
-
                 }
-
             }
         }
     }()
 }
 
-handleServiceScanResult = func(result) {
+func handleServiceScanResult(result) {
     if skipCveBaseLine {
         cveBaselineCheck(result)
     }
@@ -684,13 +682,23 @@ addScanHostCount = func() {
 }
 
 OpenPortCount = 0
+synOpenPortCount = 0
+tcpOpenPortCount = 0
 openPortCountLock = sync.NewLock()
-addOpenPortCount = func() {
+addOpenPortCount = func(isSyn) {
     openPortCountLock.Lock()
     defer openPortCountLock.Unlock()
 
+    if isSyn {
+        synOpenPortCount++
+    } else {
+        tcpOpenPortCount++
+    }
+
     OpenPortCount++
     yakit.StatusCard("开放端口数/已扫主机数", f"${OpenPortCount}/${ScanHostCount}")
+    //yakit.StatusCard("SYN开放端口数/已扫主机数", f"${synOpenPortCount}/${ScanHostCount}")
+    //yakit.StatusCard("TCP开放端口数/已扫主机数", f"${tcpOpenPortCount}/${ScanHostCount}")
     if skippedHostAliveScan {
         aliveHostCount := len(aliveHostCountList)
         yakit.StatusCard("存活主机数/扫描主机数", f"${aliveHostCount}/${ScanHostCount}")
@@ -718,7 +726,7 @@ func handleTCP(targets) {
             portRes, _ = yakit.ObjToPort(result)
             portRes.TaskName = taskName
             yakit.SavePortFromResult(portRes)
-            addOpenPortCount()
+            addOpenPortCount(false)
             handleServiceScanResult(result)
         }
 
@@ -734,10 +742,23 @@ func handleTCP(targets) {
 
 // 数据包计数
 synPacketCounter = 0
-addSynPacketCounter = func(){synPacketCounter++}
+synPacketCounterLock = sync.NewLock()
+addSynPacketCounter = func(){
+    synPacketCounterLock.Lock()
+    defer synPacketCounterLock.Unlock()
+    synPacketCounter++
+}
+finalScanHostCount = 0
 startSYNPacketCounter = func(){
     go func{
-        for { sleep(3); yakit.StatusCard("SYN 发包数", synPacketCounter) }
+        for {
+            sleep(5)
+            yakit.StatusCard("SYN 发包数", synPacketCounter)
+            if synPacketCounter/synPortsCount == finalScanHostCount {
+                yakit.StatusCard("SYN 发包", "Done")
+                break
+            }
+        }
     }
 }
 startSYNPacketCounter()
@@ -767,7 +788,7 @@ func handleSYN(targets) {
             portRes.TaskName = taskName
             yakit.SavePortFromResult(portRes)
 
-            addOpenPortCount()
+            addOpenPortCount(true)
             handleServiceScanResult(result)
         }
     } catch err {
@@ -798,8 +819,8 @@ if recordPtr > 0 {
 
 targetBatch = ""
 count := 0
-wgTCP := sync.NewSizedWaitGroup(concurrent)
-
+wgScan := sync.NewSizedWaitGroup(2)
+updateStatus("端口扫描中")
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
     yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr(),"no display")
@@ -812,13 +833,18 @@ for fileReader.Next(){
     addScanHostCount()
 
     if count == concurrent {
-        wgTCP.Add(1)
-        go func {
-            defer wgTCP.Done()
+        wgScan.Add(1)
+        go func() {
+            defer wgScan.Done()
             handleTCP(targetBatch)
-        }
+        }()
+
         if synscanEnable {
-            handleSYN(targetBatch)
+            wgScan.Add(1)
+            go func() {
+                defer wgScan.Done()
+                handleSYN(targetBatch)
+            }()
         }
         targetBatch = ""
         count = 0
@@ -827,21 +853,27 @@ for fileReader.Next(){
 
 if count > 0 {
     addScanHostCount()
-    wgTCP.Add(1)
+    wgScan.Add(1)
     go func {
-        defer wgTCP.Done()
+        defer wgScan.Done()
         handleTCP(targetBatch)
     }
     if synscanEnable {
-        handleSYN(targetBatch)
+        wgScan.Add(1)
+        go func() {
+            defer wgScan.Done()
+            handleSYN(targetBatch)
+        }()
     }
 }
-
-if synscanEnable {
-    yakit.StatusCard("SYN", "DONE")
+if skippedHostAliveScan {
+    finalScanHostCount = ScanHostCount - 1
+}else {
+    finalScanHostCount = aliveHostCount
 }
 
-wgTCP.Wait()
+updateStatus("等待端口扫描完成")
+wgScan.Wait()
 
 yakit.SetProgress(0.94)
 
@@ -849,13 +881,8 @@ go fn {
     yakit.Info("Start Vuln Check...")
     for {
         yakit.Info("漏洞检测中...")
-        sleep(3)
-        yakit.Info("漏洞检测中.....")
-        sleep(3)
-        yakit.Info("漏洞检测中........")
-        sleep(3)
+        sleep(5)
     }
-
 }
 
 
@@ -867,30 +894,16 @@ if aliveHostCount != 0 {
 }
 
 
-if hostCountSec != 0 {
-    // 根据存活 ip + (加载成功的插件数 * 2s)/concurrent  + 开放端口数
-    // 定时器，超过一定时间，就扫描结束
-    waitTimeSec = hostCountSec + (loadPluginFinished * 2) / 20 + OpenPortCount
-    yakit.Info("waitTimeSec %v", waitTimeSec)
-    if waitTimeSec < 10 {
-        waitTimeSec = 60
-    }
 
-    time.AfterFunc(
-        waitTimeSec * 1000 * 1000 * 1000,
-        func() {
-            yakit.SetProgress(1)
-            yakit.Info("AfterFunc 本次扫描任务已完成。")
-            os.Exit(0)
-        }
-    )
-}
-
-
-bruteWg.Wait()
-yakit.Info("brute end success!")
+yakit.Info("cvebaseline start")
+updateStatus("等待CVE基线检查完成")
 cveBaseLineWg.Wait()
 yakit.Info("cvebaseline end success!")
+updateStatus("等待爆破完成")
+
+yakit.Info("brute end success!")
+updateStatus("等待插件执行完成")
 manager.Wait()
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")
+updateStatus("扫描任务已完成")
