@@ -421,9 +421,7 @@ Host: %s
 
 func TestGRPCMUSTPASS_MITM_PreSetTags(t *testing.T) {
 	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	token1 := utils.RandStringBytes(20)
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -434,9 +432,7 @@ func TestGRPCMUSTPASS_MITM_PreSetTags(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(1000))
 	defer cancel()
 	stream, err := client.MITM(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	stream.Send(&ypb.MITMRequest{
@@ -471,65 +467,41 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 					"packet":    []byte(lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Token", "aaaaa")),
 					"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
 				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				cancel()
 			}()
 		}
 	}
 
-	var rpcResponse *ypb.QueryHTTPFlowResponse
-	utils.AttemptWithDelayFast(func() error {
-		rpcResponse, err = client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-			Pagination: &ypb.Paging{
-				Page:  1,
-				Limit: 100,
-			},
-			SourceType: "mitm",
-			Keyword:    token1,
-		})
-		if err != nil {
-			return err
-		}
-		if rpcResponse.GetTotal() <= 0 {
-			return utils.Errorf("no flow")
-		}
-		return nil
-	})
+	rpcResponse, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+		SourceType: "mitm",
+		Keyword:    token1,
+	}, 1)
+	require.NoError(t, err)
 
 	flow := rpcResponse.GetData()[0]
-	if !strings.Contains(flow.Tags, "YAKIT_COLOR_RED") {
-		t.Fatal("flow preset tag failed")
-	}
+	tags := strings.Split(flow.Tags, "|")
+	require.Greater(t, len(tags), 0, "flow no tags")
+	require.Equal(t, tags[0], "YAKIT_COLOR_RED", "flow preset tag not set")
+
 	_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
 		Id:   int64(flow.GetId()),
 		Tags: strings.Split(strings.ReplaceAll(flow.GetTags(), "YAKIT_COLOR_RED", "YAKIT_COLOR_BLUE"), "|"),
 
 		CheckTags: nil,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(time.Second)
-	fixRpcResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
-		Pagination: &ypb.Paging{
-			Page:  1,
-			Limit: 100,
-		},
+	require.NoError(t, err)
+
+	rpcResponse, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
 		SourceType: "mitm",
 		Keyword:    token1,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fixRpcResponse.GetTotal() <= 0 {
-		t.Fatal("no flow")
-	}
-	fixFlow := fixRpcResponse.GetData()[0]
-	if !strings.Contains(fixFlow.Tags, "YAKIT_COLOR_BLUE") {
-		t.Fatal("flow preset tag failed")
-	}
+	}, 1)
+	require.NoError(t, err)
+
+	fixFlow := rpcResponse.GetData()[0]
+	tags = strings.Split(fixFlow.Tags, "|")
+	require.Greater(t, len(tags), 0, "flow no tags")
+	require.Equal(t, tags[0], "YAKIT_COLOR_BLUE", "client.SetTagForHTTPFlow not work")
 }
 
 func TestGRPCMUSTPASS_HTTP_WithPayload(t *testing.T) {
