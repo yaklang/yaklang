@@ -28,7 +28,7 @@ func TestCodeFromDb(t *testing.T) {
 	library, err := sfdb.GetLibrary("php-param")
 	require.NoError(t, err)
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		rule, err2 := prog.SyntaxFlowWithRule(library)
+		rule, err2 := prog.SyntaxFlowRule(library)
 		require.NoError(t, err2)
 		rule.Show()
 		return nil
