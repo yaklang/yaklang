@@ -49,5 +49,14 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	for _, enum := range i.AllEnumDeclaration() {
 		y.VisitEnumDeclaration(enum)
 	}
+
+	//=================================================================== builder
+	for _, function := range y.GetProgram().Funcs {
+		function.CheckAndFinishBuild()
+		function.FixSpinUdChain()
+	}
+	for _, bluePrint := range y.GetProgram().ClassBluePrint {
+		bluePrint.SyntaxMethods()
+	}
 	return nil
 }
