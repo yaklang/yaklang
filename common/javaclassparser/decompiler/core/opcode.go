@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 type OpCode struct {
 	Id            int

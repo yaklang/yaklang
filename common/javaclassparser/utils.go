@@ -3,7 +3,7 @@ package javaclassparser
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
@@ -12,8 +12,8 @@ import (
 
 var ValueTypeError = utils.Error("error value type")
 
-func IsJavaSupperRef(value decompiler.JavaValue) bool {
-	ref, ok := value.(*decompiler.JavaRef)
+func IsJavaSupperRef(value core.JavaValue) bool {
+	ref, ok := value.(*core.JavaRef)
 	if ok {
 		return ref.Id == 0
 	}

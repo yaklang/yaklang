@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 import (
 	"encoding/json"
@@ -210,6 +210,7 @@ const (
 	OP_INVOKEVIRTUAL   = 0xb6
 	OP_ATHROW          = 0xbf
 	OP_IALOAD          = 0x2e
+	OP_END             = 0xff
 )
 
 type Instruction struct {
@@ -264,5 +265,9 @@ func init() {
 			instruction.Length = 0
 		}
 		InstrInfos[instruction.OpCode] = instruction
+	}
+	InstrInfos[OP_END] = &Instruction{
+		Name:   "end",
+		OpCode: OP_END,
 	}
 }

@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 func NewStackType(computationCategory int, close bool, name string) *StackType {
 	return &StackType{
