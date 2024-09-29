@@ -211,7 +211,7 @@ func (b *BruteUtil) run(ctx context.Context) error {
 	for {
 		target, err := b.popFirstTarget()
 		if err != nil {
-			log.Trace("finished poping target from target list")
+			log.Error("finished poping target from target list")
 			break
 		}
 
@@ -237,7 +237,7 @@ func (b *BruteUtil) run(ctx context.Context) error {
 					log.Errorf("bruete target[%s] failed: %v", t, err)
 				}
 			}()
-			log.Tracef("start processing for target: %s", t)
+			log.Infof("start processing for target: %s", t)
 
 			err := b.startProcessingTarget(t, ctx)
 			if err != nil {
@@ -367,7 +367,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 		}(i)
 	}
 
-	log.Tracef("finished handling target: %s", target)
+	log.Infof("finished handling target: %s", target)
 	return nil
 }
 
@@ -595,6 +595,8 @@ func autoSetFinishedByConnectionError(err error, result *BruteItemResult) *Brute
 	// case utils.IContains(err.Error(), "remote error: tls: access denied"):
 	//	fallthrough
 	case utils.IContains(err.Error(), "no reachable servers"):
+		fallthrough
+	case utils.IContains(err.Error(), "protocol error"):
 		fallthrough
 	case utils.IContains(err.Error(), "i/o timeout"):
 		result.Finished = true
