@@ -43,10 +43,15 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 	return y.VisitExpression(i.Expression())
 }
 
-func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
+func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
+	defer func() {
+		if v == nil {
+			log.Errorf("VisitExpression failed: %v", raw.GetText())
+		}
+	}()
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
@@ -69,33 +74,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.MemerCallExpressionContext:
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
-	//case *phpparser.CodeExecExpressionContext:
-	//	var code string
-	//	value := y.VisitExpression(ret.Expression())
-	//	if value.GetType().GetTypeKind() == ssa.StringTypeKind {
-	//		if unquote, err := strconv.Unquote(value.String()); err != nil {
-	//			code = value.String()
-	//		} else {
-	//			code = unquote
-	//		}
-	//		// 应该考虑更多情况
-	//		code = `<?php ` + code + ";"
-	//		if err := y.GetProgram().Build("Exec-"+uuid.NewString(), memedit.NewMemEditor(code), y.FunctionBuilder); err != nil {
-	//			log.Errorf("execute code %v failed", code)
-	//		}
-	//	} else {
-	//		var execFunction string
-	//		if ret.Assert() != nil {
-	//			execFunction = "assert"
-	//		} else {
-	//			execFunction = "eval"
-	//		}
-	//		readValue := y.ReadValue(execFunction)
-	//		call := y.NewCall(readValue, []ssa.Value{value})
-	//		return y.EmitCall(call)
-	//	}
-	//	return y.EmitConstInstNil()
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.FullyQualifiedNamespaceExpressionContext:
@@ -106,14 +85,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if key == nil {
 			return obj
 		}
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.IndexLegacyCallExpressionContext: // $a{1}
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
 		if key == nil {
 			return obj
 		}
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.FunctionCallExpressionContext:
 		tmp := y.isFunction
 		y.isFunction = true
@@ -475,11 +454,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		variable, _, _ := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
-		//return y.ReadValueByVariable(member)
 		rightValue := y.VisitExpression(ret.Expression())
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
-		y.AssignVariable(variable, rightValue)
+		if bluePrint, key := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember()); bluePrint != nil {
+			bluePrint.RegisterStaticMember(key, rightValue)
+		}
 		return rightValue
 	}
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
@@ -522,8 +500,8 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 		return y.VisitLeftVariable(i.FlexiVariable())
 	}
 	if i.StaticClassExprVariableMember() != nil {
-		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-		return member
+		// member := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		// return member
 	}
 	return nil
 }
@@ -542,8 +520,12 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if i.FlexiVariable() != nil {
 		return y.VisitRightValue(i.FlexiVariable())
 	} else {
-		member, _, _ := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-		return y.ReadValueByVariable(member)
+		member, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		if staticMember := member.GetStaticMember(key); utils.IsNil(staticMember) {
+			return y.EmitUndefined(key)
+		} else {
+			return staticMember
+		}
 	}
 }
 
@@ -1199,15 +1181,15 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallMethod(obj, key)
 	case *phpparser.IndexLegacyCallVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallMethod(obj, key)
 	case *phpparser.MemberVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
-		return y.ReadMemberCallVariable(obj, key)
+		return y.ReadMemberCallMethod(obj, key)
 	default:
 		return y.EmitUndefined(raw.GetText())
 	}
@@ -1230,7 +1212,7 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 			_ = i
 			value = y.ReadValue(id)
 			if value.IsUndefined() {
-				var varName = fmt.Sprintf("$dollar%v$", y.fetchDollarId())
+				var varName = fmt.Sprintf("dollar%v", y.fetchDollarId())
 				variable := y.CreateVariable(varName)
 				y.AssignVariable(variable, value)
 				return varName

@@ -231,9 +231,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
-		setMember := class.AddNormalMember
+		setMember := class.RegisterNormalMember
 		if isStatic {
-			setMember = class.AddStaticMember
+			setMember = class.RegisterStaticMember
 		}
 		field := ret.(*javaparser.FieldDeclarationContext)
 
@@ -341,7 +341,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		}
 		return typ
 	} else {
-		typ = ssa.NewClassBluePrint()
+		typ = ssa.NewClassBluePrint(className)
 		typ = y.AddFullTypeNameFromMap(className, typ)
 		return typ
 	}
@@ -437,7 +437,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 	// 实例化enum里的常量
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
-	setMember := class.AddNormalMember
+	setMember := class.RegisterNormalMember
 	for _, enumConstant := range allEnumConstant {
 		constant := enumConstant.(*javaparser.EnumConstantContext)
 		enumName := constant.Identifier().GetText()
@@ -473,7 +473,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 		_ = annotation
 	}
 
-	setMember := class.AddStaticMember
+	setMember := class.RegisterStaticMember
 
 	name := i.Identifier().GetText()
 	variable := y.CreateVariable(name)
@@ -570,7 +570,7 @@ func (y *builder) VisitMethodDeclaration(
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s", class.Name, key)
+	funcName := fmt.Sprintf("%s", key)
 	methodName := key
 
 	if isStatic {
@@ -595,11 +595,12 @@ func (y *builder) VisitMethodDeclaration(
 			for _, def := range defCallback {
 				def(newFunction)
 			}
-			class.AddStaticMethod(key, newFunction)
+			class.RegisterStaticMethod(key, newFunction)
 			//y.AddToPackage(funcName)
 		}
+		class.RegisterConstMember(key, newFunction)
 
-		y.AssignClassConst(class.Name, key, newFunction)
+		//y.AssignClassConst(class.Name, key, newFunction)
 		if i.THROWS() != nil {
 			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
 				y.VisitQualifiedNameList(qualifiedNameList)
@@ -629,7 +630,6 @@ func (y *builder) VisitMethodDeclaration(
 		for _, def := range defCallback {
 			def(newFunction)
 		}
-		//y.AddToPackage(funcName)
 	}
 
 	if i.THROWS() != nil {
@@ -643,7 +643,7 @@ func (y *builder) VisitMethodDeclaration(
 		prefix = "static "
 	}
 	log.Infof("start to build %vmethod: %v to %v", prefix, funcName, class.Name)
-	class.AddMethod(key, newFunction)
+	class.RegisterNormalMethod(key, newFunction)
 	return build
 }
 
@@ -867,10 +867,13 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		newFunction := y.NewFunc(funcName)
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		{
+			obj := y.EmitUndefined(class.Name)
+			obj.SetType(class)
 			this := y.NewParam("this")
 			this.SetType(class)
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
+			y.EmitReturn([]ssa.Value{obj})
 			y.Finish()
 		}
 		y.FunctionBuilder = y.PopFunction()

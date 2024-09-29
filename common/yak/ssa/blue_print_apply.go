@@ -1,7 +1,6 @@
 package ssa
 
 import (
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -13,15 +12,14 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	if !this.IsObject() {
 		return
 	}
-	blue := NewClassBluePrint()
-	// blue.SetObjectType(objectTyp)
+	blue := NewClassBluePrint("")
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
 			// blue.NormalMember[key.String()] = member
-			blue.AddNormalMember(key.String(), member)
+			blue.RegisterNormalMember(key.String(), member)
 			continue
 		}
 
@@ -33,7 +31,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 			}
 		}
 
-		blue.AddNormalMember(key.String(), member)
+		blue.RegisterNormalMember(key.String(), member)
 	}
 
 	if len(blue.GetMethod()) != 0 {
@@ -81,6 +79,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		prog.Cache.AddClassInstance(c.Name, obj)
 	}
 
+	// if this builder support class, just return the class
 	if builder.SupportClass {
 		return c
 	}
@@ -95,8 +94,8 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	}
 
 	for rawKey, member := range c.NormalMember {
-		typ := member.Type
-		value := member.Value
+		typ := member.GetType()
+		value := member
 		key := builder.EmitConstInst(rawKey)
 		log.Infof("apply key: %s, member: %v", key, member)
 
@@ -119,7 +118,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		// classBluePrint only create by `class` keyword.
 		// in this case, member can be set nil, just declare the type.
 		if utils.IsNil(value) {
-			value := builder.ReadMemberCallVariable(obj, key)
+			value := builder.ReadMemberCallValue(obj, key)
 			value.SetType(typ)
 		} else {
 			builder.AssignVariable(

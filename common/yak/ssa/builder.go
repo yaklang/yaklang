@@ -65,8 +65,7 @@ type FunctionBuilder struct {
 	MarkedThisObject         Value
 	MarkedThisClassBlueprint *ClassBluePrint
 
-	MarkedMemberCallWantMethod bool
-	parentBuilder              *FunctionBuilder
+	parentBuilder *FunctionBuilder
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -242,7 +241,4 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 
 func (b *FunctionBuilder) ReferenceParameter(name string) {
 	b.RefParameter[name] = struct{}{}
-}
-
-func (b *FunctionBuilder) name() {
 }
