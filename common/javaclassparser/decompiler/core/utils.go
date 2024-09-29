@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 import (
 	"encoding/binary"
@@ -308,34 +308,11 @@ func GetShortName(ctx *FunctionContext, name string) string {
 	return name
 }
 
-func CutNode(src, target *Node) {
-	for i, item := range src.Next {
-		if item == target {
-			src.Next = append(src.Next[:i], src.Next[i+1:]...)
-			break
-		}
-	}
-	for i, item := range target.Source {
-		if item == src {
-			target.Source = append(target.Source[:i], target.Source[i+1:]...)
-			break
-		}
-	}
-}
-func LinkNode(src, target *Node) {
-	target.Source = append(target.Source, src)
-	src.Next = append(src.Next, target)
-}
 func SetOpcode(src, target *OpCode) {
 	target.Source = append(target.Source, src)
 	src.Target = append(src.Target, target)
 }
-func ShowStatementNodes(nodes []*Node) {
-	funcCtx := &FunctionContext{}
-	for _, item := range nodes {
-		fmt.Printf("%d %s\n", item.Id, item.Statement.String(funcCtx))
-	}
-}
+
 func ShowOpcodes(opcodes []*OpCode) {
 	for i, opcode := range opcodes {
 		fmt.Printf("%d %s\n", i, opcode.Instr.Name)
@@ -374,14 +351,6 @@ func StatementsString(statements []Statement, funcCtx *FunctionContext) string {
 	var res string
 	for _, statement := range statements {
 		res += statement.String(funcCtx)
-	}
-	return res
-}
-
-func NodeToStatement(nodes []*Node) []Statement {
-	res := make([]Statement, len(nodes))
-	for i, node := range nodes {
-		res[i] = node.Statement
 	}
 	return res
 }
