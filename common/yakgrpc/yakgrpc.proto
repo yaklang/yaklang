@@ -717,7 +717,6 @@ service Yak {
   rpc SaveSyntaxFlowRule(SaveSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc QuerySyntaxFlowRuleGroup(QuerySyntaxFlowRuleGroupRequest)returns (QuerySyntaxFlowRuleGroupResponse);
-  rpc SaveSyntaxFlowRuleGroup(SaveSyntaxFlowRuleGroupRequest) returns (DbOperateMessage);
 }
 message GetSpaceEngineAccountStatusRequest {
   string Type = 1;
