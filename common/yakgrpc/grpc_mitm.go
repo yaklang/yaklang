@@ -1547,11 +1547,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow.AddTagToFirst("[响应被丢弃]")
 			flow.Purple()
 		}
-		// 额外添加用户手动设置的标签
-		tags := httpctx.GetFlowTags(req)
-		if len(tags) > 0 {
-			flow.AddTag(tags...)
-		}
 
 		// 处理ws升级请求包
 		if httpctx.GetIsWebWebsocketRequest(req) {
@@ -1622,6 +1617,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		if !isDroppedSaveFlow.IsSet() {
+			// 额外添加用户手动设置的标签，确保其优先级最高
+			userTags := httpctx.GetFlowTags(req)
+			if len(userTags) > 0 {
+				flow.AddTagToFirst(userTags...)
+			}
+			tags := flow.Tags
 			err := yakit.InsertHTTPFlowEx(flow, false, func() {
 				saveBarePacketHandler(flow.ID)
 			})
@@ -1631,9 +1632,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				go func() {
 					<-colorOK
 					<-pluginFinishCh
-					err := yakit.UpdateHTTPFlowTagsEx(flow)
-					if err != nil {
-						log.Errorf("update http flow tags error: %s", err)
+					if tags != flow.Tags {
+						err := yakit.UpdateHTTPFlowTagsEx(flow)
+						if err != nil {
+							log.Errorf("update http flow tags error: %s", err)
+						}
 					}
 				}()
 			}
