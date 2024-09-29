@@ -43,8 +43,8 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 	return y.VisitExpression(i.Expression())
 }
 
-func (y *builder) VisitExpression(raw phpparser.IExpressionContext)(v ssa.Value)  {
-	if y == nil || raw == nil|| y.IsStop() {
+func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value) {
+	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	defer func() {
@@ -75,32 +75,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext)(v ssa.Value)
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
 		return y.ReadMemberCallValue(obj, key)
-	//case *phpparser.CodeExecExpressionContext:
-	//	var code string
-	//	value := y.VisitExpression(ret.Expression())
-	//	if value.GetType().GetTypeKind() == ssa.StringTypeKind {
-	//		if unquote, err := strconv.Unquote(value.String()); err != nil {
-	//			code = value.String()
-	//		} else {
-	//			code = unquote
-	//		}
-	//		// 应该考虑更多情况
-	//		code = `<?php ` + code + ";"
-	//		if err := y.GetProgram().Build("Exec-"+uuid.NewString(), memedit.NewMemEditor(code), y.FunctionBuilder); err != nil {
-	//			log.Errorf("execute code %v failed", code)
-	//		}
-	//	} else {
-	//		var execFunction string
-	//		if ret.Assert() != nil {
-	//			execFunction = "assert"
-	//		} else {
-	//			execFunction = "eval"
-	//		}
-	//		readValue := y.ReadValue(execFunction)
-	//		call := y.NewCall(readValue, []ssa.Value{value})
-	//		return y.EmitCall(call)
-	//	}
-	//	return y.EmitConstInstNil()
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.FullyQualifiedNamespaceExpressionContext:
@@ -1235,7 +1209,7 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 			_ = i
 			value = y.ReadValue(id)
 			if value.IsUndefined() {
-				var varName = fmt.Sprintf("$dollar%v$", y.fetchDollarId())
+				var varName = fmt.Sprintf("dollar%v", y.fetchDollarId())
 				variable := y.CreateVariable(varName)
 				y.AssignVariable(variable, value)
 				return varName

@@ -261,7 +261,7 @@ func Test_Function_WithMemberCall(t *testing.T) {
 		$a = new A();
 		$b = $a->fun1();
 		println($b);
-		`, []string{"Function-A.fun1(Undefined-$a)"}, t)
+		`, []string{"Function-A.fun1(Undefined-A-constructor())"}, t)
 	})
 
 	t.Run("multiple member call", func(t *testing.T) {
@@ -280,7 +280,7 @@ func Test_Function_WithMemberCall(t *testing.T) {
 		$b->a = new A();
 		$call = $b->a->fun1();
 		println($call);
-		`, []string{"Function-A.fun1(Undefined-$b.a)"}, t)
+		`, []string{"Function-A.fun1(Undefined-A-constructor())"}, t)
 	})
 }
 

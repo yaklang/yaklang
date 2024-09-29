@@ -119,6 +119,31 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		setMemberCallRelationship(object, key, member)
 		setMemberVerboseName(member)
 	}
+	writeUndefind := func() *Undefined {
+		recoverScope := b.SetCurrent(object, true)
+		un := b.writeUndefine(name)
+		recoverScope()
+		if res.exist {
+			un.Kind = UndefinedMemberValid
+		} else {
+			un.Kind = UndefinedMemberInValid
+		}
+		return un
+	}
+	// normal method
+	if wantFunction {
+		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+			fun.SetObject(object)
+			un := writeUndefind()
+			memberHandler(res.typ, un)
+			//un := writeUndefind()
+			//memberHandler(res.typ, un)
+			return fun
+		}
+	}
+	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
+		return ret
+	}
 	if para, ok := ToParameter(object); ok {
 		if member, ok2 := para.GetStringMember(key.String()); ok2 {
 			return member
@@ -127,27 +152,10 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		memberHandler(res.typ, member)
 		return member
 	}
-	if ret := b.getStaticFieldValue(object, key, wantFunction); ret != nil {
-		return ret
-	}
-	// normal method
-	if wantFunction {
-		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
-			fun.SetObject(object)
-			return fun
-		}
-	}
 	if field := b.getDefaultMemberOrMethodByClass(object, key, wantFunction); !utils.IsNil(field) {
 		return field
 	}
-	recoverScope := b.SetCurrent(object, true)
-	un := b.writeUndefine(name)
-	recoverScope()
-	if res.exist {
-		un.Kind = UndefinedMemberValid
-	} else {
-		un.Kind = UndefinedMemberInValid
-	}
+	un := writeUndefind()
 	memberHandler(res.typ, un)
 	return un
 }

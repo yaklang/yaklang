@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -17,15 +18,13 @@ import (
 func (y *builder) handlerClassConstructor(class *ssa.ClassBluePrint, args []ssa.Value, ellipsis bool) *ssa.Call {
 	// constructorFunc
 	constructorFunc := class.GetMagicMethod(ssa.Constructor)
-	constructorCall := y.NewCall(constructorFunc, args)
-	constructorCall.IsEllipsis = ellipsis
-	y.EmitCall(constructorCall)
-
+	call := y.NewCall(constructorFunc, args)
+	y.EmitCall(call)
 	// destructorFunc
 	destructorFunc := class.GetMagicMethod(ssa.Destructor)
-	destructorCall := y.NewCall(destructorFunc, []ssa.Value{constructorCall})
+	destructorCall := y.NewCall(destructorFunc, []ssa.Value{call})
 	y.EmitDefer(destructorCall)
-	return constructorCall
+	return call
 }
 
 func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
@@ -58,7 +57,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		variable := y.CreateVariable(name)
 		defaultClassFullback := y.EmitUndefined(name)
 		y.AssignVariable(variable, defaultClassFullback)
-		args := []ssa.Value{obj}
+		args := []ssa.Value{}
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
 		args = append(args, tmp...)
 		call := y.NewCall(defaultClassFullback, args)
@@ -69,14 +68,13 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	obj.SetType(class)
 
 	ellipsis := false
-	args := []ssa.Value{obj}
+	args := []ssa.Value{}
 	if i.Arguments() != nil {
 		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	y.handlerClassConstructor(class, args, ellipsis)
-	return obj
+	return y.handlerClassConstructor(class, args, ellipsis)
 }
 
 func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
@@ -111,8 +109,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	y.handlerClassConstructor(bluePrint, args, ellipsis)
-	return obj
+	return y.handlerClassConstructor(bluePrint, args, ellipsis)
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
@@ -235,6 +232,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 		funcName := y.VisitIdentifier(ret.Identifier())
 		newFunction := y.NewFunc(funcName)
+		undefined := y.EmitUndefined(class.Name)
+		undefined.SetType(class)
 		newFunction.SetOrdinalBuild(func() ssa.Value {
 			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
@@ -242,6 +241,9 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				this.SetType(class)
 				y.VisitFormalParameterList(ret.FormalParameterList())
 				y.VisitMethodBody(ret.MethodBody())
+				if funcName == "__construct" {
+					y.EmitReturn([]ssa.Value{undefined})
+				}
 			}
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
@@ -250,6 +252,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 
 		switch funcName {
 		case "__construct":
+			newFunction.SetType(ssa.NewFunctionType(fmt.Sprintf("%s-__construct", class.Name), []ssa.Type{class}, class, true))
 			class.Constructor = newFunction
 		case "__destruct":
 			class.Destructor = newFunction

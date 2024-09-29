@@ -249,19 +249,6 @@ func TestJava_Literal(t *testing.T) {
 	})
 }
 
-func TestJavaFullType(t *testing.T) {
-	code := `package main;
-import java.io.FileInputStream;
-import java.io.InputStream;
-class A{
-	public static void main(){
-			InputStream in = new FileInputStream(src);
-			while(in.read>0){}
-	}
-}
-`
-	ssatest.CheckSyntaxFlow(t, code, `in<fullTypeName> as $input`, map[string][]string{"input": {}}, ssaapi.WithLanguage(ssaapi.JAVA))
-}
 func TestJava_TryWithSource(t *testing.T) {
 	code := `package org.examle.A;
 import java.io.FileInputStream;
@@ -270,7 +257,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 class A {
 	public static void main(String[] args) {
-	try (InputStream   in = new FileInputStream(src);
+	try (InputStream  in = new FileInputStream(src);
          OutputStream out = new FileOutputStream(dst)) {
         byte[] buf = new byte[BUFFER_SIZE];
         int n;

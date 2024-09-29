@@ -3,6 +3,7 @@ package php
 import (
 	_ "embed"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -34,10 +35,11 @@ include('files/'.$action.'.php'); //载入相应文件
 	})
 	t.Run("test-exec", func(t *testing.T) {
 		ssatest.Check(t, ExecCode, func(prog *ssaapi.Program) error {
-			results, err := prog.SyntaxFlowWithError(`exec(* #-> * as $param)`)
+			results, err := prog.SyntaxFlowWithError(`exec(* #-> * as $param)`, sfvm.WithEnableDebug(true))
 			require.NoError(t, err)
 			var flag bool
 			values := results.GetValues("param")
+			values.Show()
 			values.ForEach(func(value *ssaapi.Value) {
 				if strings.Contains(value.String(), "request") {
 					flag = true

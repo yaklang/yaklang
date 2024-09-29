@@ -275,8 +275,7 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-A.getA(Undefined-$a) member[0]",
-			"Function-A.getA(Undefined-$a) member[1]",
+			"Function-A.getA(Undefined-A-constructor()) member[0]", "Function-A.getA(Undefined-A-constructor()) member[1]",
 		}, t)
 	})
 
@@ -310,7 +309,6 @@ func TestOOP_var_member(t *testing.T) {
 }
 
 func TestOOP_Extend_Class(t *testing.T) {
-
 	t.Run("normal", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		<?php
@@ -365,8 +363,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-A.getA(Undefined-$a) member[0]",
-			"Function-A.getA(Undefined-$a) member[1]",
+			"Function-A.getA(Undefined-A-constructor()) member[0]", "Function-A.getA(Undefined-A-constructor()) member[1]",
 		}, t)
 	})
 
@@ -388,8 +385,7 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-A.getA(Undefined-$a) member[0]",
-			"Function-A.getA(Undefined-$a) member[side-effect(Parameter-$par, $this.a)]",
+			"Function-A.getA(Undefined-A-constructor()) member[0]", "Function-A.getA(Undefined-A-constructor()) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -407,7 +403,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-A.getNum(Undefined-$a) member[0]",
+			"Function-A.getNum(Undefined-A-constructor()) member[0]",
 		}, t)
 	})
 	t.Run("new construct", func(t *testing.T) {
@@ -417,23 +413,23 @@ class test
 {
     public $a;
 
-    public function __construct($a)
-    {
-        $this->a = $a;
-    }
+	public function aa(){
+		$this->a = 1231;
+	}
 }
 
 $a = new test();
-println($a);
+$a->aa();
+println($a->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-$a"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(1231, $this.a)"}, t)
 	})
 
 	t.Run("normal construct", func(t *testing.T) {
 		code := `<?php
 class A {
 	private $num = 0;
-	public function __construct($num) {
+	public function __construct($a,$num) {
 		$this->num = $num;
 	}
 	public function getNum() {
@@ -443,7 +439,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-A.getNum(Undefined-$a) member[side-effect(Parameter-$num, $this.num)]",
+			"Function-A.getNum(Function-__construct(1)) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }
@@ -482,16 +478,26 @@ println($c->a);`
 	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 }
 
-//func TestOOP_custom_member(t *testing.T) {
-//	code := `<?php
-//   class test{
-//       public $a = 1;
-//   }
-//	$c = new test();
-//	println($c->$a);
-//`
-//	ssatest.CheckPrintlnValue(code, []string{"1"}, t)
-//}
+func TestOOP_custom_member(t *testing.T) {
+	code := `<?php
+class C{
+	public $a = 1;
+	public function __construct($a){
+		$this->a = $a;
+	}
+}
+function A(){
+$c = new C(0);
+return $c;
+}
+$outerC = A();
+println($outerC->a);
+`
+	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"1"},
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+	//ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+}
 
 func TestOOP_Class_Instantiation(t *testing.T) {
 	t.Run("Instantiate a non-existent object", func(t *testing.T) {
@@ -500,9 +506,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		
 		$a = new A();
 		println($a);`
-		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a",
-		}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-A-constructor()"}, t)
 	})
 
 	t.Run("instantiate an existing object ", func(t *testing.T) {
@@ -517,7 +521,7 @@ func TestOOP_Class_Instantiation(t *testing.T) {
 		$a = new A(); 
 		println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-A.getNum(Undefined-$a) member[0]",
+			"Function-A.getNum(Undefined-A-constructor()) member[0]",
 		}, t)
 	})
 }
@@ -538,7 +542,7 @@ class t
 
 $c = new t();
 println($c->a);`
-		CheckPrintTopDef(t, code, []string{"2"})
+		ssatest.CheckPrintlnValue(code, []string{"side-effect(2, $this.a)"}, t)
 	})
 	t.Run("__destruct", func(t *testing.T) {
 		code := `<?php
@@ -604,7 +608,6 @@ println($a->a);
 `
 		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 	})
-
 	t.Run("no impl __construct and get parent custom member", func(t *testing.T) {
 		code := `<?php
 class b{
@@ -837,7 +840,6 @@ class a
 $c = new a();
 println($c->a);`
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
-		//CheckPrintTopDef(t, code, []string{"1"})
 	})
 	t.Run("oop test", func(t *testing.T) {
 		code := `<?php

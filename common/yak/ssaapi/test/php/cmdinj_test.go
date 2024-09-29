@@ -63,7 +63,7 @@ eval($ob->a);
 `
 		ssatest.CheckSyntaxFlow(t, code,
 			`eval(* #-> * as $param)`,
-			map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
+			map[string][]string{"param": {"Parameter-$a", "Undefined-_GET", "Undefined-_GET.1(valid)"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

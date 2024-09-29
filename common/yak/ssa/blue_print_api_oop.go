@@ -37,9 +37,14 @@ func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) 
 func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
 	// p := b.GetProgram()
 	p := b.prog
-	if _, ok := p.ClassBluePrint[name]; ok {
-		log.Errorf("CreateClassBluePrint: this class redeclare")
-	}
+	c := b.createClassBluePrintEx(name, tokenizer...)
+	p.ClassBluePrint[name] = c
+	return c
+}
+func (b *FunctionBuilder) CreateClassBluePrintWithoutAdd(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
+	return b.createClassBluePrintEx(name, tokenizer...)
+}
+func (b *FunctionBuilder) createClassBluePrintEx(name string, tokenizer ...CanStartStopToken) *ClassBluePrint {
 	c := NewClassBluePrint(name)
 	c.GeneralPhi = func(s string) *Phi {
 		return b.EmitPhi(s, nil)
@@ -47,7 +52,6 @@ func (b *FunctionBuilder) CreateClassBluePrint(name string, tokenizer ...CanStar
 	c.GeneralUndefined = func(s string) *Undefined {
 		return b.EmitUndefined(s)
 	}
-	p.ClassBluePrint[name] = c
 	klassVar := b.CreateVariable(name, tokenizer...)
 	klassContainer := b.EmitEmptyContainer()
 	b.AssignVariable(klassVar, klassContainer)

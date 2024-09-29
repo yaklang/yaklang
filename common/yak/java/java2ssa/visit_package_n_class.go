@@ -621,7 +621,7 @@ func (y *builder) VisitMethodDeclaration(
 		prefix = "static "
 	}
 	log.Infof("start to build %vmethod: %v to %v", prefix, funcName, class.Name)
-	class.AddMethod(key, newFunction)
+	class.RegisterNormalMethod(key, newFunction)
 	return build
 }
 
@@ -845,10 +845,13 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		newFunction := y.NewFunc(funcName)
 		y.FunctionBuilder = y.PushFunction(newFunction)
 		{
+			obj := y.EmitUndefined(class.Name)
+			obj.SetType(class)
 			this := y.NewParam("this")
 			this.SetType(class)
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
+			y.EmitReturn([]ssa.Value{obj})
 			y.Finish()
 		}
 		y.FunctionBuilder = y.PopFunction()

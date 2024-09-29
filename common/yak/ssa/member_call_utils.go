@@ -49,7 +49,7 @@ func checkCanMemberCallExist(value, key Value) (ret checkMemberResult) {
 			ret.typ = BasicTypes[NumberTypeKind]
 			return
 		default:
-			ret.typ = BasicTypes[AnyTypeKind]
+			ret.typ = CreateAnyType()
 			return
 		}
 	}
@@ -74,7 +74,7 @@ func checkCanMemberCallExist(value, key Value) (ret checkMemberResult) {
 			ret.typ = fieldTyp
 		} else {
 			// not this field
-			ret.typ = BasicTypes[AnyTypeKind]
+			ret.typ = CreateAnyType()
 		}
 		return
 	case StructTypeKind: // string
@@ -149,7 +149,7 @@ func checkCanMemberCallExist(value, key Value) (ret checkMemberResult) {
 			// type check error
 		}
 	case AnyTypeKind:
-		ret.typ = BasicTypes[AnyTypeKind]
+		ret.typ = CreateAnyType()
 		return
 	case ClassBluePrintTypeKind:
 		class := value.GetType().(*ClassBluePrint)

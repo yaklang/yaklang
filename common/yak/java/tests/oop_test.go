@@ -63,8 +63,7 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-A.getA(Undefined-A(Undefined-A)) member[1]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]", "Function-A.getA(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -131,9 +130,7 @@ func TestJava_Extend_Class(t *testing.T) {
 	}
 }
 		`, []string{
-			// TODO: this error
-			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-A.getA(Undefined-A(Undefined-A)) member[1]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]", "Function-A.getA(Undefined-A(Undefined-A)) member[1]",
 		}, t)
 	})
 
@@ -159,8 +156,7 @@ func TestJava_Extend_Class(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Function-A.getA(Undefined-A(Undefined-A)) member[0]",
-			"Function-A.getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+			"Function-A.getA(Undefined-A(Undefined-A)) member[0]", "Function-A.getA(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -171,7 +167,6 @@ func TestJava_Construct(t *testing.T) {
 	public	class A {
 			int num = 0;
 			public int getNum() {
-				super();
 				return this.num;
 			}
 		}
@@ -331,6 +326,7 @@ public class Main {
 	})
 
 	t.Run("test static variable and  method within a class (arg is this.a)", func(t *testing.T) {
+		//todo: 可能java要做特殊机制
 		ssatest.CheckPrintlnValue(`
 public class Main {
     static int a = 1 ;
@@ -447,8 +443,7 @@ public class Main{
 		`
 		ssatest.CheckPrintlnValue(code, []string{
 			// TODO: this error
-			"Undefined-a.getNum1(Function-com.example.A_A_A(Undefined-A,1,2))",
-			"Undefined-a.getNum2(Function-com.example.A_A_A(Undefined-A,1,2))",
+			"Function-A.getNum1(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]", "Function-A.getNum2(Function-com.example.A_A_A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
 			// "Undefined-a.getNum1(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]",
 			// "Undefined-a.getNum2(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)

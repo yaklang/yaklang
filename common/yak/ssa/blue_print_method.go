@@ -60,13 +60,13 @@ func (c *ClassBluePrint) GetMagicMethod(name BluePrintMagicMethodKind) Value {
 		case Constructor:
 			_name := fmt.Sprintf("%s-constructor", c.Name)
 			constructor := c.GeneralUndefined(_name)
-			constructor.SetType(NewFunctionType(_name, []Type{c}, c, true))
-			return constructor
+			_method = constructor
+			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
-			constructor := c.GeneralUndefined(_name)
-			constructor.SetType(NewFunctionType(_name, []Type{c}, c, true))
-			return constructor
+			destructor := c.GeneralUndefined(_name)
+			_method = destructor
+			_method.SetType(NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true))
 		default:
 			return nil
 		}
@@ -81,8 +81,8 @@ func (c *ClassBluePrint) RegisterNormalMethod(name string, val *Function) {
 		f.SetMethod(true, c)
 	}
 	// if overwrite parent-class/interface, then new function  point to the older
-	if f, ok := c.NormalMethod[name]; ok {
-		Point(val, f)
+	if method := c.GetNormalMethod(name); !utils.IsNil(method) {
+		Point(val, method)
 	}
 	c.NormalMethod[name] = val
 }

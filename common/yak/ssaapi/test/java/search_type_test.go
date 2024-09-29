@@ -91,6 +91,7 @@ func TestSimpleSearchType(t *testing.T) {
 	})
 
 	t.Run("get class instance method", func(t *testing.T) {
+		//todo: cls method not assign in this builder
 		test(t, &TestCase{
 			Code:    code,
 			SF:      `b1.methodB() as $target`,
@@ -110,8 +111,8 @@ func TestSimpleSearchType(t *testing.T) {
 			Contain: false,
 			Expect: map[string][]string{
 				"target": {
-					"Undefined-b1.methodB(valid)(Undefined-B(Undefined-B),1)",
-					"Undefined-b2.methodB(valid)(Undefined-B(Undefined-B),2)",
+					"Function-B.methodB(Undefined-B(Undefined-B),1)",
+					"Function-B.methodB(Undefined-B(Undefined-B),2)",
 				},
 			},
 		})
