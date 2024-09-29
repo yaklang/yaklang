@@ -1,13 +1,14 @@
-package decompiler
+package utils
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"strings"
 )
 
-func DumpNodesToDotExp(code *Node) string {
-	var visitor func(node *Node, visited map[*Node]bool, sb *strings.Builder)
-	visitor = func(node *Node, visited map[*Node]bool, sb *strings.Builder) {
+func DumpNodesToDotExp(code *core.Node) string {
+	var visitor func(node *core.Node, visited map[*core.Node]bool, sb *strings.Builder)
+	visitor = func(node *core.Node, visited map[*core.Node]bool, sb *strings.Builder) {
 		if node == nil {
 			return
 		}
@@ -15,9 +16,9 @@ func DumpNodesToDotExp(code *Node) string {
 			return
 		}
 		visited[node] = true
-		toString := func(node *Node) string {
+		toString := func(node *core.Node) string {
 			//return strconv.Quote(node.Statement.String(&FunctionContext{}))
-			s := strings.Replace(node.Statement.String(&FunctionContext{}), "\"", "", -1)
+			s := strings.Replace(node.Statement.String(&core.FunctionContext{}), "\"", "", -1)
 			s = strings.Replace(s, "\n", " ", -1)
 			return s
 		}
@@ -28,15 +29,15 @@ func DumpNodesToDotExp(code *Node) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("digraph G {\n")
-	visited := make(map[*Node]bool)
+	visited := make(map[*core.Node]bool)
 	visitor(code, visited, &sb)
 	sb.WriteString("}\n")
 	return sb.String()
 }
 
-func DumpOpcodesToDotExp(code *OpCode) string {
-	var visitor func(node *OpCode, visited map[*OpCode]bool, sb *strings.Builder)
-	visitor = func(node *OpCode, visited map[*OpCode]bool, sb *strings.Builder) {
+func DumpOpcodesToDotExp(code *core.OpCode) string {
+	var visitor func(node *core.OpCode, visited map[*core.OpCode]bool, sb *strings.Builder)
+	visitor = func(node *core.OpCode, visited map[*core.OpCode]bool, sb *strings.Builder) {
 		if node == nil {
 			return
 		}
@@ -51,7 +52,7 @@ func DumpOpcodesToDotExp(code *OpCode) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("digraph G {\n")
-	visited := make(map[*OpCode]bool)
+	visited := make(map[*core.OpCode]bool)
 	visitor(code, visited, &sb)
 	sb.WriteString("}\n")
 	return sb.String()

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/javaclassparser/classes"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"os"
 	"strings"
 	"testing"
@@ -50,7 +50,7 @@ func TestDemoClass(t *testing.T) {
 	assert.Equal(t, string(expectSource), source)
 }
 func TestAddSupperInterface(t *testing.T) {
-	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/Demo1.class")
+	classesContent, _ := os.ReadFile("/Users/z3/Downloads/cfr-master/src/org/benf/cfr/reader/ForTraditionTest.class")
 	cf, err := Parse(classesContent)
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestModifyOpcode(t *testing.T) {
 }
 func TestParseRawType(t *testing.T) {
 	content, _ := classes.FS.ReadFile("raw_type.json")
-	data := []*decompiler.RawJavaType{}
+	data := []*core.RawJavaType{}
 	json.Unmarshal(content, &data)
 	items := []string{}
 	for _, datum := range data {
@@ -89,7 +89,7 @@ func TestParseRawType(t *testing.T) {
 
 func TestParseStackType(t *testing.T) {
 	content, _ := classes.FS.ReadFile("stack_type.json")
-	data := []*decompiler.StackType{}
+	data := []*core.StackType{}
 	json.Unmarshal(content, &data)
 	items := []string{}
 	for _, datum := range data {

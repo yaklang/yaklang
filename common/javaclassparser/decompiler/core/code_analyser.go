@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 import (
 	"fmt"
@@ -18,12 +18,14 @@ type Decompiler struct {
 	FunctionContext               *FunctionContext
 	bytecodes                     []byte
 	opCodes                       []*OpCode
-	Statements                    []Statement
+	OpCodeRoot                    *OpCode
+	RootNode                      *Node
 	constantPoolGetter            func(id int) JavaValue
 	ConstantPoolLiteralGetter     func(constantPoolGetterid int) *JavaLiteral
 	ConstantPoolInvokeDynamicInfo func(id int) (string, string)
 	offsetToOpcodeIndex           map[uint16]int
 	opcodeIndexToOffset           map[int]uint16
+	CurrentId                     int
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) JavaValue) *Decompiler {
@@ -37,6 +39,11 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) JavaValue) 
 }
 
 func (d *Decompiler) ParseOpcode() error {
+	defer func() {
+		if len(d.opCodes) > 0 {
+			d.OpCodeRoot = d.opCodes[0]
+		}
+	}()
 	opcodes := []*OpCode{}
 	offsetToIndex := map[uint16]int{}
 	indexToOffset := map[int]uint16{}
@@ -69,12 +76,14 @@ func (d *Decompiler) ParseOpcode() error {
 	d.offsetToOpcodeIndex = offsetToIndex
 	d.opcodeIndexToOffset = indexToOffset
 	d.opCodes = opcodes
+	d.CurrentId = id
 	return d.ScanJmp()
 }
 
 func (d *Decompiler) ScanJmp() error {
 	opcodes := d.opCodes
 	visitNodeRecord := utils.NewSet[*OpCode]()
+	endOp := &OpCode{Instr: InstrInfos[OP_END], Id: d.CurrentId}
 	var walkNode func(start int)
 	walkNode = func(start int) {
 		var pre *OpCode
@@ -93,6 +102,8 @@ func (d *Decompiler) ScanJmp() error {
 			visitNodeRecord.Add(opcode)
 			pre = opcode
 			switch opcode.Instr.OpCode {
+			case OP_RETURN:
+				opcode.Target = []*OpCode{endOp}
 			case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE, OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE, OP_IFNONNULL, OP_IFNULL:
 				gotoRaw := Convert2bytesToInt(opcode.Data)
 				gotoOp := d.offsetToOpcodeIndex[d.opcodeIndexToOffset[i]+gotoRaw]
@@ -126,10 +137,7 @@ func (d *Decompiler) ScanJmp() error {
 		}
 	}
 	walkNode(0)
-	//for _, code := range d.opCodes {
-	//	code.Source = utils.NewSet(code.Source).List()
-	//	code.Target = utils.NewSet(code.Target).List()
-	//}
+	d.opCodes = append(d.opCodes, endOp)
 	return nil
 }
 func (d *Decompiler) DropUnreachableOpcode() error {
@@ -165,7 +173,7 @@ func (d *Decompiler) DropUnreachableOpcode() error {
 	d.opCodes = newOpcodes
 	return nil
 }
-func (d *Decompiler) ParseStatement1() error {
+func (d *Decompiler) ParseStatement() error {
 	funcCtx := d.FunctionContext
 	err := d.ParseOpcode()
 	if err != nil {
@@ -693,6 +701,8 @@ func (d *Decompiler) ParseStatement1() error {
 			}, func() JavaType {
 				return v.Type()
 			}))
+		case OP_END:
+			return
 		default:
 			panic("not support")
 		}
@@ -763,20 +773,7 @@ func (d *Decompiler) ParseStatement1() error {
 			return
 		})
 	}
-	statementManager := NewStatementManager(nodes[0])
-	//statementManager.SetNodes(nodes)
-
-	err = statementManager.Rewrite(func(node *Node) bool {
-		return true
-	})
-	if err != nil {
-		return err
-	}
-	sts, err := statementManager.ToStatements()
-	if err != nil {
-		return err
-	}
-	d.Statements = sts
+	d.RootNode = nodes[0]
 	return nil
 }
 
@@ -801,69 +798,10 @@ func NewCodeBlock(parent *CodeBlock) *CodeBlock {
 	parent.next = append(parent.next, c)
 	return c
 }
-func (d *Decompiler) SplitCodeBlocks() error {
-	ifStack := utils.NewStack[*IfScope]()
-	newIfScope := func(ifStart, elseStart int) {
-		ifStack.Push(&IfScope{
-			IfStart:   ifStart,
-			ElseStart: elseStart,
-		})
-	}
-	rootBlock := &CodeBlock{}
-	currentBlock := rootBlock
-	_ = currentBlock
-	for codeIndex, code := range d.opCodes {
-		if ifStack.Len() > 0 {
-			if codeIndex >= ifStack.Peek().ElseEnd {
-				currentBlock.opcodes = append(currentBlock.opcodes, code)
-				currentBlock = utils.GetLastElement(currentBlock.source)
-			}
-		}
-		switch code.Instr.OpCode {
-		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
-			newIfScope(codeIndex, int(Convert2bytesToInt(code.Data)))
-			currentBlock.opcodes = append(currentBlock.opcodes, code)
-			currentBlock = NewCodeBlock(currentBlock)
-			continue
-		case OP_IFNULL:
-			newIfScope(codeIndex, int(Convert2bytesToInt(code.Data)))
-		case OP_IFNONNULL:
-			newIfScope(codeIndex, int(Convert2bytesToInt(code.Data)))
-		case OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE:
-			newIfScope(codeIndex, int(Convert2bytesToInt(code.Data)))
-		case OP_GOTO_W:
-			if ifStack.Len() > 0 {
-				ifScope := ifStack.Peek()
-				ifScope.IfEnd = codeIndex
-				ifScope.ElseEnd = int(Convert4bytesToInt(code.Data))
-			}
-		case OP_GOTO:
-			currentBlock.opcodes = append(currentBlock.opcodes, code)
-			currentBlock = utils.GetLastElement(currentBlock.source)
-			if ifStack.Len() > 0 {
-				ifScope := ifStack.Peek()
-				ifScope.IfEnd = codeIndex
-				ifScope.ElseEnd = int(Convert2bytesToInt(code.Data))
-			}
-		default:
-			currentBlock.opcodes = append(currentBlock.opcodes, code)
-		}
-	}
-	return nil
-}
 func (d *Decompiler) ParseSourceCode() error {
-	err := d.ParseStatement1()
+	err := d.ParseStatement()
 	if err != nil {
 		return err
 	}
 	return nil
-}
-func ParseBytesCode(constantPoolGetter func(id int) JavaValue, constantPoolLiteralGetter func(id int) *JavaLiteral, code []byte) ([]Statement, error) {
-	decompiler := NewDecompiler(code, constantPoolGetter)
-	decompiler.ConstantPoolLiteralGetter = constantPoolLiteralGetter
-	err := decompiler.ParseSourceCode()
-	if err != nil {
-		return nil, err
-	}
-	return decompiler.Statements, nil
 }

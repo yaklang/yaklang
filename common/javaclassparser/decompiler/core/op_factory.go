@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 type OpFactory func(reader *JavaByteCodeReader, opcode *OpCode) error
 

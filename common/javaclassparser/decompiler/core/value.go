@@ -1,4 +1,4 @@
-package decompiler
+package core
 
 import (
 	"fmt"
@@ -284,7 +284,7 @@ func NewCustomValue(stringFun func(funcCtx *FunctionContext) string, typeFunc fu
 
 type CustomStatement struct {
 	Name       string
-	Info any
+	Info       any
 	StringFunc func(funcCtx *FunctionContext) string
 }
 

@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"strings"
 )
 
@@ -15,7 +16,7 @@ func getNameAndType(pool []ConstantInfo, index uint16) (string, string) {
 	desc := indexFromPool(int(nameAndTypeInfo.DescriptorIndex)).(*ConstantUtf8Info).Value
 	return name, desc
 }
-func showOpcodes(codes []*decompiler.OpCode) {
+func showOpcodes(codes []*core.OpCode) {
 	for i, opCode := range codes {
 		if opCode.Instr.Name == "if_icmpge" || opCode.Instr.Name == "goto" {
 			fmt.Printf("%d %s jmpto:%d\n", i, opCode.Instr.Name, opCode.Jmp)
@@ -25,7 +26,7 @@ func showOpcodes(codes []*decompiler.OpCode) {
 	}
 }
 
-func GetValueFromCP(pool []ConstantInfo, index int) decompiler.JavaValue {
+func GetValueFromCP(pool []ConstantInfo, index int) core.JavaValue {
 	indexFromPool := func(i int) ConstantInfo {
 		return pool[i-1]
 	}
@@ -35,10 +36,10 @@ func GetValueFromCP(pool []ConstantInfo, index int) decompiler.JavaValue {
 		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*ConstantUtf8Info)
 		return nameInfo.Value
 	}
-	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) decompiler.JavaValue {
+	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) core.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
-		return decompiler.NewJavaClassMember(className, name, desc)
+		return core.NewJavaClassMember(className, name, desc)
 	}
 	switch ret := constant.(type) {
 	case *ConstantMemberrefInfo:
@@ -55,7 +56,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) decompiler.JavaValue {
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		classIns := decompiler.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
+		classIns := core.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
 		return classIns
 	case *ConstantMethodrefInfo:
 		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
@@ -66,26 +67,26 @@ func GetValueFromCP(pool []ConstantInfo, index int) decompiler.JavaValue {
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		classIns := decompiler.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
+		classIns := core.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value)
 		return classIns
 	case *ConstantClassInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
-		return decompiler.NewJavaClass(typeName)
+		return core.NewJavaClass(typeName)
 	default:
 		panic("failed")
 	}
 }
-func GetLiteralFromCP(pool []ConstantInfo, index int) *decompiler.JavaLiteral {
+func GetLiteralFromCP(pool []ConstantInfo, index int) *core.JavaLiteral {
 	constant := pool[index-1]
 	switch ret := constant.(type) {
 	case *ConstantStringInfo:
-		return decompiler.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, decompiler.JavaString)
+		return core.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, core.JavaString)
 	case *ConstantLongInfo:
-		return decompiler.NewJavaLiteral(ret.Value, decompiler.JavaLong)
+		return core.NewJavaLiteral(ret.Value, core.JavaLong)
 	case *ConstantIntegerInfo:
-		return decompiler.NewJavaLiteral(ret.Value, decompiler.JavaInteger)
+		return core.NewJavaLiteral(ret.Value, core.JavaInteger)
 	default:
 		panic("failed")
 	}
@@ -93,15 +94,15 @@ func GetLiteralFromCP(pool []ConstantInfo, index int) *decompiler.JavaLiteral {
 
 type VarMap struct {
 	id  int
-	val decompiler.JavaValue
+	val core.JavaValue
 }
 
-func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]decompiler.Statement, error) {
+func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]core.Statement, error) {
 	pool := dumper.ConstantPool
-	parser := decompiler.NewDecompiler(codeAttr.Code, func(id int) decompiler.JavaValue {
+	parser := core.NewDecompiler(codeAttr.Code, func(id int) core.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
-	parser.ConstantPoolLiteralGetter = func(id int) *decompiler.JavaLiteral {
+	parser.ConstantPoolLiteralGetter = func(id int) *core.JavaLiteral {
 		return GetLiteralFromCP(dumper.ConstantPool, id)
 	}
 	parser.ConstantPoolInvokeDynamicInfo = func(index int) (string, string) {
@@ -119,9 +120,5 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute) ([]decom
 			panic("error")
 		}
 	}
-	err := parser.ParseSourceCode()
-	if err != nil {
-		return nil, err
-	}
-	return parser.Statements, nil
+	return decompiler.ParseBytesCode(parser)
 }
