@@ -1696,6 +1696,9 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 
 	fixChainCreator := func() ssa.Value {
 		var object ssa.Value
+		if len(createdName) != len(nameValues) {
+			return nil
+		}
 		for i, v := range nameValues {
 			if i == 0 {
 				newTyp := y.AddFullTypeNameFromMap(createdName[0], v.GetType())
@@ -1846,8 +1849,9 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) (typ ssa.
 		text := name.GetText()
 		if v := y.PeekValue(text); v != nil {
 			createdNameValue = append(createdNameValue, v)
+		} else {
+			createdNameValue = append(createdNameValue, y.ReadValue(text))
 		}
-		createdNameValue = append(createdNameValue, y.ReadValue(text))
 		createdName = append(createdName, text)
 	}
 	return typ, createdName, createdNameValue
