@@ -1428,7 +1428,14 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 	return nil
 }
 
-func (y *YakToCallerManager) ShouldCallByName(name string) bool {
+func (y *YakToCallerManager) ShouldCallByName(name string, callbacks ...func()) (ret bool) {
+	defer func() {
+		if !ret {
+			if len(callbacks) > 0 && callbacks[0] != nil {
+				callbacks[0]() // 如果不需要执行，就执行结果回调
+			}
+		}
+	}()
 	if y.table == nil {
 		return false
 	}
@@ -1538,7 +1545,6 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 
 	call := func(i *Caller) {
 		defer func() {
-			taskWG.Done()
 			if err := recover(); err != nil {
 				log.Errorf("call failed: \n%v", err)
 			}
@@ -1576,6 +1582,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 			y.swg.Add()
 			go func() {
 				defer func() {
+					taskWG.Done()
 					y.swg.Done()
 					if err := recover(); err != nil {
 						log.Errorf("panic from call[%v]: %v", verbose, err)

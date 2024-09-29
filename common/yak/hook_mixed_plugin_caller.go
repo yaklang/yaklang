@@ -4,12 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -483,7 +484,8 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 			HOOK_HijackHTTPRequest,
 			HOOK_HijackHTTPResponse,
 			HOOK_HijackHTTPResponseEx,
-			HOOK_hijackSaveHTTPFlow}
+			HOOK_hijackSaveHTTPFlow,
+		}
 	case forPortScan:
 		hooks = []string{HOOK_PortScanHandle}
 	default:
@@ -911,7 +913,7 @@ func (m *MixPluginCaller) HijackSaveHTTPFlowWithCallback(flow *schema.HTTPFlow, 
 		log.Infof("call HijackSaveHTTPFlow error: url[%v] not passed", flow.Url)
 		return
 	}
-	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow) {
+	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow, callback) {
 		m.callers.CallByNameWithCallback(HOOK_hijackSaveHTTPFlow, callback, flow, reject, drop)
 	}
 }
