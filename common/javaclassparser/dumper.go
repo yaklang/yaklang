@@ -2,7 +2,7 @@ package javaclassparser
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
@@ -14,7 +14,7 @@ const attrTemplate = `%s %s %s {%s}`
 type ClassObjectDumper struct {
 	imports       map[string]struct{}
 	obj           *ClassObject
-	FuncCtx       *decompiler.FunctionContext
+	FuncCtx       *core.FunctionContext
 	ClassName     string
 	PackageName   string
 	CurrentMethod *MemberInfo
@@ -57,7 +57,7 @@ func (c *ClassObjectDumper) UnTab() {
 }
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	result := classTemplate
-	funcCtx := &decompiler.FunctionContext{
+	funcCtx := &core.FunctionContext{
 		ClassName:   c.ClassName,
 		PackageName: c.PackageName,
 		BuildInLibs: []string{
@@ -135,7 +135,7 @@ func (c *ClassObjectDumper) DumpFields() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		fieldType, err := decompiler.ParseDescriptor(descriptor)
+		fieldType, err := core.ParseDescriptor(descriptor)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		paramsTypes, returnType, err := decompiler.ParseMethodDescriptor(descriptor)
+		paramsTypes, returnType, err := core.ParseMethodDescriptor(descriptor)
 		if err != nil {
 			return nil, err
 		}
@@ -184,9 +184,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					return nil, err
 				}
 				sourceCode := "\n"
-				var statementToString func(statement decompiler.Statement) string
-				var statementListToString func(statements []decompiler.Statement) string
-				statementListToString = func(statements []decompiler.Statement) string {
+				var statementToString func(statement core.Statement) string
+				var statementListToString func(statements []core.Statement) string
+				statementListToString = func(statements []core.Statement) string {
 					c.Tab()
 					defer c.UnTab()
 					var res []string
@@ -195,10 +195,10 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 					}
 					return strings.Join(res, "\n")
 				}
-				statementToString = func(statement decompiler.Statement) (statementStr string) {
+				statementToString = func(statement core.Statement) (statementStr string) {
 					switch ret := statement.(type) {
-					case *decompiler.SwitchStatement:
-						getBody := func(caseItems []*decompiler.CaseItem) string {
+					case *core.SwitchStatement:
+						getBody := func(caseItems []*core.CaseItem) string {
 							var res []string
 							for _, st := range caseItems {
 								if st.IsDefault {
@@ -212,8 +212,8 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 						statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
 							"%s\n"+
 							c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
-					case *decompiler.IfStatement:
-						getBody := func(sts []decompiler.Statement) string {
+					case *core.IfStatement:
+						getBody := func(sts []core.Statement) string {
 							c.Tab()
 							defer c.UnTab()
 							var res []string
@@ -230,21 +230,21 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 								"%s\n"+
 								c.GetTabString()+"}", getBody(ret.ElseBody))
 						}
-					case *decompiler.ExpressionStatement:
+					case *core.ExpressionStatement:
 						if funcCtx.FunctionName == "<init>" {
-							if v, ok := ret.Expression.(*decompiler.FunctionCallExpression); ok {
+							if v, ok := ret.Expression.(*core.FunctionCallExpression); ok {
 								if IsJavaSupperRef(v.Object) && v.FunctionName == "<init>" {
 									return statementStr
 								}
 							}
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
-					case *decompiler.ReturnStatement:
+					case *core.ReturnStatement:
 						if funcCtx.FunctionName == "<init>" {
 							return
 						}
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
-					case *decompiler.ForStatement:
+					case *core.ForStatement:
 						datas := []string{}
 						datas = append(datas, ret.InitVar.String(funcCtx))
 						datas = append(datas, fmt.Sprintf("%s", ret.Condition.String(funcCtx)))
@@ -285,7 +285,7 @@ func (c *ClassObjectDumper) DumpMethods() ([]string, error) {
 	return result, nil
 }
 func (c *ClassObjectDumper) parseImportCLass(name string) string {
-	packageName, className := decompiler.SplitPackageClassName(name)
+	packageName, className := core.SplitPackageClassName(name)
 	if packageName != "" {
 		c.imports[packageName] = struct{}{}
 	}
