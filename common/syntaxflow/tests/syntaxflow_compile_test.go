@@ -1,12 +1,15 @@
 package syntaxflow
 
 import (
-	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
@@ -56,12 +59,63 @@ func TestCompile(t *testing.T) {
 	}
 	frame.Show()
 }
+
 func TestCompileFromDb(t *testing.T) {
+	rulename := uuid.NewString() + ".sf"
+
+	code := `
+	a1 = {}
+	a1.b = 1
+	a2 = 3
+	`
+	syntaxflowRule := `
+a*?{.b} as $a
+	`
+
+	err := sfdb.ImportRuleWithoutValid(rulename, syntaxflowRule, false)
+	require.NoError(t, err)
+	defer sfdb.DeleteRuleByRuleName(rulename)
+
+	// check rule
+	rule, err := sfdb.GetRule(rulename)
+	require.NoError(t, err)
+	require.NotEqual(t, rule.OpCodes, "")
+
+	// check frame
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	rule, err := sfdb.GetLibrary("php-param")
+	frame, err := vm.Load(rule)
 	require.NoError(t, err)
-	frame, err := vm.CompileFromDb(rule)
+	require.Greater(t, len(frame.Codes), 0)
+
+	prog, err := ssaapi.Parse(code)
 	require.NoError(t, err)
-	fmt.Println(frame.GetRule().OpCodes)
-	require.True(t, frame.GetRule().OpCodes != "")
+
+	t.Run("test frame feed", func(t *testing.T) {
+		res, err := frame.Feed(prog)
+		require.NoError(t, err)
+		vs, ok := res.SymbolTable.Get("a")
+		log.Infof(vs.String())
+		require.True(t, ok)
+		require.Contains(t, vs.String(), "make")
+		require.NotContains(t, vs.String(), "3")
+	})
+
+	t.Run("test SyntaxFlowRule", func(t *testing.T) {
+		res, err := prog.SyntaxFlowRule(rule)
+		require.NoError(t, err)
+		vs := res.GetValues("a")
+		log.Infof(vs.String())
+		require.Contains(t, vs.String(), "make")
+		require.NotContains(t, vs.String(), "3")
+	})
+
+	t.Run("test SyntaxFlowRuleName", func(t *testing.T) {
+		res, err := prog.SyntaxFlowRuleName(rulename)
+		require.NoError(t, err)
+		vs := res.GetValues("a")
+		log.Infof(vs.String())
+		require.Contains(t, vs.String(), "make")
+		require.NotContains(t, vs.String(), "3")
+	})
+
 }

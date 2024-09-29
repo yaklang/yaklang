@@ -4,6 +4,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -31,20 +32,11 @@ func (p *Program) SyntaxFlowChain(i string, opts ...sfvm.Option) Values {
 func (p *Program) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
 	return SyntaxFlowWithError(p, i, opts...)
 }
-func (p *Program) SyntaxFlowWithRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowWithDb(p, rule, opts...)
-}
 
 func (ps Programs) SyntaxFlowWithError(i string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
 	return SyntaxFlowWithError(
 		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
 		i, opts...,
-	)
-}
-func (ps Programs) SyntaxFlowWithRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	return SyntaxFlowWithDb(
-		sfvm.NewValues(lo.Map(ps, func(p *Program, _ int) sfvm.ValueOperator { return p })),
-		rule, opts...,
 	)
 }
 
@@ -59,18 +51,6 @@ func SyntaxFlowWithError(p sfvm.ValueOperator, sfCode string, opts ...sfvm.Optio
 	}
 	res, err := frame.Feed(p)
 	return CreateResultFromQuery(res), err
-}
-func SyntaxFlowWithDb(p sfvm.ValueOperator, rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
-	if utils.IsNil(p) {
-		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
-	}
-	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
-	frame, err := vm.CompileFromDb(rule)
-	if err != nil {
-		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", rule.OpCodes, err)
-	}
-	feed, err := frame.Feed(p)
-	return CreateResultFromQuery(feed), err
 }
 
 func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config) (*SyntaxFlowResult, error) {
@@ -87,4 +67,29 @@ func SyntaxFlowWithVMContext(p sfvm.ValueOperator, sfCode string, sfResult *sfvm
 	frame.WithContext(sfResult)
 	res, err := frame.Feed(p)
 	return CreateResultFromQuery(res), err
+}
+
+func (p *Program) SyntaxFlowRuleName(ruleName string, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+	rule, err := sfdb.GetRule(ruleName)
+	if err != nil {
+		return nil, err
+	}
+	return SyntaxFlowRule(p, rule, opts...)
+}
+
+func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+	return SyntaxFlowRule(p, rule, opts...)
+}
+
+func SyntaxFlowRule(p sfvm.ValueOperator, rule *schema.SyntaxFlowRule, opts ...sfvm.Option) (*SyntaxFlowResult, error) {
+	if utils.IsNil(p) {
+		return nil, utils.Errorf("SyntaxFlowWithError: base ValueOperator is nil")
+	}
+	vm := sfvm.NewSyntaxFlowVirtualMachine(opts...)
+	frame, err := vm.Load(rule)
+	if err != nil {
+		return nil, utils.Errorf("SyntaxFlow compile %#v failed: %v", rule.OpCodes, err)
+	}
+	feed, err := frame.Feed(p)
+	return CreateResultFromQuery(feed), err
 }
