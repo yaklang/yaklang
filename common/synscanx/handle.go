@@ -158,14 +158,15 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 			}),
 
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				go func() {
-					defer func() {
-						if err := recover(); err != nil {
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-					}()
-					s.handlePacket(packet)
+				defer func() {
+					if err := recover(); err != nil {
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
 				}()
+				if packet == nil {
+					return
+				}
+				s.handlePacket(packet)
 			}),
 		)
 		if err != nil {
