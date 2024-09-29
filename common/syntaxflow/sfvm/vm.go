@@ -68,10 +68,12 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 	}
 }
 
-func (s *SyntaxFlowVirtualMachine) CompileFromDb(rule *schema.SyntaxFlowRule) (*SFFrame, error) {
+func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, error) {
 	frame := newSfFrameEx(s.vars, rule.Content, ToOpCodes(rule.OpCodes), rule, s.config)
+	frame.config = s.config
 	return frame, nil
 }
+
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
@@ -99,6 +101,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	}
 	result.rule.Content = text
 	result.VisitFlow(flow)
+	result.rule.OpCodes = result.codes.ToString()
 	frame = result.CreateFrame(s.vars)
 	frame.debug = s.config.debug
 	frame.config = s.config
