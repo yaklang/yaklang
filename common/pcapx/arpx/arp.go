@@ -241,9 +241,9 @@ func newArpARPPacket(iface *net.Interface, ip string) (gopacket.SerializeBuffer,
 		ProtAddressSize:   4,
 		Operation:         layers.ARPRequest,
 		SourceHwAddress:   []byte(iface.HardwareAddr),
-		SourceProtAddress: []byte(src.To4()[:4]),
+		SourceProtAddress: []byte(src.To4()),
 		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
-		DstProtAddress:    []byte(ipIns.To4()[:4]),
+		DstProtAddress:    []byte(ipIns.To4()),
 	}
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
