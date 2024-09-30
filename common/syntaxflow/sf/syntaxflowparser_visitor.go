@@ -175,27 +175,6 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#IntersectionRefFilter.
 	VisitIntersectionRefFilter(ctx *IntersectionRefFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#VersionInFilter.
-	VisitVersionInFilter(ctx *VersionInFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#vstart.
-	VisitVstart(ctx *VstartContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#vend.
-	VisitVend(ctx *VendContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#versionBlockElement.
-	VisitVersionBlockElement(ctx *VersionBlockElementContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#versionSuffix.
-	VisitVersionSuffix(ctx *VersionSuffixContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#versionBlock.
-	VisitVersionBlock(ctx *VersionBlockContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#versionString.
-	VisitVersionString(ctx *VersionStringContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#filterExpr.
 	VisitFilterExpr(ctx *FilterExprContext) interface{}
 
@@ -271,6 +250,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#OpcodeTypeCondition.
 	VisitOpcodeTypeCondition(ctx *OpcodeTypeConditionContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#VersionInCondition.
+	VisitVersionInCondition(ctx *VersionInConditionContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionOr.
 	VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{}
 
@@ -288,6 +270,30 @@ type SyntaxFlowParserVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#StringContainHaveCondition.
 	VisitStringContainHaveCondition(ctx *StringContainHaveConditionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionInExpression.
+	VisitVersionInExpression(ctx *VersionInExpressionContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionInterval.
+	VisitVersionInterval(ctx *VersionIntervalContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#vstart.
+	VisitVstart(ctx *VstartContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#vend.
+	VisitVend(ctx *VendContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionBlockElement.
+	VisitVersionBlockElement(ctx *VersionBlockElementContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionSuffix.
+	VisitVersionSuffix(ctx *VersionSuffixContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionBlock.
+	VisitVersionBlock(ctx *VersionBlockContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#versionString.
+	VisitVersionString(ctx *VersionStringContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#opcodesCondition.
 	VisitOpcodesCondition(ctx *OpcodesConditionContext) interface{}
