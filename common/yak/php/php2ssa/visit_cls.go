@@ -148,6 +148,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}
 
 			class := y.CreateClassBluePrint(className)
+			y.GetProgram().SetExportType(className, class)
 			if parentClass := y.GetClassBluePrint(parentClassName); parentClass != nil {
 				//感觉在ssa-classBlue中做更好，暂时修复
 				class.AddParentClass(parentClass)

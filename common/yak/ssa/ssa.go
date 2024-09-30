@@ -215,8 +215,11 @@ type Program struct {
 
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-	ExportValue    map[string]Value
-	ExportType     map[string]Type
+	// for import/export
+	ExportValue map[string]Value
+	ExportType  map[string]Type
+	importValue map[string]Value
+	importType  map[string]Type
 
 	// offset
 	OffsetMap         map[int]*OffsetItem

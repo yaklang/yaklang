@@ -20,17 +20,16 @@ const (
 )
 
 func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
-	if pkg == nil {
-		return nil
+	if c, ok := pkg.ClassBluePrint[name]; ok {
+		if !pkg.PreHandler() {
+			c.Build()
+		}
+		return c
 	}
-	c, ok := pkg.ClassBluePrint[name]
-	if !ok {
-		return nil
+	if importedC, ok := pkg.importType[name].(*ClassBluePrint); ok {
+		return importedC
 	}
-	if !pkg.PreHandler() {
-		c.Build()
-	}
-	return c
+	return nil
 }
 
 func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {

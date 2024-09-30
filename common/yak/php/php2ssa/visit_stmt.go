@@ -1,7 +1,7 @@
 package php2ssa
 
 import (
-	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -175,57 +175,56 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	} else {
 		opmode = ""
 	}
-	prog := y.GetProgram().GetApplication()
-	y.VisitUseDeclarationContentList(i.UseDeclarationContentList(), func(path []string, aliasMap map[string]string) {
-		defer func() {
-			if msg := recover(); msg != nil {
-				log.Errorf("visit use decl fail: %s", msg)
-			}
-		}()
-		for old, alias := range aliasMap {
+	prog := y.GetProgram()
+
+	list, _ := i.UseDeclarationContentList().(*phpparser.UseDeclarationContentListContext)
+	if list == nil {
+		return nil
+	}
+	getNamespace := func(name ...string) *ssa.Program{
+		namespaceName := strings.Join(name, ".")
+		namespace, ok := prog.GetLibrary(namespaceName)
+		if namespace == nil || !ok {
+			return nil
+		}
+		return namespace
+	}
+	for _, listContext := range list.AllNamespaceNameList() {
+		path, aliasMap := y.VisitNamespaceNameList(listContext)
+		namespace := getNamespace(path...)
+		if namespace == nil {
+			log.Errorf("namespace %s not found", path)
+			continue
+		}
+		for realName, currentName := range aliasMap {
 			switch opmode {
 			case "const", "function":
 				//todo const
-				if function := y.GetProgram().GetFunction(alias); !utils.IsNil(function) {
+				if function := y.GetProgram().GetFunction(currentName); !utils.IsNil(function) {
 					log.Warnf("current builder has function: %s", function.GetName())
 					continue
 				}
-				if library, _ := prog.GetLibrary(strings.Join(path, ".")); !utils.IsNil(library) {
-					if function := library.GetFunction(old); function == nil {
-						log.Errorf("get lib function fail,name: %s,namespace path: %s", old, strings.Join(path, "."))
-						continue
-					} else {
-						y.AssignVariable(y.CreateVariable(alias), function)
-						y.GetProgram().Funcs[alias] = function
-					}
+				if _, err := prog.ImportValue(namespace, realName); err != nil {
+					log.Errorf("get namespace value fail: %s", err)
 				}
-				//有两种情况，class或者整个命名空间
 			default:
-				if cls := y.GetProgram().GetClassBluePrint(alias); !utils.IsNil(cls) {
+				//有两种情况，class或者整个命名空间
+				if cls := y.GetProgram().GetClassBluePrint(currentName); !utils.IsNil(cls) {
 					log.Warnf("current builder has classblue: %s", cls)
 					continue
 				}
-				if library, _ := prog.GetLibrary(strings.Join(path, ".")); library != nil {
-					//一个类的情况
-					if bluePrint := library.GetClassBluePrint(old); !utils.IsNil(bluePrint) {
-						y.SetClassBluePrint(alias, bluePrint)
-					} else {
-						log.Warnf("lib get class: %s fail", old)
-					}
+				if _, err := prog.ImportType(namespace, realName); err != nil {
+					log.Errorf("get namespace type fail: %s", err)
 				}
-				if library, _ := prog.GetLibrary(strings.Join(append(path, old), ".")); library != nil {
-					//todo: 可能会和常量重名
-					for _, bluePrint := range library.ClassBluePrint {
-						name := fmt.Sprintf("%s\\%s", old, bluePrint.Name)
-						y.SetClassBluePrint(name, bluePrint)
-					}
-					for _, function := range library.Funcs {
-						y.AssignVariable(y.CreateVariable(fmt.Sprintf("%s\\%s", old, function.GetName())), function)
+
+				if namespace := getNamespace(append(path, realName)...); namespace != nil {
+					if err := prog.ImportAll(namespace); err != nil {
+						log.Errorf("get namespace all fail: %s", err)
 					}
 				}
 			}
 		}
-	})
+	}
 	return nil
 }
 func (y *builder) VisitUseDeclarationContentList(
