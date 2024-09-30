@@ -231,34 +231,6 @@ func (v *BaseSyntaxFlowParserVisitor) VisitIntersectionRefFilter(ctx *Intersecti
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowParserVisitor) VisitVersionInFilter(ctx *VersionInFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowParserVisitor) VisitVstart(ctx *VstartContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowParserVisitor) VisitVend(ctx *VendContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowParserVisitor) VisitVersionBlockElement(ctx *VersionBlockElementContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowParserVisitor) VisitVersionSuffix(ctx *VersionSuffixContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowParserVisitor) VisitVersionBlock(ctx *VersionBlockContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowParserVisitor) VisitVersionString(ctx *VersionStringContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowParserVisitor) VisitFilterExpr(ctx *FilterExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -359,6 +331,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitOpcodeTypeCondition(ctx *OpcodeTypeCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionInCondition(ctx *VersionInConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -380,6 +356,38 @@ func (v *BaseSyntaxFlowParserVisitor) VisitStringContainAnyCondition(ctx *String
 }
 
 func (v *BaseSyntaxFlowParserVisitor) VisitStringContainHaveCondition(ctx *StringContainHaveConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionInExpression(ctx *VersionInExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionInterval(ctx *VersionIntervalContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVstart(ctx *VstartContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVend(ctx *VendContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionBlockElement(ctx *VersionBlockElementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionSuffix(ctx *VersionSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionBlock(ctx *VersionBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitVersionString(ctx *VersionStringContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

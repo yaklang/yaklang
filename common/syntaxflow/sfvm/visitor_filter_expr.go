@@ -93,35 +93,6 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitRemoveRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.IntersectionRefFilterContext:
 		y.EmitIntersectionRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
-	case *sf.VersionInFilterContext:
-		var left, right, vstart, vend string
-		if filter.ListSelectOpen() != nil {
-			left = "greaterEqual"
-		} else if filter.OpenParen() != nil {
-			left = "greaterThan"
-		}
-
-		if filter.ListSelectClose() != nil {
-			right = "lessEqual"
-		} else if filter.CloseParen() != nil {
-			right = "lessThan"
-		}
-
-		if v := filter.Vstart(); v != nil {
-			vstart = y.VisitVersionString(v.(*sf.VstartContext).VersionString())
-		}
-		if v := filter.Vend(); v != nil {
-			vend = y.VisitVersionString(v.(*sf.VendContext).VersionString())
-		}
-
-		y.EmitNativeCall("versionIn",
-			&RecursiveConfigItem{
-				Key:   left,
-				Value: vstart,
-			}, &RecursiveConfigItem{
-				Key:   right,
-				Value: vend,
-			})
 	default:
 		panic("BUG: in filterExpr")
 	}
@@ -369,13 +340,4 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitVersionString(raw sf.IVersionStringContext) string {
-	if y == nil || raw == nil {
-		return ""
-	}
-	i := raw.(*sf.VersionStringContext)
-	if i == nil {
-		return ""
-	}
-	return i.GetText()
-}
+

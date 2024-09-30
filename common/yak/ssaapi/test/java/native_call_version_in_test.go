@@ -54,46 +54,61 @@ func TestDepencyVersionIn(t *testing.T) {
     </dependencies>
 </project>
 `)
-	t.Run("test simple versionInFilter 1", func(t *testing.T) {
+	t.Run("test simple versionIn condition filter 1", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*fastjson.version as $ver;
-$ver in(1.2.3,2.3.4] as $vulnVersion`, map[string][]string{
+$ver?{version_in:(0.1.0,1.3.0]}  as $vulnVersion`, map[string][]string{
 			"ver":         {"\"1.2.24\""},
 			"vulnVersion": {"\"1.2.24\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
-	t.Run("test simple versionInFilter 2", func(t *testing.T) {
+	t.Run("test simple versionIn condition filter 2", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*fastjson.version as $ver;
-$ver in(,1.2.24] as $vulnVersion`, map[string][]string{
+$ver ?{version_in:(,1.2.24]} as $vulnVersion`, map[string][]string{
 			"ver":         {"\"1.2.24\""},
 			"vulnVersion": {"\"1.2.24\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
-	t.Run("test simple versionInFilter 3", func(t *testing.T) {
+	t.Run("test simple versionIn condition filter 3", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*fastjson.version as $ver;
-$ver in["1.2.4",) as $vulnVersion`, map[string][]string{
+$ver ?{version_in:["1.2.24",]}as $vulnVersion`, map[string][]string{
 			"ver":         {"\"1.2.24\""},
 			"vulnVersion": {"\"1.2.24\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test the same artifactId 1 ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__./com.org/.version as $ver;
-$ver in[1.1.0,3.0.0) as $vulnVersion`, map[string][]string{
+$ver ?{version_in:[1.1.0,3.0.0)} as $vulnVersion`, map[string][]string{
 			"ver":         {"\"1.11.1\""},
 			"vulnVersion": {"\"1.11.1\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test the same artifactId 2", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*test1.version as $ver;
-$ver in[3.0.0,) as $vulnVersion`, map[string][]string{
+$ver ?{version_in:[3.0.0,)}as $vulnVersion`, map[string][]string{
 			"ver":         {"\"1.11.1\"", "\"3.22.2\""},
 			"vulnVersion": {"\"3.22.2\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test abnormal version ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__./jackson-databind/.version as $ver;
-$ver in["2.12.1-release","3.12.3-release"] as $vulnVersion`, map[string][]string{
+$ver $ver ?{version_in:["2.12.1-release","3.12.3-release"]}as $vulnVersion `, map[string][]string{
 			"ver":         {"\"2.12.3-release\""},
 			"vulnVersion": {"\"2.12.3-release\""},
+		}, false, ssaapi.WithLanguage(consts.JAVA))
+	})
+	t.Run("test complex versionIn condition filter 1", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*fastjson.version as $ver;
+$ver?{version_in:(0.1.0,1.3.0]||(1.1.0,2.3.0] }  as $vulnVersion`, map[string][]string{
+			"ver":         {"\"1.2.24\""},
+			"vulnVersion": {"\"1.2.24\""},
+		}, false, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test complex versionIn condition filter 2", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `__dependency__.*fastjson.version as $ver;
+$ver?{version_in:(0.1.0,1.0.0] || (1.5.0,2.3.0] || [0.2.4,5.2.2)  }  as $vulnVersion`, map[string][]string{
+			"ver":         {"\"1.2.24\""},
+			"vulnVersion": {"\"1.2.24\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
 	})
 }

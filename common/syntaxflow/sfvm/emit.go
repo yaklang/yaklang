@@ -175,6 +175,12 @@ func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	case int:
 	}
 }
+func (y *SyntaxFlowVisitor) EmitVersionIn( results ...*RecursiveConfigItem) {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpVersionIn,
+		SyntaxFlowConfig: results,
+	})
+}
 
 func (v *SyntaxFlowVisitor) EmitSearchExact(mod int, i string) *SFI {
 	sfi := &SFI{

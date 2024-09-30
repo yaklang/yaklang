@@ -179,21 +179,33 @@ func init() {
 		}
 
 		var results []sfvm.ValueOperator
-		v.Recursive(func(operator sfvm.ValueOperator) error {
-			val, ok := operator.(*Value)
-			if !ok {
+		switch i := v.(type) {
+		case *Values:
+			i.Recursive(func(operator sfvm.ValueOperator) error {
+				val, ok := operator.(*Value)
+				if !ok {
+					return nil
+				}
+				ssaValue := val.GetSSAValue()
+				if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
+					return nil
+				}
+				ver := fmt.Sprint(ssaValue)
+				if compareIn(ver) {
+					results = append(results, val)
+				}
 				return nil
-			}
-			ssaValue := val.GetSSAValue()
+			})
+		case *Value:
+			ssaValue := i.GetSSAValue()
 			if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
-				return nil
+				return false, nil, utils.Error("not value in version range")
 			}
 			ver := fmt.Sprint(ssaValue)
 			if compareIn(ver) {
-				results = append(results, val)
+				results = append(results, i)
 			}
-			return nil
-		})
+		}
 		if len(results) > 0 {
 			return true, sfvm.NewValues(results), nil
 		}
