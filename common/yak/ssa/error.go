@@ -96,13 +96,12 @@ func (f *Function) NewError(kind ErrorKind, tag ErrorTag, format string) {
 }
 
 func (prog *Program) AddError(err *SSAError) {
-	prog.errors = append(prog.errors, err)
+	app := prog.GetApplication()
+	app.errors = append(app.errors, err)
 }
+
 func (prog *Program) GetErrors() SSAErrors {
 	errs := prog.errors
-	for _, program := range prog.ChildApplication {
-		errs = append(errs, program.errors...)
-	}
 	return errs
 }
 

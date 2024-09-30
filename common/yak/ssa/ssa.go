@@ -176,7 +176,6 @@ type ProgramKind string
 const (
 	Application ProgramKind = "application"
 	Library                 = "library"
-	ChildAPP                = "child_application"
 )
 
 // both instruction and value
@@ -195,8 +194,7 @@ type Program struct {
 	// if no database, this is filename and file content
 	ExtraFile map[string]string
 
-	Application      *Program   // current Application
-	ChildApplication []*Program //childApplication
+	Application *Program // current Application
 	// program relationship
 	DownStream map[string]*Program
 	UpStream   map[string]*Program
