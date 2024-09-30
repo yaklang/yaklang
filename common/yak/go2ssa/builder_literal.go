@@ -42,7 +42,6 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
 
-	b.SupportClosure = true
 	newFunc := b.NewFunc("")
 
 	hitDefinedFunction := false
@@ -65,6 +64,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 	{
 		recoverRange := b.SetRange(exp.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
+		b.SupportClosure = true
 
 		if para, ok := exp.Signature().(*gol.SignatureContext); ok {
 			b.buildSignature(para)
@@ -73,10 +73,11 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		handleFunctionType(b.Function)
 
 		if block, ok := exp.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, true)
 		}
 
 		b.Finish()
+		b.SupportClosure = false
 		b.FunctionBuilder = b.PopFunction()
 		if hitDefinedFunction {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
@@ -84,7 +85,6 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		recoverRange()
 	}
 
-	b.SupportClosure = false
 	return newFunc
 }
 
@@ -775,6 +775,8 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		return b.EmitConstInst("")
 	case ssa.BooleanTypeKind:
 		return b.EmitConstInst(false)
+	case ssa.FunctionTypeKind:
+		return b.EmitUndefined("func")
 	default:
 		return b.EmitConstInst(0)
 	}
