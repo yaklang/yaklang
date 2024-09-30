@@ -107,25 +107,8 @@ filterItem
     | '+' refVariable                            # MergeRefFilter
     | '-' refVariable                            # RemoveRefFilter
     | '&' refVariable                            # IntersectionRefFilter
-    | In (
-        '['
-        | '('
-    ) vstart? ',' vend? (
-        ']'
-        | ')'
-    )   # VersionInFilter
     ;
 
-vstart: versionString;
-vend: versionString;
-// unless ',' ']' ')'
-versionBlockElement: Number versionSuffix* ;
-versionSuffix: '-' | Identifier;
-versionBlock:  versionBlockElement ('.' versionBlockElement )*;
-versionString
-    : stringLiteral
-    | versionBlock
-    ;
 
 filterExpr: filterItemFirst filterItem*;
 
@@ -183,6 +166,7 @@ conditionExpression
     |  Opcode ':' opcodesCondition (',' opcodesCondition) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
     |  Have  ':' stringLiteralWithoutStarGroup       # StringContainHaveCondition // something like .(have: 'a', 'b')
     |  HaveAny ':' stringLiteralWithoutStarGroup       # StringContainAnyCondition // something like .(have: 'a', 'b')
+    |  VersionIn ':' versionInExpression              # VersionInCondition
     | negativeCondition conditionExpression                                                    # NotCondition
     | op = (
         '>' | '<' | '=' | '==' | '>='
@@ -193,6 +177,19 @@ conditionExpression
     | op = ( '=~' | '!~') (stringLiteral | regexpLiteral) # FilterExpressionRegexpMatch
     | conditionExpression '&&' conditionExpression      # FilterExpressionAnd
     | conditionExpression '||' conditionExpression      # FilterExpressionOr
+    ;
+
+versionInExpression: versionInterval ('||' versionInterval)*;
+versionInterval: ( '[' | '(') vstart? ',' vend? (   ']'| ')' ) ;
+vstart: versionString;
+vend: versionString;
+// unless ',' ']' ')'
+versionBlockElement: Number versionSuffix* ;
+versionSuffix: '-' | Identifier;
+versionBlock:  versionBlockElement ('.' versionBlockElement )*;
+versionString
+    : stringLiteral
+    | versionBlock
     ;
 
 opcodesCondition: opcodes | identifier;

@@ -88,6 +88,7 @@ Have: 'have';
 HaveAny: 'any';
 Not: 'not';
 For: 'for';
+VersionIn: 'version_in';
 
 ConstSearchModePrefixRegexp: 'r';
 ConstSearchModePrefixGlob: 'g';

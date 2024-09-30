@@ -306,6 +306,8 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		y.EmitOperator("!")
 	case *sf.ParenConditionContext:
 		y.VisitConditionExpression(i.ConditionExpression())
+	case *sf.VersionInConditionContext:
+		y.VisitVersionInExpression(i.VersionInExpression())
 	default:
 		log.Errorf("unexpected condition expression: %T", i)
 	}
@@ -393,4 +395,69 @@ func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLit
 		res = append(res, s.GetText())
 	}
 	return res
+}
+
+func (y *SyntaxFlowVisitor) VisitVersionInExpression(raw sf.IVersionInExpressionContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	i, _ := raw.(*sf.VersionInExpressionContext)
+	if i == nil {
+		return
+	}
+	for i, interval := range i.AllVersionInterval() {
+		y.VisitVersionInterval(interval)
+		if i !=0{
+			y.EmitOperator("||")
+		}
+	}
+}
+
+func (y *SyntaxFlowVisitor) VisitVersionInterval(raw sf.IVersionIntervalContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*sf.VersionIntervalContext)
+	if i == nil {
+		return
+	}
+	var left, right, vstart, vend string
+	if i.ListSelectOpen() != nil {
+		left = "greaterEqual"
+	} else if i.OpenParen() != nil {
+		left = "greaterThan"
+	}
+
+	if i.ListSelectClose() != nil {
+		right = "lessEqual"
+	} else if i.CloseParen() != nil {
+		right = "lessThan"
+	}
+
+	if v := i.Vstart(); v != nil {
+		vstart = y.VisitVersionString(v.(*sf.VstartContext).VersionString())
+	}
+	if v := i.Vend(); v != nil {
+		vend = y.VisitVersionString(v.(*sf.VendContext).VersionString())
+	}
+
+	y.EmitVersionIn(&RecursiveConfigItem{
+		Key:   left,
+		Value: vstart,
+	}, &RecursiveConfigItem{
+		Key:   right,
+		Value: vend,
+	})
+}
+
+func (y *SyntaxFlowVisitor) VisitVersionString(raw sf.IVersionStringContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	i := raw.(*sf.VersionStringContext)
+	if i == nil {
+		return ""
+	}
+	return i.GetText()
 }

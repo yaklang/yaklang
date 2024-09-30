@@ -1014,6 +1014,44 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		})
 		s.conditionStack.Push(res)
+	case OpVersionIn:
+		value := s.stack.Peek()
+		if value == nil {
+			return utils.Wrap(CriticalError, "compare version failed: stack top is empty")
+		}
+		call, err := GetNativeCall("versionIn")
+		if err != nil {
+			s.debugSubLog("Err: %v", err)
+			log.Errorf("native call failed, not an existed native call-versionIn")
+			return utils.Errorf("get native call failed: %v", err)
+		}
+		params := NewNativeCallActualParams(i.SyntaxFlowConfig...)
+		gt := params.GetString("greaterThan")  // <
+		ge := params.GetString("greaterEqual") // <=
+		lt := params.GetString("lessThan")     // >
+		le := params.GetString("lessEqual")    // >=
+
+		var buffer bytes.Buffer
+		buffer.WriteString("compare version in")
+		if ge != "" {
+			buffer.WriteString("[" + ge)
+		} else {
+			buffer.WriteString("(" + gt)
+		}
+		buffer.WriteString(",")
+		if le != "" {
+			buffer.WriteString(le + "]")
+		} else {
+			buffer.WriteString(lt + ")")
+		}
+		s.debugSubLog(buffer.String())
+		var res []bool
+		_ = value.Recursive(func(v ValueOperator) error {
+			ok, _, _ := call(v, s, params)
+			res = append(res, ok)
+			return nil
+		})
+		s.conditionStack.Push(res)
 	case OpLogicBang:
 		conds := s.conditionStack.Pop()
 		for i := 0; i < len(conds); i++ {

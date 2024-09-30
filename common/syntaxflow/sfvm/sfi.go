@@ -56,6 +56,7 @@ const (
 	OpCondition
 	OpCompareOpcode
 	OpCompareString
+	OpVersionIn
 
 	/*
 		Binary Operator
@@ -283,6 +284,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$xpath", s.UnaryStr)
 	case OpFileFilterJsonPath:
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
+	case OpVersionIn:
+		return fmt.Sprintf(verboseLen+" ", "version$in" )
 	default:
 		panic("unhandled default case")
 	}
