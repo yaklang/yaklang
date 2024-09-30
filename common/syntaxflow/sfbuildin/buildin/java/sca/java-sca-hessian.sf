@@ -10,3 +10,86 @@ alert $vuln_hessian for {
     cve: 'CVE-2021-43297',
     level: 'high',
 }
+
+// 检查 com.alibaba:hessian-lite 版本小于 3.2.13 的不安全反序列化漏洞
+__dependency__.*alibaba*hessian*lite.version as $ver_hessian_lite;
+$ver_hessian_lite in (,3.2.13) as $vuln_hessian_lite;
+alert $vuln_hessian_lite for {
+    message: 'SCA: com.alibaba:hessian-lite 版本低于 3.2.13 存在不安全的反序列化漏洞',
+    cve: 'CVE-2022-38371',
+    level: 'high',
+}
+
+// 检查 com.alibaba:hessian-lite 版本小于 3.2.12 的远程代码执行漏洞
+$ver_hessian_lite in (,3.2.12) as $vuln_hessian_lite_rce;
+alert $vuln_hessian_lite_rce for {
+    message: 'SCA: com.alibaba:hessian-lite 版本低于 3.2.12 存在远程代码执行漏洞',
+    cve: 'CVE-2022-26136',
+    level: 'high',
+}
+
+// 检查 com.alipay.sofa:hessian 版本小于 3.5.5 的不安全反序列化漏洞（严重）
+__dependency__.*alipay*hessian.version as $ver_sofa_hessian;
+$ver_sofa_hessian in (,3.5.5) as $vuln_sofa_hessian_critical;
+alert $vuln_sofa_hessian_critical for {
+    message: 'SCA: com.alipay.sofa:hessian 版本低于 3.5.5 存在不安全的反序列化漏洞',
+    level: 'critical',
+}
+
+// 检查 com.alipay.sofa:hessian 版本小于 4.0.3 的不安全反序列化漏洞（高）
+$ver_sofa_hessian in (,4.0.3) as $vuln_sofa_hessian_high;
+alert $vuln_sofa_hessian_high for {
+    message: 'SCA: com.alipay.sofa:hessian 版本低于 4.0.3 存在不安全的反序列化漏洞',
+    level: 'high',
+}
+
+// 检查 com.caucho:hessian 存在漏洞的版本区间
+__dependency__.*caucho*hessian.version as $ver_caucho_hessian;
+$ver_caucho_hessian in [2.5.0,2.6.9) as $vuln_caucho_hessian;
+$ver_caucho_hessian in [2.7.0,2.7.8) as $vuln_caucho_hessian;
+alert $vuln_caucho_hessian for {
+    message: 'SCA: com.caucho:hessian 版本在 2.5.0 至 2.6.9 和 2.7.0 至 2.7.8 之间存在不安全的反序列化漏洞',
+    level: 'high',
+}
+
+// 检查 org.apache.camel:camel-hessian 存在漏洞的版本区间
+__dependency__.*camel*hessian.version as $ver_camel_hessian;
+$ver_camel_hessian in (,2.19.4) as $vuln_camel_hessian
+$ver_camel_hessian in [2.20.0,2.20.1) as $vuln_camel_hessian;
+alert $vuln_camel_hessian for {
+    message: 'SCA: org.apache.camel:camel-hessian 版本低于 2.19.4 和在 2.20.0 至 2.20.1 之间存在不安全的反序列化漏洞',
+    level: 'critical',
+}
+
+// 检查 org.noear:solon.serialization.hessian 版本小于 2.3.3 的输入验证不当漏洞
+__dependency__."*noear*serialization*hessian".version as $ver_noear_hessian;
+$ver_noear_hessian in (,2.3.3) as $vuln_noear_hessian;
+alert $vuln_noear_hessian for {
+    message: 'SCA: org.noear:solon.serialization.hessian 版本低于 2.3.3 存在输入验证不当的漏洞',
+    level: 'high',
+}
+
+desc(
+lang: java,
+alert_min: 2,
+'file://pom.xml': <<<POM
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vulnerable-application</artifactId>
+    <version>1.0.0</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>hessian-lite</artifactId>
+            <version>3.2.11</version> <!-- 有漏洞的版本 -->
+        </dependency>
+    </dependencies>
+</project>
+POM
+)
