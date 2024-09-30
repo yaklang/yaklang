@@ -21,7 +21,7 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 		return nil
 	}
 	//custom file not syntax
-	if y.PreHandler && i.NamespaceDeclaration() == nil {
+	if y.PreHandler() && i.NamespaceDeclaration() == nil {
 		return nil
 	}
 	y.VisitNamespaceDeclaration(i.NamespaceDeclaration())
@@ -91,7 +91,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		}
 	}
 	//compose child app
-	if i.NamespacePath() != nil && y.PreHandler {
+	if i.NamespacePath() != nil && y.PreHandler() {
 		beforfunc()
 		//namespace
 		pkgpath := y.VisitNamespacePath(i.NamespacePath())
@@ -116,7 +116,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			afterFunc()
 		}
 	} else {
-		if y.PreHandler {
+		if y.PreHandler() {
 			return nil
 		}
 		beforfunc()

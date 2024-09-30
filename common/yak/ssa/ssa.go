@@ -225,8 +225,9 @@ type Program struct {
 	OffsetSortedSlice []int
 
 	// package Loader
-	Loader *ssautil.PackageFileLoader
-	Build  Build
+	Loader      *ssautil.PackageFileLoader
+	Build       Build
+	_preHandler bool
 
 	errors SSAErrors
 
