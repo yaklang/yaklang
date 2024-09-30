@@ -1,0 +1,12 @@
+desc(
+    title: 'SCA: Checking Java hessian Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*hessian.version as $ver;
+$ver == '4.0.63' as $vuln_hessian;
+alert $vuln_hessian for {
+    message: 'SCA: hessian version 4.0.63 has an unsafe deserialization vulnerability',
+    cve: 'CVE-2021-43297',
+    level: 'high',
+}

@@ -1,0 +1,12 @@
+desc(
+    title: 'SCA: Checking Java commons-beanutils Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*commons*beanutils.version as $ver;
+$ver in [1.9.2,1.9.4] as $vuln_commons_beanutils;
+alert $vuln_commons_beanutils for {
+    message: 'SCA: commons-beanutils versions between 1.9.2 and 1.9.4 have an unsafe deserialization vulnerability',
+    cve: 'CVE-2019-10086',
+    level: 'high',
+}

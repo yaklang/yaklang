@@ -1,0 +1,12 @@
+desc(
+    title: 'SCA: Checking Java commons-collections4 Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*commons*collections4.version as $ver;
+$ver in ['4.0.0','4.999.0'] as $vuln_commons_collections4;
+alert $vuln_commons_collections4 for {
+    message: 'SCA: commons-collections4 version 4 has an unsafe deserialization vulnerability',
+    cve: 'CVE-2015-6420',
+    level: 'high',
+}
