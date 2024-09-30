@@ -23,11 +23,14 @@ func (pkg *Program) GetClassBluePrint(name string) *ClassBluePrint {
 	if pkg == nil {
 		return nil
 	}
-	if c, ok := pkg.ClassBluePrint[name]; ok {
-		return c
+	c, ok := pkg.ClassBluePrint[name]
+	if !ok {
+		return nil
 	}
-	// log.Errorf("GetClassBluePrint: not this class: %s", name)
-	return nil
+	if !pkg.PreHandler() {
+		c.Build()
+	}
+	return c
 }
 
 func (b *FunctionBuilder) SetClassBluePrint(name string, class *ClassBluePrint) {

@@ -244,7 +244,7 @@ type Program struct {
 // implement Value
 type Function struct {
 	anValue
-
+	lazyBuilder
 	isMethod   bool
 	methodName string
 

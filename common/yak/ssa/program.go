@@ -188,10 +188,14 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 }
 
 func (p *Program) GetFunction(name string) *Function {
-	if f, ok := p.Funcs[name]; ok {
-		return f
+	f, ok := p.Funcs[name]
+	if !ok {
+		return nil
 	}
-	return nil
+	if !p.PreHandler() {
+		f.Build()
+	}
+	return f
 }
 
 func (prog *Program) EachFunction(handler func(*Function)) {
