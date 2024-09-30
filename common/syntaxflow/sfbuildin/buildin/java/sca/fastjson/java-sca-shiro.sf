@@ -1,0 +1,12 @@
+desc(
+    title: 'SCA: Checking Java shiro-core Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*shiro*core.version as $ver;
+$ver in (,1.10.1] as $vuln_shiro_core;
+alert $vuln_shiro_core for {
+    message: 'SCA: shiro-core versions between 1.10.0 and 1.10.1 have an authentication bypass vulnerability',
+    cve: 'CVE-2023-22602',
+    level: 'high',
+}
