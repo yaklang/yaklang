@@ -4,7 +4,7 @@ desc(
 )
 
 __dependency__.*aspectjweaver.version as $ver;
-$ver == '1.9.5' as $vuln_aspectjweaver;
+$ver in (,1.9.5] as $vuln_aspectjweaver;
 alert $vuln_aspectjweaver for {
     message: 'SCA: aspectjweaver version 1.9.5 has a reflective file download vulnerability',
     cve: 'CVE-2020-5398',

@@ -4,7 +4,7 @@ desc(
 )
 
 __dependency__.*vaadin*server.version as $ver;
-$ver in (,'7.7.14'] as $vuln_vaadin_server;
+$ver in (,7.7.14] as $vuln_vaadin_server;
 alert $vuln_vaadin_server for {
     message: 'SCA: vaadin-server version 7.7.14 has an XSS vulnerability',
     cve: 'CVE-2021-37714',
