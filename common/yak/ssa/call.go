@@ -43,7 +43,7 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerObjectMethod()
 	c.handlerReturnType()
 	c.handleCalleeFunction()
-
+	//f.handleSideEffect(c)
 	return c
 }
 
@@ -227,11 +227,18 @@ func (c *Call) handleCalleeFunction() {
 	// get function type
 	funcTyp, ok := ToFunctionType(c.Method.GetType())
 	if !ok {
+		if param, ok := ToParameter(c.Method); ok {
+			caller := param.GetFunc()
+			callee := caller.anValue.GetFunc()
+			caller.SideEffects = append(caller.SideEffects, callee.SideEffects...)
+
+		}
 		return
 	}
 
 	{
-		builder := c.GetFunc().builder
+		function := c.GetFunc()
+		builder := function.builder
 		recoverBuilder := builder.SetCurrent(c)
 		currentScope := c.GetBlock().ScopeTable
 
@@ -277,6 +284,9 @@ func (c *Call) handleCalleeFunction() {
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
 			if se.MemberCallKind == NoMemberCall {
+				if funCallee := se.Modify.GetFunc(); funCallee != nil {
+					function.SideEffects = append(function.SideEffects, funCallee.SideEffects...)
+				}
 				// side-effect only create in scope that lower or same than modify's scope
 				if !se.forceCreate && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
 					continue
@@ -353,6 +363,18 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			}
 			// other code will mark error in function call-site
 			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.GetName()))
+		}
+	}
+}
+
+func (f *FunctionBuilder) handleSideEffect(c *Call) {
+	if parentBuilder := f.parentBuilder; parentBuilder != nil {
+		name := c.Method.GetName()
+		scope := parentBuilder.CurrentBlock.ScopeTable
+		if funCallee := ReadVariableFromScope(scope, name); funCallee != nil {
+			if fc, ok := funCallee.Value.(*Function); ok {
+				f.SideEffects = append(f.SideEffects, fc.SideEffects...)
+			}
 		}
 	}
 }
