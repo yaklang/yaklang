@@ -1,0 +1,12 @@
+desc(
+    title: 'SCA: Checking Java xstream Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*xstream.version as $ver;
+$ver in [1.4.11.1,1.4.17] as $vuln_xstream;
+alert $vuln_xstream for {
+    message: 'SCA: xstream versions between 1.4.11.1 and 1.4.17 have multiple deserialization vulnerabilities',
+    cve: 'CVE-2021-39152',
+    level: 'high',
+}

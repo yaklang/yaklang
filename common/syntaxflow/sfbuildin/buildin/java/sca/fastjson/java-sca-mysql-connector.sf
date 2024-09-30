@@ -1,0 +1,12 @@
+desc(
+    title: 'SCA: Checking Java mysql-connector-java Existed Vulnerabilities',
+    type: vuln,
+)
+
+__dependency__.*mysql*connector*java.version as $ver;
+$ver in [8.0.17,8.0.27] as $vuln_mysql_connector_java;
+alert $vuln_mysql_connector_java for {
+    message: 'SCA: mysql-connector-java versions between 8.0.17 and 8.0.27 have an information disclosure vulnerability',
+    cve: 'CVE-2021-2471',
+    level: 'mid',
+}
