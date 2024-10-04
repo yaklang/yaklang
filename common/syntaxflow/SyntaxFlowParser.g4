@@ -107,6 +107,7 @@ filterItem
     | '+' refVariable                            # MergeRefFilter
     | '-' refVariable                            # RemoveRefFilter
     | '&' refVariable                            # IntersectionRefFilter
+    | In versionInExpression                     # VersionInFilter
     ;
 
 

@@ -93,6 +93,11 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitRemoveRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.IntersectionRefFilterContext:
 		y.EmitIntersectionRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
+	case *sf.VersionInFilterContext:
+		if versionIn := filter.VersionInExpression(); versionIn != nil {
+			y.VisitVersionInExpression(versionIn)
+		}
+		y.EmitCondition()
 	default:
 		panic("BUG: in filterExpr")
 	}
@@ -339,5 +344,3 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 	}
 	return nil
 }
-
-
