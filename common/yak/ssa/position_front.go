@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -121,18 +122,11 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 }
 
 func GetRangeByText(editor *memedit.MemEditor, searchText string) []memedit.RangeIf {
-	lines := strings.Split(editor.GetSourceCode(), "\n")
+	reg := regexp.MustCompile(searchText)
+	indices := reg.FindAllStringIndex(editor.GetSourceCode(), -1)
 	var rngs []memedit.RangeIf
-	for lineNum, line := range lines {
-		col := strings.Index(line, searchText)
-		if col != -1 {
-			startLine, startCol, endLine, endCol := lineNum+1, col, lineNum+1, col+len(searchText)
-			rngs = append(rngs, editor.GetRangeByPosition(
-				editor.GetPositionByLine(startLine, startCol+1),
-				editor.GetPositionByLine(endLine, endCol+1),
-			),
-			)
-		}
+	for _, idx := range indices {
+		rngs = append(rngs, editor.GetRangeByPosition(editor.GetPositionByOffset(idx[0]), editor.GetPositionByOffset(idx[1])))
 	}
 	return rngs
 }
