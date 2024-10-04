@@ -175,6 +175,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#IntersectionRefFilter.
 	VisitIntersectionRefFilter(ctx *IntersectionRefFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#VersionInFilter.
+	VisitVersionInFilter(ctx *VersionInFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#filterExpr.
 	VisitFilterExpr(ctx *FilterExprContext) interface{}
 
