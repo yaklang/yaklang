@@ -41,6 +41,9 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	for _, enum := range i.AllEnumDeclaration() {
 		y.VisitEnumDeclaration(enum)
 	}
+	for _, bluePrint := range y.GetProgram().ClassBluePrint {
+		bluePrint.SyntaxMethods()
+	}
 
 	return nil
 }

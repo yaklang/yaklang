@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -148,4 +150,27 @@ func (c *ClassBluePrint) SetFullTypeNames(names []string) {
 
 func (c *ClassBluePrint) GetNormalMember(name string) *BluePrintMember {
 	return c.NormalMember[name]
+}
+
+func (c *ClassBluePrint) SyntaxMethods() {
+	lo.ForEach(c.ParentClass, func(item *ClassBluePrint, index int) {
+		item.SyntaxMethods()
+	})
+	syntaxHandler := func(functions ...map[string]*Function) {
+		lo.ForEach(functions, func(item map[string]*Function, index int) {
+			for _, function := range item {
+				function.Build()
+			}
+		})
+	}
+	checkAndGetMaps := func(vals ...Value) map[string]*Function {
+		results := make(map[string]*Function)
+		lo.ForEach(vals, func(item Value, index int) {
+			if funcs, b := ToFunction(c.Constructor); b {
+				results[uuid.NewString()] = funcs
+			}
+		})
+		return results
+	}
+	syntaxHandler(c.StaticMethod, c.Method, checkAndGetMaps(c.Constructor, c.Destructor))
 }

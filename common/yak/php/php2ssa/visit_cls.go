@@ -30,6 +30,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
 	class, name := y.VisitTypeRef(i.TypeRef())
+	class.SyntaxMethods()
 	var obj ssa.Value
 	obj = y.EmitUndefined(name)
 	if utils.IsNil(obj) {
@@ -736,7 +737,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
-	bluePrint.Build()
+	bluePrint.SyntaxMethods()
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
 	constructor := bluePrint.GetConstructOrDestruct("constructor")
