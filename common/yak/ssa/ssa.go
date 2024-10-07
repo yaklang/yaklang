@@ -207,6 +207,7 @@ type Program struct {
 	FileList    map[string]string   // file-name and file hash
 	LibraryFile map[string][]string //library and file relation
 	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]
+	parsedFileMap map[string]struct{}
 
 	Cache *Cache
 

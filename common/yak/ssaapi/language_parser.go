@@ -72,8 +72,8 @@ func (c *config) parseProject() (Programs, error) {
 	totalSize := 0
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
-		log.Infof("parsed file: %v", prog.GetIncludeFiles())
-		handled := prog.GetIncludeFileNum()
+		log.Infof("parsed file: %v", prog.GetParsedFiles())
+		handled := prog.GetParsedFileNum()
 		if c.process != nil {
 			c.process(msg, float64(handled)/float64(totalSize))
 		} else {
@@ -140,7 +140,7 @@ func (c *config) parseProject() (Programs, error) {
 				return nil, utils.Wrapf(err, "parse file %s error", path)
 			}
 			// ret = append(ret, prog)
-			exclude := prog.GetIncludeFiles()
+			exclude := prog.GetParsedFiles()
 			if len(exclude) > 0 {
 				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
 			}
@@ -160,8 +160,6 @@ func (c *config) parseProject() (Programs, error) {
 	//}
 	if c.SaveToProfile {
 		ssadb.SaveSSAProgram(c.ProgramName, c.ProgramDescription, string(c.language))
-
-
 	}
 	return progs, nil
 }

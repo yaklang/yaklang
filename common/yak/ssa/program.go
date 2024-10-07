@@ -30,6 +30,7 @@ func NewProgram(ProgramName string, enableDatabase bool, kind ProgramKind, fs fi
 		ClassBluePrint:          make(map[string]*ClassBluePrint),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		parsedFileMap:           make(map[string]struct{}),
 		FileList:                make(map[string]string),
 		cacheExternInstance:     make(map[string]Value),
 		externType:              make(map[string]Type),
@@ -263,6 +264,7 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
+	p.parsedFileMap[e.GetFilename()] = struct{}{}
 	if p.PreHandler() {
 		p.editorMap.Set(p.GetCurrentEditor().GetFilename(), p.GetCurrentEditor())
 	}
@@ -273,6 +275,17 @@ func (p *Program) GetIncludeFiles() []string {
 }
 func (p *Program) GetIncludeFileNum() int {
 	return p.editorMap.Len()
+}
+func (p *Program) GetParsedFiles() []string {
+	files := make([]string, 0)
+	for k := range p.parsedFileMap {
+		files = append(files, k)
+	}
+	return files
+}
+
+func (p *Program) GetParsedFileNum() int {
+	return len(p.parsedFileMap)
 }
 
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
