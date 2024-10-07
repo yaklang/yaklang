@@ -59,12 +59,11 @@ func (b *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 	_ = dirname
 	_ = filename
 	file, err := fileSystem.ReadFile(path)
+	_ = file
 	if err != nil {
 		log.Errorf("read file %s error: %v", path, err)
 		return nil
 	}
-	prog.Build(path, memedit.NewMemEditor(string(file)), builder)
-	prog.GetIncludeFiles()
 	return nil
 }
 
