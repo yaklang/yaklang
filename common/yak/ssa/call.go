@@ -284,7 +284,9 @@ func (c *Call) handleCalleeFunction() {
 			var variable *Variable
 			if se.MemberCallKind == NoMemberCall {
 				if funCallee := se.Modify.GetFunc(); funCallee != nil {
-					function.SideEffects = append(function.SideEffects, funCallee.SideEffects...)
+					if se.Variable != nil && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
+						function.SideEffects = append(function.SideEffects, se)
+					}
 				}
 				// side-effect only create in scope that lower or same than modify's scope
 				if !se.forceCreate && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
