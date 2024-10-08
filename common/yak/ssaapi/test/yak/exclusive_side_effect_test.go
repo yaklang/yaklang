@@ -106,7 +106,7 @@ c = a;
 }
 
 func Test_SideEffect_Double(t *testing.T) {
-	// 平级 b() 继承平级 a() 的 side-effect
+	// 平级b()继承平级a()的side-effect
 	code := `
 n = 1
 a=()=>{
@@ -139,7 +139,7 @@ b()
 }
 
 func Test_SideEffect_Double_lower(t *testing.T) {
-	// 外部 b() 继承内部 a() 的 side-effect
+	// 外部b()继承内部a()的side-effect
 	code := `
 n = 1
 b=()=>{
@@ -172,7 +172,7 @@ b()
 }
 
 func Test_SideEffect_Double_more(t *testing.T) {
-	// 内部 b() 继承外部 a() 的 side-effect
+	// 内部a()继承外部b()的side-effect
 	code := `
 n = 1
 b=()=>{
@@ -206,7 +206,7 @@ b=()=>{
 /* TODO: 继承外部side-effect的情况下，外部的scope可能没有执行完毕 */
 func Test_SideEffect_Double_moreEx(t *testing.T) {
 	t.Skip()
-	// 内部 b() 继承外部 a() 的 side-effect
+	// 内部a()继承外部b()的side-effect
 	code := `
 n = 1
 b=()=>{
@@ -232,6 +232,40 @@ b=()=>{
 			t.Fatal("not function")
 		}
 		assert.Equal(t, 1, len(fun2.SideEffects))
+
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.Yak))
+}
+
+func Test_SideEffect_Double_lower_exclude(t *testing.T) {
+	// 外部f1()继承内部f2()的side-effect,但在当前函数作用域之内的变量不会继承
+	code := `
+b = 1  
+f1=()=>{  
+    a = 1
+    f2=()=>{ 
+		b = 2 // side-effect f2(b) 
+		a = 3 // side-effect f2(a)
+	}  
+    f2() // call-side: f1 will append f2(b), but not f2(a)
+}  
+`
+	ssatest.CheckWithName("side-effect: f2->f1", t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		f1 := prog.SyntaxFlow("f1 as $a").GetValues("a")
+		f2 := prog.SyntaxFlow("f2 as $b").GetValues("b")
+
+		fun1, ok := ssa.ToFunction(f1[0].GetSSAValue())
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 1, len(fun1.SideEffects))
+
+		fun2, ok := ssa.ToFunction(f2[0].GetSSAValue())
+		if !ok {
+			t.Fatal("not function")
+		}
+		assert.Equal(t, 2, len(fun2.SideEffects))
 
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.Yak))
