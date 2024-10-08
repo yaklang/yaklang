@@ -1,7 +1,6 @@
 package sfvm
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -9,28 +8,12 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 )
-
-type OpCodes []*SFI
-
-func ToOpCodes(code string) OpCodes {
-	var opcodes OpCodes
-	if err := json.Unmarshal([]byte(code), &opcodes); err != nil {
-		log.Errorf("to opcode fail: %s", err)
-		return OpCodes{}
-	} else {
-		return opcodes
-	}
-}
-func (p OpCodes) ToString() string {
-	return codec.AnyToString(p)
-}
 
 type SyntaxFlowVisitor struct {
 	rule               *schema.SyntaxFlowRule
@@ -426,7 +409,7 @@ func (y *SyntaxFlowVisitor) VisitVersionInExpression(raw sf.IVersionInExpression
 	}
 	for i, interval := range i.AllVersionInterval() {
 		y.VisitVersionInterval(interval)
-		if i !=0{
+		if i != 0 {
 			y.EmitOperator("||")
 		}
 	}
