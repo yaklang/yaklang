@@ -242,11 +242,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		ctx: context.Background(),
 	}
 	c.SetLoadPluginTimeout(10)
-	c.SetCallPluginTimeout(60)
-	var err error
-	if err != nil {
-		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
-	}
+	c.SetCallPluginTimeout(float64(consts.GetGlobalCallerCallPluginTimeout()))
 	c.swg = utils.NewSizedWaitGroup(30)
 	return c, nil
 }
@@ -268,11 +264,7 @@ func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller
 		ctx: context.Background(),
 	}
 	c.SetLoadPluginTimeout(10)
-	c.SetCallPluginTimeout(60)
-	var err error
-	if err != nil {
-		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
-	}
+	c.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	c.swg = utils.NewSizedWaitGroup(30)
 	return c, nil
 }

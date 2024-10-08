@@ -330,14 +330,15 @@ func LoadGlobalNetworkConfig() {
 
 func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	defaultConfig := &ypb.GlobalNetworkConfig{
-		DisableSystemDNS: false,
-		CustomDNSServers: nil,
-		DNSFallbackTCP:   false,
-		DNSFallbackDoH:   false,
-		CustomDoHServers: nil,
-		SkipSaveHTTPFlow: false,
-		AuthInfos:        make([]*ypb.AuthInfo, 0),
-		DbSaveSync:       false,
+		DisableSystemDNS:  false,
+		CustomDNSServers:  nil,
+		DNSFallbackTCP:    false,
+		DNSFallbackDoH:    false,
+		CustomDoHServers:  nil,
+		SkipSaveHTTPFlow:  false,
+		AuthInfos:         make([]*ypb.AuthInfo, 0),
+		DbSaveSync:        false,
+		CallPluginTimeout: 60,
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
@@ -369,6 +370,10 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		consts.UpdateThirdPartyApplicationConfig(r)
 	}
 	consts.SetAIPrimaryType(c.GetPrimaryAIType())
+
+	if c.GetCallPluginTimeout() > 0 {
+		consts.SetGlobalCallerCallPluginTimeout(float64(c.GetCallPluginTimeout()))
+	}
 
 	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
