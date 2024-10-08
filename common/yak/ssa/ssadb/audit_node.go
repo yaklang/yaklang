@@ -8,17 +8,71 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
+type AuditNodeStatus struct {
+	// task
+	TaskId string `json:"task_id" gorm:"index"`
+	// syntaxflow result
+	ResultId       string `json:"result_id" gorm:"index"`
+	ResultVariable string `json:"result_variable"` // syntaxflow result variable name
+	ResultAlertMsg string `json:"result_alert_msg"`
+	// rule  info
+	RuleName  string `json:"rule_name" gorm:"index"`
+	RuleTitle string `json:"rule_title"`
+	// program info
+	ProgramName string `json:"program_name"`
+}
+
 type AuditNode struct {
 	gorm.Model
 
-	RuntimeId   string `json:"runtime_id" gorm:"index"`
-	RuleName    string `json:"rule_name" gorm:"index"`
-	RuleId      int64  `json:"rule_id" gorm:"index"`
-	ProgramName string `json:"program_name" gorm:"index"`
-	IsEntryNode bool   `json:"is_entry_node"`
+	AuditNodeStatus
+	// is entry node
+	IsEntryNode bool `json:"is_entry_node"`
+	// value
+	IRCodeID int64 `json:"ir_code_id"`
+}
 
-	SsaId      int64  `json:"ssa_id"`
-	ConstValue string `json:"const_value"`
+type ResultVariable struct {
+	Name     string `json:"result_variable"`
+	Alert    string `json:"alert"`
+	ValueNum int    `json:"num"`
+}
+
+func GetResultVariableByID(db *gorm.DB, resultID string) ([]*ResultVariable, error) {
+	// db = db.Debug()
+	// get andit node by result_id, unique by result_variable, and get number of result_variable
+	var items []*ResultVariable
+	db = db.Model(&AuditNode{}).
+		Where("result_id = ? and is_entry_node = ?", resultID, true).
+		Select("result_variable, result_alert_msg, count(ir_code_id) as num").
+		Group("result_variable").
+		Order("created_at asc")
+	row, err := db.Rows()
+	if err != nil {
+		return nil, err
+	}
+
+	for row.Next() {
+		var item ResultVariable
+		if err := row.Scan(&item.Name, &item.Alert, &item.ValueNum); err != nil {
+			log.Errorf("scan failed: %s", err)
+			continue
+		}
+		items = append(items, &item)
+	}
+	return items, nil
+}
+
+func GetResultValueByVariable(db *gorm.DB, resultID, resultVariable string) ([]int64, error) {
+	// db = db.Debug()
+	// get andit node by result_id, unique by result_variable, and get number of result_variable
+	var items []int64
+	if err := db.Model(&AuditNode{}).
+		Where("result_id = ? and result_variable = ? and is_entry_node = ?", resultID, resultVariable, true).
+		Pluck("ir_code_id", &items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 type AuditEdgeType string
@@ -33,26 +87,24 @@ const (
 
 type AuditEdge struct {
 	gorm.Model
-
-	RuntimeId   string `json:"runtime_id" gorm:"index"`
-	RuleName    string `json:"rule_name" gorm:"index"`
-	RuleId      int64  `json:"rule_id" gorm:"index"`
-	ProgramName string `json:"program_name" gorm:"index"`
-
+	// edge
 	FromNode int64
 	ToNode   int64
+
+	// program
+	ProgramName string `json:"program_name"`
+
+	// type
 	EdgeType AuditEdgeType
 
+	// for predecessor
 	AnalysisStep  int64
 	AnalysisLabel string
 }
 
-func (n *AuditNode) CreateDependsOnEdge(to int64) *AuditEdge {
+func (n *AuditNode) CreateDependsOnEdge(progName string, to int64) *AuditEdge {
 	ae := &AuditEdge{
-		RuntimeId:   n.RuntimeId,
-		RuleName:    n.RuleName,
-		RuleId:      n.RuleId,
-		ProgramName: n.ProgramName,
+		ProgramName: progName,
 		FromNode:    int64(n.ID),
 		ToNode:      to,
 		EdgeType:    EdgeType_DependsOn,
@@ -60,12 +112,9 @@ func (n *AuditNode) CreateDependsOnEdge(to int64) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreateEffectsOnEdge(to int64) *AuditEdge {
+func (n *AuditNode) CreateEffectsOnEdge(progName string, to int64) *AuditEdge {
 	ae := &AuditEdge{
-		RuntimeId:   n.RuntimeId,
-		RuleName:    n.RuleName,
-		RuleId:      n.RuleId,
-		ProgramName: n.ProgramName,
+		ProgramName: progName,
 		FromNode:    int64(n.ID),
 		ToNode:      to,
 		EdgeType:    EdgeType_EffectsOn,
@@ -73,12 +122,9 @@ func (n *AuditNode) CreateEffectsOnEdge(to int64) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreatePredecessorEdge(to int64, step int64, label string) *AuditEdge {
+func (n *AuditNode) CreatePredecessorEdge(progName string, to int64, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
-		RuntimeId:     n.RuntimeId,
-		RuleName:      n.RuleName,
-		RuleId:        n.RuleId,
-		ProgramName:   n.ProgramName,
+		ProgramName:   progName,
 		FromNode:      int64(n.ID),
 		ToNode:        to,
 		EdgeType:      EdgeType_Predecessor,
@@ -88,8 +134,8 @@ func (n *AuditNode) CreatePredecessorEdge(to int64, step int64, label string) *A
 	return ae
 }
 
-func YieldAuditNodeByRuntimeId(DB *gorm.DB, runtimeId string) chan *AuditNode {
-	db := DB.Model(&AuditNode{}).Where("runtime_id = ?", runtimeId)
+func YieldAuditNodeByResultId(DB *gorm.DB, runtimeId string) chan *AuditNode {
+	db := DB.Model(&AuditNode{}).Where("result_id = ?", runtimeId)
 	return yieldAuditNode(db, context.Background())
 }
 
