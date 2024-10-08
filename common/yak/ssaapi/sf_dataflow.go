@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -139,10 +138,10 @@ func dataFlowFilter(
 		dataPath := v.GetDataFlowPath()
 		matchedConfigs := recursiveConfig.compileAndRun(dataPath)
 
-		log.Infof("v: %v", v)
-		log.Infof("dataPath: %v", dataPath)
-		log.Infof("code[%v]: %v", configKey, code)
-		log.Infof("matchedConfig: %v", matchedConfigs)
+		//log.Infof("v: %v", v)
+		//log.Infof("dataPath: %v", dataPath)
+		//log.Infof("code[%v]: %v", configKey, code)
+		//log.Infof("matchedConfig: %v", matchedConfigs)
 
 		if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
 			delete(all, v)
