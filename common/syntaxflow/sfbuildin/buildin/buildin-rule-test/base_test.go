@@ -76,7 +76,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 					t.Fatal("no program found")
 				}
 				for _, prog := range programs {
-					runtimeId := uuid.New().String()
+					resultID := uuid.New().String()
 					result, err := prog.SyntaxFlowWithError(r.Content)
 					if !c.NegativeTest {
 						if err != nil || result.GetErrors() != nil {
@@ -115,6 +115,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 						}
 						return nil
 					}
+
 					if len(result.GetAlertVariables()) >= 0 {
 						for _, name := range result.GetAlertVariables() {
 							val := result.GetValues(name)
@@ -130,29 +131,30 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 									t.Fatal("contain any")
 								}
 							}
-							name := ""
+							programName := ""
 							val.Recursive(func(operator sfvm.ValueOperator) error {
 								switch ret := operator.(type) {
 								case *ssaapi.Value:
 									if ret.GetProgramName() == "" {
 										return nil
 									}
-									name = ret.GetProgramName()
+									programName = ret.GetProgramName()
 									return ssaapi.SaveValue(
 										ret,
-										ssaapi.OptionSaveValue_RuntimeId(runtimeId),
+										ssaapi.OptionSaveValue_ResultID(resultID),
+										ssaapi.OptionSaveValue_RuleTitle(r.Title),
+										ssaapi.OptionSaveValue_ProgramName(programName),
 										ssaapi.OptionSaveValue_RuleName(r.RuleName),
-										ssaapi.OptionSaveValue_RuleId(int(r.ID)),
 									)
 								}
 								return nil
 							})
 							count := 0
-							for node := range ssadb.YieldAuditNodeByRuntimeId(ssadb.GetDB(), runtimeId) {
+							for node := range ssadb.YieldAuditNodeByResultId(ssadb.GetDB(), resultID) {
 								count++
 								_ = node
 							}
-							if name != "" {
+							if programName != "" {
 								assert.Greater(t, count, 0)
 							}
 						}
